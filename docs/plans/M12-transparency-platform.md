@@ -6,9 +6,9 @@ last_updated: 2026-08-14
 
 # M12: Transparency Platform
 
-Constitution section M9's published stats page, section §4-ADDENDUM's M12 ("public trailing pass rates, payouts paid, on-chain proof links, auto-computed trust moat"), [EVENTS section 12](../architecture/EVENTS.md) open question 2, Appendix B5 ten-section template, and the Trustpilot auto-review-request input recorded from the Axcera brochure with a **mandatory compliance check** ([PROP_TECH_LANDSCAPE](../research/PROP_TECH_LANDSCAPE.md) section 1.2).
+Constitution section M9's published stats page, section §4-ADDENDUM's M12 ("public trailing pass rates, payouts paid, on-chain proof links, auto-computed trust moat"), [EVENTS section 12](../architecture/EVENTS.md) open question 2, Appendix B5 ten-section template, and the Trustpilot auto-review-request input recorded from the Axcera brochure with a **mandatory compliance check** ([PROP_TECH_LANDSCAPE](../../research/PROP_TECH_LANDSCAPE.md) section 1.2).
 
-**This is the launch differentiator, and the research says so precisely.** [TOP10_FIRMS](../research/TOP10_FIRMS.md) section 1B found that **TradeDay is the only top-ten firm publishing an evaluation pass rate** (36 percent, January to June 2026) and that it publishes it **as a blog figure**. Nobody auto-publishes trailing pass rates, payout totals, and average payout computed from the engine itself. The gap between a blog post and a computed, versioned, continuously refreshed surface is the entire product of this module, and it is the one competitive position Merit can take on day one that no competitor can copy without rebuilding their data plane.
+**This is the launch differentiator, and the research says so precisely.** [TOP10_FIRMS](../../research/TOP10_FIRMS.md) section 1B found that **TradeDay is the only top-ten firm publishing an evaluation pass rate** (36 percent, January to June 2026) and that it publishes it **as a blog figure**. Nobody auto-publishes trailing pass rates, payout totals, and average payout computed from the engine itself. The gap between a blog post and a computed, versioned, continuously refreshed surface is the entire product of this module, and it is the one competitive position Merit can take on day one that no competitor can copy without rebuilding their data plane.
 
 One sentence governs this module: **every number Merit publishes about itself must be computed by the same engine that decides money, from a versioned definition, over a stated window, with a stated sample, and it must be capable of being unflattering.**
 
@@ -165,7 +165,7 @@ sequenceDiagram
 
 ### 3.4 On-chain proof, and what it must not prove
 
-Merit settles external withdrawals through Rise, which is a crypto-rail settlement provider. [TOP10_FIRMS](../research/TOP10_FIRMS.md) records that public trackers such as Payout Junction index exactly this rail, which is why Tradeify, MyFundedFutures, and FundedNext have public payout volumes and why Apex and Topstep, who settle by Wise and ACH, do not. **Merit's rail choice therefore makes independent corroboration available for free, and the module's job is to take it without giving anything else away.**
+Merit settles external withdrawals through Rise, which is a crypto-rail settlement provider. [TOP10_FIRMS](../../research/TOP10_FIRMS.md) records that public trackers such as Payout Junction index exactly this rail, which is why Tradeify, MyFundedFutures, and FundedNext have public payout volumes and why Apex and Topstep, who settle by Wise and ACH, do not. **Merit's rail choice therefore makes independent corroboration available for free, and the module's job is to take it without giving anything else away.**
 
 ```mermaid
 flowchart LR
@@ -286,7 +286,7 @@ Every one of those is defensible. A firm that picks them **after** seeing the nu
 
 ### AS-M12-02: Publishing the payout proof publishes the treasury (NOVEL)
 
-**Attack.** [TOP10_FIRMS](../research/TOP10_FIRMS.md) establishes that the crypto settlement rail Merit uses is indexed by public trackers, which is what makes on-chain proof possible and is a genuine competitive gift. It cuts both ways and the second edge is sharp. **A published settlement address is a permanent, irrevocable, real-time disclosure of everything that address does**: its balance, every inflow from Merit's operating account, every outflow, the timing and size distribution of payouts, and every counterparty address.
+**Attack.** [TOP10_FIRMS](../../research/TOP10_FIRMS.md) establishes that the crypto settlement rail Merit uses is indexed by public trackers, which is what makes on-chain proof possible and is a genuine competitive gift. It cuts both ways and the second edge is sharp. **A published settlement address is a permanent, irrevocable, real-time disclosure of everything that address does**: its balance, every inflow from Merit's operating account, every outflow, the timing and size distribution of payouts, and every counterparty address.
 
 **What an adversary does with that, in ascending order of harm.**
 - A **competitor** computes Merit's payout volume, growth rate, and average payout continuously, and can time announcements against Merit's weekly funding rhythm ([ADR-011](../DECISIONS.md)), which is visible on-chain as a regular inflow.
@@ -305,11 +305,11 @@ Every one of those is defensible. A firm that picks them **after** seeing the nu
 
 ### AS-M12-03: The review request that is review gating (NOVEL, and the founder's mandatory compliance check)
 
-**Attack.** The Axcera brochure ships a Trustpilot auto-review-request on payout settlement, and it is an obviously good growth mechanic: the invitation reaches a trader at the single happiest moment of the relationship. [TOP10_FIRMS](../research/TOP10_FIRMS.md) shows why the temptation is strong, since Trustpilot rating is the industry's dominant trust signal, MyFundedFutures at 4.9 is explicitly "the benchmark", and Topstep's 3.6 is the constitution's cautionary tale.
+**Attack.** The Axcera brochure ships a Trustpilot auto-review-request on payout settlement, and it is an obviously good growth mechanic: the invitation reaches a trader at the single happiest moment of the relationship. [TOP10_FIRMS](../../research/TOP10_FIRMS.md) shows why the temptation is strong, since Trustpilot rating is the industry's dominant trust signal, MyFundedFutures at 4.9 is explicitly "the benchmark", and Topstep's 3.6 is the constitution's cautionary tale.
 
 **Why it is prohibited, on two independent grounds.** Trustpilot's own guidelines prohibit selective invitation, and inviting only traders who were just paid is the definitional case. Separately, the FTC's rule on consumer reviews and testimonials treats review gating, the practice of soliciting only customers likely to be positive, as a deceptive practice. Neither of these is a gray area, and the mechanic as described in the brochure fails both.
 
-**Why it is worse for Merit than for the firm that ships it.** Merit's entire positioning is that its numbers are computed rather than selected. A rating built by selecting whom to ask is the same sin as a pass rate built by selecting a denominator, executed on the surface where the firm is loudest about not doing it. The story that writes itself is not "prop firm solicits reviews", it is "transparency firm was gaming its reviews", and that story is fatal in a market whose [dossier](../research/ADVERSARY_DOSSIER.md) describes a community that reads firms forensically.
+**Why it is worse for Merit than for the firm that ships it.** Merit's entire positioning is that its numbers are computed rather than selected. A rating built by selecting whom to ask is the same sin as a pass rate built by selecting a denominator, executed on the surface where the firm is loudest about not doing it. The story that writes itself is not "prop firm solicits reviews", it is "transparency firm was gaming its reviews", and that story is fatal in a market whose [dossier](../../research/ADVERSARY_DOSSIER.md) describes a community that reads firms forensically.
 
 **Counter, and it produces a lower rating on purpose.**
 1. **A neutral trigger set** (INV-M12-09, section 3.5): breach, refund, account closure, and rejected KYC sit alongside payout settlement, sampled at rates proportional to each outcome's share of the population. The invited set resembles the customer base rather than its best quartile.
@@ -333,7 +333,7 @@ Every one of those is defensible. A firm that picks them **after** seeing the nu
 
 ### AS-M12-05: Publishing a constant, and why 100 percent reads as a lie (NOVEL)
 
-**Attack.** ST-07 is the share of eligible payout requests approved. Under [M05](M05-payout-system.md) INV-M5-01 there is no denial code path at all, so the number is 100 percent, always, structurally. It is simultaneously Merit's strongest possible claim and the single least believable number on the page, because every reader has seen a firm claim it and has read the Trustpilot reviews saying otherwise. [TOP10_FIRMS](../research/TOP10_FIRMS.md) records exactly that pattern at Apex: "payouts approved but unpaid 15+ business days" and accounts "under review" after profitability.
+**Attack.** ST-07 is the share of eligible payout requests approved. Under [M05](M05-payout-system.md) INV-M5-01 there is no denial code path at all, so the number is 100 percent, always, structurally. It is simultaneously Merit's strongest possible claim and the single least believable number on the page, because every reader has seen a firm claim it and has read the Trustpilot reviews saying otherwise. [TOP10_FIRMS](../../research/TOP10_FIRMS.md) records exactly that pattern at Apex: "payouts approved but unpaid 15+ business days" and accounts "under review" after profitability.
 
 **The adversarial sharpening, which is the real risk.** A competitor or a community member does not attack the number, they attack the **definition**, and there is a genuine gap to attack: what about **frozen** requests ([M05](M05-payout-system.md) section 3.3), **deferred** ones, accounts that were `recon_blocked`, and requests that were never made because the trader was not eligible? A reader who suspects Merit will assume every one of those is hidden in the word "eligible", and they would be making a reasonable inference.
 

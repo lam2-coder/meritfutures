@@ -51,7 +51,7 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 
 | Not M19 | Whose job | Why the boundary is here |
 |---|---|---|
-| Holding documents or biometrics | the provider | Merit stores status, `provider_applicant_id`, and match signals. Never a document, an image, or a template ([DATA_MODEL](../architecture/DATA_MODEL.md), [VG-10](../research/VIBE_FAILURE_POSTMORTEMS.md), INV-M19-07) |
+| Holding documents or biometrics | the provider | Merit stores status, `provider_applicant_id`, and match signals. Never a document, an image, or a template ([DATA_MODEL](../architecture/DATA_MODEL.md), [VG-10](../../research/VIBE_FAILURE_POSTMORTEMS.md), INV-M19-07) |
 | Deciding enforcement | [M7](M07-risk-abuse.md) | A dedupe hit raises a flag against **both** identities and changes no state by itself ([STATE_MACHINES](../architecture/STATE_MACHINES.md) already says so). AS-M19-05 |
 | Name matching at payout | [M5](M05-payout-system.md) | M19 supplies the verified name; M5 scores the match (its SD-M5-02, AS-M5-02) |
 | Geo-blocking | [M3](M03-billing-checkout.md) at checkout, [M9](M09-marketing-site.md) as disclosure | M19 checks **consistency** across three countries, which is a different question from whether a jurisdiction is restricted |
@@ -135,7 +135,7 @@ sequenceDiagram
     Note over M19,M7: No state changes on either identity.<br/>A face match is evidence about a human,<br/>not a verification failure.<br/>INV-M19-04, AS-M19-05.
 ```
 
-**Why the flag lands on both.** A match says two applications share a face. It does not say which identity is legitimate, and in the family-KYC case ([dossier item 6](../research/ADVERSARY_DOSSIER.md)) both may be. Flagging one and not the other would encode an assumption the data does not support.
+**Why the flag lands on both.** A match says two applications share a face. It does not say which identity is legitimate, and in the family-KYC case ([dossier item 6](../../research/ADVERSARY_DOSSIER.md)) both may be. Flagging one and not the other would encode an assumption the data does not support.
 
 ### 3.4 Screening and the geo triangle
 
@@ -198,7 +198,7 @@ stateDiagram-v2
 | FM-M19-03 | Sanctions false positive on a common name | A legitimate person is refused a relationship, which is the most damaging error available | `match_strength`, mandatory human review before `confirmed_match` | Review with dual control on confirmation, recorded either way. AS-M19-04 |
 | FM-M19-04 | Geo triangle fires on travelers and expatriates | A fairness failure aimed at exactly the population [M5](M05-payout-system.md) AS-M5-02 identifies | Mismatch rate by document country, monitored for disparate impact | Signal only (INV-M19-10). AS-M19-03 |
 | FM-M19-05 | Re-verification re-reads a cached result | The ATO control does nothing while appearing to work | `verification_purpose` and `supersedes` require a new row (SD-M19-01) | Structurally prevented. AS-M19-06 |
-| FM-M19-06 | Documents reach Merit's systems | The exact breach [VG-10](../research/VIBE_FAILURE_POSTMORTEMS.md) and D2 exist to prevent | `raw_result` schema allowlist, plus a payload scanner in CI and a canary | Hosted flow only, Merit never proxies (INV-M19-07). AS-M19-07 |
+| FM-M19-06 | Documents reach Merit's systems | The exact breach [VG-10](../../research/VIBE_FAILURE_POSTMORTEMS.md) and D2 exist to prevent | `raw_result` schema allowlist, plus a payload scanner in CI and a canary | Hosted flow only, Merit never proxies (INV-M19-07). AS-M19-07 |
 | FM-M19-07 | Provider relationship ends and evidence goes with it | Past enforcements become unsupportable | `evidence_snapshot` on `dedupe_matches` (SD-M19-04) | INV-M19-12. AS-M19-07 |
 | FM-M19-08 | Placement change applied retroactively | Traders who bought without a gate are gated after the fact, which is a rule change applied backwards | Placement read from the pinned plan version (INV-M19-01) | Structurally prevented, same mechanism as B4 #12 |
 | FM-M19-09 | Funnel telemetry not captured at the time | The section 10 decision cannot be settled by data and gets settled by opinion | `kyc_funnel_events` written at each step (SD-M19-03) | Capture is the recovery; nothing reconstructs an abandonment. AS-M19-08 |
@@ -215,7 +215,7 @@ stateDiagram-v2
 
 **Follow that through.** Biometric dedupe is a **cross-applicant** face match. Its power is a function of how much of the population is in the corpus. Under `pre_funded`, **85 percent of buyers never enter it.**
 
-**What an operator does with that, and the arithmetic is the argument.** [Dossier item 6](../research/ADVERSARY_DOSSIER.md) describes one operator running 20 to 30 accounts under different names. Suppose they buy 30 evaluations. At a realistic pass rate of roughly 15 percent, 4 or 5 of those accounts reach the funded gate and are verified. **The other 25 never enter the dedupe corpus at all.** The operator learns which of their synthetic identities pass verification at a cost of four checks, and Merit never sees the other 25 faces. Worse, the operator can **iterate**: buy in batches, discover which identity documents survive, and reuse the winners. Pre-eval would have put all 30 faces into the corpus on day one and matched them against each other immediately, before a single evaluation was traded.
+**What an operator does with that, and the arithmetic is the argument.** [Dossier item 6](../../research/ADVERSARY_DOSSIER.md) describes one operator running 20 to 30 accounts under different names. Suppose they buy 30 evaluations. At a realistic pass rate of roughly 15 percent, 4 or 5 of those accounts reach the funded gate and are verified. **The other 25 never enter the dedupe corpus at all.** The operator learns which of their synthetic identities pass verification at a cost of four checks, and Merit never sees the other 25 faces. Worse, the operator can **iterate**: buy in batches, discover which identity documents survive, and reuse the winners. Pre-eval would have put all 30 faces into the corpus on day one and matched them against each other immediately, before a single evaluation was traded.
 
 **The honest counter-argument, stated because it is strong.** Under pre-funded, the operator still cannot get **funded** without verification, so no liability exists until they pass, which is what the constitution says. That is true and it is a smaller claim than it appears: the operator has still bought 30 evaluations of reconnaissance, has learned Merit's document tolerances, and has 4 or 5 funded accounts whose faces match each other and which are caught **only if the dedupe fires across that small set**. And the fee revenue from 30 evaluations is not a consolation, because the constitution is explicit that this business dies from liability rather than from foregone fees.
 
@@ -243,7 +243,7 @@ stateDiagram-v2
 
 ### AS-M19-03: The geo triangle punishes the wrong people (NOVEL)
 
-**Attack.** Constitution (d) requires geo-consistency checks across the IP, document, and payment country triangle. A mismatch is a real fraud signal: [dossier item 6](../research/ADVERSARY_DOSSIER.md) names VPNs and synthetic identities, and [dossier item 3](../research/ADVERSARY_DOSSIER.md) names login geography versus KYC mismatch as a paid-passing-service signal. It is also, and much more often, the ordinary condition of a large fraction of legitimate customers: an expatriate with a home-country passport and a local card, a migrant worker, a dual national, a student abroad, anybody travelling, and anybody whose bank issues cards from a different country from where they live.
+**Attack.** Constitution (d) requires geo-consistency checks across the IP, document, and payment country triangle. A mismatch is a real fraud signal: [dossier item 6](../../research/ADVERSARY_DOSSIER.md) names VPNs and synthetic identities, and [dossier item 3](../../research/ADVERSARY_DOSSIER.md) names login geography versus KYC mismatch as a paid-passing-service signal. It is also, and much more often, the ordinary condition of a large fraction of legitimate customers: an expatriate with a home-country passport and a local card, a migrant worker, a dual national, a student abroad, anybody travelling, and anybody whose bank issues cards from a different country from where they live.
 
 **Why a hard rule here is worse than it looks.** Under a zero-denial brand, refusing or freezing on a triangle mismatch produces the same failure [M05](M05-payout-system.md) AS-M5-02 identifies for name matching, on the **same population**: people with cross-border lives and non-Anglophone documents. The two controls compound, so the trader whose name transliterates inconsistently is disproportionately the same trader whose passport and card disagree. Merit would have built two independent controls that fail on the same people twice.
 
@@ -275,7 +275,7 @@ stateDiagram-v2
 
 **What happens next is the problem, and it is a process gap rather than a technical one.** The corpus has a clear posture for detection: flags go to a queue, a human decides, enforcement carries an evidence pack, and there is never an automatic action ([M7](M07-risk-abuse.md)). What it does not have is guidance for the specific case where the evidence is a **biometric assertion Merit cannot inspect**, about **two people who may be strangers to each other**, where confirming the match means telling somebody they are running a fleet and denying it means overriding the firm's strongest control on the say-so of the accused.
 
-**And the disclosure trap inside it.** Telling trader A that their face matched trader B discloses B's existence and their participation to A. Telling A nothing means an unexplained restriction, which is the anti-pattern [TOP10_FIRMS](../research/TOP10_FIRMS.md) documents and constitution M5 forbids.
+**And the disclosure trap inside it.** Telling trader A that their face matched trader B discloses B's existence and their participation to A. Telling A nothing means an unexplained restriction, which is the anti-pattern [TOP10_FIRMS](../../research/TOP10_FIRMS.md) documents and constitution M5 forbids.
 
 **Counter.**
 1. **A hit changes no state** (INV-M19-04, already in the approved [STATE_MACHINES](../architecture/STATE_MACHINES.md)). It is evidence about a human, not a verification failure, and both identities remain fully operational while it is open.
@@ -288,7 +288,7 @@ stateDiagram-v2
 
 **Attack.** Appendix D4 makes a payout destination change trigger 48 hour cooling **and re-verification**, and that pairing is the primary control against the account-takeover cash-out. The implementation that fails is easy and looks correct: on a destination change, call the provider with the stored `provider_applicant_id`, receive "this applicant is verified", and proceed. Nothing has been verified. The stored status was true yesterday and says nothing about who is holding the session today, which is the only question that matters.
 
-**And the version that is genuinely hard.** Even a real re-check, if it is document-only, proves possession of a document image that an attacker who has compromised an account may well have. The control has to be a **liveness** check tied to the moment, and liveness is a moving target: injection attacks against camera streams and synthetic face generation are both live threat classes, and a technique that is adequate in 2026 may not be in 2028. [SECURITY_LANDSCAPE](../research/SECURITY_LANDSCAPE.md)'s finding that credential stuffing against trader dashboards is the most documented attack in this sector is the reason the whole chain matters: the session is the cheap part to compromise.
+**And the version that is genuinely hard.** Even a real re-check, if it is document-only, proves possession of a document image that an attacker who has compromised an account may well have. The control has to be a **liveness** check tied to the moment, and liveness is a moving target: injection attacks against camera streams and synthetic face generation are both live threat classes, and a technique that is adequate in 2026 may not be in 2028. [SECURITY_LANDSCAPE](../../research/SECURITY_LANDSCAPE.md)'s finding that credential stuffing against trader dashboards is the most documented attack in this sector is the reason the whole chain matters: the session is the cheap part to compromise.
 
 **Counter.**
 1. **Re-verification is a new row with its own liveness result** (SD-M19-01, INV-M19-06). `supersedes` links it to the prior verification, and `verification_purpose` records why. Reading a cached status cannot satisfy the trigger, because the trigger requires a row that does not exist yet.
@@ -299,7 +299,7 @@ stateDiagram-v2
 
 ### AS-M19-07: Minimization creates an evidence dependency on a third party (NOVEL)
 
-**Attack.** Appendix D2 and [VG-10](../research/VIBE_FAILURE_POSTMORTEMS.md) are emphatic and correct: documents and biometrics never touch Merit's storage, and the approved `kyc_verifications` says so in its own header. The consequence nobody has traced is that **the evidence for Merit's strongest fraud finding lives entirely at the provider.**
+**Attack.** Appendix D2 and [VG-10](../../research/VIBE_FAILURE_POSTMORTEMS.md) are emphatic and correct: documents and biometrics never touch Merit's storage, and the approved `kyc_verifications` says so in its own header. The consequence nobody has traced is that **the evidence for Merit's strongest fraud finding lives entirely at the provider.**
 
 **Three ways that becomes a problem, none requiring anybody to behave badly.** The provider's own retention policy expires the applicant record while Merit's `kyc_verifications` retention is "forever" for AML reasons, so Merit holds a conclusion whose basis has been deleted. Merit changes providers, and every historical dedupe match becomes an assertion referencing an applicant id at a company Merit no longer has a contract with. Or a trader disputes an enforcement two years later, in a forum with a discovery process, and Merit's evidence pack contains a boolean.
 

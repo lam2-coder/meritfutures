@@ -259,7 +259,7 @@ stateDiagram-v2
 
 **Attack.** Refunding to the wallet is an obviously good product decision: it is instant, it avoids card-network delay, and traders like it. It also builds a **rail crossing**, and the rail crossing is the attack. Buy an evaluation with a card. Request a refund inside [M3](M03-billing-checkout.md)'s window (pre-first-trade). Receive the refund as **wallet balance**. Withdraw it to a bank.
 
-**What has happened.** Card money has become bank money, through Merit, with none of the card network's protections and none of the checks a payment processor applies to a cash-out. For a stolen card this is a clean extraction path that leaves Merit holding the eventual chargeback, and it is materially more attractive than the existing stolen-card pattern in [dossier item 7](../research/ADVERSARY_DOSSIER.md), because that one has to pass an evaluation first and this one does not. It is also, in substance, unlicensed money movement, which is a compliance exposure quite apart from the loss.
+**What has happened.** Card money has become bank money, through Merit, with none of the card network's protections and none of the checks a payment processor applies to a cash-out. For a stolen card this is a clean extraction path that leaves Merit holding the eventual chargeback, and it is materially more attractive than the existing stolen-card pattern in [dossier item 7](../../research/ADVERSARY_DOSSIER.md), because that one has to pass an evaluation first and this one does not. It is also, in substance, unlicensed money movement, which is a compliance exposure quite apart from the loss.
 
 **And the version that is not fraud at all and is still bad.** A legitimate trader refunds to the wallet and withdraws, and Merit has processed a card payment and a bank payout with no product delivered. That pattern is exactly what a processor's risk team looks for, and [M3](M03-billing-checkout.md)'s MID health is a named business risk with a 0.65 percent chargeback threshold behind it.
 
@@ -294,15 +294,15 @@ stateDiagram-v2
 2. **The honest cost is stated:** this delays cash for legitimate fast winners on newly purchased accounts, which is a real product cost on exactly the plan ([Direct](../GLOSSARY.md#direct-instant-funded)) whose selling point is speed. It is bounded, it is disclosed at purchase, and the trader can still **spend** the value immediately, so the promise that they were paid remains true and only the bank leg waits.
 3. **The window is the card network's, not one Merit invents**, and it is shortened by the strongest available signal: a purchase whose payment has aged past the practical dispute rate for its method releases early. This is a configuration value informed by real chargeback timing rather than a fixed maximum.
 4. **[M19](M19-kyc-identity.md)'s placement interacts here directly.** Under `direct_purchase`, which INV-M19-02 makes mandatory for Direct, the buyer is verified at purchase, which is the strongest single mitigation available for this scenario and is already required for independent reasons.
-5. **AVS and CVV strictness, velocity per BIN, and [M7](M07-risk-abuse.md) D-08** remain the upstream controls ([dossier item 7](../research/ADVERSARY_DOSSIER.md)). P-3 is the last line, not the first. EC-136, GS-226.
+5. **AVS and CVV strictness, velocity per BIN, and [M7](M07-risk-abuse.md) D-08** remain the upstream controls ([dossier item 7](../../research/ADVERSARY_DOSSIER.md)). P-3 is the last line, not the first. EC-136, GS-226.
 
 ### AS-M20-06: The wallet as a transfer instrument with a checkout in front of it (NOVEL)
 
 **Attack.** [M05](M05-payout-system.md) INV-M5-14 forbids transferring a wallet balance to another identity, and that is enforced by there being no transfer endpoint. Checkout is a transfer endpoint that nobody labelled as one. If wallet value can pay for a purchase whose resulting account belongs to a different identity, then A can fund B, and the wallet is transferable through the product.
 
 **Three uses, and the third is the one that makes it urgent.**
-- **A ring pools value.** Members' wallets fund a designated operator's accounts, which is [dossier item 6](../research/ADVERSARY_DOSSIER.md)'s fleet economics with the funding problem solved.
-- **A paid-passing service gets paid in wallet value**, which is untraceable through the card rails and invisible to [M8](M08-affiliate-system.md)'s attribution ([dossier item 3](../research/ADVERSARY_DOSSIER.md)).
+- **A ring pools value.** Members' wallets fund a designated operator's accounts, which is [dossier item 6](../../research/ADVERSARY_DOSSIER.md)'s fleet economics with the funding problem solved.
+- **A paid-passing service gets paid in wallet value**, which is untraceable through the card rails and invisible to [M8](M08-affiliate-system.md)'s attribution ([dossier item 3](../../research/ADVERSARY_DOSSIER.md)).
 - **An account takeover becomes profitable without ever touching the external leg.** [SECURITY section 4.7](../architecture/SECURITY.md)'s containment argument rests on internal spend staying inside Merit's books and being reversible. If the attacker can spend the victim's balance on **their own** accounts, the value has moved to an identity Merit does not control, and reversing the ledger entry does not bring it back once those accounts have traded. This is the single largest hole the wallet could have, and it exists entirely in the gap between "spend" and "transfer".
 
 **Counter.**
