@@ -8,7 +8,7 @@ last_updated: 2026-08-13
 
 Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never prose. Per [GLOSSARY](../GLOSSARY.md#golden-file) and constitution C10, every scenario here derives from a plan doc or an approved constitution scenario and **never** from implementation output. That rule is the whole defence against the self-grading trap: if a fixture was written by reading the code, it proves only that the code agrees with itself.
 
-**Seeded in Wave 3 by [M01](../plans/M01-rules-engine.md), and approved with it at the M1 gate on 2026-08-13.** Scenarios owned by other modules are numbered here so the map is complete and stable, and are filled in by their own module plan. Constitution section 5.2 requires at least 40 golden files; this file defines 83, of which **67 are M1's** and executable against the pure engine with zero I/O, plus 5 more (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives.
+**Seeded in Wave 3 by [M01](../plans/M01-rules-engine.md), and GS-001 to GS-083 approved with it at the M1 gate on 2026-08-13.** Each later module plan appends its own block and those scenarios carry that plan's status. Constitution section 5.2 requires at least 40 golden files. **GS-001 to GS-083 are M1's**, of which 67 are executable against the pure engine with zero I/O, plus 5 (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives. The numbering map below is the current total.
 
 **Five scenarios were added and four rewritten by the M1 gate rulings** ([ADR-013](../DECISIONS.md), [ADR-014](../DECISIONS.md), [ADR-015](../DECISIONS.md)). A golden file that pinned a behavior the founder overruled is not quietly deleted: it is rewritten to pin what was actually decided, and the row says so, because a fixture that silently changes meaning is how a suite stops being a specification.
 
@@ -21,6 +21,8 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-052 to GS-070 | M1 adversarial scenarios, including the novel set from [M01 section 7](../plans/M01-rules-engine.md) | M1 |
 | GS-071 to GS-078 | Replay, engine-upgrade, and plan-config validation scenarios | M1 |
 | GS-079 to GS-083 | Scenarios created by the M1 gate rulings | M1 |
+| GS-084 to GS-093 | Rithmic bridge: ingest, provisioning, entitlements, setpoints | M2 |
+| GS-094 to GS-099 | Billing and checkout: caps, failover, chargebacks, coupons, publish | M3 |
 
 ## 2. Fixture format
 
@@ -189,6 +191,19 @@ Defined by [M02](../plans/M02-rithmic-bridge.md) section 8.3. These run against 
 | GS-092 | Balance delta matching no known settlement and no fills | Quarantine. Never classified as realized P&L, never guessed. INV-M2-12, EC-051 |
 | GS-093 | Funded reset post-condition | After `phase.passed`, the next opening balance is exactly `size_cents`, asserted by M2 before the engine sees the mark. Pairs with GS-070, which asserts the engine refuses when it is not. DEP-M2-01 |
 
-## 9. What is not here yet
+## 9. GS-094 to GS-099: billing and checkout (M3)
 
-Scenarios owned by M3 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
+Defined by [M03](../plans/M03-billing-checkout.md) section 8.2. The B4 commerce battery (GS-038 to GS-041, GS-046) is shared and stays where it is.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-094 | Account cap enforced per identity, not per email | Two emails resolving to one identity, cap of 10: the eleventh purchase is refused with `account_cap_reached`. Asserts constitution B1's binding identity rule at the one endpoint where getting it wrong costs money and creates a fleet |
+| GS-095 | Failover never retries a purchase at the second MID | A slow PSP-A session that later succeeds produces exactly one charge and one account, and the double-charge fingerprint alarm fires on two `paid` purchases for the same plan and size inside five minutes. Asserts failover is per-attempt routing and never mid-transaction. AS-M3-02 |
+| GS-096 | Chargeback lands after a settled payout | Account closes, identity flagged, compensating reversal posted, identity nets negative and the ledger says so. The settled payout is **not** clawed back. Extends GS-039 with the deliberate version of the attack. AS-M3-03 |
+| GS-097 | Coupon restricted by purchase kind | A `new`-only code is refused on a reset with `conflict`, and a coupon with no `applies_to_kind` cannot be created at all. Asserts that a leaked launch code cannot silently reprice resets forever. AS-M3-04 |
+| GS-098 | Reset onto a changed plan version renders the rule diff | Parent account on v1, current published version is v3 with a lower cap: the reset flow renders the changed rules from `copy_blocks` and refuses payment without explicit acknowledgement. Asserts that the one place a trader can be surprised by a rule change is the one place the diff is mandatory. AS-M3-05 |
+| GS-099 | Webhook citing an unknown purchase reference | Rejected and alarmed; no purchase row and no account created. Asserts that a `purchases` row Merit itself wrote is a precondition for any paid state, so a forged or replayed event cannot mint a funded account. AS-M3-06 |
+
+## 10. What is not here yet
+
+Scenarios owned by M4 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
