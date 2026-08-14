@@ -21,6 +21,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [INDEX.md](INDEX.md) | This map | draft | claude |
 | [STATE.md](STATE.md) | One screen: wave, gate, done / in-flight / blocked, next 3 actions | draft | claude |
 | [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | draft | claude |
+| [GUIDE_BRIEFING.md](GUIDE_BRIEFING.md) | **New.** Orientation for the founder's strategy-desk Claude chat: role boundaries, the gate loop, current state, the remaining session queue | draft | founder |
 | [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives | draft | founder |
 | [EDGE_CASES.md](EDGE_CASES.md) | Living registry; every bug becomes an entry plus a golden file (82 entries; EC-001 to EC-050 approved with M01, EC-051+ under review with their module) | approved | founder |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | approved | founder |
