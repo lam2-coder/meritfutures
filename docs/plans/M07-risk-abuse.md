@@ -1,7 +1,7 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # M7: Risk and Abuse
@@ -11,6 +11,8 @@ Constitution section M7, Appendix A (the whole dossier), Appendix B4 items 16, 1
 Constitution Appendix A states the kill chain this module is one link of: **rings bound by rules, caught by detection, made unprofitable by both, and the reserve survives whatever leaks through.** M1 already did the bounding. M7 does the catching, and it does it under one absolute constraint that shapes every design choice here.
 
 **Detection never denies a payout.** Enforcement happens at detection time, per the ToS, with an evidence pack, against an account or an identity. It never happens at request time against a payment. That is [detection-time enforcement](../GLOSSARY.md#detection-time-enforcement) and it is the reason the zero-denial promise can be kept while abuse is still handled.
+
+**Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** The **copy-trading clause was ruled** (section 3.4), which gives D-01 consequences for the first time, and **three detectors were added** to close the gap AS-M7-01 identified and could not close on its own: **D-12** day-0 graph-prior pairing, **D-13** the young-account fast path, and **D-14** clique position-sum detection. Together they move this module from detecting persistence to detecting entry.
 
 **Identifier conventions:** `INV-M7-nn` invariants, `SD-M7-nn` schema deltas, `D-nn` detectors, `FM-M7-nn` failure modes, `AS-M7-nn` adversarial scenarios, `OQ-M7-nn` open questions, `DEP-M7-nn` dependencies.
 
@@ -88,7 +90,7 @@ Each detector states its input, its statistic, its threshold, and what it is act
 
 | ID | Detector | Input | Statistic and threshold | Evidence of |
 |---|---|---|---|---|
-| D-01 | Fill clustering | `fills` self-join | Two accounts with fills on the same symbol and side within a 2 second window, more than a configured share of both accounts' fills | Copy trading or one operator on many accounts. **Not** by itself a ToS breach; the dossier notes copy rings are not always ToS-illegal |
+| D-01 | Fill clustering | `fills` self-join | Two accounts with fills on the same symbol and side within a 2 second window, more than a configured share of both accounts' fills. **Same-identity pairs are filtered at the detector**, not dismissed in the queue (section 3.4) | **Cross-identity copy trading, which is now itself a ToS violation** (section 3.4). This changed at the batch 1 gate: D-01 previously produced flags nobody could act on |
 | D-02 | Inverse P&L pair | `daily_marks` | Rolling 20 trading day Pearson correlation of daily realized P&L below the configured floor (dossier: below -0.8), with comparable size | The hedged-pair signature, named in the constitution as the number one industry threat |
 | D-03 | **Group inverse exposure** | `daily_marks` across a linked cluster | Sum of daily P&L across an n-account group with variance far below the sum of member variances. Group discovery from `identity_links` plus a candidate search over accounts sharing any signal | AS-M7-02: rings that defeat pairwise correlation by rotating a third leg |
 | D-04 | News-window clustering | `fills` plus a maintained Tier-1 economic calendar | Entries within a configured window of a scheduled release, **as a pattern across many events**, never a single event | Straddle farming. The pattern qualifier is load bearing: one trade around a release is a normal trading day |
@@ -99,6 +101,9 @@ Each detector states its input, its statistic, its threshold, and what it is act
 | D-09 | Destination concentration | `payout_transfers` | One `destination_ref` receiving payouts from more than one unrelated identity | **The strongest mule detector available** ([M05 AS-M5-02](M05-payout-system.md)), and it is a query rather than an inference |
 | D-10 | Affiliate self-deal | attributions | Purchase attributed to a code whose affiliate identity is linked to the buyer | B4 #16, voids attribution and flags |
 | D-11 | Dilution timing | `rule_states.engine_gates` | Small positive days appearing precisely while consistency is the only failing gate, with an inverse-correlated sibling | [M01 AS-02](M01-rules-engine.md)'s manufactured dilution. Cheap **only** because the engine already stores `profit_needed_to_dilute_cents` |
+| **D-12** | **Day-0 graph-prior pairing** | `identity_links`, `identity_signals` | Candidate pairs and groups formed from graph priors **at funding time, with zero trading data**. Output is a watched-cluster set, not a flag: it seeds D-13 and D-14 rather than accusing anyone | The ring that funds and extracts inside one cycle. This is the direct answer to AS-M7-01: a detector that needs history cannot defend the first cycle, so the first cycle is defended by what we knew before it started |
+| **D-13** | **Young-account fast path** | `daily_marks`, `fills`, over a **5 trading day** window | Correlation below **-0.95**, **and** size mirroring, **and** timing mirroring. All three, not any of three | The hedged pair, caught inside the extraction window. Deliberately **precise rather than sensitive**: on five days of data a -0.8 threshold is noise, and requiring near-perfect inverse correlation together with mirrored size and timing is what makes a short window usable at all |
+| **D-14** | **Clique position-sum** | live and end-of-day positions across a D-12 clique | Summed positions across the clique at or near zero | Third-leg rotation, detected **inside the day** rather than after it closes. Complements D-03 by working on positions rather than realized P&L, and is invariant to which pair carries the hedge, which is exactly what AS-M7-02 defeats in a pairwise detector |
 
 **D-11 is the clearest example of why the engine's transparency is also a detection asset**, and it is the counter recorded in [M04 AS-M4-01](M04-trader-portal.md): the same number that helps a ring compute its minimum manufactured profit is the number that makes their pattern arithmetic to detect.
 
@@ -115,6 +120,25 @@ The machine is [STATE_MACHINES section 7](../architecture/STATE_MACHINES.md), un
 | 3 | Strong pattern, evaluation accounts only | D-01 clustering across evaluations |
 | 2 | Weak or ambiguous pattern needing corroboration | D-06 velocity alone |
 | 1 | Informational, aggregated in a digest rather than queued | D-04 single-window observations |
+
+### 3.4 The copy-trading clause, and what it does to D-01
+
+Ruled at the batch 1 gate ([DECISIONS](../DECISIONS.md)), closing OQ-M7-01.
+
+| | Status |
+|---|---|
+| Copy trading **between accounts of the same verified identity** | **Allowed.** A trader running one strategy across their own Merit accounts is doing something the account cap already contemplates and the rules already bound |
+| Copy trading **across identities** | **Prohibited** |
+| **Third-party signal or copy-trading services** | **Prohibited** |
+| **Account management**, meaning one person trading an account belonging to another | **Prohibited** |
+
+**This is the ruling that gives D-01 consequences**, and the effect on the detector is larger than "now we can act on it".
+
+**Same-identity clustering is filtered at the detector, not dismissed in the queue.** That distinction matters operationally. A trader with five accounts running one strategy generates near-perfect same-second clustering across all ten pairs, every day, forever. Under the old design each of those was a technically correct flag that an operator had to open and dismiss, which is [AS-M7-03](#as-m7-03-poisoning-the-queue-with-false-positives-novel)'s attention attack arriving without an attacker. **Removing it at the query removes the single largest source of benign noise from this module's most-fired detector**, and it does so on a rule rather than a heuristic, which is why it is safe to do at the query rather than in review.
+
+**Cross-identity copy is now a violation in its own right**, which changes what the flag has to prove. Previously D-01's output was evidence toward some other conclusion, usually coordinated hedging, and the flag's strength rested on a statistical argument. Now the conduct **is** the violation, so the evidence is the conduct: these fills, on these accounts, held by these two identities, at these timestamps, against this ToS clause. That is exactly the form [AS-M7-07](#as-m7-07-enforcement-contested-in-public-extends-dossier-item-5) says survives a public argument, and it discloses no threshold.
+
+**The legal dependency is now specific rather than open.** DEP-M7-05 previously asked for clauses "covering coordinated trading, common control, and copy trading", which is not a standard anyone can comply with. The clause is now enumerable in the four rows above, and it is filed as a drafting note in [legal/](../legal/README.md).
 
 ---
 
@@ -180,6 +204,12 @@ Emitted per [EVENTS section 8](../architecture/EVENTS.md), plus three NEW.
 2. **On-ingest detection, not only nightly, for D-01.** Same-second fill clustering is computable the moment fills land and does not need to wait for a batch.
 3. **The strongest early control is not a detector at all.** It is M19's biometric dedupe at funding, which fires before the first trade, and the [M01 AS-09](M01-rules-engine.md) identity-level forecast, which makes a correlated cluster visible before it is eligible.
 4. **The honest bound**, which the founder should carry: a single-cycle, abandon-after-extraction ring on Direct plans is bounded by the cap and the buffer, not by detection. Per account that is 135,000c to the trader against a purchase price, and the counter is the entry cost plus verification, not the detector.
+
+**What the batch 1 gate added, and it addresses this scenario directly.** Three detectors now attack the first cycle rather than the second. **D-12** forms candidate clusters from graph priors **at funding, before a single fill exists**, so a ring is watched from day 0 rather than discovered on day 20. **D-13** runs a 5 trading day window at deliberately tightened thresholds (correlation below -0.95 plus size and timing mirroring), which is short enough to land inside the extraction window and precise enough that a five-day sample does not generate noise. **D-14** detects clique position sums near zero **inside the day**, which needs no history at all.
+
+**The margin is materially better and the residual is unchanged in kind.** A ring with genuinely clean separation produces no D-12 candidate set, and D-13 and D-14 both operate on D-12's clusters. The first cycle is now defended against rings that share any signal, which is most of them, and undefended against rings that share none, which is the same residual as AS-M7-06 and has the same answer: bounded by caps, priced into the reserve.
+
+**And the extraction timeline itself moved under this scenario's feet.** [ADR-018](../DECISIONS.md) and [ADR-019](../DECISIONS.md) shortened the minimum path: Core EOD's cycle is now 5 trading days and Merit Rapid's is 3, and under the wallet a payout reaches the trader's Merit balance the **same day** it is approved. The external withdrawal still takes 2 to 3 business days, so cash still leaves on roughly the old clock, but **the arithmetic in this scenario must be re-run against the new cycle lengths rather than the ones above**, and D-13's 5 day window is now the same length as Core EOD's entire cycle rather than comfortably inside it. GS-118 is re-pinned accordingly.
 
 GS-118.
 
@@ -294,7 +324,7 @@ The pack gives the trader every fill, mark, rule state, and gate result of their
 
 ## 10. Open questions for the founder
 
-**OQ-M7-01. Is copy trading allowed?** D-01 detects it and the dossier is explicit that copy rings "are not always ToS-illegal". The ToS must say plainly whether one operator trading many accounts, or many traders following one signal, is permitted. Until it does, D-01 produces flags nobody can act on. Recommendation: **permitted between accounts of the same verified identity, prohibited across identities**, which is enforceable, explicable, and matches what the cap already implies. This is a legal-drafting dependency and it blocks D-01 having consequences, not D-01 existing.
+**OQ-M7-01 (RULED, 2026-08-14). Is copy trading allowed?** **The recommendation was accepted and extended.** Permitted between accounts of the same verified identity; prohibited across identities; and additionally prohibited through **third-party signal or copy services** and through **account management**. The extension matters: without it, a ring could route coordination through a nominally independent signal service and satisfy the letter of a same-identity rule. **Cross-identity copy is now itself a violation** rather than evidence toward one, which is what gives D-01 consequences. See section 3.4.
 
 **OQ-M7-02. Detector thresholds at launch, with no data.** Every threshold in section 3.2 is currently a number from the dossier or from judgment. The honest position is that they will all be wrong at launch and the question is which way to be wrong. Recommendation: **tune for recall over precision during beta**, with everything above severity 3 going to the digest rather than the queue, then tighten from labelled dispositions. Beta is when a false positive is cheapest and a missed ring is most instructive.
 
@@ -312,5 +342,5 @@ The pack gives the trader every fill, mark, rule state, and gate result of their
 | DEP-M7-02 | M19 supplies biometric dedupe hits as the only automatic hard-merge signal | M19 | AS-M7-01's earliest control disappears and fleets are caught only after they trade |
 | DEP-M7-03 | M6 renders the queue with SLA and corroboration ordering, and enforces redaction | M6 | Detection produces evidence nobody acts on, and AS-M6-01 discloses thresholds |
 | DEP-M7-04 | M5 supplies `destination_ref` reuse across identities | M5 | D-09, the strongest mule detector, has no input |
-| DEP-M7-05 | Legal supplies ToS clauses covering coordinated trading, common control, and copy trading | Wave 4 legal | Enforcement has nothing to cite, and AS-M7-07 becomes unwinnable in public |
+| DEP-M7-05 | Legal supplies ToS clauses covering coordinated trading, common control, and copy trading. **The copy-trading clause is now specified** (section 3.4) and is filed as a drafting note in [legal/](../legal/README.md); the coordinated-trading and common-control clauses remain open | Wave 4 legal | Enforcement has nothing to cite, and AS-M7-07 becomes unwinnable in public |
 | DEP-M7-06 | A maintained Tier-1 economic calendar, as data | M6 admin, seed | D-04 fires on the wrong windows |

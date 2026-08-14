@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M03-billing-checkout.md, M05-payout-system.md, M07-risk-abuse.md]
 last_updated: 2026-08-14
 ---
@@ -11,6 +11,8 @@ Constitution section M8, Appendix A items 7 and 9, Appendix B4 item 16, Appendix
 Affiliates are the cheapest acquisition channel in this industry and the one with the most direct line to the firm's money: a commission is **cash out, paid on a sale that can still be reversed, to a party the firm does not control and whose public claims the firm is nonetheless answerable for.**
 
 Two facts shape everything below. **Commission is the only outflow in Merit that is paid on a promise rather than on a settled fact**, because a purchase can charge back for months after the commission is payable. And **NFA I-26-12 makes a promoter's claims the firm's problem**, so creative approval is a compliance control rather than a brand preference.
+
+**Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** [ADR-017](../DECISIONS.md) was accepted with one addition that lands here: **affiliate payout destinations carry the same 48 hour cooling window on change** as trader destinations (INV-M8-11). The one-rail rule this module argued for in AS-M8-05 is now a numbered ADR binding every module that ever pays anybody.
 
 **Identifier conventions:** `INV-M8-nn` invariants, `SD-M8-nn` schema deltas, `FM-M8-nn` failure modes, `AS-M8-nn` adversarial scenarios, `OQ-M8-nn` open questions, `DEP-M8-nn` dependencies.
 
@@ -46,6 +48,7 @@ Codes, click and purchase attribution, the commission engine, monthly statements
 | INV-M8-08 | Every published creative is approved, versioned, and carries the current required disclosure | SD-M8-03. `creative_approved` as a bare boolean is a control with nothing behind it (AS-M8-04) |
 | INV-M8-09 | An affiliate statement is immutable once issued; corrections are new lines on the next statement | Approved DATA_MODEL. The same discipline as the ledger, for the same reason |
 | INV-M8-10 | Affiliate payouts and trader payouts share one destination-concentration check | [M07](M07-risk-abuse.md) D-09 sees both. An affiliate destination that also receives trader payouts from unrelated identities is the same signal wearing a different hat (AS-M8-05) |
+| INV-M8-11 | An affiliate destination change enters a **48 hour cooling window** with re-verification and notification to the contact already on file | [ADR-017](../DECISIONS.md) as accepted. One rail is only one control if the destination-change path is also one control; an affiliate destination that could be repointed instantly would be the soft side of the same rail, and a compromised affiliate account would be the fast route to the same money. Identical mechanics to C-11, differing only in which screen initiates it. GS-140 |
 
 ---
 
@@ -240,7 +243,9 @@ GS-126.
 
 **Counter.** INV-M8-10: **affiliate payments and trader payouts share one destination-concentration check.** D-09's input is every outbound destination regardless of which module produced it. Concretely that means affiliate payments post through [M5](M05-payout-system.md)'s transfer machinery rather than a parallel one, which is also why section 1.2 puts money movement outside this module in the first place. One rail, one destination table, one detector.
 
-The design rule this generalizes to, worth carrying into M9 through M19: **every outbound payment path in Merit is the same path.** A second one is not an efficiency, it is a blind spot with a schedule. GS-127.
+The design rule this generalizes to, worth carrying into M9 through M19: **every outbound payment path in Merit is the same path.** A second one is not an efficiency, it is a blind spot with a schedule. **Accepted at the batch 1 gate as [ADR-017](../DECISIONS.md)**, which promotes this from a rule this module argued for to one binding on every module that ever pays anybody.
+
+**The ADR added the half this scenario missed.** One rail with one destination table is only genuinely one control if the **destination-change** path is also one control. This scenario defended against a shared destination and said nothing about how quickly an affiliate destination could be pointed somewhere new. Affiliate destination changes therefore carry the same 48 hour cooling window, re-verification, and notification as trader destination changes (INV-M8-11). Without it, an attacker who compromised an affiliate account would find an instant route to money that the trader-side path deliberately makes slow, and the concentration detector would see the theft only after it settled. GS-127, GS-140.
 
 ### AS-M8-06: Self-deal through a straw buyer (extends B4 #16)
 

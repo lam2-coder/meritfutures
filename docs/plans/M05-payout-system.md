@@ -1,7 +1,7 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # M5: Payout System
@@ -11,6 +11,8 @@ Constitution section M5, Appendix B4 items 7, 8, 10, 19 and 22, Appendix D4, App
 The product is trust and trust is "payouts that settle exactly as promised". Constitution 0 names payout-trust collapse as one of the four ways firms die, with the mechanism spelled out: **one late cycle, then a review-page death spiral.** Everything in this module is arranged so that the promise is kept mechanically rather than intentionally.
 
 One sentence governs the design: **approval is instant, irrevocable, and mechanical, so every control that exists must sit either before the request or after the settlement, and never in between.**
+
+**Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** [ADR-019](../DECISIONS.md) splits this module's flow into two legs. **The internal leg is new**: a payout request settles instantly to the trader's Merit Wallet. **The existing flow becomes the external leg**: a wallet-to-rail withdrawal, carrying every control this document already specifies. [ADR-016](../DECISIONS.md) was accepted with a conservative classifier and an escalation clock, and [ADR-017](../DECISIONS.md) with affiliate destination cooling. The governing sentence above survives intact and gains force: with the internal leg instant, the space between request and settlement has closed to zero, so there is now genuinely nowhere in the middle for a control to hide.
 
 **Identifier conventions:** `INV-M5-nn` invariants, `SD-M5-nn` schema deltas, `LT-nn` ledger transaction shapes, `FM-M5-nn` failure modes, `AS-M5-nn` adversarial scenarios, `OQ-M5-nn` open questions, `DEP-M5-nn` dependencies.
 
@@ -22,21 +24,33 @@ One sentence governs the design: **approval is instant, irrevocable, and mechani
 
 The request pipeline, the ledger, the Rise integration, the freeze path, and the treasury and reserve machinery.
 
+**Internal leg**, one transaction, no third party:
+
 ```
 POST /accounts/:id/payout
   -> evaluatePayout (M1, the identical function the eligibility screen called)
   -> clampPayout (M1)
   -> persist immutable eligibility_snapshot
-  -> post LT-01 ledger transaction
-  -> status: approved                       [instant, irrevocable]
-  -> enqueue transfer (idempotent)
-  -> Rise
-  -> settlement webhook
-  -> post LT-02, call M1's applySettlement exactly once
+  -> post LT-01 ledger transaction, crediting the identity's wallet position
+  -> status: settled_to_wallet              [instant, irrevocable, atomic]
+  -> call M1's applySettlement exactly once  (anchors advance, win days reset)
   -> notify
 ```
 
-There is no approval step in that list because there is no approver. That absence is the module's entire product thesis.
+**External leg**, the pre-existing flow, unchanged in every control:
+
+```
+POST /wallet/withdrawals
+  -> KYC verified, destination outside its cooling window, name matched
+  -> amount >= 10,000c, wallet balance sufficient, no withdrawal in flight
+  -> post LT-06, debiting the wallet position
+  -> status: approved -> enqueue transfer (idempotent) -> Rise
+  -> settlement webhook -> post LT-07 -> notify
+```
+
+There is no approval step in either list because there is no approver. That absence is the module's entire product thesis, and the wallet sharpens it: the leg the trader experiences as "getting paid" now has **no external party in it at all**, so there is not even a rail that could be slow.
+
+**The single most important consequence, because it reorganizes this whole document.** Every control that used to live "after settlement" now lives after the *external* settlement, and the internal leg has effectively no after. The controls did not weaken; they moved to the leg where the money actually leaves Merit, which is where they were always aimed.
 
 ### 1.2 What this module is not
 
@@ -64,7 +78,10 @@ There is no approval step in that list because there is no approver. That absenc
 | INV-M5-10 | A freeze requires at least one cited open flag and is bounded in time | Confirmed at the [Wave 2 gate](../DECISIONS.md); the time bound is SD-M5-01 and AS-M5-04 |
 | INV-M5-11 | The reserve is reported against a **live** wallet balance, not a computed one | SD-M5-03. A reserve coverage ratio derived from our own ledger rather than the rail's balance is a number that agrees with itself |
 | INV-M5-12 | The circuit breaker pauses sales and can never pause payouts | Structural: the breaker's only effect is a flag read by [M3](M03-billing-checkout.md)'s checkout. There is no code path from any liability signal to a payout block |
-| INV-M5-13 | Every settled payout is observed reducing the platform balance, or it alarms | SD-M5-04, AS-M5-01. "We paid" and "the account knows it was paid" are two claims |
+| INV-M5-13 | Every wallet-credited payout is observed reducing the platform balance, or it alarms | SD-M5-04, AS-M5-01. **This binds on the internal leg**, which is where the trading account's balance is reduced. "We credited the wallet" and "the trading account knows it was paid" remain two claims, and the wallet makes the gap between them shorter rather than absent |
+| INV-M5-14 | A wallet balance is a **payable balance**: it earns no interest, it cannot be transferred to another identity, and it is never negative | Ledger constraint plus the absence of any peer-to-peer code path. Each of the three is a deliberate product limit with a legal reason ([ADR-019](../DECISIONS.md), and the counsel-review item in [legal/](../legal/README.md)) |
+| INV-M5-15 | Wallet balances are included in Open Liability and in the reserve coverage ratio | [M06](M06-admin-ops-console.md) P-M6-01 and P-M6-07. A wallet balance has cleared every gate, which makes it the **most** certain liability on the book. A design that improved liquidity must not be allowed to quietly improve the reported liability with it |
+| INV-M5-16 | An identity-scoped ledger halt pages immediately and carries an escalation clock to global | [ADR-016](../DECISIONS.md) as accepted. Without the clock, scoping the halt creates a slower version of AS-M5-05 in which one attributable imbalance buys an indefinitely unexamined corner of the ledger |
 
 ---
 
@@ -78,6 +95,8 @@ M5 consumes [DATA_MODEL section 8](../architecture/DATA_MODEL.md) as approved pl
 | SD-M5-02 | `payout_transfers` | add `name_match_score integer null`, `name_match_method text null`, `name_match_reviewed_by text null` | `destination_name_match` is a boolean in the approved model, and real name matching is not boolean. Transliteration, married names, and common names make a strict comparison produce false freezes on legitimate traders, which under a zero-denial policy is a brand cost. The score and the method make the threshold tunable and auditable (AS-M5-02) |
 | SD-M5-03 | new `treasury_balances` | `(account_code, as_of) pk`, `balance_cents`, `source text check in ('provider_api','manual_attestation')`, `recorded_by`, `recorded_at` | The [reserve coverage ratio](../GLOSSARY.md#reserve-coverage-ratio) is the number that decides whether sales pause. Computing it from our own ledger makes it a number that agrees with itself; it must be anchored to the **rail's** reported balance, and when the rail cannot be queried, to a dated manual attestation that is visibly stale rather than silently wrong (INV-M5-11) |
 | SD-M5-04 | `payout_requests` | add `balance_reflection_status text not null default 'pending' check in ('pending','observed','missing')` and `reflected_on_trading_day date null` | INV-M5-13. A settled payout whose withdrawal never appears in the platform balance leaves the trader able to withdraw the same money twice. This column is what turns that from an invisible loss into a nightly alarm (AS-M5-01) |
+| SD-M5-06 | new `wallet_withdrawals` | `id`, `identity_id`, `amount_cents`, `destination_ref`, `status`, `idempotency_key`, `requested_at`, `settled_at null`, plus the `name_match_*` and freeze columns SD-M5-01 and SD-M5-02 add to `payout_requests` | The external leg is a different object from a payout request and modelling it as one would be the mistake. A payout request is a **claim against an account** evaluated by the engine; a withdrawal is a **movement of an already-settled balance** evaluated against KYC and destination rules. Conflating them means the engine's gates and the rail's gates share a status column, and the first person to add a state breaks the other one |
+| SD-M5-07 | `ledger_accounts` | add the `trader_wallet` account class, per identity | [ADR-019](../DECISIONS.md)'s ledger account per identity. The reserved `promotional_credit` class and the `currency` columns from the Wave 2 gate activate here, which is what that reservation was for |
 | SD-M5-05 | `ledger_transactions` | add `reversal_of uuid null fk ledger_transactions` | Corrections are compensating entries, never updates. Without a link, a reversal is a transaction that happens to be equal and opposite, and reconstructing which reversal answered which original becomes archaeology at exactly the moment (a chargeback dispute, an audit) when it must be instant |
 
 ### 2.1 The ledger transactions, stated exactly
@@ -91,8 +110,13 @@ Every money movement in Merit is one of these five shapes. Amounts are signed, p
 | LT-03 | `payout_reversal` | the exact negation of LT-01, with `reversal_of` set (SD-M5-05) |
 | LT-04 | `chargeback_reversal` | posted by [M3](M03-billing-checkout.md), referenced here because it is the transaction that makes an identity net negative honestly (B4 #10) |
 | LT-05 | `affiliate_commission` | posted by [M8](M08-affiliate-system.md) |
+| LT-06 | `wallet_withdrawal_approval` | debit `trader_wallet` (identity) `amount_cents`; credit `firm_treasury` `amount_cents`. The external leg's approval |
+| LT-07 | `wallet_withdrawal_settlement` | debit `firm_treasury`; credit the payout wallet position. The external leg's cash movement |
+| LT-08 | `wallet_purchase_debit` | debit `trader_wallet`; credit revenue. Posted by [M3](M03-billing-checkout.md) when a purchase is wallet-funded, in the same transaction as the purchase (M3's INV-M3-13) |
 
-**LT-01 needs its own paragraph because the split is where an error would be invisible.** The trader's withdrawable position is reduced by the full `approved_cents`, because that is what leaves their claim on the firm. Of that, `trader_cents` becomes a firm obligation to pay out and `firm_cents` becomes recognized revenue. The three legs sum to zero, and **`firm_cents` is recognized at approval rather than at settlement**, deliberately: the firm's share is earned when the payout is approved, and holding it in suspense until settlement would make the revenue line depend on a payment rail's latency. This is a bookkeeping opinion and it is the founder's to overrule (OQ-M5-04), so it is stated rather than assumed.
+**LT-01's credit leg changed at the batch 1 gate.** It previously credited the payout wallet position as a firm obligation to pay; it now credits the **identity's `trader_wallet`** position (SD-M5-07). The obligation is the same size and is owed to the same person; what changed is that it is now recorded against the trader who owns it rather than pooled, which is what makes wallet balances individually reportable in Open Liability (INV-M5-15).
+
+**LT-01 needs its own paragraph because the split is where an error would be invisible.** The trader's withdrawable position is reduced by the full `approved_cents`, because that is what leaves their claim on the firm. Of that, `trader_cents` becomes a firm obligation to pay out and `firm_cents` becomes recognized revenue. The three legs sum to zero, and **`firm_cents` is recognized at approval rather than at settlement**, deliberately: the firm's share is earned when the payout is approved, and holding it in suspense until settlement would make the revenue line depend on a payment rail's latency. **Ruled at the batch 1 gate, confirming what this paragraph proposed** ([DECISIONS](../DECISIONS.md)): payout **liability books at approval**, **cash derecognizes at settlement**, and **evaluation fees recognize at purchase**. Under the wallet those three separate cleanly: liability books at approval on the internal leg, changes form (not size) at wallet credit, and derecognizes as cash only when the external leg settles. `firm_cents` is recognized at approval alongside the liability, so both halves of LT-01 are recognized in the same moment and the revenue line does not depend on a rail's latency.
 
 ---
 
@@ -102,7 +126,11 @@ The payout request machine ([STATE_MACHINES section 2](../architecture/STATE_MAC
 
 ### 3.1 What happens at settlement, exactly
 
-Settlement is the single most consequential transition in the system, so its steps are ordered and each is idempotent.
+**Under [ADR-019](../DECISIONS.md) there are two settlements and they are very different animals.** The internal one is a transaction; the external one is a conversation with a third party. The steps below are the **external** leg, preserved as written because a webhook from a rail is exactly as untrustworthy as it always was.
+
+**The internal leg, for contrast, has no step list worth the name**, and that is the point: approval, LT-01, the wallet credit, both anchor advances, the win-day reset, and `applySettlement` all commit in **one database transaction**. Idempotency is the transaction plus the request's idempotency key. There is no webhook to replay, no ordering to defend, no partial state to reconcile, and no window in which a second request can arrive. Every failure mode from FM-M5-02 through FM-M5-04 is inapplicable to it by construction rather than by control, which is the strongest form of not having a bug. `payout_requests.status` reaches `settled_to_wallet` and stops.
+
+Settlement on the external leg is still the most consequential transition involving an outside party, so its steps are ordered and each is idempotent.
 
 | Step | Action | Idempotency anchor |
 |---|---|---|
@@ -118,13 +146,15 @@ Settlement is the single most consequential transition in the system, so its ste
 
 ### 3.2 Where `effective_trading_day` comes from, which decides liability
 
-[ADR-013](../DECISIONS.md) made the cadence gap count from the settled payout's **effective** trading day, defined as the first trading day whose opening balance reflects the withdrawal. That is a **fact about the platform**, not a prediction, and the distinction is load bearing.
+[ADR-013](../DECISIONS.md) made the cadence gap count from the settled payout's **effective** trading day. **[ADR-019](../DECISIONS.md) moved that anchor to the wallet-credit day**, which, because the internal leg is instant, is the same trading day as the basis day. The two anchors ADR-013 established still both exist and are still both stored; they now coincide.
+
+**What did not change, and this is the half worth protecting.** `effective_trading_day` remains an **observed** fact about the platform: the day M2 sees a mark whose `adjustment_cents` matches this settlement (M2's INV-M2-12). It is still recorded, still never predicted, and `balance_reflection_status` still tracks it (SD-M5-04). It simply no longer drives the cadence gap. That separation is deliberate: the cadence anchor is now a fact about Merit's own ledger, which is instant and certain, while the reflection observation remains a fact about the vendor's books, which is neither. **AS-M5-01 is unaffected** and remains this module's scariest finding.
 
 **Binding: `effective_trading_day` is observed, never predicted.** It is set when [M2](M02-rithmic-bridge.md) sees a mark whose `adjustment_cents` matches this settlement (M2's INV-M2-12 classification), and until then it is null. Three consequences follow, and all three are good:
 
 - Replay is deterministic years later, because the value stored is a fact that was recorded, not a calculation that depended on a business-day convention nobody wrote down.
-- The cadence gap cannot be gamed by settlement-timing games, because it starts when the money actually left the account rather than when a webhook arrived.
 - A settlement whose adjustment never appears is **visible**, because the field stays null and `balance_reflection_status` stays `pending` past its window (AS-M5-01).
+- The third consequence was that the cadence gap could not be gamed by settlement-timing games. **The wallet retires that concern rather than weakening it**: with the anchor on an instant internal credit there is no settlement timing left to game, because the trader cannot influence when a transaction that already committed committed.
 
 ### 3.3 The freeze path, bounded
 
@@ -163,7 +193,9 @@ Schemas are in [API_CONTRACT sections 6 and 10](../architecture/API_CONTRACT.md)
 | `GET /payouts` | Owns | The status timeline. `failure_note` is trader-readable and honest, because a vague failure on a payout is worse than a specific one |
 | `POST /webhooks/rise` | Owns | Signature, timestamp, nonce, replay window. Enqueues; does no business work in the request |
 | `POST /admin/accounts/:id/freeze` and `/unfreeze` | Owns | Requires a cited open flag and now also sets `freeze_expires_at` (SD-M5-01). Dual control is **not** required here, deliberately: a freeze is reversible and time-bounded, while the [ADR-010](../DECISIONS.md) dual-control set covers cap, split, gap, and treasury credentials, which are not |
-| `GET /admin/liability` | Supplies | Reserve, RCR, open liability, and the eligible-forecast inputs. Rendered by [M6](M06-admin-ops-console.md) |
+| `POST /wallet/withdrawals` **NEW** | Owns | The external leg ([ADR-019](../DECISIONS.md), SD-M5-06). Carries every control the old settlement path carried: KYC verified, destination outside its 48 hour cooling window, name match scored, **$100 minimum**, **no fee**, and G-NO-IN-FLIGHT scoped to this leg. Idempotency key required |
+| `GET /wallet` **NEW** | Owns | Balance and the credit and debit timeline. Read-only. Rendered by [M04](M04-trader-portal.md) SC-M4-10 |
+| `GET /admin/liability` | Supplies | Reserve, RCR, open liability, and the eligible-forecast inputs, **now including wallet balances** (INV-M5-15). Rendered by [M6](M06-admin-ops-console.md) |
 
 ---
 
@@ -180,6 +212,9 @@ Emitted per [EVENTS sections 6 and 7](../architecture/EVENTS.md), plus three NEW
 | `ledger.transaction_posted`, `ledger.invariant_violated` | every transaction, nightly | The second halts payouts. See AS-M5-05 |
 | `payout.balance_reflection_missing` **NEW** | observation window expires | `{ payout_request_id, account_id, approved_cents, settled_trading_day, trading_days_elapsed }`. The trader may now be able to withdraw money already paid. Consumers: ALERT (page), RISK, FEED, EVID |
 | `payout.freeze_expiring` **NEW** | 2 business days before `freeze_expires_at` | `{ payout_request_id, flag_id, expires_at }`. Forces a decision before the clock releases the payout, which is the point of having a clock. Consumers: ALERT, FEED |
+| `wallet.credited` **NEW** | internal leg | `{ identity_id, account_id, payout_request_id, amount_cents, balance_after_cents, basis_trading_day }`. This is the event the trader experiences as being paid, and it is now the one M04 and M16 celebrate rather than `payout.settled`. Consumers: FEED, NOTIF, BI, EVID |
+| `wallet.debited` **NEW** | purchase or withdrawal | `{ identity_id, amount_cents, cause, reference_id, balance_after_cents }`. Consumers: FEED, RISK, BI |
+| `wallet.withdrawal_requested` / `.settled` / `.failed` **NEW** | external leg | Mirrors the `payout.transfer_*` family for the wallet-to-rail path. Consumers: ALERT, FEED, NOTIF |
 | `treasury.coverage_changed` **NEW** | RCR crosses a threshold, or a balance is recorded | `{ rcr_bp, reserve_cents, cvar99_cents, eligible_next_7d_cents, source, as_of }`. [ADR-011](../DECISIONS.md)'s same-day top-up trigger needs an event, not a dashboard someone remembers to open. Consumers: ALERT, FEED, BI |
 
 **Consumed:** `day.closed` (refreshes withdrawable and the forecast), `flag.status_changed` (opens and closes freezes), `kyc.verified` and `kyc.expired` (context gate), `purchase.charged_back` (LT-04 and the closure), and M2's mark stream (the balance reflection observation, DEP-M5-02).
@@ -247,7 +282,14 @@ GS-107.
 3. **The RCR is computed against a live rail balance** (SD-M5-03, INV-M5-11), because a coverage ratio computed from our own ledger is a ratio that agrees with itself.
 4. **CVaR99 must model request timing as a strategy** ([M01 AS-08](M01-rules-engine.md)) and correlated identity-level waves as a scenario, or the reserve is sized against a world where traders request at random, which they demonstrably do not.
 
-**Residual, stated plainly.** With instant approval and no identity ceiling, the firm's exposure to a one-day correlated wave is bounded only by the per-account cap times the identity's account maximum. That is a deliberate, founder-ruled position (OQ-7) whose entire mitigation is visibility plus liquidity. It should be revisited if a single identity's forecast ever exceeds a configured share of the wallet. GS-108.
+**What [ADR-019](../DECISIONS.md) changed here, and it is the largest single improvement the wallet buys.** A correlated wave now lands on the **wallet**, not on cash. Ten accounts approving 1,350,000c in one day produces 1,350,000c of wallet credits and moves **no money at all**. Cash leaves only when those traders each individually request an external withdrawal, which is a separate action, subject to a $100 minimum, KYC, and destination cooling, and which historically a meaningful share of traders will delay or partially take. The firm gets the float and, more importantly, gets **time**, which is the one thing the weekly funding rhythm could not previously buy.
+
+**Three things that did not change, stated so the improvement is not over-read.**
+1. **The liability is identical.** Wallet balances are Open Liability and enter the RCR (INV-M5-15). Merit owes exactly what it owed.
+2. **The forecast is still a launch requirement.** It now forecasts external withdrawal demand rather than approval volume, which is a *harder* prediction, not an easier one, because it depends on trader behavior rather than on gates the engine computes. The Eligible-Next-7-Days figure keeps its meaning for liability and gains a sibling for cash.
+3. **The circuit breaker still cannot pause payouts** (INV-M5-12), and the asymmetry is now even more clearly correct: pausing the internal leg would be pausing a ledger entry.
+
+**Residual, stated plainly.** With instant approval and no identity ceiling, the firm's exposure to a one-day correlated wave is bounded only by the per-account cap times the identity's account maximum. That is a deliberate, founder-ruled position (OQ-7) whose mitigation is visibility plus liquidity, and the wallet improves the liquidity half substantially without touching the exposure. It should be revisited if a single identity's forecast ever exceeds a configured share of the wallet. GS-108, GS-130.
 
 ### AS-M5-04: The indefinite freeze, which is a denial nobody authorized (NOVEL)
 
@@ -264,7 +306,7 @@ GS-107.
 **Why it is worth taking seriously.** The attack does not need to move money. It only needs to make the books disagree, and the system's own safety control does the damage. For a firm whose brand is payout reliability, a competitor or a disgruntled ring could buy a very cheap outage.
 
 **Counter, three parts, and the first is the important one.**
-1. **Scope the halt.** A per-transaction imbalance halts payouts for the **identity** and the accounts involved in that transaction, not globally. Only a **global** sum mismatch halts everything, because only a global mismatch means the aggregate is unknown. This is a genuine change from the approved EVENTS wording and it is proposed here deliberately (OQ-M5-01).
+1. **Scope the halt, conservatively.** A per-transaction imbalance halts payouts for the **identity** and the accounts involved in that transaction, not globally. Only a **global** sum mismatch halts everything, because only a global mismatch means the aggregate is unknown. **Accepted as [ADR-016](../DECISIONS.md) with two conditions that are part of the control rather than refinements of it.** First, the classifier is conservative and **must prove locality before granting it**: an imbalance spanning identities, one whose attribution is ambiguous, and one that cannot be traced to a transaction at all are **all treated as global**. Second, an identity-scoped halt **pages immediately and starts an escalation clock** to a global halt (INV-M5-16, proposed window 24 hours). Without the clock this counter would create a slower version of the attack it defends against, in which one attributable imbalance buys an indefinitely unexamined corner of the ledger.
 2. **Make imbalance structurally hard.** The per-transaction zero-sum check is a deferred constraint trigger at commit, so no transaction can ever be written unbalanced in the first place. A global mismatch then implies data corruption or a direct write, both of which genuinely warrant a global halt.
 3. **Make the halt loud and short.** A global halt pages immediately, states the transaction range implicated, and carries a runbook whose first step is the reconciliation query rather than a search for the cause.
 
@@ -357,13 +399,17 @@ M5 does not own a dashboard; it supplies M6's home page, which constitution M6 d
 
 ## 10. Open questions for the founder
 
-**OQ-M5-01. Should a per-transaction ledger imbalance halt payouts globally or only for the identity involved?** The approved [EVENTS](../architecture/EVENTS.md) catalogue says `ledger.invariant_violated` halts payouts, without scoping it. AS-M5-05 argues that a global halt on a single malformed transaction is a very cheap denial-of-payouts attack and that the correct scoping is: per-transaction imbalance halts the implicated identity, global sum mismatch halts everything. Recommendation: **scope it**, and treat a global mismatch as the genuine emergency it is. This amends an approved architecture doc, so it needs a ruling rather than an assumption.
+**OQ-M5-01 (RULED, 2026-08-14, as [ADR-016](../DECISIONS.md)). Should a per-transaction ledger imbalance halt payouts globally or only for the identity involved?** **Scoped, with a conservative classifier and an escalation clock.** Unattributable or cross-identity imbalance is global; a scoped halt pages immediately and escalates to global on a clock. The recommendation below was accepted and then tightened, and the tightening is the part worth remembering: scoping a halt without a clock does not remove the denial-of-payouts attack, it slows it down and hides it. Original text follows.
+
+*Original question.* The approved [EVENTS](../architecture/EVENTS.md) catalogue says `ledger.invariant_violated` halts payouts, without scoping it. AS-M5-05 argues that a global halt on a single malformed transaction is a very cheap denial-of-payouts attack and that the correct scoping is: per-transaction imbalance halts the implicated identity, global sum mismatch halts everything. Recommendation: **scope it**, and treat a global mismatch as the genuine emergency it is. This amends an approved architecture doc, so it needs a ruling rather than an assumption.
 
 **OQ-M5-02. How long is a freeze allowed to last before it releases?** Proposed: **10 business days**, with `payout.freeze_expiring` at 2 business days out and extension by a separate audited action. Ten days is long enough for a real investigation with a vendor in the loop and short enough that it cannot quietly become a denial. The number is a policy judgment and it will end up in the ToS, so it is the founder's.
 
 **OQ-M5-03. How long is the balance-reflection observation window?** Proposed: **3 trading days** after `settled_trading_day`. Long enough to absorb a slow vendor cycle, short enough that a double-extraction opportunity does not survive a cadence gap. Depends on V-M2-05, so it may need to move after the vendor call.
 
-**OQ-M5-04. Is `firm_cents` recognized as revenue at approval or at settlement?** LT-01 recognizes at approval, on the reasoning that the firm's share is earned when the payout is approved and that deferring it makes the revenue line depend on a rail's latency. The alternative defers recognition to settlement, which is more conservative and makes revenue match cash movement. This is an accounting policy with tax consequences and it should be confirmed with whoever prepares the books before the first close, not after.
+**OQ-M5-04 (RULED, 2026-08-14). Is `firm_cents` recognized as revenue at approval or at settlement?** **At approval**, together with the payout liability, which also books at approval. **Cash derecognizes at settlement**, meaning the external leg under [ADR-019](../DECISIONS.md). **Evaluation fees recognize at purchase.** LT-01's original reasoning was accepted: the firm's share is earned when the payout is approved, and deferring it would make the revenue line depend on a rail's latency. The wallet makes this cleaner rather than harder, because liability, revenue, and cash now have three distinct and individually observable moments instead of two conflated ones. Still to be confirmed with whoever prepares the books before the first close, but as a review of a decided policy rather than an open choice.
+
+**OQ-M5-06 (NEW, from [ADR-019](../DECISIONS.md)). What is the wallet-spend velocity limit, and does it differ from the withdrawal limit?** Wallet spend is the contained failure mode in an account takeover: an attacker with a valid session can burn a balance on evaluations and resets, which never leaves Merit's books and is fully reversible by ledger entry, but which is still a real loss and a genuinely upsetting experience for the victim. A velocity limit is therefore worth having and is **not** worth setting as tightly as the external one, because the blast radius is contained and the false-positive cost is a legitimate trader being unable to buy a reset at the moment they most want one. Proposal: a per-identity daily cap on wallet-funded purchases set at a small multiple of the largest single plan price, with anything above it delayed rather than refused, and the limit reviewed once real spend distributions exist. The external withdrawal path keeps its own, stricter controls and needs no velocity limit beyond them, because destination cooling already bounds the attack. See [SECURITY](../architecture/SECURITY.md) D4.
 
 **OQ-M5-05. What is the configured wallet share that triggers a same-day top-up?** [ADR-011](../DECISIONS.md) left the threshold to this plan, saying it is "the document that can compute it against the CVaR99 estimate rather than guessing". Honest answer: **it cannot be computed yet**, because the CVaR99 estimate comes from the simulation harness and the harness is Wave 4. Proposal: launch at **50 percent** of the payout wallet balance, which is deliberately conservative, and replace it with a CVaR-derived number as the first action after the harness produces one. Recorded as a number to be replaced rather than a number to be trusted.
 

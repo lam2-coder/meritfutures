@@ -1,14 +1,16 @@
 ---
 status: review
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/OVERVIEW.md, ../architecture/INFRA.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # M2: Rithmic Bridge
 
 Constitution section M2, Appendix B3, Appendix B5 ten-section template, Appendix C5 escalation tier (money path).
 
-**Everything in this module that touches the vendor's wire format is provisional under [ADR-005](../DECISIONS.md).** The vendor call is deferred by the founder's choice. This document therefore designs the bridge **fully**, from the public CSV/SFTP description, and marks every single thing the call must confirm with a `V-M2-nn` identifier in section 11. There are **fourteen** of them. The design's whole shape is chosen so that all fourteen are bounded edits at the adapter boundary rather than redesigns, and section 11 states for each one what changes if the assumption is wrong.
+**Everything in this module that touches the vendor's wire format is provisional under [ADR-005](../DECISIONS.md).** The vendor call is deferred by the founder's choice. This document therefore designs the bridge **fully**, from the public CSV/SFTP description, and marks every single thing the call must confirm with a `V-M2-nn` identifier in section 11. There are **sixteen** of them. The design's whole shape is chosen so that all fourteen are bounded edits at the adapter boundary rather than redesigns, and section 11 states for each one what changes if the assumption is wrong.
+
+**Amended at the Wave 3 batch 1 gate (2026-08-14).** Three rulings changed this module: **fail-closed provisioning is design law** (section 3.2 and the new INV-M2-13), **[ADR-020](../DECISIONS.md)'s indicative realtime layer** adds a streaming path through this module's adapter (section 3.5), and **`V-M2-15` and `V-M2-16` join the vendor agenda**. The document stays at `status: review` because [ADR-005](../DECISIONS.md) forbids it reaching `approved` while the vendor call is outstanding, which is by design rather than an oversight.
 
 **Identifier conventions:** `INV-M2-nn` invariants, `SD-M2-nn` schema deltas, `ST-M2-n` stages of the batch, `FM-M2-nn` failure modes, `AS-M2-nn` adversarial scenarios, `OQ-M2-nn` open questions, `DEP-M2-nn` dependencies on other modules, `V-M2-nn` **vendor-confirmation dependencies**. `EC-nnn` and `GS-nnn` refer to [EDGE_CASES.md](../EDGE_CASES.md) and [GOLDEN_SCENARIOS.md](../testing/GOLDEN_SCENARIOS.md).
 
@@ -56,6 +58,8 @@ It implements the [platform adapter](../GLOSSARY.md#platform-adapter) interface 
 | INV-M2-10 | A `platform_account_ref` is never reused across accounts, for any reason | Unique index plus SD-M2-02's retirement table. This is the invariant behind AS-M2-05 |
 | INV-M2-11 | Simulator output and vendor output are consumed by the **same** parser and the same normalizer | The simulator emits files, not objects. Enforced by architecture: the simulator writes to the ingest directory and nothing downstream can tell the difference (AS-M2-01) |
 | INV-M2-12 | Non-trading balance movements never appear as `realized_pnl_cents` | The normalizer classifies every balance delta as trading or non-trading and refuses to guess. An unclassifiable delta quarantines (V-M2-05, EC-051) |
+| INV-M2-13 | **No account trades until its risk settings are confirmed**, by acknowledgement artifact or by successful read-back | **Fail-closed provisioning, ruled design law at the batch 1 gate.** The account is held out of trading entirely; an unconfirmed setpoint is a hard block, never a dashboard marker. Enforced at the provisioning saga's exit rather than by the engine, because an account that cannot trade never produces a mark to evaluate. GS-138 |
+| INV-M2-14 | Streaming ingest is **write-only into the live cache** and never into `fills`, `daily_marks`, or anything the engine reads | [ADR-020](../DECISIONS.md)'s hard rule, made structural: the streaming path has no grant on the authoritative tables. Tier 2 cannot contaminate tier 1 even by mistake. GS-132 |
 
 ---
 
@@ -82,10 +86,13 @@ export interface PlatformAdapter {
   ingestFills(file: IngestFile): Promise<NormalizedFill[]>;
   ingestEOD(file: IngestFile): Promise<VendorEodRow[]>;
   reconcile(day: TradingDay, rows: readonly VendorEodRow[]): Promise<ReconResult[]>;
+  streamLive(handler: (tick: LiveAccountTick) => void): Promise<Subscription>;  // ADR-020 tier 2, section 3.5
 }
 ```
 
-Two rules about this interface, both learned from B3's own warning that a second platform must be a new adapter and never a rewrite. **Nothing above returns a `DailyMark`.** Marks are computed by shared, adapter-independent code from `NormalizedFill[]` plus `VendorEodRow[]`, so a second platform inherits the mark logic instead of reimplementing it. And **nothing above takes a plan config.** An adapter that could read a plan config would eventually apply a rule.
+Three rules about this interface, the first two learned from B3's own warning that a second platform must be a new adapter and never a rewrite. **Nothing above returns a `DailyMark`.** Marks are computed by shared, adapter-independent code from `NormalizedFill[]` plus `VendorEodRow[]`, so a second platform inherits the mark logic instead of reimplementing it. And **nothing above takes a plan config.** An adapter that could read a plan config would eventually apply a rule.
+
+The third rule arrives with [ADR-020](../DECISIONS.md): **`streamLive` returns `LiveAccountTick`, a type that appears nowhere in the authoritative pipeline.** It is deliberately not a `NormalizedFill` and deliberately not convertible into one. The two tiers do not share a data type, which is what makes "the stream never feeds a money decision" a thing the compiler enforces rather than a thing a reviewer remembers (INV-M2-14).
 
 ---
 
@@ -129,7 +136,13 @@ stateDiagram-v2
 
 `confirmed_inferred` is a distinct state and not a synonym, because the two carry different evidential weight and the difference matters at exactly one moment: when a trader says "I paid and I cannot trade". An inferred confirmation means we believe the account exists because the vendor reported on it, which is strong for `create_account` and **worthless for `set_risk`** (you cannot infer that a risk setting applied from the account appearing in a report). Therefore:
 
-**Binding: `set_risk` operations may never reach `confirmed_inferred`.** They are confirmed by an acknowledgement artifact or they are reconciled against observed liquidation behavior in ST-M2-8, and until one of those happens the account carries an unconfirmed-setpoint marker that M6 surfaces. This is AS-M2-03, and it is the difference between believing an account is protected and knowing it.
+**Binding: `set_risk` operations may never reach `confirmed_inferred`.** They are confirmed by an acknowledgement artifact or by a successful read-back of the platform's current setting. This is AS-M2-03, and it is the difference between believing an account is protected and knowing it.
+
+**Ruled at the batch 1 gate, and this is a change of kind rather than of degree: fail-closed provisioning is design law.** Previously an account whose `set_risk` was never confirmed could trade, while `platform.setpoint_unconfirmed` surfaced it on M6's dashboard as carried liability. **It can no longer trade at all** (INV-M2-13). Entitlement is not enabled, and an account already trading whose setpoint confirmation is lost is disabled rather than flagged.
+
+The cost is real and is accepted rather than argued away: a vendor-side confirmation gap becomes a **provisioning outage** for the affected accounts. That is a paid trader who cannot trade, which is FM-M3-01's territory and the thing this whole module works hardest to avoid. It is accepted because the alternative is worse in a way that is invisible: **a provisioning outage is visible, bounded, and recoverable, and an unenforced funded account is none of those three.** The behavioral fallback in ST-M2-8 does not change and remains the detector for a setpoint that was confirmed and later stopped working.
+
+**This makes `V-M2-15` a commercial precondition rather than a technical question.** Merit needs either a provisioning acknowledgement artifact or a readable current-risk-setting endpoint. With neither, no account can be brought online under this rule at all, which is the strongest available form of what OQ-M2-04 recommended raising on the call.
 
 ### 3.3 File naming and idempotency
 
@@ -151,6 +164,24 @@ The decision SD-M2-03 records. This is the most dangerous branch in the module, 
 | new | new | yes | `correction_set` | Rows carrying `correction_of` supersede individually; rows without it that touch an applied day are a **quarantine**, not a guess |
 
 The last row is the one that earns its place. A file that silently restates a closed day without correction markers is the failure mode that would corrupt every downstream number quietly, and the only correct response is to refuse it and page a human (AS-M2-02).
+
+### 3.5 The streaming path (ADR-020, tier 2)
+
+[ADR-020](../DECISIONS.md) adds an **indicative realtime layer** and it enters Merit through this module, because M2 is still the only code that knows a vendor exists. The adapter interface gains one method and the architecture gains one hard boundary.
+
+```ts
+  // added to PlatformAdapter
+  streamLive(handler: (tick: LiveAccountTick) => void): Promise<Subscription>;
+```
+
+Mechanism is vendor-dependent and is `V-M2-16`: an **R|API+ admin connection** where one is available, or **high-frequency snapshot polling** where it is not. The adapter absorbs the difference, exactly as it already absorbs report shape, so the consumer sees one stream either way.
+
+**Four rules, and the first is the one that keeps tier 1 safe.**
+
+1. **The streaming path writes only to the live cache** (INV-M2-14). It has no grant on `fills`, `raw_ingest_rows`, `daily_marks`, or `rule_states`. A streaming bug can produce a wrong number on a dashboard and cannot produce a wrong number in a payout, and that separation is a permission rather than a convention.
+2. **Nothing from the stream is ever reconciled into the authoritative pipeline.** The EOD file remains the only source of a mark. A live tick that disagrees with the closing file is not evidence of anything except that intraday and end-of-day are different measurements, and resolving the disagreement in the stream's favor is precisely what ADR-002 exists to prevent.
+3. **Feed loss is a first-class state, not an error.** On loss the cache stops serving and every consumer falls back to last-closed values with its label changed to match (GS-133). A live surface that silently freezes at its last value is the failure mode here, because it looks exactly like a quiet market.
+4. **The simulator streams too.** The synthetic simulator gains a streaming mode alongside its file output, so the live layer is developable and testable before any vendor agreement exists. This is INV-M2-11's discipline extended to tier 2, and it is what stops ADR-020 from becoming a second reason the vendor call blocks engineering.
 
 ---
 
@@ -378,13 +409,15 @@ One page, five panels: today's file timeline (expected, received, applied, quara
 
 **OQ-M2-03. Beta posture on quarantine: page or queue?** Any quarantine is a page during beta in the design above. That is correct for learning the vendor's behavior and wrong for sleep. Confirm the beta posture, and confirm the trigger for relaxing it (proposal: 30 consecutive days with no quarantine).
 
-**OQ-M2-04. Do we accept a vendor relationship with no acknowledgement artifact?** V-M2-06. If Rithmic returns nothing at all for provisioning, `set_risk` can never be confirmed positively and AS-M2-03's residual is permanent. This is worth raising **on the vendor call itself** as a requirement rather than a question, because it is the difference between a firm that knows its accounts are protected and one that assumes it.
+**OQ-M2-04 (RULED, 2026-08-14). Do we accept a vendor relationship with no acknowledgement artifact?** **No.** Fail-closed provisioning is design law: no account trades without an acknowledgement or a successful read-back (INV-M2-13, section 3.2). The question is therefore no longer whether Merit accepts the gap but what the vendor must supply, which is why it became **`V-M2-15`, a commercial precondition** on the call rather than an item on an agenda. The recommendation in the original text was to raise it as a requirement; the ruling went further and made trading itself contingent on it.
+
+**OQ-M2-05 (NEW, from [ADR-020](../DECISIONS.md)). What is the streaming mechanism, and what does it cost?** `V-M2-16`. R|API+ admin is $100 per month per API ID ([ADR-002](../DECISIONS.md) priced it when rejecting it as an ingest path), which is affordable for one connection and is a different proposition per-account. High-frequency snapshot polling has no incremental licence cost and a worse latency profile. The choice is a call output, not a design decision, and tier 1 is unaffected either way. Recommendation: **price both on the call**, and ship the simulator-backed layer regardless, because the labeling and degradation behavior are the hard parts and neither depends on which mechanism wins.
 
 ---
 
 ## 11. Vendor-confirmation dependencies (ADR-005)
 
-**The point of this section is that the vendor call has an agenda and a definition of done.** Fourteen items. Each states the assumption, what depends on it, and what changes if it is wrong. `Blast` is how much of this module moves if the assumption fails: **edit** (a parser change), **design** (a component changes shape), **model** (the data model changes).
+**The point of this section is that the vendor call has an agenda and a definition of done.** Sixteen items, one of which (V-M2-15) is a commercial precondition rather than a question. Each states the assumption, what depends on it, and what changes if it is wrong. `Blast` is how much of this module moves if the assumption fails: **edit** (a parser change), **design** (a component changes shape), **model** (the data model changes).
 
 | ID | Assumption | What depends on it | If wrong | Blast |
 |---|---|---|---|---|
@@ -401,7 +434,9 @@ One page, five panels: today's file timeline (expected, received, applied, quara
 | V-M2-11 | Per-fill detail is available, in the EOD file or a sibling | Fill-level detectors in M7 (same-second clustering is a self-join over fills), evidence packs | M7's strongest detector class is gone and the evidence pack degrades from trade-level to day-level. This is a **product** consequence, not only a technical one | design |
 | V-M2-12 | Corrections reference the original fill | `fills.correction_of`, replay determinism, B4 #5 | The ingest layer synthesizes a correction row from a restatement. Already designed for; the mitigation is what makes this an edit rather than a redesign | edit |
 | V-M2-13 | No sandbox is available before contract | The simulator is a v1 requirement; AS-M2-01's residual | A sandbox collapses AS-M2-01's residual to near zero and is worth real money to obtain | design |
-| V-M2-14 | Server-side copy configuration and admin R\|API+ are out of scope for v1 | Module scope | In scope means a second ingest path and a second credential set, both of which [ADR-002](../DECISIONS.md) deliberately deferred | design |
+| V-M2-14 | Server-side copy configuration is out of scope for v1 | Module scope | In scope means a second provisioning surface. **Admin R\|API+ is no longer out of scope**: [ADR-020](../DECISIONS.md) makes it a candidate mechanism for the streaming layer, so this row narrowed to server-side copy alone | design |
+| **V-M2-15** | **A provisioning acknowledgement artifact exists, or the account's current risk setting is readable** | **Fail-closed provisioning (INV-M2-13), which is now design law.** Every funded account's ability to trade at all | **No account can be brought online.** This is not a degradation, it is a stop. Raise it on the call as a **requirement**, not a question: without one of the two, the relationship cannot support Merit's risk posture. Supersedes OQ-M2-04, which asked whether Merit would accept the gap; the answer is no | **commercial** |
+| **V-M2-16** | **A streaming or high-frequency snapshot mechanism is available**, whether R\|API+ admin, a market-data entitlement we already pay for, or frequent report snapshots | [ADR-020](../DECISIONS.md)'s tier 2 in its entirety: live P&L, projected floor distance, live win-day tracking, live Open Liability | The indicative layer ships against the simulator and has no production feed. Tier 1 is unaffected, so this is a **product** gap rather than a correctness one, and the honest fallback is to ship tier 1 surfaces alone and label them | design |
 
 ### Dependencies on other modules
 

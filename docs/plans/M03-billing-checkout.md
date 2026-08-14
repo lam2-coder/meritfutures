@@ -1,7 +1,7 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # M3: Billing and Checkout
@@ -9,6 +9,8 @@ last_updated: 2026-08-13
 Constitution section M3, Appendix B4 items 9 through 12 and 16, Appendix D2, Appendix B5 ten-section template. Money path under the [ADR-003](../DECISIONS.md) strict regime.
 
 This module is the front door. It is the only place a stranger who has never been authenticated can cause Merit to spend money (a provisioned account costs real entitlement dollars from the moment it exists), and it is the surface a card-fraud ring meets first. Two properties dominate every decision in it: **a purchase is a contract pinned to a plan version forever**, and **every inbound payment fact is a third-party assertion that may arrive twice, out of order, or forged.**
+
+**Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** One ruling changed this module: **[ADR-019](../DECISIONS.md)'s Merit Wallet becomes a checkout payment method** (section 3.4, INV-M3-13, SD-M3-06). The PSP application timing question (OQ-M3-04) was answered as a calendar note rather than a design change.
 
 **Identifier conventions:** `INV-M3-nn` invariants, `SD-M3-nn` schema deltas, `FM-M3-nn` failure modes, `AS-M3-nn` adversarial scenarios, `OQ-M3-nn` open questions, `DEP-M3-nn` dependencies.
 
@@ -56,6 +58,8 @@ Every arrow above can fail, and each failure has a named compensation in section
 | INV-M3-10 | A chargeback always closes the account, always flags the identity, and always posts a compensating ledger reversal, even when the identity nets negative | Automatic on `purchase.charged_back`. The books show the loss honestly. B4 #10, GS-039 |
 | INV-M3-11 | The two MIDs are never both required for a purchase to succeed, and neither is ever required to be up | Health-checked failover; `service_unavailable` only when **both** are unhealthy |
 | INV-M3-12 | A published plan version passes `validatePlan` before it is publishable, and publishing materializes `plan_version_sizes` in the same transaction | M1's CV-01 to CV-19; G-PUBLISH-APPROVED in [STATE_MACHINES section 10](../architecture/STATE_MACHINES.md). GS-076 to GS-078, GS-083 |
+| INV-M3-13 | A wallet-funded purchase debits the wallet **in the same transaction** that creates the purchase, and never creates a purchase it could not fund | Wallet balance is Merit's own ledger, so there is no third party and no asynchronous confirmation. The debit and the purchase commit together or neither does, which makes the entire PSP webhook machinery inapplicable to this path rather than merely unused |
+| INV-M3-14 | A wallet debit never takes an identity's balance below zero, and there is no credit facility anywhere in checkout | Check constraint plus the transaction in INV-M3-13. A negative wallet balance would be Merit lending money to a trader, which is a product nobody decided to build |
 
 ---
 
@@ -70,6 +74,7 @@ M3 consumes [DATA_MODEL sections 4 and 5](../architecture/DATA_MODEL.md) as appr
 | SD-M3-03 | new `mid_health` | `(psp, window_start) pk`, `attempts`, `declines`, `chargebacks`, `decline_rate_bp`, `chargeback_rate_bp`, `state text check in ('healthy','degraded','unhealthy')`, `state_changed_at` | Failover needs a **decision record**, not a live computation. A routing decision that cannot be explained after the fact is one nobody will trust during an incident, and the 65bp chargeback threshold that "threatens the processor relationship" needs to be a tracked series, not a query someone remembers to run |
 | SD-M3-04 | `coupons` | add `first_purchase_only boolean not null default false` and `applies_to_kind text check in ('new','reset','any') not null default 'any'` | Reset pricing and new-purchase pricing are different products with different margins. Without this, one leaked launch code discounts resets forever, which is the highest-volume repeat purchase in the business (AS-M3-04) |
 | SD-M3-05 | `purchases` | add `checkout_ip_country char(2) null`, `card_country char(2) null`, `geo_decision text check in ('allowed','warned','blocked')` | The geo/document/payment country triangle is an M19 and M7 input, and the decision Merit made at checkout must be recorded at checkout. Reconstructing it later from an IP log is not the same artifact |
+| SD-M3-06 | `purchases` | add `payment_method text not null check in ('psp','wallet','mixed') default 'psp'`, `wallet_debit_cents bigint not null default 0`, `wallet_ledger_transaction_id uuid null` | [ADR-019](../DECISIONS.md). Without an explicit method the wallet path is indistinguishable from a PSP purchase whose webhook never arrived, which is exactly the state FM-M3-01 pages on. `mixed` exists because a trader with $60 in the wallet buying a $99 evaluation is the common case, not an edge one, and forcing them to choose one funding source is a conversion cost with no compensating benefit |
 
 ### 2.1 The PSP abstraction
 
@@ -154,13 +159,35 @@ Publishing is where marketing and the engine are forced to be the same thing. Tw
 
 ---
 
+### 3.4 The wallet as a payment method (ADR-019)
+
+The [Merit Wallet](../DECISIONS.md) is a checkout payment method alongside the two PSPs. It is the simplest path in this module and the one most likely to be built carelessly, because it looks like a discount and is actually a money movement.
+
+**What makes it structurally different from a PSP payment:** there is no third party, no session, no webhook, no signature, and no asynchronous confirmation. The trader's wallet is a ledger account Merit owns. A wallet purchase is therefore **one transaction**: debit the wallet position, credit the appropriate revenue account, insert the `purchases` row as `paid`, and emit `purchase.paid`. No `provisioning_pending` limbo caused by payment uncertainty can exist on this path, because the payment either committed or it did not (INV-M3-13).
+
+| Concern | PSP path | Wallet path |
+|---|---|---|
+| Funding confirmation | asynchronous webhook, may arrive twice or out of order | synchronous, same transaction |
+| Failure mode | paid-not-provisioned (FM-M3-01) | insufficient balance, refused before anything is written |
+| Idempotency anchor | `(psp, provider_event_id)` | the transaction itself, plus the request idempotency key |
+| Refund | provider refund, days | ledger credit back to the wallet, instant |
+| Chargeback | possible for months | **impossible**, there is no card network in the path |
+
+**Three rules that are not obvious and are each worth a line.**
+
+**Mixed funding is supported and the wallet leg is applied first.** A trader with a partial balance pays the remainder by card. The wallet debit and the PSP session are created in one checkout transaction with the wallet leg held pending the PSP result, and **a failed PSP leg releases the wallet debit** in the same compensation step that releases a coupon claim (section 3.1). The alternative, debiting the wallet only after the card clears, leaves a window where the trader's balance is spendable twice.
+
+**A wallet refund returns to the wallet, never to a card.** Refunding a wallet purchase to an external destination would convert the wallet into a withdrawal path that bypasses [ADR-019](../DECISIONS.md)'s external leg, and with it KYC, name matching, and destination cooling. That is a laundering primitive with a refund's paperwork, and the rule against it is structural: the refund path for `payment_method = 'wallet'` has no PSP adapter call in it at all.
+
+**Chargeback risk falls, and the reason is worth stating because it changes this module's risk profile.** Wallet-funded purchases carry no chargeback exposure whatsoever, so as wallet adoption grows the denominator of `chargeback_rate_bp` shrinks while the numerator does not. **The MID health thresholds in SD-M3-03 are computed against card volume, not total volume**, or a healthy shift toward wallet funding would look like a deteriorating chargeback ratio and trip the failover in AS-M3-02's direction for no reason at all.
+
 ## 4. API endpoints touched
 
 Schemas are in [API_CONTRACT sections 5 and 8](../architecture/API_CONTRACT.md) and are not restated. What follows is what M3 adds to that contract.
 
 | Endpoint | M3's role | What this plan adds |
 |---|---|---|
-| `POST /checkout` | Owns | The full server-authoritative rule list: price from `plan_version_sizes`; discount recomputed; cap checked per identity (INV-M3-08); geo decision recorded (SD-M3-05); ToS acceptance written **before** the PSP session exists, so a buyer who abandons still has a recorded acceptance and a buyer who completes cannot have skipped it |
+| `POST /checkout` | Owns | The full server-authoritative rule list: price from `plan_version_sizes`; discount recomputed; cap checked per identity (INV-M3-08); geo decision recorded (SD-M3-05); ToS acceptance written **before** the PSP session exists, so a buyer who abandons still has a recorded acceptance and a buyer who completes cannot have skipped it. **Accepts `payment_method` of `psp`, `wallet`, or `mixed`** (SD-M3-06, section 3.4); the wallet leg is server-computed from the identity's balance and is never supplied by the client, for the same reason no price is |
 | `POST /accounts/:id/reset` | Owns | Same pipeline, `kind = 'reset'`, `parent_account_id` set. **The reset resolves the plan version current at reset time**, not the parent's, which is how a breached account on v1 becomes a new account on v3. That is correct and it must be said in the reset UI, because a trader who assumes their old rules carried over has been surprised by a rule change they never agreed to |
 | `POST /webhooks/psp/:provider` | Owns | Verify, persist raw, dedupe, then dispatch. Returns 200 on duplicate (a provider that gets a 500 retries forever) and 401 on bad signature. Never does business work in the request; it enqueues |
 | `POST /admin/plans/:id/versions`, `POST /admin/plans/versions/:id/publish` | Owns | `validatePlan` gate, `plan_version_sizes` materialization in the same transaction, dual control on cap/split/gap diffs ([ADR-010](../DECISIONS.md)), diff rendering including warnings |
@@ -347,7 +374,9 @@ One page: funnel by step for today and trailing 30 days, MID health for both pro
 
 **OQ-M3-03. Do we sell to an identity with an open severity-4 flag?** Today checkout blocks on hard limits only (cap, geo, KYC) and flags are never a checkout error, per the detection-time enforcement doctrine. That is the right default. The edge case worth ruling on: an identity with an **enforced** closure in its history buying again. Proposal: block new purchases after an enforcement, cite the ToS clause, and make it an explicit, appealable decision rather than a silent decline, because a silent decline teaches a ring to try a different email while an explicit one does not.
 
-**OQ-M3-04. PSP shortlist and application timing.** Constitution section 10 lists "PSP shortlist (apply to 2 immediately)" as an open decision, and constitution section 8 flags PSP approval lead time as a schedule risk to be front-loaded in W1. It is still open. This is a **calendar** dependency, not a design one: the adapter interface is provider-agnostic and M3 can be built and tested against a fake, but no real revenue exists until two MIDs are approved. Recommendation: apply now, in parallel with the corpus, because approval takes longer than this module does.
+**OQ-M3-04 (RULED, 2026-08-14). PSP shortlist and application timing.** Constitution section 10 lists "PSP shortlist (apply to 2 immediately)" as an open decision, and constitution section 8 flags PSP approval lead time as a schedule risk to be front-loaded in W1. This is a **calendar** dependency, not a design one: the adapter interface is provider-agnostic and M3 can be built and tested against a fake, but no real revenue exists until two MIDs are approved.
+
+**Ruled: applications go out the day the capital go-decision is made.** Not before, because a PSP application from a firm that has not committed capital is an application that gets withdrawn, and a withdrawn application is a data point a processor remembers. Not after, because approval takes longer than this module does and every day of delay is a day of launch. Pinning it to an event rather than a date is the point: the trigger is now unambiguous and it is not a thing anyone has to remember to schedule.
 
 ---
 

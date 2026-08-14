@@ -1,7 +1,7 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../architecture/DATA_MODEL.md, ../design/DESIGN_SYSTEM.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # M4: Trader Portal
@@ -9,6 +9,8 @@ last_updated: 2026-08-13
 Constitution section M4, Appendix D2 and D5, Appendix E (the Lovable and Base44 lessons), Appendix F (the anti-AI-tell standard), Appendix B5 ten-section template.
 
 The portal is where Merit's product promise either lands or does not. Everything the rules engine computes correctly is worthless if the trader cannot see why, and every competitor complaint theme in [TOP10_FIRMS](../../research/TOP10_FIRMS.md) is ultimately about a trader not being able to see the rule that decided their outcome. This module has one job: **render exactly what the engine computed, never recompute it, and never round it.**
+
+**Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** Two rulings changed this module materially: **[ADR-019](../DECISIONS.md)'s Merit Wallet adds a tenth screen** (SC-M4-10, section 3.5), and **[ADR-020](../DECISIONS.md)'s indicative realtime layer supersedes this plan's "polling, not websockets, in v1" position** (section 3.6) and adds two invariants about labeling. The module's governing sentence is unchanged and now carries more weight, not less: render exactly what the engine computed, never recompute it, never round it, **and never let a live number look like a decided one.**
 
 **Identifier conventions:** `INV-M4-nn` invariants, `SD-M4-nn` schema deltas, `SC-M4-nn` screens, `FM-M4-nn` failure modes, `AS-M4-nn` adversarial scenarios, `OQ-M4-nn` open questions, `DEP-M4-nn` dependencies.
 
@@ -18,7 +20,7 @@ The portal is where Merit's product promise either lands or does not. Everything
 
 ### 1.1 What this module is
 
-`apps/portal`, a Next.js App Router application, mobile first, consuming `/api/v1` and nothing else. Passwordless auth (passkeys plus OTP). Nine screens, listed in section 3.1.
+`apps/portal`, a Next.js App Router application, mobile first, consuming `/api/v1` and nothing else. Passwordless auth (passkeys plus OTP). **Ten** screens, listed in section 3.1.
 
 ### 1.2 What this module is not
 
@@ -44,6 +46,9 @@ The portal is where Merit's product promise either lands or does not. Everything
 | INV-M4-08 | Every rule sentence on any screen comes from `copy_blocks` on the account's pinned plan version | No rule text is authored in the portal. This is the mechanism behind constitution 0.4's "marketing must equal implementation to the tick" |
 | INV-M4-09 | The simulated-environment disclosure appears in the footer, at checkout entry, on certificates, and on the funded dashboard | Constitution section 6, and it is a compliance obligation rather than a design preference |
 | INV-M4-10 | No screen in this module is reachable without an authenticated session except the public certificate verification page | Middleware, plus the negative-authz suite asserting 401 on every route unauthenticated |
+| INV-M4-11 | Every value sourced from the indicative layer is rendered with an **indicative** label, in the same component, at the point of use | [ADR-020](../DECISIONS.md). Enforced the same way INV-M4-02 enforces `as_of_trading_day`: an indicative component takes a required `tier` prop and a component that renders a live value without it does not compile. A label in a page footer is not a label on a number |
+| INV-M4-12 | On feed loss, a live surface falls back to last-closed values **and changes its label in the same render** | The failure this prevents is a live number that silently freezes, which is indistinguishable from a quiet market and is therefore worse than an honest stale number. GS-133 |
+| INV-M4-13 | No indicative value is ever an input to a request the portal sends | The payout confirm flow reads eligibility from the authoritative endpoint only, even when a live floor distance is on screen beside it. [ADR-020](../DECISIONS.md)'s hard rule, applied at the one place in the portal where a number becomes a money decision |
 
 ---
 
@@ -61,7 +66,7 @@ M4 owns no table outright. Three deltas, one of which closes a real gap in the a
 
 ## 3. Screens and state machines
 
-### 3.1 The nine screens
+### 3.1 The ten screens
 
 | ID | Screen | The one thing it must get right |
 |---|---|---|
@@ -74,6 +79,7 @@ M4 owns no table outright. Three deltas, one of which closes a real gap in the a
 | SC-M4-07 | KYC status | Four honest states, and what to do in each |
 | SC-M4-08 | Certificates | Signed, verifiable, disclosure-bearing |
 | SC-M4-09 | Referral panel | [M8](M08-affiliate-system.md)'s trader-facing surface, with the required NFA I-26-12 disclosure |
+| SC-M4-10 | **Merit Wallet** | The balance, its two directions, and the honest statement of what a wallet balance is: money already earned and already yours, held by Merit until you withdraw it. Section 3.5 |
 
 ### 3.2 The payout request flow, which is the one that has to be perfect
 
@@ -113,6 +119,37 @@ Ruled at the M1 gate: the funded phase starts at the account size and eval profi
 
 The wording is a `copy_blocks` entry, not portal source, so it ships with the plan version it describes.
 
+### 3.5 The wallet screen (ADR-019)
+
+The wallet is where the trader's money sits between earning it and withdrawing it, so the screen's job is to make a genuinely new concept feel like the obvious one. Three elements, and the copy on the first is what decides whether traders trust the feature at all.
+
+**The balance, framed as a payable balance.** The screen says, in plain words, that this is money the trader has already earned and that Merit holds until they move it. It is **not** an account, it earns **no interest**, and it cannot be sent to another trader. Those three negatives are stated affirmatively on the screen rather than buried in the ToS, because a wallet that looks like a bank account will be treated as one, and every misunderstanding lands on support at the worst possible moment. The wording is a `copy_blocks` entry (INV-M4-08) and a counsel-review item (see [legal/](../legal/README.md)).
+
+**Two directions, deliberately asymmetric.** Money in is instant and needs no explanation. Money out has two exits and the screen shows both: **spend** on an evaluation or a reset, which is instant and internal ([M03](M03-billing-checkout.md) section 3.4), and **withdraw** to a bank destination, which carries KYC, the 48 hour destination-cooling window, a $100 minimum, and 2 to 3 business days. **No withdrawal fee**, stated on the screen rather than merely absent, because "no fee" is a claim competitors cannot make and an absence nobody notices.
+
+**The timeline.** Every credit and debit with its cause, because the wallet is a ledger view and a ledger view that does not reconcile to the trader's own memory is the fastest way to lose the trust the wallet was built to earn.
+
+**One thing the screen must not do.** It must not present the wallet balance as a score, a streak, or a level. That is [ADR-019a](../DECISIONS.md)'s bright line arriving in the one place it is most tempting to cross: a balance is money, gamifying money is what the line exists to prevent, and the fact that it is Merit's own ledger rather than a bank makes it more important to treat seriously, not less.
+
+### 3.6 The indicative layer on the dashboard (ADR-020)
+
+[ADR-020](../DECISIONS.md) puts live numbers on the trader dashboard for the first time: **live P&L, projected floor distance, and live win-day and consistency tracking**. This is the largest product change in the module and it is also the easiest place in the entire corpus to accidentally break the thing Merit sells.
+
+**The rule the screens are designed around: a live number and a decided number never look alike.** Not a different tooltip, not a different footnote, a different visual treatment at the point of use (INV-M4-11), with the two never adjacent in a way that invites comparison without context. The trader must be able to answer "is this the number the rules used" without reading anything.
+
+| Element | Tier | What it says |
+|---|---|---|
+| Live P&L, projected floor distance | indicative | "live, as of a moment ago" |
+| Live win-day and consistency tracking | indicative | "on track / not on track today", never "you have 3 win days" |
+| Balance, floor, win days, consistency, eligibility | authoritative | "as of last closed session" (INV-M4-02, unchanged) |
+| Everything in the payout center | authoritative, always | INV-M4-13 |
+
+**Projected floor distance is the feature and it is also the hazard**, so it gets its own rule. It is the single most useful number Merit can give a funded trader and the single most dangerous to get wrong, because a trader who reads it as authoritative and stops trading one tick early has lost nothing, while one who reads it as authoritative and keeps trading has lost an account. The copy therefore states the projection **and** the enforcement in the same breath: the number is indicative, and the thing that actually stops them intraday is the platform's auto-liquidator sitting at the floor ([DECISIONS](../DECISIONS.md), the Wave 2 setpoint ruling), not this display.
+
+**On feed loss the dashboard degrades rather than freezes** (INV-M4-12): live elements fall back to last-closed values with their labels changed in the same render. A frozen live number is the failure mode, because it looks exactly like a market that stopped moving.
+
+**Nothing here touches the payout center.** The confirm flow re-fetches authoritative eligibility exactly as section 3.2 already specifies, and no indicative value enters the request body (INV-M4-13). The socket could be entirely down and the payout path would be unaffected, which is the property that makes shipping tier 2 safe at all.
+
 ---
 
 ## 4. API endpoints consumed
@@ -148,7 +185,9 @@ M4 emits no domain events. It **consumes** them for live UI, and it is the surfa
 | `kyc.*` | The status card |
 | `account.graduated` | The ladder completion, with the live-invitation state |
 
-**Delivery is via polling, not websockets, in v1.** The data is T+1 by construction; a socket to deliver a number that changes once a day is infrastructure with no purchaser. Polling on focus plus a 60 second interval on the dashboard is sufficient and is one fewer stateful service to secure.
+**Delivery of domain events is via polling, not websockets.** These events are T+1 by construction; a socket to deliver a number that changes once a day is infrastructure with no purchaser. Polling on focus plus a 60 second interval on the dashboard is sufficient.
+
+**This plan's original conclusion, that v1 ships no websocket at all, is superseded by [ADR-020](../DECISIONS.md).** A socket now exists, and the distinction that makes both statements true is worth keeping: **the socket carries indicative market data, never domain events.** A `day.closed` is still delivered by polling, because it happens once and the portal can wait a minute for it. A live floor distance is delivered by socket, because it changes continuously and is the number a funded trader watches all session. The two never share a channel, which also means a socket outage cannot delay a domain event.
 
 ---
 
@@ -303,7 +342,9 @@ Not a separate one. The portal's health belongs on M6's ops page as three lines:
 
 **OQ-M4-03. Do we show the buffer as "yours but locked" or as "not yours"?** [ADR-014](../DECISIONS.md) made this sharper: after a payout the trader's loss room **is** the buffer, so the buffer is simultaneously the thing they cannot withdraw and the thing they are risking. Recommendation: show it as a distinct band on the balance display labeled as the cushion, with the sentence "after a payout, this is your loss room" attached, because a trader who discovers that relationship after their first extraction will read it as a hidden rule. This is a `copy_blocks` entry.
 
-**OQ-M4-04. Merit Rapid's cadence copy.** [EC-049](../EDGE_CASES.md): the plan's real cycle is about 5 trading days, set by the win-day gate, not by its 1 day cadence gap. The portal's cadence display must state the real figure and must not attribute the plan's speed to the gap. Confirm the wording alongside the OQ-12 decision, since if `win_days.required_count` changes on that plan the copy changes with it.
+**OQ-M4-04 (RESOLVED, 2026-08-14). Merit Rapid's cadence copy.** OQ-12 was decided as [ADR-018](../DECISIONS.md): `win_days.required_count = 3`, so **the real cycle is about 3 trading days** and that is the figure the portal displays. [EC-049](../EDGE_CASES.md) still binds: the 1 day cadence gap is dominated, never binds, and may not be presented as the reason the plan is fast. Under [ADR-019](../DECISIONS.md) the payout reaches the wallet the same day, so the cadence copy no longer needs to explain a settlement window at all; the 2 to 3 business day figure moves to the wallet screen's withdraw path, where it is actually true.
+
+**OQ-M4-05 (NEW, from [ADR-020](../DECISIONS.md)). How is "indicative" said, in one word, to a trader who will not read a sentence?** The invariants fix that a label exists and where it lives; they do not fix its wording, and this is a place where a bad word is worse than no word. "Indicative" is precise and is not a word most traders use. "Live" is the word they use and it carries exactly the wrong implication, since live is what they will assume the rules run on. "Estimated" implies imprecision that is not really the issue, because the number is accurate and merely not the one enforcement used. Recommendation: **"live (not used for rules)"** on first appearance, shortened to a persistent visual treatment plus "live" thereafter, and tested on real traders during the private beta rather than decided in this document. The one thing that must not happen is the label degrading to a tooltip, which is INV-M4-11's whole purpose.
 
 ---
 
