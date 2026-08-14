@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, COUNSEL_PACKET.md, AFFILIATE_TERMS.md, ../plans/M07-risk-abuse.md, ../plans/M19-kyc-identity.md, ../plans/M20-wallet.md, ../plans/M05-payout-system.md, ../plans/M18-graduation-track.md, ../plans/M03-billing-checkout.md, ../DECISIONS.md]
 last_updated: 2026-08-14
 ---

@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, ../../plans/M16-notification-center.md, ../../plans/M09-marketing-site.md, ../../DECISIONS.md]
 last_updated: 2026-08-14
 ---

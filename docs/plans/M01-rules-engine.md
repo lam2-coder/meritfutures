@@ -844,7 +844,7 @@ The constitution states a ceiling of "roughly 190,00 per day". That figure is re
 
 **A fast per-day rate on a hard-capped, gated, short-lived ladder is a marketing advantage. The same rate without the ladder would be a liability hole.** Merit has the ladder, and INV-17 is the assertion that keeps it.
 
-**Lifetime bound.** 5 settled payouts at 135,000c is **675,000c ($6,750) to the trader**, over roughly 5 x 5 = **25 trading days** on Core EOD, about five calendar weeks. INV-17 asserts the bound; GS-055 pins the path. Both figures fell at [ADR-024](../DECISIONS.md), and they fell in the direction that reduces liability.
+**Lifetime bound.** 5 settled payouts at 135,000c is **675,000c ($6,750) to the trader**, over roughly 5 x 5 = **25 trading days** on Core EOD, about five calendar weeks. **Direct's ladder is 4**, giving **540,000c ($5,400)** over about 20 trading days. INV-17 asserts the bound; GS-055 pins the path. Both figures fell at [ADR-024](../DECISIONS.md), and they fell in the direction that reduces liability.
 
 ### AS-04: The locked floor as a free option (NOVEL)
 
@@ -1196,7 +1196,7 @@ Three parameters are now identical across all three plans and are stated once he
 | Cadence gap, trading days | n/a | 5 | 5 | 5 | 5 | constitution 0.4 |
 | Payout cap | 300 | 75,000 | 150,000 | 300,000 | 450,000 | constitution 0.4 |
 | Split | 9000 | 9000bp | 9000bp | 9000bp | 9000bp | constitution 0.4 |
-| Ladder (`max_payouts`) | n/a | **5** | **5** | **5** | **5** | **[ADR-024](../DECISIONS.md)**. Direct may set **4 or 5** at FREEZE |
+| Ladder (`max_payouts`) | n/a | **4** | **4** | **4** | **4** | **[ADR-024](../DECISIONS.md)**, set to **4 at the FREEZE gate**: Direct skips the eval filter, so its funded population carries the unselected base rate and the heaviest per-account tail. The shortest ladder belongs on the least-filtered plan |
 | Maximum accounts per entity | n/a | 5 | 5 | 5 | 5 | constitution 0.4 |
 | KYC placement | n/a | direct_purchase | same | same | same | constitution 0.4, GLOSSARY |
 | Daily loss limit | n/a | none | none | none | none | constitution 0.4 |

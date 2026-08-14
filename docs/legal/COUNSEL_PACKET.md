@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, TOS_CLAUSES.md, PRIVACY_POLICY.md, AFFILIATE_TERMS.md, ../plans/M18-graduation-track.md, ../plans/M19-kyc-identity.md, ../plans/M20-wallet.md, ../DECISIONS.md]
 last_updated: 2026-08-14
 ---

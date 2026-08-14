@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, ../../architecture/API_CONTRACT.md, ../../plans/M10-integrations.md, ../../DECISIONS.md]
 last_updated: 2026-08-14
 ---

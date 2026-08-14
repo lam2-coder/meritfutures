@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, TOS_CLAUSES.md, ../plans/M08-affiliate-system.md, ../plans/M05-payout-system.md, ../DECISIONS.md]
 last_updated: 2026-08-14
 ---

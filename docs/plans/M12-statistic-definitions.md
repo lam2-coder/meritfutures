@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [M12-transparency-platform.md, ../DECISIONS.md, ../GLOSSARY.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M05-payout-system.md, M09-marketing-site.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
@@ -200,7 +200,7 @@ Published on the method index **with their reasons**, because an unexplained abs
 | S-13 | **ST-07** publishing a structural 100 percent with the full freeze decomposition | As drafted | ☐ approve ☐ amend |
 | S-14 | The **three exclusions**, with their reasons published verbatim | As drafted | ☐ approve ☐ amend |
 | S-15 | `effective_from` for every v1 definition is **launch plus 30 days** | As drafted | ☐ approve ☐ amend |
-| S-16 | **[OQ-M12-04](../DECISIONS.md)**: the first number publishes whatever it says, with no approval step | **Confirm the consequence in advance**: a bad first quarter publishes, is screenshotted, and cannot be withdrawn | ☐ approve ☐ amend |
+| **S-16 (APPROVED at FREEZE)** | **[OQ-M12-04](../DECISIONS.md)**: the first number publishes whatever it says, with no approval step | **Confirm the consequence in advance**: a bad first quarter publishes, is screenshotted, and cannot be withdrawn | ☐ approve ☐ amend |
 
 **S-16 is the one that matters most and it is not a definition.** [M12](M12-transparency-platform.md) INV-M12-08 removes the approval step deliberately, so that Merit can say there is no approval step. **That control is only real if its consequence is accepted before the data exists**, and accepting it afterwards is not available: the first time a founder wants to hold a number is the moment the claim stops being true.
 
@@ -213,3 +213,11 @@ Two items from [M12](M12-transparency-platform.md) section 10 that are adjacent 
 **OQ-M12-02: on-chain address or third-party trackers only?** Proposed: **cite trackers, do not publish an address.** Publishing an address publishes operational tempo permanently and irrevocably, and a group watching the balance can time a correlated wave to the funding cycle (AS-M12-02, GS-163). The proof strength lost is modest, because a tracker already indexes the rail. **The disclosure avoided is permanent.**
 
 **OQ-M12-03: the restatement materiality threshold, per statistic.** Proposed: **0.5 percentage points for rate statistics, 1 percent of value for money statistics**, published on each method page, fixed before launch. The number matters less than that it exists in advance, because AS-M12-06's real failure is a threshold chosen after seeing the delta.
+
+---
+
+## FREEZE gate ruling (2026-08-14)
+
+**The table is approved in full, including S-16.** The first published number publishes whatever it says: no soft launch, no holding the page until the figures flatter, no "we will publish once the sample is meaningful" that quietly becomes never.
+
+**The rationale, recorded because it will be tempting to revisit on a bad month: a stats page with an escape hatch is marketing, and Merit built the version without one.** The entire value of a transparency surface is that it was committed to before anyone knew what it would say. A page that publishes only favorable numbers is not a transparency page having a bad quarter; it is an advertisement that was always going to be one, and every reader who matters can tell the difference.

@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M19-kyc-identity.md, ../../DECISIONS.md]
 last_updated: 2026-08-14
 ---

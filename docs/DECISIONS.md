@@ -1,5 +1,5 @@
 ---
-status: draft
+status: approved
 depends_on: []
 last_updated: 2026-08-14
 ---
@@ -171,7 +171,7 @@ The Open Decisions Register (constitution section 10) resolves into entries here
 ## ADR-018: Merit Rapid requires 3 win days  (2026-08-14, status: accepted)
 - Context: [OQ-12](#m1-gate-closure-2026-08-13), raised by the ADR-015 ruling and left open at the M1 gate. With `win_days.required_count = 5` and win days resetting to the basis day (R-47), Merit Rapid's cycle is bound at **5 trading days by its win-day gate**, not by its 1 day cadence gap. The plan's name claims speed the lineup did not deliver: its published cadence was roughly weekly, the same order as Core EOD, and its 1 day gap was a dominated gate (EC-049) that could not be marketed as the reason the plan is fast. M01 priced the alternatives and declined to choose, because the choice is plan economics rather than engine behavior: every option is a config edit.
 - Decision: **`win_days.required_count = 3` on `merit_rapid`.** `min_trading_days` stays at 0 on all three plans, unchanged from [ADR-015](#adr-015-plan-parameters-come-from-the-founders-lifecycle-simulation-funded-minimum-trading-days-is-zero--2026-08-13-status-accepted). No engine change is required: this is a plan-config value and the gate arithmetic is untouched.
-- Recalibration, which is what makes the number defensible: the founder re-ran the lifecycle simulation at `w=3` and recorded the resulting unit economics. **Firm dollars per funded account $889, funded-to-payout conversion 48.1 percent, 2.09 payouts per paying account, and roughly 18 percent margin.** Those figures, not the plan's name, are the reason 3 was chosen over 1 or 5.
+- Recalibration, which is what makes the number defensible: the founder re-ran the lifecycle simulation at `w=3` and recorded the resulting unit economics. **Firm dollars per funded account $889, funded-to-payout conversion 48.1 percent, 2.09 payouts per paying account, and roughly 18 percent margin.** **Recalibrated exactly at the FREEZE gate once the engine landed: $904.07, 48.11 percent, 2.13, and 16.9 percent** (see the recalibration section at the end of this file). The funnel figure matched to two decimals; the others moved immaterially and unfavorably. Those figures, not the plan's name, are the reason 3 was chosen over 1 or 5.
 - **The per-day extraction ceiling of record is $300** (30,000 cents) per trading day at 50K: a 100,000c cap, a 9000bp split, a 3 trading day cycle. This ADR originally recorded approximately $240 and flagged the discrepancy; **the $240 figure was settlement-anchored commentary that predated [ADR-019](#adr-019-merit-wallet-two-leg-payouts-with-the-cadence-anchor-on-wallet-credit--2026-08-14-status-accepted) and has been corrected** (founder ruling, 2026-08-14). The `w=3` simulation calibration was **basis anchored and already contained the 3 trading day cycle**, so the correction is a bookkeeping fix to a stale annotation and **carries no economic change**: the $889, 48.1 percent, 2.09, and 18 percent figures above were produced under the 3 day cycle and stand exactly as recorded.
 - Alternatives considered: leaving it at 5 and renaming the plan again (rejected: the lineup then has no fast plan at all, and Merit Rapid's whole commercial purpose is the trader who wants a shorter cycle); dropping to 1 (rejected at the M1 gate's own arithmetic: roughly 30,000 cents per trading day on the settlement rail and roughly 45,000 on an instant one, against a design ceiling near 19,000, and it drives `cadence_gap` and `win_days` both to the floor, which is AS-01 territory); holding the ceiling by cutting the cap to about 42,000 cents (rejected: a $420 cap is a worse product than a slower cadence, and it makes the plan's headline number the unattractive one).
 - Consequences:
@@ -491,7 +491,7 @@ Three items now have a named home rather than being scattered across module plan
 - **Context:** The corpus conflated two things the market treats separately. [M01](plans/M01-rules-engine.md) R-49 graduates an account when it completes its payout ladder **and emits a live invitation in the same step**, which reads as a promise: complete the ladder, receive live capital. [M18 AS-M18-01](plans/M18-graduation-track.md) already found that promise to be a regulatory and commercial exposure, and [OQ-M18-01](#) ruled that **no live program exists at launch**. That left an engine still emitting an invitation event for a program that does not exist. Separately, the ladder counts were 8 on Core EOD and Merit Rapid and 6 on Direct, which is longer than industry practice.
 - **Decision, in two parts, and the separation is the point.**
 
-  **(1) `max_payouts` launch candidate is 5 on all plans.** Configured per `plan_version` like every other parameter ([the parameter-status ruling](#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14)), so it is tunable to launch without an engine change. **Direct may set 4 or 5 at FREEZE.** Industry consensus is the anchor: **Lucid and Tradeify both run 5.**
+  **(1) `max_payouts` launch candidate is 5 on all plans.** Configured per `plan_version` like every other parameter ([the parameter-status ruling](#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14)), so it is tunable to launch without an engine change. **Direct was set to 4 at the FREEZE gate** (see the gate closure below). Industry consensus is the anchor: **Lucid and Tradeify both run 5.**
 
   **(2) The live invitation is fully discretionary and decoupled from the ladder.** Completing the ladder sets **graduation eligibility**, which is a **review-pool flag and nothing more**. Invitation is at **Merit's sole discretion** from that pool. The two are no longer one event.
 - **The framing to publish, adopted verbatim from Lucid because it is exactly right:** the ladder is **"the maximum payout level, not a guaranteed minimum for live eligibility."** One sentence that prevents the entire misreading, and it goes in the ToS and in marketing.
@@ -555,3 +555,102 @@ Three items now have a named home rather than being scattered across module plan
   - The ladder-finiteness disclosure ruling is **confirmed unchanged**: the countdown tracker counts down from the final ordinal, and the continuation clause sits in the same sentence as the limit. [EC-122](EDGE_CASES.md#ec-122-the-payout-ladder-is-only-a-ladder-while-the-trader-is-winning--2026-08-14-module-m18-status-specced), [M18](plans/M18-graduation-track.md) INV-M18-02, GS-206.
   - **A numbering note, because the ruling as delivered cited two edge cases by the wrong number.** The ruling folds into **EC-104** (progressive cap release, M14) and **EC-122** (ladder finiteness, M18). It cited EC-136 and EC-137, which are Merit Wallet entries ("the wallet compresses the attacker's cycle as much as the trader's" and "checkout is a transfer endpoint nobody labelled as one") and are untouched by it. The mis-citation is inherited from [ADR-024](#adr-024-the-ladder-and-the-live-invitation-are-two-separate-mechanisms--2026-08-14-status-accepted), which cited EC-137 for the finiteness finding; that citation is corrected in place above. Recorded here rather than fixed silently, because a corpus whose cross-references are its navigation cannot afford a quiet renumbering, and the **docs link-check** joining the CI inventory at this gate exists to catch the next one.
 - **Founder ruling (2026-08-14): ADOPTED.**
+
+---
+
+# FREEZE gate closure (2026-08-14)
+
+The founder ruled every open item and granted the sign-offs. **The corpus is FROZEN.** This section records the gate; each ruling is folded into the documents it touches.
+
+## OQ-FREEZE-01: the loyalty perk's credit class
+
+**The implementation is CONFIRMED and [ADR-025](#)'s literal wording is OVERRULED.** The cross-account loyalty perk is `promotional_credit`, rendered inside the wallet screen and **never withdrawable**. The ADR's phrase "bonus wallet credit", read literally, would have breached INV-M14-10, [M20](plans/M20-wallet.md) INV-M20-03 and INV-M20-11, `INV-WALLET-NO-DEPOSITS`, and [M17](plans/M17-offers-engine.md) INV-M17-08, and would have handed an attacker a laundering path that does not require passing an evaluation.
+
+**Recorded because it is the most useful thing that happened at this gate: the invariant guard caught a founder-guide wording error, and the author raised it rather than implementing it.** That is the review system working as designed. The corpus's standing rule is that a session asks when the constitution is ambiguous and proposes an ADR when it is silent. This was a third case, **an instruction that was clear and wrong**, and the correct response was to implement the intent, flag the conflict, and put it in front of the founder as a named question rather than either obeying the words or quietly substituting a judgment. **A closed check constraint is a good place to discover a wording error, because it is the one kind of specification that cannot be talked past.**
+
+## OQ-FREEZE-02: the branch-workflow conflict, amending ADR-D1
+
+**[ADR-D1](#) is amended. Corpus single-trunk is achieved via immediate pull-request merge rather than by direct commit alone.**
+
+| Session origin | Workflow |
+|---|---|
+| **Harness-launched** (web, mobile, or any designated-branch instruction) | Runs its designated branch. **Must end mergeable.** The founder merges **same day** |
+| **Local** | Commits **direct to `main`**, unchanged |
+
+**Why this rather than picking a side.** The single-trunk rule exists because a commit living in one container is a commit about to be lost, and a long-lived branch is a merge conflict with a delay fuse. **A branch merged the same day is neither of those things.** The harness's branch default is not going to stop asserting itself, so a rule forbidding it would be broken on every web-launched session and would then be ignored, which is worse than a rule that accommodates it and keeps the merge window short. **PR #2 is merged.**
+
+## Sign-offs granted
+
+| Item | Ruling |
+|---|---|
+| **Wave 3 batch 2** (M09 to M20) | **APPROVED** |
+| **Wave 4** (18 new documents, 5 placeholders retired, 3 rewrites) | **APPROVED** |
+| **Plan parameters** | **CONFIRMED as launch candidates**, re-confirmed at launch as config per the standing [parameter-status ruling](#) |
+| **Direct's ladder** | **4** |
+| **KYC trigger set** | **`{second_distinct_account + pre_funded}`, earliest fires** |
+| **M12 sign-off table** | **APPROVED, including S-16** |
+
+### Direct's ladder is 4
+
+**The rationale is a risk argument, not an economic one.** Direct skips the evaluation entirely, so **its funded population carries the unselected base rate of skill**. Every other plan's funded book has passed a filter; Direct's has passed nothing. The [calibration source](../research/calibration/README.md)'s own selection math makes this decisive: an evaluation is a weak classifier, but a weak classifier is not a useless one, and removing it leaves a population at the base rate, where durable edge is 1 to 3 percent and the **per-account tail is heaviest**. **The shortest ladder belongs on the least-filtered plan.**
+
+**Lifetime to trader at 50K: 4 x 135,000c = 540,000c ($5,400).** Margin intact, confirmed exactly in the recalibration below.
+
+### The KYC trigger set is `{second_distinct_account + pre_funded}`
+
+**The fleet-coverage argument prevails.** [ADR-021](#) framed the choice as `{pre_funded always}` versus this one, and AS-M19-01's finding decides it: `pre_funded` alone leaves roughly 85 percent of buyers outside the biometric dedupe corpus, and fleet operators are disproportionately inside that 85 percent because they are serial buyers who mostly do not pass evaluations. **`second_distinct_account_purchase` captures their faces early, at a cost paid only by people who have already bought twice.**
+
+**Telemetry adjudicates post-beta.** The per-trigger funnel instrumentation and the corpus-coverage floor exist so this is revisited against data rather than re-argued. The trigger set is a config array and changing it is not an engine change.
+
+### M12's sign-off table is approved, including S-16
+
+**S-16 commits Merit to publishing whatever the first published number says.** No soft launch, no holding the page until the figures flatter, no "we will publish once the sample is meaningful" that quietly becomes never.
+
+**The rationale, recorded because it will be tempting to revisit on a bad month: a stats page with an escape hatch is marketing, and Merit built the version without one.** The entire value of a transparency surface is that it was committed to before anyone knew what it would say. A page that publishes only favorable numbers is not a transparency page having a bad quarter; it is an advertisement that was always going to be one, and every reader who matters can tell the difference.
+
+## The calibration engine landed, and the corpus is recalibrated against it
+
+`research/calibration/mc_lifecycle.py` (546 lines) is committed. **Every "at least" and "conservative rather than exact" annotation in the corpus is now replaced with a measured value.** The engine was run at the corpus's actual configuration; the runs and the checklist are recorded in [SIMULATION_HARNESS section 8](testing/SIMULATION_HARNESS.md).
+
+### The reproduction check passed
+
+Running the engine **as committed**, against its own `OUR_PLANS`, reproduces the workbook's plans tab: **$690.44 firm dollars per funded account on Core EOD** against the workbook's $698, **$829.36 on Rapid** against $800, **$207.33 on Direct** against $206. The **portfolio risk engine reproduces the [calibration README](../research/calibration/README.md)'s table exactly**, to the cent: CVaR99 at rho = 0.30 is **$132,896.71**, the multiple is **2.9285x**, and every one of the twenty ruin cells matches. **Reproducing a superseded result from superseded inputs was the cheapest available proof that the port is faithful, and it was available exactly once.** It is now spent, and it passed.
+
+### Exact recalibrated figures, at the corpus configuration
+
+`w=3` on Merit Rapid, funded `min_trading_days = 0` on all three plans, ladder **5 / 5 / 4**:
+
+| Plan | Eval pass | Funded to payout | **Firm $ per funded (50K)** | Payouts per payer | Contribution margin |
+|---|---|---|---|---|---|
+| Core EOD | 26.53% | 33.46% | **$690.44** | 1.54 | **+0.25%** |
+| **Merit Rapid** | 16.55% | **48.11%** | **$904.07** | **2.13** | **16.9%** |
+| Direct | 100% | 12.07% | **$207.33** | 1.30 | **39.2%** |
+
+**[ADR-018](#) recorded $889, 48.1 percent, 2.09 payouts per payer, and roughly 18 percent margin.** The exact figures are **$904.07, 48.11 percent, 2.13, and 16.9 percent**. The funnel figure matches to two decimal places; firm cost is 1.7 percent higher and margin 1.1 points lower than the round numbers carried since. **The direction is mildly unfavorable and the magnitude is immaterial**, which is the outcome a decision made on round numbers is entitled to hope for and not entitled to assume. Merit Rapid remains the lineup's margin engine at 16.9 percent.
+
+### The finding this run produced, which is not what anyone expected
+
+**Shortening the ladder changed the modeled firm cost by exactly nothing on Core EOD and Direct.** The two configurations, ladder 8 and 6 against ladder 5 and 4, return **identical figures to every decimal place**. The reason is visible in the table above: **mean payouts per payer are 1.54, 2.13 and 1.30, nowhere near any ladder length under discussion.** The average account never reaches rung 4, let alone rung 8.
+
+**So [ADR-024](#) and Direct's ladder of 4 are margin-neutral in the central estimate, and their entire value is tail protection.** That is a stronger statement than "margin intact", and it is the one to carry:
+
+- **The claim "liability is monotone-decreasing in `max_payouts`" is confirmed and is nearly vacuous at the mean.** The ladder does not bind the average account. It binds the account that keeps winning, which is precisely the account a reserve model must survive.
+- **A ladder is a tail control priced at zero in the central case.** Shortening it costs nothing that shows up in a margin table and removes the far right of the distribution, which is where correlated groups and undetected rings live. The [risk engine's](../research/calibration/README.md) own conclusion points the same way: the tail is all correlation and the mean is flat.
+- **The corollary is a warning.** Because the ladder never binds on the average account, **no margin table will ever show its value**, and a future review looking only at unit economics will find it costless in both directions and may conclude it can be lengthened for free. It cannot. INV-17 is the assertion, and this paragraph is the reason.
+
+### The six-divergence checklist, run
+
+| # | README divergence | Engine says | Outcome |
+|---|---|---|---|
+| 1 | "Rapid Daily" versus Merit Rapid | `'Rapid Daily (eval)'` | **Confirmed stale.** Corpus wins ([ADR-013](#)) |
+| 2 | 5 win days versus `w=3` | `winning_days=5` | **Confirmed stale, and it means the committed engine predates the founder's own `w=3` re-run.** The re-run happened; it was never saved back. Corpus wins ([ADR-018](#)) |
+| 3 | Rapid cadence gap 1 | `payout_gap=1` | **Agrees.** No divergence |
+| 4 | Funded minimum days | Core `min_days=0`, **Rapid `min_days=5`, Direct `min_days=5`** | **A seventh divergence, not in the README's six.** Corpus is 0 on all three ([ADR-015](#)) and the engine carries 5 on two plans. It is dominated by the win-day gate in both cases, so it changes nothing, which is exactly why nobody noticed |
+| 5 | Settlement anchor | Not modelled; the engine has `payout_gap` only | **Not applicable.** The anchor is a corpus-level semantic the model does not represent |
+| 6 | Split "90/9" | `split=0.90` | **Resolved as a workbook display typo.** The engine has always been correct |
+| 7 | Ladder 8 / 8 / 6 | `max_payouts=8, 8, 6` | **Confirmed stale.** Corpus is 5 / 5 / 4 ([ADR-024](#) and this gate) |
+
+**Four confirmed stale, one agreement, one not applicable, one resolved as a typo, and one new.** The corpus won every contested row, which is the result the README predicted and the reason it was written before the engine arrived.
+
+**The engine is now the source of record and it is stale in four places.** That is recorded rather than fixed here: **re-running it at the corpus configuration is a build-phase task**, listed in [SIMULATION_HARNESS section 8](testing/SIMULATION_HARNESS.md), and it must produce the table above before any CI calibration band is set from it.
+

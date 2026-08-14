@@ -2,16 +2,26 @@
 
 **Constitution:** [MERIT_BUILD_MASTER_PROMPT.md](MERIT_BUILD_MASTER_PROMPT.md) (read-only; amendments via docs/DECISIONS.md). Read it in full once; re-read the section governing your current task.
 
-## Git workflow (corpus phase): single trunk, push after every commit
-**`main` is the only branch and it is the single source of truth.** Corpus sessions commit directly to `main` and push to `origin` immediately after every commit. There are no feature branches and no pull requests during the corpus phase. The reason is a solo operator working across two machines: a commit that exists only in one container or on one laptop is a commit that is about to be lost, and a branch that exists only locally is a merge conflict with a delay fuse.
+## Git workflow (POST-FREEZE, from 2026-08-14)
 
-Deterministic enforcement lives in [.claude/settings.json](.claude/settings.json), per constitution C10 ("hooks are law; CLAUDE.md is advice"):
-- **`SessionStart` → `git pull --ff-only`**, then echo STATE.md. A session never starts on a stale tree.
-- **`Stop` → `git push origin HEAD`**. A session never ends with unpushed commits.
+**The corpus is FROZEN. Branch-per-module plus pull-request discipline is now in force** (constitution C7). The corpus-phase single-trunk rule has expired.
 
-Both hooks report failure loudly and exit zero rather than blocking, so a network outage cannot wedge a session. That is a deliberate softening, recorded in [DECISIONS.md](docs/DECISIONS.md); if a hook prints a failure, fix it by hand before doing anything else.
+**Every code change runs on a branch and lands through a pull request.** Money-path modules (rules engine, payout, ledger, auth) are reviewed line by line by the founder per constitution E2 before merge.
 
-**Branch-per-module plus pull-request discipline resumes at FREEZE for application code** (constitution C7). The single trunk is a corpus-phase rule only, and it expires the moment code exists.
+**Session-origin rule** ([ADR-D1](docs/DECISIONS.md), as amended at the FREEZE gate):
+
+| Session origin | Workflow |
+|---|---|
+| **Harness-launched** (web, mobile, any designated-branch instruction) | Run the designated branch. **End mergeable.** The founder merges same day |
+| **Local** | Branch, push, open a PR |
+
+Deterministic enforcement lives in [.claude/settings.json](.claude/settings.json), per constitution C10:
+- **`SessionStart` -> `git pull --ff-only`**, then echo STATE.md. A session never starts on a stale tree.
+- **`Stop` -> `git push origin HEAD`**. A session never ends with unpushed commits.
+
+Both hooks report failure loudly and exit zero rather than blocking, so a network outage cannot wedge a session. If a hook prints a failure, fix it by hand before doing anything else.
+
+**Changing a frozen document requires an ADR, not a commit.**
 
 ## Start ritual (every session, no exceptions)
 1. **Pull first.** `git pull --ff-only` (the SessionStart hook does this; verify it ran).
@@ -28,8 +38,9 @@ Both hooks report failure loudly and exit zero rather than blocking, so a networ
 3. **Verify clean and pushed:** `git status` reports a clean tree and `git log origin/main..HEAD` is empty. The Stop hook pushes, but the verification is yours; a hook that printed a failure into a scrollback nobody read is not a control.
 
 ## Current phase
-**Planning corpus generation (pre-FREEZE). Zero application code until STATE.md says FROZEN.**
-Wave 1 (research/) and Wave 2 (docs/architecture/) are approved. Wave 3 (docs/plans/) batch 1 is approved except M02, which holds at `review` pending the Rithmic vendor call ([ADR-005](docs/DECISIONS.md)). See STATE.md for the gate and next actions.
+**FROZEN (2026-08-14). The corpus is the specification and application code has begun.**
+A behavior not in the corpus is not in scope; a behavior in the corpus is a commitment. The first build session is the **schema-delta reconciliation**: money path, strict ADR-003 regime, fresh context, **plan mode mandatory**.
+See [docs/STATE.md](docs/STATE.md) for the post-FREEZE position, the nine surviving items, and the build sequence.
 
 ## Conventions (binding)
 - Deliverables are documents until FREEZE. Docs are the single source of truth.

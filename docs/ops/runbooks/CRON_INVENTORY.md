@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, ../../architecture/INFRA.md, ../../DECISIONS.md, ../../plans/M01-rules-engine.md, ../../plans/M12-transparency-platform.md]
 last_updated: 2026-08-14
 ---

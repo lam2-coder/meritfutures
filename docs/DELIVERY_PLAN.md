@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../MERIT_BUILD_MASTER_PROMPT.md, DECISIONS.md, STATE.md, INDEX.md, testing/STRATEGY.md, testing/SIMULATION_HARNESS.md, GUIDE_BRIEFING.md]
 last_updated: 2026-08-14
 ---

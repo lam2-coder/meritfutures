@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, COMMS_TEMPLATES.md, ../../architecture/INFRA.md, ../../plans/M05-payout-system.md]
 last_updated: 2026-08-14
 ---

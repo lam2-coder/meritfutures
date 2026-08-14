@@ -1,5 +1,5 @@
 ---
-status: draft
+status: approved
 depends_on: [INDEX.md, STATE.md, DECISIONS.md, ../MERIT_BUILD_MASTER_PROMPT.md]
 last_updated: 2026-08-14
 ---
@@ -68,28 +68,31 @@ Claude Code folds every ruling into every affected doc, commits, pushes, stops
 4. **The regime**: money-path work (rules engine, payout, ledger, auth) runs one objective per session with a fresh context; non-money work (docs, marketing, fixtures) may compound ([ADR-003](DECISIONS.md)).
 5. **Any verification to perform**, such as confirming a file landed or a count reconciles.
 
-## Current state (2026-08-14)
+## Current state (FROZEN, 2026-08-14)
 
 Authoritative version is [STATE.md](STATE.md). This is the orientation snapshot.
 
-**Wave 1 (research) approved. Wave 2 (architecture) approved. Wave 3 (module plans) complete and drafted: M01 through M20.**
+**The corpus is FROZEN as of 2026-08-14.** All four waves are approved and every document except M02 is at `approved`. **Application code may now begin**, and branch-per-module plus pull-request discipline resumes per constitution C7.
+
+**This briefing's "current state" and "session queue" sections are now historical.** [STATE.md](STATE.md) carries the post-FREEZE position and the build sequence, and it wins wherever the two differ. What remains durable here is the role split, the working loop, and the reviewer primer.
 
 | Batch | Status |
 |---|---|
 | M01 rules engine | **approved** (gate closed, eleven rulings) |
 | M02 rithmic bridge | **review**, and cannot advance while the vendor call is outstanding ([ADR-005](DECISIONS.md)) |
 | M03 to M08 | **approved** (batch 1 gate closed) |
-| M09 to M20 | **review**, awaiting the batch 2 gate |
+| Wave 4 (testing, ops, design, legal) | **approved** (FREEZE gate) |
+| M09 to M20 | **approved** (FREEZE gate) |
 
-**The gate in front of us: Wave 3 batch 2, twelve plans.** All five open batch 2 questions were ruled in the consolidated addendum and folded, so this is a **read-through rather than a decision gate**. Suggested order by downstream reach: **M20 (wallet), M19 (identity), M12 (public statistics).**
+**The gate is closed.** The first build session is the **schema-delta reconciliation**: money path, strict [ADR-003](DECISIONS.md) regime, fresh context, **plan mode mandatory**.
 
-**24 ADRs accepted.** The ones with the widest reach, worth knowing before reviewing anything:
+**25 ADRs accepted, and the corpus is FROZEN.** The ones with the widest reach, worth knowing before reviewing anything:
 
 - **ADR-013 / 014 / 015**: cadence anchoring, the permanent floor lock (no post-payout reset), and plan parameters sourced to the founder's lifecycle simulation.
 - **ADR-019 (Merit Wallet)**: payouts settle instantly to an internal wallet; external withdrawal is a second leg. This moved the cadence anchor and compressed every plan's cycle.
 - **ADR-020**: a two-tier data plane. Authoritative rules math stays EOD/batch; an indicative realtime layer ships in v1 and **never feeds an eligibility, breach, or money decision**.
 - **ADR-021 / 022 / 023**: composite KYC trigger set, identity defense as a scored graph in three priced tiers, and a bought-not-built checkout enrichment vendor.
-- **ADR-024**: the payout ladder and the live invitation are **two separate mechanisms**. `max_payouts` is 5 on all plans (industry consensus); ladder completion sets a review-pool flag, and any live invitation is at Merit's sole discretion.
+- **ADR-024**: the payout ladder and the live invitation are **two separate mechanisms**. `max_payouts` is 5 on Core EOD and Merit Rapid, **4 on Direct**; ladder completion sets a review-pool flag, and any live invitation is at Merit's sole discretion.
 
 **Open counsel items (three, one lawyer, one sitting).** These are the questions engineering cannot answer:
 

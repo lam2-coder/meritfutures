@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, COMMS_TEMPLATES.md, ../../architecture/SECURITY.md, ../../../research/SECURITY_LANDSCAPE.md, RB-09-break-glass.md]
 last_updated: 2026-08-14
 ---

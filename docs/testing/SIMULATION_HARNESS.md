@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../../research/calibration/README.md, ../plans/M01-rules-engine.md, ../DECISIONS.md, ../plans/M05-payout-system.md, ../plans/M06-admin-ops-console.md, ../plans/M07-risk-abuse.md, STRATEGY.md, GOLDEN_SCENARIOS.md]
 last_updated: 2026-08-14
 ---
@@ -228,3 +228,55 @@ The [calibration README](../../research/calibration/README.md) tabulates six pla
 **OQ-SH-02. Does the nightly run page, or digest?** Section 7.2 proposes **page**, on the same channel as a nightly batch failure. The argument for digest is that a band breach is rarely urgent at 3am. The argument for page, which is the recommendation, is that the first time this suite is treated as a digest is the last time anybody reads it.
 
 **OQ-SH-03. Is the capital decision made against RE-S-09 at $350K?** The workbook puts combined-stress 18 month ruin at **0.36 percent at $350K** and **6.28 percent at $150K**. This is the founder's call and it is on the [STATE](../STATE.md) surviving-items list rather than being decided here, but the harness should be told which figure it is defending so RE-S-08's band can be set against it rather than against a general sense of adequacy.
+
+---
+
+## 9. Section 8 executed at the FREEZE gate (2026-08-14)
+
+`research/calibration/mc_lifecycle.py` landed and section 8's checklist was run. **This section is the result, and it replaces every "at least" and "conservative rather than exact" annotation that stood in for it.**
+
+### 9.1 The reproduction check passed, and it is now spent
+
+Run **as committed** against its own `OUR_PLANS`, the engine reproduces the workbook's plans tab: **$690.44 firm dollars per funded account on Core EOD** (workbook $698), **$829.36 on Rapid** ($800), **$207.33 on Direct** ($206). The **portfolio risk engine reproduces the [calibration README](../../research/calibration/README.md)'s table exactly, to the cent**: CVaR99 at rho = 0.30 is **$132,896.71**, the multiple **2.9285x**, and all twenty ruin cells match.
+
+**Reproducing a superseded result from superseded inputs was the cheapest available proof that the port is faithful, and it was available exactly once.** It has been used and it passed.
+
+### 9.2 Exact figures at the corpus configuration
+
+`w=3` on Merit Rapid, funded `min_trading_days = 0` on all three, ladder **5 / 5 / 4**, 60,000 traders, seed 7:
+
+| Plan | Eval pass | Funded to payout | **Firm $ per funded (50K)** | Payouts per payer | Contribution margin |
+|---|---|---|---|---|---|
+| Core EOD | 26.53% | 33.46% | **$690.44** | 1.54 | **+0.25%** |
+| **Merit Rapid** | 16.55% | **48.11%** | **$904.07** | **2.13** | **16.9%** |
+| Direct | 100% | 12.07% | **$207.33** | 1.30 | **39.2%** |
+
+[ADR-018](../DECISIONS.md) carried $889, 48.1 percent, 2.09, and roughly 18 percent. **The funnel figure matches to two decimals; firm cost is 1.7 percent higher and margin 1.1 points lower.** Immaterial, and mildly unfavorable, which is what a decision made on round numbers is entitled to hope for rather than assume.
+
+**Core EOD's contribution margin is +0.25 percent**, which is not a rounding artifact and is not new: the workbook had it at **negative 0.88 percent**. Core EOD is a customer-acquisition plan whose economics live in rebuys and in the lineup, not in its own contribution line. That was always true and is now measured.
+
+### 9.3 The finding: the ladder does not bind the average account
+
+**Ladder 8 and 6 against ladder 5 and 4 return identical figures to every decimal place on Core EOD and Direct.** Mean payouts per payer are **1.54, 2.13 and 1.30**, nowhere near any ladder length under discussion.
+
+**[ADR-024](../DECISIONS.md) and Direct's ladder of 4 are therefore margin-neutral in the central estimate, and their whole value is tail protection.** Three consequences for this harness:
+
+1. **A calibration band derived from mean behavior will never show the ladder's value.** Any band that does is measuring something else.
+2. **The ladder must be exercised in the tail scenarios explicitly**, not left to the population to reach. A population whose mean account takes 1.5 payouts will exercise rung 4 rarely enough that a bug there survives calibration.
+3. **The warning to carry forward:** because no margin table will ever show the ladder costing anything, a future review looking only at unit economics will find it free in both directions and may conclude it can be lengthened at no cost. **It cannot.** INV-17 is the assertion; this paragraph is the reason.
+
+### 9.4 The divergence checklist, run
+
+**Four confirmed stale, one agreement, one not applicable, one resolved as a workbook typo, and one new.**
+
+| # | Divergence | Engine | Outcome |
+|---|---|---|---|
+| 1 | Plan name | `'Rapid Daily (eval)'` | Stale. Corpus wins |
+| 2 | Rapid win days | `winning_days=5` | Stale, **and it shows the committed engine predates the founder's own `w=3` re-run**. The re-run happened; it was never saved back |
+| 3 | Rapid cadence gap | `payout_gap=1` | Agrees |
+| 4 | Funded minimum days | Core `0`, **Rapid `5`, Direct `5`** | **New, seventh divergence.** Corpus is 0 on all three. Dominated by the win-day gate on both plans, so it changes nothing, which is exactly why it went unnoticed |
+| 5 | Settlement anchor | not modelled | Not applicable; a corpus-level semantic the model does not represent |
+| 6 | Split "90/9" | `split=0.90` | **Workbook display typo.** The engine was always right |
+| 7 | Ladder 8 / 8 / 6 | `max_payouts=8, 8, 6` | Stale. Corpus is 5 / 5 / 4 |
+
+**The engine is now the source of record and it is stale in four places.** Recorded rather than fixed here: **re-running it at the corpus configuration is a build-phase task**, and it must reproduce section 9.2's table before any CI calibration band is set from it. Until then the table above is the reference, and it was produced by running the committed engine with the corpus's parameters passed in rather than by editing the file.

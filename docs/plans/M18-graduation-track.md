@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/TOP10_FIRMS.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
@@ -17,7 +17,7 @@ last_updated: 2026-08-14
 
 **The framing to publish, adopted verbatim from Lucid:** the ladder is **"the maximum payout level, not a guaranteed minimum for live eligibility."** One sentence, and it prevents the whole misreading. Binding on the ToS and on marketing.
 
-**`max_payouts` is 5 on all plans** ([ADR-024](../DECISIONS.md)), matching Lucid and Tradeify. Lifetime to the trader at 50K is **$6,750 on Core EOD and Direct, $4,500 on Merit Rapid**.
+**`max_payouts` is **5 on Core EOD and Merit Rapid and 4 on Direct** (the FREEZE gate set Direct's)** ([ADR-024](../DECISIONS.md)), matching Lucid and Tradeify. Lifetime to the trader at 50K is **$6,750 on Core EOD, $5,400 on Direct, $4,500 on Merit Rapid**.
 
 ### Competitive map: how the market structures the live path
 
@@ -259,7 +259,7 @@ stateDiagram-v2
 **Counter, and all of it is disclosure done early rather than a mechanism.**
 1. **The ladder's finiteness is stated before purchase** (INV-M18-02): on the plan's rules page, in the plan comparison, and in the account's tracker from ordinal zero. Not "up to 5 payouts" in small type but the sentence [ADR-024](../DECISIONS.md) specifies: **"each account pays up to 5 payouts, then completes. Open another anytime."** The second clause is load bearing, and a shorter ladder makes it more so: finiteness now arrives sooner, so the continuation path has to sit in the same sentence as the limit rather than a page away.
 2. **The tracker counts down, not up.** "3 of 5 taken" and "2 remaining" are the same fact and the second is the one that cannot be misread. **Confirmed unchanged at the pre-Wave-4 fold**, together with the requirement that the continuation clause sits in the same sentence as the limit rather than a page away (EC-122).
-3. **The lifetime number is published on the rules page**: **$6,750 on Core EOD at 50K and $4,500 on Merit Rapid**, at the 9000bp split ([ADR-024](../DECISIONS.md)). [ADR-018](../DECISIONS.md) already uses that figure internally as a defense, and publishing it converts it from a defense into a feature. **The number fell when the ladder shortened from 8 to 5, and it is still the right thing to publish**: a trader who computes it before buying is a trader who cannot be surprised by it later, which is the entire point of AS-M18-02.
+3. **The lifetime number is published on the rules page**: **$6,750 on Core EOD at 50K, $5,400 on Direct, and $4,500 on Merit Rapid**, at the 9000bp split ([ADR-024](../DECISIONS.md)). [ADR-018](../DECISIONS.md) already uses that figure internally as a defense, and publishing it converts it from a defense into a feature. **The number fell when the ladder shortened from 8 to 5, and it is still the right thing to publish**: a trader who computes it before buying is a trader who cannot be surprised by it later, which is the entire point of AS-M18-02.
 4. **The graduation page exists publicly** (`GET /public/graduation`) and is linked from every rules page, so what happens at the end is readable before the beginning. EC-122, GS-206.
 
 ### AS-M18-03: Graduation is the outcome a successful ring produces (NOVEL)
@@ -402,7 +402,7 @@ M18 supplies a panel on [M6](M06-admin-ops-console.md): ordinal distribution, gr
 
 **OQ-M18-03. Does a graduation benefit exist, and if so what is it?** AS-M18-03 shows any benefit adds a step function exactly where the ladder was supposed to stop, and that the cohort receiving it is enriched for undetected rings. Proposed: **recognition and continuation only** for v1: the certificate, the published lifetime figure, and a clean path to a new account. If a benefit is ever added, it needs the cohort review, an expiry on holds, and a fresh simulation-harness pass, because a step function at the end of the ladder is a liability change rather than a marketing addition.
 
-**OQ-M18-04. Is the published lifetime figure a good idea?** AS-M18-02's counter 3 proposes publishing **$6,750 on Core EOD at 50K and $4,500 on Merit Rapid** ([ADR-024](../DECISIONS.md)), which [ADR-018](../DECISIONS.md) already uses internally as a defense of the plan's headline rate. Publishing it makes the cap unmistakable before purchase and gives the [dossier](../../research/ADVERSARY_DOSSIER.md)'s forensic readers an exact figure for the maximum extraction per account. Recommendation: **publish it.** They will compute it in an afternoon regardless, it is a large and attractive number to an honest trader, and it converts the corpus's most important liability defense into a marketing asset rather than a surprise.
+**OQ-M18-04. Is the published lifetime figure a good idea?** AS-M18-02's counter 3 proposes publishing **$6,750 on Core EOD at 50K, $5,400 on Direct, and $4,500 on Merit Rapid** ([ADR-024](../DECISIONS.md)), which [ADR-018](../DECISIONS.md) already uses internally as a defense of the plan's headline rate. Publishing it makes the cap unmistakable before purchase and gives the [dossier](../../research/ADVERSARY_DOSSIER.md)'s forensic readers an exact figure for the maximum extraction per account. Recommendation: **publish it.** They will compute it in an afternoon regardless, it is a large and attractive number to an honest trader, and it converts the corpus's most important liability defense into a marketing asset rather than a surprise.
 
 ---
 

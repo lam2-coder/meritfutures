@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../plans/M04-trader-portal.md, ../plans/M09-marketing-site.md, ../plans/M11-certificates-social-proof.md, ../plans/M12-transparency-platform.md, ../testing/STRATEGY.md, ../DECISIONS.md]
 last_updated: 2026-08-14
 ---

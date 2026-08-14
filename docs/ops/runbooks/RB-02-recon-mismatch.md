@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M02-rithmic-bridge.md, ../../plans/M01-rules-engine.md]
 last_updated: 2026-08-14
 ---

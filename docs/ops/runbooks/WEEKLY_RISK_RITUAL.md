@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, ../../plans/M06-admin-ops-console.md, ../../plans/M07-risk-abuse.md, ../../plans/M05-payout-system.md, ../../testing/SIMULATION_HARNESS.md]
 last_updated: 2026-08-14
 ---

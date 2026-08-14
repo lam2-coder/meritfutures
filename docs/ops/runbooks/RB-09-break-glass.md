@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [README.md, ../../architecture/SECURITY.md, ../../DECISIONS.md, RB-08-security-incident.md]
 last_updated: 2026-08-14
 ---

@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../../MERIT_BUILD_MASTER_PROMPT.md, ../../DECISIONS.md, ../../architecture/INFRA.md, ../../architecture/SECURITY.md, ../../architecture/EVENTS.md, ../../plans/M02-rithmic-bridge.md, ../../plans/M05-payout-system.md, ../../plans/M06-admin-ops-console.md, COMMS_TEMPLATES.md, CRON_INVENTORY.md, WEEKLY_RISK_RITUAL.md]
 last_updated: 2026-08-14
 ---

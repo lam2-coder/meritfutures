@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../DECISIONS.md, ../EDGE_CASES.md, GOLDEN_SCENARIOS.md, SIMULATION_HARNESS.md, ../architecture/INFRA.md, ../architecture/SECURITY.md, ../architecture/API_CONTRACT.md, ../architecture/DATA_MODEL.md, ../plans/M01-rules-engine.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/SECURITY_LANDSCAPE.md]
 last_updated: 2026-08-14
 ---

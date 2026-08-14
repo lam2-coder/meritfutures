@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/TOP10_FIRMS.md, M07-risk-abuse.md, M10-integrations.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M16-notification-center.md]
 last_updated: 2026-08-14
 ---

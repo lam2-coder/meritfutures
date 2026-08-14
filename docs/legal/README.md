@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../DECISIONS.md, TOS_CLAUSES.md, PRIVACY_POLICY.md, AFFILIATE_TERMS.md, COUNSEL_PACKET.md, ../plans/M07-risk-abuse.md, ../plans/M05-payout-system.md, ../plans/M08-affiliate-system.md, ../plans/M20-wallet.md, ../plans/M18-graduation-track.md]
 last_updated: 2026-08-14
 ---
