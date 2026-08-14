@@ -44,7 +44,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | review | founder |
 | [STATE_MACHINES.md](architecture/STATE_MACHINES.md) | Account / payout / flag / identity lifecycles as Mermaid | review | founder |
 | [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | draft | claude |
-| [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | draft | claude |
+| [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | review | founder |
 
 ## docs/plans/ (Wave 3, dependency order, M1 first always)
 | Doc | Purpose | Status | Owner |
