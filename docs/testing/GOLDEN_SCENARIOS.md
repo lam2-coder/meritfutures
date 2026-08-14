@@ -31,6 +31,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-118 to GS-122 | Risk and abuse: detection cadence, group hedging, queue integrity | M7 |
 | GS-123 to GS-127 | Affiliate: clawbacks, fleet funding, cookie stuffing, compliance, mule rail | M8 |
 | GS-128 to GS-141 | Scenarios created by the Wave 3 batch 1 gate rulings: the Merit Wallet, the indicative realtime layer, the new detectors, fail-closed provisioning, the scoped ledger halt, and the typed publish diff | mixed, listed per row |
+| GS-142 to GS-148 | Marketing site: cache-versus-config, content drift, statistic framing, solicitation, operator seams, permanent version URLs | M9 |
 
 ## 2. Fixture format
 
@@ -296,6 +297,20 @@ Defined by the rulings recorded in [DECISIONS.md](../DECISIONS.md#wave-3-batch-1
 | GS-141 | The publish diff types co-binding apart from dominated | M1, M3 | Publishing all three v1 plans emits **`PW-02a` as `info`** on Core EOD and Direct (gap and win days tie at 5, both load bearing) and **`PW-02b` as `warning`** on Merit Rapid (gap of 1 against 3 win days, can never bind), with distinct text. Asserts the two are never rendered identically, because three identical warnings per publish, two of them false positives, is how a founder learns to approve a diff without reading it. [M01](../plans/M01-rules-engine.md) section 2, EC-049 |
 | GS-140 | An affiliate destination change enters the 48 hour cooling window | M8, M5 | The change is accepted, does not take effect today, notifies the contact already on file, and is refused settlement inside the window, identically to a trader destination change. Pins one rail as one control, including on the path an attacker would reach through a compromised affiliate account. [ADR-017](../DECISIONS.md), pairs with GS-104 and GS-127 |
 
-## 16. What is not here yet
+## 16. GS-142 to GS-148: marketing site (M9)
+
+Defined by [M09](../plans/M09-marketing-site.md) section 8.2. Every scenario here tests the boundary between a published sentence and an executed configuration, which is the only failure class this module owns.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-142 | A plan version publishes and revalidation fails | The new version does **not** become purchasable, the previous version keeps selling, and the failure pages. Asserts that the cure for a stale price page is publish ordering rather than a shorter cache lifetime, and that the failure direction costs Merit a delay rather than costing a trader a surprise. AS-M9-01, extends GS-041 (B4 #12) |
+| GS-143 | MDX content containing a bare parameter value | The build **fails**. The same sentence written with `<PlanValue>` builds and renders the live configured value. Asserts that the marketing-versus-implementation gap is closed by a compiler rather than by a copy reviewer, because prose decays and configuration moves. AS-M9-02, EC-083 |
+| GS-144 | A published statistic rendered without its trailing window | The build **fails**, including on the OG image path, which is where screenshots actually originate. Asserts that a transparency number and the window it was computed over are one indivisible unit. AS-M9-03 |
+| GS-145 | A restricted-country visitor, with and without a VPN | The notice renders and the call to action is suppressed on the direct visit; checkout refuses server side in **both** cases. Asserts the site notice is disclosure and the control is elsewhere, and that the VPN case is an expected outcome rather than a bypass. AS-M9-04, EC-084 |
+| GS-146 | A `copy_block` whose wording contradicts its rule's operator | Publish validation **fails**: "more than" against a `>=` comparison never reaches a page. Asserts that the plain-English explainer is versioned with the rule it explains, so the forensic reader finds no seam between the sentence and the operator. AS-M9-05 |
+| GS-147 | Payout copy with one leg omitted | The lint fails on a headline, a social card, an email subject, and an OG image alike. Asserts that same-day wallet credit and the 2 to 3 business day external withdrawal are always stated together at equal weight, because a true sentence that manufactures the perception of a late cycle is the failure constitution 0 names as fatal. AS-M9-06 |
+| GS-148 | A superseded plan version's public URL | Resolves forever, is labeled superseded, names its successor, and is excluded from indexing and from every navigational path. Asserts that a rules page cited inside an evidence pack cannot 404 and cannot silently become a different document at the same address. AS-M9-07, EC-085 |
+
+## 17. What is not here yet
 
 Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**

@@ -47,7 +47,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | approved | founder |
 | [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | approved | founder |
 
-## docs/plans/ (Wave 3, dependency order, M1 first always. **Batch 1 gate closed 2026-08-14**)
+## docs/plans/ (Wave 3, dependency order, M1 first always. **Batch 1 gate closed 2026-08-14; batch 2 in progress**)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [M01-rules-engine.md](plans/M01-rules-engine.md) | The crown jewel: 50-rule taxonomy, pure library, replay self-audit. **Gate closed 2026-08-13** | approved | founder |
@@ -58,7 +58,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard **including wallet balances**, CUSUM, breakers, two-tier evidence packs, dual control | approved | founder |
 | [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution two-tier, **14 detectors**, copy-trading clause, flags queue, canaries | approved | founder |
 | [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, destination cooling, NFA I-26-12 creative approval | approved | founder |
-| [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans/rules, stats page, legal pages | draft | claude |
+| [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans and rules, publish-ordered revalidation, stats render, versioned legal and content, geo disclosure | review | founder |
 | [M10-integrations.md](plans/M10-integrations.md) | Chatwoot, Metabase, Loops, Sentry, Discord alerts | draft | claude |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Signed, verifiable pass/payout share cards | draft | claude |
 | [M12-transparency-platform.md](plans/M12-transparency-platform.md) | Public trailing pass rates and payout stats, auto-computed | draft | claude |
