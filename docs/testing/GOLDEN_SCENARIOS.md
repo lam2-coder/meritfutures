@@ -27,6 +27,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-106 to GS-111 | Payout system: reflection, mules, reserve waves, freezes, ledger halts | M5 |
 | GS-112 to GS-117 | Admin and ops: redaction, breakers, suppressions, liability definitions | M6 |
 | GS-118 to GS-122 | Risk and abuse: detection cadence, group hedging, queue integrity | M7 |
+| GS-123 to GS-127 | Affiliate: clawbacks, fleet funding, cookie stuffing, compliance, mule rail | M8 |
 
 ## 2. Fixture format
 
@@ -259,6 +260,18 @@ Defined by [M07](../plans/M07-risk-abuse.md) section 8.1. The ring rehearsal (GS
 | GS-121 | Household signals produce a soft link and never a merge | Shared IP, shared device, and shared card across two identities produce edges below the confidence ceiling, caps do **not** aggregate, and a disputed link renders on the graph before an admin acts. Pins the asymmetry: over-merging harms people who did nothing wrong and who are sympathetic, articulate, and telling the truth. AS-M7-04 |
 | GS-122 | A detector run that finds none of its own canaries | Status `degraded`, `detector.run_degraded` emitted, page fired. Synthetic subjects are excluded from every aggregate and are regenerated per run rather than static. Pins the only difference between a broken detector and a quiet night. AS-M7-05 |
 
-## 14. What is not here yet
+## 14. GS-123 to GS-127: affiliate system (M8)
 
-Scenarios owned by M8 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
+Defined by [M08](../plans/M08-affiliate-system.md) section 8.1. GS-045, the B4 self-purchase case, is shared and stays where it is.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-123 | Chargeback lands after the commission was paid | The clawback posts, the affiliate balance goes negative and nets against future commission, and a chargeback rate above the threshold **holds the next statement** pending review rather than merely appearing on a dashboard. Pins the accepted consequence of paying affiliates before the chargeback window closes, which is the only commercially available option. AS-M8-01 |
+| GS-124 | An affiliate whose referred buyers cluster on shared signals | The concentration flag fires, commission is withheld on purchases by identities linked above the confidence ceiling, and a genuine family referral below the ceiling is **not** voided. Pins the extension of the self-deal check from "the buyer is the affiliate" to "the buyer is linked to the affiliate". AS-M8-02 |
+| GS-125 | Ten thousand clicks with a near-zero conversion rate | The suspicious-pattern event fires on the clicks-to-conversions ratio and the distinct-referrer count, routes to the risk queue, and does **not** auto-suspend. The 30 day attribution window is deliberately unchanged, because shortening it would punish legitimate content affiliates to stop a pattern that is detectable directly. AS-M8-03 |
+| GS-126 | A required disclosure version is superseded | Every creative bound to the old version is withdrawn automatically, and an approved landing page whose content later changes reverts to `pending` on re-check. Pins approval as per-asset and per-disclosure-version rather than a boolean on the affiliate. AS-M8-04 |
+| GS-127 | An affiliate destination also receives trader payouts from unrelated identities | The shared destination-concentration detector fires across both payment types, because affiliate payments ride the same transfer machinery as trader payouts. Pins the general rule that every outbound payment path in Merit is the same path. AS-M8-05 |
+
+## 15. What is not here yet
+
+Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**

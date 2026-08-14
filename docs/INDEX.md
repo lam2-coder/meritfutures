@@ -21,7 +21,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [STATE.md](STATE.md) | One screen: wave, gate, done / in-flight / blocked, next 3 actions | draft | claude |
 | [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | draft | claude |
 | [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives | draft | founder |
-| [EDGE_CASES.md](EDGE_CASES.md) | Living registry; every bug becomes an entry plus a golden file (78 entries; EC-001 to EC-050 approved with M01, EC-051+ under review with their module) | approved | founder |
+| [EDGE_CASES.md](EDGE_CASES.md) | Living registry; every bug becomes an entry plus a golden file (82 entries; EC-001 to EC-050 approved with M01, EC-051+ under review with their module) | approved | founder |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | approved | founder |
 
 ## research/ (Wave 1: next up)
@@ -56,7 +56,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M05-payout-system.md](plans/M05-payout-system.md) | Instant auto-approve pipeline, ledger, Rise, bounded freeze, reserve | review | founder |
 | [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard, CUSUM, breakers, evidence packs, dual control | review | founder |
 | [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution two-tier, 11 detectors, flags queue, canaries | review | founder |
-| [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, NFA I-26-12 hooks | draft | claude |
+| [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, NFA I-26-12 creative approval | review | founder |
 | [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans/rules, stats page, legal pages | draft | claude |
 | [M10-integrations.md](plans/M10-integrations.md) | Chatwoot, Metabase, Loops, Sentry, Discord alerts | draft | claude |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Signed, verifiable pass/payout share cards | draft | claude |
@@ -73,7 +73,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [STRATEGY.md](testing/STRATEGY.md) | Section 5 instantiated with tooling choices | draft | claude |
-| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (122 defined; GS-001 to GS-083 approved with M01, GS-084+ under review with their module) | approved | founder |
+| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (127 defined; GS-001 to GS-083 approved with M01, GS-084+ under review with their module) | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | Monte-Carlo population port spec, CI calibration bands | draft | claude |
 | [ops/runbooks/README.md](ops/runbooks/README.md) | Section 7: one runbook per failure class | draft | claude |
 | [design/DESIGN_SYSTEM.md](design/DESIGN_SYSTEM.md) | Appendix F instantiated: tokens locked before any UI | draft | claude |
