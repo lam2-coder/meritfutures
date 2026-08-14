@@ -25,7 +25,7 @@ last_updated: 2026-08-14
 | **Wave 1, research** | **APPROVED**, 7 docs plus the calibration source |
 | **Wave 2, architecture** | **APPROVED**, 7 docs |
 | **Wave 3, module plans** | **Complete.** M01 approved, M03 to M08 approved, M02 held at `review` by [ADR-005](DECISIONS.md), M09 to M20 at `review` |
-| **Wave 4, testing, ops, design, legal** | **COMPLETE**, 2026-08-14. 18 new documents plus 8 placeholders rewritten. **No placeholder remains anywhere in the corpus** |
+| **Wave 4, testing, ops, design, legal** | **COMPLETE**, 2026-08-14. 18 new documents, the 5 remaining placeholders retired, and 3 existing documents substantially rewritten. **No placeholder remains anywhere in the corpus** |
 
 **73 index entries. 25 ADRs. 140 edge cases. 257 golden scenarios.** Every count is stated in [INDEX](INDEX.md) and is checked against the registries by [CI-06d](testing/STRATEGY.md) once CI exists.
 
@@ -38,7 +38,7 @@ last_updated: 2026-08-14
 ### What the founder is signing off
 
 1. **Wave 3 batch 2**, M09 through M20 at `review`. Suggested order by downstream reach: **M20, M19, M12**.
-2. **Wave 4**, 18 new documents plus 8 rewritten placeholders. The two carrying decisions rather than descriptions are [M12-statistic-definitions](plans/M12-statistic-definitions.md) (a 16-row sign-off table) and [DELIVERY_PLAN](DELIVERY_PLAN.md) (18 weeks and a launch-blocking triage).
+2. **Wave 4**, 18 new documents plus 5 retired placeholders and 3 rewrites. The two carrying decisions rather than descriptions are [M12-statistic-definitions](plans/M12-statistic-definitions.md) (a 16-row sign-off table) and [DELIVERY_PLAN](DELIVERY_PLAN.md) (18 weeks and a launch-blocking triage).
 3. **The parameter confirmation.** Every plan parameter is a **launch candidate** under the [parameter-status ruling](DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14) and is **formally confirmed at this gate**: prices, caps, win days, consistency ratios, buffers, cadence gaps, splits, and `max_payouts`. **Direct's ladder is 4 or 5 and the choice is made here.**
 4. **The KYC trigger set.** [ADR-021](DECISIONS.md) left the final set to FREEZE: `{pre_funded always}` versus `{second_distinct_account + pre_funded}`. Both are the same code and the difference is a config array.
 

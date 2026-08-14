@@ -8,7 +8,7 @@ last_updated: 2026-08-14
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
-**Regenerated in full at the Wave 4 close, 2026-08-14.** **73 entries: 71 documents, the calibration workbook, and the committed hook set.** Wave 4 added **18 new files** and rewrote **8 placeholders** into finished documents, so no placeholder remains anywhere in the corpus. **[CI-06c](testing/STRATEGY.md) makes this file's completeness a merge blocker from the first CI setup**, so "if a thing is not in INDEX.md it does not exist" stops being a rule nobody enforces.
+**Regenerated in full at the Wave 4 close, 2026-08-14.** **73 entries: 71 documents, the calibration workbook, and the committed hook set.** Wave 4 added **18 new files**, retired the **5 remaining placeholders** (testing STRATEGY and SIMULATION_HARNESS, DESIGN_SYSTEM, and the ops and legal indexes), and substantially rewrote three existing documents (TOS_CLAUSES, PRIVACY_POLICY, GOLDEN_SCENARIOS). **No placeholder remains anywhere in the corpus.** **[CI-06c](testing/STRATEGY.md) makes this file's completeness a merge blocker from the first CI setup**, so "if a thing is not in INDEX.md it does not exist" stops being a rule nobody enforces.
 
 ## Root
 | Doc | Purpose | Status | Owner |
