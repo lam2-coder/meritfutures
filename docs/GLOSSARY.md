@@ -210,9 +210,9 @@ One hundredth of one percent, integer. All ratios, thresholds, shares, and split
 An immutable double-entry row. Every financial fact is expressed as balanced debits and credits across [ledger accounts](#ledger-account). Nothing is ever updated or deleted; corrections are new compensating entries.
 
 ## ledger account
-A node in the chart of accounts. v1 classes: `firm_treasury`, **`trader_wallet`**, `fees_revenue`, `reserve`, `psp_clearing`, `promotional_credit`. The account-type enum is expandable by design.
+A node in the chart of accounts. **Seven v1 classes**: `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve`, **`trader_withdrawable`** (per identity), **`trader_wallet`** (per identity), `promotional_credit`. The account-type enum is expandable by design.
 
-**`trader_withdrawable` is a superseded name for `trader_wallet`** ([ADR-027](DECISIONS.md)). One class, not two. A reader meeting the old name in an earlier document should resolve it here. `promotional_credit` is activated rather than reserved and is **never withdrawable** ([ADR-019](DECISIONS.md), OQ-FREEZE-01).
+**`trader_withdrawable` and `trader_wallet` are two distinct per-identity positions, not one under two names** ([ADR-027](DECISIONS.md)). `SD-M5-07` **adds** the wallet class; it does not rename the other. They hold different magnitudes and move by different amounts: a payout approval reduces **withdrawable** by the full `approved_cents`, and of that, `trader_cents` becomes the **wallet** payable and `firm_cents` becomes revenue. `approved_cents != trader_cents`, which is exactly why one class cannot carry both. `promotional_credit` is activated rather than reserved and is **never withdrawable** ([ADR-019](DECISIONS.md), OQ-FREEZE-01).
 
 ## balance
 A derived value, always computed by summing [ledger entries](#ledger-entry), never stored as a mutable truth. Cached projections may exist for speed but are rebuildable and are verified against the ledger by the nightly self-audit.

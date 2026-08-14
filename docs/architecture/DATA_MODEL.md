@@ -666,7 +666,9 @@ Separates "we approved" from "the rail moved money", so a Rise outage never look
 | `kind` | text | not null, check in (`asset`,`liability`,`revenue`,`expense`,`equity`) |
 | `scope` | text | not null, check in (`firm`,`identity`) |
 | `identity_id` | uuid | fk identities, null (set when scope is identity) |
-v1 codes: `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve`, `trader_withdrawable` (per identity), `promotional_credit` (reserved, unused in v1).
+v1 codes, **seven**: `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve`, `trader_withdrawable` (per identity), **`trader_wallet` (per identity, added by `SD-M5-07`)**, `promotional_credit` (activated by [ADR-019](../DECISIONS.md), never withdrawable).
+
+**The two per-identity classes are distinct positions and neither supersedes the other** ([ADR-027](../DECISIONS.md)). Withdrawable is what the engine says the trader may draw; wallet is what Merit already owes them. A payout approval moves the full `approved_cents` out of the first and `trader_cents` into the second, the difference being `fees_revenue`.
 
 ### ledger_transactions
 | Column | Type | Constraints |

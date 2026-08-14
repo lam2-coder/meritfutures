@@ -703,7 +703,7 @@ Per module: M02 6, M03 6, M04 3, M05 7, M06 5, M07 5, M08 5. M09 3, M10 4, M11 4
 
 ### Documents amended under this ADR
 
-[DATA_MODEL](architecture/DATA_MODEL.md) (tables rewritten to post-migration truth, section 11 re-materialized at the frozen configuration, delta-provenance appendix), **[GLOSSARY](GLOSSARY.md)** (the canonical naming authority: it carries `trader_withdrawable`, `ladder.payouts_to_graduate`, and the singular KYC placement, all three of which ADR-027 and ADR-030 change), [M05](plans/M05-payout-system.md) (LT-01's debit leg and the state machine's `frozen` target), [STATE](STATE.md), [DELIVERY_PLAN](DELIVERY_PLAN.md), [GUIDE_BRIEFING](GUIDE_BRIEFING.md), [SESSION_LOG](SESSION_LOG.md), and [EDGE_CASES](EDGE_CASES.md) for gaps discovered while folding.
+[DATA_MODEL](architecture/DATA_MODEL.md) (tables rewritten to post-migration truth, section 11 re-materialized at the frozen configuration, delta-provenance appendix), **[GLOSSARY](GLOSSARY.md)** (the canonical naming authority: it carries the ledger class list, `ladder.payouts_to_graduate`, and the singular KYC placement. [ADR-027](#) **adds** `trader_wallet` to the class list, taking it to seven; [ADR-030](#) renames the other two keys), [M05](plans/M05-payout-system.md) (LT-01's debit leg and the state machine's `frozen` target), [STATE](STATE.md), [DELIVERY_PLAN](DELIVERY_PLAN.md), [GUIDE_BRIEFING](GUIDE_BRIEFING.md), [SESSION_LOG](SESSION_LOG.md), and [EDGE_CASES](EDGE_CASES.md) for gaps discovered while folding.
 
 ### C-07: the `state_hash` input, written down because it was not
 
@@ -746,14 +746,49 @@ Per module: M02 6, M03 6, M04 3, M05 7, M06 5, M07 5, M08 5. M09 3, M10 4, M11 4
 
 **Both anchors are in the hash and both stay separate columns** (C-09). Under [ADR-019](#) they coincide today; collapsing them because today's configuration makes them equal is exactly the silent fold this session exists to prevent, and it is a 40 percent liability change if the anchor ever moves back.
 
-## ADR-027: One trader ledger class, named `trader_wallet`  (2026-08-14, status: accepted)
+## ADR-027: `trader_withdrawable` and `trader_wallet` are two distinct positions  (2026-08-14, status: accepted, **reversing an earlier ruling in this same session**)
 
-- **Context:** C-01. [DATA_MODEL section 8](architecture/DATA_MODEL.md) and [GLOSSARY](GLOSSARY.md) carry `trader_withdrawable` as the per-identity ledger class. `SD-M5-07` adds `trader_wallet` per identity. [M05](plans/M05-payout-system.md)'s own LT-01 **debits `trader_withdrawable` and credits `trader_wallet` in the same transaction**, which is either a rename applied to one leg and not the other, or two genuinely distinct positions the corpus never distinguishes anywhere.
-- **Decision:** **One class, named `trader_wallet`.** [ADR-019](#) gave it its meaning and three modules (M14, M17, M20) assert invariants against that name. **`trader_withdrawable` is retired as a superseded name**, and **LT-01's debit leg is corrected** to debit `firm_payable` rather than the class it credits.
-- **Why this is a founder ruling and not a rename.** A posting that debits and credits the same position is a no-op that looks like a transfer, and it would have passed the zero-sum trigger while moving nothing. **The ledger would have balanced and the trader's wallet would have been empty.** That is the exact class of defect this session exists to catch: a delta folded wrongly produces a schema that works and is wrong.
-- **The corrected debit is `firm_treasury`**, an existing v1 class. The posting balances because `trader_cents + firm_cents = approved_cents` is already a check constraint on `payout_requests`. **Recorded because the first draft of this fold invented a `firm_payable` class that does not exist in the chart of accounts**, which would have been the same defect wearing a different name: a class nobody defined, appearing first in a migration. Caught against [GLOSSARY](GLOSSARY.md)'s class list, which is why that list is the naming authority and why it is amended here rather than alongside.
-- **Consequences:** GLOSSARY is amended under [ADR-026](#), because it is the canonical naming authority and every later document keys off it. The ledger class list carries `trader_wallet` with a comment recording the superseded name, so a reader meeting `trader_withdrawable` in an old document can resolve it.
-- **Alternatives considered:** keep both as distinct positions (rejected: nothing in the corpus defines what the distinction would mean, and inventing one at migration time is how a ledger acquires a position nobody can reconcile); keep `trader_withdrawable` as the name (rejected: ADR-019 and three modules already use `trader_wallet`, so the rename would have to propagate into invariants rather than out of them).
+- **Context:** C-01. [DATA_MODEL section 8](architecture/DATA_MODEL.md) and [GLOSSARY](GLOSSARY.md) carry `trader_withdrawable` as a per-identity ledger class. `SD-M5-07` introduces `trader_wallet` per identity. [M05](plans/M05-payout-system.md)'s LT-01 touches both in one transaction, which read at first glance like a rename applied to one leg and not the other.
+- **This ADR was first written the other way, ruling one class named `trader_wallet` and retiring `trader_withdrawable`. That ruling was wrong, was folded into GLOSSARY, DATA_MODEL and M05, and was committed. It is reversed here, and the reversal is recorded rather than the history rewritten**, because a corpus that quietly repairs a bad ruling teaches nobody what the bad ruling looked like.
+- **Decision: two distinct per-identity positions. The chart of accounts carries both. Seven v1 classes.** `SD-M5-07` says **add** the `trader_wallet` account class, and it means add.
+
+### The evidence, which was in the corpus and was read past
+
+[M05](plans/M05-payout-system.md) states the split explicitly: a payout approval reduces the **withdrawable** position by the full `approved_cents`, and **of that**, `trader_cents` becomes the wallet payable and `firm_cents` becomes revenue.
+
+**`approved_cents != trader_cents`. The two positions move by different magnitudes in the same transaction, which is precisely what one class cannot do.** Withdrawable is what the engine says the trader may draw; wallet is what Merit already owes them. They are different facts about different moments, and the payout is the event that converts one into the other minus the firm's share.
+
+### What the collapse would actually have done, which is worse than the first draft claimed
+
+The first version of this ADR asserted the collapsed posting would "balance and move nothing". **That was wrong.** With one class `X`:
+
+```
+debit  X              approved_cents   (= trader_cents + firm_cents)
+credit X              trader_cents
+credit fees_revenue   firm_cents
+```
+
+Net on `X` is `trader_cents - approved_cents = -firm_cents`. **Every payout approval would have net DEBITED the trader's single position by the firm's share, draining it on every approval, in the firm's favor.** At a 9000bp split on a 100,000c cap that is 10,000c per approval, taken from the trader, silently.
+
+**And the deferred zero-sum trigger passes**, because debits equal credits: 100,000 against 90,000 plus 10,000. **The ledger reconciles perfectly while the balance is wrong.** The invariant that would have caught it is not zero-sum; it is that a position's movement must match the business event it records, and no trigger asserts that.
+
+**This is the single best argument in the corpus for why the reconciliation session exists**, and it is sharper for having been produced by the session rather than by an adversary: a plausible reading of two documents, ruled on by the founder, folded correctly by the author, and wrong. The catch came from re-reading the source rather than from any test, which is what the E2 line-by-line read on money-path files is for.
+
+### The corrected posting
+
+```
+LT-01 payout_approval
+  debit  trader_withdrawable (identity)  approved_cents
+  credit trader_wallet       (identity)  trader_cents
+  credit fees_revenue                    firm_cents
+```
+
+**The debit leg is unchanged.** The only defect in the corpus was the table row reading `credit firm_treasury trader_cents` while its own note beneath already said the leg credits `trader_wallet`. **The row is corrected to match the note**, and that is the whole of C-01's real content.
+
+**`firm_treasury` as the debit is rejected.** It books a cash movement at approval, which contradicts the ruled recognition timing: **payout liability books at approval, cash derecognizes at settlement**. Cash moves at LT-02 and LT-07. The first draft of this ADR proposed `firm_treasury` and it is rejected on the record, alongside the `firm_payable` class that draft invented and that does not exist in the chart of accounts.
+
+- **Consequences:** [GLOSSARY](GLOSSARY.md) and [DATA_MODEL](architecture/DATA_MODEL.md) are amended to **add** `trader_wallet`, not to retire `trader_withdrawable`; the earlier "superseded name" edit is reverted in both. Migration file `0009_ledger` creates both classes. M14, M17 and M20's invariants against `trader_wallet` are unaffected, because nothing about the wallet's meaning changed; what changed is that it no longer swallows a second position.
+- **Alternatives considered:** one class named `trader_wallet` (**ruled and then reversed**, for the reasons above); one class named `trader_withdrawable` (same defect, different label); keeping both but netting them in reporting (rejected: Open Liability needs the wallet reportable per identity, INV-M5-15, and a netted view cannot be un-netted).
 
 ## ADR-028: `payout_requests.status` under the wallet  (2026-08-14, status: accepted)
 
