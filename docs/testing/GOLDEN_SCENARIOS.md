@@ -35,6 +35,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-149 to GS-154 | Integrations: support-console scoping, internal-versus-published metrics, late suppression guards, error-payload egress, alert leakage, vendor coupling | M10 |
 | GS-155 to GS-161 | Certificates and social proof: cherry-picking, revocation reach, key rotation, verify-page enumeration, revocation classes, leaderboard exposure, aggregate creep | M11 |
 | GS-162 to GS-171 | Transparency platform: denominator choice, on-chain disclosure, review gating, adversary intelligence, the constant claim, restatement, sample floors, comparative claims | M12 |
+| GS-172 to GS-178 | Trader analytics and journal: engine parity, history changes, journal isolation, provenance blending, undefined metrics, population leakage, load contention | M13 |
 
 ## 2. Fixture format
 
@@ -358,6 +359,20 @@ Defined by [M12](../plans/M12-transparency-platform.md) section 8.2. These are t
 | GS-170 | The statistics run executes on a day whose replay self-audit diverged | The run **halts**, publishes nothing, and pages. Asserts that Merit never publishes a number computed over state the engine itself does not currently vouch for. INV-M12-01, INV-M12-12 |
 | GS-171 | A definition change is written with a backdated `effective_from` | Rejected at write time. Asserts the module's central control: a definition cannot take effect before it was written, so no definition can be chosen with knowledge of its result. INV-M12-07, EC-094 |
 
-## 20. What is not here yet
+## 20. GS-172 to GS-178: trader analytics and journal (M13)
+
+Defined by [M13](../plans/M13-trader-analytics-journal.md) section 8.2. Every adversary in this set is internal: a second implementation, a helpful feature, and a load pattern.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-172 | Consistency share rendered on analytics against the engine's value | Equal **to the cent**, and the analytics database role cannot read plan config at all. Asserts that a second rulebook is prevented by permission rather than by care, since a review catches the obvious version and a unit test written by the same engineer tests the same misunderstanding. AS-M13-01, EC-099 |
+| GS-173 | A backdated correction lands on a day already snapshotted | The inputs digest changes, `analytics.history_changed` notifies with cause and date range, and the trader is told before they notice. Asserts that told-first-by-Merit and noticed-later-by-them are different products. AS-M13-02, EC-100, extends GS-034 |
+| GS-174 | Journal content requested from the risk, admin, evidence, and support paths | All four fail **by database grant**; trader view and trader export succeed. Asserts the privacy promise is an absence of a code path rather than a policy, which is the only form of it worth publishing. AS-M13-03, EC-101 |
+| GS-175 | An equity series with a live final point appended | Build failure: a series carrying mixed provenance does not render. Asserts that a label at the foot of a chart does not stop a trader reading a line as a line, on the very number they use to decide whether to keep trading. AS-M13-04, [ADR-020](../DECISIONS.md) |
+| GS-176 | An R-multiple requested with no declared risk | **Absent with a stated reason**, never inferred; with a trader-declared risk it computes and says the risk was trader-supplied. Asserts that a definitionally circular metric is worse than a missing one because it looks rigorous. AS-M13-05, EC-102 |
+| GS-177 | A percentile or population comparison requested | No such endpoint exists; self-comparison across the trader's own accounts succeeds. Asserts that a percentile endpoint is an enumerable oracle over the population distribution, which is the raw material for the figures M12 deliberately does not publish. AS-M13-06 |
+| GS-178 | Analytics load concurrent with a payout wave | Payout request p95 holds under its target and **analytics degrades first**. Asserts the only interaction that matters, which testing the two suites separately would never have exercised. AS-M13-07, EC-103, pairs with GS-051 |
+
+## 21. What is not here yet
 
 Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
