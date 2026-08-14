@@ -657,7 +657,7 @@ Running the engine **as committed**, against its own `OUR_PLANS`, reproduces the
 
 ---
 
-## ADR-031: The reviewer subagent is a citation check, not an adversarial one  (2026-08-14, status: proposed)
+## ADR-033: The reviewer subagent is a citation check, not an adversarial one  (2026-08-14, status: proposed)
 
 - **Context:** [GUIDE_BRIEFING.md:27](GUIDE_BRIEFING.md) states the problem this ADR addresses: **"Claude Code cannot be its own reviewer."** The corpus answered it with the guide chat, a review desk whose standing instruction is to **disagree** ([GUIDE_BRIEFING.md:35](GUIDE_BRIEFING.md)). That desk works and is unchanged. What 2026-08-14 established is that **disagreement is the wrong instrument for the errors that actually reach committed documents**, and that a second, narrower reviewer is needed beside it. Constitution [C10](../MERIT_BUILD_MASTER_PROMPT.md) already requires the split in principle: **"the writer/reviewer split runs review in a fresh session/subagent with its own system prompt (the agent doing the work is never the one grading it)"** ([MERIT_BUILD_MASTER_PROMPT.md:375](../MERIT_BUILD_MASTER_PROMPT.md)). It was never instantiated. This ADR instantiates it.
 - **Decision, two parts, and only the first is implemented.**

@@ -12,7 +12,7 @@ last_updated: 2026-08-14
 
 **26 ADRs on this branch. 140 edge cases. 257 golden scenarios.** Changing a frozen document requires an ADR, not a commit.
 
-**The ADR tally is split across two open branches and the number is 31 when both land.** This branch adds [ADR-031](DECISIONS.md); `claude/schema-delta-reconciliation` carries ADR-026 to ADR-030. Stated rather than left stale, because [ADR-026](DECISIONS.md) is itself a correction to a hand-maintained tally that four documents quoted.
+**The ADR tally is split across open branches, so this file does not state it.** This branch adds [ADR-033](DECISIONS.md); `claude/schema-delta-reconciliation` carries ADR-026 to ADR-032; the corpus-workflow branch carries ADR-034 and **the number allocation table**, which is the authority on what is claimed. **The count that stood here read 31 and was already wrong**, which is the case for not carrying one: a tally spanning branches nobody can see from here is derivable at merge and guessable before it.
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
@@ -25,7 +25,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [CLAUDE.md](../CLAUDE.md) | Lean session brain: rituals, git workflow, conventions, model routing | draft | founder |
 | [README.md](../README.md) | Repository front door | draft | founder |
 | [.claude/settings.json](../.claude/settings.json) | Committed hook set. Corpus phase: `SessionStart` pull, `Stop` push ([ADR-D1](DECISIONS.md)) | approved | founder |
-| [.claude/agents/reviewer.md](../.claude/agents/reviewer.md) | The citation reviewer. Verifies every factual claim against a primary source at `file:line`; verdicts to `docs/reviews/` ([ADR-031](DECISIONS.md)) | proposed | founder |
+| [.claude/agents/reviewer.md](../.claude/agents/reviewer.md) | The citation reviewer. Verifies every factual claim against a primary source at `file:line`; verdicts to `docs/reviews/` ([ADR-033](DECISIONS.md)) | proposed | founder |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |

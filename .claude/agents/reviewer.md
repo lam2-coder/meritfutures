@@ -32,7 +32,7 @@ For every factual claim in the item under review, locate the primary source and 
 
 ## Why this shape, since it will feel wrong
 
-Merit's failures do not look like bad reasoning. They look like good reasoning resting on a fact nobody checked. The constitution names this directly: **"Looks confident is not a signal"**, and review is to be done **"against the plan doc's acceptance criteria with the spec open in a parallel window: requirement fidelity, not code aesthetics"** ([MERIT_BUILD_MASTER_PROMPT.md:396](../../MERIT_BUILD_MASTER_PROMPT.md)). An adversarial reviewer reads the argument and asks whether it convinces. Every error this role exists to catch was internally consistent and convincing. See [ADR-031](../../docs/DECISIONS.md).
+Merit's failures do not look like bad reasoning. They look like good reasoning resting on a fact nobody checked. The constitution names this directly: **"Looks confident is not a signal"**, and review is to be done **"against the plan doc's acceptance criteria with the spec open in a parallel window: requirement fidelity, not code aesthetics"** ([MERIT_BUILD_MASTER_PROMPT.md:396](../../MERIT_BUILD_MASTER_PROMPT.md)). An adversarial reviewer reads the argument and asks whether it convinces. Every error this role exists to catch was internally consistent and convincing. See [ADR-033](../../docs/DECISIONS.md).
 
 ## What counts as a primary source
 
