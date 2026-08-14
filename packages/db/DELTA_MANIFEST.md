@@ -60,7 +60,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 
 | Delta | Table | Change | Migration | Status |
 |---|---|---|---|---|
-| SD-01 | `daily_marks` | add `adjustment_cents` | 0014 | pending |
+| SD-01 | `daily_marks` | add `adjustment_cents` | 0014 | **landed** |
 | SD-02 | `rule_states` | `payout_anchor_day` and `cadence_anchor_day` replace `last_payout_trading_day` | 0015 | pending |
 | SD-03 | `payout_requests` | add `settled_trading_day`, `effective_trading_day` | 0010 | **landed** |
 | SD-04 | `rule_states` | add `floor_open_cents` | 0015 | pending |
@@ -77,10 +77,10 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 |---|---|---|---|---|
 | SD-M2-01 | `provisioning_queue` | add `payload_hash` | 0007 | **landed** |
 | SD-M2-02 | new `platform_account_refs` | permanently burned platform refs | 0007 | **landed** |
-| SD-M2-03 | `ingest_files` | add `replaces_ingest_file_id`, `disposition` | 0013 | pending |
-| SD-M2-04 | `fills` | add `trading_day_vendor`, `trading_day_source` | 0013 | pending |
+| SD-M2-03 | `ingest_files` | add `replaces_ingest_file_id`, `disposition` | 0013 | **landed** |
+| SD-M2-04 | `fills` | add `trading_day_vendor`, `trading_day_source` | 0013 | **landed** |
 | SD-M2-05 | `platform_entitlements` | add `platform_user_ref`, `billing_unit` | 0007 | **landed** |
-| SD-M2-06 | `reconciliations` | add `source_ingest_file_id`, `our_source` | 0014 | pending |
+| SD-M2-06 | `reconciliations` | add `source_ingest_file_id`, `our_source` | 0014 | **landed** |
 | SD-M3-01 | `psp_webhook_events` | add `purchase_id`, `deferred_until`, `defer_attempts` | 0006 | **landed** |
 | SD-M3-02 | `purchases` | add `refundable_until`, `first_trade_at` | 0006 | **landed** |
 | SD-M3-03 | new `mid_health` | MID health as a decision record | 0006 | **landed** |
