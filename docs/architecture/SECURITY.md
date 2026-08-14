@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, API_CONTRACT.md, DATA_MODEL.md, ../../research/SECURITY_LANDSCAPE.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md]
 last_updated: 2026-08-13
 ---
@@ -188,9 +188,10 @@ The ten D0 scenarios are specified in [research/SECURITY_LANDSCAPE.md §4](../..
 2. **Device and payment fingerprints are signals, never proof.** Every enforcement path requires human judgment plus an evidence pack, and no detector enforces on its own.
 3. **T+1 visibility** means our own view of an account lags live trading by one batch cycle. Rithmic's auto-liquidator, not Merit, is the intraday control.
 4. **A solo operator is a single point of failure** for admin access and dual control. The second `owner` credential (a separately stored hardware key) is the mitigation, and it is a real operational burden the founder is choosing on purpose.
+5. **Dual control at launch scale is compromise resistance, not insider resistance.** Both `owner` credentials are held by the same person ([ADR-010](../DECISIONS.md)). What C-10 actually buys today is that one phished session or one owned laptop cannot move the cap, the split, the gap, or the payout rail alone. It is not separation of duties and must never be described as such in an audit, a policy document, or a customer conversation. It becomes separation of duties on the first operations hire, with no code change.
 
-## 9. Open questions
+## 9. Founder rulings (Wave 2 gate, 2026-08-13) and remaining questions
 
-1. **Second `owner` credential for dual control:** confirm you will hold two hardware keys in separate physical locations before launch.
-2. **Admin IP allowlist practicality:** confirm you operate from stable addresses, or accept a VPN or bastion as the allowlisted origin.
-3. **WAF vendor** is assumed to be Cloudflare in front of everything. Confirm before [INFRA](INFRA.md) locks it.
+1. **Second `owner` credential for dual control: CONFIRMED.** Two hardware keys, held by the founder in separate physical locations, before launch. The launch-scale limitation is recorded above as limitation 5 and in [ADR-010](../DECISIONS.md).
+2. **Admin IP allowlist practicality:** confirm you operate from stable addresses, or accept a VPN or bastion as the allowlisted origin. **Still open**, and it now interacts with [ADR-012](../DECISIONS.md): the allowlist protects `ADMIN_ORIGIN`, a separate apex domain rather than a Merit subdomain.
+3. **WAF vendor:** Cloudflare, **confirmed** with [ADR-007](../DECISIONS.md).

@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../DECISIONS.md, ../../research/DATA_CAPABILITIES.md]
 last_updated: 2026-08-13
 ---
@@ -296,8 +296,10 @@ Consequences the founder should hold in mind: our own view of an account is one 
 
 Streaming or intraday risk; a no-code program editor; multi-tenancy or theming; multi-asset or MT4/MT5; a second platform adapter; native mobile apps; leaderboards and contests; sub-IB trees; an in-house KYC or document store; an in-house support desk or BI tool; live-capital trading (the [ladder](../GLOSSARY.md#payout-ladder) records the invitation and closes the simulated account).
 
-## 10. Open questions for the founder
+## 10. Founder rulings (Wave 2 gate, 2026-08-13)
 
-1. **Queue choice** is proposed as pg-boss in [ADR-006](../DECISIONS.md). Confirm, or state a preference for BullMQ plus Redis.
-2. **ORM** (Drizzle versus Prisma) and **hosting** (single Hetzner box versus Railway plus Vercel) are still open §10 items; [INFRA.md](INFRA.md) proposes both with rationale.
-3. **Reserve funding cadence.** The architecture assumes the payout wallet is funded manually on a weekly rhythm with the [RCR](../GLOSSARY.md#reserve-coverage-ratio) on the admin home. Confirm the cadence you actually want to operate.
+All three resolved at the gate. Recorded in [DECISIONS.md](../DECISIONS.md#wave-2-gate-closure-2026-08-13).
+
+1. **Queue: pg-boss, accepted** ([ADR-006](../DECISIONS.md)). Closes the constitution §10 queue-tech item.
+2. **ORM: Drizzle, accepted** ([ADR-008](../DECISIONS.md)). **Hosting: Neon plus Railway plus Cloudflare, accepted** ([ADR-007](../DECISIONS.md)). Both constitution §10 items are closed. The admin origin rides along and is settled separately as a **separate apex domain** with the placeholder `ADMIN_ORIGIN` ([ADR-012](../DECISIONS.md)).
+3. **Reserve funding cadence: weekly manual plus a same-day top-up trigger** ([ADR-011](../DECISIONS.md)). The baseline stays a weekly manual transfer into the payout wallet. In addition, when the Eligible-Next-7-Days forecast crosses a configured share of the payout wallet balance, the admin home raises a same-day top-up task and alerts. The forecast exists precisely so a bad week is visible before it arrives, and this is what makes it operational rather than decorative. The threshold is configuration, reviewed monthly in the C8 retro; M5 sets its initial value against the CVaR99 estimate.

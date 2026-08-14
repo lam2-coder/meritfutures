@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, DATA_MODEL.md, STATE_MACHINES.md, ../../research/SECURITY_LANDSCAPE.md]
 last_updated: 2026-08-13
 ---
@@ -302,13 +302,17 @@ Auth: session, owner. Rate limit: 60 per minute.
 
 ### POST /accounts/:accountId/payout
 ```ts
-type PayoutRequestBody = { amount_cents: number };   // Idempotency-Key required
+// Idempotency-Key required. amount_cents is OPTIONAL (ADR-009): omitted means
+// "pay the maximum I am eligible for", which is the number the eligibility
+// endpoint already displayed. A supplied amount is a ceiling, never an instruction.
+type PayoutRequestBody = { amount_cents?: number };
 type PayoutResponse = {
   payout_request_id: string;
   status: "approved";                 // the only success value that exists
-  requested_cents: number;
+  requested_cents: number;            // echoes the effective request: the supplied amount, or max_payout_cents when omitted
+  amount_supplied: boolean;           // false when the caller took the default
   approved_cents: number;
-  clamp_reason: "none" | "cap" | "withdrawable";
+  clamp_reason: "none" | "cap" | "withdrawable" | "requested";
   trader_cents: number; firm_cents: number; split_bp: number;
   basis_trading_day: string;
   payout_ordinal: number;
@@ -317,9 +321,11 @@ type PayoutResponse = {
 };
 ```
 Auth: session, owner. Idempotency: required. Rate limit: 10 per day per account, 20 per day per identity. Anti-bot: Turnstile.
-Errors: `payout_not_eligible` (422, body includes the full `gates` object so the client shows exactly what is missing), `payouts_frozen`, `kyc_required`, `validation_failed` (amount below minimum or non-integer), `conflict` (a payout is already in flight for this account).
+Errors: `payout_not_eligible` (422, body includes the full `gates` object so the client shows exactly what is missing), `payouts_frozen`, `kyc_required`, `validation_failed` (amount non-integer, zero, or negative), `conflict` (a payout is already in flight for this account).
 
-Server behavior, in order: re-evaluate eligibility against the last closed day, clamp server-side (the request amount is a ceiling, never an instruction), persist the immutable snapshot, post the ledger transaction, approve, enqueue the transfer. The client's `amount_cents` can only ever reduce the payout, never increase it.
+Server behavior, in order: re-evaluate eligibility against the last closed day, resolve the effective request (`amount_cents` when supplied, otherwise `max_payout_cents`), clamp server-side, persist the immutable snapshot, post the ledger transaction, approve, enqueue the transfer. The clamp is `approved_cents = min(effective_request, cap_cents_for_ordinal, withdrawable_cents)` and the result must satisfy `approved_cents >= min_payout_cents`; a supplied amount that clamps below the minimum returns `payout_not_eligible` with `minimum_amount` failing, never a partial payment and never a denial. The client's `amount_cents` can only ever reduce the payout, never increase it.
+
+**One payout in flight per account.** The `conflict` above is a liability control, not a convenience: [win days](../GLOSSARY.md#win-day) and the [consistency period](../GLOSSARY.md#consistency-period) reset on settlement, so allowing a second request before the first settles would let one qualifying stretch fund several capped extractions. The rule is stated here, enforced by a unique partial index in [DATA_MODEL](DATA_MODEL.md#payout_requests), and tested as a named golden scenario.
 
 ### GET /payouts
 ```ts
@@ -471,7 +477,9 @@ Query `?reason=` is required. Generation itself is audited and emits `evidence.p
 type CreateVersionRequest = { rules: PlanRules; copy_blocks: Record<string,string>; sizes: Array<{ size_cents: number; price_cents: number; reset_price_cents: number }>; reason: string };
 type CreateVersionResponse = { plan_version_id: string; version: number; status: "draft"; computed_sizes: PlanSize[] };
 ```
-Creates a **draft**. Publishing is a separate call, and any edit touching cap, split, or cadence gap requires dual control (a second `owner` approval within a 24 hour window) per D4.
+Creates a **draft**. Publishing is a separate call, and any edit touching cap, split, or cadence gap requires dual control (a second `owner` approval within a 24 hour window) per D4 and [ADR-010](../DECISIONS.md).
+
+**Launch-scale note, stated so nobody later misreads the control.** Both `owner` credentials are held by the founder on separate hardware keys. At this scale dual control is **compromise resistance, not insider resistance**: it means one phished session or one owned laptop cannot move the cap, the split, the gap, or the payout rail alone. It becomes real separation of duties on the first operations hire, with no code change.
 
 ### POST /admin/plans/versions/:versionId/publish
 ```ts
@@ -529,13 +537,17 @@ Every row is a named test that must exist before the endpoint ships ([VG-5](../.
 | Admin session from a non-allowlisted IP | 403 at the edge |
 | `readonly` role calls any admin mutation | 403 |
 | Payout body with `amount_cents` greater than cap | approved amount clamped, never the requested value |
+| Payout body omitting `amount_cents` entirely | approved amount equals `min(cap, withdrawable)`, `amount_supplied` false |
+| Payout body with `amount_cents` below `min_payout_cents` | `payout_not_eligible` with `minimum_amount` failing; no partial payment |
 | Checkout with a client-supplied price field | field ignored; server price used |
 | `/docs`, `/openapi.json`, `/swagger` in production | 404 |
 
-## 13. What needs the founder's eyes
+## 13. Founder rulings (Wave 2 gate, 2026-08-13)
 
-1. **`404` versus `403` on trader surfaces.** Returning `404` for another trader's account hides existence but can confuse support ("the trader swears the id is right"). Recommended as written; say the word and it becomes `403`.
-2. **`POST /accounts/:id/payout` takes an amount rather than always paying the maximum.** It lets a trader take less than they could, which is a real preference for tax and cadence reasons, at the cost of one more decision in the flow.
-3. **Freeze requires a cited flag.** This is a deliberate constraint on your own future self under pressure. It is the single most important line in this document for keeping the zero-denial promise honest.
-4. **Dual control on cap, split, and gap edits.** With a solo founder this means a second `owner` credential must exist (a hardware key you keep separately). Confirm you want that friction now rather than at first hire.
-5. **`estimated_settlement` is stated as a range in the response.** Confirm 2 to 3 business days as the published figure.
+All five items that needed the founder's eyes were walked at the gate and are resolved. Recorded in [DECISIONS.md](../DECISIONS.md#wave-2-gate-closure-2026-08-13).
+
+1. **`404` versus `403` on trader surfaces: `404` confirmed.** Existence is not confirmed to a stranger. The support cost is handled by a runbook rather than by weakening the response: support resolves the trader in the admin console by identity and never trusts a trader-supplied account id ([ops/runbooks](../ops/runbooks/README.md), Wave 4).
+2. **`POST /accounts/:id/payout` takes an optional amount, defaulting to the maximum eligible** ([ADR-009](../DECISIONS.md)). Omitting the field is the common path and matches the number the eligibility endpoint already showed. A supplied amount is a ceiling and can only reduce the payout.
+3. **Freeze requires a cited flag: confirmed as written.** Unchanged. It remains the single most important line in this document for keeping the zero-denial promise honest.
+4. **Dual control on cap, split, and gap edits: confirmed, with the launch-scale note** now written into §8 and [ADR-010](../DECISIONS.md). Both keys are founder-held, and the control is documented as compromise resistance rather than insider resistance so it is never mistaken for separation of duties.
+5. **`estimated_settlement`: 2 to 3 business days confirmed** as the published figure, stated as a range everywhere it appears (API response, portal timeline, marketing site, certificates).

@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, OVERVIEW.md, SECURITY.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/CLAUDE_CODE_PLAYBOOK.md]
 last_updated: 2026-08-13
 ---
@@ -43,7 +43,7 @@ Rejected for v1: Kubernetes, a self-managed database, a service mesh, multi-regi
 **Hard rules:**
 1. Production credentials exist in exactly one place: the platform vault. They are never in `.env`, never in a preview environment, never in an agent's session.
 2. Preview and dev databases contain **synthetic data only**, produced by the seed script and the [synthetic Rithmic simulator](../GLOSSARY.md#platform-adapter). No production dump ever lands in a lower environment.
-3. The admin app is deployed as its own service with its own hostname, its own Cloudflare rules, and its own IP allowlist (C-08).
+3. The admin app is deployed as its own service on `ADMIN_ORIGIN`, a **separate apex domain** ([ADR-012](../DECISIONS.md)), with its own Cloudflare rules and its own IP allowlist (C-08). Cookie scope, CORS, and the CSP never span the two origins, so an XSS on the portal cannot reach the admin surface even in principle.
 
 ## 4. Deploy pipeline and the VG gates
 
@@ -182,8 +182,9 @@ Configured in `.claude/settings.json`. Hooks are deterministic; CLAUDE.md is adv
 
 The SFTP mechanics below are designed from the public description and must be confirmed by the vendor call: file naming conventions and any required prefixes, delivery acknowledgement mechanism, expected arrival window, retention of files on the vendor side, and whether a distinct sandbox endpoint exists before contract. The worker's ingest is arrival-triggered and digest-idempotent precisely so that wrong assumptions here degrade to a delay and an alert rather than data corruption.
 
-## 13. Open questions
+## 13. Founder rulings (Wave 2 gate, 2026-08-13) and remaining questions
 
-1. **ADR-007 (hosting) and ADR-008 (ORM)** need your confirmation. Both are proposed, neither is acted on.
-2. **Domain and origin split:** proposed `meritfutures.com` (site), `app.meritfutures.com` (portal and API), `ops.meritfutures.com` (admin, allowlisted). Confirm the third name, since it appears in DNS and should not be guessable-adjacent to the brand.
-3. **Status page** hosting: managed (Statuspage class) or a static page on Cloudflare. Recommend managed, because the one time you need it is the one time your platform is down.
+1. **ADR-007 (hosting) and ADR-008 (ORM): both ACCEPTED.** Neon plus Railway plus Cloudflare plus an S3-compatible private bucket; Drizzle with the `scopedDb(identity)` wrapper and the VG-4 lint rule. Recorded in [DECISIONS.md](../DECISIONS.md).
+2. **Domain and origin split: RULED.** `meritfutures.com` (site) and `app.meritfutures.com` (portal and API) stand. The admin console does **not** live on a Merit subdomain: it is served from a **separate apex domain**, unrelated to the brand in name, chosen at infrastructure setup ([ADR-012](../DECISIONS.md)). The reason is that a subdomain satisfies "separate origin" but not D3's "unlinked from public surfaces": `ops.meritfutures.com` is guessable and appears in certificate transparency logs beside the brand.
+   **Placeholder convention, binding from here on:** every document, configuration file, and code reference uses **`ADMIN_ORIGIN`**, resolved from the platform vault at deploy time. The real hostname is never written into this corpus, the repository, or any public artifact. It gets its own registrar lock and its own renewal reminder, because a lapsed admin domain is an outage with a hostile finder.
+3. **Status page** hosting: managed (Statuspage class) or a static page on Cloudflare. Recommend managed, because the one time you need it is the one time your platform is down. **Still open**; decide with M10.

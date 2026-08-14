@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, ../../research/DATA_CAPABILITIES.md]
 last_updated: 2026-08-13
 ---
@@ -922,10 +922,12 @@ Migrations are forward-only, reviewed on `main`, and never edited after merge. T
 
 Privacy deletion requests redact PII columns (`users.email`, `country_code`, signal previews) and retain the financial spine with the identity pseudonymized, because the ledger cannot lie about money that moved.
 
-## 16. What needs the founder's eyes
+## 16. Founder rulings (Wave 2 gate, 2026-08-13)
 
-1. **`rule_states` stored per day rather than per account.** It is the difference between an account timeline that reconstructs itself and one that has to be recomputed on demand. Costs roughly 250 rows per funded account per year.
-2. **Marks and corrections use supersession, never update.** This is what makes "what did we believe when we approved that payout" answerable, and it is the mechanism behind the never-claw-back promise (B4 #5).
-3. **`payout_requests.status` has no `denied` value and no review state.** That is the zero-denial policy expressed as a schema constraint rather than a process promise.
-4. **`identity_id` is denormalized onto `payout_requests`.** Deliberate, for identity-level race safety and aggregate exposure.
-5. **The `promotional_credit` ledger class and `currency` columns exist but are unused.** Confirm you want them reserved rather than added later.
+Walked line by line at the gate. All five confirmed as written; recorded in [DECISIONS.md](../DECISIONS.md#wave-2-gate-closure-2026-08-13).
+
+1. **`rule_states` stored per day rather than per account: confirmed.** It is the difference between an account timeline that reconstructs itself and one that has to be recomputed on demand. Costs roughly 250 rows per funded account per year.
+2. **Marks and corrections use supersession, never update: confirmed.** This is what makes "what did we believe when we approved that payout" answerable, and it is the mechanism behind the never-claw-back promise (B4 #5).
+3. **`payout_requests.status` has no `denied` value and no review state: confirmed.** That is the zero-denial policy expressed as a schema constraint rather than a process promise.
+4. **`identity_id` is denormalized onto `payout_requests`: confirmed.** Deliberate, for identity-level race safety and aggregate exposure.
+5. **The `promotional_credit` ledger class and the `currency` columns are reserved now: confirmed.** Both stay in the v1 schema and out of v1 math. `currency` defaults to `USD` on `ledger_entries` and `purchases` and is never read by any computation; `promotional_credit` exists as a `ledger_accounts` row with no entries. The cost is two columns and one row. The migration avoided is a multi-currency or bonus-mechanics retrofit onto a live, append-only ledger, which is the one table in the system where a retrofit cannot be rehearsed.

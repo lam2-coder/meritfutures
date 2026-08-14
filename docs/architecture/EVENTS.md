@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, DATA_MODEL.md]
 last_updated: 2026-08-13
 ---
@@ -282,6 +282,6 @@ Suppression rules exist because a commiseration email to someone we just restric
 
 ## 12. Open questions
 
-1. **`day.closed` volume.** At 5,000 active accounts this is roughly 1.25M rows per year in `events` on top of `daily_marks`. It is the right default (the timeline and evidence pack both want it), but confirm you want the full mark payload duplicated into the event rather than a thin pointer.
-2. **Public stats derived from events (STATS consumers).** Confirm which aggregates go on the public page at launch: trailing pass rate, payouts paid, average payout, and average time to first payout are the candidate set.
-3. **`identity.signal_observed`** is high volume and low value individually. Proposed: emit only on first observation of a signal per identity, not on every re-observation.
+1. **`day.closed` volume: RESOLVED at the Wave 2 gate (2026-08-13).** The **full mark payload** is carried in the event, not a thin pointer. At 5,000 active accounts that is roughly 1.25M rows per year in `events` on top of `daily_marks`, and it is the right price: the account timeline and the [evidence pack](../GLOSSARY.md#evidence-pack) both reconstruct from the event stream alone, without joining to state that may since have been superseded by a correction. An event that points at a mutable row proves nothing in 2031.
+2. **Public stats derived from events (STATS consumers).** Confirm which aggregates go on the public page at launch: trailing pass rate, payouts paid, average payout, and average time to first payout are the candidate set. (Still open; M12 owns it.)
+3. **`identity.signal_observed`** is high volume and low value individually. Proposed: emit only on first observation of a signal per identity, not on every re-observation. (Still open; M7 owns it.)

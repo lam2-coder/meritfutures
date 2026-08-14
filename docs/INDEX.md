@@ -22,7 +22,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | draft | claude |
 | [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives | draft | founder |
 | [EDGE_CASES.md](EDGE_CASES.md) | Living registry; every bug becomes an entry plus a golden file | draft | claude |
-| [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | review | founder |
+| [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | approved | founder |
 
 ## research/ (Wave 1: next up)
 | Doc | Purpose | Status | Owner |
@@ -35,16 +35,16 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [VIBE_FAILURE_POSTMORTEMS.md](../research/VIBE_FAILURE_POSTMORTEMS.md) | Appendix E: incident studies converted to named CI gates | approved | founder |
 | [CLAUDE_CODE_PLAYBOOK.md](../research/CLAUDE_CODE_PLAYBOOK.md) | C0: community practice, merged monthly | approved | founder |
 
-## docs/architecture/ (Wave 2)
+## docs/architecture/ (Wave 2: APPROVED at the gate, 2026-08-13)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
-| [OVERVIEW.md](architecture/OVERVIEW.md) | System diagram, module map, end-to-end data flow | review | founder |
-| [DATA_MODEL.md](architecture/DATA_MODEL.md) | Every table, column, type, index, constraint, retention | review | founder |
-| [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors | review | founder |
-| [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | review | founder |
-| [STATE_MACHINES.md](architecture/STATE_MACHINES.md) | Account / payout / flag / identity lifecycles as Mermaid | review | founder |
-| [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | review | founder |
-| [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | review | founder |
+| [OVERVIEW.md](architecture/OVERVIEW.md) | System diagram, module map, end-to-end data flow | approved | founder |
+| [DATA_MODEL.md](architecture/DATA_MODEL.md) | Every table, column, type, index, constraint, retention | approved | founder |
+| [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors | approved | founder |
+| [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | approved | founder |
+| [STATE_MACHINES.md](architecture/STATE_MACHINES.md) | Account / payout / flag / identity lifecycles as Mermaid | approved | founder |
+| [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | approved | founder |
+| [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | approved | founder |
 
 ## docs/plans/ (Wave 3, dependency order, M1 first always)
 | Doc | Purpose | Status | Owner |

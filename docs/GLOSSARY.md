@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md]
 last_updated: 2026-08-13
 ---
@@ -108,6 +108,10 @@ A terminal rule violation that closes the account. Breach is evaluated on the da
 
 ## auto-liquidator
 Rithmic's server-side risk enforcement. Merit pushes max-loss risk settings per account via provisioning; Rithmic liquidates positions when a threshold is hit, whether or not the trader is connected. Merit never builds streaming risk in v1. The EOD report records the liquidation event, time, and trigger, which becomes [evidence](#evidence-pack).
+
+## auto-liquidation setpoint
+The max-loss value Merit pushes to Rithmic for an account. **Decided and binding: the setpoint sits AT the account's current [floor](#floor)**, not above it and not below it, and it is re-pushed whenever the floor moves (a new end-of-day high, a [floor lock](#floor-lock), or a [post-payout floor recompute](#post-payout-floor-rule)).
+The consequence is the one place where a vendor's real-time behavior and Merit's end-of-day arithmetic meet, so it is stated exactly: a clean liquidation leaves the day's low **exactly at** the floor and the account **survives**, because [breach](#breach) is `low < floor` and never `low <= floor`. A liquidation that slips through the floor leaves the low **below** it and the account **breaches**. Traders therefore experience the auto-liquidator as the thing that saves them and slippage as the thing that ends them, which is both true and publishable. All three cases (one tick above the floor, exactly at the floor, one tick below) are pinned by golden files.
 
 ---
 
