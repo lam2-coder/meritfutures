@@ -11,6 +11,8 @@ last_updated: 2026-08-14
 ## Repo workflow (corpus phase)
 **`main` is the sole trunk and holds the full corpus** ([ADR-D1](DECISIONS.md)). Commit directly to `main`, push after every commit. `SessionStart` pulls and `Stop` pushes, enforced by the committed [.claude/settings.json](../.claude/settings.json). Branch-per-module and pull-request discipline resume at FREEZE for application code, per constitution C7.
 
+**One founder action outstanding:** `origin/dev` and `origin/claude/axcera-brochure-research-7s2pdd` still exist. Session credentials return 403 on ref deletion, so they could not be removed from here. Both point at commits `main` already contains, so they are stale rather than divergent and nothing is at risk; delete them from the GitHub UI or a local clone. `premain` was deliberately left alone (not named in the ruling, same commit `main` held before the merge).
+
 ## Current wave
 Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 batch 1 gate CLOSED (2026-08-14): M03 through M08 are `approved`; M02 holds at `review`.** M09 through M19 not started.
 
