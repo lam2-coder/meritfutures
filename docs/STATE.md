@@ -90,7 +90,9 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 **Schema-delta reconciliation. Money path. Strict [ADR-003](DECISIONS.md) regime: one objective, fresh context, no compounding. PLAN MODE IS MANDATORY.**
 
-**What it is.** Four waves of proposed schema deltas reconciled into one reviewed migration set against the approved [DATA_MODEL](architecture/DATA_MODEL.md): M01's ten (SD-01 to SD-10), batch 1's thirty-one (`SD-M2-nn` to `SD-M8-nn`), batch 2's, and the addendum's, including SD-M19-03 widening to record which KYC trigger fired and the link-confidence signal-weight table needing a home.
+**What it is.** Four waves of proposed schema deltas reconciled into one reviewed migration set against the approved [DATA_MODEL](architecture/DATA_MODEL.md): **M01's ten (SD-01 to SD-10), batch 1's thirty-seven (`SD-M2-nn` to `SD-M8-nn`), and batch 2's forty-one (`SD-M9-nn` to `SD-M20-nn`): 88 numbered, plus 5 unnumbered schema changes that exist as rulings with no delta number, for a total of 93.** SD-M19-03 widens to record which KYC trigger fired, and the link-confidence signal-weight table gets a home in the reserved sequence.
+
+**The counts above are corrected.** This document previously read "thirty-one" and "thirty-four", which had been wrong since Session 5 and were quoted onward by three other documents. [ADR-026](DECISIONS.md) records the correction and its provenance; the manifest completeness gate joins CI so a hand-maintained tally cannot drift again.
 
 **Why plan mode is mandatory rather than advised.** This session touches every money table at once; it is the only session whose output cannot be corrected by a later session without a migration against live data; and its failure mode is silent, because a delta folded wrongly produces a schema that works and is wrong. [DELIVERY_PLAN section 3.1](DELIVERY_PLAN.md) names the four specific reasons it is the highest-risk work remaining. **The plan is reviewed before a single migration file is written.**
 

@@ -105,7 +105,7 @@ Every money movement in Merit is one of these five shapes. Amounts are signed, p
 
 | ID | Kind | Entries |
 |---|---|---|
-| LT-01 | `payout_approval` | debit `trader_withdrawable` (identity) `approved_cents`; credit `firm_treasury` `trader_cents`; credit `fees_revenue` `-firm_cents`... **see the note below** |
+| LT-01 | `payout_approval` | debit **`firm_treasury`** `approved_cents`; credit **`trader_wallet`** (identity) `trader_cents`; credit `fees_revenue` `firm_cents`. **The debit leg was corrected by [ADR-027](../DECISIONS.md)**: it previously debited `trader_withdrawable`, which is the *same class* the credit leg targets under the one-class ruling, so the posting would have balanced and moved nothing |
 | LT-02 | `payout_settlement` | debit `firm_treasury` `trader_cents`; credit the payout wallet position `-trader_cents` |
 | LT-03 | `payout_reversal` | the exact negation of LT-01, with `reversal_of` set (SD-M5-05) |
 | LT-04 | `chargeback_reversal` | posted by [M3](M03-billing-checkout.md), referenced here because it is the transaction that makes an identity net negative honestly (B4 #10) |
@@ -113,6 +113,10 @@ Every money movement in Merit is one of these five shapes. Amounts are signed, p
 | LT-06 | `wallet_withdrawal_approval` | debit `trader_wallet` (identity) `amount_cents`; credit `firm_treasury` `amount_cents`. The external leg's approval |
 | LT-07 | `wallet_withdrawal_settlement` | debit `firm_treasury`; credit the payout wallet position. The external leg's cash movement |
 | LT-08 | `wallet_purchase_debit` | debit `trader_wallet`; credit revenue. Posted by [M3](M03-billing-checkout.md) when a purchase is wallet-funded, in the same transaction as the purchase (M3's INV-M3-13) |
+
+**LT-01's debit leg was corrected at the reconciliation** ([ADR-027](../DECISIONS.md)). It debited `trader_withdrawable` and credited `trader_wallet`; those are one class under the ruling, so the transaction would have passed the zero-sum trigger while transferring nothing. **The ledger would have balanced and the trader's wallet would have been empty.** The debit is **`firm_treasury`**, which is an existing v1 class; the posting balances because `trader_cents + firm_cents = approved_cents` is already a check constraint on `payout_requests`.
+
+**The state machine's `frozen` target changed** ([ADR-028](../DECISIONS.md)). It read `frozen --> transferring`, which is unreachable once `transferring` belongs to `wallet_withdrawals`. A released freeze now settles internally and instantly, which is what the wallet made true.
 
 **LT-01's credit leg changed at the batch 1 gate.** It previously credited the payout wallet position as a firm obligation to pay; it now credits the **identity's `trader_wallet`** position (SD-M5-07). The obligation is the same size and is owed to the same person; what changed is that it is now recorded against the trader who owns it rather than pooled, which is what makes wallet balances individually reportable in Open Liability (INV-M5-15).
 
@@ -161,7 +165,7 @@ Settlement on the external leg is still the most consequential transition involv
 ```mermaid
 stateDiagram-v2
     approved --> frozen: an investigation opens, with a cited open flag
-    frozen --> transferring: flag dismissed, or the freeze window expires
+    frozen --> settled: flag dismissed, or the freeze window expires
     frozen --> failed: enforcement decided, with an exported evidence pack
     note right of frozen
       Requires: risk_flags row in investigating,

@@ -10,7 +10,7 @@ last_updated: 2026-08-14
 
 **Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](DECISIONS.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
 
-**25 ADRs. 140 edge cases. 257 golden scenarios.** Changing a frozen document requires an ADR, not a commit.
+**30 ADRs. 140 edge cases. 257 golden scenarios.** Changing a frozen document requires an ADR, not a commit.
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 

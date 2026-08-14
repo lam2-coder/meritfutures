@@ -628,14 +628,14 @@ Seeded years ahead, maintained as data, reviewed annually.
 | `basis_trading_day` | date | not null | the [last closed day](../GLOSSARY.md#last-closed-day) the decision used |
 | `plan_version_id` | uuid | fk plan_versions, not null | the contract in force, copied for provability |
 | `eligibility_snapshot` | jsonb | not null | full gate-by-gate evaluation and inputs, immutable |
-| `status` | enum(`approved`,`transferring`,`settled`,`failed`,`frozen`) | not null | there is no `pending_review` and no `denied` by design |
+| `status` | enum(`approved`,`settled`,`failed`,`frozen`) | not null | there is no `pending_review` and no `denied` **by design**, and no addition may be made without an ADR against the zero-denial policy. `transferring` was retired to `wallet_withdrawals` by [ADR-028](../DECISIONS.md) |
 | `idempotency_key` | text | not null | client-supplied |
 | `payout_ordinal` | integer | not null | 1-based per account; drives ladder and cap schedule |
 | `approved_at` | timestamptz | not null default now() | |
 | `settled_at` | timestamptz | null | |
 | `created_at`, `updated_at` | timestamptz | not null | |
 
-Indexes: unique `(account_id, idempotency_key)`; unique `(account_id, payout_ordinal)`; `(identity_id, approved_at desc)`; `(status)` partial where status in ('approved','transferring').
+Indexes: unique `(account_id, idempotency_key)`; unique `(account_id, payout_ordinal)`; `(identity_id, approved_at desc)`; `(status)` partial where status in ('approved','frozen') ([ADR-028](../DECISIONS.md): the predicate moved with the enum. **A predicate fixed in one of two places is a uniqueness guarantee that holds on Tuesdays.**).
 Check: `trader_cents + firm_cents = approved_cents`; `approved_cents <= requested_cents`.
 Retention: forever.
 Design note for the founder: `eligibility_snapshot` is a `jsonb` column rather than a separate table because it is written exactly once, always read with its parent, and must never drift from it. A join here would add a way for the proof and the decision to disagree.
@@ -876,7 +876,7 @@ Notes that matter: `payout_cap_schedule` is an **array from day one** even thoug
 
 **Amended at the M1 gate (2026-08-13).** Two fields above changed and are called out because this document is `approved` and a silent edit to a money-path contract is exactly what the corpus exists to prevent. `phase_funded.min_trading_days` is **0** on all three plans, which disables the gate rather than setting it low ([ADR-015](../DECISIONS.md), CV-19). `post_payout_floor_rule.mode` is **`none`** and `amount_cents` is dropped, because settlement no longer touches the floor at all ([ADR-014](../DECISIONS.md), CV-18). The funded `lock` block is populated on all three plans, at `floor_at_cents = size_cents + 10000` and `at_profit_cents = drawdown_cents + 10000`.
 
-**M1's ten schema deltas are approved and not yet folded into the tables above.** SD-01 through SD-10 in [M01 section 2.3](../plans/M01-rules-engine.md) were approved with that plan and must be read together with this document until they land as one reviewed migration. They are: `daily_marks.adjustment_cents`; `rule_states.payout_anchor_day` and `cadence_anchor_day` replacing `last_payout_trading_day`; `payout_requests.settled_trading_day` and `effective_trading_day`; `rule_states.floor_open_cents`; the partial unique index on `payout_requests (account_id, payout_ordinal) where status <> 'failed'`; `rule_states.engine_eligible` with `engine_gates` and `context_gates` split; `rule_states.consistency_period_start_day`; `rule_states.state_hash`; the partial unique index on `payout_requests (account_id) where status in ('approved','transferring','frozen')`; and the conditional not-null on the two `floor_lock_*` columns. Folding them in is the next tracked action in [STATE](../STATE.md).
+**M1's ten schema deltas are approved and not yet folded into the tables above.** SD-01 through SD-10 in [M01 section 2.3](../plans/M01-rules-engine.md) were approved with that plan and must be read together with this document until they land as one reviewed migration. They are: `daily_marks.adjustment_cents`; `rule_states.payout_anchor_day` and `cadence_anchor_day` replacing `last_payout_trading_day`; `payout_requests.settled_trading_day` and `effective_trading_day`; `rule_states.floor_open_cents`; the partial unique index on `payout_requests (account_id, payout_ordinal) where status <> 'failed'`; `rule_states.engine_eligible` with `engine_gates` and `context_gates` split; `rule_states.consistency_period_start_day`; `rule_states.state_hash`; the partial unique index on `payout_requests (account_id) where status in ('approved','frozen')` ([ADR-028](../DECISIONS.md)); and the conditional not-null on the two `floor_lock_*` columns. Folding them in is the next tracked action in [STATE](../STATE.md).
 
 ## 12. Reserved-now fields, and what each buys
 

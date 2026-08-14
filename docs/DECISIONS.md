@@ -654,3 +654,129 @@ Running the engine **as committed**, against its own `OUR_PLANS`, reproduces the
 
 **The engine is now the source of record and it is stale in four places.** That is recorded rather than fixed here: **re-running it at the corpus configuration is a build-phase task**, listed in [SIMULATION_HARNESS section 8](testing/SIMULATION_HARNESS.md), and it must produce the table above before any CI calibration band is set from it.
 
+
+---
+
+## ADR-026: The schema-delta reconciliation, and the count correction  (2026-08-14, status: accepted)
+
+- **Context:** Four waves of module plans proposed schema changes that were approved with their plans and never folded into [DATA_MODEL](architecture/DATA_MODEL.md). Section 11 of that document says so in its own words. This ADR authorizes the fold, amends a frozen document, records a count correction, and carries the rejection table.
+- **Decision:** All **93** schema changes land as one migration set at `packages/db`, folded at create rather than applied as a base-plus-ALTER chain, because the repository contains no application code and no database. DATA_MODEL is amended in the same pull request under this ADR.
+
+### The count was wrong, and the correction is folded rather than merely recorded
+
+The corpus recorded "M01's ten, batch 1's thirty-one, batch 2's thirty-four". The actual counts are:
+
+| Wave | Recorded | **Actual** | Drift |
+|---|---|---|---|
+| M01 (`SD-01` to `SD-10`) | ten | **10** | correct |
+| Batch 1 (`SD-M2-nn` to `SD-M8-nn`) | thirty-one | **37** | **+6** |
+| Batch 2 (`SD-M9-nn` to `SD-M20-nn`) | thirty-four | **41** | **+7** |
+| Numbered total | 75 | **88** | **+13** |
+| Unnumbered (section below) | 0 | **5** | **+5** |
+| **Total in scope** | 75 | **93** | **+18** |
+
+Per module: M02 6, M03 6, M04 3, M05 7, M06 5, M07 5, M08 5. M09 3, M10 4, M11 4, M12 4, M13 3, M14 3, M15 2, M16 3, M17 4, M18 3, M19 4, M20 4.
+
+**Provenance, traced through git rather than assumed.** At commit `64b52b3`, when batch 1 was drafted and "thirty-one" was written, M02 to M08 held **34** deltas. **The number was wrong on the day it was recorded.** Session 7's batch-1 gate then correctly observed the set "grew by three" (`SD-M3-06`, `SD-M5-06`, `SD-M5-07`, all from [ADR-019](#)'s wallet) and applied a right increment to a wrong base: 31 + 3 = 34, where 34 + 3 = **37**. Batch 2 repeats the shape: 38 at `c5e7826`, plus `SD-M18-01` to `SD-M18-03` at [ADR-024](#), giving **41**.
+
+**Nothing is missing from the corpus. Every delta is present and traceable.** What was wrong is a hand-maintained tally that four documents quoted. **Corrected in all four**: [STATE](STATE.md), [DELIVERY_PLAN](DELIVERY_PLAN.md), [GUIDE_BRIEFING](GUIDE_BRIEFING.md), and [SESSION_LOG](SESSION_LOG.md). The session log is append-only, so its two entries are **annotated in place** rather than rewritten: the historical record stands and carries the correction beside it, because falsifying a journal to fix a number is a worse failure than the number.
+
+**The control that was missing.** The FREEZE gate moved registry counts under CI assertion (CI-06d); this tally sat outside that net. **A manifest completeness gate now joins CI**: every `SD-nn` and `U-nn` appearing anywhere in `docs/` must appear exactly once in `packages/db/DELTA_MANIFEST.md` with a disposition. A count nobody can drift is better than a count someone remembers to update.
+
+**Two things the corpus called additions are not deltas.** `ladders_completed_lifetime` is already inside `SD-M14-01`'s column list, and the `SD-M19-03` widening is an amendment to an existing delta. Both fold; neither is counted twice.
+
+### Five schema changes that exist as rulings with no delta number
+
+| # | Change | Source | Why it has no number |
+|---|---|---|---|
+| **U-01** | Link-confidence **signal-weight table** | [ADR-022](#), M07 D-16 | Known homeless. ADR-022 tiers it to v1.x, so no module claimed it |
+| **U-02** | `accounts.graduation_eligible` | [ADR-024](#), M01 R-49 | R-49 sets a flag no column exists for. `SD-M18-01` adds `graduated_at`, `graduation_path`, `terminal_settlement_id`, and not this |
+| **U-03** | Identity-scoped **ledger halt state** with escalation clock | [ADR-016](#), M05 INV-M5-16 | The ruling requires a scoped halt that pages and escalates on a configured window: a row with a subject, a start, and a deadline. Nothing holds it |
+| **U-04** | `identity_signals.kind` value for **D-15 checkout enrichment** | [ADR-023](#), M07 D-15 | The check list has no slot for the enrichment vendor's signals |
+| **U-05** | `kyc_verifications.placement` **check widening** | [ADR-021](#) | The constraint allows `pre_eval, pre_funded, direct_purchase`. The ruled trigger vocabulary is a set. `SD-M19-03` widened the funnel table and not this one |
+
+**These are the reason a count matters.** Four of the five were invisible because nobody was counting; they are rulings the schema does not yet express, which is the precise failure a reconciliation session exists to catch.
+
+### Rejection table
+
+**No delta was rejected.** All 88 numbered and all 5 unnumbered changes land, 90 in the v1 core sequence and 3 in a marked reserved sequence (`U-01` per ADR-022's v1.x tier, `SD-M18-03`'s `graduation_invitations` conditional on a live program that does not exist per [OQ-M18-01](#), and `SD-M11-04`). **This table says so explicitly rather than being absent**, because a rejection table that is missing is indistinguishable from a delta that was dropped.
+
+### Documents amended under this ADR
+
+[DATA_MODEL](architecture/DATA_MODEL.md) (tables rewritten to post-migration truth, section 11 re-materialized at the frozen configuration, delta-provenance appendix), **[GLOSSARY](GLOSSARY.md)** (the canonical naming authority: it carries `trader_withdrawable`, `ladder.payouts_to_graduate`, and the singular KYC placement, all three of which ADR-027 and ADR-030 change), [M05](plans/M05-payout-system.md) (LT-01's debit leg and the state machine's `frozen` target), [STATE](STATE.md), [DELIVERY_PLAN](DELIVERY_PLAN.md), [GUIDE_BRIEFING](GUIDE_BRIEFING.md), [SESSION_LOG](SESSION_LOG.md), and [EDGE_CASES](EDGE_CASES.md) for gaps discovered while folding.
+
+### C-07: the `state_hash` input, written down because it was not
+
+`SD-08` adds `state_hash` for the nightly replay audit and `SD-06` splits the gates precisely because context gates are not replayable. **Nothing in the corpus recorded which columns the hash covers.** If `context_gates` entered it, a freeze applied last March would produce a divergence every night until someone disabled the audit, which is FM-17 by construction.
+
+**The hash is SHA-256 over a canonical serialization** ([M01 section 12](plans/M01-rules-engine.md)): fields in the fixed declared order below, `bigint` rendered base-10, `null` as an explicit sentinel, no whitespace.
+
+**Included, in this exact order:**
+
+```
+ 1. account_id
+ 2. trading_day
+ 3. phase
+ 4. floor_cents
+ 5. floor_locked
+ 6. floor_open_cents                    -- SD-04
+ 7. high_water_balance_cents
+ 8. balance_cents
+ 9. withdrawable_cents
+10. traded_days_count
+11. win_days_count
+12. consistency_best_day_cents
+13. consistency_period_profit_cents
+14. consistency_period_start_day        -- SD-07
+15. payouts_settled_count
+16. payout_anchor_day                   -- SD-02
+17. cadence_anchor_day                  -- SD-02
+18. engine_eligible                     -- SD-06
+19. engine_gates                        -- SD-06
+```
+
+**Excluded, each for a stated reason:**
+
+| Column | Why excluded |
+|---|---|
+| `context_gates` | **The whole reason SD-06 split them.** Freeze, recon, KYC and in-flight were true on the day and may not be true now. INV-23 |
+| `engine_version` | A build identifier is not state. Including it makes every engine upgrade a universal divergence |
+| `computed_at` | Wall-clock, not state |
+| `id`, `state_hash` | Surrogate key and the hash itself |
+
+**Both anchors are in the hash and both stay separate columns** (C-09). Under [ADR-019](#) they coincide today; collapsing them because today's configuration makes them equal is exactly the silent fold this session exists to prevent, and it is a 40 percent liability change if the anchor ever moves back.
+
+## ADR-027: One trader ledger class, named `trader_wallet`  (2026-08-14, status: accepted)
+
+- **Context:** C-01. [DATA_MODEL section 8](architecture/DATA_MODEL.md) and [GLOSSARY](GLOSSARY.md) carry `trader_withdrawable` as the per-identity ledger class. `SD-M5-07` adds `trader_wallet` per identity. [M05](plans/M05-payout-system.md)'s own LT-01 **debits `trader_withdrawable` and credits `trader_wallet` in the same transaction**, which is either a rename applied to one leg and not the other, or two genuinely distinct positions the corpus never distinguishes anywhere.
+- **Decision:** **One class, named `trader_wallet`.** [ADR-019](#) gave it its meaning and three modules (M14, M17, M20) assert invariants against that name. **`trader_withdrawable` is retired as a superseded name**, and **LT-01's debit leg is corrected** to debit `firm_payable` rather than the class it credits.
+- **Why this is a founder ruling and not a rename.** A posting that debits and credits the same position is a no-op that looks like a transfer, and it would have passed the zero-sum trigger while moving nothing. **The ledger would have balanced and the trader's wallet would have been empty.** That is the exact class of defect this session exists to catch: a delta folded wrongly produces a schema that works and is wrong.
+- **The corrected debit is `firm_treasury`**, an existing v1 class. The posting balances because `trader_cents + firm_cents = approved_cents` is already a check constraint on `payout_requests`. **Recorded because the first draft of this fold invented a `firm_payable` class that does not exist in the chart of accounts**, which would have been the same defect wearing a different name: a class nobody defined, appearing first in a migration. Caught against [GLOSSARY](GLOSSARY.md)'s class list, which is why that list is the naming authority and why it is amended here rather than alongside.
+- **Consequences:** GLOSSARY is amended under [ADR-026](#), because it is the canonical naming authority and every later document keys off it. The ledger class list carries `trader_wallet` with a comment recording the superseded name, so a reader meeting `trader_withdrawable` in an old document can resolve it.
+- **Alternatives considered:** keep both as distinct positions (rejected: nothing in the corpus defines what the distinction would mean, and inventing one at migration time is how a ledger acquires a position nobody can reconcile); keep `trader_withdrawable` as the name (rejected: ADR-019 and three modules already use `trader_wallet`, so the rename would have to propagate into invariants rather than out of them).
+
+## ADR-028: `payout_requests.status` under the wallet  (2026-08-14, status: accepted)
+
+- **Context:** C-02, **the single most dangerous item in the set.** The approved enum is `approved, transferring, settled, failed, frozen`. [M05](plans/M05-payout-system.md) section 3 says the internal leg "reaches `settled_to_wallet` and stops"; M05 step S-4 says set `status = 'settled'`. Under [ADR-019](#), `transferring` describes the external leg, which now lives in `wallet_withdrawals`. **No delta proposed any of this.** And `SD-09`'s partial unique index has predicate `status in ('approved','transferring','frozen')`, so the enum question **silently decides whether G-NO-IN-FLIGHT is enforced at all.**
+- **Decision:** **The enum is `approved, settled, failed, frozen`.** `transferring` is retired from `payout_requests` and owned by `wallet_withdrawals`. **`settled_to_wallet` is not added**, because settlement to the wallet is the only settlement the internal leg has, and a status naming its destination invites a second one. **`SD-09`'s predicate becomes `status in ('approved','frozen')`.**
+- **Two corrections the ruling carries, both found by reading the files rather than the deltas:**
+  1. **[DATA_MODEL](architecture/DATA_MODEL.md) line 638 carries a second index with the same stale predicate**, `(status) partial where status in ('approved','transferring')`. It becomes `where status in ('approved','frozen')`. **A predicate fixed in one of two places is a uniqueness guarantee that holds on Tuesdays.**
+  2. **[M05](plans/M05-payout-system.md)'s state machine reads `frozen --> transferring`**, which becomes unreachable once `transferring` leaves this table. **Retargeted to `frozen --> settled`**, which is what a released freeze actually does under the wallet: the payout settles internally and instantly.
+- **Why the predicate is the dangerous half.** G-NO-IN-FLIGHT is the gate that stops a second payout while one is outstanding. If the index kept `transferring` in its predicate after the value stopped occurring, **the index would still exist, still be valid, and enforce nothing**, because no row would ever match. A gate that silently stops gating is worse than one that is absent, and nothing in the test suite would fail.
+- **Consequences:** the enum is written with a comment naming the zero-denial policy, so a future `denied` or review state is a deliberate act against a stated rule rather than an oversight. `wallet_withdrawals` owns the external leg's states per [M20](plans/M20-wallet.md).
+- **Alternatives considered:** keep `transferring` on `payout_requests` for the external leg (rejected: it duplicates state that `wallet_withdrawals` owns, and two tables tracking one transfer is how they disagree); add `settled_to_wallet` (rejected above).
+
+## ADR-029: `dedupe_matches` is the authoritative hard link  (2026-08-14, status: accepted)
+
+- **Context:** C-05. `SD-M19-04`'s `dedupe_matches` exists because the single `kyc_verifications.dedupe_matched_identity_id` column "cannot express a face matching three identities". **The delta does not say to drop the column.** Under [ADR-022](#) a dedupe hit is a **hard link that auto-enforces**, so two sources that can disagree is an enforcement defect rather than a redundancy.
+- **Decision:** **Drop `dedupe_matched_identity_id`. `dedupe_matches` is authoritative.** `biometric_dedupe_hit` stays as the fast boolean, because a boolean cannot contradict a set; it can only be stale, and staleness is detectable.
+- **Why it needed a ruling.** This is an **auto-enforcement input**. A hard link bans an account without human review, and a system with two sources for that decision will eventually enforce on the one that happens to be read first. Leaving both would have been the safe-looking choice and the wrong one.
+- **Alternatives considered:** keep the column as a denormalized "first match" (rejected: "first" is not a property of a set, and the column would drift the moment a second match arrived).
+
+## ADR-030: Plan-config key names are `max_payouts` and `kyc.triggers`  (2026-08-14, status: accepted)
+
+- **Context:** C-06. `ladder.payouts_to_graduate` ([DATA_MODEL section 11](architecture/DATA_MODEL.md), [M01](plans/M01-rules-engine.md) R-49, CV-14) versus `max_payouts` (M01 Appendix A, [ADR-024](#)). Section 11's literal example is also stale: ladder 8, `win_days.required_count` 5, `phase_eval.min_trading_days` 1, and `kyc.placement` as a singular enum against [ADR-021](#)'s ruled trigger set. **The zod schema and the CV publish validations key off these names.**
+- **Decision:** the canonical name is **`max_payouts`**, matching ADR-024 and every Appendix A table. **`kyc.placement` becomes `kyc.triggers`, an array.** Section 11's example is re-materialized at the frozen configuration under [ADR-026](#).
+- **Consequences:** [GLOSSARY](GLOSSARY.md) is amended, since it carries `ladder.payouts_to_graduate` and the singular placement. `U-05` widens the `kyc_verifications.placement` check to the ruled trigger vocabulary in the same migration, because a config key and a stored value that disagree is the same defect one layer down.
+- **Alternatives considered:** keep `payouts_to_graduate` (rejected: ADR-024 is the later ruling and Appendix A is what a founder reads when confirming parameters); keep the singular placement and store the trigger set elsewhere (rejected: it splits one fact across two shapes).
+
