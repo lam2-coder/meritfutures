@@ -131,7 +131,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## Blocked
 
-Nothing.
+Nothing, and **one thing needs the founder's hand at merge rather than a session's**: **two open pull requests both claim `ADR-031`.** PR #4 (this branch) carries ADR-031 and ADR-032, both accepted; PR #5 carries a different, proposed ADR-031. Both branch from `main`, where the registry ends at 030. **Whichever merges second corrupts the registry**, and no session can fix it alone without risking the same collision on the next number. **The founder assigns at merge.** A CI check asserting unique, gapless ADR headings would have failed the second pull request instead.
 
 ## Next 3 actions
 
