@@ -1,7 +1,7 @@
 ---
 status: draft
 depends_on: []
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # STATE
@@ -22,6 +22,7 @@ Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 (Module pla
 - **Wave 3 batch 1 written:** M02 rithmic-bridge, M03 billing-checkout, M04 trader-portal, M05 payout-system, M06 admin-ops-console, M07 risk-abuse, M08 affiliate-system. Each a full B5 ten-section plan, each committed separately.
 - Registries grown to **127 golden scenarios** and **82 edge cases**. 44 adversarial scenarios across the eight plans, 35 of them novel.
 - ADRs 001 to 015 accepted; **016 and 017 proposed** (see below).
+- **Wave 1 amendment (2026-08-14), no gate reopened.** Actual Axcera brochure (Feb 2026, first primary vendor source) folded into PROP_TECH_LANDSCAPE: verified pricing ($15K setup, $5K/mo, ~$1K/mo hosting, +$5K/mo per extra platform, 6 to 8 week launch), the **stealth rev-share** gotcha named ($10K/mo escalator above $250K monthly revenue; auto tier upgrade above $150K/mo or 2,500 accounts), and a new 3-year TCO comparison (section 2.1: Axcera ~$220-280K at Merit's plan, YPF ~$125K+, DXtrade ~$190K+, self-build ~$7K). Black Arrow/BookMap/DeepMap added to DATA_CAPABILITIES' front-end inventory (no v1 impact). SHOULD/LATER nuggets routed to M11 (per-trade certificates), M12 (Trustpilot auto-review on payout settlement, compliance check mandatory when specced), M17 (free trials, rule-based promos), M08 (vesting/holds corroborates OQ-M8-01). Nothing contradicts an approved decision.
 
 ## In flight
 - Nothing. Parked at the batch 1 review gate as instructed.
