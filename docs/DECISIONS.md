@@ -49,6 +49,12 @@ The Open Decisions Register (constitution section 10) resolves into entries here
 - Consequences: Cosmetic; a one-line INDEX edit either way.
 - **Founder approval (2026-08-13): ACCEPTED.** The playbook stays at research/CLAUDE_CODE_PLAYBOOK.md; the Appendix C0 reference to docs/ is superseded and the Session-1 landmine is closed.
 
+## ADR-006: Queue technology is pg-boss (Postgres-only)  (2026-08-13, status: proposed)
+- Context: Constitution section 10 leaves queue tech open (BullMQ plus Redis, or pg-boss). Wave 2 needs the answer because the provisioning saga, Rise transfers, and the nightly batch all enqueue work, and the choice changes the backup and restore story.
+- Decision (proposed): pg-boss. Jobs live in the same Postgres instance as the money data.
+- Alternatives considered: BullMQ plus Redis (higher throughput, richer primitives, mature dashboards, but adds a second stateful service to secure, back up, and restore, and puts job state outside the PITR boundary that protects the ledger). At v1 scale (5,000 accounts in a nightly batch under 10 minutes, payout request p95 under 500ms) the throughput advantage buys nothing we need.
+- Consequences: One datastore to restore, one credential set, one backup drill. Enqueue participates in the same transaction as the state change that caused it, which removes a whole class of saga bugs ("committed the purchase, lost the provisioning job"). Restore-from-backup keeps queued work and idempotency keys consistent with the ledger (B4 scenario 19). If job volume ever outgrows Postgres, migration is a contained change behind the job interface.
+
 ## ADR-005: Rithmic vendor call deferred; M2 ingest specifics are provisional  (2026-08-13, status: accepted)
 - Context: ADR-002 is conditional on a Rithmic vendor call confirming EOD report formats and field lists, delivery cadence and timing guarantees, correction/backdated-fill semantics (critical for replay determinism, B4 #5), sandbox availability, server-side copy configuration, and admin R|API+ terms. The founder is deferring that call pending a capital decision.
 - Decision: Wave 2 architecture is designed fully from the known public CSV/SFTP quote details rather than waiting. Every ingest specific that the vendor call must later confirm is labeled **provisional-pending-vendor-confirmation** at the point of use, and the assumption is stated explicitly so a later correction is a bounded edit rather than a redesign.

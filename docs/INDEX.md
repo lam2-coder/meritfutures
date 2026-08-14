@@ -38,7 +38,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 ## docs/architecture/ (Wave 2)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
-| [OVERVIEW.md](architecture/OVERVIEW.md) | System diagram, module map, end-to-end data flow | draft | claude |
+| [OVERVIEW.md](architecture/OVERVIEW.md) | System diagram, module map, end-to-end data flow | review | founder |
 | [DATA_MODEL.md](architecture/DATA_MODEL.md) | Every table, column, type, index, constraint, retention | draft | claude |
 | [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors | draft | claude |
 | [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | draft | claude |
