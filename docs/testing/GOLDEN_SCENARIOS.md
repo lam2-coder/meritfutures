@@ -39,6 +39,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-179 to GS-185 | Loyalty and retention: cap-release liability, streak incentives, the bright line's composition, inverted win-back targeting, tier discretion, config bypass, calendar-broken streaks | M14 |
 | GS-186 to GS-191 | Discord integration: role disclosure, chat-account-as-credential, bot-token voice, moderation versus enforcement, enforcement by role removal, support in public | M15 |
 | GS-192 to GS-197 | Notification center: freeze notice versus tip-off, muting the alarm first, batch broadcasts, template leakage, proof of notice, new-kind defaults | M16 |
+| GS-198 to GS-204 | Offers engine: rules sold as promotions, free-trial identity loss, price experiments, stacking floors, leaked codes, chargeback-funded credit, rule experiments | M17 |
 
 ## 2. Fixture format
 
@@ -416,6 +417,20 @@ Defined by [M16](../plans/M16-notification-center.md) section 8.2. The module's 
 | GS-196 | A notice disputed with `read_at` null, and again with `read_at` set | Both answered from **dispatch plus delivery**, and `read_at` is never cited. Asserts that the convenient field is the one that cannot bear the weight a dispute puts on it. AS-M16-05, EC-116 |
 | GS-197 | A migration adds a new notification kind | Marketing defaults **off**, the class is stated in the migration, and an unclassified kind fails the registry test. Asserts that class assignment is a policy decision that otherwise looks like a data row and gets no review. AS-M16-06 |
 
-## 24. What is not here yet
+## 24. GS-198 to GS-204: offers engine (M17)
+
+Defined by [M17](../plans/M17-offers-engine.md) section 8.2. The module's governing sentence is that an offer changes the price of a known thing and may never change the thing, and five of these fixtures test that boundary from a different side.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-198 | A campaign attempts a temporary cap or a waived consistency gate | Refused: no write grant exists, and **no offer field can express a plan parameter**. The compliant path is a published plan version, pinned and visible before purchase. Asserts the parameter-status ruling on the surface most tempted to break it. AS-M17-01, EC-117 |
+| GS-199 | A free-trial cohort sharing device and ASN signals | Absent a payment fingerprint, entity resolution degrades **measurably**; the trial path requires KYC before provisioning and counts against the entity cap. Asserts that free trials drive marginal identity cost to zero, which is the one condition under which the account cap stops constraining anything. AS-M17-02, EC-118 |
+| GS-200 | A price experiment runs while the public pricing page renders | The public page shows the **offer-free config price** to every visitor, and the offer is presented against the stored list price. Asserts that experiments live in offers bound to identities, never on the surface M09 guarantees is config-rendered. AS-M17-03 |
+| GS-201 | Coupon plus bundle plus promotional credit on a Direct plan | The floor **clamps**, `offer.floor_applied` alerts, and no combination reaches or crosses it. Asserts that the characteristic failure is a combination nobody enumerated, and that the Direct floor is a liability number rather than a margin one. AS-M17-04, EC-119, extends GS-040 |
+| GS-202 | A campaign code posted to a public aggregator | `max_redemptions` caps it, the refusal and distinct-identity rates raise the leak signature within the hour, revocation is immediate, and **completed purchases are not repriced**. Asserts that retroactive repricing would be the FundingTicks failure applied to commerce. AS-M17-05 |
+| GS-203 | Credit granted, spent, then the funding purchase charged back | The grant revokes, the promotional balance goes **negative**, further credit spend blocks, and settlement follows the existing chargeback path. Asserts that a credit must know what paid for it or a stolen card buys two extractions. AS-M17-06, EC-120, pairs with GS-039 |
+| GS-204 | An experiment proposed with a rule-varying arm | **Unrepresentable**: `varies` has no such value, so the experiment cannot be written down. Asserts the line that Merit experiments on what it charges and how it explains itself, never on what it enforces. AS-M17-07 |
+
+## 25. What is not here yet
 
 Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**

@@ -66,7 +66,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | Derived loyalty state, cap release only via the dual-controlled publish path, recognition-not-economics streaks, inverted win-back targeting, ADR-019a compositional rule | review | founder |
 | [M15-discord-integration.md](plans/M15-discord-integration.md) | Per-role consent, one-way link that is never a credential, template-only announcements, moderation separated from enforcement. Post-launch per constitution section 10 | review | founder |
 | [M16-notification-center.md](plans/M16-notification-center.md) | Four notification classes deciding what a preference may silence, contact-change ceremony with prior-contact window, identity coalescing, template allowlist | review | founder |
-| [M17-offers-engine.md](plans/M17-offers-engine.md) | Contextual reset pricing, bundles, A/B-able configs | draft | claude |
+| [M17-offers-engine.md](plans/M17-offers-engine.md) | Server-authoritative price resolution, dual-controlled price floors, identity-bound offers, promotional credit provenance, experiments that cannot vary a rule | review | founder |
 | [M18-live-graduation-pipeline.md](plans/M18-live-graduation-pipeline.md) | Ladder tracker, invitation workflow | draft | claude |
 | [M19-kyc-identity.md](plans/M19-kyc-identity.md) | Dedicated KYC provider, placement config, biometric dedupe | draft | claude |
 
