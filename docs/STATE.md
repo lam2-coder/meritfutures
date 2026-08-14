@@ -29,7 +29,7 @@ Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 batch 1 gat
 - SECURITY gains C-23 to C-26, the wallet ATO blast-radius analysis (§4.7), and the break-glass procedure (§8.1). INFRA gains the 50,000-trader scale targets (§10.5).
 
 ## In flight
-**Wave 3 batch 2 (M09 through M20), drafting in progress.** Each doc lands at `review`, committed separately, with its edge cases and golden scenarios appended in the same commit. Done so far: **M09**.
+**Wave 3 batch 2 (M09 through M20), drafting in progress.** Each doc lands at `review`, committed separately, with its edge cases and golden scenarios appended in the same commit. Done so far: **M09, M10**.
 
 ## Settled at the follow-up ruling (2026-08-14)
 The four findings raised after the batch 1 fold are closed and folded.

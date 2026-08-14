@@ -59,7 +59,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution two-tier, **14 detectors**, copy-trading clause, flags queue, canaries | approved | founder |
 | [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, destination cooling, NFA I-26-12 creative approval | approved | founder |
 | [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans and rules, publish-ordered revalidation, stats render, versioned legal and content, geo disclosure | review | founder |
-| [M10-integrations.md](plans/M10-integrations.md) | Chatwoot, Metabase, Loops, Sentry, Discord alerts | draft | claude |
+| [M10-integrations.md](plans/M10-integrations.md) | One outbound bus: contract allowlists, send-time suppression, support-context scoping, replica exclusion, vendor-down chaos | review | founder |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Signed, verifiable pass/payout share cards | draft | claude |
 | [M12-transparency-platform.md](plans/M12-transparency-platform.md) | Public trailing pass rates and payout stats, auto-computed | draft | claude |
 | [M13-trader-analytics-journal.md](plans/M13-trader-analytics-journal.md) | Per-account performance breakdowns | draft | claude |
