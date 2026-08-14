@@ -1,5 +1,5 @@
 ---
-status: draft
+status: review
 depends_on: [../../docs/architecture/DATA_MODEL.md, ../../docs/DECISIONS.md]
 last_updated: 2026-08-14
 ---
@@ -127,7 +127,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M11-01 | `certificates` | add `signing_key_id`, `code`, `claims_schema_version` | 0020 | **landed** |
 | SD-M11-02 | `certificates` | add `revocation_class` | 0020 | **landed** |
 | SD-M11-03 | `certificates` | add `deferred_until`, `deferred_reason` | 0020 | **landed** |
-| SD-M11-04 | new `certificate_verifications` | the public oracle's access log | 0025 | pending, **reserved** |
+| SD-M11-04 | new `certificate_verifications` | the public oracle's access log | 0025 | **landed**, **reserved** |
 | SD-M12-01 | new `statistic_definitions` | a statistic is a choice of denominator | 0021 | **landed** |
 | SD-M12-02 | new `published_statistics` | append-only, with numerator and denominator | 0021 | **landed** |
 | SD-M12-03 | new `review_requests` | who was invited, and were they representative | 0021 | **landed** |
@@ -149,7 +149,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M17-04 | new `offer_experiments` | no enum value for a rule | 0024 | **landed** |
 | SD-M18-01 | `accounts` | add `graduated_at`, `graduation_path`, `terminal_settlement_id` | 0007 | **landed** |
 | SD-M18-02 | new `graduation_benefits` | accrual with a stated basis | 0023 | **landed** |
-| SD-M18-03 | new `graduation_invitations` | shape decided before commercial pressure decides it | 0025 | pending, **reserved** |
+| SD-M18-03 | new `graduation_invitations` | shape decided before commercial pressure decides it | 0025 | **landed**, **reserved** |
 | SD-M19-01 | `kyc_verifications` | add `verification_purpose`, `supersedes`, `liveness_passed`, `liveness_method` | 0003 | **landed** |
 | SD-M19-02 | new `sanctions_screenings` | its own object with a review trail | 0003 | **landed** |
 | SD-M19-03 | new `kyc_funnel_events` | the abandonment is the measurement; widened to record the trigger that fired | 0003 | **landed** |
@@ -165,7 +165,7 @@ Rulings the schema did not yet express. Four of the five were invisible because 
 
 | # | Change | Source | Migration | Status |
 |---|---|---|---|---|
-| U-01 | new `identity_signal_weights` | ADR-022, M07 D-16 | 0025 | pending, **reserved** (ADR-022 tiers it to v1.x) |
+| U-01 | new `identity_signal_weights` | ADR-022, M07 D-16 | 0025 | **landed**, **reserved** (ADR-022 tiers it to v1.x) |
 | U-02 | `accounts.graduation_eligible` | ADR-024, M01 R-49 | 0007 | **landed** |
 | U-03 | new `ledger_halts`, identity-scoped with an escalation clock | ADR-016, M05 INV-M5-16 | 0016 | **landed** |
 | U-04 | `identity_signals.kind` gains `footprint_enrichment` | ADR-023, M07 D-15 | 0002 | **landed** |
@@ -175,7 +175,20 @@ Rulings the schema did not yet express. Four of the five were invisible because 
 
 **No delta was rejected.** This table says so explicitly rather than being absent, because a rejection table that is missing is indistinguishable from a delta that was dropped. A delta that is ever rejected is rejected in writing, in an ADR, never by omission.
 
-## 7. Two things the corpus called additions and that are not deltas
+## 7. Discovered during the fold, and NOT silently absorbed
+
+**One item found while folding that ADR-026's table of five unnumbered changes does not carry.**
+
+`provisioning_status` gains **`confirmed_inferred`**. The approved [DATA_MODEL section 6](../../docs/architecture/DATA_MODEL.md) declares the enum as `queued, written, delivered, confirmed, failed`. [M02 section 3.2](../../docs/plans/M02-rithmic-bridge.md) adds a sixth value and makes it a distinct state rather than a synonym, and AS-M2-03 makes it binding that a `set_risk` operation may never reach it. **That is a schema change to an approved document with no delta number, which is the definition of an unnumbered change, and it is not one of U-01 to U-05.**
+
+It is folded (the value is in `0001`, the binding is a CHECK in `0007`), so nothing is missing from the schema. Two things are nonetheless wrong on the record and are recorded here rather than repaired quietly:
+
+1. **`0001_extensions_and_enums` cites the wrong delta.** Its inline marker reads `-- SD-M2-06 adds confirmed_inferred`. `SD-M2-06` is the `reconciliations` delta (`source_ingest_file_id`, `our_source`), which lands in `0014`. The correct provenance is **M02 section 3.2 and AS-M2-03**. Migrations are sacred, so `0001` is not edited; the correction lives here and in `0007`, where the binding CHECK carries the right citation.
+2. **The total in scope is arguably 94 rather than 93.** This manifest does not move ADR-026's count on its own authority. **The item needs a founder ruling: either a `U-06` entry, or a finding that a state-machine value inside an approved module plan is not a "schema change" for the reconciliation's purposes.** Recorded, not decided.
+
+This is the shape ADR-026 predicted: four of its five unnumbered changes were invisible because nobody was counting, and the manifest gate exists so the fifth kind cannot hide either.
+
+## 8. Two things the corpus called additions and that are not deltas
 
 - **`ladders_completed_lifetime`** is already inside `SD-M14-01`'s column list.
 - **The `SD-M19-03` widening** is an amendment to an existing delta, not a new one.
