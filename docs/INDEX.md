@@ -10,7 +10,7 @@ last_updated: 2026-08-14
 
 **Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](DECISIONS.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
 
-**30 ADRs. 140 edge cases. 257 golden scenarios.** Changing a frozen document requires an ADR, not a commit.
+**Counts are not stated here.** The ADR tally lives in [DECISIONS.md](DECISIONS.md), edge cases in [EDGE_CASES.md](EDGE_CASES.md), and golden scenarios in [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md). Every hand-maintained count in this corpus has drifted, so CI-06g's rule applies to this line: generate it or point at the source. This points. Changing a frozen document requires an ADR, not a commit.
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
@@ -23,6 +23,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [CLAUDE.md](../CLAUDE.md) | Lean session brain: rituals, git workflow, conventions, model routing | draft | founder |
 | [README.md](../README.md) | Repository front door | draft | founder |
 | [.claude/settings.json](../.claude/settings.json) | Committed hook set. Corpus phase: `SessionStart` pull, `Stop` push ([ADR-D1](DECISIONS.md)) | approved | founder |
+| [.claude/agents/reviewer.md](../.claude/agents/reviewer.md) | The citation reviewer. Verifies every factual claim against a primary source at `file:line`; verdicts to `docs/reviews/` ([ADR-033](DECISIONS.md)) | proposed | founder |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |
