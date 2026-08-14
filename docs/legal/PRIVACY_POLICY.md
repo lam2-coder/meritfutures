@@ -1,5 +1,5 @@
 ---
-status: draft
+status: review
 depends_on: [README.md, ../plans/M19-kyc-identity.md, ../plans/M07-risk-abuse.md, ../plans/M03-billing-checkout.md, ../DECISIONS.md, ../architecture/SECURITY.md]
 last_updated: 2026-08-14
 ---

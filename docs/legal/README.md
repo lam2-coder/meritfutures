@@ -1,12 +1,12 @@
 ---
-status: draft
-depends_on: [../DECISIONS.md, ../plans/M07-risk-abuse.md, ../plans/M05-payout-system.md, ../plans/M08-affiliate-system.md]
+status: review
+depends_on: [../DECISIONS.md, TOS_CLAUSES.md, PRIVACY_POLICY.md, AFFILIATE_TERMS.md, COUNSEL_PACKET.md, ../plans/M07-risk-abuse.md, ../plans/M05-payout-system.md, ../plans/M08-affiliate-system.md, ../plans/M20-wallet.md, ../plans/M18-graduation-track.md]
 last_updated: 2026-08-14
 ---
 
 # Legal Docs Index
 
-ToS, Privacy, Risk Disclosure drafts, sim-language copy blocks, restricted-jurisdiction list. **Content is generated in Wave 4** (source spec: constitution sections 6 and 9).
+ToS, Privacy, affiliate terms, the counsel packet, sim-language disclosure blocks, and the restricted-jurisdiction placeholder. **Written in Wave 4** (source spec: constitution sections 6 and 9). **Every document here is `draft for counsel` and none is publishable text**, which is a status rather than a caveat: the corpus's job was to state precisely what the system does so a lawyer drafts against a requirement rather than against a guess.
 
 What follows are **drafting notes**: rulings already taken that the Wave 4 drafts must implement, and the counsel-review items those rulings created. They are recorded here as they are decided rather than collected at the end, because a clause that is remembered at drafting time is a clause that gets drafted, and one that is not is an enforcement Merit cannot cite.
 
@@ -62,14 +62,18 @@ The rationale is on the record in [DECISIONS](../DECISIONS.md) and has a complia
 | Restricted-jurisdiction list | constitution section 10, pending counsel |
 | Coordinated-trading and common-control clauses, still open | [M07](../plans/M07-risk-abuse.md) DEP-M7-05 |
 
-## Drafting skeletons (2026-08-14)
+## The documents (completed Wave 4, 2026-08-14)
 
 | Doc | Covers | Status |
 |---|---|---|
+| [TOS_CLAUSES.md](TOS_CLAUSES.md) | **Fifteen** required clauses with what each must accomplish, the simulated-environment disclosure-block inventory across seven surfaces, clause 8's Lucid framing, the wallet property list, the restricted-jurisdiction placeholder structure, and what must not appear | draft for counsel |
 | [PRIVACY_POLICY.md](PRIVACY_POLICY.md) | Collection categories and purposes, the fraud-prevention retention carve-out, sharing by recipient category | draft for counsel |
-| [TOS_CLAUSES.md](TOS_CLAUSES.md) | Eight required clauses, what each must accomplish, and what must not appear | draft for counsel |
+| [AFFILIATE_TERMS.md](AFFILIATE_TERMS.md) | **New.** NFA I-26-12 implemented as per-asset approval with disclosure versioning, the two mandatory disclosure blocks, eight enumerated prohibited-claim classes, the four-step enforcement ladder, and commission clawback and termination terms | draft for counsel |
+| [COUNSEL_PACKET.md](COUNSEL_PACKET.md) | **New.** The three questions as one sendable document: live-program structure, wallet characterization, and escheatment plus BIPA and GDPR. Each with the facts the answer turns on, what is already decided, and what is blocked | draft for counsel |
 
-**Both are categories-and-purposes only.** Neither contains drafted prose, and neither is publishable. **BIPA plus GDPR lawful-basis mapping is flagged in both and is [counsel packet item 3](../DECISIONS.md).**
+**None contains drafted prose and none is publishable.** The two mappings counsel must supply, BIPA and state biometric consent, and GDPR lawful basis per category, are flagged in the privacy policy and are [counsel packet](COUNSEL_PACKET.md) item 3.
+
+**Two documents deliberately do not exist yet.** A **risk disclosure** is not written because its content depends on counsel packet items 1 and 2, and drafting it now would produce a document that has to be rewritten rather than reviewed. The **restricted-jurisdiction list** is not written because it is counsel's output rather than an engineering input; [TOS_CLAUSES](TOS_CLAUSES.md) section 5 specifies the clause structure so the list drops in without a redraft.
 
 ## Norm positioning
 
@@ -81,4 +85,6 @@ The rationale is on the record in [DECISIONS](../DECISIONS.md) and has a complia
 
 ## The counsel packet
 
-Three items, listed in full in [DECISIONS](../DECISIONS.md): the **live-program structure** and what may be said about graduation before one exists; **wallet characterization** as a payable rather than regulated stored value; and **escheatment mapping plus the BIPA and GDPR analysis**.
+**Now its own document: [COUNSEL_PACKET.md](COUNSEL_PACKET.md).** Three items, one lawyer, one sitting: the **live-program structure** and what may be said about graduation before one exists; **wallet characterization** as a payable rather than regulated stored value; and **escheatment mapping plus the BIPA and GDPR lawful-basis analysis**. Each carries the facts its answer turns on, so the sitting is a briefing rather than an interview.
+
+**Two of the three most likely resolve as "yes, with conditions", and the conditions are the valuable output.** That is the argument for asking before code exists: a segregation requirement is a bank-account decision today and a migration later. The packet also carries a fourth question to ask at the end, which is what Merit has not thought to ask.
