@@ -27,7 +27,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 ## research/ (Wave 1: next up)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
-| [PROP_TECH_LANDSCAPE.md](../research/PROP_TECH_LANDSCAPE.md) | Section 1: 8+ vendor teardown, feature matrix, MUST/SHOULD/LATER | draft | claude |
+| [PROP_TECH_LANDSCAPE.md](../research/PROP_TECH_LANDSCAPE.md) | Section 1: 8+ vendor teardown, feature matrix, MUST/SHOULD/LATER | review | founder |
 | [TOP10_FIRMS.md](../research/TOP10_FIRMS.md) | Section 1B: firm surveillance one-pagers, refreshed monthly | draft | claude |
 | [ADVERSARY_DOSSIER.md](../research/ADVERSARY_DOSSIER.md) | Appendix A instantiated with current scheme intel | draft | claude |
 | [DATA_CAPABILITIES.md](../research/DATA_CAPABILITIES.md) | B3: platform data matrix (Rithmic/Tradovate/dxFeed/...) | draft | claude |
