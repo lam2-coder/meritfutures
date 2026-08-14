@@ -25,6 +25,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-094 to GS-099 | Billing and checkout: caps, failover, chargebacks, coupons, publish | M3 |
 | GS-100 to GS-105 | Trader portal: transparency, confirm-time truth, certificates, ATO | M4 |
 | GS-106 to GS-111 | Payout system: reflection, mules, reserve waves, freezes, ledger halts | M5 |
+| GS-112 to GS-117 | Admin and ops: redaction, breakers, suppressions, liability definitions | M6 |
 
 ## 2. Fixture format
 
@@ -232,6 +233,19 @@ Defined by [M05](../plans/M05-payout-system.md) section 8.2. The B4 payout batte
 | GS-110 | A one cent per-transaction ledger imbalance | Halts payouts for the implicated identity only; a global sum mismatch halts everything and pages. Asserts that the system's own safety control is not itself a cheap denial-of-payouts trigger. AS-M5-05 |
 | GS-111 | Settlement rail outage during a payout wave | Transfers queue with idempotency keys intact, no state is lost, and the pre-written comms template reaches every affected trader before any of them asks. Asserts that the communications response is part of the definition of done, not an afterthought. AS-M5-07 |
 
-## 12. What is not here yet
+## 12. GS-112 to GS-117: admin and ops console (M6)
 
-Scenarios owned by M6 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
+Defined by [M06](../plans/M06-admin-ops-console.md) section 8.2. Three of these pin controls against Merit's own future behavior rather than against an external adversary, which is deliberate: the failure this module actually suffers is a control that gets ignored.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-112 | Evidence pack redaction by declared audience | A `trader` pack carries every fill, mark, rule state, gate result, the plan's rule text, and the fact and ToS clause of any flag, and carries **no** detector parameter, threshold, or other identity. An `internal` pack carries everything. Asserts that answering a dispute cannot also publish the detection thresholds to the ring that triggered them. AS-M6-01 |
+| GS-113 | Loss ratio computed on a sample below the minimum | State is `insufficient_data`, sales are **not** paused, and the alert carries the sample size. Asserts the breaker's first firing is not a false one, because a control that is wrong the first time is a control that gets overridden every time after. AS-M6-02 |
+| GS-114 | Alarm suppression expires and the alarm returns by itself | Suppression requires a written reason and a mandatory expiry; expiry restores automatically; ledger imbalance, replay divergence, and payout balance-reflection-missing cannot be suppressed at all. Asserts that "temporarily off" is a dated fact rather than a thing people tell themselves. AS-M6-03 |
+| GS-115 | The three liability numbers diverge on one book | An account with 500,000c withdrawable, a 150,000c cap, and 6 ladder rungs left contributes 500,000c to open liability, 150,000c to bounded near-term liability, and 900,000c to remaining ladder exposure. Asserts they are named separately and never conflated, which is the precise failure that killed FTT. AS-M6-04 |
+| GS-116 | Evidence pack export burst | Ten exports inside an hour alerts; signed URLs are short-lived and single-use; no screen returns a bulk identity list. Asserts the admin console's read surface is treated as a crown jewel, not only its write surface. AS-M6-05 |
+| GS-117 | Reversing a protective state requires the reason typed first | Unfreeze, breaker override, and entitlement re-enable each require a reason before the confirm control enables; a breaker override with no expiry is rejected; no route edits a verified identity at all. Asserts that the dangerous actions are slow by design, because the operator being social-engineered is the founder on a phone. AS-M6-06 |
+
+## 13. What is not here yet
+
+Scenarios owned by M7 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
