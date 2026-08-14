@@ -215,7 +215,7 @@ stateDiagram-v2
 | ID | Failure | Blast radius | Detection | Recovery |
 |---|---|---|---|---|
 | FM-M18-01 | Copy promises a live program that does not exist | Merit has made an unbacked promise about real capital, in writing, to its best traders | Copy lint and review (INV-M18-01) | Say what exists. AS-M18-01 |
-| FM-M18-02 | Ladder finiteness discovered at ordinal 8 | A trader learns the cap only when it binds, which is constitution 0.5's founding hazard | Disclosure presence tests on the rules page, tracker, and comparison | INV-M18-02. AS-M18-02 |
+| FM-M18-02 | Ladder finiteness discovered at the final ordinal | A trader learns the cap only when it binds, which is constitution 0.5's founding hazard | Disclosure presence tests on the rules page, tracker, and comparison | INV-M18-02. AS-M18-02 |
 | FM-M18-03 | Graduation delays or conditions the final payout | The most trust-sensitive payout an account makes is the one Merit made conditional | Ordering test: `applySettlement` completes before any graduation transition | INV-M18-04 |
 | FM-M18-04 | A graduated account strands a withdrawable balance | Merit holds money it owes with no mechanism to release it | Terminal settlement is a required state (SD-M18-01), with an age alarm | INV-M18-05. AS-M18-05 |
 | FM-M18-05 | Vault display shows a projection | A trader plans around money that may never exist | Display test asserting the rendered value equals `accrued_cents` | INV-M18-06. AS-M18-04 |
@@ -258,13 +258,13 @@ stateDiagram-v2
 
 **Counter, and all of it is disclosure done early rather than a mechanism.**
 1. **The ladder's finiteness is stated before purchase** (INV-M18-02): on the plan's rules page, in the plan comparison, and in the account's tracker from ordinal zero. Not "up to 5 payouts" in small type but the sentence [ADR-024](../DECISIONS.md) specifies: **"each account pays up to 5 payouts, then completes. Open another anytime."** The second clause is load bearing, and a shorter ladder makes it more so: finiteness now arrives sooner, so the continuation path has to sit in the same sentence as the limit rather than a page away.
-2. **The tracker counts down, not up.** "3 of 8 taken" and "5 remaining" are the same fact and the second is the one that cannot be misread.
+2. **The tracker counts down, not up.** "3 of 5 taken" and "2 remaining" are the same fact and the second is the one that cannot be misread. **Confirmed unchanged at the pre-Wave-4 fold**, together with the requirement that the continuation clause sits in the same sentence as the limit rather than a page away (EC-122).
 3. **The lifetime number is published on the rules page**: **$6,750 on Core EOD at 50K and $4,500 on Merit Rapid**, at the 9000bp split ([ADR-024](../DECISIONS.md)). [ADR-018](../DECISIONS.md) already uses that figure internally as a defense, and publishing it converts it from a defense into a feature. **The number fell when the ladder shortened from 8 to 5, and it is still the right thing to publish**: a trader who computes it before buying is a trader who cannot be surprised by it later, which is the entire point of AS-M18-02.
 4. **The graduation page exists publicly** (`GET /public/graduation`) and is linked from every rules page, so what happens at the end is readable before the beginning. EC-122, GS-206.
 
 ### AS-M18-03: Graduation is the outcome a successful ring produces (NOVEL)
 
-**Attack.** A graduation benefit, whatever it is, rewards completing the ladder. Completing the ladder means eight successful payout cycles, which is precisely the bounded extraction a hedged pair or a ring is engineered to achieve. [M07](M07-risk-abuse.md)'s detectors are good and imperfect, and by construction the population that reaches the final ordinal is enriched for whatever the detectors missed: a genuinely skilled trader and an undetected ring look identical in the ladder tracker, because the ladder measures extraction rather than skill.
+**Attack.** A graduation benefit, whatever it is, rewards completing the ladder. Completing the ladder means five successful payout cycles ([ADR-024](../DECISIONS.md)), which is precisely the bounded extraction a hedged pair or a ring is engineered to achieve. [M07](M07-risk-abuse.md)'s detectors are good and imperfect, and by construction the population that reaches the final ordinal is enriched for whatever the detectors missed: a genuinely skilled trader and an undetected ring look identical in the ladder tracker, because the ladder measures extraction rather than skill.
 
 **The discontinuity is the problem.** Everything else in Merit's design bounds the adversary smoothly: caps bound the payout, the ladder bounds the lifetime, and [ADR-018](../DECISIONS.md) leans on that boundedness explicitly. A graduation benefit adds a **step function at exactly the point the ladder was supposed to end**, so a ring's payoff for surviving detection jumps rather than stopping. If the benefit is access to real capital (GP-M18-01), the step is enormous and the adversary's optimal strategy becomes "survive eight cycles undetected", which is a target they can plan against.
 
@@ -347,7 +347,7 @@ stateDiagram-v2
 | ID | Scenario | Pins |
 |---|---|---|
 | GS-205 | Any surface using live-program language with no contracted program | Copy lint failure across page, email, certificate, and social card. AS-M18-01 |
-| GS-206 | An account reaches ordinal 8 | Finiteness was disclosed at purchase, in the comparison, and counted down in the tracker from ordinal 0; the lifetime figure was published in money. AS-M18-02 |
+| GS-206 | An account reaches the final ladder ordinal | Finiteness was disclosed at purchase, in the comparison, and **counted down** in the tracker from the final ordinal; the lifetime figure was published in money. **Countdown framing and the same-breath continuation clause confirmed unchanged by founder ruling, 2026-08-14** ([ADR-025](../DECISIONS.md#adr-025-progressive-cap-release-is-rejected-for-v1-and-replaced-with-cross-account-loyalty--2026-08-14-status-accepted)'s fold). AS-M18-02, EC-122 |
 | GS-207 | A graduating account carrying an unresolved correlation signal | The final payout and terminal settlement complete; only the **benefit** is held, with a cited flag, a reason class, and an expiry. AS-M18-03 |
 | GS-208 | A vault display with a benefit not yet accrued | Renders accrued value only, with its basis; progress appears as a count, never as a currency figure. AS-M18-04 |
 | GS-209 | Graduation with withdrawable balance remaining | Terminal settlement pays it to the wallet automatically, is not an ordinal, is not capped by the payout cap, and is labeled distinctly on the timeline. AS-M18-05 |
