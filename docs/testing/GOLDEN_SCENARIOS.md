@@ -36,6 +36,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-155 to GS-161 | Certificates and social proof: cherry-picking, revocation reach, key rotation, verify-page enumeration, revocation classes, leaderboard exposure, aggregate creep | M11 |
 | GS-162 to GS-171 | Transparency platform: denominator choice, on-chain disclosure, review gating, adversary intelligence, the constant claim, restatement, sample floors, comparative claims | M12 |
 | GS-172 to GS-178 | Trader analytics and journal: engine parity, history changes, journal isolation, provenance blending, undefined metrics, population leakage, load contention | M13 |
+| GS-179 to GS-185 | Loyalty and retention: cap-release liability, streak incentives, the bright line's composition, inverted win-back targeting, tier discretion, config bypass, calendar-broken streaks | M14 |
 
 ## 2. Fixture format
 
@@ -373,6 +374,20 @@ Defined by [M13](../plans/M13-trader-analytics-journal.md) section 8.2. Every ad
 | GS-177 | A percentile or population comparison requested | No such endpoint exists; self-comparison across the trader's own accounts succeeds. Asserts that a percentile endpoint is an enumerable oracle over the population distribution, which is the raw material for the figures M12 deliberately does not publish. AS-M13-06 |
 | GS-178 | Analytics load concurrent with a payout wave | Payout request p95 holds under its target and **analytics degrades first**. Asserts the only interaction that matters, which testing the two suites separately would never have exercised. AS-M13-07, EC-103, pairs with GS-051 |
 
-## 21. What is not here yet
+## 21. GS-179 to GS-185: loyalty and retention (M14)
+
+Defined by [M14](../plans/M14-loyalty-retention.md) section 8.2. [ADR-019a](../DECISIONS.md)'s bright line is binding on this module by name, and three of these fixtures exist to keep it that way.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-179 | A progressive cap release is proposed | It reaches the engine **only** through the plan-version path with dual control, the proposal carries `projected_lifetime_delta_cents`, and CV-10, CV-11, CV-17, and INV-21 all run. Asserts that a cap edit is a cap edit regardless of the word "loyalty" in front of it. AS-M14-01, EC-104 |
+| GS-180 | A hedged pair accumulates a perfect streak | The streak earns **recognition and no economic benefit**, and the cohort surfaces as an M7 input. Asserts that a streak reward pays out faster than D-02's detection window closes, so its most reliable earners would be the undetected. AS-M14-02, EC-105 |
+| GS-181 | An earned free spin awarding a randomized reset discount | Rejected by the compositional test: no mechanic may let a randomized outcome determine what a later purchase yields. Asserts that ADR-019a's two clauses are violated by their composition even when each is satisfied alone. AS-M14-03, EC-106 |
+| GS-182 | Win-back scoring across a population containing serial resetters | Above the velocity ceiling the identity is **excluded rather than prioritized**, and flagged or restricted identities are excluded at both computation and send. Asserts the deliberate inversion of what every off-the-shelf retention tool does by default. AS-M14-04, EC-107 |
+| GS-183 | A high-milestone identity reaches the flags queue and the payout path | Loyalty state is unreadable from both, and from support's default view. Asserts that a status visible to a reviewer degrades detection in a way no metric records, because nobody logs the flag they did not raise. AS-M14-05 |
+| GS-184 | The loyalty service attempts to write a payout cap | Fails on the database grant, and there is **no per-account override column to write to**. Asserts that ADR-010's control cannot be routed around by a service whose job is to be generous. AS-M14-06, EC-108 |
+| GS-185 | A streak spans a half day, a holiday, and a limit-locked session | The streak **pauses and survives**; only trader conduct breaks it, and the break event names its enumerated cause. Asserts consistency with the published halted-session answer rather than a second calendar understanding. AS-M14-07, EC-109, pairs with GS-030 to GS-032 |
+
+## 22. What is not here yet
 
 Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**

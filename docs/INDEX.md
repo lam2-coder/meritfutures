@@ -63,7 +63,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Issuance, signing key lifecycle, non-enumerable verification, revocation classes, deferred per-trade cards, opt-in leaderboard | review | founder |
 | [M12-transparency-platform.md](plans/M12-transparency-platform.md) | **Launch differentiator.** Seven auto-computed statistics with versioned definitions, immutable history and restatement, proof links, compliant review requests | review | founder |
 | [M13-trader-analytics-journal.md](plans/M13-trader-analytics-journal.md) | Per-account analytics read from engine tables, versioned round-trip derivation, private journal, load isolation from the payout path | review | founder |
-| [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | Progressive cap release, streaks, win-backs | draft | claude |
+| [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | Derived loyalty state, cap release only via the dual-controlled publish path, recognition-not-economics streaks, inverted win-back targeting, ADR-019a compositional rule | review | founder |
 | [M15-discord-integration.md](plans/M15-discord-integration.md) | Role sync, announcements bot | draft | claude |
 | [M16-notification-center.md](plans/M16-notification-center.md) | In-app/email/push preference matrix, event-driven | draft | claude |
 | [M17-offers-engine.md](plans/M17-offers-engine.md) | Contextual reset pricing, bundles, A/B-able configs | draft | claude |
