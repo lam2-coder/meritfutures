@@ -853,3 +853,67 @@ This ADR named four things stale in [DATA_MODEL section 11](architecture/DATA_MO
 
 **Why this is an amendment and not a quiet fix.** An ADR that instructs a future session to change two correct parameters is a landmine that fires the second time somebody follows it. It is corrected in place, here, with its provenance, for the same reason [ADR-027](#) was reversed on the record rather than repaired: a corpus that quietly fixes a bad instruction teaches nobody what the bad instruction looked like.
 
+
+---
+
+## ADR-031: The published statistic is `bigint` with a unit, and its no-floats exemption is retired  (2026-08-14, status: accepted)
+
+- **Context:** `published_statistics.value_numeric` was one of three columns on the [DELTA_MANIFEST section 9](../packages/db/DELTA_MANIFEST.md) no-floats exemption list, authorized on the reading that a published rate is not expressible as an integer. The fold recorded a note against it rather than acting: removing an authorized exemption is not a call to make without asking. This is the answer.
+- **Decision:** **`value_numeric numeric` becomes `value bigint`, with a mandatory `value_unit`.** Its exemption is retired. The remaining exemption set is `correlation_groups.statistic` and `correlation_groups.threshold`, and **`0027`'s `DO` block now asserts exactly those two, in both directions.**
+
+### Why the exemption did not survive inspection
+
+**All seven ruled statistics are exactly representable as integers under conventions the corpus already fixed**, so the exemption bought nothing:
+
+| Statistics | Figure | Integer form |
+|---|---|---|
+| ST-01, ST-02, ST-07 | rates | **integer basis points**, the unit the constitution already uses for every ratio |
+| ST-03, ST-04 | money | **integer cents** |
+| ST-05, ST-06 | durations | **whole seconds** |
+
+**The cents case is the one that decided it.** For ST-03 and ST-04 this column holds **money on a public surface**, and [DATA_MODEL section 1](architecture/DATA_MODEL.md) says money is `bigint` integer cents, never `numeric` and never a float. It does not stop being money because it is being published. **An authorized exemption that covers a money column is not an exemption, it is a hole with a ruling attached**, and the ruling makes it harder to see rather than easier.
+
+### The rename is the point, not tidiness
+
+**`value_numeric` holding a `bigint` would be a lie that survives every grep a future reader runs.** A column name that describes a type it no longer has is worse than no name at all, because it is confidently wrong. The column is **`value`**.
+
+### One vocabulary, and it is a type
+
+`value_unit` and `numerator_unit` are both **`statistic_unit`**, a shared enum: `count`, `bp`, `cents`, `duration_seconds`.
+
+**Two `text` columns with two `CHECK` lists would have been two vocabularies for one concept, and two vocabularies for one concept is how they drift.** A later migration widens one, nobody widens the other, and a published figure and its own numerator begin disagreeing about what a number means on a surface Merit cannot restate quietly. A shared type makes the drift impossible rather than unlikely.
+
+**`bp` never legitimately appears as a numerator unit** (a numerator is a count, a sum of cents, or an elapsed duration; the rate is what division produces). It is in the shared type anyway, because the alternative is a second type existing only to omit one value, which is the thing being prevented.
+
+- **Consequences:** `0001` gains `statistic_unit`; `0021` carries `value`, `value_unit`, and `numerator_unit` retyped from `text` + `CHECK`; `published_statistics_value_has_unit` is added, and `published_statistics_value_or_suppression` now requires the unit alongside the value. `0027`'s exemption list drops to two entries. [DATA_MODEL](architecture/DATA_MODEL.md) and [DELTA_MANIFEST](../packages/db/DELTA_MANIFEST.md) section 9 are amended, and `SD-M12-02`'s column list in [M12](plans/M12-transparency-platform.md) is amended. **The publisher must now round to the unit at computation time**, which is where the choice belongs: a rounding decision made by a column type is a decision nobody made.
+- **Alternatives considered:** keep `numeric` for rates only and split the column in two (rejected: a nullable-pair value column is a discriminator wearing a disguise, and it does not fix the cents case, which is the one that matters); keep the exemption and add `value_unit` alone (rejected: the unit does not make `numeric` money-safe); **also convert `correlation_groups.statistic` and `.threshold` and empty the list entirely (rejected at this gate by the founder). Rho is not money, it is not a ratio of two integers Merit controls, and the threshold must share the type of the statistic it is compared against.** **The rounding is not harmless there, which is exactly the difference from the column that left: a plain integer rho of `0.30` is `0`, and `rho = 0.30` is the reserve-critical figure.** The risk engine shows mean monthly payouts flat near $45.3K across every correlation level while CVaR99 nearly doubles from $84.8K at `rho = 0.05` to $132.9K at `rho = 0.30`; an integer cast erases the entire range the tail lives in. Reversing this is a risk-path change and needs its own ADR. The property worth stating is not that the list is short: **it is that no money-bearing column is on it.**
+
+## ADR-032: `measure` on `published_statistics`, and the pair invariant as DDL  (2026-08-14, status: accepted)
+
+- **Context:** **OI-02**, carried out of the schema-delta fold unresolved because it changes what a published, append-only, publicly restated row *is*. **Three of the seven ruled statistics publish two figures at once:** ST-04 mean **and** median, ST-05 p50 **and** p95, ST-06 p50 **and** p95. Two rows for one statistic, window and grain collided on `published_statistics_window_uq`, and no column said which figure a row carried. **The second figure was unwritable.**
+- **Decision:** **add `measure` (`statistic_measure`: `rate`, `total`, `mean`, `median`, `p50`, `p95`, `count`) to `published_statistics` and to the window unique key**, and add a **deferred constraint trigger, STAT-C1**, asserting that a publish run emitting one measure for a `stat_code` emits **every measure that statistic's definition declares**. `statistic_definitions` gains **`measures`**, the declared set.
+
+### The rejected alternative, recorded because it is the one that looks cheaper
+
+**Separate `stat_code`s per figure: `ST-04-mean` and `ST-04-median`, `ST-05-p50` and `ST-05-p95`.** It needs **no schema change at all**, which is exactly why it has to be rejected in writing rather than passed over.
+
+**It is worse, and the reason is not aesthetic. It makes the pair independently publishable, and [M12](plans/M12-statistic-definitions.md) forbids precisely that.** ST-04's ruling is that mean and median publish together and **"neither is published alone"**; ST-05 and ST-06 are **"published as a pair on the same surface"**. Under separate codes, publishing `ST-04-mean` and not `ST-04-median` is not a violation the schema can even describe: they are two statistics, and a firm may publish one statistic and not another. **The modelling choice would delete the invariant by making it unstateable**, and it would do so while looking like the conservative option because it touches nothing.
+
+A mean without its median is the specific distortion M12 exists to prevent: **a mean is the number one large payout inflates, and a median alone hides that large payouts happen at all.** That is a claim about a pair, so the pair must be one object in the schema.
+
+### Why the column is not enough, and the trigger is the ruling
+
+**`measure` makes the second row WRITABLE. It does nothing to make it REQUIRED.** A run that emits ST-04's mean and never emits its median satisfies every constraint on the table and publishes exactly the forbidden thing.
+
+**STAT-C1 converts "neither is published alone" from prose into DDL.** It is a **deferred constraint trigger in `0027`, the same shape and the same file as the ledger zero-sum check**, for the same two reasons: it is a **multi-row invariant** that only holds once the run's transaction has written all its rows, and it must fail at write rather than be discovered later by a job. **`published_statistics` is append-only and publicly restated: a missing median is not a bug that gets fixed, it is a number Merit published and must restate in public.**
+
+STAT-C1 also rejects a measure the definition does not declare, and a row whose `(stat_code, definition_version)` has no definition at all. **A published figure whose definition does not exist is unverifiable by the reader**, which is the condition M12 exists to remove.
+
+**Scope: original publications, `restatement_of IS NULL`.** A restatement of one measure is legitimate and is **not** publishing it alone, because its pair is already published and still standing. Requiring the full set on a correction would mean Merit could not fix a mean without restating a median that was right.
+
+### The empty set, which the first draft of the constraint admitted
+
+`statistic_definitions.measures` is `NOT NULL`, non-empty, and duplicate-free. The non-empty check was first written `array_length(measures, 1) >= 1`. **`array_length` on an empty array returns `NULL`, `NULL >= 1` is `NULL`, and a `CHECK` evaluating to `NULL` passes.** The obvious spelling admitted the one value it existed to reject, and **an empty declared set makes STAT-C1 vacuous**: a statistic could publish nothing and satisfy "every measure it declares". It is `cardinality(measures) >= 1`. **It was caught by testing the constraint, not by reading it**, which is the argument for testing every invariant against the database rather than reviewing its text.
+
+- **Consequences:** amends **approved `SD-M12-02`** and **touches the immutability contract on a public surface**, which is why this is an ADR and not a commit. `0001` gains `statistic_measure`; `0021` gains `published_statistics.measure`, `statistic_definitions.measures`, the two declaration checks and the `measures_are_distinct` helper, and `published_statistics_window_uq` gains `measure`; `0027` gains STAT-C1. [M12](plans/M12-transparency-platform.md) and [M12-statistic-definitions](plans/M12-statistic-definitions.md) carry the declared measure set per statistic. **OI-02 is closed.** The nightly run must now write a statistic's figures in **one transaction**, which it already did and which is now enforced.
+- **Alternatives considered:** separate `stat_code`s per figure (**rejected above, on the record**); a `figures jsonb` column holding both (rejected: it makes the pair one row and the invariant trivial, at the cost of every figure losing its own `numerator`, `denominator`, `sample_size` and suppression state, which is the reader-checkability M12 is built on); enforcing completeness in the publisher's application code (rejected: the control has to survive a second publisher, and this surface cannot be corrected quietly); a non-deferred trigger (rejected: it fails on the first row of every correct run).

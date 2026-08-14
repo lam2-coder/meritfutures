@@ -130,8 +130,8 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M11-02 | `certificates` | add `revocation_class` | 0020 | **landed** |
 | SD-M11-03 | `certificates` | add `deferred_until`, `deferred_reason` | 0020 | **landed** |
 | SD-M11-04 | new `certificate_verifications` | the public oracle's access log | 0025 | **landed**, **reserved** |
-| SD-M12-01 | new `statistic_definitions` | a statistic is a choice of denominator | 0021 | **landed** |
-| SD-M12-02 | new `published_statistics` | append-only, with numerator and denominator | 0021 | **landed** |
+| SD-M12-01 | new `statistic_definitions` | a statistic is a choice of denominator | 0021 | **landed**, **amended by [ADR-032](../../docs/DECISIONS.md)**: gains `measures`, the declared measure set |
+| SD-M12-02 | new `published_statistics` | append-only, with numerator and denominator | 0021 | **landed**, **amended by [ADR-031](../../docs/DECISIONS.md)** (`value_numeric numeric` -> `value bigint` plus `value_unit`) **and [ADR-032](../../docs/DECISIONS.md)** (`measure`, and in the window key) |
 | SD-M12-03 | new `review_requests` | who was invited, and were they representative | 0021 | **landed** |
 | SD-M12-04 | new `proof_links` | permanent disclosure needs an audited row | 0021 | **landed** |
 | SD-M13-01 | new `round_trips` | versioned fill grouping | 0022 | **landed** |
@@ -196,7 +196,7 @@ Items found while folding that are **not schema deltas** and are **not closed**.
 | # | Item | Status |
 |---|---|---|
 | **OI-01** | **`liability_snapshots` exists in two shapes.** The migration (`0009`) follows `SD-M6-01`: keyed on `as_of timestamptz`, carrying `open_liability_cents`, `bounded_near_term_cents`, `remaining_ladder_exposure_cents`, `wallet_balances_cents`, `absorbed_corrections_cents`. [DATA_MODEL section 8](../../docs/architecture/DATA_MODEL.md) still shows the earlier shape keyed on `snapshot_on date` with `funded_accounts`, `reserve_cents`, `cvar99_cents`, `rcr_bp` and `per_plan`. **The migration is the truth.** The four RCR and CVaR fields have **no home in the folded shape** and need one before [M06](../../docs/plans/M06-admin-ops-console.md) is built: the reserve coverage ratio is the number that decides whether sales pause | **OPEN**, founder ruling (2026-08-14) that it is tracked here |
-| **OI-02** | **`published_statistics` cannot express three of the seven ruled statistics.** ST-04 publishes mean **and** median together and "neither is published alone"; ST-05 and ST-06 each publish **p50 and p95**. Two rows for one statistic, window and grain collide on `published_statistics_window_uq`, and no column distinguishes which figure a row carries. Proposed fix: a `measure` discriminator (`rate`, `total`, `mean`, `median`, `p50`, `p95`, `count`) on the table and in the index. **Not applied**: it changes what a published, append-only, publicly-restated row *is* | **OPEN**, needs the founder's read of `0021` |
+| **OI-02** | **`published_statistics` cannot express three of the seven ruled statistics.** ST-04 publishes mean **and** median together and "neither is published alone"; ST-05 and ST-06 each publish **p50 and p95**. Two rows for one statistic, window and grain collide on `published_statistics_window_uq`, and no column distinguishes which figure a row carries. Proposed fix: a `measure` discriminator (`rate`, `total`, `mean`, `median`, `p50`, `p95`, `count`) on the table and in the index. **Applied** by [ADR-032](../../docs/DECISIONS.md), together with **STAT-C1**, a deferred constraint trigger in `0027` asserting that a publish run emitting one measure emits every measure its definition declares. The column made the second figure writable; the trigger is what makes it required | **CLOSED** (2026-08-14) |
 | **OI-03** | **`0026`'s append-only revoke list is a list, and a list drifts.** Eighteen tables are named there against [DATA_MODEL section 1](../../docs/architecture/DATA_MODEL.md)'s Mutability set. The CI check must assert the revoke list **against the document** rather than trusting either | **OPEN**, CI not yet built |
 | **OI-04** | **Two legitimate single-column updates on append-only tables** (`daily_marks.superseded_by`, `identity_links.suppressed`) are forbidden by the grants and require `SECURITY DEFINER` functions that **do not exist yet**. A naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug | **OPEN**, arrives with the owning module |
 
@@ -204,34 +204,73 @@ Items found while folding that are **not schema deltas** and are **not closed**.
 
 **Constitution and [DATA_MODEL section 1](../../docs/architecture/DATA_MODEL.md): money is `bigint` integer cents, ratios are integer basis points, never `numeric` and never a float, in any financial path.**
 
-**Three columns in this schema are non-integer. Every one is a ruled exemption rather than a local judgment, and the list is asserted rather than documented.**
+**Two columns in this schema are non-integer. Both are a ruled exemption rather than a local judgment, and the list is asserted rather than documented.**
 
 ```
 correlation_groups.statistic
 correlation_groups.threshold
-published_statistics.value_numeric
 ```
 
-**The assertion lives in `0027_triggers_invariants.sql`** as a `DO` block that reads `information_schema.columns` and **fails the migration** if the set of `numeric`, `real` or `double precision` columns in `public` is anything other than exactly those three. It asserts in **both directions**: an unlisted column fails, and so does a stale entry naming a column that no longer exists, because an allowlist wider than the schema quietly grants more than it names.
+**No money-bearing column is on this list, and after [ADR-031](../../docs/DECISIONS.md) none is.** That is the property the list exists to hold and it is worth more than its length: what remains is two correlation coefficients on a risk-detection table, and what left was a column holding published cents.
 
-**Verified to bite**, not merely to run: adding a rogue `numeric` column and re-running `0027` fails with `NO-FLOATS: liability_snapshots.rogue_rate is not on the exemption list`.
+**The assertion lives in `0027_triggers_invariants.sql`** as a `DO` block that reads `information_schema.columns` and **fails the migration** if the set of `numeric`, `real` or `double precision` columns in `public` is anything other than exactly those two. It asserts in **both directions**: an unlisted column fails, and so does a stale entry naming a column that no longer exists, because an allowlist wider than the schema quietly grants more than it names.
+
+**Verified to bite in both directions**, not merely to run:
+
+| Perturbation | Result |
+|---|---|
+| Add a rogue `numeric` column | `NO-FLOATS: liability_snapshots.rogue_rate is not on the exemption list` |
+| Retype an exempt column to `bigint` | `NO-FLOATS: the exemption list names correlation_groups.threshold which does not exist` |
+| Clean schema | Passes, and the only two non-integer columns in `public` are the two named above |
 
 | Column | Ruling |
 |---|---|
 | `correlation_groups.statistic` | **Exempt.** A correlation coefficient is not money and is not a ratio of two integers Merit controls. Rounding it to cents or to basis points is the actual error |
 | `correlation_groups.threshold` | **Exempt**, same reason, and it must be the same type as the statistic it is compared against |
-| `published_statistics.value_numeric` | **Exempt as authorized**, and see the note below |
 
-### Scope correction: two columns shipped outside the authorization
+**Both were re-examined at this gate and left exempt on the founder's ruling**, and the rounding is not harmless here, which is exactly the difference from the column that left. **A plain integer `rho` of `0.30` is `0`, and `rho = 0.30` is the reserve-critical figure**: the risk engine shows mean monthly payouts flat near $45.3K across every correlation level while CVaR99 nearly doubles from $84.8K at `rho = 0.05` to $132.9K at `rho = 0.30`. An integer cast erases the whole range the tail lives in. Converting them would be a risk-path change reversing a recorded exemption, and it needs its own ADR rather than a line in this one.
 
-`published_statistics.numerator` and `.denominator` shipped as `numeric` and **were never authorized**. Both are now `bigint`. The reasoning, because it is a ruling and not a cleanup:
+### What left the list: `published_statistics.value_numeric`, by [ADR-031](../../docs/DECISIONS.md)
+
+**It was authorized, and the authorization did not survive inspection.** It is now **`value bigint`** with a mandatory **`value_unit`**.
+
+**All seven ruled statistics are exactly representable as integers under the corpus's own conventions**: ST-01, ST-02 and ST-07 are rates in **integer basis points**; ST-03 and ST-04 are money in **integer cents**; ST-05 and ST-06 are durations in **whole seconds**. The exemption bought nothing.
+
+**The cents case is what decided it.** For ST-03 and ST-04 the column held **money on a public surface**, which is the case DATA_MODEL section 1 names directly. **An authorized exemption covering a money column is not an exemption, it is a hole with a ruling attached.**
+
+**The rename is load-bearing.** `value_numeric` holding a `bigint` would be a lie that survives every grep a future reader runs.
+
+### Scope correction, from the fold: two columns shipped outside the authorization
+
+`published_statistics.numerator` and `.denominator` shipped as `numeric` and **were never authorized**. Both are `bigint`. The reasoning, because it is a ruling and not a cleanup:
 
 - **The denominator is a COUNT in all six statistics that have one**, and ST-03 has none at all because it is a total rather than a rate. It is compared against `min_sample` (250 on ST-01, 100 on ST-02, 50 elsewhere), **which is an integer**. A `numeric` denominator permits `249.7`, which is not a number of accounts, and **a sample gate decided on a rounding is a sample gate that does not gate**.
-- **The numerator is one of exactly three things across the seven definitions, and all three are integers**: a count (ST-01, ST-02, ST-07), **integer cents** (ST-03 and ST-04 are a sum of `trader_cents`), or a whole-second duration (ST-05, ST-06). **The cents case is the one that matters: that is MONEY, and it does not stop being money because it is being published.** `numeric` there is the case DATA_MODEL section 1 names directly.
+- **The numerator is one of exactly three things across the seven definitions, and all three are integers**: a count (ST-01, ST-02, ST-07), **integer cents** (ST-03 and ST-04 are a sum of `trader_cents`), or a whole-second duration (ST-05, ST-06). **The cents case is the one that matters: that is MONEY, and it does not stop being money because it is being published.**
 - **`numerator_unit` is forced by the type change, not added alongside it.** DATA_MODEL section 1 makes a quantity column with no unit a review reject, and a `bigint` numerator is otherwise ambiguous between cents and a count on a surface Merit cannot restate quietly.
 
-### Note on `published_statistics.value_numeric`, for the founder
+### One unit vocabulary, and it is a type
 
-**It is on the authorized list and is left as authorized.** On inspection it does not require the exemption: **all seven ruled statistics are exactly representable as integers under the corpus's own conventions** (ST-01/02/07 rates in basis points, ST-03/04 money in integer cents, ST-05/06 durations in whole seconds). For ST-03 and ST-04 this column currently holds **money on a public surface**.
+`value_unit` and `numerator_unit` are both **`statistic_unit`** (`count`, `bp`, `cents`, `duration_seconds`), declared once in `0001`.
 
-Tightening it to `bigint` plus the same unit discriminator the numerator now carries is a one-line change. **Removing an authorized exemption is not a call to make without asking**, so it is recorded and not applied.
+**Two `text` columns with two `CHECK` lists would be two vocabularies for one concept, and two vocabularies for one concept is how they drift**: a later migration widens one, nobody widens the other, and a published figure and its own numerator begin disagreeing about what a number means. A shared type makes that impossible rather than unlikely. `bp` never legitimately appears as a numerator unit and is in the shared type anyway, because a second type existing only to omit one value is the drift being prevented.
+
+## 10. Verification performed on this file's claims
+
+**All 27 migrations apply in order against PostgreSQL 16 with `ON_ERROR_STOP`**, producing **96 tables, 326 indexes, 347 check constraints and 6 triggers**. No file was edited to make that pass.
+
+**This is a syntax and dependency check, not a semantic one.** It proves the set is installable and proves nothing about whether a delta was folded correctly, which is what the E2 read is for. The constraints that carry a ruling are tested individually against the database:
+
+| Assertion | Probe | Result |
+|---|---|---|
+| **STAT-C1** | Publish ST-04 `mean` alone | Fails at commit, naming the missing `median` |
+| **STAT-C1** | Publish ST-04 `mean` and `median` in one transaction | Commits |
+| **STAT-C1** | Publish a measure the definition does not declare | Fails |
+| **STAT-C1** | Publish against a `(stat_code, definition_version)` with no definition | Fails |
+| **STAT-C1** | Restate one measure of a published pair | Commits, by the ruled `restatement_of IS NULL` scope |
+| `published_statistics_window_uq` | Two live rows, same cell, same measure | Fails |
+| `published_statistics_value_has_unit` | A value with no unit | Fails |
+| `statistic_definitions_measures_nonempty` | An empty declared measure set | Fails, **after the `array_length` defect below was fixed** |
+| `statistic_definitions_measures_distinct` | A declared set with a repeat | Fails |
+| NO-FLOATS | Both directions, per section 9 | Fails as intended in each |
+
+**One defect was found by this testing and not by reading.** `statistic_definitions_measures_nonempty` was first written `array_length(measures, 1) >= 1`. **`array_length` on an empty array returns `NULL`, `NULL >= 1` is `NULL`, and a `CHECK` evaluating to `NULL` passes**, so the constraint admitted the single value it existed to reject, and an empty declared set makes STAT-C1 vacuous. It is `cardinality(measures) >= 1`. Recorded because the lesson generalizes: **an invariant that was reviewed and not executed has not been checked.**

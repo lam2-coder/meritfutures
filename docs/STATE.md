@@ -104,7 +104,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The schema-delta reconciliation has landed (2026-08-14, item 9)
 
-**All 93 schema changes are folded. 27 migration files at [`packages/db/migrations`](../packages/db/migrations), verified to apply in order against PostgreSQL 16** (96 tables, 326 indexes, 342 check constraints, 5 triggers). Every delta traces to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../packages/db/DELTA_MANIFEST.md), which is the file [ADR-026](DECISIONS.md)'s completeness gate reads. **No delta was rejected.**
+**All 93 schema changes are folded. 27 migration files at [`packages/db/migrations`](../packages/db/migrations), verified to apply in order against PostgreSQL 16** (96 tables, 326 indexes, **347** check constraints, **6** triggers, as of the two rulings below). **The figures here read 342 and 5 and were wrong when written**; DATA_MODEL carried 345 and 5 for the same set. Another hand-maintained tally, the exact class of drift [ADR-026](DECISIONS.md) caught in the delta counts, in the document that recorded the catch. Every delta traces to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../packages/db/DELTA_MANIFEST.md), which is the file [ADR-026](DECISIONS.md)'s completeness gate reads. **No delta was rejected.**
 
 **Nothing merges without the founder's E2 line-by-line read.** Sixteen files carry an `E2 READ: MONEY PATH` header naming what in them needs it and why. The install check proves the set is installable and **proves nothing about whether a delta was folded correctly**, which is the whole reason E2 exists.
 
@@ -114,7 +114,20 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 |---|---|---|
 | **A** | **A sixth unnumbered change.** `provisioning_status` gains `confirmed_inferred` ([M02 section 3.2](plans/M02-rithmic-bridge.md), AS-M2-03), which ADR-026's table of five does not carry. **It is folded**; what is open is whether the count in scope is 93 or **94**, and `0001`'s inline marker cites `SD-M2-06` for it, which is the `reconciliations` delta | The manifest gate exists so an uncounted change cannot hide. It caught one. **Founder rules: a `U-06` entry, or a finding that a state-machine value in an approved plan is not a schema change for this purpose** |
 | **B** | **[ADR-030](DECISIONS.md)'s stale list is wrong in two of four.** `win_days.required_count: 5` and `phase_eval.min_trading_days: 1` are Core EOD's **frozen** values per [M01 Appendix A.1](plans/M01-rules-engine.md). `w = 3` is Merit Rapid's | Following the list would have put **Merit Rapid's cadence on Core EOD's contract**. Recorded in the amended section 11, not applied |
-| **C** | **DATA_MODEL is only partly at post-migration truth.** Sections 3, 8, 11 and the new 17 are amended; **the table-by-table rewrite of sections 4 through 10 is not done** | Until it is, those tables are read **together with** the manifest. `liability_snapshots` in particular exists in two shapes: the migration follows `SD-M6-01`, and section 8's RCR fields have no home in the folded shape |
+| **C** | **DATA_MODEL is only partly at post-migration truth.** Sections 3, 8, 11, 13 and the new 17 are amended; **the table-by-table rewrite of sections 4 through 10 is not done** | Until it is, those tables are read **together with** the manifest. `liability_snapshots` in particular exists in two shapes: the migration follows `SD-M6-01`, and section 8's RCR fields have no home in the folded shape |
+
+## Two rulings on the transparency surface (2026-08-14)
+
+**Both land on `published_statistics`, both amend approved `SD-M12-02`, and both are folded into `0021` and `0027` rather than recorded.**
+
+| ADR | Ruling | What it changes |
+|---|---|---|
+| **[ADR-031](DECISIONS.md)** | **`value_numeric numeric` becomes `value bigint` with a mandatory `value_unit`** | Its no-floats exemption is retired. All seven ruled statistics are exactly representable as integers, and for ST-03 and ST-04 the column held **money on a public surface**. `value_unit` and `numerator_unit` share one `statistic_unit` type, because two vocabularies for one concept is how they drift |
+| **[ADR-032](DECISIONS.md)** | **`measure` joins the table and the window unique key, and STAT-C1 enforces the pair** | **Closes OI-02.** ST-04's median, and ST-05's and ST-06's p95, were unwritable. The column makes them writable; the deferred constraint trigger makes them **required**, converting "neither is published alone" from M12 prose into DDL. The rejected alternative, separate `stat_code`s per figure, is recorded: it needs no schema change and deletes the invariant by making it unstateable |
+
+**The no-floats exemption list is now two columns and no money.** `correlation_groups.statistic` and `.threshold` stay exempt on the founder's ruling: a plain integer `rho` of `0.30` is `0`, and `rho = 0.30` is the reserve-critical figure.
+
+**Every constraint carrying a ruling is now probed against the database**, one perturbation each, tabulated in [DELTA_MANIFEST section 10](../packages/db/DELTA_MANIFEST.md). **That testing found a defect a reading had passed**: a `CHECK` written `array_length(measures, 1) >= 1` admits the empty array, because `array_length` returns `NULL` there and **a `CHECK` evaluating to `NULL` passes**. It admitted the one value it existed to reject, and an empty declared set makes STAT-C1 vacuous. Now `cardinality()`.
 
 ## Blocked
 

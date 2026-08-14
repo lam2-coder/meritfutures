@@ -18,8 +18,17 @@
 --      thing this module exists to avoid.
 --   4. min_sample lives in the definition row rather than in code because it
 --      is A PUBLICATION POLICY, not an implementation detail.
+--   5. THE PUBLISHED FIGURE IS bigint WITH A UNIT (ADR-031), not numeric. Its
+--      no-floats exemption is retired: all seven ruled statistics are exactly
+--      representable as integers, and for ST-03 and ST-04 the column holds
+--      MONEY on a public surface.
+--   6. A ROW CARRIES ONE `measure` (ADR-032), because ST-04, ST-05 and ST-06
+--      each publish two figures and M12 says neither is published alone. The
+--      "alone" half is a multi-row invariant and lives in 0027.
 --
 -- Deltas folded: SD-M12-01, SD-M12-02, SD-M12-03, SD-M12-04
+-- Amended by:    ADR-031 (value, value_unit, statistic_unit)
+--                ADR-032 (measure, statistic_definitions.measures)
 --
 -- effective_from on a definition is ALWAYS IN THE FUTURE at write time
 -- (INV-M12-07). A definition that takes effect retroactively is a definition
@@ -27,6 +36,17 @@
 -- =============================================================================
 
 BEGIN;
+
+-- -----------------------------------------------------------------------------
+-- measures_are_distinct
+-- -----------------------------------------------------------------------------
+-- A CHECK constraint may not contain a subquery, and duplicate-detection over
+-- an array needs one. IMMUTABLE because it reads nothing outside its argument,
+-- which is what makes it legal in a CHECK rather than merely accepted there.
+CREATE FUNCTION measures_are_distinct(m statistic_measure[]) RETURNS boolean
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT cardinality(m) = (SELECT count(DISTINCT x) FROM unnest(m) AS x);
+$$;
 
 -- -----------------------------------------------------------------------------
 -- statistic_definitions                                         -- SD-M12-01
@@ -51,6 +71,26 @@ CREATE TABLE statistic_definitions (
   -- nobody reads.
   min_sample       integer NOT NULL CHECK (min_sample > 0),       -- SD-M12-01
 
+  -- ADR-032. THE MEASURE SET THIS DEFINITION DECLARES, and the thing the
+  -- completeness trigger in 0027 checks a publish run against.
+  --
+  -- It is on the DEFINITION rather than in code because it is part of what the
+  -- statistic IS. ST-04 is not "average payout, and median as a nice extra";
+  -- it is a definition whose published form is two figures, and a version of
+  -- it that published one would be a different definition. Declaring the set
+  -- beside numerator_spec and denominator_spec is what lets the database
+  -- enforce "neither is published alone" instead of a reviewer remembering it.
+  --
+  --   ST-01, ST-02, ST-07  {rate}
+  --   ST-03                {total}
+  --   ST-04                {mean, median}
+  --   ST-05, ST-06         {p50, p95}
+  --
+  -- Changing this set on a live statistic is a new definition VERSION, by the
+  -- same rule that governs the specs: statistic_definitions rows are versioned
+  -- and superseded, never edited in place.
+  measures         statistic_measure[] NOT NULL,                  -- ADR-032
+
   method_body_mdx  text NOT NULL,   -- the published methodology page
   adr_ref          text NULL,       -- the ruling that fixed this definition
 
@@ -61,6 +101,23 @@ CREATE TABLE statistic_definitions (
 
   CONSTRAINT statistic_definitions_no_self_supersede CHECK (
     superseded_by IS NULL OR superseded_by <> id
+  ),
+
+  -- A definition that declares no measure publishes nothing, and a definition
+  -- that declares the same measure twice makes the completeness check in 0027
+  -- ambiguous about what "every measure" counted.
+  --
+  -- cardinality(), NOT array_length(). array_length(ARRAY[]::x[], 1) is NULL,
+  -- NULL >= 1 is NULL, and a CHECK that evaluates to NULL PASSES. Written the
+  -- obvious way this constraint admits the empty set, which is the one value
+  -- it exists to reject: an empty declared set makes STAT-C1 vacuous, so a
+  -- statistic could publish nothing at all and satisfy "every measure it
+  -- declares". Caught by testing the constraint rather than reading it.
+  CONSTRAINT statistic_definitions_measures_nonempty CHECK (
+    cardinality(measures) >= 1
+  ),
+  CONSTRAINT statistic_definitions_measures_distinct CHECK (
+    measures_are_distinct(measures)
   )
 );
 
@@ -93,11 +150,48 @@ CREATE TABLE published_statistics (
   window_end_day     date NOT NULL,
   as_of_trading_day  date NOT NULL,
 
-  -- numeric, and it is A RULED EXEMPTION rather than a default. See the
-  -- NO-FLOATS EXEMPTION LIST in 0027 and in DELTA_MANIFEST section 9. The
-  -- published figure is a ratio for ST-01, ST-02 and ST-07, and rounding a
-  -- pass rate to cents would be the actual error.
-  value_numeric      numeric NULL,
+  -- ADR-032. WHICH FIGURE THIS ROW CARRIES.
+  --
+  -- Without it, ST-04's mean and median, and ST-05's and ST-06's p50 and p95,
+  -- collide on published_statistics_window_uq below and the second one is
+  -- unwritable. The rejected alternative was separate stat_codes per figure
+  -- (ST-04-mean, ST-04-median), which needs no schema change and is worse: it
+  -- makes the pair INDEPENDENTLY PUBLISHABLE, and M12 forbids exactly that.
+  -- See ADR-032.
+  --
+  -- The measure a row carries must be one its definition declares, and a
+  -- publish run that emits one measure for a stat_code must emit ALL of them.
+  -- That is a multi-row invariant and it lives with the other multi-row
+  -- invariants, as a deferred constraint trigger in 0027.
+  measure            statistic_measure NOT NULL,                  -- ADR-032
+
+  -- ADR-031. BIGINT, AND THE NO-FLOATS EXEMPTION THIS COLUMN HELD IS GONE.
+  --
+  -- It was `value_numeric numeric`, authorized as an exemption on the reading
+  -- that a published rate is not expressible as an integer. All seven ruled
+  -- statistics are exactly representable as integers under the corpus's own
+  -- conventions:
+  --
+  --   ST-01, ST-02, ST-07  rates, in integer BASIS POINTS
+  --   ST-03, ST-04         money, in INTEGER CENTS
+  --   ST-05, ST-06         durations, in WHOLE SECONDS
+  --
+  -- THE CENTS CASE IS THE ONE THAT DECIDED IT. For ST-03 and ST-04 this column
+  -- holds money on a public surface, and DATA_MODEL section 1 says money is
+  -- bigint integer cents, never numeric and never float. An exemption that
+  -- covers a money column is not an exemption, it is a hole with a ruling
+  -- attached.
+  --
+  -- RENAMED from value_numeric, because the old name describes a type this
+  -- column no longer has. A column called `value_numeric` holding a bigint is
+  -- a lie that survives every grep a future reader runs.
+  value              bigint NULL,                                 -- ADR-031
+
+  -- Forced by the type, exactly as numerator_unit was: a bare bigint is
+  -- ambiguous between 1470 basis points and 1470 cents, and this is a surface
+  -- Merit cannot restate quietly. Same statistic_unit type as the numerator
+  -- below, because two vocabularies for one concept is how they drift.
+  value_unit         statistic_unit NULL,                         -- ADR-031
 
   -- SD-M12-02. STORED ALONGSIDE THE RATIO. A published ratio without its
   -- components cannot be checked by the reader.
@@ -126,11 +220,11 @@ CREATE TABLE published_statistics (
   -- numerator_unit is FORCED BY THE TYPE, not added alongside it: DATA_MODEL
   -- section 1 makes a quantity column with no unit a review reject, and a
   -- bigint numerator is otherwise ambiguous between cents and a count on a
-  -- surface Merit cannot restate quietly.
+  -- surface Merit cannot restate quietly. It carries the SAME statistic_unit
+  -- type as value_unit above (ADR-031); the standalone CHECK list it used to
+  -- carry was the second of two vocabularies for one concept.
   numerator          bigint NULL,                                 -- SD-M12-02
-  numerator_unit     text NULL CHECK (numerator_unit IN (
-                       'count', 'cents', 'duration_seconds'
-                     )),                                          -- SD-M12-02
+  numerator_unit     statistic_unit NULL,                         -- SD-M12-02
   denominator        bigint NULL CHECK (denominator IS NULL OR denominator >= 0),
                                                                   -- SD-M12-02
   sample_size        integer NOT NULL CHECK (sample_size >= 0),
@@ -165,17 +259,25 @@ CREATE TABLE published_statistics (
   -- Requiring one here made ST-03 unpublishable.
   CONSTRAINT published_statistics_value_or_suppression CHECK (
     (suppressed_reason IS NULL
-       AND value_numeric IS NOT NULL
+       AND value IS NOT NULL
+       AND value_unit IS NOT NULL
        AND numerator IS NOT NULL
        AND numerator_unit IS NOT NULL)
     OR
-    (suppressed_reason IS NOT NULL AND value_numeric IS NULL)
+    (suppressed_reason IS NOT NULL AND value IS NULL)
   ),
 
   -- A numerator without its unit is a number whose meaning depends on which
   -- statistic the reader thinks they are looking at.
   CONSTRAINT published_statistics_numerator_has_unit CHECK (
     (numerator IS NULL) = (numerator_unit IS NULL)
+  ),
+
+  -- ADR-031. The same rule for the published figure itself, which is the one a
+  -- reader actually quotes. 1470 is 14.70 percent or $14.70 depending on a
+  -- column nobody made mandatory.
+  CONSTRAINT published_statistics_value_has_unit CHECK (
+    (value IS NULL) = (value_unit IS NULL)
   ),
 
   CONSTRAINT published_statistics_no_self_restatement CHECK (
@@ -188,15 +290,11 @@ CREATE INDEX published_statistics_code_idx
 CREATE INDEX published_statistics_restatement_idx
   ON published_statistics (restatement_of) WHERE restatement_of IS NOT NULL;
 
--- One live publication per statistic per window per grain. A restatement is
--- how a second one exists.
+-- One live publication per statistic per window per grain PER MEASURE. A
+-- restatement is how a second one exists.
 --
--- OPEN ITEM FOR THE E2 READ, found while typing the numerator and NOT fixed
--- here, because it changes the shape of an append-only public surface and that
--- is the founder's call rather than mine.
---
--- THREE OF THE SEVEN STATISTICS PUBLISH TWO FIGURES AT ONCE, and this index
--- makes the second one unwritable:
+-- OI-02, closed by ADR-032. Three of the seven statistics publish two figures
+-- at once and this index used to make the second one unwritable:
 --
 --   ST-04  mean AND median together. "Neither is published alone": a mean is
 --          the number one large payout distorts, and a median alone hides that
@@ -204,15 +302,19 @@ CREATE INDEX published_statistics_restatement_idx
 --   ST-05  p50 AND p95
 --   ST-06  p50 AND p95
 --
--- Two rows for the same stat_code, definition_version, window and grain
--- collide on this index, and there is no column distinguishing which figure a
--- row carries. The fix is a `measure` discriminator
--- ('rate','total','mean','median','p50','p95','count') added to the table and
--- to this index. It is small, and it is a change to what a published row IS.
--- Recorded in DELTA_MANIFEST section 10.
+-- `measure` is what makes the pair expressible, and it is in this key rather
+-- than only on the table because without it the uniqueness guarantee would
+-- read "one row per window" while the table needs two.
+--
+-- WHAT THIS KEY DOES NOT DO, and why 0027 carries a trigger. Adding measure
+-- makes the second row WRITABLE; it does nothing to make it REQUIRED. A run
+-- that emits ST-04's mean and never emits its median satisfies every
+-- constraint on this table, and publishes exactly the thing M12 forbids. That
+-- is a multi-row invariant, so it is a deferred constraint trigger next to the
+-- ledger zero-sum check rather than anything expressible here.
 CREATE UNIQUE INDEX published_statistics_window_uq
   ON published_statistics (stat_code, definition_version, window_start_day,
-                           window_end_day, coalesce(grain_key, ''))
+                           window_end_day, coalesce(grain_key, ''), measure)
   WHERE restatement_of IS NULL;
 
 -- -----------------------------------------------------------------------------

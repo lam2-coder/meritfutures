@@ -5,7 +5,7 @@
 -- safe. Every constraint here fails at INSERT, not in a job that runs later
 -- against data that already exists.
 --
--- Carries: the deferred zero-sum trigger, LEDGER-C1, LEDGER-C2,
+-- Carries: the deferred zero-sum trigger, LEDGER-C1, LEDGER-C2, STAT-C1,
 --          published-plan_version immutability, accounts.plan_version_id
 --          immutability, one-live-mark, and DATA_MODEL section 13's set.
 -- =============================================================================
@@ -133,6 +133,106 @@ CREATE TRIGGER ledger_entries_class_declared
   FOR EACH ROW EXECUTE FUNCTION assert_ledger_account_class_declared();
 
 -- -----------------------------------------------------------------------------
+-- STAT-C1: a publish run emits every measure its definition declares
+-- -----------------------------------------------------------------------------
+-- ADR-032. THE SECOND HALF OF OI-02, and the half that is not a column.
+--
+-- Adding `measure` to published_statistics made ST-04's median WRITABLE. It
+-- did nothing to make it REQUIRED. A run that emits the mean and never emits
+-- the median satisfies every constraint on that table and publishes exactly
+-- what M12 forbids: "neither is published alone" for ST-04, and ST-05 and
+-- ST-06 "published as a pair on the same surface".
+--
+-- THIS CONVERTS THAT SENTENCE FROM PROSE INTO DDL, and prose is the wrong
+-- place for it on this surface. published_statistics is append-only and
+-- publicly restated: a missing median is not a bug you fix, it is a number
+-- Merit published and must now restate in public.
+--
+-- DEFERRED, and for the same reason the ledger zero-sum trigger above is
+-- deferred: the rows arrive one at a time and the set is only complete once
+-- the run's transaction has written all of them. Checking at statement time
+-- would fail on the first row of every correct run.
+--
+-- SCOPE: rows with restatement_of IS NULL, the original publish run. A
+-- restatement of ONE measure is legitimate and is NOT publishing it alone,
+-- because its pair is already published and still standing; requiring the full
+-- set on a correction would mean Merit could not fix a mean without restating
+-- a median that was right.
+CREATE FUNCTION assert_publish_run_measures_complete() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+  declared statistic_measure[];
+  emitted  statistic_measure[];
+  missing  statistic_measure[];
+BEGIN
+  -- A restatement corrects one figure. See SCOPE above.
+  IF NEW.restatement_of IS NOT NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT d.measures INTO declared
+    FROM statistic_definitions d
+   WHERE d.stat_code = NEW.stat_code
+     AND d.version   = NEW.definition_version;
+
+  IF declared IS NULL THEN
+    RAISE EXCEPTION
+      'STAT-C1: no statistic_definitions row for stat_code % version %. A '
+      'published figure whose definition does not exist is unverifiable by '
+      'the reader, which is the thing M12 exists to prevent.',
+      NEW.stat_code, NEW.definition_version
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  IF NOT (NEW.measure = ANY (declared)) THEN
+    RAISE EXCEPTION
+      'STAT-C1: stat_code % version % published measure % which its definition '
+      'does not declare (declares %). See ADR-032.',
+      NEW.stat_code, NEW.definition_version, NEW.measure, declared
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- Every measure emitted for this exact publication cell. The cell is the
+  -- window_uq key minus the measure: same statistic, same definition version,
+  -- same window, same grain.
+  SELECT coalesce(array_agg(p.measure ORDER BY p.measure),
+                  ARRAY[]::statistic_measure[])
+    INTO emitted
+    FROM published_statistics p
+   WHERE p.stat_code          = NEW.stat_code
+     AND p.definition_version = NEW.definition_version
+     AND p.window_start_day   = NEW.window_start_day
+     AND p.window_end_day     = NEW.window_end_day
+     AND p.grain_key IS NOT DISTINCT FROM NEW.grain_key
+     AND p.restatement_of IS NULL;
+
+  SELECT coalesce(array_agg(m ORDER BY m), ARRAY[]::statistic_measure[])
+    INTO missing
+    FROM unnest(declared) m
+   WHERE NOT (m = ANY (emitted));
+
+  IF array_length(missing, 1) IS NOT NULL THEN
+    RAISE EXCEPTION
+      'STAT-C1: publish run for stat_code % version % window % to % grain % '
+      'emitted % but its definition declares %. Missing: %. Neither figure of '
+      'a pair is published alone (M12, ADR-032).',
+      NEW.stat_code, NEW.definition_version,
+      NEW.window_start_day, NEW.window_end_day,
+      coalesce(NEW.grain_key, '(global)'),
+      emitted, declared, missing
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER published_statistics_measures_complete
+  AFTER INSERT ON published_statistics
+  DEFERRABLE INITIALLY DEFERRED
+  FOR EACH ROW EXECUTE FUNCTION assert_publish_run_measures_complete();
+
+-- -----------------------------------------------------------------------------
 -- Published plan_versions are immutable (B4 #12)
 -- -----------------------------------------------------------------------------
 -- The single most valuable promise Merit can make, in a market whose live case
@@ -189,13 +289,18 @@ CREATE TRIGGER accounts_plan_version_pinned
 -- -----------------------------------------------------------------------------
 -- Constitution and DATA_MODEL section 1: money is bigint integer cents, ratios
 -- are integer basis points, NEVER numeric and NEVER float, in any financial
--- path. Three columns in this schema are non-integer and every one of them is
--- a RULED EXEMPTION rather than a local judgment.
+-- path. Two columns in this schema are non-integer and both are a RULED
+-- EXEMPTION rather than a local judgment.
+--
+-- NO MONEY-BEARING COLUMN IS ON THIS LIST, and after ADR-031 none ever was.
+-- That is the property the list exists to hold, and it is worth more than the
+-- count: what remains is two correlation coefficients on a risk-detection
+-- table, and what left was a column holding published cents.
 --
 -- THE LIST IS ASSERTED, NOT DOCUMENTED. The DO block below fails the migration
 -- if the set of non-integer numeric-family columns in `public` is anything
--- other than exactly these three. A fourth one cannot be added by a later
--- migration without deleting a line from this file, which is a diff a reviewer
+-- other than exactly these two. A third one cannot be added by a later
+-- migration without adding a line to this file, which is a diff a reviewer
 -- sees rather than a discovery CI makes later.
 --
 -- | Column                              | Type    | Why it is exempt          |
@@ -205,37 +310,40 @@ CREATE TRIGGER accounts_plan_version_pinned
 -- |                                     |         | ratio of integers.        |
 -- |                                     |         | Rounding it to cents or   |
 -- |                                     |         | to bp is the actual error |
--- | published_statistics.value_numeric  | numeric | The published figure.     |
--- |                                     |         | ST-01/02/07 are rates.    |
--- |                                     |         | SEE THE NOTE BELOW: this  |
--- |                                     |         | one is exempt as ruled    |
--- |                                     |         | and does not need to be   |
--- |                                     |         | on this list             |
 --
--- NOTE ON published_statistics.value_numeric, for the founder's read.
--- This column is on the authorized list and is left as authorized. On
--- inspection it does not require the exemption: all seven ruled statistics are
+-- WHAT LEFT THE LIST, AND WHY THE LIST IS NOW SHORTER BY A MONEY COLUMN.
+--
+-- published_statistics.value_numeric was AUTHORIZED and is retired by ADR-031.
+-- It is now `value bigint` with a `value_unit`. All seven ruled statistics are
 -- exactly representable as integers under the corpus's own conventions
 -- (ST-01/02/07 rates in basis points, ST-03/04 money in integer cents,
--- ST-05/06 durations in whole seconds), and for ST-03 and ST-04 `numeric`
--- currently holds MONEY on a public surface, which is the case DATA_MODEL
--- section 1 names directly. Tightening it to bigint plus the same unit
--- discriminator the numerator now carries is a one-line change and it is the
--- founder's call, because removing an authorized exemption is not mine to
--- make. Recorded in DELTA_MANIFEST section 9.
+-- ST-05/06 durations in whole seconds), and for ST-03 and ST-04 the column
+-- held MONEY ON A PUBLIC SURFACE, which is the case DATA_MODEL section 1 names
+-- directly. An authorized exemption covering a money column is not an
+-- exemption; it is a hole with a ruling attached.
 --
--- WHAT LEFT THE LIST. published_statistics.numerator and .denominator shipped
--- as numeric and are now bigint. The numerator is a count, integer cents, or a
--- whole-second duration across the seven definitions, carried with a
+-- published_statistics.numerator and .denominator shipped as numeric and were
+-- NEVER authorized. Both are bigint. The numerator is a count, integer cents,
+-- or a whole-second duration across the seven definitions, carried with a
 -- numerator_unit discriminator; the denominator is a count everywhere it
--- exists and is compared against an integer min_sample. Neither was ever
--- authorized and neither needed to be.
+-- exists and is compared against an integer min_sample.
+--
+-- The two correlation columns are LEFT EXEMPT on the founder's ruling at this
+-- gate. Rho is not money, it is not a ratio of two integers Merit controls,
+-- and the threshold must be the same type as the statistic it is compared
+-- against. Reversing that is a risk-path change and would need its own ADR.
+--
+-- AND THE ROUNDING IS NOT HARMLESS HERE, which is the difference from the
+-- column that just left. A plain integer rho of 0.30 IS ZERO, and rho = 0.30
+-- is the RESERVE-CRITICAL figure: the risk engine shows mean monthly payouts
+-- flat near $45.3K across every correlation level while CVaR99 nearly doubles
+-- from $84.8K at rho = 0.05 to $132.9K at rho = 0.30 (0008). An integer cast
+-- would erase the whole range the tail lives in.
 DO $$
 DECLARE
   allowed  text[] := ARRAY[
     'correlation_groups.statistic',
-    'correlation_groups.threshold',
-    'published_statistics.value_numeric'
+    'correlation_groups.threshold'
   ];
   found    text[];
   unlisted text[];

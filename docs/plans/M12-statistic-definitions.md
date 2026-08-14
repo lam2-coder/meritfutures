@@ -165,6 +165,26 @@ Each carries the same fields, in the same order, so the sign-off is a comparison
 
 ---
 
+### The declared measure set and the published unit, per statistic
+
+**Added at the schema-delta gate under [ADR-031](../DECISIONS.md) and [ADR-032](../DECISIONS.md).** These two columns are not new decisions about what a statistic means; they are the definitions above written in the form the database now requires, and `statistic_definitions.measures` is seeded from this table.
+
+| Statistic | Declared `measures` | `value_unit` | Why |
+|---|---|---|---|
+| **ST-01** | `{rate}` | `bp` | A pass rate, in integer basis points |
+| **ST-02** | `{rate}` | `bp` | Same |
+| **ST-03** | `{total}` | `cents` | A total, not a rate. It has no denominator by ruling, and the count behind it is `sample_size` |
+| **ST-04** | `{mean, median}` | `cents` | **Two figures, and neither is published alone.** This row is the reason the column exists |
+| **ST-05** | `{p50, p95}` | `duration_seconds` | Two figures, published together |
+| **ST-06** | `{p50, p95}` | `duration_seconds` | Two figures, and **published as a pair with ST-05 on the same surface** |
+| **ST-07** | `{rate}` | `bp` | A rate, in integer basis points |
+
+**Three of the seven declare two measures, and that is now enforced rather than described.** A publish run that emits ST-04's mean and never emits its median **fails at commit** (STAT-C1). The prose in ST-04 and ST-06 above said this before the schema could; it now says the same thing twice, in two places that cannot disagree.
+
+**Every unit is an integer unit**, because every one of these figures is exactly representable as one. There is no `numeric` on this surface: the published value is `bigint` carrying the unit beside it, so 1470 is unambiguously 14.70 percent and never $14.70.
+
+**Changing a declared measure set on a live statistic is a new definition version**, by the same rule that governs the numerator and denominator specs. A statistic that quietly stopped publishing its median would be a different statistic wearing the same code.
+
 ## 3. The three deliberate exclusions
 
 Published on the method index **with their reasons**, because an unexplained absence is read as concealment while an explained one is read as judgment (GS-165).
@@ -198,6 +218,8 @@ Published on the method index **with their reasons**, because an unexplained abs
 | S-11 | **ST-05** with the freeze decomposition published alongside | As drafted | ☐ approve ☐ amend |
 | S-12 | **ST-06** published as a pair with ST-05 on the same surface | As drafted | ☐ approve ☐ amend |
 | S-13 | **ST-07** publishing a structural 100 percent with the full freeze decomposition | As drafted | ☐ approve ☐ amend |
+| S-14 | **The published value is `bigint` with a unit**, not `numeric`. Every statistic's unit is fixed in the table above | [ADR-031](../DECISIONS.md) | **Ruled 2026-08-14** |
+| S-15 | **Each statistic declares its measure set**, and a publish run emitting one measure emits all of them | [ADR-032](../DECISIONS.md) | **Ruled 2026-08-14** |
 | S-14 | The **three exclusions**, with their reasons published verbatim | As drafted | ☐ approve ☐ amend |
 | S-15 | `effective_from` for every v1 definition is **launch plus 30 days** | As drafted | ☐ approve ☐ amend |
 | **S-16 (APPROVED at FREEZE)** | **[OQ-M12-04](../DECISIONS.md)**: the first number publishes whatever it says, with no approval step | **Confirm the consequence in advance**: a bad first quarter publishes, is screenshotted, and cannot be withdrawn | ☐ approve ☐ amend |

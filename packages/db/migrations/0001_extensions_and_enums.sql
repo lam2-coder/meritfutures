@@ -104,4 +104,46 @@ CREATE TYPE risk_flag_status AS ENUM (
   'open', 'investigating', 'dismissed', 'enforced'
 );
 
+-- -----------------------------------------------------------------------------
+-- Transparency
+-- -----------------------------------------------------------------------------
+-- ADR-031. THE UNIT VOCABULARY IS ONE VOCABULARY, AND IT IS A TYPE RATHER THAN
+-- TWO CHECK LISTS.
+--
+-- published_statistics carries a unit on the value and a unit on the numerator.
+-- Written as two independent CHECK constraints they are two vocabularies for
+-- one concept, and two vocabularies for one concept is how they drift: a later
+-- migration widens one, nobody widens the other, and a published figure and
+-- its own numerator start disagreeing about what a number means on a surface
+-- Merit cannot restate quietly.
+--
+--   count             a number of accounts, evaluations, requests, payouts
+--   bp                integer basis points. ST-01, ST-02, ST-07 are rates
+--   cents             integer cents. ST-03 and ST-04. THIS IS MONEY
+--   duration_seconds  whole seconds. ST-05 and ST-06
+--
+-- 'bp' never legitimately appears as a NUMERATOR unit, because a numerator is
+-- a count, a sum of cents, or an elapsed duration, and the rate is what you
+-- get by dividing. It is in the shared type anyway: the alternative is a
+-- second type that exists only to omit one value, which is the drift this type
+-- exists to prevent.
+CREATE TYPE statistic_unit AS ENUM (
+  'count', 'bp', 'cents', 'duration_seconds'
+);
+
+-- ADR-032. WHICH FIGURE A PUBLISHED ROW CARRIES.
+--
+-- Three of the seven ruled statistics publish two figures at once: ST-04 mean
+-- AND median ("neither is published alone"), ST-05 and ST-06 p50 AND p95. One
+-- row per statistic per window cannot express that.
+--
+-- Shared, for the same reason as statistic_unit above: statistic_definitions
+-- DECLARES a measure set and published_statistics carries one measure per row,
+-- and the completeness trigger in 0027 compares the two. A comparison between
+-- two independently maintained vocabularies is a comparison that eventually
+-- passes for the wrong reason.
+CREATE TYPE statistic_measure AS ENUM (
+  'rate', 'total', 'mean', 'median', 'p50', 'p95', 'count'
+);
+
 COMMIT;

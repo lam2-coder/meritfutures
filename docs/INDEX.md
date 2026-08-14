@@ -31,7 +31,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [STATE.md](STATE.md) | One screen: wave, gate, done / in-flight / blocked, next actions | approved | claude |
 | [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | approved | claude |
 | [GUIDE_BRIEFING.md](GUIDE_BRIEFING.md) | Orientation for the founder's strategy-desk chat: role boundaries, the gate loop, current state, the session queue | approved | founder |
-| [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives. **25 ADRs plus four gate-closure records** | approved | founder |
+| [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives. **32 numbered ADRs plus [ADR-D1](DECISIONS.md) and the gate-closure records.** The count read 25 through ADR-030 and is corrected here | approved | founder |
 | [EDGE_CASES.md](EDGE_CASES.md) | Living registry, **140 entries**. EC-001 to EC-050 approved with M01; EC-051+ carry their module's status | approved | founder |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | approved | founder |
 | [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **New.** Constitution section 8 re-planned: 18 weeks, the launch-blocking triage across M11 to M20, the pre-FREEZE queue, and the one trade actually available | approved | founder |
@@ -75,7 +75,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M10-integrations.md](plans/M10-integrations.md) | One outbound bus, send-time suppression, support-context scoping, vendor-down chaos | approved | founder |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Issuance, key lifecycle, non-enumerable verification, revocation classes, opt-in leaderboard | approved | founder |
 | [M12-transparency-platform.md](plans/M12-transparency-platform.md) | **Launch differentiator.** Seven auto-computed statistics, versioned definitions, immutable history, proof links | approved | founder |
-| [M12-statistic-definitions.md](plans/M12-statistic-definitions.md) | **New.** The seven definitions as a 16-row founder sign-off table, drafted before any data exists | approved | founder |
+| [M12-statistic-definitions.md](plans/M12-statistic-definitions.md) | The seven definitions as a founder sign-off table, drafted before any data exists. **Amended by [ADR-031](DECISIONS.md) and [ADR-032](DECISIONS.md):** each statistic now declares its measure set and its integer unit | approved | founder |
 | [M13-trader-analytics-journal.md](plans/M13-trader-analytics-journal.md) | Per-account analytics from engine tables, private journal, load isolation from the payout path | approved | founder |
 | [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | **Amended by [ADR-025](DECISIONS.md):** cap release rejected, cross-account loyalty added, INV-M14-11 bounds invariance | approved | founder |
 | [M15-discord-integration.md](plans/M15-discord-integration.md) | Per-role consent, a link that is never a credential, template-only announcements. Post-launch | approved | founder |
@@ -90,7 +90,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Artifact | Purpose | Status | Owner |
 |---|---|---|---|
 | [migrations/](../packages/db/migrations) | The reviewed migration set. **27 files, all 93 schema deltas folded at create**, verified to apply in order against PostgreSQL 16. Sixteen carry an `E2 READ: MONEY PATH` header | review | founder (E2 line-by-line read) |
-| [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), and one defect discovered while folding. **[ADR-026](DECISIONS.md)'s completeness gate reads this file** | review | founder |
+| [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), the no-floats exemption list (**two columns, no money**, under [ADR-031](DECISIONS.md)), and the per-constraint verification table. **[ADR-026](DECISIONS.md)'s completeness gate reads this file** | review | founder |
 
 ## docs/testing/ (Wave 4)
 | Doc | Purpose | Status | Owner |
