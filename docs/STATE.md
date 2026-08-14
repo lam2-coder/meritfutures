@@ -9,39 +9,46 @@ last_updated: 2026-08-13
 **Milestone:** planning corpus generation. **NOT FROZEN. Zero application code.**
 
 ## Current wave
-Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 (Module plans) is in progress.** M01 is APPROVED at the M1 gate (2026-08-13) and Wave 3 batch 1 (M02 through M08) is being written against its now-fixed interfaces.
+Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 (Module plans) in progress.** M01 APPROVED at the M1 gate. **Wave 3 batch 1 (M02 through M08) is drafted and at `status: review`.** M09 through M19 not started.
 
 ## Gate in front of us
-**Wave 3 batch 1 review.** M02 through M08 are being drafted to `status: review` for founder review. Per B5, no module's code begins until its plan doc is reviewed and its section 7 contains adversarial scenarios not found in the constitution. M09 through M19 are not started.
+**Wave 3 batch 1 review.** Seven plans await founder review. Suggested order, money paths first: **M05, M02, M03**, then M07, M06, M04, M08. Per B5, no module's code begins until its plan doc is reviewed and its section 7 carries adversarial scenarios not found in the constitution; all seven do.
+
+**M02 cannot reach `approved` while the Rithmic vendor call is outstanding** ([ADR-005](DECISIONS.md)). Its fourteen `V-M2-nn` items are the call's agenda.
 
 ## Done
-- Constitution committed at repo root; full section 0.5 skeleton.
-- Wave 1 complete and approved: all seven research/ docs at `status: approved`.
-- Wave 2 complete and approved: eight architecture docs at `status: approved`.
-- **M1 gate closed (2026-08-13).** All eleven open questions ruled on. [M01](plans/M01-rules-engine.md), [GOLDEN_SCENARIOS](testing/GOLDEN_SCENARIOS.md), and [EDGE_CASES](EDGE_CASES.md) are `approved`. Three new ADRs: **013** (cadence gap anchors on the settled payout's effective day; Rapid Daily renamed **Merit Rapid**), **014** (no post-payout floor reset; floor lock enabled on all three plans at size plus $100; `post_payout_floor_rule` retired to `none`), **015** (plan parameters sourced from the founder's lifecycle simulation; funded minimum trading days is 0 on all three plans).
-- ADRs accepted: 001 through 015. See [DECISIONS.md](DECISIONS.md).
+- Wave 1 approved (7 docs). Wave 2 approved (8 docs).
+- **M1 gate closed.** All eleven open questions ruled. M01, GOLDEN_SCENARIOS, EDGE_CASES at `approved`. ADR-013 (settlement cadence anchor; Rapid Daily renamed **Merit Rapid**), ADR-014 (no post-payout floor reset; lock on all three plans at size plus $100), ADR-015 (plan parameters from the founder's lifecycle simulation; funded min days 0).
+- **Wave 3 batch 1 written:** M02 rithmic-bridge, M03 billing-checkout, M04 trader-portal, M05 payout-system, M06 admin-ops-console, M07 risk-abuse, M08 affiliate-system. Each a full B5 ten-section plan, each committed separately.
+- Registries grown to **127 golden scenarios** and **82 edge cases**. 44 adversarial scenarios across the eight plans, 35 of them novel.
+- ADRs 001 to 015 accepted; **016 and 017 proposed** (see below).
 
 ## In flight
-- Wave 3 batch 1, starting now: M02 rithmic-bridge, M03 billing-checkout, M04 trader-portal, M05 payout-system, M06 admin-ops, M07 risk-abuse, M08 affiliate. Each consumes M01's approved interfaces rather than restating them.
+- Nothing. Parked at the batch 1 review gate as instructed.
 
-## Open for the founder, non-blocking
-- **OQ-12 (new, from the M1 gate).** Merit Rapid's cycle is **5 trading days**, set by its 5 win-day gate, not 3 to 4 as OQ-1 estimated before the win-day count was fixed. Its 1 day cadence gap is a dominated gate that never binds (EC-049). An instant settlement rail does **not** make the plan daily, because the settlement leg already hides behind the win-day gate; only `win_days.required_count` moves that cadence, and lowering it to 1 raises extraction to roughly 30,000 cents per trading day on the current rail (about 1.6x the design ceiling) or roughly 45,000 on an instant rail (about 2.4x). Holding the ceiling at a 2 day cycle needs the cap at about 42,000c ($420). Every option is a config edit; nothing is blocked.
-- **The post-beta revisit recorded in ADR-014.** The floor lock hands the trader a bounded free option (AS-04). Accepted deliberately, watched as a cohort via `rule.floor_locked` from launch, revisited against realized variance after beta.
+## Blocking nothing, but needs founder eyes
+Ordered by how much they change, most first.
+
+1. **OQ-M5-01 / [ADR-016](DECISIONS.md) (proposed).** A one cent ledger imbalance currently halts **every** payout for every trader. Scoping it to the implicated identity, with only a global mismatch stopping everything, amends approved EVENTS wording and needs a ruling.
+2. **OQ-12 (from the M1 gate).** Merit Rapid's real cycle is 5 trading days, set by its win-day gate, not 3 to 4 by its 1 day cadence gap. Published copy depends on the answer, and an instant settlement rail does **not** make the plan daily.
+3. **OQ-M7-01.** Is copy trading allowed? Detector D-01 finds it either way; without a ToS clause its flags cannot be acted on. Legal drafting dependency.
+4. **OQ-M3-04.** PSP applications are still open (constitution section 10, and section 8 flags the lead time as a schedule risk to front-load in W1). This is a **calendar** dependency, not a design one: no revenue exists until two MIDs are approved, and approval takes longer than the module does.
+5. **OQ-M2-04.** Does Merit accept a vendor relationship with no provisioning acknowledgement artifact? If Rithmic returns nothing, `set_risk` can never be positively confirmed and an account can trade with no working auto-liquidator. Worth raising **on the call as a requirement**, not a question.
+6. **OQ-M6-03.** Break-glass for the second `owner` credential. Both dual-control keys are the founder's; if both are lost or the founder is unreachable, no sensitive change can be made at all.
+7. **OQ-M5-04.** Is the firm's split recognized as revenue at approval or at settlement? An accounting policy with tax consequences, to settle before the first close.
+8. **[ADR-017](DECISIONS.md) (proposed).** One outbound payment rail for every module that ever pays anybody.
+9. Commercial judgments: OQ-M8-01 (new-affiliate reserve holdback), OQ-M8-02 (flat commission rate), OQ-M3-02 (refund window stated precisely enough to publish), OQ-M5-02 (freeze expiry, proposed 10 business days).
 
 ## Provisional: pending Rithmic vendor confirmation (ADR-005)
-The vendor call is deferred pending the founder's capital decision. These are designed fully but provisional, and each is flagged at its point of use. **M02's plan doc may not leave `review` for `approved` while these are open** (ADR-005).
-1. **EOD report file formats and field lists.** Assumed: per-account CSV with account ref, session date, opening and closing balance, realized P&L, plus either per-fill detail rows or a separate fills file.
-2. **Delivery cadence and timing guarantee.** Assumed: one post-session delivery per trading day with no contractual arrival-time SLA. The batch is therefore arrival-triggered with a late-file alarm, never clock-triggered.
-3. **Correction and backdated-fill semantics.** Assumed: corrections arrive as new rows referencing the original (`fills.correction_of`), not as silent in-place restatements. **Highest-risk assumption in the corpus**, because replay determinism depends on it (B4 #5). Mitigation designed: if the vendor restates in place, the ingest layer converts a restatement into a correction row so the table contract holds either way.
-4. **Sandbox availability** before contract. Assumed unavailable, which is why the synthetic Rithmic simulator is a v1 requirement rather than a convenience.
-5. **Provisioning CSV schemas** and the acknowledgement mechanism (G-VENDOR-CONFIRMED in STATE_MACHINES section 5).
-6. **Server-side copy configuration** and **admin R|API+ terms**. Assumed out of scope for v1.
-7. **Non-trading balance movements applied between sessions** (M1 dependency D-M2-2). The engine's breach arithmetic assumes the platform applies payout withdrawals between sessions. If it applies them intraday, `daily_marks` must carry an intraday adjustment timestamp and the breach comparison changes shape. Second-highest-risk vendor assumption in the corpus.
+Now enumerated as **fourteen numbered items** in [M02 section 11](plans/M02-rithmic-bridge.md), each with what depends on it, what changes if it is wrong, and whether the blast radius is an edit, a design change, or a data-model change. The two highest risk:
+- **V-M2-05**, non-trading balance movements applied between sessions and distinguishable in the report. If wrong, `daily_marks` needs an intraday adjustment timestamp and M1's breach comparison changes shape. **Data-model blast radius.**
+- **V-M2-08**, whether the account's current risk setting or its liquidation events are visible to us. If not, Merit cannot verify the one control the entire intraday risk posture rests on, and [M02 AS-M2-03](plans/M02-rithmic-bridge.md)'s residual is permanent.
+Also newly load bearing: **V-M2-11**, per-fill detail. Without it M7's strongest detector family (fill clustering, news windows, martingale) does not exist, and evidence packs degrade from trade level to day level.
 
 ## Blocked
-- Nothing blocking. The vendor call is deferred by choice; engineering proceeds against the simulator.
+- Nothing. The vendor call is deferred by choice; engineering proceeds against the simulator, which is a v1 requirement rather than a convenience.
 
 ## Next 3 actions
-1. Founder review of Wave 3 batch 1 (M02 through M08), one doc at a time, money paths first (M05, then M02, then M03).
-2. **Fold M1's ten schema deltas (SD-01 to SD-10) into DATA_MODEL as one reviewed migration.** They are approved but not yet folded; DATA_MODEL section 11 carries the pointer so the gap is visible rather than silent. This is a money-path migration and gets its own session under the ADR-003 strict regime.
-3. Wave 3 batch 2: M09 through M19, in dependency order, after batch 1 clears its gate.
+1. Founder review of Wave 3 batch 1, money paths first (M05, M02, M03).
+2. **Fold M1's ten schema deltas (SD-01 to SD-10) into DATA_MODEL as one reviewed migration.** Approved but not yet folded; DATA_MODEL section 11 carries the pointer so the gap is visible rather than silent. Money-path migration, own session, ADR-003 strict regime. **Note:** batch 1 proposed a further 31 module-level deltas (`SD-M2-nn` through `SD-M8-nn`); they should fold in the same pass, not as a second migration.
+3. Wave 3 batch 2: M09 through M19, after batch 1 clears its gate.
