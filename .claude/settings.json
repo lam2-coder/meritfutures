@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git pull --ff-only 2>&1 || echo 'PULL FAILED: resolve divergence with origin before writing anything. Do not commit on top of a stale tree.'"
+          },
+          {
+            "type": "command",
+            "command": "echo '--- docs/STATE.md ---'; cat docs/STATE.md 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git push origin HEAD 2>&1 || echo 'PUSH FAILED: work is committed locally but NOT on origin. This container is ephemeral. Push before the session ends.'"
+          }
+        ]
+      }
+    ]
+  }
+}
