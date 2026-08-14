@@ -62,13 +62,13 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 |---|---|---|---|---|
 | SD-01 | `daily_marks` | add `adjustment_cents` | 0014 | pending |
 | SD-02 | `rule_states` | `payout_anchor_day` and `cadence_anchor_day` replace `last_payout_trading_day` | 0015 | pending |
-| SD-03 | `payout_requests` | add `settled_trading_day`, `effective_trading_day` | 0010 | pending |
+| SD-03 | `payout_requests` | add `settled_trading_day`, `effective_trading_day` | 0010 | **landed** |
 | SD-04 | `rule_states` | add `floor_open_cents` | 0015 | pending |
-| SD-05 | `payout_requests` | ordinal unique becomes partial `where status <> 'failed'` | 0010 | pending |
+| SD-05 | `payout_requests` | ordinal unique becomes partial `where status <> 'failed'` | 0010 | **landed** |
 | SD-06 | `rule_states` | `engine_eligible`; `engine_gates` / `context_gates` split | 0015 | pending |
 | SD-07 | `rule_states` | add `consistency_period_start_day` | 0015 | pending |
 | SD-08 | `rule_states` | add `state_hash` | 0015 | pending |
-| SD-09 | `payout_requests` | partial unique `(account_id) where status in ('approved','frozen')` (predicate per ADR-028) | 0010 | pending |
+| SD-09 | `payout_requests` | partial unique `(account_id) where status in ('approved','frozen')` (predicate per ADR-028) | 0010 | **landed** |
 | SD-10 | `plan_version_sizes` | conditional not-null on the two `floor_lock_*` columns | 0004 | **landed** |
 
 ## 3. Batch 1: M02 to M08, 37 deltas
@@ -90,23 +90,23 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M4-01 | new `certificates` | the row behind a verifiable share card | 0020 | pending |
 | SD-M4-02 | `purchases` | add `rule_diff_acknowledged_at` | 0006 | **landed** |
 | SD-M4-03 | `sessions` | add `created_ip`, `created_user_agent`, `last_seen_at`, `last_seen_ip` | 0002 | **landed** |
-| SD-M5-01 | `payout_requests` | add `frozen_at`, `freeze_flag_id`, `freeze_expires_at` | 0010 | pending |
-| SD-M5-02 | `payout_transfers` | add `name_match_score`, `name_match_method`, `name_match_reviewed_by` | 0010 | pending |
+| SD-M5-01 | `payout_requests` | add `frozen_at`, `freeze_flag_id`, `freeze_expires_at` | 0010 | **landed** |
+| SD-M5-02 | `payout_transfers` | add `name_match_score`, `name_match_method`, `name_match_reviewed_by` | 0010 | **landed** |
 | SD-M5-03 | new `treasury_balances` | the RCR's anchor | 0009 | **landed** |
-| SD-M5-04 | `payout_requests` | add `balance_reflection_status`, `reflected_on_trading_day` | 0010 | pending |
+| SD-M5-04 | `payout_requests` | add `balance_reflection_status`, `reflected_on_trading_day` | 0010 | **landed** |
 | SD-M5-05 | `ledger_transactions` | add `reversal_of` | 0009 | **landed** |
 | SD-M5-06 | new `wallet_withdrawals` | the external leg as its own object | 0011 | pending |
 | SD-M5-07 | `ledger_accounts` | **add** the `trader_wallet` class (ADR-027) | 0009 | **landed** |
 | SD-M6-01 | `liability_snapshots` | identity max, absorbed corrections, bounded open liability | 0009 | **landed** |
 | SD-M6-02 | new `plan_breaker_state` | breaker with a recorded sample size | 0016 | pending |
 | SD-M6-03 | new `alarm_suppressions` | mandatory expiry on every suppression | 0016 | pending |
-| SD-M6-04 | `evidence_packs` | add `audience`, `redaction_profile`, `includes_detector_detail` | 0008 | pending |
+| SD-M6-04 | `evidence_packs` | add `audience`, `redaction_profile`, `includes_detector_detail` | 0008 | **landed** |
 | SD-M6-05 | new `dual_control_approvals` | ADR-010's second approval as a row | 0016 | pending |
-| SD-M7-01 | `detector_runs` | add `synthetic_expected`, `synthetic_found`; `degraded` status | 0008 | pending |
-| SD-M7-02 | `risk_flags` | add `sla_due_at`, `first_touched_at` | 0008 | pending |
-| SD-M7-03 | new `detector_definitions` | versioned parameters with an effective date | 0008 | pending |
+| SD-M7-01 | `detector_runs` | add `synthetic_expected`, `synthetic_found`; `degraded` status | 0008 | **landed** |
+| SD-M7-02 | `risk_flags` | add `sla_due_at`, `first_touched_at` | 0008 | **landed** |
+| SD-M7-03 | new `detector_definitions` | versioned parameters with an effective date | 0008 | **landed** |
 | SD-M7-04 | `identity_links` | add `disputed_at`, `dispute_note`, `suppressed`, `suppressed_by` | 0002 | **landed** |
-| SD-M7-05 | new `correlation_groups` | group-level correlation results | 0008 | pending |
+| SD-M7-05 | new `correlation_groups` | group-level correlation results | 0008 | **landed** |
 | SD-M8-01 | `affiliate_commissions` | add `chargeback_window_ends_on`, `clawback_of`, `paid_in_statement_id` | 0012 | pending |
 | SD-M8-02 | `affiliate_clicks` | add `referrer_host`, `landing_is_direct`, `click_fingerprint`, `suspicious_reason` | 0005 | **landed** |
 | SD-M8-03 | new `affiliate_creatives` | what was approved, not merely that something was | 0005 | **landed** |
