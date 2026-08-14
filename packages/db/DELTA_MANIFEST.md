@@ -120,9 +120,9 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M9-01 | `plan_versions` | add `public_slug`, `public_visible` | 0004 | **landed** |
 | SD-M9-02 | new `content_documents` | versioned content with a checksum | 0020 | pending |
 | SD-M9-03 | new `page_revalidations` | revalidation as part of publish's definition of done | 0020 | pending |
-| SD-M10-01 | new `integration_contracts` | per-vendor field allowlist as a row | 0018 | pending |
-| SD-M10-02 | new `integration_dispatches` | what was sent, to whom, about whom | 0018 | pending |
-| SD-M10-03 | new `support_context_views` | privileged support reads, audited | 0018 | pending |
+| SD-M10-01 | new `integration_contracts` | per-vendor field allowlist as a row | 0018 | **landed** |
+| SD-M10-02 | new `integration_dispatches` | what was sent, to whom, about whom | 0018 | **landed** |
+| SD-M10-03 | new `support_context_views` | privileged support reads, audited | 0018 | **landed** |
 | SD-M10-04 | `identities` | add `support_contact_ref` | 0002 | **landed** |
 | SD-M11-01 | `certificates` | add `signing_key_id`, `code`, `claims_schema_version` | 0020 | pending |
 | SD-M11-02 | `certificates` | add `revocation_class` | 0020 | pending |
