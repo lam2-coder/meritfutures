@@ -17,10 +17,10 @@ Wave 1 gate: founder review of all seven research/ docs; contradictions with the
 ## Done
 - Constitution committed at repo root.
 - Full folder skeleton per section 0.5 with tracking docs and lean CLAUDE.md.
-- Wave 1 docs 1-3/7: PROP_TECH_LANDSCAPE, TOP10_FIRMS, ADVERSARY_DOSSIER (status: review).
+- Wave 1 docs 1-4/7: PROP_TECH_LANDSCAPE, TOP10_FIRMS, ADVERSARY_DOSSIER, DATA_CAPABILITIES (status: review). ADR-002 (Rithmic ingest path) proposed.
 
 ## In flight
-- Wave 1 docs 4-7 (DATA_CAPABILITIES, SECURITY_LANDSCAPE, VIBE_FAILURE_POSTMORTEMS, CLAUDE_CODE_PLAYBOOK).
+- Wave 1 docs 5-7 (SECURITY_LANDSCAPE, VIBE_FAILURE_POSTMORTEMS, CLAUDE_CODE_PLAYBOOK).
 
 ## Blocked
 - Nothing.
