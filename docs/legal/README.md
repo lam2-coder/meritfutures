@@ -1,11 +1,63 @@
 ---
 status: draft
-depends_on: []
-last_updated: 2026-08-13
+depends_on: [../DECISIONS.md, ../plans/M07-risk-abuse.md, ../plans/M05-payout-system.md, ../plans/M08-affiliate-system.md]
+last_updated: 2026-08-14
 ---
 
 # Legal Docs Index
 
-ToS, Privacy, Risk Disclosure drafts, sim-language copy blocks, restricted-jurisdiction list.
+ToS, Privacy, Risk Disclosure drafts, sim-language copy blocks, restricted-jurisdiction list. **Content is generated in Wave 4** (source spec: constitution sections 6 and 9).
 
-Placeholder created at skeleton stage (MERIT_BUILD_MASTER_PROMPT.md, section 0.5). Content is generated in Wave 4. Source spec: section 6 / section 9 (M9).
+What follows are **drafting notes**: rulings already taken that the Wave 4 drafts must implement, and the counsel-review items those rulings created. They are recorded here as they are decided rather than collected at the end, because a clause that is remembered at drafting time is a clause that gets drafted, and one that is not is an enforcement Merit cannot cite.
+
+## 1. The copy-trading clause (ruled 2026-08-14)
+
+From the Wave 3 batch 1 gate ([DECISIONS](../DECISIONS.md), [M07](../plans/M07-risk-abuse.md) section 3.4). The ToS must state all four rows, enumerated rather than gestured at:
+
+| Conduct | Status |
+|---|---|
+| Copy trading between accounts of the **same verified identity** | **Allowed** |
+| Copy trading **across identities** | **Prohibited** |
+| **Third-party signal or copy-trading services** | **Prohibited** |
+| **Account management**, meaning one person trading an account belonging to another | **Prohibited** |
+
+**Why the enumeration matters more than the policy.** [M07 AS-M7-07](../plans/M07-risk-abuse.md) establishes that enforcement must rest on **behavior described in the ToS**, never on a detector threshold, because citing a threshold both invites an argument about the number and publishes it. "Coordinated trading" is not a standard anyone can comply with; the four rows above are. The clause is what makes cross-identity copy a violation in its own right rather than evidence toward one, and that is the difference between a defensible enforcement and a public argument Merit loses while being right.
+
+**Drafting note.** The third-party-services and account-management rows are not decoration. Without them a ring routes its coordination through a nominally independent signal service and satisfies the letter of a same-identity rule.
+
+## 2. The Merit Wallet (ADR-019, ruled 2026-08-14)
+
+**A counsel-review item, flagged as such rather than assumed settled.** The wallet holds trader money on Merit's books, and the distance between "a payable balance" and "a regulated deposit-taking activity" is a question for a lawyer in the relevant jurisdictions, not for this corpus.
+
+**The framing the product is built to, which the drafts must match:**
+
+- **Payable balance.** The wallet records money Merit **already owes** the trader, held pending their instruction to withdraw or spend it. It is not an account, not a deposit, and not a custody arrangement.
+- **No interest.** Balances earn nothing, and the product carries no mechanism by which they could.
+- **No peer-to-peer transfer.** A balance cannot move between identities. There is no code path, which is the strongest form of the clause ([M05](../plans/M05-payout-system.md) INV-M5-14).
+- **Two exits only:** spend on Merit products, or withdraw to a verified destination in the trader's own name, subject to KYC, the 48 hour destination-cooling window, a $100 minimum, and 2 to 3 business days.
+- **No withdrawal fee.**
+
+**The specific questions for counsel**, so the review has an agenda rather than a document:
+1. Does holding trader balances in these terms constitute regulated money transmission or deposit-taking in the jurisdictions Merit serves, and does the answer change with balance size or holding period?
+2. Do the balances need to be segregated, and if so, does that interact with the payout wallet's funding rhythm ([ADR-011](../DECISIONS.md))?
+3. What must be disclosed at the point a trader first receives a wallet credit, as distinct from what lives in the ToS?
+4. What happens to a wallet balance on account closure, on enforcement, and on an unresponsive trader after a long period?
+
+## 3. The gamification bright line (ADR-019a)
+
+Not itself a legal document, and it belongs in the drafting notes because it constrains what any future offer or loyalty copy may say:
+
+**Purchased is always known contents. Randomized is earned only, and only with disclosed odds. No purchased loot boxes, ever.**
+
+The rationale is on the record in [DECISIONS](../DECISIONS.md) and has a compliance half worth repeating here: Merit sells simulated-trading evaluations in a market whose regulatory characterization is already contested, and a paid random-outcome mechanic invites the reading the firm can least afford, which is that the product is a wager rather than an evaluation.
+
+## 4. Already-recorded obligations the Wave 4 drafts inherit
+
+| Obligation | Source |
+|---|---|
+| Affiliate ToS with **enumerated prohibited-claim classes** (guarantees, fabricated results, omitted simulated-environment disclosure, implied partnership with Merit), plus the graduated enforcement ladder and the treatment of unpaid commission on termination | [M08](../plans/M08-affiliate-system.md) AS-M8-04, OQ-M8-04, DEP-M8-04, NFA I-26-12 |
+| Simulated-environment disclosure in the footer, at checkout entry, on certificates, and on the funded dashboard | [M04](../plans/M04-trader-portal.md) INV-M4-09, constitution section 6 |
+| ToS acceptance recorded per version with IP and timestamp, as the first artifact any enforcement dispute asks for | [M03](../plans/M03-billing-checkout.md) INV-M3-09 |
+| The freeze contract: a cited open flag, a ToS clause, a written reason, and a **published expiry** | [M05](../plans/M05-payout-system.md) INV-M5-10, AS-M5-04 |
+| Restricted-jurisdiction list | constitution section 10, pending counsel |
+| Coordinated-trading and common-control clauses, still open | [M07](../plans/M07-risk-abuse.md) DEP-M7-05 |

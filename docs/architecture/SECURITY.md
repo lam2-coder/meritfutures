@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, API_CONTRACT.md, DATA_MODEL.md, ../../research/SECURITY_LANDSCAPE.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # Security Architecture (Constitution Appendix D, instantiated)
@@ -38,6 +38,10 @@ Controls carry stable IDs so plans, tests, and code comments can cite them.
 | C-20 | Alerting on admin login, failed-auth bursts, payout-config changes, role grants, SFTP failures, out-of-hours admin actions | INFRA |
 | C-21 | Server-authoritative pricing, eligibility, and clamping; the client can only ever reduce a payout | checkout, payout endpoints |
 | C-22 | OpenAPI and docs endpoints return 404 in production; `/internal/*` only on the admin origin | API |
+| C-23 | **Wallet-spend velocity limits** per identity, with excess delayed rather than refused | wallet-funded checkout ([M03](../plans/M03-billing-checkout.md) section 3.4), §4.7 |
+| C-24 | **Affiliate destination changes carry the same 48 hour cooling as trader destinations** | [ADR-017](../DECISIONS.md), [M08](../plans/M08-affiliate-system.md) INV-M8-11 |
+| C-25 | **Sealed physical backup of the second `owner` credential**, with a documented unseal procedure, a quarterly existence check, and a lost-key rotation runbook | §8, ops calendar |
+| C-26 | **The indicative realtime layer holds no write grant on any authoritative table** and feeds no eligibility, breach, or money decision | [ADR-020](../DECISIONS.md), [M02](../plans/M02-rithmic-bridge.md) INV-M2-14 |
 
 ## 2. Crown jewels and STRIDE
 
@@ -56,6 +60,8 @@ The asset: the ability to cause money to leave Merit.
 | I | Payout history of one trader visible to another | C-03, C-18 |
 | D | Payout endpoint flooded on a promo day | C-07, and the queue absorbs transfer work asynchronously |
 | E | Ops role escalates to change split or cap | C-08, C-10, C-20 |
+| S | **Stolen session spends a wallet balance on evaluations and resets** | C-23, and the containment analysis in §4.7. This is the [ADR-019](../DECISIONS.md) failure mode that stays inside Merit's books |
+| T | **Indicative feed manipulated to move a money decision** | C-26. Structurally impossible rather than defended: the engine has no read path to the live cache |
 
 Additional payout-specific hardening (D4) is detailed in §4.
 
@@ -151,6 +157,27 @@ The [D0 checklist](../../research/SECURITY_LANDSCAPE.md) mapped onto the real en
 4. **Rise credentials** are minimum-scope and IP-pinned, held only by the worker, rotated on the 90 day calendar, and changing them requires dual control plus a delay window.
 5. **Anomaly alerting on admin actions** outside normal hours or geography, specifically freeze, unfreeze, close, and any plan-config change.
 6. **The freeze contract:** a freeze requires at least one cited open flag and a ToS clause. This is enforced by the API, not by discipline, because the pressure to "just hold this one" arrives exactly when the money is largest.
+7. **Affiliate destinations are trader destinations.** Any change to an affiliate payout destination enters the same 48 hour cooling window with re-verification and notification (C-24). [ADR-017](../DECISIONS.md) put every outbound payment on one rail, and a rail with one slow door and one fast door is a rail with one door.
+
+## 4.7 The Merit Wallet: account-takeover blast radius (ADR-019)
+
+The wallet changes the shape of the highest-value attack on a trader account, and the change is genuinely favorable, but only if the two failure modes are controlled separately rather than averaged. **They are asymmetric, and the asymmetry is the design.**
+
+| | External theft (wallet to a bank destination) | Internal spend (wallet to evaluations and resets) |
+|---|---|---|
+| What the attacker must beat | KYC verification, the 48 hour destination-cooling window (C-11), name matching (C-12), and a settlement the victim is notified about | A valid session, and nothing else |
+| Speed | Slow by construction. Nothing settles today | Instant |
+| Where the money goes | Out of Merit, irrecoverably | **Nowhere.** It stays on Merit's books as revenue against a purchase |
+| Recovery | Ordinary fraud recovery, which usually means none | **Compensating ledger entries** with `reversal_of` set. Fully reversible |
+| Primary control | Destination cooling. Unchanged from the pre-wallet design | **C-23, wallet-spend velocity limits** |
+
+**The honest reading, which is the reason this is a net improvement.** Before the wallet, an attacker with a valid session raced a payout to an external destination and the only control was the cooling window. After the wallet, the same attacker's *fast* path leads to a contained, reversible loss, and the path that leaves Merit is still slow. **The wallet is a better place for a compromised balance to sit than a bank destination**, because the attacker's easiest move is the one Merit can undo.
+
+**Three rules follow and none of them is optional.**
+
+1. **Velocity limits are set for containment, not for prevention** (C-23, [M05](../plans/M05-payout-system.md) OQ-M5-06). The blast radius is bounded and reversible, so a tight limit buys little and costs a legitimate trader the reset they wanted at the moment they wanted it. Excess is **delayed and alerted**, not refused.
+2. **Reversal is a documented runbook, not an improvisation.** A wallet drained by an attacker is refunded by compensating entries against the specific purchases, with the account reinstated. This must exist before launch, because the first time it is needed the victim is already angry and the procedure being obvious in principle will not help.
+3. **A wallet balance is never a substitute for the destination controls.** It would be tempting, given the containment above, to relax cooling on the reasoning that the wallet absorbs the risk. It does not: the wallet absorbs the *internal* risk. The external leg is where money actually leaves, and it keeps every control it had.
 
 ## 5. Data protection and privacy
 
@@ -187,11 +214,24 @@ The ten D0 scenarios are specified in [research/SECURITY_LANDSCAPE.md §4](../..
 1. **Cross-firm collusion is invisible to us** (adversary scheme 2). No control here detects a hedge whose other leg sits at another firm. The answer is bounding (caps, ladder, reserve), not detection, until a shared-vendor network is worth buying.
 2. **Device and payment fingerprints are signals, never proof.** Every enforcement path requires human judgment plus an evidence pack, and no detector enforces on its own.
 3. **T+1 visibility** means our own view of an account lags live trading by one batch cycle. Rithmic's auto-liquidator, not Merit, is the intraday control.
-4. **A solo operator is a single point of failure** for admin access and dual control. The second `owner` credential (a separately stored hardware key) is the mitigation, and it is a real operational burden the founder is choosing on purpose.
+4. **A solo operator is a single point of failure** for admin access and dual control. The second `owner` credential (a separately stored hardware key) is the mitigation, and it is a real operational burden the founder is choosing on purpose. **The availability half of this is now addressed by the break-glass procedure in §8.1**, which does not remove the limitation and does stop it from becoming an outage.
 5. **Dual control at launch scale is compromise resistance, not insider resistance.** Both `owner` credentials are held by the same person ([ADR-010](../DECISIONS.md)). What C-10 actually buys today is that one phished session or one owned laptop cannot move the cap, the split, the gap, or the payout rail alone. It is not separation of duties and must never be described as such in an audit, a policy document, or a customer conversation. It becomes separation of duties on the first operations hire, with no code change.
+
+### 8.1 Break-glass for the second `owner` credential (ruled 2026-08-14)
+
+[ADR-010](../DECISIONS.md) puts both dual-control credentials in one person's hands, honestly documented as compromise resistance rather than separation of duties. That leaves an **availability** gap rather than a security one: if the founder loses both keys, or is unreachable during an incident, no sensitive change can be made at all, and the sensitive set includes the payout rail's credentials.
+
+Ruled at the Wave 3 batch 1 gate ([M06 OQ-M6-03](../plans/M06-admin-ops-console.md)), in four parts. All four are required before launch, and the fourth exists because the first three describe a control that is only real if it is exercised.
+
+1. **A sealed physical backup of the second key**, stored separately from both working keys, in a container whose tampering is evident rather than merely unlikely.
+2. **A documented unseal procedure**, written now rather than during the incident it exists for. It states who may unseal, what is recorded, and what must be rotated afterwards, because an unsealed credential is a credential whose custody chain has ended.
+3. **A quarterly existence check**, on the same ops calendar as the restore drill (§7) and the key rotation drill. It verifies the seal is intact and the credential is where the procedure says it is. **An untested break-glass is the same as none**, and the moment you discover that is the incident.
+4. **A lost-key rotation runbook**, covering the case where a working key is lost and the sealed backup is promoted to being a working credential. This is the case the first three parts do not cover on their own: promoting the backup leaves the firm with two working keys and no backup, and the runbook's job is to say so and to require a new seal.
+
+**What this weakens, stated plainly, because every break-glass weakens something.** A sealed offline credential is a third copy of a credential whose whole security argument is that there are only two. The exposure is physical rather than remote, the unseal is evident rather than silent, and the alternative was accepting an indefinite outage on the firm's most sensitive controls. That trade is the right one at this scale and it is a trade, not a free improvement.
 
 ## 9. Founder rulings (Wave 2 gate, 2026-08-13) and remaining questions
 
-1. **Second `owner` credential for dual control: CONFIRMED.** Two hardware keys, held by the founder in separate physical locations, before launch. The launch-scale limitation is recorded above as limitation 5 and in [ADR-010](../DECISIONS.md).
+1. **Second `owner` credential for dual control: CONFIRMED.** Two hardware keys, held by the founder in separate physical locations, before launch. The launch-scale limitation is recorded above as limitation 5 and in [ADR-010](../DECISIONS.md). **Extended at the Wave 3 batch 1 gate with the break-glass procedure in §8.1**, which closes the availability gap that two founder-held keys leave open.
 2. **Admin IP allowlist practicality:** confirm you operate from stable addresses, or accept a VPN or bastion as the allowlisted origin. **Still open**, and it now interacts with [ADR-012](../DECISIONS.md): the allowlist protects `ADMIN_ORIGIN`, a separate apex domain rather than a Merit subdomain.
 3. **WAF vendor:** Cloudflare, **confirmed** with [ADR-007](../DECISIONS.md).

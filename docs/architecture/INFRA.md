@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, OVERVIEW.md, SECURITY.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/CLAUDE_CODE_PLAYBOOK.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # Infrastructure (Constitution §2, D3, Appendix E doctrine)
@@ -159,17 +159,44 @@ Bill creep is the quiet vibe-infra tax, and in Merit's case the platform charges
 
 ## 10. Claude Code hook set (C10, with the playbook refinement)
 
-Configured in `.claude/settings.json`. Hooks are deterministic; CLAUDE.md is advisory. Anything that must always happen is here.
+Configured in `.claude/settings.json`, **which now exists and is committed to the repository** ([ADR-D1](../DECISIONS.md)). Hooks are deterministic; CLAUDE.md is advisory. Anything that must always happen is here.
+
+**The file currently carries the corpus-phase set only.** `SessionStart` (pull, then echo STATE) and `Stop` (push) are live today, because they are the two that matter while the deliverables are documents. The rest of the table below lands at FREEZE, when there is a test command to run and a `payout/` path to guard. Wiring `PostToolUse` to a test command that does not exist yet would be a hook that fails on every edit, and a hook everyone learns to ignore is worse than one that is not there.
 
 | Hook | Action | Notes |
 |---|---|---|
-| `SessionStart` | Echo `docs/STATE.md` and the last `SESSION_LOG` entry | The start ritual, automated |
-| `PreToolUse` | Block dangerous shell patterns (`rm -rf`, production connection strings, force-push) and any write into `payout/` or `ledger/` paths without the confirm flag | The Replit lesson, enforced |
-| `PostToolUse` | Run the module's test command after every file edit | Highest-value hook in community consensus |
-| `Stop` | Completion gate: lint, typecheck, tests must pass before the turn can end | Deterministic definition of done |
+| `SessionStart` | **`git pull --ff-only`** ([ADR-D1](../DECISIONS.md)), then echo `docs/STATE.md` and the last `SESSION_LOG` entry | **Live.** The start ritual, automated. A session never begins on a stale tree |
+| `Stop` | **`git push origin HEAD`** ([ADR-D1](../DECISIONS.md)) | **Live.** A session never ends with unpushed commits. Reports failure and exits zero rather than blocking, so a network outage cannot wedge a session; the softening is recorded in the ADR |
+| `PreToolUse` | *(at FREEZE)* Block dangerous shell patterns (`rm -rf`, production connection strings, force-push) and any write into `payout/` or `ledger/` paths without the confirm flag | The Replit lesson, enforced |
+| `PostToolUse` | *(at FREEZE)* Run the module's test command after every file edit | Highest-value hook in community consensus |
+| `Stop` (extended) | *(at FREEZE)* Completion gate: lint, typecheck, tests must pass before the turn can end, in addition to the push above | Deterministic definition of done |
 | `PreCompact` | Preserve schema and API decisions with rationale, error messages and their fixes, the modified-file list, and the current plan step; summarize exploration | Compact policy also stated in CLAUDE.md |
 
 **Output discipline (from the [playbook](../../research/CLAUDE_CODE_PLAYBOOK.md)):** hooks emit pass or fail plus the first failing line only. Full formatter and test dumps go to `test-results/` and are read on demand. A hook that floods the context defeats the purpose of having one.
+
+## 10.5 Scale targets, and the evolution path
+
+**The architecture above is validated for 50,000 active traders.** That figure is recorded here rather than left implicit, because "will this scale" is a question that otherwise gets answered by anxiety instead of arithmetic, usually at the moment someone is proposing to replace something that works.
+
+| Dimension | At 50,000 active traders |
+|---|---|
+| Fills | roughly **1,000,000 per day** |
+| `fills` rows retained | roughly **250,000,000 per year** |
+| Payout requests | **2,000 to 5,000 per day** |
+| Nightly batch | 50,000 accounts, against the 10 minute budget written for 5,000 |
+
+**Nothing in that table requires a different architecture.** Four changes cover it, and every one of them is a standard operation on the stack [ADR-007](../DECISIONS.md) already chose:
+
+1. **Table partitioning on `fills` and `daily_marks`**, by trading day or by month. These are the two append-only tables whose row counts grow without bound, and partitioning them is a migration plus a retention policy, not a redesign. Everything else in the schema is bounded by account count rather than by fill volume.
+2. **The nightly batch fans out to a parallel worker pool.** The batch is already per-account and per-trading-day inside one transaction each ([M02](../plans/M02-rithmic-bridge.md) ST-M2-5), which means it is embarrassingly parallel by construction. This was a design property from the beginning and it is the reason a ten-times account count is a concurrency setting rather than a rewrite.
+3. **Metabase moves to a read replica.** It already runs as `merit_readonly` (§5); the change is which host that role connects to.
+4. **pg-boss stays.** [ADR-006](../DECISIONS.md) chose it partly on the reasoning that Postgres handles this scale of job volume comfortably, and 5,000 payout requests a day is not close to the point where that stops being true. If it ever is, the job interface is deliberately narrow enough that the swap is contained, which was also part of that ADR's acceptance.
+
+**All four are standard and non-architectural.** None changes a module boundary, a table's meaning, or a rule. They are things you do to a working system, in an afternoon each, when the numbers say to.
+
+**The real constraint at that scale is ops headcount, not infrastructure, and pretending otherwise would be the expensive mistake.** At 50,000 active traders the flags queue, the evidence packs, the KYC exceptions, the destination-cooling reviews, the name-match false positives, the support conversations about a breach, and the daily liability read are all **human** work, and every one of them scales roughly linearly with trader count. [M07](../plans/M07-risk-abuse.md) FM-M7-04 already names the failure mode in miniature: a queue nobody works is documented negligence. At fifty times the volume that stops being a metric and becomes the binding constraint on the whole business.
+
+The consequence for planning: **capacity questions at this scale should be asked about people first and about Postgres second.** The infrastructure evolution above is a known, cheap, written-down path. The operational one is not, and it is the one that needs a plan before the growth arrives rather than during it.
 
 ## 11. Local development
 
