@@ -40,7 +40,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 |---|---|---|---|
 | [OVERVIEW.md](architecture/OVERVIEW.md) | System diagram, module map, end-to-end data flow | review | founder |
 | [DATA_MODEL.md](architecture/DATA_MODEL.md) | Every table, column, type, index, constraint, retention | review | founder |
-| [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors | draft | claude |
+| [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors | review | founder |
 | [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | review | founder |
 | [STATE_MACHINES.md](architecture/STATE_MACHINES.md) | Account / payout / flag / identity lifecycles as Mermaid | review | founder |
 | [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | draft | claude |
