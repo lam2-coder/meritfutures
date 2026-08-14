@@ -95,7 +95,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M5-03 | new `treasury_balances` | the RCR's anchor | 0009 | **landed** |
 | SD-M5-04 | `payout_requests` | add `balance_reflection_status`, `reflected_on_trading_day` | 0010 | **landed** |
 | SD-M5-05 | `ledger_transactions` | add `reversal_of` | 0009 | **landed** |
-| SD-M5-06 | new `wallet_withdrawals` | the external leg as its own object | 0011 | pending |
+| SD-M5-06 | new `wallet_withdrawals` | the external leg as its own object | 0011 | **landed** |
 | SD-M5-07 | `ledger_accounts` | **add** the `trader_wallet` class (ADR-027) | 0009 | **landed** |
 | SD-M6-01 | `liability_snapshots` | identity max, absorbed corrections, bounded open liability | 0009 | **landed** |
 | SD-M6-02 | new `plan_breaker_state` | breaker with a recorded sample size | 0016 | pending |
@@ -107,11 +107,11 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M7-03 | new `detector_definitions` | versioned parameters with an effective date | 0008 | **landed** |
 | SD-M7-04 | `identity_links` | add `disputed_at`, `dispute_note`, `suppressed`, `suppressed_by` | 0002 | **landed** |
 | SD-M7-05 | new `correlation_groups` | group-level correlation results | 0008 | **landed** |
-| SD-M8-01 | `affiliate_commissions` | add `chargeback_window_ends_on`, `clawback_of`, `paid_in_statement_id` | 0012 | pending |
+| SD-M8-01 | `affiliate_commissions` | add `chargeback_window_ends_on`, `clawback_of`, `paid_in_statement_id` | 0012 | **landed** |
 | SD-M8-02 | `affiliate_clicks` | add `referrer_host`, `landing_is_direct`, `click_fingerprint`, `suspicious_reason` | 0005 | **landed** |
 | SD-M8-03 | new `affiliate_creatives` | what was approved, not merely that something was | 0005 | **landed** |
 | SD-M8-04 | `affiliates` | add `balance_cents`, `negative_balance_since` | 0005 | **landed** |
-| SD-M8-05 | `attributions` | add `buyer_identity_id`, `affiliate_identity_id`, `self_deal_link_confidence_bp` | 0012 | pending |
+| SD-M8-05 | `attributions` | add `buyer_identity_id`, `affiliate_identity_id`, `self_deal_link_confidence_bp` | 0012 | **landed** |
 
 ## 4. Batch 2: M09 to M20, 41 deltas
 
@@ -154,10 +154,10 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M19-02 | new `sanctions_screenings` | its own object with a review trail | 0003 | **landed** |
 | SD-M19-03 | new `kyc_funnel_events` | the abandonment is the measurement; widened to record the trigger that fired | 0003 | **landed** |
 | SD-M19-04 | new `dedupe_matches` | authoritative hard link (ADR-029) | 0003 | **landed** |
-| SD-M20-01 | new `wallet_entries` | what kind of money it is | 0011 | pending |
-| SD-M20-02 | new `wallet_spend_limits` | per identity, not global | 0011 | pending |
-| SD-M20-03 | `wallet_withdrawals` | add `source_provenance_summary`, `earliest_credit_at` | 0011 | pending |
-| SD-M20-04 | new `wallet_dormancy` | the obligation is not discovered during an audit | 0011 | pending |
+| SD-M20-01 | new `wallet_entries` | what kind of money it is | 0011 | **landed** |
+| SD-M20-02 | new `wallet_spend_limits` | per identity, not global | 0011 | **landed** |
+| SD-M20-03 | `wallet_withdrawals` | add `source_provenance_summary`, `earliest_credit_at` | 0011 | **landed** |
+| SD-M20-04 | new `wallet_dormancy` | the obligation is not discovered during an audit | 0011 | **landed** |
 
 ## 5. The five unnumbered changes
 
