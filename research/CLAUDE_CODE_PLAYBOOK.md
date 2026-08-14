@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md]
 last_updated: 2026-08-13
 ---
@@ -12,10 +12,10 @@ Current community and Anthropic practice for running Claude Code on a solo+AI mo
 
 ## 1. The one constraint everything reduces to: context is the budget
 
-Community consensus 2026: "Claude Code best practices reduce to one constraint — the context window fills up quickly." The named failure modes are precise and match the constitution's treasury metaphor:
-- **Context poisoning** — a hallucinated result contaminates later turns.
-- **Context confusion** — irrelevant material steers the answer.
-- **Context clash** — two parts of the context contradict each other.
+Community consensus 2026: "Claude Code best practices reduce to one constraint: the context window fills up quickly." The named failure modes are precise and match the constitution's treasury metaphor:
+- **Context poisoning**: a hallucinated result contaminates later turns.
+- **Context confusion**: irrelevant material steers the answer.
+- **Context clash**: two parts of the context contradict each other.
 Every iteration appends to the window; as history grows, the model degrades. ([HighLearningRate](https://highlearningrate.substack.com/p/agents-fail-between-model-calls-2026), [SmartScope advanced practices](https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/))
 
 **Merit alignment:** C4 already treats context as scarce. The playbook additions below are tactics, not a new doctrine.
@@ -27,13 +27,13 @@ Community now states the exact division the constitution's C10 adopted: **hooks/
 - **Hooks are law.** "Without hooks, every safeguard depends on the model understanding your instructions; with hooks you enforce at the system level." Merit's mandatory hook set (C10) stands: PostToolUse test-run, PreToolUse dangerous-pattern + payout/ledger write block, Stop completion gate (lint+typecheck+test), PreCompact preservation, SessionStart STATE echo.
   - **New caveat (adopt):** auto-format/heavy hooks can burn large context (one report: 160k tokens across 3 rounds). **Rule for Merit:** hooks must emit terse output (pass/fail + first failing line), never stream full formatter/test dumps into the thread; verbose artifacts go to `test-results/` and are read on demand (matches C4). ([SmartScope](https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/))
 - **Skills for repeated knowledge.** "If you've written the same instructions twice, it should have been a skill." Merit's early skills (C10) confirmed valuable: `migration-procedure`, `golden-file-authoring`, `payout-path-review`, `rithmic-csv-format`, `design-tokens`. Progressive disclosure keeps CLAUDE.md lean.
-- **Subagents for isolation.** "Sub-agents run in a separate context window and can explore or verify without cluttering the main conversation." Use for: research/log-spelunking/dependency audits (return a summary file), and — critically for Merit — the **writer/reviewer split** (C10 self-grading rule): the agent that writes M1 is never the one grading it; the reviewer runs as a fresh subagent with its own system prompt.
+- **Subagents for isolation.** "Sub-agents run in a separate context window and can explore or verify without cluttering the main conversation." Use for: research/log-spelunking/dependency audits (return a summary file), and, critically for Merit, the **writer/reviewer split** (C10 self-grading rule): the agent that writes M1 is never the one grading it; the reviewer runs as a fresh subagent with its own system prompt.
 
 ## 3. Plan mode and spec-first (the highest-ROI habit)
 
 "Planning before implementation is non-negotiable; plan mode before any edit." Spec-driven flows show large implementation-time reductions because the thinking precedes the typing. ([zenn best-practice guide](https://zenn.dev/tmasuyama1114/articles/claude_code_best_practice_202601?locale=en), [Medium 2026 workflows](https://medium.com/data-science-collective/effective-claude-code-workflows-in-2026-what-changed-and-what-works-now-c93ebc6f8f50))
 
-**Merit alignment:** this IS the whole planning-corpus doctrine (§0.5) — plan mode is mandatory for structural work and migrations (C5). The constitution is ahead of community practice here, not behind it. The B5 module-plan template and the "no plan, no place on the roadmap" gate are the strongest version of this habit found anywhere in the research.
+**Merit alignment:** this IS the whole planning-corpus doctrine (§0.5). Plan mode is mandatory for structural work and migrations (C5). The constitution is ahead of community practice here, not behind it. The B5 module-plan template and the "no plan, no place on the roadmap" gate are the strongest version of this habit found anywhere in the research.
 
 ## 4. CLAUDE.md discipline (with a research-backed warning)
 
@@ -60,7 +60,7 @@ Documented 2026 failure catalog and the Merit control each implies:
 
 **C0 gate: where community practice contradicts the constitution, propose an amendment, don't silently adopt.** Two genuine tensions surfaced; both are proposed as amendments (not yet acted on):
 
-1. **Session length: compound vs reset.** A visible 2026 community strand argues "keep sessions longer, let context compound across tasks, reset only when you change projects" — enabled by 1M-token windows + compaction. The constitution's C4/C3 says the opposite: `/clear` between unrelated tasks, one objective per session, start fresh per module slice. **Assessment:** the constitution is right *for Merit's money paths* (context poisoning on a payout/ledger diff is catastrophic; the file-based handoff standard makes resets cheap), but the "compound" approach may be fine for low-stakes UI/doc work. **Proposed ADR-003 (below): keep per-slice resets on money paths; permit longer compounding sessions only for non-money work (site/docs/fixtures), explicitly.** Not adopted pending founder approval.
+1. **Session length: compound vs reset.** A visible 2026 community strand argues "keep sessions longer, let context compound across tasks, reset only when you change projects", enabled by 1M-token windows + compaction. The constitution's C4/C3 says the opposite: `/clear` between unrelated tasks, one objective per session, start fresh per module slice. **Assessment:** the constitution is right *for Merit's money paths* (context poisoning on a payout/ledger diff is catastrophic; the file-based handoff standard makes resets cheap), but the "compound" approach may be fine for low-stakes UI/doc work. **Proposed ADR-003 (below): keep per-slice resets on money paths; permit longer compounding sessions only for non-money work (site/docs/fixtures), explicitly.** Not adopted pending founder approval.
 
 2. **Playbook file location.** §0.5 skeleton (`research/`) vs Appendix C0 text (`docs/`). Standing landmine since Session 1. **Proposed: leave in `research/` (all Phase-0 research lives together; C1 says research outputs land in `research/`), and treat the C0 `docs/` reference as superseded.** A one-line fix either way; founder picks. Logged as ADR-004 candidate.
 
@@ -75,10 +75,10 @@ Everything else in current practice **agrees with or is already exceeded by** th
 **Money paths:** tests-first from spec-derived golden files; writer ≠ reviewer (reviewer is a fresh subagent); founder reads every diff line-by-line on rules-engine/payout/ledger/auth; the comprehension rule is non-negotiable.
 **On errors:** two failed corrections on one bug → stop, write a precise repro, fresh session.
 **End (before context runs out):** commit clean (conventional message referencing the doc/section); append SESSION_LOG (done/next/blockers/landmines/files); update STATE.md; regenerate INDEX if any doc changed status.
-**Weekly:** C8 meta-retro on objective signals only (plan items shipped, golden tests added/passing, CI history, EDGE_CASES closed) — never "it felt productive" (the 19%-slower-but-felt-20%-faster RCT).
+**Weekly:** C8 meta-retro on objective signals only (plan items shipped, golden tests added/passing, CI history, EDGE_CASES closed), never "it felt productive" (the 19%-slower-but-felt-20%-faster RCT).
 
 ## Contradictions / notes summary
 
 - **Two proposed amendments** (session-length policy; playbook file location) carried to DECISIONS.md as ADR-003 and ADR-004 candidates. Neither acted on; both await the founder.
 - **No hard blockers.** Current practice validates the constitution's operating model; the only real divergences (worktree cap, session resets) are places where the constitution is *deliberately stricter* for money-code safety, and Merit should keep the stricter rule.
-- **One adopted refinement** (no amendment needed, it is additive): hooks must emit terse output and route verbose artifacts to `test-results/`, to protect the context budget — fold into INFRA.md's hook specs in Wave 2.
+- **One adopted refinement** (no amendment needed, it is additive): hooks must emit terse output and route verbose artifacts to `test-results/`, to protect the context budget. Fold into INFRA.md's hook specs in Wave 2.

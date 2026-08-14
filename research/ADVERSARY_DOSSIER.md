@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, TOP10_FIRMS.md]
 last_updated: 2026-08-13
 ---
@@ -18,7 +18,7 @@ The 9-scheme taxonomy from Appendix A, populated with current intel (researched 
 
 **Economics on Merit rules (recomputed, still holds).** Pair cost 2× eval fee; funded-side prize bounded by cap × split ($1,500 × 90% = $1,350/request); consistency + 5 win days + cadence gap force multi-day grinding, ceiling ~$190/day. Not riskless, not fast. On uncapped/daily competitors the same play yields $270+/day repeatable.
 
-**Detection signal (M7).** Rolling correlation of daily P&L between account pairs < −0.8 (the constitution's threshold, confirmed as the industry-standard signature: "equal and opposite positions, matched lot sizes, synchronized entry timing"); mirrored size/timing on the same instrument; shared entity-graph edges (device/IP/payment) elevate severity but are NOT required — unlinked inverse pairs still flag.
+**Detection signal (M7).** Rolling correlation of daily P&L between account pairs < −0.8 (the constitution's threshold, confirmed as the industry-standard signature: "equal and opposite positions, matched lot sizes, synchronized entry timing"); mirrored size/timing on the same instrument; shared entity-graph edges (device/IP/payment) elevate severity but are NOT required. Unlinked inverse pairs still flag.
 
 **GT-A1 (the ring rehearsal, extends B4 #21).** Six accounts, three hedged pairs, staggered entries ±2s, sizes matched within 10%. Expected: inverse-correlation detector flags all three pairs by day 3; caps clamp cumulative extraction to the computed ceiling; evidence pack contains the correlation series and paired fill timeline.
 
@@ -26,7 +26,7 @@ The 9-scheme taxonomy from Appendix A, populated with current intel (researched 
 
 **Current mechanics.** Long at Merit, short at Apex; invisible to any single firm's data. Now a fee-based membership industry: coordinated groups sell entry, split proceeds, and use the publicity-pressure play on detection. ([Finance Magnates](https://www.financemagnates.com/forex/coordinated-groups-are-exploiting-prop-trading-models-with-arbitrage/))
 
-**Detection signal.** Single-firm data cannot see the other leg. Proxies: accounts that trade only around high-conviction directional moments with abnormal win-rate-vs-hold-time profiles; entity-graph links to known scheme 1 flags; geography/device overlap with other flagged cohorts. True detection needs a shared-vendor network (QuantSentry-class bad-actor DB claims 10,000+ verified threat profiles — the bolt-on argument; [RiskGuard](https://axcera.io/solutions/risk-guard), [QuantSentry review](https://alexfirdaus.com/quantsentry-review/)).
+**Detection signal.** Single-firm data cannot see the other leg. Proxies: accounts that trade only around high-conviction directional moments with abnormal win-rate-vs-hold-time profiles; entity-graph links to known scheme 1 flags; geography/device overlap with other flagged cohorts. True detection needs a shared-vendor network (QuantSentry-class bad-actor DB claims 10,000+ verified threat profiles, the bolt-on argument; [RiskGuard](https://axcera.io/solutions/risk-guard), [QuantSentry review](https://alexfirdaus.com/quantsentry-review/)).
 
 **Posture: accept, bound, budget.** Caps bound per-account damage; the 8-payout ladder bounds lifetime damage; the reserve prices the leak-through. No detector spec v1 beyond the proxies above.
 
@@ -76,7 +76,7 @@ The 9-scheme taxonomy from Appendix A, populated with current intel (researched 
 
 **Current mechanics.** Sim-feed latency/stale-quote arb remains the documented firm-killer (80-100 firm closures 2023-2026 attributed largely to automated extraction from simulator pricing); commercial HFT-arb software now ships "masking layers" (lot randomization, hold-time extension, manual-simulation) explicitly to evade detection; news-straddle brackets and martingale eval brute-forcing remain standard. ([Quantt](https://www.quantt.co.uk/resources/latency-arbitrage-explained), [BJF "arbitrage masking" marketing](https://bjftradinggroup.com/arbitrage-masking-2026-intelligent-flow-camouflage-ai-detection/), [brokeret legal framing](https://brokeret.com/blog/latency-arbitrage-illegal-legal-vs-contract-platform-rules))
 
-**Merit exposure assessment.** Lower than CFD peers: Rithmic routes to real CME-matched sim (no house-made price feed to arb), and EOD rule computation removes intraday rule-race exploits. Residual: news-window straddles (allowed at competitors like Lucid — a marketing tension to resolve in plan copy), martingale brute-forcing across cheap resets, and platform bug abuse.
+**Merit exposure assessment.** Lower than CFD peers: Rithmic routes to real CME-matched sim (no house-made price feed to arb), and EOD rule computation removes intraday rule-race exploits. Residual: news-window straddles (allowed at competitors like Lucid, a marketing tension to resolve in plan copy), martingale brute-forcing across cheap resets, and platform bug abuse.
 
 **Detection signal.** Maintained Tier-1 economic calendar as data; entries within ±N sec of calendar events flagged as pattern (never single events); size-after-loss regression for martingale at strategy level; reset-velocity per entity (brute-force signature: many cheap resets, each with all-in risk profile); fill-vs-quote sanity in recon (stale-fill detection deferred to M2 reconciliation).
 
@@ -106,5 +106,5 @@ CFTC's My Forex Funds case was dismissed with prejudice in May 2025 with sanctio
 ## Contradictions / notes
 
 - **No constitution contradictions.** All 9 schemes confirmed live; thresholds (−0.8 correlation, ±2s clustering, 0.65% chargeback ratio) match current industry practice.
-- **New intel the constitution lacks (additive, no amendment needed):** (a) the publicity-pressure extortion pattern post-detection — evidence packs are therefore a launch requirement, not a nice-to-have; (b) commercial "arbitrage masking" tooling means naive single-signal detectors are already countered — M7's multi-signal scoring design is correct; (c) affiliate-coordinated chargeback fraud is a named industry pattern — M8 must track per-affiliate chargeback rate from day one (small M8 spec addition, flagged for the Wave 3 plan doc).
+- **New intel the constitution lacks (additive, no amendment needed):** (a) the publicity-pressure extortion pattern post-detection, so evidence packs are a launch requirement, not a nice-to-have; (b) commercial "arbitrage masking" tooling means naive single-signal detectors are already countered, so M7's multi-signal scoring design is correct; (c) affiliate-coordinated chargeback fraud is a named industry pattern, so M8 must track per-affiliate chargeback rate from day one (small M8 spec addition, flagged for the Wave 3 plan doc).
 - **Rule-design tension for the founder (carried to plans):** several top firms allow news trading as a marketing feature (Lucid: "no blackout windows"); Merit's news-straddle detector flags patterns, not events, which is compatible with allowing news trading in copy. The plan-doc copy for M9 must say precisely what is allowed so scheme 5 finds no daylight.

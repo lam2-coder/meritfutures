@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md]
 last_updated: 2026-08-13
 ---
@@ -103,7 +103,7 @@ Legend: ● full, ◐ partial/add-on, ○ absent/unknown. "Merit v1" column = wh
 | Marketing CMS / program catalog | ● | ◐ | ◐ | ○ | ◐ | ◐ | ◐ | ○ | B static (M9) |
 | Futures platform breadth (Rithmic et al.) | ◐ | ◐ | ◐ (Rithmic yes) | ● (own platform) | ● (own platform) | ● (widest) | ◐ | ◐ | Rithmic-native only |
 | Trading contest engine | ◐ | ○ | ● | ○ | ◐ | ○ | ◐ | ○ | LATER |
-| Public transparency/stats page | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | B (M12) — nobody ships this |
+| Public transparency/stats page | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | B (M12), nobody ships this |
 
 Two cells matter most: **no vendor ships a public transparency platform** (M12 is open field), and **no vendor defaults to fully automatic payout approval** (Merit's zero-denial pipeline is structurally differentiated, not just faster).
 

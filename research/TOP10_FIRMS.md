@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, PROP_TECH_LANDSCAPE.md]
 last_updated: 2026-08-13
 ---
@@ -49,7 +49,7 @@ Deep profiles of the ten biggest futures props as of 2026-08-13, plus the table-
 ### 5. Lucid Trading
 
 - **Rules:** three families: LucidPro (structured eval, EOD DD, funded consistency), LucidFlex (eval, then funded with no daily loss limit, no funded consistency), LucidDirect (instant funded, 20% consistency, strong caps). 100% of first $10K, then 90/10. Live graduation restructured Feb 2026 alongside **LucidMaxx Daily Payout Account** (premium daily-payout product); live bonus $1,000-4,500 on reaching live target. News trading allowed, no blackout windows. ([damnpropfirms rules](https://damnpropfirms.com/prop-firms/lucid-trading-rules-payouts/), [MondoTraders](https://mondotraders.com/en/blog/lucid-trading-verified-payouts-2026), [directionsmag](https://www.directionsmag.com/reviews/prop-trading-firms/lucid-trading))
-- **Tech:** Rithmic, Tradovate, NinjaTrader connections. **Dropped ProjectX ("LucidX") after reliability concerns and a major infrastructure outage** — a live case of platform-vendor risk. Payouts via Rise (USDC/USDT); markets minutes-fast settlement. ([pipback](https://pipback.com/blogs/lucid-trading-review/))
+- **Tech:** Rithmic, Tradovate, NinjaTrader connections. **Dropped ProjectX ("LucidX") after reliability concerns and a major infrastructure outage**, a live case of platform-vendor risk. Payouts via Rise (USDC/USDT); markets minutes-fast settlement. ([pipback](https://pipback.com/blogs/lucid-trading-review/))
 - **Signal:** $463M verified payouts / 281K withdrawals claimed; PropScore 83 (tied #1); community sentiment ranks it top for payout reliability and value ([MondoTraders](https://mondotraders.com/en/blog/lucid-trading-verified-payouts-2026), [X ranking post](https://x.com/stocksgeeks/status/2005129358252642586)).
 - **Trust trajectory: rising fast.** The growth firm of 2026 on payout-speed brand.
 
@@ -57,7 +57,7 @@ Deep profiles of the ten biggest futures props as of 2026-08-13, plus the table-
 
 - **Rules (TradeDay 2.0, May 2026):** two routes: **Quick Pay** (5-day eval minimum, choice of intraday or EOD drawdown, 30% eval-only consistency; funded: day-one payout eligibility with any positive balance, $250 minimum, no milestones/buffer/consistency) and **Fast Pass** (3-day pass, 45% eval-only consistency, flat 80/20). Tiered split: 80% to $50K profits, 90% $50-100K, 95% above. Payouts within 24h. ([damnpropfirms](https://damnpropfirms.com/futures-prop-firms/tradeday/), [tradingfinder](https://tradingfinder.com/props/tradeday/))
 - **Tech:** Tradovate, NinjaTrader, TradingView, Jigsaw Daytradr, **all on CQG feed** (notable: a top-10 futures firm running no Rithmic at all). Chicago-based, operating since 2020.
-- **Signal:** 2.0 relaunch was the year's cleanest rebrand; **publicly discloses evaluation pass rate (36%, Jan-Jun 2026)** — the only top-10 firm doing voluntary stats disclosure, directly validating Merit's M12 transparency bet. ([damnpropfirms](https://damnpropfirms.com/futures-prop-firms/tradeday/))
+- **Signal:** 2.0 relaunch was the year's cleanest rebrand; **publicly discloses evaluation pass rate (36%, Jan-Jun 2026)**, the only top-10 firm doing voluntary stats disclosure, directly validating Merit's M12 transparency bet. ([damnpropfirms](https://damnpropfirms.com/futures-prop-firms/tradeday/))
 - **Trust trajectory: stable-good.** 4.6 Trustpilot, 1,300+ reviews, $10M+ verified payouts.
 
 ### 7. FundedNext Futures
@@ -76,7 +76,7 @@ Deep profiles of the ten biggest futures props as of 2026-08-13, plus the table-
 
 ### 9. FundedFuturesFamily
 
-- **Rules:** 100% of first $10K lifetime then 90/10; **escalating funded consistency: 40% (payouts 1-3), 45% (4-5), 50% (6+)** — the inverse of a progressive unlock, tightening as traders extract; 3-7 qualifying days at $200+ profit; 24-hour Rise processing. Sizes $25K-150K, $79-325 pricing. ([PropScorer profile](https://www.propscorer.com/firms/funded-futures-family))
+- **Rules:** 100% of first $10K lifetime then 90/10; **escalating funded consistency: 40% (payouts 1-3), 45% (4-5), 50% (6+)**, the inverse of a progressive unlock, tightening as traders extract; 3-7 qualifying days at $200+ profit; 24-hour Rise processing. Sizes $25K-150K, $79-325 pricing. ([PropScorer profile](https://www.propscorer.com/firms/funded-futures-family))
 - **Tech:** Rise payout rail confirmed; platform set typical (Tradovate/NinjaTrader class). Founded 2024.
 - **Signal:** #8 on-chain; "human-led customer service" as positioning.
 - **Trust trajectory: good for its age.** 4.5 Trustpilot, 1,900 reviews; PropScore 78.
@@ -87,7 +87,7 @@ Deep profiles of the ten biggest futures props as of 2026-08-13, plus the table-
 - **Signal:** the named riser in the constitution; ex-ProjectX white-label ("AlphaTicks") that migrated post-exclusivity.
 - **Trust trajectory:** 4.5 customer rating; too young for a long trajectory. Watch.
 
-**Watchlist:** FuturesElite (#10 on-chain, 4.1 marketplace rating), BlueGuardian Futures ($100M+ paid, entering futures from CFD side), FundingTicks (negative watch: December 2025 retroactive rule-change scandal with profit clawbacks, the live case study in how one announcement destroys a brand — [Finance Magnates](https://www.financemagnates.com/forex/prop-firm-fundingticks-faces-massive-backlash-after-retroactive-rule-change/)).
+**Watchlist:** FuturesElite (#10 on-chain, 4.1 marketplace rating), BlueGuardian Futures ($100M+ paid, entering futures from CFD side), FundingTicks (negative watch: December 2025 retroactive rule-change scandal with profit clawbacks, the live case study in how one announcement destroys a brand, [Finance Magnates](https://www.financemagnates.com/forex/prop-firm-fundingticks-faces-massive-backlash-after-retroactive-rule-change/)).
 
 ---
 
@@ -95,14 +95,14 @@ Deep profiles of the ten biggest futures props as of 2026-08-13, plus the table-
 
 1. **Instant or same-day payout processing** with a published SLA (MFF instant, TPT ~1 hour, TradeDay/Tradeify/FFF 24h, FundedNext 24h with a $1,000 penalty). A 2-3 day settle is still acceptable; a slow *approval* no longer is.
 2. **Rise (or equivalent stablecoin-capable) payout rail** with USDC/USDT option; Wise/ACH as the fiat alternative (Apex, Topstep).
-3. **Multi-platform trader choice on a real-time feed** — at minimum Tradovate + NinjaTrader + TradingView on CQG or Rithmic; dxFeed-based orderflow platforms (Quantower, ATAS, Volumetrica) increasingly expected at the top end. Merit v1 is Rithmic-native by constitution; the platform-list gap is a marketing question, not an engineering one (Rithmic feeds NinjaTrader, Quantower, ATAS, etc.).
+3. **Multi-platform trader choice on a real-time feed**: at minimum Tradovate + NinjaTrader + TradingView on CQG or Rithmic; dxFeed-based orderflow platforms (Quantower, ATAS, Volumetrica) increasingly expected at the top end. Merit v1 is Rithmic-native by constitution; the platform-list gap is a marketing question, not an engineering one (Rithmic feeds NinjaTrader, Quantower, ATAS, etc.).
 4. **A dashboard that shows live rule state** (drawdown floor distance, consistency meter, days-to-eligible): every top firm has one; traders screenshot them constantly.
 5. **Discount-code culture**: perpetual 40-50% codes; list price is fiction. Coupons and per-affiliate codes are launch-day requirements (M3).
 6. **Discord as the primary community/announcement channel** (Tradeify: 102K members) with X for payout-proof marketing.
-7. **EOD drawdown as the marquee "fair rules" feature** (Apex 4.0 default, Lucid, Alpha, MFF Core, TradeDay option) — the industry converged on Merit's founding rule model.
-8. **One-step / short evals and instant-funded products** (TPT 1-step, Tradeify Lightning, LucidDirect, MFF Rapid) — Merit's three-plan lineup matches the market shape.
-9. **Certificates/share cards and referral programs** — universal.
-10. **Automated payout review** (Apex 4.0 "automated review", MFF instant-approve) — manual-review-by-default is now a competitive liability.
+7. **EOD drawdown as the marquee "fair rules" feature** (Apex 4.0 default, Lucid, Alpha, MFF Core, TradeDay option). The industry converged on Merit's founding rule model.
+8. **One-step / short evals and instant-funded products** (TPT 1-step, Tradeify Lightning, LucidDirect, MFF Rapid). Merit's three-plan lineup matches the market shape.
+9. **Certificates/share cards and referral programs**: universal.
+10. **Automated payout review** (Apex 4.0 "automated review", MFF instant-approve). Manual-review-by-default is now a competitive liability.
 
 ## Gaps nobody serves (Merit openings)
 
@@ -111,9 +111,9 @@ Deep profiles of the ten biggest futures props as of 2026-08-13, plus the table-
 3. **Rules provably identical to enforcement.** Topstep's real-time-MLL-vs-expectation complaints and the FundingTicks retroactive-change scandal show the market's #1 wound is label-vs-engine gaps. Config-versioned rules rendered live to marketing (constitution §0 item 5) is unserved.
 4. **Rule stability commitments.** 2026's cadence of caps cut (Topstep April), consistency changed (Apex March), plans retired (Tradeify March) means "your account keeps the rules it was sold under" (our plan_version pinning) is a marketable promise nobody makes explicitly.
 5. **Honest liability mechanics disclosed** (caps/gaps/ladders explained as what they are). Firms hide these in help centers; Merit can publish the why.
-6. **A serious trader-facing eligibility breakdown** (gate-by-gate "here's exactly what's missing for your payout" — our `GET /accounts/:id/eligibility`). Current dashboards show progress bars but not the full gate logic.
+6. **A serious trader-facing eligibility breakdown** (gate-by-gate "here's exactly what's missing for your payout", our `GET /accounts/:id/eligibility`). Current dashboards show progress bars but not the full gate logic.
 
 ## Contradictions / notes for DECISIONS.md
 
 - **No constitution contradictions.** The §1B firm list needed one swap (Alpha Futures in, FuturesElite to watchlist), which §1B explicitly authorizes.
-- **Market drift worth noting (no amendment required):** (a) several top firms now run CQG or dxFeed rather than Rithmic (TradeDay is 100% CQG; MFF is dual CQG+dxFeed) — Rithmic-native remains valid but the B3 adapter-interface directive is more important than the constitution implies; (b) payout-cap direction across the market is tightening (Topstep cuts) while consistency direction is loosening (Apex 30→50%) — Merit's plan parameters sit comfortably inside current market norms; (c) win-day/qualifying-day resets after payout (Tradeify pattern cited in constitution M1) confirmed still current.
+- **Market drift worth noting (no amendment required):** (a) several top firms now run CQG or dxFeed rather than Rithmic (TradeDay is 100% CQG; MFF is dual CQG+dxFeed), so Rithmic-native remains valid but the B3 adapter-interface directive is more important than the constitution implies; (b) payout-cap direction across the market is tightening (Topstep cuts) while consistency direction is loosening (Apex 30→50%), so Merit's plan parameters sit comfortably inside current market norms; (c) win-day/qualifying-day resets after payout (Tradeify pattern cited in constitution M1) confirmed still current.

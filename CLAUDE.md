@@ -9,7 +9,7 @@
 
 ## Current phase
 **Planning corpus generation (pre-FREEZE). Zero application code until STATE.md says FROZEN.**
-Wave 1 (research/) is next. See STATE.md for the gate and next actions.
+Wave 1 (research/) is approved. Wave 2 (docs/architecture/) is in progress. See STATE.md for the gate and next actions.
 
 ## Conventions (binding)
 - Deliverables are documents until FREEZE. Docs are the single source of truth.
@@ -24,6 +24,10 @@ Wave 1 (research/) is next. See STATE.md for the gate and next actions.
 - Plan before content: waves advance only through founder-approved gates.
 - Small conventional commits referencing the constitution section or doc.
 - Never weaken a gate to pass it; every discovered gap becomes a docs/EDGE_CASES.md entry.
+
+## Session-length regime (ADR-003)
+- **Money paths** (rules-engine, payout, ledger, auth): one objective per session, fresh session per slice, `/clear` between unrelated tasks. Context poisoning on these diffs is catastrophic.
+- **Non-money work** (marketing site, docs, fixtures, seed data): longer compounding sessions are permitted.
 
 ## Model preferences
 Default: sonnet (routine drafting on approved outlines)
