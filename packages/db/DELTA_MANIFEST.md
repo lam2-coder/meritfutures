@@ -8,7 +8,9 @@ last_updated: 2026-08-14
 
 **The completeness gate reads this file.** [ADR-026](../../docs/DECISIONS.md) requires that every `SD-nn` and `U-nn` appearing anywhere in `docs/` appears **exactly once** here with a disposition. A count nobody can drift is better than a count someone remembers to update.
 
-**93 schema changes in scope: 88 numbered, 5 unnumbered.** No delta was rejected. 90 land in the v1 core sequence and 3 in the marked reserved sequence.
+**94 schema changes in scope: 88 numbered, 6 unnumbered.** No delta was rejected. 91 land in the v1 core sequence and 3 in the marked reserved sequence.
+
+**The count moved from 93 to 94 by founder ruling (2026-08-14).** `U-06` is the sixth unnumbered change, found while folding. [ADR-026](../../docs/DECISIONS.md)'s table of five did not carry it. See section 5.
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
@@ -38,7 +40,7 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 | 0018 | `integrations` | no | `integration_contracts`, `integration_dispatches`, `support_context_views` |
 | 0019 | `notifications_and_community` | no | `notification_kinds`, `notifications`, `notification_preferences`, `contact_channels`, `discord_links`, `discord_announcements` |
 | 0020 | `public_surface` | no | `content_documents`, `page_revalidations`, `certificates` |
-| 0021 | `transparency` | no | `statistic_definitions`, `published_statistics`, `review_requests`, `proof_links` |
+| 0021 | `transparency` | narrow | `statistic_definitions`, `published_statistics`, `review_requests`, `proof_links` |
 | 0022 | `analytics_journal` | no | `round_trips`, `journal_entries`, `analytics_snapshots` |
 | 0023 | `loyalty_and_graduation` | no | `loyalty_criteria`, `loyalty_states`, `loyalty_benefit_grants`, `graduation_benefits` |
 | 0024 | `offers` | yes | `offer_experiments`, `offers`, `price_floors`, `promotional_credit_grants` |
@@ -159,9 +161,9 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M20-03 | `wallet_withdrawals` | add `source_provenance_summary`, `earliest_credit_at` | 0011 | **landed** |
 | SD-M20-04 | new `wallet_dormancy` | the obligation is not discovered during an audit | 0011 | **landed** |
 
-## 5. The five unnumbered changes
+## 5. The six unnumbered changes
 
-Rulings the schema did not yet express. Four of the five were invisible because nobody was counting.
+Rulings the schema did not yet express. **Five of the six were invisible because nobody was counting**, and the sixth was miscited to a delta that means something else. This is the reason a count matters.
 
 | # | Change | Source | Migration | Status |
 |---|---|---|---|---|
@@ -170,27 +172,66 @@ Rulings the schema did not yet express. Four of the five were invisible because 
 | U-03 | new `ledger_halts`, identity-scoped with an escalation clock | ADR-016, M05 INV-M5-16 | 0016 | **landed** |
 | U-04 | `identity_signals.kind` gains `footprint_enrichment` | ADR-023, M07 D-15 | 0002 | **landed** |
 | U-05 | `kyc_verifications.placement` check widened to the ruled trigger set | ADR-021 | 0003 | **landed** |
+| **U-06** | `provisioning_status` gains **`confirmed_inferred`**, plus the binding that `set_risk` may never reach it | M02 section 3.2, AS-M2-03 | 0001 (value), 0007 (binding CHECK) | **landed** |
+
+**`U-06` was found while folding and is the sixth unnumbered change.** The approved [DATA_MODEL section 6](../../docs/architecture/DATA_MODEL.md) declares `provisioning_status` with five values; [M02 section 3.2](../../docs/plans/M02-rithmic-bridge.md) adds a sixth and makes it a distinct state rather than a synonym, and AS-M2-03 makes it **binding that a `set_risk` operation may never reach it**. That is a schema change to an approved document with no delta number, which is the definition of an unnumbered change.
+
+**Ruled by the founder, 2026-08-14: it is `U-06`, and the total in scope is 94.** `0001`'s inline marker previously read `-- SD-M2-06`, which is the `reconciliations` delta and lands in `0014`. **The marker is corrected to `-- U-06` in `0001` and added in `0007`.** Editing `0001` is permitted because it is committed and **not merged**; the rule is that a migration is never edited *once merged*, and shipping a knowingly wrong citation into a merge is the worse outcome.
 
 ## 6. Rejection table
 
 **No delta was rejected.** This table says so explicitly rather than being absent, because a rejection table that is missing is indistinguishable from a delta that was dropped. A delta that is ever rejected is rejected in writing, in an ADR, never by omission.
 
-## 7. Discovered during the fold, and NOT silently absorbed
-
-**One item found while folding that ADR-026's table of five unnumbered changes does not carry.**
-
-`provisioning_status` gains **`confirmed_inferred`**. The approved [DATA_MODEL section 6](../../docs/architecture/DATA_MODEL.md) declares the enum as `queued, written, delivered, confirmed, failed`. [M02 section 3.2](../../docs/plans/M02-rithmic-bridge.md) adds a sixth value and makes it a distinct state rather than a synonym, and AS-M2-03 makes it binding that a `set_risk` operation may never reach it. **That is a schema change to an approved document with no delta number, which is the definition of an unnumbered change, and it is not one of U-01 to U-05.**
-
-It is folded (the value is in `0001`, the binding is a CHECK in `0007`), so nothing is missing from the schema. Two things are nonetheless wrong on the record and are recorded here rather than repaired quietly:
-
-1. **`0001_extensions_and_enums` cites the wrong delta.** Its inline marker reads `-- SD-M2-06 adds confirmed_inferred`. `SD-M2-06` is the `reconciliations` delta (`source_ingest_file_id`, `our_source`), which lands in `0014`. The correct provenance is **M02 section 3.2 and AS-M2-03**. Migrations are sacred, so `0001` is not edited; the correction lives here and in `0007`, where the binding CHECK carries the right citation.
-2. **The total in scope is arguably 94 rather than 93.** This manifest does not move ADR-026's count on its own authority. **The item needs a founder ruling: either a `U-06` entry, or a finding that a state-machine value inside an approved module plan is not a "schema change" for the reconciliation's purposes.** Recorded, not decided.
-
-This is the shape ADR-026 predicted: four of its five unnumbered changes were invisible because nobody was counting, and the manifest gate exists so the fifth kind cannot hide either.
-
-## 8. Two things the corpus called additions and that are not deltas
+## 7. Two things the corpus called additions and that are not deltas
 
 - **`ladders_completed_lifetime`** is already inside `SD-M14-01`'s column list.
 - **The `SD-M19-03` widening** is an amendment to an existing delta, not a new one.
 
 Both fold. Neither is counted twice.
+
+## 8. Open items carried out of the fold
+
+Items found while folding that are **not schema deltas** and are **not closed**. They are here rather than only in a session log because this is the file the next session reads first.
+
+| # | Item | Status |
+|---|---|---|
+| **OI-01** | **`liability_snapshots` exists in two shapes.** The migration (`0009`) follows `SD-M6-01`: keyed on `as_of timestamptz`, carrying `open_liability_cents`, `bounded_near_term_cents`, `remaining_ladder_exposure_cents`, `wallet_balances_cents`, `absorbed_corrections_cents`. [DATA_MODEL section 8](../../docs/architecture/DATA_MODEL.md) still shows the earlier shape keyed on `snapshot_on date` with `funded_accounts`, `reserve_cents`, `cvar99_cents`, `rcr_bp` and `per_plan`. **The migration is the truth.** The four RCR and CVaR fields have **no home in the folded shape** and need one before [M06](../../docs/plans/M06-admin-ops-console.md) is built: the reserve coverage ratio is the number that decides whether sales pause | **OPEN**, founder ruling (2026-08-14) that it is tracked here |
+| **OI-02** | **`published_statistics` cannot express three of the seven ruled statistics.** ST-04 publishes mean **and** median together and "neither is published alone"; ST-05 and ST-06 each publish **p50 and p95**. Two rows for one statistic, window and grain collide on `published_statistics_window_uq`, and no column distinguishes which figure a row carries. Proposed fix: a `measure` discriminator (`rate`, `total`, `mean`, `median`, `p50`, `p95`, `count`) on the table and in the index. **Not applied**: it changes what a published, append-only, publicly-restated row *is* | **OPEN**, needs the founder's read of `0021` |
+| **OI-03** | **`0026`'s append-only revoke list is a list, and a list drifts.** Eighteen tables are named there against [DATA_MODEL section 1](../../docs/architecture/DATA_MODEL.md)'s Mutability set. The CI check must assert the revoke list **against the document** rather than trusting either | **OPEN**, CI not yet built |
+| **OI-04** | **Two legitimate single-column updates on append-only tables** (`daily_marks.superseded_by`, `identity_links.suppressed`) are forbidden by the grants and require `SECURITY DEFINER` functions that **do not exist yet**. A naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug | **OPEN**, arrives with the owning module |
+
+## 9. NO-FLOATS EXEMPTION LIST
+
+**Constitution and [DATA_MODEL section 1](../../docs/architecture/DATA_MODEL.md): money is `bigint` integer cents, ratios are integer basis points, never `numeric` and never a float, in any financial path.**
+
+**Three columns in this schema are non-integer. Every one is a ruled exemption rather than a local judgment, and the list is asserted rather than documented.**
+
+```
+correlation_groups.statistic
+correlation_groups.threshold
+published_statistics.value_numeric
+```
+
+**The assertion lives in `0027_triggers_invariants.sql`** as a `DO` block that reads `information_schema.columns` and **fails the migration** if the set of `numeric`, `real` or `double precision` columns in `public` is anything other than exactly those three. It asserts in **both directions**: an unlisted column fails, and so does a stale entry naming a column that no longer exists, because an allowlist wider than the schema quietly grants more than it names.
+
+**Verified to bite**, not merely to run: adding a rogue `numeric` column and re-running `0027` fails with `NO-FLOATS: liability_snapshots.rogue_rate is not on the exemption list`.
+
+| Column | Ruling |
+|---|---|
+| `correlation_groups.statistic` | **Exempt.** A correlation coefficient is not money and is not a ratio of two integers Merit controls. Rounding it to cents or to basis points is the actual error |
+| `correlation_groups.threshold` | **Exempt**, same reason, and it must be the same type as the statistic it is compared against |
+| `published_statistics.value_numeric` | **Exempt as authorized**, and see the note below |
+
+### Scope correction: two columns shipped outside the authorization
+
+`published_statistics.numerator` and `.denominator` shipped as `numeric` and **were never authorized**. Both are now `bigint`. The reasoning, because it is a ruling and not a cleanup:
+
+- **The denominator is a COUNT in all six statistics that have one**, and ST-03 has none at all because it is a total rather than a rate. It is compared against `min_sample` (250 on ST-01, 100 on ST-02, 50 elsewhere), **which is an integer**. A `numeric` denominator permits `249.7`, which is not a number of accounts, and **a sample gate decided on a rounding is a sample gate that does not gate**.
+- **The numerator is one of exactly three things across the seven definitions, and all three are integers**: a count (ST-01, ST-02, ST-07), **integer cents** (ST-03 and ST-04 are a sum of `trader_cents`), or a whole-second duration (ST-05, ST-06). **The cents case is the one that matters: that is MONEY, and it does not stop being money because it is being published.** `numeric` there is the case DATA_MODEL section 1 names directly.
+- **`numerator_unit` is forced by the type change, not added alongside it.** DATA_MODEL section 1 makes a quantity column with no unit a review reject, and a `bigint` numerator is otherwise ambiguous between cents and a count on a surface Merit cannot restate quietly.
+
+### Note on `published_statistics.value_numeric`, for the founder
+
+**It is on the authorized list and is left as authorized.** On inspection it does not require the exemption: **all seven ruled statistics are exactly representable as integers under the corpus's own conventions** (ST-01/02/07 rates in basis points, ST-03/04 money in integer cents, ST-05/06 durations in whole seconds). For ST-03 and ST-04 this column currently holds **money on a public surface**.
+
+Tightening it to `bigint` plus the same unit discriminator the numerator now carries is a one-line change. **Removing an authorized exemption is not a call to make without asking**, so it is recorded and not applied.

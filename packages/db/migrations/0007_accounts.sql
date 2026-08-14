@@ -21,7 +21,7 @@
 --      account, corrupts two accounts, one of which may be funded, and is
 --      invisible until reconciliation.
 --
--- Deltas folded: SD-M2-01, SD-M2-02, SD-M2-05, SD-M18-01, U-02
+-- Deltas folded: SD-M2-01, SD-M2-02, SD-M2-05, SD-M18-01, U-02, U-06
 --
 -- Cycle breaks closed and opened here:
 --   * CLOSED: purchases.parent_account_id -> accounts (opened in 0006).
@@ -287,7 +287,7 @@ CREATE TABLE provisioning_queue (
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now(),
 
-  -- AS-M2-03, M02 section 3.2. BINDING: set_risk MAY NEVER REACH
+  -- U-06. AS-M2-03, M02 section 3.2. BINDING: set_risk MAY NEVER REACH
   -- confirmed_inferred.
   --
   -- An inferred confirmation means we believe the account exists because the

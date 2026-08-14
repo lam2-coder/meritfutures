@@ -93,15 +93,46 @@ CREATE TABLE published_statistics (
   window_end_day     date NOT NULL,
   as_of_trading_day  date NOT NULL,
 
-  -- numeric, not bigint: these are ratios and counts, not money. The
-  -- no-floats rule governs financial paths, and rounding a pass rate to cents
-  -- would be the actual error.
+  -- numeric, and it is A RULED EXEMPTION rather than a default. See the
+  -- NO-FLOATS EXEMPTION LIST in 0027 and in DELTA_MANIFEST section 9. The
+  -- published figure is a ratio for ST-01, ST-02 and ST-07, and rounding a
+  -- pass rate to cents would be the actual error.
   value_numeric      numeric NULL,
 
   -- SD-M12-02. STORED ALONGSIDE THE RATIO. A published ratio without its
   -- components cannot be checked by the reader.
-  numerator          numeric NULL,                                -- SD-M12-02
-  denominator        numeric NULL,                                -- SD-M12-02
+  --
+  -- BIGINT, NOT NUMERIC, AND THE REASON IS NOT TIDINESS.
+  --
+  -- Across the seven ruled statistics the numerator is one of exactly three
+  -- things and every one of them is an integer:
+  --
+  --   count             ST-01, ST-02, ST-07 (evaluations, accounts, requests)
+  --   cents             ST-03, ST-04 (sum of trader_cents across settled
+  --                     payouts). THIS IS MONEY. DATA_MODEL section 1 says
+  --                     money is bigint integer cents and "never numeric,
+  --                     never float", and it does not stop being money
+  --                     because it is being published
+  --   duration_seconds  ST-05, ST-06 (elapsed request-to-credit and
+  --                     request-to-settlement)
+  --
+  -- The denominator is a COUNT in all six statistics that have one, and ST-03
+  -- has none at all because it is a total rather than a rate. A numeric
+  -- denominator permits 249.7, which is not a number of accounts, and it is
+  -- compared against min_sample (250 on ST-01, 100 on ST-02, 50 elsewhere),
+  -- which is an integer. A sample gate decided on a rounding is a sample gate
+  -- that does not gate.
+  --
+  -- numerator_unit is FORCED BY THE TYPE, not added alongside it: DATA_MODEL
+  -- section 1 makes a quantity column with no unit a review reject, and a
+  -- bigint numerator is otherwise ambiguous between cents and a count on a
+  -- surface Merit cannot restate quietly.
+  numerator          bigint NULL,                                 -- SD-M12-02
+  numerator_unit     text NULL CHECK (numerator_unit IN (
+                       'count', 'cents', 'duration_seconds'
+                     )),                                          -- SD-M12-02
+  denominator        bigint NULL CHECK (denominator IS NULL OR denominator >= 0),
+                                                                  -- SD-M12-02
   sample_size        integer NOT NULL CHECK (sample_size >= 0),
 
   grain_key          text NULL,   -- per plan, per size, or null for global
@@ -126,14 +157,25 @@ CREATE TABLE published_statistics (
   ),
 
   -- A row either publishes a value with its components, or states why it did
-  -- not. Never neither, and never a value with no denominator.
+  -- not. Never neither.
+  --
+  -- The denominator is NOT required, and that is a correction rather than a
+  -- relaxation: ST-03 (total paid to traders) has NO DENOMINATOR by ruling,
+  -- because it is a total and the surface says so rather than implying a rate.
+  -- Requiring one here made ST-03 unpublishable.
   CONSTRAINT published_statistics_value_or_suppression CHECK (
     (suppressed_reason IS NULL
        AND value_numeric IS NOT NULL
        AND numerator IS NOT NULL
-       AND denominator IS NOT NULL)
+       AND numerator_unit IS NOT NULL)
     OR
     (suppressed_reason IS NOT NULL AND value_numeric IS NULL)
+  ),
+
+  -- A numerator without its unit is a number whose meaning depends on which
+  -- statistic the reader thinks they are looking at.
+  CONSTRAINT published_statistics_numerator_has_unit CHECK (
+    (numerator IS NULL) = (numerator_unit IS NULL)
   ),
 
   CONSTRAINT published_statistics_no_self_restatement CHECK (
@@ -148,6 +190,26 @@ CREATE INDEX published_statistics_restatement_idx
 
 -- One live publication per statistic per window per grain. A restatement is
 -- how a second one exists.
+--
+-- OPEN ITEM FOR THE E2 READ, found while typing the numerator and NOT fixed
+-- here, because it changes the shape of an append-only public surface and that
+-- is the founder's call rather than mine.
+--
+-- THREE OF THE SEVEN STATISTICS PUBLISH TWO FIGURES AT ONCE, and this index
+-- makes the second one unwritable:
+--
+--   ST-04  mean AND median together. "Neither is published alone": a mean is
+--          the number one large payout distorts, and a median alone hides that
+--          large payouts happen at all
+--   ST-05  p50 AND p95
+--   ST-06  p50 AND p95
+--
+-- Two rows for the same stat_code, definition_version, window and grain
+-- collide on this index, and there is no column distinguishing which figure a
+-- row carries. The fix is a `measure` discriminator
+-- ('rate','total','mean','median','p50','p95','count') added to the table and
+-- to this index. It is small, and it is a change to what a published row IS.
+-- Recorded in DELTA_MANIFEST section 10.
 CREATE UNIQUE INDEX published_statistics_window_uq
   ON published_statistics (stat_code, definition_version, window_start_day,
                            window_end_day, coalesce(grain_key, ''))

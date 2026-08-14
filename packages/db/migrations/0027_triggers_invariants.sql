@@ -184,4 +184,96 @@ CREATE TRIGGER accounts_plan_version_pinned
   BEFORE UPDATE ON accounts
   FOR EACH ROW EXECUTE FUNCTION assert_account_plan_version_pinned();
 
+-- -----------------------------------------------------------------------------
+-- NO-FLOATS EXEMPTION LIST
+-- -----------------------------------------------------------------------------
+-- Constitution and DATA_MODEL section 1: money is bigint integer cents, ratios
+-- are integer basis points, NEVER numeric and NEVER float, in any financial
+-- path. Three columns in this schema are non-integer and every one of them is
+-- a RULED EXEMPTION rather than a local judgment.
+--
+-- THE LIST IS ASSERTED, NOT DOCUMENTED. The DO block below fails the migration
+-- if the set of non-integer numeric-family columns in `public` is anything
+-- other than exactly these three. A fourth one cannot be added by a later
+-- migration without deleting a line from this file, which is a diff a reviewer
+-- sees rather than a discovery CI makes later.
+--
+-- | Column                              | Type    | Why it is exempt          |
+-- |-------------------------------------|---------|---------------------------|
+-- | correlation_groups.statistic        | numeric | A correlation coefficient |
+-- | correlation_groups.threshold        | numeric | is not money and is not a |
+-- |                                     |         | ratio of integers.        |
+-- |                                     |         | Rounding it to cents or   |
+-- |                                     |         | to bp is the actual error |
+-- | published_statistics.value_numeric  | numeric | The published figure.     |
+-- |                                     |         | ST-01/02/07 are rates.    |
+-- |                                     |         | SEE THE NOTE BELOW: this  |
+-- |                                     |         | one is exempt as ruled    |
+-- |                                     |         | and does not need to be   |
+-- |                                     |         | on this list             |
+--
+-- NOTE ON published_statistics.value_numeric, for the founder's read.
+-- This column is on the authorized list and is left as authorized. On
+-- inspection it does not require the exemption: all seven ruled statistics are
+-- exactly representable as integers under the corpus's own conventions
+-- (ST-01/02/07 rates in basis points, ST-03/04 money in integer cents,
+-- ST-05/06 durations in whole seconds), and for ST-03 and ST-04 `numeric`
+-- currently holds MONEY on a public surface, which is the case DATA_MODEL
+-- section 1 names directly. Tightening it to bigint plus the same unit
+-- discriminator the numerator now carries is a one-line change and it is the
+-- founder's call, because removing an authorized exemption is not mine to
+-- make. Recorded in DELTA_MANIFEST section 9.
+--
+-- WHAT LEFT THE LIST. published_statistics.numerator and .denominator shipped
+-- as numeric and are now bigint. The numerator is a count, integer cents, or a
+-- whole-second duration across the seven definitions, carried with a
+-- numerator_unit discriminator; the denominator is a count everywhere it
+-- exists and is compared against an integer min_sample. Neither was ever
+-- authorized and neither needed to be.
+DO $$
+DECLARE
+  allowed  text[] := ARRAY[
+    'correlation_groups.statistic',
+    'correlation_groups.threshold',
+    'published_statistics.value_numeric'
+  ];
+  found    text[];
+  unlisted text[];
+  missing  text[];
+BEGIN
+  SELECT coalesce(array_agg(table_name || '.' || column_name ORDER BY
+                            table_name, column_name), ARRAY[]::text[])
+    INTO found
+    FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND data_type IN ('numeric', 'real', 'double precision');
+
+  SELECT coalesce(array_agg(c), ARRAY[]::text[]) INTO unlisted
+    FROM unnest(found) c WHERE c <> ALL (allowed);
+
+  SELECT coalesce(array_agg(c), ARRAY[]::text[]) INTO missing
+    FROM unnest(allowed) c WHERE c <> ALL (found);
+
+  IF array_length(unlisted, 1) IS NOT NULL THEN
+    RAISE EXCEPTION
+      'NO-FLOATS: % is not on the exemption list. Money is bigint integer '
+      'cents and ratios are integer basis points (DATA_MODEL section 1). '
+      'Adding a non-integer column requires a founder ruling and a line in '
+      'this list, not a local judgment in a migration.',
+      array_to_string(unlisted, ', ')
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- The list is asserted in BOTH directions. A stale entry for a column that
+  -- no longer exists is how an allowlist quietly grants more than it names.
+  IF array_length(missing, 1) IS NOT NULL THEN
+    RAISE EXCEPTION
+      'NO-FLOATS: the exemption list names % which does not exist. Remove the '
+      'stale entry rather than leaving the list wider than the schema.',
+      array_to_string(missing, ', ')
+      USING ERRCODE = 'check_violation';
+  END IF;
+END
+$$;
+
 COMMIT;

@@ -49,7 +49,7 @@ CREATE TYPE account_status AS ENUM (
   'closed_admin', 'closed_chargeback', 'graduated'
 );
 
--- SD-M2-06 adds confirmed_inferred. M02 section 3.2 makes it a distinct state
+-- U-06 adds confirmed_inferred. M02 section 3.2 makes it a distinct state
 -- and not a synonym: an inferred confirmation is strong evidence for
 -- create_account and WORTHLESS for set_risk, because you cannot infer that a
 -- risk setting applied from an account appearing in a report.
