@@ -22,7 +22,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | draft | claude |
 | [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives | draft | founder |
 | [EDGE_CASES.md](EDGE_CASES.md) | Living registry; every bug becomes an entry plus a golden file | draft | claude |
-| [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | draft | claude |
+| [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | review | founder |
 
 ## research/ (Wave 1: next up)
 | Doc | Purpose | Status | Owner |
