@@ -42,6 +42,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-198 to GS-204 | Offers engine: rules sold as promotions, free-trial identity loss, price experiments, stacking floors, leaked codes, chargeback-funded credit, rule experiments | M17 |
 | GS-205 to GS-211 | Live-graduation pipeline: unbacked live-program promises, ladder finiteness, graduating-cohort risk, vault projections, stranded balances, discretion at the last step, third-party exposure | M18 |
 | GS-212 to GS-221 | KYC and identity: corpus coverage, provider dependency, geo triangle fairness, sanctions carve-out, dedupe false matches, real re-verification, evidence durability, funnel telemetry | M19 |
+| GS-222 to GS-231 | Merit Wallet: credit farming, spend-back laundering, refund arbitrage, deposit accretion, chargeback races, transfer through checkout, dormancy, float segregation | M20 |
 
 ## 2. Fixture format
 
@@ -464,6 +465,23 @@ Defined by [M19](../plans/M19-kyc-identity.md) section 8.2. Identity is the chok
 | GS-220 | A plan with no evaluation phase published with a placement other than `direct_purchase` | Publish validation **fails**. Asserts that instant funding leaves no later gate to move to, so this placement is not configurable. INV-M19-02 |
 | GS-221 | The placement config changes after an account was purchased | The account keeps its **pinned** placement and no retroactive gate appears. Asserts that a config change must not require verification from people who bought without it, which would be a rule change applied backwards. INV-M19-01, pairs with GS-041 |
 
-## 27. What is not here yet
+## 27. GS-222 to GS-231: Merit Wallet (M20)
 
-Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
+Defined by [M20](../plans/M20-wallet.md) section 8.2. The wallet has two exits and every fixture here is somebody using the exit that was not built for them.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-222 | Promotional credit buys an evaluation that passes and pays out | The payout credits the wallet normally, the **first withdrawal containing that value is held for review** rather than confiscated, and spending it inside Merit is unaffected. Asserts that separating ledger classes closes the direct route and the product itself is the converter. AS-M20-01, EC-132 |
+| GS-223 | A payouts-frozen identity attempts a wallet-funded purchase | **Refused**, and expired KYC, `recon_blocked`, and an active restriction do the same. Asserts that a freeze covering one exit is not a freeze, and that spending converts frozen value into accounts that produce fresh unfrozen credits. AS-M20-02, EC-133 |
+| GS-224 | A card-funded purchase is refunded | The refund returns **to the card**, on every path including partial and admin-initiated; a wallet-funded purchase refunds to the wallet. Asserts the rails never cross, because crossing them turns card money into withdrawable cash outside the card network's protections. AS-M20-03, EC-134 |
+| GS-225 | Every conceivable inbound funding attempt | No deposit, top-up, or third-party funding path exists, and the `provenance` constraint rejects any credit outside the closed list. Asserts the boundary between a payable and a regulated stored-value product, which a checkout convenience would otherwise cross by ticket. AS-M20-04, EC-135 |
+| GS-226 | Direct purchase, fast payout, then the funding card charges back | The withdrawal was **held** until the chargeback window closed, and the value was spendable inside Merit throughout. Asserts that ADR-019 compressed the attacker's cycle by exactly as much as the trader's. AS-M20-05, EC-136, extends GS-039 |
+| GS-227 | Wallet spend targeting an account owned by another identity | **Refused and flagged at high severity**, with ownership resolved server side inside the debit transaction. Asserts that checkout is a transfer endpoint nobody labelled, and that SECURITY §4.7's containment claim is only true because of this check. AS-M20-06, EC-137 |
+| GS-228 | A balance reaches the jurisdictional dormancy period | Escalating contact through security-class channels including prior contacts, **never forfeited**, remitted per jurisdiction. Asserts that expiry is the most brand-destroying term available and indefinite holding is non-compliant. AS-M20-07, EC-138 |
+| GS-229 | Reserve coverage computed while the wallet float is large | Float is **excluded from reserve**, reported separately, and the RCR is computed from reserve alone against a live rail balance. Asserts the mechanism by which the breaker at 1.0 would quietly become fictional. AS-M20-08 |
+| GS-230 | Simultaneous withdrawal and checkout spend against one balance | Exactly one succeeds where the balance covers only one, and the position never goes negative. Pins the concurrency case created by having two exits from one integer. INV-M20-01 |
+| GS-231 | Per-identity reconciliation against a globally balanced ledger | The per-identity assertion **fails and pages** even though the global sum is zero. Asserts that the wallet is where a per-identity error would hide, which a global zero-sum check cannot see. INV-M20-10, [ADR-016](../DECISIONS.md) |
+
+## 28. What is not here yet
+
+**Wave 3 batch 2 added GS-142 to GS-231**, taking the registry to **231**. Scenarios owned by M9 through M20 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**

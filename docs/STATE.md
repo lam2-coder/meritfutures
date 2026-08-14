@@ -14,10 +14,12 @@ last_updated: 2026-08-14
 **One founder action outstanding:** `origin/dev` and `origin/claude/axcera-brochure-research-7s2pdd` still exist. Session credentials return 403 on ref deletion, so they could not be removed from here. Both point at commits `main` already contains, so they are stale rather than divergent and nothing is at risk; delete them from the GitHub UI or a local clone. `premain` was deliberately left alone (not named in the ruling, same commit `main` held before the merge).
 
 ## Current wave
-Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 batch 1 gate CLOSED (2026-08-14): M03 through M08 are `approved`; M02 holds at `review`.** M09 through M19 not started.
+Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 batch 1 gate CLOSED (2026-08-14): M03 through M08 are `approved`; M02 holds at `review`.** **Wave 3 batch 2 DRAFTED (2026-08-14): M09 through M20 are at `review`, awaiting the gate. Wave 3 is complete.**
 
 ## Gate in front of us
-**Wave 3 batch 2: M09 through M19.** Nothing blocks it. Batch 1's rulings produced drafting inputs that batch 2 must consume rather than rediscover, listed under "Next 3 actions".
+**The Wave 3 batch 2 gate: twelve plans, M09 through M20, all at `review`.** Nothing blocks the review. Read the batch summary in [SESSION_LOG](SESSION_LOG.md) first; it lists what needs a ruling and what only needs reading.
+
+**Four items in batch 2 need a founder decision before their module can be built, and two of them are counsel questions rather than engineering ones.** In descending order of consequence: [M18](plans/M18-live-graduation-pipeline.md) OQ-M18-01 (does a live program exist, and on whose paper), [M20](plans/M20-wallet.md) OQ-M20-03 (is the wallet a payable or a regulated stored-value product), [M19](plans/M19-kyc-identity.md) OQ-M19-01 (does the dedupe-corpus finding change the KYC placement recommendation), and [M12](plans/M12-transparency-platform.md) OQ-M12-01 (the seven statistic definitions, which must be fixed before any data exists).
 
 **M02 cannot reach `approved` while the Rithmic vendor call is outstanding** ([ADR-005](DECISIONS.md)). Its agenda is now **sixteen** `V-M2-nn` items, and `V-M2-15` is a **commercial precondition rather than a question**: without either a provisioning acknowledgement artifact or a readable current-risk-setting endpoint, fail-closed provisioning means no account can be brought online at all.
 
@@ -25,11 +27,12 @@ Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 batch 1 gat
 - Wave 1 approved (7 docs). Wave 2 approved (8 docs). M1 gate closed with ADR-013/014/015.
 - **Wave 3 batch 1 gate closed.** Five ADRs: **016** (scoped ledger halt, accepted with a conservative unattributable classifier and an escalation clock), **017** (one outbound rail, plus 48h cooling on affiliate destinations), **018** (Merit Rapid `w=3`, resolving OQ-12), **019** (Merit Wallet, two-leg payouts, cadence anchor on wallet credit) with **019a** (gamification bright line), **020** (two-tier data plane). Plus [ADR-D1](DECISIONS.md) for the repo workflow.
 - Also ruled: the copy-trading clause, M07's three new detectors (D-12, D-13, D-14), two-tier evidence packs, fail-closed provisioning as design law, break-glass custody, ledger recognition timing, the PSP calendar trigger, and `mc_lifecycle.py` as the version-controlled calibration source.
-- Registries at **140 golden scenarios** and 82 edge cases.
+- **Wave 3 batch 2 drafted: twelve plans, M09 through M20**, each a full B5 ten-section doc at `review`. M20 is a new module the corpus did not previously have a plan for.
+- Registries at **231 golden scenarios** and **138 edge cases** (batch 2 added GS-142 to GS-231 and EC-083 to EC-138).
 - SECURITY gains C-23 to C-26, the wallet ATO blast-radius analysis (§4.7), and the break-glass procedure (§8.1). INFRA gains the 50,000-trader scale targets (§10.5).
 
 ## In flight
-**Wave 3 batch 2 (M09 through M20), drafting in progress.** Each doc lands at `review`, committed separately, with its edge cases and golden scenarios appended in the same commit. Done so far: **M09, M10, M11, M12** (deep), **M13, M14, M15, M16, M17, M18, M19** (deep).
+- Nothing. Batch 2 is complete and parked at the gate as instructed.
 
 ## Settled at the follow-up ruling (2026-08-14)
 The four findings raised after the batch 1 fold are closed and folded.

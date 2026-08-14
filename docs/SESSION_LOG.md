@@ -132,3 +132,30 @@ Append-only handoff journal (C3 ritual). Newest entry last. Format per entry: do
   - **The typed publish messages are a credibility control, not formatting.** After ADR-019 the cadence check fires on all three v1 plans; rendering them uniformly would have put two false positives in front of the founder on every single publish, which is AS-M6-02's mechanism (a control that cries wolf gets overridden) arriving at a publish gate instead of a circuit breaker. The `info` / `warning` split is what keeps the one real warning legible.
   - The `~$7,200 lifetime` figure is worth memorizing alongside the `$300/day` one, because they are the same plan and only one of them is a liability number. A per-day rate that terminates after 24 trading days is a different object from one that does not.
 - **Files touched:** docs/{DECISIONS,STATE,INDEX,GLOSSARY,SESSION_LOG}.md; docs/plans/{M01,M03,M05,M06}*.md; docs/testing/{GOLDEN_SCENARIOS,SIMULATION_HARNESS}.md.
+
+---
+
+## 2026-08-14 - Session 9: Wave 3 batch 2 (M09 through M20). Wave 3 complete
+- **Done.** Three preamble items, then twelve full B5 ten-section plans, each committed separately at `review` with its edge cases and golden scenarios in the same commit.
+  - **Preamble.** GLOSSARY's link example pointed at `../GLOSSARY.md` from inside `docs/GLOSSARY.md`, which does not resolve; corrected to show both depths (typo-class fix on an approved doc, founder authorized in the preamble, no gate reopened). The **parameter-status ruling** is recorded in three places: [M01 Appendix A.0](plans/M01-rules-engine.md), a citable [DECISIONS](DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14) entry, and [STATE](STATE.md). `research/calibration/` re-verified absent, so that item stays tracked and no parameter could be diffed against the model this session.
+  - **M09 marketing site.** Publish-ordered revalidation rather than cache TTLs; two build lints (no parameter literal in a component, no parameter value in content prose) as the module's real controls.
+  - **M10 integrations.** One outbound bus with one field-allowlist contract per vendor, so "what did we tell that vendor about this trader" has exactly one answer.
+  - **M11 certificates.** Per-trade certificates deferred with the reasoning written down; verification page designed as a public oracle over Merit's own payout book.
+  - **M12 transparency platform (deep).** Seven statistics with versioned definitions whose `effective_from` is always in the future, immutable published values with restatement, and **no approval step between computation and publication**, on purpose.
+  - **M13 analytics and journal.** The analytics database role cannot read plan config at all, so a second rulebook is prevented by permission rather than by care.
+  - **M14 loyalty.** Cap release only through the dual-controlled publish path; streaks are recognition with no economics; win-back targeting inverted.
+  - **M15 Discord.** Per-role consent, a link that can never be a credential, template-only announcements, moderation kept separate from enforcement.
+  - **M16 notifications.** Four classes deciding what a preference may silence, and a contact-change ceremony that notifies prior contacts for a window.
+  - **M17 offers.** An offer changes the price of a known thing and may never change the thing; price floors are dual controlled; the experiments table has no enum value for a rule.
+  - **M18 live graduation.** Opens with its regulatory finding rather than burying it.
+  - **M19 KYC (deep).** All seven constitution points, plus the corpus-coverage finding that amends section 10's own tradeoff.
+  - **M20 wallet (deep).** New module. The wallet as an object, with a closed credit list and three provenance rules.
+- **Next.** The batch 2 gate. Four items need a founder decision before their module can be built: M18 OQ-M18-01 (live program, and on whose paper), M20 OQ-M20-03 (payable versus regulated stored value), M19 OQ-M19-01 (does the dedupe-corpus finding move the KYC placement), and M12 OQ-M12-01 (the seven statistic definitions, which must be fixed before any data exists). Two of the four are counsel questions. After the gate: fold the schema deltas into DATA_MODEL as one reviewed migration (now M1's ten, batch 1's thirty-one, and batch 2's thirty-four), and commit `research/calibration/mc_lifecycle.py`.
+- **Blockers.** None. M02 still holds at `review` by [ADR-005](DECISIONS.md), unchanged.
+- **Landmines.**
+  - **M20 did not exist as a plan file and is not in the constitution's module list.** It was created this session because [ADR-019](DECISIONS.md) created the wallet and no module owned it. INDEX carries it; anyone reading the constitution alone will not know it exists.
+  - **Three plans amend or extend approved documents and each needs the founder to notice.** M19 AS-M19-01 amends constitution section 10's placement tradeoff by adding a variable it omits. M18 AS-M18-01 finds that the module's own name presumes something the corpus cannot currently support. M14 INV-M14-02 asserts that a cap edit is a cap edit regardless of the word "loyalty", which constrains a product surface nobody has built yet.
+  - **A commit message containing escaped double quotes broke shell quoting** and left registry edits applied with no commit. Recovered by committing with `-F` from a message file. Long commit bodies should use `-F` from the start.
+  - **Section numbering in GOLDEN_SCENARIOS was renumbered twelve times** by scripted inserts, each bumping the trailing "What is not here yet" heading. It is currently section 28. Any future insert must bump it again.
+  - **Batch 2 is a large surface at `review` with no CI behind it.** Cross-references were written by hand; a link check over `docs/` is worth running before the gate.
+- **Files touched:** docs/{INDEX,STATE,SESSION_LOG,DECISIONS,GLOSSARY,EDGE_CASES}.md; docs/plans/{M01,M09,M10,M11,M12,M13,M14,M15,M16,M17,M18,M19,M20}*.md; docs/testing/GOLDEN_SCENARIOS.md.

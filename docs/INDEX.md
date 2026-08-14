@@ -47,7 +47,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | approved | founder |
 | [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | approved | founder |
 
-## docs/plans/ (Wave 3, dependency order, M1 first always. **Batch 1 gate closed 2026-08-14; batch 2 in progress**)
+## docs/plans/ (Wave 3, dependency order, M1 first always. **Batch 1 gate closed 2026-08-14. Batch 2 drafted 2026-08-14: M09 through M20 at `review`, awaiting the gate**)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [M01-rules-engine.md](plans/M01-rules-engine.md) | The crown jewel: 50-rule taxonomy, pure library, replay self-audit. **Gate closed 2026-08-13** | approved | founder |
@@ -69,6 +69,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M17-offers-engine.md](plans/M17-offers-engine.md) | Server-authoritative price resolution, dual-controlled price floors, identity-bound offers, promotional credit provenance, experiments that cannot vary a rule | review | founder |
 | [M18-live-graduation-pipeline.md](plans/M18-live-graduation-pipeline.md) | Ladder finiteness disclosed pre-purchase, mechanical graduation, terminal settlement, accrued-only vault. **Carries the live-program regulatory finding** | review | founder |
 | [M19-kyc-identity.md](plans/M19-kyc-identity.md) | Placement as pinned config, dedupe as a relationship with dispositions, sanctions carve-out, real re-verification, minimization with durable evidence, funnel telemetry | review | founder |
+| [M20-wallet.md](plans/M20-wallet.md) | **New module.** The wallet as an object: closed credit list, provenance rules, two exits sharing context gates, dormancy and escheatment, float segregation | review | founder |
 
 ## docs/testing/, ops/, design/, legal/ (Wave 4)
 | Doc | Purpose | Status | Owner |
