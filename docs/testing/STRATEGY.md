@@ -230,6 +230,8 @@ The generator rewrites every span from the artifact it derives from, and **CI fa
 
 **The pointed form** removes the number: *"the ADR registry is [DECISIONS.md](../DECISIONS.md)"* rather than *"25 ADRs"*. Prefer it wherever the count is decoration. **A count that no reader acts on is a liability with no upside.**
 
+**The query has to be specified, not assumed.** Counting table rows in the `EC` and `GS` registries gives 22 and 301; counting **distinct identifiers** gives the correct 140 and 257. Both are "a script deriving it", and one is wrong. **A generated span is only as good as the named query behind it**, so every key carries its query in the generator rather than in a reader's head.
+
 **Derivable keys at the first run:** `adr_count`, `ec_count`, `gs_count`, `index_entries`, `delta_count`, `migration_files`, and, once `packages/db` exists, the schema-object counts (`tables`, `indexes`, `check_constraints`, `triggers`) taken from a live apply rather than from a reading.
 
 **The gate's first run is a sweep**, and it will find more than the five known instances. That is the point: the five were found by accident, one at a time, and each was found by somebody who happened to be looking.
