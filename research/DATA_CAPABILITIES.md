@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, PROP_TECH_LANDSCAPE.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # Platform Data Capabilities (Constitution B3)
@@ -59,6 +59,10 @@ Topstep-exclusive since February 2026; third-party service offering ended; not p
 - **Data types:** NinjaTrader as a front-end connects through Rithmic/CQG/Tradovate feeds ([crosstrade NT8 prop guide](https://crosstrade.io/blog/ninjatrader-8-prop-firm-connection-guide)); when traders use NinjaTrader-on-Rithmic, all fills still land in Rithmic's admin surface, so no separate ingest needed.
 - **Admin scope:** NinjaTrader Prop (their B2B program) exposes admin tooling to member firms; terms OPEN and irrelevant unless we join their program (we won't in v1; Rithmic User IDs already permit NinjaTrader connections).
 - **Read for us:** NinjaTrader is a *platform permission* on the Rithmic provisioning CSV, not a data source. This collapses a whole adapter: fills arrive via Rithmic regardless of front-end.
+
+### Front-end inventory additions (Wave 1 amendment, 2026-08-14; no v1 impact)
+
+The Axcera Futures Solution brochure (February 2026, primary source; see [PROP_TECH_LANDSCAPE section 1.2](PROP_TECH_LANDSCAPE.md)) lists **Black Arrow, BookMap, and DeepMap** among its supported futures platforms, beyond the names already inventoried here. For Merit these sit in the same class as NinjaTrader/Quantower/ATAS: front-end candidates, not data sources. When they connect through Rithmic, fills land in Rithmic's admin surface and no adapter exists to build; they are candidate values for `accounts.front_end_permissions` (section 4) and nothing more. No v1 impact. The same brochure still lists ProjectX despite the February 2026 Topstep exclusivity, so its platform list is corroborating evidence only.
 
 ## 2. Matrix summary
 

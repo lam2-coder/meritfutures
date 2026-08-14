@@ -1,12 +1,12 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # Prop-Tech Vendor Landscape (Constitution §1)
 
-Teardown of the vendors that define the feature bar for trader-funded firms, a vendor × capability matrix, the MUST/SHOULD/LATER cut for Merit v1, and the list of features that would force data-model changes if bolted on later. Research performed 2026-08-13 via live web sources; citations inline. Refresh cadence: before Wave 2 freeze, then monthly through launch.
+Teardown of the vendors that define the feature bar for trader-funded firms, a vendor × capability matrix, the MUST/SHOULD/LATER cut for Merit v1, and the list of features that would force data-model changes if bolted on later. Research performed 2026-08-13 via live web sources; citations inline. Amended 2026-08-14 with a primary source (Axcera brochure, section 1.2 and 2.1); no gate reopened. Refresh cadence: before Wave 2 freeze, then monthly through launch.
 
 ## 1. Vendor teardowns
 
@@ -25,11 +25,21 @@ Modules observed on their site:
 
 **Read for Merit:** YPF's breadth exists because they are multi-tenant and multi-asset. Every module maps to a Merit module (M4/M5/M6/M7/M8/M9/M10/M16), but Merit's single-tenant futures-only EOD scope removes the program editor, multi-platform sync, and multi-region complexity, which is precisely why the constitution's 2-3 month estimate is plausible against their "18-24 months, $5-10M" positioning.
 
-### 1.2 Axcera (module boundaries as a hint)
+### 1.2 Axcera (module boundaries as a hint; pricing now verified)
 
-Modular suite: **Prop CRM** (multiphase challenges, onboarding, trader area), **Broker CRM**, **Trading APIs**, and **RiskGuard** as a separable risk layer usable standalone or integrated. Covers forex, futures, crypto, equities. Fixed-fee, no revenue share, no per-trader pricing; no published prices (a competitor's comparison page claims $5K-30K/month, unverified). ([axcera.io](https://axcera.io/), [axcera.io/solutions/risk-guard](https://axcera.io/solutions/risk-guard), [fundedtrading.com review](https://fundedtrading.com/tech-provider/axcera/))
+Modular suite: **Prop CRM** (multiphase challenges, onboarding, trader area), **Broker CRM**, **Trading APIs**, and **RiskGuard** as a separable risk layer usable standalone or integrated. Covers forex, futures, crypto, equities. ([axcera.io](https://axcera.io/), [axcera.io/solutions/risk-guard](https://axcera.io/solutions/risk-guard), [fundedtrading.com review](https://fundedtrading.com/tech-provider/axcera/))
 
-**Read for Merit:** Axcera considering RiskGuard separable confirms our M7 boundary (risk as a detector-source pluggable module with its own flag schema). Their CRM/Trading-API split mirrors our M6 (admin) vs M2 (bridge) split. Fixed-fee-no-rev-share is their sales wedge against FPFX; irrelevant to us as builders but useful pricing intel if we ever buy a bolt-on.
+**Verified pricing (primary source: Axcera Futures Solution brochure, February 2026, obtained 2026-08-14).** Supersedes the earlier unverified competitor claim of $5K-30K/month:
+
+- **$15,000 one-time setup; $5,000/month fixed fee; hosting billed at cost, roughly $1,000/month.**
+- **One futures platform included; each additional futures platform is +$5,000/month.**
+- **Launch timeline 6 to 8 weeks; support SLA under 1 hour.**
+- Brochure feature nuggets routed to plan docs as SHOULD/LATER inputs: per-trade certificates (M11), Trustpilot auto-review request on payout settlement (M12, compliance check required when specced), free-trial accounts and rule-based promo campaigns (M17), affiliate commission vesting/holds (M8).
+- Supported-platform list includes Black Arrow, BookMap, and DeepMap (added to DATA_CAPABILITIES' front-end inventory; no v1 impact). The brochure **still lists ProjectX** despite the February 2026 Topstep exclusivity (section 1.5), so treat the platform list as corroborating evidence only, not current procurement fact.
+
+**Named gotcha: the stealth rev-share.** The "fixed fee, no revenue share" positioning carries two revenue-indexed escalators in the brochure fine print: the monthly fee increases by **$10,000/month, ongoing, once firm revenue exceeds $250K/month**, and the contract **auto-upgrades to the next tier above $150K/month revenue or 2,500 accounts**. A fee that steps with revenue is a revenue share with extra steps. File it alongside DXtrade's chargeable-active-user model (section 1.4) and PropForge's per-active-account fee (section 1.9) as the third pricing-trap pattern: when evaluating any vendor, **verify what indexes the fee, not what the pricing page calls it.**
+
+**Read for Merit:** Axcera considering RiskGuard separable confirms our M7 boundary (risk as a detector-source pluggable module with its own flag schema). Their CRM/Trading-API split mirrors our M6 (admin) vs M2 (bridge) split. Fixed-fee-no-rev-share is their sales wedge against FPFX; now known to be conditional on staying under the revenue escalators, which matters if we ever buy a bolt-on and is quantified in the TCO comparison (section 2.1).
 
 ### 1.3 FPFX Tech / PropAccount (the calibration anchor)
 
@@ -96,7 +106,7 @@ Legend: ● full, ◐ partial/add-on, ○ absent/unknown. "Merit v1" column = wh
 | Lifecycle messaging (journeys, A/B) | ● | ◐ | ◐ | ○ | ◐ | ◐ | ◐ | ○ | K (Loops/Customer.io) (M10) |
 | Analytics/BI (cohorts, payout health) | ● | ● | ◐ | ○ | ◐ | ● | ◐ | ◐ | K (Metabase) + M6 liability dashboard |
 | Support/ticketing w/ trader context | ● | ◐ | ◐ | ○ | ◐ | ◐ | ◐ | ○ | K (Chatwoot) (M10) |
-| Certificates / share cards | ● | ◐ | ● | ○ | ◐ | ◐ | ◐ | ○ | B (M11) |
+| Certificates / share cards | ● | ● (incl. per-trade) | ● | ○ | ◐ | ◐ | ◐ | ○ | B (M11) |
 | Leaderboards / contests | ◐ | ◐ | ● | ○ | ● | ◐ | ● | ○ | LATER |
 | KYC integration | ● | ● | ◐ | ○ | ● | ● | ◐ | ● | K (dedicated provider, M19) |
 | Trader mobile app | ● | ◐ | ◐ | ● | ● | ◐ | ◐ (PWA) | ○ | LATER (mobile-first web instead) |
@@ -106,6 +116,21 @@ Legend: ● full, ◐ partial/add-on, ○ absent/unknown. "Merit v1" column = wh
 | Public transparency/stats page | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | B (M12), nobody ships this |
 
 Two cells matter most: **no vendor ships a public transparency platform** (M12 is open field), and **no vendor defaults to fully automatic payout approval** (Merit's zero-denial pipeline is structurally differentiated, not just faster).
+
+The Axcera column was re-verified against the February 2026 brochure (primary source, section 1.2): certificates upgraded to full (per-trade certificates ship), and its futures-platform breadth stays ◐ because every platform past the first is a $5K/month add-on.
+
+### 2.1 Three-year TCO comparison (buy vs build, amended 2026-08-14)
+
+Cash outlay over 36 months at Merit's planned scale. Build labor is excluded on the self-build row by design: the constitution's premise is that the founder plus Claude Code are the build, so the comparison is cash out the door.
+
+| Option | Basis | 3-year TCO |
+|---|---|---|
+| **Axcera Futures Solution** | $15K setup + $5K/mo fixed + ~$1K/mo hosting at cost = ~$231K baseline, single platform. The stealth rev-share escalator (+$10K/mo above $250K monthly revenue) and the auto-tier-upgrade (above $150K/mo revenue or 2,500 accounts) put Merit's plan into escalator territory well inside 3 years; each additional futures platform is another $180K over the period | **~$220-280K** |
+| **YPF / QTG** | No public pricing; reported enterprise quotes put the realistic 3-year floor here, before per-account and module add-ons | **~$125K+** |
+| **DXtrade XT** | $12K setup + $4,800/mo = ~$185K, plus $24 per chargeable active account (the entitlement-hygiene trap, section 1.4) | **~$190K+** |
+| **Self-build (Merit)** | Infra only: Neon + Railway + Cloudflare, ~$200/month per the approved ADR-007 stack | **~$7K** |
+
+Three readings. First, the buy options cluster at $125K-280K over 3 years while carrying the constraints Merit's constitution rejects (multi-tenant program editors, review-stage payout defaults, per-account billing). Second, Axcera's brochure makes the buy-side pricing concrete for the first time and it lands at the **top** of the cluster at Merit's plan, because the escalators activate exactly when a firm succeeds. Third, the ~30x gap between any buy option and self-build cash cost is the constitution's build decision restated in vendor-verified numbers; the real cost of self-build is founder time and delivery risk, which the planning corpus exists to control. Platform and data fees (Rithmic IDs, CME data) are common to every row and excluded.
 
 ## 3. MUST / SHOULD / LATER for Merit v1
 
@@ -117,6 +142,8 @@ public stats/transparency page (M12; differentiator, cheap because engine comput
 
 **LATER (explicitly deferred):**
 mobile native apps; leaderboards/contests; n-tier sub-IB trees; no-code program editor (never, by constitution); multi-platform support beyond Rithmic (adapter interface reserved); AI copilot/journal features; progressive cap release (M14, v1.1 per constitution); QuantSentry/RiskGuard-class vendor bolt-on (flag schema designed for it).
+
+**Additions from the Axcera brochure (2026-08-14), all SHOULD/LATER, none v1 MUST:** per-trade certificates (M11); Trustpilot auto-review request on payout settlement (M12, with a mandatory ToS/platform-policy compliance check when specced); free-trial accounts and rule-based promo campaigns (M17); affiliate commission vesting/holds (M8, corroborates the OQ-M8-01 holdback as market practice). Each is recorded in its module plan doc as a drafting input.
 
 ## 4. Features that would change the data model if added later (reserve schema now)
 
@@ -136,7 +163,9 @@ mobile native apps; leaderboards/contests; n-tier sub-IB trees; no-code program 
 - **No contradictions with the constitution found.** The §1 vendor list, the buy-vs-build split, and the single-tenant rationale all survived contact with current data.
 - **Context update (no amendment needed):** ProjectX is no longer licensable (Topstep-exclusive since Feb 2026); the constitution already labeled it Topstep-owned and only directed UX study, which TopstepX still serves.
 - **Calibration confirmation:** FPFX's 14% pass / 45% funded-to-payout aligns with §5.3 bands; no band change proposed.
+- **Wave 1 amendment, 2026-08-14 (no gate reopened).** The actual Axcera Futures Solution brochure (February 2026) was obtained, the doc's first primary vendor source. Folded in: verified pricing (section 1.2), the stealth rev-share gotcha named as a pricing-trap pattern, the 3-year TCO comparison (section 2.1), matrix cell corrections, SHOULD/LATER nuggets routed to M8/M11/M12/M17, and Black Arrow/BookMap/DeepMap added to DATA_CAPABILITIES' inventory. Nothing contradicts an approved decision; the brochure narrows unknowns and strengthens the build case, so the doc stays `approved`.
+- **Corroboration note:** the brochure still lists ProjectX as a supported platform despite the Feb 2026 exclusivity, which dates the platform list and confirms vendor marketing lags market structure. Weigh brochure platform lists as corroborating evidence only.
 
 ## Sources
 
-Key sources cited inline. Primary: [quanttechnology.com](https://quanttechnology.com/yourpropfirm), [axcera.io](https://axcera.io/), [fpfxtech.com](https://www.fpfxtech.com/), [propaccount.com](https://propaccount.com/), [dx.trade](https://dx.trade/prop-trading-technology/), [projectx.com](https://www.projectx.com/index.html), [tickblaze.com](https://tickblaze.com/prop-firm-partner/), [tradetechsolutions.io](https://www.tradetechsolutions.io/), [match-trade.com](https://match-trade.com/products/proptrading/), [propforge.io](https://propforge.io/), [Finance Magnates 300K-account exclusive](https://www.financemagnates.com/forex/analysis/exclusive-only-7-of-300000-prop-trading-accounts-achieved-payouts/), [Finance Magnates on ProjectX](https://www.financemagnates.com/forex/prop-firms-report-futures-prop-tech-provider-projectx-to-end-its-third-party-service-offering/), [MFF help center](https://help.myfundedfutures.com/en/articles/13745661-payout-policy-overview-best-and-fastest-prop-firm-payouts).
+Key sources cited inline. **Primary document: Axcera Futures Solution brochure, February 2026 (on file, obtained 2026-08-14).** Web primaries: [quanttechnology.com](https://quanttechnology.com/yourpropfirm), [axcera.io](https://axcera.io/), [fpfxtech.com](https://www.fpfxtech.com/), [propaccount.com](https://propaccount.com/), [dx.trade](https://dx.trade/prop-trading-technology/), [projectx.com](https://www.projectx.com/index.html), [tickblaze.com](https://tickblaze.com/prop-firm-partner/), [tradetechsolutions.io](https://www.tradetechsolutions.io/), [match-trade.com](https://match-trade.com/products/proptrading/), [propforge.io](https://propforge.io/), [Finance Magnates 300K-account exclusive](https://www.financemagnates.com/forex/analysis/exclusive-only-7-of-300000-prop-trading-accounts-achieved-payouts/), [Finance Magnates on ProjectX](https://www.financemagnates.com/forex/prop-firms-report-futures-prop-tech-provider-projectx-to-end-its-third-party-service-offering/), [MFF help center](https://help.myfundedfutures.com/en/articles/13745661-payout-policy-overview-best-and-fastest-prop-firm-payouts).

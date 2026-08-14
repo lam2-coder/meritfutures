@@ -1,7 +1,7 @@
 ---
 status: review
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M03-billing-checkout.md, M05-payout-system.md, M07-risk-abuse.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # M8: Affiliate System
@@ -295,7 +295,7 @@ The design rule this generalizes to, worth carrying into M9 through M19: **every
 
 ## 10. Open questions for the founder
 
-**OQ-M8-01. Reserve holdback on new affiliates.** Proposed: retain 20 percent of each statement until the chargeback window closes on the underlying purchases, for the first 90 days of an affiliate relationship, falling to zero thereafter. It makes new affiliates carry the risk they introduce, which is where the risk actually is (AS-M8-01), and it is standard practice in high-risk affiliate programs, so it is explicable to partners. It also makes Merit slightly less attractive than a competitor paying in full immediately. This is a commercial judgment.
+**OQ-M8-01. Reserve holdback on new affiliates.** Proposed: retain 20 percent of each statement until the chargeback window closes on the underlying purchases, for the first 90 days of an affiliate relationship, falling to zero thereafter. It makes new affiliates carry the risk they introduce, which is where the risk actually is (AS-M8-01), and it is standard practice in high-risk affiliate programs, so it is explicable to partners. It also makes Merit slightly less attractive than a competitor paying in full immediately. This is a commercial judgment. *Market corroboration (Wave 1 amendment, 2026-08-14): the Axcera Futures Solution brochure (February 2026, primary source; [PROP_TECH_LANDSCAPE section 1.2](../../research/PROP_TECH_LANDSCAPE.md)) ships affiliate commission vesting/holds as a standard feature, so a holdback is explicable to partners as prevailing vendor practice, not a Merit-only friction.*
 
 **OQ-M8-02. The commission rate, and whether it varies by plan.** The constitution says "% of net sale" without fixing it. A flat rate is simple and explicable. A rate that varies by plan lets Merit steer acquisition toward the plans whose economics it prefers, and immediately creates an incentive for affiliates to push a trader onto a plan that suits the affiliate rather than the trader. Recommendation: **flat across plans in v1.** Steering acquisition through commission is a lever that is hard to un-pull once partners have built around it.
 
