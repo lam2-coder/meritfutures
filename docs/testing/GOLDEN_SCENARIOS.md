@@ -38,6 +38,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-172 to GS-178 | Trader analytics and journal: engine parity, history changes, journal isolation, provenance blending, undefined metrics, population leakage, load contention | M13 |
 | GS-179 to GS-185 | Loyalty and retention: cap-release liability, streak incentives, the bright line's composition, inverted win-back targeting, tier discretion, config bypass, calendar-broken streaks | M14 |
 | GS-186 to GS-191 | Discord integration: role disclosure, chat-account-as-credential, bot-token voice, moderation versus enforcement, enforcement by role removal, support in public | M15 |
+| GS-192 to GS-197 | Notification center: freeze notice versus tip-off, muting the alarm first, batch broadcasts, template leakage, proof of notice, new-kind defaults | M16 |
 
 ## 2. Fixture format
 
@@ -402,6 +403,19 @@ Defined by [M15](../plans/M15-discord-integration.md) section 8.2. Every fixture
 | GS-190 | An enforcement closes an account holding a synced role | Removal is deferred into a batch window containing mixed churn, and the trader was notified first. Asserts that a role vanishing at a timestamp publishes a private enforcement to a public room, bypassing the whole two-tier evidence machinery in one API call. AS-M15-05 |
 | GS-191 | An account-specific question asked in a public channel | An automatic routing reply, **no account state disclosed**, and no human answer in channel. Asserts that a public answer is an unlogged support interaction with an audience. AS-M15-06 |
 
-## 23. What is not here yet
+## 23. GS-192 to GS-197: notification center (M16)
+
+Defined by [M16](../plans/M16-notification-center.md) section 8.2. The module's entire failure surface is the class boundary, so four of these six are negative fixtures.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-192 | A freeze notice for an account inside an active investigation | The notice **sends on time**, carrying the ToS clause and the expiry date, and contains no detector, threshold, pattern description, or other identity. Asserts the tension is resolved by changing what the notice contains rather than whether it is sent, because the alternative is the "under review" anti-pattern Merit defined itself against. AS-M16-01, EC-114 |
+| GS-193 | Contact change, then preference mute, then destination change | The **prior contact** receives every security notice, the preference change confirmed to the old contact before taking effect, and the sequence raises a high-severity risk signal. Asserts that a cooling window protects nobody if the person it exists to warn cannot be reached. AS-M16-02, EC-115, pairs with GS-104 |
+| GS-194 | The nightly batch is replayed after a mid-run crash | One coalesced message per **identity**, and zero duplicates on replay; security and money classes stay exempt from coalescing. Asserts that recovery from a batch failure must not itself be a broadcast to the entire trader base. AS-M16-03, pairs with GS-047 |
+| GS-195 | A template referencing a detector name and a population comparison | **Lint failure**; a template referencing published rule values and the trader's own facts passes. Asserts that the boundary is rules versus detection rather than secrecy versus openness, and that it derives from M7's strip registry so the two lists cannot drift. AS-M16-04 |
+| GS-196 | A notice disputed with `read_at` null, and again with `read_at` set | Both answered from **dispatch plus delivery**, and `read_at` is never cited. Asserts that the convenient field is the one that cannot bear the weight a dispute puts on it. AS-M16-05, EC-116 |
+| GS-197 | A migration adds a new notification kind | Marketing defaults **off**, the class is stated in the migration, and an unclassified kind fails the registry test. Asserts that class assignment is a policy decision that otherwise looks like a data row and gets no review. AS-M16-06 |
+
+## 24. What is not here yet
 
 Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
