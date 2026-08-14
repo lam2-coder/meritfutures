@@ -60,9 +60,65 @@ See [docs/STATE.md](docs/STATE.md) for the post-FREEZE position, the nine surviv
 - **Money paths** (rules-engine, payout, ledger, auth): one objective per session, fresh session per slice, `/clear` between unrelated tasks. Context poisoning on these diffs is catastrophic.
 - **Non-money work** (marketing site, docs, fixtures, seed data): longer compounding sessions are permitted.
 
-## Model preferences
-Default: sonnet (routine drafting on approved outlines)
-Escalate to fable-5 for: rules-engine design and edge-case enumeration; schema/API contract docs;
-  security architecture; module plan docs for M1/M2/M5/M7; Phase-0 synthesis; B4 scenario invention
-Opus 4.8 @ xhigh for: long drafting sessions, deep review passes
-Haiku for: changelogs, summaries, bulk mechanical transforms
+## Build cadence (post-FREEZE)
+
+**When to start a fresh session**
+
+| Situation | Action |
+|---|---|
+| Money-path work (migrations, engine, ledger, payout, auth) | **New session every time.** ADR-003, no exceptions |
+| The session reports it is low on context | New session, even mid-file-set |
+| The objective changes | New session |
+| Non-money work (site copy, fixtures, docs) | May compound in one session |
+
+**Read early, merge late.** Migrations are sacred: once merged, never edited, only
+superseded (constitution E2). So the founder's E2 line-by-line read happens
+**incrementally, as each money-path file lands**, while the reasoning behind it is
+still fresh; the **merge happens once**, when the full set exists and is coherent.
+Merging file by file locks `0002` before `0010` has had the chance to prove it wrong.
+
+**Report the count honestly.** "I am at 9 of 27" beats 18 thin files that look
+complete. A session that runs out of context mid-set says so and stops.
+
+### The build-session prompt is a template, not a new prompt each time
+
+Continuing an in-flight file set needs **one line changed**, not a rewrite:
+
+```
+Already written, do not redo: [LIST WHAT LANDED]
+Start at [NEXT FILE] and work forward.
+```
+
+Objective, branch, conventions, settled rulings and stop condition stay identical
+between sessions. Rewriting them invites drift.
+
+### Session sequence
+
+```
+Schema-delta build sessions   -> E2-read each money file as it lands
+Merge the schema branch once  -> after the read, not during
+Planning session: rest of P1  -> scaffold, TradingCalendar, full CI gate inventory
+Build sessions for P1
+Planning session: P2 engine   -> money path, PLAN MODE, the longest pole
+```
+
+## Model preferences (post-FREEZE)
+
+The corpus-phase table routed on document type. Application code routes on **how much
+of the work is novel reasoning versus faithful transcription**.
+
+| Work | Level |
+|---|---|
+| **Planning sessions** (phase plans, engine design, edge-case enumeration) | Highest available. Depth here converts directly into migrations never written. Fable-5 for rules-engine and schema/API contract design, per the corpus-phase instinct |
+| **Money-path implementation** (the E2 files, ledger, payout, auth) | High. The reasoning is settled; the **verification** is the work |
+| **Non-money implementation** (transcription against an approved plan) | Normal to high. Care and context beat peak reasoning; max thinking mostly costs wall-clock |
+| **Deep review passes** (reading across many docs for contradictions) | High |
+| **Mechanical transforms** (manifest updates, INDEX regeneration, changelogs, summaries) | Small and fast |
+
+**A caution learned the hard way.** The reconciliation session's three worst errors
+(a ledger class that did not exist, a debit account that broke ruled recognition
+timing, and a sign written backwards inside the ADR recording the first two) were
+**not capability failures**. Each was a failure to check a claim against the primary
+source. Escalating the model does not fix that class of error; reading the source
+and adding a mechanical assertion does. Prefer a new CI gate over a bigger model
+whenever the error is checkable.
