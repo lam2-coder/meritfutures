@@ -205,8 +205,38 @@ The batch 2 gate ruled that the docs link-check joins the inventory. It arrives 
 | CI-06c | **INDEX completeness**: every tracked document appears in [INDEX](../INDEX.md), and every INDEX row resolves | merge | "If a thing is not in INDEX.md, it does not exist" is a rule with no enforcement until this check exists |
 | CI-06d | **Registry reconciliation**: the counts stated in [EDGE_CASES](../EDGE_CASES.md) and [GOLDEN_SCENARIOS](GOLDEN_SCENARIOS.md) equal the number of entries, and every `GS-nnn` cited anywhere in the corpus exists in the registry | merge | Both counts are quoted in gate summaries, and a quoted count that drifted is a gate decided on a wrong number |
 | CI-06e | **Every `EC-nnn` names a golden scenario reference, and it resolves** | merge | TR-04's second half. An edge case with no fixture is a decision nobody can test |
+| CI-06f | **ADR numbers are unique and gapless.** Every `## ADR-nnn` heading in [DECISIONS](../DECISIONS.md) is distinct; the allocated set runs 001 to the maximum with no holes; and **a pull request may not introduce a number already present on `main` or reserved in the allocation table** | merge | **Fails the second pull request to claim a number, rather than failing the corpus after both have merged.** The ADR number is the corpus's most-cited identifier, and two branches forking from the same `main` will both take "the next one" |
+| CI-06g | **COUNT GATE: no document states a quantity a script can derive**, unless the number sits inside a generated span the script rewrites. CI regenerates every span and fails if the tree changes, and scans for bare numerals adjacent to a registry noun | merge | **Every hand-maintained count in this corpus has drifted. Five for five.** A count is not a fact a document owns; it is a query result somebody pasted |
 
 **A note on why these are merge blockers in a repository with no code.** They are cheap, they are deterministic, and they protect the artifact the entire pre-FREEZE phase produces. The corpus is the deliverable until STATE says FROZEN, and a deliverable with no CI is a deliverable held together by one person's attention.
+
+#### CI-06f, and why gaplessness is asserted over allocated **plus reserved**
+
+**A branch cannot see the numbers its siblings have taken.** Two pull requests forking from the same `main` both read the registry, both find the same maximum, and both claim the next integer; neither is wrong locally and the corpus is broken globally the moment the second merges. That is not hypothetical, it is [ADR-034](../DECISIONS.md)'s own context.
+
+So the check is **not** "the numbers in this file are gapless". It is **gapless over the allocated set union the reservation table**, and a number reserved by an open pull request counts as taken. **A branch that holds a reserved-but-unmerged number therefore shows a hole in `DECISIONS.md` and passes**, which is the correct behavior and the one a naive gapless check gets wrong.
+
+**Heading order is deliberately not asserted.** On `main` today `ADR-005` sits between `ADR-008` and `ADR-009` in file order; the set is still unique and gapless, so this gate passes and should. Reordering a registry that every other document deep-links into buys readability and costs a link sweep, and **a gate nobody agreed to should not be the thing that forces that trade.** Recorded so a future reader does not infer from a green check that the file is sorted.
+
+#### CI-06g, the COUNT GATE, and the two ways to satisfy it
+
+**Either generate the number into the document, or delete it and point at the script.** There is no third option and in particular "check it carefully at the gate" is not one, because that is what was being done.
+
+**The generated form** wraps the number in a comment-delimited span, which renders as the bare number everywhere Markdown is read:
+
+```
+The corpus carries <!--gen:adr_count-->25<!--/gen--> ADRs.
+```
+
+The generator rewrites every span from the artifact it derives from, and **CI fails if regenerating changes the tree.** The number in the document is then a cache of a query, marked as one.
+
+**The pointed form** removes the number: *"the ADR registry is [DECISIONS.md](../DECISIONS.md)"* rather than *"25 ADRs"*. Prefer it wherever the count is decoration. **A count that no reader acts on is a liability with no upside.**
+
+**The query has to be specified, not assumed.** Counting table rows in the `EC` and `GS` registries gives 22 and 301; counting **distinct identifiers** gives the correct 140 and 257. Both are "a script deriving it", and one is wrong. **A generated span is only as good as the named query behind it**, so every key carries its query in the generator rather than in a reader's head.
+
+**Derivable keys at the first run:** `adr_count`, `ec_count`, `gs_count`, `index_entries`, `delta_count`, `migration_files`, and, once `packages/db` exists, the schema-object counts (`tables`, `indexes`, `check_constraints`, `triggers`) taken from a live apply rather than from a reading.
+
+**The gate's first run is a sweep**, and it will find more than the five known instances. That is the point: the five were found by accident, one at a time, and each was found by somebody who happened to be looking.
 
 ### 4.5 The anti-slop gates
 

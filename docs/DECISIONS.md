@@ -18,6 +18,18 @@ Every choice with rationale and alternatives. Constitution amendments are propos
 
 The Open Decisions Register (constitution section 10) resolves into entries here during W1 with the founder: queue tech, ORM, Rithmic ingest path, PSP shortlist, auth provider, hosting, restricted-jurisdiction list, Discord bot scope, KYC placement (M19).
 
+## Number allocation, and why this table exists
+
+**An ADR number is claimed here before it is written.** Two branches forking from the same `main` both read the registry, both find the same maximum, and both take the next integer. Neither is wrong locally; the corpus is broken the moment the second merges. **[ADR-034](#) rules the allocation, and [CI-06f](testing/STRATEGY.md) enforces it.**
+
+| Numbers | Claimed by | State |
+|---|---|---|
+| 001 to 032 | merged to `main` | **allocated.** 026 to 030 are the schema-delta fold; 031 and 032 are the `published_statistics` rulings. **They landed with PR #4 on 2026-08-14**, and their numbers are now cited inside merged migration comments, `DELTA_MANIFEST` and `DATA_MODEL`, which is why they were the ones that did not move |
+| **033** | `claude/builder-reviewer-loop-rykvhs` (PR #5) | **reserved, unmerged.** The citation-reviewer ADR, renumbered from `031` on that branch under the ruling below. **A hole at 033 in this file is expected until PR #5 merges**, and is exactly the case `CI-06f`'s allocated-plus-reserved union exists to pass |
+| **034** | this ruling | **reserved, unmerged** |
+
+**Gaplessness is asserted over allocated plus reserved**, so a branch holding a reserved number shows a hole in this file and passes. A branch inventing an unreserved number fails.
+
 ---
 
 ## ADR-001: Repo root stands in for `merit/`  (2026-08-13, status: proposed)
@@ -978,3 +990,40 @@ The constitution already says why: **"Looks confident is not a signal. AI mistak
   - **The reviewer is available immediately and is not yet mandatory anywhere.** Until the hook question is ruled, invoking it is a session's judgment, and the natural first use is the sixteen money-path migration files awaiting the E2 read.
   - **The ADR numbering skips 026 to 030**, which are claimed by the unmerged `claude/schema-delta-reconciliation` branch. This entry is 031 so the two branches do not collide on a number. Both branches append to the end of this file, so a merge conflict here is expected and resolves by keeping both blocks in numerical order.
   - **A verdict is evidence and is subject to the evidence doctrine** ([MERIT_BUILD_MASTER_PROMPT.md:374](../MERIT_BUILD_MASTER_PROMPT.md)): a PASS with no quoted lines under it is not a PASS, and the verdict format requires the cited claims be listed so the enumeration can be audited rather than trusted.
+
+---
+
+## ADR-034: ADR numbers are allocated, not guessed, and no document states a derivable count  (2026-08-14, status: accepted)
+
+- **Context:** Two open pull requests both claimed **ADR-031** against a `main` whose registry then ended at 025 (PR #4 has since merged, taking 026 to 032 with it). Separately, **five hand-maintained counts in this corpus have been found wrong, and every hand-maintained count that has been checked has been found wrong.** The two problems are the same problem: **a number that lives in prose is a query result somebody pasted, and nothing re-runs the query.**
+- **Decision:** two gates, both merge blockers, both in [STRATEGY section 4.4](testing/STRATEGY.md).
+  1. **CI-06f.** ADR headings are **unique**, the set is **gapless over allocated plus reserved**, and **a pull request may not introduce a number already on `main` or reserved above.** Numbers are claimed in the allocation table at the top of this file **before** the ADR is written.
+  2. **CI-06g, the COUNT GATE.** **No document states a quantity a script can derive**, unless the number sits in a generated span the script rewrites. **Either generate it into the document or delete it and point at the script.**
+
+### The collision, and the ruling on who moves
+
+**PR #4 keeps 031 and 032. PR #5 renumbers to 033.** Not seniority and not merge order: **PR #4's numbers are cited inside migration comments, `DELTA_MANIFEST` and `DATA_MODEL`, and a migration is sacred once merged.** Renumbering PR #4 would mean editing files that are about to become uneditable, or leaving migration comments pointing at an ADR that no longer exists. PR #5's number is cited only within its own branch, so moving it costs a `sed` and a re-read.
+
+**Neither branch did anything wrong**, which is the whole argument for the gate. Both followed the only rule that existed: take the next number. **A convention that two careful people can follow simultaneously and still break is not a convention, it is a race.**
+
+### The evidence for the COUNT GATE: five for five
+
+| Count | Stated | Actual | How it was found |
+|---|---|---|---|
+| Schema deltas in scope | **75** | **88** numbered, 93 total | [ADR-026](#). Wrong **on the day it was recorded**, then quoted by four documents, then given a correct increment on a wrong base |
+| No-floats exemption set | **"now empty"** | **two columns** | Caught only because asserting the stated set would have **failed the migration**. The membership was wrong, not just the size |
+| ADR count in [INDEX](INDEX.md) | **25** | 30 on the branch that added five | Noticed in passing while reading for something else |
+| ADR count in [INDEX](INDEX.md), **again** | **30** | **32** | **Drifted a sixth time, on `main`, on the day this gate was ruled.** PR #4 corrected the number to its own branch's truth and then landed two more ADRs in the same pull request. Found by deriving it, not by reading it |
+| Check constraints / triggers | **342 / 5** in STATE, **345 / 5** in DATA_MODEL | **347 / 6** | Two documents describing one migration set disagreed with each other and both disagreed with the database |
+| "Three rulings changed a column" | **three** | **four**, in the list directly beneath the word | Survived a gate. **The count and its own list were one sentence apart** |
+
+**Six for six, and the sample is every count anybody checked.** The sixth arrived between this ruling being written and its branch being merged, which is the shortest drift interval on record and the least surprising one. There is no reason to believe the unchecked ones are better; the exemption-set entry is the one that matters most, because **the number was wrong in an instruction, not merely in a description**, and it was caught by the schema refusing it rather than by a reader.
+
+**The last row is the one that ends the argument.** A wrong count with the correct list immediately below it, in the same sentence, in a frozen document, past a gate. **No amount of care fixes this class**, because care is what was already being applied.
+
+### What the gate does not do
+
+**It does not make counts trustworthy; it makes them absent or derived.** A generated span can still be generated from the wrong query, and CI-06g cannot tell a right query from a wrong one. What it removes is the failure mode where **the number and its source drift apart silently over months**, which is every instance in the table above.
+
+- **Consequences:** [STRATEGY section 4.4](testing/STRATEGY.md) gains CI-06f and CI-06g. This file gains the allocation table, and claiming a number there is now a step in writing an ADR. [INDEX](INDEX.md)'s two count claims are converted to generated spans as the worked example. **The sweep is the gate's first run and is not done here**: the generator and the CI job arrive with the CI setup, alongside CI-06a to CI-06e, which are likewise specified and not yet wired. **Until then these two gates are documented, not running**, and that is stated rather than implied.
+- **Alternatives considered:** allocate ADR numbers at merge instead of at write time (rejected: the number is cited inside the ADR's own body and across other documents while the branch is in flight, so late allocation moves the edit cost from one `sed` to a corpus-wide rewrite); use a timestamp or a hash instead of a sequence (rejected: the sequence is readable and cited in conversation, and "ADR-031" is worth more than an opaque key); **ban counts outright with no generated form** (rejected: some counts are load-bearing in gate summaries, where deleting the number would make the summary useless); **rely on review** (rejected on the evidence above, five for five, one of them one sentence from its own refutation).
