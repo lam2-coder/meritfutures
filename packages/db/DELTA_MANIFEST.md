@@ -87,7 +87,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M3-04 | `coupons` | add `first_purchase_only`, `applies_to_kind` | 0006 | **landed** |
 | SD-M3-05 | `purchases` | add `checkout_ip_country`, `card_country`, `geo_decision` | 0006 | **landed** |
 | SD-M3-06 | `purchases` | add `payment_method`, `wallet_debit_cents`, `wallet_ledger_transaction_id` | 0006 (fk in 0011) | **landed** |
-| SD-M4-01 | new `certificates` | the row behind a verifiable share card | 0020 | pending |
+| SD-M4-01 | new `certificates` | the row behind a verifiable share card | 0020 | **landed** |
 | SD-M4-02 | `purchases` | add `rule_diff_acknowledged_at` | 0006 | **landed** |
 | SD-M4-03 | `sessions` | add `created_ip`, `created_user_agent`, `last_seen_at`, `last_seen_ip` | 0002 | **landed** |
 | SD-M5-01 | `payout_requests` | add `frozen_at`, `freeze_flag_id`, `freeze_expires_at` | 0010 | **landed** |
@@ -118,15 +118,15 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | Delta | Table | Change | Migration | Status |
 |---|---|---|---|---|
 | SD-M9-01 | `plan_versions` | add `public_slug`, `public_visible` | 0004 | **landed** |
-| SD-M9-02 | new `content_documents` | versioned content with a checksum | 0020 | pending |
-| SD-M9-03 | new `page_revalidations` | revalidation as part of publish's definition of done | 0020 | pending |
+| SD-M9-02 | new `content_documents` | versioned content with a checksum | 0020 | **landed** |
+| SD-M9-03 | new `page_revalidations` | revalidation as part of publish's definition of done | 0020 | **landed** |
 | SD-M10-01 | new `integration_contracts` | per-vendor field allowlist as a row | 0018 | **landed** |
 | SD-M10-02 | new `integration_dispatches` | what was sent, to whom, about whom | 0018 | **landed** |
 | SD-M10-03 | new `support_context_views` | privileged support reads, audited | 0018 | **landed** |
 | SD-M10-04 | `identities` | add `support_contact_ref` | 0002 | **landed** |
-| SD-M11-01 | `certificates` | add `signing_key_id`, `code`, `claims_schema_version` | 0020 | pending |
-| SD-M11-02 | `certificates` | add `revocation_class` | 0020 | pending |
-| SD-M11-03 | `certificates` | add `deferred_until`, `deferred_reason` | 0020 | pending |
+| SD-M11-01 | `certificates` | add `signing_key_id`, `code`, `claims_schema_version` | 0020 | **landed** |
+| SD-M11-02 | `certificates` | add `revocation_class` | 0020 | **landed** |
+| SD-M11-03 | `certificates` | add `deferred_until`, `deferred_reason` | 0020 | **landed** |
 | SD-M11-04 | new `certificate_verifications` | the public oracle's access log | 0025 | pending, **reserved** |
 | SD-M12-01 | new `statistic_definitions` | a statistic is a choice of denominator | 0021 | pending |
 | SD-M12-02 | new `published_statistics` | append-only, with numerator and denominator | 0021 | pending |
@@ -138,11 +138,11 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M14-01 | new `loyalty_states` | derived per day, never a mutable balance | 0023 | pending |
 | SD-M14-02 | new `loyalty_benefit_grants` | which criteria version earned it | 0023 | pending |
 | SD-M14-03 | new `loyalty_criteria` | versioned promises, with `breaks_on` enumerated | 0023 | pending |
-| SD-M15-01 | new `discord_links` | per-role consent | 0019 | pending |
-| SD-M15-02 | new `discord_announcements` | every message, with the event that caused it | 0019 | pending |
-| SD-M16-01 | new `notification_kinds` | the class is the policy, and it lives in data | 0019 | pending |
-| SD-M16-02 | `notifications` | add class, rendered body, delivery split | 0019 | pending |
-| SD-M16-03 | new `contact_channels` | the previous contact must exist as a row | 0019 | pending |
+| SD-M15-01 | new `discord_links` | per-role consent | 0019 | **landed** |
+| SD-M15-02 | new `discord_announcements` | every message, with the event that caused it | 0019 | **landed** |
+| SD-M16-01 | new `notification_kinds` | the class is the policy, and it lives in data | 0019 | **landed** |
+| SD-M16-02 | `notifications` | add class, rendered body, delivery split | 0019 | **landed** |
+| SD-M16-03 | new `contact_channels` | the previous contact must exist as a row | 0019 | **landed** |
 | SD-M17-01 | new `offers` | stated contents before payment | 0024 | pending |
 | SD-M17-02 | new `price_floors` | a hard stop that is not the sum of the discounts | 0024 | pending |
 | SD-M17-03 | new `promotional_credit_grants` | what funded a credit | 0024 | pending |
