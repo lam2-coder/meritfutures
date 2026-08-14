@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # M1: Rules Engine
@@ -286,7 +286,9 @@ The engine reads two things and never anything else: `plan_versions.rules` for s
 
 **Warnings, which do not block but appear in the publish diff:** `required_win_days >= min_trading_days` (the minimum-days gate is dominated and does nothing, EC-042, and this now fires on all three v1 plans by design); `cadence_gap_trading_days + min_settlement_lag_trading_days <= win_days.required_count` (**the cadence gap is dominated by the win-day gate**, EC-049; this fires on Merit Rapid); `cap_cents > buffer_cents` (the first payout leaves less cushion than the plan implies); `cadence_gap_trading_days == 0` combined with `required_win_days <= 1` (approaching an uncapped daily extraction, see AS-01).
 
-**The two anchors are why the cadence warning needs a settlement term.** Win days count from the payout's **basis** day (R-47) and the cadence gap counts from its **effective** day (R-37), so the two gates are not measured from the same origin. Expressed in basis-day terms the gap requires `settlement_lag + gap` trading days and win days require `required_win_days`, which is why a naive `gap <= required_win_days` comparison would wrongly flag Core EOD. `min_settlement_lag_trading_days` is a published configuration constant with the v1 value **2** (the fast end of the confirmed 2 to 3 business day window), not a literal in engine code, precisely so that a faster settlement rail re-runs this comparison instead of quietly invalidating it. At an instant rail the constant is 0 and the warning correctly begins to fire on Core EOD as well.
+**The two anchors are why the cadence warning needs a settlement term, and [ADR-019](../DECISIONS.md) has now driven that term to zero.** Win days count from the payout's **basis** day (R-47) and the cadence gap counts from the **wallet-credit** day (R-37). Under the Merit Wallet the internal leg is instant, so the wallet-credit day *is* the basis day, the two gates are measured from the same origin, and **`min_settlement_lag_trading_days` takes the v1 value 0**. It remains a published configuration constant rather than a literal in engine code, for the same reason it always was: a future change to the settlement model re-runs this comparison instead of quietly invalidating it.
+
+**The consequence, stated because it changes which plans carry the warning.** M01 previously recorded that "at an instant rail the constant is 0 and the warning correctly begins to fire on Core EOD as well". That is now the live case. The comparison is `0 + gap <= required_win_days`, so it fires on **Merit Rapid** (`0 + 1 <= 3`) and on **Core EOD** (`0 + 5 <= 5`), and on Direct identically to Core. On Core EOD and Direct the gap and the win-day gate co-bind at exactly 5 trading days rather than one dominating the other, which is a warning worth seeing in the publish diff but is not the EC-049 pathology: a gate that ties is not a gate that does nothing. On Merit Rapid the gap is genuinely dominated and EC-049 stands.
 
 **Why these are warnings and not errors.** A dominated gate is not wrong, it is inert, and a future plan may want it inert. What is unacceptable is publishing it as a protection. The warning exists so the publish diff makes the founder look at it, and the rule that follows from it is a marketing rule rather than an engine rule: **copy may not describe a dominated gate as a constraint.**
 
@@ -466,8 +468,8 @@ Every gate is evaluated independently and reported gate by gate. `engineEligible
 | R-34 | Win days | `win_days.required_count` | `winDaysCount >= required_count` (`>=`), counted over trading days strictly after `payoutAnchorDay` | GS-006, GS-053 |
 | R-35 | Buffer and withdrawable | `buffer_bp` to `buffer_cents` | `withdrawable = max(0, balance_cents - size_cents - buffer_cents)`. The buffer is permanent and is never withdrawable | GS-025 |
 | R-36 | Funded consistency | `phase_funded.consistency.*` | R-29 arithmetic over the period defined by R-47. Payout-gated: failing **delays** eligibility and never breaches, never denies retroactively | GS-024 |
-| R-37 | Cadence gap | `cadence_gap_trading_days` | `count(trading days d : cadenceAnchorDay < d <= basisDay) >= cadence_gap_trading_days` (`>=`), computed by `calendar.sequence` subtraction. `cadenceAnchorDay` is the last settled payout's **effective** trading day, confirmed at the gate ([ADR-013](../DECISIONS.md)). Passes trivially when it is null (no gap on the first payout). On any plan where `cadence_gap_trading_days <= required_win_days` this gate is **dominated** by R-34 and never binds (EC-049) | GS-059, GS-082, EC-039 |
-| R-38 | One payout in flight | n/a | No request for this account in `approved`, `transferring`, or `frozen`. A **liability control**: without it, one qualifying stretch funds several capped extractions | GS-052, GS-053 |
+| R-37 | Cadence gap | `cadence_gap_trading_days` | `count(trading days d : cadenceAnchorDay < d <= basisDay) >= cadence_gap_trading_days` (`>=`), computed by `calendar.sequence` subtraction. **`cadenceAnchorDay` is the last settled payout's wallet-credit day** ([ADR-019](../DECISIONS.md)), which is the same trading day as its basis day because the internal leg is instant. This **supersedes [ADR-013](../DECISIONS.md)'s effective-day anchor**; the two-anchor structure is unchanged and the two anchors now coincide. Passes trivially when it is null (no gap on the first payout). On any plan where `cadence_gap_trading_days <= required_win_days` this gate is **dominated** by R-34 and never binds (EC-049) | GS-059, GS-082, EC-039 |
+| R-38 | One payout in flight | n/a | **Applies to the external leg only** ([ADR-019](../DECISIONS.md)): no wallet-to-rail withdrawal for this identity in `approved`, `transferring`, or `frozen`. The internal leg completes in one transaction, so there is no window for a second request to arrive inside and AS-01 is structurally resolved rather than gated. The rule survives on the external leg as the liability control it always was | GS-052, GS-053 |
 | R-39 | Minimum payout | `min_payout_cents` | `min(withdrawable, cap) >= 10000` (`>=`, exactly 100.00 is eligible) | GS-042 |
 | R-40 | Context gates | n/a | Account `active` and phase `funded`; KYC `verified`; not `payoutsFrozen` at account or identity level; not `reconBlocked`. Evaluated at read time, excluded from the replayed state | GS-044 |
 | R-41 | Eligibility is the conjunction | n/a | `eligible = engineEligible && contextEligible`, with no shortcut path and no override anywhere in the codebase | INV-15 |
@@ -798,22 +800,26 @@ Steady state afterwards is cheaper, because the buffer is one-time: balance sits
 
 | Anchor | Cycle length | Trader receives per cycle | Per trading day |
 |---|---|---|---|
-| Cadence counted from the settlement's effective day | 2 to 3 settlement days plus 5 gap days = **7 to 8 trading days** | 135,000c | **16,875c to 19,286c** |
-| Cadence counted from the basis day | **5 trading days** | 135,000c | **27,000c** |
+| Cadence counted from the settlement's effective day ([ADR-013](../DECISIONS.md), superseded) | 2 to 3 settlement days plus 5 gap days = **7 to 8 trading days** | 135,000c | **16,875c to 19,286c** |
+| Cadence counted from the basis day, which is the wallet-credit day ([ADR-019](../DECISIONS.md), **live**) | **5 trading days** | 135,000c | **27,000c** |
 
-The constitution states a ceiling of "roughly 190,00 per day". That figure is reproducible **only** under the settlement anchor. **Ruled at the gate: settlement anchored** ([ADR-013](../DECISIONS.md)), so the binding row is the first one and the steady-state ceiling on Core EOD is 16,875 to 19,286 cents per trading day. The second row is retained because it is the counterfactual that made the decision legible, and because anyone who later proposes moving the anchor needs to see what it costs.
+The constitution states a ceiling of "roughly 190,00 per day". That figure is reproducible **only** under the settlement anchor. It was ruled that way at the M1 gate, and **[ADR-019](../DECISIONS.md) has since moved the anchor to the wallet-credit day**, which is the basis day. **The binding row is now the second one**, and Core EOD's steady-state ceiling is **27,000 cents per trading day**. The first row is retained because it is the counterfactual, and because it records exactly what the wallet cost in liability terms.
 
-**The same arithmetic across the lineup**, now that [ADR-015](../DECISIONS.md) has confirmed every parameter. What binds a cycle is `max(required_win_days, cadence gap measured from the effective day)`, because win days reset to the basis day and each one needs its own trading day:
+**Why this does not blow up the reserve model, stated carefully because it is the obvious worry.** [ADR-013](../DECISIONS.md)'s own calibration note records that the founder's Monte Carlo lifecycle simulation was **basis anchored**, which is why settlement anchoring made realized liability *at most* the modeled figure. Returning to the basis anchor therefore **does not exceed the model; it spends the conservatism margin ADR-013 accidentally created.** Realized liability now tracks the model instead of sitting below it. The practical consequence for anyone reading a reserve number: CVaR99 and RE-S-01's calibration bands are central estimates from here on, with no built-in cushion, and they should be treated as such.
+
+**The same arithmetic across the lineup**, at [ADR-018](../DECISIONS.md)'s `w=3` on Merit Rapid and [ADR-019](../DECISIONS.md)'s anchor. What binds a cycle is `max(required_win_days, cadence_gap)`, both now measured from the same basis day, because win days reset to that day and each one needs its own trading day:
 
 | Plan (50K) | Cap to trader | Binding gate | Cycle | Per trading day |
 |---|---|---|---|---|
-| Core EOD | 135,000c | cadence gap, 5 trading days after the effective day | 7 to 8 trading days | 16,875c to 19,286c |
-| Merit Rapid | 90,000c | **win days, 5**, the 1 day gap never binds | 5 trading days | 18,000c |
-| Direct | 135,000c | cadence gap, 5 trading days after the effective day | 7 to 8 trading days | 16,875c to 19,286c |
+| Core EOD | 135,000c | win days and the 5 day gap, **co-binding** | 5 trading days | 27,000c |
+| Merit Rapid | 90,000c | **win days, 3** ([ADR-018](../DECISIONS.md)); the 1 day gap never binds | 3 trading days | 30,000c |
+| Direct | 135,000c | win days and the 5 day gap, **co-binding** | 5 trading days | 27,000c |
 
-All three land on the constitution's approximately $190 per day design ceiling, which is a meaningful check: the ceiling is a property of the lineup rather than a coincidence on one plan. The Merit Rapid row is also the finding that corrected OQ-1's cadence estimate and produced OQ-12.
+**The lineup no longer lands on a single design ceiling, and that is the deliberate outcome of two rulings rather than a drift.** The constitution's approximately $190 per day figure belonged to the settlement anchor and does not survive the wallet. The three plans now sit between 27,000c and 30,000c per trading day, which is a tighter spread than before but at a materially higher level, and the founder's `w=3` recalibration ([ADR-018](../DECISIONS.md): firm dollars per funded account $889, funded-to-payout 48.1 percent, 2.09 payouts per payer, roughly 18 percent margin) is the evidence that the higher level is priced.
 
-**Lifetime bound.** 8 settled payouts at 135,000c is 1,080,000c to the trader, over roughly 5 + 7 x 7.5 = 57.5 trading days, or about eleven and a half calendar weeks. INV-17 asserts the bound; GS-055 pins the path.
+**One number in that table does not reconcile and is flagged rather than reconciled by assertion.** ADR-018 records a per-day ceiling of approximately **$240** (24,000c) from the recalibrated simulation. The Merit Rapid row above derives **30,000c** from the published parameters: a 100,000c cap, a 9000bp split, and a 3 trading day cycle. The two differ by roughly 25 percent, in the direction where the model understates extraction. **Neither number is silently preferred.** The $240 figure is the number of record until `research/calibration/mc_lifecycle.py` is committed, at which point the arithmetic above is checked against the model and one of them is corrected in writing. Tracked in [STATE](../STATE.md) and in [SIMULATION_HARNESS](../testing/SIMULATION_HARNESS.md).
+
+**Lifetime bound.** 8 settled payouts at 135,000c is 1,080,000c to the trader, over roughly 5 x 8 = 40 trading days on Core EOD, or about eight calendar weeks, down from eleven and a half under the settlement anchor. INV-17 asserts the bound; GS-055 pins the path.
 
 ### AS-04: The locked floor as a free option (NOVEL)
 
@@ -1008,7 +1014,7 @@ One page, four panels: gate funnel (how many funded accounts sit at each failing
 
 | OQ | Ruling | Where it landed in this document |
 |---|---|---|
-| OQ-1 | Settlement anchored. Rapid Daily renamed **Merit Rapid**, cadence published honestly | R-37, R-46, AS-03, Appendix A |
+| OQ-1 | Settlement anchored. Rapid Daily renamed **Merit Rapid**, cadence published honestly. **The anchor half is superseded by [ADR-019](../DECISIONS.md)**, which moved it to the wallet-credit day; the rename and the honesty requirement stand | R-37, R-46, AS-03, Appendix A |
 | OQ-2 | Confirmed. Three plain-language placements are now requirements on M04 and M10 | R-31 and its following paragraph |
 | OQ-3 | Confirmed from `mc_lifecycle.py OUR_PLANS`, matching every proposal. Funded min days 0 | Appendix A, R-33, CV-19 |
 | OQ-4 | Approved. X = 10,000c, lock enabled on all three plans | R-15, Appendix A |
@@ -1019,17 +1025,21 @@ One page, four panels: gate funnel (how many funded accounts sit at each failing
 | OQ-9 | Confirmed. The dilution number is displayed at all times | section 4, AS-13 |
 | OQ-10 | Confirmed. Absorbed total is a named admin line; favorable patterns flag | AS-05 |
 | OQ-11 | Confirmed, including trader-favorable bugfixes | Appendix B.4 |
+| **OQ-12** | **Resolved at the batch 1 gate as [ADR-018](../DECISIONS.md): Merit Rapid `w=3`, a 3 trading day cycle** | section 10.2, AS-03, Appendix A.2 and A.4 |
 
-### 10.2 The question the rulings raised
+### 10.2 The question the rulings raised, and how it was answered
 
-**OQ-12 (open, non-blocking). Merit Rapid's cadence is set by its win-day gate, not by its cadence gap.**
-OQ-1 estimated Merit Rapid's practical cadence at 3 to 4 trading days from the settlement window plus the one-in-flight rule. That estimate was made before OQ-3 fixed the win-day count, and it is wrong. With `required_win_days = 5` and win days resetting to the **basis** day (R-47), the trader needs 5 trading days after the basis day before another request can qualify, and the 2 to 3 day settlement leg fits entirely inside that window. The honest number is **about one payout per 5 trading days**, roughly weekly, and the 1 day cadence gap on that plan is a dominated gate that never binds (EC-049).
+**OQ-12 (RESOLVED at the batch 1 gate, 2026-08-14, as [ADR-018](../DECISIONS.md): `w=3`). Merit Rapid's cadence is set by its win-day gate, not by its cadence gap.**
 
-Two things follow, and both are the founder's call rather than the engine's:
-1. **The published copy is now computable and must say 5 trading days**, not 3 to 4, and must not attribute the plan's speed to its 1 day gap.
-2. **An instant settlement rail does not make this plan daily.** The settlement leg is already hidden behind the win-day gate. The only lever on Merit Rapid's cadence is `win_days.required_count`, and moving it is a liability decision: dropping to 1 win day gives roughly 30,000 cents per trading day on the current rail and roughly 45,000 on an instant rail, against a design ceiling of about 19,000. Holding the ceiling at a 2 trading day cycle would require the cap to fall to about 42,000c ($420).
+*The finding, as originally recorded.* OQ-1 estimated Merit Rapid's practical cadence at 3 to 4 trading days from the settlement window plus the one-in-flight rule. That estimate was made before OQ-3 fixed the win-day count, and it was wrong. With `required_win_days = 5` and win days resetting to the **basis** day (R-47), the trader needed 5 trading days after the basis day before another request could qualify, and the 2 to 3 day settlement leg fitted entirely inside that window. The honest number was **about one payout per 5 trading days**, roughly weekly, and the 1 day cadence gap on that plan was a dominated gate that never binds (EC-049).
 
-Every option is a config edit. No engine change is implied by any of them, which is why this does not block M02 through M08.
+Two things followed, and both were the founder's call rather than the engine's:
+1. **The published copy is computable**, and must not attribute the plan's speed to its 1 day gap.
+2. **An instant settlement rail does not make this plan daily.** The settlement leg was already hidden behind the win-day gate. The only lever on Merit Rapid's cadence is `win_days.required_count`, and moving it is a liability decision.
+
+*The ruling.* **`win_days.required_count = 3`**, giving a **3 trading day cycle**, with `min_trading_days` unchanged at 0. The founder re-ran the lifecycle simulation at `w=3` and recorded the unit economics that justify it: firm dollars per funded account $889, funded-to-payout conversion 48.1 percent, 2.09 payouts per paying account, roughly 18 percent margin, and a recorded per-day ceiling of approximately $240. Dropping to 1 win day was rejected on this document's own arithmetic; holding the old ceiling by cutting the cap to about 42,000c ($420) was rejected as a worse product than a slower cadence.
+
+As predicted, no engine change was implied: the ruling is a single value in `plan_versions`, and Appendix A.2 and A.4 are re-materialized around it. **Two consequences were not predicted here and are recorded where they belong rather than left in a resolved question.** [ADR-019](../DECISIONS.md)'s wallet moved the cadence anchor to the basis day, which changed every plan's cycle and not only this one (see AS-03). And the recalibrated $240 per-day figure does not reconcile with the 30,000c this document's parameters imply, which is now an open item against the committed calibration source rather than a settled number.
 
 ### 10.3 The questions as originally asked
 
@@ -1107,19 +1117,19 @@ Three parameters are now identical across all three plans and are stated once he
 | Floor lock enabled | n/a | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
 | Floor lock at profit | n/a | 135,000 | 260,000 | 510,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
 | Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
-| Win days required | n/a | 5 | 5 | 5 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md). **This is the gate that sets the plan's cadence, see OQ-12** |
+| Win days required | n/a | **3** | **3** | **3** | **[ADR-018](../DECISIONS.md)**, recalibrated `research/calibration/mc_lifecycle.py OUR_PLANS`. **This is the gate that sets the plan's cadence** |
 | Win day floor | 30 | 7,500 | 15,000 | 30,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
 | Buffer | 200 | 50,000 | 100,000 | 200,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
 | Funded consistency | 4000 | 4000bp | 4000bp | 4000bp | constitution 0.4 |
 | Funded minimum trading days | n/a | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
-| Cadence gap, trading days | n/a | 1 | 1 | 1 | constitution 0.4. **Dominated by the win-day gate and never binds** (EC-049); publish-time warning fires by design |
+| Cadence gap, trading days | n/a | 1 | 1 | 1 | constitution 0.4. **Dominated by the win-day gate and never binds** (EC-049); publish-time warning fires by design, and fires more strongly at `w=3` because [ADR-019](../DECISIONS.md) drove the settlement term to 0 |
 | Payout cap | 200 | 50,000 | 100,000 | 200,000 | constitution 0.4 (1,000.00 at 50K) |
 | Split | 9000 | 9000bp | 9000bp | 9000bp | constitution 0.4 |
 | Ladder | n/a | 8 | 8 | 8 | constitution 0.4 |
 | Maximum accounts per entity | n/a | 5 | 5 | 5 | constitution 0.4 |
 | Daily loss limit | n/a | none | none | none | constitution 0.4 |
 
-**Published cadence copy for this plan, binding on M09 and M04:** one payout per cycle of about **5 trading days**, set by the 5 win-day requirement. Settlement takes 2 to 3 business days and runs inside that window, so it does not add to it. The 1 day cadence gap may not be described as the reason the plan is fast.
+**Published cadence copy for this plan, binding on M09 and M04:** one payout per cycle of about **3 trading days**, set by the 3 win-day requirement ([ADR-018](../DECISIONS.md)). Under [ADR-019](../DECISIONS.md) the payout lands in the trader's Merit Wallet the same day it is approved, so nothing in the cycle waits on a bank; the 2 to 3 business day window applies only to an external withdrawal from the wallet and is published as such. The 1 day cadence gap may not be described as the reason the plan is fast, because it never binds.
 
 ### A.3 Direct, instant funded (`direct`)
 
@@ -1153,12 +1163,17 @@ Every CV rule that could plausibly fail on these numbers, checked at 50K. This e
 | CV-11, `buffer > lock offset` | 100,000 > 10,000 ✓ | 100,000 > 10,000 ✓ | 150,000 > 10,000 ✓ |
 | CV-12, lock trigger equals drawdown plus offset | 260,000 = 250,000 + 10,000 ✓ | 260,000 = 250,000 + 10,000 ✓ | 210,000 = 200,000 + 10,000 ✓ |
 | CV-17, only when the lock is disabled | not applicable ✓ | not applicable ✓ | not applicable ✓ |
-| Warning: min-days gate dominated | fires (0 <= 5) | fires (0 <= 5) | fires (0 <= 5) |
-| Warning: cadence gap dominated by win days, `2 + gap <= win_days` | not fired (2+5=7 > 5) | **fires** (2+1=3 <= 5) | not fired (2+5=7 > 5) |
+| CV-05, `required_win_days >= 1` | 5 >= 1 ✓ | **3 >= 1 ✓** | 5 >= 1 ✓ |
+| Warning: min-days gate dominated | fires (0 <= 5) | fires (0 <= 3) | fires (0 <= 5) |
+| Warning: cadence gap dominated by win days, `min_settlement_lag + gap <= win_days`, **lag now 0** | **fires** (0+5=5 <= 5), co-binding | **fires** (0+1=1 <= 3), genuinely dominated | **fires** (0+5=5 <= 5), co-binding |
 | Warning: `cap > buffer` | fires (150,000 > 100,000) | not fired (100,000 = 100,000) | not fired (150,000 = 150,000) |
 | INV-21 worst case: post-payout balance versus floor | size+100,000 vs at most size+10,000 ✓ | size+100,000 vs at most size+10,000 ✓ | size+150,000 vs at most size+10,000 ✓ |
 
-Two rows deserve a sentence. **Core EOD's cadence gap is not dominated** even though its gap and win-day count are both 5, because the gap starts counting only after the money lands: in basis-day terms it asks for 7 to 8 trading days against the win-day gate's 5, so the gap is the binding constraint on that plan and the plan's published cadence is honestly the gap. **Merit Rapid's is dominated**, which is OQ-12. And the `cap > buffer` warning firing on Core EOD alone is the plain statement that a Core trader's first extraction takes more out than the cushion the plan leaves behind, which is true, intended, and exactly the sort of thing that should appear in a publish diff rather than in a support ticket.
+Three rows deserve a sentence, and the cadence row changed meaning at this gate.
+
+**The cadence warning now fires on all three plans, and it means two different things.** [ADR-019](../DECISIONS.md) moved the cadence anchor to the wallet-credit day and drove `min_settlement_lag_trading_days` to 0, so the comparison lost the settlement term that used to keep Core EOD clear of it. On **Core EOD and Direct** the gap and the win-day gate now tie at 5 trading days: they **co-bind**, neither is redundant, and either one moving would change the plan's cadence. That is worth seeing in a publish diff and it is **not** the EC-049 pathology, because a gate that ties is not a gate that does nothing. On **Merit Rapid** at `w=3` the gap is genuinely dominated (1 against 3) and EC-049 stands unchanged: that gap can never bind and may not be published as a protection or as the reason the plan is fast. **The warning's text must therefore distinguish co-binding from dominated**, or it will be read as three identical problems and dismissed as three identical false positives, which is exactly the [AS-M6-02](M06-admin-ops-console.md) failure applied to a publish gate.
+
+And the `cap > buffer` warning firing on Core EOD alone is the plain statement that a Core trader's first extraction takes more out than the cushion the plan leaves behind, which is true, intended, and exactly the sort of thing that should appear in a publish diff rather than in a support ticket.
 
 ---
 
