@@ -61,7 +61,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans and rules, publish-ordered revalidation, stats render, versioned legal and content, geo disclosure | review | founder |
 | [M10-integrations.md](plans/M10-integrations.md) | One outbound bus: contract allowlists, send-time suppression, support-context scoping, replica exclusion, vendor-down chaos | review | founder |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Issuance, signing key lifecycle, non-enumerable verification, revocation classes, deferred per-trade cards, opt-in leaderboard | review | founder |
-| [M12-transparency-platform.md](plans/M12-transparency-platform.md) | Public trailing pass rates and payout stats, auto-computed | draft | claude |
+| [M12-transparency-platform.md](plans/M12-transparency-platform.md) | **Launch differentiator.** Seven auto-computed statistics with versioned definitions, immutable history and restatement, proof links, compliant review requests | review | founder |
 | [M13-trader-analytics-journal.md](plans/M13-trader-analytics-journal.md) | Per-account performance breakdowns | draft | claude |
 | [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | Progressive cap release, streaks, win-backs | draft | claude |
 | [M15-discord-integration.md](plans/M15-discord-integration.md) | Role sync, announcements bot | draft | claude |
