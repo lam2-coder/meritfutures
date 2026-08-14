@@ -135,20 +135,20 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M13-01 | new `round_trips` | versioned fill grouping | 0022 | **landed** |
 | SD-M13-02 | new `journal_entries` | soft delete with a hard-delete job | 0022 | **landed** |
 | SD-M13-03 | new `analytics_snapshots` | computed once per closed day | 0022 | **landed** |
-| SD-M14-01 | new `loyalty_states` | derived per day, never a mutable balance | 0023 | pending |
-| SD-M14-02 | new `loyalty_benefit_grants` | which criteria version earned it | 0023 | pending |
-| SD-M14-03 | new `loyalty_criteria` | versioned promises, with `breaks_on` enumerated | 0023 | pending |
+| SD-M14-01 | new `loyalty_states` | derived per day, never a mutable balance | 0023 | **landed** |
+| SD-M14-02 | new `loyalty_benefit_grants` | which criteria version earned it | 0023 | **landed** |
+| SD-M14-03 | new `loyalty_criteria` | versioned promises, with `breaks_on` enumerated | 0023 | **landed** |
 | SD-M15-01 | new `discord_links` | per-role consent | 0019 | **landed** |
 | SD-M15-02 | new `discord_announcements` | every message, with the event that caused it | 0019 | **landed** |
 | SD-M16-01 | new `notification_kinds` | the class is the policy, and it lives in data | 0019 | **landed** |
 | SD-M16-02 | `notifications` | add class, rendered body, delivery split | 0019 | **landed** |
 | SD-M16-03 | new `contact_channels` | the previous contact must exist as a row | 0019 | **landed** |
-| SD-M17-01 | new `offers` | stated contents before payment | 0024 | pending |
-| SD-M17-02 | new `price_floors` | a hard stop that is not the sum of the discounts | 0024 | pending |
-| SD-M17-03 | new `promotional_credit_grants` | what funded a credit | 0024 | pending |
-| SD-M17-04 | new `offer_experiments` | no enum value for a rule | 0024 | pending |
+| SD-M17-01 | new `offers` | stated contents before payment | 0024 | **landed** |
+| SD-M17-02 | new `price_floors` | a hard stop that is not the sum of the discounts | 0024 | **landed** |
+| SD-M17-03 | new `promotional_credit_grants` | what funded a credit | 0024 | **landed** |
+| SD-M17-04 | new `offer_experiments` | no enum value for a rule | 0024 | **landed** |
 | SD-M18-01 | `accounts` | add `graduated_at`, `graduation_path`, `terminal_settlement_id` | 0007 | **landed** |
-| SD-M18-02 | new `graduation_benefits` | accrual with a stated basis | 0023 | pending |
+| SD-M18-02 | new `graduation_benefits` | accrual with a stated basis | 0023 | **landed** |
 | SD-M18-03 | new `graduation_invitations` | shape decided before commercial pressure decides it | 0025 | pending, **reserved** |
 | SD-M19-01 | `kyc_verifications` | add `verification_purpose`, `supersedes`, `liveness_passed`, `liveness_method` | 0003 | **landed** |
 | SD-M19-02 | new `sanctions_screenings` | its own object with a review trail | 0003 | **landed** |
