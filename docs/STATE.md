@@ -82,7 +82,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 | 6 | **Launch-time parameter re-confirmation.** Every value is a config row, and the standing rule requires a deliberate confirmation rather than an inherited one | Launch | founder |
 | 7 | **The `promotional_credit` loyalty perk's build**, per OQ-FREEZE-01 as ruled | M14 | claude, build phase |
 | 8 | **Post-beta KYC trigger adjudication** on the funnel and corpus-coverage telemetry | Nothing. A config array | founder, post-beta |
-| 9 | **The schema-delta reconciliation.** The first build session, below | The first line of application code | claude |
+| 9 | ~~**The schema-delta reconciliation.**~~ **LANDED 2026-08-14**, pending the founder's E2 read. See below | The first line of application code | claude, done; founder reads |
 
 ---
 
@@ -100,12 +100,28 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ---
 
+---
+
+## The schema-delta reconciliation has landed (2026-08-14, item 9)
+
+**All 93 schema changes are folded. 27 migration files at [`packages/db/migrations`](../packages/db/migrations), verified to apply in order against PostgreSQL 16** (96 tables, 326 indexes, 342 check constraints, 5 triggers). Every delta traces to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../packages/db/DELTA_MANIFEST.md), which is the file [ADR-026](DECISIONS.md)'s completeness gate reads. **No delta was rejected.**
+
+**Nothing merges without the founder's E2 line-by-line read.** Sixteen files carry an `E2 READ: MONEY PATH` header naming what in them needs it and why. The install check proves the set is installable and **proves nothing about whether a delta was folded correctly**, which is the whole reason E2 exists.
+
+**Three things the fold produced that need a founder decision or a follow-on session:**
+
+| # | Item | Why it matters |
+|---|---|---|
+| **A** | **A sixth unnumbered change.** `provisioning_status` gains `confirmed_inferred` ([M02 section 3.2](plans/M02-rithmic-bridge.md), AS-M2-03), which ADR-026's table of five does not carry. **It is folded**; what is open is whether the count in scope is 93 or **94**, and `0001`'s inline marker cites `SD-M2-06` for it, which is the `reconciliations` delta | The manifest gate exists so an uncounted change cannot hide. It caught one. **Founder rules: a `U-06` entry, or a finding that a state-machine value in an approved plan is not a schema change for this purpose** |
+| **B** | **[ADR-030](DECISIONS.md)'s stale list is wrong in two of four.** `win_days.required_count: 5` and `phase_eval.min_trading_days: 1` are Core EOD's **frozen** values per [M01 Appendix A.1](plans/M01-rules-engine.md). `w = 3` is Merit Rapid's | Following the list would have put **Merit Rapid's cadence on Core EOD's contract**. Recorded in the amended section 11, not applied |
+| **C** | **DATA_MODEL is only partly at post-migration truth.** Sections 3, 8, 11 and the new 17 are amended; **the table-by-table rewrite of sections 4 through 10 is not done** | Until it is, those tables are read **together with** the manifest. `liability_snapshots` in particular exists in two shapes: the migration follows `SD-M6-01`, and section 8's RCR fields have no home in the folded shape |
+
 ## Blocked
 
 Nothing.
 
 ## Next 3 actions
 
-1. **The schema-delta reconciliation session**, in plan mode, fresh context.
+1. **The founder's E2 read** on the sixteen money-path migration files, and rulings on items A and B above. Nothing merges first.
 2. **In parallel, the three calendar items**: book the vendor call, book the counsel sitting, and send the PSP applications the day the capital decision lands.
-3. **Re-run and commit `mc_lifecycle.py`** at the corpus configuration, closing the last calibration gap.
+3. **The DATA_MODEL table-by-table rewrite** (item C), then the CI manifest and append-only-grant gates, then the first module against this schema.
