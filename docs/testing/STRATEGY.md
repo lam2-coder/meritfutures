@@ -216,6 +216,8 @@ The batch 2 gate ruled that the docs link-check joins the inventory. It arrives 
 
 So the check is **not** "the numbers in this file are gapless". It is **gapless over the allocated set union the reservation table**, and a number reserved by an open pull request counts as taken. **A branch that holds a reserved-but-unmerged number therefore shows a hole in `DECISIONS.md` and passes**, which is the correct behavior and the one a naive gapless check gets wrong.
 
+**Heading order is deliberately not asserted.** On `main` today `ADR-005` sits between `ADR-008` and `ADR-009` in file order; the set is still unique and gapless, so this gate passes and should. Reordering a registry that every other document deep-links into buys readability and costs a link sweep, and **a gate nobody agreed to should not be the thing that forces that trade.** Recorded so a future reader does not infer from a green check that the file is sorted.
+
 #### CI-06g, the COUNT GATE, and the two ways to satisfy it
 
 **Either generate the number into the document, or delete it and point at the script.** There is no third option and in particular "check it carefully at the gate" is not one, because that is what was being done.
