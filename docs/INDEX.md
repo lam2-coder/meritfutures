@@ -1,7 +1,7 @@
 ---
 status: draft
 depends_on: []
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # INDEX: The Map
@@ -12,7 +12,8 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [MERIT_BUILD_MASTER_PROMPT.md](../MERIT_BUILD_MASTER_PROMPT.md) | The constitution. Read-only; amendments via DECISIONS.md | approved | founder |
-| [CLAUDE.md](../CLAUDE.md) | Lean session brain: rituals, conventions, model routing | draft | founder |
+| [CLAUDE.md](../CLAUDE.md) | Lean session brain: rituals, git workflow, conventions, model routing | draft | founder |
+| [.claude/settings.json](../.claude/settings.json) | Committed hook set. Corpus phase: `SessionStart` pull, `Stop` push ([ADR-D1](DECISIONS.md)) | approved | founder |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |
@@ -46,17 +47,17 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | approved | founder |
 | [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | approved | founder |
 
-## docs/plans/ (Wave 3, dependency order, M1 first always)
+## docs/plans/ (Wave 3, dependency order, M1 first always. **Batch 1 gate closed 2026-08-14**)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [M01-rules-engine.md](plans/M01-rules-engine.md) | The crown jewel: 50-rule taxonomy, pure library, replay self-audit. **Gate closed 2026-08-13** | approved | founder |
-| [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning CSVs, ingest, reconciliation, simulator, 14 vendor-confirmation items | review | founder |
-| [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargeback handling, MID failover | review | founder |
-| [M04-trader-portal.md](plans/M04-trader-portal.md) | Next.js portal: dashboard, payout center, certificates, Appendix F gate | review | founder |
-| [M05-payout-system.md](plans/M05-payout-system.md) | Instant auto-approve pipeline, ledger, Rise, bounded freeze, reserve | review | founder |
-| [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard, CUSUM, breakers, evidence packs, dual control | review | founder |
-| [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution two-tier, 11 detectors, flags queue, canaries | review | founder |
-| [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, NFA I-26-12 creative approval | review | founder |
+| [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning CSVs, ingest, reconciliation, simulator, streaming path, **16 vendor-confirmation items**. Held at `review` by [ADR-005](DECISIONS.md) until the vendor call | review | founder |
+| [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargeback handling, MID failover, **wallet as a payment method** | approved | founder |
+| [M04-trader-portal.md](plans/M04-trader-portal.md) | Next.js portal: dashboard, payout center, **wallet screen**, **indicative live layer**, certificates, Appendix F gate | approved | founder |
+| [M05-payout-system.md](plans/M05-payout-system.md) | **Two-leg payouts**: instant wallet credit, external rail withdrawal, ledger, bounded freeze, reserve | approved | founder |
+| [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard **including wallet balances**, CUSUM, breakers, two-tier evidence packs, dual control | approved | founder |
+| [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution two-tier, **14 detectors**, copy-trading clause, flags queue, canaries | approved | founder |
+| [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, destination cooling, NFA I-26-12 creative approval | approved | founder |
 | [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans/rules, stats page, legal pages | draft | claude |
 | [M10-integrations.md](plans/M10-integrations.md) | Chatwoot, Metabase, Loops, Sentry, Discord alerts | draft | claude |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Signed, verifiable pass/payout share cards | draft | claude |
@@ -73,8 +74,8 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [STRATEGY.md](testing/STRATEGY.md) | Section 5 instantiated with tooling choices | draft | claude |
-| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (127 defined; GS-001 to GS-083 approved with M01, GS-084+ under review with their module) | approved | founder |
-| [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | Monte-Carlo population port spec, CI calibration bands | draft | claude |
+| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (**140 defined**; GS-001 to GS-083 approved with M01, GS-084 to GS-140 approved with their module except M02's) | approved | founder |
+| [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | Monte-Carlo population port spec, CI calibration bands. Carries the Wave 4 inputs the gate rulings changed | draft | claude |
 | [ops/runbooks/README.md](ops/runbooks/README.md) | Section 7: one runbook per failure class | draft | claude |
 | [design/DESIGN_SYSTEM.md](design/DESIGN_SYSTEM.md) | Appendix F instantiated: tokens locked before any UI | draft | claude |
-| [legal/README.md](legal/README.md) | ToS/disclosure drafts, sim-language blocks, geo list | draft | claude |
+| [legal/README.md](legal/README.md) | ToS/disclosure drafts, sim-language blocks, geo list. Carries the copy-trading clause and the wallet counsel agenda | draft | claude |
