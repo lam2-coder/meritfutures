@@ -219,7 +219,7 @@ Retention: forever (AML obligation), PII minimal by construction.
 | Column | Type | Constraints | Why |
 |---|---|---|---|
 | `id` | uuid | pk | |
-| `code` | text | not null, unique | `core_eod`, `rapid_daily`, `direct` |
+| `code` | text | not null, unique | `core_eod`, `merit_rapid`, `direct` (renamed from `rapid_daily` at the M1 gate, [ADR-013](../DECISIONS.md)) |
 | `name` | text | not null | display |
 | `is_active` | boolean | not null default true | delisting never deletes |
 | `sort_order` | integer | not null default 0 | |
@@ -856,7 +856,7 @@ Retention: 30 days. Replaying a key returns the stored response verbatim.
       "lock": { "enabled": true, "at_profit_cents": null, "floor_at_cents": null }
     },
     "daily_loss_limit": { "type": "none", "amount_bp": null },
-    "min_trading_days": 5,
+    "min_trading_days": 0,
     "win_days": { "required_count": 5, "floor_bp": 30, "reset_on_payout": true },
     "consistency": { "enabled": true, "max_day_share_bp": 3000, "mode": "payout_gated" },
     "buffer_bp": 200,
@@ -865,7 +865,7 @@ Retention: 30 days. Replaying a key returns the stored response verbatim.
     "min_payout_cents": 10000,
     "split_bp": 9000,
     "ladder": { "payouts_to_graduate": 8 },
-    "post_payout_floor_rule": { "mode": "reset_to_balance_minus_dd", "amount_cents": null }
+    "post_payout_floor_rule": { "mode": "none" }
   },
   "limits": { "max_accounts_per_entity": 10 },
   "kyc": { "placement": "pre_funded" }
@@ -873,6 +873,10 @@ Retention: 30 days. Replaying a key returns the stored response verbatim.
 ```
 
 Notes that matter: `payout_cap_schedule` is an **array from day one** even though v1 has one step, because progressive cap release is a known v1.1 candidate and turning a scalar into a schedule later is a migration plus a config rewrite. `mode` on consistency is explicit so nobody has to remember which phase behaves how. `max_days: null` means unlimited.
+
+**Amended at the M1 gate (2026-08-13).** Two fields above changed and are called out because this document is `approved` and a silent edit to a money-path contract is exactly what the corpus exists to prevent. `phase_funded.min_trading_days` is **0** on all three plans, which disables the gate rather than setting it low ([ADR-015](../DECISIONS.md), CV-19). `post_payout_floor_rule.mode` is **`none`** and `amount_cents` is dropped, because settlement no longer touches the floor at all ([ADR-014](../DECISIONS.md), CV-18). The funded `lock` block is populated on all three plans, at `floor_at_cents = size_cents + 10000` and `at_profit_cents = drawdown_cents + 10000`.
+
+**M1's ten schema deltas are approved and not yet folded into the tables above.** SD-01 through SD-10 in [M01 section 2.3](../plans/M01-rules-engine.md) were approved with that plan and must be read together with this document until they land as one reviewed migration. They are: `daily_marks.adjustment_cents`; `rule_states.payout_anchor_day` and `cadence_anchor_day` replacing `last_payout_trading_day`; `payout_requests.settled_trading_day` and `effective_trading_day`; `rule_states.floor_open_cents`; the partial unique index on `payout_requests (account_id, payout_ordinal) where status <> 'failed'`; `rule_states.engine_eligible` with `engine_gates` and `context_gates` split; `rule_states.consistency_period_start_day`; `rule_states.state_hash`; the partial unique index on `payout_requests (account_id) where status in ('approved','transferring','frozen')`; and the conditional not-null on the two `floor_lock_*` columns. Folding them in is the next tracked action in [STATE](../STATE.md).
 
 ## 12. Reserved-now fields, and what each buys
 

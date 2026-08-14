@@ -48,7 +48,7 @@ The scheduled job that ingests the day's [ingest files](#ingest-file), normalize
 ## Part 2: Plans and configuration
 
 ## plan
-A named product family (Core EOD, Rapid Daily, Direct). A plan has no rules of its own; its rules live in [plan versions](#plan-version).
+A named product family (Core EOD, Merit Rapid, Direct), with codes `core_eod`, `merit_rapid`, `direct`. A plan has no rules of its own; its rules live in [plan versions](#plan-version). "Merit Rapid" was called "Rapid Daily" in the constitution and was renamed at the M1 gate ([ADR-013](DECISIONS.md)) because its real cadence is about one payout per 5 trading days, not one per day.
 
 ## plan version
 An immutable, versioned rule configuration plus the published copy blocks that describe it. An [account](#account) is permanently bound to the plan version it was sold under. Publishing a new version never mutates existing accounts. "The rules at the time" is always provable because the version is pinned on the account and snapshotted on every [eligibility snapshot](#eligibility-snapshot).
@@ -89,7 +89,7 @@ Floor = (maximum end-of-day balance ever achieved) minus (drawdown amount). The 
 Config: `drawdown.type = "trailing_eod"`.
 
 ## floor lock
-The rule that stops a trailing floor from trailing once the account reaches a configured profit threshold, fixing the floor at [account size](#account-size) plus a configured amount (typically the point at which the trader's capital is protected). Locking is permanent for the account.
+The rule that stops a trailing floor from trailing once the account reaches a configured profit threshold, fixing the floor at [account size](#account-size) plus a configured amount (typically the point at which the trader's capital is protected). Locking is permanent for the account: the high-water balance stops updating at the same moment, which is what makes the floor immutable rather than merely capped. **Enabled on all three v1 plans at account size plus 10,000 cents ($100)**, engaging at exactly `drawdown + 10,000c` of closing profit so that the trailing floor is already sitting at the lock value when it engages and the floor never jumps ([ADR-014](DECISIONS.md)).
 Config: `drawdown.lock.enabled`, `drawdown.lock.at_profit_cents`, `drawdown.lock.floor_at_cents`.
 
 ## static drawdown
@@ -100,7 +100,7 @@ Config: `drawdown.type = "static"`.
 Floor trails real-time equity including unrealized profit. Supported by config for future use and **not used in v1**, because Merit computes from end-of-day marks and delegates intraday enforcement to Rithmic. Named here so the term is never confused with [trailing-EOD](#trailing-eod-drawdown) in copy: several competitors use intraday trailing and it is the most complained-about mechanic in the industry.
 
 ## daily loss limit (DLL)
-A per-day loss threshold. Two modes: **soft** (flatten or pause; in v1 Merit flags only, because Rithmic's auto-liquidator performs the enforcement) and **hard** (counts as a [breach](#breach)). Configured per plan.
+A per-day loss threshold. Two modes: **soft** (flatten or pause; in v1 Merit flags only, because Rithmic's auto-liquidator performs the enforcement) and **hard** (counts as a [breach](#breach)). A hard limit breaches when the day's realized loss is **more than** the limit (strict `>`), so a loss exactly at the limit survives, matching the [floor](#floor) comparison's strict `<`. No v1 plan configures a limit; the operator is fixed now so the two breach comparators can never disagree by accident later.
 Config: `daily_loss_limit.type = "none" | "soft" | "hard"`, `daily_loss_limit.amount_bp`.
 
 ## breach
@@ -110,7 +110,7 @@ A terminal rule violation that closes the account. Breach is evaluated on the da
 Rithmic's server-side risk enforcement. Merit pushes max-loss risk settings per account via provisioning; Rithmic liquidates positions when a threshold is hit, whether or not the trader is connected. Merit never builds streaming risk in v1. The EOD report records the liquidation event, time, and trigger, which becomes [evidence](#evidence-pack).
 
 ## auto-liquidation setpoint
-The max-loss value Merit pushes to Rithmic for an account. **Decided and binding: the setpoint sits AT the account's current [floor](#floor)**, not above it and not below it, and it is re-pushed whenever the floor moves (a new end-of-day high, a [floor lock](#floor-lock), or a [post-payout floor recompute](#post-payout-floor-rule)).
+The max-loss value Merit pushes to Rithmic for an account. **Decided and binding: the setpoint sits AT the account's current [floor](#floor)**, not above it and not below it, and it is re-pushed whenever the floor moves, which since [ADR-013 and ADR-014](DECISIONS.md) can only happen for two reasons: a new end-of-day high, or a [floor lock](#floor-lock). Both move the floor **up**, so a setpoint that is stale is always too permissive rather than too strict, which is the safe direction.
 The consequence is the one place where a vendor's real-time behavior and Merit's end-of-day arithmetic meet, so it is stated exactly: a clean liquidation leaves the day's low **exactly at** the floor and the account **survives**, because [breach](#breach) is `low < floor` and never `low <= floor`. A liquidation that slips through the floor leaves the low **below** it and the account **breaches**. Traders therefore experience the auto-liquidator as the thing that saves them and slippage as the thing that ends them, which is both true and publishable. All three cases (one tick above the floor, exactly at the floor, one tick below) are pinned by golden files.
 
 ---
@@ -125,7 +125,7 @@ The eval profit threshold, in bp of account size, measured on closing balance ve
 Config: `phase_eval.profit_target_bp`.
 
 ## minimum trading days
-The count of [traded days](#traded-day) required before the phase can be passed (eval) or a payout can be requested (funded). Compared with `>=`.
+The count of [traded days](#traded-day) required before the phase can be passed (eval) or a payout can be requested (funded). Compared with `>=`. **A value of 0 disables the gate**, which then reports `pass: true, skipped: true` and renders as disabled rather than as satisfied, because a gate that cannot fail must say so (EC-050). All three v1 plans configure 0 in the funded phase ([ADR-015](DECISIONS.md)); the eval value is unaffected and is at least 1.
 Config: `min_trading_days`.
 
 ## traded day
@@ -160,7 +160,8 @@ The window over which funded consistency is measured: profit since the later of 
 Binding edge case: the consistency check is **skipped entirely unless total period profit is strictly greater than zero**. A zero or negative denominator makes the ratio meaningless, so the gate passes by definition and the trader is never blocked by an undefined comparison.
 
 ## cadence gap
-The minimum number of [trading days](#trading-day) that must elapse between payouts, counted from the last **settled** payout. Compared with `>=`. Denied or frozen requests do not reset the gap, because a request that produced no money must not cost the trader time.
+The minimum number of [trading days](#trading-day) that must elapse between payouts, counted from the last settled payout's **effective** trading day, meaning the first trading day whose opening balance reflects the withdrawal ([ADR-013](DECISIONS.md)). Compared with `>=`. Denied or frozen requests do not reset the gap, because a request that produced no money must not cost the trader time.
+The gap is measured from a different day than the [win day](#win-day) reset, which uses the same payout's **basis** day. That is deliberate: the gap governs liability rate, so it starts when money leaves; win days govern earned progress, so they start from the day the decision was computed against, and a trader keeps the progress they made while waiting for the transfer. On a plan where `cadence_gap + settlement lag` is at most the required win-day count, this gate is dominated by the win-day gate and does not bind (EC-049).
 Config: `cadence_gap_trading_days`.
 
 ## payout cap
@@ -192,8 +193,8 @@ Config: `ladder.payouts_to_graduate`.
 Automatic closure of a funded account on reaching the ladder count, with status `graduated` and a live-program invitation event. The live program itself is post-launch; v1 records the invitation and closes the simulated account.
 
 ## post-payout floor rule
-How the [floor](#floor) is recomputed after a settled payout. Two configured modes: reset the floor to (new balance minus drawdown), or lock it at (account size plus a configured amount). Chosen per plan and published.
-Config: `post_payout_floor_rule.mode`, `post_payout_floor_rule.amount_cents`.
+**Retired in v1.** A settled payout reduces the balance and does not touch the [floor](#floor), the high-water balance, or the [floor lock](#floor-lock) ([ADR-014](DECISIONS.md)). The constitution's two configured modes (reset the floor to new balance minus drawdown, or lock at account size plus an amount) are both unused; the config key is retained and pinned to `none` by validation so it cannot be quietly reintroduced. The trader-facing consequence, which must be published in these words: **after a payout your loss room is your [buffer](#buffer)**, or the buffer minus $100 once the floor has locked, not the full drawdown.
+Config: `post_payout_floor_rule.mode = "none"`.
 
 ---
 

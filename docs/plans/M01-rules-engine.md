@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md]
 last_updated: 2026-08-13
 ---
@@ -7,6 +7,8 @@ last_updated: 2026-08-13
 # M1: Rules Engine
 
 **The crown jewel. Built first, with its test suite, before any UI.** Constitution section M1, Appendix B5 ten-section template, Appendix C5 escalation tier.
+
+**Approved at the M1 gate on 2026-08-13.** All eleven open questions were ruled on; the rulings are recorded in [DECISIONS.md](../DECISIONS.md#m1-gate-closure-2026-08-13) and are folded into the body of this document rather than appended to it. Three of them changed the specification: [ADR-013](../DECISIONS.md) fixed the cadence anchor and renamed Rapid Daily to **Merit Rapid**, [ADR-014](../DECISIONS.md) removed the post-payout floor recompute and enabled the floor lock on all three plans, and [ADR-015](../DECISIONS.md) sourced the previously unspecified plan parameters and set funded minimum trading days to 0. Section 10 now records what was decided and the one question the rulings themselves raised.
 
 This document exists to be implemented from, not interpreted from. The bar it is written to: a competent TypeScript engineer who has read [GLOSSARY.md](../GLOSSARY.md) and [DATA_MODEL.md](../architecture/DATA_MODEL.md) and nothing else about Merit can build the entire engine from this file without asking a question. Where a decision is genuinely still the founder's, it appears in section 10 and nowhere else, so the rest of the document contains no soft spots.
 
@@ -112,7 +114,7 @@ Each is enforced somewhere real. "Enforced by review" is not an entry in this ta
 | INV-03 | All ratios are integer basis points, compared by cross-multiplication, never division | RE-U-029, code review against R-29 |
 | INV-04 | Replaying every mark from day one reproduces stored state byte-identically | Nightly self-audit job, GS-071, Appendix B |
 | INV-05 | `withdrawable_cents >= 0` always | Formula floors at zero (R-35), check constraint, property RE-P-05 |
-| INV-06 | The floor never decreases while trailing, within a phase, absent a post-payout recompute | Property RE-P-01, GS-010 |
+| INV-06 | The floor never decreases. No exception, no phase qualifier, no settlement carve-out ([ADR-014](../DECISIONS.md)) | Property RE-P-01, GS-010, GS-081 |
 | INV-07 | A locked floor never changes again for the life of the account | Property RE-P-02, GS-016 |
 | INV-08 | The win-day count never decreases except when the payout anchor advances | Property RE-P-03 |
 | INV-09 | The traded-day count never decreases | Property RE-P-04 |
@@ -127,7 +129,7 @@ Each is enforced somewhere real. "Enforced by review" is not an entry in this ta
 | INV-18 | `mark.opening_balance_cents == prior.balance_cents + mark.adjustment_cents` | Asserted at DO-3, violation raises reconciliation (EC-047) |
 | INV-19 | `mark.closing_balance_cents == mark.opening_balance_cents + mark.realized_pnl_cents` | Asserted at DO-3 |
 | INV-20 | The first funded mark opens at exactly `size_cents` | Asserted at DO-3 on the phase-transition boundary, GS-070 |
-| INV-21 | A settled payout can never breach the account that earned it | Derived from R-19 plus CV-11, GS-065 |
+| INV-21 | A settled payout can never breach the account that earned it | Derived from CV-11 (lock enabled) and CV-17 (lock disabled), GS-065, GS-083 |
 | INV-22 | No settled payout's `eligibility_snapshot` is ever rewritten, by replay, by correction, or by an engine upgrade | Append-only grant, Appendix B protocol, GS-074 |
 | INV-23 | Context gates (frozen, recon, KYC, in flight) never enter the replayed state or its hash | SD-06, Appendix B |
 | INV-24 | The engine emits events but never commands: nothing it returns moves money by itself | Output type carries facts only; M5 posts the ledger |
@@ -272,14 +274,21 @@ The engine reads two things and never anything else: `plan_versions.rules` for s
 | CV-08 | `cadence_gap_trading_days >= 0` | |
 | CV-09 | `payout_cap_schedule` is non-empty, starts at `from_ordinal: 1`, ordinals strictly increase, every `cap_cents > 0` | A gap in the schedule leaves an ordinal with no cap |
 | CV-10 | every `cap_cents >= min_payout_cents` | Otherwise no payout at that rung can ever satisfy the minimum, and the account is permanently ineligible while looking healthy (GS-076) |
-| CV-11 | when `drawdown.lock.enabled`, `buffer_cents > (floor_lock_floor_at_cents - size_cents)` | This is what guarantees INV-21: after any capped payout the balance is at least `size + buffer`, which stays above a locked floor |
+| CV-11 | when `drawdown.lock.enabled`, `buffer_cents > (floor_lock_floor_at_cents - size_cents)` | Half of INV-21. Since the floor never exceeds `floor_lock_floor_at_cents` while the lock is enabled (pre-lock it is strictly below by CV-12, post-lock it equals it), and a post-payout balance is always at least `size + buffer`, this inequality is what stops a payout from breaching the account that earned it. Load bearing since [ADR-014](../DECISIONS.md) removed the post-payout reset |
 | CV-12 | when `drawdown.lock.enabled`, `floor_lock_at_profit_cents == drawdown_cents + (floor_lock_floor_at_cents - size_cents)` | Forces the lock to engage exactly where the trailing floor already sits, so the floor never jumps. See R-15 |
 | CV-13 | `0 < split_bp <= 10000` | |
 | CV-14 | `ladder.payouts_to_graduate >= 1` | |
 | CV-15 | `min_payout_cents == 10000` | Fixed by GLOSSARY and never scaled by size. Stated as validation so a well-meaning config edit cannot quietly move it |
 | CV-16 | `daily_loss_limit.type` in `none`, `soft`, `hard`, and `daily_loss_limit_cents` present when not `none` | |
+| CV-17 | when `drawdown.type = "trailing_eod"` and **not** `drawdown.lock.enabled`, every `cap_cents` in the schedule `< drawdown_cents` | The other half of INV-21, and it exists only because [ADR-014](../DECISIONS.md) removed the post-payout reset. Without a reset the floor stays put while a payout drops the balance, so a payout taken on a new closing high moves the balance down by `cap` against a floor sitting `drawdown` below the same high. If `cap >= drawdown`, **the payout breaches the account that earned it.** No v1 plan can reach this (all three enable the lock, and CV-11 covers that case), which is exactly why it has to be validated rather than remembered (GS-083) |
+| CV-18 | `post_payout_floor_rule.mode == "none"` | The key is retired but retained, per [ADR-014](../DECISIONS.md). Stated as validation for the same reason as CV-15: a well-meaning config edit must not be able to quietly reintroduce a floor recompute that no rule, test, or published copy accounts for |
+| CV-19 | `phase_funded.min_trading_days >= 0`, and **0 means the gate is disabled** and reports `pass: true, skipped: true` | [ADR-015](../DECISIONS.md) sets it to 0 on all three plans. A disabled gate must be visibly disabled in the eligibility breakdown, using the same `skipped` shape as the consistency denominator rule, so no trader or support agent ever sees a gate that reads as satisfied when it was never evaluated (GS-080) |
 
-**Warnings, which do not block but appear in the publish diff:** `required_win_days >= min_trading_days` (the minimum-days gate is dominated and does nothing, EC-042); `cap_cents > buffer_cents` (the first payout leaves less cushion than the plan implies); `cadence_gap_trading_days == 0` combined with `required_win_days <= 1` (approaching an uncapped daily extraction, see AS-01).
+**Warnings, which do not block but appear in the publish diff:** `required_win_days >= min_trading_days` (the minimum-days gate is dominated and does nothing, EC-042, and this now fires on all three v1 plans by design); `cadence_gap_trading_days + min_settlement_lag_trading_days <= win_days.required_count` (**the cadence gap is dominated by the win-day gate**, EC-049; this fires on Merit Rapid); `cap_cents > buffer_cents` (the first payout leaves less cushion than the plan implies); `cadence_gap_trading_days == 0` combined with `required_win_days <= 1` (approaching an uncapped daily extraction, see AS-01).
+
+**The two anchors are why the cadence warning needs a settlement term.** Win days count from the payout's **basis** day (R-47) and the cadence gap counts from its **effective** day (R-37), so the two gates are not measured from the same origin. Expressed in basis-day terms the gap requires `settlement_lag + gap` trading days and win days require `required_win_days`, which is why a naive `gap <= required_win_days` comparison would wrongly flag Core EOD. `min_settlement_lag_trading_days` is a published configuration constant with the v1 value **2** (the fast end of the confirmed 2 to 3 business day window), not a literal in engine code, precisely so that a faster settlement rail re-runs this comparison instead of quietly invalidating it. At an instant rail the constant is 0 and the warning correctly begins to fire on Core EOD as well.
+
+**Why these are warnings and not errors.** A dominated gate is not wrong, it is inert, and a future plan may want it inert. What is unacceptable is publishing it as a protection. The warning exists so the publish diff makes the founder look at it, and the rule that follows from it is a marketing rule rather than an engine rule: **copy may not describe a dominated gate as a constraint.**
 
 ---
 
@@ -305,7 +314,7 @@ flowchart TD
 | Step | What happens | Rules |
 |---|---|---|
 | DO-1 | Reject unless: the account is open, `mark.tradingDay` is a calendar trading day, no live state exists for that day already (idempotence, INV-14), and `mark.tradingDay > prior.tradingDay` | R-02, R-06 |
-| DO-2 | For each settlement whose `effectiveTradingDay` equals today, call `applySettlement` in ordinal order. This advances both anchors, increments `payoutsSettledCount`, recomputes the floor, resets win days and the consistency period, and may graduate the account | R-46 to R-50 |
+| DO-2 | For each settlement whose `effectiveTradingDay` equals today, call `applySettlement` in ordinal order. This reduces the balance, advances both anchors, increments `payoutsSettledCount`, resets win days and the consistency period, and may graduate the account. **It does not touch the floor** ([ADR-014](../DECISIONS.md), R-19, R-48) | R-46 to R-50 |
 | DO-3 | Assert INV-18, INV-19, INV-20. A failure does not throw: it returns an `AssertionFailure`, the batch raises reconciliation, and **no state is written for the day** | R-07, R-10 |
 | DO-4 | Compare `mark.lowBalanceCents` against `state.floorCents` carried from the previous day, which is written to `floorOpenCents`. Then the hard daily loss limit, if configured | R-18, R-21, R-22 |
 | DO-5 | On breach: phase to `closed`, `breached = true`, emit `breach.detected`. Nothing after this runs. Breach beats every pass, target, and eligibility condition that the same day might also satisfy | R-24, R-25 |
@@ -364,17 +373,25 @@ Two transitions deserve their own sentence because they are where money and fair
 stateDiagram-v2
     [*] --> trailing: R-12, floor = size - drawdown
     trailing --> trailing: R-13, new closing high raises hwb and floor
-    trailing --> trailing: R-19, settled payout recomputes floor per post_payout_floor_rule
     trailing --> locked: R-15, profit reaches floor_lock_at_profit_cents
-    locked --> locked: every subsequent day, floor is immutable
+    locked --> locked: every subsequent day, hwb stops updating, floor is immutable
     note right of locked
       Locking is permanent for the life of the account.
-      A post-payout recompute does not unlock and
-      does not move a locked floor (R-19c).
+      A settlement never moves the floor in either
+      direction (R-19, R-48, ADR-014).
     end note
 ```
 
 For a `static` drawdown the machine has one state: `floor = size - drawdown`, forever (R-16).
+
+**The whole floor, in one expression** ([ADR-014](../DECISIONS.md)). Every rule in group C is a consequence of this and of the fact that `hwb` stops updating at the lock:
+
+```
+floor(d) = max( hwb(d) - drawdown_cents ,
+                floorLocked ? floor_lock_floor_at_cents : size_cents - drawdown_cents )
+```
+
+The `max` is redundant given the update order (trailing only raises, and the lock freezes `hwb` exactly where the trailing floor already equals the locked value, by CV-12). It is written this way because it is the founder's binding formulation, because it makes INV-06 self-evident rather than derived, and because a reader who is trying to break the engine should be able to see in one line that **no term in the floor can ever go down.** A settlement appears nowhere in it, which is the entire content of the OQ-5 ruling.
 
 ### 3.5 The complete rule taxonomy
 
@@ -406,21 +423,21 @@ Fifty rules. Every one carries its config field, its exact arithmetic in integer
 | ID | Rule | Config | Arithmetic and operator | Pinned by |
 |---|---|---|---|---|
 | R-12 | Initial floor | `drawdown.amount_bp` to `drawdown_cents` | `floor = size_cents - drawdown_cents` at account open, and again at the funded reset with the funded drawdown | GS-008 |
-| R-13 | Trailing-EOD floor | `drawdown.type = "trailing_eod"` | `hwb' = max(hwb, closing_balance_cents)`; `floor' = hwb' - drawdown_cents`. Uses the **closing** balance only; the intraday high never raises it | GS-009, GS-011 |
-| R-14 | The floor never retreats while trailing | n/a | Follows from `max`. Asserted separately because a post-payout recompute is the only legal exception | GS-010 |
-| R-15 | Floor lock | `drawdown.lock.*` to `floor_lock_at_profit_cents`, `floor_lock_floor_at_cents` | Trigger: `closing_balance_cents - size_cents >= floor_lock_at_profit_cents` (`>=`). Effect: `floor = floor_lock_floor_at_cents`, `floorLocked = true`, permanently. CV-12 forces the trigger to sit exactly where the trailing floor already is, so **the floor never jumps** | GS-015, GS-016 |
+| R-13 | Trailing-EOD floor | `drawdown.type = "trailing_eod"` | `hwb' = max(hwb, closing_balance_cents)`; `floor' = hwb' - drawdown_cents`. Uses the **closing** balance only; the intraday high never raises it. `hwb` stops updating once `floorLocked` | GS-009, GS-011 |
+| R-14 | The floor never retreats | n/a | Follows from `max`. Asserted separately because it is the property a future change is most likely to break, and since [ADR-014](../DECISIONS.md) it has **no exceptions at all** | GS-010, GS-081 |
+| R-15 | Floor lock | `drawdown.lock.*` to `floor_lock_at_profit_cents`, `floor_lock_floor_at_cents` | Trigger: `closing_balance_cents - size_cents >= floor_lock_at_profit_cents` (`>=`). Effect: `floor = floor_lock_floor_at_cents`, `floorLocked = true`, `hwb` frozen, all permanently. CV-12 forces the trigger to sit exactly where the trailing floor already is, so **the floor never jumps**. Enabled on all three v1 plans at `floor_lock_floor_at_cents = size_cents + 10,000c` ([ADR-014](../DECISIONS.md)) | GS-015, GS-016 |
 | R-16 | Static drawdown | `drawdown.type = "static"` | `floor = size_cents - drawdown_cents` for the life of the account | RE-U-016 |
 | R-17 | Intraday trailing is config-supported and unimplemented | `drawdown.type = "intraday_trailing"` | Rejected at publish by CV-01 | GS-078 |
 | R-18 | The breach comparator is the floor **at the open** | n/a | `floorOpenCents = prior.floorCents`. Trailing happens at DO-7, strictly after the breach check at DO-4 | GS-012 |
-| R-19 | Post-payout floor recompute | `post_payout_floor_rule.mode` | (a) `reset_to_balance_minus_dd`: `hwb = balance_after_withdrawal`, `floor = hwb - drawdown_cents`. (b) `lock_at_size_plus`: `floor = size_cents + amount_cents`, `floorLocked = true`. (c) If already locked, neither mode moves the floor | GS-065, RE-U-019 |
-| R-20 | The auto-liquidation setpoint pushed to the platform equals the current floor | n/a | Re-pushed whenever the floor moves. A clean liquidation lands exactly on the floor and survives; slippage below it breaches | GS-013, GS-014, D-M2-3 |
+| R-19 | **There is no post-payout floor recompute** | `post_payout_floor_rule.mode = "none"`, CV-18 | A settled payout reduces `balanceCents` and changes nothing else about the floor: `floorCents`, `highWaterBalanceCents`, and `floorLocked` all carry through untouched. The trader's loss room after an extraction is therefore the [buffer](../GLOSSARY.md#buffer), or the buffer minus the lock offset once locked, and that is what the rules page must say ([ADR-014](../DECISIONS.md)) | GS-081, GS-065, RE-U-019 |
+| R-20 | The auto-liquidation setpoint pushed to the platform equals the current floor | n/a | Re-pushed whenever the floor moves. A clean liquidation lands exactly on the floor and survives; slippage below it breaches. Since [ADR-014](../DECISIONS.md) the floor only ever moves **up**, so a stale setpoint is always too permissive rather than too strict, which is the safe direction for the trader and a bounded, measurable cost to the firm (D-M2-3) | GS-013, GS-014, D-M2-3 |
 
 #### Group D: breach
 
 | ID | Rule | Config | Arithmetic and operator | Pinned by |
 |---|---|---|---|---|
 | R-21 | Floor breach | n/a | `low_balance_cents < floorOpenCents` (**strict `<`**, touching the floor is not a breach) | GS-013, GS-014 |
-| R-22 | Hard daily loss limit | `daily_loss_limit.type = "hard"` | `-realized_pnl_cents >= daily_loss_limit_cents` (`>=`). Note the asymmetry with R-21 and see OQ-6 | RE-U-022 |
+| R-22 | Hard daily loss limit | `daily_loss_limit.type = "hard"` | `-realized_pnl_cents > daily_loss_limit_cents` (**strict `>`**, a loss exactly at the limit survives). Aligned with R-21's strict `<` at the M1 gate (OQ-6), **amending the approved STATE_MACHINES G-BREACH guard**, which carried `>=`. Published as "more than". No v1 plan configures a daily loss limit | RE-U-022, GS-079 |
 | R-23 | Soft daily loss limit | `daily_loss_limit.type = "soft"` | Never a breach. The engine emits a fact; Rithmic performs any enforcement | RE-U-023 |
 | R-24 | Breach is terminal and immediate | n/a | Phase to `closed`, no further state is ever written for the account | GS-063, INV-12 |
 | R-25 | Breach beats everything on the same day | n/a | Ordering law DO-4 before DO-8. No `phase.passed`, no eligibility, no graduation | GS-063, GS-064 |
@@ -445,11 +462,11 @@ Every gate is evaluated independently and reported gate by gate. `engineEligible
 
 | ID | Gate | Config | Arithmetic and operator | Pinned by |
 |---|---|---|---|---|
-| R-33 | Minimum trading days | `phase_funded.min_trading_days` | `tradedDaysCount >= min_trading_days` (`>=`), counted from the funded reset, not from account open | RE-U-033 |
+| R-33 | Minimum trading days | `phase_funded.min_trading_days` | `tradedDaysCount >= min_trading_days` (`>=`), counted from the funded reset, not from account open. **Configured 0 on all three v1 plans, which disables the gate**: it reports `pass: true, skipped: true` and is rendered as disabled rather than as satisfied (CV-19, [ADR-015](../DECISIONS.md)) | RE-U-033, GS-080 |
 | R-34 | Win days | `win_days.required_count` | `winDaysCount >= required_count` (`>=`), counted over trading days strictly after `payoutAnchorDay` | GS-006, GS-053 |
 | R-35 | Buffer and withdrawable | `buffer_bp` to `buffer_cents` | `withdrawable = max(0, balance_cents - size_cents - buffer_cents)`. The buffer is permanent and is never withdrawable | GS-025 |
 | R-36 | Funded consistency | `phase_funded.consistency.*` | R-29 arithmetic over the period defined by R-47. Payout-gated: failing **delays** eligibility and never breaches, never denies retroactively | GS-024 |
-| R-37 | Cadence gap | `cadence_gap_trading_days` | `count(trading days d : cadenceAnchorDay < d <= basisDay) >= cadence_gap_trading_days` (`>=`), computed by `calendar.sequence` subtraction. Passes trivially when `cadenceAnchorDay` is null (no gap on the first payout) | GS-059, EC-039 |
+| R-37 | Cadence gap | `cadence_gap_trading_days` | `count(trading days d : cadenceAnchorDay < d <= basisDay) >= cadence_gap_trading_days` (`>=`), computed by `calendar.sequence` subtraction. `cadenceAnchorDay` is the last settled payout's **effective** trading day, confirmed at the gate ([ADR-013](../DECISIONS.md)). Passes trivially when it is null (no gap on the first payout). On any plan where `cadence_gap_trading_days <= required_win_days` this gate is **dominated** by R-34 and never binds (EC-049) | GS-059, GS-082, EC-039 |
 | R-38 | One payout in flight | n/a | No request for this account in `approved`, `transferring`, or `frozen`. A **liability control**: without it, one qualifying stretch funds several capped extractions | GS-052, GS-053 |
 | R-39 | Minimum payout | `min_payout_cents` | `min(withdrawable, cap) >= 10000` (`>=`, exactly 100.00 is eligible) | GS-042 |
 | R-40 | Context gates | n/a | Account `active` and phase `funded`; KYC `verified`; not `payoutsFrozen` at account or identity level; not `reconBlocked`. Evaluated at read time, excluded from the replayed state | GS-044 |
@@ -468,9 +485,9 @@ Every gate is evaluated independently and reported gate by gate. `engineEligible
 
 | ID | Rule | Config | Arithmetic and operator | Pinned by |
 |---|---|---|---|---|
-| R-46 | Settlement advances both anchors | n/a | `payoutAnchorDay = fact.basisTradingDay`; `cadenceAnchorDay = fact.effectiveTradingDay`. Both stored, both replayable | EC-039 |
+| R-46 | Settlement advances both anchors | n/a | `payoutAnchorDay = fact.basisTradingDay`; `cadenceAnchorDay = fact.effectiveTradingDay`. Both stored, both replayable. Confirmed at the gate, [ADR-013](../DECISIONS.md) | EC-039, GS-082 |
 | R-47 | Win days and the consistency period reset on settlement, anchored to the basis day | `win_days.reset_on_payout` | `winDaysCount = count of win days d > payoutAnchorDay`; `consistencyPeriodStartDay = the next trading day after payoutAnchorDay`. Progress earned during the transfer window is **kept**, because it happened after the snapshot the payout was based on | GS-053, GS-068 |
-| R-48 | Floor recompute on settlement | `post_payout_floor_rule` | R-19, applied at the open of `effectiveTradingDay`, in the same step as the balance adjustment, so balance and floor move together | GS-065, INV-21 |
+| R-48 | **The floor is untouched by settlement** | `post_payout_floor_rule.mode = "none"` | R-19. The balance falls at the open of `effectiveTradingDay`; `floorCents`, `highWaterBalanceCents`, and `floorLocked` are carried through unchanged. INV-21 is guaranteed by config validation (CV-11, CV-17) rather than by a compensating recompute, which is the stronger arrangement because it fails at publish time instead of at settlement time | GS-065, GS-081, INV-21 |
 | R-49 | Ladder graduation | `ladder.payouts_to_graduate` | `payoutsSettledCount >= payouts_to_graduate` (`>=`), evaluated immediately after a settlement. Phase to `graduated`, account closed, live invitation emitted | GS-067 |
 | R-50 | Lifetime accounting | n/a | `lifetimeSettledCents += approvedCents`. INV-17 bounds it at `ladder * max cap` | RE-P-17 |
 
@@ -538,7 +555,8 @@ export function advanceDay(input: DayInput): DayOutput {
     periodProfit = periodProfit + mark.realizedPnlCents;
   }
 
-  // DO-7 trail, then lock
+  // DO-7 trail, then lock. Both guarded by !floorLocked, which is what freezes hwb at the lock
+  // and makes the floor expression in section 3.4 resolve to the locked value forever after.
   let hwb = s.highWaterBalanceCents;
   let floor = s.floorCents;
   let floorLocked = s.floorLocked;
@@ -552,6 +570,10 @@ export function advanceDay(input: DayInput): DayOutput {
     floorLocked = true;
     events.push(floorLockedEvent(s, floor));
   }
+  // R-14 tripwire. No input can reach this; only a future edit to the two blocks above can.
+  // It throws rather than returning an AssertionFailure because it is not a data problem
+  // (contrast DO-3, where the vendor's arithmetic is what failed).
+  if (floor < s.floorCents) throw new EngineInvariantError('INV-06');
 
   s = { ...s, tradingDay: mark.tradingDay, balanceCents: mark.closingBalanceCents,
         floorOpenCents: floorOpen, floorCents: floor, floorLocked, highWaterBalanceCents: hwb,
@@ -620,19 +642,11 @@ export function applySettlement(s: RuleState, plan: ResolvedPlan, fact: Settleme
   const events: EngineEvent[] = [];
   const balance = s.balanceCents - fact.approvedCents;
 
-  let floor = s.floorCents, hwb = s.highWaterBalanceCents, locked = s.floorLocked;
-  if (!locked) {                                                                   // R-19c
-    if (plan.funded.postPayoutFloorRule.mode === 'reset_to_balance_minus_dd') {
-      hwb = balance; floor = balance - plan.funded.drawdownCents;                   // R-19a
-    } else {
-      floor = plan.sizeCents + plan.funded.postPayoutFloorRule.amountCents!;        // R-19b
-      locked = true;
-    }
-    events.push(floorRecomputed(s, floor));
-  }
+  // R-19 and R-48, ADR-014: the floor, the high-water balance, and the lock are NOT touched.
+  // CV-11 and CV-17 are what make this safe, and they are checked at publish, not here.
+  // INV-21 is therefore a property of the config, which is where it can actually be enforced.
 
-  const next: RuleState = { ...s, balanceCents: balance, floorCents: floor,
-    highWaterBalanceCents: hwb, floorLocked: locked,
+  const next: RuleState = { ...s, balanceCents: balance,
     payoutAnchorDay: fact.basisTradingDay,                                          // R-46
     cadenceAnchorDay: fact.effectiveTradingDay,                                     // R-46
     winDaysCount: 0, consistencyBestDayCents: 0n, consistencyPeriodProfitCents: 0n,  // R-47
@@ -710,7 +724,7 @@ All exist in the approved [EVENTS.md](../architecture/EVENTS.md) catalogue excep
 | `phase.pass_deferred_consistency` | DO-8 | Carries `shortfall_cents`, throttled to once per account per week by M10 |
 | `account.graduated`, `account.live_invitation_issued` | R-49 | |
 | `payout.win_days_reset` | R-47 | Carries `previous_count`, `reset_to`, and now also `anchor_trading_day`, because "reset to zero" without the anchor is not enough to explain the next cycle |
-| `payout.floor_recomputed` | R-48 | `mode`, `previous_floor_cents`, `new_floor_cents` |
+| `payout.floor_recomputed` | **retired at the M1 gate** | The event exists in the approved [EVENTS.md](../architecture/EVENTS.md) catalogue and has no producer after [ADR-014](../DECISIONS.md), because settlement no longer moves the floor. It is marked retired rather than deleted: the catalogue is a contract other modules read, and a silently vanished event name is worse than a documented dead one. Nothing consumes it in v1 |
 | `rule.floor_locked` **NEW** | R-15 | The lock is permanent and changes the trader's risk profile for the rest of the account's life. It belongs on the timeline and in the evidence pack. Payload `{ account_id, trading_day, at_profit_cents, locked_floor_cents }` |
 | `rule.soft_dll_exceeded` **NEW** | R-23 | Only when a plan configures a soft daily loss limit, which no v1 plan does. Defined now so enabling one is a config change and not a code change. Payload `{ account_id, trading_day, realized_pnl_cents, limit_cents }`. Consumers: RISK, TL |
 | `replay.divergence_detected` | Appendix B | Field-level, one per diverging field, so the alert says what moved |
@@ -787,17 +801,34 @@ Steady state afterwards is cheaper, because the buffer is one-time: balance sits
 | Cadence counted from the settlement's effective day | 2 to 3 settlement days plus 5 gap days = **7 to 8 trading days** | 135,000c | **16,875c to 19,286c** |
 | Cadence counted from the basis day | **5 trading days** | 135,000c | **27,000c** |
 
-The constitution states a ceiling of "roughly 190,00 per day". That figure is reproducible **only** under the settlement anchor. This is the arithmetic behind OQ-1 and EC-039, and it is why the anchor is a founder decision rather than an implementation detail: it moves the per-account liability rate by 40 percent.
+The constitution states a ceiling of "roughly 190,00 per day". That figure is reproducible **only** under the settlement anchor. **Ruled at the gate: settlement anchored** ([ADR-013](../DECISIONS.md)), so the binding row is the first one and the steady-state ceiling on Core EOD is 16,875 to 19,286 cents per trading day. The second row is retained because it is the counterfactual that made the decision legible, and because anyone who later proposes moving the anchor needs to see what it costs.
+
+**The same arithmetic across the lineup**, now that [ADR-015](../DECISIONS.md) has confirmed every parameter. What binds a cycle is `max(required_win_days, cadence gap measured from the effective day)`, because win days reset to the basis day and each one needs its own trading day:
+
+| Plan (50K) | Cap to trader | Binding gate | Cycle | Per trading day |
+|---|---|---|---|---|
+| Core EOD | 135,000c | cadence gap, 5 trading days after the effective day | 7 to 8 trading days | 16,875c to 19,286c |
+| Merit Rapid | 90,000c | **win days, 5**, the 1 day gap never binds | 5 trading days | 18,000c |
+| Direct | 135,000c | cadence gap, 5 trading days after the effective day | 7 to 8 trading days | 16,875c to 19,286c |
+
+All three land on the constitution's approximately $190 per day design ceiling, which is a meaningful check: the ceiling is a property of the lineup rather than a coincidence on one plan. The Merit Rapid row is also the finding that corrected OQ-1's cadence estimate and produced OQ-12.
 
 **Lifetime bound.** 8 settled payouts at 135,000c is 1,080,000c to the trader, over roughly 5 + 7 x 7.5 = 57.5 trading days, or about eleven and a half calendar weeks. INV-17 asserts the bound; GS-055 pins the path.
 
 ### AS-04: The locked floor as a free option (NOVEL)
 
-**Attack.** Under `post_payout_floor_rule.mode = lock_at_size_plus`, or once R-15's lock engages, the account's downside is fixed at `size + 10,000c` while its upside is unbounded. A rational adversary who reaches the lock should immediately maximize variance: the worst case is a bounded, already-paid-for loss and the best case is another capped extraction. This is not cheating. It is the plan's own incentive structure, and it arrives exactly when the account has proven it can make money.
+**Attack.** Once R-15's lock engages, the account's downside is fixed at `size + 10,000c` while its upside is unbounded. A rational adversary who reaches the lock should immediately maximize variance: the worst case is a bounded, already-paid-for loss and the best case is another capped extraction. This is not cheating. It is the plan's own incentive structure, and it arrives exactly when the account has proven it can make money.
 
 **Numbers.** After locking, the trader risks at most `balance - (size + 10,000c)` of their own progress and nothing of their capital. On a locked CORE-50K account sitting at `size + 250,000c`, a maximum-variance day risks 240,000c of paper progress for a chance at another 150,000c cap. Repeated across a fleet, the firm carries the variance.
 
-**Counter.** Choose `reset_to_balance_minus_dd` for v1, which keeps the floor trailing beneath the balance forever and never hands out the option. CV-11 and CV-12 make the alternative safe to publish if the founder wants it, and the lock's engagement is now an event (`rule.floor_locked`) so M6 and M7 can watch post-lock behavior as a cohort. GS-056.
+**Ruled at the gate: the option is accepted, not defended against** ([ADR-014](../DECISIONS.md)). This plan's original recommendation was `reset_to_balance_minus_dd`, which keeps the floor trailing beneath the balance forever and never hands out the option. The founder overruled it and removed the post-payout recompute entirely, with a post-beta revisit on the record. The honest accounting of what that buys and costs:
+
+- **What it costs.** The option is real and it is the strongest at exactly the moment the account is most capable. There is no rule-level counter, and inventing one after publication would be a rule change against live accounts, which is the thing Merit exists not to do.
+- **What bounds it.** The only thing at risk post-lock is progress above `size + 10,000c`, which is the [buffer](../GLOSSARY.md#buffer), which was never withdrawable. Per-cycle firm exposure is the cap; lifetime exposure is `ladder * cap` (INV-17). The option therefore has bounded value per account and a hard lifetime stop.
+- **What the founder's version buys.** No reset means the floor never falls, so after every extraction the trader's loss room is the buffer rather than the full drawdown: $1,000 instead of $2,500 on CORE-50K. That is materially tighter than the alternative and it moves realized liability **down**, not up. The free option and the tighter room are two halves of the same ruling.
+- **What must be published.** "After a payout, your loss room is your buffer" belongs on the rules page in those words. A trader who works this out for themselves after their first extraction reads it as a hidden rule, and they will be right that it was never stated.
+
+**Counter, as built.** Config validation, not runtime logic: CV-11 guarantees INV-21 while the lock is enabled, CV-17 covers the lock-disabled case that the removal of the reset newly exposed, and CV-12 keeps the lock from introducing a discontinuity. The lock's engagement is an event (`rule.floor_locked`), so M6 and M7 watch post-lock behavior as a named cohort from launch, which is what makes the post-beta revisit a data decision rather than an argument. GS-056, GS-081, GS-083.
 
 ### AS-05: The correction window as an extraction channel (NOVEL)
 
@@ -817,9 +848,11 @@ The constitution states a ceiling of "roughly 190,00 per day". That figure is re
 
 **Attack.** A [traded day](../GLOSSARY.md#traded-day) needs one fill. One micro round trip costs commission and advances the counter. Minimum-trading-day requirements are therefore a fee, not a constraint, and a rented fleet can keep twenty accounts' counters advancing while one directional account carries the ring's actual risk.
 
-**Numbers.** On CORE-50K the minimum-days gate requires 5 traded days and the win-day gate requires 5 win days. Since every win day is a traded day, the minimum-days gate is **structurally incapable of binding** (EC-042).
+**Numbers.** The funded minimum-days gate was proposed at 5 while the win-day gate requires 5 win days. Since every win day is a traded day, the minimum-days gate was **structurally incapable of binding** (EC-042).
 
-**Counter.** The engine's definition does not change: inventing a minimum size or minimum hold time invites a public argument Merit would lose, and would break legitimate small-size traders. Instead the config validator warns at publish when the gate is dominated, marketing must not present a dominated gate as a protection, and the fleet pattern (many accounts, exactly one round trip per day, identical timing) is an M7 detector input. GS-060.
+**Resolved at the gate by deletion rather than by defence.** [ADR-015](../DECISIONS.md) sets funded `min_trading_days` to **0** on all three plans, so the gate is explicitly disabled and reports `skipped` rather than sitting in the eligibility breakdown looking like a protection (CV-19, GS-080). This is the cheapest possible outcome: the exploit was never against the engine, it was against the marketing claim, and removing the claim removes it.
+
+**Counter for the part that remains.** The traded-day definition does not change: inventing a minimum size or minimum hold time invites a public argument Merit would lose and would break legitimate small-size traders. The real gates are win days, the buffer, and consistency. The fleet pattern (many accounts, exactly one round trip per day, identical timing) is an M7 detector input, and the publish-time dominated-gate warning now covers the cadence gap as well as minimum days (EC-049). GS-060.
 
 ### AS-08: Peak picking (NOVEL)
 
@@ -833,7 +866,9 @@ The constitution states a ceiling of "roughly 190,00 per day". That figure is re
 
 **Attack.** B4 #7 covers two accounts paying out in the same second and answers "independent, both valid". The engine-level extension: one identity holding the plan maximum of ten copy-traded accounts will have all ten cross the win-day gate on the **same** trading day, because they trade identically. Each payout is individually correct and individually capped at 150,000c. The aggregate is 1,500,000c in one day from one human, and AS-01's in-flight rule does not help because each account has its own.
 
-**Counter.** The engine stays per-account, because cross-account state inside a pure fold would destroy replay. What M1 owes M6 is the **forecast**: `GET /admin/eligible-forecast` aggregates at identity level as well as account level, so a correlated wave is visible in the Eligible-Next-7-Days number before it lands, which is exactly the trigger ADR-011's same-day top-up was designed for. Whether an identity-level daily extraction ceiling should exist is OQ-7. GS-062.
+**Counter.** The engine stays per-account, because cross-account state inside a pure fold would destroy replay. What M1 owes M6 is the **forecast**: `GET /admin/eligible-forecast` aggregates at identity level as well as account level, so a correlated wave is visible in the Eligible-Next-7-Days number before it lands, which is exactly the trigger ADR-011's same-day top-up was designed for.
+
+**Ruled at the gate (OQ-7): no identity-level extraction ceiling in v1.** Visibility, not a rule. The consequence is worth stating rather than assuming: Merit accepts that a single identity can legitimately extract 1,500,000c in one day, and the control is that the money is reserved for before it is requested. That makes ADR-011's top-up trigger a **payout-trust control**, not a treasury convenience, and it means M6's forecast is a launch requirement rather than a dashboard nicety. If the trigger is late, the identity wave is what finds out. GS-062.
 
 ### AS-10: The payout that breaches the account that earned it (NOVEL)
 
@@ -879,9 +914,9 @@ Every behavior above maps to a named test. Constitution section 5 is binding, an
 |---|---|---|---|---|
 | Unit, one per rule | `RE-U-nn` | 50, one per rule R-01 to R-50 | every commit | merge |
 | Property, fast-check | `RE-P-nn` | 18 | every commit | merge |
-| Golden fixtures | `GS-nnn` | 62 owned by M1, plus 5 shared | every commit | merge |
+| Golden fixtures | `GS-nnn` | 67 owned by M1, plus 5 shared | every commit | merge |
 | Determinism | `RE-D-nn` | 3 | every commit | merge |
-| Config validation | `RE-C-nn` | 16, one per CV rule | every commit | merge |
+| Config validation | `RE-C-nn` | 19, one per CV rule | every commit | merge |
 | Simulation, 10K traders | `RE-S-nn` | 4 | nightly CI | nightly alarm |
 | Replay self-audit rehearsal | `RE-R-nn` | 5 | nightly CI and in prod | page in prod |
 
@@ -891,7 +926,7 @@ Written against generated day sequences. Each states the property in the form th
 
 | ID | Property |
 |---|---|
-| RE-P-01 | For `trailing_eod`, across any day sequence with no settlement, `floor(d+1) >= floor(d)` |
+| RE-P-01 | `floor(d+1) >= floor(d)` for **every** generated day sequence, for both drawdown types, **including sequences containing settlements**. Since [ADR-014](../DECISIONS.md) the "no settlement" qualifier is gone, which strengthens the property and shrinks the generator's exclusion list to nothing |
 | RE-P-02 | Once `floorLocked`, `floor` is constant for every subsequent day, including across settlements |
 | RE-P-03 | `winDaysCount` is non-decreasing between settlements, and after a settlement equals the count of win days strictly after `payoutAnchorDay` |
 | RE-P-04 | `tradedDaysCount` is non-decreasing within a phase |
@@ -965,43 +1000,76 @@ One page, four panels: gate funnel (how many funded accounts sit at each failing
 
 ---
 
-## 10. Open questions for the founder
+## 10. Open questions, and what the founder ruled
 
-Ordered by how much they change. The first two are blocking: both decide published marketing copy and both change plan configs.
+**All eleven were answered at the M1 gate on 2026-08-13.** The rulings are recorded in full in [DECISIONS.md](../DECISIONS.md#m1-gate-closure-2026-08-13) and are already folded into sections 1 through 9 above; nothing in this document depends on reading section 10 to be implementable. What follows is the ruling summary, then the one question the rulings themselves opened, then the original text of each question preserved as the record of what was actually asked.
 
-**OQ-1 (BLOCKING). Which day does the cadence gap count from, and can Rapid Daily be published as daily?**
+### 10.1 Ruling summary
+
+| OQ | Ruling | Where it landed in this document |
+|---|---|---|
+| OQ-1 | Settlement anchored. Rapid Daily renamed **Merit Rapid**, cadence published honestly | R-37, R-46, AS-03, Appendix A |
+| OQ-2 | Confirmed. Three plain-language placements are now requirements on M04 and M10 | R-31 and its following paragraph |
+| OQ-3 | Confirmed from `mc_lifecycle.py OUR_PLANS`, matching every proposal. Funded min days 0 | Appendix A, R-33, CV-19 |
+| OQ-4 | Approved. X = 10,000c, lock enabled on all three plans | R-15, Appendix A |
+| OQ-5 | **Overruled.** No post-payout reset. `floor = max(trail minus DD, lock)` | section 3.4, R-19, R-48, AS-04, CV-17, CV-18 |
+| OQ-6 | Aligned: exactly at the limit survives, so `>` | R-22, amends STATE_MACHINES G-BREACH |
+| OQ-7 | No identity ceiling in v1 | AS-09 |
+| OQ-8 | Resolved via OQ-3 | R-33, CV-19 |
+| OQ-9 | Confirmed. The dilution number is displayed at all times | section 4, AS-13 |
+| OQ-10 | Confirmed. Absorbed total is a named admin line; favorable patterns flag | AS-05 |
+| OQ-11 | Confirmed, including trader-favorable bugfixes | Appendix B.4 |
+
+### 10.2 The question the rulings raised
+
+**OQ-12 (open, non-blocking). Merit Rapid's cadence is set by its win-day gate, not by its cadence gap.**
+OQ-1 estimated Merit Rapid's practical cadence at 3 to 4 trading days from the settlement window plus the one-in-flight rule. That estimate was made before OQ-3 fixed the win-day count, and it is wrong. With `required_win_days = 5` and win days resetting to the **basis** day (R-47), the trader needs 5 trading days after the basis day before another request can qualify, and the 2 to 3 day settlement leg fits entirely inside that window. The honest number is **about one payout per 5 trading days**, roughly weekly, and the 1 day cadence gap on that plan is a dominated gate that never binds (EC-049).
+
+Two things follow, and both are the founder's call rather than the engine's:
+1. **The published copy is now computable and must say 5 trading days**, not 3 to 4, and must not attribute the plan's speed to its 1 day gap.
+2. **An instant settlement rail does not make this plan daily.** The settlement leg is already hidden behind the win-day gate. The only lever on Merit Rapid's cadence is `win_days.required_count`, and moving it is a liability decision: dropping to 1 win day gives roughly 30,000 cents per trading day on the current rail and roughly 45,000 on an instant rail, against a design ceiling of about 19,000. Holding the ceiling at a 2 trading day cycle would require the cap to fall to about 42,000c ($420).
+
+Every option is a config edit. No engine change is implied by any of them, which is why this does not block M02 through M08.
+
+### 10.3 The questions as originally asked
+
+Preserved verbatim, because the reasoning that produced a ruling is part of the record and because Appendix C's traceability rows point at these numbers.
+
+**OQ-1 (RULED: settlement anchor, renamed Merit Rapid, option a). Which day does the cadence gap count from, and can Rapid Daily be published as daily?**
 The gap can anchor on the payout's basis day or its settlement day. On CORE-50K the choice moves the steady-state extraction ceiling from 16,875 to 19,286 cents per trading day (settlement) to 27,000 cents per trading day (basis), a 40 percent change in the per-account liability rate. The constitution's own stated ceiling of roughly 19,000 cents per day is reproducible **only** under the settlement anchor, so this document specifies settlement anchoring, matching GLOSSARY's "counted from the last settled payout".
 The consequence you need to rule on: **Rapid Daily cannot be daily under that anchor.** With a 1 trading day gap counted from settlement, plus the one-in-flight rule (R-38, which is a liability control we cannot drop), the practical cadence is one payout per settlement cycle, roughly every 3 to 4 trading days. Three options: (a) publish Rapid Daily's cadence honestly as "one payout per settlement cycle, typically every 3 to 4 trading days", which needs no engine change and is the recommendation; (b) anchor Rapid Daily's gap on the basis day and accept a materially higher extraction rate on that plan; (c) allow multiple in-flight payouts on Rapid Daily with an aggregate in-flight cap, which is the most engineering and the most risk. See AS-01, AS-03, EC-039.
 
-**OQ-2 (BLOCKING). Confirm that the funded phase starts at the account size and eval profit is not carried.** R-31 specifies it, the buffer gate and the whole funded time-gate design depend on it, and it is standard in the industry. It is also the fact a trader is most likely to discover at the worst possible moment. Confirm, and confirm it appears in plain language on the rules page, the eval progress card, and the pass email.
+**OQ-2 (RULED: confirmed, three placements required). Confirm that the funded phase starts at the account size and eval profit is not carried.** R-31 specifies it, the buffer gate and the whole funded time-gate design depend on it, and it is standard in the industry. It is also the fact a trader is most likely to discover at the worst possible moment. Confirm, and confirm it appears in plain language on the rules page, the eval progress card, and the pass email.
 
-**OQ-3 (BLOCKING). Rapid Daily's funded gates are not specified anywhere.** The constitution gives Rapid Daily its consistency thresholds, cap, gap, split, ladder, and account maximum, but not its drawdown, eval profit target, win-day count, win-day floor, buffer, or funded minimum days. Six numbers, all of which change the plan's economics and all of which must be published. Appendix A marks each as `RULING NEEDED` with a proposed default carried over from Core EOD.
+**OQ-3 (RULED: confirmed from the lifecycle simulation; funded min days 0). Rapid Daily's funded gates are not specified anywhere.** The constitution gives Rapid Daily its consistency thresholds, cap, gap, split, ladder, and account maximum, but not its drawdown, eval profit target, win-day count, win-day floor, buffer, or funded minimum days. Six numbers, all of which change the plan's economics and all of which must be published. Appendix A marks each as `RULING NEEDED` with a proposed default carried over from Core EOD.
 
-**OQ-4. Floor lock values.** The constitution says the trailing floor "locks at initial balance plus $X once buffer or profit threshold reached" without fixing X. This document proposes X = 10,000 cents with the lock engaging at `drawdown_cents + 10,000c` of profit, which is chosen so the trailing floor is already sitting exactly at the lock value when it engages and therefore never jumps (CV-12, R-15). Confirm the value, and confirm the lock is enabled on Core EOD and Direct.
+**OQ-4 (RULED: approved, X = 10,000c, all three plans). Floor lock values.** The constitution says the trailing floor "locks at initial balance plus $X once buffer or profit threshold reached" without fixing X. This document proposes X = 10,000 cents with the lock engaging at `drawdown_cents + 10,000c` of profit, which is chosen so the trailing floor is already sitting exactly at the lock value when it engages and therefore never jumps (CV-12, R-15). Confirm the value, and confirm the lock is enabled on Core EOD and Direct.
 
-**OQ-5. Post-payout floor rule per plan.** `reset_to_balance_minus_dd` or `lock_at_size_plus`. AS-04 argues for `reset_to_balance_minus_dd` on every v1 plan, because the locked variant hands the trader a free option exactly when they have proven they can make money. Recommendation: reset mode everywhere in v1.
+**OQ-5 (RULED: OVERRULED, no post-payout reset at all, revisit post-beta). Post-payout floor rule per plan.** `reset_to_balance_minus_dd` or `lock_at_size_plus`. AS-04 argues for `reset_to_balance_minus_dd` on every v1 plan, because the locked variant hands the trader a free option exactly when they have proven they can make money. Recommendation: reset mode everywhere in v1.
 
-**OQ-6. Operator asymmetry on the hard daily loss limit.** The approved STATE_MACHINES G-BREACH uses `>=` for the daily loss limit (loss exactly at the limit breaches) while the floor uses strict `<` (a low exactly at the floor survives). No v1 plan configures a daily loss limit, so nothing turns on it today, but the two operators should not disagree by accident when one is eventually enabled. Recommendation: align on "exactly at the limit survives", making it `>` for the daily loss limit, published as "more than".
+**OQ-6 (RULED: aligned on "exactly at the limit survives", so `>`). Operator asymmetry on the hard daily loss limit.** The approved STATE_MACHINES G-BREACH uses `>=` for the daily loss limit (loss exactly at the limit breaches) while the floor uses strict `<` (a low exactly at the floor survives). No v1 plan configures a daily loss limit, so nothing turns on it today, but the two operators should not disagree by accident when one is eventually enabled. Recommendation: align on "exactly at the limit survives", making it `>` for the daily loss limit, published as "more than".
 
-**OQ-7. Identity-level extraction ceiling.** AS-09: ten copy-traded accounts under one identity can produce 1,500,000 cents of correct, individually capped payouts on one day. v1 handles this with visibility (identity-level forecast plus ADR-011's top-up trigger) rather than a rule. Do you want an identity-level daily ceiling as a config in v1, accepting that it introduces the first cross-account rule and therefore the first thing the engine cannot decide from one account's state?
+**OQ-7 (RULED: no identity ceiling in v1). Identity-level extraction ceiling.** AS-09: ten copy-traded accounts under one identity can produce 1,500,000 cents of correct, individually capped payouts on one day. v1 handles this with visibility (identity-level forecast plus ADR-011's top-up trigger) rather than a rule. Do you want an identity-level daily ceiling as a config in v1, accepting that it introduces the first cross-account rule and therefore the first thing the engine cannot decide from one account's state?
 
-**OQ-8. Funded minimum trading days on Core EOD.** The DATA_MODEL example carries 5, the constitution does not state it. With 5 required win days it can never bind (EC-042). Keep it at 5 as a floor for future configs, or set it explicitly lower and stop implying a protection that does not exist?
+**OQ-8 (RULED: resolved via OQ-3, set to 0 on all three plans, field retained). Funded minimum trading days on Core EOD.** The DATA_MODEL example carries 5, the constitution does not state it. With 5 required win days it can never bind (EC-042). Keep it at 5 as a floor for future configs, or set it explicitly lower and stop implying a protection that does not exist?
 
-**OQ-9. What the trader sees when eligibility is lost by making money.** AS-13. The engine reports `profit_needed_to_dilute_cents` continuously. Confirm the portal shows the consistency meter and that number **at all times**, not only when the gate fails, so the shape of the rule is visible before it bites.
+**OQ-9 (RULED: confirmed as specified). What the trader sees when eligibility is lost by making money.** AS-13. The engine reports `profit_needed_to_dilute_cents` continuously. Confirm the portal shows the consistency meter and that number **at all times**, not only when the gate fails, so the shape of the rule is visible before it bites.
 
-**OQ-10. Absorbed corrections.** AS-05. When a post-settlement correction changes a settled payout's basis, the difference is absorbed and never clawed back. Confirm that the absorbed total appears as a named line on the admin liability dashboard rather than being invisible, and that a systematically favorable correction pattern per identity is a flag rather than only a number.
+**OQ-10 (RULED: confirmed as specified). Absorbed corrections.** AS-05. When a post-settlement correction changes a settled payout's basis, the difference is absorbed and never clawed back. Confirm that the absorbed total appears as a named line on the admin liability dashboard rather than being invisible, and that a systematically favorable correction pattern per identity is a flag rather than only a number.
 
-**OQ-11. Engine upgrade approval.** Appendix B requires founder approval of a diff report before any engine change that alters historical output is applied. Confirm you want that gate on **every** such change, including bugfixes that are unambiguously in the trader's favor.
+**OQ-11 (RULED: confirmed as specified, including trader-favorable bugfixes). Engine upgrade approval.** Appendix B requires founder approval of a diff report before any engine change that alters historical output is applied. Confirm you want that gate on **every** such change, including bugfixes that are unambiguously in the trader's favor.
 
 ---
 
 ## Appendix A: canonical plan parameters
 
-Materialized values, in integer cents, for the three launch plans at three sizes. **The `Source` column is not decoration.** Values marked `RULING NEEDED` are not in the constitution and are carried here as proposals so nothing is silently invented (OQ-3, OQ-4).
+Materialized values, in integer cents, for the three launch plans at three sizes. **Approved at the M1 gate; every `RULING NEEDED` marker is cleared.** The `Source` column is not decoration: every published number traces to the constitution, to the founder's lifecycle simulation, or to a numbered ADR, and a number with no source is a bug in this table.
 
 Sizes: 25K is 2,500,000c, 50K is 5,000,000c, 100K is 10,000,000c. Percentage-expressed rules scale by size; `min_payout_cents` never does.
 
-### A.1 Core EOD
+Three parameters are now identical across all three plans and are stated once here rather than three times below: `min_payout_cents` is 10,000 at every size ([GLOSSARY](../GLOSSARY.md#minimum-payout), CV-15), `post_payout_floor_rule.mode` is `none` ([ADR-014](../DECISIONS.md), CV-18), and funded `min_trading_days` is `0`, which disables that gate ([ADR-015](../DECISIONS.md), CV-19).
+
+### A.1 Core EOD (`core_eod`)
 
 | Parameter | bp | 25K | 50K | 100K | Source |
 |---|---|---|---|---|---|
@@ -1010,57 +1078,87 @@ Sizes: 25K is 2,500,000c, 50K is 5,000,000c, 100K is 10,000,000c. Percentage-exp
 | Eval minimum trading days | n/a | 1 | 1 | 1 | constitution 0.4 |
 | Eval consistency | n/a | disabled | disabled | disabled | constitution 0.4 |
 | Funded drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | constitution 0.4 |
-| Funded floor lock at profit | n/a | 135,000 | 260,000 | 510,000 | **RULING NEEDED**, OQ-4, = drawdown + 10,000 |
-| Funded locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | **RULING NEEDED**, OQ-4 |
+| Floor lock enabled | n/a | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
+| Floor lock at profit | n/a | 135,000 | 260,000 | 510,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
+| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
 | Win days required | n/a | 5 | 5 | 5 | constitution 0.4 |
 | Win day floor | 30 | 7,500 | 15,000 | 30,000 | constitution 0.4 (150.00 at 50K) |
 | Buffer | 200 | 50,000 | 100,000 | 200,000 | constitution 0.4 (1,000.00 at 50K) |
 | Funded consistency | 3000 | 3000bp | 3000bp | 3000bp | constitution 0.4 |
-| Funded minimum trading days | n/a | 5 | 5 | 5 | DATA_MODEL example, **OQ-8** |
+| Funded minimum trading days | n/a | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
 | Cadence gap, trading days | n/a | 5 | 5 | 5 | constitution 0.4 |
 | Payout cap, ordinal 1 and up | 300 | 75,000 | 150,000 | 300,000 | constitution 0.4 (1,500.00 at 50K) |
-| Minimum payout | n/a | 10,000 | 10,000 | 10,000 | GLOSSARY, never scaled |
 | Split to trader | 9000 | 9000bp | 9000bp | 9000bp | constitution 0.4 |
 | Ladder | n/a | 8 | 8 | 8 | constitution 0.4 |
 | Maximum accounts per entity | n/a | 10 | 10 | 10 | constitution 0.4 |
-| Post-payout floor rule | n/a | reset_to_balance_minus_dd | same | same | **RULING NEEDED**, OQ-5 |
 | Daily loss limit | n/a | none | none | none | constitution 0.4 |
 
-### A.2 Rapid Daily
+### A.2 Merit Rapid (`merit_rapid`)
+
+**Renamed from "Rapid Daily" at the M1 gate** ([ADR-013](../DECISIONS.md)). The plan is fast relative to the lineup; it is not daily, and the name must not claim it is.
 
 | Parameter | bp | 25K | 50K | 100K | Source |
 |---|---|---|---|---|---|
-| Eval drawdown | 500 | 125,000 | 250,000 | 500,000 | **RULING NEEDED**, OQ-3, proposed from Core |
-| Eval profit target | 600 | 150,000 | 300,000 | 600,000 | **RULING NEEDED**, OQ-3, proposed from Core |
+| Eval drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Eval profit target | 600 | 150,000 | 300,000 | 600,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
 | Eval minimum trading days | n/a | 2 | 2 | 2 | constitution 0.4 |
 | Eval consistency | 3000 | 3000bp | 3000bp | 3000bp | constitution 0.4 |
-| Funded drawdown | 500 | 125,000 | 250,000 | 500,000 | **RULING NEEDED**, OQ-3 |
-| Win days required | n/a | 5 | 5 | 5 | **RULING NEEDED**, OQ-3, and it interacts with OQ-1 |
-| Win day floor | 30 | 7,500 | 15,000 | 30,000 | **RULING NEEDED**, OQ-3 |
-| Buffer | 200 | 50,000 | 100,000 | 200,000 | **RULING NEEDED**, OQ-3 |
+| Funded drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Floor lock enabled | n/a | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
+| Floor lock at profit | n/a | 135,000 | 260,000 | 510,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
+| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
+| Win days required | n/a | 5 | 5 | 5 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md). **This is the gate that sets the plan's cadence, see OQ-12** |
+| Win day floor | 30 | 7,500 | 15,000 | 30,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Buffer | 200 | 50,000 | 100,000 | 200,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
 | Funded consistency | 4000 | 4000bp | 4000bp | 4000bp | constitution 0.4 |
-| Funded minimum trading days | n/a | 5 | 5 | 5 | **RULING NEEDED**, OQ-3 |
-| Cadence gap, trading days | n/a | 1 | 1 | 1 | constitution 0.4, **see OQ-1** |
+| Funded minimum trading days | n/a | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
+| Cadence gap, trading days | n/a | 1 | 1 | 1 | constitution 0.4. **Dominated by the win-day gate and never binds** (EC-049); publish-time warning fires by design |
 | Payout cap | 200 | 50,000 | 100,000 | 200,000 | constitution 0.4 (1,000.00 at 50K) |
-| Split, ladder, maximum accounts | n/a | 9000bp, 8, 5 | same | same | constitution 0.4 |
+| Split | 9000 | 9000bp | 9000bp | 9000bp | constitution 0.4 |
+| Ladder | n/a | 8 | 8 | 8 | constitution 0.4 |
+| Maximum accounts per entity | n/a | 5 | 5 | 5 | constitution 0.4 |
+| Daily loss limit | n/a | none | none | none | constitution 0.4 |
 
-### A.3 Direct (instant funded)
+**Published cadence copy for this plan, binding on M09 and M04:** one payout per cycle of about **5 trading days**, set by the 5 win-day requirement. Settlement takes 2 to 3 business days and runs inside that window, so it does not add to it. The 1 day cadence gap may not be described as the reason the plan is fast.
+
+### A.3 Direct, instant funded (`direct`)
 
 | Parameter | bp | 25K | 50K | 100K | Source |
 |---|---|---|---|---|---|
 | Eval phase | n/a | disabled | disabled | disabled | constitution 0.4 |
 | Funded drawdown, trailing EOD | 400 | 100,000 | 200,000 | 400,000 | constitution 0.4 |
+| Floor lock enabled | n/a | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
+| Floor lock at profit | n/a | 110,000 | 210,000 | 410,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
+| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
 | Win days required | n/a | 5 | 5 | 5 | constitution 0.4 |
-| Win day floor | 30 | 7,500 | 15,000 | 30,000 | **RULING NEEDED**, OQ-3, proposed from Core |
+| Win day floor | 30 | 7,500 | 15,000 | 30,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
 | Buffer | 300 | 75,000 | 150,000 | 300,000 | constitution 0.4 (1,500.00 at 50K) |
 | Funded consistency | 2500 | 2500bp | 2500bp | 2500bp | constitution 0.4 |
-| Funded minimum trading days | n/a | 5 | 5 | 5 | **RULING NEEDED**, OQ-3 |
+| Funded minimum trading days | n/a | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
 | Cadence gap, trading days | n/a | 5 | 5 | 5 | constitution 0.4 |
 | Payout cap | 300 | 75,000 | 150,000 | 300,000 | constitution 0.4 |
 | Split | 9000 | 9000bp | 9000bp | 9000bp | constitution 0.4 |
 | Ladder | n/a | 6 | 6 | 6 | constitution 0.4 |
 | Maximum accounts per entity | n/a | 5 | 5 | 5 | constitution 0.4 |
 | KYC placement | n/a | direct_purchase | same | same | constitution 0.4, GLOSSARY |
+| Daily loss limit | n/a | none | none | none | constitution 0.4 |
+
+### A.4 Validation walk of the approved lineup
+
+Every CV rule that could plausibly fail on these numbers, checked at 50K. This exists so the first `validatePlan` run is a confirmation rather than a discovery.
+
+| Check | Core EOD | Merit Rapid | Direct |
+|---|---|---|---|
+| CV-10, every `cap >= min_payout` | 150,000 >= 10,000 ✓ | 100,000 >= 10,000 ✓ | 150,000 >= 10,000 ✓ |
+| CV-11, `buffer > lock offset` | 100,000 > 10,000 ✓ | 100,000 > 10,000 ✓ | 150,000 > 10,000 ✓ |
+| CV-12, lock trigger equals drawdown plus offset | 260,000 = 250,000 + 10,000 ✓ | 260,000 = 250,000 + 10,000 ✓ | 210,000 = 200,000 + 10,000 ✓ |
+| CV-17, only when the lock is disabled | not applicable ✓ | not applicable ✓ | not applicable ✓ |
+| Warning: min-days gate dominated | fires (0 <= 5) | fires (0 <= 5) | fires (0 <= 5) |
+| Warning: cadence gap dominated by win days, `2 + gap <= win_days` | not fired (2+5=7 > 5) | **fires** (2+1=3 <= 5) | not fired (2+5=7 > 5) |
+| Warning: `cap > buffer` | fires (150,000 > 100,000) | not fired (100,000 = 100,000) | not fired (150,000 = 150,000) |
+| INV-21 worst case: post-payout balance versus floor | size+100,000 vs at most size+10,000 ✓ | size+100,000 vs at most size+10,000 ✓ | size+150,000 vs at most size+10,000 ✓ |
+
+Two rows deserve a sentence. **Core EOD's cadence gap is not dominated** even though its gap and win-day count are both 5, because the gap starts counting only after the money lands: in basis-day terms it asks for 7 to 8 trading days against the win-day gate's 5, so the gap is the binding constraint on that plan and the plan's published cadence is honestly the gap. **Merit Rapid's is dominated**, which is OQ-12. And the `cap > buffer` warning firing on Core EOD alone is the plain statement that a Core trader's first extraction takes more out than the cushion the plan leaves behind, which is true, intended, and exactly the sort of thing that should appear in a publish diff rather than in a support ticket.
 
 ---
 
@@ -1124,11 +1222,13 @@ Every constitution M1 requirement, and where it is discharged. A blank cell in t
 | Win days with reset after every payout | R-09, R-34, R-47 | GS-006, GS-007, GS-053, RE-P-03, RE-P-18 |
 | Buffer, withdrawable, buffer permanent | R-35 | GS-025, RE-P-05, RE-P-14 |
 | Funded consistency, payout-gated | R-36 | GS-024, EC-036 |
-| Cadence gap, denied or frozen requests do not reset it | R-37, R-46 | GS-059, EC-039, OQ-1 |
+| Cadence gap, denied or frozen requests do not reset it | R-37, R-46 | GS-059, GS-082, EC-039, [ADR-013](../DECISIONS.md) |
 | Cap per request, minimum payout 100.00 | R-42, R-39 | GS-026 to GS-028, GS-042 |
 | Split applied at ledger level | R-44 | GS-029, RE-P-08 |
 | Payout ladder, auto-graduate, invitation event | R-49 | GS-067 |
-| Post-payout floor recompute per config | R-19, R-48 | GS-065, RE-U-019 |
+| Post-payout floor recompute per config | R-19, R-48. **Superseded by [ADR-014](../DECISIONS.md): the constitution's two configured modes are replaced by no recompute at all.** The requirement is discharged by being deliberately removed, with the config key retained and pinned to `none` by CV-18 so the removal is enforced rather than remembered | GS-081, GS-065, RE-U-019, RE-C-18 |
+| Daily loss limit operator agrees with the floor operator | R-21, R-22 | GS-013, GS-079 |
+| Funded minimum days gate, and what a zero means | R-33, CV-19 | RE-U-033, GS-080, RE-C-19 |
 | Rounding, integer cents, operators documented per rule | R-29, INV-02, section 3.5 | every unit test's boundary pair |
 | Zero and negative consistency denominators | R-30 | GS-021, GS-022 |
 | Win day exactly at the floor counts | R-09 | GS-006, GS-007 |

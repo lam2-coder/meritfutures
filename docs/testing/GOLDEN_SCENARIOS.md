@@ -1,6 +1,6 @@
 ---
-status: review
-depends_on: [../plans/M01-rules-engine.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../EDGE_CASES.md]
+status: approved
+depends_on: [../plans/M01-rules-engine.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../EDGE_CASES.md, ../DECISIONS.md]
 last_updated: 2026-08-13
 ---
 
@@ -8,7 +8,9 @@ last_updated: 2026-08-13
 
 Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never prose. Per [GLOSSARY](../GLOSSARY.md#golden-file) and constitution C10, every scenario here derives from a plan doc or an approved constitution scenario and **never** from implementation output. That rule is the whole defence against the self-grading trap: if a fixture was written by reading the code, it proves only that the code agrees with itself.
 
-**Seeded in Wave 3 by [M01](../plans/M01-rules-engine.md).** Scenarios owned by other modules are numbered here so the map is complete and stable, and are filled in by their own module plan. Constitution section 5.2 requires at least 40 golden files; this file defines 78, of which **62 are M1's** and executable against the pure engine with zero I/O, plus 5 more (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives.
+**Seeded in Wave 3 by [M01](../plans/M01-rules-engine.md), and approved with it at the M1 gate on 2026-08-13.** Scenarios owned by other modules are numbered here so the map is complete and stable, and are filled in by their own module plan. Constitution section 5.2 requires at least 40 golden files; this file defines 83, of which **67 are M1's** and executable against the pure engine with zero I/O, plus 5 more (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives.
+
+**Five scenarios were added and four rewritten by the M1 gate rulings** ([ADR-013](../DECISIONS.md), [ADR-014](../DECISIONS.md), [ADR-015](../DECISIONS.md)). A golden file that pinned a behavior the founder overruled is not quietly deleted: it is rewritten to pin what was actually decided, and the row says so, because a fixture that silently changes meaning is how a suite stops being a specification.
 
 ## 1. Numbering map
 
@@ -18,6 +20,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-030 to GS-051 | The Appendix B4 evil-brain battery, `GS-(029 + n)` maps to B4 item `n` | mixed, listed per row |
 | GS-052 to GS-070 | M1 adversarial scenarios, including the novel set from [M01 section 7](../plans/M01-rules-engine.md) | M1 |
 | GS-071 to GS-078 | Replay, engine-upgrade, and plan-config validation scenarios | M1 |
+| GS-079 to GS-083 | Scenarios created by the M1 gate rulings | M1 |
 
 ## 2. Fixture format
 
@@ -57,7 +60,7 @@ expect:
 
 ## 3. GS-001 to GS-029: rule and boundary scenarios (M1)
 
-Plan shorthand resolves to [M01 Appendix A](../plans/M01-rules-engine.md). CORE-50K: size 5,000,000c, drawdown 250,000c, eval target 300,000c, buffer 100,000c, win-day floor 15,000c, 5 win days, consistency 3000bp, gap 5, cap 150,000c, min payout 10,000c, split 9000bp, ladder 8.
+Plan shorthand resolves to [M01 Appendix A](../plans/M01-rules-engine.md), which is approved and is the only place these numbers are defined. CORE-50K: size 5,000,000c, drawdown 250,000c, eval target 300,000c, buffer 100,000c, win-day floor 15,000c, 5 win days, funded consistency 3000bp, funded min days 0 (gate disabled), cadence gap 5, cap 150,000c, min payout 10,000c, split 9000bp, ladder 8, floor lock enabled at 260,000c of profit fixing the floor at size + 10,000c, no post-payout floor recompute.
 
 | ID | Name | Pins | Rule |
 |---|---|---|---|
@@ -127,24 +130,24 @@ Plan shorthand resolves to [M01 Appendix A](../plans/M01-rules-engine.md). CORE-
 | GS-052 | Payout stacking before settlement | AS-01, novel | Three requests fired inside the transfer window are refused by G-NO-IN-FLIGHT. Without the rule, one qualifying stretch funds three capped extractions |
 | GS-053 | Stacking attempt across the settlement boundary | AS-01, novel | Request 2 lands the instant request 1 settles: win days have reset to the basis-day anchor, so it fails the win-day gate rather than paying |
 | GS-054 | Manufactured dilution days from a hedged pair | AS-02, novel | Account A takes controlled small profits solely to inflate the consistency denominator while account B carries the loss. Engine behaves correctly; the scenario asserts the detector signal exists and that consistency alone does not stop it |
-| GS-055 | Minimum-variance path to a full-cap extraction | AS-03, novel | Five days at 50,000c each, best-day share 2000bp, clears every gate. Asserts the true floor on days-to-first-payout is 5 trading days at 27,000c per trading day to the trader, not the constitution's stated 19,000c |
-| GS-056 | Locked floor converts the account into a free option | AS-04, novel | After the lock engages, a maximum-variance day cannot breach below `size + 10,000`. Asserts the liability consequence of `lock_at_size_plus` versus `reset_to_balance_minus_dd` |
+| GS-055 | Minimum-variance path to a full-cap extraction | AS-03, novel. **Rewritten by [ADR-013](../DECISIONS.md)** | Five days at 50,000c each, best-day share 2000bp, clears every gate: the floor on days-to-first-payout is 5 trading days. Steady state is then 7 to 8 trading days per cycle under the ruled **settlement** anchor, giving 16,875c to 19,286c per trading day to the trader, which reproduces the constitution's stated ceiling. The fixture also carries the basis-anchored counterfactual (5 day cycle, 27,000c per day) as an **expected-to-fail** case, so any future change that re-anchors the gap fails this file loudly instead of silently raising liability 40 percent |
+| GS-056 | Locked floor converts the account into a free option | AS-04, novel. **Rewritten by [ADR-014](../DECISIONS.md)** | The lock is enabled on all three plans and there is no post-payout reset, so this asserts the shipped behavior rather than a comparison between two modes. After the lock engages at `size + 260,000c` of high water, a maximum-variance day cannot breach below `size + 10,000c`, and the post-payout balance of `size + 100,000c` leaves exactly 90,000c of loss room. Pins the free option as **accepted and bounded**: the only capital at risk is the buffer, which was never withdrawable |
 | GS-057 | Correction lands after settlement and favors the trader | AS-05, novel | Never clawed back, flagged, absorbed. Asserts the absorbed amount is computed and reported rather than silently dropped |
 | GS-058 | Correction lands after settlement and favors the firm | AS-05, novel | Symmetric treatment: also never clawed back, also flagged. Asserts the policy is not one-directional |
 | GS-059 | Holiday cluster compresses the cadence gap in calendar time | AS-06, novel | Five trading days spanning the Christmas cluster is 9 calendar days; the same five trading days in June is 7. Asserts the gap is counted in trading days and that the published copy says so |
-| GS-060 | Zero-risk day farming for min-trading-days | AS-07, novel | One micro round trip per day advances traded days at commission cost. Asserts the min-trading-days gate provides no protection when win days are required, and quantifies it |
+| GS-060 | Zero-risk day farming for min-trading-days | AS-07, novel. **Rewritten by [ADR-015](../DECISIONS.md)** | One micro round trip per day advances traded days at commission cost. The funded min-days gate is now configured 0 and reports `skipped`, so the fixture asserts two things: that the farming pattern buys nothing against the real gates (win days, buffer, consistency), and that a disabled gate renders as disabled rather than as satisfied. Pairs with GS-080 |
 | GS-061 | Peak-picking: requesting on a local maximum | AS-08, novel | A volatile account requests on its best close. Asserts the firm systematically pays at trader-chosen local maxima and hands the premium to the simulation harness to price |
 | GS-062 | Identity-level correlated eligibility wave | AS-09, extends B4 #7 | Ten copy-traded accounts under one identity clear the win-day gate the same day. Each is individually correct and capped; the aggregate is 1,500,000c in one day. Asserts the identity-level forecast exists |
 | GS-063 | Breach and profit target on the same day | Constitution M1 | Breach wins, account closes, no `phase.passed`, no funded state written |
 | GS-064 | Breach and payout eligibility on the same day | M1 extension | Breach wins. An eligibility that existed at the previous close does not survive the breach check |
-| GS-065 | Settled payout drops the balance below the floor | AS-10, novel | The withdrawal is an adjustment, not a loss. Asserts the breach comparison neutralizes non-trading balance movements and that a payout can never breach the account that earned it |
+| GS-065 | Settled payout drops the balance toward a floor that does not move | AS-10, novel. **Rewritten by [ADR-014](../DECISIONS.md)** | The withdrawal is an adjustment, not a loss, and the floor is **not** recomputed to compensate. Asserts that the breach comparison neutralizes non-trading balance movements, that the day's opening balance after a maximum capped payout still sits above the floor by the buffer minus the lock offset, and therefore that a payout can never breach the account that earned it. INV-21 now rests on config validation (CV-11, CV-17), so this fixture is paired with GS-083, which proves the validator catches the config that would break it |
 | GS-066 | Failed transfer does not consume a ladder rung | AS-11, novel | Ordinal 3 fails, the retry is ordinal 3 again, `payouts_settled_count` never moved, graduation still requires 8 settled |
 | GS-067 | Graduation fires exactly on the ladder count | Constitution M1 | The 8th settlement graduates; the 7th does not. `>=` asserted at both boundaries |
 | GS-068 | Consistency period boundary at the settlement day | AS-12, novel | The basis day itself is excluded from the new period and the day after is included. Asserts a one-day off-by-one cannot silently move eligibility |
 | GS-069 | Adding profit on the best day breaks a passing consistency gate | AS-13, novel | The monotonicity counterexample. Eligibility is **not** monotone in profit, contrary to constitution section 5.1's phrasing, and the fixture is the proof |
 | GS-070 | Funded start balance does not equal size | AS-14, novel | A platform that fails to reset the funded account produces a first funded mark whose opening balance is not `size_cents`. The engine refuses the day and raises reconciliation rather than computing on it |
 
-## 6. GS-071 to GS-078: replay, upgrade, and config validation (M1)
+## 6. GS-071 to GS-083: replay, upgrade, and config validation (M1)
 
 | ID | Name | Pins |
 |---|---|---|
@@ -157,6 +160,18 @@ Plan shorthand resolves to [M01 Appendix A](../plans/M01-rules-engine.md). CORE-
 | GS-077 | Plan config rejected at publish: consistency threshold of 0 bp or above 10000 bp | Impossible and meaningless configurations respectively |
 | GS-078 | Plan config rejected at publish: intraday trailing drawdown selected in v1 | Config-supported and explicitly unimplemented. Publishing it fails loudly rather than computing something plausible |
 
-## 7. What is not here yet
+## 7. GS-079 to GS-083: scenarios created by the M1 gate rulings (M1)
+
+Every row here exists because a founder ruling on 2026-08-13 changed a rule, an operator, or a config value. They are numbered after the original set rather than inserted, so no existing fixture reference moves.
+
+| ID | Name | Source | Pins |
+|---|---|---|---|
+| GS-079 | Hard daily loss limit exactly at the limit survives | OQ-6, [M1 gate](../DECISIONS.md#m1-gate-closure-2026-08-13) | A day whose realized loss equals `daily_loss_limit_cents` exactly does **not** breach, and one cent more does. Asserts R-22's strict `>` and, in the same fixture, R-21's strict `<` on the floor, so the two operators are pinned **together**. The point of the file is not the DLL, which no v1 plan configures: it is that the two breach comparators can never drift apart unnoticed, since the day they disagree is the day a trader loses an account on a rule Merit publishes as "more than" |
+| GS-080 | A gate configured to zero renders as disabled, not as satisfied | OQ-3 and OQ-8, [ADR-015](../DECISIONS.md) | Funded `min_trading_days = 0` produces `pass: true, skipped: true` in `engine_gates`, the same shape the consistency denominator rule uses, and the eligibility response distinguishes it from a gate that was evaluated and passed. Asserts that `engineEligible` is unaffected. Exists because "a gate that is always true" and "a gate that is turned off" look identical in a boolean and must not look identical to a trader or a support agent |
+| GS-081 | Settlement leaves the floor, the high-water balance, and the lock untouched | OQ-5, [ADR-014](../DECISIONS.md) | A capped payout settles on a locked account and on an unlocked one. In both cases `floor_cents`, `high_water_balance_cents`, and `floor_locked` are byte-identical across the settlement while `balance_cents` falls by exactly `approved_cents`. No `payout.floor_recomputed` event is emitted. This is the direct fixture for the retirement of the post-payout recompute, and it is what makes INV-06 assertable with no settlement carve-out |
+| GS-082 | Merit Rapid: the cadence gap counts from the effective day, and the win-day gate is what actually binds | OQ-1 and OQ-12, [ADR-013](../DECISIONS.md) | On a `merit_rapid` account with `cadence_gap_trading_days = 1`, a request made one trading day after the **basis** day fails, because the gap counts from the **effective** day and because only one or two win days have accrued. The same account qualifies on the fifth trading day after the basis day, driven by the win-day gate rather than by the gap. Asserts both anchors independently and pins the published cadence figure that M09 renders |
+| GS-083 | Plan config rejected at publish: trailing drawdown, lock disabled, cap at or above the drawdown | CV-17, [ADR-014](../DECISIONS.md) | Publishing fails with CV-17 named. The fixture also carries the arithmetic of what would have happened: an account paid on a new closing high would open the next session below its own floor and breach on the day it was paid. This is the file that keeps INV-21 true now that no post-payout recompute exists to rescue it |
+
+## 8. What is not here yet
 
 Scenarios owned by M2 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**

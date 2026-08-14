@@ -129,7 +129,7 @@ Auth: session. Rate limit: 120 per minute.
 type PlansResponse = {
   data: Array<{
     plan_id: string;
-    code: "core_eod" | "rapid_daily" | "direct";
+    code: "core_eod" | "merit_rapid" | "direct";   // renamed at the M1 gate, ADR-013
     name: string;
     current_version: { plan_version_id: string; version: number };
     sizes: Array<{
