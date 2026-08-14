@@ -22,7 +22,7 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 | 0002 | `identity` | yes | `identities`, `identity_signals`, `identity_links`, `identity_merges`, `users`, `passkeys`, `otp_challenges`, `sessions` |
 | 0003 | `kyc` | yes | `kyc_verifications`, `sanctions_screenings`, `kyc_funnel_events`, `dedupe_matches` |
 | 0004 | `catalog` | yes | `plans`, `plan_versions`, `plan_version_sizes`, `tos_versions`, `tos_acceptances`, `geo_restrictions`, `contract_specs`, `trading_calendar` |
-| 0005 | `affiliate_program` | no | `affiliates`, `affiliate_creatives`, `affiliate_clicks` |
+| 0005 | `affiliate_program` | narrow | `affiliates`, `affiliate_creatives`, `affiliate_clicks` |
 | 0006 | `commerce` | yes | `coupons`, `purchases`, `coupon_redemptions`, `psp_webhook_events`, `mid_health` |
 | 0007 | `accounts` | yes | `accounts`, `account_status_history`, `platform_account_refs`, `provisioning_queue`, `platform_entitlements` |
 | 0008 | `risk` | no | `detector_definitions`, `detector_runs`, `risk_flags`, `correlation_groups`, `evidence_packs` |
@@ -68,7 +68,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-07 | `rule_states` | add `consistency_period_start_day` | 0015 | pending |
 | SD-08 | `rule_states` | add `state_hash` | 0015 | pending |
 | SD-09 | `payout_requests` | partial unique `(account_id) where status in ('approved','frozen')` (predicate per ADR-028) | 0010 | pending |
-| SD-10 | `plan_version_sizes` | conditional not-null on the two `floor_lock_*` columns | 0004 | pending |
+| SD-10 | `plan_version_sizes` | conditional not-null on the two `floor_lock_*` columns | 0004 | **landed** |
 
 ## 3. Batch 1: M02 to M08, 37 deltas
 
@@ -107,16 +107,16 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M7-04 | `identity_links` | add `disputed_at`, `dispute_note`, `suppressed`, `suppressed_by` | 0002 | **landed** |
 | SD-M7-05 | new `correlation_groups` | group-level correlation results | 0008 | pending |
 | SD-M8-01 | `affiliate_commissions` | add `chargeback_window_ends_on`, `clawback_of`, `paid_in_statement_id` | 0012 | pending |
-| SD-M8-02 | `affiliate_clicks` | add `referrer_host`, `landing_is_direct`, `click_fingerprint`, `suspicious_reason` | 0005 | pending |
-| SD-M8-03 | new `affiliate_creatives` | what was approved, not merely that something was | 0005 | pending |
-| SD-M8-04 | `affiliates` | add `balance_cents`, `negative_balance_since` | 0005 | pending |
+| SD-M8-02 | `affiliate_clicks` | add `referrer_host`, `landing_is_direct`, `click_fingerprint`, `suspicious_reason` | 0005 | **landed** |
+| SD-M8-03 | new `affiliate_creatives` | what was approved, not merely that something was | 0005 | **landed** |
+| SD-M8-04 | `affiliates` | add `balance_cents`, `negative_balance_since` | 0005 | **landed** |
 | SD-M8-05 | `attributions` | add `buyer_identity_id`, `affiliate_identity_id`, `self_deal_link_confidence_bp` | 0012 | pending |
 
 ## 4. Batch 2: M09 to M20, 41 deltas
 
 | Delta | Table | Change | Migration | Status |
 |---|---|---|---|---|
-| SD-M9-01 | `plan_versions` | add `public_slug`, `public_visible` | 0004 | pending |
+| SD-M9-01 | `plan_versions` | add `public_slug`, `public_visible` | 0004 | **landed** |
 | SD-M9-02 | new `content_documents` | versioned content with a checksum | 0020 | pending |
 | SD-M9-03 | new `page_revalidations` | revalidation as part of publish's definition of done | 0020 | pending |
 | SD-M10-01 | new `integration_contracts` | per-vendor field allowlist as a row | 0018 | pending |
