@@ -128,13 +128,13 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M11-02 | `certificates` | add `revocation_class` | 0020 | **landed** |
 | SD-M11-03 | `certificates` | add `deferred_until`, `deferred_reason` | 0020 | **landed** |
 | SD-M11-04 | new `certificate_verifications` | the public oracle's access log | 0025 | pending, **reserved** |
-| SD-M12-01 | new `statistic_definitions` | a statistic is a choice of denominator | 0021 | pending |
-| SD-M12-02 | new `published_statistics` | append-only, with numerator and denominator | 0021 | pending |
-| SD-M12-03 | new `review_requests` | who was invited, and were they representative | 0021 | pending |
-| SD-M12-04 | new `proof_links` | permanent disclosure needs an audited row | 0021 | pending |
-| SD-M13-01 | new `round_trips` | versioned fill grouping | 0022 | pending |
-| SD-M13-02 | new `journal_entries` | soft delete with a hard-delete job | 0022 | pending |
-| SD-M13-03 | new `analytics_snapshots` | computed once per closed day | 0022 | pending |
+| SD-M12-01 | new `statistic_definitions` | a statistic is a choice of denominator | 0021 | **landed** |
+| SD-M12-02 | new `published_statistics` | append-only, with numerator and denominator | 0021 | **landed** |
+| SD-M12-03 | new `review_requests` | who was invited, and were they representative | 0021 | **landed** |
+| SD-M12-04 | new `proof_links` | permanent disclosure needs an audited row | 0021 | **landed** |
+| SD-M13-01 | new `round_trips` | versioned fill grouping | 0022 | **landed** |
+| SD-M13-02 | new `journal_entries` | soft delete with a hard-delete job | 0022 | **landed** |
+| SD-M13-03 | new `analytics_snapshots` | computed once per closed day | 0022 | **landed** |
 | SD-M14-01 | new `loyalty_states` | derived per day, never a mutable balance | 0023 | pending |
 | SD-M14-02 | new `loyalty_benefit_grants` | which criteria version earned it | 0023 | pending |
 | SD-M14-03 | new `loyalty_criteria` | versioned promises, with `breaks_on` enumerated | 0023 | pending |
