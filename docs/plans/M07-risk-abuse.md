@@ -306,7 +306,7 @@ The pack gives the trader every fill, mark, rule state, and gate result of their
 | **v1.x** | Probabilistic scoring, the signal-weight table, [M06](M06-admin-ops-console.md)'s graph explorer | Weights tuned on no data are guesses wearing a number |
 | **post-launch** | D-17 behavioral fingerprinting | A fingerprint corpus with three members is a false-positive engine |
 
-**Golden scenarios are required per tier**, so a defense promoted upward arrives with the fixture proving it does what the tier above assumed. GS-207, GS-208, GS-209.
+**Golden scenarios are required per tier**, so a defense promoted upward arrives with the fixture proving it does what the tier above assumed. GS-235 to GS-238, plus GS-239 for D-15's fail-open behavior.
 
 **The framing that makes these comparable: identity replacement cost.** The measure of an identity defense is not how many fakes it catches but **what a fresh usable identity costs the adversary**. Biometric dedupe is expensive to defeat; an email-domain heuristic is free. Scoring every control on that one axis is what the [dossier](../../research/ADVERSARY_DOSSIER.md) now does, and it is the only way to compare a $2 provider call against a detector.
 

@@ -35,6 +35,8 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [SECURITY_LANDSCAPE.md](../research/SECURITY_LANDSCAPE.md) | D0: breach history, control checklist, B4 additions | approved | founder |
 | [VIBE_FAILURE_POSTMORTEMS.md](../research/VIBE_FAILURE_POSTMORTEMS.md) | Appendix E: incident studies converted to named CI gates | approved | founder |
 | [CLAUDE_CODE_PLAYBOOK.md](../research/CLAUDE_CODE_PLAYBOOK.md) | C0: community practice, merged monthly | approved | founder |
+| [calibration/README.md](../research/calibration/README.md) | **New.** Calibration source of record: the committed workbook, the six workbook-versus-corpus divergences, the rho-correlation risk table, and the derived selection math | approved | founder |
+| [calibration/futures_prop_firm_model.xlsx](../research/calibration/futures_prop_firm_model.xlsx) | The 18-tab business-model workbook. **`mc_lifecycle.py` still outstanding** | approved | founder |
 
 ## docs/architecture/ (Wave 2: APPROVED at the gate, 2026-08-13)
 | Doc | Purpose | Status | Owner |
@@ -67,16 +69,18 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M15-discord-integration.md](plans/M15-discord-integration.md) | Per-role consent, one-way link that is never a credential, template-only announcements, moderation separated from enforcement. Post-launch per constitution section 10 | review | founder |
 | [M16-notification-center.md](plans/M16-notification-center.md) | Four notification classes deciding what a preference may silence, contact-change ceremony with prior-contact window, identity coalescing, template allowlist | review | founder |
 | [M17-offers-engine.md](plans/M17-offers-engine.md) | Server-authoritative price resolution, dual-controlled price floors, identity-bound offers, promotional credit provenance, experiments that cannot vary a rule | review | founder |
-| [M18-graduation-track.md](plans/M18-graduation-track.md) | Ladder finiteness disclosed pre-purchase, mechanical graduation, terminal settlement, accrued-only vault. **Carries the live-program regulatory finding** | review | founder |
-| [M19-kyc-identity.md](plans/M19-kyc-identity.md) | Placement as pinned config, dedupe as a relationship with dispositions, sanctions carve-out, real re-verification, minimization with durable evidence, funnel telemetry | review | founder |
+| [M18-graduation-track.md](plans/M18-graduation-track.md) | **Renamed from M18-live-graduation-pipeline** to match shipped behavior. Ladder finiteness disclosed pre-purchase, mechanical graduation, terminal settlement, accrued-only vault. **No live program at launch** ([OQ-M18-01](DECISIONS.md)) | review | founder |
+| [M19-kyc-identity.md](plans/M19-kyc-identity.md) | **Composite trigger set** ([ADR-021](DECISIONS.md)), verification UX as milestone-not-accusation, placement as pinned config, dedupe as a relationship with dispositions, sanctions carve-out, real re-verification, minimization with durable evidence, funnel telemetry | review | founder |
 | [M20-wallet.md](plans/M20-wallet.md) | **New module.** The wallet as an object: closed credit list, provenance rules, two exits sharing context gates, dormancy and escheatment, float segregation | review | founder |
 
 ## docs/testing/, ops/, design/, legal/ (Wave 4)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [STRATEGY.md](testing/STRATEGY.md) | Section 5 instantiated with tooling choices | draft | claude |
-| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (**141 defined**; GS-001 to GS-083 approved with M01, GS-084 to GS-141 approved with their module except M02's) | approved | founder |
+| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (**239 defined**; GS-001 to GS-083 approved with M01, GS-084 to GS-141 approved with their module except M02's, GS-142 to GS-239 at review with batch 2 and the addendum) | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | Monte-Carlo population port spec, CI calibration bands. Carries the Wave 4 inputs the gate rulings changed | draft | claude |
 | [ops/runbooks/README.md](ops/runbooks/README.md) | Section 7: one runbook per failure class | draft | claude |
 | [design/DESIGN_SYSTEM.md](design/DESIGN_SYSTEM.md) | Appendix F instantiated: tokens locked before any UI | draft | claude |
-| [legal/README.md](legal/README.md) | ToS/disclosure drafts, sim-language blocks, geo list. Carries the copy-trading clause and the wallet counsel agenda | draft | claude |
+| [legal/README.md](legal/README.md) | Index, norm positioning, and the three-item counsel packet | draft | claude |
+| [legal/PRIVACY_POLICY.md](legal/PRIVACY_POLICY.md) | **New.** Collection categories with purposes, the fraud-prevention retention carve-out, sharing by recipient category. Draft for counsel | draft | founder |
+| [legal/TOS_CLAUSES.md](legal/TOS_CLAUSES.md) | **New.** Eight required clauses including account linking, verification rights, copy trading, and wallet terms. Draft for counsel | draft | founder |

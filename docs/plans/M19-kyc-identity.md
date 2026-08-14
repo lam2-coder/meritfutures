@@ -43,7 +43,7 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 | PL-M19-01 | `pre_eval` | At checkout, before purchase completes | **~$1.50 to $2 on 100 percent of buyers**, and friction on a $79 to $99 impulse purchase | Maximum deterrence, maximum friction; no major competitor gates purchase |
 | PL-M19-02 | `pre_funded` | At evaluation pass, before the funded account exists | **~15 percent of buyers**, an 85 percent cost saving; friction lands on people already invested | "The likely sweet spot" |
 | PL-M19-03 | `direct_purchase` | At purchase, always, on Direct and any instant-funded plan | 100 percent of Direct buyers | **Not configurable.** Funding is immediate, so there is no later moment |
-| — | payout-only | — | — | **Rejected by the constitution**: too late under a zero-denial policy |
+| n/a | payout-only | n/a | n/a | **Rejected by the constitution**: too late under a zero-denial policy |
 
 **Superseded by [ADR-021](../DECISIONS.md): placement is a composite trigger set, not a single point.** The three rows above remain the vocabulary and the cost model, but the configuration is now a **set of trigger events** and verification fires at whichever is reached **first**. AS-M19-01 is the reason: placement also decides how much of the population enters the biometric dedupe corpus, and the corpus is the fleet-killer.
 

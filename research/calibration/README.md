@@ -23,7 +23,7 @@ The upload accompanying the workbook on 2026-08-14 was **not** `mc_lifecycle.py`
 
 ## The workbook predates several approved ADRs, and this matters
 
-**The `Our Firm — Plans` tab is a snapshot taken before the M1 gate and the batch 1 gate.** It is corroborating evidence for the corpus, not an authority over it. Where the two disagree, **the corpus wins**, because the corpus carries the founder rulings and the workbook has not been re-run since.
+**The `Our Firm - Plans` tab is a snapshot taken before the M1 gate and the batch 1 gate.** It is corroborating evidence for the corpus, not an authority over it. Where the two disagree, **the corpus wins**, because the corpus carries the founder rulings and the workbook has not been re-run since.
 
 Known divergences as of 2026-08-14:
 

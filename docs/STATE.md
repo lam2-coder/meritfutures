@@ -17,11 +17,16 @@ last_updated: 2026-08-14
 Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 batch 1 gate CLOSED (2026-08-14): M03 through M08 are `approved`; M02 holds at `review`.** **Wave 3 batch 2 DRAFTED (2026-08-14): M09 through M20 are at `review`, awaiting the gate. Wave 3 is complete.**
 
 ## Gate in front of us
-**The Wave 3 batch 2 gate: twelve plans, M09 through M20, all at `review`.** Nothing blocks the review. Read the batch summary in [SESSION_LOG](SESSION_LOG.md) first; it lists what needs a ruling and what only needs reading.
+**The Wave 3 batch 2 gate: twelve plans, M09 through M20, all at `review`.** The consolidated founder addendum (2026-08-14) has been folded and **closes all five open batch 2 questions**, so what remains is the read-through rather than a set of decisions.
 
-**Four items in batch 2 need a founder decision before their module can be built, and two of them are counsel questions rather than engineering ones.** In descending order of consequence: [M18](plans/M18-graduation-track.md) OQ-M18-01 (does a live program exist, and on whose paper), [M20](plans/M20-wallet.md) OQ-M20-03 (is the wallet a payable or a regulated stored-value product), [M19](plans/M19-kyc-identity.md) OQ-M19-01 (does the dedupe-corpus finding change the KYC placement recommendation), and [M12](plans/M12-transparency-platform.md) OQ-M12-01 (the seven statistic definitions, which must be fixed before any data exists).
+**M02 cannot reach `approved` while the Rithmic vendor call is outstanding** ([ADR-005](DECISIONS.md)). Its agenda is **sixteen** `V-M2-nn` items, and `V-M2-15` is a **commercial precondition rather than a question**.
 
-**M02 cannot reach `approved` while the Rithmic vendor call is outstanding** ([ADR-005](DECISIONS.md)). Its agenda is now **sixteen** `V-M2-nn` items, and `V-M2-15` is a **commercial precondition rather than a question**: without either a provisioning acknowledgement artifact or a readable current-risk-setting endpoint, fail-closed provisioning means no account can be brought online at all.
+## Counsel packet (three items, one lawyer, one sitting)
+Formalized at the batch 2 gate ([DECISIONS](DECISIONS.md)). These are the questions engineering cannot answer.
+
+1. **Live-program structure.** Does a ring-fenced affiliated entity on the MFFU pattern change Merit's regulatory character, and what may be said about graduation before one exists? Blocks all live-program copy; blocks nothing in code.
+2. **Wallet characterization.** Is the wallet a payable rather than regulated stored value, given `INV-WALLET-NO-DEPOSITS`, no interest, no transfer, no deposit, payable on demand? The answer may add conditions rather than a prohibition, which is why it is cheap now.
+3. **Escheatment mapping plus the BIPA and GDPR lawful-basis analysis** for the biometric and monitoring disclosures. Blocks the privacy policy leaving draft.
 
 ## Done
 - Wave 1 approved (7 docs). Wave 2 approved (8 docs). M1 gate closed with ADR-013/014/015.
@@ -31,10 +36,13 @@ Wave 1 (Research) APPROVED. Wave 2 (Architecture) APPROVED. **Wave 3 batch 1 gat
 - Registries at **231 golden scenarios** and **138 edge cases** (batch 2 added GS-142 to GS-231 and EC-083 to EC-138).
 - SECURITY gains C-23 to C-26, the wallet ATO blast-radius analysis (§4.7), and the break-glass procedure (§8.1). INFRA gains the 50,000-trader scale targets (§10.5).
 
+- **Consolidated founder addendum folded (2026-08-14).** Three ADRs: **021** (KYC placement is a composite trigger set, resolving OQ-M19-01), **022** (identity defense elevated to a scored graph in three priced tiers), **023** (SEON-class checkout enrichment, buy-not-build, observe mode first). All five batch 2 questions ruled. M18 renamed to **M18-graduation-track** to match shipped behavior. Legal skeletons added. Registry at **239** golden scenarios.
+- **Calibration workbook committed.** `research/calibration/futures_prop_firm_model.xlsx` with a provenance README. Its Risk Engine tab corroborates the conservatism ruling exactly: CVaR99 at rho = 0.30 is **$132,897/mo (2.93x mean)**, the reserve rule is hold >= CVaR99 (**~$135K ring-fenced**), and combined regime-stress ruin runs **6.3% at $150K of capital versus 0.36% at $350K**.
+
 ## In flight
 - Nothing. Batch 2 is complete and parked at the gate as instructed.
 
-## Settled at the follow-up ruling (2026-08-14)
+## Settled by founder ruling (2026-08-14)
 The four findings raised after the batch 1 fold are closed and folded.
 
 1. **Merit Rapid's per-day ceiling of record is $300** (30,000c). The $240 figure was settlement-anchored commentary predating [ADR-019](DECISIONS.md); the `w=3` calibration was basis anchored and already contained the 3 day cycle, so **no economic change**. Corrected in ADR-018, [M01 AS-03](plans/M01-rules-engine.md), STATE, and [SIMULATION_HARNESS](testing/SIMULATION_HARNESS.md), with the dossier framing added: the ceiling nominally exceeds the MFF-magnet benchmark, and the defense is the win-day gate, the 8-payout ladder (roughly **$7,200 per account lifetime**), and detection, **never the per-day rate**.
@@ -68,6 +76,8 @@ Ordered by how much they change, most first.
 - Nothing. The vendor call is deferred by choice; engineering proceeds against the simulator, which now needs a **streaming mode** as well as file output.
 
 ## Next 3 actions
-1. **Wave 3 batch 2: M09 through M19.** Carry these inputs in rather than rediscovering them: **M09** publishes Merit Rapid at 3 trading days and must not attribute the plan's speed to its cadence gap (EC-049); **M11** per-trade certificates; **M12** Trustpilot auto-review on payout settlement, with the compliance check mandatory; **M14 and M17** are bound by [ADR-019a](DECISIONS.md)'s gamification bright line and by the activated `promotional_credit` ledger class; **M17** free trials and rule-based promos; **M19** is now load bearing for the wallet's external leg.
-2. **Fold the schema deltas into DATA_MODEL as one reviewed migration.** M1's ten (SD-01 to SD-10), batch 1's thirty-one (`SD-M2-nn` to `SD-M8-nn`), and now the gate's additions: SD-M2-03 unchanged, **SD-M3-06** (wallet payment method), **SD-M5-06** (`wallet_withdrawals`), **SD-M5-07** (`trader_wallet` ledger class). Money-path migration, own session, ADR-003 strict regime.
-3. **Commit `research/calibration/mc_lifecycle.py` and the business-model workbook.** A founder action, and the last thing standing between Appendix A's parameters and being diffable against a versioned model. It also converts SIMULATION_HARNESS's ceiling check (30,000c on Merit Rapid, 27,000c on Core EOD and Direct) from a stated expectation into a runnable one.
+1. **Founder review of Wave 3 batch 2** (M09 through M20). All five open questions are ruled and folded, so this is a read-through rather than a decision gate. Suggested order: **M20, M19, M12** (wallet, identity, and the public statistics are the three with the most downstream reach).
+2. **Fold the schema deltas into DATA_MODEL as one reviewed migration.** M1's ten, batch 1's thirty-one, batch 2's additions, and now the addendum's: SD-M19-03 widens to record **which trigger fired**, and the link-confidence signal-weight table needs a home. Money-path migration, own session, ADR-003 strict regime.
+3. **Wave 4**, whose first two actions are now well specified: **SIMULATION_HARNESS** (the port checklist is the calibration README's divergence table) and the **M12 seven-definition sign-off table** ([OQ-M12-01](DECISIONS.md)).
+
+**Founder actions outstanding:** commit `mc_lifecycle.py`; book the Rithmic vendor call; book the counsel sitting for the three-item packet; delete the stale `origin/dev` and `origin/claude/*` refs.
