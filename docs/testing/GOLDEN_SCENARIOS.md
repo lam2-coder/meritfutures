@@ -26,6 +26,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-100 to GS-105 | Trader portal: transparency, confirm-time truth, certificates, ATO | M4 |
 | GS-106 to GS-111 | Payout system: reflection, mules, reserve waves, freezes, ledger halts | M5 |
 | GS-112 to GS-117 | Admin and ops: redaction, breakers, suppressions, liability definitions | M6 |
+| GS-118 to GS-122 | Risk and abuse: detection cadence, group hedging, queue integrity | M7 |
 
 ## 2. Fixture format
 
@@ -246,6 +247,18 @@ Defined by [M06](../plans/M06-admin-ops-console.md) section 8.2. Three of these 
 | GS-116 | Evidence pack export burst | Ten exports inside an hour alerts; signed URLs are short-lived and single-use; no screen returns a bulk identity list. Asserts the admin console's read surface is treated as a crown jewel, not only its write surface. AS-M6-05 |
 | GS-117 | Reversing a protective state requires the reason typed first | Unfreeze, breaker override, and entitlement re-enable each require a reason before the confirm control enables; a breaker override with no expiry is rejected; no route edits a verified identity at all. Asserts that the dangerous actions are slow by design, because the operator being social-engineered is the founder on a phone. AS-M6-06 |
 
-## 13. What is not here yet
+## 13. GS-118 to GS-122: risk and abuse (M7)
 
-Scenarios owned by M7 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
+Defined by [M07](../plans/M07-risk-abuse.md) section 8.1. The ring rehearsal (GS-050) and the M1 adversarial fixtures it depends on (GS-054, GS-060, GS-062) are shared and stay where they are.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-118 | Detection cadence beats extraction on the minimum-variance path | A six-account ring on the 5 trading day path is flagged by fill clustering and group exposure before the first settlement lands, and the inverse-pair detector is asserted **not** to have fired, because its 20 day window has no data yet. Pins the honest conclusion that the flagship correlation detector does not defend the first cycle at all. AS-M7-01 |
+| GS-119 | Three-leg rotation defeats pairwise correlation and not group variance | Every pair sits comfortably inside the pairwise threshold while the group's summed variance sits far below the sum of member variances, and the group detector fires. Pins the invariance that makes rotating legs pointless. AS-M7-02 |
+| GS-120 | Queue ordering under manufactured noise | Fifty innocent clustering flags do not outrank one identity with three independent detector families implicated, and a detector whose precision collapses is auto-demoted to digest severity as a data change rather than a deploy. Pins attention as the scarce resource an adversary can attack. AS-M7-03 |
+| GS-121 | Household signals produce a soft link and never a merge | Shared IP, shared device, and shared card across two identities produce edges below the confidence ceiling, caps do **not** aggregate, and a disputed link renders on the graph before an admin acts. Pins the asymmetry: over-merging harms people who did nothing wrong and who are sympathetic, articulate, and telling the truth. AS-M7-04 |
+| GS-122 | A detector run that finds none of its own canaries | Status `degraded`, `detector.run_degraded` emitted, page fired. Synthetic subjects are excluded from every aggregate and are regenerated per run rather than static. Pins the only difference between a broken detector and a quiet night. AS-M7-05 |
+
+## 14. What is not here yet
+
+Scenarios owned by M8 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
