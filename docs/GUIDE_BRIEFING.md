@@ -117,7 +117,7 @@ Roughly, and in dependency order. Each is one Claude Code session unless noted.
 | # | Session | Regime | Notes |
 |---|---|---|---|
 | 1 | **Batch 2 gate closure** | non-money | Fold whatever the read-through produces. May be small if the read-through is clean |
-| 2 | **The consolidated schema-delta migration** | **money path, strict** | M01's ten deltas, batch 1's thirty-one, batch 2's, plus the addendum's. **Its own session, fresh context**, per ADR-003. This is the single highest-risk documentation session remaining, because it reconciles four waves of proposed schema changes into one reviewed migration against an approved DATA_MODEL |
+| 2 | **The consolidated schema-delta migration** | **money path, strict** | M01's ten, batch 1's **thirty-seven**, batch 2's **forty-one**, plus 5 unnumbered: **93 total** ([ADR-026](DECISIONS.md) corrected the tally). **Its own session, fresh context**, per ADR-003. This is the single highest-risk documentation session remaining, because it reconciles four waves of proposed schema changes into one reviewed migration against an approved DATA_MODEL |
 | 3 | **Wave 4: SIMULATION_HARNESS** | non-money | The port spec. Its checklist already exists: the divergence table in the calibration README. Blocked in part on `mc_lifecycle.py` |
 | 4 | **Wave 4: testing STRATEGY** | non-money | Constitution section 5 instantiated with tooling |
 | 5 | **Wave 4: ops runbooks** | non-money | One per failure class. The DDOS-is-also-an-exfiltration-alarm trigger belongs here |
