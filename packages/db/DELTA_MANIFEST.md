@@ -48,10 +48,11 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ### Two forward references, and why they are not an ALTER chain
 
-The greenfield rule folds every delta at create. It does **not** abolish genuine reference cycles, and there are exactly two:
+The greenfield rule folds every delta at create. It does **not** abolish genuine reference cycles, and there are exactly three:
 
 1. **`purchases.parent_account_id` -> `accounts`**, while `accounts.purchase_id` -> `purchases`. The foreign key is added in `0007_accounts`.
 2. **`purchases.wallet_ledger_transaction_id`** (SD-M3-06) -> `ledger_transactions`, which is created in `0009` because `accounts` must precede `0010_payouts`. The foreign key is added in `0011_wallet`.
+3. **`accounts.terminal_settlement_id`** (SD-M18-01) -> `payout_requests`, while `payout_requests.account_id` -> `accounts`. The foreign key is added in `0010_payouts`.
 
 Both are cycle breaks on a column that is created with its table, not a delta applied later. Each carries a comment at both ends.
 
@@ -74,20 +75,20 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 
 | Delta | Table | Change | Migration | Status |
 |---|---|---|---|---|
-| SD-M2-01 | `provisioning_queue` | add `payload_hash` | 0007 | pending |
-| SD-M2-02 | new `platform_account_refs` | permanently burned platform refs | 0007 | pending |
+| SD-M2-01 | `provisioning_queue` | add `payload_hash` | 0007 | **landed** |
+| SD-M2-02 | new `platform_account_refs` | permanently burned platform refs | 0007 | **landed** |
 | SD-M2-03 | `ingest_files` | add `replaces_ingest_file_id`, `disposition` | 0013 | pending |
 | SD-M2-04 | `fills` | add `trading_day_vendor`, `trading_day_source` | 0013 | pending |
-| SD-M2-05 | `platform_entitlements` | add `platform_user_ref`, `billing_unit` | 0007 | pending |
+| SD-M2-05 | `platform_entitlements` | add `platform_user_ref`, `billing_unit` | 0007 | **landed** |
 | SD-M2-06 | `reconciliations` | add `source_ingest_file_id`, `our_source` | 0014 | pending |
-| SD-M3-01 | `psp_webhook_events` | add `purchase_id`, `deferred_until`, `defer_attempts` | 0006 | pending |
-| SD-M3-02 | `purchases` | add `refundable_until`, `first_trade_at` | 0006 | pending |
-| SD-M3-03 | new `mid_health` | MID health as a decision record | 0006 | pending |
-| SD-M3-04 | `coupons` | add `first_purchase_only`, `applies_to_kind` | 0006 | pending |
-| SD-M3-05 | `purchases` | add `checkout_ip_country`, `card_country`, `geo_decision` | 0006 | pending |
-| SD-M3-06 | `purchases` | add `payment_method`, `wallet_debit_cents`, `wallet_ledger_transaction_id` | 0006 (fk in 0011) | pending |
+| SD-M3-01 | `psp_webhook_events` | add `purchase_id`, `deferred_until`, `defer_attempts` | 0006 | **landed** |
+| SD-M3-02 | `purchases` | add `refundable_until`, `first_trade_at` | 0006 | **landed** |
+| SD-M3-03 | new `mid_health` | MID health as a decision record | 0006 | **landed** |
+| SD-M3-04 | `coupons` | add `first_purchase_only`, `applies_to_kind` | 0006 | **landed** |
+| SD-M3-05 | `purchases` | add `checkout_ip_country`, `card_country`, `geo_decision` | 0006 | **landed** |
+| SD-M3-06 | `purchases` | add `payment_method`, `wallet_debit_cents`, `wallet_ledger_transaction_id` | 0006 (fk in 0011) | **landed** |
 | SD-M4-01 | new `certificates` | the row behind a verifiable share card | 0020 | pending |
-| SD-M4-02 | `purchases` | add `rule_diff_acknowledged_at` | 0006 | pending |
+| SD-M4-02 | `purchases` | add `rule_diff_acknowledged_at` | 0006 | **landed** |
 | SD-M4-03 | `sessions` | add `created_ip`, `created_user_agent`, `last_seen_at`, `last_seen_ip` | 0002 | **landed** |
 | SD-M5-01 | `payout_requests` | add `frozen_at`, `freeze_flag_id`, `freeze_expires_at` | 0010 | pending |
 | SD-M5-02 | `payout_transfers` | add `name_match_score`, `name_match_method`, `name_match_reviewed_by` | 0010 | pending |
@@ -146,7 +147,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M17-02 | new `price_floors` | a hard stop that is not the sum of the discounts | 0024 | pending |
 | SD-M17-03 | new `promotional_credit_grants` | what funded a credit | 0024 | pending |
 | SD-M17-04 | new `offer_experiments` | no enum value for a rule | 0024 | pending |
-| SD-M18-01 | `accounts` | add `graduated_at`, `graduation_path`, `terminal_settlement_id` | 0007 | pending |
+| SD-M18-01 | `accounts` | add `graduated_at`, `graduation_path`, `terminal_settlement_id` | 0007 | **landed** |
 | SD-M18-02 | new `graduation_benefits` | accrual with a stated basis | 0023 | pending |
 | SD-M18-03 | new `graduation_invitations` | shape decided before commercial pressure decides it | 0025 | pending, **reserved** |
 | SD-M19-01 | `kyc_verifications` | add `verification_purpose`, `supersedes`, `liveness_passed`, `liveness_method` | 0003 | **landed** |
@@ -165,7 +166,7 @@ Rulings the schema did not yet express. Four of the five were invisible because 
 | # | Change | Source | Migration | Status |
 |---|---|---|---|---|
 | U-01 | new `identity_signal_weights` | ADR-022, M07 D-16 | 0025 | pending, **reserved** (ADR-022 tiers it to v1.x) |
-| U-02 | `accounts.graduation_eligible` | ADR-024, M01 R-49 | 0007 | pending |
+| U-02 | `accounts.graduation_eligible` | ADR-024, M01 R-49 | 0007 | **landed** |
 | U-03 | new `ledger_halts`, identity-scoped with an escalation clock | ADR-016, M05 INV-M5-16 | 0016 | pending |
 | U-04 | `identity_signals.kind` gains `footprint_enrichment` | ADR-023, M07 D-15 | 0002 | **landed** |
 | U-05 | `kyc_verifications.placement` check widened to the ruled trigger set | ADR-021 | 0003 | **landed** |
