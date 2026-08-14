@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # GLOSSARY
@@ -225,10 +225,12 @@ The sum of [withdrawable](#withdrawable) across all funded accounts at a point i
 Funds set aside to cover projected payouts. Held and reported separately from operating funds.
 
 ## reserve coverage ratio (RCR)
-`reserve / CVaR99 estimate`. Below 1.0, the [circuit breaker](#circuit-breaker) pauses new sales. It never pauses payouts.
+`reserve / CVaR99 at rho = 0.30`. Below 1.0, the [circuit breaker](#circuit-breaker) pauses new sales. It never pauses payouts. The RCR breaker is one of the three places Merit's conservatism deliberately lives (see [CVaR99](#cvar99)).
 
 ## CVaR99
 Conditional value at risk at the 99th percentile: the expected payout liability in the worst 1% of modeled outcomes, produced by the simulation harness and refreshed on a schedule.
+
+**CVaR99 evaluated at `rho = 0.30` is the reserve floor, never the estimate** (founder ruling, 2026-08-14, [DECISIONS](DECISIONS.md)). The harness's calibration bands are **central estimates** and carry no built-in cushion. Conservatism lives in three named places instead: the correlation assumption **`rho = 0.30`**, the **regime-stress ruin scenarios**, and the **RCR breaker at 1.0**. Sizing the payout wallet against a central estimate is sizing against a coin flip, and the two numbers are easy to confuse because the same harness emits both under the same name.
 
 ## loss ratio
 Trailing 30-day payouts divided by fees, per plan. Above 6000 bp (60%), the circuit breaker auto-pauses that plan's new sales and alerts.

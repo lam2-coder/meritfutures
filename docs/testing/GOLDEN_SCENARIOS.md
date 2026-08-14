@@ -10,7 +10,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 
 **Seeded in Wave 3 by [M01](../plans/M01-rules-engine.md), and GS-001 to GS-083 approved with it at the M1 gate on 2026-08-13.** Each later module plan appends its own block and those scenarios carry that plan's status. Constitution section 5.2 requires at least 40 golden files. **GS-001 to GS-083 are M1's**, of which 67 are executable against the pure engine with zero I/O, plus 5 (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives. The numbering map below is the current total.
 
-**Five scenarios were added and four rewritten by the M1 gate rulings** ([ADR-013](../DECISIONS.md), [ADR-014](../DECISIONS.md), [ADR-015](../DECISIONS.md)). **Thirteen more were added and four rewritten by the Wave 3 batch 1 gate rulings** ([ADR-016](../DECISIONS.md) through [ADR-020](../DECISIONS.md)), bringing the registry to **140**. A golden file that pinned a behavior the founder overruled is not quietly deleted: it is rewritten to pin what was actually decided, and the row says so, because a fixture that silently changes meaning is how a suite stops being a specification.
+**Five scenarios were added and four rewritten by the M1 gate rulings** ([ADR-013](../DECISIONS.md), [ADR-014](../DECISIONS.md), [ADR-015](../DECISIONS.md)). **Fourteen more were added and four rewritten by the Wave 3 batch 1 gate rulings** ([ADR-016](../DECISIONS.md) through [ADR-020](../DECISIONS.md)), bringing the registry to **141**. A golden file that pinned a behavior the founder overruled is not quietly deleted: it is rewritten to pin what was actually decided, and the row says so, because a fixture that silently changes meaning is how a suite stops being a specification.
 
 **GS-055 is the one to read if you read only one row of that rewrite.** It pinned the extraction ceiling under the settlement anchor and carried the basis-anchored case as an expected-to-fail counterfactual. [ADR-019](../DECISIONS.md) made the counterfactual live, so the fixture now pins the opposite direction. That is exactly the situation this file's rule about rewriting rather than deleting exists for: the number changed because a decision changed, and both the number and the decision are on the record.
 
@@ -30,7 +30,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-112 to GS-117 | Admin and ops: redaction, breakers, suppressions, liability definitions | M6 |
 | GS-118 to GS-122 | Risk and abuse: detection cadence, group hedging, queue integrity | M7 |
 | GS-123 to GS-127 | Affiliate: clawbacks, fleet funding, cookie stuffing, compliance, mule rail | M8 |
-| GS-128 to GS-140 | Scenarios created by the Wave 3 batch 1 gate rulings: the Merit Wallet, the indicative realtime layer, the new detectors, fail-closed provisioning, and the scoped ledger halt | mixed, listed per row |
+| GS-128 to GS-141 | Scenarios created by the Wave 3 batch 1 gate rulings: the Merit Wallet, the indicative realtime layer, the new detectors, fail-closed provisioning, the scoped ledger halt, and the typed publish diff | mixed, listed per row |
 
 ## 2. Fixture format
 
@@ -275,7 +275,7 @@ Defined by [M08](../plans/M08-affiliate-system.md) section 8.1. GS-045, the B4 s
 | GS-126 | A required disclosure version is superseded | Every creative bound to the old version is withdrawn automatically, and an approved landing page whose content later changes reverts to `pending` on re-check. Pins approval as per-asset and per-disclosure-version rather than a boolean on the affiliate. AS-M8-04 |
 | GS-127 | An affiliate destination also receives trader payouts from unrelated identities | The shared destination-concentration detector fires across both payment types, because affiliate payments ride the same transfer machinery as trader payouts. Pins the general rule that every outbound payment path in Merit is the same path. AS-M8-05 |
 
-## 15. GS-128 to GS-140: scenarios created by the Wave 3 batch 1 gate rulings
+## 15. GS-128 to GS-141: scenarios created by the Wave 3 batch 1 gate rulings
 
 Defined by the rulings recorded in [DECISIONS.md](../DECISIONS.md#wave-3-batch-1-gate-closure-2026-08-14). Same discipline as every block above: each derives from the ruling and the plan doc, never from an implementation.
 
@@ -293,6 +293,7 @@ Defined by the rulings recorded in [DECISIONS.md](../DECISIONS.md#wave-3-batch-1
 | GS-137 | Copy trading, allowed and prohibited | M7 | Same-identity clustering across a trader's own accounts is **filtered at the detector** and raises nothing at all. Identical clustering across two identities raises a flag whose evidence is the conduct and the ToS clause, never a correlation coefficient. Pins the clause from the batch 1 gate and pins the removal of D-01's largest benign-noise source |
 | GS-138 | An account with an unconfirmed setpoint cannot trade | M2 | Provisioning completes, `set_risk` returns no acknowledgement and no read-back succeeds, and the account is held out of trading entirely rather than surfaced as carried liability. Pins fail-closed provisioning as design law, and pins that the failure is a visible bounded outage rather than a silent unprotected account. AS-M2-03 |
 | GS-139 | A ledger imbalance scopes only when locality is proven | M5 | An imbalance attributable to exactly one identity halts that identity's payouts, **pages immediately**, and starts the escalation clock; on expiry it escalates to a global halt. An imbalance spanning identities, one with ambiguous attribution, and one traceable to no transaction all halt **globally** on the spot. Pins the classifier proving locality before granting it. [ADR-016](../DECISIONS.md), extends GS-110 |
+| GS-141 | The publish diff types co-binding apart from dominated | M1, M3 | Publishing all three v1 plans emits **`PW-02a` as `info`** on Core EOD and Direct (gap and win days tie at 5, both load bearing) and **`PW-02b` as `warning`** on Merit Rapid (gap of 1 against 3 win days, can never bind), with distinct text. Asserts the two are never rendered identically, because three identical warnings per publish, two of them false positives, is how a founder learns to approve a diff without reading it. [M01](../plans/M01-rules-engine.md) section 2, EC-049 |
 | GS-140 | An affiliate destination change enters the 48 hour cooling window | M8, M5 | The change is accepted, does not take effect today, notifies the contact already on file, and is refused settlement inside the window, identically to a trader destination change. Pins one rail as one control, including on the path an attacker would reach through a compromised affiliate account. [ADR-017](../DECISIONS.md), pairs with GS-104 and GS-127 |
 
 ## 16. What is not here yet

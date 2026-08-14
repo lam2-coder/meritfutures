@@ -155,7 +155,9 @@ Publishing is where marketing and the engine are forced to be the same thing. Tw
 
 **`copy_blocks` are keyed by rule path.** A published version carries the human sentence for each rule alongside the rule's own parameters, and a publish is rejected when a rule has parameters and no copy block. That is what makes constitution 0.4's "marketing must equal implementation to the tick" enforceable rather than aspirational.
 
-**The publish diff shows the warnings.** M1's dominated-gate warnings (EC-042, EC-049) appear in the diff the founder approves. A dominated gate publishes fine; publishing copy that calls it a protection does not, and the diff is where that gets caught.
+**The publish diff shows the messages, and it shows their severity.** M1's publish-diff checks (`PW-01` to `PW-04`, [M01](M01-rules-engine.md) section 2) appear in the diff the founder approves, **typed as `info` or `warning` rather than rendered uniformly**. A dominated gate publishes fine; publishing copy that calls it a protection does not, and the diff is where that gets caught.
+
+**The typing is not cosmetic and the reason is worth carrying.** After [ADR-019](../DECISIONS.md) the cadence check fires on all three v1 plans, meaning "these two gates co-bind" on two of them and "this gate can never bind" on the third. Rendering all three identically would put two false positives in front of the founder on every publish, and a diff whose warnings are usually noise is a diff that gets approved without reading, which is the failure this gate exists to prevent. The renderer therefore groups by severity and `warning` sorts first.
 
 ---
 
