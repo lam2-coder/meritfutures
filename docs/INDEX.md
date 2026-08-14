@@ -31,7 +31,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [TOP10_FIRMS.md](../research/TOP10_FIRMS.md) | Section 1B: firm surveillance one-pagers, refreshed monthly | review | founder |
 | [ADVERSARY_DOSSIER.md](../research/ADVERSARY_DOSSIER.md) | Appendix A instantiated with current scheme intel | review | founder |
 | [DATA_CAPABILITIES.md](../research/DATA_CAPABILITIES.md) | B3: platform data matrix (Rithmic/Tradovate/dxFeed/...) | review | founder |
-| [SECURITY_LANDSCAPE.md](../research/SECURITY_LANDSCAPE.md) | D0: breach history, control checklist, B4 additions | draft | claude |
+| [SECURITY_LANDSCAPE.md](../research/SECURITY_LANDSCAPE.md) | D0: breach history, control checklist, B4 additions | review | founder |
 | [VIBE_FAILURE_POSTMORTEMS.md](../research/VIBE_FAILURE_POSTMORTEMS.md) | Appendix E: incident studies converted to named CI gates | draft | claude |
 | [CLAUDE_CODE_PLAYBOOK.md](../research/CLAUDE_CODE_PLAYBOOK.md) | C0: community practice, merged monthly | draft | claude |
 
