@@ -61,13 +61,13 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | Delta | Table | Change | Migration | Status |
 |---|---|---|---|---|
 | SD-01 | `daily_marks` | add `adjustment_cents` | 0014 | **landed** |
-| SD-02 | `rule_states` | `payout_anchor_day` and `cadence_anchor_day` replace `last_payout_trading_day` | 0015 | pending |
+| SD-02 | `rule_states` | `payout_anchor_day` and `cadence_anchor_day` replace `last_payout_trading_day` | 0015 | **landed** |
 | SD-03 | `payout_requests` | add `settled_trading_day`, `effective_trading_day` | 0010 | **landed** |
-| SD-04 | `rule_states` | add `floor_open_cents` | 0015 | pending |
+| SD-04 | `rule_states` | add `floor_open_cents` | 0015 | **landed** |
 | SD-05 | `payout_requests` | ordinal unique becomes partial `where status <> 'failed'` | 0010 | **landed** |
-| SD-06 | `rule_states` | `engine_eligible`; `engine_gates` / `context_gates` split | 0015 | pending |
-| SD-07 | `rule_states` | add `consistency_period_start_day` | 0015 | pending |
-| SD-08 | `rule_states` | add `state_hash` | 0015 | pending |
+| SD-06 | `rule_states` | `engine_eligible`; `engine_gates` / `context_gates` split | 0015 | **landed** |
+| SD-07 | `rule_states` | add `consistency_period_start_day` | 0015 | **landed** |
+| SD-08 | `rule_states` | add `state_hash` | 0015 | **landed** |
 | SD-09 | `payout_requests` | partial unique `(account_id) where status in ('approved','frozen')` (predicate per ADR-028) | 0010 | **landed** |
 | SD-10 | `plan_version_sizes` | conditional not-null on the two `floor_lock_*` columns | 0004 | **landed** |
 
