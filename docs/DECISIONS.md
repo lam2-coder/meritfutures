@@ -768,7 +768,15 @@ credit X              trader_cents
 credit fees_revenue   firm_cents
 ```
 
-Net on `X` is `trader_cents - approved_cents = -firm_cents`. **Every payout approval would have net DEBITED the trader's single position by the firm's share, draining it on every approval, in the firm's favor.** At a 9000bp split on a 100,000c cap that is 10,000c per approval, taken from the trader, silently.
+**The convention is positive debit, negative credit** ([DATA_MODEL](architecture/DATA_MODEL.md) `ledger_entries.amount_cents`, [M05](plans/M05-payout-system.md) section 4). The two legs on `X` are therefore `+approved_cents` and `-trader_cents`, so:
+
+```
+net on X = approved_cents - trader_cents = +firm_cents   (a DEBIT)
+```
+
+**Every payout approval would have net DEBITED the trader's single position by the firm's share, draining it on every approval, in the firm's favour.** At a 9000bp split on a 100,000c cap that is 10,000c per approval, taken from the trader, silently.
+
+**This expression was itself written inverted in the first draft of this ADR** (`trader_cents - approved_cents = -firm_cents`, labelled a debit, which under the stated convention is a credit). The magnitude and the conclusion were right and the direction was written backwards. **An ADR recording a direction error must not contain one**, and the fact that it did on the first pass is the fourth direction-or-class error to land on LT-01 in a single day.
 
 **And the deferred zero-sum trigger passes**, because debits equal credits: 100,000 against 90,000 plus 10,000. **The ledger reconciles perfectly while the balance is wrong.** The invariant that would have caught it is not zero-sum; it is that a position's movement must match the business event it records, and no trigger asserts that.
 
@@ -789,6 +797,19 @@ LT-01 payout_approval
 
 - **Consequences:** [GLOSSARY](GLOSSARY.md) and [DATA_MODEL](architecture/DATA_MODEL.md) are amended to **add** `trader_wallet`, not to retire `trader_withdrawable`; the earlier "superseded name" edit is reverted in both. Migration file `0009_ledger` creates both classes. M14, M17 and M20's invariants against `trader_wallet` are unaffected, because nothing about the wallet's meaning changed; what changed is that it no longer swallows a second position.
 - **Alternatives considered:** one class named `trader_wallet` (**ruled and then reversed**, for the reasons above); one class named `trader_withdrawable` (same defect, different label); keeping both but netting them in reporting (rejected: Open Liability needs the wallet reportable per identity, INV-M5-15, and a netted view cannot be un-netted).
+
+### Two database constraints, because prose review is not the control here
+
+**Three direction-or-class errors landed on LT-01 in a single day**, and a fourth landed inside the ADR describing them: the `trader_withdrawable`/`trader_wallet` collapse, the invented `firm_payable` class, the `firm_treasury` debit that contradicted the recognition timing, and the inverted sign expression above. Every one was produced by careful reading and caught by more careful reading. **That line is too easy to get wrong for prose review to be the control.**
+
+Both constraints are **database triggers in migration `0027`, not CI checks**, because `ledger_entries` is append-only and a bad row must fail at insert rather than be discovered by a job that runs later against data that already exists.
+
+| ID | Constraint | What it catches |
+|---|---|---|
+| **LEDGER-C1** | **No `ledger_transaction` may contain two entries against the same `ledger_account_id` with opposite signs** | **The exact signature of the C-01 collapse**, mechanized. A transaction that debits and credits one position is either a no-op wearing a transfer's clothes or a silent net movement in one party's favour. **It has no legitimate use** in this chart of accounts, so the constraint is a flat prohibition rather than a threshold |
+| **LEDGER-C2** | **Every `ledger_account_id` must resolve to a declared class in the chart of accounts** | **The `firm_payable` catch**, mechanized. A class that appears first in a migration is a class nobody defined, and the seven v1 codes are the whole permitted vocabulary |
+
+**Neither replaces the E2 read; both make it survivable.** A human reading a money-path diff is the right control for whether a posting means what it should. Neither of these triggers can tell you that. What they can do is guarantee that the two failure shapes which already occurred cannot reach a committed row, which is the difference between a control that depends on attention and one that does not.
 
 ## ADR-028: `payout_requests.status` under the wallet  (2026-08-14, status: accepted)
 
