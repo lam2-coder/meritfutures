@@ -68,7 +68,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M16-notification-center.md](plans/M16-notification-center.md) | Four notification classes deciding what a preference may silence, contact-change ceremony with prior-contact window, identity coalescing, template allowlist | review | founder |
 | [M17-offers-engine.md](plans/M17-offers-engine.md) | Server-authoritative price resolution, dual-controlled price floors, identity-bound offers, promotional credit provenance, experiments that cannot vary a rule | review | founder |
 | [M18-live-graduation-pipeline.md](plans/M18-live-graduation-pipeline.md) | Ladder finiteness disclosed pre-purchase, mechanical graduation, terminal settlement, accrued-only vault. **Carries the live-program regulatory finding** | review | founder |
-| [M19-kyc-identity.md](plans/M19-kyc-identity.md) | Dedicated KYC provider, placement config, biometric dedupe | draft | claude |
+| [M19-kyc-identity.md](plans/M19-kyc-identity.md) | Placement as pinned config, dedupe as a relationship with dispositions, sanctions carve-out, real re-verification, minimization with durable evidence, funnel telemetry | review | founder |
 
 ## docs/testing/, ops/, design/, legal/ (Wave 4)
 | Doc | Purpose | Status | Owner |
