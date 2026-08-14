@@ -37,6 +37,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-162 to GS-171 | Transparency platform: denominator choice, on-chain disclosure, review gating, adversary intelligence, the constant claim, restatement, sample floors, comparative claims | M12 |
 | GS-172 to GS-178 | Trader analytics and journal: engine parity, history changes, journal isolation, provenance blending, undefined metrics, population leakage, load contention | M13 |
 | GS-179 to GS-185 | Loyalty and retention: cap-release liability, streak incentives, the bright line's composition, inverted win-back targeting, tier discretion, config bypass, calendar-broken streaks | M14 |
+| GS-186 to GS-191 | Discord integration: role disclosure, chat-account-as-credential, bot-token voice, moderation versus enforcement, enforcement by role removal, support in public | M15 |
 
 ## 2. Fixture format
 
@@ -388,6 +389,19 @@ Defined by [M14](../plans/M14-loyalty-retention.md) section 8.2. [ADR-019a](../D
 | GS-184 | The loyalty service attempts to write a payout cap | Fails on the database grant, and there is **no per-account override column to write to**. Asserts that ADR-010's control cannot be routed around by a service whose job is to be generous. AS-M14-06, EC-108 |
 | GS-185 | A streak spans a half day, a holiday, and a limit-locked session | The streak **pauses and survives**; only trader conduct breaks it, and the break event names its enumerated cause. Asserts consistency with the published halted-session answer rather than a second calendar understanding. AS-M14-07, EC-109, pairs with GS-030 to GS-032 |
 
-## 22. What is not here yet
+## 22. GS-186 to GS-191: Discord integration (M15)
+
+Defined by [M15](../plans/M15-discord-integration.md) section 8.2. Every fixture here tests a disclosure, because that is the only thing this module actually does.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-186 | Role sync for a trader opted into one role and not another | **Only the consented role** is granted, and no role in the catalogue encodes an amount, size, count, or rank. Asserts that consent to be in a room is not consent to be labeled in it, and that granularity is what turns a badge into a target list ordered by value. AS-M15-01, EC-110 |
+| GS-187 | A Discord identity presented to auth, recovery, and support verification | All three refuse and the link table is unreachable from each by grant; a bot state query returns a portal link and no account data. Asserts that a community feature must not import the password-stuffing threat model SECURITY C-01 designed Merit out of. AS-M15-02, EC-111 |
+| GS-188 | The bot token used to post an unknown template and a free-text message | **Both refused**; a replayed legitimate template posts and is recorded with its causing event. Asserts that the control bounds what a valid credential can say, since a fake retroactive rule change does its damage at the screenshot rather than at the correction. AS-M15-03, EC-112 |
+| GS-189 | Prohibited-arrangement solicitation observed in the community | Moderated as a server matter, producing **no flag, no evidence entry, and no account action**. Asserts the published separation between moderating a room and enforcing against an account. AS-M15-04, EC-113 |
+| GS-190 | An enforcement closes an account holding a synced role | Removal is deferred into a batch window containing mixed churn, and the trader was notified first. Asserts that a role vanishing at a timestamp publishes a private enforcement to a public room, bypassing the whole two-tier evidence machinery in one API call. AS-M15-05 |
+| GS-191 | An account-specific question asked in a public channel | An automatic routing reply, **no account state disclosed**, and no human answer in channel. Asserts that a public answer is an unlogged support interaction with an audience. AS-M15-06 |
+
+## 23. What is not here yet
 
 Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
