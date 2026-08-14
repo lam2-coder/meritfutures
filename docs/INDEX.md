@@ -21,7 +21,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [STATE.md](STATE.md) | One screen: wave, gate, done / in-flight / blocked, next 3 actions | draft | claude |
 | [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | draft | claude |
 | [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives | draft | founder |
-| [EDGE_CASES.md](EDGE_CASES.md) | Living registry; every bug becomes an entry plus a golden file (50 entries, seeded by M01) | approved | founder |
+| [EDGE_CASES.md](EDGE_CASES.md) | Living registry; every bug becomes an entry plus a golden file (56 entries; EC-001 to EC-050 approved with M01, EC-051+ under review with their module) | approved | founder |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | approved | founder |
 
 ## research/ (Wave 1: next up)
@@ -50,7 +50,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [M01-rules-engine.md](plans/M01-rules-engine.md) | The crown jewel: 50-rule taxonomy, pure library, replay self-audit. **Gate closed 2026-08-13** | approved | founder |
-| [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning CSVs, ingest, reconciliation, simulator | draft | claude |
+| [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning CSVs, ingest, reconciliation, simulator, 14 vendor-confirmation items | review | founder |
 | [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargeback handling | draft | claude |
 | [M04-trader-portal.md](plans/M04-trader-portal.md) | Next.js portal: dashboard, payout center, certificates | draft | claude |
 | [M05-payout-system.md](plans/M05-payout-system.md) | Instant auto-approve pipeline, Rise, freeze path, reserve | draft | claude |
@@ -73,7 +73,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [STRATEGY.md](testing/STRATEGY.md) | Section 5 instantiated with tooling choices | draft | claude |
-| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (83 defined, 67 M1's, seeded by M01) | approved | founder |
+| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (93 defined; GS-001 to GS-083 approved with M01, GS-084+ under review with their module) | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | Monte-Carlo population port spec, CI calibration bands | draft | claude |
 | [ops/runbooks/README.md](ops/runbooks/README.md) | Section 7: one runbook per failure class | draft | claude |
 | [design/DESIGN_SYSTEM.md](design/DESIGN_SYSTEM.md) | Appendix F instantiated: tokens locked before any UI | draft | claude |
