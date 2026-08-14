@@ -269,7 +269,7 @@ GS-122.
 
 **Attack.** Long at Merit, short at another firm. Invisible to any single firm's data by construction. The dossier's own conclusion is "accept, bound, budget".
 
-**Counter, which is honest rather than clever.** Nothing in M7 detects this and nothing will. What bounds it is already built: the per-request cap, the [consistency](../GLOSSARY.md#funded-consistency) gate that forces multi-day extraction, the cadence gap, and the 8-payout ladder that bounds lifetime extraction per account (INV-17). What prices it is the reserve. What could eventually detect it is a shared-vendor risk network, which the flag schema already accommodates through `risk_flags.source` accepting `vendor:<name>` without a migration.
+**Counter, which is honest rather than clever.** Nothing in M7 detects this and nothing will. What bounds it is already built: the per-request cap, the [consistency](../GLOSSARY.md#funded-consistency) gate that forces multi-day extraction, the cadence gap, and the **5-payout ladder** that bounds lifetime extraction per account (INV-17, [ADR-024](../DECISIONS.md)). What prices it is the reserve. What could eventually detect it is a shared-vendor risk network, which the flag schema already accommodates through `risk_flags.source` accepting `vendor:<name>` without a migration.
 
 **The one thing M7 owes here is not pretending.** The metric that matters is the share of realized payout liability attributable to accounts with **no** internal ring signal, tracked over time. If that share climbs, cross-firm activity is growing and the reserve assumption needs revisiting. Nobody can detect the scheme; anyone can watch its footprint.
 

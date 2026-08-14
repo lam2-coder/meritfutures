@@ -231,7 +231,7 @@ A firm that funds its wallet against the overstatement holds too much cash and s
 **Counter.** Three named numbers, never one, each with its own definition printed next to it (SD-M6-01):
 1. **Open liability**, `sum(withdrawable)`. The accounting claim.
 2. **Bounded near-term liability**, `sum(min(withdrawable, cap_for_next_ordinal))` over accounts eligible now or within 7 trading days. **This is the number the payout wallet is funded against**, and it is the one [ADR-011](../DECISIONS.md)'s trigger reads.
-3. **Remaining ladder exposure**, `sum((ladder - payouts_settled) * cap)` over funded accounts. The upper bound on lifetime commitment, and the number INV-17 asserts.
+3. **Remaining ladder exposure**, `sum((ladder - payouts_settled) * cap)` over funded accounts. The upper bound on lifetime commitment, and the number INV-17 asserts. **[ADR-024](../DECISIONS.md) shortened the ladder to 5 on every plan, so this number fell**; it is read from the pinned plan version like every other parameter, never from a constant.
 
 Showing all three, labeled, is cheap. Showing one and calling it "liability" is how the FTT quote happens. GS-115.
 

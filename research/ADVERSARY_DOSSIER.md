@@ -28,9 +28,9 @@ The 9-scheme taxonomy from Appendix A, populated with current intel (researched 
 
 **Detection signal.** Single-firm data cannot see the other leg. Proxies: accounts that trade only around high-conviction directional moments with abnormal win-rate-vs-hold-time profiles; entity-graph links to known scheme 1 flags; geography/device overlap with other flagged cohorts. True detection needs a shared-vendor network (QuantSentry-class bad-actor DB claims 10,000+ verified threat profiles, the bolt-on argument; [RiskGuard](https://axcera.io/solutions/risk-guard), [QuantSentry review](https://alexfirdaus.com/quantsentry-review/)).
 
-**Posture: accept, bound, budget.** Caps bound per-account damage; the 8-payout ladder bounds lifetime damage; the reserve prices the leak-through. No detector spec v1 beyond the proxies above.
+**Posture: accept, bound, budget.** Caps bound per-account damage; the **5-payout ladder** bounds lifetime damage ([ADR-024](../docs/DECISIONS.md)); the reserve prices the leak-through. No detector spec v1 beyond the proxies above.
 
-**GT-A2.** Simulated single-leg extractor: account trades twice a month, only large NFP-day directional wins, hits cap each cycle. Expected: no breach (rules honored), velocity/pattern flag raised at low severity, liability forecast counts it, ladder graduates it out after 8 payouts. This is the "we survive what we cannot see" test.
+**GT-A2.** Simulated single-leg extractor: account trades twice a month, only large NFP-day directional wins, hits cap each cycle. Expected: no breach (rules honored), velocity/pattern flag raised at low severity, liability forecast counts it, ladder graduates it out after **5** payouts. This is the "we survive what we cannot see" test.
 
 ## Scheme 3: Paid passing services and account management
 

@@ -501,4 +501,14 @@ Added by [ADR-021](../DECISIONS.md), [ADR-022](../DECISIONS.md), and [ADR-023](.
 
 Plus two scenarios owned by the verification UX ruling, listed here because their module rows already cite them: **GS-206** (a verification abandoned mid-flow resumes cleanly at the step where it stopped) and **GS-207 to GS-209**, superseded by GS-235 to GS-238 above and retained as their module-side references.
 
-**Wave 3 batch 2 added GS-142 to GS-231, and the consolidated addendum added GS-232 to GS-239**, taking the registry to **239**. Scenarios owned by M9 through M20 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
+## 26. GS-240 to GS-242: the ladder and invitation separation
+
+[ADR-024](../DECISIONS.md).
+
+| ID | Scenario | Pins |
+|---|---|---|
+| GS-240 | Ladder completion graduates without inviting | The fifth settlement sets phase `graduated`, closes the account, and sets `graduation_eligible`. **No invitation event is emitted.** Asserts R-49's split, which is the mechanical half of the decoupling |
+| GS-241 | INV-17's bound at the shortened ladder | No sequence of settlements exceeds `5 * max cap`. At Core EOD 50K that is 750,000c gross and 675,000c to the trader; at Merit Rapid 500,000c and 450,000c. Replaces the 8-rung expectations in GS-067's neighbourhood |
+| GS-242 | Percent-of-size scaling holds at 150K | Every bp-expressed parameter derives correctly at 15,000,000c, and `min_payout_cents` does **not** scale. Pins that adding a size is a row rather than a redesign ([ADR-024](../DECISIONS.md)) |
+
+**Wave 3 batch 2 added GS-142 to GS-231, the consolidated addendum added GS-232 to GS-239, and ADR-024 added GS-240 to GS-242**, taking the registry to **242**. Scenarios owned by M9 through M20 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**

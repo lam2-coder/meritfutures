@@ -78,7 +78,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [STRATEGY.md](testing/STRATEGY.md) | Section 5 instantiated with tooling choices | draft | claude |
-| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (**239 defined**; GS-001 to GS-083 approved with M01, GS-084 to GS-141 approved with their module except M02's, GS-142 to GS-239 at review with batch 2 and the addendum) | approved | founder |
+| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | Every B4 scenario plus inventions, numbered (**242 defined**; GS-001 to GS-083 approved with M01, GS-084 to GS-141 approved with their module except M02's, GS-142 to GS-242 at review with batch 2 and the addendum) | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | Monte-Carlo population port spec, CI calibration bands. Carries the Wave 4 inputs the gate rulings changed | draft | claude |
 | [ops/runbooks/README.md](ops/runbooks/README.md) | Section 7: one runbook per failure class | draft | claude |
 | [design/DESIGN_SYSTEM.md](design/DESIGN_SYSTEM.md) | Appendix F instantiated: tokens locked before any UI | draft | claude |

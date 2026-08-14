@@ -505,7 +505,7 @@ Every gate is evaluated independently and reported gate by gate. `engineEligible
 | R-46 | Settlement advances both anchors | n/a | `payoutAnchorDay = fact.basisTradingDay`; `cadenceAnchorDay = fact.effectiveTradingDay`. Both stored, both replayable. Confirmed at the gate, [ADR-013](../DECISIONS.md) | EC-039, GS-082 |
 | R-47 | Win days and the consistency period reset on settlement, anchored to the basis day | `win_days.reset_on_payout` | `winDaysCount = count of win days d > payoutAnchorDay`; `consistencyPeriodStartDay = the next trading day after payoutAnchorDay`. Progress earned during the transfer window is **kept**, because it happened after the snapshot the payout was based on | GS-053, GS-068 |
 | R-48 | **The floor is untouched by settlement** | `post_payout_floor_rule.mode = "none"` | R-19. The balance falls at the open of `effectiveTradingDay`; `floorCents`, `highWaterBalanceCents`, and `floorLocked` are carried through unchanged. INV-21 is guaranteed by config validation (CV-11, CV-17) rather than by a compensating recompute, which is the stronger arrangement because it fails at publish time instead of at settlement time | GS-065, GS-081, INV-21 |
-| R-49 | Ladder graduation | `ladder.payouts_to_graduate` | `payoutsSettledCount >= payouts_to_graduate` (`>=`), evaluated immediately after a settlement. Phase to `graduated`, account closed, live invitation emitted | GS-067 |
+| R-49 | Ladder graduation | `ladder.payouts_to_graduate` | `payoutsSettledCount >= payouts_to_graduate` (`>=`), evaluated immediately after a settlement. Phase to `graduated`, account closed, **and the `graduation_eligible` flag set**. **No live invitation is emitted** ([ADR-024](../DECISIONS.md)): eligibility is a review-pool flag, and invitation is a discretionary operator action taken from that pool, outside the engine | GS-067, GS-240 |
 | R-50 | Lifetime accounting | n/a | `lifetimeSettledCents += approvedCents`. INV-17 bounds it at `ladder * max cap` | RE-P-17 |
 
 ### 3.6 Reference algorithm
@@ -839,12 +839,12 @@ The constitution states a ceiling of "roughly 190,00 per day". That figure is re
 **Merit Rapid's ceiling nominally exceeds the benchmark that made a competitor a payout magnet, and the defense is not the per-day rate.** MyFundedFutures' Rapid plan, with 24 hour payout eligibility, is the market's reference point for a high-cadence product ([TOP10_FIRMS](../../research/TOP10_FIRMS.md)), and the [dossier](../../research/ADVERSARY_DOSSIER.md) is clear that such products draw disproportionate adversarial attention. Reading $300 per day as Merit's exposure would be the mistake, because the per-day rate is not what bounds this plan. Three things are:
 
 1. **The win-day gate.** Three win days at or above the win-day floor, on three separate trading days, resetting to the basis day on every settlement (R-47). The cadence is a floor on effort, not a schedule anyone is handed.
-2. **The 8-payout lifetime ladder.** A Merit Rapid account is capped at **8 x 90,000c = 720,000c, roughly $7,200 to the trader over its entire life** (INV-17), reached in at most 24 trading days. A per-day rate that terminates is a different object from one that does not, and the lifetime figure is the one that belongs in a liability conversation.
+2. **The 5-payout lifetime ladder.** A Merit Rapid account is capped at **5 x 90,000c = 450,000c, roughly $4,500 to the trader over its entire life** (INV-17), reached in at most 15 trading days. A per-day rate that terminates is a different object from one that does not, and the lifetime figure is the one that belongs in a liability conversation. **[ADR-024](../DECISIONS.md) shortened this ladder from 8 to 5, which tightens the bound rather than loosening it**: liability is monotone-decreasing in `max_payouts`, so the defense described here is now stronger than when it was first written.
 3. **Detection that now attacks the first cycle**, not the second: D-12, D-13, and D-14 in [M07](M07-risk-abuse.md).
 
 **A fast per-day rate on a hard-capped, gated, short-lived ladder is a marketing advantage. The same rate without the ladder would be a liability hole.** Merit has the ladder, and INV-17 is the assertion that keeps it.
 
-**Lifetime bound.** 8 settled payouts at 135,000c is 1,080,000c to the trader, over roughly 5 x 8 = 40 trading days on Core EOD, or about eight calendar weeks, down from eleven and a half under the settlement anchor. INV-17 asserts the bound; GS-055 pins the path.
+**Lifetime bound.** 5 settled payouts at 135,000c is **675,000c ($6,750) to the trader**, over roughly 5 x 5 = **25 trading days** on Core EOD, about five calendar weeks. INV-17 asserts the bound; GS-055 pins the path. Both figures fell at [ADR-024](../DECISIONS.md), and they fell in the direction that reduces liability.
 
 ### AS-04: The locked floor as a free option (NOVEL)
 
@@ -1121,83 +1121,85 @@ Materialized values, in integer cents, for the three launch plans at three sizes
 
 **And the converse, which matters equally.** A structural ruling may not be presented to the public as a tunable, a promotion, or a limited-time condition. "Caps exist" is not a campaign; the cap's *value* is a config. [M17](M17-offers-engine.md) is bound by this line as tightly as it is bound by [ADR-019a](../DECISIONS.md)'s gamification bright line.
 
-Sizes: 25K is 2,500,000c, 50K is 5,000,000c, 100K is 10,000,000c. Percentage-expressed rules scale by size; `min_payout_cents` never does.
+Sizes: 25K is 2,500,000c, 50K is 5,000,000c, 100K is 10,000,000c, **150K is 15,000,000c**. Percentage-expressed rules scale by size; `min_payout_cents` never does.
+
+**Percent-of-size scaling is confirmed across all four sizes** ([ADR-024](../DECISIONS.md)). **The bp figure is the source and the cents columns are derived**, which is what makes adding a size a row rather than a redesign. **Per-size overrides remain available config** for the case where a size needs to depart from its bp figure; none of the v1 sizes uses one.
 
 Three parameters are now identical across all three plans and are stated once here rather than three times below: `min_payout_cents` is 10,000 at every size ([GLOSSARY](../GLOSSARY.md#minimum-payout), CV-15), `post_payout_floor_rule.mode` is `none` ([ADR-014](../DECISIONS.md), CV-18), and funded `min_trading_days` is `0`, which disables that gate ([ADR-015](../DECISIONS.md), CV-19).
 
 ### A.1 Core EOD (`core_eod`)
 
-| Parameter | bp | 25K | 50K | 100K | Source |
-|---|---|---|---|---|---|
-| Eval drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | constitution 0.4 |
-| Eval profit target | 600 | 150,000 | 300,000 | 600,000 | constitution 0.4 |
-| Eval minimum trading days | n/a | 1 | 1 | 1 | constitution 0.4 |
-| Eval consistency | n/a | disabled | disabled | disabled | constitution 0.4 |
-| Funded drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | constitution 0.4 |
-| Floor lock enabled | n/a | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
-| Floor lock at profit | n/a | 135,000 | 260,000 | 510,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
-| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
-| Win days required | n/a | 5 | 5 | 5 | constitution 0.4 |
-| Win day floor | 30 | 7,500 | 15,000 | 30,000 | constitution 0.4 (150.00 at 50K) |
-| Buffer | 200 | 50,000 | 100,000 | 200,000 | constitution 0.4 (1,000.00 at 50K) |
-| Funded consistency | 3000 | 3000bp | 3000bp | 3000bp | constitution 0.4 |
-| Funded minimum trading days | n/a | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
-| Cadence gap, trading days | n/a | 5 | 5 | 5 | constitution 0.4 |
-| Payout cap, ordinal 1 and up | 300 | 75,000 | 150,000 | 300,000 | constitution 0.4 (1,500.00 at 50K) |
-| Split to trader | 9000 | 9000bp | 9000bp | 9000bp | constitution 0.4 |
-| Ladder | n/a | 8 | 8 | 8 | constitution 0.4 |
-| Maximum accounts per entity | n/a | 10 | 10 | 10 | constitution 0.4 |
-| Daily loss limit | n/a | none | none | none | constitution 0.4 |
+| Parameter | bp | 25K | 50K | 100K | **150K** | Source |
+|---|---|---|---|---|---|---|
+| Eval drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | 750,000 | constitution 0.4 |
+| Eval profit target | 600 | 150,000 | 300,000 | 600,000 | 900,000 | constitution 0.4 |
+| Eval minimum trading days | n/a | 1 | 1 | 1 | 1 | constitution 0.4 |
+| Eval consistency | n/a | disabled | disabled | disabled | disabled | constitution 0.4 |
+| Funded drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | 750,000 | constitution 0.4 |
+| Floor lock enabled | n/a | true | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
+| Floor lock at profit | n/a | 135,000 | 260,000 | 510,000 | 760,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
+| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
+| Win days required | n/a | 5 | 5 | 5 | 5 | constitution 0.4 |
+| Win day floor | 30 | 7,500 | 15,000 | 30,000 | 45,000 | constitution 0.4 (150.00 at 50K) |
+| Buffer | 200 | 50,000 | 100,000 | 200,000 | 300,000 | constitution 0.4 (1,000.00 at 50K) |
+| Funded consistency | 3000 | 3000bp | 3000bp | 3000bp | 3000bp | constitution 0.4 |
+| Funded minimum trading days | n/a | 0 | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
+| Cadence gap, trading days | n/a | 5 | 5 | 5 | 5 | constitution 0.4 |
+| Payout cap, ordinal 1 and up | 300 | 75,000 | 150,000 | 300,000 | 450,000 | constitution 0.4 (1,500.00 at 50K) |
+| Split to trader | 9000 | 9000bp | 9000bp | 9000bp | 9000bp | constitution 0.4 |
+| Ladder (`max_payouts`) | n/a | **5** | **5** | **5** | **5** | **[ADR-024](../DECISIONS.md)**, industry consensus (Lucid, Tradeify) |
+| Maximum accounts per entity | n/a | 10 | 10 | 10 | 10 | constitution 0.4 |
+| Daily loss limit | n/a | none | none | none | none | constitution 0.4 |
 
 ### A.2 Merit Rapid (`merit_rapid`)
 
 **Renamed from "Rapid Daily" at the M1 gate** ([ADR-013](../DECISIONS.md)). The plan is fast relative to the lineup; it is not daily, and the name must not claim it is.
 
-| Parameter | bp | 25K | 50K | 100K | Source |
-|---|---|---|---|---|---|
-| Eval drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
-| Eval profit target | 600 | 150,000 | 300,000 | 600,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
-| Eval minimum trading days | n/a | 2 | 2 | 2 | constitution 0.4 |
-| Eval consistency | 3000 | 3000bp | 3000bp | 3000bp | constitution 0.4 |
-| Funded drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
-| Floor lock enabled | n/a | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
-| Floor lock at profit | n/a | 135,000 | 260,000 | 510,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
-| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
-| Win days required | n/a | **3** | **3** | **3** | **[ADR-018](../DECISIONS.md)**, recalibrated `research/calibration/mc_lifecycle.py OUR_PLANS`. **This is the gate that sets the plan's cadence** |
-| Win day floor | 30 | 7,500 | 15,000 | 30,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
-| Buffer | 200 | 50,000 | 100,000 | 200,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
-| Funded consistency | 4000 | 4000bp | 4000bp | 4000bp | constitution 0.4 |
-| Funded minimum trading days | n/a | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
-| Cadence gap, trading days | n/a | 1 | 1 | 1 | constitution 0.4. **Dominated by the win-day gate and never binds** (EC-049); publish-time warning fires by design, and fires more strongly at `w=3` because [ADR-019](../DECISIONS.md) drove the settlement term to 0 |
-| Payout cap | 200 | 50,000 | 100,000 | 200,000 | constitution 0.4 (1,000.00 at 50K) |
-| Split | 9000 | 9000bp | 9000bp | 9000bp | constitution 0.4 |
-| Ladder | n/a | 8 | 8 | 8 | constitution 0.4 |
-| Maximum accounts per entity | n/a | 5 | 5 | 5 | constitution 0.4 |
-| Daily loss limit | n/a | none | none | none | constitution 0.4 |
+| Parameter | bp | 25K | 50K | 100K | **150K** | Source |
+|---|---|---|---|---|---|---|
+| Eval drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | 750,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Eval profit target | 600 | 150,000 | 300,000 | 600,000 | 900,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Eval minimum trading days | n/a | 2 | 2 | 2 | 2 | constitution 0.4 |
+| Eval consistency | 3000 | 3000bp | 3000bp | 3000bp | 3000bp | constitution 0.4 |
+| Funded drawdown, trailing EOD | 500 | 125,000 | 250,000 | 500,000 | 750,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Floor lock enabled | n/a | true | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
+| Floor lock at profit | n/a | 135,000 | 260,000 | 510,000 | 760,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
+| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
+| Win days required | n/a | **3** | **3** | **3** | **3** | **[ADR-018](../DECISIONS.md)**, recalibrated `research/calibration/mc_lifecycle.py OUR_PLANS`. **This is the gate that sets the plan's cadence** |
+| Win day floor | 30 | 7,500 | 15,000 | 30,000 | 45,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Buffer | 200 | 50,000 | 100,000 | 200,000 | 300,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Funded consistency | 4000 | 4000bp | 4000bp | 4000bp | 4000bp | constitution 0.4 |
+| Funded minimum trading days | n/a | 0 | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
+| Cadence gap, trading days | n/a | 1 | 1 | 1 | 1 | constitution 0.4. **Dominated by the win-day gate and never binds** (EC-049); publish-time warning fires by design, and fires more strongly at `w=3` because [ADR-019](../DECISIONS.md) drove the settlement term to 0 |
+| Payout cap | 200 | 50,000 | 100,000 | 200,000 | 300,000 | constitution 0.4 (1,000.00 at 50K) |
+| Split | 9000 | 9000bp | 9000bp | 9000bp | 9000bp | constitution 0.4 |
+| Ladder (`max_payouts`) | n/a | **5** | **5** | **5** | **5** | **[ADR-024](../DECISIONS.md)**, industry consensus (Lucid, Tradeify) |
+| Maximum accounts per entity | n/a | 5 | 5 | 5 | 5 | constitution 0.4 |
+| Daily loss limit | n/a | none | none | none | none | constitution 0.4 |
 
 **Published cadence copy for this plan, binding on M09 and M04:** one payout per cycle of about **3 trading days**, set by the 3 win-day requirement ([ADR-018](../DECISIONS.md)). Under [ADR-019](../DECISIONS.md) the payout lands in the trader's Merit Wallet the same day it is approved, so nothing in the cycle waits on a bank; the 2 to 3 business day window applies only to an external withdrawal from the wallet and is published as such. The 1 day cadence gap may not be described as the reason the plan is fast, because it never binds.
 
 ### A.3 Direct, instant funded (`direct`)
 
-| Parameter | bp | 25K | 50K | 100K | Source |
-|---|---|---|---|---|---|
-| Eval phase | n/a | disabled | disabled | disabled | constitution 0.4 |
-| Funded drawdown, trailing EOD | 400 | 100,000 | 200,000 | 400,000 | constitution 0.4 |
-| Floor lock enabled | n/a | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
-| Floor lock at profit | n/a | 110,000 | 210,000 | 410,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
-| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
-| Win days required | n/a | 5 | 5 | 5 | constitution 0.4 |
-| Win day floor | 30 | 7,500 | 15,000 | 30,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
-| Buffer | 300 | 75,000 | 150,000 | 300,000 | constitution 0.4 (1,500.00 at 50K) |
-| Funded consistency | 2500 | 2500bp | 2500bp | 2500bp | constitution 0.4 |
-| Funded minimum trading days | n/a | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
-| Cadence gap, trading days | n/a | 5 | 5 | 5 | constitution 0.4 |
-| Payout cap | 300 | 75,000 | 150,000 | 300,000 | constitution 0.4 |
-| Split | 9000 | 9000bp | 9000bp | 9000bp | constitution 0.4 |
-| Ladder | n/a | 6 | 6 | 6 | constitution 0.4 |
-| Maximum accounts per entity | n/a | 5 | 5 | 5 | constitution 0.4 |
-| KYC placement | n/a | direct_purchase | same | same | constitution 0.4, GLOSSARY |
-| Daily loss limit | n/a | none | none | none | constitution 0.4 |
+| Parameter | bp | 25K | 50K | 100K | **150K** | Source |
+|---|---|---|---|---|---|---|
+| Eval phase | n/a | disabled | disabled | disabled | disabled | constitution 0.4 |
+| Funded drawdown, trailing EOD | 400 | 100,000 | 200,000 | 400,000 | 600,000 | constitution 0.4 |
+| Floor lock enabled | n/a | true | true | true | true | [ADR-014](../DECISIONS.md), OQ-4 |
+| Floor lock at profit | n/a | 110,000 | 210,000 | 410,000 | 610,000 | [ADR-014](../DECISIONS.md), = drawdown + 10,000 by CV-12 |
+| Locked floor | n/a | size + 10,000 | size + 10,000 | size + 10,000 | size + 10,000 | [ADR-014](../DECISIONS.md), X = $100 |
+| Win days required | n/a | 5 | 5 | 5 | 5 | constitution 0.4 |
+| Win day floor | 30 | 7,500 | 15,000 | 30,000 | 45,000 | `mc_lifecycle.py OUR_PLANS`, [ADR-015](../DECISIONS.md) |
+| Buffer | 300 | 75,000 | 150,000 | 300,000 | 450,000 | constitution 0.4 (1,500.00 at 50K) |
+| Funded consistency | 2500 | 2500bp | 2500bp | 2500bp | 2500bp | constitution 0.4 |
+| Funded minimum trading days | n/a | 0 | 0 | 0 | 0 | [ADR-015](../DECISIONS.md), gate disabled |
+| Cadence gap, trading days | n/a | 5 | 5 | 5 | 5 | constitution 0.4 |
+| Payout cap | 300 | 75,000 | 150,000 | 300,000 | 450,000 | constitution 0.4 |
+| Split | 9000 | 9000bp | 9000bp | 9000bp | 9000bp | constitution 0.4 |
+| Ladder (`max_payouts`) | n/a | **5** | **5** | **5** | **5** | **[ADR-024](../DECISIONS.md)**. Direct may set **4 or 5** at FREEZE |
+| Maximum accounts per entity | n/a | 5 | 5 | 5 | 5 | constitution 0.4 |
+| KYC placement | n/a | direct_purchase | same | same | same | constitution 0.4, GLOSSARY |
+| Daily loss limit | n/a | none | none | none | none | constitution 0.4 |
 
 ### A.4 Validation walk of the approved lineup
 

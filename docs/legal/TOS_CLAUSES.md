@@ -12,6 +12,8 @@ last_updated: 2026-08-14
 
 ## Clauses required
 
+**Nine clauses.** Each exists because a specific mechanism in the corpus is unenforceable without it.
+
 | # | Clause | What it must accomplish | Driven by |
 |---|---|---|---|
 | 1 | **Account linking** | Merit may treat multiple accounts as controlled by one person on the basis of identity, device, payment, destination, and behavioral signals, and may apply per-person limits and enforcement across them | [ADR-022](../DECISIONS.md). Without it, the link-confidence graph produces conclusions Merit cannot act on. Apex publishes an equivalent clause |
@@ -21,12 +23,13 @@ last_updated: 2026-08-14
 | 5 | **Enforcement process** | What Merit may do on a confirmed violation, in what order, with what notice, and what the trader's route of response is | **A process clause protects Merit more than a discretion clause does.** "Decisions are final" language is explicitly rejected: it is false (a human can reverse) and it is what a wronged trader screenshots |
 | 6 | **Eligibility representation** | The trader represents they have **no outstanding balances or unresolved disputes with other proprietary trading firms** | **Lucid-style.** A cheap, self-executing filter against operators cycling between firms, and it makes a later discovery a breach of representation rather than an argument about house rules |
 | 7 | **Wallet terms** | The wallet is a **payable balance**. It bears **no interest**, permits **no peer-to-peer transfer**, and **accepts no deposits** (`INV-WALLET-NO-DEPOSITS`). Funds originate only from payouts, promotional credit, and refunds | [ADR-019](../DECISIONS.md), [M20](../plans/M20-wallet.md). The no-deposit property is what the payable framing rests on, so it is a term and not only an implementation detail |
-| 8 | **Dormancy and unclaimed balances** | Notice schedule from 12 months of inactivity, and a statement that Merit never keeps a balance | [OQ-M20-04](../DECISIONS.md). Escheatment mapping is counsel packet item 3 |
+| 8 | **Ladder and live eligibility** | The payout ladder is **the maximum payout level, not a guaranteed minimum for live eligibility**. Ladder completion sets graduation eligibility only; any live invitation is **at Merit's sole discretion** | [ADR-024](../DECISIONS.md), Lucid's framing adopted verbatim. **This clause exists to be quoted back**, so it is written to be quotable |
+| 9 | **Dormancy and unclaimed balances** | Notice schedule from 12 months of inactivity, and a statement that Merit never keeps a balance | [OQ-M20-04](../DECISIONS.md). Escheatment mapping is counsel packet item 3 |
 
 ## What must not appear
 
 - **"Decisions are final."** See clause 5.
-- **Any live-program or funded-capital representation.** [OQ-M18-01](../DECISIONS.md): no live program exists at launch and no copy is written until counsel rules.
+- **Any live-program or funded-capital representation.** [OQ-M18-01](../DECISIONS.md): no live program exists at launch and no copy is written until counsel rules. Clause 8 is the **only** permitted statement touching live eligibility, and it is a disclaimer of entitlement rather than a description of a program.
 - **Any rule Merit does not implement.** The publish-time validation ([M01](../plans/M01-rules-engine.md) PW-01 to PW-04) exists to catch the reverse case; this is the same discipline applied to prose.
 
 ## Norm positioning, recorded so counsel can calibrate

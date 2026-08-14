@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, PROP_TECH_LANDSCAPE.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # Top-10 Futures Firm Surveillance (Constitution §1B)
@@ -15,6 +15,21 @@ Deep profiles of the ten biggest futures props as of 2026-08-13, plus the table-
 **Roster used (size + trajectory):** Apex, Topstep, MyFundedFutures, Tradeify, Lucid, TradeDay, FundedNext Futures, TakeProfit Trader, FundedFuturesFamily, Alpha Futures (riser, swapped in per §1B's allowance). FuturesElite retained on the watchlist (smaller on-chain volume, 4.1 marketplace rating).
 
 ---
+
+
+## Live-path structures and ladder lengths (2026-08-14, for [ADR-024](../docs/DECISIONS.md))
+
+Recorded because "industry consensus is 5" is a claim that should be checkable rather than remembered, and because the **live path is where firms differ most in honesty**.
+
+| Firm | Payout ladder | Live-path structure | What Merit takes from it |
+|---|---|---|---|
+| **Lucid** | **5** | **Discretionary, and published as such.** Frames the ladder as "the maximum payout level, **not a guaranteed minimum** for live eligibility" | **Merit adopts this framing verbatim.** It is the single sentence that prevents the entire misreading, and Lucid got there first |
+| **Tradeify** | **5** | Discretionary. Counts the ladder **across an entity's accounts** rather than per account | Ladder length confirms consensus. The cross-account counting is recorded as a **config option Merit does not adopt by default** |
+| **Topstep** | n/a | The selectivity benchmark: **0.71 percent** of funded traders reach live capital | **The number that settles the argument.** Any firm implying that completing a ladder leads to live capital is describing something no firm operates |
+| **TopOne** | varies | Live path advertised as a progression | The pattern to avoid |
+| **Phidias** | varies | Live path advertised as a progression | The pattern to avoid |
+
+**The reading, and it is the reason this table exists.** Ladder length is genuinely converged at 5, so Merit sitting there is unremarkable and needs no defense. **Live-path framing is not converged**, and it splits cleanly: the two firms that publish a discretionary framing are the two Merit is matching, and the firms that advertise a progression are describing an outcome that a 0.71 percent selectivity rate makes almost entirely notional. **Merit's ladder is at consensus and its live posture is at the honest end of it**, which is a defensible position to hold publicly and a cheap one to hold now, before any copy exists.
 
 ## One-pagers
 

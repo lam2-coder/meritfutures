@@ -83,12 +83,13 @@ Authoritative version is [STATE.md](STATE.md). This is the orientation snapshot.
 
 **The gate in front of us: Wave 3 batch 2, twelve plans.** All five open batch 2 questions were ruled in the consolidated addendum and folded, so this is a **read-through rather than a decision gate**. Suggested order by downstream reach: **M20 (wallet), M19 (identity), M12 (public statistics).**
 
-**23 ADRs accepted.** The ones with the widest reach, worth knowing before reviewing anything:
+**24 ADRs accepted.** The ones with the widest reach, worth knowing before reviewing anything:
 
 - **ADR-013 / 014 / 015**: cadence anchoring, the permanent floor lock (no post-payout reset), and plan parameters sourced to the founder's lifecycle simulation.
 - **ADR-019 (Merit Wallet)**: payouts settle instantly to an internal wallet; external withdrawal is a second leg. This moved the cadence anchor and compressed every plan's cycle.
 - **ADR-020**: a two-tier data plane. Authoritative rules math stays EOD/batch; an indicative realtime layer ships in v1 and **never feeds an eligibility, breach, or money decision**.
 - **ADR-021 / 022 / 023**: composite KYC trigger set, identity defense as a scored graph in three priced tiers, and a bought-not-built checkout enrichment vendor.
+- **ADR-024**: the payout ladder and the live invitation are **two separate mechanisms**. `max_payouts` is 5 on all plans (industry consensus); ladder completion sets a review-pool flag, and any live invitation is at Merit's sole discretion.
 
 **Open counsel items (three, one lawyer, one sitting).** These are the questions engineering cannot answer:
 
@@ -137,10 +138,11 @@ Roughly, and in dependency order. Each is one Claude Code session unless noted.
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once. Canonical field names and comparison operators live here |
 | [research/calibration/README.md](../research/calibration/README.md) | The economic model: the risk engine's correlation table, the reserve rule, and the derived selection math |
 
-## Five things a reviewer should know before ruling on anything
+## Six things a reviewer should know before ruling on anything
 
 1. **Money is integer cents, thresholds in basis points. No floats in financial paths**, including in document examples.
 2. **The engine is pure and EOD.** Intraday enforcement is delegated to the vendor's auto-liquidator; Merit's own state reflects the last closed trading day. Every trader-facing surface must say so.
-3. **Zero denial is a policy with teeth.** `payout_requests` has no `denied` status and no review state. The freeze endpoint requires a cited open flag. These are schema constraints deliberately aimed at the founder's own future self under pressure.
-4. **The payout tail is all correlation.** Mean monthly payouts barely move with trader correlation; the 1-in-100 month nearly doubles. This is why the identity and abuse detectors are a **reserve control**, not only an abuse control, and it is the strongest argument for funding them properly.
-5. **Roughly 93 percent of the funded book has zero or negative true edge.** The funded time-gates work precisely because they let that population revert before cash leaves. Pass rate is a **price knob, not a quality filter**, and any copy implying otherwise is the kind of marketing-versus-implementation gap the constitution exists to prevent.
+3. **The ladder is a limit, not a promise.** Completing it sets graduation eligibility, which is a review-pool flag. Merit publishes Lucid's framing verbatim: the ladder is "the maximum payout level, not a guaranteed minimum for live eligibility." Topstep's live selectivity is 0.71 percent, which is what makes any other framing dishonest.
+4. **Zero denial is a policy with teeth.** `payout_requests` has no `denied` status and no review state. The freeze endpoint requires a cited open flag. These are schema constraints deliberately aimed at the founder's own future self under pressure.
+5. **The payout tail is all correlation.** Mean monthly payouts barely move with trader correlation; the 1-in-100 month nearly doubles. This is why the identity and abuse detectors are a **reserve control**, not only an abuse control, and it is the strongest argument for funding them properly.
+6. **Roughly 93 percent of the funded book has zero or negative true edge.** The funded time-gates work precisely because they let that population revert before cash leaves. Pass rate is a **price knob, not a quality filter**, and any copy implying otherwise is the kind of marketing-versus-implementation gap the constitution exists to prevent.

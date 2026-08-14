@@ -13,6 +13,39 @@ last_updated: 2026-08-14
 - **If a live program is ever built, the working structure is a ring-fenced affiliated entity**, on the MFFU pattern. Recorded as a starting point for counsel, not as a decision.
 - **Counsel packet item 1** ([DECISIONS](../DECISIONS.md)) covers all three graduation paths, because the question is what Merit may *say* about graduation before a program exists, and that is not an engineering question.
 
+**Second ruling folded, and it changes the module's spine: [ADR-024](../DECISIONS.md) separates the ladder from the live invitation.** Completing the ladder sets **graduation eligibility**, which is a **review-pool flag and nothing more**. Invitation is at **Merit's sole discretion** from that pool. [M01](M01-rules-engine.md) R-49 no longer emits an invitation event, because **an engine that emits an invitation on ladder completion has already made the promise**, and the promise is what commits Merit rather than the program.
+
+**The framing to publish, adopted verbatim from Lucid:** the ladder is **"the maximum payout level, not a guaranteed minimum for live eligibility."** One sentence, and it prevents the whole misreading. Binding on the ToS and on marketing.
+
+**`max_payouts` is 5 on all plans** ([ADR-024](../DECISIONS.md)), matching Lucid and Tradeify. Lifetime to the trader at 50K is **$6,750 on Core EOD and Direct, $4,500 on Merit Rapid**.
+
+### Competitive map: how the market structures the live path
+
+Recorded here and in [TOP10_FIRMS](../../research/TOP10_FIRMS.md) so "industry consensus is 5" is checkable rather than remembered.
+
+| Firm | Ladder | Live path |
+|---|---|---|
+| **Lucid** | **5** | Discretionary. Publishes the ladder as "the maximum payout level, **not a guaranteed minimum** for live eligibility", which is the framing Merit adopts verbatim |
+| **Tradeify** | **5** | Discretionary. Counts the ladder **across an entity's accounts** rather than per account, which Merit records as a config option and does not adopt by default |
+| **Topstep** | n/a | The selectivity benchmark: **0.71 percent** of funded traders reach live capital. Any firm implying ladder completion leads to live capital is describing something no firm actually operates |
+| **TopOne** | varies | Live path advertised as a progression |
+| **Phidias** | varies | Live path advertised as a progression |
+
+**What the map is for.** Merit's ladder length sits exactly at consensus, and its live posture sits at the honest end of it. The two firms that publish a discretionary framing are the two Merit is matching; the firms that advertise a progression are the pattern [AS-M18-01](#) warns about.
+
+### The review-pool surface
+
+**Specified now, shipped with zero live copy**, per the prior ruling. The surface is internal; the silence is external.
+
+| Requirement | Detail |
+|---|---|
+| An **admin queue over graduation-eligible accounts** | The pool, not a leaderboard. Ordered by whatever an operator is actually deciding on |
+| **Full history and evidence attached to each row** | Every mark, every payout, every flag, every rule state. A discretionary decision is made **against the record**, never against a name |
+| **No trader-facing exposure of pool membership** | A trader learns they are eligible; they learn nothing about being reviewed, ranked, or passed over |
+| The decision is **logged with its reason** | Discretion that leaves no record is indistinguishable from arbitrariness when it is questioned later |
+
+**Why the evidence attachment is not optional.** A discretionary invitation is exactly the decision most likely to be challenged as unfair, and the only defensible answer is the account's own record. Building the pool without the evidence would produce a queue that invites judgment and supplies nothing to judge with.
+
 Constitution section §4-ADDENDUM ("ladder tracker, invitation workflow, vault and bonus display, **the marketing face of the payout cap**"), Appendix B5's ten-section template, and [M01](M01-rules-engine.md) INV-17's lifetime bound. The `graduated` phase and the invitation event are already present in the approved [DATA_MODEL](../architecture/DATA_MODEL.md) and [EVENTS](../architecture/EVENTS.md), reserved for this module.
 
 **This plan opens with the finding rather than burying it in section 7, because it changes what the module is.**
@@ -46,7 +79,7 @@ The trader-facing face of [M01](M01-rules-engine.md)'s payout ladder, and whatev
 | GP-M18-02 | **Third-party introduction** | Merit introduces graduates to an unaffiliated firm that runs live programs | Lower, and not zero: introduction for compensation has its own rules, and Merit's brand rides on the third party's conduct | Viable, and needs a written arrangement |
 | GP-M18-03 | **Continuation, honestly framed** | Graduation completes the account. The trader opens a new account, keeps their record, and the ladder restarts | **None.** It is what already happens | **v1.** Ship this, and say exactly what it is |
 
-**GP-M18-03 is not a consolation prize and this plan does not present it as one.** The ladder's real function is to bound per-account lifetime extraction (INV-17), and a trader who completes one has extracted roughly $7,200 on Merit Rapid or $10,800 on Core EOD at 50K, which is a genuine outcome worth marking. What the module must not do is dress GP-M18-03 in GP-M18-01's language.
+**GP-M18-03 is not a consolation prize and this plan does not present it as one.** The ladder's real function is to bound per-account lifetime extraction (INV-17), and a trader who completes one has extracted roughly $4,500 on Merit Rapid or $6,750 on Core EOD at 50K, which is a genuine outcome worth marking. What the module must not do is dress GP-M18-03 in GP-M18-01's language.
 
 ### 1.3 What this module is not
 
@@ -224,9 +257,9 @@ stateDiagram-v2
 **And the aggravating detail.** [ADR-018](../DECISIONS.md) makes the ladder one of the three named defenses of Merit Rapid's headline per-day rate, alongside the win-day gate and detection. A defense the customer does not know about is a defense that will feel like a trap when it fires.
 
 **Counter, and all of it is disclosure done early rather than a mechanism.**
-1. **The ladder's finiteness is stated before purchase** (INV-M18-02): on the plan's rules page, in the plan comparison, and in the account's tracker from ordinal zero. Not "up to 8 payouts" in small type: **"this account can make 8 payouts, then it completes"**, with the lifetime figure spelled out in money.
+1. **The ladder's finiteness is stated before purchase** (INV-M18-02): on the plan's rules page, in the plan comparison, and in the account's tracker from ordinal zero. Not "up to 5 payouts" in small type but the sentence [ADR-024](../DECISIONS.md) specifies: **"each account pays up to 5 payouts, then completes. Open another anytime."** The second clause is load bearing, and a shorter ladder makes it more so: finiteness now arrives sooner, so the continuation path has to sit in the same sentence as the limit rather than a page away.
 2. **The tracker counts down, not up.** "3 of 8 taken" and "5 remaining" are the same fact and the second is the one that cannot be misread.
-3. **The lifetime number is published on the rules page**: roughly $10,800 on Core EOD at 50K and roughly $7,200 on Merit Rapid, at the 9000bp split. [ADR-018](../DECISIONS.md) already uses that figure internally as a defense, and publishing it converts it from a defense into a feature, because it is a large and honest number.
+3. **The lifetime number is published on the rules page**: **$6,750 on Core EOD at 50K and $4,500 on Merit Rapid**, at the 9000bp split ([ADR-024](../DECISIONS.md)). [ADR-018](../DECISIONS.md) already uses that figure internally as a defense, and publishing it converts it from a defense into a feature. **The number fell when the ladder shortened from 8 to 5, and it is still the right thing to publish**: a trader who computes it before buying is a trader who cannot be surprised by it later, which is the entire point of AS-M18-02.
 4. **The graduation page exists publicly** (`GET /public/graduation`) and is linked from every rules page, so what happens at the end is readable before the beginning. EC-122, GS-206.
 
 ### AS-M18-03: Graduation is the outcome a successful ring produces (NOVEL)
@@ -369,7 +402,7 @@ M18 supplies a panel on [M6](M06-admin-ops-console.md): ordinal distribution, gr
 
 **OQ-M18-03. Does a graduation benefit exist, and if so what is it?** AS-M18-03 shows any benefit adds a step function exactly where the ladder was supposed to stop, and that the cohort receiving it is enriched for undetected rings. Proposed: **recognition and continuation only** for v1: the certificate, the published lifetime figure, and a clean path to a new account. If a benefit is ever added, it needs the cohort review, an expiry on holds, and a fresh simulation-harness pass, because a step function at the end of the ladder is a liability change rather than a marketing addition.
 
-**OQ-M18-04. Is the published lifetime figure a good idea?** AS-M18-02's counter 3 proposes publishing roughly $10,800 on Core EOD at 50K and roughly $7,200 on Merit Rapid, which [ADR-018](../DECISIONS.md) already uses internally as a defense of the plan's headline rate. Publishing it makes the cap unmistakable before purchase and gives the [dossier](../../research/ADVERSARY_DOSSIER.md)'s forensic readers an exact figure for the maximum extraction per account. Recommendation: **publish it.** They will compute it in an afternoon regardless, it is a large and attractive number to an honest trader, and it converts the corpus's most important liability defense into a marketing asset rather than a surprise.
+**OQ-M18-04. Is the published lifetime figure a good idea?** AS-M18-02's counter 3 proposes publishing **$6,750 on Core EOD at 50K and $4,500 on Merit Rapid** ([ADR-024](../DECISIONS.md)), which [ADR-018](../DECISIONS.md) already uses internally as a defense of the plan's headline rate. Publishing it makes the cap unmistakable before purchase and gives the [dossier](../../research/ADVERSARY_DOSSIER.md)'s forensic readers an exact figure for the maximum extraction per account. Recommendation: **publish it.** They will compute it in an afternoon regardless, it is a large and attractive number to an honest trader, and it converts the corpus's most important liability defense into a marketing asset rather than a surprise.
 
 ---
 
