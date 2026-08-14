@@ -98,10 +98,10 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M5-06 | new `wallet_withdrawals` | the external leg as its own object | 0011 | **landed** |
 | SD-M5-07 | `ledger_accounts` | **add** the `trader_wallet` class (ADR-027) | 0009 | **landed** |
 | SD-M6-01 | `liability_snapshots` | identity max, absorbed corrections, bounded open liability | 0009 | **landed** |
-| SD-M6-02 | new `plan_breaker_state` | breaker with a recorded sample size | 0016 | pending |
-| SD-M6-03 | new `alarm_suppressions` | mandatory expiry on every suppression | 0016 | pending |
+| SD-M6-02 | new `plan_breaker_state` | breaker with a recorded sample size | 0016 | **landed** |
+| SD-M6-03 | new `alarm_suppressions` | mandatory expiry on every suppression | 0016 | **landed** |
 | SD-M6-04 | `evidence_packs` | add `audience`, `redaction_profile`, `includes_detector_detail` | 0008 | **landed** |
-| SD-M6-05 | new `dual_control_approvals` | ADR-010's second approval as a row | 0016 | pending |
+| SD-M6-05 | new `dual_control_approvals` | ADR-010's second approval as a row | 0016 | **landed** |
 | SD-M7-01 | `detector_runs` | add `synthetic_expected`, `synthetic_found`; `degraded` status | 0008 | **landed** |
 | SD-M7-02 | `risk_flags` | add `sla_due_at`, `first_touched_at` | 0008 | **landed** |
 | SD-M7-03 | new `detector_definitions` | versioned parameters with an effective date | 0008 | **landed** |
@@ -167,7 +167,7 @@ Rulings the schema did not yet express. Four of the five were invisible because 
 |---|---|---|---|---|
 | U-01 | new `identity_signal_weights` | ADR-022, M07 D-16 | 0025 | pending, **reserved** (ADR-022 tiers it to v1.x) |
 | U-02 | `accounts.graduation_eligible` | ADR-024, M01 R-49 | 0007 | **landed** |
-| U-03 | new `ledger_halts`, identity-scoped with an escalation clock | ADR-016, M05 INV-M5-16 | 0016 | pending |
+| U-03 | new `ledger_halts`, identity-scoped with an escalation clock | ADR-016, M05 INV-M5-16 | 0016 | **landed** |
 | U-04 | `identity_signals.kind` gains `footprint_enrichment` | ADR-023, M07 D-15 | 0002 | **landed** |
 | U-05 | `kyc_verifications.placement` check widened to the ruled trigger set | ADR-021 | 0003 | **landed** |
 
