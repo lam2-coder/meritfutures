@@ -1,5 +1,5 @@
 ---
-status: draft
+status: approved
 depends_on: []
 last_updated: 2026-08-14
 ---
@@ -200,3 +200,51 @@ Append-only handoff journal (C3 ritual). Newest entry last. Format per entry: do
   - **The decoupling matters even though no live program exists, and the reason is easy to lose.** An engine that emits an invitation on ladder completion **has already made the promise**; the promise commits Merit, not the program. Retrofitting discretion onto a population that already believes the ladder leads somewhere is far more expensive than designing it in now, while the population is zero.
   - **Topstep's 0.71 percent is the number that settles the argument** and is worth keeping to hand. It is what makes "complete the ladder, get live capital" a description of something no firm actually operates, and it is the empirical backing for a framing Merit would otherwise be adopting on principle alone.
 - **Files touched:** docs/DECISIONS.md; docs/plans/{M01,M06,M07,M14,M18-graduation-track}.md; docs/EDGE_CASES.md; docs/legal/TOS_CLAUSES.md; docs/testing/GOLDEN_SCENARIOS.md; research/{TOP10_FIRMS,ADVERSARY_DOSSIER}.md; docs/{INDEX,STATE,GUIDE_BRIEFING,SESSION_LOG}.md.
+
+---
+
+## 2026-08-14 - Session 9: pre-wave folds plus Wave 4 (testing, ops, design, legal)
+
+- **Done:**
+  - **Pre-wave fold, [ADR-025](DECISIONS.md).** Progressive cap release **rejected for v1 rather than deferred**, with the full option table: on the 5-rung ladder ADR-024 established, the market's own shape ("after five payouts your cap goes up") is structurally impossible because five payouts is the whole ladder, release at ordinal 5 costs +20 percent of the lifetime bound to deliver one raised payout at the end of an account's life, and release from ordinal 4 costs +40 percent. Replaced with **cross-account loyalty**: the Nth completed ladder earns reset discounts, bonus credit and review-pool priority, and **no per-account bound moves**. Folded into M14 (LM-M14-01 rejected, LM-M14-05 added, INV-M14-11 and INV-M14-12, section 3.2 replaced, 3.5 added as a negative flow, AS-M14-01 rewritten, AS-M14-08 added, OQ-M14-01 closed), EC-104 amended, EC-139 and EC-140 added, GS-179 rewritten, GS-243 to GS-245 added.
+  - **Ladder disclosure confirmed unchanged.** Countdown tracker and the same-breath continuation clause, folded into EC-122, M18 AS-M18-02 and GS-206. M18's stale ordinal-8 references corrected to the 5-rung ladder.
+  - **testing/STRATEGY.md written.** Four binding rules, tooling decided with rejected alternatives, section 5's seven requirements as named suites, eight `PT-nn` engine properties, and one complete CI gate inventory: ten pipeline stages, VG-1 to VG-12 with the test that implements each, the D0 battery, the anti-slop gates, and five corpus-integrity checks including the docs link-check.
+  - **testing/GOLDEN_SCENARIOS.md consolidated, 242 to 257.** Four defects repaired, ten D0 fixtures added, verification-UX pair renumbered out of a collision, new section 33 carrying an ownership partition that sums to 257.
+  - **testing/SIMULATION_HARNESS.md finalized.** Ten population parameters, eleven calibration bands, eight outputs, and section 8's executable checklist for when the engine lands.
+  - **ops/runbooks written.** Eleven runbooks plus comms templates, cron inventory and the weekly risk ritual.
+  - **design/DESIGN_SYSTEM.md written.** Forest ink and brass, two semantic colors, the ruled row, the full token set, 17 review gates, 8 slop-score checks.
+  - **legal/ completed.** TOS_CLAUSES expanded from nine clauses to fifteen with the disclosure inventory and the geo placeholder structure, AFFILIATE_TERMS and COUNSEL_PACKET added.
+  - **M12 seven-statistic sign-off table drafted** as its own doc, with six global choices and a 16-row sign-off.
+  - **DELIVERY_PLAN.md written.** Section 8 re-planned to 18 weeks with the launch-blocking triage, and the schema-delta reconciliation split into its own flagged high-risk session.
+  - **INDEX regenerated (62 docs), STATE moved to the FREEZE gate.**
+- **Next:** Founder read-through and the FREEZE gate. Then the schema-delta reconciliation session, on its own, fresh context, strict regime.
+- **Blockers:** None. The vendor call and the counsel sitting are deferred by choice.
+- **Landmines:**
+  - **`mc_lifecycle.py` did not land.** The founder's instruction assumed it would. It has not, so the six-divergence checklist could not be run, the four ladder-5 figures stay conservative rather than exact, and the "at least" annotations stay. The STATE item is unchanged rather than cleared, and SIMULATION_HARNESS section 8 is now the executable checklist so the next session does not have to reconstruct it.
+  - **The ruling cited EC-136 and EC-137, which are Merit Wallet entries.** The affected entries are EC-104 and EC-122. The mis-citation is inherited from ADR-024, which cited EC-137 for the ladder-finiteness finding. Corrected in place there and recorded in ADR-025 rather than fixed silently, because a corpus whose cross-references are its navigation cannot absorb a quiet renumbering.
+  - **"Bonus wallet credit" crosses four invariants if read literally.** Implemented as `promotional_credit` rendered inside the wallet screen and never withdrawable. Raised as OQ-FREEZE-01 and OQ-M14-07. **This is the one place in the session where the ruling's literal words were not implemented**, and it is a money-path change to a closed check constraint if overruled.
+  - **The registry went from 242 to 257 and this was not scope creep**, but a reviewer should check the reconciliation in GOLDEN_SCENARIOS section 33.2 rather than take it on trust: ten discharge an obligation SECURITY section 9 recorded for Wave 4, three carry ADR-025, and two fix a collision where GS-206 to GS-209 answered to two different blocks.
+  - **The session ran on a designated branch rather than on `main`**, because the harness launched it with an explicit branch instruction that conflicts with ADR-D1's single trunk. Everything is pushed and a pull request carries it into `main`, but the conflict will recur on every session launched the same way. Raised as OQ-FREEZE-02.
+  - **Two counts in this corpus are now asserted by CI rather than by attention** (CI-06d). Before this session they were quoted in gate summaries and maintained by hand, and one of them had already drifted.
+- **Files touched:** docs/DECISIONS.md; docs/EDGE_CASES.md; docs/INDEX.md; docs/STATE.md; docs/SESSION_LOG.md; docs/DELIVERY_PLAN.md; docs/plans/{M12-transparency-platform,M12-statistic-definitions,M14-loyalty-retention,M18-graduation-track}.md; docs/testing/{STRATEGY,GOLDEN_SCENARIOS,SIMULATION_HARNESS}.md; docs/design/DESIGN_SYSTEM.md; docs/legal/{README,TOS_CLAUSES,PRIVACY_POLICY,AFFILIATE_TERMS,COUNSEL_PACKET}.md; docs/ops/runbooks/ (15 files).
+
+---
+
+## 2026-08-14 - Session 13: FREEZE gate closed, corpus FROZEN
+- **Done.** Ruled every open gate item, ran the calibration engine, recalibrated, and froze the corpus.
+  - **OQ-FREEZE-01:** implementation **confirmed**, [ADR-025](DECISIONS.md)'s literal wording **overruled**. The loyalty perk is `promotional_credit`, never withdrawable. Recorded that **the invariant guard caught a founder-guide wording error** and the author raised it rather than implementing it, which is the review system working as designed.
+  - **OQ-FREEZE-02:** [ADR-D1](DECISIONS.md) amended. Harness-launched sessions run designated branches and **must end mergeable**, founder merges same day; local sessions commit direct to `main`. PR #2 merged. CLAUDE.md's git section rewritten for the post-FREEZE regime.
+  - **Sign-offs:** Wave 3 batch 2 approved, Wave 4 approved, plan parameters confirmed as launch candidates, **Direct's ladder = 4**, **KYC trigger set = `{second_distinct_account_purchase, pre_funded}`**, M12's table approved **including S-16**.
+  - **The engine landed and was RUN.** `mc_lifecycle.py`, 546 lines. Reproduction check passed: the engine as committed reproduces the workbook's plans tab ($690.44 / $829.36 / $207.33 against $698 / $800 / $206), and the **risk engine reproduces the README's table exactly, to the cent** (CVaR99 at rho=0.30 = $132,896.71, multiple 2.9285x, all twenty ruin cells).
+  - **Exact recalibrated figures** at `w=3`, min_days 0, ladder 5/5/4: Core EOD **$690.44** firm per funded, 33.46% funded-to-payout, +0.25% margin; **Merit Rapid $904.07, 48.11%, 2.13 payouts per payer, 16.9% margin**; Direct **$207.33**, 12.07%, 39.2%. ADR-018 had carried $889 / 48.1% / 2.09 / ~18%.
+  - **42 documents flipped to `approved`.** Only M02 remains at `review`. STATE marked **FROZEN**, INDEX regenerated from actual frontmatter.
+- **Next:** The schema-delta reconciliation session. Money path, strict regime, fresh context, **plan mode mandatory**.
+- **Blockers:** None.
+- **Landmines:**
+  - **The single most important finding of this session: the ladder does not bind the average account.** Ladder 8/6 and ladder 5/4 return **identical figures to every decimal place** on Core EOD and Direct, because mean payouts per payer are 1.54, 2.13 and 1.30, nowhere near any ladder length ever discussed. [ADR-024](DECISIONS.md) and Direct's 4 are **margin-neutral in the central estimate and their entire value is tail protection.** The dangerous corollary: **no margin table will ever show the ladder costing anything**, so a future review looking only at unit economics will find it free in both directions and may conclude it can be lengthened for free. It cannot. INV-17 is the assertion and this is the reason.
+  - **The committed engine predates the founder's own `w=3` re-run.** It carries `winning_days=5` on Rapid. The re-run that produced ADR-018's numbers happened and was never saved back into the file. The engine is now the source of record and it is **stale in four places** (plan name, Rapid win days, Rapid and Direct minimum days, ladder counts). Re-running it at the corpus configuration is a build-phase task and **must reproduce SIMULATION_HARNESS section 9.2's table before any CI calibration band is set from it.**
+  - **A seventh divergence was found that the README's six did not have:** funded `min_days` is 5 on Rapid and Direct in the engine, against 0 in the corpus ([ADR-015](DECISIONS.md)). It is dominated by the win-day gate on both plans, so it changes nothing, **which is exactly why nobody noticed it for four waves.** Dominated gates hide divergences.
+  - **The recalibration moved the numbers mildly against us**, which is worth saying plainly: firm cost 1.7 percent higher and margin 1.1 points lower than the round figures the corpus carried. Immaterial, and it is the outcome a decision made on round numbers is entitled to hope for rather than assume. Merit Rapid remains the margin engine at **16.9 percent**.
+  - **Core EOD's contribution margin is +0.25 percent and that is not a defect.** The workbook had it at **negative 0.88 percent**. Core EOD is a customer-acquisition plan whose economics live in rebuys and in the lineup, never in its own contribution line. Anyone reading the margin table cold will see a broken plan; it is a deliberate one.
+  - **The reproduction check is now spent.** It was available exactly once, while both the superseded parameters and the superseded results still existed. It passed. There is no second chance to prove the port faithful this cheaply.
+- **Files touched:** docs/DECISIONS.md; docs/STATE.md; docs/INDEX.md; CLAUDE.md; docs/testing/SIMULATION_HARNESS.md; docs/plans/{M01,M12-statistic-definitions,M18-graduation-track,M19}.md; docs/EDGE_CASES.md; docs/GUIDE_BRIEFING.md; 42 status flips across docs/ and research/; docs/SESSION_LOG.md.

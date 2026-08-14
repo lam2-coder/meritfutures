@@ -1,5 +1,5 @@
 ---
-status: review
+status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/SECURITY_LANDSCAPE.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md, M17-offers-engine.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
@@ -67,7 +67,9 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 - **Resets inflate `second_purchase_any`.** A trader who resets once becomes a second purchaser under that trigger without ever holding a second account, which is a different population entirely. Choosing it buys coverage and simultaneously buys friction on Merit's most loyal repeat customers.
 - **Precedent exists.** Topstep verifies before the second purchase, so the composite sits inside published industry practice rather than ahead of it.
 
-**The founder is weighing `{pre_funded always}` against `{second_distinct_account + pre_funded}`, and the final trigger set is decided at FREEZE** on beta funnel data. Both are the same code and differ only in a config array, which is the whole reason this was built as a set.
+**RULED at the FREEZE gate: the trigger set is `{second_distinct_account_purchase, pre_funded}`, earliest fires.** The fleet-coverage argument prevails. `pre_funded` alone leaves roughly 85 percent of buyers outside the dedupe corpus, and fleet operators sit disproportionately inside that 85 percent because they are serial buyers who mostly do not pass evaluations. The second-account trigger captures their faces early, at a cost paid only by people who have already bought twice.
+
+**Telemetry adjudicates post-beta.** The per-trigger funnel instrumentation and the corpus-coverage floor exist so this is revisited against data rather than re-argued. Both candidate sets were the same code and differed only in a config array, which is the whole reason this was built as a set, and that property survives the ruling: changing the set later is not an engine change.
 
 **Required telemetry, per ADR-021's conditions:** per-trigger funnel instrumentation (SD-M19-03 widens to record **which trigger fired**, not only the placement), **corpus-coverage as a reported number with a configured floor**, and a **pre-agreed per-plan escalation path** so the beta escalates specific plan and size combinations rather than negotiating a lineup-wide switch under pressure.
 
