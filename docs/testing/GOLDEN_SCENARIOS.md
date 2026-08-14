@@ -40,6 +40,7 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-186 to GS-191 | Discord integration: role disclosure, chat-account-as-credential, bot-token voice, moderation versus enforcement, enforcement by role removal, support in public | M15 |
 | GS-192 to GS-197 | Notification center: freeze notice versus tip-off, muting the alarm first, batch broadcasts, template leakage, proof of notice, new-kind defaults | M16 |
 | GS-198 to GS-204 | Offers engine: rules sold as promotions, free-trial identity loss, price experiments, stacking floors, leaked codes, chargeback-funded credit, rule experiments | M17 |
+| GS-205 to GS-211 | Live-graduation pipeline: unbacked live-program promises, ladder finiteness, graduating-cohort risk, vault projections, stranded balances, discretion at the last step, third-party exposure | M18 |
 
 ## 2. Fixture format
 
@@ -431,6 +432,20 @@ Defined by [M17](../plans/M17-offers-engine.md) section 8.2. The module's govern
 | GS-203 | Credit granted, spent, then the funding purchase charged back | The grant revokes, the promotional balance goes **negative**, further credit spend blocks, and settlement follows the existing chargeback path. Asserts that a credit must know what paid for it or a stolen card buys two extractions. AS-M17-06, EC-120, pairs with GS-039 |
 | GS-204 | An experiment proposed with a rule-varying arm | **Unrepresentable**: `varies` has no such value, so the experiment cannot be written down. Asserts the line that Merit experiments on what it charges and how it explains itself, never on what it enforces. AS-M17-07 |
 
-## 25. What is not here yet
+## 25. GS-205 to GS-211: live-graduation pipeline (M18)
+
+Defined by [M18](../plans/M18-live-graduation-pipeline.md) section 8.2. Almost every failure in this module is a promise rather than a computation, so most of these are disclosure fixtures.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-205 | Any surface using live-program language with no contracted program | Copy lint failure across page, email, certificate, and social card alike. Asserts that the copy is what commits Merit, not the code, and that a disclosure repeated on every surface cannot be made conditionally false by a marketing sentence. AS-M18-01, EC-121 |
+| GS-206 | An account reaches the final ladder ordinal | Finiteness was disclosed at purchase, in the plan comparison, and counted **down** in the tracker from ordinal zero, with the lifetime figure published in money. Asserts that a defense the customer does not know about feels like a trap when it fires. AS-M18-02, EC-122 |
+| GS-207 | A graduating account carrying an unresolved correlation signal | The final payout and the terminal settlement **complete**; only the discretionary benefit is held, with a cited flag, a reason class, and an expiry. Asserts that the review touches the reward and never the money. AS-M18-03, EC-123 |
+| GS-208 | A vault display with a benefit not yet accrued | Renders **accrued value only** with its stated basis; progress appears as a count rather than as a currency figure. Asserts that a number in a box with a currency symbol is a balance to the person reading it, whatever the caption says. AS-M18-04 |
+| GS-209 | Graduation with withdrawable balance remaining | A terminal settlement pays it to the wallet automatically, is **not an ordinal**, is not capped by the payout cap, and is labeled distinctly on the timeline. Asserts that zero denial must not fail at an accounting boundary. AS-M18-05, EC-124 |
+| GS-210 | Graduation with no human in the path | Reaching the final settlement graduates the account, and **no approval step exists for anyone to use**. Asserts that discretion reintroduced at the last step is discretion everyone who was not invited will infer a reason for. AS-M18-06 |
+| GS-211 | A third-party introduction is presented to a graduate | The party is **named**, compensation is disclosed at the point of introduction, no representation is made about their terms, and declining costs the trader nothing. Asserts that an introduction a trader must accept to receive full value is not an introduction. AS-M18-07 |
+
+## 26. What is not here yet
 
 Scenarios owned by M9 through M19 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
