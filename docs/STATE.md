@@ -17,10 +17,10 @@ Wave 1 gate: founder review of all seven research/ docs; contradictions with the
 ## Done
 - Constitution committed at repo root.
 - Full folder skeleton per section 0.5 with tracking docs and lean CLAUDE.md.
-- Wave 1 doc 1/7: research/PROP_TECH_LANDSCAPE.md (status: review).
+- Wave 1 docs 1-2/7: research/PROP_TECH_LANDSCAPE.md, research/TOP10_FIRMS.md (status: review).
 
 ## In flight
-- Wave 1 docs 2-7 (TOP10_FIRMS, ADVERSARY_DOSSIER, DATA_CAPABILITIES, SECURITY_LANDSCAPE, VIBE_FAILURE_POSTMORTEMS, CLAUDE_CODE_PLAYBOOK).
+- Wave 1 docs 3-7 (ADVERSARY_DOSSIER, DATA_CAPABILITIES, SECURITY_LANDSCAPE, VIBE_FAILURE_POSTMORTEMS, CLAUDE_CODE_PLAYBOOK).
 
 ## Blocked
 - Nothing.
