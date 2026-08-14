@@ -187,7 +187,7 @@ The full gate-by-gate evaluation, input state, plan version, and computed clamp,
 
 ## payout ladder
 The count of settled payouts after which a funded account automatically [graduates](#graduation). It bounds lifetime extraction per account and is the liability architecture's backstop.
-Config: `ladder.payouts_to_graduate`.
+Config: **`max_payouts`** ([ADR-030](DECISIONS.md); `ladder.payouts_to_graduate` is the superseded key name). v1 values: **5** on Core EOD and Merit Rapid, **4** on Direct.
 
 ## graduation
 Automatic closure of a funded account on reaching the ladder count, with status `graduated` and a live-program invitation event. The live program itself is post-launch; v1 records the invitation and closes the simulated account.
@@ -210,7 +210,9 @@ One hundredth of one percent, integer. All ratios, thresholds, shares, and split
 An immutable double-entry row. Every financial fact is expressed as balanced debits and credits across [ledger accounts](#ledger-account). Nothing is ever updated or deleted; corrections are new compensating entries.
 
 ## ledger account
-A node in the chart of accounts. v1 classes: `firm_treasury`, `trader_withdrawable`, `fees_revenue`, `reserve`, `psp_clearing`, `promotional_credit` (reserved for future bonus mechanics). The account-type enum is expandable by design.
+A node in the chart of accounts. **Seven v1 classes**: `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve`, **`trader_withdrawable`** (per identity), **`trader_wallet`** (per identity), `promotional_credit`. The account-type enum is expandable by design.
+
+**`trader_withdrawable` and `trader_wallet` are two distinct per-identity positions, not one under two names** ([ADR-027](DECISIONS.md)). `SD-M5-07` **adds** the wallet class; it does not rename the other. They hold different magnitudes and move by different amounts: a payout approval reduces **withdrawable** by the full `approved_cents`, and of that, `trader_cents` becomes the **wallet** payable and `firm_cents` becomes revenue. `approved_cents != trader_cents`, which is exactly why one class cannot carry both. `promotional_credit` is activated rather than reserved and is **never withdrawable** ([ADR-019](DECISIONS.md), OQ-FREEZE-01).
 
 ## balance
 A derived value, always computed by summing [ledger entries](#ledger-entry), never stored as a mutable truth. Cached projections may exist for speed but are rebuildable and are verified against the ledger by the nightly self-audit.
@@ -306,6 +308,8 @@ The identity verification lifecycle: `kyc_required`, `pending`, `verified`, `rej
 
 ## KYC placement
 The configurable point at which verification is required: `pre_eval` (at purchase) or `pre_funded` (at eval pass). Beta launches `pre_funded`; Direct plans always verify at purchase because funding is immediate. It is config, never a hardcode, so the decision can change without a rewrite.
+
+**Superseded by the ruled trigger set** ([ADR-021](DECISIONS.md), [ADR-030](DECISIONS.md)). Placement is no longer a single point: the config key is **`kyc.triggers`, an array**, and verification fires at whichever configured trigger is reached **first**. The v1 set ruled at FREEZE is **`{second_distinct_account_purchase, pre_funded}`**. Direct plans always verify at purchase, which is not configurable. `payout_request` is invalid as a sole trigger.
 
 ## biometric dedupe
 The KYC provider's face match across all applicants, which surfaces one-person-many-names fleets before any liability exists. It catches what device fingerprints miss and feeds the [identity graph](#identity-graph).

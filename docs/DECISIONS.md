@@ -654,3 +654,266 @@ Running the engine **as committed**, against its own `OUR_PLANS`, reproduces the
 
 **The engine is now the source of record and it is stale in four places.** That is recorded rather than fixed here: **re-running it at the corpus configuration is a build-phase task**, listed in [SIMULATION_HARNESS section 8](testing/SIMULATION_HARNESS.md), and it must produce the table above before any CI calibration band is set from it.
 
+
+---
+
+## ADR-026: The schema-delta reconciliation, and the count correction  (2026-08-14, status: accepted)
+
+- **Context:** Four waves of module plans proposed schema changes that were approved with their plans and never folded into [DATA_MODEL](architecture/DATA_MODEL.md). Section 11 of that document says so in its own words. This ADR authorizes the fold, amends a frozen document, records a count correction, and carries the rejection table.
+- **Decision:** All **93** schema changes land as one migration set at `packages/db`, folded at create rather than applied as a base-plus-ALTER chain, because the repository contains no application code and no database. DATA_MODEL is amended in the same pull request under this ADR.
+
+### The count was wrong, and the correction is folded rather than merely recorded
+
+The corpus recorded "M01's ten, batch 1's thirty-one, batch 2's thirty-four". The actual counts are:
+
+| Wave | Recorded | **Actual** | Drift |
+|---|---|---|---|
+| M01 (`SD-01` to `SD-10`) | ten | **10** | correct |
+| Batch 1 (`SD-M2-nn` to `SD-M8-nn`) | thirty-one | **37** | **+6** |
+| Batch 2 (`SD-M9-nn` to `SD-M20-nn`) | thirty-four | **41** | **+7** |
+| Numbered total | 75 | **88** | **+13** |
+| Unnumbered (section below) | 0 | **5** | **+5** |
+| **Total in scope** | 75 | **93** | **+18** |
+
+Per module: M02 6, M03 6, M04 3, M05 7, M06 5, M07 5, M08 5. M09 3, M10 4, M11 4, M12 4, M13 3, M14 3, M15 2, M16 3, M17 4, M18 3, M19 4, M20 4.
+
+**Provenance, traced through git rather than assumed.** At commit `64b52b3`, when batch 1 was drafted and "thirty-one" was written, M02 to M08 held **34** deltas. **The number was wrong on the day it was recorded.** Session 7's batch-1 gate then correctly observed the set "grew by three" (`SD-M3-06`, `SD-M5-06`, `SD-M5-07`, all from [ADR-019](#)'s wallet) and applied a right increment to a wrong base: 31 + 3 = 34, where 34 + 3 = **37**. Batch 2 repeats the shape: 38 at `c5e7826`, plus `SD-M18-01` to `SD-M18-03` at [ADR-024](#), giving **41**.
+
+**Nothing is missing from the corpus. Every delta is present and traceable.** What was wrong is a hand-maintained tally that four documents quoted. **Corrected in all four**: [STATE](STATE.md), [DELIVERY_PLAN](DELIVERY_PLAN.md), [GUIDE_BRIEFING](GUIDE_BRIEFING.md), and [SESSION_LOG](SESSION_LOG.md). The session log is append-only, so its two entries are **annotated in place** rather than rewritten: the historical record stands and carries the correction beside it, because falsifying a journal to fix a number is a worse failure than the number.
+
+**The control that was missing.** The FREEZE gate moved registry counts under CI assertion (CI-06d); this tally sat outside that net. **A manifest completeness gate now joins CI**: every `SD-nn` and `U-nn` appearing anywhere in `docs/` must appear exactly once in `packages/db/DELTA_MANIFEST.md` with a disposition. A count nobody can drift is better than a count someone remembers to update.
+
+**Two things the corpus called additions are not deltas.** `ladders_completed_lifetime` is already inside `SD-M14-01`'s column list, and the `SD-M19-03` widening is an amendment to an existing delta. Both fold; neither is counted twice.
+
+### Five schema changes that exist as rulings with no delta number
+
+| # | Change | Source | Why it has no number |
+|---|---|---|---|
+| **U-01** | Link-confidence **signal-weight table** | [ADR-022](#), M07 D-16 | Known homeless. ADR-022 tiers it to v1.x, so no module claimed it |
+| **U-02** | `accounts.graduation_eligible` | [ADR-024](#), M01 R-49 | R-49 sets a flag no column exists for. `SD-M18-01` adds `graduated_at`, `graduation_path`, `terminal_settlement_id`, and not this |
+| **U-03** | Identity-scoped **ledger halt state** with escalation clock | [ADR-016](#), M05 INV-M5-16 | The ruling requires a scoped halt that pages and escalates on a configured window: a row with a subject, a start, and a deadline. Nothing holds it |
+| **U-04** | `identity_signals.kind` value for **D-15 checkout enrichment** | [ADR-023](#), M07 D-15 | The check list has no slot for the enrichment vendor's signals |
+| **U-05** | `kyc_verifications.placement` **check widening** | [ADR-021](#) | The constraint allows `pre_eval, pre_funded, direct_purchase`. The ruled trigger vocabulary is a set. `SD-M19-03` widened the funnel table and not this one |
+
+**These are the reason a count matters.** Four of the five were invisible because nobody was counting; they are rulings the schema does not yet express, which is the precise failure a reconciliation session exists to catch.
+
+### Rejection table
+
+**No delta was rejected.** All 88 numbered and all 5 unnumbered changes land, 90 in the v1 core sequence and 3 in a marked reserved sequence (`U-01` per ADR-022's v1.x tier, `SD-M18-03`'s `graduation_invitations` conditional on a live program that does not exist per [OQ-M18-01](#), and `SD-M11-04`). **This table says so explicitly rather than being absent**, because a rejection table that is missing is indistinguishable from a delta that was dropped.
+
+### Documents amended under this ADR
+
+[DATA_MODEL](architecture/DATA_MODEL.md) (tables rewritten to post-migration truth, section 11 re-materialized at the frozen configuration, delta-provenance appendix), **[GLOSSARY](GLOSSARY.md)** (the canonical naming authority: it carries the ledger class list, `ladder.payouts_to_graduate`, and the singular KYC placement. [ADR-027](#) **adds** `trader_wallet` to the class list, taking it to seven; [ADR-030](#) renames the other two keys), [M05](plans/M05-payout-system.md) (LT-01's debit leg and the state machine's `frozen` target), [STATE](STATE.md), [DELIVERY_PLAN](DELIVERY_PLAN.md), [GUIDE_BRIEFING](GUIDE_BRIEFING.md), [SESSION_LOG](SESSION_LOG.md), and [EDGE_CASES](EDGE_CASES.md) for gaps discovered while folding.
+
+### C-07: the `state_hash` input, written down because it was not
+
+`SD-08` adds `state_hash` for the nightly replay audit and `SD-06` splits the gates precisely because context gates are not replayable. **Nothing in the corpus recorded which columns the hash covers.** If `context_gates` entered it, a freeze applied last March would produce a divergence every night until someone disabled the audit, which is FM-17 by construction.
+
+**The hash is SHA-256 over a canonical serialization** ([M01 section 12](plans/M01-rules-engine.md)): fields in the fixed declared order below, `bigint` rendered base-10, `null` as an explicit sentinel, no whitespace.
+
+**Included, in this exact order:**
+
+```
+ 1. account_id
+ 2. trading_day
+ 3. phase
+ 4. floor_cents
+ 5. floor_locked
+ 6. floor_open_cents                    -- SD-04
+ 7. high_water_balance_cents
+ 8. balance_cents
+ 9. withdrawable_cents
+10. traded_days_count
+11. win_days_count
+12. consistency_best_day_cents
+13. consistency_period_profit_cents
+14. consistency_period_start_day        -- SD-07
+15. payouts_settled_count
+16. payout_anchor_day                   -- SD-02
+17. cadence_anchor_day                  -- SD-02
+18. engine_eligible                     -- SD-06
+19. engine_gates                        -- SD-06
+```
+
+**Excluded, each for a stated reason:**
+
+| Column | Why excluded |
+|---|---|
+| `context_gates` | **The whole reason SD-06 split them.** Freeze, recon, KYC and in-flight were true on the day and may not be true now. INV-23 |
+| `engine_version` | A build identifier is not state. Including it makes every engine upgrade a universal divergence |
+| `computed_at` | Wall-clock, not state |
+| `id`, `state_hash` | Surrogate key and the hash itself |
+
+**Both anchors are in the hash and both stay separate columns** (C-09). Under [ADR-019](#) they coincide today; collapsing them because today's configuration makes them equal is exactly the silent fold this session exists to prevent, and it is a 40 percent liability change if the anchor ever moves back.
+
+## ADR-027: `trader_withdrawable` and `trader_wallet` are two distinct positions  (2026-08-14, status: accepted, **reversing an earlier ruling in this same session**)
+
+- **Context:** C-01. [DATA_MODEL section 8](architecture/DATA_MODEL.md) and [GLOSSARY](GLOSSARY.md) carry `trader_withdrawable` as a per-identity ledger class. `SD-M5-07` introduces `trader_wallet` per identity. [M05](plans/M05-payout-system.md)'s LT-01 touches both in one transaction, which read at first glance like a rename applied to one leg and not the other.
+- **This ADR was first written the other way, ruling one class named `trader_wallet` and retiring `trader_withdrawable`. That ruling was wrong, was folded into GLOSSARY, DATA_MODEL and M05, and was committed. It is reversed here, and the reversal is recorded rather than the history rewritten**, because a corpus that quietly repairs a bad ruling teaches nobody what the bad ruling looked like.
+- **Decision: two distinct per-identity positions. The chart of accounts carries both. Seven v1 classes.** `SD-M5-07` says **add** the `trader_wallet` account class, and it means add.
+
+### The evidence, which was in the corpus and was read past
+
+[M05](plans/M05-payout-system.md) states the split explicitly: a payout approval reduces the **withdrawable** position by the full `approved_cents`, and **of that**, `trader_cents` becomes the wallet payable and `firm_cents` becomes revenue.
+
+**`approved_cents != trader_cents`. The two positions move by different magnitudes in the same transaction, which is precisely what one class cannot do.** Withdrawable is what the engine says the trader may draw; wallet is what Merit already owes them. They are different facts about different moments, and the payout is the event that converts one into the other minus the firm's share.
+
+### What the collapse would actually have done, which is worse than the first draft claimed
+
+The first version of this ADR asserted the collapsed posting would "balance and move nothing". **That was wrong.** With one class `X`:
+
+```
+debit  X              approved_cents   (= trader_cents + firm_cents)
+credit X              trader_cents
+credit fees_revenue   firm_cents
+```
+
+**The convention is positive debit, negative credit** ([DATA_MODEL](architecture/DATA_MODEL.md) `ledger_entries.amount_cents`, [M05](plans/M05-payout-system.md) section 4). The two legs on `X` are therefore `+approved_cents` and `-trader_cents`, so:
+
+```
+net on X = approved_cents - trader_cents = +firm_cents   (a DEBIT)
+```
+
+**Every payout approval would have net DEBITED the trader's single position by the firm's share, draining it on every approval, in the firm's favour.** At a 9000bp split on a 100,000c cap that is 10,000c per approval, taken from the trader, silently.
+
+**This expression was itself written inverted in the first draft of this ADR** (`trader_cents - approved_cents = -firm_cents`, labelled a debit, which under the stated convention is a credit). The magnitude and the conclusion were right and the direction was written backwards. **An ADR recording a direction error must not contain one**, and the fact that it did on the first pass is the fourth direction-or-class error to land on LT-01 in a single day.
+
+**And the deferred zero-sum trigger passes**, because debits equal credits: 100,000 against 90,000 plus 10,000. **The ledger reconciles perfectly while the balance is wrong.** The invariant that would have caught it is not zero-sum; it is that a position's movement must match the business event it records, and no trigger asserts that.
+
+**This is the single best argument in the corpus for why the reconciliation session exists**, and it is sharper for having been produced by the session rather than by an adversary: a plausible reading of two documents, ruled on by the founder, folded correctly by the author, and wrong. The catch came from re-reading the source rather than from any test, which is what the E2 line-by-line read on money-path files is for.
+
+### The corrected posting
+
+```
+LT-01 payout_approval
+  debit  trader_withdrawable (identity)  approved_cents
+  credit trader_wallet       (identity)  trader_cents
+  credit fees_revenue                    firm_cents
+```
+
+**The debit leg is unchanged.** The only defect in the corpus was the table row reading `credit firm_treasury trader_cents` while its own note beneath already said the leg credits `trader_wallet`. **The row is corrected to match the note**, and that is the whole of C-01's real content.
+
+**`firm_treasury` as the debit is rejected.** It books a cash movement at approval, which contradicts the ruled recognition timing: **payout liability books at approval, cash derecognizes at settlement**. Cash moves at LT-02 and LT-07. The first draft of this ADR proposed `firm_treasury` and it is rejected on the record, alongside the `firm_payable` class that draft invented and that does not exist in the chart of accounts.
+
+- **Consequences:** [GLOSSARY](GLOSSARY.md) and [DATA_MODEL](architecture/DATA_MODEL.md) are amended to **add** `trader_wallet`, not to retire `trader_withdrawable`; the earlier "superseded name" edit is reverted in both. Migration file `0009_ledger` creates both classes. M14, M17 and M20's invariants against `trader_wallet` are unaffected, because nothing about the wallet's meaning changed; what changed is that it no longer swallows a second position.
+- **Alternatives considered:** one class named `trader_wallet` (**ruled and then reversed**, for the reasons above); one class named `trader_withdrawable` (same defect, different label); keeping both but netting them in reporting (rejected: Open Liability needs the wallet reportable per identity, INV-M5-15, and a netted view cannot be un-netted).
+
+### Two database constraints, because prose review is not the control here
+
+**Three direction-or-class errors landed on LT-01 in a single day**, and a fourth landed inside the ADR describing them: the `trader_withdrawable`/`trader_wallet` collapse, the invented `firm_payable` class, the `firm_treasury` debit that contradicted the recognition timing, and the inverted sign expression above. Every one was produced by careful reading and caught by more careful reading. **That line is too easy to get wrong for prose review to be the control.**
+
+Both constraints are **database triggers in migration `0027`, not CI checks**, because `ledger_entries` is append-only and a bad row must fail at insert rather than be discovered by a job that runs later against data that already exists.
+
+| ID | Constraint | What it catches |
+|---|---|---|
+| **LEDGER-C1** | **No `ledger_transaction` may contain two entries against the same `ledger_account_id` with opposite signs** | **The exact signature of the C-01 collapse**, mechanized. A transaction that debits and credits one position is either a no-op wearing a transfer's clothes or a silent net movement in one party's favour. **It has no legitimate use** in this chart of accounts, so the constraint is a flat prohibition rather than a threshold |
+| **LEDGER-C2** | **Every `ledger_account_id` must resolve to a declared class in the chart of accounts** | **The `firm_payable` catch**, mechanized. A class that appears first in a migration is a class nobody defined, and the seven v1 codes are the whole permitted vocabulary |
+
+**Neither replaces the E2 read; both make it survivable.** A human reading a money-path diff is the right control for whether a posting means what it should. Neither of these triggers can tell you that. What they can do is guarantee that the two failure shapes which already occurred cannot reach a committed row, which is the difference between a control that depends on attention and one that does not.
+
+## ADR-028: `payout_requests.status` under the wallet  (2026-08-14, status: accepted)
+
+- **Context:** C-02, **the single most dangerous item in the set.** The approved enum is `approved, transferring, settled, failed, frozen`. [M05](plans/M05-payout-system.md) section 3 says the internal leg "reaches `settled_to_wallet` and stops"; M05 step S-4 says set `status = 'settled'`. Under [ADR-019](#), `transferring` describes the external leg, which now lives in `wallet_withdrawals`. **No delta proposed any of this.** And `SD-09`'s partial unique index has predicate `status in ('approved','transferring','frozen')`, so the enum question **silently decides whether G-NO-IN-FLIGHT is enforced at all.**
+- **Decision:** **The enum is `approved, settled, failed, frozen`.** `transferring` is retired from `payout_requests` and owned by `wallet_withdrawals`. **`settled_to_wallet` is not added**, because settlement to the wallet is the only settlement the internal leg has, and a status naming its destination invites a second one. **`SD-09`'s predicate becomes `status in ('approved','frozen')`.**
+- **Two corrections the ruling carries, both found by reading the files rather than the deltas:**
+  1. **[DATA_MODEL](architecture/DATA_MODEL.md) line 638 carries a second index with the same stale predicate**, `(status) partial where status in ('approved','transferring')`. It becomes `where status in ('approved','frozen')`. **A predicate fixed in one of two places is a uniqueness guarantee that holds on Tuesdays.**
+  2. **[M05](plans/M05-payout-system.md)'s state machine reads `frozen --> transferring`**, which becomes unreachable once `transferring` leaves this table. **Retargeted to `frozen --> settled`**, which is what a released freeze actually does under the wallet: the payout settles internally and instantly.
+- **Why the predicate is the dangerous half.** G-NO-IN-FLIGHT is the gate that stops a second payout while one is outstanding. If the index kept `transferring` in its predicate after the value stopped occurring, **the index would still exist, still be valid, and enforce nothing**, because no row would ever match. A gate that silently stops gating is worse than one that is absent, and nothing in the test suite would fail.
+- **Consequences:** the enum is written with a comment naming the zero-denial policy, so a future `denied` or review state is a deliberate act against a stated rule rather than an oversight. `wallet_withdrawals` owns the external leg's states per [M20](plans/M20-wallet.md).
+- **Alternatives considered:** keep `transferring` on `payout_requests` for the external leg (rejected: it duplicates state that `wallet_withdrawals` owns, and two tables tracking one transfer is how they disagree); add `settled_to_wallet` (rejected above).
+
+## ADR-029: `dedupe_matches` is the authoritative hard link  (2026-08-14, status: accepted)
+
+- **Context:** C-05. `SD-M19-04`'s `dedupe_matches` exists because the single `kyc_verifications.dedupe_matched_identity_id` column "cannot express a face matching three identities". **The delta does not say to drop the column.** Under [ADR-022](#) a dedupe hit is a **hard link that auto-enforces**, so two sources that can disagree is an enforcement defect rather than a redundancy.
+- **Decision:** **Drop `dedupe_matched_identity_id`. `dedupe_matches` is authoritative.** `biometric_dedupe_hit` stays as the fast boolean, because a boolean cannot contradict a set; it can only be stale, and staleness is detectable.
+- **Why it needed a ruling.** This is an **auto-enforcement input**. A hard link bans an account without human review, and a system with two sources for that decision will eventually enforce on the one that happens to be read first. Leaving both would have been the safe-looking choice and the wrong one.
+- **Alternatives considered:** keep the column as a denormalized "first match" (rejected: "first" is not a property of a set, and the column would drift the moment a second match arrived).
+
+## ADR-030: Plan-config key names are `max_payouts` and `kyc.triggers`  (2026-08-14, status: accepted)
+
+- **Context:** C-06. `ladder.payouts_to_graduate` ([DATA_MODEL section 11](architecture/DATA_MODEL.md), [M01](plans/M01-rules-engine.md) R-49, CV-14) versus `max_payouts` (M01 Appendix A, [ADR-024](#)). Section 11's literal example is also stale: ladder 8, `win_days.required_count` 5, `phase_eval.min_trading_days` 1, and `kyc.placement` as a singular enum against [ADR-021](#)'s ruled trigger set. **The zod schema and the CV publish validations key off these names.**
+- **Decision:** the canonical name is **`max_payouts`**, matching ADR-024 and every Appendix A table. **`kyc.placement` becomes `kyc.triggers`, an array.** Section 11's example is re-materialized at the frozen configuration under [ADR-026](#).
+- **Consequences:** [GLOSSARY](GLOSSARY.md) is amended, since it carries `ladder.payouts_to_graduate` and the singular placement. `U-05` widens the `kyc_verifications.placement` check to the ruled trigger vocabulary in the same migration, because a config key and a stored value that disagree is the same defect one layer down.
+- **Alternatives considered:** keep `payouts_to_graduate` (rejected: ADR-024 is the later ruling and Appendix A is what a founder reads when confirming parameters); keep the singular placement and store the trigger set elsewhere (rejected: it splits one fact across two shapes).
+
+### AMENDED 2026-08-14, at the schema-delta fold: two of the four "stale" entries were not stale
+
+**The decision above is unchanged. The stale list in its Context is corrected, and the correction is recorded rather than applied.**
+
+This ADR named four things stale in [DATA_MODEL section 11](architecture/DATA_MODEL.md)'s example: `ladder` 8, `win_days.required_count` 5, `phase_eval.min_trading_days` 1, and the singular `kyc.placement`. **Only the first and fourth were stale.** Those two are the key-name rulings and they are folded.
+
+| Entry | Verdict | Evidence |
+|---|---|---|
+| `ladder: { payouts_to_graduate: 8 }` | **Stale, as this ADR says.** Now `max_payouts: 5` | [ADR-024](#) |
+| `kyc.placement` singular | **Stale, as this ADR says.** Now `kyc.triggers`, an array | [ADR-021](#) |
+| `win_days.required_count: 5` | **NOT STALE.** It is Core EOD's frozen value | [M01 Appendix A.1](plans/M01-rules-engine.md), source constitution 0.4 |
+| `phase_eval.min_trading_days: 1` | **NOT STALE.** Also Core EOD's frozen value, and CV-04 requires `>= 1` | [M01 Appendix A.1](plans/M01-rules-engine.md), CV-04 |
+
+**The error was a plan mix-up and it would have been a money-path one.** `w = 3` is **Merit Rapid's** win-day count ([ADR-018](#)), not Core EOD's. The section 11 example was never a Merit Rapid example: its `cadence_gap_trading_days: 5`, `cap_bp: 300` and `split_bp: 9000` are Core EOD's throughout. **Editing those two values to match this list would have published Merit Rapid's cadence on Core EOD's contract**, which changes the plan's per-cycle extraction rate and its liability profile while leaving every other number in the example correct and therefore reassuring.
+
+**Why this is an amendment and not a quiet fix.** An ADR that instructs a future session to change two correct parameters is a landmine that fires the second time somebody follows it. It is corrected in place, here, with its provenance, for the same reason [ADR-027](#) was reversed on the record rather than repaired: a corpus that quietly fixes a bad instruction teaches nobody what the bad instruction looked like.
+
+
+---
+
+## ADR-031: The published statistic is `bigint` with a unit, and its no-floats exemption is retired  (2026-08-14, status: accepted)
+
+- **Context:** `published_statistics.value_numeric` was one of three columns on the [DELTA_MANIFEST section 9](../packages/db/DELTA_MANIFEST.md) no-floats exemption list, authorized on the reading that a published rate is not expressible as an integer. The fold recorded a note against it rather than acting: removing an authorized exemption is not a call to make without asking. This is the answer.
+- **Decision:** **`value_numeric numeric` becomes `value bigint`, with a mandatory `value_unit`.** Its exemption is retired. The remaining exemption set is `correlation_groups.statistic` and `correlation_groups.threshold`, and **`0027`'s `DO` block now asserts exactly those two, in both directions.**
+
+### Why the exemption did not survive inspection
+
+**All seven ruled statistics are exactly representable as integers under conventions the corpus already fixed**, so the exemption bought nothing:
+
+| Statistics | Figure | Integer form |
+|---|---|---|
+| ST-01, ST-02, ST-07 | rates | **integer basis points**, the unit the constitution already uses for every ratio |
+| ST-03, ST-04 | money | **integer cents** |
+| ST-05, ST-06 | durations | **whole seconds** |
+
+**The cents case is the one that decided it.** For ST-03 and ST-04 this column holds **money on a public surface**, and [DATA_MODEL section 1](architecture/DATA_MODEL.md) says money is `bigint` integer cents, never `numeric` and never a float. It does not stop being money because it is being published. **An authorized exemption that covers a money column is not an exemption, it is a hole with a ruling attached**, and the ruling makes it harder to see rather than easier.
+
+### The rename is the point, not tidiness
+
+**`value_numeric` holding a `bigint` would be a lie that survives every grep a future reader runs.** A column name that describes a type it no longer has is worse than no name at all, because it is confidently wrong. The column is **`value`**.
+
+### One vocabulary, and it is a type
+
+`value_unit` and `numerator_unit` are both **`statistic_unit`**, a shared enum: `count`, `bp`, `cents`, `duration_seconds`.
+
+**Two `text` columns with two `CHECK` lists would have been two vocabularies for one concept, and two vocabularies for one concept is how they drift.** A later migration widens one, nobody widens the other, and a published figure and its own numerator begin disagreeing about what a number means on a surface Merit cannot restate quietly. A shared type makes the drift impossible rather than unlikely.
+
+**`bp` never legitimately appears as a numerator unit** (a numerator is a count, a sum of cents, or an elapsed duration; the rate is what division produces). It is in the shared type anyway, because the alternative is a second type existing only to omit one value, which is the thing being prevented.
+
+- **Consequences:** `0001` gains `statistic_unit`; `0021` carries `value`, `value_unit`, and `numerator_unit` retyped from `text` + `CHECK`; `published_statistics_value_has_unit` is added, and `published_statistics_value_or_suppression` now requires the unit alongside the value. `0027`'s exemption list drops to two entries. [DATA_MODEL](architecture/DATA_MODEL.md) and [DELTA_MANIFEST](../packages/db/DELTA_MANIFEST.md) section 9 are amended, and `SD-M12-02`'s column list in [M12](plans/M12-transparency-platform.md) is amended. **The publisher must now round to the unit at computation time**, which is where the choice belongs: a rounding decision made by a column type is a decision nobody made.
+- **Alternatives considered:** keep `numeric` for rates only and split the column in two (rejected: a nullable-pair value column is a discriminator wearing a disguise, and it does not fix the cents case, which is the one that matters); keep the exemption and add `value_unit` alone (rejected: the unit does not make `numeric` money-safe); **also convert `correlation_groups.statistic` and `.threshold` and empty the list entirely (rejected at this gate by the founder). Rho is not money, it is not a ratio of two integers Merit controls, and the threshold must share the type of the statistic it is compared against.** **The rounding is not harmless there, which is exactly the difference from the column that left: a plain integer rho of `0.30` is `0`, and `rho = 0.30` is the reserve-critical figure.** The risk engine shows mean monthly payouts flat near $45.3K across every correlation level while CVaR99 nearly doubles from $84.8K at `rho = 0.05` to $132.9K at `rho = 0.30`; an integer cast erases the entire range the tail lives in. Reversing this is a risk-path change and needs its own ADR. The property worth stating is not that the list is short: **it is that no money-bearing column is on it.**
+
+## ADR-032: `measure` on `published_statistics`, and the pair invariant as DDL  (2026-08-14, status: accepted)
+
+- **Context:** **OI-02**, carried out of the schema-delta fold unresolved because it changes what a published, append-only, publicly restated row *is*. **Three of the seven ruled statistics publish two figures at once:** ST-04 mean **and** median, ST-05 p50 **and** p95, ST-06 p50 **and** p95. Two rows for one statistic, window and grain collided on `published_statistics_window_uq`, and no column said which figure a row carried. **The second figure was unwritable.**
+- **Decision:** **add `measure` (`statistic_measure`: `rate`, `total`, `mean`, `median`, `p50`, `p95`, `count`) to `published_statistics` and to the window unique key**, and add a **deferred constraint trigger, STAT-C1**, asserting that a publish run emitting one measure for a `stat_code` emits **every measure that statistic's definition declares**. `statistic_definitions` gains **`measures`**, the declared set.
+
+### The rejected alternative, recorded because it is the one that looks cheaper
+
+**Separate `stat_code`s per figure: `ST-04-mean` and `ST-04-median`, `ST-05-p50` and `ST-05-p95`.** It needs **no schema change at all**, which is exactly why it has to be rejected in writing rather than passed over.
+
+**It is worse, and the reason is not aesthetic. It makes the pair independently publishable, and [M12](plans/M12-statistic-definitions.md) forbids precisely that.** ST-04's ruling is that mean and median publish together and **"neither is published alone"**; ST-05 and ST-06 are **"published as a pair on the same surface"**. Under separate codes, publishing `ST-04-mean` and not `ST-04-median` is not a violation the schema can even describe: they are two statistics, and a firm may publish one statistic and not another. **The modelling choice would delete the invariant by making it unstateable**, and it would do so while looking like the conservative option because it touches nothing.
+
+A mean without its median is the specific distortion M12 exists to prevent: **a mean is the number one large payout inflates, and a median alone hides that large payouts happen at all.** That is a claim about a pair, so the pair must be one object in the schema.
+
+### Why the column is not enough, and the trigger is the ruling
+
+**`measure` makes the second row WRITABLE. It does nothing to make it REQUIRED.** A run that emits ST-04's mean and never emits its median satisfies every constraint on the table and publishes exactly the forbidden thing.
+
+**STAT-C1 converts "neither is published alone" from prose into DDL.** It is a **deferred constraint trigger in `0027`, the same shape and the same file as the ledger zero-sum check**, for the same two reasons: it is a **multi-row invariant** that only holds once the run's transaction has written all its rows, and it must fail at write rather than be discovered later by a job. **`published_statistics` is append-only and publicly restated: a missing median is not a bug that gets fixed, it is a number Merit published and must restate in public.**
+
+STAT-C1 also rejects a measure the definition does not declare, and a row whose `(stat_code, definition_version)` has no definition at all. **A published figure whose definition does not exist is unverifiable by the reader**, which is the condition M12 exists to remove.
+
+**Scope: original publications, `restatement_of IS NULL`.** A restatement of one measure is legitimate and is **not** publishing it alone, because its pair is already published and still standing. Requiring the full set on a correction would mean Merit could not fix a mean without restating a median that was right.
+
+### The empty set, which the first draft of the constraint admitted
+
+`statistic_definitions.measures` is `NOT NULL`, non-empty, and duplicate-free. The non-empty check was first written `array_length(measures, 1) >= 1`. **`array_length` on an empty array returns `NULL`, `NULL >= 1` is `NULL`, and a `CHECK` evaluating to `NULL` passes.** The obvious spelling admitted the one value it existed to reject, and **an empty declared set makes STAT-C1 vacuous**: a statistic could publish nothing and satisfy "every measure it declares". It is `cardinality(measures) >= 1`. **It was caught by testing the constraint, not by reading it**, which is the argument for testing every invariant against the database rather than reviewing its text.
+
+- **Consequences:** amends **approved `SD-M12-02`** and **touches the immutability contract on a public surface**, which is why this is an ADR and not a commit. `0001` gains `statistic_measure`; `0021` gains `published_statistics.measure`, `statistic_definitions.measures`, the two declaration checks and the `measures_are_distinct` helper, and `published_statistics_window_uq` gains `measure`; `0027` gains STAT-C1. [M12](plans/M12-transparency-platform.md) and [M12-statistic-definitions](plans/M12-statistic-definitions.md) carry the declared measure set per statistic. **OI-02 is closed.** The nightly run must now write a statistic's figures in **one transaction**, which it already did and which is now enforced.
+- **Alternatives considered:** separate `stat_code`s per figure (**rejected above, on the record**); a `figures jsonb` column holding both (rejected: it makes the pair one row and the invariant trivial, at the cost of every figure losing its own `numerator`, `denominator`, `sample_size` and suppression state, which is the reader-checkability M12 is built on); enforcing completeness in the publisher's application code (rejected: the control has to survive a second publisher, and this surface cannot be corrected quietly); a non-deferred trigger (rejected: it fails on the first row of every correct run).
