@@ -373,3 +373,18 @@ This closes a gap that has been load bearing since [ADR-015](#adr-015-plan-param
 The path is referenced from [ADR-015](#adr-015-plan-parameters-come-from-the-founders-lifecycle-simulation-funded-minimum-trading-days-is-zero--2026-08-13-status-accepted), [ADR-018](#adr-018-merit-rapid-requires-3-win-days--2026-08-14-status-accepted), and [SIMULATION_HARNESS](testing/SIMULATION_HARNESS.md), which Wave 4 writes against it.
 
 **Status as of 2026-08-14: the files are not yet in the repository.** `research/calibration/` does not exist; the founder is uploading them. Every reference already points at that path, which is deliberate, because the path is the contract and the citations should not have to be rewritten when the artifact lands. Until then, Appendix A's parameters are sourced to the model **by citation rather than by diff**, and that is precisely the gap committing them closes. Tracked in [STATE](STATE.md).
+
+---
+
+# Parameter status: launch candidates versus structural rulings (founder ruling, 2026-08-14)
+
+Recorded here as well as in [STATE](STATE.md) and [M01 Appendix A.0](plans/M01-rules-engine.md) because twelve module plans are about to cite it, and a ruling that binds a whole wave needs one stable anchor rather than a sentence people remember differently.
+
+**Every plan parameter is a versioned-config launch candidate.** Prices, caps, win-day counts, consistency ratios, buffers, cadence gaps, splits, and ladder counts are **economically validated working values**, produced by the lifecycle simulation and intended for launch. They are **formally confirmed by the founder at the FREEZE gate** and are **tunable up to launch without an engine change**, because each is a row in `plan_version_sizes` rather than a constant in code.
+
+**Structural rulings are fixed absent a new ADR**: that universal per-payout caps exist, that the payout ladder exists and bounds lifetime extraction, [EOD semantics](GLOSSARY.md#t1) as the authoritative tier, zero denial, [ADR-014](#adr-014-the-floor-never-resets-on-settlement-the-lock-is-a-permanent-stop--2026-08-13-status-accepted)'s permanent floor lock, and [ADR-019](#adr-019-merit-wallet-two-leg-payouts-with-the-cadence-anchor-on-wallet-credit--2026-08-14-status-accepted)'s cadence anchor.
+
+**The two binding consequences for every public surface**, which is why this ruling reaches past M01:
+
+1. **A parameter is read, never copied.** Any surface that shows a number must read it at request time from the account's pinned plan version or from the published plan version, never from a literal in a template, a chart axis, a price card, or a piece of blog copy. Binding on [M09](plans/M09-marketing-site.md), [M11](plans/M11-certificates-social-proof.md), [M12](plans/M12-transparency-platform.md), [M13](plans/M13-trader-analytics-journal.md), [M17](plans/M17-offers-engine.md), and [M18](plans/M18-live-graduation-pipeline.md).
+2. **A structural ruling is never marketed as a tunable.** "Caps exist" is not a promotion and may not be offered, waived, or framed as a limited-time condition. The cap's *value* is a config; the cap's *existence* is not. Binding on [M17](plans/M17-offers-engine.md) alongside [ADR-019a](#adr-019a-the-gamification-bright-line).

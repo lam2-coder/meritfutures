@@ -6,7 +6,7 @@ last_updated: 2026-08-14
 
 # GLOSSARY
 
-Every domain term defined **once**, here. All other docs link to this file (`[win day](../GLOSSARY.md#win-day)`) rather than redefining. If a definition needs to change, it changes here and nowhere else.
+Every domain term defined **once**, here. All other docs link to this file (`[win day](GLOSSARY.md#win-day)` from a sibling in `docs/`, `[win day](../GLOSSARY.md#win-day)` from one level deeper such as `docs/plans/`) rather than redefining. If a definition needs to change, it changes here and nowhere else.
 
 Two hard conventions apply to every numeric term below:
 - **Money is integer cents.** No floats anywhere in a financial path, including examples in docs.

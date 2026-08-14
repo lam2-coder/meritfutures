@@ -39,12 +39,17 @@ The four findings raised after the batch 1 fold are closed and folded.
 3. **Conservatism is relocated, not lost.** Calibration bands are central estimates; conservatism lives in `rho = 0.30`, the regime-stress ruin scenarios, and the RCR breaker at 1.0. **`CVaR99 at rho = 0.30` is the reserve floor, never the estimate.** Codified in [DECISIONS](DECISIONS.md), [GLOSSARY](GLOSSARY.md#cvar99), [M05](plans/M05-payout-system.md), [M06](plans/M06-admin-ops-console.md), and SIMULATION_HARNESS.
 4. **The publish-time cadence check is split into two typed messages**, `PW-02a` (`info`, co-binding) and `PW-02b` (`warning`, dominated), with distinct text. [M01](plans/M01-rules-engine.md) section 2 carries the full typed table; [M03](plans/M03-billing-checkout.md) renders by severity.
 
+## Parameter status (founder ruling, 2026-08-14)
+**Every plan parameter is a versioned-config launch candidate.** Prices, caps, win days, consistency ratios, buffers, cadence gaps, splits, and ladder counts are economically validated working values, **formally confirmed at the FREEZE gate** and **tunable up to launch without an engine change**. **Structural rulings are fixed absent a new ADR**: universal caps exist, the payout ladder exists, EOD semantics are authoritative, zero denial, the permanent floor lock ([ADR-014](DECISIONS.md)), and the wallet-credit cadence anchor ([ADR-019](DECISIONS.md)).
+
+Two consequences bind every public surface: **a parameter is read at request time from the pinned plan version, never copied into a template or a chart**, and **a structural ruling is never marketed as a tunable**. Recorded in [DECISIONS](DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14) and [M01 Appendix A.0](plans/M01-rules-engine.md).
+
 ## Blocking nothing, but needs founder eyes
 Ordered by how much they change, most first.
 
 1. **`V-M2-15` is now commercial.** Fail-closed provisioning means the vendor relationship cannot support Merit's risk posture without an acknowledgement artifact or a readable risk setting. This changes what the vendor call is for, and it should be raised first on the agenda rather than as item fifteen.
 2. **ADR-020 costs roughly 2 to 4 weeks** at Wave 4, the largest single scope addition since the constitution. Recorded as a duration so it can be traded against something if the schedule tightens.
-3. **`research/calibration/mc_lifecycle.py` and the workbook are not yet in the repository.** Checked 2026-08-14: `research/calibration/` does not exist. Every reference points at that path already, so the commit is all that is outstanding. Until then, Appendix A's parameters are sourced to the model by citation rather than by diff.
+3. **`research/calibration/mc_lifecycle.py` and the workbook are not yet in the repository.** **Re-verified at the start of the batch 2 session (2026-08-14): `research/calibration/` still does not exist**, so the item stays tracked and no parameter verification against the model was possible this session. Every reference points at that path already, so the commit is all that is outstanding. Until then, Appendix A's parameters are sourced to the model by citation rather than by diff, which is exactly the standing the ruling above calls "launch candidate".
 4. Remaining commercial judgments, unchanged: OQ-M8-01 (new-affiliate reserve holdback), OQ-M8-02 (flat commission rate), OQ-M3-02 (refund window stated precisely enough to publish), OQ-M5-02 (freeze expiry, proposed 10 business days), OQ-M5-05 and OQ-M5-06 (top-up threshold, wallet-spend velocity), OQ-M6-02 (breaker minimum sample), OQ-M7-03 (severity-5 SLA).
 
 ## Provisional: pending Rithmic vendor confirmation (ADR-005)

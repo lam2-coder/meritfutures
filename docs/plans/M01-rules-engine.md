@@ -1102,6 +1102,25 @@ The consequence you need to rule on: **Rapid Daily cannot be daily under that an
 
 Materialized values, in integer cents, for the three launch plans at three sizes. **Approved at the M1 gate; every `RULING NEEDED` marker is cleared.** The `Source` column is not decoration: every published number traces to the constitution, to the founder's lifecycle simulation, or to a numbered ADR, and a number with no source is a bug in this table.
 
+### A.0 What kind of number these are (founder ruling, 2026-08-14)
+
+**Every parameter in this appendix is a versioned-config launch candidate.** Prices, caps, win-day counts, consistency ratios, buffers, cadence gaps, splits, and ladder counts are **economically validated working values**: they are the output of the lifecycle simulation and they are what Merit intends to launch with. They are **formally confirmed by the founder at the FREEZE gate** and remain **tunable up to launch without an engine change**, because every one of them is a row in `plan_version_sizes` rather than a constant in code.
+
+**What is not tunable, and the distinction is the whole point of stating this.** The **structural rulings** are fixed absent a new ADR:
+
+| Fixed absent a new ADR | Where it is ruled |
+|---|---|
+| Universal per-payout caps exist on every plan and every ordinal | constitution 0.4, CV-10 |
+| The payout ladder exists, is finite, and bounds lifetime extraction | INV-17, constitution 0.4 |
+| EOD semantics: every rule, gate, breach, and money decision is computed from closed-session data | [ADR-002](../DECISIONS.md), [ADR-020](../DECISIONS.md)'s tier boundary |
+| Zero denial: there is no code path that denies an eligible request | constitution M5, [M05 INV-M5-01](M05-payout-system.md) |
+| The floor never resets on settlement; the lock is a permanent stop | [ADR-014](../DECISIONS.md) |
+| The cadence anchor is the wallet-credit day | [ADR-019](../DECISIONS.md) |
+
+**Why this needs saying in this document rather than only in the ADR registry.** Downstream modules render these numbers to the public. [M09](M09-marketing-site.md) publishes prices and rule text, [M12](M12-transparency-platform.md) publishes computed outcomes against them, and [M17](M17-offers-engine.md) prices offers relative to them. Each of those must treat a parameter as **a config value read at request time from the account's pinned plan version**, never as a literal copied into a template, a chart, or a price card. A parameter that is tunable in the engine and hardcoded in a marketing page is the marketing-versus-implementation gap constitution 0.5 exists to prevent, and it would appear the first time a value moves.
+
+**And the converse, which matters equally.** A structural ruling may not be presented to the public as a tunable, a promotion, or a limited-time condition. "Caps exist" is not a campaign; the cap's *value* is a config. [M17](M17-offers-engine.md) is bound by this line as tightly as it is bound by [ADR-019a](../DECISIONS.md)'s gamification bright line.
+
 Sizes: 25K is 2,500,000c, 50K is 5,000,000c, 100K is 10,000,000c. Percentage-expressed rules scale by size; `min_payout_cents` never does.
 
 Three parameters are now identical across all three plans and are stated once here rather than three times below: `min_payout_cents` is 10,000 at every size ([GLOSSARY](../GLOSSARY.md#minimum-payout), CV-15), `post_payout_floor_rule.mode` is `none` ([ADR-014](../DECISIONS.md), CV-18), and funded `min_trading_days` is `0`, which disables that gate ([ADR-015](../DECISIONS.md), CV-19).
