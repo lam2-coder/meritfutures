@@ -8,9 +8,13 @@ last_updated: 2026-08-14
 
 Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never prose. Per [GLOSSARY](../GLOSSARY.md#golden-file) and constitution C10, every scenario here derives from a plan doc or an approved constitution scenario and **never** from implementation output. That rule is the whole defence against the self-grading trap: if a fixture was written by reading the code, it proves only that the code agrees with itself.
 
-**Seeded in Wave 3 by [M01](../plans/M01-rules-engine.md), and GS-001 to GS-083 approved with it at the M1 gate on 2026-08-13.** Each later module plan appends its own block and those scenarios carry that plan's status. Constitution section 5.2 requires at least 40 golden files. **GS-001 to GS-083 are M1's**, of which 67 are executable against the pure engine with zero I/O, plus 5 (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives. The numbering map below is the current total.
+**Seeded in Wave 3 by [M01](../plans/M01-rules-engine.md), and GS-001 to GS-083 approved with it at the M1 gate on 2026-08-13.** Each later module plan appends its own block and those scenarios carry that plan's status. Constitution section 5.2 requires at least 40 golden files and the registry defines **257**. **GS-001 to GS-083 are M1's**, of which 67 are executable against the pure engine with zero I/O, plus 5 (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives. The numbering map below is the current total and section 33 is the reconciliation behind it.
 
-**Five scenarios were added and four rewritten by the M1 gate rulings** ([ADR-013](../DECISIONS.md), [ADR-014](../DECISIONS.md), [ADR-015](../DECISIONS.md)). **Fourteen more were added and four rewritten by the Wave 3 batch 1 gate rulings** ([ADR-016](../DECISIONS.md) through [ADR-020](../DECISIONS.md)), bringing the registry to **141**. A golden file that pinned a behavior the founder overruled is not quietly deleted: it is rewritten to pin what was actually decided, and the row says so, because a fixture that silently changes meaning is how a suite stops being a specification.
+**Five scenarios were added and four rewritten by the M1 gate rulings** ([ADR-013](../DECISIONS.md), [ADR-014](../DECISIONS.md), [ADR-015](../DECISIONS.md)). **Fourteen more were added and four rewritten by the Wave 3 batch 1 gate rulings** ([ADR-016](../DECISIONS.md) through [ADR-020](../DECISIONS.md)). A golden file that pinned a behavior the founder overruled is not quietly deleted: it is rewritten to pin what was actually decided, and the row says so, because a fixture that silently changes meaning is how a suite stops being a specification.
+
+**Consolidated in Wave 4, and the registry now stands at 257** (section 33 carries the full reconciliation, the ownership partition, and the coverage map). Four things were repaired in that pass and each is worth naming, because a registry whose defects are fixed silently is a registry nobody can trust the next count from. **The section numbering was duplicated at 25, 26 and 27** and is now contiguous through 33. **Section 6's stated range said GS-071 to GS-083 while its table ended at GS-078**, which overlapped section 7. **GS-139 to GS-141 were listed out of order.** And **GS-206 through GS-209 were claimed by two different blocks at once**, the M18 graduation scenarios and the addendum's verification-UX scenarios; the verification-UX pair is renumbered to GS-256 and GS-257, and the collision note stays in section 28 rather than being erased.
+
+**Two blocks were added in the same pass.** GS-246 to GS-255 are the **Appendix D0 attack battery**, discharging the obligation [SECURITY section 9](../architecture/SECURITY.md) recorded for Wave 4. GS-243 to GS-245 carry [ADR-025](../DECISIONS.md#adr-025-progressive-cap-release-is-rejected-for-v1-and-replaced-with-cross-account-loyalty--2026-08-14-status-accepted).
 
 **GS-055 is the one to read if you read only one row of that rewrite.** It pinned the extraction ceiling under the settlement anchor and carried the basis-anchored case as an expected-to-fail counterfactual. [ADR-019](../DECISIONS.md) made the counterfactual live, so the fixture now pins the opposite direction. That is exactly the situation this file's rule about rewriting rather than deleting exists for: the number changed because a decision changed, and both the number and the decision are on the record.
 
@@ -46,6 +50,8 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 | GS-232 to GS-239 | Scenarios created by the consolidated founder addendum: the composite KYC trigger set, the three identity-defense tiers, checkout enrichment | mixed, listed per row |
 | GS-240 to GS-242 | Scenarios created by [ADR-024](../DECISIONS.md): the ladder and invitation separation, the shortened lifetime bound, percent-of-size scaling | M1, M18 |
 | GS-243 to GS-245 | Scenarios created by [ADR-025](../DECISIONS.md#adr-025-progressive-cap-release-is-rejected-for-v1-and-replaced-with-cross-account-loyalty--2026-08-14-status-accepted): bound invariance across loyalty state, perk exclusion under review, loyalty credit provenance | M14 |
+| GS-246 to GS-255 | The Appendix D0 attack battery, `GS-(245 + n)` maps to D0 item `n` | mixed, listed per row |
+| GS-256 to GS-257 | Verification UX: mid-flow resumption, milestone-not-accusation copy | M19 |
 
 ## 2. Fixture format
 
@@ -172,7 +178,7 @@ Plan shorthand resolves to [M01 Appendix A](../plans/M01-rules-engine.md), which
 | GS-069 | Adding profit on the best day breaks a passing consistency gate | AS-13, novel | The monotonicity counterexample. Eligibility is **not** monotone in profit, contrary to constitution section 5.1's phrasing, and the fixture is the proof |
 | GS-070 | Funded start balance does not equal size | AS-14, novel | A platform that fails to reset the funded account produces a first funded mark whose opening balance is not `size_cents`. The engine refuses the day and raises reconciliation rather than computing on it |
 
-## 6. GS-071 to GS-083: replay, upgrade, and config validation (M1)
+## 6. GS-071 to GS-078: replay, upgrade, and config validation (M1)
 
 | ID | Name | Pins |
 |---|---|---|
@@ -308,8 +314,8 @@ Defined by the rulings recorded in [DECISIONS.md](../DECISIONS.md#wave-3-batch-1
 | GS-137 | Copy trading, allowed and prohibited | M7 | Same-identity clustering across a trader's own accounts is **filtered at the detector** and raises nothing at all. Identical clustering across two identities raises a flag whose evidence is the conduct and the ToS clause, never a correlation coefficient. Pins the clause from the batch 1 gate and pins the removal of D-01's largest benign-noise source |
 | GS-138 | An account with an unconfirmed setpoint cannot trade | M2 | Provisioning completes, `set_risk` returns no acknowledgement and no read-back succeeds, and the account is held out of trading entirely rather than surfaced as carried liability. Pins fail-closed provisioning as design law, and pins that the failure is a visible bounded outage rather than a silent unprotected account. AS-M2-03 |
 | GS-139 | A ledger imbalance scopes only when locality is proven | M5 | An imbalance attributable to exactly one identity halts that identity's payouts, **pages immediately**, and starts the escalation clock; on expiry it escalates to a global halt. An imbalance spanning identities, one with ambiguous attribution, and one traceable to no transaction all halt **globally** on the spot. Pins the classifier proving locality before granting it. [ADR-016](../DECISIONS.md), extends GS-110 |
-| GS-141 | The publish diff types co-binding apart from dominated | M1, M3 | Publishing all three v1 plans emits **`PW-02a` as `info`** on Core EOD and Direct (gap and win days tie at 5, both load bearing) and **`PW-02b` as `warning`** on Merit Rapid (gap of 1 against 3 win days, can never bind), with distinct text. Asserts the two are never rendered identically, because three identical warnings per publish, two of them false positives, is how a founder learns to approve a diff without reading it. [M01](../plans/M01-rules-engine.md) section 2, EC-049 |
 | GS-140 | An affiliate destination change enters the 48 hour cooling window | M8, M5 | The change is accepted, does not take effect today, notifies the contact already on file, and is refused settlement inside the window, identically to a trader destination change. Pins one rail as one control, including on the path an attacker would reach through a compromised affiliate account. [ADR-017](../DECISIONS.md), pairs with GS-104 and GS-127 |
+| GS-141 | The publish diff types co-binding apart from dominated | M1, M3 | Publishing all three v1 plans emits **`PW-02a` as `info`** on Core EOD and Direct (gap and win days tie at 5, both load bearing) and **`PW-02b` as `warning`** on Merit Rapid (gap of 1 against 3 win days, can never bind), with distinct text. Asserts the two are never rendered identically, because three identical warnings per publish, two of them false positives, is how a founder learns to approve a diff without reading it. [M01](../plans/M01-rules-engine.md) section 2, EC-049 |
 
 ## 16. GS-142 to GS-148: marketing site (M9)
 
@@ -437,9 +443,9 @@ Defined by [M17](../plans/M17-offers-engine.md) section 8.2. The module's govern
 | GS-203 | Credit granted, spent, then the funding purchase charged back | The grant revokes, the promotional balance goes **negative**, further credit spend blocks, and settlement follows the existing chargeback path. Asserts that a credit must know what paid for it or a stolen card buys two extractions. AS-M17-06, EC-120, pairs with GS-039 |
 | GS-204 | An experiment proposed with a rule-varying arm | **Unrepresentable**: `varies` has no such value, so the experiment cannot be written down. Asserts the line that Merit experiments on what it charges and how it explains itself, never on what it enforces. AS-M17-07 |
 
-## 25. GS-205 to GS-211: live-graduation pipeline (M18)
+## 25. GS-205 to GS-211: graduation track (M18)
 
-Defined by [M18](../plans/M18-graduation-track.md) section 8.2. Almost every failure in this module is a promise rather than a computation, so most of these are disclosure fixtures.
+Defined by [M18](../plans/M18-graduation-track.md) section 8.2. **The module was renamed from "live-graduation pipeline" to "graduation track" at the batch 2 gate**, and this heading follows it, because a section named for a pipeline to a program that does not exist is the marketing-versus-implementation gap committed in a table of contents. Almost every failure in this module is a promise rather than a computation, so most of these are disclosure fixtures.
 
 | ID | Name | Pins |
 |---|---|---|
@@ -485,9 +491,7 @@ Defined by [M20](../plans/M20-wallet.md) section 8.2. The wallet has two exits a
 | GS-230 | Simultaneous withdrawal and checkout spend against one balance | Exactly one succeeds where the balance covers only one, and the position never goes negative. Pins the concurrency case created by having two exits from one integer. INV-M20-01 |
 | GS-231 | Per-identity reconciliation against a globally balanced ledger | The per-identity assertion **fails and pages** even though the global sum is zero. Asserts that the wallet is where a per-identity error would hide, which a global zero-sum check cannot see. INV-M20-10, [ADR-016](../DECISIONS.md) |
 
-## 28. What is not here yet
-
-## 25. GS-232 to GS-239: the consolidated founder addendum
+## 28. GS-232 to GS-239: the consolidated founder addendum
 
 Added by [ADR-021](../DECISIONS.md), [ADR-022](../DECISIONS.md), and [ADR-023](../DECISIONS.md). Per ADR-022's condition, **each identity-defense tier carries its own scenarios**, so a defense promoted from one tier to the next arrives with the fixture proving it does what the tier above assumed.
 
@@ -502,9 +506,9 @@ Added by [ADR-021](../DECISIONS.md), [ADR-022](../DECISIONS.md), and [ADR-023](.
 | GS-238 | **v1.x tier:** graph explorer packs are audience-scoped | A trader-facing pack generated from a cluster node contains conduct, rule text, and own trades, and **contains no weight, threshold, or detector internal**. The two-tier rule applied to the richest surface that exists |
 | GS-239 | Enrichment failure never blocks checkout | The enrichment call times out; in observe mode the purchase completes, and in enforcement mode it **fails open** and completes. Asserts a fraud signal can never become an outage. [ADR-023](../DECISIONS.md) |
 
-Plus two scenarios owned by the verification UX ruling, listed here because their module rows already cite them: **GS-206** (a verification abandoned mid-flow resumes cleanly at the step where it stopped) and **GS-207 to GS-209**, superseded by GS-235 to GS-238 above and retained as their module-side references.
+**A numbering collision is corrected here, 2026-08-14.** This block previously claimed GS-206 and GS-207 to GS-209 for the addendum's verification-UX ruling. **Those numbers belong to [M18](../plans/M18-graduation-track.md)** (the final ladder ordinal, the unresolved correlation signal at graduation, and the vault display), and citing them twice meant two different fixtures answered to one id, which is the failure mode a numbered registry exists to make impossible. The verification-UX scenarios are renumbered to **GS-256 and GS-257**, section 32. The identity-defense tier scenarios are **GS-235 to GS-238** in the table above and were never separately numbered.
 
-## 26. GS-240 to GS-242: the ladder and invitation separation
+## 29. GS-240 to GS-242: the ladder and invitation separation
 
 [ADR-024](../DECISIONS.md).
 
@@ -514,7 +518,7 @@ Plus two scenarios owned by the verification UX ruling, listed here because thei
 | GS-241 | INV-17's bound at the shortened ladder | No sequence of settlements exceeds `5 * max cap`. At Core EOD 50K that is 750,000c gross and 675,000c to the trader; at Merit Rapid 500,000c and 450,000c. Replaces the 8-rung expectations in GS-067's neighbourhood |
 | GS-242 | Percent-of-size scaling holds at 150K | Every bp-expressed parameter derives correctly at 15,000,000c, and `min_payout_cents` does **not** scale. Pins that adding a size is a row rather than a redesign ([ADR-024](../DECISIONS.md)) |
 
-## 27. GS-243 to GS-245: the cap-release rejection and cross-account loyalty (M14)
+## 30. GS-243 to GS-245: the cap-release rejection and cross-account loyalty (M14)
 
 [ADR-025](../DECISIONS.md#adr-025-progressive-cap-release-is-rejected-for-v1-and-replaced-with-cross-account-loyalty--2026-08-14-status-accepted). GS-179 above is rewritten by the same ruling and stays where it is.
 
@@ -524,4 +528,124 @@ Plus two scenarios owned by the verification UX ruling, listed here because thei
 | GS-244 | An identity completes its Nth ladder while under an open severity 4+ flag | The **milestone is earned and recorded**; **no perk is issued** while the exclusion holds, evaluated at computation and again at issuance; and the milestone is **not revoked** when the review closes, because the fact is true. Pins that a loyalty program which withholds a reward and a loyalty program which erases an achievement are different products. AS-M14-08, EC-139 |
 | GS-245 | Loyalty bonus credit funds an evaluation that passes and pays out | The credit posts as `promotional_credit` and **never** as `trader_wallet`; the resulting payout credits the wallet normally; and the first withdrawal containing that value is **held for review** under [M20](../plans/M20-wallet.md)'s P-1. Pins that loyalty is a new **source** of promotional credit and deliberately not a new **class** of it, so it inherits an existing control rather than needing one. AS-M14-08, EC-139, extends GS-222 |
 
-**Wave 3 batch 2 added GS-142 to GS-231, the consolidated addendum added GS-232 to GS-239, ADR-024 added GS-240 to GS-242, and [ADR-025](../DECISIONS.md#adr-025-progressive-cap-release-is-rejected-for-v1-and-replaced-with-cross-account-loyalty--2026-08-14-status-accepted) added GS-243 to GS-245**, taking the registry to **245**. Scenarios owned by M9 through M20 are numbered above where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
+## 31. GS-246 to GS-255: the Appendix D0 attack battery
+
+[SECURITY section 9](../architecture/SECURITY.md) records that the ten `D0` scenarios specified in [SECURITY_LANDSCAPE section 4](../../research/SECURITY_LANDSCAPE.md) "become numbered entries in `docs/testing/GOLDEN_SCENARIOS.md` during Wave 4". **This is that block, and it discharges the obligation.**
+
+`GS-(245 + n)` is `D0-n`, the same mnemonic the B4 battery uses at `GS-(029 + n)`, so the mapping never needs looking up.
+
+**Four of these extend an existing fixture rather than duplicating one, and the rows say which.** That is the honest form of deduplication here: each `D0` item is a distinct attack with its own expected behavior, and the fixture it pairs with covers a neighbouring case. Collapsing them would lose the attack; numbering them without stating the pairing would double-count the coverage in a table people read as a coverage report.
+
+| ID | D0 | Scenario | Owner | Pins |
+|---|---|---|---|---|
+| GS-246 | 1 | Credential-stuffing storm: 50,000 login attempts across 5,000 emails in ten minutes | M4, SEC | **Passwordless has nothing to stuff.** The OTP endpoint rate-limits per IP **and** per identity, Turnstile engages, **no legitimate user is locked out** (an account-lockout policy would convert this into a denial-of-service on the whole trader base), and the burst alarms. Models the June 2025 industry event directly, which is the single most documented attack against trader dashboards |
+| GS-247 | 2 | IDOR sweep: an authenticated trader enumerates accounts, marks, timelines, and payouts they do not own | M4, M5 | Every cross-owner request resolves to **`404` rather than `403`**, so existence is never confirmed to a stranger (the M1 gate ruling), and **zero object properties leak** in any error body. Pairs with VG-5's per-resource negative test, which proves the tests exist; this fixture proves the sweep finds nothing |
+| GS-248 | 3 | Payout destination swap from a hijacked session, then a payout request | M4, M5, M19 | Extends GS-104, GS-131, and GS-217 into one end-to-end attack chain: the destination change enters its **48 hour cooling window**, the payout is refused inside it, the contact already on file is notified, the out-of-hours and geo anomaly alarms fire, and a name mismatch against the verified identity freezes rather than pays. Pins that the four controls compose, which testing them separately never shows |
+| GS-249 | 4 | Forged settlement webhook, plus a valid one replayed 50 times | M5 | **Signature verification rejects the forgery** and the timestamp-and-nonce window rejects the replays. Extends GS-037, which pins that 50 replays of a *valid* event produce one settlement; this fixture adds the case where the event was never ours |
+| GS-250 | 5 | Spoofed PSP `payment.success` for an order that was never paid | M3 | HMAC verification **fails closed**, no account is provisioned, and the alarm fires. Extends GS-099 (a webhook citing an unknown purchase reference) with the signature half, and pairs with GS-038, which pins that a *legitimate* duplicate and out-of-order delivery still resolves to one correct state |
+| GS-251 | 6 | A trader-scoped token calls admin routes and the internal batch trigger | M6 | Refused server side; **the admin origin refuses a non-allowlisted IP even with a valid credential**, so the two controls are independent rather than layered on one check. Pins that role enforcement never depends on the client having hidden a button |
+| GS-252 | 7 | A compromised operator credential edits a live plan version's cap, split, or gap | M3, M6 | **Dual control blocks a single-actor change** ([ADR-010](../DECISIONS.md)), the edit creates a **new version** so existing accounts are untouched (B4 #12, GS-041), and every cap, split, or gap edit audits and alarms. Pairs with GS-184, which pins the same protection against a *service* rather than a person, and with GS-179, which pins that no second cap step exists to reach for |
+| GS-253 | 8 | Mass redemption of a single-use code across tabs and bots, with client-set price fields probed in the same run | M3, M17 | The unique index decides one winner (extends GS-040), **pricing is resolved server side from the plan version and the offer** so a client-supplied amount changes nothing (extends GS-200), `max_redemptions` caps the spread (extends GS-202), and the velocity throttle plus Turnstile engage. One fixture because the attacker runs it as one script |
+| GS-254 | 9 | An admin or affiliate field accepting a URL is set to an internal metadata address | M8, M10 | The **egress allowlist refuses internal hosts** and no user-supplied host is fetched server side, ever. Pins the general rule rather than the instance: a URL a user can set is a request Merit's network makes on their behalf |
+| GS-255 | 10 | `/docs`, `/openapi.json`, `/swagger`, and undocumented internal routes requested from the public origin | INFRA | `401` or `404` against the **production build**, asserted in CI rather than in a checklist, and internal routes are unreachable off the admin origin rather than merely unlinked. This is the one D0 item already wired as a build gate (CI-07) as well as a fixture |
+
+## 32. GS-256 to GS-257: verification UX (M19)
+
+Owned by the consolidated addendum's verification-UX ruling and **renumbered here from the M18 range they collided with**, per the note in section 28.
+
+| ID | Scenario | Pins |
+|---|---|---|
+| GS-256 | A verification is abandoned mid-flow and resumed later | The trader **resumes at the step where they stopped** rather than restarting, no second provider applicant is created, and the abandonment is recorded as a funnel event with its step. Pins that the identity gate is a process the trader is walked through rather than an exam they can fail by closing a tab, and it is what makes GS-219's drop-off measurement describe a real population |
+| GS-257 | Every verification surface is rendered and linted | The copy frames verification as a **milestone**, not an accusation: no failure language, no implication of suspicion, the trigger that fired is named in plain words, and what happens next is stated with a time. Asserts that a control which lands on honest traders and fraudsters identically must read as routine to the honest ones, which is the whole reason [ADR-021](../DECISIONS.md) moved friction upstream instead of to payout time. Pairs with GS-214 and GS-216, which pin that the scoring behind it does not accuse either |
+
+## 33. Ownership index and coverage reconciliation
+
+### 33.1 Scenarios by primary owner
+
+**Every scenario has exactly one primary owner and this table is a partition**, so the counts sum to the registry total rather than to something larger. That is the property that makes the table checkable: a co-ownership table would double-count, and a coverage figure nobody can add up is a coverage figure nobody should quote. Co-owned scenarios are listed in 33.2, and each such row in its own section already says which assertion belongs to which module.
+
+| Primary owner | Scenarios | Count |
+|---|---|---|
+| **M1 rules engine** | GS-001 to GS-032, GS-034 to GS-035, GS-042, GS-044, GS-047, GS-049, GS-052 to GS-083, GS-141, GS-241 to GS-242 | 73 |
+| **M2 Rithmic bridge** | GS-033, GS-043, GS-084 to GS-093, GS-138 | 13 |
+| **M3 billing and checkout** | GS-038 to GS-041, GS-094 to GS-099, GS-239, GS-250, GS-252 | 13 |
+| **M4 trader portal** | GS-100 to GS-105, GS-132 to GS-133, GS-246 to GS-247 | 10 |
+| **M5 payout system** | GS-036 to GS-037, GS-048, GS-051, GS-106 to GS-111, GS-128 to GS-129, GS-131, GS-139, GS-248 to GS-249 | 16 |
+| **M6 admin and ops console** | GS-112 to GS-117, GS-130, GS-251 | 8 |
+| **M7 risk and abuse** | GS-046, GS-050, GS-118 to GS-122, GS-134 to GS-137, GS-235 to GS-238 | 15 |
+| **M8 affiliate system** | GS-045, GS-123 to GS-127, GS-140 | 7 |
+| **M9 marketing site** | GS-142 to GS-148 | 7 |
+| **M10 integrations** | GS-149 to GS-154, GS-254 | 7 |
+| **M11 certificates and social proof** | GS-155 to GS-161 | 7 |
+| **M12 transparency platform** | GS-162 to GS-171 | 10 |
+| **M13 analytics and journal** | GS-172 to GS-178 | 7 |
+| **M14 loyalty and retention** | GS-179 to GS-185, GS-243 to GS-245 | 10 |
+| **M15 Discord integration** | GS-186 to GS-191 | 6 |
+| **M16 notification center** | GS-192 to GS-197 | 6 |
+| **M17 offers engine** | GS-198 to GS-204, GS-253 | 8 |
+| **M18 graduation track** | GS-205 to GS-211, GS-240 | 8 |
+| **M19 KYC and identity** | GS-212 to GS-221, GS-232 to GS-234, GS-256 to GS-257 | 15 |
+| **M20 Merit Wallet** | GS-222 to GS-231 | 10 |
+| **INFRA and cross-cutting** | GS-255 | 1 |
+| | | **257** |
+
+**Numbering is contiguous from GS-001 to GS-257 with no gaps and no duplicates**, which CI-06d asserts on every push ([STRATEGY](STRATEGY.md) section 4.4). The count in this file's closing line, the count quoted in [STATE](../STATE.md), the sum of the column above, and the number of rows across sections 3 to 32 are the same number or the build fails.
+
+### 33.2 Co-owned scenarios
+
+These carry an assertion in more than one module's suite. The primary owner in 33.1 is the module that owns the fixture; the participants own an assertion inside it.
+
+| Scenario | Primary | Participants |
+|---|---|---|
+| GS-034 backdated correction for a closed day | M1 | M2 |
+| GS-035 payout at 23:59:59 versus the batch | M1 | M5 |
+| GS-039 chargeback after a settled payout | M3 | M5 |
+| GS-041 plan v2 published while checkout is open on v1 | M3 | M1 |
+| GS-047 batch crash at account 2,341 | M1 | M2 |
+| GS-050 six-account hedged syndicate rehearsal | M7 | M1 |
+| GS-131 account takeover against a funded wallet | M5 | M4 |
+| GS-132 indicative data never reaches a money decision | M4 | M6, M2 |
+| GS-133 streaming feed loss degrades to last closed | M4 | M2 |
+| GS-140 affiliate destination cooling window | M8 | M5 |
+| GS-141 the publish diff types co-binding apart from dominated | M1 | M3 |
+| GS-248 destination swap from a hijacked session | M5 | M4, M19 |
+| GS-252 compromised operator edits a live plan version | M3 | M6 |
+| GS-253 mass coupon redemption with price probing | M3 | M17 |
+
+### 33.2 How the registry reached 257
+
+| Source | Range | Added | Running total |
+|---|---|---|---|
+| M01, seeded in Wave 3 and approved at the M1 gate | GS-001 to GS-078 | 78 | 78 |
+| M1 gate rulings ([ADR-013](../DECISIONS.md) to [ADR-015](../DECISIONS.md)) | GS-079 to GS-083 | 5 | 83 |
+| Wave 3 batch 1 module plans (M02 to M08) | GS-084 to GS-127 | 44 | 127 |
+| Wave 3 batch 1 gate rulings ([ADR-016](../DECISIONS.md) to [ADR-020](../DECISIONS.md)) | GS-128 to GS-141 | 14 | 141 |
+| Wave 3 batch 2 module plans (M09 to M20) | GS-142 to GS-231 | 90 | 231 |
+| Consolidated founder addendum ([ADR-021](../DECISIONS.md) to [ADR-023](../DECISIONS.md)) | GS-232 to GS-239 | 8 | 239 |
+| [ADR-024](../DECISIONS.md), ladder and invitation separation | GS-240 to GS-242 | 3 | 242 |
+| [ADR-025](../DECISIONS.md#adr-025-progressive-cap-release-is-rejected-for-v1-and-replaced-with-cross-account-loyalty--2026-08-14-status-accepted), cap-release rejection | GS-243 to GS-245 | 3 | 245 |
+| **Wave 4: the Appendix D0 attack battery** | GS-246 to GS-255 | 10 | 255 |
+| **Wave 4: verification UX, renumbered out of a collision** | GS-256 to GS-257 | 2 | **257** |
+
+**The registry was quoted at 242 going into Wave 4 and stands at 257 leaving it.** The fifteen are not scope creep: ten discharge an obligation [SECURITY](../architecture/SECURITY.md) recorded for this wave, three carry a founder ruling, and two fix a collision in which one number answered to two fixtures.
+
+### 33.3 Constitution and research coverage
+
+| Source battery | Where it lands | Complete |
+|---|---|---|
+| Appendix B4, 22 evil-brain scenarios | GS-030 to GS-051, `GS-(029 + n)` is B4 item `n` | yes |
+| Appendix D0, 10 attack scenarios | GS-246 to GS-255, `GS-(245 + n)` is D0 item `n` | yes |
+| Appendix A adversary taxonomy, 9 schemes | Distributed across M7 (GS-118 to GS-122, GS-134 to GS-137), M19 (GS-212 to GS-221), M20 (GS-222 to GS-231), and M1's adversarial set (GS-052 to GS-070) | yes |
+| Constitution section 5.2's named examples | GS-020, GS-028, GS-041, GS-050, GS-059, GS-063, GS-065, GS-082 | yes |
+| Section 5.2's minimum of 40 golden files | 257 defined | yes |
+
+### 33.4 What is not here yet, and why
+
+Three deliberate absences, each recorded so it reads as a decision rather than a gap.
+
+1. **No fixture exists for the live-graduation program.** [OQ-M18-01](../DECISIONS.md) ruled that no live program exists at launch and that zero live-program copy is written until counsel rules. A fixture pinning behavior for a program that does not exist would be the marketing-versus-implementation gap arriving through the test suite, which is the one direction nobody watches.
+2. **No fixture pins the vendor's real file format.** GS-084 pins that the simulator and a vendor file traverse the identical parser, which is the strongest assertion available before the [Rithmic vendor call](../STATE.md) happens. Sixteen `V-M2-nn` items are its agenda, and fixtures written against a guessed format would be a specification of the guess.
+3. **The v1.x and post-launch identity-defense tiers carry fixtures that cannot yet run.** GS-237 and GS-238 describe the signal-weight table and the graph explorer, and [ADR-022](../DECISIONS.md) requires each tier to arrive with the fixture proving it does what the tier above assumed. They are written now and executed when the tier ships, which is the ordering that stops a promoted defense from arriving unproven.
+
+Scenarios owned by M9 through M20 are numbered where they intersect the B4 battery and are otherwise added by each module plan as it is written. The rule for every wave that follows: **a scenario enters this file before its implementation exists, or it is not a golden file.**
+
