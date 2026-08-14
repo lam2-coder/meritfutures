@@ -265,6 +265,18 @@ Every notice about steps 2 and 3 now arrives at an address the attacker controls
 
 ---
 
+## 7.9 Verification notifications
+
+Bound by [M19 section 7.9](M19-kyc-identity.md)'s milestone-not-accusation rule. Verification is the one notification class where the *tone* is a control rather than a preference.
+
+| Rule | Detail |
+|---|---|
+| **The trigger notification leads with the achievement** | Subject and preview text carry the milestone ("You passed"), never the requirement |
+| **One reminder, then stop** | A single follow-up after the contextual prompt. The persistent dashboard card ([M04](M04-trader-portal.md)) carries the rest. **A verification nag sequence is an accusation delivered on a schedule** |
+| **No fraud vocabulary** | Same banned list as the portal, enforced by the same lint over the template catalogue |
+| **Failure notifications name a human** | Every failure message routes to support and states that a person will look. Never "decisions are final" |
+| **Not suppressible into silence** | Verification is preference-respecting for channel but not for existence: a trader who muted everything still learns that their funded account is waiting on one step |
+
 ## 8. Test plan
 
 ### 8.1 Suites

@@ -45,7 +45,33 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 | PL-M19-03 | `direct_purchase` | At purchase, always, on Direct and any instant-funded plan | 100 percent of Direct buyers | **Not configurable.** Funding is immediate, so there is no later moment |
 | — | payout-only | — | — | **Rejected by the constitution**: too late under a zero-denial policy |
 
-**Beta launches `pre_funded`**, instruments the funnel per (g), and revisits `pre_eval` only if funded-stage fraud volume justifies pushing friction to checkout. This plan implements that and adds one finding the constitution's tradeoff does not price, in AS-M19-01: **placement also decides how much of the population enters the biometric dedupe corpus, and the corpus is the fleet-killer.**
+**Superseded by [ADR-021](../DECISIONS.md): placement is a composite trigger set, not a single point.** The three rows above remain the vocabulary and the cost model, but the configuration is now a **set of trigger events** and verification fires at whichever is reached **first**. AS-M19-01 is the reason: placement also decides how much of the population enters the biometric dedupe corpus, and the corpus is the fleet-killer.
+
+### 1.2.1 The composite trigger set (ADR-021)
+
+| Trigger | Fires when | Population it reaches |
+|---|---|---|
+| `first_purchase` | Any first purchase | 100 percent of buyers. The old `pre_eval` behavior, now one option rather than the only early one |
+| `second_distinct_account_purchase` | A purchase creating a **second concurrent** account | **The fleet-operator trigger.** Small, and precisely aimed |
+| `second_purchase_any` | Any second purchase, **including resets** | Larger and cheaper, but see the reset caveat below |
+| `eval_pass` / `pre_funded` | Evaluation passed, before the funded account exists | The constitution's "likely sweet spot", roughly 15 percent of buyers |
+| `payout_request` | A payout is requested | **Invalid as a sole trigger.** Retained only as a backstop for when an earlier trigger somehow did not fire |
+
+**Direct and any instant-funded plan always verify at purchase.** Not configurable, because funding is immediate and there is no later moment.
+
+**Why the composite answers AS-M19-01 better than either single point did.** `pre_funded` leaves the fleet operator outside the corpus *precisely because fleet operators mostly do not pass evaluations*. They buy many accounts and farm the ones that happen to run. **A serial buyer of distinct concurrent accounts is exactly the population `pre_funded` misses**, and `second_distinct_account_purchase` captures their faces early at a cost paid only by people who have already bought twice. That is a better answer than lineup-wide `pre_eval` friction on a $79 impulse purchase.
+
+**`payout_request` is invalid alone and the reason is worth stating once.** Verification first demanded at payout time is the [zero-denial policy](../GLOSSARY.md) meeting a wall: the trader has earned the money, the gate is new to them, and Merit's brand promise is that approval is mechanical. It is the industry's worst-reviewed practice and it is the one placement the constitution already rejected.
+
+**Two caveats recorded in the config's own documentation, because both are easy to miss:**
+- **Resets inflate `second_purchase_any`.** A trader who resets once becomes a second purchaser under that trigger without ever holding a second account, which is a different population entirely. Choosing it buys coverage and simultaneously buys friction on Merit's most loyal repeat customers.
+- **Precedent exists.** Topstep verifies before the second purchase, so the composite sits inside published industry practice rather than ahead of it.
+
+**The founder is weighing `{pre_funded always}` against `{second_distinct_account + pre_funded}`, and the final trigger set is decided at FREEZE** on beta funnel data. Both are the same code and differ only in a config array, which is the whole reason this was built as a set.
+
+**Required telemetry, per ADR-021's conditions:** per-trigger funnel instrumentation (SD-M19-03 widens to record **which trigger fired**, not only the placement), **corpus-coverage as a reported number with a configured floor**, and a **pre-agreed per-plan escalation path** so the beta escalates specific plan and size combinations rather than negotiating a lineup-wide switch under pressure.
+
+**The provider remains undecided, and one property is non-negotiable regardless:** the provider adapter is **vendor-agnostic**, and the selected provider is **named in the privacy policy at selection time**, which makes provider choice a disclosure event and not only a procurement one.
 
 ### 1.3 What this module is not
 
@@ -328,6 +354,28 @@ stateDiagram-v2
 
 ---
 
+## 7.9 Verification UX: a milestone, never an accusation
+
+Ruled at the batch 2 gate and binding on this module, [M04](M04-trader-portal.md), and [M16](M16-notification-center.md). It exists because [AS-M19-05](#as-m19-05-the-fleet-killer-is-also-a-false-accusation-engine-novel) establishes that the fleet-killer is also a false-accusation engine, and the **framing is the mitigation that costs nothing**.
+
+**The governing rule: verification is framed as a milestone the trader has reached, never as a suspicion Merit is acting on.**
+
+| Requirement | What it means concretely |
+|---|---|
+| **Congratulations, then verify** | At the `pre_funded` trigger the message leads with the achievement: "**You passed. One quick step to activate your funded account, about 2 minutes.**" The gate is the consequence of winning, not a checkpoint before being trusted |
+| **The second-account trigger is framed as unlocking** | "Verify once to unlock multiple accounts", because that is literally what it does |
+| **A positive why-statement** | Every prompt says why in the trader's interest (protecting their account and their payouts), never in Merit's (fraud) |
+| **A stated time expectation** | "About 2 minutes." An unbounded task is abandoned; a bounded one is completed |
+| **Save and resume** | A trader who drops out mid-flow returns to where they were. GS-206 |
+| **Embedded provider flow** | The provider's flow is embedded, never a redirect to an unfamiliar domain that reads as a phishing attempt |
+| **Pre-disclosure on plan pages** | The requirement appears on the plan page **before purchase**, so it is never a surprise discovered after payment. Binding on [M09](M09-marketing-site.md) |
+| **Zero fraud or suspicion language, user-facing** | No "fraud", "suspicious", "risk", "flagged", "review" in any trader-facing verification string. Those words belong in the internal tier and nowhere else |
+| **A support-assisted failure path** | A failed verification routes to a human. **The words "decisions are final" may not appear**, because they are false (a human can reverse it) and because they are what a trader screenshots |
+| **A permanent Verified badge** | The status is a thing the trader keeps and can see, not a gate they passed once and cannot confirm |
+| **One contextual prompt plus a persistent dashboard card** | One prompt at the trigger moment, then a card that waits. Repeated prompting reads as accusation regardless of wording |
+
+**Why this is in a risk module rather than a design document.** Every item above is a decision about what the *detection system* is allowed to say out loud, and the failure it prevents is not an aesthetic one: it is a legitimate trader, correctly flagged for review by a soft link, who reads "your account is under review for fraud" and posts the screenshot. [ADR-022](../DECISIONS.md)'s soft-link review queue makes that population larger, not smaller, which is exactly why the language rule tightens as the graph gets better.
+
 ## 8. Test plan
 
 ### 8.1 Suites
@@ -406,7 +454,9 @@ M19 owns the funnel dashboard the section 10 decision will be settled from: cove
 
 ## 10. Open questions for the founder
 
-**OQ-M19-01. Does AS-M19-01's finding change the placement recommendation?** The constitution's tradeoff prices cost and conversion and omits corpus coverage, and AS-M19-01 shows `pre_funded` puts roughly 85 percent of buyers outside the dedupe corpus, which is the control the same section calls the fleet-killer. Proposed: **launch `pre_funded` as directed, add corpus coverage to the telemetry, and pre-agree the escalation** as a per-plan move to `pre_eval` on the plan and size combinations the beta shows fleets using, rather than as a lineup-wide switch. This is a genuine amendment to a constitution section and it needs a ruling rather than an assumption.
+**OQ-M19-01. RESOLVED at the batch 2 gate by [ADR-021](../DECISIONS.md): yes, and the answer is a composite trigger set rather than a different single point.** The corpus-coverage telemetry and the pre-agreed per-plan escalation are both adopted as proposed. Section 1.2.1 carries the implementation. The original question is preserved below.
+
+**OQ-M19-01 (as asked). Does AS-M19-01's finding change the placement recommendation?** The constitution's tradeoff prices cost and conversion and omits corpus coverage, and AS-M19-01 shows `pre_funded` puts roughly 85 percent of buyers outside the dedupe corpus, which is the control the same section calls the fleet-killer. Proposed: **launch `pre_funded` as directed, add corpus coverage to the telemetry, and pre-agree the escalation** as a per-plan move to `pre_eval` on the plan and size combinations the beta shows fleets using, rather than as a lineup-wide switch. This is a genuine amendment to a constitution section and it needs a ruling rather than an assumption.
 
 **OQ-M19-02. Is the sanctions carve-out from zero denial acceptable as stated?** INV-M19-05 makes a confirmed sanctions match the only mandatory refusal in the corpus, scoped to the relationship rather than to a request. Proposed: **accept as written**, with the counsel item filed, and with the scoping language preserved verbatim wherever it is repeated, because the risk is not the carve-out but its later use as precedent.
 

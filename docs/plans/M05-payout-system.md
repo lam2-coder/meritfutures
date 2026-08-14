@@ -327,6 +327,16 @@ GS-110.
 
 ---
 
+## 7.9 Two norms from the market, one adopted and one refused
+
+Folded from the [dossier](../../research/ADVERSARY_DOSSIER.md)'s 2026-08-14 primary-source pass, because both are decisions about this module's brand promise rather than its mechanics.
+
+**Refused: fraud friction applied at payout time.** Apex requires two days of screen recordings from a trader requesting a payout. As a fraud control it is defensible; as an experience it is **friction applied to legitimate winners at the exact moment the firm owes them money**, and it is indistinguishable from a stall to everyone living through it. **Merit does not add a verification demand at payout.** Identity friction moves upstream of funding ([ADR-021](../DECISIONS.md), [ADR-022](../DECISIONS.md)) precisely so that the payout path stays mechanical. This is the operational meaning of the zero-denial policy: not that Merit never checks, but that Merit never checks *here*.
+
+**The one exception, and it is not a new demand:** the [bounded freeze](../GLOSSARY.md) still exists, still requires a cited open flag, and still expires. A freeze is a pre-existing flag surfacing, never a fresh hurdle invented at request time.
+
+**Adopted and published: the $100 minimum, against Apex's $500.** A five-fold difference in how long a small winner waits to see real money is a genuine trust differentiator and it should be stated as a comparison rather than buried in a table. It belongs in this module's copy and on [M12](M12-transparency-platform.md)'s public surfaces.
+
 ## 8. Test plan
 
 ### 8.1 Suites

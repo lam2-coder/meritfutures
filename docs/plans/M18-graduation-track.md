@@ -4,7 +4,14 @@ depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture
 last_updated: 2026-08-14
 ---
 
-# M18: Live-Graduation Pipeline
+# M18: Graduation Track
+
+**Renamed at the batch 2 gate, from "Live-Graduation Pipeline" to "Graduation Track", to match shipped behavior.** [OQ-M18-01](../DECISIONS.md) ruled that **no live program exists at launch**: the ladder ends in **graduation eligibility plus continuation** (GP-M18-03, the path that requires nothing and is honest). A module named for a pipeline to a live program would have been a name describing an aspiration, which is precisely the marketing-versus-implementation gap constitution section 0.5 exists to prevent, committed in the filename.
+
+**Three consequences bind immediately:**
+- **Zero live-program copy is written until counsel rules.** That includes the marketing site, the portal, certificates, emails, and Discord. The copy is what commits Merit, not the code.
+- **If a live program is ever built, the working structure is a ring-fenced affiliated entity**, on the MFFU pattern. Recorded as a starting point for counsel, not as a decision.
+- **Counsel packet item 1** ([DECISIONS](../DECISIONS.md)) covers all three graduation paths, because the question is what Merit may *say* about graduation before a program exists, and that is not an engineering question.
 
 Constitution section §4-ADDENDUM ("ladder tracker, invitation workflow, vault and bonus display, **the marketing face of the payout cap**"), Appendix B5's ten-section template, and [M01](M01-rules-engine.md) INV-17's lifetime bound. The `graduated` phase and the invitation event are already present in the approved [DATA_MODEL](../architecture/DATA_MODEL.md) and [EVENTS](../architecture/EVENTS.md), reserved for this module.
 
@@ -354,7 +361,9 @@ M18 supplies a panel on [M6](M06-admin-ops-console.md): ordinal distribution, gr
 
 ## 10. Open questions for the founder
 
-**OQ-M18-01. Which graduation path, and does a live program exist at all?** This is the largest open question in batch 2 and AS-M18-01 explains why it cannot be answered by an engineer. GP-M18-01 changes Merit's regulatory character and contradicts a disclosure repeated on every surface. GP-M18-02 is a commercial arrangement with real brand exposure. GP-M18-03 requires nothing and is honest. Proposed: **ship GP-M18-03 for v1, file a counsel item covering all three, and write no graduation copy until the ruling exists.** The copy is the thing that commits Merit, not the code.
+**OQ-M18-01. RULED at the batch 2 gate: no live program exists at launch.** Ship **GP-M18-03**: the ladder ends in graduation eligibility plus continuation. **Zero live-program copy until counsel rules**, the working structure if one is ever built is a **ring-fenced affiliated entity on the MFFU pattern**, and the module is **renamed to match shipped behavior** (see the header). **Counsel packet item 1.** The original question is preserved below.
+
+**OQ-M18-01 (as asked). Which graduation path, and does a live program exist at all?** This is the largest open question in batch 2 and AS-M18-01 explains why it cannot be answered by an engineer. GP-M18-01 changes Merit's regulatory character and contradicts a disclosure repeated on every surface. GP-M18-02 is a commercial arrangement with real brand exposure. GP-M18-03 requires nothing and is honest. Proposed: **ship GP-M18-03 for v1, file a counsel item covering all three, and write no graduation copy until the ruling exists.** The copy is the thing that commits Merit, not the code.
 
 **OQ-M18-02. If a third-party introduction is on the table, is it worth the brand exposure?** AS-M18-07's honest reading is that the revenue is small, the exposure is asymmetric and lands through Merit's most vocal traders, and a graduate can find a live firm without an introduction. Recommendation: **no**, unless the counterparty's payout record and complaint profile survive the same [TOP10_FIRMS](../../research/TOP10_FIRMS.md) diligence Merit applies to competitors, and the agreement carries a termination right tied to their conduct.
 

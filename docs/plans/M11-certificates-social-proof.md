@@ -28,7 +28,7 @@ The issuance and verification system for signed claims Merit makes about an acco
 |---|---|---|---|
 | CT-M11-01 | **Pass** | This account passed its evaluation on this trading day, on this plan at this size | v1 |
 | CT-M11-02 | **Payout** | This account was paid this amount on this trading day, ordinal *n* of its ladder | v1 |
-| CT-M11-03 | **Graduation** | This account completed its payout ladder | v1, and it is the ladder's public face alongside [M18](M18-live-graduation-pipeline.md) |
+| CT-M11-03 | **Graduation** | This account completed its payout ladder | v1, and it is the ladder's public face alongside [M18](M18-graduation-track.md) |
 | CT-M11-04 | **Per-trade** | This account took this trade, with entry, exit, size, and result | **Deferred, OQ-M11-01.** The Axcera brochure ships these; AS-M11-01 is the reason Merit should not, in the shape they ship |
 
 Plus: the public verification page, the signing key lifecycle, the render pipeline, and the opt-in leaderboard surface reserved in [DATA_MODEL section 12](../architecture/DATA_MODEL.md) (`identities.display_name`, `.leaderboard_opt_in`).

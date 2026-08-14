@@ -271,6 +271,21 @@ GS-105.
 
 ---
 
+## 7.9 Verification UX in the portal
+
+[M19 section 7.9](M19-kyc-identity.md) carries the full specification; what M04 owns is the rendering, and three of its requirements are portal surfaces rather than copy decisions.
+
+| Surface | Requirement |
+|---|---|
+| **The trigger moment** | **One** contextual prompt, leading with the achievement: "**You passed. One quick step to activate your funded account, about 2 minutes.**" Never a modal that blocks the dashboard |
+| **The persistent card** | After the prompt, a dashboard card that waits. **Repeated prompting reads as accusation regardless of wording**, so the card is the only reminder |
+| **Save and resume** | A trader who abandons mid-flow returns to exactly where they were. This is the single highest-value item in the whole spec, because abandonment is the dominant failure and a lost place is why people do not come back. GS-206 |
+| **Embedded provider flow** | Rendered in place, never a redirect to an unfamiliar domain, which reads as phishing to exactly the security-conscious trader Merit wants |
+| **The Verified badge** | Permanent and visible. A status the trader keeps, not a gate they passed and cannot confirm |
+| **Failure** | Routes to a human. **The words "decisions are final" may not appear in any string this module renders** |
+
+**The vocabulary rule is binding on this module's copy and is testable:** no trader-facing verification string contains "fraud", "suspicious", "risk", "flagged", or "review". Those words are internal-tier. A lint over the portal's string catalogue is the cheapest possible enforcement and it belongs in CI alongside the Appendix F em-dash check.
+
 ## 8. Test plan
 
 ### 8.1 Suites

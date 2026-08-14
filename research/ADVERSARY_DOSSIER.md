@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, TOP10_FIRMS.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # Adversary Dossier (Constitution Appendix A, instantiated)
@@ -91,6 +91,28 @@ The 9-scheme taxonomy from Appendix A, populated with current intel (researched 
 **GT-A9 (extends B4 #16).** (a) Affiliate purchases through own code from same device fingerprint as affiliate login: attribution voided, flag raised. (b) Support agent role attempts account-email change without verification-runbook flag set: action blocked, admin alert fires, audit row written. (c) Promo code redeemed 40× in one hour from one ASN: code auto-suspended, alert.
 
 ---
+
+## Norm corroboration: what firms publicly admit to doing (primary source, 2026-08-14)
+
+**Apex acknowledges linking accounts on IP, device, billing instrument, and behavioral similarity, explicitly including spousal accounts.** That matters to Merit in one specific way: it establishes that [ADR-022](../docs/DECISIONS.md)'s link-confidence graph is **inside published industry practice, not ahead of it.** Merit's planned scope sits at or below what Tradeify, Topstep, and Blue Guardian already publish. The aggressive end of the norm is Blue Guardian's stack: continuous document monitoring, provider-final decisions, and a 7-day funded-inactivity rule.
+
+**Named anti-pattern, adopted as a thing Merit will not do: Apex's two-day screen-recording payout requirement.** The trader wins, requests a payout, and is then asked to produce two days of screen recordings. Read as fraud control it is defensible. Read as what it actually is, **it is friction applied to legitimate winners at the exact moment the firm owes them money**, and it is indistinguishable from a stall to everyone experiencing it. The general form is the one to remember: **fraud friction applied at payout time is a payout-trust tax, and it is paid overwhelmingly by honest traders**, because the dishonest ones either have the recordings or have already left. Merit's answer is [ADR-021](../docs/DECISIONS.md) and [ADR-022](../docs/DECISIONS.md): move identity friction **upstream of funding**, where being wrong is cheap, so that nothing new is ever demanded at payout.
+
+**A published trust differentiator worth defending: Apex requires a $500 minimum payout; Merit's is $100.** That is a five-fold difference in how long a small winner waits to see real money, and it is exactly the sort of number that belongs on a comparison surface ([M12](../docs/plans/M12-transparency-platform.md)) and in the payout copy ([M05](../docs/plans/M05-payout-system.md)).
+
+## Identity replacement cost: the axis every control is scored on
+
+[ADR-022](../docs/DECISIONS.md) introduces the framing this dossier should have had from the start. **The measure of an identity defense is not how many fakes it catches. It is what a fresh, usable identity costs the adversary.**
+
+| Control | Replacement cost imposed | Verdict |
+|---|---|---|
+| Biometric dedupe at a trigger point | **High.** A new face is needed, not a new email | The fleet-killer, and the name is earned |
+| Payout-destination concentration (D-09) | **High.** The money has to land somewhere, and somewhere is observable | Strongest mule detector available |
+| Payment-fingerprint velocity (D-08) | Moderate. New cards are purchasable but not free | Real friction |
+| Device and IP correlation | Low. A VPN and a fresh browser profile | A signal, never a verdict |
+| Email-domain heuristics | **Zero.** A new address is free and instant | Worth collecting, never worth enforcing on |
+
+**Reading the table is the point.** It puts a $2 provider call and a self-joined SQL query on the same axis for the first time, and it explains why [ADR-022](../docs/DECISIONS.md) auto-enforces on hard links and only queues soft ones: the cheap-to-defeat signals are exactly the ones where a false positive is most likely and an enforcement least defensible.
 
 ## Vendor fraud-marketing review (what the detection industry says the threats are)
 

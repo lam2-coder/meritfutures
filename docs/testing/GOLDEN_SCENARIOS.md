@@ -436,7 +436,7 @@ Defined by [M17](../plans/M17-offers-engine.md) section 8.2. The module's govern
 
 ## 25. GS-205 to GS-211: live-graduation pipeline (M18)
 
-Defined by [M18](../plans/M18-live-graduation-pipeline.md) section 8.2. Almost every failure in this module is a promise rather than a computation, so most of these are disclosure fixtures.
+Defined by [M18](../plans/M18-graduation-track.md) section 8.2. Almost every failure in this module is a promise rather than a computation, so most of these are disclosure fixtures.
 
 | ID | Name | Pins |
 |---|---|---|

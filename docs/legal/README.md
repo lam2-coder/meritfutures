@@ -61,3 +61,24 @@ The rationale is on the record in [DECISIONS](../DECISIONS.md) and has a complia
 | The freeze contract: a cited open flag, a ToS clause, a written reason, and a **published expiry** | [M05](../plans/M05-payout-system.md) INV-M5-10, AS-M5-04 |
 | Restricted-jurisdiction list | constitution section 10, pending counsel |
 | Coordinated-trading and common-control clauses, still open | [M07](../plans/M07-risk-abuse.md) DEP-M7-05 |
+
+## Drafting skeletons (2026-08-14)
+
+| Doc | Covers | Status |
+|---|---|---|
+| [PRIVACY_POLICY.md](PRIVACY_POLICY.md) | Collection categories and purposes, the fraud-prevention retention carve-out, sharing by recipient category | draft for counsel |
+| [TOS_CLAUSES.md](TOS_CLAUSES.md) | Eight required clauses, what each must accomplish, and what must not appear | draft for counsel |
+
+**Both are categories-and-purposes only.** Neither contains drafted prose, and neither is publishable. **BIPA plus GDPR lawful-basis mapping is flagged in both and is [counsel packet item 3](../DECISIONS.md).**
+
+## Norm positioning
+
+**Merit's planned scope sits at or below the published practice of Tradeify, Topstep, and Blue Guardian.** This is recorded because it is the useful fact when a clause is challenged: Merit's identity linking, verification triggers, and monitoring disclosures are all inside what competitors already publish, not ahead of them. Apex publicly acknowledges linking on IP, device, billing instrument, and behavioral similarity including spousal accounts.
+
+**The aggressive end of the norm, for calibration, is Blue Guardian's stack:** continuous document monitoring, provider-final decisions, and a 7-day funded-inactivity rule. **Merit adopts none of the three.**
+
+**One market practice is explicitly refused rather than positioned against:** payout-time fraud friction, of which Apex's two-day screen-recording requirement is the named example. Merit moves identity friction upstream of funding so nothing new is ever demanded at payout ([M05](../plans/M05-payout-system.md) section 7.9).
+
+## The counsel packet
+
+Three items, listed in full in [DECISIONS](../DECISIONS.md): the **live-program structure** and what may be said about graduation before one exists; **wallet characterization** as a payable rather than regulated stored value; and **escheatment mapping plus the BIPA and GDPR analysis**.

@@ -263,6 +263,20 @@ GS-117.
 
 ---
 
+## 7.9 The identity-graph explorer
+
+[ADR-022](../DECISIONS.md)'s v1.x deliverable, specified here because it is an admin surface. **An operator who cannot see the graph will reason about the graph anyway, from a flat list of flags, badly.**
+
+| Requirement | Why |
+|---|---|
+| Nodes are identities; **edges are weighted** and labeled with the signal that produced them | An unweighted graph makes a shared IP look like a biometric match |
+| **Hard and soft edges are visually distinct** | The enforcement rule differs between them, so the picture must too |
+| **One-click evidence pack from any node or cluster** | The pack is the artifact a dispute or a chargeback needs, and building it by hand is how it gets skipped |
+| Packs are **audience-scoped** by the two-tier rule | Weights, thresholds and detector internals are **internal-tier always**, and a graph view makes it far easier to leak them by accident |
+| Every view is logged as an access to the underlying identities | An investigator browsing the graph is reading personal data across many people |
+
+**The failure this prevents is [AS-M6-01](#)'s, one layer up.** A cluster view that renders thresholds next to a trader-facing export is a single screenshot that gives away the whole detection posture. The audience scoping is not a feature of the pack; it is a property of the surface.
+
 ## 8. Test plan
 
 ### 8.1 Suites

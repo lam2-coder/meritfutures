@@ -100,6 +100,9 @@ Each detector states its input, its statistic, its threshold, and what it is act
 | D-08 | Payment velocity | `identity_signals` | Distinct cards or BINs per identity, and identities per payment fingerprint, over a window | Stolen-card evaluation purchasing (dossier item 7) |
 | D-09 | Destination concentration | `payout_transfers` | One `destination_ref` receiving payouts from more than one unrelated identity | **The strongest mule detector available** ([M05 AS-M5-02](M05-payout-system.md)), and it is a query rather than an inference |
 | D-10 | Affiliate self-deal | attributions | Purchase attributed to a code whose affiliate identity is linked to the buyer | B4 #16, voids attribution and flags |
+| D-15 | **Digital-footprint enrichment** | checkout enrichment adapter | Email and phone footprint age and connectedness, device and IP reputation, VPN or datacenter origin, BIN intelligence, from a SEON-class vendor ([ADR-023](../DECISIONS.md)). **Observe mode at launch**, thresholds tuned on beta data, then soft-decline plus review queue. Never a silent decline | A fresh identity with a clean card is invisible to every other detector at checkout, which is the cheapest moment to see it |
+| D-16 | **Link-confidence score** | all identity signals | Not a detector so much as the **aggregation of every other one** ([ADR-022](../DECISIONS.md)). Hard links auto-enforce; soft clusters queue a **pre-funding** review. The signal-weight table is config | Asks the question the detector list never asked: how confident are we that these two accounts are one person |
+| D-17 | **Behavioral fingerprint against the banned corpus** | `fills`, `daily_marks` | A returning banned operator recognized by how they trade. **Flag-and-review only, never auto-enforce**, and the output must be evidence-grade | **post-launch tier.** Requires a banned corpus, which requires having banned people |
 | D-11 | Dilution timing | `rule_states.engine_gates` | Small positive days appearing precisely while consistency is the only failing gate, with an inverse-correlated sibling | [M01 AS-02](M01-rules-engine.md)'s manufactured dilution. Cheap **only** because the engine already stores `profit_needed_to_dilute_cents` |
 | **D-12** | **Day-0 graph-prior pairing** | `identity_links`, `identity_signals` | Candidate pairs and groups formed from graph priors **at funding time, with zero trading data**. Output is a watched-cluster set, not a flag: it seeds D-13 and D-14 rather than accusing anyone | The ring that funds and extracts inside one cycle. This is the direct answer to AS-M7-01: a detector that needs history cannot defend the first cycle, so the first cycle is defended by what we knew before it started |
 | **D-13** | **Young-account fast path** | `daily_marks`, `fills`, over a **5 trading day** window | Correlation below **-0.95**, **and** size mirroring, **and** timing mirroring. All three, not any of three | The hedged pair, caught inside the extraction window. Deliberately **precise rather than sensitive**: on five days of data a -0.8 threshold is noise, and requiring near-perfect inverse correlation together with mirrored size and timing is what makes a short window usable at all |
@@ -279,6 +282,33 @@ GS-122.
 The pack gives the trader every fill, mark, rule state, and gate result of their own account, plus the rule text that applied. That is a complete answer to "show your work" that discloses nothing about how the pattern was found.
 
 ---
+
+## 7.9 Link-confidence scoring, and the tiers it ships in
+
+[ADR-022](../DECISIONS.md), folded here because it changes what this module *is*: a set of independent detectors becomes a **scored identity graph**, and enforcement grades by confidence rather than by which detector happened to fire.
+
+| Link class | Signals | Behavior |
+|---|---|---|
+| **Hard** | Biometric dedupe hit ([M19](M19-kyc-identity.md) SD-M19-04), same payout destination (D-09), same payment fingerprint (D-08), a `confirmed_same_person` disposition | **Auto-enforce.** These are facts, not inferences |
+| **Soft** | Shared device or IP, behavioral similarity, timing correlation, shared address components, D-15's footprint signals | **Queue a pre-funding review.** Never auto-enforce |
+
+**The review is pre-funding, and the timing is the point.** A soft cluster caught before an account is funded costs a review. The same cluster caught at payout costs a dispute, an evidence pack, and a trader who earned money and is being told to wait. [M07 AS-M7-01](#) established that the minimum extraction path is short; the corollary is that identity review has to happen upstream of funding or it happens too late to be cheap.
+
+**Two supporting changes:**
+- **Honest-baseline anomaly scoring.** Anomaly is measured against the **honest population's** distribution, not the whole population's, because a population containing the fleet normalizes the fleet. Same reasoning as the [consistency denominator rule](../GLOSSARY.md#consistency-denominator-rule), applied to detection.
+- **The signal-weight table is configuration**, tuned through a reviewed diff. Weights are the detector internals that [M06](M06-admin-ops-console.md)'s two-tier evidence packs keep **internal-tier always**, and the richer the graph the more a leak is worth.
+
+**Shipping tiers, forced by data availability rather than by ambition:**
+
+| Tier | Contents | Why then |
+|---|---|---|
+| **v1** | Hard links plus KYC dedupe | They are facts and need no tuning |
+| **v1.x** | Probabilistic scoring, the signal-weight table, [M06](M06-admin-ops-console.md)'s graph explorer | Weights tuned on no data are guesses wearing a number |
+| **post-launch** | D-17 behavioral fingerprinting | A fingerprint corpus with three members is a false-positive engine |
+
+**Golden scenarios are required per tier**, so a defense promoted upward arrives with the fixture proving it does what the tier above assumed. GS-207, GS-208, GS-209.
+
+**The framing that makes these comparable: identity replacement cost.** The measure of an identity defense is not how many fakes it catches but **what a fresh usable identity costs the adversary**. Biometric dedupe is expensive to defeat; an email-domain heuristic is free. Scoring every control on that one axis is what the [dossier](../../research/ADVERSARY_DOSSIER.md) now does, and it is the only way to compare a $2 provider call against a detector.
 
 ## 8. Test plan
 

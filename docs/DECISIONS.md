@@ -386,5 +386,102 @@ Recorded here as well as in [STATE](STATE.md) and [M01 Appendix A.0](plans/M01-r
 
 **The two binding consequences for every public surface**, which is why this ruling reaches past M01:
 
-1. **A parameter is read, never copied.** Any surface that shows a number must read it at request time from the account's pinned plan version or from the published plan version, never from a literal in a template, a chart axis, a price card, or a piece of blog copy. Binding on [M09](plans/M09-marketing-site.md), [M11](plans/M11-certificates-social-proof.md), [M12](plans/M12-transparency-platform.md), [M13](plans/M13-trader-analytics-journal.md), [M17](plans/M17-offers-engine.md), and [M18](plans/M18-live-graduation-pipeline.md).
+1. **A parameter is read, never copied.** Any surface that shows a number must read it at request time from the account's pinned plan version or from the published plan version, never from a literal in a template, a chart axis, a price card, or a piece of blog copy. Binding on [M09](plans/M09-marketing-site.md), [M11](plans/M11-certificates-social-proof.md), [M12](plans/M12-transparency-platform.md), [M13](plans/M13-trader-analytics-journal.md), [M17](plans/M17-offers-engine.md), and [M18](plans/M18-graduation-track.md).
 2. **A structural ruling is never marketed as a tunable.** "Caps exist" is not a promotion and may not be offered, waived, or framed as a limited-time condition. The cap's *value* is a config; the cap's *existence* is not. Binding on [M17](plans/M17-offers-engine.md) alongside [ADR-019a](#adr-019a-the-gamification-bright-line).
+
+---
+
+# Consolidated founder addendum and batch 2 gate closure (2026-08-14)
+
+The founder returned a consolidated addendum covering the M19 placement question, an elevation of Merit's identity defenses, the legal disclosure skeletons, four primary-source intelligence folds, a checkout enrichment vendor, the verification UX, and rulings on the five open batch 2 questions. Three became ADRs because they choose between alternatives or amend an approved decision. The rest are recorded in the closure table below.
+
+## ADR-021: KYC placement is a composite trigger set, not a single point  (2026-08-14, status: accepted)
+
+- **Context:** Constitution section 10 frames placement as a choice among three points, and [M19](plans/M19-kyc-identity.md) implemented all three as `kyc.placement` config. [AS-M19-01](plans/M19-kyc-identity.md) then found the tradeoff omits its most important term: placement decides **how much of the buyer population enters the biometric dedupe corpus**, and that corpus is what the constitution itself calls the fleet-killer. At `pre_funded`, roughly **85 percent of buyers never enter it**. OQ-M19-01 asked whether that finding changes the recommendation.
+- **Decision:** **Placement becomes a set of trigger events rather than a single point.** Verification fires at whichever of the configured triggers is reached **first**:
+
+  | Trigger | Fires when | Note |
+  |---|---|---|
+  | `first_purchase` | Any first purchase | The `pre_eval` behavior, now one option among several rather than the only early one |
+  | `second_distinct_account_purchase` | A purchase creating a second concurrent account | **The fleet-operator trigger.** See below |
+  | `second_purchase_any` | Any second purchase, **including resets** | Cheaper coverage, but see the reset caveat |
+  | `eval_pass` / `pre_funded` | Evaluation passed, before the funded account exists | The constitution's "likely sweet spot" |
+  | `payout_request` | A payout is requested | **Invalid as a sole trigger.** Retained only as a backstop that fires when an earlier trigger somehow did not, because verification first demanded at payout time is the [zero-denial policy](GLOSSARY.md) meeting a wall, and it is the industry's worst-reviewed practice |
+
+  **Direct and any instant-funded plan always verify at purchase**, unchanged and not configurable, because funding is immediate and no later moment exists.
+- **The composite is what resolves OQ-M19-01, and the reason is the finding itself.** `pre_funded` alone leaves the fleet operator outside the corpus precisely because fleet operators mostly do not pass evaluations; they buy many accounts and farm the ones that run. **A serial buyer of distinct concurrent accounts is the exact population `pre_funded` misses, and `second_distinct_account_purchase` captures their faces early**, at a cost paid only by people who have already bought twice. That converts AS-M19-01 from an argument for lineup-wide `pre_eval` friction into a targeted trigger, which is a better answer than either of the two the constitution offered.
+- **Founder's live comparison, recorded because the choice is not yet final:** `{pre_funded always}` versus `{second_distinct_account + pre_funded}`. **The final trigger set is decided at FREEZE**, on beta funnel data rather than in advance. Both options are the same code; the difference is a config array.
+- **Conditions of acceptance:**
+  1. **Implemented as configuration**, a set rather than an enum, with **per-trigger funnel telemetry** (M19g, SD-M19-03's `kyc_funnel_events` already carries `placement`; it widens to carry the trigger that fired).
+  2. **Corpus-coverage telemetry is adopted** as proposed in OQ-M19-01: the share of the buyer population inside the dedupe corpus is a reported number with a configured floor, not an inference.
+  3. **Per-plan escalation is pre-agreed**, not lineup-wide: the beta escalates specific plan and size combinations that show fleet behavior, and the escalation path is agreed before the data arrives so it is not negotiated under pressure.
+  4. **Resets inflate `second_purchase_any` and this is written into the config's own documentation.** A trader who resets once is a second purchaser under that trigger without being a second-account holder, which is a different population entirely. Choosing `second_purchase_any` buys coverage and buys friction on Merit's most loyal repeat customers at the same time.
+  5. **Precedent recorded:** Topstep verifies before the second purchase, so the composite sits inside published industry practice rather than ahead of it.
+- **The provider is still undecided, and one thing must be true regardless.** The **provider adapter is vendor-agnostic** ([M19](plans/M19-kyc-identity.md) section 1.1), and the selected provider is **named in the privacy policy at selection time**, which makes provider choice a disclosure event and not only a procurement one.
+- **Alternatives considered:** `pre_funded` alone (the constitution's sweet spot; rejected because AS-M19-01 shows it leaves the fleet-killer's corpus 15 percent full); lineup-wide `pre_eval` (maximum coverage, and it puts a $2 identity check in front of a $79 impulse purchase that no major competitor gates); payout-only (rejected by the constitution and again here).
+
+## ADR-022: Identity defense is elevated to a scored graph, in three priced tiers  (2026-08-14, status: accepted)
+
+- **Context:** Merit's identity defenses were specified as independent detectors ([M07](plans/M07-risk-abuse.md) D-01 to D-14) plus biometric dedupe ([M19](plans/M19-kyc-identity.md)). The dossier's schemes 1, 3, 4 and 6 are all **identity-multiplication** attacks, and the workbook's risk engine makes the same point from the liability side: **the payout tail is all correlation**, and correlation is what linked accounts produce. Treating each signal as its own detector means the system never asks the one question that matters, which is how confident Merit is that two accounts are one person.
+- **Decision:** Adopt **link-confidence scoring across all signals**, with enforcement graded by confidence rather than by which detector fired.
+
+  | Link class | Examples | Behavior |
+  |---|---|---|
+  | **Hard** | Biometric dedupe hit, same payout destination, same payment fingerprint, confirmed same-person disposition | **Auto-enforce.** These are facts, not inferences |
+  | **Soft** | Shared device or IP, behavioral similarity, timing correlation, shared address components | **Queue a pre-funding review.** Never auto-enforce, and the review happens **before funding** rather than before payout, which is the moment where being wrong is cheap |
+
+  The **signal-weight table is configuration**, not code, so weights are tuned on beta data through a reviewed diff.
+- **The other three components:**
+  - **Behavioral fingerprinting against the banned corpus at funding.** A returning banned operator is recognizable by how they trade, not only by who they are. **Flag-and-review only, never auto-enforce**, and the output must be **evidence-grade**: a flag that cannot be explained in an evidence pack is a flag that cannot survive a dispute.
+  - **Honest-baseline anomaly scoring.** Anomaly is measured against the *honest* population's distribution rather than against the whole population, because a population that contains the fleet normalizes the fleet. This is the same reasoning as the [consistency denominator rule](GLOSSARY.md#consistency-denominator-rule) applied to detection.
+  - **Identity-replacement-cost framing enters the [dossier](../research/ADVERSARY_DOSSIER.md).** The correct measure of an identity defense is not how many fakes it catches; it is **what a fresh usable identity costs the adversary**. Every control is scored on how much it raises that price, which makes biometric dedupe (expensive to defeat) and email-domain heuristics (free to defeat) comparable on one axis for the first time.
+  - **[M06](plans/M06-admin-ops-console.md) gains an identity-graph explorer** with **weighted edges** and **one-click evidence packs** from any node or cluster. An operator who cannot see the graph will reason about the graph anyway, from a list of flags, badly.
+- **Thresholds, weights, and detector internals are internal-tier always**, per the two-tier evidence pack ruling. This is not a new rule; it is that ruling applied to a much richer object, and the richer the object the more a leak is worth.
+- **Priority, which is the part that makes this shippable:**
+
+  | Tier | Contents | When |
+  |---|---|---|
+  | **v1** | Hard links plus KYC dedupe | Launch. These are facts and they auto-enforce |
+  | **v1.x** | Probabilistic scoring, the signal-weight table, the M06 graph explorer | After beta produces the data the weights need |
+  | **post-launch** | Behavioral fingerprinting against the banned corpus | Requires a banned corpus, which requires having banned people |
+
+  **The ordering is forced by data availability rather than by ambition.** Weights tuned on no data are guesses wearing a number, and a fingerprint corpus with three members is a false-positive engine.
+- **Golden scenarios are required for each tier**, so that a defense promoted from one tier to the next arrives with the fixture that proves it does what the tier above assumed.
+- **Alternatives considered:** keep independent detectors and let the queue correlate them (status quo; rejected because the correlation happens in an operator's head and is therefore unreviewable and unreproducible); auto-enforce on soft links to cut review load (rejected outright: [AS-M19-05](plans/M19-kyc-identity.md) already establishes that the fleet-killer is also a false-accusation engine, and soft links are exactly where the false accusations live); build all three tiers for v1 (rejected: two of the three need data that does not exist yet).
+
+## ADR-023: A digital-footprint enrichment vendor at checkout, bought and not built  (2026-08-14, status: accepted)
+
+- **Context:** [M03](plans/M03-billing-checkout.md) collects payment signals and [M07](plans/M07-risk-abuse.md) resolves identities from them, but Merit sees only what its own funnel produces. A fresh identity with a clean card looks identical to a real customer at checkout, and the cheapest moment to learn otherwise is before the purchase completes.
+- **Decision:** Adopt a **SEON-class enrichment vendor at checkout**, supplying **email and phone digital-footprint** (how old and how connected the identity's public presence is), **device, IP, VPN and datacenter detection**, and **BIN intelligence**. It is a **v1 signal feeding the identity graph** through the [M07](plans/M07-risk-abuse.md) adapter, which is **vendor-agnostic** for the same reason the platform adapter is.
+- **Rollout is graduated, and the sequence is the control:**
+  1. **Observe mode from launch.** Signals recorded, scored, and reported; **nothing is blocked**. The purpose is to learn the distribution on Merit's own traffic.
+  2. **Thresholds tuned on beta data**, never on the vendor's defaults, because the vendor's defaults describe a different population.
+  3. **Graduated enforcement:** a **soft decline plus a review queue**, and **never a silent decline**. A customer who is refused is told, and a human can reverse it.
+- **Buy, not build**, and the reason is categorical. This is a **data-network product**: its value comes from having seen an email address across millions of merchants, which Merit structurally cannot replicate at any engineering budget. Building it would produce a worse version of a commodity while consuming the schedule of the modules that are actually differentiated.
+- **Consequences:** a cost line enters the [Cost Stack](../research/calibration/README.md), a new sub-processor enters the privacy policy's disclosed sharing categories, and [M03](plans/M03-billing-checkout.md) gains a checkout dependency whose **failure must be non-blocking** in observe mode and **fail-open on timeout** in enforcement mode, because a checkout that cannot complete because an enrichment call timed out converts a fraud control into an outage.
+- **Alternatives considered:** build in-house from Merit's own signals (rejected above); no enrichment (rejected: it leaves the cheapest detection moment unused, and the dossier's payment-side schemes are exactly what this class of product is built for); hard-decline on a bad score from day one (rejected: enforcing on an untuned threshold against an unmeasured population is how a firm declines its own customers on launch week).
+
+## Batch 2 gate closure table (2026-08-14)
+
+The five open batch 2 questions, plus the two verification items. Each confirms or directs rather than choosing between architectures, so they are recorded here rather than as ADRs.
+
+| Ruling | Where it was asked | Outcome |
+|---|---|---|
+| **OQ-M18-01: which graduation path, and does a live program exist?** | [M18](plans/M18-graduation-track.md) | **No live program exists at launch.** The ladder ends in **graduation eligibility plus continuation**, which is GP-M18-03, the path that requires nothing and is honest. **Zero live-program copy is written until counsel rules**, and that includes the marketing site, the portal, certificates, and Discord. The working structure, if one is ever built, is a **ring-fenced affiliated entity** on the MFFU pattern. **The module is renamed to match shipped behavior** rather than describing an aspiration. **Counsel packet item 1** |
+| **OQ-M20-03: is the wallet a payable or a regulated stored-value product?** | [M20](plans/M20-wallet.md) | **Proceed on the payable-balance framing**, with a named invariant so the framing cannot erode by accident: **`INV-WALLET-NO-DEPOSITS`. Wallet funds originate only from payouts, promotional credit, and refunds. No external loading, ever, without a new ADR and counsel sign-off.** The closed credit list is confirmed to **exclude deposits explicitly** rather than merely omitting them, because an omission is a gap someone fills and an exclusion is a decision someone must reverse. **Counsel packet item 2** |
+| **OQ-M19-01: does the corpus-coverage finding change placement?** | [M19](plans/M19-kyc-identity.md) | **Resolved by [ADR-021](#adr-021-kyc-placement-is-a-composite-trigger-set-not-a-single-point--2026-08-14-status-accepted).** The finding does change it, and the answer is a composite trigger set rather than a different single point. The corpus-coverage telemetry and the pre-agreed per-plan escalation are both adopted as proposed |
+| **OQ-M12-01: the seven public statistic definitions** | [M12](plans/M12-transparency-platform.md) | **Draft them as a founder sign-off table for the Wave 4 gate.** Each statistic gets **both a trailing-window and a lifetime form**, **denominators always stated** on the surface itself and never only in a methodology page, and a **future-dated `effective_from`** per M12's existing design so a definition change is announced before it takes effect rather than discovered after. The unflattering readings M12 proposed stand as the drafting basis |
+| **OQ-M20-04: dormancy and escheatment** | [M20](plans/M20-wallet.md) | **Dormancy tracking and 12-month notices are designed now**, in v1, because retrofitting a notice schedule onto balances that have already gone quiet means reconstructing when they went quiet. **Escheatment state-mapping is counsel packet item 3**: trigger dates vary by jurisdiction, and the mapping belongs on a calendar rather than in anyone's memory |
+| **The docs link-check joins the CI gate inventory** | [SESSION_LOG](SESSION_LOG.md) landmine | **Accepted.** A corpus whose cross-references are its navigation needs the check that proves they resolve. The 59-link fix is verified in this session's closing check, and the gate is added to the inventory so the next 59 are caught by a robot |
+| **Calibration source** | [STATE](STATE.md) | **Workbook committed, engine still outstanding.** `research/calibration/futures_prop_firm_model.xlsx` is in the repository with a provenance [README](../research/calibration/README.md). `mc_lifecycle.py` is not: the accompanying upload was an unrelated database dump. The STATE item **narrows rather than clears** |
+
+## The counsel packet
+
+Three items now have a named home rather than being scattered across module plans, because they are the questions engineering cannot answer and they all need the same lawyer at the same time.
+
+| # | Question | Blocking what |
+|---|---|---|
+| 1 | The live-program structure: does a ring-fenced affiliated entity on the MFFU pattern change Merit's regulatory character, and what may be said about graduation before one exists? | All live-program copy. Nothing in code |
+| 2 | Is the wallet a payable rather than a regulated stored-value product, given `INV-WALLET-NO-DEPOSITS`, no interest, no transfer, no deposit, payable on demand? | Launch, and the answer may add conditions rather than a prohibition, which is why it is cheap now |
+| 3 | Escheatment mapping per jurisdiction, and the BIPA plus GDPR lawful-basis mapping for the biometric and monitoring disclosures | The privacy policy leaving draft, and the dormancy calendar |
+

@@ -67,7 +67,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M15-discord-integration.md](plans/M15-discord-integration.md) | Per-role consent, one-way link that is never a credential, template-only announcements, moderation separated from enforcement. Post-launch per constitution section 10 | review | founder |
 | [M16-notification-center.md](plans/M16-notification-center.md) | Four notification classes deciding what a preference may silence, contact-change ceremony with prior-contact window, identity coalescing, template allowlist | review | founder |
 | [M17-offers-engine.md](plans/M17-offers-engine.md) | Server-authoritative price resolution, dual-controlled price floors, identity-bound offers, promotional credit provenance, experiments that cannot vary a rule | review | founder |
-| [M18-live-graduation-pipeline.md](plans/M18-live-graduation-pipeline.md) | Ladder finiteness disclosed pre-purchase, mechanical graduation, terminal settlement, accrued-only vault. **Carries the live-program regulatory finding** | review | founder |
+| [M18-graduation-track.md](plans/M18-graduation-track.md) | Ladder finiteness disclosed pre-purchase, mechanical graduation, terminal settlement, accrued-only vault. **Carries the live-program regulatory finding** | review | founder |
 | [M19-kyc-identity.md](plans/M19-kyc-identity.md) | Placement as pinned config, dedupe as a relationship with dispositions, sanctions carve-out, real re-verification, minimization with durable evidence, funnel telemetry | review | founder |
 | [M20-wallet.md](plans/M20-wallet.md) | **New module.** The wallet as an object: closed credit list, provenance rules, two exits sharing context gates, dormancy and escheatment, float segregation | review | founder |
 

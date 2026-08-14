@@ -1,6 +1,6 @@
 ---
 status: review
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M17-offers-engine.md, M18-live-graduation-pipeline.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M17-offers-engine.md, M18-graduation-track.md]
 last_updated: 2026-08-14
 ---
 
@@ -50,7 +50,7 @@ Three consequences that this module must hold, and the third is the one a naive 
 | Pricing and issuing an offer | [M17](M17-offers-engine.md) | M14 decides **who has earned what**; M17 decides what an offer costs, renders it, and issues the credit or coupon. One offers engine, one place where money and price meet |
 | Changing a plan parameter | [M1](M01-rules-engine.md) config plus [M3](M03-billing-checkout.md)'s publish path | M14 never writes a cap, a split, a gap, or a ladder. It **proposes a plan version** like any other change (INV-M14-02, AS-M14-06) |
 | Sending anything | [M16](M16-notification-center.md) and [M10](M10-integrations.md) | Including the guards. A win-back computed here is still suppressed at send by live state ([M10](M10-integrations.md) AS-M10-03) |
-| The payout ladder or graduation | [M1](M01-rules-engine.md), [M18](M18-live-graduation-pipeline.md) | The ladder is structural ([parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14)). Loyalty may not extend it, shorten it, or sell relief from it |
+| The payout ladder or graduation | [M1](M01-rules-engine.md), [M18](M18-graduation-track.md) | The ladder is structural ([parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14)). Loyalty may not extend it, shorten it, or sell relief from it |
 | Deciding who is trustworthy | [M7](M07-risk-abuse.md) | Loyalty status is **never** a risk mitigant. A tier is a record of spending and surviving, not of honesty (AS-M14-05) |
 
 ### 1.4 Invariants

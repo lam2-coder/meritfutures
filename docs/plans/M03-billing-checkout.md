@@ -304,6 +304,20 @@ All in the approved [EVENTS.md section 4](../architecture/EVENTS.md) except the 
 
 ---
 
+## 7.9 Checkout enrichment (ADR-023)
+
+A **SEON-class digital-footprint vendor** runs at checkout, supplying email and phone footprint, device, IP, VPN and datacenter detection, and BIN intelligence. It is [D-15](M07-risk-abuse.md) from M07's side; what M03 owns is the call and its failure behavior.
+
+| Property | Requirement |
+|---|---|
+| Adapter | **Vendor-agnostic**, same reasoning as the platform adapter. This is a commodity data-network product and the vendor will be re-evaluated |
+| Launch posture | **Observe mode.** Signals recorded and scored, **nothing blocked**, until thresholds are tuned on Merit's own traffic rather than the vendor's defaults |
+| Enforcement posture | **Soft decline plus review queue. Never a silent decline.** A refused customer is told, and a human can reverse it |
+| **Failure behavior** | **Non-blocking in observe mode; fail-open on timeout in enforcement mode** |
+| Disclosure | A new sub-processor in the privacy policy's sharing categories, and a line in the [Cost Stack](../../research/calibration/README.md) |
+
+**The fail-open rule is the one to defend in review.** A checkout that cannot complete because an enrichment call timed out has converted a fraud control into an outage, and the trade is lopsided: the cost of letting a rare bad purchase through is one account's exposure, while the cost of a blocked checkout is every purchase during the incident. Enrichment is a signal, not a gate, and a signal that can stop revenue is misconfigured.
+
 ## 8. Test plan
 
 ### 8.1 Suites

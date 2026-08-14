@@ -1,12 +1,32 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ADVERSARY_DOSSIER.md]
-last_updated: 2026-08-13
+last_updated: 2026-08-14
 ---
 
 # Security Landscape (Constitution Appendix D0)
 
 Prop-firm/trading-platform breach history, fintech incident patterns, an OWASP ASVS L2 + API Top-10 baseline, a control checklist mapped to every B2 endpoint, and 10 attack scenarios to merge into the B4 battery. Researched 2026-08-13; citations inline. This doc feeds architecture/SECURITY.md (Wave 2) and the per-module STRIDE one-pagers.
+
+
+## Confirmed breach precedent: Topstep, September to October 2025 (primary source)
+
+**The first confirmed breach of a major futures prop firm, and the corpus's strongest empirical argument for PII minimization.**
+
+| Fact | Detail |
+|---|---|
+| Window | September to October 2025 |
+| Presentation | **A DDOS that masked a PII exposure.** The visible event was an availability incident; the actual loss was data |
+| Disclosure | Notice filed with the **Massachusetts Attorney General**, which is what makes this primary-source rather than forum rumor |
+| Remediation | **TransUnion** credit monitoring offered to affected individuals |
+
+**Three lessons, and the first one is the reason this entry exists.**
+
+1. **The noisy incident was not the incident.** A DDOS is the loudest possible event and it consumed the response. Any incident runbook that treats availability and confidentiality as separate playbooks will run the wrong one first. This belongs in [ops/runbooks](../docs/ops/runbooks/README.md) as a named trigger: **a DDOS against Merit is also a data-exfiltration alarm until proven otherwise.**
+2. **It is the empirical case for provider-side PII minimization.** Merit's [M19](../docs/plans/M19-kyc-identity.md) design already holds identity documents at the provider and keeps only decisions, scores and metadata. Topstep is what the alternative costs: a firm holding its own PII corpus, a notice to a state AG, and a credit-monitoring bill. **The minimization is not a privacy nicety; it is the reason a Merit breach would be a smaller sentence in a smaller letter.**
+3. **The remediation is the floor, not the plan.** Credit monitoring after the fact is what a firm offers when it held data it did not need. Merit's equivalent position should be that the interesting data was never on our side of the boundary.
+
+**The counter-pressure to hold honestly:** minimization creates an **evidence dependency on a third party** ([M19 AS-M19-07](../docs/plans/M19-kyc-identity.md)). If the provider relationship ends, Merit keeps its decisions and scores but not the underlying documents, so an enforcement contested years later rests on `evidence_snapshot` rather than on an image. That trade is still the right one, and it is a trade rather than a free win.
 
 ## 1. Breach history and incident patterns
 
