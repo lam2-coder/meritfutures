@@ -43,7 +43,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors | review | founder |
 | [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | review | founder |
 | [STATE_MACHINES.md](architecture/STATE_MACHINES.md) | Account / payout / flag / identity lifecycles as Mermaid | review | founder |
-| [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | draft | claude |
+| [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, cost guards, E doctrine | review | founder |
 | [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | review | founder |
 
 ## docs/plans/ (Wave 3, dependency order, M1 first always)
