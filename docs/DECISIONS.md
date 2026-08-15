@@ -27,7 +27,7 @@ The Open Decisions Register (constitution section 10) resolves into entries here
 | 001 to 032 | merged to `main` | **allocated.** 026 to 030 are the schema-delta fold; 031 and 032 are the `published_statistics` rulings. **They landed with PR #4 on 2026-08-14**, and their numbers are now cited inside merged migration comments, `DELTA_MANIFEST` and `DATA_MODEL`, which is why they were the ones that did not move |
 | **033** | merged to `main` (PR #5) | **allocated.** The citation-reviewer ADR, renumbered from `031` on that branch under the ruling below |
 | **034** | merged to `main` (PR #6) | **allocated.** The allocation ruling itself, and the COUNT GATE |
-| **035** | `claude/builder-reviewer-loop-rykvhs`, the DATA_MODEL post-migration rewrite | **reserved, unmerged.** The `plan_versions` immutability-trigger defect, below |
+| **035** | `claude/merit-futures-briefing-7auoor`, the PR #7 / PR #8 reconciliation | **reserved, unmerged. ACCEPTED 2026-08-15.** The `plan_versions` immutability-trigger defect, raised on `claude/builder-reviewer-loop-rykvhs` and ruled at the reconciliation that folded both branches into one. **The fix is `0028` and the structural fix is `CI-06j`** |
 
 **Gaplessness is asserted over allocated plus reserved**, so a branch holding a reserved number shows a hole in this file and passes. A branch inventing an unreserved number fails.
 
@@ -1047,7 +1047,7 @@ The constitution already says why: **"Looks confident is not a signal. AI mistak
 - **Consequences:** [STRATEGY section 4.4](testing/STRATEGY.md) gains CI-06f and CI-06g. This file gains the allocation table, and claiming a number there is now a step in writing an ADR. [INDEX](INDEX.md)'s two count claims are converted to generated spans as the worked example. **The sweep is the gate's first run and is not done here**: the generator and the CI job arrive with the CI setup, alongside CI-06a to CI-06e, which are likewise specified and not yet wired. **Until then these two gates are documented, not running**, and that is stated rather than implied.
 - **Alternatives considered:** allocate ADR numbers at merge instead of at write time (rejected: the number is cited inside the ADR's own body and across other documents while the branch is in flight, so late allocation moves the edit cost from one `sed` to a corpus-wide rewrite); use a timestamp or a hash instead of a sequence (rejected: the sequence is readable and cited in conversation, and "ADR-031" is worth more than an opaque key); **ban counts outright with no generated form** (rejected: some counts are load-bearing in gate summaries, where deleting the number would make the summary useless); **rely on review** (rejected on the evidence above, five for five, one of them one sentence from its own refutation).
 
-## ADR-035: `0027`'s published-plan-version immutability trigger reads a column that does not exist  (2026-08-15, status: proposed)
+## ADR-035: `0027`'s published-plan-version immutability trigger reads a column that does not exist  (2026-08-15, status: accepted)
 
 - **Context:** The DATA_MODEL post-migration rewrite verified each documented invariant by **executing** it against a clean PostgreSQL 16 install of all 27 migrations rather than by reading it. One failed.
 
@@ -1082,3 +1082,45 @@ The constitution already says why: **"Looks confident is not a signal. AI mistak
   - **Treat it as a detail rather than an ADR.** Rejected: the migration and the approved design disagree about **what the system does**, not about how it is written, and that is the line the rewrite was instructed to escalate at rather than reconcile quietly.
 
 - **Consequences:** DATA_MODEL §13 marks the invariant as defective as merged and names this ADR; §17 carries the executed evidence. Nothing merges a fix without the founder's E2 read, because the superseding migration is a money-path file. **Until it lands, `plan_versions` rows are effectively frozen once published**, which is safe in the direction that matters and blocks a delisting nobody has needed yet. The migration count moves from 27 to 28 when it does.
+
+- **Founder approval (2026-08-15): ACCEPTED**, at the PR #7 / PR #8 reconciliation. **The fix is [`0028_supersede_plan_version_immutability.sql`](../packages/db/migrations/0028_supersede_plan_version_immutability.sql)**, and it carries an `E2 READ: MONEY PATH` header like every other money-path file. `0027` is not edited.
+
+### Amendments made at acceptance, none of them cosmetic
+
+**Read these before the E2 read on `0028`. Two of the four are larger than the ADR as proposed.**
+
+| # | Amendment | Why |
+|---|---|---|
+| **1** | **The pinned column set is DERIVED, not listed.** The guard compares `to_jsonb(NEW)` against `to_jsonb(OLD)` excluding the three columns permitted to move, so a column added to `plan_versions` by a future migration is pinned automatically | The ADR proposed "pins the full set of columns the promise covers", which in practice means a hand-written list of eleven names. **A hand-maintained list is the same object as a hand-maintained count, and this corpus has now found nine of those wrong.** The failure mode is silent and arrives with the next `ALTER TABLE` |
+| **2** | **`public_visible` is permitted to move, and it is called out rather than quietly permitted.** `plan_versions_visible_implies_published` (`0004`) forbids `public_visible = true` on a non-published row | **Pinning it would have produced a second undelistable-plan bug against a different constraint.** Retiring a version that is on sale would have been impossible, and the error would have named a CHECK rather than a column. Found by executing the fix, not by reading it |
+| **3** | **A RETIRED row is now frozen absolutely.** `0027`'s guard fired only when `OLD.status = 'published'`, so a retired row was completely unguarded: **retire a version, rewrite its `rules`, and every account pinned to that `plan_version_id` silently trades under new rules.** A two-step version of the exact retroactive change B4 #12 exists to make impossible | **This is a money-path widening and it was not in the ADR as proposed. [STATE_MACHINES section 9](architecture/STATE_MACHINES.md) already rules retirement terminal (`retired --> [*]`)**, so `0028` enforces the approved design rather than extending it, but it is enforcement that did not exist before and the E2 read must cover it |
+| **4** | **SEVEN `array_length` CHECKs, not six.** `correlation_groups_is_a_group` (`0008:223`), `wallet_dormancy_review_was_noticed` (`0011:277`), `integration_contracts_enabled_has_fields` (`0018:65`), `notification_kinds_has_channels` (`0019:73`), `page_revalidations_has_paths` (`0020:85`), `round_trips_has_entry` (`0022:64`), `round_trips_closed_has_exit` (`0022:66`) | [DELTA_MANIFEST section 12](../packages/db/DELTA_MANIFEST.md) said "Six further" **above its own list of seven**, and the reconciliation brief quoted the six onward. The eighth hand-maintained count found wrong, in the section recording the seventh. Verify with `grep -n 'array_length' packages/db/migrations/*.sql`; the three remaining hits are `0027`'s **correct** `IF array_length(...) IS NOT NULL` idiom |
+
+### The structural fix: CI-06j
+
+**[CI-06j](testing/STRATEGY.md): every `NEW.`/`OLD.` column a PL/pgSQL trigger body names must resolve against the columns the migrations declare.** It is [LEDGER-C2](#adr-027-trader_withdrawable-and-trader_wallet-are-two-distinct-positions--2026-08-14-status-accepted-reversing-an-earlier-ruling-in-this-same-session)'s idea applied to columns: LEDGER-C2 asserts that a ledger entry's account **class** was declared, and this asserts that a trigger's **column** was declared. Both exist because "it reads correctly" is not a check.
+
+**It found this defect from the tree, with no database, on its first run.** That matters more than the fix: the defect survived a founder-grade review, a 27-file install check, and every probe in DELTA_MANIFEST section 10, because PL/pgSQL resolves record fields at execution and nothing had ever executed the one transition the design permits.
+
+**The probe that proves it ships with it.** [`scripts/db/probe_plan_version_immutability.sql`](../scripts/db/probe_plan_version_immutability.sql), 14 assertions, and **it leads with the SUCCESS case** rather than with a rejection. Every existing probe attempted a mutation and asserted a rejection, so every one of them passed against a guard that rejected **everything**. That is how a guard broken in exactly this way stays invisible.
+
+**Counterfactual, executed against a clean install of `0001` to `0027` only:**
+
+```
+-- the permitted transition, pre-0028
+ERROR:  record "new" has no field "config"
+CONTEXT:  PL/pgSQL function assert_published_plan_version_immutable() line 5 at IF
+
+-- the seven empty-array CHECKs, pre-0028
+correlation_groups_is_a_group              -> EMPTY ARRAY ACCEPTED
+wallet_dormancy_review_was_noticed         -> EMPTY ARRAY PASSED THE CHECK
+integration_contracts_enabled_has_fields   -> EMPTY ARRAY ACCEPTED
+notification_kinds_has_channels            -> EMPTY ARRAY ACCEPTED
+page_revalidations_has_paths               -> EMPTY ARRAY ACCEPTED
+round_trips_has_entry                      -> EMPTY ARRAY PASSED THE CHECK
+round_trips_closed_has_exit                -> EMPTY ARRAY PASSED THE CHECK
+
+-- the same seven, post-0028: all seven rejected by CHECK
+```
+
+**The gate that would have caught it now exists, and it has been watched failing.** [`scripts/corpus/falsify.mjs`](../scripts/corpus/falsify.mjs) runs every gate against the tree, where it must pass, and against a copy carrying one seeded violation aimed at it, where it must fail **on that finding** rather than merely exit non-zero. All eleven do both.

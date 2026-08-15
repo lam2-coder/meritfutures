@@ -24,7 +24,11 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [README.md](../README.md) | Repository front door | draft | founder |
 | [.claude/settings.json](../.claude/settings.json) | Committed hook set. Corpus phase: `SessionStart` pull, `Stop` push ([ADR-D1](DECISIONS.md)) | approved | founder |
 | [.claude/agents/reviewer.md](../.claude/agents/reviewer.md) | The citation reviewer. Verifies every factual claim against a primary source at `file:line`; verdicts to `docs/reviews/` ([ADR-033](DECISIONS.md)) | proposed | founder |
-| [scripts/corpus/gates.mjs](../scripts/corpus/gates.mjs) | The corpus-integrity gates as a runnable check, no dependencies. `node scripts/corpus/gates.mjs check` runs CI-06a to CI-06g plus **CI-06i**; `generate` rewrites every CI-06g span from its named query ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
+| [.github/workflows/corpus.yml](../.github/workflows/corpus.yml) | The CI wiring. `integrity` runs `gates.mjs` and proves the spans regenerate to nothing; `migrations` is **CI-06h**: the forward-only apply under `ON_ERROR_STOP`, the must-fail re-apply, the counts read from `pg_indexes` and `pg_constraint`, and the ledger probes | approved | founder |
+| [scripts/corpus/gates.mjs](../scripts/corpus/gates.mjs) | The corpus-integrity gates as a runnable check, no dependencies. `check` runs **CI-06a to CI-06j plus [ADR-026](DECISIONS.md)'s manifest gate, eleven in all**; `generate` rewrites every CI-06g span from its named query; `anchors` lists what a file offers ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
+| [scripts/corpus/falsify.mjs](../scripts/corpus/falsify.mjs) | **Runs every gate against a tree carrying one seeded violation aimed at it, and fails if the gate does not fail on that finding.** A gate nobody has watched fail is not a gate ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
+| [scripts/db/probe_ledger_constraints.sql](../scripts/db/probe_ledger_constraints.sql) | LEDGER-C1, LEDGER-C2 and zero-sum probed against a real database, checked by error message rather than by exception class, plus the counterfactual that proves C1 is not redundant ([ADR-027](DECISIONS.md)) | approved | founder |
+| [scripts/db/probe_plan_version_immutability.sql](../scripts/db/probe_plan_version_immutability.sql) | 14 assertions on `plan_versions` immutability and the seven `cardinality()` conversions. **Leads with the permitted transition succeeding**, which is the probe that did not exist ([ADR-035](DECISIONS.md)) | approved | founder |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |
@@ -97,7 +101,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 ## docs/testing/ (Wave 4)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
-| [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 gains CI-06f (ADR numbers unique and gapless) and CI-06g (the COUNT GATE) under [ADR-034](DECISIONS.md)** | approved | founder |
+| [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 now runs**: CI-06a to CI-06j plus [ADR-026](DECISIONS.md)'s manifest gate, all eleven passing clean and failing dirty under `falsify.mjs`. CI-06f and CI-06g are [ADR-034](DECISIONS.md)'s; CI-06j is [ADR-035](DECISIONS.md)'s | approved | founder |
 | [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | **Consolidated. 257 scenarios**, contiguous, deduplicated, with an ownership partition, the reconciliation from 242, and the coverage map | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | **Written.** Port spec, ten population parameters, eleven calibration bands, eight outputs, and the `mc_lifecycle.py` checklist | approved | founder |
 

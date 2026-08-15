@@ -137,8 +137,26 @@ Nothing.
 
 | # | Finding | Needs |
 |---|---|---|
-| **[ADR-035](DECISIONS.md)** | **`0027`'s published-plan-version immutability trigger reads `NEW.config`; the column is `rules`.** Proven by executing it, not by reading it. Every update to a published row raises, so the promise holds by accident and **the ruled `published -> retired` transition is refused too: no plan version can be retired.** A draft row updates normally, which is why the install check and every existing probe missed it | **A founder ruling and a superseding migration.** `0027` is merged, so it is not edited. The migration set goes 27 to 28 |
-| **`OI-01`** | **`liability_snapshots` exists in the folded shape only**, and the approved design's four reserve-coverage fields have no home. §8 now recommends a separate table rather than widening this one, with the reasoning, and does not decide it | A founder ruling before [M06](plans/M06-admin-ops-console.md) |
+| **[ADR-035](DECISIONS.md)** | **`0027`'s published-plan-version immutability trigger reads `NEW.config`; the column is `rules`.** Proven by executing it, not by reading it. Every update to a published row raises, so the promise holds by accident and **the ruled `published -> retired` transition is refused too: no plan version can be retired.** A draft row updates normally, which is why the install check and every existing probe missed it | **ACCEPTED 2026-08-15.** Fixed by [`0028`](../packages/db/migrations/0028_supersede_plan_version_immutability.sql), a superseding migration; `0027` is not edited. Set goes 27 to 28. **Two amendments at acceptance are larger than the ADR as proposed** and are named in it |
+| **`OI-01`** | **`liability_snapshots` exists in the folded shape only**, and the approved design's four reserve-coverage fields have no home. §8 now recommends a separate table rather than widening this one, with the reasoning, and does not decide it | **STILL OPEN, deliberately.** A founder ruling before [M06](plans/M06-admin-ops-console.md). The reconciliation session was instructed not to decide it and did not |
+
+---
+
+## The PR #7 / PR #8 reconciliation (2026-08-15)
+
+**Two branches overlapped on 11 of 13 files and both independently wrote `scripts/corpus/gates.mjs`. They are now one branch and nothing was dropped.**
+
+**The founder's ruling on the runner, and the criterion is the transferable part.** PR #8's `gates.mjs` is the base **because it had been falsified**: it produced 109 phantom broken anchors and 119 phantom refless edge cases, both were traced to bugs in the runner rather than to the corpus, both were fixed, and only then did it find 27 real broken anchors. PR #7's runner had not been watched fail correctly. **A gate nobody has watched fail is not a gate**, and that is now [`scripts/corpus/falsify.mjs`](../scripts/corpus/falsify.mjs) rather than a judgment about a transcript.
+
+| From | What landed |
+|---|---|
+| **PR #8** | `gates.mjs` as the base. The DATA_MODEL post-migration rewrite, all 96 tables. `ADR-035`. `CI-06i` |
+| **PR #7** | `.github/workflows/corpus.yml` **unchanged**, the only CI wiring either branch had. `probe_ledger_constraints.sql`. The STATE reconciliation and item **A**'s closure (`U-06`, total 94). `CI-06h`. **[ADR-026](DECISIONS.md)'s manifest completeness gate, which PR #8 had no equivalent of.** `CI-06d` contiguity, `CI-06b` `depends_on` resolution, `CI-06a` duplicate-heading anchors, the `anchors` subcommand |
+| **Neither** | **`CI-06j`**, the gate that would have caught `ADR-035`. `falsify.mjs`. `0028`. `probe_plan_version_immutability.sql` |
+
+**Eleven checks run in one dependency-free runner, and every one has been watched pass clean and fail dirty.** The three things `falsify.mjs` found on its first run are in [STRATEGY section 4.4](testing/STRATEGY.md); the shortest of them is that **a gate failing for a reason nobody planted proves nothing**, which two of the eleven were doing.
+
+**What was dropped, in writing rather than by omission:** PR #7's narrower per-gate document scopes, its finding-count exit accounting, and its prose. Nothing else. **`falsify.mjs` is not wired into CI**, because the ruling was to take `corpus.yml` unchanged and adding a step is a change; it is a three-line addition and a founder call.
 
 ---
 
@@ -146,4 +164,24 @@ Nothing.
 
 1. **The founder's E2 read** on the <!--gen:e2_files-->18<!--/gen--> money-path migration files, and a ruling on item **B** ([ADR-030](DECISIONS.md)'s stale config list, wrong in two of four). **A** and **C** are closed. Nothing merges first.
 2. **In parallel, the three calendar items**: book the vendor call, book the counsel sitting, and send the PSP applications the day the capital decision lands.
-3. **Rule `OI-01`** (`liability_snapshots`, surfaced with a recommendation and deliberately not decided by a session), then the append-only-grant check (`OI-03`, whose document half is now exact in [DATA_MODEL §1](architecture/DATA_MODEL.md)), then the first module against this schema. **[ADR-035](DECISIONS.md) is accepted and `0028` is written**; it needs the E2 read like every other money-path file, not a separate ruling.
+3. **Rule `OI-01`** (`liability_snapshots`, surfaced with a recommendation and deliberately not decided by a session), then the rest of **P1** below. **[ADR-035](DECISIONS.md) is accepted and `0028` is written**; it needs the E2 read like every other money-path file, not a separate ruling.
+
+---
+
+## What actually remains of P1 (2026-08-15)
+
+**[DELIVERY_PLAN section 4](DELIVERY_PLAN.md) gives P1 three contents: the monorepo scaffold, the reconciled schema and migrations, TradingCalendar as data, and CI carrying the full [STRATEGY](testing/STRATEGY.md) gate inventory.** Its definition of done is **"every VG gate wired and failing correctly on a seeded violation, VG-12 not deferred"**. Measured against that, honestly:
+
+| P1 item | State | What is actually left |
+|---|---|---|
+| **The reconciled schema and migrations** | **DONE**, pending the E2 read | <!--gen:migration_files-->28<!--/gen--> files, 96 tables, 326 indexes, 347 check constraints, 6 triggers, verified on a clean PostgreSQL 16 install. Nothing to build. **The founder's read is the remaining work and it is not engineering** |
+| **CI-06, corpus integrity** | **DONE and exceeded** | Eleven checks, all passing clean and failing dirty. The row's own definition of done is met **for CI-06 only** |
+| **CI-06h, migration install** | **WIRED, never executed by GitHub** | The job exists in `corpus.yml` and was verified by hand against PostgreSQL 16. **It has not run in Actions once**, because no push has reached a runner with the workflow present. First push proves it or does not |
+| **The monorepo scaffold** | **NOT STARTED** | There is no `package.json`, no workspace file, no `tsconfig`, no `apps/`, no test runner. `packages/db` holds `.sql` and `.md` and nothing executable. **Everything in the tree today is documents, SQL, and two `.mjs` scripts with no dependencies** |
+| **TradingCalendar as data** | **SCHEMA ONLY** | `trading_calendar` exists in `0004` with its ruled semantics (half day counts as a full day, a halt advances counters but not win days). **There is not one row of data anywhere in the repository, and no seed mechanism**: `grep -c 'INSERT INTO' packages/db/migrations/*.sql` is zero across the set. The CME session calendar has to be sourced, encoded, and given a maintenance path |
+| **CI-01 to CI-05, CI-07 to CI-09** | **NOT STARTED** | `.github/workflows/` holds exactly one file. Lint and types, unit and property, golden files, integration, security static, build checks, E2E and the nightly do not exist |
+| **VG-1 to VG-12** | **NOT STARTED** | Twelve gates, ten of which need the scaffold to exist before they can be wired. **VG-12 is explicitly not deferrable** and needs a lockfile before it means anything |
+
+**The honest summary: two of P1's three named contents are substantially done and the third has not begun.** Schema and corpus-integrity CI are real and verified. **The scaffold is the whole of what is left, and it is the thing every remaining VG gate is blocked on** — a gate cannot fail correctly on a seeded violation in a repository with nothing to lint, nothing to type-check and nothing to build.
+
+**One thing the reconciliation proved about P1's definition of done, and it is worth carrying into the scaffold session.** "Failing correctly on a seeded violation" is not one check, it is two: the gate must fail, and it must fail **on the seeded finding**. Two of the eleven corpus gates failed on a truncated tree copy and would have been scored as working. `falsify.mjs` is the shape that catches that, and the VG gates should arrive with the same harness rather than with a claim.
