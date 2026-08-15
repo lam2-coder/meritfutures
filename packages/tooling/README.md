@@ -41,9 +41,13 @@ Plan parameters are rows in `plan_versions.rules` and `plan_version_sizes`.
 There is no plan parameter anywhere in application code, and that includes
 here.
 
-## Not here yet
+## What is deliberately not in the base
 
-VG-4, the ESLint rule banning raw Drizzle client imports outside `packages/db`
-([ADR-008](../../docs/DECISIONS.md)), needs the `scopedDb(identity)` accessor to
-exist before it can name what it permits. It lands with CI-01, which is a later
-session in [P1 section 6](../../docs/plans/P1-monorepo-scaffold.md).
+VG-4 landed with CI-01 (session S-C) as `merit/no-raw-db-client`, and it is
+attached in the workspace root's [`eslint.config.js`](../../eslint.config.js)
+rather than here. That is the same reason `merit/engine-purity` is attached
+there: the base holds the rules that apply to **every** file, and a rule whose
+whole meaning is the path it is scoped to belongs beside its glob.
+
+Type-aware linting is still off, for the reason stated in `eslint.base.js`.
+`no-raw-db-client` did not need it: what it reads is the module specifier.

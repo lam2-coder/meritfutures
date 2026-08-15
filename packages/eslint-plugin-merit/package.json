@@ -14,10 +14,12 @@
   "peerDependencies": {
     "eslint": "catalog:"
   },
+  "//": "`typescript-eslint` is a TEST dependency only: RuleTester must parse the files these rules actually run over, which are TypeScript. Under espree a `import type { X } from 'y'` case is a parse error rather than a result, and a rule tested only on the JavaScript subset is a rule whose TypeScript behavior is a guess. It is a `catalog:` reference, so no new version enters the tree.",
   "devDependencies": {
     "@types/node": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
     "vitest": "catalog:"
   }
 }

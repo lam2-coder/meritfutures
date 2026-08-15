@@ -18,6 +18,35 @@ export default [
   ...base,
 
   {
+    // -------------------------------------------------------------------------
+    // VG-4. EVERY PATH BUT ONE.
+    // -------------------------------------------------------------------------
+    // STRATEGY section 4.2 phrases VG-4 over "app paths"; ADR-008 and
+    // packages/db's own header phrase the invariant it protects over the
+    // complement: `packages/db` is THE ONLY PACKAGE PERMITTED TO IMPORT THE
+    // DRIZZLE CLIENT. Those two are not the same set, and the wider one is
+    // correct. A raw connection opened inside `packages/rithmic` or
+    // `packages/tooling` is exactly as unscoped as one opened in `apps/portal`,
+    // and the narrow reading would have left the rule silent on every path that
+    // is not an app.
+    //
+    // THE EXCEPTION IS ONE `ignores` LINE, IN THIS FILE, AND THAT IS
+    // DELIBERATE. An allowlist inside the rule is a list a rule change can
+    // widen without a reviewer reading the word "ignores"; a line here is a
+    // diff on the file whose entire subject is which rules apply where.
+    //
+    // `test/` IS IN SCOPE. A test that opens its own connection is the same
+    // unscoped query with a shorter lifetime, and CI-04's integration suite
+    // reaches its database through the accessor like everything else.
+    files: ['apps/**/*.ts', 'packages/**/*.ts'],
+    ignores: ['packages/db/**'],
+    plugins: { merit },
+    rules: {
+      'merit/no-raw-db-client': 'error',
+    },
+  },
+
+  {
     // THE ENGINE'S SOURCE, AND ONLY ITS SOURCE.
     //
     // `test/` is deliberately out of scope. A property suite generates dates to

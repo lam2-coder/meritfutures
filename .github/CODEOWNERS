@@ -1,0 +1,48 @@
+# =============================================================================
+# .github/CODEOWNERS
+# =============================================================================
+# VG-12'S HUMAN-APPROVAL HALF, WHICH IS A POLICY AND NOT A JOB.
+#
+# STRATEGY section 4.2 gives VG-12 four parts: `--frozen-lockfile`, SCA, SBOM,
+# and "human approval for any new package". CI-05 enforces the first three
+# mechanically. The fourth cannot be a workflow step, because a job can see that
+# the dependency surface changed and cannot see that a human agreed to it.
+# Pretending otherwise would produce the worst available outcome: a green check
+# that reads as an approval nobody gave.
+#
+# So the approval is enforced where GitHub can enforce it, by making a change to
+# any of the files below require this repository's owner as a reviewer. THE
+# BRANCH PROTECTION RULE IS THE OTHER HALF OF THIS FILE and it is not in the
+# repository: "Require review from Code Owners" must be on for the default
+# branch, or this file is documentation. CI-05 prints the dependency surface it
+# sees change on a pull request, so the requirement is visible in the log
+# whether or not the setting is on.
+#
+# WHY THE LIST IS THE FILES AND NOT `package.json` ALONE. A package enters this
+# tree through four doors: a manifest, the catalog that resolves its version,
+# the lockfile that pins its tree, and the `.npmrc` settings that decide whether
+# any of that is enforced. `save-exact` turned off is a new package admission
+# with no diff on any manifest.
+
+# The dependency surface, VG-12.
+/pnpm-workspace.yaml    @lam2-coder
+/pnpm-lock.yaml         @lam2-coder
+/.npmrc                 @lam2-coder
+/package.json           @lam2-coder
+apps/*/package.json     @lam2-coder
+packages/*/package.json @lam2-coder
+
+# The gates themselves. A workflow edit can turn any gate in this repository off
+# and the diff that does it is three characters.
+/.github/workflows/     @lam2-coder
+/.github/CODEOWNERS     @lam2-coder
+/scripts/               @lam2-coder
+/packages/tooling/      @lam2-coder
+/packages/eslint-plugin-merit/ @lam2-coder
+/.semgrep/              @lam2-coder
+
+# Migrations are sacred: forward-only, reviewed on main, never edited after
+# merge, only superseded, and every money-path file gets the founder's
+# line-by-line read (constitution E2). This line does not create that
+# requirement, it makes GitHub ask for it.
+/packages/db/migrations/ @lam2-coder
