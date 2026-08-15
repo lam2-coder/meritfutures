@@ -54,7 +54,7 @@ See [docs/STATE.md](docs/STATE.md) for the post-FREEZE position, the nine surviv
 ## Working agreements (from section 9, applicable pre-FREEZE)
 - Plan before content: waves advance only through founder-approved gates.
 - Small conventional commits referencing the constitution section or doc.
-- Never weaken a gate to pass it; every discovered gap becomes a docs/EDGE_CASES.md entry.
+- Never weaken a gate to pass it; every discovered gap becomes a docs/edge-cases/ entry.
 
 ## Session-length regime (ADR-003)
 - **Money paths** (rules-engine, payout, ledger, auth): one objective per session, fresh session per slice, `/clear` between unrelated tasks. Context poisoning on these diffs is catastrophic.

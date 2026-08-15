@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [M12-transparency-platform.md, ../decisions/README.md, ../GLOSSARY.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M05-payout-system.md, M09-marketing-site.md, M20-wallet.md]
+depends_on: [M12-transparency-platform.md, ../decisions/README.md, ../GLOSSARY.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M05-payout-system.md, M09-marketing-site.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
 
@@ -8,7 +8,7 @@ last_updated: 2026-08-14
 
 **This is a sign-off artifact for the Wave 4 gate**, drafted per [OQ-M12-01](../decisions/gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md)'s ruling at the batch 2 gate. Each definition below is the exact arithmetic Merit will publish about itself, and **each needs a founder decision before any data exists**, which is the only honest moment to make it.
 
-**Why this cannot wait, in one paragraph.** A pass rate is not a number, it is a **choice of denominator**, and every available choice is defensible while moving the answer by tens of points ([AS-M12-01](M12-transparency-platform.md), [EC-094](../EDGE_CASES.md)). Choosing after the data exists means choosing with knowledge of the result, which is indistinguishable from selecting the flattering one no matter how honest the chooser. **The whole value of the transparency platform is created by the credible possibility of publishing something bad**, and that credibility comes from precommitment rather than from accuracy. GS-171 refuses a definition written with a backdated `effective_from` at write time, for exactly this reason.
+**Why this cannot wait, in one paragraph.** A pass rate is not a number, it is a **choice of denominator**, and every available choice is defensible while moving the answer by tens of points ([AS-M12-01](M12-transparency-platform.md), [EC-094](../edge-cases/EC-094.md)). Choosing after the data exists means choosing with knowledge of the result, which is indistinguishable from selecting the flattering one no matter how honest the chooser. **The whole value of the transparency platform is created by the credible possibility of publishing something bad**, and that credibility comes from precommitment rather than from accuracy. GS-171 refuses a definition written with a backdated `effective_from` at write time, for exactly this reason.
 
 **The three binding requirements from the ruling**, applied to every row below:
 
@@ -29,7 +29,7 @@ These apply to every statistic and they are the ones that move the numbers most.
 | G-3 | A reset | **A new attempt.** A trader who resets and passes has passed on their second attempt, and the page says so | Counting a reset-and-pass as one success inflates the rate by the entire reset population, which is the largest single distortion available after G-1 |
 | G-4 | Grain | **Per account**, with a **per-identity figure published alongside** | One identity may hold up to ten accounts, so per-account and per-identity differ materially. Publishing only the higher one is a choice, so both are published |
 | G-5 | Window anchor | **Outcome date**, so a trailing 90 days describes outcomes that occurred in it | Anchoring on purchase date lets a slow window look better than it was, because the failures have not landed yet |
-| G-6 | Merit Rapid's cadence in ST-05 and ST-06 | Published per plan, with the **3 trading day cycle attributed to the win-day gate**, never to the cadence gap | The gap is a **dominated gate** ([EC-049](../EDGE_CASES.md)) and describing it as the reason the plan is fast would be a marketing-versus-implementation gap in a published statistic |
+| G-6 | Merit Rapid's cadence in ST-05 and ST-06 | Published per plan, with the **3 trading day cycle attributed to the win-day gate**, never to the cadence gap | The gap is a **dominated gate** ([EC-049](../edge-cases/EC-049.md)) and describing it as the reason the plan is fast would be a marketing-versus-implementation gap in a published statistic |
 
 **One more choice, which the ruling did not name and which belongs with these.** **A statistic is never suppressed because it is unflattering, and there is no endpoint that could do it.** Publication is automatic and scheduled ([M12](M12-transparency-platform.md) INV-M12-08), `POST /internal/stats/run` cannot write to `published_statistics`, and the only path to a public surface is the nightly run. That is the control that makes every choice above worth making.
 

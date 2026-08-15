@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../decisions/README.md, ../EDGE_CASES.md, GOLDEN_SCENARIOS.md, SIMULATION_HARNESS.md, ../architecture/INFRA.md, ../architecture/SECURITY.md, ../architecture/API_CONTRACT.md, ../architecture/DATA_MODEL.md, ../plans/M01-rules-engine.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/SECURITY_LANDSCAPE.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../decisions/README.md, ../edge-cases/README.md, GOLDEN_SCENARIOS.md, SIMULATION_HARNESS.md, ../architecture/INFRA.md, ../architecture/SECURITY.md, ../architecture/API_CONTRACT.md, ../architecture/DATA_MODEL.md, ../plans/M01-rules-engine.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/SECURITY_LANDSCAPE.md]
 last_updated: 2026-08-15
 ---
 
@@ -21,7 +21,7 @@ Everything below is mechanics. These four are the strategy.
 | TR-01 | **Tests come from the spec, never from the implementation.** Every golden file's expected value is computed by hand from the plan doc's prose, by somebody reading the prose rather than the code | Constitution C10's self-grading trap. A fixture written by reading the implementation proves only that the code agrees with itself, which is the property that lets an ambiguous rule ship. [M12](../plans/M12-transparency-platform.md) section 8 applies the same rule to published statistics and [GOLDEN_SCENARIOS](GOLDEN_SCENARIOS.md) section 1 states it for fixtures |
 | TR-02 | **Tests first on any money path.** Rules engine, ledger, payout, auth. The fixture exists, and fails, before the function does | Constitution section 5's opening clause and section 9's working agreements. On a money path the test is the specification, and writing it afterwards means specifying the thing that was built |
 | TR-03 | **Never weaken a test to pass it.** A failing golden file is either a bug or a founder ruling, and the second one rewrites the fixture with the ruling cited in the row | Constitution section 9. [GS-055](GOLDEN_SCENARIOS.md) and [GS-179](GOLDEN_SCENARIOS.md) are the worked examples: both changed meaning because a decision changed, both say so in the row, and neither was deleted |
-| TR-04 | **Every discovered gap becomes an [EDGE_CASES](../EDGE_CASES.md) entry plus a golden file, in that order.** No exceptions, including for gaps found in review rather than in a test run | Constitution section 9. The registry is 140 entries because this rule has been applied from the first session, and its value is entirely in never having made an exception |
+| TR-04 | **Every discovered gap becomes an [EDGE_CASES](../edge-cases/README.md) entry plus a golden file, in that order.** No exceptions, including for gaps found in review rather than in a test run | Constitution section 9. The registry is 140 entries because this rule has been applied from the first session, and its value is entirely in never having made an exception |
 
 **One consequence worth stating plainly, because it decides how much of this is affordable.** Merit has one operator. A test suite whose failures are not trusted is worse than a smaller suite whose failures are, because the first one trains its own reader to click through red. Every gate below is therefore either a **merge blocker** or an **advisory with a named owner**, and there is no third category. A check nobody would stop for is a check that gets deleted.
 
@@ -121,7 +121,7 @@ One happy path and the ten most valuable unhappy ones, all in Playwright, all ag
 | 7 | Certificate verification: valid, unknown, revoked | The verification page is the authority and the image never is. GS-102 |
 | 8 | Wallet-funded purchase and its refund | The rails never cross. GS-224 |
 | 9 | Live dashboard under feed loss | The label changes in the same render as the value. GS-133 |
-| 10 | Ladder tracker at the final ordinal | Countdown framing, with the continuation clause in the same sentence as the limit. GS-206, [EC-122](../EDGE_CASES.md) |
+| 10 | Ladder tracker at the final ordinal | Countdown framing, with the continuation clause in the same sentence as the limit. GS-206, [EC-122](../edge-cases/EC-122.md) |
 
 ### 3.6 Beta shadow-run (section 5.6): the mandatory gate to public launch
 
@@ -203,7 +203,7 @@ The batch 2 gate ruled that the docs link-check joins the inventory. It arrives 
 | CI-06a | **Link check** (lychee, including anchors) | merge | The corpus's cross-references are its navigation. 59 links broke silently before a human found them; the next 59 are caught by a robot |
 | CI-06b | **Frontmatter present and valid** on every document: `status`, `depends_on`, `last_updated` | merge | A document without a status cannot be gated, and the whole wave model is statuses |
 | CI-06c | **INDEX completeness**: every tracked document appears in [INDEX](../INDEX.md), and every INDEX row resolves | merge | "If a thing is not in INDEX.md, it does not exist" is a rule with no enforcement until this check exists |
-| CI-06d | **Registry reconciliation**: the counts stated in [EDGE_CASES](../EDGE_CASES.md) and [GOLDEN_SCENARIOS](GOLDEN_SCENARIOS.md) equal the number of entries, and every `GS-nnn` cited anywhere in the corpus exists in the registry | merge | Both counts are quoted in gate summaries, and a quoted count that drifted is a gate decided on a wrong number |
+| CI-06d | **Registry reconciliation**: the counts stated in [EDGE_CASES](../edge-cases/README.md) and [GOLDEN_SCENARIOS](GOLDEN_SCENARIOS.md) equal the number of entries, and every `GS-nnn` cited anywhere in the corpus exists in the registry | merge | Both counts are quoted in gate summaries, and a quoted count that drifted is a gate decided on a wrong number |
 | CI-06e | **Every `EC-nnn` names a golden scenario reference, and it resolves** | merge | TR-04's second half. An edge case with no fixture is a decision nobody can test |
 | CI-06f | **ADR numbers are unique and gapless.** Every `## ADR-nnn` heading in [DECISIONS](../decisions/README.md) is distinct; the allocated set runs 001 to the maximum with no holes; and **a pull request may not introduce a number already present on `main` or reserved in the allocation table** | merge | **Fails the second pull request to claim a number, rather than failing the corpus after both have merged.** The ADR number is the corpus's most-cited identifier, and two branches forking from the same `main` will both take "the next one" |
 | CI-06g | **COUNT GATE: no document states a quantity a script can derive, AND no document restates a value another document or the config owns** ([ADR-034](../decisions/ADR-034.md), extended to parameters by [ADR-037](../decisions/ADR-037.md)), unless the number sits inside a generated span the script rewrites. Either generate it into the document or delete it and point at the source. CI regenerates every span and fails if the tree changes, and scans for bare numerals adjacent to a registry noun | merge | **Every hand-maintained count in this corpus has drifted. Five for five.** A count is not a fact a document owns; it is a query result somebody pasted. **The parameter half was added when [GOLDEN_SCENARIOS section 3](GOLDEN_SCENARIOS.md) was found restating thirteen [Appendix A.1](../plans/M01-rules-engine.md#a1-core-eod-core_eod) values in the sentence that named Appendix A as their only authority, with the ladder stale at 8 against 5.** A count misleads a reader; **a plan parameter is an input to a running system**, so the same shape costs more |
@@ -298,7 +298,7 @@ Appendix F2's code-level tells and the slop-reviewer pass, wired rather than rem
 
 | Check | Implementation | Blocks |
 |---|---|---|
-| No `TODO` or `FIXME` reaches `main` | ESLint rule. A gap becomes an [EDGE_CASES](../EDGE_CASES.md) entry or gets fixed | merge |
+| No `TODO` or `FIXME` reaches `main` | ESLint rule. A gap becomes an [EDGE_CASES](../edge-cases/README.md) entry or gets fixed | merge |
 | No `as any` or type-assertion workaround outside test fixtures | ESLint rule | merge |
 | No banned constructs in the engine (dates, locales, floats, `Math.random`) | Custom ESLint rule over `packages/rules-engine` | merge |
 | Conventional commit referencing a plan section or an edge-case ID | commitlint | merge |

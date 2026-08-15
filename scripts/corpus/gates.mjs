@@ -194,7 +194,39 @@ const REGISTRIES = [
     // TABLES by CI-06f and CI-06h. Excluded here so CI-06b still checks it.
     entry: (f) => /^docs\/decisions\/(ADR-(?:\d{3}|D\d+)\.md|gates\/[^/]+\.md)$/.test(f),
   },
+  {
+    id: 'edge-cases',
+    dir: 'docs/edge-cases',
+    readme: 'docs/edge-cases/README.md',
+    // The battery file is an entry too: one file holding 22 identifiers, per
+    // ADR-043's ruling that a table row is not a document.
+    entry: (f) => /^docs\/edge-cases\/EC-\d{3}(-to-\d{3}-appendix-b4-battery)?\.md$/.test(f),
+  },
 ];
+
+// -----------------------------------------------------------------------------
+// The edge-case registry, read from the directory (ADR-043 stage 2)
+// -----------------------------------------------------------------------------
+// Same rule-2 problem as adrFiles: the input is a glob, and a glob that matches
+// nothing returns an empty array rather than throwing, so the emptiness check is
+// the whole of "a gate that cannot run is not a gate that passed" here.
+//
+// It returns the concatenated BODY rather than a list of identifiers, because
+// CI-06d and CI-06e each parse it differently: one wants definitions, the other
+// wants the two entry FORMS and their golden-scenario fields. Handing both the
+// same text keeps one reader rather than two that agree until they do not.
+function edgeCaseBody() {
+  const dir = 'docs/edge-cases';
+  if (!existsSync(join(ROOT, dir))) {
+    throw new Error(`${dir} does not exist; the edge-case registry has moved or is gone`);
+  }
+  const files = readdirSync(join(ROOT, dir))
+    .filter((f) => /^EC-\d{3}.*\.md$/.test(f))
+    .sort()
+    .map((f) => join(dir, f));
+  if (files.length === 0) throw new Error(`no EC entry files in ${dir}; the gate cannot run`);
+  return files.map((f) => read(f)).join('\n');
+}
 
 const isRegistryEntry = (file) => REGISTRIES.some((r) => r.entry(file));
 
@@ -456,7 +488,7 @@ const ci06d = {
   run() {
     const findings = [];
     const gsBody = read('docs/testing/GOLDEN_SCENARIOS.md');
-    const ecBody = read('docs/EDGE_CASES.md');
+    const ecBody = edgeCaseBody();
     const defined = (body, re) => new Set([...body.matchAll(re)].map((m) => m[1]));
     // A definition is an identifier at the start of a registry row or heading.
     const gs = defined(gsBody, /^[|#\s]*\**\s*(GS-\d{3})\b/gm);
@@ -493,7 +525,7 @@ const ci06e = {
     'TR-04\'s second half. An edge case with no fixture is a decision nobody can test.',
   run() {
     const findings = [];
-    const ecBody = read('docs/EDGE_CASES.md');
+    const ecBody = edgeCaseBody();
     const gs = new Set(
       [...read('docs/testing/GOLDEN_SCENARIOS.md').matchAll(/^[|#\s]*\**\s*(GS-\d{3})\b/gm)].map(
         (m) => m[1],
@@ -617,8 +649,7 @@ const SPAN_QUERIES = {
   // battery and live as TABLE ROWS under one heading, so counting `## EC-nnn`
   // gives 119 against the registry's 140. This is the exact trap STRATEGY names
   // when it says counting rows gives 22 and counting identifiers gives 140.
-  ec_count: () =>
-    new Set([...read('docs/EDGE_CASES.md').matchAll(/\b(EC-\d{3})\b/g)].map((m) => m[1])).size,
+  ec_count: () => new Set([...edgeCaseBody().matchAll(/\b(EC-\d{3})\b/g)].map((m) => m[1])).size,
   gs_count: () =>
     new Set(
       [...read('docs/testing/GOLDEN_SCENARIOS.md').matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1]),

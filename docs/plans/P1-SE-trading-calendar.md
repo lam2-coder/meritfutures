@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../decisions/README.md, ../GLOSSARY.md, ../STATE.md, ../EDGE_CASES.md, ../architecture/DATA_MODEL.md, ../architecture/INFRA.md, ../testing/STRATEGY.md, ../testing/GOLDEN_SCENARIOS.md, ../ops/runbooks/CRON_INVENTORY.md, P1-monorepo-scaffold.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, M12-statistic-definitions.md, FOLD-01-phone-identity.md, FOLD-02-enforcement-window-and-suspension.md, ../../packages/db/DELTA_MANIFEST.md]
+depends_on: [../decisions/README.md, ../GLOSSARY.md, ../STATE.md, ../edge-cases/README.md, ../architecture/DATA_MODEL.md, ../architecture/INFRA.md, ../testing/STRATEGY.md, ../testing/GOLDEN_SCENARIOS.md, ../ops/runbooks/CRON_INVENTORY.md, P1-monorepo-scaffold.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, M12-statistic-definitions.md, FOLD-01-phone-identity.md, FOLD-02-enforcement-window-and-suspension.md, ../../packages/db/DELTA_MANIFEST.md]
 last_updated: 2026-08-15
 ---
 
@@ -51,7 +51,7 @@ Hand-maintaining a full year is two hundred and fifty chances to be wrong. The s
 |---|---|---|
 | **Structural, offline** | A transcription slip | Coverage contiguous; no Saturday row; every full session's bounds match the stated CT rule; no holiday carries a session; the file's declared `session_count` equals its own generated array length. **Two independent statements of one number that must agree**, which is this corpus's own idiom |
 | **Cross-source, offline** | A DST error, the one class a careful reader still gets wrong | The file states **both** the CT wall time and the UTC instant for every session. The loader **verifies rather than computes**: it converts CT to UTC through `Intl` with `timeZone: 'America/Chicago'` (Node ships the IANA database with full ICU, and `.nvmrc` pins the Node version and therefore the tzdata) and refuses any row where the two disagree. The DST transitions inside coverage are asserted to land on exactly the days IANA declares and **nowhere else** |
-| **Against reality, in production** | A row that is simply wrong about a day that has already happened | [`SD-M2-04`](M02-rithmic-bridge.md)'s `fills.trading_day_vendor` and `trading_day_source` already exist for this, and AS-M2-06's divergence alarm is already specified ([EC-056](../EDGE_CASES.md), GS-090). **This plan wires the calendar to that alarm rather than inventing a second one.** It is the only mechanism in the system that can falsify a calendar row from outside the calendar |
+| **Against reality, in production** | A row that is simply wrong about a day that has already happened | [`SD-M2-04`](M02-rithmic-bridge.md)'s `fills.trading_day_vendor` and `trading_day_source` already exist for this, and AS-M2-06's divergence alarm is already specified ([EC-056](../edge-cases/EC-056.md), GS-090). **This plan wires the calendar to that alarm rather than inventing a second one.** It is the only mechanism in the system that can falsify a calendar row from outside the calendar |
 
 The third layer is the only one that can catch a wrong row, and it is retrospective by construction. That is not a shortfall to be engineered away; it is why the first two layers exist.
 
@@ -76,7 +76,7 @@ So the correction path is partitioned by whether anything depends on the day, an
 
 ## 5. Half-day sessions
 
-**The semantics are ruled and this plan does not reopen them.** A half day is a **full** trading day for every counter (B4 #3, [EC-005](../EDGE_CASES.md), GS-003, GS-032). A half day counting as half a day would make the minimum-trading-days gate a different promise in November. The only thing `is_half_day` changes is `session_close_at`.
+**The semantics are ruled and this plan does not reopen them.** A half day is a **full** trading day for every counter (B4 #3, [EC-005](../edge-cases/EC-005.md), GS-003, GS-032). A half day counting as half a day would make the minimum-trading-days gate a different promise in November. The only thing `is_half_day` changes is `session_close_at`.
 
 **The finding is that one close time cannot serve six symbols.** [`contract_specs`](../architecture/DATA_MODEL.md) lists `ES`, `MES`, `NQ`, `MNQ`, `CL`, `GC`, spanning CME, NYMEX and COMEX, whose **early closes differ by product group** while their regular hours agree. `trading_calendar` has one row per trading day and **no symbol dimension**, so one `session_close_at` is wrong for some group on every early-close day.
 

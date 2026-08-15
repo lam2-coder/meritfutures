@@ -40,12 +40,12 @@ last_updated: 2026-08-14
 | **M01 to M10** | **MUST**, unchanged | Section 8's original scope |
 | **M20 Merit Wallet** | **MUST** | Test 1. [ADR-019](decisions/ADR-019.md) is structural: the cadence anchor is the wallet-credit day, so every plan's published cycle depends on it existing |
 | **M19 KYC and identity** | **MUST** | Tests 1 and 2. Zero denial means fraud must be caught before anyone is in the money, and identity is the chokepoint. Direct plans verify at purchase and cannot ship without it |
-| **M18 graduation track**, minimal | **MUST**, partially | Test 1. **The terminal settlement is the launch-blocking part**: a graduated account holding withdrawable balance with no request path is a denial by accounting boundary ([EC-124](EDGE_CASES.md)). The ladder tracker and its finiteness disclosure are test 2. **The review-pool surface is not launch-blocking** and can follow |
+| **M18 graduation track**, minimal | **MUST**, partially | Test 1. **The terminal settlement is the launch-blocking part**: a graduated account holding withdrawable balance with no request path is a denial by accounting boundary ([EC-124](edge-cases/EC-124.md)). The ladder tracker and its finiteness disclosure are test 2. **The review-pool surface is not launch-blocking** and can follow |
 | **M16 notification center**, security and money classes | **MUST**, partially | Test 2. Freeze notices, destination-change warnings, and eligibility notices are obligations. **The preference matrix and marketing classes are not launch-blocking** |
 | **M12 transparency platform**, the machine | **MUST**, with a nuance | Test 3. It is the launch differentiator and no competitor can copy it without rebuilding their data plane. **The nuance: at a `min_sample` of 250 it publishes "not yet meaningful" on launch day.** The machine, the definitions, and the method pages must ship at launch; the numbers arrive when the sample does, and **that is the honest version rather than a compromise** |
 | **M11 certificates**, minimal | **SHOULD** | Test 3, weakly. Pass and payout cards with verification. It feeds M12's proof links and it is the cheapest social proof available. Cut the leaderboard and the deferred per-trade kind |
 | **M17 offers engine**, minimal | **SHOULD** | Commercial. Reset pricing at launch is needed; experiments, bundles, and promotional credit are not |
-| **M13 analytics and journal** | **LATER** | Retention driver, not a launch requirement. It also carries the load-contention risk against the payout path ([EC-103](EDGE_CASES.md)), which is a reason to ship it when there is slack rather than during a launch |
+| **M13 analytics and journal** | **LATER** | Retention driver, not a launch requirement. It also carries the load-contention risk against the payout path ([EC-103](edge-cases/EC-103.md)), which is a reason to ship it when there is slack rather than during a launch |
 | **M14 loyalty and retention** | **LATER** | [ADR-025](decisions/ADR-025.md) shrank it and its trigger is a **completed ladder**, which by construction nobody has for at least 25 trading days after the first funded account |
 | **M15 Discord** | **LATER** | Constitution section 10 already says post-launch |
 
@@ -111,7 +111,7 @@ Eighteen weeks. Each phase carries a definition of done that includes its tests 
 | M13 analytics and journal, M14 loyalty, M15 Discord | Post-launch, in that order |
 | M17's experiments, bundles, and promotional credit | Post-launch. Reset pricing ships in P4 |
 | M18's review-pool surface | Post-launch. **The terminal settlement ships in P5** because it is a correctness requirement |
-| M11's leaderboard and deferred per-trade certificate kind | Post-launch, and the per-trade kind may never ship ([EC-090](EDGE_CASES.md)) |
+| M11's leaderboard and deferred per-trade certificate kind | Post-launch, and the per-trade kind may never ship ([EC-090](edge-cases/EC-090.md)) |
 | [ADR-022](decisions/ADR-022.md)'s **v1.x** tier: probabilistic scoring, the signal-weight table, the M06 graph explorer | After beta produces the data the weights need. **The ordering is forced by data availability rather than by ambition** |
 | [ADR-022](decisions/ADR-022.md)'s **post-launch** tier: behavioral fingerprinting against the banned corpus | It requires a banned corpus, which requires having banned people |
 | Any live-capital program | Counsel packet item 1, and no copy until then |

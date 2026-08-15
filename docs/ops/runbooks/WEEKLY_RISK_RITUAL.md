@@ -67,5 +67,5 @@ Constitution section 7: **a weekly risk ritual checklist page in admin (loss rat
 
 ## The two questions to end on
 
-1. **What did I look at this week that I did not understand?** Write it down. It becomes an [EDGE_CASES](../../EDGE_CASES.md) entry or an investigation, and the ones that get skipped are the ones that were slightly boring.
+1. **What did I look at this week that I did not understand?** Write it down. It becomes an [EDGE_CASES](../../edge-cases/README.md) entry or an investigation, and the ones that get skipped are the ones that were slightly boring.
 2. **What would I want to have already checked, if the worst thing happened tomorrow?** If the answer is not on this list, add it.

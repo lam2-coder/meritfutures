@@ -66,7 +66,7 @@ Everything the implicated credential could reach, not everything you believe it 
 
 ## Post-mortem
 
-Within a week, written, blameless, and specific. It produces: an [EDGE_CASES](../../EDGE_CASES.md) entry, a golden file where the failure is testable, and at least one change to this runbook. **A post-mortem that changes no procedure did not find the cause.**
+Within a week, written, blameless, and specific. It produces: an [EDGE_CASES](../../edge-cases/README.md) entry, a golden file where the failure is testable, and at least one change to this runbook. **A post-mortem that changes no procedure did not find the cause.**
 
 ## Standing controls this runbook depends on
 

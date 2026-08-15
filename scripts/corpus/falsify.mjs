@@ -47,8 +47,12 @@ const edit = (dir, file, fn) => {
   const p = join(dir, file);
   writeFileSync(p, fn(readFileSync(p, 'utf8')));
 };
+// Accepts a string or a RegExp, and CHECKS THE ANCHOR EXISTS either way. A seed
+// whose anchor has moved must announce itself rather than replace nothing and
+// report a gate that cannot fail.
 const once = (body, needle, replacement) => {
-  if (!body.includes(needle)) throw new Error(`seed anchor not found: ${needle}`);
+  const found = typeof needle === 'string' ? body.includes(needle) : needle.test(body);
+  if (!found) throw new Error(`seed anchor not found: ${needle}`);
   return body.replace(needle, replacement);
 };
 
@@ -193,15 +197,18 @@ const SEEDS = {
     // paragraph above EC-001, the gate correctly ignores it, and the harness
     // reports a gate that cannot fail. The seed was wrong and the gate was
     // right, which is the same shape as the 109 phantom anchors.
+    // ADR-043 stage 2 moved the registry to a directory, so the seed targets the
+    // ENTRY FILE. It no longer needs to slice past the convention paragraph: the
+    // paragraph lives in the README and the entry file is only the entry, which is
+    // the split making a seed simpler rather than harder.
+    //
+    // The stale version of this seed was watched failing as SEED IS STALE before
+    // it was fixed, which is the mechanism the founder's rider asked for doing its
+    // job on the first seed to need it.
     seed: (d) =>
-      edit(d, 'docs/EDGE_CASES.md', (b) => {
-        const at = b.indexOf('## EC-001:');
-        if (at === -1) throw new Error('EC-001 block not found');
-        return (
-          b.slice(0, at) +
-          b.slice(at).replace(/^- Golden scenario ref:.*$/m, '- Golden scenario ref:')
-        );
-      }),
+      edit(d, 'docs/edge-cases/EC-001.md', (b) =>
+        once(b, /^- Golden scenario ref:.*$/m, '- Golden scenario ref:'),
+      ),
   },
   'CI-06f': {
     what: 'an ADR claiming a number nobody reserved',

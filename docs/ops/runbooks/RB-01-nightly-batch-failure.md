@@ -51,4 +51,4 @@ Only if states are still stale after the morning. Use [COMMS_TEMPLATES](COMMS_TE
 
 ## Post-incident
 
-Every distinct cause becomes an [EDGE_CASES](../../EDGE_CASES.md) entry and a golden file (TR-04). A batch failure that produced no registry entry was not diagnosed.
+Every distinct cause becomes an [EDGE_CASES](../../edge-cases/README.md) entry and a golden file (TR-04). A batch failure that produced no registry entry was not diagnosed.

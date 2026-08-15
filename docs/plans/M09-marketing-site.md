@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M12-transparency-platform.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M12-transparency-platform.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 
@@ -52,7 +52,7 @@ Three of those surfaces are unlike the rest and deserve naming up front, because
 | INV-M9-05 | The simulated-environment disclosure appears in the footer of every page, in checkout, in the ToS, and on every certificate | Constitution section 6 and Appendix F. A layout-level component, so a new page cannot omit it by being new |
 | INV-M9-06 | No number on the stats page is computed here | The page fetches M12's published aggregate and renders it with its window and as-of date attached. There is no arithmetic in this module (AS-M9-03) |
 | INV-M9-07 | Content pages (blog, FAQ) may not state a plan parameter in prose | Build-time lint (VG-M9-2) over MDX: a currency figure, a percentage, or a day count in content prose fails the build unless it is emitted by the `<PlanValue>` component, which reads config. This is the single most important control in the module and the one most likely to be argued with (AS-M9-02) |
-| INV-M9-08 | The published cadence for **Merit Rapid is about 3 trading days**, and the copy attributes it to the **win-day gate**, never to the 1 day cadence gap | [ADR-018](../decisions/ADR-018.md), [EC-049](../EDGE_CASES.md). A dominated gate may not be published as the reason a plan is fast, and may not be published as a protection at all |
+| INV-M9-08 | The published cadence for **Merit Rapid is about 3 trading days**, and the copy attributes it to the **win-day gate**, never to the 1 day cadence gap | [ADR-018](../decisions/ADR-018.md), [EC-049](../edge-cases/EC-049.md). A dominated gate may not be published as the reason a plan is fast, and may not be published as a protection at all |
 | INV-M9-09 | Marketing prose never claims a payout timing the wallet does not deliver | [ADR-019](../decisions/ADR-019.md). The internal leg is same day to the Merit Wallet; the external leg is 2 to 3 business days. Both are stated, and the second is never omitted to make the first read better (AS-M9-06) |
 | INV-M9-10 | The marketing origin holds no session, no trader data, and no write path | [SECURITY](../architecture/SECURITY.md) C-08's separation logic applied downward: the most-attacked and least-privileged surface in the estate is also the one with nothing to steal |
 | INV-M9-11 | A page rendering a **superseded** plan version is reachable, labeled, and never the default | Permanent per-version URLs. A trader pinned to v1 must be able to read v1's public page, and a stranger must never land on it by accident (AS-M9-07) |

@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/TOP10_FIRMS.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M09-marketing-site.md, M10-integrations.md, M11-certificates-social-proof.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/TOP10_FIRMS.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M09-marketing-site.md, M10-integrations.md, M11-certificates-social-proof.md]
 last_updated: 2026-08-14
 ---
 
@@ -470,7 +470,7 @@ M12 owns a small internal dashboard: run health, suppression map, restatement lo
 | A reset | **A new attempt.** A trader who resets and passes has passed on their second attempt, and the page says so |
 | Grain | **Per account**, with a per-identity figure published alongside, since one identity may hold up to ten accounts |
 | Window anchor | **Outcome date**, so the trailing 90 days describes outcomes that occurred in it |
-| Merit Rapid's cadence in ST-05 and ST-06 | Published per plan, with [ADR-018](../decisions/ADR-018.md)'s 3 trading day cycle attributed to the **win-day gate**, never to the cadence gap ([EC-049](../EDGE_CASES.md)) |
+| Merit Rapid's cadence in ST-05 and ST-06 | Published per plan, with [ADR-018](../decisions/ADR-018.md)'s 3 trading day cycle attributed to the **win-day gate**, never to the cadence gap ([EC-049](../edge-cases/EC-049.md)) |
 
 **OQ-M12-02. Does Merit publish an on-chain settlement address of its own, or cite third-party trackers only?** AS-M12-02 finds that publishing an address publishes operational tempo permanently and irrevocably, and that a ring watching the balance can time a correlated wave to the funding cycle. Proposed: **cite trackers, do not publish an address.** The proof strength lost is modest, because the tracker already indexes the rail and will attribute Merit's volume regardless. The disclosure avoided is permanent. If the founder wants the stronger proof, it must come with the swept working balance, the ceiling alarm, and the trader-facing disclosure that destination addresses are publicly observable.
 

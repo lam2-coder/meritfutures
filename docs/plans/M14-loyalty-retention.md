@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M17-offers-engine.md, M18-graduation-track.md, M20-wallet.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M17-offers-engine.md, M18-graduation-track.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
 
@@ -374,7 +374,7 @@ sequenceDiagram
 
 ### AS-M14-08: Cross-account loyalty rewards the one population that completes ladders reliably (NOVEL)
 
-**Attack.** LM-M14-05 pays perks for **completed ladders**, and a completed ladder is five settled payouts on one account. That is a bounded, gated, detected achievement, which is exactly why it is a defensible thing to reward. It is also, precisely and by construction, what a hedged pair or a small ring is engineered to produce. [AS-M14-02](#as-m14-02-the-streak-reward-pays-for-the-behaviour-the-cadence-gap-exists-to-slow-novel) already establishes that a hedge earns streaks mechanically; [EC-123](../EDGE_CASES.md) establishes that the graduating population is enriched for whatever [M07](M07-risk-abuse.md) missed. So the identity most likely to reach a third or fourth completed ladder quickly is not the durable retail trader the program exists to keep. It is the operator whose extraction is a process.
+**Attack.** LM-M14-05 pays perks for **completed ladders**, and a completed ladder is five settled payouts on one account. That is a bounded, gated, detected achievement, which is exactly why it is a defensible thing to reward. It is also, precisely and by construction, what a hedged pair or a small ring is engineered to produce. [AS-M14-02](#as-m14-02-the-streak-reward-pays-for-the-behaviour-the-cadence-gap-exists-to-slow-novel) already establishes that a hedge earns streaks mechanically; [EC-123](../edge-cases/EC-123.md) establishes that the graduating population is enriched for whatever [M07](M07-risk-abuse.md) missed. So the identity most likely to reach a third or fourth completed ladder quickly is not the durable retail trader the program exists to keep. It is the operator whose extraction is a process.
 
 **Three shapes the harm takes, in ascending order of how much they should worry anybody.**
 - **A discount is spent on somebody who was buying anyway.** A marketing loss, bounded by the discount, and genuinely not interesting.

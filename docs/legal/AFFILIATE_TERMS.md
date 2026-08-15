@@ -8,7 +8,7 @@ last_updated: 2026-08-14
 
 **DRAFT FOR COUNSEL. Not publishable text.** Same discipline as [TOS_CLAUSES](TOS_CLAUSES.md): requirements, not prose.
 
-**Why affiliates get their own document.** An affiliate is not a customer and the failure modes are different in kind. A trader can breach a rule and cost Merit an account; **an affiliate can make a claim Merit has to answer for**, to a regulator, in a market whose regulatory characterization is already contested. [M08 AS-M8-04](../plans/M08-affiliate-system.md) and [EC-082](../EDGE_CASES.md) both land on the same finding: the promoter's claim becomes the firm's problem, and the only defense is a disclosure regime that is enforced per asset rather than accepted once at signup.
+**Why affiliates get their own document.** An affiliate is not a customer and the failure modes are different in kind. A trader can breach a rule and cost Merit an account; **an affiliate can make a claim Merit has to answer for**, to a regulator, in a market whose regulatory characterization is already contested. [M08 AS-M8-04](../plans/M08-affiliate-system.md) and [EC-082](../edge-cases/EC-082.md) both land on the same finding: the promoter's claim becomes the firm's problem, and the only defense is a disclosure regime that is enforced per asset rather than accepted once at signup.
 
 ---
 
