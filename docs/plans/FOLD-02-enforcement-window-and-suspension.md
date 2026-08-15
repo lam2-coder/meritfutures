@@ -28,16 +28,27 @@ Per [ADR-034](../DECISIONS.md) and [ADR-036](../DECISIONS.md), and read against 
 
 | Registry | Claim |
 |---|---|
-| **ADR-037** | **Reserved for [FOLD-01](FOLD-01-phone-identity.md)'s passwordless ADR** (its session 2). Not this fold's |
-| **ADR-038** | Ruling A, the payout enforcement window |
-| **ADR-039** | Ruling B, identity-level suspension |
+| **ADR-037**, **ADR-038** | **Taken by an open sibling pull request.** See the collision below. Not this fold's |
+| **ADR-039** | **Reserved for [FOLD-01](FOLD-01-phone-identity.md)'s passwordless ADR** (its session 2). Not this fold's |
+| **ADR-040** | Ruling A, the payout enforcement window |
+| **ADR-041** | Ruling B, identity-level suspension |
 | **`0029`** | **Reserved for `0029_phone_identity_and_auth.sql`** (FOLD-01 section 4). Not this fold's |
 | **`0030`** | `0030_payout_hold_enum.sql` |
 | **`0031`** | `0031_payout_hold_and_identity_restriction.sql` |
 
-**Both reservation rows for FOLD-01 are written in the same commit as this fold's, and that is a finding rather than a courtesy.** `CI-06f` and `CI-06h` assert gaplessness over allocated **plus reserved**. Claiming 038 while 037 has no row is a hole the gate reports; claiming `0030` while `0029` has no row is the same failure on the registry that cannot be renamed, only superseded. FOLD-01 is committed on this branch and has claimed neither number yet, so this is the first session that can see both.
+**Both reservation rows for FOLD-01 are written in the same commit as this fold's, and that is a finding rather than a courtesy.** `CI-06f` and `CI-06h` assert gaplessness over allocated **plus reserved**. Claiming 040 while 039 has no row is a hole the gate reports; claiming `0030` while `0029` has no row is the same failure on the registry that cannot be renamed, only superseded. FOLD-01 is committed on this branch and has claimed neither number yet, so this is the first session that can see both.
 
-**A second correction while in the table.** The `036` row reads "reserved, unmerged". [ADR-036](../DECISIONS.md) merged in PR #11. That is the same staleness the `035` row was corrected for on 2026-08-15, recurring four rows later in the file that records it, and it is corrected in the same commit.
+### The collision, found by looking rather than by a gate
+
+**This plan first claimed 038 and 039, and both were already taken.** `claude/builder-reviewer-loop-rykvhs`, open as **PR #15**, reserved **037 and 038** in its own copy of the allocation table for the S-D review rulings. Nothing on this branch could see that: `git rev-list origin/main...HEAD` shows this branch is one commit ahead of a `main` whose table ends at 036, and **every gate here passed against that table**.
+
+**This is `CI-06f`'s and `CI-06h`'s own declared gap, met in the wild inside two days of being declared.** [ADR-036](../DECISIONS.md) states it in as many words: the table "cannot stop a branch that never reads `main`", and the cross-branch assertion "needs a job that can see both refs". The remedy that worked was reading the open pull request list before writing a number, which is a human step in a process whose whole argument is that human steps drift.
+
+**The numbers move here rather than at merge**, on [ADR-034](../DECISIONS.md)'s own tiebreak: the branch whose numbers are cited least is the one that moves, and PR #15's are cited across a landed fold while this fold's exist only inside this file.
+
+**Every remote branch was checked, not just the one with an open pull request.** `claude/merit-futures-briefing-7auoor`, `claude/p1-scaffold-plan`, `p10` and `s-d` all carry tables ending at 035 or 036; `dev` and `premain` predate the table. **`0029` is still the next free migration number on every branch**, so only the ADR half moved.
+
+**And a correction while in the table.** The `036` row on `main` reads "reserved, unmerged". [ADR-036](../DECISIONS.md) merged in PR #11. That is the same staleness the `035` row was corrected for on 2026-08-15, recurring four rows later in the file that records it, and it is corrected in the same commit. **The sibling branch corrected it independently**, which is two branches fixing one row and is its own small argument for the cross-ref job.
 
 ---
 
@@ -60,7 +71,7 @@ Six readings changed this plan. Each is a live contradiction or a proven gap, no
 
 ### 4.1 The ADR says it amends zero denial, in both sentences
 
-Written into ADR-038 verbatim and in this order, because the halves are not interchangeable:
+Written into ADR-040 verbatim and in this order, because the halves are not interchangeable:
 
 > **The substance survives.** No payout is denied. Every hold either pays inside 48 hours or produces a documented enforcement action carrying a cited flag, a ToS clause and an evidence pack.
 >
@@ -237,7 +248,7 @@ Each addition beyond the eight is forced by a named gate: `CI-06i` in both direc
 | # | Session | Scope |
 |---|---|---|
 | 1 | **This plan** | Landed. Stops here |
-| 2 | ADR-038, ADR-039, **all four allocation rows**, and the stale `036` correction | **Money path.** It lands alone so a sibling branch can read the claims before writing against them |
+| 2 | ADR-040, ADR-041, **all five allocation rows**, and the stale `036` correction | **Money path.** It lands alone so a sibling branch can read the claims before writing against them |
 | 3 | `0030`, `0031`, DATA_MODEL, DELTA_MANIFEST | **Money path, fresh session.** The E2 read happens on this diff, incrementally, per read-early-merge-late |
 | 4 | STATE_MACHINES, M05, M20, M07, SECURITY section 4 | **Money path.** The machines and the invariants |
 | 5 | M02's provisional platform leg, M06, M03, M04, M16, and the M08 confirmation | The surfaces |
