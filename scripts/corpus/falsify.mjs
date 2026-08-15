@@ -52,6 +52,26 @@ const once = (body, needle, replacement) => {
   return body.replace(needle, replacement);
 };
 
+// Nudge a generated span off its query WITHOUT NAMING EITHER NUMBER.
+//
+// THIS SEED USED TO CARRY THE COUNT: `once(b, '<!--gen:ec_count-->140', '...141')`.
+// It broke the first time an edge case was added, which is to say the first
+// time the corpus did the ordinary thing the span exists to track, and it broke
+// in the direction that matters least and reads worst: a HAND-MAINTAINED COUNT
+// INSIDE THE HARNESS BUILT TO CATCH HAND-MAINTAINED COUNTS. ADR-034 is five for
+// five on this class and this was the sixth site.
+//
+// Reading the span and adding one keeps the seed a real violation forever: the
+// value written is wrong by construction whatever the query returns, and the
+// anchor check survives because a missing span still throws rather than
+// silently seeding nothing.
+const bumpSpan = (body, name) => {
+  const pattern = new RegExp(`<!--gen:${name}-->(\\d+)<!--/gen-->`);
+  const found = pattern.exec(body);
+  if (found === null) throw new Error(`seed anchor not found: a <!--gen:${name}--> span`);
+  return body.replace(pattern, `<!--gen:${name}-->${Number(found[1]) + 1}<!--/gen-->`);
+};
+
 // One seeded violation per gate. Each is the SMALLEST edit that the gate's own
 // row says must fail, and each names the real failure it stands in for.
 //
@@ -118,7 +138,7 @@ const SEEDS = {
     what: 'a generated span hand-edited away from its query',
     real: 'every hand-maintained count in this corpus that has been checked was wrong',
     expect: 'span "ec_count"',
-    seed: (d) => edit(d, 'docs/STATE.md', (b) => once(b, '<!--gen:ec_count-->140', '<!--gen:ec_count-->141')),
+    seed: (d) => edit(d, 'docs/STATE.md', (b) => bumpSpan(b, 'ec_count')),
   },
   'CI-06h': {
     what: 'a hole in the migration sequence that no row reserves',

@@ -33,8 +33,9 @@
 //
 // AND WHAT IT REFUSES, each because reading it wrong is worse than not reading
 // it: tabs, odd indentation, document markers, anchors and aliases, merge keys,
-// block scalars (`|`, `>`), non-empty flow collections, duplicate keys, and
-// DECIMAL NUMBERS.
+// block scalars (`|`, `>`), non-empty flow collections, duplicate keys,
+// DECIMAL NUMBERS, AMBIGUOUS PLAIN SCALARS, and UNREAD CONTENT INSIDE A
+// SEQUENCE ITEM.
 //
 // The float refusal is the one worth naming. "Money is integer cents; no floats
 // in financial paths (applies to all doc examples too)" is a repository rule,
@@ -42,13 +43,49 @@
 // silently everywhere else in this ecosystem; here it is an error that names
 // the rule.
 //
+// -----------------------------------------------------------------------------
+// THE RULE THIS FILE IS WRITTEN AGAINST: REFUSE, NEVER MIS-READ
+// -----------------------------------------------------------------------------
+// A fixture the loader REJECTS costs a session five minutes. A fixture the
+// loader MISREADS is a golden file pinning something nobody wrote, and it is
+// indistinguishable from a correct one until the day it matters. So the subset
+// is closed in both directions: a construct outside it throws with a line
+// number, and no construct inside it may quietly produce a value the fixture
+// author did not write.
+//
+// Two ways this parser could have failed that rule were found and closed, and
+// both are recorded because each was a silent pass rather than a crash:
+//
+//   1. SEQUENCE ITEMS DROPPED THEIR TAIL. `parseNode` returns how much it
+//      consumed and both sequence-item call sites discarded it, so
+//      `- \n  - a\n  keep_me: 1` parsed to `[["a"]]` and `keep_me` was read off
+//      the disk, held in memory and thrown away. That is a stated fixture input
+//      the engine never sees, which is the failure mode `AWAITING_M01_INPUT` in
+//      ../src/loader.ts exists to make impossible from the other direction.
+//   2. PLAIN SCALARS A REAL YAML LIBRARY TYPES DIFFERENTLY. `True`, `yes`,
+//      `NULL`, `0x1F`, `007`, `+5`, `1_000`, `.inf` and `1:30` were all read as
+//      strings here and are booleans, null, integers, floats or a sexagesimal
+//      elsewhere. See the date note below: this is that hazard generalized, and
+//      the date is the only member of the class this parser admits.
+//
 // ONE HAZARD THIS FILE CREATES ON PURPOSE, RECORDED RATHER THAN HIDDEN. An
 // unquoted `2026-11-03` is a STRING here and a `Date` under a real YAML
 // library, because YAML's core schema resolves timestamps. GOLDEN_SCENARIOS
 // section 2 prints trading days unquoted, so the fixtures are written the way
-// the corpus prints them and this parser is what makes that safe. Anyone
-// swapping in `yaml` must quote every date in every fixture in the same commit,
-// or the loader starts handing the engine a clock reading.
+// the corpus prints them and this parser is what makes that safe.
+//
+// **ANYONE SWAPPING IN `yaml` MUST QUOTE EVERY DATE IN EVERY FIXTURE IN THE
+// SAME COMMIT**, or the loader starts handing the engine a clock reading, in
+// the one package whose entire contract is that it has none. Not the next
+// commit and not a follow-up issue: the two edits are one edit, because the
+// tree between them is a tree where every fixture loads, every test passes, and
+// `trading_day` is a `Date`. `ADMITTED_TIMESTAMP` below is where that obligation
+// is enforced in code, and it says so at the point a reader would change it.
+//
+// WHY NOT JUST QUOTE THE DATES NOW AND REMOVE THE HAZARD. Because the fixture
+// format is a corpus document (GOLDEN_SCENARIOS section 2) and it prints them
+// unquoted. Quoting them here would be the loader editing the specification to
+// suit the implementation, which is TR-01's direction inverted.
 // =============================================================================
 
 /** A construct outside the subset, always with the line it was found on. */
@@ -79,6 +116,72 @@ const INTEGER = /^-?(0|[1-9][0-9]*)$/;
 const DECIMAL = /^-?[0-9]+\.[0-9]+$/;
 const EXPONENT = /^-?[0-9]+(\.[0-9]+)?[eE][-+]?[0-9]+$/;
 const INDICATORS = new Set(['&', '*', '!', '|', '>', '%', '@', '`', '?', ',', '[', '{']);
+
+/**
+ * The one plain scalar shape that resolves to a non-string elsewhere and is
+ * admitted here anyway, as a string.
+ *
+ * GOLDEN_SCENARIOS section 2 prints `trading_day: 2026-11-03` unquoted and the
+ * fixtures are written the way the corpus prints them. **A real YAML library
+ * resolves this through the core schema's timestamp rule and hands back a
+ * `Date`**, which is a clock reading entering `@merit/rules-engine`, a package
+ * whose entire contract is that it has none.
+ *
+ * **SO SWAPPING THIS PARSER FOR `yaml` MEANS QUOTING EVERY DATE IN EVERY
+ * FIXTURE IN THE SAME COMMIT.** That is the whole reason this constant is a
+ * named admission with a comment rather than one branch of a regex: the next
+ * person to reach for the dependency reads this line while doing it.
+ */
+const ADMITTED_TIMESTAMP = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Plain scalars that mean one thing here and another under a real YAML library.
+ *
+ * EVERY ONE OF THESE PARSED AS A STRING BEFORE THIS TABLE EXISTED, silently.
+ * The subset's own line is "strings: quoted or plain", and a plain string IS in
+ * the subset, so none of these was a construct the parser failed to recognise:
+ * they are constructs it recognised as the wrong thing. That is the failure
+ * this file's header calls worse than a rejection, and a fixture is exactly
+ * where it lands, because a fixture is where a value is stated by hand and
+ * never computed.
+ *
+ * **QUOTING IS THE ESCAPE HATCH AND IT IS THE POINT.** `x: "yes"` is a string
+ * under every schema anybody could swap in, so the refusal costs a fixture
+ * author two characters and buys the guarantee that the file means the same
+ * thing after the dependency question is settled either way.
+ */
+const AMBIGUOUS_PLAIN: ReadonlyArray<readonly [RegExp, string]> = [
+  [
+    /^(?:y|n|yes|no|on|off|true|false|null)$/i,
+    'YAML 1.1 resolves this to a boolean or to null and YAML 1.2 core resolves ' +
+      'only the exact lowercase spellings, so its type depends on the library',
+  ],
+  [
+    /^[-+]?0[xXoObB][0-9a-zA-Z_]*$/,
+    'a hexadecimal, octal or binary integer literal, which is an integer under a ' +
+      'real YAML library and is not in this subset',
+  ],
+  [
+    /^[-+]?[0-9][0-9_]*$/,
+    'an integer written with a leading zero, an explicit "+", or digit separators. ' +
+      'The subset writes integers as -?(0|[1-9][0-9]*) and a real YAML library ' +
+      'would resolve this form to a number',
+  ],
+  [
+    /^[-+]?\.(?:inf|nan)$/i,
+    'a YAML float constant. Money is integer cents and no float may appear in a fixture',
+  ],
+  [
+    /^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+$/,
+    'a YAML 1.1 sexagesimal, which resolves to a single number rather than to the ' +
+      'text as written',
+  ],
+  [
+    /^\d{4}-\d{1,2}-\d{1,2}(?:[Tt\s].*)?$/,
+    'a timestamp outside the YYYY-MM-DD form the fixture format prints. Only the ' +
+      'bare trading day is admitted unquoted, and it is admitted as a string',
+  ],
+];
 
 /**
  * Remove a trailing `#` comment, respecting quotes.
@@ -173,6 +276,22 @@ function parseScalar(raw: string, n: number): YamlValue {
   if (text.includes(': ')) {
     throw new YamlSubsetError(n, `ambiguous plain scalar containing ": " -> ${text}`);
   }
+
+  // The plain scalar is a string here. Under a real YAML library some plain
+  // scalars are not strings, and reading one as the wrong type is the silent
+  // mis-parse this parser exists to make impossible. The trading day is the one
+  // admitted member of that class and it is admitted deliberately; everything
+  // else in it is refused and quoting is the way to say "I meant the text".
+  if (ADMITTED_TIMESTAMP.test(text)) return text;
+  for (const [pattern, why] of AMBIGUOUS_PLAIN) {
+    if (pattern.test(text)) {
+      throw new YamlSubsetError(
+        n,
+        `ambiguous plain scalar "${text}": ${why}. Quote it to mean the text, ` +
+          'or write it in the form the subset states',
+      );
+    }
+  }
   return text;
 }
 
@@ -229,6 +348,40 @@ function parseMapping(lines: Line[], start: number, indent: number): [YamlValue,
   return [map, i];
 }
 
+/**
+ * Parse one sequence item's whole block, and refuse to read part of it.
+ *
+ * `parseNode` returns how far it got, and BOTH SEQUENCE-ITEM CALL SITES USED TO
+ * DISCARD THAT NUMBER. `parseSequence` stops at the first line that is not a
+ * dash rather than throwing, so an item that opened a nested sequence and then
+ * carried anything else silently lost the remainder:
+ *
+ *     days:
+ *       -
+ *         - a
+ *         keep_me: 1        <- read from disk, parsed, and thrown away
+ *
+ * parsed to `{days: [["a"]]}` with no error on any stream. THAT IS THE ONE
+ * OUTCOME THIS PARSER IS WRITTEN TO MAKE IMPOSSIBLE: the fixture states an
+ * input, the engine never sees it, and the scenario goes green while pinning
+ * something else. ../src/loader.ts refuses a fixture field it can neither map
+ * nor list for exactly this reason, and a field the parser never surfaces
+ * cannot reach that refusal at all.
+ *
+ * So the item's block is read to the end or the file does not load.
+ */
+function readWholeItem(block: Line[], indent: number, dash: number): YamlValue {
+  const [value, consumed] = parseNode(block, 0, indent);
+  const unread = block[consumed];
+  if (unread !== undefined) {
+    throw new YamlSubsetError(
+      unread.n,
+      `unread content inside the sequence item opened on line ${dash} -> ${unread.text}`,
+    );
+  }
+  return value;
+}
+
 function parseSequence(lines: Line[], start: number, indent: number): [YamlValue, number] {
   const items: YamlValue[] = [];
   let i = start;
@@ -264,13 +417,13 @@ function parseSequence(lines: Line[], start: number, indent: number): [YamlValue
           `indent of ${head.indent} where ${itemIndent} was expected`,
         );
       }
-      items.push(parseNode(continuation, 0, itemIndent)[0]);
+      items.push(readWholeItem(continuation, itemIndent, line.n));
     } else if (KEY_AHEAD.test(rest)) {
       // `- key: value` opens a mapping whose first pair shares the dash's line.
       // Reading it as one virtual block is what keeps the mapping parser the
       // only place mapping rules are written.
       const virtual: Line[] = [{ n: line.n, indent: itemIndent, text: rest }, ...continuation];
-      items.push(parseNode(virtual, 0, itemIndent)[0]);
+      items.push(readWholeItem(virtual, itemIndent, line.n));
     } else {
       if (continuation.length > 0) {
         throw new YamlSubsetError(line.n, 'a scalar sequence item may not carry a nested block');

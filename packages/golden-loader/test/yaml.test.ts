@@ -54,6 +54,24 @@ describe('the subset it reads', () => {
     expect(parsed['trading_day']).toBe('2026-11-03');
   });
 
+  test('the trading day is the ONLY member of its class that is admitted', () => {
+    // The admission is deliberate and it is exactly one shape wide. Every other
+    // plain scalar a real YAML library would type differently is refused, so
+    // the fixture tree cannot quietly acquire a second one while the dependency
+    // question is open.
+    expect(() => parseYamlSubset('opened_on: 2026-11-3')).toThrow(/ambiguous plain scalar/);
+    expect(() => parseYamlSubset('opened_on: 2026-11-03T00:00:00Z')).toThrow(
+      /ambiguous plain scalar/,
+    );
+  });
+
+  test('quoting is the escape hatch, and it means the text under every schema', () => {
+    expect(parseYamlSubset('clamp_reason: "yes"\nnote: "007"')).toEqual({
+      clamp_reason: 'yes',
+      note: '007',
+    });
+  });
+
   test('booleans, null and negative integers', () => {
     expect(parseYamlSubset('a: true\nb: false\nc: null\nd: ~\ne: -20000')).toEqual({
       a: true,
@@ -89,6 +107,35 @@ describe('the constructs it refuses', () => {
     ['an unterminated quote', 'pins: "the floor', 'unterminated'],
     ['a mapping after a top-level sequence', '- a\nkey: 1', 'unread content'],
     ['a plain scalar that is not a pair', 'id: GS-011\nbad line here', 'not a "key: value" pair'],
+
+    // THE SEEDED CASE FOR THE ONE SILENT MIS-PARSE THIS PARSER HAD. Before
+    // `readWholeItem`, this parsed to `{days: [["a"]]}` on every stream, with
+    // `keep_me` read from disk and discarded. A fixture input the engine never
+    // sees is the worst outcome available to a golden file, because the
+    // scenario passes while pinning something the author did not write.
+    [
+      'content after a nested sequence inside one item, which used to be dropped',
+      'days:\n  -\n    - a\n    keep_me: 1',
+      'unread content inside the sequence item',
+    ],
+    [
+      'a second nested block after a nested sequence',
+      'days:\n  -\n    - a\n    - b\n    c: 1',
+      'unread content inside the sequence item',
+    ],
+
+    // THE AMBIGUOUS PLAIN SCALARS, which are the date hazard generalized. Each
+    // is a string here and something else under `yaml`, so each is refused
+    // rather than read as the wrong type.
+    ['a case-variant boolean', 'breached: True', 'ambiguous plain scalar'],
+    ['a YAML 1.1 boolean word', 'breached: yes', 'ambiguous plain scalar'],
+    ['a case-variant null', 'daily_loss_limit: NULL', 'ambiguous plain scalar'],
+    ['a hexadecimal integer', 'fill_count: 0x1F', 'ambiguous plain scalar'],
+    ['an integer with a leading zero', 'fill_count: 007', 'ambiguous plain scalar'],
+    ['an integer with an explicit plus', 'realized_pnl_cents: +20000', 'ambiguous plain scalar'],
+    ['an integer with digit separators', 'size_cents: 5_000_000', 'ambiguous plain scalar'],
+    ['a float constant', 'floor_cents: .inf', 'ambiguous plain scalar'],
+    ['a sexagesimal', 'session_length: 1:30', 'ambiguous plain scalar'],
   ];
 
   test.each(refused)('refuses %s', (_label, source, needle) => {
