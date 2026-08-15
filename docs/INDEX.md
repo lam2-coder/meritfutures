@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-14
+last_updated: 2026-08-15
 ---
 
 # INDEX: The Map
@@ -10,7 +10,7 @@ last_updated: 2026-08-14
 
 **Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](DECISIONS.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
 
-**<!--gen:adr_count-->34<!--/gen--> ADRs. <!--gen:ec_count-->140<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](DECISIONS.md)).
+**<!--gen:adr_count-->35<!--/gen--> ADRs. <!--gen:ec_count-->140<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](DECISIONS.md)).
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
@@ -24,6 +24,11 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [README.md](../README.md) | Repository front door | draft | founder |
 | [.claude/settings.json](../.claude/settings.json) | Committed hook set. Corpus phase: `SessionStart` pull, `Stop` push ([ADR-D1](DECISIONS.md)) | approved | founder |
 | [.claude/agents/reviewer.md](../.claude/agents/reviewer.md) | The citation reviewer. Verifies every factual claim against a primary source at `file:line`; verdicts to `docs/reviews/` ([ADR-033](DECISIONS.md)) | proposed | founder |
+| [.github/workflows/corpus.yml](../.github/workflows/corpus.yml) | The CI wiring. `integrity` runs `gates.mjs` and proves the spans regenerate to nothing; `migrations` is **CI-06h**: the forward-only apply under `ON_ERROR_STOP`, the must-fail re-apply, the counts read from `pg_indexes` and `pg_constraint`, and the ledger probes | approved | founder |
+| [scripts/corpus/gates.mjs](../scripts/corpus/gates.mjs) | The corpus-integrity gates as a runnable check, no dependencies. `check` runs **CI-06a to CI-06j plus [ADR-026](DECISIONS.md)'s manifest gate, eleven in all**; `generate` rewrites every CI-06g span from its named query; `anchors` lists what a file offers ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
+| [scripts/corpus/falsify.mjs](../scripts/corpus/falsify.mjs) | **Runs every gate against a tree carrying one seeded violation aimed at it, and fails if the gate does not fail on that finding.** A gate nobody has watched fail is not a gate ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
+| [scripts/db/probe_ledger_constraints.sql](../scripts/db/probe_ledger_constraints.sql) | LEDGER-C1, LEDGER-C2 and zero-sum probed against a real database, checked by error message rather than by exception class, plus the counterfactual that proves C1 is not redundant ([ADR-027](DECISIONS.md)) | approved | founder |
+| [scripts/db/probe_plan_version_immutability.sql](../scripts/db/probe_plan_version_immutability.sql) | 14 assertions on `plan_versions` immutability and the seven `cardinality()` conversions. **Leads with the permitted transition succeeding**, which is the probe that did not exist ([ADR-035](DECISIONS.md)) | approved | founder |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |
@@ -90,13 +95,13 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 
 | Artifact | Purpose | Status | Owner |
 |---|---|---|---|
-| [migrations/](../packages/db/migrations) | The reviewed migration set. **27 files, all 93 schema deltas folded at create**, verified to apply in order against PostgreSQL 16. Sixteen carry an `E2 READ: MONEY PATH` header | review | founder (E2 line-by-line read) |
+| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->28<!--/gen--> files, all <!--gen:manifest_changes-->94<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->18<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
 | [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), the no-floats exemption list (**two columns, no money**, under [ADR-031](DECISIONS.md)), and the per-constraint verification table. **[ADR-026](DECISIONS.md)'s completeness gate reads this file** | review | founder |
 
 ## docs/testing/ (Wave 4)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
-| [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 gains CI-06f (ADR numbers unique and gapless) and CI-06g (the COUNT GATE) under [ADR-034](DECISIONS.md)** | approved | founder |
+| [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 now runs**: CI-06a to CI-06j plus [ADR-026](DECISIONS.md)'s manifest gate, all eleven passing clean and failing dirty under `falsify.mjs`. CI-06f and CI-06g are [ADR-034](DECISIONS.md)'s; CI-06j is [ADR-035](DECISIONS.md)'s | approved | founder |
 | [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | **Consolidated. 257 scenarios**, contiguous, deduplicated, with an ownership partition, the reconciliation from 242, and the coverage map | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | **Written.** Port spec, ten population parameters, eleven calibration bands, eight outputs, and the `mc_lifecycle.py` checklist | approved | founder |
 

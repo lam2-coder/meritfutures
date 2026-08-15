@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../DECISIONS.md, ../EDGE_CASES.md, GOLDEN_SCENARIOS.md, SIMULATION_HARNESS.md, ../architecture/INFRA.md, ../architecture/SECURITY.md, ../architecture/API_CONTRACT.md, ../architecture/DATA_MODEL.md, ../plans/M01-rules-engine.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/SECURITY_LANDSCAPE.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-15
 ---
 
 # Testing Strategy
@@ -207,8 +207,49 @@ The batch 2 gate ruled that the docs link-check joins the inventory. It arrives 
 | CI-06e | **Every `EC-nnn` names a golden scenario reference, and it resolves** | merge | TR-04's second half. An edge case with no fixture is a decision nobody can test |
 | CI-06f | **ADR numbers are unique and gapless.** Every `## ADR-nnn` heading in [DECISIONS](../DECISIONS.md) is distinct; the allocated set runs 001 to the maximum with no holes; and **a pull request may not introduce a number already present on `main` or reserved in the allocation table** | merge | **Fails the second pull request to claim a number, rather than failing the corpus after both have merged.** The ADR number is the corpus's most-cited identifier, and two branches forking from the same `main` will both take "the next one" |
 | CI-06g | **COUNT GATE: no document states a quantity a script can derive**, unless the number sits inside a generated span the script rewrites. CI regenerates every span and fails if the tree changes, and scans for bare numerals adjacent to a registry noun | merge | **Every hand-maintained count in this corpus has drifted. Five for five.** A count is not a fact a document owns; it is a query result somebody pasted |
+| CI-06h | **Migration install and object counts.** The set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP`; re-applying it **must fail**; and the table and trigger counts the corpus states are checked against the **installed database**, not against a grep of the DDL | merge | An install that reports green because `psql` continued past a failed statement is worse than no install check. And index and check-constraint totals are **not derivable by grep**: Postgres backs every primary key and unique constraint with an index, so the DDL derives 219 where the database reports 326. A derivation that disagrees with its artifact by a third would pass CI while telling the reader something false, so those two are emitted by this job and stated nowhere |
+| **CI-06i** | **DATA_MODEL and the migrations name the same table set, in BOTH directions.** Every `CREATE TABLE` in [`packages/db/migrations`](../../packages/db/migrations) has a `### <table>` section in [DATA_MODEL](../architecture/DATA_MODEL.md), and every `### <table>` section has a `CREATE TABLE` that creates it | merge | **At the fold the migrations created 96 tables and DATA_MODEL documented 46. Fifty tables had no design record at all and nothing failed, because nothing was counting.** The next module is built by reading DATA_MODEL rather than the DDL, so a table with no design record is a module built blind, and a section describing a table that does not exist is a module built against a fiction. **Only one of the two directions is the obvious one** |
+| **CI-06j** | **Every column a PL/pgSQL trigger body names exists on the table it guards.** Every `NEW.<col>` and `OLD.<col>` reference in every trigger function resolves against the columns the migrations declare for every table a `CREATE TRIGGER` attaches that function to; and no trigger function reading `NEW.`/`OLD.` is left unattached | merge | **[ADR-035](../DECISIONS.md). `assert_published_plan_version_immutable()` read `NEW.config` and `plan_versions` has no `config` column.** PL/pgSQL resolves record fields **at execution**, so the migration installed cleanly, the 27-file apply passed, every probe passed, and the function was wrong only when it fired. It fired on the one transition the design permits, so **no plan version could be retired.** This is [LEDGER-C2](../DECISIONS.md)'s idea applied to columns: LEDGER-C2 asserts a ledger entry's account **class** was declared, this asserts a trigger's **column** was declared. It found the defect from the tree with no database |
 
 **A note on why these are merge blockers in a repository with no code.** They are cheap, they are deterministic, and they protect the artifact the entire pre-FREEZE phase produces. The corpus is the deliverable until STATE says FROZEN, and a deliverable with no CI is a deliverable held together by one person's attention.
+
+#### These gates are now a script, and it runs
+
+**[`scripts/corpus/gates.mjs`](../../scripts/corpus/gates.mjs), no dependencies, `node scripts/corpus/gates.mjs check`.** All ten of the gates above, plus [ADR-026](../DECISIONS.md)'s manifest completeness gate, pass as of 2026-08-15. That is **eleven checks in one runner**. A gate with an install step is a gate that stops running on the day the install breaks, so the runner reads the tree and nothing else.
+
+```
+node scripts/corpus/gates.mjs check            every gate
+node scripts/corpus/gates.mjs check CI-06j     one gate
+node scripts/corpus/gates.mjs generate         rewrite every CI-06g span from its query
+node scripts/corpus/gates.mjs list             the gates, and what each one covers
+node scripts/corpus/gates.mjs anchors <f.md>   the anchors a file offers, for repairing a dead link
+```
+
+**Each gate declares what it does NOT cover, in a `covers` line the `list` command prints.** Four coverage gaps are real and stated rather than implied: CI-06a resolves relative links and anchors and does **not** fetch external `http(s)` targets, which need network and stay with the lychee job; CI-06f checks uniqueness and gaplessness within `DECISIONS.md` against the allocation table and cannot check the cross-branch half, which needs a job that can see both refs; CI-06g compares the spans that exist and does **not** yet sweep for bare numerals adjacent to a registry noun; **CI-06h checks the migration sequence and that the install job still exists, and does NOT install anything**, which needs a live PostgreSQL and runs in CI. **A gate that cannot check the whole of its row says so rather than returning green for a check it did not perform.**
+
+#### The gates have been watched failing, and that is a command now
+
+**[`scripts/corpus/falsify.mjs`](../../scripts/corpus/falsify.mjs), `node scripts/corpus/falsify.mjs`.** It runs every gate twice: against the tree, where each must **PASS**, and against a copy of the tree carrying **one seeded violation aimed at that gate**, where each must **FAIL on that finding** rather than merely exit non-zero. A gate that passes both times is not checking what its row says, and the harness reports that as an error.
+
+**A gate nobody has watched fail is not a gate**, and this is the criterion the founder used to choose between two independently written runners at the PR #7 / PR #8 reconciliation. That judgment was made by reading a transcript. This makes it a command.
+
+**It earned its place on its first run by finding three things**, all of which would otherwise have shipped:
+
+| # | What it found | The shape of it |
+|---|---|---|
+| 1 | **CI-06j reported `0028`'s rebound guard as orphaned.** A superseding migration uses `CREATE OR REPLACE FUNCTION` and does not recreate the trigger, and the single-pass parser let the later definition wipe the earlier attachment | A gate wrong about the corpus, caught before it failed a build |
+| 2 | **CI-06a and CI-06c "failed" on a tree the harness had copied incompletely.** Both exited non-zero on links into a directory that was never copied | **A gate failing for a reason nobody planted proves nothing.** Every seed now names a substring its finding must contain |
+| 3 | **CI-06e's seed landed on the convention paragraph above `EC-001`**, which the gate correctly ignores, so the gate "could not be made to fail" | The seed was wrong and the gate was right. Same shape as the 109 phantom anchors |
+
+**It is not wired into CI, and neither is [`probe_plan_version_immutability.sql`](../../scripts/db/probe_plan_version_immutability.sql).** The reconciliation ruling was to take PR #7's `corpus.yml` unchanged, and adding a step is a change. **Two artifacts therefore exist and do not run**: the falsification harness (three lines in the `integrity` job) and ADR-035's probe (one line beside the existing probe step in `migrations`, which today runs only `probe_ledger_constraints.sql`). Both are founder calls.
+
+**The second one is worth naming plainly.** The `plan_versions` guard is verified by hand in one session and by nothing after it, which is precisely the condition that let the `NEW.config` defect live inside `0027` through a founder-grade review and a 27-file install check. **A probe that ships beside a fix and never runs again is the same object as the golden test that was missing.**
+
+**Writing the runner falsified two of its own gates before it found anything real, which is the part worth carrying.** CI-06a first reported **109 broken anchors** because the slug function collapsed runs of whitespace where GitHub maps each space to one hyphen; the corpus was right and the gate was wrong. CI-06e first reported **119 edge cases with no golden scenario** because it read only the `## EC-nnn` block form and the Appendix B4 battery lives as 22 table rows under one heading. **A gate is not trustworthy because it fails; it is trustworthy once you have checked what it fails on.** Both were caught by reading the failures instead of accepting them, and the same discipline is what found [ADR-035](../DECISIONS.md).
+
+**What the first honest run then found**, after those two fixes, was small and real: `docs/INDEX.md`'s `adr_count` span drifted the moment `ADR-035` was written (regenerated by the `generate` command, which is the half of CI-06g that did not exist before), and **27 genuinely broken anchors** across `DECISIONS`, `GLOSSARY`, `API_CONTRACT`, `OVERVIEW`, `INFRA`, `DATA_MODEL` and `M05`, now repaired.
+
+**CI-06e's one accepted exception, and it is printed rather than silent.** `EC-057` states `Golden scenario ref: none owned; covered by the refund-window unit suite and M7's velocity detector`. That is a considered answer, not a forgotten field, so the runner accepts the sentinel `none owned` **and names every entry it accepted in the output**, because an accepted exception nobody can see is how a gate quietly stops gating. **The sentinel is a convention introduced with the runner and is open to a founder ruling**: the alternative is that `EC-057` gets a golden scenario of its own and the sentinel is deleted.
 
 #### CI-06f, and why gaplessness is asserted over allocated **plus reserved**
 

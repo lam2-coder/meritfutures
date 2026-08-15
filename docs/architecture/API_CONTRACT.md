@@ -544,7 +544,7 @@ Every row is a named test that must exist before the endpoint ships ([VG-5](../.
 
 ## 13. Founder rulings (Wave 2 gate, 2026-08-13)
 
-All five items that needed the founder's eyes were walked at the gate and are resolved. Recorded in [DECISIONS.md](../DECISIONS.md#wave-2-gate-closure-2026-08-13).
+All five items that needed the founder's eyes were walked at the gate and are resolved. Recorded in [DECISIONS.md](../DECISIONS.md).
 
 1. **`404` versus `403` on trader surfaces: `404` confirmed.** Existence is not confirmed to a stranger. The support cost is handled by a runbook rather than by weakening the response: support resolves the trader in the admin console by identity and never trusts a trader-supplied account id ([ops/runbooks](../ops/runbooks/README.md), Wave 4).
 2. **`POST /accounts/:id/payout` takes an optional amount, defaulting to the maximum eligible** ([ADR-009](../DECISIONS.md)). Omitting the field is the common path and matches the number the eligibility endpoint already showed. A supplied amount is a ceiling and can only reduce the payout.
