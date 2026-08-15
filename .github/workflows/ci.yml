@@ -197,6 +197,13 @@ jobs:
   security-static:
     name: CI-05 security static
     runs-on: ubuntu-latest
+    # A BLOCKING GATE THAT HANGS IS WORSE THAN ONE THAT FAILS. grype's
+    # vulnerability database comes from an external CDN, and on the run that
+    # first turned this stage green it took 55 seconds while a later run sat on
+    # the same step for twenty minutes. The default job timeout is SIX HOURS,
+    # which on a merge blocker means a pull request nobody can land and nobody
+    # can diagnose. Twenty minutes is roughly ten times the observed good case.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:

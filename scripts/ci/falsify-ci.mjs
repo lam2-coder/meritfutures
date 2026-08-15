@@ -77,20 +77,30 @@ const MARK = '__falsify__';
 // -----------------------------------------------------------------------------
 
 /**
- * A syntactically valid AWS access key id that has never been issued: the
- * `AKIA` prefix and sixteen more characters, which is gitleaks'
- * `aws-access-token` shape.
+ * The header of a PEM private key block, and VG-1's seed.
  *
- * THE FIRST VERSION OF THIS SEED READ `AKIA` + `QYLPT7EXAMPLE` + `000` AND
- * GITLEAKS CORRECTLY IGNORED IT. Its default allowlist drops a candidate whose
- * secret contains a stopword, and `EXAMPLE` is one: the whole point of that
- * list is that a placeholder in a code sample is not a leaked credential. The
- * harness reported `DID NOT FAIL` and the gate was right; THE SEED WAS WRONG,
- * which is the same shape as CI-06e's seed landing on the convention paragraph
- * above EC-001. A seed has to be a thing the gate is supposed to catch, not a
- * thing that merely looks like one to the person writing it.
+ * TWO AWS ACCESS KEY IDS WERE TRIED FIRST AND GITLEAKS WAS RIGHT TO IGNORE
+ * BOTH, which is the part worth carrying rather than the constant that
+ * replaced them. `AKIA` + `QYLPT7EXAMPLE` + `000` lost to the stopword
+ * allowlist, because a placeholder in a code sample is not a leaked
+ * credential and `EXAMPLE` is the archetype of one. `AKIA` +
+ * `3QF7ZL2XN8VBWK4R` lost as well, so the stopword was not the whole story:
+ * the AWS rule carries its own entropy and context conditions, and A
+ * SYNTHETIC KEY THAT SATISFIES THE REGEX IS NOT NECESSARILY A THING THE RULE
+ * IS WILLING TO REPORT. Both times the harness said `DID NOT FAIL`, and both
+ * times THE GATE WAS RIGHT AND THE SEED WAS WRONG, which is the same shape as
+ * CI-06e's seed landing on the convention paragraph above EC-001.
+ *
+ * A PEM header has none of those conditions in front of it: gitleaks'
+ * `private-key` rule matches the marker. So the seed exercises THE SCANNER
+ * rather than the scanner's opinion about whether a given string looks real,
+ * which is the honest choice for a gate whose job is "a secret reached the
+ * tree". IT COSTS EXACTLY ONE THING, STATED RATHER THAN IMPLIED: this case
+ * proves gitleaks is wired and reading files. It does not prove any particular
+ * rule is enabled, and the two AWS attempts are the evidence that those are
+ * different claims.
  */
-const FAKE_AWS_KEY = ['AKIA', '3QF7ZL2XN8VBWK4R'].join('');
+const PRIVATE_KEY_HEADER = ['-----', 'BEGIN RSA PRIVATE KEY', '-----'].join('');
 
 /** The marker comment STRATEGY section 4.5 bans from reaching `main`. */
 const BANNED_MARKER = ['TO', 'DO'].join('');
@@ -358,18 +368,23 @@ const CASES = [
   {
     id: 'CI-05/gitleaks',
     stage: 'CI-05',
-    seeds: 'a syntactically valid AWS access key id in a source file',
-    needles: [FAKE_AWS_KEY],
+    seeds: 'a PEM private key block sitting in a source tree',
+    needles: [PRIVATE_KEY_HEADER],
     requires: ['gitleaks'],
     run: () => {
       const dir = temp();
-      // Named the way a leaked credential is actually named. gitleaks' AWS
-      // rule carries keywords, and a seed that hides the word `aws` is a seed
-      // testing a narrower gate than the one that runs.
+      // The body is not a key and does not need to be: the `private-key` rule
+      // matches the marker. A real key here would be a real key in a CI log.
       write(
         dir,
-        'src/config.ts',
-        `export const awsAccessKeyId = '${FAKE_AWS_KEY}';\n`,
+        'deploy/id_rsa',
+        [
+          PRIVATE_KEY_HEADER,
+          'bm90IGEga2V5LiB0aGlzIGlzIHRoZSBzZWVkZWQgdmlvbGF0aW9uIENJLTA1IGV4aXN0cw==',
+          'dG8gY2F0Y2gsIGFuZCBnaXRsZWFrcyBtYXRjaGVzIHRoZSBtYXJrZXIgcmF0aGVyIHRoYW4=',
+          PRIVATE_KEY_HEADER.replace('BEGIN', 'END'),
+          '',
+        ].join('\n'),
       );
       const out = join(dir, 'gitleaks.json');
       const ran = run('gitleaks', [
@@ -526,6 +541,22 @@ const CASES = [
 // Runner
 // -----------------------------------------------------------------------------
 
+/**
+ * A tool's own output, indented and bounded, for the two verdicts where the
+ * reader's next question is "what did it actually say".
+ *
+ * @param {string} output
+ * @returns {string}
+ */
+function indent(output) {
+  const LIMIT = 4000;
+  const body = output.length > LIMIT ? `${output.slice(0, LIMIT)}\n[truncated]` : output;
+  return body
+    .split('\n')
+    .map((line) => `        | ${line}`)
+    .join('\n');
+}
+
 /** Remove any seeded file a killed run left behind, before and after. */
 function sweep() {
   const found = run('sh', [
@@ -602,11 +633,18 @@ function main() {
     if (result.status === 0) {
       console.log(`  DID NOT FAIL          ${testCase.id}  <- ${testCase.seeds}`);
       console.log('        The gate accepted a violation aimed straight at it.');
+      // WHAT THE TOOL ACTUALLY SAID, because the alternative is guessing. The
+      // gitleaks seed took two rounds to settle and both were spent inferring
+      // a reason from an exit code; the tool had the answer each time and
+      // nothing printed it. A harness that reports a verdict and withholds the
+      // evidence makes its own findings expensive.
+      console.log(indent(result.output));
       failed++;
     } else if (absent.length > 0) {
       console.log(`  FAILED OFF-TARGET     ${testCase.id}  <- ${testCase.seeds}`);
       console.log(`        exited ${result.status} without saying: ${absent.join(', ')}`);
       console.log('        A gate that fails for a reason nobody planted proves nothing.');
+      console.log(indent(result.output));
       failed++;
     } else {
       console.log(`  failed as required    ${testCase.id}  <- ${testCase.seeds}`);
