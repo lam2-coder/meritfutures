@@ -146,12 +146,19 @@ const SEEDS = {
     // Was 'migration gap' until ADR-036 made the check gapless over allocated
     // PLUS reserved. The rename leaves 0028 allocated-but-absent, which is now
     // indistinguishable from a legitimate reservation and correctly passes; the
-    // finding this seed plants is the UNRESERVED hole it opens at 0029.
-    expect: '0029 is neither on disk nor reserved',
+    // finding this seed plants is the UNRESERVED hole it opens.
+    //
+    // THE TARGET MOVES WITH THE TABLE, and that is the maintenance cost of a
+    // seed pinned to a literal. This read 0029 until 2026-08-15, when ADR-039
+    // to ADR-042 reserved 0029 through 0032 and the seeded hole landed on a
+    // legitimate reservation, so the gate correctly passed and the seed proved
+    // nothing. It was watched not failing before it was retargeted. 0033 is the
+    // first number the table does not claim.
+    expect: '0033 is neither on disk nor reserved',
     seed: (d) =>
       renameSync(
         join(d, 'packages/db/migrations/0028_supersede_plan_version_immutability.sql'),
-        join(d, 'packages/db/migrations/0030_supersede_plan_version_immutability.sql'),
+        join(d, 'packages/db/migrations/0034_supersede_plan_version_immutability.sql'),
       ),
   },
   'CI-06i': {
@@ -244,9 +251,16 @@ const SCOPE_CASES = [
   // indistinguishable from switching it off.
   //
   // The SEEDS entry above proves CI-06h still reports an unreserved hole. It
-  // cannot prove that a RESERVED hole passes, because the tree has no
-  // reservations, and it cannot prove that an unclaimed number on disk fails,
-  // because every number on disk is claimed.
+  // cannot prove that a RESERVED hole passes, nor that an unclaimed number on
+  // disk fails, without planting each case itself.
+  //
+  // BOTH CASES ARE PINNED TO A LITERAL AND BOTH MOVED ON 2026-08-15. They read
+  // 0029 while the table reserved nothing and every number on disk was claimed.
+  // ADR-039 to ADR-042 reserved 0029 through 0032, which made the reserved case
+  // insert a SECOND row for a number already reserved (a pass that asserts
+  // nothing) and made the unallocated case write a file the table now claims (a
+  // finding that no longer fires). One had gone vacuous and one had gone silent,
+  // and only the silent one announced itself. 0033 is the first free number.
   // ---------------------------------------------------------------------------
   {
     name: 'CI-06h/reserved',
@@ -260,7 +274,7 @@ const SCOPE_CASES = [
         const at = m.index + m[0].length;
         return (
           b.slice(0, at) +
-          '\n| 0029 | a sibling branch, unmerged | **reserved.** No file on disk here, which is ' +
+          '\n| 0033 | a sibling branch, unmerged | **reserved.** No file on disk here, which is ' +
           'the whole case: a branch cannot see its siblings |' +
           b.slice(at)
         );
@@ -270,13 +284,13 @@ const SCOPE_CASES = [
     name: 'CI-06h/unallocated',
     gate: 'CI-06h',
     what: 'a migration on disk that no allocation row claims, which MUST be a finding',
-    // 0029 follows 0028, so this opens NO hole. The allocation finding is the
-    // only one it can produce, which is what makes it a test of that half
-    // rather than of the contiguity half.
-    expect: '0029 is not claimed by the migration allocation table',
+    // 0033 follows the last reserved number, so this opens NO hole. The
+    // allocation finding is the only one it can produce, which is what makes it
+    // a test of that half rather than of the contiguity half.
+    expect: '0033 is not claimed by the migration allocation table',
     seed: (d) =>
       writeFileSync(
-        join(d, 'packages/db/migrations/0029_probe_unallocated.sql'),
+        join(d, 'packages/db/migrations/0033_probe_unallocated.sql'),
         '-- A migration whose number came from `ls` rather than from the table.\n',
       ),
   },

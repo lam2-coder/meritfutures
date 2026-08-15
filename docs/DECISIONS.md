@@ -29,24 +29,49 @@ The Open Decisions Register (constitution section 10) resolves into entries here
 | **034** | merged to `main` (PR #6) | **allocated.** The allocation ruling itself, and the COUNT GATE |
 | **035** | merged to `main` (PR #9) | **allocated.** The `plan_versions` immutability-trigger defect, ruled at the PR #7 / PR #8 reconciliation. **The fix is `0028`, which merged with it, and the structural fix is `CI-06j`.** This row said `reserved, unmerged` until 2026-08-15, four commits after the merge that made it false |
 | **036** | merged to `main` (PR #13) | **allocated.** The migration number allocation table below, and `CI-06h`'s allocation half. **This row said `reserved, unmerged` until 2026-08-15**, which is the second time the State column has been found stale after a merge and is why [ADR-036](#) records that the column is prose rather than a checked fact |
-| **037** | `claude/builder-reviewer-loop-rykvhs`, the S-D ruling fold | **reserved, unmerged.** A shorthand may not restate a value the config owns |
-| **038** | `claude/builder-reviewer-loop-rykvhs`, the S-D ruling fold | **reserved, unmerged.** A CI stage states, in its own output, what it currently proves |
+| **037** | merged to `main` (PR #15) | **allocated.** A shorthand may not restate a value the config owns. **This row said `reserved, unmerged` until 2026-08-15**, three commits after the merge that falsified it |
+| **038** | merged to `main` (PR #15) | **allocated.** A CI stage states, in its own output, what it currently proves. **Stale in exactly the same way and corrected in the same commit**, which makes four |
+| **039** | `claude/corpus-workflow-founder-rulings-py70hi`, the [FOLD-01](plans/FOLD-01-phone-identity.md) fold | **written on the branch, unmerged.** Passwordless auth, and phone as a first-class identity signal |
+| **040** | `claude/corpus-workflow-founder-rulings-py70hi`, the [FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) fold | **written on the branch, unmerged.** The payout enforcement window |
+| **041** | `claude/corpus-workflow-founder-rulings-py70hi`, the [FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) fold | **written on the branch, unmerged.** Identity-level restriction, and its enforcement surface |
+| **042** | `claude/corpus-workflow-founder-rulings-py70hi`, the [S-E](plans/P1-SE-trading-calendar.md) session | **written on the branch, unmerged.** The trading-calendar source discipline, and the wall-clock unit ruling |
 
 **Gaplessness is asserted over allocated plus reserved**, so a branch holding a reserved number shows a hole in this file and passes. A branch inventing an unreserved number fails.
 
 **The State column is the one part of this table no gate can check**, and the `035` row is the proof: a reservation becomes an allocation at merge, and **a runner reading one ref cannot tell the two apart**, because the branch holding a reservation and the `main` that has absorbed it both show the heading present and the row claimed. `CI-06f` reads the Numbers column, which is the load-bearing half. The State column is prose for a reader, it drifts like all prose, and [ADR-036](#) records that rather than implying the whole row is enforced.
 
-## Migration number allocation, and why there are two tables
+**The count is now four, and the correction this session was commissioned to make had already been made.** The session brief named the `036` row as still reading `reserved, unmerged` after the pull request that merged it. It does not: `036` was corrected in the same fold that landed [ADR-037](#) and [ADR-038](#), and the row records its own repair. **The staleness had moved on to `037` and `038`**, which PR #15 merged and which still claimed to be reserved on a branch that no longer exists. That is the third and fourth instance, it was found by reading `git log` against the table rather than by reading the table, and **a brief written against this column was wrong about it inside two days**, which is the same evidence one layer out. The remedy is not more care. It is that **the State column is not a fact and is not read as one**; what a gate can check is the Numbers column, and what a reader should check is the ref.
 
-**A migration number is claimed here before the file is written.** It is the same race as the one above, on the registry where it is least recoverable. [ADR-034](#) resolved the ADR collision by **renumbering the branch whose number was cited least**, and that remedy does not exist here: a migration is sacred once merged (constitution E2), so a number that has landed cannot be renamed, only superseded. **[ADR-036](#) rules the allocation and [CI-06h](testing/STRATEGY.md) enforces it**, by the same rule as `CI-06f` and against this table.
+## Migration number allocation, and why there is more than one table
+
+**A migration number is claimed here before the file is written.** It is the same race as the one above, on the registry where it is least recoverable. **This heading read "why there are two tables" until a third arrived below it**, which is a hand-maintained count in the file that rules against them, one week old. [ADR-034](#) resolved the ADR collision by **renumbering the branch whose number was cited least**, and that remedy does not exist here: a migration is sacred once merged (constitution E2), so a number that has landed cannot be renamed, only superseded. **[ADR-036](#) rules the allocation and [CI-06h](testing/STRATEGY.md) enforces it**, by the same rule as `CI-06f` and against this table.
 
 | Numbers | Claimed by | State |
 |---|---|---|
 | 0001 to 0028 | merged to `main` | **allocated.** `0001` to `0027` are the schema-delta fold (PR #4); **`0028` is [ADR-035](#)'s superseding migration and it is written, merged and on `main`** as of PR #9, not reserved. `0025` is the marked reserved sequence, three tables created and unused at launch, which reserves *tables* and is an ordinary allocation of a *number* |
+| **0029** | `claude/corpus-workflow-founder-rulings-py70hi`, [FOLD-01](plans/FOLD-01-phone-identity.md) section 4 | **reserved, unwritten.** `0029_phone_identity_and_auth.sql`, [ADR-039](#)'s nine changes, with an `E2 READ: MONEY PATH` header |
+| **0030** | `claude/corpus-workflow-founder-rulings-py70hi`, [FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) section 6 | **reserved, unwritten.** `0030_payout_hold_enum.sql`, the `ALTER TYPE ... ADD VALUE` and nothing else, deliberately without `BEGIN`/`COMMIT`. It is its own file because PostgreSQL refuses to use a new enum value inside the transaction that added it, and every index predicate in `0031` is such a use |
+| **0031** | `claude/corpus-workflow-founder-rulings-py70hi`, [FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) section 6 | **reserved, unwritten.** `0031_payout_hold_and_identity_restriction.sql`, [ADR-040](#)'s hold and [ADR-041](#)'s restriction episode |
+| **0032** | `claude/corpus-workflow-founder-rulings-py70hi`, [S-E](plans/P1-SE-trading-calendar.md) section 10 | **reserved, unwritten.** `0032_trading_calendar_holidays_coverage_revisions.sql`, [ADR-042](#)'s F-1 through F-4 |
 
-**Nothing is reserved today and `0029` is the next free number.** A session that needs one adds its row here in the same commit that creates the file, and the row is what a sibling branch reads.
+**The next free number is the one after the last row of this table, and this file no longer says which it is.** It said `0029` while two approved plans stated their reservation rows "are written in the same commit as this fold's". They were not, and the sentence claiming nothing was reserved was **the only thing in the repository asserting it**, in the table that exists to end assertions of that kind. [ADR-034](#)'s remedy applies to it exactly: either generate the number or delete it and point at the source. **Deleted.** A session that needs a number adds its row here in the same commit that creates the file, and the row is what a sibling branch reads.
 
 **The same two-ref limit applies.** This table makes a collision visible to the second branch **that reads `main`**; it cannot stop a branch that never looks. The cross-branch assertion, that a pull request may not claim a number already on `main`, needs a job that can see both refs and belongs with `CI-06f`'s identical gap.
+
+## CI gate identifier allocation, and why there are now three tables
+
+**A `CI-06` letter is claimed here before the gate is written.** It is the third numbered registry in this repository and it had no table until three folds claimed from it in one week: [FOLD-01](plans/FOLD-01-phone-identity.md) section 7 claims `k`, [FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) section 4.4 claims `l`, and [S-E](plans/P1-SE-trading-calendar.md) section 7.1 claims `m`. **Each of the three plans states which letters the other two are taking**, which is three documents hand-maintaining one sequence and is precisely the arrangement [ADR-034](#) and [ADR-036](#) were each written to end. **ADR-038 collided this week for exactly this reason**, on the registry that already had a table, so the argument that a third table is premature has a counterexample three rows above it.
+
+| Letter | Claimed by | State |
+|---|---|---|
+| `a` to `j` | merged to `main` | **allocated.** The ten gates in [`gates.mjs`](../scripts/corpus/gates.mjs) today, rowed in [STRATEGY section 4.4](testing/STRATEGY.md) |
+| **`k`** | `claude/corpus-workflow-founder-rulings-py70hi`, [FOLD-01](plans/FOLD-01-phone-identity.md) section 7 | **reserved, unwritten.** `CI-06k`, declared authority: every endpoint in the negative-authz matrix carries a required-factor cell, every sensitive action [ADR-039](#)'s C-27 names declares a non-single factor, and no `notification_kinds` class outside the post-identity security and money classes is `rate_limit_exempt` |
+| **`l`** | `claude/corpus-workflow-founder-rulings-py70hi`, [FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) section 4.4 | **reserved, unwritten.** `CI-06l`, every expiry has a sweep: each expiry column in the migration set either names a release job in [CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md) or sits on a written exemption list with a reason |
+| **`m`** | `claude/corpus-workflow-founder-rulings-py70hi`, [S-E](plans/P1-SE-trading-calendar.md) section 7.1 | **reserved, unwritten.** `CI-06m`, the calendar's declared counts agree with its own contents, the fixture calendar is regenerated and `git diff --quiet`, and every `date` column in the migration set has a [DATA_MODEL](architecture/DATA_MODEL.md) row naming its unit |
+
+**One letter in this file is already spoken for by something that is not a gate, and it is named here so a reader does not mistake it for a reservation.** [ADR-036](#)'s alternatives list rejects "**`CI-06k`, a sibling of `CI-06f`**" by name. That `CI-06k` was never written and never claimed; the letter is FOLD-01's. **This is the failure mode the shared allocation parser was hardened against on the other two tables**, where a three-digit numeral in prose used to reserve a number silently, and it is why the first cell of a table row is the only thing that claims anything here either.
+
+**No gate reads this table yet, and that is stated rather than implied.** `allocated()` in [`gates.mjs`](../scripts/corpus/gates.mjs) parses a four-digit or three-digit first cell and is called on the two tables above; a letter does not parse and nothing calls it here. The table binds a reviewer today and its enforcement is an open item, which is the position `CI-06g`'s parameter half shipped in ([ADR-037](#)) and it is stated the same way. **The cheap version of the gate is the one to write**: uniqueness of the letters in the STRATEGY rows, and gaplessness over allocated plus reserved, which is `CI-06f`'s assertion with a different alphabet.
 
 ---
 
@@ -1156,7 +1181,7 @@ round_trips_closed_has_exit                -> EMPTY ARRAY PASSED THE CHECK
 
 - **Decision:** three parts, and the third is the one that is not obvious.
 
-  1. **A second allocation table in [this file](#migration-number-allocation-and-why-there-are-two-tables), beside the ADR one.** One mechanism, one place to look. Claiming a migration number is a step in writing a migration, exactly as ADR-034 made it a step in writing an ADR.
+  1. **A second allocation table in [this file](#migration-number-allocation-and-why-there-is-more-than-one-table), beside the ADR one.** One mechanism, one place to look. Claiming a migration number is a step in writing a migration, exactly as ADR-034 made it a step in writing an ADR.
   2. **The assertion is `CI-06f`'s, verbatim: gapless over allocated PLUS reserved.** A hole matching a reservation passes, because a branch cannot see its siblings' files. A number on disk that no row claims fails.
   3. **It extends `CI-06h` rather than arriving as a sibling gate, and this was decided on evidence rather than on tidiness.** See below.
 
@@ -1233,3 +1258,280 @@ round_trips_closed_has_exit                -> EMPTY ARRAY PASSED THE CHECK
 - **Consequences:** [`.github/workflows/golden.yml`](../.github/workflows/golden.yml) runs the stage with `--reporter=verbose`, because Vitest's default reporter swallows test stdout on a passing run and the block would otherwise be computed and discarded. `packages/golden-loader` gains `src/coverage.ts` and three assertions that the emitted block is derived from the run rather than typed, including the file-exists check on the citation it makes to `test/compare.test.ts`. [STRATEGY section 4.4](testing/STRATEGY.md)'s `CI-03` row records the obligation.
 
   **The obligation generalizes and is stated as a rule rather than as a note about one stage:** any CI stage whose assertions are narrower than its name emits the difference in its own output. `CI-04` will need it first, since it cannot run on a fork pull request and [P1 section 2.2](plans/P1-monorepo-scaffold.md) already requires it to "degrade honestly rather than appear green"; `CI-06h`'s "does NOT install anything" is the same statement made in a `covers` line that only the corpus runner prints.
+
+---
+
+## ADR-039: Auth is passkeys plus email OTP plus SMS OTP, and a verified phone is an identity signal  (2026-08-15, status: accepted)
+
+**The fold plan is [FOLD-01](plans/FOLD-01-phone-identity.md) and it is approved. This ADR records the ruling and does not re-derive it.**
+
+- **Context:** Merit's auth surface was specified as passwordless with two factors, and phone was a contact field. [SECURITY C-01](architecture/SECURITY.md) reads "Passwordless only: passkeys plus email OTP". **Emails are free to mint and real mobile numbers are scarce**, so a phone number is worth far more to [ADR-022](#)'s link-confidence graph as a node than it is worth to [M16](plans/M16-notification-center.md) as a delivery address.
+
+- **Decision:** **Auth is passkeys plus email OTP plus SMS OTP, any single factor sufficient for login. No passwords are retained, credential-stuffing immunity is preserved, and that immunity is the reason.** **Phone verification is mandatory at registration and is a first-class identity signal rather than a contact field.**
+
+  | Point | Ruling |
+  |---|---|
+  | **(a)** | Carrier and line-type lookup at capture: VoIP and burner detection, portability history, digital-footprint presence. **VoIP is scored, never rejected.** VoIP plus a fresh email plus a datacenter IP plus no footprint is recorded as the **fleet signature** |
+  | **(b)** | **One verified phone per identity**, enforced as a hard graph link |
+  | **(c)** | Phone change carries D4 controls: dual-channel verification, notification to the prior number **and** email, and a 48 hour external-withdrawal hold |
+  | **(d)** | Sensitive actions (payout destination change, contact change, external withdrawal) require a passkey or dual channel. **Never SMS alone.** SIM-swap defense, and it is the reason |
+  | **(e)** | SMS delivery is security-critical per [M16](plans/M16-notification-center.md). Cost and deliverability enter [M03](plans/M03-billing-checkout.md)'s Cost Stack |
+
+- **Two direct textual contradictions are resolved here rather than glossed**, because both sit in a frozen document and a reader arriving from either needs to land somewhere.
+  1. **[SECURITY section 2.7](architecture/SECURITY.md) says "no SMS-based second factor anywhere in the stack".** That sentence sits under "The founder (the human asset)" and is **rescoped to founder and admin credentials**. Admin auth stays hardware-key SSO (C-08) with no SMS path, ever. The trader surface gains SMS OTP; the operator surface does not.
+  2. **C-01 widens from two factors to three, and the stuffing-immunity claim in section 2.6 is unchanged and is the reason.** A widening is not a weakening, and the ADR says so in those words so a later reader cannot mistake one for the other.
+
+- **The four amendments folded with the ruling.**
+  1. **(e) is a confirmation rather than an amendment.** `INV-M16-11` already exempts the security and money classes. It is recorded as **confirmed**, in those words.
+  2. **But the class splits, and the split is the finding.** `INV-M16-11` was written for **post-identity** messages. Registration OTP is **pre-identity**, unauthenticated, and addressed to an attacker-supplied number. Rate-limit-exempt SMS there is **SMS pumping**: the attacker owns premium-rate numbers, drives volume, takes the carrier share, and Merit pays. Pre-identity OTP keeps per-number, per-IP and per-country velocity plus a **cost circuit breaker**. Post-identity security messages keep `INV-M16-11` unchanged. Two classes.
+  3. **(b)'s hard link needs the recycling guard the ruling already pays for.** Carriers reassign numbers. A banned identity's number, reassigned later, would auto-link an innocent owner with no review, because no review is what a hard link means. **Portability history, already bought by (a), is wired to the decision:** reassignment after the linked identity's ban date means it is not the same node.
+  4. **The session and authority boundary becomes an invariant, C-27.** Any single factor establishes a session sufficient for every read surface. No single factor, and **specifically never SMS alone**, is sufficient for a sensitive action. Each requires a passkey assertion or a dual-channel confirmation, which **elevates** the session rather than re-establishing it. **A SIM-swapped session can see everything and change nothing.** Written down rather than left as an emergent property of two rules, and enforced by a server-side required-factor declaration per endpoint recorded on the session, not by discipline.
+
+### The cost breaker degrades, it does not stop
+
+**Founder ruling, and it is the one thing in this fold that a careful implementer would have got backwards.**
+
+> **The cost breaker degrades, it does not stop.** Phone verification is mandatory at registration, so a tripped breaker means **no new customers**: the control protecting revenue becomes a cheap denial-of-service on it. **Fail-closed protects money on provisioning and destroys it on registration.**
+>
+> On trip, **registration continues** with phone verification **deferred to a hard gate before first funding**. [ADR-021](#)'s composite trigger set already makes `pre_funded` a real gate, so this is an existing mechanism reused and not a new one.
+>
+> **And it trips alarms.** A breaker that degrades silently is one nobody notices is stuck.
+
+**The asymmetry is the content.** Merit's other fail-closed postures guard a moment where the wrong answer moves money or provisions an unenforced account: [M02](plans/M02-rithmic-bridge.md)'s `INV-M2-13` refuses to trade an unconfirmed setpoint, and `0007` makes a `set_risk` row reaching `confirmed_inferred` unwritable. Registration is the opposite shape. Nothing has moved, nothing is owed, and the only thing a refusal protects is an SMS bill. **A control whose failure mode is "Merit stops acquiring customers" is a control an attacker will deliberately trip**, and the cost of tripping it is the price of the SMS traffic that trips it, which is the attacker's whole business model in amendment 2 anyway. Degrading converts a denial-of-service into a queue.
+
+**The deferred gate is a real gate and not a promise.** `pre_funded` fires before the funded account exists, which is before the first moment Merit's own capital is at risk, and it is already one of ADR-021's configured triggers with its own funnel telemetry. **An identity that registered under a tripped breaker cannot reach a funded account without the verification it skipped.**
+
+**The alarm is not optional and is the half that decays.** A degraded mode nobody is watching becomes the normal mode. The trip, the degraded window and the recovery are each alarming events, and **the number of registrations that completed unverified during the window is a reported figure**, because a queue nobody drains is a fail-open with extra steps.
+
+- **Consequences:** `0029` carries `otp_send_budget` on `plan_breaker_state`'s pattern from `0016` rather than a new idiom. **A golden scenario pins the degraded path**: a breaker-tripped registration completes, the identity reaches `pre_funded`, and the funding gate refuses it until phone verification lands. It is named here because a degraded path with no fixture is a path that gets removed by whoever finds it confusing. [SECURITY](architecture/SECURITY.md) gains C-27 and C-28; [M16](plans/M16-notification-center.md) gains the pre-identity class and a fifth `notification_kinds.class`; [M19](plans/M19-kyc-identity.md) gains the recycling guard; the registration lookup takes its own `integration_contracts` row under [M10](plans/M10-integrations.md)'s field allowlist and inherits checkout's failure posture verbatim, **non-blocking, fail-open on timeout, VoIP scored and never rejected**. **Portability history becomes a disqualifying selection criterion in [ADR-023](#)'s procurement**: a vendor that cannot supply it cannot be selected, because amendment 3's guard has no input without it. [COUNSEL_PACKET](legal/COUNSEL_PACKET.md) item 3 gains **3d, telecom metadata lawful basis**, and the [privacy policy](legal/PRIVACY_POLICY.md)'s carrier row **cites 3d rather than asserting a basis**. **`CI-06k` is claimed** in the gate table above.
+
+- **The hard link binds the graph and never enforces alone.** (b) says "auto-enforced like KYC face-dedupe" and the corpus holds two readings: `INV-M19-04` says a dedupe hit raises a flag against both identities and changes no state, while [ADR-022](#) says hard links auto-enforce. Ruled: **identity to phone** is a genuine database constraint, one live verified phone per identity, a partial unique index. **Phone to identity** completes verification, writes the edge at the hard-link confidence ceiling, and opens a **severity-5 flag against both identities**, changing no state automatically. The reason is amendment 3: refusing at the door puts the innocent owner of a recycled number into a support ticket before the portability check can rescue them, and [AS-M19-05](plans/M19-kyc-identity.md) already says that person belongs in a review queue.
+
+- **Alternatives considered:** **a second vendor for portability history** (rejected: [ADR-023](#)'s vendor already sells three of (a)'s four signals, and [OQ-M19-04](plans/M19-kyc-identity.md)'s corpus-splitting argument plus ADR-022's identity-replacement-cost framing both cut against a second sub-processor for one signal class; the remedy is a procurement condition, not a contract); **reject VoIP at registration** (rejected by the ruling itself: VoIP is a legitimate line type for a real customer and a scored signal is worth more than a refused one); **fail-closed on the cost breaker** (rejected above, and it is the ruling's substance); **keep `INV-M16-11` unsplit** (rejected: an exemption written for authenticated recipients, applied to an attacker-supplied number, is a funded attack); **leave the authority boundary as an emergent property of (d) and single-factor login** (rejected: an emergent property is not enforceable and `sessions` cannot refuse what it never recorded, which is why the `auth_factor` delta exists).
+
+---
+
+## ADR-040: The payout enforcement window, and zero denial expressed as a state that expires  (2026-08-15, status: accepted)
+
+**The fold plan is [FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) and it is approved. This ADR records Ruling A and does not re-derive it.**
+
+- **Context:** The corpus as frozen has exactly two enforcement shapes on a payout: a bounded freeze on an in-flight request ([M05](plans/M05-payout-system.md) SD-M5-01) and terminal closure ([STATE_MACHINES section 9](architecture/STATE_MACHINES.md)). **There is nothing between them, and the gap is where an operator under pressure improvises.**
+
+- **Decision:** **`held_pending_review`, a pre-approval state entered when an unresolved high-severity flag exists at request time.** Hard SLA: **auto-release and pay within 48 hours** unless a documented enforcement action, closure for cause per the ToS with an evidence pack, is recorded. The trader sees an honest status with the SLA. The external leg, wallet to Rise, supports halt-before-settlement on a flag raised after wallet credit, on the same 48 hour rule. Both audit-logged with a cited flag and a ToS clause, per the existing freeze constraint.
+
+### It amends zero denial, in both sentences, and the halves are not interchangeable
+
+> **The substance survives.** No payout is denied. Every hold either pays inside 48 hours or produces a documented enforcement action carrying a cited flag, a ToS clause and an evidence pack.
+>
+> **The mechanism changes.** Zero denial was expressed as "no review state exists". It is now expressed as "a review state exists and it expires". A constraint aimed at the founder's own future self, quietly reinterpreted, is the failure it was built against, so the reinterpretation is recorded as an amendment rather than absorbed as a clarification.
+
+**The amendment must name every site, and there are ten.** `0001:73`, `0010:77`, `0010:225`, [STATE_MACHINES](architecture/STATE_MACHINES.md) line 89, [M05](plans/M05-payout-system.md) INV-M5-01, [M06](plans/M06-admin-ops-console.md) section 1.2, [M07](plans/M07-risk-abuse.md) line 13, [TOS_CLAUSES](legal/TOS_CLAUSES.md) line 118, [GUIDE_BRIEFING](GUIDE_BRIEFING.md) line 149, [SESSION_LOG](SESSION_LOG.md) line 46. **Amending one leaves the corpus contradicting itself in nine places.** The sentence is not in [CLAUDE.md](../CLAUDE.md) at all, which is where the fold expected to find it.
+
+**Two of the ten sit inside merged migrations and can never be edited** (constitution E2). `0010:225` is a `COMMENT ON TABLE`, which is replaceable metadata, so `0031` re-states it. **`0001:73` and `0010:77` are `--` comments and stay as written forever.** This ADR says so rather than implying the sweep was complete, and `0031`'s header cites this ADR so a reader arriving from `0010` lands somewhere.
+
+### It is not `frozen` under a second name, and the discriminator is the ledger
+
+Both states answer the corpus's three hold questions identically: there is a cited flag, it expires, it blocks settlement. **They diverge on the only question that decides behavior.**
+
+| | `held_pending_review` | `frozen` |
+|---|---|---|
+| Entered | at request time, **before** approval | from `approved`, **after** LT-01 posted |
+| Ledger | **nothing posted.** No wallet credit. Nothing owed | LT-01 posted, `trader_wallet` credited, the money is already the trader's |
+| Release means | **approve and pay** | let settlement proceed |
+| Enforcement means | close the request. **Nothing to reverse** | LT-03 `payout_reversal` |
+| Clock | 48 hours | 48 hours, ruled below |
+
+**Two consequences ruled rather than inherited.**
+
+1. **A held request stores the full evaluated decision.** The eligibility snapshot, `approved_cents`, the split, the ordinal and the pinned plan version are computed at request time and frozen; only the ledger posting is deferred. Release is then mechanical and re-evaluates nothing, which preserves `INV-M5-02`, the number shown is the number sent, and decisively **keeps every existing `NOT NULL` and every existing CHECK on `payout_requests` intact**. A superseding migration that relaxes `NOT NULL` on the money table has a far wider blast radius than one that only adds.
+2. **A held request that reaches auto-release pays, even if the account breached during the hold.** `INV-M5-09`'s first clause holds, the snapshot was true when it was taken; its second clause, the money was already the trader's, does not. **The first governs, because the alternative is that Merit's own hold cost the trader money**, which is the exact shape zero denial exists to make impossible. Pinned by a golden scenario, not left to reasoning.
+
+### OQ-M5-02 is CLOSED at 48 hours, matching the hold
+
+**Founder ruling.**
+
+> **OQ-M5-02 closes at 48 hours, matching the hold. The investigate-time justification is identical in both cases, and the post-credit case holds money Merit has already recognised as owed.**
+
+[M05](plans/M05-payout-system.md) OQ-M5-02 proposed **10 business days** for `frozen` and was never ruled. Left alone, Merit would have bound itself to **48 hours where nothing has moved** and to **10 business days where the money is already the trader's**, which reads backwards from the side of the person waiting. The two clocks are now one number, and **the case for the longer clock was never about the investigation**: an investigation into a flagged payout is the same investigation whichever side of LT-01 it opens on. What differed was only which state the schema happened to have.
+
+**The unit moves with the number and is ruled in [ADR-042](#), not here.** "10 business days" becomes **48 wall-clock hours**, because Merit computes nothing in business days. `payout.freeze_expiring` was specified at "2 business days before `freeze_expires_at`" and **recomputes in hours**. Its lead value is set where the event is written, and **a two-day lead inside a 48 hour window is degenerate**, so the fold chooses it deliberately rather than converting the old number and moving on.
+
+### The auto-release is now the load-bearing control, so it is structural
+
+It is the only thing standing between a hold and an indefinite one. **Three mechanisms, none of them new.**
+
+1. **The hold joins the existing hourly freeze-expiry sweep** ([CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md)), which already carries an S1 dead-man switch whose stated reason is that "a stalled sweep converts a bounded hold into an unbounded one, which is a denial nobody authorized". One job, one row, one switch.
+2. **The alarm fires on the query, not on the job.** A nightly assertion that no request sits past its hold expiry, evaluated independently of whether the sweep reported success. This is [M02](plans/M02-rithmic-bridge.md) `FM-M2-11`'s idiom applied to the releaser: **a job that reports success is not evidence that the work happened.**
+3. **It becomes the fourth unsuppressible alarm**, ruled next.
+
+**Founder ruling.**
+
+> **The unsuppressible alarm list moves from three to four. A releaser that can be muted is not a control.**
+
+[M06](plans/M06-admin-ops-console.md) OQ-M6-01 named three: ledger global imbalance, replay divergence, and payout balance-reflection missing, each meaning Merit no longer knows something it must know before paying anyone. **A hold or a freeze past its expiry joins them**, and the reason is the same one stated in the other direction: the other three mean Merit cannot safely pay, and this one means Merit has stopped paying and nobody is being told. OQ-M6-01's own counter-argument, that a fourth alarm could page nightly forever on an unresolvable vendor gap, does not apply: **the condition here is resolvable by Merit alone, in one action, with no third party in it.**
+
+**Plus one new CI gate, because the error is checkable from the tree.** **`CI-06l`, every expiry has a sweep:** each expiry column in the migration set either names a release job in CRON_INVENTORY or appears on a written exemption list with a reason, in the NO-FLOATS list's idiom. It reads the DDL and one document, needs no database, and **must be watched failing on a seeded violation and on the seeded finding**, per [`falsify.mjs`](../scripts/corpus/falsify.mjs). The letter is claimed in the gate table above.
+
+### The predicate, and the external leg's deliberate asymmetry
+
+**A held request is outstanding.** Both `SD-09` predicates are dropped and re-created under the same names, adjacent, in `0031`: `payout_requests_no_in_flight_uq` and `payout_requests_outstanding_idx` each become `WHERE status IN ('approved','frozen','held_pending_review')`. **This is the `C-02` defect verbatim** ([ADR-028](#)): a predicate that stops matching is a gate that still exists, is still valid, enforces nothing, and fails no test. Every other object on the table was read and dispositioned rather than assumed, including `payout_requests_account_ordinal_uq`, which is **unchanged and correct**: a held request holds its ordinal while held, and enforcement sends it to `failed`, which releases the rung (EC-037).
+
+**The wallet-to-rail halt is not a status value and the payout hold is.** On `payout_requests` the hold **replaces** approval and is mutually exclusive with every other status, so it is a status. On `wallet_withdrawals` the halt is **orthogonal** to the rail state, and collapsing an orthogonal hold into the rail's status column is precisely `SD-M5-06`'s named mistake. So `0031` gives the external leg **enforcement rather than a state**: a CHECK that a withdrawal carrying a live freeze cannot be `settled`, the open index re-created so a halted row stays visible, and the same 48 hour expiry on the same hourly sweep. **Release resumes the rail; it does not re-pay, because the money is already the trader's.**
+
+### The cross-cutting correction: STATE_MACHINES section 2 still carried a retired enum value
+
+**[ADR-028](#) retired `transferring` from `payout_requests` and named two sites it corrected, [DATA_MODEL](architecture/DATA_MODEL.md) line 638 and [M05](plans/M05-payout-system.md)'s machine. It missed the authoritative drawing.** [STATE_MACHINES section 2](architecture/STATE_MACHINES.md) routed `approved --> transferring --> settled`, carried `frozen --> transferring`, and gave `transferring` a row in both the state table and the transition table, on a table whose enum has not contained the value since ADR-028. **Corrected in this commit**, on ADR-028's own remedy: `frozen` releases to `settled`, which is what a released freeze does under the wallet, and the external leg's states stay in section 3 where `wallet_withdrawals` owns them.
+
+**The sweep is not complete and the remaining sites are named rather than left for a grep.** [STATE_MACHINES section 10](architecture/STATE_MACHINES.md)'s `G-NO-IN-FLIGHT` and `G-FREEZE-DURING-FLIGHT` both still name `transferring`; [M01](plans/M01-rules-engine.md) `SD-09` and its `hasPayoutInFlight` comment carry the pre-ADR-028 predicate; [EDGE_CASES](EDGE_CASES.md) line 148 states the gate in the old terms; [API_CONTRACT](architecture/API_CONTRACT.md) line 335 types the status union with the retired value. **All four are surfaces this fold must touch anyway to add `held_pending_review`**, and correcting them in the same edit that widens the predicate is one read rather than two. Naming them here is the point: **ADR-028 believed its sweep was complete and it was two sites short**, and the only reason this one was found is that a founder read the machine rather than the ADR.
+
+- **Alternatives considered:** **a `denied` status** (rejected outright: it is the policy this ADR amends, and the amendment keeps the substance precisely so the value stays unnecessary); **an unbounded review state** (rejected: an unbounded hold is a denial nobody had to authorize, which is `FM-M5-09` restated); **collapse the hold into `frozen`** (rejected on the ledger discriminator above: one of the two has money posted against it and the other does not, and a release means a different act in each); **relax `NOT NULL` on `payout_requests` so a held row can defer its evaluation** (rejected: a superseding migration that relaxes a constraint on the money table has a far wider blast radius than one that only adds, and storing the full decision costs nothing); **put the external halt in the rail's status column** (rejected above, `SD-M5-06`); **keep OQ-M5-02 at 10 business days** (rejected: it holds recognised money longer than unrecognised money, and it is measured in a unit Merit does not compute).
+
+---
+
+## ADR-041: Identity-level restriction is `restricted`, and this is its enforcement surface  (2026-08-15, status: accepted)
+
+**The fold plan is [FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) and it is approved. This ADR records Ruling B and does not re-derive it.**
+
+- **Context:** Ruling B asks for **a reversible state on the trader identity halting all activity across every linked account at once**: purchases and resets blocked at checkout, payout requests blocked, wallet spend and external withdrawal blocked, platform trading revoked through the Rithmic bridge, and **account state preserved intact for restoration**. Distinct from closure for cause, which is terminal, and from a per-account freeze, which is narrow. Cited flag and ToS clause, audit-logged with actor and reason, reversible with a documented restore action, and [ADR-040](#)'s 48 hour SLA applies where a payout is pending.
+
+### It is `restricted`, and not a new `suspended` value
+
+**Founder ruling.**
+
+> **`restricted`, not a new `suspended` value.** `0002:41` already says "who is restricted is restricted across every account they hold". **The state exists; its binding surface does not, and `G-ELIGIBLE` not naming `identities.status` is the whole finding.**
+
+`identity_status` already carries a reversible `restricted` state and it is wired end to end: the enum in `0001`, the column and its explained-reason CHECK in `0002`, the machine with `G-ENFORCEMENT-RESTRICT` and `G-RESTRICTION-LIFTED` in [STATE_MACHINES section 9](architecture/STATE_MACHINES.md), the `identity.restricted` event and `enforcement.applied`'s `restrict` action in [EVENTS](architecture/EVENTS.md), wallet spend and withdrawal both blocked by it ([M20](plans/M20-wallet.md) `INV-M20-06`), and it is already on the trader's own `GET /me`. **`suspended` would be `restricted` under a second name, and two expressions of one concept is this repository's most repeated defect.** Adding it would create one deliberately, in the same week [ADR-040](#) refused to create one for the payout hold.
+
+**What is missing is not the state but its binding.** `G-ELIGIBLE` names `payouts_frozen` on the account and on the identity and does **not** name `identities.status`. Checkout has no restriction check. Nothing revokes platform trading on a restriction. **That absence is the actual content of Ruling B**, and it is why the ruling reads as asking for a new state: the existing one does almost nothing.
+
+**The counter-argument is real and is recorded rather than dismissed.** `restricted` is a weaker word than `suspended`, and the corpus never enumerated what it restricts, so a reader could reasonably have concluded it meant something narrower. **The answer is to enumerate it once, in one table, and assert it.** This is the one place the fold departs from the ruling's literal wording, it is flagged rather than absorbed, and **OQ-F2-01 closes on it.**
+
+### What `restricted` binds, enumerated once
+
+| Surface | Behavior | Where it is enforced |
+|---|---|---|
+| Purchases and resets | refused at checkout, **server side** | [M03](plans/M03-billing-checkout.md), joining the existing `geo_restricted` and `account_cap_reached` refusal set |
+| Payout requests | blocked | **`G-ELIGIBLE` gains the identity status.** It names `payouts_frozen` today and not `status` |
+| Wallet spend | blocked | Already true. [M20](plans/M20-wallet.md) `INV-M20-06` |
+| External withdrawal | blocked | Already true, same source |
+| Affiliate settlement | blocked | [ADR-017](#) put every outbound payment on one rail, and **a restriction that stops one door and not the other is not a restriction** |
+| Platform trading | revoked through the Rithmic bridge | [M02](plans/M02-rithmic-bridge.md), **PROVISIONAL**, below |
+| Account state | **preserved intact.** No account status moves, no ladder rung is consumed, no entitlement history is rewritten | The restriction is a layer over the account machine, exactly as `payouts_frozen` and `recon_blocked` already are |
+
+**Distinct from its two neighbours, in one sentence: closure for cause is terminal and per account; a freeze is per payment and expires; a restriction is per human, halts everything, and is reversed by a documented restore.**
+
+### The episode is a row, not a column
+
+`identities` carries `status` and `status_reason` and nothing else, while `accounts` has had `account_status_history` since `0007`. **A repeat restriction would overwrite its predecessor and a restore would be unprovable at exactly the moment it is contested.** `0031` adds a restriction-episode table: the identity, the cited `risk_flags` id, the ToS clause, the written reason, the actor, the opened-at, the SLA due-at where a payout is pending, the restored-at, the restoring actor, the restore evidence, and the evidence-pack id on the enforcement branch. A **partial unique index gives at most one open episode per identity**, and a completeness CHECK in `identities_freeze_is_explained`'s shape makes an episode with a clock and no flag, or a flag and no clock, unwritable.
+
+**[ADR-040](#)'s 48 hour SLA binds the restriction rather than the payout.** A restriction cannot hold a held payout past its own 48 hours. **That is the property that stops Ruling B from becoming a route around Ruling A**, and it is asserted rather than intended.
+
+### Restoration inherits fail-closed provisioning, and the platform leg is PROVISIONAL
+
+**Revocation** is fail-closed on the way out: `disable_entitlement`, then `disable_account`, both already `provisioning_queue.operation` values in `0007`. **Restoration** is fail-closed on the way back: `set_risk` at the account's current floor **confirmed first**, then entitlement, then permissions. `0007` already makes it unwritable for a `set_risk` row to reach `confirmed_inferred`, which is exactly the guarantee restoration needs, because re-enabling an entitlement against an unconfirmed setpoint is an unenforced funded account and `INV-M2-13` forbids it.
+
+> **Suspension is always available. Restoration is contingent on `V-M2-15`.** With neither an acknowledgement artifact nor a readable current risk setting, a restored account cannot be confirmed, and under `INV-M2-13` an unconfirmed account does not trade. **A restricted trader would be revocable and not restorable.**
+
+`V-M2-15` is the corpus's one open commercial precondition, [M02](plans/M02-rithmic-bridge.md) is still at `status: review` by [ADR-005](#), and **this ADR moves neither.** It adds a row to the vendor agenda. The honest form of a provisional dependency is an asymmetry, not a caveat.
+
+**The entry point is a v1 surface, because [ADR-022](#) tiers the identity-graph explorer to v1.x.** Restriction is an action on [M06](plans/M06-admin-ops-console.md)'s flags queue and identity drill-down, both v1, sitting on the `investigating` to `enforced` path that already requires an exported evidence pack, a ToS clause and a written reason. The graph one-click arrives with the explorer. **Both directions inherit GS-117**, the typed reason before the confirm control enables, and restoration is a reversal of a protective state, which is the category GS-117 names explicitly.
+
+### M15 moves to launch scope, partial, and it belongs in this ADR
+
+**Founder ruling.**
+
+> **M15 partial, +3 to 5 days, P8. `INV-M15-06` is the reason: a role vanishing at the moment of enforcement publishes the enforcement.**
+
+**The connection is an invariant, not a roadmap preference.** `INV-M15-06` requires role removal to be silent, batched, and never coincident with an enforcement, because a role disappearing at the moment an account closes publishes the enforcement to everyone in the server ([M15](plans/M15-discord-integration.md) `AS-M15-05`, `FM-M15-04`). **Ruling B creates an enforcement that halts every linked account at once.** If roles sync and M15 ships later, restriction is built with no counterpart discipline and **the first restriction broadcasts itself.**
+
+**Partial scope** is the link and the announcement templates, per M15's own `OQ-M15-01`; role sync stays post-launch. It matches the "MUST, partially" idiom [DELIVERY_PLAN](DELIVERY_PLAN.md) already uses for M16 and M18. Phase **P8**, so the surface exists when P9's beta community forms. **The weeks are recorded rather than absorbed**, per DELIVERY_PLAN's own discipline and [ADR-020](#)'s "+2 to 4 weeks" precedent, and the headline is restated with the delta rather than left implied.
+
+**It also amends the constitution.** Section 10 lists Discord community bot scope as post-launch among the Open Decisions Register items. The constitution is read-only and **this ADR is the amendment**, per [CLAUDE.md](../CLAUDE.md).
+
+- **Consequences:** `0031` carries the restriction-episode table. `G-ELIGIBLE` gains `identities.status`, which is a money-path change to the payout gate and lands with the machines. [M03](plans/M03-billing-checkout.md) gains a server-side refusal reason; [M08](plans/M08-affiliate-system.md) is **confirmed** rather than amended, since [ADR-017](#) already put affiliate settlement on the one rail. [DELIVERY_PLAN](DELIVERY_PLAN.md) sections 1, 2, 4 and 5 move with M15. **OQ-F2-01 and OQ-F2-03 close.**
+
+- **Alternatives considered:** **add `suspended` to `identity_status`** (rejected above, and it is the ruling's substance: it is `restricted` under a second name, and the enum would then hold two values whose difference no document could state); **rely on per-account freezes applied across every account** (rejected: it is per human by definition, the set of accounts changes while the episode is open, and account state must be preserved rather than moved); **a boolean column beside `status`** (rejected: it makes the identity machine's third value dead and puts two sources of truth on one question); **an episode column set on `identities` rather than a table** (rejected: a repeat restriction overwrites its predecessor and a restore becomes unprovable when contested); **ship M15 post-launch as planned** (rejected: `INV-M15-06` has no implementation to constrain if the enforcement ships first, and the first restriction is the one that publishes itself).
+
+---
+
+## ADR-042: The trading calendar is transcribed from the exchange, and Merit computes nothing in business days  (2026-08-15, status: accepted)
+
+**The session plan is [P1 S-E](plans/P1-SE-trading-calendar.md) and it is approved. This ADR records the rulings and does not re-derive them.**
+
+- **Context:** `trading_calendar` exists in [`0004_catalog.sql`](../packages/db/migrations/0004_catalog.sql) with its ruled semantics and **zero rows, no source file, no loader and no seed mechanism.** The calendar decides what a trading day is, and every counter the engine keeps is counted in trading days: R-01, R-02, R-05, R-34, R-37, R-47. **A wrong row changes rule outcomes with no change to a line of engine code, and it does so silently**, because the engine is a pure function of the calendar it is handed and three mechanisms guarantee it cannot check for itself: `types: []`, `merit/engine-purity`, and the `RI-01` manifest check. **That purity is the reason this table is the highest-leverage unreviewed data in the system.**
+
+### The source is the exchange's own publication, and it is verified rather than trusted
+
+**The source is CME Group's published holiday calendar and published Globex hours** for the listed product groups, transcribed by hand into a checked-in JSON file carrying a provenance block: source URL, retrieval date, the retrieved artifact committed beside it, and its SHA-256. This is `TR-01`'s discipline, **every value transcribed from the named authority and never from an implementation**, applied to calendar data.
+
+**No third-party calendar library is introduced.** `VG-12` makes a new dependency a human admission a session cannot grant itself, and a library is in any case **not more authoritative than the exchange's own publication**: it is somebody else's transcription of the same document.
+
+**The file holds exceptions, not two hundred and fifty rows.** Hand-maintaining a full year is two hundred and fifty chances to be wrong. The file carries the holiday list, the early-close list with each early close's CT time, and the coverage bounds; full sessions are generated from the stated rule. **The generated year is committed and reviewed**, so the reviewable artifact still exists and git holds its history. **This does not violate B4 #1**, and the distinction is stated because a careful future reader will otherwise read the generator as the thing that rule exists to prevent: B4 #1 forbids the **engine** deriving a trading day from a timestamp at runtime, and does not forbid a build step whose output is committed, digest-pinned and thereafter read as data.
+
+**Three verification layers, because a source read twice is still one source.** Structural offline checks catch a transcription slip. **The cross-source layer catches DST, the one class a careful reader still gets wrong**: the file states both the CT wall time and the UTC instant for every session, and the loader **verifies rather than computes**, converting through `Intl` with `timeZone: 'America/Chicago'` and refusing any row where the two disagree. The third layer is the only one that can falsify a row against reality, and it is `SD-M2-04`'s existing `fills.trading_day_vendor` divergence alarm (EC-056, GS-090) **wired to the calendar rather than duplicated**. It is retrospective by construction, and that is why the first two exist.
+
+**Correcting a row once trading has occurred against it is neither E2 nor "it is only data".** E2 does not reach a data row, **but the reason E2 exists reaches it exactly**: a row a `daily_mark` has already been computed against has already run. So the partition is asserted rather than judged. **No dependent row in `fills`, `daily_marks` or `rule_states`**: an ordinary data change, the loader updating it having first asserted the dependency count is zero. **Dependent rows exist**: not a data edit, an incident. Prior image written, every affected account replayed through the same `advanceDay` fold, and **B4 #5 governs the outcome, so a settled payout whose eligibility changes retroactively is never clawed back**, it is flagged for review and absorbed.
+
+### OQ-SE-01: F-1 through F-4 are all accepted
+
+**Founder ruling.**
+
+> **OQ-SE-01: all four of F-1 to F-4 accepted.**
+
+| # | Finding | What `0032` does |
+|---|---|---|
+| **F-1** | **`is_holiday` is unwritable as designed.** `session_open_at` and `session_close_at` are `NOT NULL` under `CHECK (session_close_at > session_open_at)`, so a holiday row must carry a **fabricated** session interval, while the CHECK beside it says in its own comment that "a holiday has no session to contain fills in" | Supersede `0004`, never edit it. Session columns nullable for holiday rows under `CHECK (is_holiday = (session_open_at IS NULL))`, ordering check made NULL-safe. **A holiday becomes a positive fact rather than an absence**, which is also what the fail-closed control needs |
+| **F-2** | **A corrected row leaves no prior image.** The table carries `updated_at` and `notes` and cannot answer what the calendar said on the day the engine read it, so `INV-04` is defined against a value that can move and replay cannot distinguish a calendar correction from an engine regression | An append-only `trading_calendar_revisions` table: prior row image, actor, reason, source digest, incident reference. **Git is real history and is the wrong history**: it records what the file said and cannot prove what the database held when the mark was computed |
+| **F-3** | **One `session_close_at` cannot serve six symbols across three exchanges on an early-close day.** `contract_specs` lists `ES`, `MES`, `NQ`, `MNQ`, `CL`, `GC`, whose early closes differ by product group while their regular hours agree, and `trading_calendar` has no symbol dimension | **The latest close across the listed groups**, per-group times in `notes`. R-01 is a containment lookup, so the only thing at stake is whether a fill can fall outside every session, and the latest close guarantees it cannot. **The symbol dimension is rejected**: it turns R-01 into a per-symbol lookup, changes the engine's calendar contract, and makes the calendar's grain differ from the grain every counter is defined at |
+| **F-4** | **Coverage has no storage**, so an exhausted calendar is indistinguishable from an unbroken holiday: every counter quietly stops advancing, no rule fires, nothing breaches, nothing becomes eligible, and **nothing raises** | A `trading_calendar_loads` fact: source id, coverage bounds, source digest, loaded at, actor. It serves fail-closed, the horizon alarm and the digest round-trip at once, and it is **needed under either reading of F-1** |
+
+**The four are one migration or none**, and `0032` is that migration, with an `E2 READ: MONEY PATH` header. **A calendar that runs out is the single most silent failure available to this table**, so a stored coverage fact makes "we do not know about this day" a positive answer and **the batch refuses rather than guesses.**
+
+### OQ-SE-02: current year plus two, with the horizon alarm at six months
+
+**Founder ruling.**
+
+> **OQ-SE-02: current year plus two, horizon alarm at six months.**
+
+`0004`'s own `COMMENT ON TABLE` says "seeded years ahead, reviewed annually", and **the current year plus two is about as far as CME publishes**, so it is the honest maximum rather than a chosen one. The horizon alarm warns when coverage runs less than six months ahead, and **the annual review joins [CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md)**, which today carries 90-day and quarterly rows and no annual one.
+
+### "Business day" is the rail's language. Merit quotes it and never computes it
+
+**Founder ruling, and it is the widest thing in this ADR.**
+
+> **"Business day" is the rail's language. Merit quotes it and never computes it.** [GLOSSARY](GLOSSARY.md) gains the term defined as exactly that. **[M05](plans/M05-payout-system.md)'s "10 business days" becomes 48 wall-clock hours** and `payout.freeze_expiring` recomputes in hours. **The published "2 to 3 business days" settlement claim is unchanged**, because it is the rail's claim, quoted.
+
+> **The 48 hour clocks are wall clock. The obligation is to RELEASE, not to SETTLE.** Release ends the hold; settlement follows the rail.
+
+**An obligation Merit binds itself to is measured in exactly one of two units.**
+
+> **Trading days**, answered only by `TradingCalendar`, for every engine counter.
+> **Wall-clock hours**, answered only by `now()`, for every release deadline.
+>
+> **Nothing Merit computes is measured in business days.** That is the rail's language, quoted on the surface where the rail's leg is described, and never computed by Merit.
+>
+> The calendar has no opinion about a `timestamptz` deadline, and a `timestamptz` deadline has no opinion about whether the exchange is open. **A 48 hour hold that expires at 03:00 on Christmas Day releases at 03:00 on Christmas Day.** That is not an oversight in the unit, it is the reason the unit was chosen. **Releasing is Merit's own act and needs no exchange, no bank and no calendar, which is exactly what makes it a promise Merit can keep.** An obligation that waited for the exchange would be a promise about somebody else's schedule.
+
+**This closes OQ-SE-03 and it is why the number in [ADR-040](#) could be ruled at all.** ADR-040 sets the freeze clock to 48 hours; this ADR says what 48 of them are.
+
+**Nothing is wrong today, and that is a measurement rather than a reassurance.** Across all 28 merged migrations there is zero `::date`, zero `CAST(`, zero `interval` in any case, no `date` column carrying any default, and every `now()` is a `DEFAULT now()` on a `timestamptz`. The engine is guarded three ways and cannot read a clock at all. **The exposure is what the two folds are about to add.** `0029` through `0031` introduce the first `interval '48 hours'` arithmetic and the first `now()` comparisons on the money path, plus an hourly sweep. **The moment that is idiomatic in the payout tables, the next session that needs "five trading days from now" has a working pattern sitting right there that produces a wrong answer on roughly 104 days a year.** The moment to wire the guard is before those migrations, and it is cheapest now precisely because it is green.
+
+**Three at-risk items, found by looking, none of them a defect yet.** `freeze_expires_at` on both `payout_requests` and `wallet_withdrawals` is a `timestamptz` described in prose as business days, and **there is no business-day calendar anywhere in the system**, so whoever implements the sweep reaches for the only calendar in the database, which is a different set of days. **"Business day" appears in M04, M05, M07, M09, M11, M12, M16 and three runbooks, including the published settlement claim the brand is built on, and it is not in GLOSSARY.** And 45 `date` columns carry no statement of their unit: `published_statistics` holds `as_of_trading_day`, whose unit is in its name, beside `window_start_day`, whose unit lives only in [M12](plans/M12-statistic-definitions.md) and whose DATA_MODEL Why cell is empty, **in one table.**
+
+**Prose is not a control, so three mechanisms enforce the boundary**, each watched failing on its own seeded violation: an **import ban** in [`packages/eslint-plugin-merit`](../packages/eslint-plugin-merit/README.md) forbidding the hold, expiry and sweep path from importing `TradingCalendar`, beside `no-raw-db-client` and `engine-purity`, because **an import is checkable and an intention is not**; a **SQL shape check** over the migrations forbidding `interval` arithmetic against a `date` column and any `timestamptz` cast to `date`, **vacuously true today, which is precisely the argument for wiring it now**; and the **unit-declaration half of `CI-06m`**, every `date` column having a DATA_MODEL row naming its unit, on `payable_after` and `chargeback_window_ends_on`'s model. **One place both units legitimately appear** is the trader's screen, where `next_eligible_trading_day` and a hold's `expires_at` can sit together, and the rule there is copy rather than code: each is labelled with its unit.
+
+### OQ-SE-04: a second transcription, and the blindness is the condition
+
+**Founder ruling.**
+
+> **OQ-SE-04: second transcription, and the blindness is the condition.** A second reader who can see the first **rationalises disagreements rather than surfacing them**. Transcribe independently, diff, require it empty.
+>
+> **A calendar package is rejected**: it encodes someone else's reading of the same publication, **a second instance of the same error class rather than an independent check.**
+
+The IANA cross-check covers DST completely and covers the holiday list not at all, which is the gap a second encoding exists to close. **The blindness is what makes it an encoding rather than a review**, and the failure mode it defeats is specific: a reader shown an existing transcription reconciles to it, so the diff comes back empty for the wrong reason and the check reports success while proving nothing. **This is the positive-control lesson from `0028` and `falsify.mjs` applied to a human**: a check that cannot fail is not a check, and a second reader who can see the first cannot fail in the direction that matters.
+
+**The rejection of the package is the sharper half.** A vetted calendar library looks like independence and is not: it is one more transcription of the same CME publication, made by somebody with no more access to the exchange than Merit has, and **it correlates with the first transcription on exactly the days both readers would misread.** Adding a dependency to buy a correlated check spends a `VG-12` admission on nothing. **The second transcription needs no dependency admission**, which is why it is the v1 answer.
+
+- **Consequences:** `0032` carries F-1 through F-4. [GLOSSARY](GLOSSARY.md) gains **business day**, defined as the rail's unit, quoted and never computed. [M05](plans/M05-payout-system.md)'s freeze window becomes 48 wall-clock hours ([ADR-040](#)) and `payout.freeze_expiring` recomputes in hours. **`CI-06m` is claimed** in the gate table above and carries three checks: the source file's declared counts agree with its own contents, the fixture calendar is regenerated and `git diff --quiet`, and every `date` column has a DATA_MODEL row naming its unit. **The loader lives in `packages/db/src/seed/`**, because `packages/db` is the only package permitted to import the database client ([ADR-008](#)) and its single lint `ignores` entry is that package: **putting the loader anywhere else needs a second exception, and the exception is the control.** The `migrations` job is **extended rather than duplicated**, on [ADR-036](#)'s stated precedent that a sibling job needs a second copy of the source parser. **`cme-2026.json` becomes derived** from the seeded rows rather than maintained beside them, which is what turns its own note about two hand-maintained calendars into a mechanism. **The `TradingCalendar` module itself is deliberately out of scope**: the query surface arrives with its first consumer rather than being guessed at now.
+
+- **Alternatives considered:** **a third-party calendar package as the loader's input** (rejected: `VG-12`, and it is not more authoritative than the exchange's own publication); **the same package as a CI cross-check only** (rejected above: it correlates with the transcription it is checking); **a full hand-maintained year** (rejected: two hundred and fifty chances to be wrong, against a holiday-plus-early-close list that is a few dozen values); **generating sessions at runtime instead of committing them** (rejected: B4 #1, and a committed artifact is what a reviewer can read and git can diff); **git as F-2's prior image** (rejected above: it proves what the file said, not what the database held); **a symbol dimension on the calendar** (rejected as F-3, it changes R-01's contract); **business days as a third Merit-computed unit** (rejected: it would need a bank calendar the system does not have and would not be Merit's promise to keep); **converting the freeze clock to trading days** (rejected: releasing is Merit's own act and waiting for the exchange makes it a promise about somebody else's schedule).
