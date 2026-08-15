@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../plans/M01-rules-engine.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../EDGE_CASES.md, ../DECISIONS.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-15
 ---
 
 # Golden Scenarios
@@ -15,6 +15,8 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 **Consolidated in Wave 4, and the registry now stands at 257** (section 33 carries the full reconciliation, the ownership partition, and the coverage map). Four things were repaired in that pass and each is worth naming, because a registry whose defects are fixed silently is a registry nobody can trust the next count from. **The section numbering was duplicated at 25, 26 and 27** and is now contiguous through 33. **Section 6's stated range said GS-071 to GS-083 while its table ended at GS-078**, which overlapped section 7. **GS-139 to GS-141 were listed out of order.** And **GS-206 through GS-209 were claimed by two different blocks at once**, the M18 graduation scenarios and the addendum's verification-UX scenarios; the verification-UX pair is renumbered to GS-256 and GS-257, and the collision note stays in section 28 rather than being erased.
 
 **Two blocks were added in the same pass.** GS-246 to GS-255 are the **Appendix D0 attack battery**, discharging the obligation [SECURITY section 9](../architecture/SECURITY.md) recorded for Wave 4. GS-243 to GS-245 carry [ADR-025](../DECISIONS.md#adr-025-progressive-cap-release-is-rejected-for-v1-and-replaced-with-cross-account-loyalty--2026-08-14-status-accepted).
+
+**A fifth defect was repaired at the S-D read and it is a different class from the four above, which is why it is named separately.** Section 3's plan shorthand **restated thirteen parameter values from [M01 Appendix A.1](../plans/M01-rules-engine.md#a1-core-eod-core_eod) in the same sentence that named Appendix A as the only place they are defined**, and one of the thirteen had drifted: the ladder read 8 against Appendix A.1's 5 ([ADR-024](../DECISIONS.md)). The four earlier repairs were numbering; this one is a **value a running system reads from config**, which is the first time this registry has been found disagreeing with the specification rather than with itself. **The thirteen copies are deleted and the section points at the appendix** ([ADR-037](../DECISIONS.md#adr-037-a-shorthand-may-not-restate-a-value-the-config-owns--2026-08-15-status-accepted)); GS-066 and GS-067 carried the same stale 8 in their pins and now name `max_payouts` rather than a number.
 
 **GS-055 is the one to read if you read only one row of that rewrite.** It pinned the extraction ceiling under the settlement anchor and carried the basis-anchored case as an expected-to-fail counterfactual. [ADR-019](../DECISIONS.md) made the counterfactual live, so the fixture now pins the opposite direction. That is exactly the situation this file's rule about rewriting rather than deleting exists for: the number changed because a decision changed, and both the number and the decision are on the record.
 
@@ -91,7 +93,9 @@ expect:
 
 ## 3. GS-001 to GS-029: rule and boundary scenarios (M1)
 
-Plan shorthand resolves to [M01 Appendix A](../plans/M01-rules-engine.md), which is approved and is the only place these numbers are defined. CORE-50K: size 5,000,000c, drawdown 250,000c, eval target 300,000c, buffer 100,000c, win-day floor 15,000c, 5 win days, funded consistency 3000bp, funded min days 0 (gate disabled), cadence gap 5, cap 150,000c, min payout 10,000c, split 9000bp, ladder 8, floor lock enabled at 260,000c of profit fixing the floor at size + 10,000c, no post-payout floor recompute.
+**`CORE-50K` is the 50K column of [M01 Appendix A.1](../plans/M01-rules-engine.md#a1-core-eod-core_eod), and this section restates none of it.** Appendix A is approved, it is the only place those numbers are defined, and a reader who needs a value reads it there. The executable form is [`packages/rules-engine/fixtures/plans/CORE-50K.json`](../../packages/rules-engine/fixtures/plans/CORE-50K.json), transcribed from that column and from nowhere else.
+
+**This paragraph used to restate thirteen of those values, and one of them had drifted** ([ADR-037](../DECISIONS.md#adr-037-a-shorthand-may-not-restate-a-value-the-config-owns--2026-08-15-status-accepted)): it said the ladder was 8 where Appendix A.1 says **5** per [ADR-024](../DECISIONS.md), in the same sentence that called Appendix A the only authority. **The thirteen copies are the defect and the wrong one is the symptom**, so the copies are deleted rather than corrected. [CI-06g](STRATEGY.md)'s rule now reaches parameters as well as counts: **a shorthand may not restate a value the config owns.**
 
 | ID | Name | Pins | Rule |
 |---|---|---|---|
@@ -172,8 +176,8 @@ Plan shorthand resolves to [M01 Appendix A](../plans/M01-rules-engine.md), which
 | GS-063 | Breach and profit target on the same day | Constitution M1 | Breach wins, account closes, no `phase.passed`, no funded state written |
 | GS-064 | Breach and payout eligibility on the same day | M1 extension | Breach wins. An eligibility that existed at the previous close does not survive the breach check |
 | GS-065 | Settled payout drops the balance toward a floor that does not move | AS-10, novel. **Rewritten by [ADR-014](../DECISIONS.md)** | The withdrawal is an adjustment, not a loss, and the floor is **not** recomputed to compensate. Asserts that the breach comparison neutralizes non-trading balance movements, that the day's opening balance after a maximum capped payout still sits above the floor by the buffer minus the lock offset, and therefore that a payout can never breach the account that earned it. INV-21 now rests on config validation (CV-11, CV-17), so this fixture is paired with GS-083, which proves the validator catches the config that would break it |
-| GS-066 | Failed transfer does not consume a ladder rung | AS-11, novel | Ordinal 3 fails, the retry is ordinal 3 again, `payouts_settled_count` never moved, graduation still requires 8 settled |
-| GS-067 | Graduation fires exactly on the ladder count | Constitution M1 | The 8th settlement graduates; the 7th does not. `>=` asserted at both boundaries |
+| GS-066 | Failed transfer does not consume a ladder rung | AS-11, novel | Ordinal 3 fails, the retry is ordinal 3 again, `payouts_settled_count` never moved, and graduation still requires the plan's full `max_payouts` settlements |
+| GS-067 | Graduation fires exactly on the ladder count | Constitution M1 | The `max_payouts`th settlement graduates; the one before it does not. `>=` asserted at both boundaries. **The count is the plan's, read from config**, and stating it here would be a fourteenth copy of the value [ADR-037](../DECISIONS.md#adr-037-a-shorthand-may-not-restate-a-value-the-config-owns--2026-08-15-status-accepted) deleted the other thirteen of |
 | GS-068 | Consistency period boundary at the settlement day | AS-12, novel | The basis day itself is excluded from the new period and the day after is included. Asserts a one-day off-by-one cannot silently move eligibility |
 | GS-069 | Adding profit on the best day breaks a passing consistency gate | AS-13, novel | The monotonicity counterexample. Eligibility is **not** monotone in profit, contrary to constitution section 5.1's phrasing, and the fixture is the proof |
 | GS-070 | Funded start balance does not equal size | AS-14, novel | A platform that fails to reset the funded account produces a first funded mark whose opening balance is not `size_cents`. The engine refuses the day and raises reconciliation rather than computing on it |

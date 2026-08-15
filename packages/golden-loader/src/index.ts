@@ -33,6 +33,9 @@ export type {
 export { describeDiff, diffEndState, diffEvents, snakeToCamel } from './compare.js';
 export type { Diff } from './compare.js';
 
+export { mismatchProofExists, renderStageCoverage, stageCoverage } from './coverage.js';
+export type { StageCoverage } from './coverage.js';
+
 export { engineIsIdentityStub, runFixture } from './run.js';
 export type { FixtureOutcome } from './run.js';
 

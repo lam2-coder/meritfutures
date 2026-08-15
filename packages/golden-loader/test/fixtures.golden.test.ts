@@ -1,3 +1,5 @@
+import { appendFileSync } from 'node:fs';
+
 import { describe, expect, test } from 'vitest';
 
 import {
@@ -5,8 +7,11 @@ import {
   describeDiff,
   engineIsIdentityStub,
   loadFixtureDirectory,
+  mismatchProofExists,
   registryIds,
+  renderStageCoverage,
   runFixture,
+  stageCoverage,
   type GoldenFixture,
 } from '../src/index.js';
 
@@ -26,6 +31,61 @@ import {
 
 const { fixtures, failures } = loadFixtureDirectory();
 const stubbed = engineIsIdentityStub();
+
+// -----------------------------------------------------------------------------
+// THE STAGE STATES WHAT IT CURRENTLY PROVES, IN ITS OWN OUTPUT
+// -----------------------------------------------------------------------------
+// A green check that means something narrower than its name is this
+// repository's most repeated defect, and CI-03 is currently a sharp instance of
+// it: the polarity is inverted while the engine is a stub, a corrupted expected
+// end state still passes, and the end-to-end assertion is skipped rather than
+// run. All three were true and all three were stated only in a pull request
+// body, which is written once by whoever landed the stage and read by nobody
+// afterwards.
+//
+// SO THE STAGE SAYS IT ITSELF, ON EVERY RUN, IN THE JOB LOG AND IN THE ACTIONS
+// SUMMARY. `stageCoverage()` measures the claims rather than repeating them:
+// the corrupted-expectation claim is proved by corrupting real loaded fixtures
+// and re-running the stage's own assertion over them, so the block cannot
+// describe a stage other than the one that just ran, and it changes on its own
+// when M01 lands.
+const coverage = stageCoverage();
+const report = renderStageCoverage(coverage);
+
+console.log(`\n${report}\n`);
+
+// `$GITHUB_STEP_SUMMARY` is where a reader who never opens a log still sees it.
+// Absent locally, which is why this is guarded rather than assumed.
+const summary = process.env['GITHUB_STEP_SUMMARY'];
+if (summary !== undefined && summary !== '') appendFileSync(summary, `${report}\n`);
+
+describe('what this stage proves, which is narrower than its name', () => {
+  test('the coverage statement is derived from this run, not written down', () => {
+    // If any of these could drift, the block above would be prose with a
+    // console.log in front of it, which is the thing it exists to replace.
+    expect(coverage.polarity).toBe(stubbed ? 'inverted' : 'direct');
+    expect(coverage.fixtures).toBe(fixtures.length);
+    expect(coverage.loadFailures).toBe(failures.length);
+    expect(coverage.endToEndRunning).toBe(!stubbed);
+    expect(coverage.registryScenarios).toBe(registryIds().size);
+  });
+
+  test('the file it cites for the mismatch proof exists', () => {
+    // The one claim in the block that is a reference rather than a measurement.
+    // A citation to a deleted file is how a coverage statement rots into a
+    // second thing nobody re-derives.
+    expect(mismatchProofExists(coverage)).toBe(true);
+  });
+
+  test.runIf(stubbed)('a corrupted expected end state passes this stage, and it says so', () => {
+    // THE ASSERTION IS THAT THE STAGE IS CURRENTLY BLIND, which is a strange
+    // thing to assert until you consider the alternative: the blindness is real
+    // either way, and the choice is between a suite that knows it and a suite
+    // that does not. When M01 lands `stubbed` goes false, this test stops
+    // running, and the block above prints the caught direction instead.
+    expect(coverage.corruptedExpectationStillPasses).toBe(true);
+  });
+});
 
 describe('the fixture directory', () => {
   test('every fixture loads', () => {

@@ -38,9 +38,30 @@ The arrow also points the right way: `RI-01` asserts `packages/rules-engine` dec
 
 **What the probe does not cover, stated rather than implied.** An engine that returns its input state by reference *and* emits no event for a day that moves the floor would be read as the stub. That engine fails `GS-009` and `GS-011` the moment the polarity flips, so the failure mode is loud rather than silent.
 
+## The stage says what it currently proves, and the claims are measured
+
+[ADR-038](../../docs/DECISIONS.md#adr-038-a-ci-stage-states-in-its-own-output-what-it-currently-proves--2026-08-15-status-accepted). While the polarity is inverted, `CI-03 golden files: pass` means three things its name contradicts:
+
+| | |
+|---|---|
+| The assertion is `diffs.length > 0` | A fixture that MATCHES is the finding |
+| **A corrupted expected end state still passes** | Any expectation at all produces diffs against an engine that computes nothing, so the stage is blind to whether the expected end states are the ones the corpus states |
+| The end-to-end assertion is not running | It is behind `describe.runIf(!stubbed)` and shows up as a skip count |
+
+All three were correct, and all three were stated **only in a pull request body**, which is authored once and read during one review. So [`src/coverage.ts`](src/coverage.ts) emits them into the job log and `$GITHUB_STEP_SUMMARY` on every run, and it **measures** rather than repeats: the corrupted-expectation claim is proved by corrupting every loaded fixture and re-running the stage's own assertion over it, and the fixture-to-registry fraction is derived from the tree and the registry. **When M01 lands the block changes on its own**, exactly as the polarity does.
+
+`--reporter=verbose` is part of the stage's command for this reason and not for taste: Vitest's default reporter swallows test stdout on a passing run.
+
+**The proof that a wrong expectation FAILS is not in this stage**, and the block says so and names where it is: [`test/compare.test.ts`](test/compare.test.ts), made against hand-built states rather than against whatever the engine does today. The stage asserts that file exists, so the citation cannot rot.
+
 ## The YAML subset parser, and the dependency it is standing in for
 
 `src/yaml.ts` reads a small, strictly specified subset and **throws on everything else**, with a line number. The subset and its refusals are listed in the file's own header.
+
+**The rule it is written against is refuse, never mis-read**, and two ways it was failing that rule were found and closed. Both were silent passes rather than crashes, which is the only kind that matters here:
+
+1. **Sequence items dropped their tail.** `parseNode` returns how much it consumed and both sequence-item call sites discarded it, so a nested sequence followed by anything else parsed with the remainder **read from disk and thrown away**. A fixture input the engine never sees is the worst outcome a golden file has: the scenario passes while pinning something the author did not write. `readWholeItem` now refuses to read part of an item.
+2. **Plain scalars a real YAML library types differently.** `True`, `yes`, `NULL`, `0x1F`, `007`, `+5`, `1_000`, `.inf` and `1:30` were all strings here and are booleans, null, integers, floats or a sexagesimal elsewhere. **This is the date hazard below, generalized**, and the bare `YYYY-MM-DD` trading day is now the single named admission in that class. Quoting is the escape hatch and it means the text under every schema.
 
 **Why not the `yaml` package.** VG-12 makes every new dependency a human admission decision ([STRATEGY section 4.2](../../docs/testing/STRATEGY.md), [`.npmrc`](../../.npmrc)) and a session cannot grant itself that approval. **Swapping this file for `yaml` is a founder call and a small diff.** Two things to weigh before making it:
 
