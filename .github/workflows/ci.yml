@@ -224,6 +224,36 @@ jobs:
           semgrep --version || status=1
           exit $status
 
+      # A PIN NOBODY LOOKS AT IS A PIN THAT AGES, and a scanner three majors
+      # behind reports green about a rule set it does not have. This step never
+      # fails: a stale pin is a decision to make, not a build to break, and a
+      # gate that goes red because somebody else shipped a release is a gate
+      # that gets bypassed with a flag.
+      #
+      # It also earned its place immediately. The pins in this file were
+      # guessed, and this is what tells a session which numbers are real
+      # without waiting for a 404 that only fires on the first stale one.
+      - name: Scanner pin drift
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          for spec in "gitleaks/gitleaks:$GITLEAKS_VERSION" "anchore/syft:$SYFT_VERSION" "anchore/grype:$GRYPE_VERSION"; do
+            repo="${spec%:*}"; pinned="${spec##*:}"
+            tag=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null \
+              | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -1)
+            if [ -z "$tag" ]; then
+              echo "${repo}: could not reach the release API"
+            elif [ "$tag" = "$pinned" ]; then
+              echo "${repo}: pinned at ${pinned}, current"
+            else
+              echo "::notice::${repo} is pinned at ${pinned}; upstream publishes ${tag}"
+            fi
+          done
+          exit 0
+
       # -----------------------------------------------------------------------
       # VG-1, secret scan
       # -----------------------------------------------------------------------
