@@ -41,12 +41,32 @@ jobs:
           # unable to look.
           fetch-depth: 0
 
+      # RIDER 3, OQ-P1-03. `.nvmrc` is the only place the Node version is
+      # written. This step used to carry `node-version: '22'`, which made two
+      # files hold one number with nothing reconciling them: a hand-maintained
+      # count in a different costume, and it drifts the same way. RI-05 in
+      # packages/tooling asserts no workflow pins the version inline.
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: .nvmrc
 
       - name: Run corpus gates
         run: node scripts/corpus/gates.mjs check
+
+      # RIDER 1. THE GATES ARE PROVEN FALSIFIABLE AS OF ONE SESSION AND NOTHING
+      # KEPT THEM SO. A gate nobody has watched fail is not a gate
+      # (STRATEGY section 4.4), and the step above only ever watches them pass:
+      # a gate silently narrowed until it reads nothing reports PASS in exactly
+      # the same way as a gate that is working.
+      #
+      # falsify.mjs runs every gate twice, once against this tree where it must
+      # pass and once against a copy carrying one seeded violation aimed at it
+      # where it must fail ON THAT FINDING rather than merely exit non-zero, and
+      # then runs the scope cases that assert each gate reads the right set of
+      # files. It runs BEFORE the regeneration step below, which rewrites spans
+      # in the working tree that falsify.mjs copies.
+      - name: Gates are falsifiable
+        run: node scripts/corpus/falsify.mjs
 
       # CI-06g is only meaningful if regenerating changes nothing. The check
       # above compares spans against their queries; this proves the generator
@@ -161,3 +181,19 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_ledger_constraints.sql
+
+      # RIDER 2. ADR-035's guard, verified by nothing since the session that
+      # fixed it. `assert_published_plan_version_immutable()` read `NEW.config`
+      # on a table whose rule contract is `rules`; PL/pgSQL resolves record
+      # fields at execution rather than at CREATE FUNCTION, so the migration
+      # installed cleanly, every existing probe passed, and the function was
+      # wrong only when it fired. It fired on the one transition the design
+      # permits and no plan version could be retired.
+      #
+      # A PROBE THAT SHIPS BESIDE A FIX AND NEVER RUNS AGAIN IS THE SAME OBJECT
+      # AS THE GOLDEN TEST THAT WAS MISSING. This job ran only the ledger probe
+      # until now.
+      - name: Probe ADR-035's plan-version immutability guard
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_plan_version_immutability.sql

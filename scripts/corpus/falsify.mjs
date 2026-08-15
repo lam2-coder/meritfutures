@@ -34,8 +34,7 @@
 // =============================================================================
 
 import {
-  cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync, existsSync,
-  readdirSync,
+  cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync, readdirSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, dirname, resolve } from 'node:path';

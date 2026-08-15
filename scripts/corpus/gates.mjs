@@ -771,7 +771,8 @@ const ci06h = {
     'migration filenames number 1..n with no duplicates, every number on disk is ' +
     'claimed by a row of the migration allocation table in DECISIONS.md, every ' +
     'hole matches a reservation, and the corpus workflow still carries the ' +
-    'ON_ERROR_STOP apply, the must-fail re-apply and the database-derived counts. ' +
+    'ON_ERROR_STOP apply, the must-fail re-apply, the database-derived counts ' +
+    'and both database probes. ' +
     'TWO THINGS IT DOES NOT DO. The install itself needs a live PostgreSQL and ' +
     'runs in CI, so a green result here is NOT a claim that the set installs. And ' +
     'the cross-branch half, that a pull request may not claim a number already on ' +
@@ -824,6 +825,14 @@ const ci06h = {
       ['Re-applying the set fails', 'the must-fail re-apply step is gone'],
       ['pg_indexes', 'the counts are no longer derived from the database'],
       ['probe_ledger_constraints.sql', 'the ledger constraint probes are no longer run'],
+      // Added with rider 2 of the P1 scaffold. The probe is now wired into the
+      // migrations job, and this is what keeps it wired: a probe that ships
+      // beside a fix and never runs again is the same object as the golden test
+      // that was missing, and deleting the step is how it stops running.
+      [
+        'probe_plan_version_immutability.sql',
+        "ADR-035's plan-version immutability probe is no longer run",
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
