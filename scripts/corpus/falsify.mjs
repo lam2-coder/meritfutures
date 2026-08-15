@@ -122,9 +122,13 @@ const SEEDS = {
     seed: (d) => edit(d, 'docs/STATE.md', (b) => once(b, '<!--gen:ec_count-->140', '<!--gen:ec_count-->141')),
   },
   'CI-06h': {
-    what: 'a hole in the migration sequence',
+    what: 'a hole in the migration sequence that no row reserves',
     real: 'migrations apply in filename order, so a missing number is an order nobody can reason about',
-    expect: 'migration gap',
+    // Was 'migration gap' until ADR-036 made the check gapless over allocated
+    // PLUS reserved. The rename leaves 0028 allocated-but-absent, which is now
+    // indistinguishable from a legitimate reservation and correctly passes; the
+    // finding this seed plants is the UNRESERVED hole it opens at 0029.
+    expect: '0029 is neither on disk nor reserved',
     seed: (d) =>
       renameSync(
         join(d, 'packages/db/migrations/0028_supersede_plan_version_immutability.sql'),
@@ -213,6 +217,49 @@ const SCOPE_CASES = [
       const f = join(d, 'docs/INDEX.md');
       writeFileSync(f, readFileSync(f, 'utf8').replace(/^status: .*$/m, 'status: nearly'));
     },
+  },
+  // ---------------------------------------------------------------------------
+  // ADR-036, the migration allocation table. Both directions, and the pair is
+  // the point: the reservation semantics make the gate QUIETER on one input and
+  // LOUDER on another, and a change that only ever makes a gate quieter is
+  // indistinguishable from switching it off.
+  //
+  // The SEEDS entry above proves CI-06h still reports an unreserved hole. It
+  // cannot prove that a RESERVED hole passes, because the tree has no
+  // reservations, and it cannot prove that an unclaimed number on disk fails,
+  // because every number on disk is claimed.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06h/reserved',
+    gate: 'CI-06h',
+    what: 'a number reserved by a sibling branch, with no file here, which must NOT be a finding',
+    expect: 'PASS',
+    seed: (d) =>
+      edit(d, 'docs/DECISIONS.md', (b) => {
+        const m = /^\| 0001 to 0028 \|.*$/m.exec(b);
+        if (!m) throw new Error('seed anchor not found: the 0001 to 0028 allocation row');
+        const at = m.index + m[0].length;
+        return (
+          b.slice(0, at) +
+          '\n| 0029 | a sibling branch, unmerged | **reserved.** No file on disk here, which is ' +
+          'the whole case: a branch cannot see its siblings |' +
+          b.slice(at)
+        );
+      }),
+  },
+  {
+    name: 'CI-06h/unallocated',
+    gate: 'CI-06h',
+    what: 'a migration on disk that no allocation row claims, which MUST be a finding',
+    // 0029 follows 0028, so this opens NO hole. The allocation finding is the
+    // only one it can produce, which is what makes it a test of that half
+    // rather than of the contiguity half.
+    expect: '0029 is not claimed by the migration allocation table',
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'packages/db/migrations/0029_probe_unallocated.sql'),
+        '-- A migration whose number came from `ls` rather than from the table.\n',
+      ),
   },
 ];
 

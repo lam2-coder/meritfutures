@@ -175,6 +175,54 @@ const isCorpusDocument = (file) =>
 // would have passed the whole runner.
 
 // -----------------------------------------------------------------------------
+// The allocation tables: ONE parser, called by CI-06f and CI-06h both (ADR-036)
+// -----------------------------------------------------------------------------
+// DECISIONS.md carries two allocation tables, one for ADR numbers and one for
+// migration numbers, and the rule over both is ADR-034's: a number is claimed in
+// the table BEFORE the artifact is written, and gaplessness is asserted over
+// allocated PLUS reserved so a branch holding a reservation shows a hole and
+// passes.
+//
+// ONE FUNCTION READS BOTH. Writing a second scan for the second table is
+// OQ-P1-04's defect, in the runner OQ-P1-04 was ruled about, and the arrival of
+// a second table is precisely the event that creates it. Two expressions of
+// "what does this table claim" would have agreed for exactly as long as nothing
+// was ever reserved.
+//
+// IT READS THE FIRST CELL OF TABLE ROWS ONLY. CI-06f's predecessor scanned the
+// whole section with /\b(\d{3})\b/, so any three-digit numeral in the
+// surrounding PROSE reserved that number. That is the dangerous direction: a
+// number reserved by accident is a hole this gate stops reporting.
+const ADR_ALLOCATION = '## Number allocation';
+const MIGRATION_ALLOCATION = '## Migration number allocation';
+
+function allocated(body, heading) {
+  const start = body.indexOf(heading);
+  if (start === -1) throw new Error(`allocation table not found: "${heading}"`);
+  const rest = body.slice(start + heading.length);
+  const next = rest.search(/\n## /);
+  const claimed = new Set();
+  let rows = 0;
+  for (const line of (next === -1 ? rest : rest.slice(0, next)).split('\n')) {
+    if (!line.startsWith('|')) continue;
+    // `| 001 to 032 |`, `| **033** |`, `| 0001 to 0028 |`. The header row and
+    // the `|---|` separator do not match, which is how they are skipped.
+    const m = /^\s*\*{0,2}(\d{3,4})\*{0,2}(?:\s+to\s+\*{0,2}(\d{3,4})\*{0,2})?\s*$/.exec(
+      line.split('|')[1] ?? '',
+    );
+    if (!m) continue;
+    rows++;
+    const to = m[2] ? Number(m[2]) : Number(m[1]);
+    for (let n = Number(m[1]); n <= to; n++) claimed.add(n);
+  }
+  // A table that parses to nothing is a gate with an empty reservation set,
+  // which reports every hole and no false pass. It is still a runner that has
+  // lost its input, and rule 2 of this file says that is an ERROR, not a pass.
+  if (rows === 0) throw new Error(`allocation table claims no numbers: "${heading}"`);
+  return claimed;
+}
+
+// -----------------------------------------------------------------------------
 // CI-06a  Link check
 // -----------------------------------------------------------------------------
 const ci06a = {
@@ -447,15 +495,9 @@ const ci06f = {
     }
     if (seen.size === 0) throw new Error('no ADR headings found; the gate cannot run');
     // The allocation table is the reserved set: any number it names is allowed
-    // to be absent from this file, because a sibling branch holds it.
-    const alloc = new Set();
-    const tableStart = body.indexOf('## Number allocation');
-    const tableEnd = body.indexOf('\n---', tableStart);
-    for (const m of body.slice(tableStart, tableEnd).matchAll(/\b(\d{3})\b(?:\s*to\s*(\d{3}))?/g)) {
-      const from = Number(m[1]);
-      const to = m[2] ? Number(m[2]) : from;
-      for (let n = from; n <= to; n++) alloc.add(n);
-    }
+    // to be absent from this file, because a sibling branch holds it. Shared
+    // with CI-06h since ADR-036; see `allocated` for why it is one function.
+    const alloc = allocated(body, ADR_ALLOCATION);
     const max = Math.max(...seen, ...alloc);
     for (let n = 1; n <= max; n++) {
       if (!seen.has(n) && !alloc.has(n)) {
@@ -703,22 +745,38 @@ const ci06i = {
 // What a tree can check is the two things that make that job meaningful, and
 // both have a real failure mode:
 //
-//   1. THE SEQUENCE. Migrations are applied in filename order, so a duplicated
-//      or missing number is an ordering nobody can reason about. Two files
-//      numbered 0028 apply in an order decided by the rest of the filename.
+//   1. THE SEQUENCE, AGAINST THE ALLOCATION TABLE (ADR-036). Migrations are
+//      applied in filename order, so a duplicated or missing number is an
+//      ordering nobody can reason about. Two files numbered 0028 apply in an
+//      order decided by the rest of the filename.
+//
+//      DERIVING THE SET FROM THE TREE ALONE IS BLIND BY CONSTRUCTION, which is
+//      the half ADR-036 adds. A branch can only see the files it holds, so two
+//      branches forking from the same main both find 0028 and both write 0029,
+//      and each passes locally. The collision surfaces at MERGE, in a directory,
+//      and a merged migration cannot be renumbered -- E2 makes it sacred, so the
+//      renumber-the-cheaper-branch remedy ADR-034 used for the ADR collision has
+//      no equivalent here. So the check is CI-06f's: gapless over the numbers on
+//      disk PLUS the numbers this table reserves, and every number on disk must
+//      be claimed by a row.
+//
 //   2. THE WIRING STILL EXISTS. A gate whose CI job was deleted reports nothing
 //      at all, which reads identically to a gate that passed. This asserts the
 //      job is present and still carries the three steps that make it a check
 //      rather than a smoke test.
 const ci06h = {
   id: 'CI-06h',
-  title: 'Migration sequence is gapless, and the install job that proves it exists',
+  title: 'Migration numbers are gapless over allocated plus reserved, and the install job exists',
   covers:
-    'migration filenames number 1..n with no holes and no duplicates, and the ' +
-    'corpus workflow still carries the ON_ERROR_STOP apply, the must-fail ' +
-    're-apply and the database-derived counts. The install ITSELF needs a live ' +
-    'PostgreSQL and runs in CI, NOT here. A green result from this gate is not ' +
-    'a claim that the set installs.',
+    'migration filenames number 1..n with no duplicates, every number on disk is ' +
+    'claimed by a row of the migration allocation table in DECISIONS.md, every ' +
+    'hole matches a reservation, and the corpus workflow still carries the ' +
+    'ON_ERROR_STOP apply, the must-fail re-apply and the database-derived counts. ' +
+    'TWO THINGS IT DOES NOT DO. The install itself needs a live PostgreSQL and ' +
+    'runs in CI, so a green result here is NOT a claim that the set installs. And ' +
+    'the cross-branch half, that a pull request may not claim a number already on ' +
+    'main, needs a job that can see both refs; this run sees one, exactly as ' +
+    "CI-06f's does. The table's State column is prose and is not parsed.",
   run() {
     const findings = [];
     const files = sqlFiles().map((p) => p.replace('packages/db/migrations/', ''));
@@ -734,10 +792,25 @@ const ci06h = {
       if (seen.has(n)) findings.push(`${m[1]}: claimed by both ${seen.get(n)} and ${f}`);
       else seen.set(n, f);
     }
-    const ns = [...seen.keys()].sort((a, b) => a - b);
-    if (ns.length && ns[0] !== 1) findings.push(`migrations start at ${ns[0]}, not 0001`);
-    for (let i = 1; i < ns.length; i++) {
-      if (ns[i] !== ns[i - 1] + 1) findings.push(`migration gap: ${ns[i - 1]} -> ${ns[i]}`);
+
+    // ADR-036. Same shape as CI-06f, same parser, and the start-at-0001 check
+    // that used to live here is subsumed: a missing 0001 that nobody reserved
+    // is the n = 1 hole.
+    const pad = (n) => String(n).padStart(4, '0');
+    const alloc = allocated(read('docs/DECISIONS.md'), MIGRATION_ALLOCATION);
+    const max = Math.max(...seen.keys(), ...alloc);
+    for (let n = 1; n <= max; n++) {
+      if (!seen.has(n) && !alloc.has(n)) {
+        findings.push(`${pad(n)} is neither on disk nor reserved (a hole in the migration sequence)`);
+      }
+    }
+    for (const [n, f] of [...seen].sort((a, b) => a[0] - b[0])) {
+      if (!alloc.has(n)) {
+        findings.push(
+          `${f}: ${pad(n)} is not claimed by the migration allocation table in ` +
+            'docs/DECISIONS.md. Claim the number there before writing the file (ADR-036)',
+        );
+      }
     }
 
     const wf = '.github/workflows/corpus.yml';
