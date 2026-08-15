@@ -76,8 +76,21 @@ const MARK = '__falsify__';
 // Fragment-assembled needles: see the header
 // -----------------------------------------------------------------------------
 
-/** A syntactically valid AWS access key id that has never been issued. */
-const FAKE_AWS_KEY = ['AKIA', 'QYLPT7EXAMPLE', '000'].join('');
+/**
+ * A syntactically valid AWS access key id that has never been issued: the
+ * `AKIA` prefix and sixteen more characters, which is gitleaks'
+ * `aws-access-token` shape.
+ *
+ * THE FIRST VERSION OF THIS SEED READ `AKIA` + `QYLPT7EXAMPLE` + `000` AND
+ * GITLEAKS CORRECTLY IGNORED IT. Its default allowlist drops a candidate whose
+ * secret contains a stopword, and `EXAMPLE` is one: the whole point of that
+ * list is that a placeholder in a code sample is not a leaked credential. The
+ * harness reported `DID NOT FAIL` and the gate was right; THE SEED WAS WRONG,
+ * which is the same shape as CI-06e's seed landing on the convention paragraph
+ * above EC-001. A seed has to be a thing the gate is supposed to catch, not a
+ * thing that merely looks like one to the person writing it.
+ */
+const FAKE_AWS_KEY = ['AKIA', '3QF7ZL2XN8VBWK4R'].join('');
 
 /** The marker comment STRATEGY section 4.5 bans from reaching `main`. */
 const BANNED_MARKER = ['TO', 'DO'].join('');
@@ -350,7 +363,14 @@ const CASES = [
     requires: ['gitleaks'],
     run: () => {
       const dir = temp();
-      write(dir, 'src/config.ts', `export const key = '${FAKE_AWS_KEY}';\n`);
+      // Named the way a leaked credential is actually named. gitleaks' AWS
+      // rule carries keywords, and a seed that hides the word `aws` is a seed
+      // testing a narrower gate than the one that runs.
+      write(
+        dir,
+        'src/config.ts',
+        `export const awsAccessKeyId = '${FAKE_AWS_KEY}';\n`,
+      );
       const out = join(dir, 'gitleaks.json');
       const ran = run('gitleaks', [
         'dir',
