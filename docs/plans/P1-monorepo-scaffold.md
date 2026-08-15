@@ -1,5 +1,5 @@
 ---
-status: draft
+status: approved
 depends_on: [../architecture/OVERVIEW.md, ../testing/STRATEGY.md, ../DELIVERY_PLAN.md, ../DECISIONS.md]
 last_updated: 2026-08-15
 ---
@@ -88,7 +88,9 @@ Each line is a command with an output, per the evidence doctrine. "It works" is 
 6. `node scripts/corpus/gates.mjs check` still reports every gate passing, and `node scripts/corpus/falsify.mjs` is green.
 7. The three riders are in `corpus.yml` and the workflow is green on the pull request.
 
-**Items 6 and 7 cannot both hold against section 3's tree until OQ-P1-04 is ruled, and that is a real conflict rather than a caveat.** CI-06b demands frontmatter on every `.md` under `packages/`, so the first package README fails it. **The scaffold session must not discover this**, because the only fixes available to a session under a red gate are to weaken the gate or to put a corpus gate status on a file that is not a corpus document. Both are wrong, and one of them is wrong in the way this corpus exists to prevent. **The ruling is a precondition of S-B**, section 6.
+**Items 6 and 7 could not both hold against section 3's tree until OQ-P1-04 was ruled, and that was a real conflict rather than a caveat.** CI-06b demanded frontmatter on every `.md` under `packages/`, so the first package README failed it. **The scaffold session must not discover this**, because the only fixes available to a session under a red gate are to weaken the gate or to put a corpus gate status on a file that is not a corpus document. Both are wrong, and one of them is wrong in the way this corpus exists to prevent.
+
+**Ruled and folded 2026-08-15, before S-B rather than inside it** ([section 7](#oq-p1-04-ruled-2026-08-15)). Item 6 now holds against a tree carrying a package README, and `falsify.mjs` asserts it in both directions rather than leaving it to the next reader.
 
 ## 5. The three riders
 
@@ -129,7 +131,7 @@ hand-maintained count in a different costume, and it drifts the same way.
 | # | Session | Regime | Creates | Depends on |
 |---|---|---|---|---|
 | **S-A** | **ADR-036, the migration number allocation table**, as a second table beside the ADR allocation in [DECISIONS](../DECISIONS.md). One mechanism, one place to look | non-money | nothing new | PR #9 merged |
-| **S-B** | **The scaffold**, section 3, carrying all three riders | non-money | section 3's list | S-A, **and the OQ-P1-04 ruling** |
+| **S-B** | **The scaffold**, section 3, carrying all three riders | non-money | section 3's list | S-A. **OQ-P1-04 is ruled and folded**, section 7 |
 | **S-C** | **CI-01, CI-02 and CI-05, with VG-12** | non-money | `.github/workflows/ci.yml` | S-B |
 | **S-D** | **The golden fixture loader and CI-03** | non-money | the loader and the fixture directory | S-B |
 | **S-E** | **TradingCalendar as data** | **money path, fresh session, plan mode** | the seed mechanism and the calendar rows | S-B |
@@ -140,7 +142,9 @@ hand-maintained count in a different costume, and it drifts the same way.
 
 **Every gate any of these sessions wires ships with a seeded violation in `falsify.mjs`, and must fail on that finding rather than merely exit non-zero.** Two of the eleven corpus gates were failing off-target and would have been scored as working. [STATE](../STATE.md) already carries this as the thing the reconciliation proved about P1's own definition of done: "failing correctly on a seeded violation" is two checks, not one.
 
-## 7. Rulings, and the one question that blocks
+## 7. Rulings
+
+**All four questions are ruled. Nothing in this plan blocks, and it is `approved` as written.**
 
 ### Ruled 2026-08-15
 
@@ -149,24 +153,57 @@ hand-maintained count in a different costume, and it drifts the same way.
 | **OQ-P1-01** | Do the tooling packages need an ADR, given [OVERVIEW section 3](../architecture/OVERVIEW.md)'s container table does not name them? | **No ADR.** That table is architectural containers and these are build tooling. **And `packages/config` is renamed `packages/tooling`**, per section 2.1: a package named `config` is where the next person puts a plan parameter, and it will look right |
 | **OQ-P1-02** | A build orchestrator, or none? | **None at P1.** Adopting one later is additive rather than a migration |
 | **OQ-P1-03** | Where is the Node version pinned? | **`.nvmrc` is the only source**, read by `setup-node` through `node-version-file`. **Rider 3**, section 5 |
+| **OQ-P1-04** | CI-06b demands corpus frontmatter on every markdown file under `packages/`, so the first package README fails it. Which scope is right? | **A, with a structural amendment that is part of the ruling rather than a note.** Folded into the runner the same day. Below |
 
-### OQ-P1-04, open, and S-B does not start until it is ruled
+### OQ-P1-04, ruled 2026-08-15
 
-**CI-06b's scope is `^(docs|research|packages)/`, so it demands corpus frontmatter on every markdown file under `packages/`, and the first package README fails it.** Reproduced against the tree at this branch:
+**RULED: option A, and the amendment is the transferable half.** Folded into [`scripts/corpus/gates.mjs`](../../scripts/corpus/gates.mjs) and [`scripts/corpus/falsify.mjs`](../../scripts/corpus/falsify.mjs) at this branch, before S-B rather than inside it.
+
+#### The defect, as it was found
+
+**CI-06b's scope was `^(docs|research|packages)/`, so it demanded corpus frontmatter on every markdown file under `packages/`, and the first package README failed it.** Reproduced against the tree at this branch, before the fix:
 
 ```
 FAIL   CI-06b  Frontmatter present and valid on every tracked document  (1)
        packages/rules-engine/README.md: no frontmatter block
 ```
 
-**The sharpest form of the defect is that the same file passes CI-06c**, whose scope is `^(docs|research)/` **plus `packages/db/DELTA_MANIFEST.md` by name**. **The runner already contains both answers to "what is a tracked document", ten lines apart, and only one of them survives a scaffold.** The divergence is inherited: the reconciliation took PR #8's glob where PR #7 carried the explicit allowlist, and the two looked equivalent because `packages/` has held exactly one markdown file since it existed.
+**The sharpest form of the defect is that the same file passed CI-06c**, whose scope was `^(docs|research)/` **plus `packages/db/DELTA_MANIFEST.md` by name**. **The runner contained both answers to "what is a tracked document", ten lines apart, and only one of them survives a scaffold.** The divergence is inherited: the reconciliation took PR #8's glob where PR #7 carried the explicit allowlist, and the two looked equivalent because `packages/` has held exactly one markdown file since it existed.
 
-| Option | What it costs |
+#### The options, with their dispositions
+
+| Option | Disposition |
 |---|---|
-| **A. Bring CI-06b to CI-06c's scope**: `docs/` and `research/`, plus an explicit allowlist of files elsewhere, `DELTA_MANIFEST.md` being the only current entry | An allowlist is a list, and a list drifts. Mitigated by the two gates then reading **one** definition, so a future corpus document under `packages/` is added in one place rather than two |
-| **B. Keep the glob and put frontmatter on package READMEs** | **`status: approved` on a package README is a gate status on a file that is not gated**, and `depends_on` has no meaning there. It also strands the file between the two gates: CI-06b would require the status while CI-06c would not require an INDEX row, in a corpus whose rule is that a thing not in INDEX does not exist |
-| **C. Exempt `README.md` by filename** | **Punches a hole through the corpus itself.** `docs/legal/README.md` and `docs/ops/runbooks/README.md` are corpus documents and would silently stop being checked |
+| **A. Bring CI-06b to CI-06c's document set**: `docs/` and `research/`, plus an explicit allowlist of files elsewhere, `DELTA_MANIFEST.md` being the only current entry | **RULED.** CI-06b's row in [STRATEGY section 4.4](../testing/STRATEGY.md) says "every document", and the document class it means is the corpus. A package README is a source file that happens to be markdown. **The row is not amended and needs no ADR**: the ruling settles which document class it always meant |
+| **B. Keep the glob and put frontmatter on package READMEs** | **REJECTED for making a gate green by making its status field meaningless.** `status: approved` on a package README is a gate status on a file that is not gated, and `depends_on` has no meaning there. It also strands the file between the two gates: CI-06b would require the status while CI-06c would not require an INDEX row, in a corpus whose rule is that a thing not in INDEX does not exist |
+| **C. Exempt `README.md` by filename** | **DISQUALIFIED ON EVIDENCE rather than on taste.** [`docs/legal/README.md`](../legal/README.md) and [`docs/ops/runbooks/README.md`](../ops/runbooks/README.md) are corpus documents, both `status: approved` with INDEX rows, and would silently stop being checked. **The evidence is one file wider than the ruling stated**: [`research/calibration/README.md`](../../research/calibration/README.md) is a third, also approved and indexed. Three corpus documents, not two |
 
-**Recommendation: A, which is the founder's own read.** CI-06b's row in [STRATEGY section 4.4](../testing/STRATEGY.md) says "every document", and the document class it means is the corpus. A package README is a source file that happens to be markdown. **C is disqualified on evidence rather than on taste**, and B is the option that makes a gate green by making its status field meaningless, which is the failure this corpus names most often.
+#### The amendment: one predicate, not two that agree
 
-**This is recorded as a question rather than applied, deliberately, and the reason is the ruling itself.** The scope is a merge blocker, the session that found it is the session that finds it inconvenient, and **a gate narrowed by the party it is about to block is not a gate.** The fix is one line in a runner and it still does not belong to this session.
+**Do not narrow CI-06b's regex to match CI-06c's. Two expressions of one concept that agree today is exactly how this defect was born.** One predicate lives in `gates.mjs` and both gates call it:
+
+```js
+const isCorpusDocument = (file) =>
+  (/^(docs|research)\//.test(file) || file === 'packages/db/DELTA_MANIFEST.md')
+  && file !== 'docs/INDEX.md'
+  && !/^docs\/reviews\//.test(file);
+```
+
+**The by-name allowlist is a hand-maintained list, which is [ADR-034](../DECISIONS.md)'s own drift class.** Fine at one entry. **If it reaches three it needs a rule instead of a list**, and that sentence is a comment in the runner rather than only here.
+
+**One consequence the unified predicate carries, named rather than discovered later.** `docs/INDEX.md` is excluded because INDEX cannot hold a row pointing at itself, which is CI-06c's reason. That exclusion now reaches CI-06b, so **INDEX's own frontmatter is checked by nothing**. It is one file and it is `status: approved` today. The alternative was a second expression in CI-06b, which is the thing this amendment exists to prevent, so the loss is recorded and left for a one-line ruling rather than traded for the defect.
+
+#### The gate is now asserted to be correctly scoped, not merely quieter
+
+**Two cases in `falsify.mjs`, one per direction, because a narrowing tested only from the quiet side is indistinguishable from a gate switched off.**
+
+| Case | Asserts |
+|---|---|
+| `CI-06b/out` | A file under `packages/` with no frontmatter **must not** be a CI-06b finding |
+| `CI-06b/in` | A file under `docs/` with no frontmatter **must** be one |
+
+**Both were watched fail before they were trusted**, per the harness's own rule. Against the pre-ruling regex, `CI-06b/out` reports `READ A FILE IT MUST NOT` and names `packages/rules-engine/README.md`. Against a predicate narrowed until it no longer reads `docs/`, `CI-06b/in` reports `DID NOT FAIL`. **Neither is a case that can only pass**, which was the whole complaint against a gate nobody has seen fail.
+
+#### Why the previous session recorded this rather than applying it
+
+**The scope is a merge blocker, the session that found it is the session that finds it inconvenient, and a gate narrowed by the party it is about to block is not a gate.** The fix was one line in a runner and it still did not belong to that session. **The founder ruled it, and the ruling arrived larger than the question**: option A alone would have left two expressions in the file.
