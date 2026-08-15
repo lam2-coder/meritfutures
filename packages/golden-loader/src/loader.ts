@@ -189,7 +189,17 @@ export const REPO_ROOT = ((): string => {
 /** GOLDEN_SCENARIOS section 2 fixes this path, and the corpus cites it. */
 export const FIXTURE_DIR = join(REPO_ROOT, 'packages/rules-engine/fixtures');
 
-export const REGISTRY_PATH = join(REPO_ROOT, 'docs/testing/GOLDEN_SCENARIOS.md');
+/**
+ * ADR-043 split the registry into one file per SECTION, so this is a DIRECTORY.
+ *
+ * It was `docs/testing/GOLDEN_SCENARIOS.md` until 2026-08-15. The split moved the
+ * file and this constant was missed, because the sweep covered markdown and
+ * `scripts/` and this is neither: it is application code reading a corpus
+ * document by path. CI-02 and CI-03 are what found it, which is the honest
+ * version of "every gate reading these by path needs its reader updated" -- the
+ * readers are not all gates.
+ */
+export const REGISTRY_PATH = join(REPO_ROOT, 'docs/testing/golden-scenarios');
 
 // -----------------------------------------------------------------------------
 // The registry
@@ -210,7 +220,25 @@ export function registryIds(registryPath: string = REGISTRY_PATH): Set<string> {
   if (!existsSync(registryPath)) {
     throw new Error(`the golden scenario registry is missing: ${registryPath}`);
   }
-  const body = readFileSync(registryPath, 'utf8');
+  // A DIRECTORY OR A SINGLE FILE. Callers in the test suite pass a temporary file
+  // to exercise the parse, and the live registry is now a directory, so both are
+  // accepted rather than forcing every caller to know which.
+  let body: string;
+  if (statSync(registryPath).isDirectory()) {
+    const files = readdirSync(registryPath)
+      .filter((f) => /^\d{2}-.*\.md$/.test(f))
+      .sort();
+    // The same rule the corpus runner applies to its directory readers: a glob
+    // that matches nothing returns an empty set rather than throwing, and an
+    // empty registry would make every fixture's pin resolve against nothing and
+    // report full coverage of zero scenarios.
+    if (files.length === 0) {
+      throw new Error(`the golden scenario registry has no section files: ${registryPath}`);
+    }
+    body = files.map((f) => readFileSync(join(registryPath, f), 'utf8')).join('\n');
+  } else {
+    body = readFileSync(registryPath, 'utf8');
+  }
   return new Set([...body.matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1] as string));
 }
 
