@@ -12,6 +12,8 @@
     "check:invariants": "node packages/tooling/checks/repo-invariants.mjs",
     "gates": "node scripts/corpus/gates.mjs check",
     "falsify": "node scripts/corpus/falsify.mjs",
+    "//falsify:ci": "The CI-01, CI-02 and CI-05 gates watched failing on a seeded violation. NOT part of `verify`, and the reason is the one repo-invariants.mjs states: a check that cannot run is not a check that passed. Three of its cases need gitleaks, syft and grype, so folding it into `verify` would make the local gate unrunnable on a laptop that has not installed four scanners. CI runs it per stage (`falsify-ci.mjs CI-01`), where they are all pinned and present.",
+    "falsify:ci": "node scripts/ci/falsify-ci.mjs",
     "verify": "pnpm run check:invariants && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run gates && pnpm run falsify"
   },
   "devDependencies": {

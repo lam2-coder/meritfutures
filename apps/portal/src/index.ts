@@ -6,7 +6,8 @@
 // The authenticated trader surface, and the BOLA blast radius, so it is
 // identity-scoped everywhere (OVERVIEW section 3). Every query it makes goes
 // through `scopedDb(identity)` from @merit/db; VG-4 is the ESLint rule that
-// makes "everywhere" mechanical, and it lands with CI-01.
+// makes "everywhere" mechanical, and it is wired: `merit/no-raw-db-client`
+// runs over this path in CI-01 and blocks merge on a raw client import.
 //
 // It deploys as `portal-api` rather than `portal`: the service name is INFRA
 // section 2's and is reproduced rather than invented.

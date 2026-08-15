@@ -8,9 +8,11 @@
 // THIS PACKAGE IS THE ONLY ONE PERMITTED TO IMPORT THE DRIZZLE CLIENT, and that
 // is what makes VG-4 writable at all: "a custom ESLint rule banning raw client
 // imports in app paths" (STRATEGY section 4.2) is expressible only if app paths
-// are a glob and exactly one package is the exception. The rule lands with
-// CI-01 in session S-C; it needs `scopedDb` to exist before it can name what it
-// permits.
+// are a glob and exactly one package is the exception. THE RULE IS WIRED
+// (session S-C): `merit/no-raw-db-client`, attached in the workspace root's
+// eslint.config.js to `apps/**` and `packages/**` with `packages/db/**` as the
+// single `ignores` entry. It did not wait for `scopedDb`, because what it bans
+// is fixed today and what it points at is this package.
 //
 // NEITHER THE CLIENT NOR THE ACCESSOR EXISTS YET, and the scaffold does not
 // invent them. What it fixes is that they will live here and nowhere else.

@@ -30,6 +30,12 @@ makes VG-4 writable: a rule phrased over "app paths" needs app paths to be a
 glob and needs exactly one package to be the exception.
 
 Neither the client nor the accessor exists yet. What this scaffold fixes is that
-they will live here and nowhere else. VG-4 itself lands with CI-01 in session
-S-C of [P1 section 6](../../docs/plans/P1-monorepo-scaffold.md), because it
-needs `scopedDb` to exist before it can name what it permits.
+they will live here and nowhere else.
+
+**VG-4 is wired** (session S-C) as `merit/no-raw-db-client` in
+[`eslint-plugin-merit`](../eslint-plugin-merit/README.md), attached to
+`apps/**` and `packages/**` with this package as the single `ignores` entry. It
+did not wait for `scopedDb`: what it bans is fixed today, and what it points at
+is this package. **The exception is one line in the workspace root's
+`eslint.config.js`**, which is where a reviewer looks to answer "which rules
+apply where", rather than an allowlist inside the rule.
