@@ -274,3 +274,22 @@ correlation_groups.threshold
 | NO-FLOATS | Both directions, per section 9 | Fails as intended in each |
 
 **One defect was found by this testing and not by reading.** `statistic_definitions_measures_nonempty` was first written `array_length(measures, 1) >= 1`. **`array_length` on an empty array returns `NULL`, `NULL >= 1` is `NULL`, and a `CHECK` evaluating to `NULL` passes**, so the constraint admitted the single value it existed to reject, and an empty declared set makes STAT-C1 vacuous. It is `cardinality(measures) >= 1`. Recorded because the lesson generalizes: **an invariant that was reviewed and not executed has not been checked.**
+
+---
+
+## 11. Install verification against PostgreSQL 16 (2026-08-15)
+
+Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md) ships verified rather than hoped for.
+
+| Check | Result |
+|---|---|
+| All 27 migrations apply forward-only from empty, `ON_ERROR_STOP=1` | **pass**, zero errors |
+| Re-applying the set fails | **pass**, rejected as expected |
+| `LEDGER-C1` fires on opposite signs against one account | **pass**, verified by error message and function name |
+| `LEDGER-C2` fires on an undeclared class (`firm_payable`) | **pass** |
+| Zero-sum fires on an unbalanced transaction | **pass** |
+| **Counterfactual: C1 disabled, zero-sum armed** | **the collapse COMMITS.** Transaction nets 0; wallet net debited 10,000c. [ADR-027](../../docs/DECISIONS.md) proven empirically |
+
+**Object counts as reported by the database:** 96 tables, **326 indexes**, **347 check constraints**, 6 triggers.
+
+**The index figure is why those two counts are stated here and nowhere else.** A grep of the DDL finds **219** `CREATE INDEX` statements, because Postgres backs every primary key and unique constraint with an index that the DDL never names. A derivation that disagrees with its artifact by a third would pass CI while telling the reader something false, so `sql_tables` and `sql_triggers` are generated spans and these two are emitted by the install job.

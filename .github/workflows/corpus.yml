@@ -3,6 +3,12 @@ name: corpus
 # CI-06, corpus integrity. Constitution C10: a gate that lives in a document is
 # a gate somebody remembers; a gate that lives in CI is a gate.
 #
+# VERIFIED against PostgreSQL 16 on 2026-08-15 before first push, rather than
+# shipped and hoped for: all 27 migrations apply forward-only from empty; a
+# re-apply is rejected; the database reports 96 tables, 326 indexes, 347 check
+# constraints and 6 triggers; and all three ledger probes fire for the right
+# reason (checked by message, not by exception class).
+#
 # Every check here exists because the thing it checks ALREADY DRIFTED once:
 #   CI-06a  59 links broke silently before a human found them
 #   CI-06d  registry counts were quoted in gate summaries while wrong
@@ -138,8 +144,11 @@ jobs:
           set -euo pipefail
           db_tables=$(grep '^tables=' object_counts.txt | cut -d= -f2)
           db_trigs=$(grep '^triggers=' object_counts.txt | cut -d= -f2)
-          sql_tables=$(grep -hcE '^CREATE TABLE ' packages/db/migrations/*.sql | paste -sd+ | bc)
-          sql_trigs=$(grep -hcE '^CREATE (CONSTRAINT )?TRIGGER ' packages/db/migrations/*.sql | paste -sd+ | bc)
+          # grep -o | wc -l rather than grep -c | bc: grep exits 1 when NO file
+          # matches, which under set -e aborts the step with a confusing error
+          # instead of reporting zero. wc always exits 0.
+          sql_tables=$(grep -hoE '^CREATE TABLE ' packages/db/migrations/*.sql | wc -l)
+          sql_trigs=$(grep -hoE '^CREATE (CONSTRAINT )?TRIGGER ' packages/db/migrations/*.sql | wc -l)
           fail=0
           [ "$db_tables" = "$sql_tables" ] || { echo "::error::tables: DDL says $sql_tables, database says $db_tables"; fail=1; }
           [ "$db_trigs" = "$sql_trigs" ] || { echo "::error::triggers: DDL says $sql_trigs, database says $db_trigs"; fail=1; }
