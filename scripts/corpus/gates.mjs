@@ -600,7 +600,7 @@ const sqlMatchCount = (re) =>
 // fence as the worked example; regenerating it would rewrite the explanation of
 // the mechanism to match the mechanism.
 function spansIn(body) {
-  const masked = body.replace(/^```[\s\S]*?^```/gm, (block) => block.replace(/</g, ' '));
+  const masked = body.replace(/^```[\s\S]*?^```/gm, (block) => block.replace(/</g, '\0'));
   return [...masked.matchAll(/<!--gen:([a-z_]+)-->(.*?)<!--\/gen-->/gs)];
 }
 
