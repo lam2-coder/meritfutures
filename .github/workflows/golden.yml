@@ -1,0 +1,90 @@
+name: golden
+
+# CI-03, golden files. STRATEGY section 4.1 makes it a stage that runs on every
+# push and BLOCKS INDEPENDENTLY of CI-02, which is the whole reason the Vitest
+# projects map to CI stages rather than to packages (P1 section 2.2). A CI-03
+# that can only be run as part of CI-02 is not a stage, it is a subset.
+#
+# -----------------------------------------------------------------------------
+# WHY THIS IS ITS OWN FILE RATHER THAN A JOB IN ci.yml
+# -----------------------------------------------------------------------------
+# P1 section 6 runs S-C (CI-01, CI-02 and CI-05, with VG-12) and S-D (this
+# session) in parallel off the same scaffold, and `.github/workflows/ci.yml` is
+# S-C's file to create. TWO SESSIONS WRITING ONE FILE COST A FULL RECONCILIATION
+# ONCE ALREADY (the PR #7 / PR #8 overlap, where both branches independently
+# wrote scripts/corpus/gates.mjs and eleven of thirteen files collided). So this
+# stage arrives in a file no other in-flight session touches.
+#
+# Folding it into ci.yml once that file exists is a merge, not a rewrite: the
+# `golden` job below moves across whole. Left as a founder call rather than
+# taken, for the same reason the reconciliation ruling took corpus.yml unchanged.
+#
+# -----------------------------------------------------------------------------
+# WHAT THIS STAGE CURRENTLY ASSERTS, STATED HERE SO A GREEN CHECK IS NOT READ AS
+# MORE THAN IT IS
+# -----------------------------------------------------------------------------
+# packages/rules-engine ships the scaffold's identity evaluation. TR-02 puts the
+# fixture before the function on a money path, so every fixture in the directory
+# is in the window where it MUST FAIL, and the suite asserts that failure rather
+# than suffering it: under the stub, a fixture that MATCHES is the finding. The
+# polarity is read off the engine by a probe, not written into a fixture, so it
+# flips on its own when M01 lands and no fixture is edited to make it flip.
+#
+# The fixture directory holds three scenarios, not the registry's full set. The
+# remaining fixtures arrive with P2, when there is an engine to have an expected
+# end state against; writing them now would mean expected end states derived
+# from nothing.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: golden-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  golden:
+    name: CI-03 golden files
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # RIDER 3, OQ-P1-03. `.nvmrc` is the only place the Node version is
+      # written, and RI-05 asserts no workflow pins it inline.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # The pnpm version is read from `packageManager` in the root package.json
+      # and is written nowhere else, for the same reason. `corepack enable`
+      # installs whatever that field names.
+      - name: Enable corepack
+        run: corepack enable
+
+      # VG-12's first half. A golden stage that installs a resolution nobody
+      # approved is a golden stage running against a different tree than the
+      # one that was reviewed.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # CI-03. The command P1 section 2.2 names, run exactly as it is named.
+      - name: Golden fixtures
+        run: pnpm exec vitest run --project golden
+
+      # THE LOADER'S OWN RULES, WATCHED FAILING ON A SEEDED VIOLATION. P1
+      # section 6: "Every gate any of these sessions wires ships with a seeded
+      # violation ... and must fail ON THAT FINDING rather than merely exit
+      # non-zero." Each L-nn rule has one case that asserts the rule id that
+      # came back, and the unmutated copy of the fixture tree is asserted to
+      # load clean, because a rule that refuses everything passes every seeded
+      # case and gates nothing.
+      #
+      # It runs in the `unit` project because it tests the loader rather than
+      # the fixtures, and it runs HERE as well as in CI-02 because a CI-03 whose
+      # loader has quietly stopped refusing anything is a green stage that
+      # checks nothing.
+      - name: The loader fails on a seeded violation
+        run: pnpm exec vitest run --project unit packages/golden-loader

@@ -1,0 +1,24 @@
+# GS-008  Initial floor at account open
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01,
+# GOLDEN_SCENARIOS section 1). Every number below traces to a document:
+#
+#   floor = size_cents - drawdown_cents at account open      M01 R-12
+#   50K size            5,000,000c                           M01 Appendix A, sizes line
+#   Core EOD drawdown   250,000c at 50K, 500bp               M01 Appendix A.1
+#   4,750,000 = 5,000,000 - 250,000                          GOLDEN_SCENARIOS GS-008 row
+#
+# THE DAY STREAM IS EMPTY ON PURPOSE. The registry row says "before any mark
+# exists", so the scenario is the floor an account has the instant it opens and
+# a single day would be a different scenario.
+id: GS-008
+name: initial floor at account open
+source: M01 R-12
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days: []
+settlements: []

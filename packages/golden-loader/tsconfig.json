@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // THIS PACKAGE READS FILES AND THE ENGINE MAY NOT. That asymmetry is the
+    // reason the loader is a package of its own rather than a file inside
+    // packages/rules-engine/test: the engine's tsconfig sets `types: []` so
+    // that `node:fs` does not exist there, and a loader living inside that
+    // package could only read a directory by weakening the strongest of the
+    // three mechanisms guarding the purity boundary.
+    "types": ["node"],
+    "lib": ["ES2023"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

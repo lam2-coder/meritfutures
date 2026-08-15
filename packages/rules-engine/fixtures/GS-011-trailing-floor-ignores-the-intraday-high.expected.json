@@ -1,0 +1,11 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "floor_cents": 4770000,
+    "high_water_balance_cents": 5020000,
+    "breached": false
+  },
+  "events": ["day.closed"],
+  "pins": "floor trails the closing balance, never the intraday high",
+  "note": "Transcribed from the expect block GOLDEN_SCENARIOS section 2 prints for this scenario, moved to the sibling where the ruled format puts it."
+}
