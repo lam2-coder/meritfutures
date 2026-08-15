@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-14
+last_updated: 2026-08-15
 ---
 
 # STATE
@@ -114,7 +114,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 |---|---|---|
 | **A** | **A sixth unnumbered change.** `provisioning_status` gains `confirmed_inferred` ([M02 section 3.2](plans/M02-rithmic-bridge.md), AS-M2-03), which ADR-026's table of five does not carry. **It is folded**; what is open is whether the count in scope is 93 or **94**, and `0001`'s inline marker cites `SD-M2-06` for it, which is the `reconciliations` delta | The manifest gate exists so an uncounted change cannot hide. It caught one. **Founder rules: a `U-06` entry, or a finding that a state-machine value in an approved plan is not a schema change for this purpose** |
 | **B** | **[ADR-030](DECISIONS.md)'s stale list is wrong in two of four.** `win_days.required_count: 5` and `phase_eval.min_trading_days: 1` are Core EOD's **frozen** values per [M01 Appendix A.1](plans/M01-rules-engine.md). `w = 3` is Merit Rapid's | Following the list would have put **Merit Rapid's cadence on Core EOD's contract**. Recorded in the amended section 11, not applied |
-| **C** | **DATA_MODEL is only partly at post-migration truth.** Sections 3, 8, 11, 13 and the new 17 are amended; **the table-by-table rewrite of sections 4 through 10 is not done** | Until it is, those tables are read **together with** the manifest. `liability_snapshots` in particular exists in two shapes: the migration follows `SD-M6-01`, and section 8's RCR fields have no home in the folded shape |
+| **C** | ~~**DATA_MODEL is only partly at post-migration truth.**~~ **CLOSED 2026-08-15.** §3 through §10 rewritten table by table against the `.sql`. **The scope was larger than this row described: the migrations create 96 tables and the document carried 46 sections, so 50 tables had no design record at all.** All 96 now do, the reconciliation runs both ways as [CI-06i](testing/STRATEGY.md), and the line-15 banner is gone | **It closed with two findings rather than none.** [ADR-035](DECISIONS.md) is a proven defect in a merged money-path migration; `OI-01` (`liability_snapshots`' two shapes) is surfaced with a recommendation and still needs a ruling |
 
 ## Two rulings on the transparency surface (2026-08-14)
 
@@ -133,8 +133,23 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 Nothing, and **one thing needs the founder's hand at merge rather than a session's**: **two open pull requests both claim `ADR-031`.** PR #4 (this branch) carries ADR-031 and ADR-032, both accepted; PR #5 carries a different, proposed ADR-031. Both branch from `main`, where the registry ends at 030. **Whichever merges second corrupts the registry**, and no session can fix it alone without risking the same collision on the next number. **The founder assigns at merge.** A CI check asserting unique, gapless ADR headings would have failed the second pull request instead.
 
+## The DATA_MODEL rewrite landed, and found a defect (2026-08-15, item C)
+
+**All 96 tables carry a `### <table>` design record with columns, types, constraints, indexes, retention and the reason each exists**, checked against the migration that creates it rather than against the plan that proposed it. Verified two ways: [CI-06i](testing/STRATEGY.md) reconciles the table sets in both directions from the tree, and a generated diff against a live PostgreSQL 16 catalogue found **zero undocumented columns and zero documented columns that do not exist**.
+
+**[`scripts/corpus/gates.mjs`](../scripts/corpus/gates.mjs) exists and all eight gates pass.** CI-06a through CI-06g were specified and not running; they run now, with no dependencies. The first honest run found 27 broken anchors, all repaired, and one drifted count span, regenerated. **Each gate states what it does not cover** rather than implying full coverage.
+
+**Two findings the rewrite would not reconcile quietly:**
+
+| # | Finding | Needs |
+|---|---|---|
+| **[ADR-035](DECISIONS.md)** | **`0027`'s published-plan-version immutability trigger reads `NEW.config`; the column is `rules`.** Proven by executing it, not by reading it. Every update to a published row raises, so the promise holds by accident and **the ruled `published -> retired` transition is refused too: no plan version can be retired.** A draft row updates normally, which is why the install check and every existing probe missed it | **A founder ruling and a superseding migration.** `0027` is merged, so it is not edited. The migration set goes 27 to 28 |
+| **`OI-01`** | **`liability_snapshots` exists in the folded shape only**, and the approved design's four reserve-coverage fields have no home. §8 now recommends a separate table rather than widening this one, with the reasoning, and does not decide it | A founder ruling before [M06](plans/M06-admin-ops-console.md) |
+
+---
+
 ## Next 3 actions
 
-1. **The founder's E2 read** on the sixteen money-path migration files, and rulings on items A and B above. Nothing merges first.
+1. **The founder's E2 read** on the seventeen money-path migration files, and rulings on items A and B above. Nothing merges first.
 2. **In parallel, the three calendar items**: book the vendor call, book the counsel sitting, and send the PSP applications the day the capital decision lands.
-3. **The DATA_MODEL table-by-table rewrite** (item C), then the CI manifest and append-only-grant gates, then the first module against this schema.
+3. **Rule [ADR-035](DECISIONS.md) and `OI-01`**, then the CI job that runs `gates.mjs` on every push plus the append-only-grant check (`OI-03`, whose document half is now exact in [DATA_MODEL §1](architecture/DATA_MODEL.md)), then the first module against this schema.

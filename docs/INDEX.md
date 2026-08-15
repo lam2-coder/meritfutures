@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-14
+last_updated: 2026-08-15
 ---
 
 # INDEX: The Map
@@ -10,7 +10,7 @@ last_updated: 2026-08-14
 
 **Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](DECISIONS.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
 
-**<!--gen:adr_count-->34<!--/gen--> ADRs. <!--gen:ec_count-->140<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](DECISIONS.md)).
+**<!--gen:adr_count-->35<!--/gen--> ADRs. <!--gen:ec_count-->140<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](DECISIONS.md)).
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
@@ -24,6 +24,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [README.md](../README.md) | Repository front door | draft | founder |
 | [.claude/settings.json](../.claude/settings.json) | Committed hook set. Corpus phase: `SessionStart` pull, `Stop` push ([ADR-D1](DECISIONS.md)) | approved | founder |
 | [.claude/agents/reviewer.md](../.claude/agents/reviewer.md) | The citation reviewer. Verifies every factual claim against a primary source at `file:line`; verdicts to `docs/reviews/` ([ADR-033](DECISIONS.md)) | proposed | founder |
+| [scripts/corpus/gates.mjs](../scripts/corpus/gates.mjs) | The corpus-integrity gates as a runnable check, no dependencies. `node scripts/corpus/gates.mjs check` runs CI-06a to CI-06g plus **CI-06i**; `generate` rewrites every CI-06g span from its named query ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |
