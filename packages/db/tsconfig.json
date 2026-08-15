@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+
+  // `migrations/` IS NOT INCLUDED AND NEVER WILL BE. Migrations are plain
+  // reviewable SQL (ADR-008) and they are sacred: once merged, never edited,
+  // only superseded (constitution E2). Nothing in this package compiles them,
+  // generates them, or reads them at build time.
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

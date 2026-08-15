@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+
+    // The rules are JavaScript so that ESLint can load them with no build step
+    // (see index.js). `checkJs` is what stops that from meaning "unchecked".
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": ["index.js", "rules/**/*.js", "test/**/*.ts"]
+}

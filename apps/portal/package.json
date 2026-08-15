@@ -1,0 +1,19 @@
+{
+  "name": "@merit/portal",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Trader dashboard, payout center, certificates, KYC status, referrals. Railway service: portal-api.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@merit/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Public marketing, plans, rules pages, stats, legal. Railway service: site.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

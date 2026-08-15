@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // TIER 1 OF P1 SECTION 2.3, AT THE TYPE LEVEL. `types: []` means no ambient
+    // declarations are in scope at all: not `@types/node`, so `process`,
+    // `Buffer` and `require` do not exist here; not the DOM, so `fetch`,
+    // `localStorage` and `window` do not exist either. An I/O call inside this
+    // package is a COMPILE ERROR before it is a lint finding, which is the
+    // strongest of the three mechanisms guarding this boundary and the only one
+    // a lint-disable comment cannot route around.
+    //
+    // The test files import `vitest` and `fast-check` as modules, which needs
+    // no ambient types.
+    "types": [],
+
+    // No DOM. The engine runs headless in tests and in the replay self-audit.
+    "lib": ["ES2023"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

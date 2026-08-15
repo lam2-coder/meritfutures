@@ -1,0 +1,19 @@
+{
+  "name": "@merit/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Nightly batch, provisioning delivery, Rise transfers, detectors, hygiene jobs. Railway service: worker.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

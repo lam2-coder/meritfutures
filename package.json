@@ -1,0 +1,26 @@
+{
+  "name": "merit",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write \"*.{js,mjs,ts,json}\" \".prettierrc\" \"{apps,packages}/**/*.{ts,mts,js,mjs,json}\"",
+    "format:check": "prettier --check \"*.{js,mjs,ts,json}\" \".prettierrc\" \"{apps,packages}/**/*.{ts,mts,js,mjs,json}\"",
+    "test": "vitest run",
+    "check:invariants": "node packages/tooling/checks/repo-invariants.mjs",
+    "gates": "node scripts/corpus/gates.mjs check",
+    "falsify": "node scripts/corpus/falsify.mjs",
+    "verify": "pnpm run check:invariants && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run gates && pnpm run falsify"
+  },
+  "devDependencies": {
+    "@merit/tooling": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "eslint-plugin-merit": "workspace:*",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

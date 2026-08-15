@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+
+    // The `.mjs` and `.js` files here are type-checked from their JSDoc rather
+    // than compiled, which is what lets an invariant check run with no build
+    // step (see the header of checks/repo-invariants.mjs).
+    "allowJs": true,
+    "checkJs": true
+  },
+
+  // THE WORKSPACE ROOT'S OWN CONFIG FILES ARE TYPE-CHECKED HERE. They belong to
+  // no package, so without this line `vitest.config.ts` and `eslint.config.js`
+  // are the two files in the tree that decide how everything is tested and
+  // linted and are checked by nothing. `packages/tooling` is where P1
+  // section 2.1 puts shared build config, so it is where they are read.
+  "include": [
+    "checks/**/*.mjs",
+    "eslint.base.js",
+    "test/**/*.ts",
+    "../../vitest.config.ts",
+    "../../eslint.config.js"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@merit/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Liability dashboard, account drill-down, flags queue, evidence export. Separate origin. Railway service: admin.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
