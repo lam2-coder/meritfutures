@@ -196,3 +196,23 @@ Nothing.
 **The honest summary: two of P1's three named contents are substantially done and the third has not begun.** Schema and corpus-integrity CI are real and verified. **The scaffold is the whole of what is left, and it is the thing every remaining VG gate is blocked on** — a gate cannot fail correctly on a seeded violation in a repository with nothing to lint, nothing to type-check and nothing to build.
 
 **One thing the reconciliation proved about P1's definition of done, and it is worth carrying into the scaffold session.** "Failing correctly on a seeded violation" is not one check, it is two: the gate must fail, and it must fail **on the seeded finding**. Two of the eleven corpus gates failed on a truncated tree copy and would have been scored as working. `falsify.mjs` is the shape that catches that, and the VG gates should arrive with the same harness rather than with a claim.
+
+---
+
+## The P1 scaffold plan is approved and OQ-P1-04 is ruled (2026-08-15)
+
+**[P1-monorepo-scaffold](plans/P1-monorepo-scaffold.md) is `approved`.** Four questions, all ruled: the tooling packages need no ADR and `packages/config` is `packages/tooling`, no build orchestrator at P1, `.nvmrc` is the only Node version in the tree, and **OQ-P1-04**.
+
+**OQ-P1-04 was a merge blocker sitting in front of the scaffold, and the ruling arrived larger than the question.** CI-06b demanded corpus frontmatter on every markdown file under `packages/`, so the first package README would have failed it while passing CI-06c ten lines away in the same runner. Option A was ruled, **with a structural amendment that is the transferable half: the fix is one predicate both gates call, not CI-06b's regex narrowed to match CI-06c's.** Two expressions of one concept that agree today is how the defect was born, and `packages/` holding exactly one markdown file is the only reason they ever agreed.
+
+| | |
+|---|---|
+| **Folded** | `isCorpusDocument` in [`scripts/corpus/gates.mjs`](../scripts/corpus/gates.mjs), read by CI-06b and CI-06c both. The by-name allowlist carries its own expiry in a comment: **one entry is fine, three needs a rule instead of a list**, which is [ADR-034](DECISIONS.md)'s drift class applied to the fix for a drift |
+| **C disqualified on evidence** | `docs/legal/README.md`, `docs/ops/runbooks/README.md` **and `research/calibration/README.md`**, all approved and indexed. **The ruling named two and the tree carries three** |
+| **B rejected** | It makes a gate green by making its status field meaningless |
+| **Asserted, not claimed** | [`falsify.mjs`](../scripts/corpus/falsify.mjs) gains a **SCOPE** phase and two cases: a file under `packages/` with no frontmatter must **not** fail CI-06b, and a file under `docs/` with no frontmatter **must**. Both directions, because a narrowing tested only from the quiet side is indistinguishable from a gate switched off |
+| **Watched fail** | Against the pre-ruling regex, `CI-06b/out` reports `READ A FILE IT MUST NOT`. Against a predicate narrowed past `docs/`, `CI-06b/in` reports `DID NOT FAIL`. Neither case can only pass |
+
+**One coverage loss, named rather than discovered.** The unified predicate excludes `docs/INDEX.md`, which CI-06c skips because INDEX cannot carry a row pointing at itself. That exclusion now reaches CI-06b, so **INDEX's own frontmatter is checked by nothing**. One file, `status: approved` today. The alternative was a second expression inside CI-06b, which is the thing the amendment exists to prevent, so it is recorded for a one-line ruling rather than traded back for the defect.
+
+**Eleven gates pass and thirteen assertions hold** (eleven seeded violations, two scope cases). **The next session is S-A**, the migration number allocation table as [ADR-036](DECISIONS.md), then S-B, the scaffold itself, carrying all three riders in [plan section 5](plans/P1-monorepo-scaffold.md#5-the-three-riders).

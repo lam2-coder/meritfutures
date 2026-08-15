@@ -10,9 +10,15 @@
 // times is not checking what its row says it checks, and this harness reports
 // that as an error rather than as a green run.
 //
+// It then runs the SCOPE cases: a gate that fails on the right violation may
+// still be reading the wrong set of files, which is the defect OQ-P1-04 named.
+// Each scope case asserts one direction of one boundary, and no boundary is
+// asserted in one direction only.
+//
 //   node scripts/corpus/falsify.mjs
 //
-// Exit code is 0 only when every gate passed clean AND failed dirty.
+// Exit code is 0 only when every gate passed clean AND failed dirty AND every
+// scope case landed on the side of the boundary it names.
 //
 // WHY THIS EXISTS. Two independent sessions wrote a gates.mjs, and the founder
 // picked between them on exactly this criterion: PR #8's runner had been watched
@@ -28,7 +34,8 @@
 // =============================================================================
 
 import {
-  cpSync, mkdtempSync, readFileSync, writeFileSync, rmSync, renameSync, existsSync, readdirSync,
+  cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync, existsSync,
+  readdirSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, dirname, resolve } from 'node:path';
@@ -147,9 +154,82 @@ const SEEDS = {
   },
 };
 
+// =============================================================================
+// SCOPE CASES: a gate asserted to be correctly SCOPED, not merely quieter
+// =============================================================================
+// A SEEDS entry proves a gate CAN fail. It cannot prove the gate reads the
+// right set of files, and OQ-P1-04 was exactly that defect: CI-06b's document
+// set was one directory wider than CI-06c's, and the two agreed only because
+// `packages/` had held one markdown file since it existed.
+//
+// The ruling narrowed CI-06b. A narrowing tested only from the quiet side is
+// indistinguishable from a gate switched off, so every case below states ONE
+// direction of a boundary and no boundary appears here in one direction only.
+//
+// `expect` is either the literal 'PASS' (the gate must not read this file at
+// all) or a substring the gate's finding must contain. Same discipline as
+// SEEDS: "it exited non-zero" is not evidence.
+//
+// TARGETED RATHER THAN EXHAUSTIVE, deliberately, and unlike SEEDS there is no
+// completeness check over it. A scope case exists where a boundary has actually
+// been argued about. Inventing one per gate would fill this file with cases
+// nobody chose, which is the opposite of the point.
+const SCOPE_CASES = [
+  {
+    name: 'CI-06b/out',
+    gate: 'CI-06b',
+    what: 'a package README with no frontmatter, which must NOT be a finding',
+    expect: 'PASS',
+    seed: (d) => {
+      mkdirSync(join(d, 'packages/rules-engine'), { recursive: true });
+      writeFileSync(
+        join(d, 'packages/rules-engine/README.md'),
+        '# rules-engine\n\nA source file that happens to be markdown. No frontmatter, on purpose.\n',
+      );
+    },
+  },
+  {
+    name: 'CI-06b/in',
+    gate: 'CI-06b',
+    what: 'a document under docs/ with no frontmatter, which MUST be a finding',
+    expect: 'docs/PROBE_NO_FRONTMATTER.md: no frontmatter block',
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'docs/PROBE_NO_FRONTMATTER.md'),
+        '# Probe\n\nA corpus document with no frontmatter block.\n',
+      ),
+  },
+  {
+    // The first fold of OQ-P1-04 put docs/INDEX.md inside the shared
+    // predicate's exclusion, which was CI-06c's rule (a list cannot contain
+    // itself) applied to the wrong question. INDEX's own frontmatter was then
+    // checked by nothing: `status: nearly` would have passed every gate.
+    // INDEX is a corpus document; only CI-06c has a reason to skip it.
+    name: 'CI-06b/index',
+    gate: 'CI-06b',
+    what: "INDEX's own frontmatter is checked, which the first fold silently lost",
+    expect: 'docs/INDEX.md: status "nearly" is not one of draft | review | approved | frozen',
+    seed: (d) => {
+      const f = join(d, 'docs/INDEX.md');
+      writeFileSync(f, readFileSync(f, 'utf8').replace(/^status: .*$/m, 'status: nearly'));
+    },
+  },
+];
+
 function gateIds() {
   const out = execFileSync('node', [join(ROOT, 'scripts/corpus/gates.mjs'), 'list'], { encoding: 'utf8' });
   return [...out.matchAll(/^(\S+)\s\s/gm)].map((m) => m[1]);
+}
+
+// EVERYTHING except .git and node_modules. Copying a named subset left .claude/
+// out on the first run, and CI-06a and CI-06c then "failed" on links into a
+// directory the harness had not copied. A harness that tests a tree the gates
+// never see is testing the harness.
+function copyTree(dir) {
+  for (const entry of readdirSync(ROOT)) {
+    if (entry === '.git' || entry === 'node_modules') continue;
+    cpSync(join(ROOT, entry), join(dir, entry), { recursive: true });
+  }
 }
 
 function runGate(dir, id) {
@@ -188,14 +268,7 @@ function main() {
   for (const id of ids) {
     const dir = mkdtempSync(join(tmpdir(), 'merit-falsify-'));
     try {
-      // EVERYTHING except .git and node_modules. Copying a named subset left
-      // .claude/ out on the first run, and CI-06a and CI-06c then "failed"
-      // on links into a directory the harness had not copied. A harness that
-      // tests a tree the gates never see is testing the harness.
-      for (const entry of readdirSync(ROOT)) {
-        if (entry === '.git' || entry === 'node_modules') continue;
-        cpSync(join(ROOT, entry), join(dir, entry), { recursive: true });
-      }
+      copyTree(dir);
       SEEDS[id].seed(dir);
       const { pass, stdout } = runGate(dir, id);
       const findings = stdout.split('\n').filter((l) => l.startsWith('       ')).map((l) => l.trim());
@@ -218,10 +291,43 @@ function main() {
     }
   }
 
+  console.log('\nSCOPE: each case asserts ONE direction of a gate boundary\n');
+  for (const c of SCOPE_CASES) {
+    const dir = mkdtempSync(join(tmpdir(), 'merit-scope-'));
+    try {
+      copyTree(dir);
+      c.seed(dir);
+      const { pass, stdout } = runGate(dir, c.gate);
+      const findings = stdout.split('\n').filter((l) => l.startsWith('       ')).map((l) => l.trim());
+      if (c.expect === 'PASS') {
+        if (pass) {
+          console.log(`  out of scope, passed  ${c.name}  <- ${c.what}`);
+        } else {
+          bad++;
+          console.log(`  READ A FILE IT MUST NOT  ${c.name}  <- ${c.what}`);
+          console.log(`        ${c.gate} reported FAIL on a tree that does not violate it:`);
+          for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
+        }
+      } else if (!pass && findings.some((f) => f.includes(c.expect))) {
+        console.log(`  in scope, failed      ${c.name}  <- ${c.what}`);
+        console.log(`        ${findings.find((f) => f.includes(c.expect)).slice(0, 150)}`);
+      } else {
+        bad++;
+        console.log(`  ${pass ? 'DID NOT FAIL         ' : 'FAILED OFF-TARGET    '} ${c.name}  <- ${c.what}`);
+        console.log(`        Expected a finding containing "${c.expect}". Got ${findings.length} finding(s):`);
+        for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   console.log(
     bad === 0
-      ? `\nAll ${ids.length} gates pass clean and fail dirty. Each one has now been watched doing both.`
-      : `\n${bad} problem(s). A gate that cannot be made to fail is not checking anything.`,
+      ? `\nAll ${ids.length} gates pass clean and fail dirty, and ${SCOPE_CASES.length} scope ` +
+          `case(s) hold. Each one has now been watched doing both.`
+      : `\n${bad} problem(s). A gate that cannot be made to fail is not checking anything, and ` +
+          `a gate that fails on a file outside its scope is checking the wrong thing.`,
   );
   return bad ? 1 : 0;
 }

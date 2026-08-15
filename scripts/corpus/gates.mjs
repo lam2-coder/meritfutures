@@ -137,6 +137,47 @@ function frontmatter(body) {
 }
 
 // -----------------------------------------------------------------------------
+// What counts as a corpus document
+// -----------------------------------------------------------------------------
+// ONE definition, called by CI-06b and CI-06c both, because until OQ-P1-04 was
+// ruled this runner carried two of them ten lines apart. CI-06b globbed
+// `^(docs|research|packages)/`; CI-06c globbed `^(docs|research)/` plus
+// DELTA_MANIFEST by name. They agreed for exactly as long as `packages/` held
+// one markdown file, and the first package README would have failed one and
+// passed the other.
+//
+// THE RULING IS THE SHAPE, NOT THE REGEX. Bringing CI-06b's expression into
+// line with CI-06c's would have produced two expressions of one concept that
+// agree today, which is precisely how the defect was born. So there is one
+// predicate and both gates call it.
+//
+// A package README is a source file that happens to be markdown. A corpus
+// document is a thing with a gateable status and an INDEX row, and it is the
+// second class these gates exist for. Exempting `README.md` by filename was
+// rejected on evidence: `docs/legal/README.md`, `docs/ops/runbooks/README.md`
+// and `research/calibration/README.md` are corpus documents, approved and
+// indexed, and would have silently stopped being checked.
+//
+// THE BY-NAME ENTRY IS A HAND-MAINTAINED LIST, which is ADR-034's own drift
+// class. Fine at one entry. If it reaches three it needs a rule instead of a
+// list.
+//
+// `docs/INDEX.md` is excluded because INDEX cannot carry a row pointing at
+// itself. That exclusion now reaches CI-06b too, so INDEX's own frontmatter is
+// checked by nothing. Stated rather than discovered later.
+const isCorpusDocument = (file) =>
+  (/^(docs|research)\//.test(file) || file === 'packages/db/DELTA_MANIFEST.md') &&
+  !/^docs\/reviews\//.test(file); // verdicts are overwritten artifacts
+
+// docs/INDEX.md is NOT excluded here, and the distinction is the ruling.
+// INDEX is a corpus document: it carries frontmatter and a gate status, and
+// CI-06b must check it. CI-06c skips it for an unrelated reason -- a list
+// cannot contain itself -- which is a property of that gate's mechanics
+// rather than of the document class. Folding the two together put INDEX's
+// own frontmatter beyond every gate, so a hand-edit to `status: nearly`
+// would have passed the whole runner.
+
+// -----------------------------------------------------------------------------
 // CI-06a  Link check
 // -----------------------------------------------------------------------------
 const ci06a = {
@@ -194,14 +235,16 @@ const ci06b = {
   id: 'CI-06b',
   title: 'Frontmatter present and valid on every tracked document',
   covers:
-    'status, depends_on and last_updated on every .md under docs/, research/ and ' +
-    'packages/, AND that every depends_on target resolves to a file that exists.',
+    'status, depends_on and last_updated on every corpus document, AND that every ' +
+    'depends_on target resolves to a file that exists. The document set is ' +
+    'isCorpusDocument, shared with CI-06c (OQ-P1-04). A markdown file under ' +
+    'packages/ that is not on that list is a source file rather than a corpus ' +
+    'document and is NOT checked; neither is docs/INDEX.md.',
   run() {
     const valid = new Set(['draft', 'review', 'approved', 'frozen']);
     const findings = [];
     for (const file of markdownFiles()) {
-      if (!/^(docs|research|packages)\//.test(file)) continue;
-      if (/^docs\/reviews\//.test(file)) continue; // verdicts are overwritten artifacts
+      if (!isCorpusDocument(file)) continue;
       const fm = frontmatter(read(file));
       if (!fm) {
         findings.push(`${file}: no frontmatter block`);
@@ -259,11 +302,14 @@ const ci06c = {
     // Scope widened at the reconciliation to match PR #7's: research/ and the
     // DELTA_MANIFEST are tracked documents that INDEX already carries, and a
     // gate that reads "every tracked document" while checking only docs/ is a
-    // gate reporting green for a check it did not perform.
+    // gate reporting green for a check it did not perform. That scope is now
+    // isCorpusDocument, which CI-06b reads from too (OQ-P1-04).
     for (const file of markdownFiles()) {
-      if (!/^(docs|research)\//.test(file) && file !== 'packages/db/DELTA_MANIFEST.md') continue;
+      if (!isCorpusDocument(file)) continue;
+      // Gate-local, not a scope rule: a list cannot contain itself. INDEX is a
+      // corpus document and CI-06b checks its frontmatter; only this gate has
+      // a reason to skip it.
       if (file === 'docs/INDEX.md') continue;
-      if (/^docs\/reviews\//.test(file)) continue; // verdicts are overwritten artifacts
       if (!linked.has(file)) findings.push(`not in INDEX: ${file}`);
     }
     return findings;
