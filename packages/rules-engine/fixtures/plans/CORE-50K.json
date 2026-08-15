@@ -1,7 +1,7 @@
 {
   "id": "CORE-50K",
   "source": "docs/plans/M01-rules-engine.md Appendix A.1, the 50K column",
-  "note": "TRANSCRIBED FROM APPENDIX A AND FROM NOWHERE ELSE. GOLDEN_SCENARIOS section 3 restates the same numbers in prose and disagrees with Appendix A on the ladder: the prose says 8, Appendix A.1 says 5 per ADR-024, and the same sentence names Appendix A as 'the only place these numbers are defined'. This file follows the named authority. The discrepancy is reported and needs a founder ruling; it is not resolved here.",
+  "note": "TRANSCRIBED FROM APPENDIX A AND FROM NOWHERE ELSE, which is now the only remaining copy of these values and is deliberate: a config record is the thing that owns a value rather than a restatement of one. GOLDEN_SCENARIOS section 3 used to restate thirteen of them in prose and disagreed with Appendix A on the ladder, saying 8 against Appendix A.1's 5 per ADR-024, in the same sentence that named Appendix A as 'the only place these numbers are defined'. This file followed the named authority and reported the discrepancy. ADR-037 closed it by DELETING the thirteen restated values rather than correcting the one that had drifted, and extended CI-06g's rule from counts to parameters. Nothing in this file changed as a result; it was right on the day it was written.",
   "plan_code": "core_eod",
   "size_label": "50K",
   "plan_version_id": "0199c7a1-0000-7000-8000-000000000001",

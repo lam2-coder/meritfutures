@@ -20,8 +20,7 @@ name: golden
 # taken, for the same reason the reconciliation ruling took corpus.yml unchanged.
 #
 # -----------------------------------------------------------------------------
-# WHAT THIS STAGE CURRENTLY ASSERTS, STATED HERE SO A GREEN CHECK IS NOT READ AS
-# MORE THAN IT IS
+# WHAT THIS STAGE CURRENTLY ASSERTS, AND WHY THE STAGE SAYS SO ITSELF
 # -----------------------------------------------------------------------------
 # packages/rules-engine ships the scaffold's identity evaluation. TR-02 puts the
 # fixture before the function on a money path, so every fixture in the directory
@@ -30,10 +29,28 @@ name: golden
 # polarity is read off the engine by a probe, not written into a fixture, so it
 # flips on its own when M01 lands and no fixture is edited to make it flip.
 #
+# THREE CONSEQUENCES OF THAT INVERSION THAT "CI-03 golden files: pass" DOES NOT
+# CONVEY, and which used to be stated only in a pull request body:
+#
+#   - the stage's assertion is `diffs.length > 0`, the opposite of its name;
+#   - A CORRUPTED EXPECTED END STATE THEREFORE STILL PASSES, because any
+#     expectation at all produces diffs against an engine that computes nothing;
+#   - the end-to-end assertion is behind `describe.runIf(!stubbed)` and does not
+#     run, appearing only as a skip count.
+#
+# A pull request body is written once by whoever landed the stage and is read by
+# nobody on run 200. SO THE STAGE EMITS ALL THREE IN ITS OWN OUTPUT, on every
+# run, into this job's log and into the Actions step summary. The claims are
+# MEASURED rather than repeated: the corrupted-expectation one is proved by
+# corrupting the real loaded fixtures and re-running the stage's own assertion.
+# packages/golden-loader/src/coverage.ts is where that lives.
+#
 # The fixture directory holds three scenarios, not the registry's full set. The
 # remaining fixtures arrive with P2, when there is an engine to have an expected
 # end state against; writing them now would mean expected end states derived
-# from nothing.
+# from nothing. That fraction is in the emitted block too, derived from the
+# registry rather than typed here, because it is exactly the kind of number
+# ADR-034 found wrong every time it was checked.
 
 on:
   push:
@@ -70,9 +87,23 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # CI-03. The command P1 section 2.2 names, run exactly as it is named.
+      # CI-03. The command P1 section 2.2 names, plus a reporter flag and
+      # nothing else.
+      #
+      # `--reporter=verbose` IS LOAD BEARING AND IS NOT COSMETIC. The stage
+      # prints a coverage statement saying what this green check actually
+      # proves, and Vitest's default reporter SWALLOWS test stdout on a passing
+      # run. Without the flag the block is computed and thrown away, and the job
+      # log reads "Tests 13 passed | 3 skipped", which is the exact shape of
+      # green check this ruling is about: it does not distinguish a stage with
+      # nothing to skip from one whose end-to-end assertion is switched off.
+      #
+      # The flag changes reporting only. The project, the includes and the
+      # assertions are the ones P1 section 2.2 names, and the verbose output
+      # also prints every test NAME, so the three `against the real engine`
+      # cases appear in the log as skipped by name rather than as a count.
       - name: Golden fixtures
-        run: pnpm exec vitest run --project golden
+        run: pnpm exec vitest run --project golden --reporter=verbose
 
       # THE LOADER'S OWN RULES, WATCHED FAILING ON A SEEDED VIOLATION. P1
       # section 6: "Every gate any of these sessions wires ships with a seeded

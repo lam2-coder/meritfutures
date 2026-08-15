@@ -28,7 +28,9 @@ The Open Decisions Register (constitution section 10) resolves into entries here
 | **033** | merged to `main` (PR #5) | **allocated.** The citation-reviewer ADR, renumbered from `031` on that branch under the ruling below |
 | **034** | merged to `main` (PR #6) | **allocated.** The allocation ruling itself, and the COUNT GATE |
 | **035** | merged to `main` (PR #9) | **allocated.** The `plan_versions` immutability-trigger defect, ruled at the PR #7 / PR #8 reconciliation. **The fix is `0028`, which merged with it, and the structural fix is `CI-06j`.** This row said `reserved, unmerged` until 2026-08-15, four commits after the merge that made it false |
-| **036** | `claude/builder-reviewer-loop-rykvhs`, session S-A | **reserved, unmerged.** The migration number allocation table below, and `CI-06h`'s allocation half |
+| **036** | merged to `main` (PR #13) | **allocated.** The migration number allocation table below, and `CI-06h`'s allocation half. **This row said `reserved, unmerged` until 2026-08-15**, which is the second time the State column has been found stale after a merge and is why [ADR-036](#) records that the column is prose rather than a checked fact |
+| **037** | `claude/builder-reviewer-loop-rykvhs`, the S-D ruling fold | **reserved, unmerged.** A shorthand may not restate a value the config owns |
+| **038** | `claude/builder-reviewer-loop-rykvhs`, the S-D ruling fold | **reserved, unmerged.** A CI stage states, in its own output, what it currently proves |
 
 **Gaplessness is asserted over allocated plus reserved**, so a branch holding a reserved number shows a hole in this file and passes. A branch inventing an unreserved number fails.
 
@@ -1173,3 +1175,61 @@ round_trips_closed_has_exit                -> EMPTY ARRAY PASSED THE CHECK
 - **Consequences:** [STRATEGY section 4.4](testing/STRATEGY.md)'s `CI-06h` row is amended to carry the allocation half, and its stated coverage gap gains the cross-branch limitation `CI-06f` already declares. **The runner still holds eleven checks**, which is the extension rather than the sibling showing up in the count. `falsify.mjs` gains two scope cases, one per direction: a reserved hole must **pass**, an unallocated number on disk must **fail**. The next free migration number is `0029`, and it is stated in the table rather than derived by a reader from a directory listing.
 
   **What this does not do, stated rather than implied.** It cannot stop a branch that never reads `main`, and it cannot verify the State column. Both are the two-ref problem `CI-06f` declares and neither is closed here.
+
+---
+
+## ADR-037: A shorthand may not restate a value the config owns  (2026-08-15, status: accepted)
+
+- **Context:** [GOLDEN_SCENARIOS section 3](testing/GOLDEN_SCENARIOS.md) opened with a plan shorthand for `CORE-50K` that **restated thirteen parameter values from [M01 Appendix A.1](plans/M01-rules-engine.md#a1-core-eod-core_eod), in the same sentence that named Appendix A as "the only place these numbers are defined"**. Twelve agreed. The thirteenth said the ladder was **8** where Appendix A.1 says **5** ([ADR-024](#)).
+
+  **This is a different failure from the twelve counts [ADR-034](#) was ruled against, and the difference is the whole reason it needs its own ADR.** A count is a description of the corpus, and a wrong one misleads a reader. **A plan parameter is an input to a running system.** `max_payouts` is a column in `plan_version_sizes`, it is read at request time by the engine, and it bounds lifetime extraction under INV-17. A document restating it is a second copy of a number the config owns, and the corpus is what a fixture author transcribes from.
+
+  **It was found the only way it could have been found.** S-D wrote `packages/rules-engine/fixtures/plans/CORE-50K.json` by transcribing Appendix A.1, and the transcription disagreed with the prose. No gate saw it: `CI-06g` compares generated spans and this was not one, and its declared coverage gap is exactly this shape.
+
+  **The sentence's own construction is the evidence.** It named its authority and then restated the authority's contents, which is the shape that guarantees drift: the reader is told not to look, so nobody does, and the copy and the source part company at the next ruling. **[ADR-024](#) shortened the ladder from 8 to 5 on 2026-08-14 and moved every Appendix A table. It could not move a sentence in a different document that nobody knew was holding the number.**
+
+- **Decision:** three parts.
+
+  1. **The thirteen restated values are DELETED, not corrected.** Section 3 now points at Appendix A.1 and at the fixture plan record, and states no parameter. Fixing the `8` would have left twelve copies and the mechanism that produced the drift intact.
+  2. **`CI-06g`'s rule extends from counts to parameters.** [ADR-034](#) read "no document states a quantity a script can derive". It now reads: **no document states a quantity a script can derive, and no document restates a value another document or the config owns.** Both halves have the same remedy, which is `ADR-034`'s: **either generate it into the document, or delete it and point at the source.**
+  3. **GS-066 and GS-067's pins name `max_payouts` rather than a number.** Both carried the same stale 8 inside a scenario description. The boundary pair is what those fixtures pin and the literal was never load bearing to it.
+
+- **Why the deletion is safe here specifically:** the shorthand existed to spare a reader one hop, and the hop is now one anchored link to an approved table with a `Source` column, which is strictly more than the prose carried. The **executable** copy survives deliberately: `fixtures/plans/CORE-50K.json` must state the values because the loader reads them, and a config record is the thing that owns a value rather than a restatement of one.
+
+- **What this does NOT do, stated rather than implied.** **No script enforces the parameter half yet.** `CI-06g` still compares the generated spans that exist, and its `covers` line now names the parameter sweep alongside the numeral sweep as declared and not run. Closing it needs a query that can tell a restatement from a scenario's own arithmetic: GS-026's "withdrawable 214,250, cap 150,000" is a computed boundary the fixture exists to pin and must survive any sweep that removes a shorthand. **That query is not ruled and inventing one here would be a gate that fails on correct prose**, which is how a gate gets switched off. The rule binds a reviewer today and the enforcement is an open item, which is the same position `CI-06g` shipped in and it is stated the same way.
+
+- **Alternatives considered:** **fix the `8` and keep the shorthand** (rejected: it treats the symptom, and the shorthand would drift again at the next parameter ruling, which is a thing that happens roughly weekly); **convert the thirteen values to generated spans** (rejected: it needs a query that parses an Appendix A table cell per parameter, which is thirteen queries and a markdown-table parser standing between a founder editing an approved table and a green build, to preserve a convenience nobody asked for); **make the fixture plan record the authority and have Appendix A point at it** (rejected outright: Appendix A is what the founder confirms parameters in and what M09 publishes from, and a test fixture may not become the source of a launch parameter); **leave it as a reported discrepancy** (rejected: it was already reported once, in [STATE](STATE.md) and in the fixture's own `note`, and a discrepancy that survives a session in a `note` is how it survives ten).
+
+- **Consequences:** [GOLDEN_SCENARIOS](testing/GOLDEN_SCENARIOS.md) section 3 loses its shorthand values and gains the record of the repair beside the four numbering repairs already in its header; GS-066 and GS-067's pins change. [STRATEGY section 4.4](testing/STRATEGY.md)'s `CI-06g` row carries the extended rule and the extended coverage gap. `fixtures/plans/CORE-50K.json`'s `note` stops reporting an open discrepancy and records the ruling that closed it. **[STATE](STATE.md)'s S-D finding 2 closes.** The ladder value itself is untouched: it is 5 on Core EOD and Merit Rapid and 4 on Direct, it was always 5, and no number moved in this ADR.
+
+---
+
+## ADR-038: A CI stage states, in its own output, what it currently proves  (2026-08-15, status: accepted)
+
+- **Context:** `CI-03 golden files` goes green on every push and **means something considerably narrower than its name.** `packages/rules-engine` is the scaffold's identity evaluation, so TR-02 puts every fixture in the window where it must fail, and the stage asserts that failure rather than suffering it. Three things follow that the check's name actively contradicts:
+
+  | | |
+  |---|---|
+  | **The polarity is inverted** | The assertion is `diffs.length > 0`. A fixture that MATCHES is the finding |
+  | **A corrupted expected end state still passes** | Under that polarity any expectation at all produces diffs, so the stage is blind to whether the expected end states are the ones the corpus states |
+  | **The end-to-end assertion is not running** | It sits behind `describe.runIf(!stubbed)` and appears as a skip count, which a summary line does not distinguish from a stage with nothing to skip |
+
+  **All three were true, all three were correct, and all three were written down only in a pull request body.** That is the defect. A pull request body is authored once by whoever landed the stage, is read during one review, and is not attached to run 200 on a Tuesday when somebody merges on a green check.
+
+  **This corpus has paid for this class more than any other.** Two of the eleven corpus gates were failing off-target and would have been scored as working (STRATEGY section 4.4). `CI-05` reported a green scan while its database was restored after the scan that needed it. `CI-06h` returns green for a schema it did not install. Each one was a check whose name promised more than it did, and each was found by somebody reading the implementation rather than the result.
+
+  **The remedy already exists for the corpus runner and stops at its edge.** Every gate there declares what it does **not** cover in a `covers` line the `list` command prints. Nothing carried that discipline into the GitHub Actions stages, which is where a merge decision is actually made.
+
+- **Decision:** **a stage that proves less than its name says emits the difference in its own output, on every run, and the load-bearing claims are measured rather than written.**
+
+  1. **In the stage's own output.** The job log and `$GITHUB_STEP_SUMMARY`, which is what a reader sees without opening a log. Not a comment in a workflow file, not a README, not a pull request body, all of which are read at authoring time and never again.
+  2. **Measured, not repeated.** [`packages/golden-loader/src/coverage.ts`](../packages/golden-loader/src/coverage.ts) derives the polarity from the same probe the suite uses, derives the fixture and registry counts from the tree and the registry, and **proves the corrupted-expectation claim by corrupting every loaded fixture and re-running the stage's own assertion over it.** A coverage statement somebody typed is a count somebody pasted, and [ADR-034](#) settled what happens to those.
+  3. **It expires by itself.** When M01 lands, the probe stops holding, the block prints the caught direction instead, and the assertion that the stage is currently blind stops running. Nothing is edited to make that happen, which is the same property the polarity already has.
+
+- **Why not simply fix the stage instead of describing it:** because the narrowness is correct. TR-02 requires the fixture to fail before the function exists and STRATEGY section 1 forbids a permanently red required stage. The inverted polarity is the ruled resolution of those two, and the alternative, a per-fixture `pending: true`, is the weakening TR-03 forbids. **The stage is right and its name is what is wrong**, so the output is where the correction belongs.
+
+- **Alternatives considered:** **rename the check to say `CI-03 golden files (inverted, stub)`** (rejected: a name that encodes today's state is a hand-maintained fact in the one place nothing re-derives, and it would be stale the day M01 lands; the emitted block changes itself); **put it in the README** (rejected: it is already in the README, and it was also in the pull request body, and the defect persisted); **fail the stage while the engine is a stub** (rejected: STRATEGY section 1, a permanently red required stage trains its own reader to click through red, which is worse than a narrow green one that says so); **assert the coverage facts as prose in a test name only** (rejected as insufficient alone: a test name is not visible in the default reporter's passing output, which is why `--reporter=verbose` is now part of the stage's command and why the block also goes to the step summary).
+
+- **Consequences:** [`.github/workflows/golden.yml`](../.github/workflows/golden.yml) runs the stage with `--reporter=verbose`, because Vitest's default reporter swallows test stdout on a passing run and the block would otherwise be computed and discarded. `packages/golden-loader` gains `src/coverage.ts` and three assertions that the emitted block is derived from the run rather than typed, including the file-exists check on the citation it makes to `test/compare.test.ts`. [STRATEGY section 4.4](testing/STRATEGY.md)'s `CI-03` row records the obligation.
+
+  **The obligation generalizes and is stated as a rule rather than as a note about one stage:** any CI stage whose assertions are narrower than its name emits the difference in its own output. `CI-04` will need it first, since it cannot run on a fork pull request and [P1 section 2.2](plans/P1-monorepo-scaffold.md) already requires it to "degrade honestly rather than appear green"; `CI-06h`'s "does NOT install anything" is the same statement made in a `covers` line that only the corpus runner prints.
