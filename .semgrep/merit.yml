@@ -1,0 +1,130 @@
+# =============================================================================
+# .semgrep/merit.yml
+# =============================================================================
+# CI-05's owned rules. Semgrep runs in that stage with these AND with the
+# upstream registry rulesets; this file is the half this repository controls.
+#
+# WHY THERE IS AN OWNED HALF AT ALL, and it is not "the registry is not good
+# enough". Two reasons, both structural:
+#
+#   1. A GATE HAS TO HAVE A STABLE FALSIFICATION TARGET. `falsify-ci.mjs` seeds
+#      a violation and asserts semgrep fails ON THAT FINDING. Seeding against a
+#      registry rule means the seed is calibrated to text somebody else can
+#      rewrite, and the day they do, the harness reports a gate that "cannot be
+#      made to fail" for a reason that has nothing to do with this repository.
+#   2. THE THINGS MERIT MOST NEEDS CHECKED ARE NOT GENERIC. "There is no plan
+#      parameter anywhere in application code" is a ruling from
+#      DATA_MODEL section 12; no upstream ruleset has heard of it.
+#
+# EACH RULE CITES THE DOCUMENT IT ENFORCES. A lint rule with no citation is a
+# preference, and a preference that blocks merge is how a gate gets bypassed
+# with a flag.
+#
+# SCOPE, and one entry deserves naming. `docs/` and `research/` are prose and
+# `packages/db/migrations/` is sacred SQL that is reviewed by a human under
+# constitution E2 and never edited after merge. A semgrep finding there could
+# not be acted on without violating E2, and a gate whose only available remedy
+# is forbidden is a gate that gets disabled.
+
+rules:
+  # ---------------------------------------------------------------------------
+  # A plan parameter read from the environment
+  # ---------------------------------------------------------------------------
+  # DATA_MODEL section 12: "There is no plan parameter anywhere in application
+  # code: these are rows in `plan_versions.rules` and `plan_version_sizes`."
+  # P1 section 2.3 tier 2 makes that a path allowlist; this is the narrower
+  # case that a lint cannot express and that a reviewer reads straight past,
+  # because `process.env.MAX_DRAWDOWN_BP` looks like configuration and is a
+  # plan parameter with a different spelling.
+  #
+  # M01 requires every downstream surface to read from the ACCOUNT'S PINNED
+  # plan version at request time. A value from the environment is pinned to the
+  # deployment instead, so two accounts on two plan versions get the same
+  # number and the engine's whole versioning story is silently gone.
+  - id: merit-plan-parameter-from-env
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      A plan parameter read from the environment ($NAME). Plan parameters are rows in
+      plan_versions.rules and plan_version_sizes, read from the account's PINNED plan version at
+      request time (DATA_MODEL section 12, M01). A value from the environment is pinned to the
+      deployment rather than to the account, so two accounts on two plan versions read the same
+      number and the versioning is gone with nothing failing.
+    patterns:
+      - pattern-either:
+          - pattern: process.env.$NAME
+          - pattern: process.env['$NAME']
+          - pattern: process.env["$NAME"]
+      # The suffixes plan parameters are written with, per the money rule:
+      # integer cents and basis points. `_PCT` is here because it is what
+      # somebody reaches for when they have decided to use a percentage, which
+      # is the same finding one step earlier.
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: ^.*(_BP|_BPS|_CENTS|_PCT|_PERCENT|_RATIO|_CAP|_THRESHOLD|_LIMIT)$
+    paths:
+      include:
+        - apps/
+        - packages/
+
+  # ---------------------------------------------------------------------------
+  # SQL assembled from interpolation
+  # ---------------------------------------------------------------------------
+  # ADR-008 gives the system one accessor, `scopedDb(identity)`, and the point
+  # of a single accessor is that the identity scope is applied in one place.
+  # A hand-assembled statement is unparameterised AND unscoped in the same
+  # line, and it is the shape D0's injection scenarios take
+  # (SECURITY section 9, GS-246 to GS-255).
+  #
+  # `sql` as a TAGGED TEMPLATE is the safe form and is deliberately not matched:
+  # the driver parameterises the interpolations. What this catches is a raw
+  # string handed to an execute call, which is the form that does not.
+  - id: merit-sql-from-interpolation
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      SQL assembled by string interpolation and executed. This is unparameterised and unscoped in
+      one line. Every query goes through scopedDb(identity) (ADR-008), and a parameterised
+      statement is the only form that survives the D0 injection scenarios (SECURITY section 9).
+    patterns:
+      - pattern-either:
+          - pattern: $DB.execute(`...${$X}...`)
+          - pattern: $DB.query(`...${$X}...`)
+          - pattern: $DB.unsafe(`...${$X}...`)
+          - pattern: $DB.raw(`...${$X}...`)
+          - pattern: $DB.execute("..." + $X)
+          - pattern: $DB.query("..." + $X)
+    paths:
+      include:
+        - apps/
+        - packages/
+
+  # ---------------------------------------------------------------------------
+  # Money through a float
+  # ---------------------------------------------------------------------------
+  # The constitution's money rule, which CLAUDE.md restates: money is integer
+  # cents, thresholds are basis points or integer cents, no floats in financial
+  # paths. `merit/engine-purity` bans float LITERALS inside
+  # packages/rules-engine; this is the wider case, the parse and the format,
+  # anywhere in the tree.
+  #
+  # `toFixed` is the one worth staring at. It is not a display helper here: it
+  # is where an integer-cents value becomes a string with a rounding mode
+  # nobody chose, and the number that reaches a trader's payout screen is the
+  # number the firm is on the hook for.
+  - id: merit-money-through-a-float
+    languages: [typescript, javascript]
+    severity: ERROR
+    message: >-
+      Floating-point arithmetic on a money-shaped value. Money is integer cents and thresholds are
+      basis points or integer cents (constitution, CLAUDE.md); a float parse or a toFixed is a
+      rounding decision nobody made, in the path whose output the firm is on the hook for.
+    patterns:
+      - pattern-either:
+          - pattern: parseFloat(...)
+          - pattern: Number.parseFloat(...)
+          - pattern: $X.toFixed(...)
+    paths:
+      include:
+        - apps/
+        - packages/

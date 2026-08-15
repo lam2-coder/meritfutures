@@ -1,0 +1,328 @@
+name: ci
+
+# =============================================================================
+# CI-01, CI-02 and CI-05 (STRATEGY section 4.1), session S-C of P1 section 6.
+# =============================================================================
+# Three stages. Each runs on every push, each blocks on its own, and NONE OF
+# THEM `needs:` ANOTHER. That is the ruling rather than a preference:
+# STRATEGY section 4.1 makes them separate rows because a lint failure must not
+# hide a security finding behind a skipped job. `corpus.yml` is the fourth
+# stage, CI-06, and is a separate file with a separate owner.
+#
+#   CI-01  Lint and types      tsc --noEmit, ESLint (VG-4), prettier, RI-01..05
+#   CI-02  Unit and property   Vitest, the `unit` and `property` projects
+#   CI-05  Security static     gitleaks (VG-1), semgrep, pnpm audit,
+#                              syft SBOM + grype scan, --frozen-lockfile (VG-12)
+#
+# -----------------------------------------------------------------------------
+# EVERY STAGE PROVES ITSELF FAILING, IN ITS OWN JOB
+# -----------------------------------------------------------------------------
+# `scripts/ci/falsify-ci.mjs <stage>` seeds one violation aimed at each gate the
+# stage carries and requires the gate to fail ON THAT FINDING. P1 section 6:
+# "Every gate any of these sessions wires ships with a seeded violation, and
+# must fail on that finding rather than merely exit non-zero." STATE is sharper:
+# two of the eleven corpus gates once failed on a truncated tree copy and would
+# have been scored as working.
+#
+# It is the LAST step of each job rather than a fourth job, so a stage cannot be
+# green while the proof that it can fail lives somewhere a person deleted.
+#
+# -----------------------------------------------------------------------------
+# WHAT CI-02 IS GREEN ABOUT TODAY, WHICH IS NOT WHAT ITS ROW EVENTUALLY MEANS
+# -----------------------------------------------------------------------------
+# STRATEGY section 4.1 gives CI-02 "Vitest across packages, the `PT-nn` suites,
+# every module's `Mxx-*-nn` suites". THE `PT-nn` AND `Mxx-*-nn` SUITES DO NOT
+# EXIST. They arrive with P2, when there is an engine to state a property about.
+# What runs today is the scaffold's placeholder tests plus the two real suites
+# S-B and this session wrote: the repository invariants and the ESLint rules,
+# each watched failing on a seeded violation.
+#
+# The stage is wired so those suites join it with NO WORKFLOW CHANGE: a file
+# named `*.property.test.ts` lands in the `property` project by the glob in
+# `vitest.config.ts`, and any `test/**/*.test.ts` lands in `unit`. A STAGE THAT
+# IS GREEN BECAUSE IT HAS NOTHING TO RUN IS NOT THE SAME OBJECT AS A STAGE THAT
+# IS GREEN BECAUSE IT PASSED, and the difference has to be said out loud
+# somewhere the reader is, not inferred from a check mark.
+#
+# -----------------------------------------------------------------------------
+# NODE, pnpm AND WHY NEITHER IS AN ACTION
+# -----------------------------------------------------------------------------
+# The Node version is read from `.nvmrc` and appears nowhere else (OQ-P1-03,
+# rider 3); `RI-05` fails any workflow that pins it inline. pnpm comes from
+# Corepack reading `packageManager` in the root manifest, which is the same
+# argument one level down: the version is already written in a file this
+# repository owns, so a `pnpm/action-setup` version input would be a second
+# place holding it.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # ---------------------------------------------------------------------------
+  # THE CI-05 SCANNERS, PINNED, IN ONE PLACE
+  # ---------------------------------------------------------------------------
+  # A scanner installed at `latest` is a gate whose behavior changes on a day
+  # nobody touched this repository, which is the same defect as an unpinned
+  # dependency and is the thing VG-12 exists to stop. Pinning the scanners is
+  # VG-12 applied to the tools that enforce VG-12.
+  #
+  # `scripts/ci/install-pinned-tool.sh` resolves and prints the current upstream
+  # tag when a pin 404s, so a bump is one edit here informed by the error.
+  # It also prints each archive's sha256 and warns while the digest is
+  # unpinned; pinning the bytes is the next step and is named in the pull
+  # request rather than implied by the pin above it.
+  GITLEAKS_VERSION: '8.28.0'
+  SYFT_VERSION: '1.29.0'
+  GRYPE_VERSION: '0.95.0'
+  # Verified against PyPI before it was written here, rather than guessed.
+  SEMGREP_VERSION: '1.173.0'
+
+jobs:
+  # ===========================================================================
+  # CI-01  Lint and types
+  # ===========================================================================
+  lint-and-types:
+    name: CI-01 lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # RIDER 3, OQ-P1-03. `.nvmrc` is the only place the Node version is
+          # written, and RI-05 below asserts no workflow pins it inline.
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      # VG-12's first part, and P1 section 4's first definition-of-done line.
+      # The lockfile is the admitted dependency tree; an install that is allowed
+      # to update it is an install that admits packages nobody approved.
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      # The scaffold invariants, which P1 section 2 argues a cheap choice
+      # destroys silently: the engine's manifest purity (RI-01), the absence of
+      # a coverage gate (RI-02), the Vitest projects being the CI stages
+      # (RI-03), four separate deployables (RI-04) and one Node version (RI-05).
+      # They run FIRST because RI-03 is the check that says whether the next
+      # job's `--project` selectors mean anything.
+      - name: Repository invariants (RI-01 to RI-05)
+        run: node packages/tooling/checks/repo-invariants.mjs
+
+      - name: Types
+        run: pnpm run typecheck
+
+      # VG-4 (`merit/no-raw-db-client`) and `merit/engine-purity` run here,
+      # along with STRATEGY section 4.5's anti-slop rules. Each is `error`, so
+      # each blocks: a lint rule set to warn is a rule that gets scrolled past.
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Format
+        run: pnpm run format:check
+
+      - name: Gates are falsifiable
+        run: node scripts/ci/falsify-ci.mjs CI-01
+
+  # ===========================================================================
+  # CI-02  Unit and property
+  # ===========================================================================
+  unit-and-property:
+    name: CI-02 unit and property
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      # THE TWO PROJECTS CI-02 OWNS, NAMED. `golden` is CI-03 and `integration`
+      # is CI-04, and both are deliberately absent: P1 section 2.2 makes the
+      # projects map to CI STAGES rather than to packages precisely so that this
+      # line can exist. `vitest run` with no selector would make CI-02 go red
+      # for a CI-03 failure and there would be no way to tell them apart.
+      #
+      # Vitest exits non-zero when a selected project matches no test files, so
+      # a project emptied by a bad glob fails here rather than reporting green
+      # for having looked at nothing. That is not configured; it is the default,
+      # and `--passWithNoTests` must never be added to this line.
+      - name: Unit and property suites
+        run: pnpm exec vitest run --project unit --project property
+
+      - name: Gates are falsifiable
+        run: node scripts/ci/falsify-ci.mjs CI-02
+
+  # ===========================================================================
+  # CI-05  Security static
+  # ===========================================================================
+  security-static:
+    name: CI-05 security static
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # VG-1 IS "gitleaks ON THE DIFF AND THE FULL HISTORY" and a shallow
+          # clone has no history to scan. The gate would pass by being unable
+          # to look, which is the failure mode corpus.yml's CI-06f comment
+          # names about its own fetch depth.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      # VG-12, part one. It is repeated in every job on purpose: a stage that
+      # installs with an unfrozen lockfile is a stage testing a tree that is not
+      # the tree under review.
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the pinned scanners
+        run: |
+          set -euo pipefail
+          chmod +x scripts/ci/install-pinned-tool.sh
+          sudo -E scripts/ci/install-pinned-tool.sh gitleaks/gitleaks "$GITLEAKS_VERSION" \
+            'gitleaks_{v}_linux_x64.tar.gz' gitleaks
+          sudo -E scripts/ci/install-pinned-tool.sh anchore/syft "$SYFT_VERSION" \
+            'syft_{v}_linux_amd64.tar.gz' syft
+          sudo -E scripts/ci/install-pinned-tool.sh anchore/grype "$GRYPE_VERSION" \
+            'grype_{v}_linux_amd64.tar.gz' grype
+          python3 -m pip install --quiet "semgrep==${SEMGREP_VERSION}"
+          semgrep --version
+
+      # -----------------------------------------------------------------------
+      # VG-1, secret scan
+      # -----------------------------------------------------------------------
+      # BOTH DIRECTIONS, because they find different things. `git` walks every
+      # commit, which is where a secret that was committed and then deleted
+      # still lives; `dir` reads the tree as it stands, which catches a file
+      # that history has not seen yet. A repository scanned only one way has a
+      # blind spot in whichever direction was skipped.
+      - name: VG-1 secret scan, full history
+        run: gitleaks git . --redact --no-banner --exit-code 1
+
+      - name: VG-1 secret scan, working tree
+        run: gitleaks dir . --redact --no-banner --exit-code 1
+
+      # -----------------------------------------------------------------------
+      # semgrep
+      # -----------------------------------------------------------------------
+      # Two halves. `.semgrep/merit.yml` is the half this repository owns and
+      # each of its rules cites the document it enforces; the registry rulesets
+      # are the generic security coverage nobody should hand-write.
+      #
+      # THE REGISTRY HALF CAN GO RED ON A DAY NOBODY TOUCHED THIS TREE, because
+      # its rules are upstream and they change. That is a real cost and it is
+      # accepted rather than hidden: the alternative is a vendored copy that
+      # stops receiving the rules that make it worth running. It is also why the
+      # falsification seed targets an OWNED rule, whose text this repository
+      # controls.
+      - name: semgrep
+        run: |
+          semgrep scan \
+            --config .semgrep/merit.yml \
+            --config p/typescript \
+            --config p/secrets \
+            --error --metrics=off --quiet
+
+      # -----------------------------------------------------------------------
+      # VG-12, SCA
+      # -----------------------------------------------------------------------
+      - name: Dependency advisories
+        run: pnpm audit --audit-level=moderate
+
+      # -----------------------------------------------------------------------
+      # VG-12, SBOM and scan
+      # -----------------------------------------------------------------------
+      # The SBOM is built from the INSTALLED tree rather than from the manifests,
+      # so it lists what a deployment would actually contain: transitive
+      # packages included, which is where a hallucinated or typosquatted name
+      # arrives without appearing in any diff a human read.
+      - name: VG-12 SBOM
+        run: |
+          syft scan dir:. -o cyclonedx-json=sbom.cdx.json -o spdx-json=sbom.spdx.json -q
+          echo "SBOM components: $(node -e "process.stdout.write(String((JSON.parse(require('node:fs').readFileSync('sbom.cdx.json','utf8')).components||[]).length))")"
+
+      - name: VG-12 vulnerability scan
+        run: grype sbom:sbom.cdx.json --fail-on medium -o table
+
+      # The SBOM is the artifact VG-12 asks for, and an SBOM that exists only
+      # inside a finished job is an SBOM nobody can diff against last week's.
+      - name: Keep the SBOM
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.cdx.json
+            sbom.spdx.json
+          if-no-files-found: error
+
+      # -----------------------------------------------------------------------
+      # VG-12, the human-approval half
+      # -----------------------------------------------------------------------
+      # THIS STEP DOES NOT BLOCK AND MUST NOT PRETEND TO. A job can see that the
+      # dependency surface changed; it cannot see that a human agreed to it, and
+      # a green check that reads as an approval nobody gave is worse than no
+      # check. The approval is enforced by `.github/CODEOWNERS` plus the branch
+      # protection setting that requires a code-owner review, which lives in
+      # repository settings and not in this file.
+      #
+      # What this step is for is that the requirement appears in the log of the
+      # run a reviewer is already looking at, naming the exact files, rather
+      # than living only in a policy document.
+      - name: VG-12 dependency surface, for the human half
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || true
+          changed=$(git diff --name-only "$base"...HEAD -- \
+            pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json \
+            'apps/*/package.json' 'packages/*/package.json' || true)
+          if [ -z "$changed" ]; then
+            echo "The dependency surface is unchanged on this pull request."
+            exit 0
+          fi
+          {
+            echo "### VG-12: this pull request changes the dependency surface"
+            echo
+            echo 'Every new package needs a named human approval (STRATEGY section 4.2). That'
+            echo 'approval is a code-owner review on the files below, not this check.'
+            echo
+            echo '```'
+            echo "$changed"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::VG-12: dependency surface changed. A code-owner review is required for the new packages."
+          echo "$changed"
+
+      - name: Gates are falsifiable
+        run: node scripts/ci/falsify-ci.mjs CI-05

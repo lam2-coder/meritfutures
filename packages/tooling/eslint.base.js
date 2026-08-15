@@ -10,12 +10,14 @@ import tseslint from 'typescript-eslint';
 // grows its own copy of the base config, and a gate gets disabled in one of
 // them without a diff anyone reads.
 //
-// WHAT IS DELIBERATELY NOT HERE. VG-4, the rule banning raw Drizzle client
-// imports outside `packages/db` (ADR-008, STRATEGY section 4.2), needs the
-// `scopedDb(identity)` accessor to exist before it can name what it permits.
-// That accessor is M-series work and the rule lands with CI-01 in session S-C
-// (P1 section 6). It is named here so its absence is a scheduled gap rather
-// than an oversight.
+// WHAT IS DELIBERATELY NOT HERE. VG-4 (`merit/no-raw-db-client`) landed with
+// CI-01 in session S-C, and it is attached in the workspace root's
+// eslint.config.js rather than in this base, beside `merit/engine-purity` and
+// for the same reason: THIS FILE HOLDS THE RULES THAT APPLY TO EVERY FILE, and
+// a rule whose whole meaning is the path it is scoped to belongs beside its
+// glob. VG-4's one exception is an `ignores` line there; folding it in here
+// would put the exception in a file no reviewer opens to answer "which rules
+// apply where".
 
 /**
  * Paths ESLint must not read. The corpus is prose and the migrations are SQL;
