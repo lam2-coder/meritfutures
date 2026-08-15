@@ -156,7 +156,18 @@ Nothing.
 
 **Eleven checks run in one dependency-free runner, and every one has been watched pass clean and fail dirty.** The three things `falsify.mjs` found on its first run are in [STRATEGY section 4.4](testing/STRATEGY.md); the shortest of them is that **a gate failing for a reason nobody planted proves nothing**, which two of the eleven were doing.
 
-**What was dropped, in writing rather than by omission:** PR #7's narrower per-gate document scopes, its finding-count exit accounting, and its prose. Nothing else. **`falsify.mjs` is not wired into CI**, because the ruling was to take `corpus.yml` unchanged and adding a step is a change; it is a three-line addition and a founder call.
+**What was dropped, in writing rather than by omission:** PR #7's narrower per-gate document scopes, its finding-count exit accounting, and its prose. Nothing else.
+
+**TWO artifacts this session produced are not wired into CI, and both are consequences of the ruling to take `corpus.yml` unchanged.** Adding a step is a change, so neither was added.
+
+| Not wired | What it costs | The addition |
+|---|---|---|
+| [`scripts/corpus/falsify.mjs`](../scripts/corpus/falsify.mjs) | The eleven gates are proven falsifiable **as of this session** and nothing keeps them that way. A gate that stops failing correctly next month passes silently | three lines in the `integrity` job |
+| [`scripts/db/probe_plan_version_immutability.sql`](../scripts/db/probe_plan_version_immutability.sql) | **The `migrations` job runs only `probe_ledger_constraints.sql`.** ADR-035's guard is verified by hand in this session and by nothing thereafter, which is the exact condition that let the defect live in `0027` | one line beside the existing probe step |
+
+**Until they are wired they are scripts somebody has to remember**, which is the failure mode this corpus already named for the gates themselves. Both are founder calls, not a session's.
+
+**`CI-06h` has now run in GitHub Actions and passed** (PR #9, first execution): the runner's own database reported **96 tables, 326 indexes, 347 check constraints, 6 triggers**, the re-apply was rejected, and the ledger probes fired 3/3. It is no longer a job verified only on a laptop.
 
 ---
 
