@@ -954,7 +954,7 @@ Privacy deletion requests redact PII columns (`users.email`, `country_code`, sig
 
 ## 16. Founder rulings (Wave 2 gate, 2026-08-13)
 
-Walked line by line at the gate. All five confirmed as written; recorded in [DECISIONS.md](../DECISIONS.md#wave-2-gate-closure-2026-08-13).
+Walked line by line at the gate. All five confirmed as written; recorded in [DECISIONS.md](../DECISIONS.md).
 
 1. **`rule_states` stored per day rather than per account: confirmed.** It is the difference between an account timeline that reconstructs itself and one that has to be recomputed on demand. Costs roughly 250 rows per funded account per year.
 2. **Marks and corrections use supersession, never update: confirmed.** This is what makes "what did we believe when we approved that payout" answerable, and it is the mechanism behind the never-claw-back promise (B4 #5).

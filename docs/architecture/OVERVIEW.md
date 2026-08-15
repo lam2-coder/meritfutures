@@ -298,7 +298,7 @@ Streaming or intraday risk; a no-code program editor; multi-tenancy or theming; 
 
 ## 10. Founder rulings (Wave 2 gate, 2026-08-13)
 
-All three resolved at the gate. Recorded in [DECISIONS.md](../DECISIONS.md#wave-2-gate-closure-2026-08-13).
+All three resolved at the gate. Recorded in [DECISIONS.md](../DECISIONS.md).
 
 1. **Queue: pg-boss, accepted** ([ADR-006](../DECISIONS.md)). Closes the constitution §10 queue-tech item.
 2. **ORM: Drizzle, accepted** ([ADR-008](../DECISIONS.md)). **Hosting: Neon plus Railway plus Cloudflare, accepted** ([ADR-007](../DECISIONS.md)). Both constitution §10 items are closed. The admin origin rides along and is settled separately as a **separate apex domain** with the placeholder `ADMIN_ORIGIN` ([ADR-012](../DECISIONS.md)).
