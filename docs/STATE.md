@@ -175,7 +175,7 @@ Nothing.
 
 1. **The founder's E2 read** on the <!--gen:e2_files-->18<!--/gen--> money-path migration files, and a ruling on item **B** ([ADR-030](DECISIONS.md)'s stale config list, wrong in two of four). **A** and **C** are closed. Nothing merges first.
 2. **In parallel, the three calendar items**: book the vendor call, book the counsel sitting, and send the PSP applications the day the capital decision lands.
-3. **Rule `OI-01`** (`liability_snapshots`, surfaced with a recommendation and deliberately not decided by a session), then the rest of **P1** below. **[ADR-035](DECISIONS.md) is accepted and `0028` is written**; it needs the E2 read like every other money-path file, not a separate ruling.
+3. **Rule `OI-01`** (`liability_snapshots`, surfaced with a recommendation and deliberately not decided by a session), then the rest of **P1** below. **[ADR-035](DECISIONS.md) is accepted and `0028` is written**; it needs the E2 read like every other money-path file, not a separate ruling. **S-B has landed**, so [P1 section 6](plans/P1-monorepo-scaffold.md)'s **S-C** (CI-01, CI-02, CI-05 with VG-12), **S-D** (the golden fixture loader and CI-03) and **S-E** (TradingCalendar as data, money path, fresh session, plan mode) are all unblocked and may run in parallel.
 
 ---
 
@@ -188,12 +188,12 @@ Nothing.
 | **The reconciled schema and migrations** | **DONE**, pending the E2 read | <!--gen:migration_files-->28<!--/gen--> files, 96 tables, 326 indexes, 347 check constraints, 6 triggers, verified on a clean PostgreSQL 16 install. Nothing to build. **The founder's read is the remaining work and it is not engineering** |
 | **CI-06, corpus integrity** | **DONE and exceeded** | Eleven checks, all passing clean and failing dirty. The row's own definition of done is met **for CI-06 only** |
 | **CI-06h, migration install** | **WIRED, never executed by GitHub** | The job exists in `corpus.yml` and was verified by hand against PostgreSQL 16. **It has not run in Actions once**, because no push has reached a runner with the workflow present. First push proves it or does not |
-| **The monorepo scaffold** | **NOT STARTED** | There is no `package.json`, no workspace file, no `tsconfig`, no `apps/`, no test runner. `packages/db` holds `.sql` and `.md` and nothing executable. **Everything in the tree today is documents, SQL, and two `.mjs` scripts with no dependencies** |
+| **The monorepo scaffold** | **DONE** (S-B, 2026-08-15) | Nine workspace-root files, three libraries, four deployables, two tooling packages, and a lockfile. `pnpm install --frozen-lockfile` from clean, `tsc --noEmit` across nine projects, four named Vitest projects each runnable alone. **Section 6's S-C, S-D and S-E are the remaining P1 sessions** |
 | **TradingCalendar as data** | **SCHEMA ONLY** | `trading_calendar` exists in `0004` with its ruled semantics (half day counts as a full day, a halt advances counters but not win days). **There is not one row of data anywhere in the repository, and no seed mechanism**: `grep -c 'INSERT INTO' packages/db/migrations/*.sql` is zero across the set. The CME session calendar has to be sourced, encoded, and given a maintenance path |
 | **CI-01 to CI-05, CI-07 to CI-09** | **NOT STARTED** | `.github/workflows/` holds exactly one file. Lint and types, unit and property, golden files, integration, security static, build checks, E2E and the nightly do not exist |
 | **VG-1 to VG-12** | **NOT STARTED** | Twelve gates, ten of which need the scaffold to exist before they can be wired. **VG-12 is explicitly not deferrable** and needs a lockfile before it means anything |
 
-**The honest summary: two of P1's three named contents are substantially done and the third has not begun.** Schema and corpus-integrity CI are real and verified. **The scaffold is the whole of what is left, and it is the thing every remaining VG gate is blocked on** — a gate cannot fail correctly on a seeded violation in a repository with nothing to lint, nothing to type-check and nothing to build.
+**The honest summary, as of S-B: the scaffold exists and the gates that were blocked on it are now writable rather than written.** Schema and corpus-integrity CI are real and verified, and there is now a repository with something to lint, something to type-check and something to build. **That was the block, and it is the whole of what S-B removed.** CI-01 to CI-05 and CI-07 to CI-09 remain unwritten, and VG-1 to VG-12 remain unwired; the difference is that they are now ordinary work rather than work waiting on a decision.
 
 **One thing the reconciliation proved about P1's definition of done, and it is worth carrying into the scaffold session.** "Failing correctly on a seeded violation" is not one check, it is two: the gate must fail, and it must fail **on the seeded finding**. Two of the eleven corpus gates failed on a truncated tree copy and would have been scored as working. `falsify.mjs` is the shape that catches that, and the VG gates should arrive with the same harness rather than with a claim.
 
@@ -216,6 +216,30 @@ Nothing.
 **The one coverage loss was recovered the same day, and the dilemma turned out to be false.** The first fold excluded `docs/INDEX.md` from the unified predicate, so **INDEX's own frontmatter was checked by nothing** and a hand-edit to `status: nearly` would have passed the whole runner. The recorded way out was a second expression inside CI-06b, which is the thing the amendment exists to prevent. **Neither was needed.** INDEX **is** a corpus document and belongs inside the predicate; CI-06c skips it because **a list cannot contain itself**, which is a property of that gate rather than of the document class, so the skip moved into CI-06c alone. `CI-06b/index` in [`falsify.mjs`](../scripts/corpus/falsify.mjs) proves it in both directions.
 
 **Eleven gates pass and thirteen assertions hold** (eleven seeded violations, two scope cases).
+
+## S-B landed: the monorepo scaffold (2026-08-15)
+
+**[P1 section 3](plans/P1-monorepo-scaffold.md)'s list exists, all three riders are in `corpus.yml`, and section 4's seven definition-of-done lines were each run as a command.** `pnpm install --frozen-lockfile` from an empty tree, `tsc --noEmit` across nine projects, `vitest run` executing all four named projects, the dependency check watched failing on a seeded workspace dependency, no coverage threshold asserted rather than assumed, eleven gates green and `falsify.mjs` green.
+
+**The three boundaries the plan says a cheap scaffold destroys silently are each mechanical now.**
+
+| Boundary | Mechanism | Failure it makes impossible to reach quietly |
+|---|---|---|
+| **Engine purity** | `RI-01` reads the manifest, `merit/engine-purity` reads the source, and `types: []` with `lib: ["ES2023"]` removes every ambient global from the package | An I/O call inside the engine is a **compile error** before it is a lint finding, and a clock read is caught as the same defect class as an import. Three mechanisms because each misses what the others catch: the manifest cannot see an import that resolves through a hoisted layout, the lint cannot see nondeterminism that arrives as an argument, the compiler cannot see a declared-but-unused dependency |
+| **`apps/admin` is a separate deployable** | `RI-04` | Four packages with four names and no app depending on another. One application with three route groups now fails CI-01 rather than passing review |
+| **No coverage threshold** | `RI-02` | Five known spellings plus the config files that exist only to hold one. The needles are **assembled from fragments** so the checker and its test do not match themselves, which is the alternative to an exclusion in the least visible possible place |
+
+**Two defects were found that the brief did not name, and one of them is a file on section 3's list.**
+
+**`vitest.workspace.ts` is dead in Vitest 4 and fails silently.** Verified against `vitest@4.1.10` before the file was written: with that file present, `vitest run` still discovers `**/*.test.ts` through its default include and reports green, **while the four named projects do not exist**. Honouring section 3's filename literally would have produced exactly the CI-03-is-not-a-stage failure section 2.2 exists to prevent, arrived at by following the plan. The projects live in `vitest.config.ts`; `RI-03` asserts the four names are present **and** that no `vitest.workspace.*` returns.
+
+**TypeScript is 6.0.3 rather than 7.0.2**, because `typescript-eslint@8.67.0` and its canary both declare `peerDependencies.typescript` as `>=4.8.4 <6.1.0`. TypeScript 7 has no supported lint toolchain, so CI-01's two halves cannot both run on it.
+
+**Every dependency version is a `catalog:` reference resolved once in `pnpm-workspace.yaml`**, which is rider 3's argument applied past the Node version: a version written in nine manifests is a hand-maintained count and drifts the same way.
+
+**Each of the five invariants was watched failing on a seeded violation, and the seeds found four real defects in the checks.** The workspace-globs parser could not see a `packages:` key on line 1; the coverage scan matched its own test file twice, once through a string literal and once through a **comment**; a `fast-check` date arbitrary generated the Invalid Date because `noInvalidDate` is not the default. **Three of the four were the check being right and the harness being wrong**, which is the shape the 109 phantom anchors had.
+
+---
 
 ## S-A landed: migration numbers are allocated (2026-08-15)
 
