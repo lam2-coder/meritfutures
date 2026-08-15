@@ -90,6 +90,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M18-graduation-track.md](plans/M18-graduation-track.md) | Ladder finiteness disclosed pre-purchase, countdown tracker, mechanical graduation, terminal settlement. **No live program at launch** | approved | founder |
 | [M19-kyc-identity.md](plans/M19-kyc-identity.md) | Composite trigger set, verification as milestone, dedupe with dispositions, sanctions carve-out, funnel telemetry | approved | founder |
 | [M20-wallet.md](plans/M20-wallet.md) | The wallet as an object: closed credit list, provenance rules, two exits, dormancy, float segregation | approved | founder |
+| [P1-monorepo-scaffold.md](plans/P1-monorepo-scaffold.md) | **Build phase, not a module plan.** The scaffold P1 has left: the package boundaries argued against what the cheap choice breaks, the Vitest workspace mapped to the ruled CI stages, the three tiers of forbidding a plan parameter a home in code, the file manifest that enforces one-artifact-one-session, and the sequencing from ADR-036 through TradingCalendar | draft | founder |
 
 ## packages/db/ (build phase, from 2026-08-14)
 
