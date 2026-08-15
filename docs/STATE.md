@@ -171,6 +171,24 @@ Nothing.
 
 ---
 
+## FOLD-01 is planned and approved, and it found a gap in a shipped control (2026-08-15)
+
+**[FOLD-01](plans/FOLD-01-phone-identity.md) is `approved`.** The passwordless-auth and phone-as-identity ruling plus four founder amendments, planned across twenty-one files and six sessions. **Plan only; nothing was folded**, which was the brief's stop condition. The `FOLD-nn` series is new and exists because a ruling this size is too large to fold from a prompt and too small to be a module.
+
+**The two decisions the brief required were taken, and the first turned on evidence rather than preference.** The registration lookup is **[ADR-023](DECISIONS.md)'s existing vendor**, because ADR-023 already buys phone digital-footprint, VPN and datacenter detection; **only portability history is separable, so it becomes a disqualifying selection criterion** rather than an assumption, since amendment 3's recycling guard has no input without it. Carrier metadata joins **counsel packet item 3** as a new sub-item.
+
+**The founder ruled the hard link at plan approval**, because (b)'s phrase "auto-enforced like KYC face-dedupe" sits between `INV-M19-04` (a hit changes no state) and [ADR-022](DECISIONS.md) (hard links auto-enforce). One live verified phone per identity is a real unique index; a second identity verifying a live number **completes, binds the edge at the hard ceiling, and opens a severity-5 flag against both**.
+
+| Finding | State |
+|---|---|
+| **`OI-06`. The 48 hour payout-destination cooling window has no storage.** There is no `payout_destinations` table in the merged 96; `destination_ref` is a column on `payout_transfers` and `wallet_withdrawals`, the destination **of a transfer**. **C-11, C-24, [SECURITY section 4](architecture/SECURITY.md) item 1, [M20](plans/M20-wallet.md) `WF-M20-02` and [M04](plans/M04-trader-portal.md)'s destination-cooling scenario all cite a control whose input does not exist** | **OPEN, a founder ruling.** Surfaced with a recommendation and deliberately not decided. Migration `0029` builds the phone hold on its own storage and does not touch it. **Found by trying to model the ruling's (c) on the control (c) says to copy** |
+| **[SECURITY section 2.7](architecture/SECURITY.md) says "no SMS-based second factor anywhere in the stack" and the ruling adds SMS OTP** | **Resolved in the plan, folded by the ADR.** Section 2.7 sits under "The founder (the human asset)" and is rescoped to founder and admin credentials; admin keeps hardware-key SSO with no SMS path |
+| **`contact_channels.kind check in ('email','push')`**, so `INV-M16-03`'s prior-contact countermeasure cannot notify a prior **number** | Folded by `0029`. The one contact kind the ruling makes an identity signal is the one kind the table cannot hold today |
+
+**The plan pre-claimed ten delta identifiers, an edge case and a golden scenario, and [ADR-026](DECISIONS.md)'s gate refused all twelve.** The gate was right: **only ADR and migration numbers have an allocation table**, and a delta identifier is claimed by its `DELTA_MANIFEST` row existing. **That is [ADR-034](DECISIONS.md)'s drift class reproduced inside the plan for folding it**, and it was caught by a robot in under a minute rather than at merge, which is the argument for the gates in one line.
+
+---
+
 ## Next 3 actions
 
 1. **The founder's E2 read** on the <!--gen:e2_files-->18<!--/gen--> money-path migration files, and a ruling on item **B** ([ADR-030](DECISIONS.md)'s stale config list, wrong in two of four). **A** and **C** are closed. Nothing merges first.
