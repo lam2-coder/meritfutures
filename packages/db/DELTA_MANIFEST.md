@@ -1,7 +1,7 @@
 ---
 status: review
 depends_on: [../../docs/architecture/DATA_MODEL.md, ../../docs/DECISIONS.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-15
 ---
 
 # Delta manifest
@@ -199,6 +199,7 @@ Items found while folding that are **not schema deltas** and are **not closed**.
 | **OI-02** | **`published_statistics` cannot express three of the seven ruled statistics.** ST-04 publishes mean **and** median together and "neither is published alone"; ST-05 and ST-06 each publish **p50 and p95**. Two rows for one statistic, window and grain collide on `published_statistics_window_uq`, and no column distinguishes which figure a row carries. Proposed fix: a `measure` discriminator (`rate`, `total`, `mean`, `median`, `p50`, `p95`, `count`) on the table and in the index. **Applied** by [ADR-032](../../docs/DECISIONS.md), together with **STAT-C1**, a deferred constraint trigger in `0027` asserting that a publish run emitting one measure emits every measure its definition declares. The column made the second figure writable; the trigger is what makes it required | **CLOSED** (2026-08-14) |
 | **OI-03** | **`0026`'s append-only revoke list is a list, and a list drifts.** Eighteen tables are named there against [DATA_MODEL section 1](../../docs/architecture/DATA_MODEL.md)'s Mutability set. The CI check must assert the revoke list **against the document** rather than trusting either | **OPEN**, CI not yet built |
 | **OI-04** | **Two legitimate single-column updates on append-only tables** (`daily_marks.superseded_by`, `identity_links.suppressed`) are forbidden by the grants and require `SECURITY DEFINER` functions that **do not exist yet**. A naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug | **OPEN**, arrives with the owning module |
+| **OI-05** | **`0027`'s published-plan-version immutability trigger reads `NEW.config`, and `plan_versions` has no `config` column.** The rule contract is `rules`. PL/pgSQL resolves record fields at execution, so the migration installs cleanly and the function is wrong only when it fires. **Proven by execution, not by reading**: every `UPDATE` against a published row raises `record "new" has no field "config"`. The immutability promise survives by accident, because the error rejects the write; **the ruled `published -> retired` transition is refused too, so no plan version can be retired.** A draft row updates normally, which is why the install check and every probe in section 10 missed it. **`0027` is merged and is not edited**: the fix is a superseding migration, which takes the set from 27 files to 28 | **OPEN**, [ADR-035](../../docs/DECISIONS.md) proposed, founder rules |
 
 ## 9. NO-FLOATS EXEMPTION LIST
 
@@ -274,3 +275,18 @@ correlation_groups.threshold
 | NO-FLOATS | Both directions, per section 9 | Fails as intended in each |
 
 **One defect was found by this testing and not by reading.** `statistic_definitions_measures_nonempty` was first written `array_length(measures, 1) >= 1`. **`array_length` on an empty array returns `NULL`, `NULL >= 1` is `NULL`, and a `CHECK` evaluating to `NULL` passes**, so the constraint admitted the single value it existed to reject, and an empty declared set makes STAT-C1 vacuous. It is `cardinality(measures) >= 1`. Recorded because the lesson generalizes: **an invariant that was reviewed and not executed has not been checked.**
+
+## 11. Re-verification at the DATA_MODEL rewrite (2026-08-15)
+
+**The set was installed from scratch against PostgreSQL 16 again and reproduced section 10's figures exactly: 96 tables, 326 indexes, 347 check constraints, 6 triggers.** Nothing in `packages/db` was edited.
+
+| Check | Result |
+|---|---|
+| Table set against [DATA_MODEL](../../docs/architecture/DATA_MODEL.md), both directions | **96 / 96.** Wired as [CI-06i](../../docs/testing/STRATEGY.md) so it is a robot's job from here |
+| Every column of every table carries a design record | **zero undocumented columns; zero documented columns that do not exist.** Generated diff of the document against `information_schema.columns` |
+| NO-FLOATS `DO` block on a clean install | passes; the only two non-integer columns are the two in section 9 |
+| **`plan_versions` published-row immutability, executed rather than read** | **FAILS. `OI-05`, [ADR-035](../../docs/DECISIONS.md)** |
+
+**The same lesson as the `array_length` defect, one file over and one gate later.** Section 10's probe table covers STAT-C1, the window uniqueness, the unit constraints and NO-FLOATS. It does not cover the immutability triggers, and **the one thing never executed is the one thing that was broken**. Any probe table is an inventory of what somebody thought to test; the gap in it is not visible from inside it.
+
+**Six further `CHECK` constraints are written in the `array_length` form and are correct today only because no code exists to write an empty array**: `correlation_groups_is_a_group` (`0008`), `page_revalidations_has_paths` (`0020`), `integration_contracts_enabled_has_fields` (`0018`), `notification_kinds_has_channels` (`0019`), `round_trips_has_entry` and `round_trips_closed_has_exit` (`0022`), plus `wallet_dormancy_review_was_noticed` (`0011`). Each admits the empty array by the `NULL`-passes rule. **Folded into [ADR-035](../../docs/DECISIONS.md)'s proposed superseding migration** rather than left as seven separate discoveries.
