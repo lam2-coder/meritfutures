@@ -1,0 +1,22 @@
+{
+  "name": "@merit/golden-loader",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CI-03. Reads packages/rules-engine/fixtures and folds each day stream through the engine's public entry point. It cannot reach the engine's internals, which is what keeps TR-01 enforceable.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT DEPENDS ON THE ENGINE AND THE ENGINE DEPENDS ON NOTHING. The arrow points this way on purpose: RI-01 asserts packages/rules-engine declares no workspace dependency, so the loader can never become something the engine imports. `@merit/rules-engine` resolves through that package's `exports` map, which publishes `.` and nothing else, so `../rules-engine/src/floor.js` is not reachable from here at all.",
+  "dependencies": {
+    "@merit/rules-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

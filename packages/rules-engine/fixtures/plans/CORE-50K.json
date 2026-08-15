@@ -1,0 +1,44 @@
+{
+  "id": "CORE-50K",
+  "source": "docs/plans/M01-rules-engine.md Appendix A.1, the 50K column",
+  "note": "TRANSCRIBED FROM APPENDIX A AND FROM NOWHERE ELSE. GOLDEN_SCENARIOS section 3 restates the same numbers in prose and disagrees with Appendix A on the ladder: the prose says 8, Appendix A.1 says 5 per ADR-024, and the same sentence names Appendix A as 'the only place these numbers are defined'. This file follows the named authority. The discrepancy is reported and needs a founder ruling; it is not resolved here.",
+  "plan_code": "core_eod",
+  "size_label": "50K",
+  "plan_version_id": "0199c7a1-0000-7000-8000-000000000001",
+  "rules": {
+    "drawdown": { "type": "trailing_eod", "amount_bp": 500 },
+    "eval": {
+      "profit_target_bp": 600,
+      "min_trading_days": 1,
+      "consistency": "disabled"
+    },
+    "funded": { "consistency_bp": 3000, "min_trading_days": 0 },
+    "win_days": { "required_count": 5, "floor_bp": 30 },
+    "buffer_bp": 200,
+    "cadence_gap_trading_days": 5,
+    "payout": {
+      "cap_bp": 300,
+      "min_payout_cents": 10000,
+      "split_bp": 9000,
+      "max_payouts": 5
+    },
+    "floor_lock": {
+      "enabled": true,
+      "at_profit_cents": 260000,
+      "locked_floor_offset_cents": 10000
+    },
+    "post_payout_floor_rule": { "mode": "none" },
+    "daily_loss_limit": null,
+    "max_accounts_per_entity": 10
+  },
+  "size": {
+    "size_cents": 5000000,
+    "eval_drawdown_cents": 250000,
+    "eval_profit_target_cents": 300000,
+    "funded_drawdown_cents": 250000,
+    "win_day_floor_cents": 15000,
+    "buffer_cents": 100000,
+    "payout_cap_cents": 150000,
+    "min_payout_cents": 10000
+  }
+}

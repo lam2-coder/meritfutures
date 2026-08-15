@@ -1,0 +1,11 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "floor_cents": 4850000,
+    "high_water_balance_cents": 5100000,
+    "breached": false
+  },
+  "events": ["day.closed"],
+  "pins": "a new closing high raises the high-water balance and the trailing floor with it, by exactly the drawdown",
+  "note": "The four end-state fields and the `day.closed` event type are the shape GOLDEN_SCENARIOS section 2 prints for GS-011; the values are GS-009's own row."
+}

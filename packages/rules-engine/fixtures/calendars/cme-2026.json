@@ -1,0 +1,13 @@
+{
+  "id": "cme-2026",
+  "status": "partial",
+  "note": "FIVE SESSIONS, NOT A YEAR. TradingCalendar as data is session S-E (P1 section 6) and there is not one calendar row anywhere in this repository yet. This file exists so the three example fixtures can resolve a session, and it declares a `coverage` interval the loader enforces (L-08) precisely so it cannot quietly be mistaken for the CME year. When S-E lands, this file is DERIVED from the seeded trading_calendar rows rather than maintained beside them: two hand-maintained calendars is the drift class this corpus has found thirteen times.",
+  "coverage": { "from": "2026-11-02", "to": "2026-11-06" },
+  "sessions": [
+    { "trading_day": "2026-11-02", "kind": "full" },
+    { "trading_day": "2026-11-03", "kind": "full" },
+    { "trading_day": "2026-11-04", "kind": "full" },
+    { "trading_day": "2026-11-05", "kind": "full" },
+    { "trading_day": "2026-11-06", "kind": "full" }
+  ]
+}

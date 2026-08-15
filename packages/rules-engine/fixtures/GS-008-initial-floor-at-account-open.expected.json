@@ -1,0 +1,8 @@
+{
+  "end_state": {
+    "floor_cents": 4750000
+  },
+  "events": [],
+  "pins": "the floor at account open is size minus drawdown, and it exists before any mark does",
+  "note": "IT PINS ONE FIELD BECAUSE THE CORPUS STATES ONE. The GS-008 row gives the floor and says nothing about the high-water basis an account opens with, so nothing here states one either. Filling in a field the plan document does not state would be inventing a pin, which is TR-01 read backwards."
+}
