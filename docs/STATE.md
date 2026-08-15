@@ -215,4 +215,18 @@ Nothing.
 
 **The one coverage loss was recovered the same day, and the dilemma turned out to be false.** The first fold excluded `docs/INDEX.md` from the unified predicate, so **INDEX's own frontmatter was checked by nothing** and a hand-edit to `status: nearly` would have passed the whole runner. The recorded way out was a second expression inside CI-06b, which is the thing the amendment exists to prevent. **Neither was needed.** INDEX **is** a corpus document and belongs inside the predicate; CI-06c skips it because **a list cannot contain itself**, which is a property of that gate rather than of the document class, so the skip moved into CI-06c alone. `CI-06b/index` in [`falsify.mjs`](../scripts/corpus/falsify.mjs) proves it in both directions.
 
-**Eleven gates pass and thirteen assertions hold** (eleven seeded violations, two scope cases). **The next session is S-A**, the migration number allocation table as [ADR-036](DECISIONS.md), then S-B, the scaffold itself, carrying all three riders in [plan section 5](plans/P1-monorepo-scaffold.md#5-the-three-riders).
+**Eleven gates pass and thirteen assertions hold** (eleven seeded violations, two scope cases).
+
+## S-A landed: migration numbers are allocated (2026-08-15)
+
+**[ADR-036](DECISIONS.md). [DECISIONS](DECISIONS.md) now carries two allocation tables**, ADR numbers and migration numbers, and `CI-06h` asserts the second one by `CI-06f`'s rule: gapless over allocated plus reserved, and **a number on disk that no row claims fails.** `0001` to `0028` are allocated and merged; **nothing is reserved and `0029` is the next free number.**
+
+**The registry that had no table was the one that could least afford a collision.** `CI-06h` derived the sequence from the tree, which is the check a branch can satisfy while colliding with its sibling: two branches both find `0028`, both write `0029`, both pass locally. [ADR-034](DECISIONS.md) resolved the ADR collision by renumbering the cheaper branch, and **that remedy does not exist for a migration**, which E2 makes sacred once merged.
+
+**It extends `CI-06h` rather than arriving as a sibling gate, and that was decided on evidence.** A reserved number has no file on disk, so `CI-06h`'s existing gap check would fail on the exact hole a sibling gate would exist to permit. `CI-06h` had to become allocation-aware either way, and a sibling then holds a second expression of one concept **in the runner OQ-P1-04 was ruled about**. One parser reads both tables; it is stricter than the inline scan it replaced, which read three-digit numerals out of the section's prose.
+
+**Two hand-maintained claims about this very sequence were found wrong while writing the ADR that exists to end that class.** The commissioning brief said `0028` was reserved and not yet written: it is written, merged in PR #9, and `origin/main` lists 28 migration files. The ADR table's own `035` row said `reserved, unmerged` four commits after the merge that falsified it. **Eleventh and twelfth.** The State column is prose no gate can parse from one ref, and both the table and [STRATEGY](testing/STRATEGY.md) now say so rather than letting the row look enforced.
+
+**Eleven gates pass clean and fail dirty, and sixteen assertions hold** (eleven seeded violations, five scope cases). All four counterfactuals for the new half were watched: reservations ignored gives `READ A FILE IT MUST NOT`, the allocation check removed gives `DID NOT FAIL`, the hole loop disabled gives `FAILED OFF-TARGET` rather than a pass, and a renamed table heading gives `ERROR` rather than a green gate.
+
+**The next session is S-B**, the scaffold itself, carrying all three riders in [plan section 5](plans/P1-monorepo-scaffold.md#5-the-three-riders).
