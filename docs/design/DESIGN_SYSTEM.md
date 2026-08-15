@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../plans/M04-trader-portal.md, ../plans/M09-marketing-site.md, ../plans/M11-certificates-social-proof.md, ../plans/M12-transparency-platform.md, ../testing/STRATEGY.md, ../DECISIONS.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../plans/M04-trader-portal.md, ../plans/M09-marketing-site.md, ../plans/M11-certificates-social-proof.md, ../plans/M12-transparency-platform.md, ../testing/STRATEGY.md, ../decisions/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -171,7 +171,7 @@ Appendix F calls generic copy "the textual purple gradient" and the rules are en
 | **No emoji as icons**, anywhere | SS-07 |
 | **At least one sentence per section that sounds like a person wrote it** | Review gate DG-16. It is a judgment and it is the difference between correct copy and copy somebody wrote |
 | **No em-dashes**, in any Merit prose, site or docs | SS-08. Appendix F names it and the corpus already obeys it |
-| **A parameter is read, never copied** | The [parameter-status ruling](../DECISIONS.md). A number in a headline, a chart axis, a price card, or blog copy is read from the pinned plan version at request time. GS-143 fails the build on a bare value |
+| **A parameter is read, never copied** | The [parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md). A number in a headline, a chart axis, a price card, or blog copy is read from the pinned plan version at request time. GS-143 fails the build on a bare value |
 
 ---
 

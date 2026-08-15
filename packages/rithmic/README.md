@@ -5,7 +5,7 @@ The platform adapter: `provision`, `entitle`, `ingestFills`, `ingestEOD`,
 adapter #2 is additive rather than a rewrite.
 
 **The interface is declared and nothing implements it.** M02 holds at `review`
-by [ADR-005](../../docs/DECISIONS.md) pending the Rithmic vendor call: file
+by [ADR-005](../../docs/decisions/ADR-005.md) pending the Rithmic vendor call: file
 naming conventions, delivery acknowledgement, the arrival window, vendor-side
 retention and sandbox availability are all provisional. Writing an
 implementation against unconfirmed mechanics is how a bounded edit becomes a

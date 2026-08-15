@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md]
 last_updated: 2026-08-14
 ---
 
@@ -57,7 +57,7 @@ Plus: the public verification page, the signing key lifecycle, the render pipeli
 | INV-M11-08 | A rendered image is re-generated on fetch from the live row, and its URL is short lived | The image is never a static artifact Merit keeps serving after the row changed. This is what makes revocation reach the surface that actually circulates (AS-M11-02) |
 | INV-M11-09 | No certificate is issued for an account with an open severity 4+ flag, and issuance is **deferred rather than denied** | The account's achievement is real and the card can be issued when the flag closes. Deferral with a visible reason is the zero-denial posture applied to a non-money surface |
 | INV-M11-10 | Leaderboard participation is **opt in**, reversible, and shows a display name that is not the trader's legal name | [DATA_MODEL](../architecture/DATA_MODEL.md)'s reserved columns. A leaderboard is a targeting list for paid-passing services if it is not (AS-M11-06) |
-| INV-M11-11 | Every value on a certificate is read from the account's **pinned plan version** and its stored facts, never recomputed | [Parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14). A card issued in March must still say what was true in March after the plan is retuned in June |
+| INV-M11-11 | Every value on a certificate is read from the account's **pinned plan version** and its stored facts, never recomputed | [Parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md). A card issued in March must still say what was true in March after the plan is retuned in June |
 
 ---
 
@@ -171,7 +171,7 @@ stateDiagram-v2
 | `certificate.verify_anomaly` **NEW** | enumeration signature detected | `{ window, distinct_codes, unknown_rate, ip_hash_count }`. Consumers: ALERT, RISK. AS-M11-04 |
 | `leaderboard.opt_changed` **NEW** | opt in or out | `{ identity_id, opted_in }`. Consumers: FEED, BI |
 
-**Consumed:** `phase.passed` (CT-M11-01), `wallet.credited` (CT-M11-02, because [ADR-019](../DECISIONS.md) makes the wallet credit the moment the trader experiences as being paid), `account.graduated` (CT-M11-03), `flag.status_changed` (deferral resolution), and `enforcement.applied` (revocation).
+**Consumed:** `phase.passed` (CT-M11-01), `wallet.credited` (CT-M11-02, because [ADR-019](../decisions/ADR-019.md) makes the wallet credit the moment the trader experiences as being paid), `account.graduated` (CT-M11-03), `flag.status_changed` (deferral resolution), and `enforcement.applied` (revocation).
 
 **One consumption choice worth stating.** The payout certificate fires on `wallet.credited`, not on `payout.settled`. Under the two-leg design the wallet credit is instant and irrevocable, and the external settlement may not happen for days or at all if the trader leaves the balance in the wallet. Issuing on external settlement would mean a trader who was paid has no card, which is exactly backwards.
 

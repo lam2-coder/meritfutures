@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../architecture/OVERVIEW.md, ../testing/STRATEGY.md, ../DELIVERY_PLAN.md, ../DECISIONS.md]
+depends_on: [../architecture/OVERVIEW.md, ../testing/STRATEGY.md, ../DELIVERY_PLAN.md, ../decisions/README.md]
 last_updated: 2026-08-15
 ---
 
@@ -10,7 +10,7 @@ last_updated: 2026-08-15
 
 ## 1. What this plan is, and what it is not
 
-**It is not a design.** The containers are ruled in [OVERVIEW section 3](../architecture/OVERVIEW.md), the tooling is ruled in [STRATEGY section 2](../testing/STRATEGY.md), the pipeline stages are ruled in [STRATEGY section 4.1](../testing/STRATEGY.md), and the data accessor is ruled in [ADR-008](../DECISIONS.md). **This plan re-plans none of it.** Its job is the three things the corpus does not say: which of those rulings the scaffold can silently break, what the session actually creates, and in what order.
+**It is not a design.** The containers are ruled in [OVERVIEW section 3](../architecture/OVERVIEW.md), the tooling is ruled in [STRATEGY section 2](../testing/STRATEGY.md), the pipeline stages are ruled in [STRATEGY section 4.1](../testing/STRATEGY.md), and the data accessor is ruled in [ADR-008](../decisions/ADR-008.md). **This plan re-plans none of it.** Its job is the three things the corpus does not say: which of those rulings the scaffold can silently break, what the session actually creates, and in what order.
 
 **Scope boundary, stated so nobody scores P1 against the wrong line.** This plan covers the workspace and the packages. It does **not** cover the CI workflow files, the golden fixture loader, or TradingCalendar's data, each of which is its own session in section 6. P1's definition of done in [DELIVERY_PLAN section 4](../DELIVERY_PLAN.md) is "every VG gate wired and failing correctly on a seeded violation, VG-12 not deferred", and the scaffold is the precondition for that rather than the whole of it.
 
@@ -24,7 +24,7 @@ last_updated: 2026-08-15
 
 **Why this belongs in the scaffold session rather than in P2.** The first `import { db }` into the engine will be added because it is convenient, in a session with a deadline, and every one of those three commitments degrades quietly at that moment. The cheapest time to make it impossible is while the package has no code in it.
 
-**`apps/admin` is a separate deployable from the first commit, and it will look like waste for weeks.** [ADR-012](../DECISIONS.md) puts the admin console on a separate apex domain, [SECURITY](../architecture/SECURITY.md) treats one owned admin as total loss, and [STRATEGY section 2](../testing/STRATEGY.md) chose Playwright over Cypress **specifically because** that separate origin makes cross-origin a requirement rather than an edge case. The tempting scaffold is one application with three route groups. That choice is invisible for months, is a re-platform to undo, and it silently converts a security control into a URL convention.
+**`apps/admin` is a separate deployable from the first commit, and it will look like waste for weeks.** [ADR-012](../decisions/ADR-012.md) puts the admin console on a separate apex domain, [SECURITY](../architecture/SECURITY.md) treats one owned admin as total loss, and [STRATEGY section 2](../testing/STRATEGY.md) chose Playwright over Cypress **specifically because** that separate origin makes cross-origin a requirement rather than an edge case. The tempting scaffold is one application with three route groups. That choice is invisible for months, is a re-platform to undo, and it silently converts a security control into a URL convention.
 
 **`worker` is the one row in OVERVIEW's table with no path prefix, and this plan decides it: `apps/worker`.** It is a deployable with its own lifecycle, not a library anything imports. Putting it under `packages/` would make "apps are deployables, packages are libraries" false in exactly one place, and that rule is not decoration: VG-4 depends on it, per the next paragraph. **Recorded as a plan decision rather than an ADR**, because it names a path and moves no ruling.
 
@@ -130,7 +130,7 @@ hand-maintained count in a different costume, and it drifts the same way.
 
 | # | Session | Regime | Creates | Depends on |
 |---|---|---|---|---|
-| **S-A** | **ADR-036, the migration number allocation table**, as a second table beside the ADR allocation in [DECISIONS](../DECISIONS.md). One mechanism, one place to look | non-money | nothing new | PR #9 merged |
+| **S-A** | **ADR-036, the migration number allocation table**, as a second table beside the ADR allocation in [DECISIONS](../decisions/README.md). One mechanism, one place to look | non-money | nothing new | PR #9 merged |
 | **S-B** | **The scaffold**, section 3, carrying all three riders | non-money | section 3's list | S-A. **OQ-P1-04 is ruled and folded**, section 7 |
 | **S-C** | **CI-01, CI-02 and CI-05, with VG-12** | non-money | `.github/workflows/ci.yml` | S-B |
 | **S-D** | **The golden fixture loader and CI-03** | non-money | the loader and the fixture directory | S-B |
@@ -138,7 +138,7 @@ hand-maintained count in a different costume, and it drifts the same way.
 
 **S-A lands before any parallel money-path work**, which is the whole reason it is first: migration numbers have no allocation table, [CI-06h](../testing/STRATEGY.md) asserts they are gapless and unique but surfaces a collision at merge rather than in CI, and nothing today stops two branches both claiming `0029`.
 
-**S-E is money path and is called out as such.** The calendar decides what a trading day is, and every counter the engine keeps is counted in trading days, so a wrong row changes rule outcomes without changing a line of engine code. It gets a fresh session, plan mode, and [ADR-003](../DECISIONS.md)'s strict regime. **That prompt is written when S-B lands, not before**, because it should name the seed mechanism the scaffold actually produced.
+**S-E is money path and is called out as such.** The calendar decides what a trading day is, and every counter the engine keeps is counted in trading days, so a wrong row changes rule outcomes without changing a line of engine code. It gets a fresh session, plan mode, and [ADR-003](../decisions/ADR-003.md)'s strict regime. **That prompt is written when S-B lands, not before**, because it should name the seed mechanism the scaffold actually produced.
 
 **Every gate any of these sessions wires ships with a seeded violation in `falsify.mjs`, and must fail on that finding rather than merely exit non-zero.** Two of the eleven corpus gates were failing off-target and would have been scored as working. [STATE](../STATE.md) already carries this as the thing the reconciliation proved about P1's own definition of done: "failing correctly on a seeded violation" is two checks, not one.
 
@@ -188,7 +188,7 @@ const isCorpusDocument = (file) =>
   && !/^docs\/reviews\//.test(file);
 ```
 
-**The by-name allowlist is a hand-maintained list, which is [ADR-034](../DECISIONS.md)'s own drift class.** Fine at one entry. **If it reaches three it needs a rule instead of a list**, and that sentence is a comment in the runner rather than only here.
+**The by-name allowlist is a hand-maintained list, which is [ADR-034](../decisions/ADR-034.md)'s own drift class.** Fine at one entry. **If it reaches three it needs a rule instead of a list**, and that sentence is a comment in the runner rather than only here.
 
 **The consequence the first fold carried, and the ruling that recovered it.** The first fold excluded `docs/INDEX.md` from the shared predicate, because INDEX cannot hold a row pointing at itself. That exclusion reached CI-06b too, so **INDEX's own frontmatter was checked by nothing** and a hand-edit to `status: nearly` would have passed the whole runner. It was recorded rather than traded, and **ruled 2026-08-15: the dilemma was false.** `docs/INDEX.md` **is** a corpus document, so it belongs inside `isCorpusDocument`; CI-06c skips it for an unrelated reason, that **a list cannot contain itself**, which is a property of that gate's mechanics rather than of the document class. The skip moved into CI-06c alone. That is not a second expression of the document class and nothing was traded. **`CI-06b/index` in `falsify.mjs` proves it**, and has been watched both ways: it reports the bad status with the fix in place, and `DID NOT FAIL` against the pre-ruling predicate.
 

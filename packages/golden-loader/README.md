@@ -40,7 +40,7 @@ The arrow also points the right way: `RI-01` asserts `packages/rules-engine` dec
 
 ## The stage says what it currently proves, and the claims are measured
 
-[ADR-038](../../docs/DECISIONS.md#adr-038-a-ci-stage-states-in-its-own-output-what-it-currently-proves--2026-08-15-status-accepted). While the polarity is inverted, `CI-03 golden files: pass` means three things its name contradicts:
+[ADR-038](../../docs/decisions/ADR-038.md). While the polarity is inverted, `CI-03 golden files: pass` means three things its name contradicts:
 
 | | |
 |---|---|

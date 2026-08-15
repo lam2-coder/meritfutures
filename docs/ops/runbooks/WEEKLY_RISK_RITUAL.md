@@ -21,7 +21,7 @@ Constitution section 7: **a weekly risk ritual checklist page in admin (loss rat
 | **Reserve coverage ratio** against **CVaR99 at `rho = 0.30`**, which is the **floor and never the estimate** | Anything below 1.2. The breaker is at 1.0 and it stops **sales**, never payouts, and arriving at it unprepared is the failure |
 | **Eligible-Next-7-Days forecast**, per identity and in aggregate | A single identity contributing a large share. That is a correlated wave arriving, and the answer is liquidity and visibility rather than a payout block (GS-108) |
 | **Wallet float**, reported separately from reserve | Float is excluded from reserve and reported apart (GS-229). A ratio that improved because float grew is a ratio that did not improve |
-| Top-up trigger state | Whether it fired this week and whether it was actioned the same day ([ADR-011](../../DECISIONS.md)) |
+| Top-up trigger state | Whether it fired this week and whether it was actioned the same day ([ADR-011](../../decisions/ADR-011.md)) |
 
 ### 2. Liability
 

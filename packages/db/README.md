@@ -14,7 +14,7 @@ changes are in scope, and it is the one markdown file under `packages/` that is
 a corpus document, gated as such.
 
 Migration numbers are claimed in the allocation table in
-[`docs/DECISIONS.md`](../../docs/DECISIONS.md) **before the file is written**.
+[`docs/decisions/`](../../docs/decisions/README.md) **before the file is written**.
 A branch cannot see its siblings, so two branches forking from the same `main`
 both find the same last number, and the collision surfaces at merge in a
 directory rather than in CI. `CI-06h` asserts the sequence is gapless over
@@ -23,7 +23,7 @@ allocated plus reserved.
 ## The accessor
 
 `scopedDb(identity)` is the only sanctioned data idiom
-([ADR-008](../../docs/DECISIONS.md), accepted with the wrapper and the ESLint
+([ADR-008](../../docs/decisions/ADR-008.md), accepted with the wrapper and the ESLint
 ban as part of the acceptance rather than a follow-up). **This is the only
 package permitted to import the Drizzle client**, and that exception is what
 makes VG-4 writable: a rule phrased over "app paths" needs app paths to be a

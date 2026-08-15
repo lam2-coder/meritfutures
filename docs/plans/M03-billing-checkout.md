@@ -1,16 +1,16 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md]
 last_updated: 2026-08-14
 ---
 
 # M3: Billing and Checkout
 
-Constitution section M3, Appendix B4 items 9 through 12 and 16, Appendix D2, Appendix B5 ten-section template. Money path under the [ADR-003](../DECISIONS.md) strict regime.
+Constitution section M3, Appendix B4 items 9 through 12 and 16, Appendix D2, Appendix B5 ten-section template. Money path under the [ADR-003](../decisions/ADR-003.md) strict regime.
 
 This module is the front door. It is the only place a stranger who has never been authenticated can cause Merit to spend money (a provisioned account costs real entitlement dollars from the moment it exists), and it is the surface a card-fraud ring meets first. Two properties dominate every decision in it: **a purchase is a contract pinned to a plan version forever**, and **every inbound payment fact is a third-party assertion that may arrive twice, out of order, or forged.**
 
-**Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** One ruling changed this module: **[ADR-019](../DECISIONS.md)'s Merit Wallet becomes a checkout payment method** (section 3.4, INV-M3-13, SD-M3-06). The PSP application timing question (OQ-M3-04) was answered as a calendar note rather than a design change.
+**Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** One ruling changed this module: **[ADR-019](../decisions/ADR-019.md)'s Merit Wallet becomes a checkout payment method** (section 3.4, INV-M3-13, SD-M3-06). The PSP application timing question (OQ-M3-04) was answered as a calendar note rather than a design change.
 
 **Identifier conventions:** `INV-M3-nn` invariants, `SD-M3-nn` schema deltas, `FM-M3-nn` failure modes, `AS-M3-nn` adversarial scenarios, `OQ-M3-nn` open questions, `DEP-M3-nn` dependencies.
 
@@ -74,7 +74,7 @@ M3 consumes [DATA_MODEL sections 4 and 5](../architecture/DATA_MODEL.md) as appr
 | SD-M3-03 | new `mid_health` | `(psp, window_start) pk`, `attempts`, `declines`, `chargebacks`, `decline_rate_bp`, `chargeback_rate_bp`, `state text check in ('healthy','degraded','unhealthy')`, `state_changed_at` | Failover needs a **decision record**, not a live computation. A routing decision that cannot be explained after the fact is one nobody will trust during an incident, and the 65bp chargeback threshold that "threatens the processor relationship" needs to be a tracked series, not a query someone remembers to run |
 | SD-M3-04 | `coupons` | add `first_purchase_only boolean not null default false` and `applies_to_kind text check in ('new','reset','any') not null default 'any'` | Reset pricing and new-purchase pricing are different products with different margins. Without this, one leaked launch code discounts resets forever, which is the highest-volume repeat purchase in the business (AS-M3-04) |
 | SD-M3-05 | `purchases` | add `checkout_ip_country char(2) null`, `card_country char(2) null`, `geo_decision text check in ('allowed','warned','blocked')` | The geo/document/payment country triangle is an M19 and M7 input, and the decision Merit made at checkout must be recorded at checkout. Reconstructing it later from an IP log is not the same artifact |
-| SD-M3-06 | `purchases` | add `payment_method text not null check in ('psp','wallet','mixed') default 'psp'`, `wallet_debit_cents bigint not null default 0`, `wallet_ledger_transaction_id uuid null` | [ADR-019](../DECISIONS.md). Without an explicit method the wallet path is indistinguishable from a PSP purchase whose webhook never arrived, which is exactly the state FM-M3-01 pages on. `mixed` exists because a trader with $60 in the wallet buying a $99 evaluation is the common case, not an edge one, and forcing them to choose one funding source is a conversion cost with no compensating benefit |
+| SD-M3-06 | `purchases` | add `payment_method text not null check in ('psp','wallet','mixed') default 'psp'`, `wallet_debit_cents bigint not null default 0`, `wallet_ledger_transaction_id uuid null` | [ADR-019](../decisions/ADR-019.md). Without an explicit method the wallet path is indistinguishable from a PSP purchase whose webhook never arrived, which is exactly the state FM-M3-01 pages on. `mixed` exists because a trader with $60 in the wallet buying a $99 evaluation is the common case, not an edge one, and forcing them to choose one funding source is a conversion cost with no compensating benefit |
 
 ### 2.1 The PSP abstraction
 
@@ -157,13 +157,13 @@ Publishing is where marketing and the engine are forced to be the same thing. Tw
 
 **The publish diff shows the messages, and it shows their severity.** M1's publish-diff checks (`PW-01` to `PW-04`, [M01](M01-rules-engine.md) section 2) appear in the diff the founder approves, **typed as `info` or `warning` rather than rendered uniformly**. A dominated gate publishes fine; publishing copy that calls it a protection does not, and the diff is where that gets caught.
 
-**The typing is not cosmetic and the reason is worth carrying.** After [ADR-019](../DECISIONS.md) the cadence check fires on all three v1 plans, meaning "these two gates co-bind" on two of them and "this gate can never bind" on the third. Rendering all three identically would put two false positives in front of the founder on every publish, and a diff whose warnings are usually noise is a diff that gets approved without reading, which is the failure this gate exists to prevent. The renderer therefore groups by severity and `warning` sorts first.
+**The typing is not cosmetic and the reason is worth carrying.** After [ADR-019](../decisions/ADR-019.md) the cadence check fires on all three v1 plans, meaning "these two gates co-bind" on two of them and "this gate can never bind" on the third. Rendering all three identically would put two false positives in front of the founder on every publish, and a diff whose warnings are usually noise is a diff that gets approved without reading, which is the failure this gate exists to prevent. The renderer therefore groups by severity and `warning` sorts first.
 
 ---
 
 ### 3.4 The wallet as a payment method (ADR-019)
 
-The [Merit Wallet](../DECISIONS.md) is a checkout payment method alongside the two PSPs. It is the simplest path in this module and the one most likely to be built carelessly, because it looks like a discount and is actually a money movement.
+The [Merit Wallet](../decisions/ADR-019.md) is a checkout payment method alongside the two PSPs. It is the simplest path in this module and the one most likely to be built carelessly, because it looks like a discount and is actually a money movement.
 
 **What makes it structurally different from a PSP payment:** there is no third party, no session, no webhook, no signature, and no asynchronous confirmation. The trader's wallet is a ledger account Merit owns. A wallet purchase is therefore **one transaction**: debit the wallet position, credit the appropriate revenue account, insert the `purchases` row as `paid`, and emit `purchase.paid`. No `provisioning_pending` limbo caused by payment uncertainty can exist on this path, because the payment either committed or it did not (INV-M3-13).
 
@@ -179,7 +179,7 @@ The [Merit Wallet](../DECISIONS.md) is a checkout payment method alongside the t
 
 **Mixed funding is supported and the wallet leg is applied first.** A trader with a partial balance pays the remainder by card. The wallet debit and the PSP session are created in one checkout transaction with the wallet leg held pending the PSP result, and **a failed PSP leg releases the wallet debit** in the same compensation step that releases a coupon claim (section 3.1). The alternative, debiting the wallet only after the card clears, leaves a window where the trader's balance is spendable twice.
 
-**A wallet refund returns to the wallet, never to a card.** Refunding a wallet purchase to an external destination would convert the wallet into a withdrawal path that bypasses [ADR-019](../DECISIONS.md)'s external leg, and with it KYC, name matching, and destination cooling. That is a laundering primitive with a refund's paperwork, and the rule against it is structural: the refund path for `payment_method = 'wallet'` has no PSP adapter call in it at all.
+**A wallet refund returns to the wallet, never to a card.** Refunding a wallet purchase to an external destination would convert the wallet into a withdrawal path that bypasses [ADR-019](../decisions/ADR-019.md)'s external leg, and with it KYC, name matching, and destination cooling. That is a laundering primitive with a refund's paperwork, and the rule against it is structural: the refund path for `payment_method = 'wallet'` has no PSP adapter call in it at all.
 
 **Chargeback risk falls, and the reason is worth stating because it changes this module's risk profile.** Wallet-funded purchases carry no chargeback exposure whatsoever, so as wallet adoption grows the denominator of `chargeback_rate_bp` shrinks while the numerator does not. **The MID health thresholds in SD-M3-03 are computed against card volume, not total volume**, or a healthy shift toward wallet funding would look like a deteriorating chargeback ratio and trip the failover in AS-M3-02's direction for no reason at all.
 
@@ -192,7 +192,7 @@ Schemas are in [API_CONTRACT sections 5 and 8](../architecture/API_CONTRACT.md) 
 | `POST /checkout` | Owns | The full server-authoritative rule list: price from `plan_version_sizes`; discount recomputed; cap checked per identity (INV-M3-08); geo decision recorded (SD-M3-05); ToS acceptance written **before** the PSP session exists, so a buyer who abandons still has a recorded acceptance and a buyer who completes cannot have skipped it. **Accepts `payment_method` of `psp`, `wallet`, or `mixed`** (SD-M3-06, section 3.4); the wallet leg is server-computed from the identity's balance and is never supplied by the client, for the same reason no price is |
 | `POST /accounts/:id/reset` | Owns | Same pipeline, `kind = 'reset'`, `parent_account_id` set. **The reset resolves the plan version current at reset time**, not the parent's, which is how a breached account on v1 becomes a new account on v3. That is correct and it must be said in the reset UI, because a trader who assumes their old rules carried over has been surprised by a rule change they never agreed to |
 | `POST /webhooks/psp/:provider` | Owns | Verify, persist raw, dedupe, then dispatch. Returns 200 on duplicate (a provider that gets a 500 retries forever) and 401 on bad signature. Never does business work in the request; it enqueues |
-| `POST /admin/plans/:id/versions`, `POST /admin/plans/versions/:id/publish` | Owns | `validatePlan` gate, `plan_version_sizes` materialization in the same transaction, dual control on cap/split/gap diffs ([ADR-010](../DECISIONS.md)), diff rendering including warnings |
+| `POST /admin/plans/:id/versions`, `POST /admin/plans/versions/:id/publish` | Owns | `validatePlan` gate, `plan_version_sizes` materialization in the same transaction, dual control on cap/split/gap diffs ([ADR-010](../decisions/ADR-010.md)), diff rendering including warnings |
 | `GET /purchases` | Owns | |
 | `GET /plans`, `GET /plans/:id/versions/:v` | Serves | The **same** rules object marketing renders (B2). One shape, one source |
 
@@ -289,7 +289,7 @@ All in the approved [EVENTS.md section 4](../architecture/EVENTS.md) except the 
 
 **Why it nearly works.** Every mechanism behaves exactly as designed. The pin holds. The publish is valid. The reset is correctly priced. There is no bug anywhere, and the trader is still right to be angry.
 
-**Counter, which is product design, not code.** The reset flow **must render the diff** between the parent account's plan version and the version being purchased, whenever they differ, and require explicit acknowledgement of the changed rules before payment. `copy_blocks` keyed by rule path (section 3.3) is what makes that diff renderable at all: it is the same mechanism that makes marketing equal implementation, used in the one place where a trader is most likely to be surprised. And a dual-control gate on cap, split, and gap edits ([ADR-010](../DECISIONS.md)) means the change that would trigger this cannot be made by one compromised session. GS-098.
+**Counter, which is product design, not code.** The reset flow **must render the diff** between the parent account's plan version and the version being purchased, whenever they differ, and require explicit acknowledgement of the changed rules before payment. `copy_blocks` keyed by rule path (section 3.3) is what makes that diff renderable at all: it is the same mechanism that makes marketing equal implementation, used in the one place where a trader is most likely to be surprised. And a dual-control gate on cap, split, and gap edits ([ADR-010](../decisions/ADR-010.md)) means the change that would trigger this cannot be made by one compromised session. GS-098.
 
 ### AS-M3-06: The checkout that provisions before the money is real (NOVEL)
 

@@ -1,6 +1,6 @@
 # Merit Futures: Session Brain
 
-**Constitution:** [MERIT_BUILD_MASTER_PROMPT.md](MERIT_BUILD_MASTER_PROMPT.md) (read-only; amendments via docs/DECISIONS.md). Read it in full once; re-read the section governing your current task.
+**Constitution:** [MERIT_BUILD_MASTER_PROMPT.md](MERIT_BUILD_MASTER_PROMPT.md) (read-only; amendments via docs/decisions/). Read it in full once; re-read the section governing your current task.
 
 ## Git workflow (POST-FREEZE, from 2026-08-14)
 
@@ -8,7 +8,7 @@
 
 **Every code change runs on a branch and lands through a pull request.** Money-path modules (rules engine, payout, ledger, auth) are reviewed line by line by the founder per constitution E2 before merge.
 
-**Session-origin rule** ([ADR-D1](docs/DECISIONS.md), as amended at the FREEZE gate):
+**Session-origin rule** ([ADR-D1](docs/decisions/ADR-D1.md), as amended at the FREEZE gate):
 
 | Session origin | Workflow |
 |---|---|
@@ -49,7 +49,7 @@ See [docs/STATE.md](docs/STATE.md) for the post-FREEZE position, the nine surviv
 - Money is integer cents; thresholds in basis points / integer cents. No floats in financial paths (applies to all doc examples too).
 - Timestamps UTC in storage; trading day follows the exchange session calendar (CT), maintained as data.
 - Avoid em-dashes in all Merit prose, site and docs (Appendix F).
-- When the constitution is ambiguous, ASK. When it is silent, propose an ADR in docs/DECISIONS.md and proceed on approval.
+- When the constitution is ambiguous, ASK. When it is silent, propose an ADR in docs/decisions/ and proceed on approval.
 
 ## Working agreements (from section 9, applicable pre-FREEZE)
 - Plan before content: waves advance only through founder-approved gates.

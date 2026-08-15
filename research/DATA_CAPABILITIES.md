@@ -86,7 +86,7 @@ The Axcera Futures Solution brochure (February 2026, primary source; see [PROP_T
 - **Reconciliation stays mandatory:** our computed EOD balance vs Rithmic's stated EOD balance per account, nightly; mismatch = red alert + payout-eligibility exclusion (M2).
 - **Contingency:** if the W1 vendor call reveals EOD report files lack per-fill granularity (only summaries), we ingest both the fill/order detail files AND the EOD summary; the constitution's `fills` → `daily_marks` pipeline already assumes raw fills. The vendor call must confirm which files exist; the architecture works in either shape because marks are computed, not trusted.
 
-Proposed as ADR-002 in [DECISIONS.md](../docs/DECISIONS.md); founder approval closes the §10 open item "Rithmic ingest path."
+Proposed as ADR-002 in [docs/decisions/](../docs/decisions/README.md); founder approval closes the §10 open item "Rithmic ingest path."
 
 ## 4. Schema fields to reserve now (adapter-proofing)
 

@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, ../../plans/M16-notification-center.md, ../../plans/M09-marketing-site.md, ../../DECISIONS.md]
+depends_on: [README.md, ../../plans/M16-notification-center.md, ../../plans/M09-marketing-site.md, ../../decisions/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -18,7 +18,7 @@ Constitution section 7: **incident comms templates pre-written**. Twelve of them
 2. **Never say "we are investigating" without a time.** It reads as "we do not know how long", which is true and is exactly why the time has to be a commitment to update rather than a commitment to resolve.
 3. **Name what was never at risk.** In this market a partial statement is read as a full one, and "your funds were never at risk" is only worth saying when it is true, which is why it is a field rather than a habit.
 4. **No detector names, thresholds, patterns, or other identities**, ever, in any trader-facing message ([M16](../../plans/M16-notification-center.md) GS-192, GS-195). The two-tier evidence rule applies to comms.
-5. **A parameter is read, never copied.** Any template rendering a plan value reads it from the pinned plan version at send time ([parameter-status ruling](../../DECISIONS.md)). No number is typed into a template.
+5. **A parameter is read, never copied.** Any template rendering a plan value reads it from the pinned plan version at send time ([parameter-status ruling](../../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md)). No number is typed into a template.
 
 **And the meta-rule: a template is a starting point that must be edited before sending.** A message that reads as boilerplate during a real incident does more harm than a slightly awkward one that reads as a person.
 

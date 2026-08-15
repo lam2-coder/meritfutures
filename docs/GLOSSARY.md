@@ -38,7 +38,7 @@ The maintained dataset of trading days, session open/close times, half days, hol
 The most recent trading day for which the [nightly batch](#nightly-batch) has completed and marks are final. Every rule evaluation, eligibility check, and payout decision is computed against the last closed day and nothing more recent. This is the semantic that makes a payout request at 23:59:59 and a batch at 00:05 deterministic (B4 scenario 6).
 
 ## T+1
-Shorthand for Merit's data posture under [ADR-002](DECISIONS.md): all derived state reflects the last closed day, so our system's view of an account lags live trading by one batch cycle. Intraday enforcement is delegated to Rithmic's [auto-liquidator](#auto-liquidator). Trader-facing and admin surfaces label data "as of last closed session".
+Shorthand for Merit's data posture under [ADR-002](decisions/ADR-002.md): all derived state reflects the last closed day, so our system's view of an account lags live trading by one batch cycle. Intraday enforcement is delegated to Rithmic's [auto-liquidator](#auto-liquidator). Trader-facing and admin surfaces label data "as of last closed session".
 
 ## nightly batch
 The scheduled job that ingests the day's [ingest files](#ingest-file), normalizes [fills](#fill), computes [daily marks](#daily-mark), runs breach checks, advances [rule state](#rule-state), emits events, and runs the [replay self-audit](#replay-determinism) and [reconciliation](#reconciliation). It is arrival-triggered (files present) with a late-file alarm, resumable, and idempotent per account per day.
@@ -48,7 +48,7 @@ The scheduled job that ingests the day's [ingest files](#ingest-file), normalize
 ## Part 2: Plans and configuration
 
 ## plan
-A named product family (Core EOD, Merit Rapid, Direct), with codes `core_eod`, `merit_rapid`, `direct`. A plan has no rules of its own; its rules live in [plan versions](#plan-version). "Merit Rapid" was called "Rapid Daily" in the constitution and was renamed at the M1 gate ([ADR-013](DECISIONS.md)) because its real cadence is about one payout per 5 trading days, not one per day.
+A named product family (Core EOD, Merit Rapid, Direct), with codes `core_eod`, `merit_rapid`, `direct`. A plan has no rules of its own; its rules live in [plan versions](#plan-version). "Merit Rapid" was called "Rapid Daily" in the constitution and was renamed at the M1 gate ([ADR-013](decisions/ADR-013.md)) because its real cadence is about one payout per 5 trading days, not one per day.
 
 ## plan version
 An immutable, versioned rule configuration plus the published copy blocks that describe it. An account is permanently bound to the plan version it was sold under. Publishing a new version never mutates existing accounts. "The rules at the time" is always provable because the version is pinned on the account and snapshotted on every [eligibility snapshot](#eligibility-snapshot).
@@ -89,7 +89,7 @@ Floor = (maximum end-of-day balance ever achieved) minus (drawdown amount). The 
 Config: `drawdown.type = "trailing_eod"`.
 
 ## floor lock
-The rule that stops a trailing floor from trailing once the account reaches a configured profit threshold, fixing the floor at [account size](#account-size) plus a configured amount (typically the point at which the trader's capital is protected). Locking is permanent for the account: the high-water balance stops updating at the same moment, which is what makes the floor immutable rather than merely capped. **Enabled on all three v1 plans at account size plus 10,000 cents ($100)**, engaging at exactly `drawdown + 10,000c` of closing profit so that the trailing floor is already sitting at the lock value when it engages and the floor never jumps ([ADR-014](DECISIONS.md)).
+The rule that stops a trailing floor from trailing once the account reaches a configured profit threshold, fixing the floor at [account size](#account-size) plus a configured amount (typically the point at which the trader's capital is protected). Locking is permanent for the account: the high-water balance stops updating at the same moment, which is what makes the floor immutable rather than merely capped. **Enabled on all three v1 plans at account size plus 10,000 cents ($100)**, engaging at exactly `drawdown + 10,000c` of closing profit so that the trailing floor is already sitting at the lock value when it engages and the floor never jumps ([ADR-014](decisions/ADR-014.md)).
 Config: `drawdown.lock.enabled`, `drawdown.lock.at_profit_cents`, `drawdown.lock.floor_at_cents`.
 
 ## static drawdown
@@ -110,7 +110,7 @@ A terminal rule violation that closes the account. Breach is evaluated on the da
 Rithmic's server-side risk enforcement. Merit pushes max-loss risk settings per account via provisioning; Rithmic liquidates positions when a threshold is hit, whether or not the trader is connected. Merit never builds streaming risk in v1. The EOD report records the liquidation event, time, and trigger, which becomes [evidence](#evidence-pack).
 
 ## auto-liquidation setpoint
-The max-loss value Merit pushes to Rithmic for an account. **Decided and binding: the setpoint sits AT the account's current [floor](#floor)**, not above it and not below it, and it is re-pushed whenever the floor moves, which since [ADR-013 and ADR-014](DECISIONS.md) can only happen for two reasons: a new end-of-day high, or a [floor lock](#floor-lock). Both move the floor **up**, so a setpoint that is stale is always too permissive rather than too strict, which is the safe direction.
+The max-loss value Merit pushes to Rithmic for an account. **Decided and binding: the setpoint sits AT the account's current [floor](#floor)**, not above it and not below it, and it is re-pushed whenever the floor moves, which since [ADR-013 and ADR-014](decisions/ADR-013.md) can only happen for two reasons: a new end-of-day high, or a [floor lock](#floor-lock). Both move the floor **up**, so a setpoint that is stale is always too permissive rather than too strict, which is the safe direction.
 The consequence is the one place where a vendor's real-time behavior and Merit's end-of-day arithmetic meet, so it is stated exactly: a clean liquidation leaves the day's low **exactly at** the floor and the account **survives**, because [breach](#breach) is `low < floor` and never `low <= floor`. A liquidation that slips through the floor leaves the low **below** it and the account **breaches**. Traders therefore experience the auto-liquidator as the thing that saves them and slippage as the thing that ends them, which is both true and publishable. All three cases (one tick above the floor, exactly at the floor, one tick below) are pinned by golden files.
 
 ---
@@ -125,7 +125,7 @@ The eval profit threshold, in bp of account size, measured on closing balance ve
 Config: `phase_eval.profit_target_bp`.
 
 ## minimum trading days
-The count of [traded days](#traded-day) required before the phase can be passed (eval) or a payout can be requested (funded). Compared with `>=`. **A value of 0 disables the gate**, which then reports `pass: true, skipped: true` and renders as disabled rather than as satisfied, because a gate that cannot fail must say so (EC-050). All three v1 plans configure 0 in the funded phase ([ADR-015](DECISIONS.md)); the eval value is unaffected and is at least 1.
+The count of [traded days](#traded-day) required before the phase can be passed (eval) or a payout can be requested (funded). Compared with `>=`. **A value of 0 disables the gate**, which then reports `pass: true, skipped: true` and renders as disabled rather than as satisfied, because a gate that cannot fail must say so (EC-050). All three v1 plans configure 0 in the funded phase ([ADR-015](decisions/ADR-015.md)); the eval value is unaffected and is at least 1.
 Config: `min_trading_days`.
 
 ## traded day
@@ -160,7 +160,7 @@ The window over which funded consistency is measured: profit since the later of 
 Binding edge case: the consistency check is **skipped entirely unless total period profit is strictly greater than zero**. A zero or negative denominator makes the ratio meaningless, so the gate passes by definition and the trader is never blocked by an undefined comparison.
 
 ## cadence gap
-The minimum number of [trading days](#trading-day) that must elapse between payouts, counted from the last settled payout's **effective** trading day, meaning the first trading day whose opening balance reflects the withdrawal ([ADR-013](DECISIONS.md)). Compared with `>=`. Denied or frozen requests do not reset the gap, because a request that produced no money must not cost the trader time.
+The minimum number of [trading days](#trading-day) that must elapse between payouts, counted from the last settled payout's **effective** trading day, meaning the first trading day whose opening balance reflects the withdrawal ([ADR-013](decisions/ADR-013.md)). Compared with `>=`. Denied or frozen requests do not reset the gap, because a request that produced no money must not cost the trader time.
 The gap is measured from a different day than the [win day](#win-day) reset, which uses the same payout's **basis** day. That is deliberate: the gap governs liability rate, so it starts when money leaves; win days govern earned progress, so they start from the day the decision was computed against, and a trader keeps the progress they made while waiting for the transfer. On a plan where `cadence_gap + settlement lag` is at most the required win-day count, this gate is dominated by the win-day gate and does not bind (EC-049).
 Config: `cadence_gap_trading_days`.
 
@@ -187,13 +187,13 @@ The full gate-by-gate evaluation, input state, plan version, and computed clamp,
 
 ## payout ladder
 The count of settled payouts after which a funded account automatically [graduates](#graduation). It bounds lifetime extraction per account and is the liability architecture's backstop.
-Config: **`max_payouts`** ([ADR-030](DECISIONS.md); `ladder.payouts_to_graduate` is the superseded key name). v1 values: **5** on Core EOD and Merit Rapid, **4** on Direct.
+Config: **`max_payouts`** ([ADR-030](decisions/ADR-030.md); `ladder.payouts_to_graduate` is the superseded key name). v1 values: **5** on Core EOD and Merit Rapid, **4** on Direct.
 
 ## graduation
 Automatic closure of a funded account on reaching the ladder count, with status `graduated` and a live-program invitation event. The live program itself is post-launch; v1 records the invitation and closes the simulated account.
 
 ## post-payout floor rule
-**Retired in v1.** A settled payout reduces the balance and does not touch the [floor](#floor), the high-water balance, or the [floor lock](#floor-lock) ([ADR-014](DECISIONS.md)). The constitution's two configured modes (reset the floor to new balance minus drawdown, or lock at account size plus an amount) are both unused; the config key is retained and pinned to `none` by validation so it cannot be quietly reintroduced. The trader-facing consequence, which must be published in these words: **after a payout your loss room is your [buffer](#buffer)**, or the buffer minus $100 once the floor has locked, not the full drawdown.
+**Retired in v1.** A settled payout reduces the balance and does not touch the [floor](#floor), the high-water balance, or the [floor lock](#floor-lock) ([ADR-014](decisions/ADR-014.md)). The constitution's two configured modes (reset the floor to new balance minus drawdown, or lock at account size plus an amount) are both unused; the config key is retained and pinned to `none` by validation so it cannot be quietly reintroduced. The trader-facing consequence, which must be published in these words: **after a payout your loss room is your [buffer](#buffer)**, or the buffer minus $100 once the floor has locked, not the full drawdown.
 Config: `post_payout_floor_rule.mode = "none"`.
 
 ---
@@ -212,7 +212,7 @@ An immutable double-entry row. Every financial fact is expressed as balanced deb
 ## ledger account
 A node in the chart of accounts. **Seven v1 classes**: `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve`, **`trader_withdrawable`** (per identity), **`trader_wallet`** (per identity), `promotional_credit`. The account-type enum is expandable by design.
 
-**`trader_withdrawable` and `trader_wallet` are two distinct per-identity positions, not one under two names** ([ADR-027](DECISIONS.md)). `SD-M5-07` **adds** the wallet class; it does not rename the other. They hold different magnitudes and move by different amounts: a payout approval reduces **withdrawable** by the full `approved_cents`, and of that, `trader_cents` becomes the **wallet** payable and `firm_cents` becomes revenue. `approved_cents != trader_cents`, which is exactly why one class cannot carry both. `promotional_credit` is activated rather than reserved and is **never withdrawable** ([ADR-019](DECISIONS.md), OQ-FREEZE-01).
+**`trader_withdrawable` and `trader_wallet` are two distinct per-identity positions, not one under two names** ([ADR-027](decisions/ADR-027.md)). `SD-M5-07` **adds** the wallet class; it does not rename the other. They hold different magnitudes and move by different amounts: a payout approval reduces **withdrawable** by the full `approved_cents`, and of that, `trader_cents` becomes the **wallet** payable and `firm_cents` becomes revenue. `approved_cents != trader_cents`, which is exactly why one class cannot carry both. `promotional_credit` is activated rather than reserved and is **never withdrawable** ([ADR-019](decisions/ADR-019.md), OQ-FREEZE-01).
 
 ## balance
 A derived value, always computed by summing [ledger entries](#ledger-entry), never stored as a mutable truth. Cached projections may exist for speed but are rebuildable and are verified against the ledger by the nightly self-audit.
@@ -232,7 +232,7 @@ Funds set aside to cover projected payouts. Held and reported separately from op
 ## CVaR99
 Conditional value at risk at the 99th percentile: the expected payout liability in the worst 1% of modeled outcomes, produced by the simulation harness and refreshed on a schedule.
 
-**CVaR99 evaluated at `rho = 0.30` is the reserve floor, never the estimate** (founder ruling, 2026-08-14, [DECISIONS](DECISIONS.md)). The harness's calibration bands are **central estimates** and carry no built-in cushion. Conservatism lives in three named places instead: the correlation assumption **`rho = 0.30`**, the **regime-stress ruin scenarios**, and the **RCR breaker at 1.0**. Sizing the payout wallet against a central estimate is sizing against a coin flip, and the two numbers are easy to confuse because the same harness emits both under the same name.
+**CVaR99 evaluated at `rho = 0.30` is the reserve floor, never the estimate** (founder ruling, 2026-08-14, [DECISIONS](decisions/README.md)). The harness's calibration bands are **central estimates** and carry no built-in cushion. Conservatism lives in three named places instead: the correlation assumption **`rho = 0.30`**, the **regime-stress ruin scenarios**, and the **RCR breaker at 1.0**. Sizing the payout wallet against a central estimate is sizing against a coin flip, and the two numbers are easy to confuse because the same harness emits both under the same name.
 
 ## loss ratio
 Trailing 30-day payouts divided by fees, per plan. Above 6000 bp (60%), the circuit breaker auto-pauses that plan's new sales and alerts.
@@ -309,7 +309,7 @@ The identity verification lifecycle: `kyc_required`, `pending`, `verified`, `rej
 ## KYC placement
 The configurable point at which verification is required: `pre_eval` (at purchase) or `pre_funded` (at eval pass). Beta launches `pre_funded`; Direct plans always verify at purchase because funding is immediate. It is config, never a hardcode, so the decision can change without a rewrite.
 
-**Superseded by the ruled trigger set** ([ADR-021](DECISIONS.md), [ADR-030](DECISIONS.md)). Placement is no longer a single point: the config key is **`kyc.triggers`, an array**, and verification fires at whichever configured trigger is reached **first**. The v1 set ruled at FREEZE is **`{second_distinct_account_purchase, pre_funded}`**. Direct plans always verify at purchase, which is not configurable. `payout_request` is invalid as a sole trigger.
+**Superseded by the ruled trigger set** ([ADR-021](decisions/ADR-021.md), [ADR-030](decisions/ADR-030.md)). Placement is no longer a single point: the config key is **`kyc.triggers`, an array**, and verification fires at whichever configured trigger is reached **first**. The v1 set ruled at FREEZE is **`{second_distinct_account_purchase, pre_funded}`**. Direct plans always verify at purchase, which is not configurable. `payout_request` is invalid as a sole trigger.
 
 ## biometric dedupe
 The KYC provider's face match across all applicants, which surfaces one-person-many-names fleets before any liability exists. It catches what device fingerprints miss and feeds the [identity graph](#identity-graph).

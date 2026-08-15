@@ -28,7 +28,7 @@ The 9-scheme taxonomy from Appendix A, populated with current intel (researched 
 
 **Detection signal.** Single-firm data cannot see the other leg. Proxies: accounts that trade only around high-conviction directional moments with abnormal win-rate-vs-hold-time profiles; entity-graph links to known scheme 1 flags; geography/device overlap with other flagged cohorts. True detection needs a shared-vendor network (QuantSentry-class bad-actor DB claims 10,000+ verified threat profiles, the bolt-on argument; [RiskGuard](https://axcera.io/solutions/risk-guard), [QuantSentry review](https://alexfirdaus.com/quantsentry-review/)).
 
-**Posture: accept, bound, budget.** Caps bound per-account damage; the **5-payout ladder** bounds lifetime damage ([ADR-024](../docs/DECISIONS.md)); the reserve prices the leak-through. No detector spec v1 beyond the proxies above.
+**Posture: accept, bound, budget.** Caps bound per-account damage; the **5-payout ladder** bounds lifetime damage ([ADR-024](../docs/decisions/ADR-024.md)); the reserve prices the leak-through. No detector spec v1 beyond the proxies above.
 
 **GT-A2.** Simulated single-leg extractor: account trades twice a month, only large NFP-day directional wins, hits cap each cycle. Expected: no breach (rules honored), velocity/pattern flag raised at low severity, liability forecast counts it, ladder graduates it out after **5** payouts. This is the "we survive what we cannot see" test.
 
@@ -94,15 +94,15 @@ The 9-scheme taxonomy from Appendix A, populated with current intel (researched 
 
 ## Norm corroboration: what firms publicly admit to doing (primary source, 2026-08-14)
 
-**Apex acknowledges linking accounts on IP, device, billing instrument, and behavioral similarity, explicitly including spousal accounts.** That matters to Merit in one specific way: it establishes that [ADR-022](../docs/DECISIONS.md)'s link-confidence graph is **inside published industry practice, not ahead of it.** Merit's planned scope sits at or below what Tradeify, Topstep, and Blue Guardian already publish. The aggressive end of the norm is Blue Guardian's stack: continuous document monitoring, provider-final decisions, and a 7-day funded-inactivity rule.
+**Apex acknowledges linking accounts on IP, device, billing instrument, and behavioral similarity, explicitly including spousal accounts.** That matters to Merit in one specific way: it establishes that [ADR-022](../docs/decisions/ADR-022.md)'s link-confidence graph is **inside published industry practice, not ahead of it.** Merit's planned scope sits at or below what Tradeify, Topstep, and Blue Guardian already publish. The aggressive end of the norm is Blue Guardian's stack: continuous document monitoring, provider-final decisions, and a 7-day funded-inactivity rule.
 
-**Named anti-pattern, adopted as a thing Merit will not do: Apex's two-day screen-recording payout requirement.** The trader wins, requests a payout, and is then asked to produce two days of screen recordings. Read as fraud control it is defensible. Read as what it actually is, **it is friction applied to legitimate winners at the exact moment the firm owes them money**, and it is indistinguishable from a stall to everyone experiencing it. The general form is the one to remember: **fraud friction applied at payout time is a payout-trust tax, and it is paid overwhelmingly by honest traders**, because the dishonest ones either have the recordings or have already left. Merit's answer is [ADR-021](../docs/DECISIONS.md) and [ADR-022](../docs/DECISIONS.md): move identity friction **upstream of funding**, where being wrong is cheap, so that nothing new is ever demanded at payout.
+**Named anti-pattern, adopted as a thing Merit will not do: Apex's two-day screen-recording payout requirement.** The trader wins, requests a payout, and is then asked to produce two days of screen recordings. Read as fraud control it is defensible. Read as what it actually is, **it is friction applied to legitimate winners at the exact moment the firm owes them money**, and it is indistinguishable from a stall to everyone experiencing it. The general form is the one to remember: **fraud friction applied at payout time is a payout-trust tax, and it is paid overwhelmingly by honest traders**, because the dishonest ones either have the recordings or have already left. Merit's answer is [ADR-021](../docs/decisions/ADR-021.md) and [ADR-022](../docs/decisions/ADR-022.md): move identity friction **upstream of funding**, where being wrong is cheap, so that nothing new is ever demanded at payout.
 
 **A published trust differentiator worth defending: Apex requires a $500 minimum payout; Merit's is $100.** That is a five-fold difference in how long a small winner waits to see real money, and it is exactly the sort of number that belongs on a comparison surface ([M12](../docs/plans/M12-transparency-platform.md)) and in the payout copy ([M05](../docs/plans/M05-payout-system.md)).
 
 ## Identity replacement cost: the axis every control is scored on
 
-[ADR-022](../docs/DECISIONS.md) introduces the framing this dossier should have had from the start. **The measure of an identity defense is not how many fakes it catches. It is what a fresh, usable identity costs the adversary.**
+[ADR-022](../docs/decisions/ADR-022.md) introduces the framing this dossier should have had from the start. **The measure of an identity defense is not how many fakes it catches. It is what a fresh, usable identity costs the adversary.**
 
 | Control | Replacement cost imposed | Verdict |
 |---|---|---|
@@ -112,7 +112,7 @@ The 9-scheme taxonomy from Appendix A, populated with current intel (researched 
 | Device and IP correlation | Low. A VPN and a fresh browser profile | A signal, never a verdict |
 | Email-domain heuristics | **Zero.** A new address is free and instant | Worth collecting, never worth enforcing on |
 
-**Reading the table is the point.** It puts a $2 provider call and a self-joined SQL query on the same axis for the first time, and it explains why [ADR-022](../docs/DECISIONS.md) auto-enforces on hard links and only queues soft ones: the cheap-to-defeat signals are exactly the ones where a false positive is most likely and an enforcement least defensible.
+**Reading the table is the point.** It puts a $2 provider call and a self-joined SQL query on the same axis for the first time, and it explains why [ADR-022](../docs/decisions/ADR-022.md) auto-enforces on hard links and only queues soft ones: the cheap-to-defeat signals are exactly the ones where a false positive is most likely and an enforcement least defensible.
 
 ## Vendor fraud-marketing review (what the detection industry says the threats are)
 

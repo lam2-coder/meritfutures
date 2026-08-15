@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../DECISIONS.md, TOS_CLAUSES.md, PRIVACY_POLICY.md, AFFILIATE_TERMS.md, COUNSEL_PACKET.md, ../plans/M07-risk-abuse.md, ../plans/M05-payout-system.md, ../plans/M08-affiliate-system.md, ../plans/M20-wallet.md, ../plans/M18-graduation-track.md]
+depends_on: [../decisions/README.md, TOS_CLAUSES.md, PRIVACY_POLICY.md, AFFILIATE_TERMS.md, COUNSEL_PACKET.md, ../plans/M07-risk-abuse.md, ../plans/M05-payout-system.md, ../plans/M08-affiliate-system.md, ../plans/M20-wallet.md, ../plans/M18-graduation-track.md]
 last_updated: 2026-08-14
 ---
 
@@ -12,7 +12,7 @@ What follows are **drafting notes**: rulings already taken that the Wave 4 draft
 
 ## 1. The copy-trading clause (ruled 2026-08-14)
 
-From the Wave 3 batch 1 gate ([DECISIONS](../DECISIONS.md), [M07](../plans/M07-risk-abuse.md) section 3.4). The ToS must state all four rows, enumerated rather than gestured at:
+From the Wave 3 batch 1 gate ([DECISIONS](../decisions/README.md), [M07](../plans/M07-risk-abuse.md) section 3.4). The ToS must state all four rows, enumerated rather than gestured at:
 
 | Conduct | Status |
 |---|---|
@@ -39,7 +39,7 @@ From the Wave 3 batch 1 gate ([DECISIONS](../DECISIONS.md), [M07](../plans/M07-r
 
 **The specific questions for counsel**, so the review has an agenda rather than a document:
 1. Does holding trader balances in these terms constitute regulated money transmission or deposit-taking in the jurisdictions Merit serves, and does the answer change with balance size or holding period?
-2. Do the balances need to be segregated, and if so, does that interact with the payout wallet's funding rhythm ([ADR-011](../DECISIONS.md))?
+2. Do the balances need to be segregated, and if so, does that interact with the payout wallet's funding rhythm ([ADR-011](../decisions/ADR-011.md))?
 3. What must be disclosed at the point a trader first receives a wallet credit, as distinct from what lives in the ToS?
 4. What happens to a wallet balance on account closure, on enforcement, and on an unresponsive trader after a long period?
 
@@ -49,7 +49,7 @@ Not itself a legal document, and it belongs in the drafting notes because it con
 
 **Purchased is always known contents. Randomized is earned only, and only with disclosed odds. No purchased loot boxes, ever.**
 
-The rationale is on the record in [DECISIONS](../DECISIONS.md) and has a compliance half worth repeating here: Merit sells simulated-trading evaluations in a market whose regulatory characterization is already contested, and a paid random-outcome mechanic invites the reading the firm can least afford, which is that the product is a wager rather than an evaluation.
+The rationale is on the record in [DECISIONS](../decisions/README.md) and has a compliance half worth repeating here: Merit sells simulated-trading evaluations in a market whose regulatory characterization is already contested, and a paid random-outcome mechanic invites the reading the firm can least afford, which is that the product is a wager rather than an evaluation.
 
 ## 4. Already-recorded obligations the Wave 4 drafts inherit
 

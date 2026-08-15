@@ -477,7 +477,7 @@ Query `?reason=` is required. Generation itself is audited and emits `evidence.p
 type CreateVersionRequest = { rules: PlanRules; copy_blocks: Record<string,string>; sizes: Array<{ size_cents: number; price_cents: number; reset_price_cents: number }>; reason: string };
 type CreateVersionResponse = { plan_version_id: string; version: number; status: "draft"; computed_sizes: PlanSize[] };
 ```
-Creates a **draft**. Publishing is a separate call, and any edit touching cap, split, or cadence gap requires dual control (a second `owner` approval within a 24 hour window) per D4 and [ADR-010](../DECISIONS.md).
+Creates a **draft**. Publishing is a separate call, and any edit touching cap, split, or cadence gap requires dual control (a second `owner` approval within a 24 hour window) per D4 and [ADR-010](../decisions/ADR-010.md).
 
 **Launch-scale note, stated so nobody later misreads the control.** Both `owner` credentials are held by the founder on separate hardware keys. At this scale dual control is **compromise resistance, not insider resistance**: it means one phished session or one owned laptop cannot move the cap, the split, the gap, or the payout rail alone. It becomes real separation of duties on the first operations hire, with no code change.
 
@@ -544,10 +544,10 @@ Every row is a named test that must exist before the endpoint ships ([VG-5](../.
 
 ## 13. Founder rulings (Wave 2 gate, 2026-08-13)
 
-All five items that needed the founder's eyes were walked at the gate and are resolved. Recorded in [DECISIONS.md](../DECISIONS.md).
+All five items that needed the founder's eyes were walked at the gate and are resolved. Recorded in [DECISIONS.md](../decisions/README.md).
 
 1. **`404` versus `403` on trader surfaces: `404` confirmed.** Existence is not confirmed to a stranger. The support cost is handled by a runbook rather than by weakening the response: support resolves the trader in the admin console by identity and never trusts a trader-supplied account id ([ops/runbooks](../ops/runbooks/README.md), Wave 4).
-2. **`POST /accounts/:id/payout` takes an optional amount, defaulting to the maximum eligible** ([ADR-009](../DECISIONS.md)). Omitting the field is the common path and matches the number the eligibility endpoint already showed. A supplied amount is a ceiling and can only reduce the payout.
+2. **`POST /accounts/:id/payout` takes an optional amount, defaulting to the maximum eligible** ([ADR-009](../decisions/ADR-009.md)). Omitting the field is the common path and matches the number the eligibility endpoint already showed. A supplied amount is a ceiling and can only reduce the payout.
 3. **Freeze requires a cited flag: confirmed as written.** Unchanged. It remains the single most important line in this document for keeping the zero-denial promise honest.
-4. **Dual control on cap, split, and gap edits: confirmed, with the launch-scale note** now written into §8 and [ADR-010](../DECISIONS.md). Both keys are founder-held, and the control is documented as compromise resistance rather than insider resistance so it is never mistaken for separation of duties.
+4. **Dual control on cap, split, and gap edits: confirmed, with the launch-scale note** now written into §8 and [ADR-010](../decisions/ADR-010.md). Both keys are founder-held, and the control is documented as compromise resistance rather than insider resistance so it is never mistaken for separation of duties.
 5. **`estimated_settlement`: 2 to 3 business days confirmed** as the published figure, stated as a range everywhere it appears (API response, portal timeline, marketing site, certificates).

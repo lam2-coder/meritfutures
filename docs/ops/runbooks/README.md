@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../../MERIT_BUILD_MASTER_PROMPT.md, ../../DECISIONS.md, ../../architecture/INFRA.md, ../../architecture/SECURITY.md, ../../architecture/EVENTS.md, ../../plans/M02-rithmic-bridge.md, ../../plans/M05-payout-system.md, ../../plans/M06-admin-ops-console.md, COMMS_TEMPLATES.md, CRON_INVENTORY.md, WEEKLY_RISK_RITUAL.md]
+depends_on: [../../../MERIT_BUILD_MASTER_PROMPT.md, ../../decisions/README.md, ../../architecture/INFRA.md, ../../architecture/SECURITY.md, ../../architecture/EVENTS.md, ../../plans/M02-rithmic-bridge.md, ../../plans/M05-payout-system.md, ../../plans/M06-admin-ops-console.md, COMMS_TEMPLATES.md, CRON_INVENTORY.md, WEEKLY_RISK_RITUAL.md]
 last_updated: 2026-08-14
 ---
 
@@ -61,16 +61,16 @@ Constitution section 7 instantiated: one runbook per failure class, a cron inven
 
 | Runbook | Why it exists | Ruled at |
 |---|---|---|
-| [RB-10](RB-10-support-account-lookup.md) **Support: "the trader swears the account id is right"** | The API returns `404`, not `403`, when a trader addresses a resource they do not own, so existence is never confirmed to a stranger ([API_CONTRACT section 1](../../architecture/API_CONTRACT.md#1-conventions)). Support therefore never resolves an account from a trader-supplied id | Wave 2 gate, 2026-08-13 ([DECISIONS](../../DECISIONS.md)) |
+| [RB-10](RB-10-support-account-lookup.md) **Support: "the trader swears the account id is right"** | The API returns `404`, not `403`, when a trader addresses a resource they do not own, so existence is never confirmed to a stranger ([API_CONTRACT section 1](../../architecture/API_CONTRACT.md#1-conventions)). Support therefore never resolves an account from a trader-supplied id | Wave 2 gate, 2026-08-13 ([DECISIONS](../../decisions/README.md)) |
 | [RB-08](RB-08-security-incident.md)'s **DDoS trigger** | A DDoS against Merit is a data-exfiltration alarm until proven otherwise | [SECURITY_LANDSCAPE](../../../research/SECURITY_LANDSCAPE.md) section 1 |
-| [RB-09](RB-09-break-glass.md) **break-glass unseal and lost-key rotation** | The batch 1 gate ruled a sealed physical backup, a documented unseal procedure, a quarterly existence check, and a lost-key rotation runbook, all of which must exist before launch | Wave 3 batch 1 gate, 2026-08-14 ([DECISIONS](../../DECISIONS.md)) |
-| [RB-07](RB-07-ledger-imbalance.md)'s **escalation clock** | An identity-scoped halt pages immediately and escalates to global on expiry, so scoping the halt does not create a slower version of the attack it fixed | [ADR-016](../../DECISIONS.md) |
+| [RB-09](RB-09-break-glass.md) **break-glass unseal and lost-key rotation** | The batch 1 gate ruled a sealed physical backup, a documented unseal procedure, a quarterly existence check, and a lost-key rotation runbook, all of which must exist before launch | Wave 3 batch 1 gate, 2026-08-14 ([DECISIONS](../../decisions/README.md)) |
+| [RB-07](RB-07-ledger-imbalance.md)'s **escalation clock** | An identity-scoped halt pages immediately and escalates to global on expiry, so scoping the halt does not create a slower version of the attack it fixed | [ADR-016](../../decisions/ADR-016.md) |
 
 ---
 
 ## 5. Open questions for the founder
 
-**OQ-RB-01. What is the identity-scoped ledger halt's escalation window?** [ADR-016](../../DECISIONS.md) proposed **24 hours** and left the value to M5 configuration. [RB-07](RB-07-ledger-imbalance.md) uses 24 hours throughout. Confirm at FREEZE.
+**OQ-RB-01. What is the identity-scoped ledger halt's escalation window?** [ADR-016](../../decisions/ADR-016.md) proposed **24 hours** and left the value to M5 configuration. [RB-07](RB-07-ledger-imbalance.md) uses 24 hours throughout. Confirm at FREEZE.
 
 **OQ-RB-02. Who is the second contact?** Every runbook here assumes one operator. Several of them (a restore, a break-glass unseal, a security incident with a disclosure decision) are materially safer with a second person who can be woken. Proposed: **name a technical contact and a legal contact before launch**, even if neither has system access, because the value is somebody to think out loud at rather than somebody to delegate to.
 

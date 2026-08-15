@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../DECISIONS.md, ../../research/DATA_CAPABILITIES.md]
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../decisions/README.md, ../../research/DATA_CAPABILITIES.md]
 last_updated: 2026-08-13
 ---
 
@@ -76,7 +76,7 @@ Merit holds no trader documents (they stay at the [KYC provider](../GLOSSARY.md#
 | `packages/rithmic` | Platform adapter: provision, entitle, ingestFills, ingestEOD, reconcile | Isolates every vendor specific behind the interface so adapter #2 is additive |
 | `worker` | Nightly batch, provisioning delivery, Rise transfers, detectors, hygiene jobs | Long-running and retryable work must never sit in a request path |
 
-The queue runs on **pg-boss** (Postgres-only) rather than BullMQ plus Redis: one fewer stateful service to back up, restore, and reason about, and the job store participates in the same transactions and the same PITR as the money data. This resolves a §10 open item and is proposed as [ADR-006](../DECISIONS.md).
+The queue runs on **pg-boss** (Postgres-only) rather than BullMQ plus Redis: one fewer stateful service to back up, restore, and reason about, and the job store participates in the same transactions and the same PITR as the money data. This resolves a §10 open item and is proposed as [ADR-006](../decisions/ADR-006.md).
 
 ## 4. Module map
 
@@ -290,7 +290,7 @@ Both directions are files over SFTP, which is Rithmic's own scriptable bulk inte
 
 Consequences the founder should hold in mind: our own view of an account is one batch cycle behind live trading, so every trader-facing and admin-facing number is labeled "as of last closed session", and a trader who breaches at 10:00 is liquidated by Rithmic immediately but appears breached in Merit only after that night's batch.
 
-**Provisional pending vendor confirmation ([ADR-005](../DECISIONS.md)):** report file formats and field lists, delivery cadence and any timing guarantee, correction and backdated-fill semantics, sandbox availability, provisioning CSV schemas, and server-side copy configuration. The design absorbs either report shape because marks are always **computed** from ingested rows and never trusted from a vendor summary. The full provisional list lives in [STATE.md](../STATE.md).
+**Provisional pending vendor confirmation ([ADR-005](../decisions/ADR-005.md)):** report file formats and field lists, delivery cadence and any timing guarantee, correction and backdated-fill semantics, sandbox availability, provisioning CSV schemas, and server-side copy configuration. The design absorbs either report shape because marks are always **computed** from ingested rows and never trusted from a vendor summary. The full provisional list lives in [STATE.md](../STATE.md).
 
 ## 9. What v1 deliberately does not build
 
@@ -298,8 +298,8 @@ Streaming or intraday risk; a no-code program editor; multi-tenancy or theming; 
 
 ## 10. Founder rulings (Wave 2 gate, 2026-08-13)
 
-All three resolved at the gate. Recorded in [DECISIONS.md](../DECISIONS.md).
+All three resolved at the gate. Recorded in [DECISIONS.md](../decisions/README.md).
 
-1. **Queue: pg-boss, accepted** ([ADR-006](../DECISIONS.md)). Closes the constitution §10 queue-tech item.
-2. **ORM: Drizzle, accepted** ([ADR-008](../DECISIONS.md)). **Hosting: Neon plus Railway plus Cloudflare, accepted** ([ADR-007](../DECISIONS.md)). Both constitution §10 items are closed. The admin origin rides along and is settled separately as a **separate apex domain** with the placeholder `ADMIN_ORIGIN` ([ADR-012](../DECISIONS.md)).
-3. **Reserve funding cadence: weekly manual plus a same-day top-up trigger** ([ADR-011](../DECISIONS.md)). The baseline stays a weekly manual transfer into the payout wallet. In addition, when the Eligible-Next-7-Days forecast crosses a configured share of the payout wallet balance, the admin home raises a same-day top-up task and alerts. The forecast exists precisely so a bad week is visible before it arrives, and this is what makes it operational rather than decorative. The threshold is configuration, reviewed monthly in the C8 retro; M5 sets its initial value against the CVaR99 estimate.
+1. **Queue: pg-boss, accepted** ([ADR-006](../decisions/ADR-006.md)). Closes the constitution §10 queue-tech item.
+2. **ORM: Drizzle, accepted** ([ADR-008](../decisions/ADR-008.md)). **Hosting: Neon plus Railway plus Cloudflare, accepted** ([ADR-007](../decisions/ADR-007.md)). Both constitution §10 items are closed. The admin origin rides along and is settled separately as a **separate apex domain** with the placeholder `ADMIN_ORIGIN` ([ADR-012](../decisions/ADR-012.md)).
+3. **Reserve funding cadence: weekly manual plus a same-day top-up trigger** ([ADR-011](../decisions/ADR-011.md)). The baseline stays a weekly manual transfer into the payout wallet. In addition, when the Eligible-Next-7-Days forecast crosses a configured share of the payout wallet balance, the admin home raises a same-day top-up task and alerts. The forecast exists precisely so a bad week is visible before it arrives, and this is what makes it operational rather than decorative. The threshold is configuration, reviewed monthly in the C8 retro; M5 sets its initial value against the CVaR99 estimate.

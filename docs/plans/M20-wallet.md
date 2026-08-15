@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M08-affiliate-system.md, M14-loyalty-retention.md, M17-offers-engine.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../EDGE_CASES.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M08-affiliate-system.md, M14-loyalty-retention.md, M17-offers-engine.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 
 # M20: Merit Wallet
 
-[ADR-019](../DECISIONS.md), Appendix B5's ten-section template, Appendix D4's payout-path hardening, and [SECURITY section 4.7](../architecture/SECURITY.md)'s wallet account-takeover blast-radius analysis. **Money path under [ADR-003](../DECISIONS.md)'s strict regime**, and the newest crown jewel in the estate.
+[ADR-019](../decisions/ADR-019.md), Appendix B5's ten-section template, Appendix D4's payout-path hardening, and [SECURITY section 4.7](../architecture/SECURITY.md)'s wallet account-takeover blast-radius analysis. **Money path under [ADR-003](../decisions/ADR-003.md)'s strict regime**, and the newest crown jewel in the estate.
 
 [M05](M05-payout-system.md) owns both payout legs and this plan does not restate them. **M20 owns the wallet as an object**: what a balance is, what may enter it, what may leave it and by which route, and the fraud surface that exists only because one balance is simultaneously spendable inside Merit and withdrawable outside it.
 
@@ -32,7 +32,7 @@ The `trader_wallet` ledger position per identity ([M05](M05-payout-system.md) SD
 | WF-M20-04 | **Refund credit** | In | [M03](M03-billing-checkout.md) | **Only for wallet-funded purchases** (INV-M20-05, AS-M20-03) |
 | WF-M20-05 | **Correction** | Either | Admin, dual controlled | Compensating ledger entries only, never an update |
 
-**`promotional_credit` is not in that table and that is the point.** It is a separate ledger class ([ADR-019](../DECISIONS.md), [M14](M14-loyalty-retention.md) INV-M14-10, [M17](M17-offers-engine.md) INV-M17-08) with no path to `trader_wallet` and no path to a withdrawal. Section 3.4 and AS-M20-01 explain why that separation, on its own, is not sufficient.
+**`promotional_credit` is not in that table and that is the point.** It is a separate ledger class ([ADR-019](../decisions/ADR-019.md), [M14](M14-loyalty-retention.md) INV-M14-10, [M17](M17-offers-engine.md) INV-M17-08) with no path to `trader_wallet` and no path to a withdrawal. Section 3.4 and AS-M20-01 explain why that separation, on its own, is not sufficient.
 
 ### 1.2 What a wallet balance is, stated precisely
 
@@ -61,10 +61,10 @@ The `trader_wallet` ledger position per identity ([M05](M05-payout-system.md) SD
 | INV-M20-05 | A refund is returned to the **payment method that funded the purchase**, always. A card purchase never refunds to the wallet | AS-M20-03. Crossing rails converts card money into withdrawable cash and bypasses the card network's own protections |
 | INV-M20-06 | A **payouts-frozen** identity cannot spend wallet value either | AS-M20-02. A freeze that stops the cash door and leaves the product door open is not a freeze |
 | INV-M20-07 | Wallet spend carries a per-identity velocity limit, with excess **delayed rather than refused** | [SECURITY](../architecture/SECURITY.md) C-23, [M05](M05-payout-system.md) OQ-M5-06 |
-| INV-M20-08 | Wallet balances are **segregated in reporting and in fact**, and the float is never treated as working capital | AS-M20-08. [ADR-019](../DECISIONS.md) says liquidity improves and liability does not, and this is the invariant that keeps the second half true |
+| INV-M20-08 | Wallet balances are **segregated in reporting and in fact**, and the float is never treated as working capital | AS-M20-08. [ADR-019](../decisions/ADR-019.md) says liquidity improves and liability does not, and this is the invariant that keeps the second half true |
 | INV-M20-09 | A wallet balance is **payable on demand forever**, and dormancy never forfeits it | AS-M20-07. A forfeiture clause on money already earned is the single most brand-destroying term available to this firm |
 | INV-M20-10 | Every wallet position reconciles: sum of credits minus sum of debits equals the ledger position, per identity, nightly | Extends [M05](M05-payout-system.md) INV-M5-04's zero-sum discipline to a per-identity assertion, because the wallet is where a per-identity error would hide |
-| INV-M20-11 | The wallet is **not an account a third party can pay into**. There is no deposit, no top-up, and no funding from outside | AS-M20-04. The moment Merit accepts inbound money into a spendable, withdrawable balance, it is operating something quite different from what [ADR-019](../DECISIONS.md) approved |
+| INV-M20-11 | The wallet is **not an account a third party can pay into**. There is no deposit, no top-up, and no funding from outside | AS-M20-04. The moment Merit accepts inbound money into a spendable, withdrawable balance, it is operating something quite different from what [ADR-019](../decisions/ADR-019.md) approved |
 
 ---
 
@@ -191,7 +191,7 @@ stateDiagram-v2
 | `wallet.spend_refused` **NEW** | frozen, cross-identity, or insufficient | `{ identity_id, reason }`. Consumers: RISK, FEED. **A cross-identity attempt is high severity**, because there is no legitimate reason to make one (AS-M20-06) |
 | `wallet.withdrawal_held` **NEW** | P-1 or P-3 | `{ withdrawal_id, rule, provenance_summary, expected_release }`. Consumers: ALERT, NOTIF, FEED. The trader is told which rule and when it clears |
 | `wallet.provenance_anomaly` **NEW** | a composition pattern matches a farming or laundering signature | `{ identity_id, pattern, window }`. Consumers: ALERT, RISK, EVID |
-| `wallet.reconciliation_failed` **NEW** | INV-M20-10's nightly per-identity assertion fails | `{ identity_id, expected, actual }`. **Pages**, and it is an [ADR-016](../DECISIONS.md) scoped-halt input |
+| `wallet.reconciliation_failed` **NEW** | INV-M20-10's nightly per-identity assertion fails | `{ identity_id, expected, actual }`. **Pages**, and it is an [ADR-016](../decisions/ADR-016.md) scoped-halt input |
 | `wallet.dormancy_changed` **NEW** | section 3.5 transitions | `{ identity_id, state }`. Consumers: NOTIF, FEED, and the legal calendar |
 
 **Consumed:** `payout.approved` and the internal-leg settlement, `purchase.charged_back` and `purchase.refunded`, `flag.status_changed` and `identity.payouts_frozen`, `kyc.verified` and `kyc.expired`, and `offer.redeemed` (to record that an account was bought with promotional credit, which is P-1's input).
@@ -211,7 +211,7 @@ stateDiagram-v2
 | FM-M20-07 | Wallet value funds another identity's account | The wallet is a transfer instrument, which INV-M5-14 forbids | Target-account ownership check (INV-M20-02) | Refuse and flag at high severity. AS-M20-06 |
 | FM-M20-08 | Dormant balance forfeited or quietly retained | Either a brand catastrophe or an unclaimed-property violation | Dormancy state machine (SD-M20-04) | Never forfeit (INV-M20-09); remit per jurisdiction. AS-M20-07 |
 | FM-M20-09 | Float treated as working capital | The firm spends money it owes, and the RCR stops meaning anything | Segregation, reconciliation, and float reported separately (INV-M20-08) | AS-M20-08 |
-| FM-M20-10 | Per-identity position diverges from the ledger | A wallet-shaped hole, invisible in a global sum that still balances | Nightly per-identity assertion (INV-M20-10) | `wallet.reconciliation_failed` pages and scopes a halt per [ADR-016](../DECISIONS.md) |
+| FM-M20-10 | Per-identity position diverges from the ledger | A wallet-shaped hole, invisible in a global sum that still balances | Nightly per-identity assertion (INV-M20-10) | `wallet.reconciliation_failed` pages and scopes a halt per [ADR-016](../decisions/ADR-016.md) |
 
 ---
 
@@ -221,7 +221,7 @@ stateDiagram-v2
 
 ### AS-M20-01: Bonus-credit farming, or promotional credit laundered into cash through a funded account (NOVEL)
 
-**Attack.** [ADR-019](../DECISIONS.md) and [M14](M14-loyalty-retention.md) INV-M14-10 separate `promotional_credit` from `trader_wallet` with no path between them, and [M17](M17-offers-engine.md) INV-M17-08 asserts it again. That closes the **direct** route and leaves the product open as an indirect one:
+**Attack.** [ADR-019](../decisions/ADR-019.md) and [M14](M14-loyalty-retention.md) INV-M14-10 separate `promotional_credit` from `trader_wallet` with no path between them, and [M17](M17-offers-engine.md) INV-M17-08 asserts it again. That closes the **direct** route and leaves the product open as an indirect one:
 
 1. Accumulate promotional credit through whatever mechanic issues it: a campaign, a loyalty grant, a reset promotion.
 2. Spend the credit on an evaluation. Credit is spendable at checkout, which is the entire point of it.
@@ -271,21 +271,21 @@ stateDiagram-v2
 
 ### AS-M20-04: The wallet becomes a deposit account by accretion (NOVEL)
 
-**Attack.** Nobody proposes operating a payment institution. What gets proposed, in order, each reasonable: let traders **top up** the wallet so they can buy faster; let a trader's **employer or backer** fund it; let a wallet balance be **sent to another trader** as a gift or a split; pay a small **return** on idle balances to encourage traders to leave money in. [ADR-019](../DECISIONS.md) already rejected interest and peer-to-peer transfer "outright, see the legal note", and it did not reject top-ups, because nobody had proposed them yet.
+**Attack.** Nobody proposes operating a payment institution. What gets proposed, in order, each reasonable: let traders **top up** the wallet so they can buy faster; let a trader's **employer or backer** fund it; let a wallet balance be **sent to another trader** as a gift or a split; pay a small **return** on idle balances to encourage traders to leave money in. [ADR-019](../decisions/ADR-019.md) already rejected interest and peer-to-peer transfer "outright, see the legal note", and it did not reject top-ups, because nobody had proposed them yet.
 
 **Why the line matters so much.** A balance that only ever receives money the customer already earned, and only ever pays it back or spends it on the issuer's own products, is a **payable**. A balance that accepts inbound funds from the customer or a third party, holds them, and pays them out, is stored value, and depending on the jurisdiction that is money transmission or e-money, with licensing, safeguarding, and reporting obligations that no document in this corpus contemplates. **Merit's whole compliance posture assumes the first thing.** And a top-up feature would arrive as a checkout convenience with an engineering ticket, not as a regulatory decision, which is exactly how firms end up operating unlicensed.
 
 **Counter.**
 1. **No deposit, no top-up, no third-party funding, ever** (INV-M20-11). There is no endpoint, no payment method, and no admin path. This is the module's hardest boundary and it is enforced by the absence of a mechanism.
 2. **The only credits are WF-M20-01 payouts, WF-M20-04 refunds of wallet-funded purchases, and WF-M20-05 corrections** (section 1.1). That list is closed, is asserted by the `provenance` check constraint, and adding a value to it is a schema change that surfaces in a money-path migration review.
-3. **No interest and no peer-to-peer**, per [ADR-019](../DECISIONS.md), unchanged, and now with the reason recorded in the same place as the rest of the boundary.
-4. **A counsel item is filed in [legal/](../legal/README.md)** confirming that a payable of this shape is not a regulated stored-value product in Merit's operating jurisdictions, before launch rather than after. [ADR-019](../DECISIONS.md) already flagged a wallet counsel-review item; this scenario states precisely which question it must answer. EC-135, GS-225.
+3. **No interest and no peer-to-peer**, per [ADR-019](../decisions/ADR-019.md), unchanged, and now with the reason recorded in the same place as the rest of the boundary.
+4. **A counsel item is filed in [legal/](../legal/README.md)** confirming that a payable of this shape is not a regulated stored-value product in Merit's operating jurisdictions, before launch rather than after. [ADR-019](../decisions/ADR-019.md) already flagged a wallet counsel-review item; this scenario states precisely which question it must answer. EC-135, GS-225.
 
 ### AS-M20-05: The payout funded by a payment that came back (NOVEL)
 
 **Attack.** B4 #10 pins the chargeback that lands after a settled payout: the identity nets negative, the account closes, and the ledger shows the firm's loss honestly. The wallet adds a **timing** dimension that pin does not cover. A trader buys with a stolen card, passes quickly, takes a payout to the wallet, and withdraws to a bank. Weeks later the chargeback lands. Merit has already sent real cash out of the building on an account funded by a payment that was reversed, and B4 #10's honest accounting records a loss rather than preventing one.
 
-**Why the wallet makes this sharper rather than softer.** Under the pre-wallet design the whole cycle ran on the external rail's timing: request, approve, transfer, settle, which took days and made the fast version harder. [ADR-019](../DECISIONS.md) deliberately compressed the cycle: Merit Rapid is a 3 trading day cycle and the wallet credit is instant. The improvement is real and it also compresses the attacker's cycle by exactly the same amount, and the attacker's cycle is the one racing the chargeback window.
+**Why the wallet makes this sharper rather than softer.** Under the pre-wallet design the whole cycle ran on the external rail's timing: request, approve, transfer, settle, which took days and made the fast version harder. [ADR-019](../decisions/ADR-019.md) deliberately compressed the cycle: Merit Rapid is a 3 trading day cycle and the wallet credit is instant. The improvement is real and it also compresses the attacker's cycle by exactly the same amount, and the attacker's cycle is the one racing the chargeback window.
 
 **The arithmetic.** A Direct plan funds immediately, so no evaluation is needed at all. A $99 purchase on a stolen card, on a plan whose first payout can arrive within days, against a chargeback window measured in weeks or months, is a very favourable trade for the attacker. It is also, at volume, a MID health event: [M3](M03-billing-checkout.md)'s 0.65 percent threshold is the processor relationship, and this pattern damages it while extracting cash.
 
@@ -308,7 +308,7 @@ stateDiagram-v2
 **Counter.**
 1. **Wallet value may only buy products for the spending identity's own accounts** (INV-M20-02). The target account's ownership is resolved server side and compared to the paying identity, in the same transaction as the debit.
 2. **A cross-identity spend attempt is a high-severity flag, not a validation error** (`wallet.spend_refused`), because there is no legitimate reason to make one. A trader cannot construct this request by accident through the UI, so an attempt is evidence.
-3. **Gifting is not a feature and will be requested.** The answer is recorded in advance: a gift is a transfer, a transfer is prohibited by INV-M5-14, and the reason is legal as well as anti-abuse ([ADR-019](../DECISIONS.md)'s rejection of peer-to-peer, AS-M20-04).
+3. **Gifting is not a feature and will be requested.** The answer is recorded in advance: a gift is a transfer, a transfer is prohibited by INV-M5-14, and the reason is legal as well as anti-abuse ([ADR-019](../decisions/ADR-019.md)'s rejection of peer-to-peer, AS-M20-04).
 4. **This tightens [SECURITY section 4.7](../architecture/SECURITY.md)'s containment claim into something true**: internal spend is contained **because** it can only ever buy the victim's own products, which are recoverable by ledger entry and by closing the accounts. Without INV-M20-02 the containment claim was aspirational. EC-137, GS-227.
 
 ### AS-M20-07: The dormant balance nobody may keep (NOVEL)
@@ -328,9 +328,9 @@ stateDiagram-v2
 
 ### AS-M20-08: The float that stops looking like a liability (NOVEL)
 
-**Attack.** The adversary is the firm's own balance sheet. [ADR-019](../DECISIONS.md) is explicit that the wallet improves **liquidity** while leaving **liability** unchanged, and that wallet balances join Open Liability and the reserve coverage ratio. As the wallet grows, a large, stable, non-interest-bearing pool of cash sits in Merit's accounts, and every quarter it does not move. The pressure is not a decision to misappropriate it; it is a slow reframing, in which the float becomes "our cash position", then working capital, then the thing that funds a marketing push in a slow month.
+**Attack.** The adversary is the firm's own balance sheet. [ADR-019](../decisions/ADR-019.md) is explicit that the wallet improves **liquidity** while leaving **liability** unchanged, and that wallet balances join Open Liability and the reserve coverage ratio. As the wallet grows, a large, stable, non-interest-bearing pool of cash sits in Merit's accounts, and every quarter it does not move. The pressure is not a decision to misappropriate it; it is a slow reframing, in which the float becomes "our cash position", then working capital, then the thing that funds a marketing push in a slow month.
 
-**Why it is fatal rather than merely aggressive.** The RCR is the control that pauses sales ([M05](M05-payout-system.md) INV-M5-12, FM-M5-06) and it is computed as reserve over `CVaR99 at rho = 0.30`. If wallet balances are counted as reserve **and** owed as liability, the ratio flatters itself with the same money on both sides, and the breaker stops meaning anything at exactly the moment it matters: a wave of withdrawals is simultaneously the event that draws down the float and the event the reserve exists for. The [batch 1 gate's conservatism ruling](../DECISIONS.md) put operational conservatism in the RCR breaker at 1.0, and this is the mechanism by which that number quietly becomes fictional.
+**Why it is fatal rather than merely aggressive.** The RCR is the control that pauses sales ([M05](M05-payout-system.md) INV-M5-12, FM-M5-06) and it is computed as reserve over `CVaR99 at rho = 0.30`. If wallet balances are counted as reserve **and** owed as liability, the ratio flatters itself with the same money on both sides, and the breaker stops meaning anything at exactly the moment it matters: a wave of withdrawals is simultaneously the event that draws down the float and the event the reserve exists for. The [batch 1 gate's conservatism ruling](../decisions/gates/wave-3-batch-1-gate-closure-2026-08-14.md) put operational conservatism in the RCR breaker at 1.0, and this is the mechanism by which that number quietly becomes fictional.
 
 **Counter.**
 1. **Segregation in fact and in reporting** (INV-M20-08). Wallet balances are held in the payout wallet's segregated position, are reported as a distinct line, and are **never** counted toward reserve. [M06](M06-admin-ops-console.md)'s liability dashboard shows float and reserve as separate figures with the RCR computed from reserve alone.
@@ -372,7 +372,7 @@ stateDiagram-v2
 | GS-228 | A balance reaches the jurisdictional dormancy period | Escalating contact through security-class channels including prior contacts; **never forfeited**; remitted per jurisdiction. AS-M20-07 |
 | GS-229 | Reserve coverage computed while wallet float is large | Float is excluded from reserve, reported separately, and the RCR is computed from reserve alone against a live rail balance. AS-M20-08 |
 | GS-230 | Simultaneous withdrawal and checkout spend against one balance | Exactly one succeeds where the balance covers only one; the position never goes negative. INV-M20-01, FM-M20-01 |
-| GS-231 | Per-identity reconciliation with a global ledger that still balances | The per-identity assertion **fails and pages** even though the global sum is zero. INV-M20-10, [ADR-016](../DECISIONS.md) |
+| GS-231 | Per-identity reconciliation with a global ledger that still balances | The per-identity assertion **fails and pages** even though the global sum is zero. INV-M20-10, [ADR-016](../decisions/ADR-016.md) |
 
 ### 8.3 Coverage rule
 
@@ -387,7 +387,7 @@ stateDiagram-v2
 | Metric | Why it matters |
 |---|---|
 | Total wallet float, and its distribution across identities | INV-M20-08. The concentration matters as much as the total, because a few large balances are a different liquidity profile from many small ones |
-| Withdrawal rate: share of credited value withdrawn within 7, 30, and 90 days | The behavioural assumption [ADR-019](../DECISIONS.md)'s liquidity claim rests on, measured rather than assumed |
+| Withdrawal rate: share of credited value withdrawn within 7, 30, and 90 days | The behavioural assumption [ADR-019](../decisions/ADR-019.md)'s liquidity claim rests on, measured rather than assumed |
 | Spend rate: share of credited value spent at checkout | The other half, and the input to whether the wallet is a payout mechanism or a closed-loop currency |
 | Withdrawals held by rule (P-1, P-3), count and median duration | AS-M20-01 and AS-M20-05. A rising median is a bounded control becoming an unbounded one, which is [M05](M05-payout-system.md) AS-M5-04's pattern |
 | `wallet.spend_delayed` bursts per identity | The account-takeover signature, and the tuning input for C-23's limits |
@@ -402,7 +402,7 @@ stateDiagram-v2
 | Alert | Threshold | Severity |
 |---|---|---|
 | Wallet position negative | any | **page**. INV-M20-01 regressed |
-| Per-identity reconciliation failure | any | **page**, and it scopes a halt per [ADR-016](../DECISIONS.md) |
+| Per-identity reconciliation failure | any | **page**, and it scopes a halt per [ADR-016](../decisions/ADR-016.md) |
 | Cross-identity spend attempt | any | **page** to risk |
 | Refund routed to a wallet from a non-wallet-funded purchase | any | **page**. The rails crossed |
 | A credit posted with a provenance outside the closed list | any | **page**. A new way in exists |
@@ -424,7 +424,7 @@ M20 supplies the float panel on [M6](M06-admin-ops-console.md): total float, its
 
 **OQ-M20-03. RULED at the batch 2 gate: proceed on the payable-balance framing, with a named invariant.** **`INV-WALLET-NO-DEPOSITS`: wallet funds originate only from payouts, promotional credit, and refunds. No external loading, ever, without a new ADR and counsel sign-off.** The closed credit list **excludes deposits explicitly** rather than merely omitting them, because an omission is a gap someone eventually fills and an exclusion is a decision someone has to reverse in writing. Counsel confirmation is **counsel packet item 2** and is still wanted before launch; the framing proceeds meanwhile. The original question is preserved below.
 
-**OQ-M20-03 (as asked). Counsel confirmation that the wallet is a payable and not a regulated stored-value product.** [ADR-019](../DECISIONS.md) flagged a wallet counsel item and AS-M20-04 states the precise question: does a balance that receives only earned funds and refunds of its own spend, pays no interest, permits no transfer, accepts no deposit, and is payable on demand, avoid money-transmission or e-money characterization in Merit's operating jurisdictions? **This should be answered before launch**, because the answer may add a condition rather than a prohibition, and conditions are cheap in advance.
+**OQ-M20-03 (as asked). Counsel confirmation that the wallet is a payable and not a regulated stored-value product.** [ADR-019](../decisions/ADR-019.md) flagged a wallet counsel item and AS-M20-04 states the precise question: does a balance that receives only earned funds and refunds of its own spend, pays no interest, permits no transfer, accepts no deposit, and is payable on demand, avoid money-transmission or e-money characterization in Merit's operating jurisdictions? **This should be answered before launch**, because the answer may add a condition rather than a prohibition, and conditions are cheap in advance.
 
 **OQ-M20-04. RULED: dormancy tracking and the 12-month notice schedule are designed now, in v1.** Retrofitting a notice schedule onto balances that have already gone quiet means reconstructing when they went quiet, which is the kind of archaeology that produces a compliance answer nobody can defend. **Escheatment state-mapping is counsel packet item 3**: trigger dates vary by jurisdiction and the mapping belongs on a calendar. The published policy stating Merit never keeps a balance stands. The original question is preserved below.
 

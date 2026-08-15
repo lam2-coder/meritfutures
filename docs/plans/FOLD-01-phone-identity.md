@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../DECISIONS.md, ../architecture/SECURITY.md, ../architecture/DATA_MODEL.md, ../legal/PRIVACY_POLICY.md, ../legal/COUNSEL_PACKET.md, ../testing/STRATEGY.md, M03-billing-checkout.md, M04-trader-portal.md, M07-risk-abuse.md, M10-integrations.md, M16-notification-center.md, M19-kyc-identity.md, ../../packages/db/DELTA_MANIFEST.md]
+depends_on: [../decisions/README.md, ../architecture/SECURITY.md, ../architecture/DATA_MODEL.md, ../legal/PRIVACY_POLICY.md, ../legal/COUNSEL_PACKET.md, ../testing/STRATEGY.md, M03-billing-checkout.md, M04-trader-portal.md, M07-risk-abuse.md, M10-integrations.md, M16-notification-center.md, M19-kyc-identity.md, ../../packages/db/DELTA_MANIFEST.md]
 last_updated: 2026-08-15
 ---
 
@@ -8,7 +8,7 @@ last_updated: 2026-08-15
 
 **A fold plan, not a module plan.** The `FOLD-nn` series exists because a founder ruling that touches nine documents and the first post-merge migration is too large to fold from a prompt and too small to be a module. It is approved before the fold begins and it is what the fold is scored against.
 
-**The ruling itself becomes an ADR during the fold.** Its number is claimed in [DECISIONS](../DECISIONS.md)'s allocation table before it is written, per [ADR-034](../DECISIONS.md) and [ADR-036](../DECISIONS.md), and this plan deliberately does not bake a number into a filename it cannot rename later.
+**The ruling itself becomes an ADR during the fold.** Its number is claimed in [DECISIONS](../decisions/README.md)'s allocation table before it is written, per [ADR-034](../decisions/ADR-034.md) and [ADR-036](../decisions/ADR-036.md), and this plan deliberately does not bake a number into a filename it cannot rename later.
 
 ---
 
@@ -16,7 +16,7 @@ last_updated: 2026-08-15
 
 Auth is passkeys plus email OTP plus SMS OTP, any single factor sufficient for login. **No passwords are retained, credential-stuffing immunity is preserved, and that immunity is the reason.**
 
-**Phone verification is mandatory at registration and is a first-class identity signal rather than a contact field.** Emails are free to mint and real mobile numbers are scarce, so phone is a high-weight node in [ADR-022](../DECISIONS.md)'s link-confidence graph.
+**Phone verification is mandatory at registration and is a first-class identity signal rather than a contact field.** Emails are free to mint and real mobile numbers are scarce, so phone is a high-weight node in [ADR-022](../decisions/ADR-022.md)'s link-confidence graph.
 
 | Point | Ruling |
 |---|---|
@@ -43,7 +43,7 @@ Five readings changed this plan. Each is a live contradiction or a gap, not a nu
 |---|---|---|---|
 | **1** | **[SECURITY section 2.7](../architecture/SECURITY.md) says "no SMS-based second factor anywhere in the stack"** | `SECURITY.md:122` | The ruling adds SMS OTP for traders. A direct textual contradiction, resolved explicitly in the ADR rather than glossed. **Section 2.7 sits under "The founder (the human asset)" and is rescoped to founder and admin credentials.** Admin auth stays hardware-key SSO (C-08) with no SMS path, ever |
 | **2** | **C-01 reads "Passwordless only: passkeys plus email OTP"** | `SECURITY.md:19` | C-01 widens to three factors. **The stuffing-immunity claim in section 2.6 is unchanged and is the reason**, and the ADR says so in those words so a later reader cannot mistake a widening for a weakening |
-| **3** | **[ADR-023](../DECISIONS.md)'s vendor already buys phone footprint**: "email and **phone** digital-footprint... device, IP, VPN and datacenter detection" | `DECISIONS.md:483`, restated at `M03:311` and [M07](M07-risk-abuse.md) D-15 | Decision 1 below resolves on this evidence rather than on preference |
+| **3** | **[ADR-023](../decisions/ADR-023.md)'s vendor already buys phone footprint**: "email and **phone** digital-footprint... device, IP, VPN and datacenter detection" | `DECISIONS.md:483`, restated at `M03:311` and [M07](M07-risk-abuse.md) D-15 | Decision 1 below resolves on this evidence rather than on preference |
 | **4** | **`contact_channels.kind check in ('email','push')`**, and its live-uniqueness index is per `(identity_id, kind)` | [DATA_MODEL](../architecture/DATA_MODEL.md), `0019` | **The `INV-M16-03` prior-contact countermeasure cannot notify a prior number today.** (c) is unbuildable until `sms` joins that check |
 | **5** | **`OI-06`. There is no `payout_destinations` table anywhere in the merged 96 tables.** `destination_ref` is a column on `payout_transfers` (`0010:243`) and `wallet_withdrawals` (`0011:132`), the destination **of a transfer** | grep of `packages/db/migrations` | **C-11, C-24, [SECURITY section 4](../architecture/SECURITY.md) item 1, [M20](M20-wallet.md) `WF-M20-02` and [M04](M04-trader-portal.md)'s destination-cooling scenario all require "destination outside its 48 hour cooling window", and nothing in the schema can answer when a destination changed.** Found by trying to model (c) on the control (c) says to copy. See section 8 |
 
@@ -51,7 +51,7 @@ Five readings changed this plan. Each is a live contradiction or a gap, not a nu
 
 ## 3. The two decisions this plan takes rather than defers
 
-### 3.1 The registration lookup is [ADR-023](../DECISIONS.md)'s existing vendor, scope widened. No second sub-processor.
+### 3.1 The registration lookup is [ADR-023](../decisions/ADR-023.md)'s existing vendor, scope widened. No second sub-processor.
 
 ADR-023 already purchases phone digital-footprint, VPN and datacenter detection, and device and IP reputation from a SEON-class vendor. **Three of (a)'s four signals sit inside that purchased scope; only portability history is a genuinely separable product.** [M19](M19-kyc-identity.md) OQ-M19-04's corpus-splitting argument and ADR-022's identity-replacement-cost framing both cut against buying a second vendor for one signal class.
 
@@ -81,11 +81,11 @@ The privacy policy is the output; **the lawful basis is the question.** [COUNSEL
 
 ## 4. Migration `0029`, and the number is claimed before the file is written
 
-`0029_phone_identity_and_auth.sql`, carrying an `E2 READ: MONEY PATH` header naming what in it needs the founder's line-by-line read and why. **The row in [DECISIONS](../DECISIONS.md)'s migration allocation table, which today reads "Nothing is reserved and `0029` is the next free number", is written in the same commit that creates the file.**
+`0029_phone_identity_and_auth.sql`, carrying an `E2 READ: MONEY PATH` header naming what in it needs the founder's line-by-line read and why. **The row in [DECISIONS](../decisions/README.md)'s migration allocation table, which today reads "Nothing is reserved and `0029` is the next free number", is written in the same commit that creates the file.**
 
 **It supersedes and never edits.** Constitution E2.
 
-**Nine changes. The delta identifiers are allocated in session 3, not here, and the reason is a finding in its own right.** This plan first named them inline and [ADR-026](../DECISIONS.md)'s completeness gate refused all ten, correctly: **only ADR numbers and migration numbers have an allocation table.** A delta identifier is claimed by its DELTA_MANIFEST row existing, so a plan that writes one before the row exists has pre-claimed in a registry with no claim mechanism, which is the exact drift ADR-034 and ADR-036 were built to stop. Each change below therefore names its owning module and its table, and takes the next free number in that module's series when the manifest row is written.
+**Nine changes. The delta identifiers are allocated in session 3, not here, and the reason is a finding in its own right.** This plan first named them inline and [ADR-026](../decisions/ADR-026.md)'s completeness gate refused all ten, correctly: **only ADR numbers and migration numbers have an allocation table.** A delta identifier is claimed by its DELTA_MANIFEST row existing, so a plan that writes one before the row exists has pre-claimed in a registry with no claim mechanism, which is the exact drift ADR-034 and ADR-036 were built to stop. Each change below therefore names its owning module and its table, and takes the next free number in that module's series when the manifest row is written.
 
 | # | Change | Owner | Serves |
 |---|---|---|---|
@@ -99,7 +99,7 @@ The privacy policy is the output; **the lawful basis is the question.** [COUNSEL
 | 8 | `notification_kinds.class` gains `pre_identity_auth`, and a new **`rate_limit_exempt boolean` generated from `class`** | [M16](M16-notification-center.md) | Amendment 2, made unforgeable the way `mutable` already is |
 | 9 | `kyc_verifications.verification_purpose` check widened: `reverify_phone_change` | [M19](M19-kyc-identity.md) | (c)'s re-verification, `INV-M19-06` |
 
-**Two disciplines inherited from defects this corpus already paid for.** Every `CHECK` over an array uses `cardinality()` and never `array_length`, because a `CHECK` evaluating to `NULL` passes. Every trigger body names only columns the migrations declare, which is what [CI-06j](../testing/STRATEGY.md) asserts from the tree after [ADR-035](../DECISIONS.md).
+**Two disciplines inherited from defects this corpus already paid for.** Every `CHECK` over an array uses `cardinality()` and never `array_length`, because a `CHECK` evaluating to `NULL` passes. Every trigger body names only columns the migrations declare, which is what [CI-06j](../testing/STRATEGY.md) asserts from the tree after [ADR-035](../decisions/ADR-035.md).
 
 ---
 
@@ -121,7 +121,7 @@ The ruling named nine documents. **The corpus's own gates force twenty-one, and 
 
 | File | What lands |
 |---|---|
-| [DECISIONS](../DECISIONS.md) | The ADR itself, its allocation row, the `0029` allocation row, and the amendments by citation to **ADR-022** (the hard-link class gains verified phone) and **ADR-023** (the registration call site, and portability history as a selection criterion) |
+| [DECISIONS](../decisions/README.md) | The ADR itself, its allocation row, the `0029` allocation row, and the amendments by citation to **ADR-022** (the hard-link class gains verified phone) and **ADR-023** (the registration call site, and portability history as a selection criterion) |
 | [SECURITY](../architecture/SECURITY.md) | C-01 widened with the immunity reason preserved verbatim; **C-27** the authority boundary; **C-28** pre-identity OTP velocity and the cost breaker; section 2.6 gains SIM-swap and OTP-interception rows; **section 2.7 rescoped** per finding 1; a **new section 4.8**, phone-change hardening under D4 |
 | [M19](M19-kyc-identity.md) | The three M19 deltas from section 4; two new invariants, that the phone hard link binds the graph and never enforces alone, and that the recycling guard is wired to portability history; section 3.2 gains the phone-change trigger; **a new adversarial scenario, the recycled number** |
 | [M07](M07-risk-abuse.md) | Sections 3.1 and 7.9 hard-link tables gain verified phone; **D-18**, the registration lookup, carrying the **fleet signature** as a named composite scored by D-16; the M7 delta wiring portability history to the recycling decision |
@@ -137,7 +137,7 @@ The ruling named nine documents. **The corpus's own gates force twenty-one, and 
 |---|---|
 | [COUNSEL_PACKET](../legal/COUNSEL_PACKET.md) | Section 3.2. Item 3 gains **3d** |
 | [DATA_MODEL](../architecture/DATA_MODEL.md) | **CI-06i, both directions.** Three new `### <table>` sections plus amended columns on five existing tables. A new table with no design record fails the gate |
-| [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md) | **[ADR-026](../DECISIONS.md)'s completeness gate.** Every new delta appears exactly once with a disposition and takes its number here, the sequence table gains `0029`, and `manifest_changes` regenerates |
+| [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md) | **[ADR-026](../decisions/ADR-026.md)'s completeness gate.** Every new delta appears exactly once with a disposition and takes its number here, the sequence table gains `0029`, and `manifest_changes` regenerates |
 | [EDGE_CASES](../EDGE_CASES.md) | **CI-06e.** New entries continue from the registry's maximum, each naming a golden scenario that resolves |
 | [GOLDEN_SCENARIOS](../testing/GOLDEN_SCENARIOS.md) | **CI-06d.** New scenarios continue from the registry's maximum in a new section, one per (a) to (e) plus amendments 2 and 3 plus the authority boundary. **Eight minimum** |
 | [STRATEGY](../testing/STRATEGY.md) | The new suites, and the gate in section 7 |
@@ -171,7 +171,7 @@ The [session brain](../../CLAUDE.md)'s caution is to prefer a gate over a bigger
 
 ## 9. Session sequence
 
-[ADR-003](../DECISIONS.md) strict. **This is not one session.**
+[ADR-003](../decisions/ADR-003.md) strict. **This is not one session.**
 
 | # | Session | Scope |
 |---|---|---|

@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [M12-transparency-platform.md, ../DECISIONS.md, ../GLOSSARY.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M05-payout-system.md, M09-marketing-site.md, M20-wallet.md]
+depends_on: [M12-transparency-platform.md, ../decisions/README.md, ../GLOSSARY.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M05-payout-system.md, M09-marketing-site.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
 
 # M12: The seven statistic definitions, for founder sign-off
 
-**This is a sign-off artifact for the Wave 4 gate**, drafted per [OQ-M12-01](../DECISIONS.md)'s ruling at the batch 2 gate. Each definition below is the exact arithmetic Merit will publish about itself, and **each needs a founder decision before any data exists**, which is the only honest moment to make it.
+**This is a sign-off artifact for the Wave 4 gate**, drafted per [OQ-M12-01](../decisions/gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md)'s ruling at the batch 2 gate. Each definition below is the exact arithmetic Merit will publish about itself, and **each needs a founder decision before any data exists**, which is the only honest moment to make it.
 
 **Why this cannot wait, in one paragraph.** A pass rate is not a number, it is a **choice of denominator**, and every available choice is defensible while moving the answer by tens of points ([AS-M12-01](M12-transparency-platform.md), [EC-094](../EDGE_CASES.md)). Choosing after the data exists means choosing with knowledge of the result, which is indistinguishable from selecting the flattering one no matter how honest the chooser. **The whole value of the transparency platform is created by the credible possibility of publishing something bad**, and that credibility comes from precommitment rather than from accuracy. GS-171 refuses a definition written with a backdated `effective_from` at write time, for exactly this reason.
 
@@ -53,7 +53,7 @@ Each carries the same fields, in the same order, so the sign-off is a comparison
 | **Grain** | Per plan, and lineup total. Per-account **and** per-identity (G-4) |
 | **`min_sample`** | **250 completed evaluations** per published cell |
 | **Surface statement** | The rate, the numerator, the denominator, the window, the as-of trading day, and the **open count** |
-| **Why 250** | [OQ-M12-04](../DECISIONS.md)'s recommendation. A high floor is a legitimate way to be careful and, unlike an approval step, it is a commitment made **before** the data rather than after |
+| **Why 250** | [OQ-M12-04](../decisions/gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md)'s recommendation. A high floor is a legitimate way to be careful and, unlike an approval step, it is a commitment made **before** the data rather than after |
 
 **The founder decision this one carries.** ST-01 is the headline and it is the number a competitor will quote against Merit if it is low. **TradeDay publishes 36 percent, as a blog figure**, and it is the only top-ten firm publishing a pass rate at all. Merit's own selection math puts blended pass near **14.7 percent**, and the honest reason it is lower is G-1 and G-3: Merit counts the never-traded and counts a reset as a second attempt, and a blog figure has no stated denominator to compare against. **The comparison Merit may make is about the practice, not the value** (GS-169).
 
@@ -72,7 +72,7 @@ Each carries the same fields, in the same order, so the sign-off is a comparison
 | **`min_sample`** | **100 resolved funded accounts** |
 | **Surface statement** | Rate, numerator, denominator, window, as-of day, and the still-funded count |
 
-**This is the number that says whether funded accounts actually get paid**, which is the question ST-01 does not answer, and it is the more important of the two. [ADR-018](../DECISIONS.md)'s recalibration reports **48.1 percent** internally, which is a good number and is exactly why publishing it is worth the risk of the quarter it is not.
+**This is the number that says whether funded accounts actually get paid**, which is the question ST-01 does not answer, and it is the more important of the two. [ADR-018](../decisions/ADR-018.md)'s recalibration reports **48.1 percent** internally, which is a good number and is exactly why publishing it is worth the risk of the quarter it is not.
 
 ---
 
@@ -89,7 +89,7 @@ Each carries the same fields, in the same order, so the sign-off is a comparison
 | **`min_sample`** | None. A total of a small number is still a true total |
 | **Surface statement** | The figure, the window, the as-of day, the **count of payouts** behind it, and a link to the proof trail |
 
-**Two decisions worth naming.** **Wallet credit is the recognition point**, not external settlement, because that is when the trader has the money under [ADR-019](../DECISIONS.md) and publishing the later moment would understate a real thing. And **the count is published with the total**, because a large total from three payouts and a large total from three hundred are different claims.
+**Two decisions worth naming.** **Wallet credit is the recognition point**, not external settlement, because that is when the trader has the money under [ADR-019](../decisions/ADR-019.md) and publishing the later moment would understate a real thing. And **the count is published with the total**, because a large total from three payouts and a large total from three hundred are different claims.
 
 ---
 
@@ -125,7 +125,7 @@ Each carries the same fields, in the same order, so the sign-off is a comparison
 | **`min_sample`** | **50 requests** |
 | **Surface statement** | p50 and p95, count, the **freeze decomposition**, window, as-of day |
 
-**Under [ADR-019](../DECISIONS.md) this is effectively zero and it is Merit's strongest verifiable claim.** Approval, the ledger posting, and the wallet credit commit in one transaction (GS-128). **A number that is structurally near-zero is exactly the kind of claim a reader disbelieves**, which is why the freeze decomposition is published with it rather than as a footnote: the believable version of "instant" is the one that shows the exceptions.
+**Under [ADR-019](../decisions/ADR-019.md) this is effectively zero and it is Merit's strongest verifiable claim.** Approval, the ledger posting, and the wallet credit commit in one transaction (GS-128). **A number that is structurally near-zero is exactly the kind of claim a reader disbelieves**, which is why the freeze decomposition is published with it rather than as a footnote: the believable version of "instant" is the one that shows the exceptions.
 
 ---
 
@@ -167,7 +167,7 @@ Each carries the same fields, in the same order, so the sign-off is a comparison
 
 ### The declared measure set and the published unit, per statistic
 
-**Added at the schema-delta gate under [ADR-031](../DECISIONS.md) and [ADR-032](../DECISIONS.md).** These two columns are not new decisions about what a statistic means; they are the definitions above written in the form the database now requires, and `statistic_definitions.measures` is seeded from this table.
+**Added at the schema-delta gate under [ADR-031](../decisions/ADR-031.md) and [ADR-032](../decisions/ADR-032.md).** These two columns are not new decisions about what a statistic means; they are the definitions above written in the form the database now requires, and `statistic_definitions.measures` is seeded from this table.
 
 | Statistic | Declared `measures` | `value_unit` | Why |
 |---|---|---|---|
@@ -218,11 +218,11 @@ Published on the method index **with their reasons**, because an unexplained abs
 | S-11 | **ST-05** with the freeze decomposition published alongside | As drafted | ☐ approve ☐ amend |
 | S-12 | **ST-06** published as a pair with ST-05 on the same surface | As drafted | ☐ approve ☐ amend |
 | S-13 | **ST-07** publishing a structural 100 percent with the full freeze decomposition | As drafted | ☐ approve ☐ amend |
-| S-14 | **The published value is `bigint` with a unit**, not `numeric`. Every statistic's unit is fixed in the table above | [ADR-031](../DECISIONS.md) | **Ruled 2026-08-14** |
-| S-15 | **Each statistic declares its measure set**, and a publish run emitting one measure emits all of them | [ADR-032](../DECISIONS.md) | **Ruled 2026-08-14** |
+| S-14 | **The published value is `bigint` with a unit**, not `numeric`. Every statistic's unit is fixed in the table above | [ADR-031](../decisions/ADR-031.md) | **Ruled 2026-08-14** |
+| S-15 | **Each statistic declares its measure set**, and a publish run emitting one measure emits all of them | [ADR-032](../decisions/ADR-032.md) | **Ruled 2026-08-14** |
 | S-14 | The **three exclusions**, with their reasons published verbatim | As drafted | ☐ approve ☐ amend |
 | S-15 | `effective_from` for every v1 definition is **launch plus 30 days** | As drafted | ☐ approve ☐ amend |
-| **S-16 (APPROVED at FREEZE)** | **[OQ-M12-04](../DECISIONS.md)**: the first number publishes whatever it says, with no approval step | **Confirm the consequence in advance**: a bad first quarter publishes, is screenshotted, and cannot be withdrawn | ☐ approve ☐ amend |
+| **S-16 (APPROVED at FREEZE)** | **[OQ-M12-04](../decisions/gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md)**: the first number publishes whatever it says, with no approval step | **Confirm the consequence in advance**: a bad first quarter publishes, is screenshotted, and cannot be withdrawn | ☐ approve ☐ amend |
 
 **S-16 is the one that matters most and it is not a definition.** [M12](M12-transparency-platform.md) INV-M12-08 removes the approval step deliberately, so that Merit can say there is no approval step. **That control is only real if its consequence is accepted before the data exists**, and accepting it afterwards is not available: the first time a founder wants to hold a number is the moment the claim stops being true.
 

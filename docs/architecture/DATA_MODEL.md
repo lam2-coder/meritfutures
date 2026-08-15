@@ -8,7 +8,7 @@ last_updated: 2026-08-15
 
 Every table, every column, with type, constraints, indexes, retention, and the reason it exists. Terms are defined in [GLOSSARY.md](../GLOSSARY.md). Migrations are sacred: once merged, a migration is never edited, only superseded.
 
-> **Amended under [ADR-026](../DECISIONS.md), 2026-08-14. The schema-delta reconciliation has landed.**
+> **Amended under [ADR-026](../decisions/ADR-026.md), 2026-08-14. The schema-delta reconciliation has landed.**
 >
 > All **94** approved schema changes are folded into one reviewed migration set at [`packages/db/migrations`](../../packages/db/migrations), 27 files, verified to apply in order against PostgreSQL 16. Every delta is traced to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../../packages/db/DELTA_MANIFEST.md), which is the file the completeness gate reads. **No delta was rejected.**
 >
@@ -16,11 +16,11 @@ Every table, every column, with type, constraints, indexes, retention, and the r
 >
 > **This document is at post-migration truth as of 2026-08-15.** §3 through §10 were rewritten table by table against the `.sql` rather than against the plan documents that proposed them: every table the migrations create has a `### <table>` section, and every section resolves to a `CREATE TABLE`. The reconciliation runs **in both directions** as [CI-06i](../testing/STRATEGY.md), so the next table added without a design record is caught by a robot rather than by counting.
 >
-> **Two things found in the rewrite were not reconciled quietly. One is closed, one is still the founder's.** [ADR-035](../DECISIONS.md) recorded a defect in `0027`'s published-plan-version immutability trigger, proven by execution: plan retirement was impossible. **ACCEPTED and fixed 2026-08-15 by [`0028`](../../packages/db/migrations/0028_supersede_plan_version_immutability.sql)**, which needs the founder's E2 read like every money-path file. **`OI-01` is OPEN and stays open**: `liability_snapshots` exists in one shape here and carried another in the approved design, with a recommendation in §8 and **no ruling, deliberately** — it is a founder call and no session takes it.
+> **Two things found in the rewrite were not reconciled quietly. One is closed, one is still the founder's.** [ADR-035](../decisions/ADR-035.md) recorded a defect in `0027`'s published-plan-version immutability trigger, proven by execution: plan retirement was impossible. **ACCEPTED and fixed 2026-08-15 by [`0028`](../../packages/db/migrations/0028_supersede_plan_version_immutability.sql)**, which needs the founder's E2 read like every money-path file. **`OI-01` is OPEN and stays open**: `liability_snapshots` exists in one shape here and carried another in the approved design, with a recommendation in §8 and **no ruling, deliberately** — it is a founder call and no session takes it.
 >
-> **Four rulings changed a column or a value rather than adding one**, and each is folded rather than merely recorded: [ADR-027](../DECISIONS.md) (two distinct per-identity ledger classes, seven in total), [ADR-028](../DECISIONS.md) (`payout_requests.status` and **both** of its index predicates), [ADR-029](../DECISIONS.md) (`dedupe_matched_identity_id` dropped), and [ADR-030](../DECISIONS.md) (`max_payouts`, `kyc.triggers`). The sentence read "three" against a list of four and is corrected here.
+> **Four rulings changed a column or a value rather than adding one**, and each is folded rather than merely recorded: [ADR-027](../decisions/ADR-027.md) (two distinct per-identity ledger classes, seven in total), [ADR-028](../decisions/ADR-028.md) (`payout_requests.status` and **both** of its index predicates), [ADR-029](../decisions/ADR-029.md) (`dedupe_matched_identity_id` dropped), and [ADR-030](../decisions/ADR-030.md) (`max_payouts`, `kyc.triggers`). The sentence read "three" against a list of four and is corrected here.
 
-> **Further amended, 2026-08-14, by two rulings on `published_statistics`.** [ADR-031](../DECISIONS.md): `value_numeric numeric` becomes **`value bigint`** with a mandatory **`value_unit`**, retiring its no-floats exemption and leaving **two** columns on that list, none of them money. [ADR-032](../DECISIONS.md): **`measure`** joins the table and the window unique key, `statistic_definitions` gains **`measures`**, and **STAT-C1** in `0027` makes "neither figure of a pair is published alone" a database constraint rather than prose. Both amend approved `SD-M12-02`; the second touches the immutability contract on a public surface. Sections amended: §13 (invariants) and §17 (the no-floats exemption list, and the verification record), plus this header.
+> **Further amended, 2026-08-14, by two rulings on `published_statistics`.** [ADR-031](../decisions/ADR-031.md): `value_numeric numeric` becomes **`value bigint`** with a mandatory **`value_unit`**, retiring its no-floats exemption and leaving **two** columns on that list, none of them money. [ADR-032](../decisions/ADR-032.md): **`measure`** joins the table and the window unique key, `statistic_definitions` gains **`measures`**, and **STAT-C1** in `0027` makes "neither figure of a pair is published alone" a database constraint rather than prose. Both amend approved `SD-M12-02`; the second touches the immutability contract on a public surface. Sections amended: §13 (invariants) and §17 (the no-floats exemption list, and the verification record), plus this header.
 
 ## 1. Conventions (binding across every table)
 
@@ -179,7 +179,7 @@ Observed entity-resolution signals. One row per observation type per value per i
 |---|---|---|---|
 | `id` | uuid | pk | |
 | `identity_id` | uuid | fk identities, not null, on delete restrict | |
-| `kind` | text | not null, check in (`device`,`ip`,`asn`,`email_normalized`,`payment`,`kyc_identity`,`rise_identity`,**`footprint_enrichment`**) | text plus check because this set grows with every detector that observes a new kind of thing. **`footprint_enrichment` is `U-04`**: [ADR-023](../DECISIONS.md)'s SEON-class checkout enrichment vendor feeding M07's D-15. Observe mode at launch, fail-open on timeout, never a silent decline |
+| `kind` | text | not null, check in (`device`,`ip`,`asn`,`email_normalized`,`payment`,`kyc_identity`,`rise_identity`,**`footprint_enrichment`**) | text plus check because this set grows with every detector that observes a new kind of thing. **`footprint_enrichment` is `U-04`**: [ADR-023](../decisions/ADR-023.md)'s SEON-class checkout enrichment vendor feeding M07's D-15. Observe mode at launch, fail-open on timeout, never a silent decline |
 | `value_hash` | bytea | not null | **hashed, never raw**: card BIN plus last four, device id, IP |
 | `value_preview` | text | null | non-identifying display fragment for admin (for example `visa ****4242`), deliberately not enough to reconstruct what it previews |
 | `first_seen_at` | timestamptz | not null default now() | |
@@ -199,7 +199,7 @@ Graph edges between identities, produced by resolution and by detectors. Append-
 | `identity_a` | uuid | fk identities, not null, on delete restrict | |
 | `identity_b` | uuid | fk identities, not null, on delete restrict | |
 | `link_kind` | text | not null | `shared_device`, `shared_payment`, `biometric_match`, `behavioural_correlation` |
-| `confidence_bp` | integer | not null, check between 0 and 10000 | evidence strength, never a boolean. [ADR-022](../DECISIONS.md) made the graph **scored**: hard links auto-enforce, soft clusters queue a pre-funding review, and a boolean edge cannot carry that distinction |
+| `confidence_bp` | integer | not null, check between 0 and 10000 | evidence strength, never a boolean. [ADR-022](../decisions/ADR-022.md) made the graph **scored**: hard links auto-enforce, soft clusters queue a pre-funding review, and a boolean edge cannot carry that distinction |
 | `evidence` | jsonb | not null | the specific observations behind the edge. An edge without its evidence is an accusation without a reason |
 | `created_by` | text | not null | detector name or `admin` |
 | `created_at` | timestamptz | not null default now() | |
@@ -211,7 +211,7 @@ Graph edges between identities, produced by resolution and by detectors. Append-
 Indexes: unique `identity_links_edge_uq (identity_a, identity_b, link_kind)`; `identity_links_a_idx (identity_a)`; `identity_links_b_idx (identity_b)`; `identity_links_live_idx (identity_a, identity_b)` where `not suppressed`, which is the enforcement read path.
 Constraints: `identity_links_canonical_order` (`identity_a < identity_b`, so an edge is stored once and cannot answer differently depending on argument order); `identity_links_suppression_has_author` (a suppression with no author is a suppression nobody owns).
 Append-only, and `suppressed` is one of the two ruled single-column exceptions in §17: the `UPDATE` is performed by a `SECURITY DEFINER` function that arrives with M07, never by the application role.
-Why the dispute path exists at all (INV-M7-09): two housemates, a married couple sharing a card, and a father funding a son's evaluation all produce **genuine** edges between **genuinely different** humans. Without a dispute path the graph's errors are permanent and invisible to the person they harm, and [ADR-022](../DECISIONS.md)'s soft-link queue makes the wrongly-linked-but-legitimate population larger, not smaller. The edge is never deleted, because "we decided this edge was wrong" is itself evidence.
+Why the dispute path exists at all (INV-M7-09): two housemates, a married couple sharing a card, and a father funding a son's evaluation all produce **genuine** edges between **genuinely different** humans. Without a dispute path the graph's errors are permanent and invisible to the person they harm, and [ADR-022](../decisions/ADR-022.md)'s soft-link queue makes the wrongly-linked-but-legitimate population larger, not smaller. The edge is never deleted, because "we decided this edge was wrong" is itself evidence.
 
 ### identity_merges
 | Column | Type | Constraints | Why |
@@ -236,14 +236,14 @@ Merit stores **status and references only**. Documents, images, and biometric te
 |---|---|---|---|
 | `id` | uuid | pk | |
 | `identity_id` | uuid | fk identities, not null, on delete restrict | |
-| `provider` | text | not null | Sumsub, Veriff, Persona class. The adapter is vendor-agnostic (M19 section 1.1) and the selected provider is named in the privacy policy at selection time, which makes provider choice a disclosure event and not only a procurement one ([ADR-021](../DECISIONS.md)) |
+| `provider` | text | not null | Sumsub, Veriff, Persona class. The adapter is vendor-agnostic (M19 section 1.1) and the selected provider is named in the privacy policy at selection time, which makes provider choice a disclosure event and not only a procurement one ([ADR-021](../decisions/ADR-021.md)) |
 | `provider_applicant_id` | text | not null | the only pointer we keep |
 | `state` | `kyc_status` enum(`kyc_required`,`pending`,`verified`,`rejected`,`expired`) | not null | mirrors the provider lifecycle |
-| `placement` | text | not null, check in (`first_purchase`,`second_distinct_account_purchase`,`second_purchase_any`,`eval_pass`,`pre_funded`,`direct_purchase`,`payout_request`) | **Widened by `U-05` under [ADR-021](../DECISIONS.md).** Records **which trigger fired**, not which set was configured. `pre_eval` is retired into `first_purchase`; `payout_request` is invalid as a sole trigger and exists only as a backstop. The frozen `kyc.triggers` value is `['second_distinct_account_purchase','pre_funded']` |
+| `placement` | text | not null, check in (`first_purchase`,`second_distinct_account_purchase`,`second_purchase_any`,`eval_pass`,`pre_funded`,`direct_purchase`,`payout_request`) | **Widened by `U-05` under [ADR-021](../decisions/ADR-021.md).** Records **which trigger fired**, not which set was configured. `pre_eval` is retired into `first_purchase`; `payout_request` is invalid as a sole trigger and exists only as a backstop. The frozen `kyc.triggers` value is `['second_distinct_account_purchase','pre_funded']` |
 | `document_country` | char(2) | null | geo-consistency triangle, recorded as three columns so a disagreement is visible rather than resolved silently |
 | `ip_country` | char(2) | null | |
 | `payment_country` | char(2) | null | |
-| `biometric_dedupe_hit` | boolean | not null default false | the fleet-killer signal. Survives [ADR-029](../DECISIONS.md) because **a boolean cannot contradict a set; it can only be stale, and staleness is detectable** |
+| `biometric_dedupe_hit` | boolean | not null default false | the fleet-killer signal. Survives [ADR-029](../decisions/ADR-029.md) because **a boolean cannot contradict a set; it can only be stale, and staleness is detectable** |
 | `rejection_reason` | text | null | |
 | `verified_at` | timestamptz | null | |
 | `expires_at` | timestamptz | null | drives re-verification |
@@ -253,9 +253,9 @@ Merit stores **status and references only**. Documents, images, and biometric te
 | `liveness_passed` | boolean | null | **`SD-M19-01`** |
 | `liveness_method` | text | null | **`SD-M19-01`.** Recorded because liveness techniques and their defeat rates move quickly: an enforcement decided on a 2027 liveness check needs to know which technique produced it (AS-M19-06), and a boolean alone ages into an assertion nobody can re-evaluate |
 | `created_at`, `updated_at` | timestamptz | not null default now() | |
-| ~~`dedupe_matched_identity_id`~~ | ~~uuid~~ | **never created, by [ADR-029](../DECISIONS.md)** | `dedupe_matches` (`SD-M19-04`) is authoritative. A dedupe hit is an **auto-enforcement input**: it bans an account without human review, and a system with two sources for that decision will eventually enforce on whichever is read first. Greenfield means the column is never created rather than created and dropped |
+| ~~`dedupe_matched_identity_id`~~ | ~~uuid~~ | **never created, by [ADR-029](../decisions/ADR-029.md)** | `dedupe_matches` (`SD-M19-04`) is authoritative. A dedupe hit is an **auto-enforcement input**: it bans an account without human review, and a system with two sources for that decision will eventually enforce on whichever is read first. Greenfield means the column is never created rather than created and dropped |
 
-Indexes: `kyc_verifications_identity_state_idx (identity_id, state)`; `kyc_verifications_dedupe_hit_idx (biometric_dedupe_hit)` where true; `kyc_verifications_supersedes_idx (supersedes)` where not null; `kyc_verifications_placement_idx (placement, created_at desc)`, which is the per-placement funnel telemetry [ADR-021](../DECISIONS.md) made a condition of its acceptance.
+Indexes: `kyc_verifications_identity_state_idx (identity_id, state)`; `kyc_verifications_dedupe_hit_idx (biometric_dedupe_hit)` where true; `kyc_verifications_supersedes_idx (supersedes)` where not null; `kyc_verifications_placement_idx (placement, created_at desc)`, which is the per-placement funnel telemetry [ADR-021](../decisions/ADR-021.md) made a condition of its acceptance.
 Constraints: `kyc_verifications_supersession_matches_purpose` (an `initial` supersedes nothing and every other purpose supersedes something, so the chain has no holes); `kyc_verifications_no_self_supersede`.
 Retention: forever (AML obligation), PII minimal by construction.
 
@@ -287,8 +287,8 @@ Retention: forever (AML obligation).
 |---|---|---|---|
 | `id` | bigint | pk, generated always as identity | high volume, never in a URL |
 | `identity_id` | uuid | fk identities, not null, on delete restrict | |
-| `placement` | text | not null, check in the same seven values as `kyc_verifications.placement` | **widened at the reconciliation**: this column records **which trigger fired**, not which placement was configured. Under [ADR-021](../DECISIONS.md) the placement is a set and the triggers race, so recording the configured set would answer a question nobody asked and lose the one that decides the adjudication |
-| `plan_code` | text | not null | per-plan escalation is pre-agreed rather than lineup-wide ([ADR-021](../DECISIONS.md) condition 3) |
+| `placement` | text | not null, check in the same seven values as `kyc_verifications.placement` | **widened at the reconciliation**: this column records **which trigger fired**, not which placement was configured. Under [ADR-021](../decisions/ADR-021.md) the placement is a set and the triggers race, so recording the configured set would answer a question nobody asked and lose the one that decides the adjudication |
+| `plan_code` | text | not null | per-plan escalation is pre-agreed rather than lineup-wide ([ADR-021](../decisions/ADR-021.md) condition 3) |
 | `step` | text | not null, check in (`gate_reached`,`session_created`,`provider_opened`,`submitted`,`decided`,`abandoned`) | |
 | `occurred_at` | timestamptz | not null default now() | |
 | `attempt_number` | integer | not null default 1, check > 0 | |
@@ -300,7 +300,7 @@ Retention: forever (it is the measurement series).
 Why it exists: drop-off per placement **cannot** be reconstructed from `kyc_verifications`, because the traders who matter most are the ones who never created a verification row at all. The abandonment is the measurement (AS-M19-08). This is the table that settles the post-beta KYC trigger adjudication, which is one of the nine items that survived FREEZE and is a config array decided on this data.
 
 ### dedupe_matches
-**`SD-M19-04`**, [ADR-029](../DECISIONS.md), finding C-05. The authoritative hard link.
+**`SD-M19-04`**, [ADR-029](../decisions/ADR-029.md), finding C-05. The authoritative hard link.
 
 | Column | Type | Constraints | Why |
 |---|---|---|---|
@@ -318,7 +318,7 @@ Why it exists: drop-off per placement **cannot** be reconstructed from `kyc_veri
 Indexes: unique `dedupe_matches_pair_uq (identity_a, identity_b, provider_ref)`, so a re-screen returning the same pair updates the disposition rather than stacking a second opinion; `dedupe_matches_a_idx`; `dedupe_matches_b_idx`; `dedupe_matches_open_idx (observed_at)` where `disposition = 'open'`, which is both the review queue and the auto-enforcement read path.
 Constraints: `dedupe_matches_canonical_order` (`identity_a < identity_b`); `dedupe_matches_resolution_is_explained` (a resolved disposition carries its reasoning, and `inconclusive` counts as resolved because deciding not to decide is a decision).
 Retention: forever.
-Why it is a table and not a column: a match is a **relationship between two identities**, not a property of one. The approved single column could not express a face matching three identities, and "first match" is not a property of a set. Under [ADR-022](../DECISIONS.md) a dedupe hit is a hard link that auto-enforces, so two sources that can disagree is an enforcement defect rather than a redundancy.
+Why it is a table and not a column: a match is a **relationship between two identities**, not a property of one. The approved single column could not express a face matching three identities, and "first match" is not a property of a set. Under [ADR-022](../decisions/ADR-022.md) a dedupe hit is a hard link that auto-enforces, so two sources that can disagree is an enforcement defect rather than a redundancy.
 
 ## 4. Catalog and configuration
 
@@ -328,7 +328,7 @@ Created by [`0004_catalog`](../../packages/db/migrations/0004_catalog.sql). Eigh
 | Column | Type | Constraints | Why |
 |---|---|---|---|
 | `id` | uuid | pk | |
-| `code` | text | not null, unique | `core_eod`, `merit_rapid`, `direct` (renamed from `rapid_daily` at the M1 gate, [ADR-013](../DECISIONS.md)). The old code is not carried forward: no row exists to migrate, and a retired alias is a second name for one thing |
+| `code` | text | not null, unique | `core_eod`, `merit_rapid`, `direct` (renamed from `rapid_daily` at the M1 gate, [ADR-013](../decisions/ADR-013.md)). The old code is not carried forward: no row exists to migrate, and a retired alias is a second name for one thing |
 | `name` | text | not null | display |
 | `is_active` | boolean | not null default true | delisting never deletes. A plan nobody can buy still has to explain the accounts sold under it |
 | `sort_order` | integer | not null default 0 | |
@@ -346,7 +346,7 @@ The immutable rule contract. Shape of `rules` in §11.
 | `plan_id` | uuid | fk plans, not null, on delete restrict | |
 | `version` | integer | not null, check > 0 | monotonic per plan |
 | `status` | `plan_version_status` enum(`draft`,`published`,`retired`) | not null default `draft` | only `published` can be sold |
-| `rules` | jsonb | not null | the full config, shape in §11, validated by zod at the write boundary. **[ADR-030](../DECISIONS.md)'s two key names are load bearing**: the ladder length is `phase_funded.max_payouts` (frozen at 5 / 5 / 4) and `kyc.triggers` is an array |
+| `rules` | jsonb | not null | the full config, shape in §11, validated by zod at the write boundary. **[ADR-030](../decisions/ADR-030.md)'s two key names are load bearing**: the ladder length is `phase_funded.max_payouts` (frozen at 5 / 5 / 4) and `kyc.triggers` is an array |
 | `copy_blocks` | jsonb | not null default `'{}'` | published rule text keyed by rule path, so marketing copy and engine parameters ship together. A version cannot be published with copy that describes a different number |
 | `public_slug` | text | not null | **`SD-M9-01`.** A stable, permanent public URL that survives being superseded (INV-M9-11). Deriving the URL from the version number would make the archive URL change whenever numbering does, which breaks the link AS-M9-07 depends on: the trader who wants to show someone the rules their account was sold under |
 | `public_visible` | boolean | not null default false | **`SD-M9-01`.** A version can be published-for-engine while not yet being the one on sale. Two facts, and one boolean cannot hold both |
@@ -357,7 +357,7 @@ The immutable rule contract. Shape of `rules` in §11.
 
 Indexes: unique `plan_versions_plan_version_uq (plan_id, version)`; unique `plan_versions_public_slug_uq (public_slug)`, unique across every version of every plan rather than within a plan, because the slug is the permanent public URL; `plan_versions_on_sale_idx (plan_id)` where `public_visible`, which is the site's read path.
 Constraints: `plan_versions_published_has_timestamp`; `plan_versions_retired_has_timestamp`; `plan_versions_visible_implies_published` (a draft is never on sale, because public visibility on an unpublished version would put an unexecutable contract on the pricing page).
-**Rows with `status = 'published'` are immutable**, enforced by the trigger `plan_versions_published_immutable` in `0027` running `assert_published_plan_version_immutable()`, **whose body is replaced by [`0028`](../../packages/db/migrations/0028_supersede_plan_version_immutability.sql) under [ADR-035](../DECISIONS.md)**. It rejects any update other than `published` moving to `retired` with `retired_at` set, pins every other column by comparing the whole row rather than a list of names, and **freezes a retired row absolutely** per [STATE_MACHINES section 9](STATE_MACHINES.md)'s `retired --> [*]`. `public_visible` is permitted to move because `plan_versions_visible_implies_published` forbids a visible non-published row. Publishing a change means creating a new version. This is what makes "the rules at the time" provable (B4 #12).
+**Rows with `status = 'published'` are immutable**, enforced by the trigger `plan_versions_published_immutable` in `0027` running `assert_published_plan_version_immutable()`, **whose body is replaced by [`0028`](../../packages/db/migrations/0028_supersede_plan_version_immutability.sql) under [ADR-035](../decisions/ADR-035.md)**. It rejects any update other than `published` moving to `retired` with `retired_at` set, pins every other column by comparing the whole row rather than a list of names, and **freezes a retired row absolutely** per [STATE_MACHINES section 9](STATE_MACHINES.md)'s `retired --> [*]`. `public_visible` is permitted to move because `plan_versions_visible_implies_published` forbids a visible non-published row. Publishing a change means creating a new version. This is what makes "the rules at the time" provable (B4 #12).
 
 > **This line named the trigger `plan_versions_immutable_when_published` until 2026-08-15 and `0027` has always called it `plan_versions_published_immutable`.** A citation that does not resolve, in the paragraph describing the corpus's most valuable promise, one line above the trigger that was reading a column that did not exist. Recorded rather than smoothed: **constraint and trigger names cited in prose are not yet checked by any gate**, and CI-06j checks columns rather than object names.
 Retention: forever. A retired version is still needed to explain a 2027 payout in 2031.
@@ -376,7 +376,7 @@ Materialized per-size thresholds. Percentages scale, but the published number mu
 | `profit_target_cents` | bigint | null, check > 0 | null on Direct: there is no evaluation, so there is no profit target. A zero here would be a target of zero, which is a different and reachable thing |
 | `buffer_cents` | bigint | not null, check >= 0 | |
 | `win_day_floor_cents` | bigint | not null, check > 0 | |
-| `payout_cap_schedule_cents` | jsonb | not null | ordered steps keyed by payout ordinal; an array from day one even though v1 publishes one flat step. [ADR-025](../DECISIONS.md) rejected progressive cap release for v1 and the **shape** stays, because the reservation costs nothing and the retrofit does not |
+| `payout_cap_schedule_cents` | jsonb | not null | ordered steps keyed by payout ordinal; an array from day one even though v1 publishes one flat step. [ADR-025](../decisions/ADR-025.md) rejected progressive cap release for v1 and the **shape** stays, because the reservation costs nothing and the retrofit does not |
 | `daily_loss_limit_cents` | bigint | null, check > 0 | null when the plan has none, which is all three in v1 |
 | `floor_lock_enabled` | boolean | not null | **`SD-10`.** Materialized from the parent's `rules` jsonb at publish, because a CHECK cannot read another table (see below) |
 | `floor_lock_at_profit_cents` | bigint | null, check > 0 | **`SD-10`** |
@@ -520,7 +520,7 @@ Concurrency: redemption is an atomic claim (see `coupon_redemptions`), never a r
 | `checkout_ip_country` | char(2) | null | **`SD-M3-05`** |
 | `card_country` | char(2) | null | **`SD-M3-05`** |
 | `geo_decision` | text | null, check in (`allowed`,`warned`,`blocked`) | **`SD-M3-05`.** The decision Merit made at checkout is recorded at checkout. Reconstructing it later from an IP log is not the same artifact: it tells you where they were, not what we decided |
-| `payment_method` | text | not null default `psp`, check in (`psp`,`wallet`,`mixed`) | **`SD-M3-06`, [ADR-019](../DECISIONS.md).** `mixed` exists because a trader with $60 in the wallet buying a $99 evaluation is the common case, not an edge one |
+| `payment_method` | text | not null default `psp`, check in (`psp`,`wallet`,`mixed`) | **`SD-M3-06`, [ADR-019](../decisions/ADR-019.md).** `mixed` exists because a trader with $60 in the wallet buying a $99 evaluation is the common case, not an edge one |
 | `wallet_debit_cents` | bigint | not null default 0, check >= 0 | **`SD-M3-06`.** Server-computed from the identity's balance, never supplied by the client, for the same reason no price is |
 | `wallet_ledger_transaction_id` | uuid | null, **fk added in `0011`** | **`SD-M3-06`.** One of the three ruled reference cycles (§17) |
 | `rule_diff_acknowledged_at` | timestamptz | null | **`SD-M4-02`.** A reset onto a changed plan version must be explicitly acknowledged (AS-M3-05). A reset is a new contract, and a trader who did not notice is a trader who was not told |
@@ -690,7 +690,7 @@ The unique on `loyalty_grant_id` and the grant's own single-spend guarantee (`00
 
 Indexes: `promotional_credit_grants_identity_idx (identity_id, expires_at)`; `promotional_credit_grants_funding_idx (funding_purchase_id)` where not null (the query a chargeback runs); `promotional_credit_grants_live_idx (identity_id, expires_at)` where `revoked_at is null and consumed_cents < amount_cents`.
 Constraints: `promotional_credit_grants_consumed_within_amount`; `promotional_credit_grants_revocation_is_explained`.
-**Never withdrawable** (OQ-FREEZE-01, which overruled [ADR-025](../DECISIONS.md)'s literal wording and confirmed the implementation). Promotional credit is rendered inside the wallet screen and is **not** wallet value: it has its own ledger class (`promotional_credit`, `0009`) and no `wallet_entries.provenance` value (`0011`). The ledger records the money; this table records the entitlement's provenance and expiry.
+**Never withdrawable** (OQ-FREEZE-01, which overruled [ADR-025](../decisions/ADR-025.md)'s literal wording and confirmed the implementation). Promotional credit is rendered inside the wallet screen and is **not** wallet value: it has its own ledger class (`promotional_credit`, `0009`) and no `wallet_entries.provenance` value (`0011`). The ledger records the money; this table records the entitlement's provenance and expiry.
 
 ## 6. Accounts and platform
 
@@ -721,7 +721,7 @@ Created by [`0007_accounts`](../../packages/db/migrations/0007_accounts.sql). Fi
 | `graduated_at` | timestamptz | null | **`SD-M18-01`** |
 | `graduation_path` | text | null, check in (`continuation`,`third_party_intro`,`live_program`) | **`SD-M18-01`.** `live_program` is in the vocabulary and **no live program exists at launch** (OQ-M18-01 as ruled at the FREEZE gate). The value is present so the shape is decided before commercial pressure decides it, and zero live-program copy ships until counsel rules |
 | `terminal_settlement_id` | uuid | null, **fk added in `0010`** | **`SD-M18-01`.** Without it, a graduated account holding a balance is indistinguishable from one that paid out fully (INV-M18-05). One of the three ruled reference cycles (§17) |
-| `graduation_eligible` | boolean | not null default false | **`U-02`.** [ADR-024](../DECISIONS.md), M01 R-49: the engine sets phase `graduated` plus this review-pool flag and emits **no** invitation event. An engine that emits an invitation on ladder completion has already made the promise, and the promise commits Merit rather than the program |
+| `graduation_eligible` | boolean | not null default false | **`U-02`.** [ADR-024](../decisions/ADR-024.md), M01 R-49: the engine sets phase `graduated` plus this review-pool flag and emits **no** invitation event. An engine that emits an invitation on ladder completion has already made the promise, and the promise commits Merit rather than the program |
 | `created_at`, `updated_at` | timestamptz | not null default now() | |
 
 Indexes: `accounts_identity_status_idx (identity_id, status)`; unique `accounts_platform_ref_uq (platform, platform_account_ref)` where not null; `accounts_funded_idx (phase)` where `phase = 'funded'` (the open-liability scan); `accounts_provisioning_idx (created_at)` where `status = 'provisioning_pending'`; `accounts_graduation_pool_idx (identity_id)` where `graduation_eligible`.
@@ -789,7 +789,7 @@ One row per **intent**, so partial success is legible. A batch that half-applied
 Indexes: `provisioning_queue_status_idx (status, queued_at)`; unique `provisioning_queue_intent_uq (account_id, operation, payload_hash)` where `status <> 'failed'`, so a genuine retry after a failure is permitted and a second live intent is not.
 Constraints: `provisioning_queue_set_risk_never_inferred` (**`U-06`**, AS-M2-03: a `set_risk` operation may never reach `confirmed_inferred`); `provisioning_queue_delivered_has_timestamp`.
 Why `U-06` is a CHECK rather than a convention: an inferred confirmation means we believe the account exists because the vendor reported on it. That is strong evidence for `create_account` and **worthless** for `set_risk`, because you cannot infer that a risk setting applied from an account appearing in a report. The failure is silent, and an account trading with no working auto-liquidator is a liability the firm is carrying without knowing.
-**Provisional ([ADR-005](../DECISIONS.md)):** the operation set and payload fields follow the public CSV/SFTP description and must be confirmed against the real provisioning spec at the vendor call.
+**Provisional ([ADR-005](../decisions/ADR-005.md)):** the operation set and payload fields follow the public CSV/SFTP description and must be confirmed against the real provisioning spec at the vendor call.
 
 ### platform_entitlements
 The hygiene ledger behind real monthly cost. B3 reservation, now a real table.
@@ -882,7 +882,7 @@ Append-only. Retention: 24 months hot, then archived to object storage with the 
 Indexes: unique `fills_platform_fill_uq (platform, platform_fill_id)`; `fills_account_day_idx (account_id, trading_day)`; `fills_trading_day_idx (trading_day)`; `fills_account_executed_idx (account_id, executed_at)`; `fills_correction_idx (correction_of)` where not null; `fills_day_divergence_idx (trading_day, account_id)` where the vendor day is present and differs, which is the divergence alarm's read path.
 Constraints: `fills_vendor_day_present_when_claimed`; `fills_agreed_means_equal`; `fills_no_self_correction`.
 Append-only, including corrections. Retention: forever.
-**Provisional ([ADR-005](../DECISIONS.md)):** correction arrival semantics. The design assumes corrections arrive as new rows referencing the original. If the vendor restates in place, the ingest layer converts a restatement into a correction row so this table's contract holds regardless.
+**Provisional ([ADR-005](../decisions/ADR-005.md)):** correction arrival semantics. The design assumes corrections arrive as new rows referencing the original. If the vendor restates in place, the ingest layer converts a restatement into a correction row so this table's contract holds regardless.
 Why a wrong trading day matters: it shifts win-day counts, minimum days, and the breach comparison for that account.
 
 ### daily_marks
@@ -970,7 +970,7 @@ Indexes: unique `rule_states_account_day_uq (account_id, trading_day)`, total ra
 Constraints: `rule_states_anchors_move_together`; `rule_states_cadence_anchor_not_before_payout_anchor`; `rule_states_settlements_imply_anchors`; `rule_states_consistency_period_started`; `rule_states_consistency_numerator_within_denominator`; `rule_states_high_water_bounds_balance`; `rule_states_win_days_within_traded_days`; `rule_states_hash_is_sha256`.
 Append-only. Retention: forever.
 
-**The `state_hash` input list ([ADR-026](../DECISIONS.md) C-07), reproduced here because a hash whose input set is implicit is a hash that changes meaning when a column is added.** Nineteen fields in this exact declared order, bigint rendered base-10, null as an explicit sentinel, no whitespace:
+**The `state_hash` input list ([ADR-026](../decisions/ADR-026.md) C-07), reproduced here because a hash whose input set is implicit is a hash that changes meaning when a column is added.** Nineteen fields in this exact declared order, bigint rendered base-10, null as an explicit sentinel, no whitespace:
 
 | | | | |
 |---|---|---|---|
@@ -982,7 +982,7 @@ Append-only. Retention: forever.
 
 Excluded, each for a stated reason: `context_gates` (the whole reason `SD-06` split them, INV-23); `engine_version` (a build identifier is not state, and including it makes every engine upgrade a universal divergence); `computed_at` (wall clock, not state); `id` and `state_hash` themselves.
 
-**Why the two anchors stay two columns (`SD-02`, finding C-09).** They are genuinely different dates and conflating them is a silent liability change of 40 percent (EC-039). Under [ADR-019](../DECISIONS.md)'s current configuration they coincide, and that is precisely the trap: a single column would work perfectly until the anchor moved back, at which point the gap between payouts changes and nothing in the schema records that two facts had been merged. `rule_states_settlements_imply_anchors` is the constraint that would have failed loudly if they had been collapsed and half-populated.
+**Why the two anchors stay two columns (`SD-02`, finding C-09).** They are genuinely different dates and conflating them is a silent liability change of 40 percent (EC-039). Under [ADR-019](../decisions/ADR-019.md)'s current configuration they coincide, and that is precisely the trap: a single column would work perfectly until the anchor moved back, at which point the gap between payouts changes and nothing in the schema records that two facts had been merged. `rule_states_settlements_imply_anchors` is the constraint that would have failed loudly if they had been collapsed and half-populated.
 
 **Why the gate split matters operationally (`SD-06`).** Freeze, recon, KYC and in-flight were true on the day and may not be true now. Mixing them into the replayed state guarantees nightly false divergences, and FM-17 is what happens next: a self-audit that becomes noisy becomes a self-audit that gets disabled. The trader's actual eligibility is `engine_eligible` **and** every context gate, and that combined answer is deliberately not stored here, because it is not a property of the day; it is a property of the moment it was asked.
 
@@ -993,23 +993,23 @@ Created by [`0009_ledger`](../../packages/db/migrations/0009_ledger.sql), [`0010
 **Money movement is three objects, not one.** A [payout request](../GLOSSARY.md) is a claim against an account evaluated by the engine. A wallet entry is what the trader is owed. A wallet withdrawal is the external rail moving it. Conflating any two of them makes the engine's gates and the rail's gates share a status column, and the first person to add a state breaks the other one.
 
 ### ledger_accounts
-The chart of accounts. Seven v1 classes ([ADR-027](../DECISIONS.md)).
+The chart of accounts. Seven v1 classes ([ADR-027](../decisions/ADR-027.md)).
 
 | Column | Type | Constraints | Why |
 |---|---|---|---|
 | `id` | uuid | pk | |
-| `code` | text | not null, check in the seven declared codes | the vocabulary is closed in DDL. A class appearing first in a migration is a class nobody defined, and the first draft of [ADR-027](../DECISIONS.md) invented `firm_payable`, which is why this is a constraint and not a convention |
+| `code` | text | not null, check in the seven declared codes | the vocabulary is closed in DDL. A class appearing first in a migration is a class nobody defined, and the first draft of [ADR-027](../decisions/ADR-027.md) invented `firm_payable`, which is why this is a constraint and not a convention |
 | `kind` | text | not null, check in (`asset`,`liability`,`revenue`,`expense`,`equity`) | |
 | `scope` | text | not null, check in (`firm`,`identity`) | |
 | `identity_id` | uuid | fk identities, null | set when scope is identity |
 | `created_at` | timestamptz | not null default now() | |
 
-The seven v1 codes: `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve`, `trader_withdrawable` (per identity), **`trader_wallet`** (per identity, added by `SD-M5-07`), `promotional_credit` (activated by [ADR-019](../DECISIONS.md), never withdrawable).
+The seven v1 codes: `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve`, `trader_withdrawable` (per identity), **`trader_wallet`** (per identity, added by `SD-M5-07`), `promotional_credit` (activated by [ADR-019](../decisions/ADR-019.md), never withdrawable).
 Indexes: unique `ledger_accounts_firm_code_uq (code)` where `scope = 'firm'`; unique `ledger_accounts_identity_code_uq (code, identity_id)` where `scope = 'identity'`. Two partial uniques rather than one, because the firm case has a `NULL` `identity_id` and NULLs do not collide.
 Constraints: `ledger_accounts_code_is_declared`; `ledger_accounts_scope_identity` (the two must agree in both directions).
 Retention: forever.
 
-**The two per-identity classes are distinct positions and neither supersedes the other** ([ADR-027](../DECISIONS.md), finding C-01). Withdrawable is what the engine says the trader may draw; wallet is what Merit already owes them. A payout approval moves the full `approved_cents` out of the first and `trader_cents` into the second, the difference being `fees_revenue`. `approved_cents <> trader_cents`, so **the two positions move by different magnitudes in one transaction, which one class cannot do.** Collapsing them passes the zero-sum trigger and net-debits the trader's position by `firm_cents` on every approval: the ledger reconciles perfectly and the balance is wrong. LEDGER-C1 in `0027` makes that shape unrepresentable.
+**The two per-identity classes are distinct positions and neither supersedes the other** ([ADR-027](../decisions/ADR-027.md), finding C-01). Withdrawable is what the engine says the trader may draw; wallet is what Merit already owes them. A payout approval moves the full `approved_cents` out of the first and `trader_cents` into the second, the difference being `fees_revenue`. `approved_cents <> trader_cents`, so **the two positions move by different magnitudes in one transaction, which one class cannot do.** Collapsing them passes the zero-sum trigger and net-debits the trader's position by `firm_cents` on every approval: the ledger reconciles perfectly and the balance is wrong. LEDGER-C1 in `0027` makes that shape unrepresentable.
 
 ### ledger_transactions
 | Column | Type | Constraints | Why |
@@ -1045,10 +1045,10 @@ Append-only; no `UPDATE`, no `DELETE` grant (`0026`). Retention: forever.
 | Name | Shape | What it catches |
 |---|---|---|
 | `ledger_entries_zero_sum` | deferred constraint trigger, INV-M5-04 | a transaction whose entries do not sum to exactly zero. Deferred to commit because entries arrive one at a time and a transaction is only balanced once all its legs exist |
-| **LEDGER-C1** `ledger_entries_no_opposite_signs` | deferred constraint trigger, [ADR-027](../DECISIONS.md) | a transaction posting **opposite signs against one ledger account**. This is the C-01 collapse mechanized: it passed zero-sum (100,000 against 90,000 plus 10,000) while net-debiting the trader by `firm_cents`. A flat prohibition rather than a threshold, because that shape has no legitimate use in this chart of accounts |
-| **LEDGER-C2** `ledger_entries_class_declared` | `BEFORE INSERT` trigger, [ADR-027](../DECISIONS.md) | an entry against an undeclared class. The CHECK on `ledger_accounts.code` is the primary guard; this is the second line, because a FK to a table whose own CHECK could be dropped in a later migration is a guarantee with a dependency |
+| **LEDGER-C1** `ledger_entries_no_opposite_signs` | deferred constraint trigger, [ADR-027](../decisions/ADR-027.md) | a transaction posting **opposite signs against one ledger account**. This is the C-01 collapse mechanized: it passed zero-sum (100,000 against 90,000 plus 10,000) while net-debiting the trader by `firm_cents`. A flat prohibition rather than a threshold, because that shape has no legitimate use in this chart of accounts |
+| **LEDGER-C2** `ledger_entries_class_declared` | `BEFORE INSERT` trigger, [ADR-027](../decisions/ADR-027.md) | an entry against an undeclared class. The CHECK on `ledger_accounts.code` is the primary guard; this is the second line, because a FK to a table whose own CHECK could be dropped in a later migration is a guarantee with a dependency |
 
-The global sum is a nightly assertion. It is proportionate for [ADR-016](../DECISIONS.md)'s global halt precisely because an unbalanced transaction cannot be written in the first place, so a global mismatch implies data corruption or a direct write.
+The global sum is a nightly assertion. It is proportionate for [ADR-016](../decisions/ADR-016.md)'s global halt precisely because an unbalanced transaction cannot be written in the first place, so a global mismatch implies data corruption or a direct write.
 
 ### treasury_balances
 **`SD-M5-03`**, INV-M5-11. The reserve coverage ratio's anchor.
@@ -1076,9 +1076,9 @@ Why it is anchored outside our own ledger: the RCR decides whether sales pause, 
 | `id` | bigint | pk, generated always as identity | |
 | `as_of` | timestamptz | not null, unique | |
 | `open_liability_cents` | bigint | not null | **1.** The sum of withdrawable across funded accounts |
-| `bounded_near_term_cents` | bigint | not null | **2.** Sum of `min(withdrawable, cap for next ordinal)` over accounts eligible now or inside 7 trading days. The figure the payout wallet is funded against, and the one [ADR-011](../DECISIONS.md)'s top-up trigger reads |
-| `remaining_ladder_exposure_cents` | bigint | not null | **3.** Sum of `(ladder - payouts_settled) * cap`. The upper bound on lifetime commitment; INV-17 asserts it. Read from the pinned plan version, never from a constant. [ADR-024](../DECISIONS.md) shortened the ladder to 5 / 5 / 4, so this number fell |
-| `wallet_balances_cents` | bigint | not null | [ADR-019](../DECISIONS.md) made wallet balances part of Open Liability (INV-M5-15) |
+| `bounded_near_term_cents` | bigint | not null | **2.** Sum of `min(withdrawable, cap for next ordinal)` over accounts eligible now or inside 7 trading days. The figure the payout wallet is funded against, and the one [ADR-011](../decisions/ADR-011.md)'s top-up trigger reads |
+| `remaining_ladder_exposure_cents` | bigint | not null | **3.** Sum of `(ladder - payouts_settled) * cap`. The upper bound on lifetime commitment; INV-17 asserts it. Read from the pinned plan version, never from a constant. [ADR-024](../decisions/ADR-024.md) shortened the ladder to 5 / 5 / 4, so this number fell |
+| `wallet_balances_cents` | bigint | not null | [ADR-019](../decisions/ADR-019.md) made wallet balances part of Open Liability (INV-M5-15) |
 | `absorbed_corrections_cents` | bigint | not null default 0 | signed. The absorbed-corrections line (OQ-10 ruling, M02 AS-M2-07) |
 | `computed_at` | timestamptz | not null default now() | |
 
@@ -1103,7 +1103,7 @@ Retention: forever.
 | `basis_trading_day` | date | not null | the [last closed day](../GLOSSARY.md#last-closed-day) the decision used. Not a wall clock |
 | `plan_version_id` | uuid | fk plan_versions, not null, on delete restrict | the contract in force, copied for provability. The account pins it too; this copy is what makes the payout explicable without reading the account |
 | `eligibility_snapshot` | jsonb | not null | full gate-by-gate evaluation and inputs, immutable |
-| `status` | `payout_status` enum(`approved`,`settled`,`failed`,`frozen`) | not null | **the ruled enum ([ADR-028](../DECISIONS.md)).** There is no `denied` and no review state **by design**; `transferring` was retired to `wallet_withdrawals`. Adding a value requires an ADR against the zero-denial policy |
+| `status` | `payout_status` enum(`approved`,`settled`,`failed`,`frozen`) | not null | **the ruled enum ([ADR-028](../decisions/ADR-028.md)).** There is no `denied` and no review state **by design**; `transferring` was retired to `wallet_withdrawals`. Adding a value requires an ADR against the zero-denial policy |
 | `idempotency_key` | text | not null | client-supplied |
 | `payout_ordinal` | integer | not null, check > 0 | 1-based per account; drives the ladder and the cap schedule. R-45 defines it as `payouts_settled_count + 1`, so it is derived from **settlements** rather than attempts |
 | `approved_at` | timestamptz | not null default now() | |
@@ -1117,12 +1117,12 @@ Retention: forever.
 | `reflected_on_trading_day` | date | null | **`SD-M5-04`** |
 | `created_at`, `updated_at` | timestamptz | not null default now() | |
 
-Indexes: unique `payout_requests_account_idempotency_uq (account_id, idempotency_key)`; unique `payout_requests_account_ordinal_uq (account_id, payout_ordinal)` where `status <> 'failed'` (**`SD-05`**); unique `payout_requests_no_in_flight_uq (account_id)` where `status in ('approved','frozen')` (**`SD-09`**, predicate per [ADR-028](../DECISIONS.md)); `payout_requests_outstanding_idx (status)` where the **same** predicate; `payout_requests_identity_approved_idx (identity_id, approved_at desc)`; `payout_requests_freeze_expiry_idx (freeze_expires_at)` where `status = 'frozen'`; `payout_requests_reflection_pending_idx (settled_trading_day)` where settled and not observed.
+Indexes: unique `payout_requests_account_idempotency_uq (account_id, idempotency_key)`; unique `payout_requests_account_ordinal_uq (account_id, payout_ordinal)` where `status <> 'failed'` (**`SD-05`**); unique `payout_requests_no_in_flight_uq (account_id)` where `status in ('approved','frozen')` (**`SD-09`**, predicate per [ADR-028](../decisions/ADR-028.md)); `payout_requests_outstanding_idx (status)` where the **same** predicate; `payout_requests_identity_approved_idx (identity_id, approved_at desc)`; `payout_requests_freeze_expiry_idx (freeze_expires_at)` where `status = 'frozen'`; `payout_requests_reflection_pending_idx (settled_trading_day)` where settled and not observed.
 Constraints: `payout_requests_split_sums` (`trader_cents + firm_cents = approved_cents`); `payout_requests_approved_within_requested`; `payout_requests_freeze_is_complete`; `payout_requests_settled_has_days`; `payout_requests_effective_after_settled`; `payout_requests_reflection_needs_settlement`; `payout_requests_observed_has_day`.
 Retention: forever.
 Design note for the founder: `eligibility_snapshot` is a `jsonb` column rather than a separate table because it is written exactly once, always read with its parent, and must never drift from it. A join here would add a way for the proof and the decision to disagree.
 **Why `SD-05`'s ordinal index is partial.** A failed transfer must not consume a ladder rung or advance the cap schedule (EC-037). With a total unique index a failure would burn the ordinal and the retry would need a new one, which silently shortens a finite ladder (5 / 5 / 4).
-**Why the `SD-09` predicate is the dangerous half, and why the two indexes sit adjacent.** The partial unique enforces G-NO-IN-FLIGHT in the database because the engine is not the only writer (FM-11, EC-040, GS-052). If `transferring` had stayed in the predicate after [ADR-028](../DECISIONS.md) retired the value, the index would still exist, still be valid, and enforce **nothing**, because no row would ever match, and no test would fail. **A predicate fixed in one of two places is a uniqueness guarantee that holds on Tuesdays**, so both are written in one file, adjacent, with the same predicate, precisely so a future change to one is visibly a change to one of two.
+**Why the `SD-09` predicate is the dangerous half, and why the two indexes sit adjacent.** The partial unique enforces G-NO-IN-FLIGHT in the database because the engine is not the only writer (FM-11, EC-040, GS-052). If `transferring` had stayed in the predicate after [ADR-028](../decisions/ADR-028.md) retired the value, the index would still exist, still be valid, and enforce **nothing**, because no row would ever match, and no test would fail. **A predicate fixed in one of two places is a uniqueness guarantee that holds on Tuesdays**, so both are written in one file, adjacent, with the same predicate, precisely so a future change to one is visibly a change to one of two.
 
 ### payout_transfers
 Separates "we approved" from "the rail moved money", so a Rise outage never looks like a payout problem.
@@ -1148,7 +1148,7 @@ Separates "we approved" from "the rail moved money", so a Rise outage never look
 
 Indexes: unique `payout_transfers_provider_transfer_uq (provider, provider_transfer_id)` where not null; `payout_transfers_request_idx (payout_request_id)`; `payout_transfers_open_idx (status, created_at)` where in flight.
 Constraints: `payout_transfers_score_has_method` (a score with no method is a number nobody can re-derive when the matcher is replaced); `payout_transfers_settled_has_timestamp`.
-**Why `SD-M5-02` exists: real name matching is not boolean.** Transliteration, married names, and common names make a strict comparison produce false freezes on legitimate traders, which under a zero-denial policy is a brand cost paid by the people least deserving of it. Merit refuses the market norm of payout-time fraud friction (Apex's screen-recording requirement, refused on the record), and that refusal only holds if the identity friction lands upstream of funding, which is what [ADR-021](../DECISIONS.md)'s triggers are for. These three columns are what keep the name check from becoming the friction that reappears here.
+**Why `SD-M5-02` exists: real name matching is not boolean.** Transliteration, married names, and common names make a strict comparison produce false freezes on legitimate traders, which under a zero-denial policy is a brand cost paid by the people least deserving of it. Merit refuses the market norm of payout-time fraud friction (Apex's screen-recording requirement, refused on the record), and that refusal only holds if the identity friction lands upstream of funding, which is what [ADR-021](../decisions/ADR-021.md)'s triggers are for. These three columns are what keep the name check from becoming the friction that reappears here.
 
 ### wallet_entries
 **`SD-M20-01`**, INV-M20-03, INV-M20-04. Append-only.
@@ -1158,7 +1158,7 @@ Constraints: `payout_transfers_score_has_method` (a score with no method is a nu
 | `id` | bigint | pk, generated always as identity | |
 | `identity_id` | uuid | fk identities, not null, on delete restrict | |
 | `direction` | text | not null, check in (`credit`,`debit`) | |
-| `amount_cents` | bigint | not null, check > 0 | magnitude, always positive; `direction` carries the sign. Deliberately **not** the ledger's signed convention: the ledger's sign means debit or credit against a chart of accounts, and reusing one convention for two different questions is the shape of error [ADR-027](../DECISIONS.md) was reversed over |
+| `amount_cents` | bigint | not null, check > 0 | magnitude, always positive; `direction` carries the sign. Deliberately **not** the ledger's signed convention: the ledger's sign means debit or credit against a chart of accounts, and reusing one convention for two different questions is the shape of error [ADR-027](../decisions/ADR-027.md) was reversed over |
 | `provenance` | text | not null, check in (`payout`,`refund_wallet_funded`,`correction`) | **the closed list.** The ledger records the money; this records **what kind of money it is** |
 | `cause` | text | not null | the business event, human readable |
 | `reference_id` | uuid | not null | polymorphic: payout request, purchase, or the corrected entry |
@@ -1182,7 +1182,7 @@ Why provenance is a wallet fact and not a ledger fact: the ledger knows an amoun
 | `identity_id` | uuid | fk identities, not null, on delete restrict | |
 | `amount_cents` | bigint | not null, check > 0 | |
 | `destination_ref` | text | not null | provider-side destination id, never bank details |
-| `status` | `wallet_withdrawal_status` enum(`requested`,`cooling`,`approved`,**`transferring`**,`settled`,`failed`,`cancelled`) | not null default `requested` | this table **owns** `transferring` ([ADR-028](../DECISIONS.md)), along with `cooling` and `cancelled`, which the internal leg has no use for at all |
+| `status` | `wallet_withdrawal_status` enum(`requested`,`cooling`,`approved`,**`transferring`**,`settled`,`failed`,`cancelled`) | not null default `requested` | this table **owns** `transferring` ([ADR-028](../decisions/ADR-028.md)), along with `cooling` and `cancelled`, which the internal leg has no use for at all |
 | `idempotency_key` | text | not null | |
 | `requested_at` | timestamptz | not null default now() | |
 | `settled_at` | timestamptz | null | |
@@ -1234,7 +1234,7 @@ Constraints: `wallet_dormancy_review_was_noticed` (reaching `escheat_review` wit
 Unclaimed-property obligations are jurisdictional and real, and the alternative to a state machine is **discovering the obligation during an audit**. Dormancy is designed now; escheatment itself is a counsel question (OQ-M20-04 as ruled), which is why the dormancy calendar is blocked on the counsel sitting. The state machine can be built and exercised without the calendar; the calendar cannot be retrofitted onto balances nobody tracked.
 
 ### ledger_halts
-**`U-03`**, [ADR-016](../DECISIONS.md), M05 INV-M5-16. An identity-scoped halt with an escalation clock.
+**`U-03`**, [ADR-016](../decisions/ADR-016.md), M05 INV-M5-16. An identity-scoped halt with an escalation clock.
 
 | Column | Type | Constraints | Why |
 |---|---|---|---|
@@ -1299,7 +1299,7 @@ Constraints: `alarm_suppressions_expiry_after_start`.
 Constitution M1's own FM-17 names the failure this prevents: a self-audit that becomes slow becomes a self-audit that gets disabled. A mandatory expiry converts "temporarily off" from a lie people tell themselves into a dated fact.
 
 ### dual_control_approvals
-**`SD-M6-05`**. [ADR-010](../DECISIONS.md) requires a second approval within a window, and that needs a row.
+**`SD-M6-05`**. [ADR-010](../decisions/ADR-010.md) requires a second approval within a window, and that needs a row.
 
 | Column | Type | Constraints | Why |
 |---|---|---|---|
@@ -1310,7 +1310,7 @@ Constitution M1's own FM-17 names the failure this prevents: a self-audit that b
 | `requested_at` | timestamptz | not null default now() | |
 | `payload_hash` | bytea | not null | **`SD-M6-05`.** Pins **what** is being approved. An approval that does not pin the payload approves whatever the request happens to say when it executes, which is a control that can be edited after it is passed |
 | `approved_by`, `approved_at` | text, timestamptz | null | |
-| `expires_at` | timestamptz | **not null** | [ADR-010](../DECISIONS.md)'s "within a window", not null for the same reason `alarm_suppressions.expires_at` is |
+| `expires_at` | timestamptz | **not null** | [ADR-010](../decisions/ADR-010.md)'s "within a window", not null for the same reason `alarm_suppressions.expires_at` is |
 | `status` | text | not null default `pending`, check in (`pending`,`approved`,`expired`,`withdrawn`) | |
 | `created_at` | timestamptz | not null default now() | |
 
@@ -1410,7 +1410,7 @@ Constraints: `correlation_groups_is_a_group` (`array_length(member_account_ids, 
 Retention: forever.
 Why this is a reserve control and not only an abuse control, which is the strongest argument in the corpus for funding it: the risk engine shows mean monthly payouts flat near $45.3K across every correlation level while CVaR99 nearly doubles from $84.8K at `rho = 0.05` to $132.9K at `rho = 0.30`. **The tail is all correlation**, and that is also why these two columns keep their exemption: a plain integer `rho` of `0.30` is `0`.
 
-> **CLOSED 2026-08-15 by [`0028`](../../packages/db/migrations/0028_supersede_plan_version_immutability.sql).** `correlation_groups_is_a_group` was written `array_length(member_account_ids, 1) >= 3`. An empty array yields `NULL >= 3`, which is `NULL`, and **a `CHECK` evaluating to `NULL` passes**, so the constraint admitted the empty group it existed to reject. Verified by execution: the empty array was **accepted** against `0001` to `0027` and is **rejected** against `0001` to `0028`. `0028` re-adds it as `cardinality(member_account_ids) >= 3` under the same name, so every citation of it still resolves. **`0027` and `0008` are not edited**; a merged migration is superseded, never rewritten. Six other constraints carried the identical trap and are corrected in the same file: see [ADR-035](../DECISIONS.md) amendment 4 for the line-cited list of all seven.
+> **CLOSED 2026-08-15 by [`0028`](../../packages/db/migrations/0028_supersede_plan_version_immutability.sql).** `correlation_groups_is_a_group` was written `array_length(member_account_ids, 1) >= 3`. An empty array yields `NULL >= 3`, which is `NULL`, and **a `CHECK` evaluating to `NULL` passes**, so the constraint admitted the empty group it existed to reject. Verified by execution: the empty array was **accepted** against `0001` to `0027` and is **rejected** against `0001` to `0028`. `0028` re-adds it as `cardinality(member_account_ids) >= 3` under the same name, so every citation of it still resolves. **`0027` and `0008` are not edited**; a merged migration is superseded, never rewritten. Six other constraints carried the identical trap and are corrected in the same file: see [ADR-035](../decisions/ADR-035.md) amendment 4 for the line-cited list of all seven.
 
 ### evidence_packs
 Export is itself an audited act, because an evidence pack contains everything about a trader.
@@ -1432,7 +1432,7 @@ Export is itself an audited act, because an evidence pack contains everything ab
 Indexes: `evidence_packs_account_idx (account_id, generated_at desc)`; `evidence_packs_audience_idx (audience, generated_at desc)`.
 Constraints: **`evidence_packs_trader_gets_no_detector_detail`** (`audience <> 'trader' OR includes_detector_detail = false`).
 Retention: forever.
-Why the disclosure rule is DDL rather than a handler (AS-M6-01): a pack given to a trader in a dispute is a channel that discloses detector thresholds **to the adversary who triggered them**. The audience must be a declared, audited property of the export rather than a judgment made in the moment by whoever is answering the ticket. Detector internals are internal-tier always ([ADR-022](../DECISIONS.md)): the richer the graph, the more a leak is worth. That one combination must be unrepresentable, and it is the combination a hurried export would produce.
+Why the disclosure rule is DDL rather than a handler (AS-M6-01): a pack given to a trader in a dispute is a channel that discloses detector thresholds **to the adversary who triggered them**. The audience must be a declared, audited property of the export rather than a judgment made in the moment by whoever is answering the ticket. Detector internals are internal-tier always ([ADR-022](../decisions/ADR-022.md)): the richer the graph, the more a leak is worth. That one combination must be unrepresentable, and it is the combination a hurried export would produce.
 
 ## 10. Affiliate, system, and the module surfaces
 
@@ -1513,7 +1513,7 @@ Last-touch attribution with a 30 day window is stealable by volume, and the thef
 | `void_reason` | text | null | |
 | `buyer_identity_id` | uuid | fk identities, not null, on delete restrict | **`SD-M8-05`** |
 | `affiliate_identity_id` | uuid | fk identities, not null, on delete restrict | **`SD-M8-05`.** Both identities are stored rather than joined, because the check is a statement about the two of them **at the moment of purchase**, and an affiliate can be reassigned or an identity merged afterwards |
-| `self_deal_link_confidence_bp` | integer | null, check between 0 and 10000 | **`SD-M8-05`.** The link-graph score ([ADR-022](../DECISIONS.md)) that produced the verdict. Null when the two identities are literally the same row, because that case needs no score |
+| `self_deal_link_confidence_bp` | integer | null, check between 0 and 10000 | **`SD-M8-05`.** The link-graph score ([ADR-022](../decisions/ADR-022.md)) that produced the verdict. Null when the two identities are literally the same row, because that case needs no score |
 | `created_at`, `updated_at` | timestamptz | not null default now() | |
 
 Indexes: unique on `(purchase_id)` (inline); `attributions_affiliate_idx (affiliate_id, created_at desc)`; `attributions_buyer_idx (buyer_identity_id)`; `attributions_self_deal_review_idx (self_deal_link_confidence_bp desc)` where scored and not yet voided.
@@ -1853,7 +1853,7 @@ Why the table exists at all (`SD-M4-01`): [API_CONTRACT section 6](API_CONTRACT.
 **Transparency (`0021`).** Not a money-path file, and the one whose output is hardest to take back. `0021` also creates the helper function `measures_are_distinct(statistic_measure[])`, which exists because a `CHECK` may not contain a subquery and duplicate detection over an array needs one; it is `IMMUTABLE` because it reads nothing outside its argument, which is what makes it legal in a `CHECK` rather than merely accepted there.
 
 ### statistic_definitions
-**`SD-M12-01`**, amended by [ADR-032](../DECISIONS.md).
+**`SD-M12-01`**, amended by [ADR-032](../decisions/ADR-032.md).
 
 | Column | Type | Constraints | Why |
 |---|---|---|---|
@@ -1867,7 +1867,7 @@ Why the table exists at all (`SD-M4-01`): [API_CONTRACT section 6](API_CONTRACT.
 | `window_spec` | text | not null | trailing window and lifetime forms |
 | `grain` | text | not null | |
 | `min_sample` | integer | not null, check > 0 | **`SD-M12-01`.** A publication policy, not an implementation detail. Below it the statistic is suppressed rather than published with a wide error bar nobody reads |
-| `measures` | `statistic_measure[]` | not null | **[ADR-032](../DECISIONS.md).** The declared measure set, and what STAT-C1 checks a publish run against. ST-01/02/07 `{rate}`; ST-03 `{total}`; ST-04 `{mean, median}`; ST-05/06 `{p50, p95}` |
+| `measures` | `statistic_measure[]` | not null | **[ADR-032](../decisions/ADR-032.md).** The declared measure set, and what STAT-C1 checks a publish run against. ST-01/02/07 `{rate}`; ST-03 `{total}`; ST-04 `{mean, median}`; ST-05/06 `{p50, p95}` |
 | `method_body_mdx` | text | not null | the published methodology page |
 | `adr_ref` | text | null | the ruling that fixed this definition |
 | `effective_from` | date | not null | **always in the future at write time** (INV-M12-07). A definition that takes effect retroactively is a definition chosen after seeing the number it produces |
@@ -1880,7 +1880,7 @@ Why `measures` lives on the definition rather than in code: it is part of what t
 **Why the nonempty check says `cardinality` and not `array_length`.** Written the obvious way, `array_length(measures, 1) >= 1` evaluates to `NULL` on the empty array, and **a `CHECK` evaluating to `NULL` passes**, so the constraint admitted the single value it existed to reject. An empty declared set makes STAT-C1 vacuous: a statistic could publish nothing at all and satisfy "every measure it declares". It was caught by **executing** the constraint, not by reading it.
 
 ### published_statistics
-**`SD-M12-02`**, amended by [ADR-031](../DECISIONS.md) and [ADR-032](../DECISIONS.md). Append-only, never updated.
+**`SD-M12-02`**, amended by [ADR-031](../decisions/ADR-031.md) and [ADR-032](../decisions/ADR-032.md). Append-only, never updated.
 
 | Column | Type | Constraints | Why |
 |---|---|---|---|
@@ -1889,9 +1889,9 @@ Why `measures` lives on the definition rather than in code: it is part of what t
 | `definition_version` | integer | not null, check > 0 | |
 | `window_start_day`, `window_end_day` | date | not null | |
 | `as_of_trading_day` | date | not null | |
-| `measure` | `statistic_measure` | not null | **[ADR-032](../DECISIONS.md).** Which figure this row carries. Without it ST-04's mean and median, and ST-05's and ST-06's p50 and p95, collide on the window unique index and the second is unwritable |
-| `value` | bigint | null | **[ADR-031](../DECISIONS.md).** Renamed from `value_numeric numeric`, and its no-floats exemption is retired |
-| `value_unit` | `statistic_unit` | null | **[ADR-031](../DECISIONS.md).** 1470 is 14.70 percent or $14.70 depending on a column nobody made mandatory |
+| `measure` | `statistic_measure` | not null | **[ADR-032](../decisions/ADR-032.md).** Which figure this row carries. Without it ST-04's mean and median, and ST-05's and ST-06's p50 and p95, collide on the window unique index and the second is unwritable |
+| `value` | bigint | null | **[ADR-031](../decisions/ADR-031.md).** Renamed from `value_numeric numeric`, and its no-floats exemption is retired |
+| `value_unit` | `statistic_unit` | null | **[ADR-031](../decisions/ADR-031.md).** 1470 is 14.70 percent or $14.70 depending on a column nobody made mandatory |
 | `numerator` | bigint | null | **`SD-M12-02`.** A count, integer cents, or a whole-second duration across the seven definitions |
 | `numerator_unit` | `statistic_unit` | null | **`SD-M12-02`**, forced by the type rather than added alongside it |
 | `denominator` | bigint | null, check >= 0 when present | **`SD-M12-02`.** A count in all six statistics that have one; ST-03 has none, because it is a total rather than a rate |
@@ -2008,7 +2008,7 @@ Primary key: composite `(account_id, as_of_trading_day)`.
 Indexes: `analytics_snapshots_day_idx (as_of_trading_day)`.
 The expensive shapes are computed once per account per closed day in the batch, not per page load.
 
-**Loyalty and graduation (`0023`).** Not a money-path file by table, and it sits directly beside one, so the boundary is stated hard: **[ADR-025](../DECISIONS.md) rejected progressive cap release for v1 rather than deferring it, and no loyalty benefit moves a per-account bound** (INV-M14-11, INV-M14-12). There is no `benefit_code` here that can raise a cap, lengthen a ladder, or change a gate, and there is no column for one. A cap edit is a cap edit regardless of the word "loyalty", and it goes through the dual-controlled publish path or it does not happen. What loyalty may do instead is cross-account: reset discounts, promotional credit (never withdrawable), and review-pool priority.
+**Loyalty and graduation (`0023`).** Not a money-path file by table, and it sits directly beside one, so the boundary is stated hard: **[ADR-025](../decisions/ADR-025.md) rejected progressive cap release for v1 rather than deferring it, and no loyalty benefit moves a per-account bound** (INV-M14-11, INV-M14-12). There is no `benefit_code` here that can raise a cap, lengthen a ladder, or change a gate, and there is no column for one. A cap edit is a cap edit regardless of the word "loyalty", and it goes through the dual-controlled publish path or it does not happen. What loyalty may do instead is cross-account: reset discounts, promotional credit (never withdrawable), and review-pool priority.
 
 ### loyalty_criteria
 **`SD-M14-03`**, INV-M14-07.
@@ -2091,10 +2091,10 @@ Constraints: `loyalty_benefit_grants_criteria_fk`; `loyalty_benefit_grants_consu
 Indexes: `graduation_benefits_identity_idx (identity_id)`; `graduation_benefits_account_idx (account_id)`; `graduation_benefits_pending_idx (created_at)` where neither conferred nor withheld, the review queue.
 Constraints: `graduation_benefits_not_both_conferred_and_withheld`.
 
-**The reserved sequence (`0025`).** Three tables, **created and deliberately empty at launch**. Marked rather than deferred, because [ADR-026](../DECISIONS.md) rejected no delta: a rejected delta is rejected in writing in an ADR, never by omission, and a table that quietly failed to appear is indistinguishable from one that was dropped. Each costs an empty table now and avoids a migration against live data later, which is the same trade §12 documents for every other reservation.
+**The reserved sequence (`0025`).** Three tables, **created and deliberately empty at launch**. Marked rather than deferred, because [ADR-026](../decisions/ADR-026.md) rejected no delta: a rejected delta is rejected in writing in an ADR, never by omission, and a table that quietly failed to appear is indistinguishable from one that was dropped. Each costs an empty table now and avoids a migration against live data later, which is the same trade §12 documents for every other reservation.
 
 ### identity_signal_weights
-**`U-01`**, [ADR-022](../DECISIONS.md), M07 D-16. Reserved.
+**`U-01`**, [ADR-022](../decisions/ADR-022.md), M07 D-16. Reserved.
 
 | Column | Type | Constraints | Why |
 |---|---|---|---|
@@ -2112,7 +2112,7 @@ Constraints: `graduation_benefits_not_both_conferred_and_withheld`.
 Primary key: composite `(signal_kind, link_kind, version)`.
 Indexes: `identity_signal_weights_live_idx (signal_kind, link_kind)` where `effective_to is null`.
 Constraints: `identity_signal_weights_range_ordered`.
-Why it stays empty at launch, stated so a future reader does not "fix" it: [ADR-022](../DECISIONS.md)'s tier ordering is forced by **data availability, not by ambition**. The v1 tier is deliberately only the facts. Weights tuned on no data are guesses wearing a number, and a scored graph running on guessed weights produces confident wrong answers about which humans are the same human. The weights are configuration, tuned through a reviewed diff, and they are detector internals that M06's evidence packs keep internal-tier always.
+Why it stays empty at launch, stated so a future reader does not "fix" it: [ADR-022](../decisions/ADR-022.md)'s tier ordering is forced by **data availability, not by ambition**. The v1 tier is deliberately only the facts. Weights tuned on no data are guesses wearing a number, and a scored graph running on guessed weights produces confident wrong answers about which humans are the same human. The weights are configuration, tuned through a reviewed diff, and they are detector internals that M06's evidence packs keep internal-tier always.
 
 ### graduation_invitations
 **`SD-M18-03`**. Reserved. Only if GP-M18-01 or GP-M18-02 ever ships; no live program exists at launch (OQ-M18-01) and zero live-program copy ships until counsel rules.
@@ -2130,7 +2130,7 @@ Why it stays empty at launch, stated so a future reader does not "fix" it: [ADR-
 
 Indexes: `graduation_invitations_identity_idx (identity_id, issued_at desc)`; `graduation_invitations_open_idx (expires_at)` where unanswered.
 Constraints: `graduation_invitations_one_response`; `graduation_invitations_expiry_after_issue`.
-The decoupling this table sits behind matters even though the program does not exist: [ADR-024](../DECISIONS.md) removed the invitation from R-49 because **an engine that emits an invitation on ladder completion has already made the promise**, and the promise commits Merit rather than the program. Invitation is a discretionary operator action taken from the `accounts.graduation_eligible` pool (`U-02`). Retrofitting discretion onto a population that already believes the ladder leads somewhere is far more expensive than designing it in now, while the population is zero. Topstep's live selectivity is 0.71 percent, and that is the number that settles the argument.
+The decoupling this table sits behind matters even though the program does not exist: [ADR-024](../decisions/ADR-024.md) removed the invitation from R-49 because **an engine that emits an invitation on ladder completion has already made the promise**, and the promise commits Merit rather than the program. Invitation is a discretionary operator action taken from the `accounts.graduation_eligible` pool (`U-02`). Retrofitting discretion onto a population that already believes the ladder leads somewhere is far more expensive than designing it in now, while the population is zero. Topstep's live selectivity is 0.71 percent, and that is the number that settles the argument.
 
 ### certificate_verifications
 **`SD-M11-04`**, AS-M11-04. Reserved.
@@ -2192,24 +2192,24 @@ The verify endpoint is the only public oracle Merit operates about its own payou
 }
 ```
 
-**Re-materialized at the frozen configuration under [ADR-026](../DECISIONS.md), and [ADR-030](../DECISIONS.md)'s two key names are folded.** The example above is **Core EOD** (`core_eod`), which is what its `cadence_gap_trading_days: 5`, `cap_bp: 300` and `split_bp: 9000` have always been. Two changes and one correction:
+**Re-materialized at the frozen configuration under [ADR-026](../decisions/ADR-026.md), and [ADR-030](../decisions/ADR-030.md)'s two key names are folded.** The example above is **Core EOD** (`core_eod`), which is what its `cadence_gap_trading_days: 5`, `cap_bp: 300` and `split_bp: 9000` have always been. Two changes and one correction:
 
 | Was | Now | Why |
 |---|---|---|
-| `"ladder": { "payouts_to_graduate": 8 }` | `"max_payouts": 5` | **[ADR-030](../DECISIONS.md)** rules the canonical name, matching [ADR-024](../DECISIONS.md) and every Appendix A table. The value is [ADR-024](../DECISIONS.md)'s **5** (Direct is **4**). The zod schema and the CV publish validations key off this name |
-| `"kyc": { "placement": "pre_funded" }` | `"kyc": { "triggers": [...] }` | **[ADR-030](../DECISIONS.md)**. Under [ADR-021](../DECISIONS.md) placement is a **set** firing at whichever trigger is reached first, and one fact cannot be split across two shapes. `U-05` widens the stored `kyc_verifications.placement` check to the same vocabulary in the same migration |
+| `"ladder": { "payouts_to_graduate": 8 }` | `"max_payouts": 5` | **[ADR-030](../decisions/ADR-030.md)** rules the canonical name, matching [ADR-024](../decisions/ADR-024.md) and every Appendix A table. The value is [ADR-024](../decisions/ADR-024.md)'s **5** (Direct is **4**). The zod schema and the CV publish validations key off this name |
+| `"kyc": { "placement": "pre_funded" }` | `"kyc": { "triggers": [...] }` | **[ADR-030](../decisions/ADR-030.md)**. Under [ADR-021](../decisions/ADR-021.md) placement is a **set** firing at whichever trigger is reached first, and one fact cannot be split across two shapes. `U-05` widens the stored `kyc_verifications.placement` check to the same vocabulary in the same migration |
 
-**A correction to ADR-030's own stale list, recorded rather than applied silently.** That ADR also named `win_days.required_count: 5` and `phase_eval.min_trading_days: 1` as stale in this example. **They are not.** Both are Core EOD's frozen values per [M01 Appendix A.1](../plans/M01-rules-engine.md), sourced to constitution 0.4. **`w = 3` is Merit Rapid's win-day count** ([ADR-018](../DECISIONS.md)), not Core EOD's, and the example was never a Merit Rapid example. The two key names were the real content of C-06 and they are folded; the two parameter values needed no change.
+**A correction to ADR-030's own stale list, recorded rather than applied silently.** That ADR also named `win_days.required_count: 5` and `phase_eval.min_trading_days: 1` as stale in this example. **They are not.** Both are Core EOD's frozen values per [M01 Appendix A.1](../plans/M01-rules-engine.md), sourced to constitution 0.4. **`w = 3` is Merit Rapid's win-day count** ([ADR-018](../decisions/ADR-018.md)), not Core EOD's, and the example was never a Merit Rapid example. The two key names were the real content of C-06 and they are folded; the two parameter values needed no change.
 
 **Every value here is a launch candidate re-confirmed at launch, never a constant.** There is no plan parameter anywhere in application code: these are rows in `plan_versions.rules` and `plan_version_sizes`.
 
 Notes that matter: `payout_cap_schedule` is an **array from day one** even though v1 has one step, because progressive cap release is a known v1.1 candidate and turning a scalar into a schedule later is a migration plus a config rewrite. `mode` on consistency is explicit so nobody has to remember which phase behaves how. `max_days: null` means unlimited.
 
-**Amended at the M1 gate (2026-08-13).** Two fields above changed and are called out because this document is `approved` and a silent edit to a money-path contract is exactly what the corpus exists to prevent. `phase_funded.min_trading_days` is **0** on all three plans, which disables the gate rather than setting it low ([ADR-015](../DECISIONS.md), CV-19). `post_payout_floor_rule.mode` is **`none`** and `amount_cents` is dropped, because settlement no longer touches the floor at all ([ADR-014](../DECISIONS.md), CV-18). The funded `lock` block is populated on all three plans, at `floor_at_cents = size_cents + 10000` and `at_profit_cents = drawdown_cents + 10000`.
+**Amended at the M1 gate (2026-08-13).** Two fields above changed and are called out because this document is `approved` and a silent edit to a money-path contract is exactly what the corpus exists to prevent. `phase_funded.min_trading_days` is **0** on all three plans, which disables the gate rather than setting it low ([ADR-015](../decisions/ADR-015.md), CV-19). `post_payout_floor_rule.mode` is **`none`** and `amount_cents` is dropped, because settlement no longer touches the floor at all ([ADR-014](../decisions/ADR-014.md), CV-18). The funded `lock` block is populated on all three plans, at `floor_at_cents = size_cents + 10000` and `at_profit_cents = drawdown_cents + 10000`.
 
-**M1's ten schema deltas are folded.** SD-01 through SD-10 in [M01 section 2.3](../plans/M01-rules-engine.md) landed in the migration set under [ADR-026](../DECISIONS.md): `daily_marks.adjustment_cents` (`0014`); `rule_states.payout_anchor_day` and `cadence_anchor_day` replacing `last_payout_trading_day`, `floor_open_cents`, `engine_eligible` with the `engine_gates` / `context_gates` split, `consistency_period_start_day` and `state_hash` (all `0015`); `payout_requests.settled_trading_day` and `effective_trading_day`, the partial unique on `(account_id, payout_ordinal) where status <> 'failed'`, and the partial unique on `(account_id) where status in ('approved','frozen')` ([ADR-028](../DECISIONS.md)) (all `0010`); and the conditional not-null on the two `floor_lock_*` columns (`0004`).
+**M1's ten schema deltas are folded.** SD-01 through SD-10 in [M01 section 2.3](../plans/M01-rules-engine.md) landed in the migration set under [ADR-026](../decisions/ADR-026.md): `daily_marks.adjustment_cents` (`0014`); `rule_states.payout_anchor_day` and `cadence_anchor_day` replacing `last_payout_trading_day`, `floor_open_cents`, `engine_eligible` with the `engine_gates` / `context_gates` split, `consistency_period_start_day` and `state_hash` (all `0015`); `payout_requests.settled_trading_day` and `effective_trading_day`, the partial unique on `(account_id, payout_ordinal) where status <> 'failed'`, and the partial unique on `(account_id) where status in ('approved','frozen')` ([ADR-028](../decisions/ADR-028.md)) (all `0010`); and the conditional not-null on the two `floor_lock_*` columns (`0004`).
 
-**Two of those needed a shape decision that the delta did not specify, and both are written down where they land rather than inferred at build time.** `SD-08`'s hash input list is [ADR-026](../DECISIONS.md) C-07, reproduced in full in `0015`. `SD-10`'s conditional not-null cannot be a CHECK over the parent's `rules` jsonb, so `floor_lock_enabled` is **materialized on `plan_version_sizes` at publish** alongside every other value that table materializes, and the reasoning is in `0004`.
+**Two of those needed a shape decision that the delta did not specify, and both are written down where they land rather than inferred at build time.** `SD-08`'s hash input list is [ADR-026](../decisions/ADR-026.md) C-07, reproduced in full in `0015`. `SD-10`'s conditional not-null cannot be a CHECK over the parent's `rules` jsonb, so `floor_lock_enabled` is **materialized on `plan_version_sizes` at publish** alongside every other value that table materializes, and the reasoning is in `0004`.
 
 ## 12. Reserved-now fields, and what each buys
 
@@ -2228,19 +2228,19 @@ Notes that matter: `payout_cap_schedule` is an **array from day one** even thoug
 | `graduated` phase plus invitation event | accounts, events | already present | live-program pipeline (M18) |
 | `identity_signal_weights`, `graduation_invitations`, `certificate_verifications` | three tables in `0025` | three empty tables | scored entity resolution, a live program, and the verify endpoint's abuse log, each retrofitted onto live data (§17) |
 | `feed`, `platform` value sets | accounts | two `check` lists | a second data feed or venue |
-| `wallet_withdrawal_status = transferring` | wallet_withdrawals | one enum value | the external rail growing a state the internal leg never had ([ADR-028](../DECISIONS.md)) |
+| `wallet_withdrawal_status = transferring` | wallet_withdrawals | one enum value | the external rail growing a state the internal leg never had ([ADR-028](../decisions/ADR-028.md)) |
 
 ## 13. Invariants, and the test that enforces each
 
 | Invariant | Enforcement |
 |---|---|
 | Ledger sums to zero per transaction and globally | `ledger_entries_zero_sum`, a deferred constraint trigger in `0027`; property test; nightly assertion |
-| **No transaction debits and credits the same ledger account** | **LEDGER-C1** `ledger_entries_no_opposite_signs`, a deferred constraint trigger ([ADR-027](../DECISIONS.md)). The collapse it catches **passes** the zero-sum check |
+| **No transaction debits and credits the same ledger account** | **LEDGER-C1** `ledger_entries_no_opposite_signs`, a deferred constraint trigger ([ADR-027](../decisions/ADR-027.md)). The collapse it catches **passes** the zero-sum check |
 | **Every entry resolves to one of the seven declared classes** | **LEDGER-C2** `ledger_entries_class_declared`, a `BEFORE INSERT` trigger, plus the `CHECK` on `ledger_accounts.code` |
 | `withdrawable_cents >= 0` always | check constraint; property test over generated day sequences |
 | One live mark per account per trading day | partial unique index `daily_marks_live_per_account_day_uq` |
 | Replay reproduces stored rule_states byte-identically | nightly self-audit job; CI golden replay; `state_hash` (`SD-08`) is the comparison key |
-| A published plan_version never changes, and a retired one never changes again | `plan_versions_published_immutable`, an update trigger in `0027`. **DEFECTIVE AS MERGED, FIXED BY [`0028`](../../packages/db/migrations/0028_supersede_plan_version_immutability.sql) under [ADR-035](../DECISIONS.md), accepted 2026-08-15.** As merged it read `NEW.config` on a table whose rule contract is `rules`, so the promise held by accident and the ruled `published -> retired` transition was refused too. `0028` pins the whole row rather than three columns, permits exactly `published -> retired` with `retired_at`, and makes retirement terminal. Probed by [`probe_plan_version_immutability.sql`](../../scripts/db/probe_plan_version_immutability.sql), which **leads with the permitted transition succeeding**: a golden test attempting mutation would have passed against a guard that rejected everything, and that is precisely what happened |
+| A published plan_version never changes, and a retired one never changes again | `plan_versions_published_immutable`, an update trigger in `0027`. **DEFECTIVE AS MERGED, FIXED BY [`0028`](../../packages/db/migrations/0028_supersede_plan_version_immutability.sql) under [ADR-035](../decisions/ADR-035.md), accepted 2026-08-15.** As merged it read `NEW.config` on a table whose rule contract is `rules`, so the promise held by accident and the ruled `published -> retired` transition was refused too. `0028` pins the whole row rather than three columns, permits exactly `published -> retired` with `retired_at`, and makes retirement terminal. Probed by [`probe_plan_version_immutability.sql`](../../scripts/db/probe_plan_version_immutability.sql), which **leads with the permitted transition succeeding**: a golden test attempting mutation would have passed against a guard that rejected everything, and that is precisely what happened |
 | Win-day count never decreases except on payout reset | property test |
 | `approved_cents <= min(requested, withdrawable, cap)` | check constraint plus engine property test |
 | An account's plan_version_id never changes | `accounts_plan_version_pinned`, an update trigger in `0027`. Verified to fire |
@@ -2251,7 +2251,7 @@ Notes that matter: `payout_cap_schedule` is an **array from day one** even thoug
 | **A dual-control approver is not the requester** | `dual_control_approvals_second_person`, a check constraint (`SD-M6-05`) |
 | **`closing = opening + realized_pnl + adjustment`** (INV-18) | `daily_marks_balance_arithmetic`, checkable only because `SD-01` exists |
 | **No non-integer column exists outside the two ruled exemptions** | a `DO` block in `0027` reading `information_schema.columns`, asserted in both directions (§17) |
-| **Neither figure of a paired statistic is published alone** (ST-04 mean and median, ST-05 and ST-06 p50 and p95) | **STAT-C1**, a deferred constraint trigger ([ADR-032](../DECISIONS.md)): a publish run emitting one `measure` for a `stat_code` must emit every measure its definition declares. Probed against the database, both ways |
+| **Neither figure of a paired statistic is published alone** (ST-04 mean and median, ST-05 and ST-06 p50 and p95) | **STAT-C1**, a deferred constraint trigger ([ADR-032](../decisions/ADR-032.md)): a publish run emitting one `measure` for a `stat_code` must emit every measure its definition declares. Probed against the database, both ways |
 
 ## 14. Migration policy
 
@@ -2275,7 +2275,7 @@ Privacy deletion requests redact PII columns (`users.email`, `country_code`, sig
 
 ## 16. Founder rulings (Wave 2 gate, 2026-08-13)
 
-Walked line by line at the gate. All five confirmed as written; recorded in [DECISIONS.md](../DECISIONS.md).
+Walked line by line at the gate. All five confirmed as written; recorded in [DECISIONS.md](../decisions/README.md).
 
 1. **`rule_states` stored per day rather than per account: confirmed.** It is the difference between an account timeline that reconstructs itself and one that has to be recomputed on demand. Costs roughly 250 rows per funded account per year.
 2. **Marks and corrections use supersession, never update: confirmed.** This is what makes "what did we believe when we approved that payout" answerable, and it is the mechanism behind the never-claw-back promise (B4 #5).
@@ -2283,7 +2283,7 @@ Walked line by line at the gate. All five confirmed as written; recorded in [DEC
 4. **`identity_id` is denormalized onto `payout_requests`: confirmed.** Deliberate, for identity-level race safety and aggregate exposure.
 5. **The `promotional_credit` ledger class and the `currency` columns are reserved now: confirmed.** Both stay in the v1 schema and out of v1 math. `currency` defaults to `USD` on `ledger_entries` and `purchases` and is never read by any computation; `promotional_credit` exists as a `ledger_accounts` row with no entries. The cost is two columns and one row. The migration avoided is a multi-currency or bonus-mechanics retrofit onto a live, append-only ledger, which is the one table in the system where a retrofit cannot be rehearsed.
 
-## 17. Delta provenance (added under [ADR-026](../DECISIONS.md))
+## 17. Delta provenance (added under [ADR-026](../decisions/ADR-026.md))
 
 **Every schema change in the migration set traces to the document that proposed it, and the trace lives in one file.** [`packages/db/DELTA_MANIFEST.md`](../../packages/db/DELTA_MANIFEST.md) carries all 94 with a disposition, plus the migration sequence, the rejection table, and the reference cycles. **The completeness gate reads it**: every `SD-nn` and `U-nn` appearing anywhere in `docs/` must appear exactly once there. A count nobody can drift is better than a count someone remembers to update.
 
@@ -2297,7 +2297,7 @@ Walked line by line at the gate. All five confirmed as written; recorded in [DEC
 
 ### The three tables that are created and deliberately empty
 
-`0025_reserved_sequence` holds `identity_signal_weights` (`U-01`), `graduation_invitations` (`SD-M18-03`) and `certificate_verifications` (`SD-M11-04`). **Marked, not deferred.** [ADR-026](../DECISIONS.md) rejected no delta, and a table that quietly failed to appear is indistinguishable from one that was dropped.
+`0025_reserved_sequence` holds `identity_signal_weights` (`U-01`), `graduation_invitations` (`SD-M18-03`) and `certificate_verifications` (`SD-M11-04`). **Marked, not deferred.** [ADR-026](../decisions/ADR-026.md) rejected no delta, and a table that quietly failed to appear is indistinguishable from one that was dropped.
 
 ### What §1's Mutability section now means operationally
 
@@ -2311,7 +2311,7 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 
 **The list is asserted, not documented.** `0027` carries a `DO` block that reads `information_schema.columns` and fails the migration if the set of `numeric`, `real` or `double precision` columns in `public` is anything other than exactly those two, **in both directions**: an unlisted column fails, and so does a stale entry naming a column that no longer exists. **Verified to bite in both directions**, not merely to run. Full per-column ruling in [DELTA_MANIFEST section 9](../../packages/db/DELTA_MANIFEST.md).
 
-**The third entry was retired by [ADR-031](../DECISIONS.md).** `published_statistics.value_numeric` was authorized and did not survive inspection: all seven ruled statistics are exactly representable as integers under this document's own conventions (ST-01/02/07 rates in **integer basis points**, ST-03/04 money in **integer cents**, ST-05/06 durations in **whole seconds**), and for ST-03 and ST-04 the column held **money on a public surface**, which is the case §1 names directly. It is now **`value bigint`** with a mandatory **`value_unit`**, and it is renamed because a column called `value_numeric` holding a `bigint` is a lie that survives every grep. **An authorized exemption covering a money column is not an exemption; it is a hole with a ruling attached.**
+**The third entry was retired by [ADR-031](../decisions/ADR-031.md).** `published_statistics.value_numeric` was authorized and did not survive inspection: all seven ruled statistics are exactly representable as integers under this document's own conventions (ST-01/02/07 rates in **integer basis points**, ST-03/04 money in **integer cents**, ST-05/06 durations in **whole seconds**), and for ST-03 and ST-04 the column held **money on a public surface**, which is the case §1 names directly. It is now **`value bigint`** with a mandatory **`value_unit`**, and it is renamed because a column called `value_numeric` holding a `bigint` is a lie that survives every grep. **An authorized exemption covering a money column is not an exemption; it is a hole with a ruling attached.**
 
 **Two further columns shipped outside that authorization and are corrected.** `published_statistics.numerator` and `.denominator` were `numeric` and are now `bigint` with a `numerator_unit` discriminator. The denominator is a count in all six statistics that have one and is compared against an integer `min_sample`; the numerator is a count, **integer cents**, or a whole-second duration, and for ST-03 and ST-04 it is a sum of `trader_cents`, which is money and does not stop being money because it is being published.
 
@@ -2330,11 +2330,11 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 | Every `CREATE TABLE` has a `### <table>` section, and every section has a `CREATE TABLE` | [CI-06i](../testing/STRATEGY.md), both directions | **96 / 96, no orphan in either direction** |
 | Every column of every table appears in its section's column table | generated diff of the document against `information_schema.columns` | **zero undocumented columns, zero documented columns that do not exist** |
 | The no-floats exemption set | `0027`'s own `DO` block, on a clean install | **passes; the only two non-integer columns are the two named above** |
-| `plan_versions` published-row immutability, **against `0001` to `0027` only** | **executed**, not read: insert a published version, attempt the ruled `published -> retired` transition | **FAILED. [ADR-035](../DECISIONS.md)** |
+| `plan_versions` published-row immutability, **against `0001` to `0027` only** | **executed**, not read: insert a published version, attempt the ruled `published -> retired` transition | **FAILED. [ADR-035](../decisions/ADR-035.md)** |
 | The same, **against `0001` to `0028`** | [`probe_plan_version_immutability.sql`](../../scripts/db/probe_plan_version_immutability.sql), 14 assertions, leading with the permitted transition | **14 / 14 pass** |
 | Every `NEW.`/`OLD.` column in every trigger body resolves | [CI-06j](../testing/STRATEGY.md), from the tree, no database | **passes.** It found ADR-035 on its first run |
 | The seven `array_length` `CHECK`s reject the empty array | one empty-array `INSERT` each, before and after `0028` | **7 accepted before, 7 rejected after** |
 
 **The first row is why this section exists in this form.** The trigger read `NEW.config` and `OLD.config`, and `plan_versions` has no `config` column: the rule contract is `rules`. Every `UPDATE` against a published row therefore raised `record "new" has no field "config"`. The promise "a published plan version never changes" survived by accident, because the error rejects the write; **the permitted retirement transition was refused too, so a plan version could not be retired at all**. A draft row updates normally, which is why an install check and every existing probe missed it. **An invariant that was reviewed and not executed has not been checked**, which is the same lesson the `array_length` defect taught one file over, found the same way.
 
-**And the deeper one, which is now a gate.** Every probe in this corpus attempted a forbidden thing and asserted a rejection. A guard that rejects **everything** passes all of them. `probe_plan_version_immutability.sql` therefore leads with the **permitted** transition, and `0028` ships with it, per [ADR-035](../DECISIONS.md)'s own words: the missing test is the finding as much as the missing column is.
+**And the deeper one, which is now a gate.** Every probe in this corpus attempted a forbidden thing and asserted a rejection. A guard that rejects **everything** passes all of them. `probe_plan_version_immutability.sql` therefore leads with the **permitted** transition, and `0028` ships with it, per [ADR-035](../decisions/ADR-035.md)'s own words: the missing test is the finding as much as the missing column is.

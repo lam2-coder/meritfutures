@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [INDEX.md, STATE.md, DECISIONS.md, ../MERIT_BUILD_MASTER_PROMPT.md]
+depends_on: [INDEX.md, STATE.md, decisions/README.md, ../MERIT_BUILD_MASTER_PROMPT.md]
 last_updated: 2026-08-14
 ---
 
@@ -10,7 +10,7 @@ last_updated: 2026-08-14
 
 ## The project in one paragraph
 
-Merit Futures is a futures proprietary trading firm being built by a solo founder. Traders buy an evaluation, pass it against published rules, receive a funded account, and withdraw a share of profits on a mechanical cadence. The firm's product is not the trading platform (that is a vendor, Rithmic) but the **rules engine, the payout pipeline, and the liability controls around them**: what counts as a breach, what makes a payout eligible, what stops a coordinated group from extracting more than the model priced. The whole build is governed by a constitution ([MERIT_BUILD_MASTER_PROMPT.md](../MERIT_BUILD_MASTER_PROMPT.md), read-only, amended only through ADRs in [DECISIONS.md](DECISIONS.md)). Its central discipline: **the entire system is specified as documents before any application code exists**, so that design errors are caught in prose where they cost an edit rather than in a money path where they cost a payout. The corpus is currently about 40 documents and roughly 30,000 lines. **Zero application code exists and none may be written until STATE.md says FROZEN.**
+Merit Futures is a futures proprietary trading firm being built by a solo founder. Traders buy an evaluation, pass it against published rules, receive a funded account, and withdraw a share of profits on a mechanical cadence. The firm's product is not the trading platform (that is a vendor, Rithmic) but the **rules engine, the payout pipeline, and the liability controls around them**: what counts as a breach, what makes a payout eligible, what stops a coordinated group from extracting more than the model priced. The whole build is governed by a constitution ([MERIT_BUILD_MASTER_PROMPT.md](../MERIT_BUILD_MASTER_PROMPT.md), read-only, amended only through ADRs in [DECISIONS.md](decisions/README.md)). Its central discipline: **the entire system is specified as documents before any application code exists**, so that design errors are caught in prose where they cost an edit rather than in a money path where they cost a payout. The corpus is currently about 40 documents and roughly 30,000 lines. **Zero application code exists and none may be written until STATE.md says FROZEN.**
 
 ## Who does what
 
@@ -30,9 +30,9 @@ Three concrete jobs:
 
 1. **Scrutinize gate summaries.** When a session ends, it reports what it did. The guide's job is to ask what the summary is not saying: which recommendation is load bearing, which number moved without being flagged, which "confirmed as specified" is actually a decision wearing a confirmation's clothes, which open question was quietly answered by an assumption. **Findings the guide raises become founder rulings or they become nothing.**
 2. **Issue rulings, or prepare them.** Most gate items are decisions the founder must make. The guide's value is turning "here are eleven open questions" into "here are the three that change the economics, here is what each option costs, here is my recommendation and the argument against it." The founder rules; the guide makes ruling cheap.
-3. **Draft the next session prompt.** Claude Code sessions are one-objective and context-bounded ([ADR-003](DECISIONS.md)). A good prompt carries the objective, the rulings to fold, the constraints, and the stop condition. A vague prompt produces a session that does four things adequately instead of one thing properly.
+3. **Draft the next session prompt.** Claude Code sessions are one-objective and context-bounded ([ADR-003](decisions/ADR-003.md)). A good prompt carries the objective, the rulings to fold, the constraints, and the stop condition. A vague prompt produces a session that does four things adequately instead of one thing properly.
 
-**A standing instruction: the guide should disagree.** A review desk that ratifies is not a review desk. If a Claude Code recommendation looks wrong, say so and argue it. Several of the strongest decisions in this corpus came from overruling the plan's own recommendation ([ADR-014](DECISIONS.md) is the clearest: the plan recommended a post-payout floor reset and the founder rejected it outright).
+**A standing instruction: the guide should disagree.** A review desk that ratifies is not a review desk. If a Claude Code recommendation looks wrong, say so and argue it. Several of the strongest decisions in this corpus came from overruling the plan's own recommendation ([ADR-014](decisions/ADR-014.md) is the clearest: the plan recommended a post-payout floor reset and the founder rejected it outright).
 
 ## The working loop
 
@@ -65,7 +65,7 @@ Claude Code folds every ruling into every affected doc, commits, pushes, stops
 1. **One objective**, stated as a deliverable.
 2. **The rulings to fold**, in enough detail that the session does not have to infer intent.
 3. **The stop condition**, explicitly ("stop after X, do not begin Y"). Sessions will otherwise continue into the next thing.
-4. **The regime**: money-path work (rules engine, payout, ledger, auth) runs one objective per session with a fresh context; non-money work (docs, marketing, fixtures) may compound ([ADR-003](DECISIONS.md)).
+4. **The regime**: money-path work (rules engine, payout, ledger, auth) runs one objective per session with a fresh context; non-money work (docs, marketing, fixtures) may compound ([ADR-003](decisions/ADR-003.md)).
 5. **Any verification to perform**, such as confirming a file landed or a count reconciles.
 
 ## Current state (FROZEN, 2026-08-14)
@@ -79,12 +79,12 @@ Authoritative version is [STATE.md](STATE.md). This is the orientation snapshot.
 | Batch | Status |
 |---|---|
 | M01 rules engine | **approved** (gate closed, eleven rulings) |
-| M02 rithmic bridge | **review**, and cannot advance while the vendor call is outstanding ([ADR-005](DECISIONS.md)) |
+| M02 rithmic bridge | **review**, and cannot advance while the vendor call is outstanding ([ADR-005](decisions/ADR-005.md)) |
 | M03 to M08 | **approved** (batch 1 gate closed) |
 | Wave 4 (testing, ops, design, legal) | **approved** (FREEZE gate) |
 | M09 to M20 | **approved** (FREEZE gate) |
 
-**The gate is closed.** The first build session is the **schema-delta reconciliation**: money path, strict [ADR-003](DECISIONS.md) regime, fresh context, **plan mode mandatory**.
+**The gate is closed.** The first build session is the **schema-delta reconciliation**: money path, strict [ADR-003](decisions/ADR-003.md) regime, fresh context, **plan mode mandatory**.
 
 **25 ADRs accepted, and the corpus is FROZEN.** The ones with the widest reach, worth knowing before reviewing anything:
 
@@ -117,7 +117,7 @@ Roughly, and in dependency order. Each is one Claude Code session unless noted.
 | # | Session | Regime | Notes |
 |---|---|---|---|
 | 1 | **Batch 2 gate closure** | non-money | Fold whatever the read-through produces. May be small if the read-through is clean |
-| 2 | **The consolidated schema-delta migration** | **money path, strict** | M01's ten, batch 1's **thirty-seven**, batch 2's **forty-one**, plus 5 unnumbered: **93 total** ([ADR-026](DECISIONS.md) corrected the tally). **Its own session, fresh context**, per ADR-003. This is the single highest-risk documentation session remaining, because it reconciles four waves of proposed schema changes into one reviewed migration against an approved DATA_MODEL |
+| 2 | **The consolidated schema-delta migration** | **money path, strict** | M01's ten, batch 1's **thirty-seven**, batch 2's **forty-one**, plus 5 unnumbered: **93 total** ([ADR-026](decisions/ADR-026.md) corrected the tally). **Its own session, fresh context**, per ADR-003. This is the single highest-risk documentation session remaining, because it reconciles four waves of proposed schema changes into one reviewed migration against an approved DATA_MODEL |
 | 3 | **Wave 4: SIMULATION_HARNESS** | non-money | The port spec. Its checklist already exists: the divergence table in the calibration README. Blocked in part on `mc_lifecycle.py` |
 | 4 | **Wave 4: testing STRATEGY** | non-money | Constitution section 5 instantiated with tooling |
 | 5 | **Wave 4: ops runbooks** | non-money | One per failure class. The DDOS-is-also-an-exfiltration-alarm trigger belongs here |
@@ -135,7 +135,7 @@ Roughly, and in dependency order. Each is one Claude Code session unless noted.
 |---|---|
 | [STATE.md](STATE.md) | **Always start here.** Live wave, gate, open items, next actions. Wins over this briefing wherever they differ |
 | [INDEX.md](INDEX.md) | Every document, one line each, with status and owner. **If a thing is not in INDEX, it does not exist** |
-| [DECISIONS.md](DECISIONS.md) | Every ADR with rationale and alternatives, plus the gate-closure tables. The record of why anything is the way it is |
+| [DECISIONS.md](decisions/README.md) | Every ADR with rationale and alternatives, plus the gate-closure tables. The record of why anything is the way it is |
 | [MERIT_BUILD_MASTER_PROMPT.md](../MERIT_BUILD_MASTER_PROMPT.md) | The constitution. Read-only; amendments are ADRs |
 | [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal. **The landmines sections are the highest-value paragraphs in the corpus** for a reviewer, because they record what nearly went wrong |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once. Canonical field names and comparison operators live here |

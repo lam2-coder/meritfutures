@@ -20,7 +20,7 @@ Write down, in the incident channel: the target timestamp, why it was chosen, an
 
 1. **Stop the application writes.** Scale the worker to zero. Put the portal and admin into read-only or maintenance.
 2. **Take a snapshot of the current broken state before restoring over it.** A corrupted database is evidence and it is the only copy of anything written since the target time.
-3. **Restore to the chosen point** using the vendor's documented procedure ([ADR-007](../../DECISIONS.md): the restore is a documented vendor procedure rehearsed quarterly, not a homegrown script).
+3. **Restore to the chosen point** using the vendor's documented procedure ([ADR-007](../../decisions/ADR-007.md): the restore is a documented vendor procedure rehearsed quarterly, not a homegrown script).
 4. **Verify before reconnecting**, per the checklist below.
 5. **Reconnect the worker last**, after the queue state is verified.
 
@@ -30,7 +30,7 @@ Write down, in the incident channel: the target timestamp, why it was chosen, an
 |---|---|---|
 | 1 | **Ledger sums to zero**, globally and per identity | The first question about any restored database is whether the books survived. GS-231 pins that a per-identity error hides behind a global zero |
 | 2 | **No duplicate settlements**, and **idempotency keys survived the restore** | GS-048, B4 #19. This is the failure a restore uniquely creates: a queued transfer replaying against a provider that already sent it |
-| 3 | **Queue state consistent with the ledger** | [ADR-006](../../DECISIONS.md) put jobs in the same Postgres for exactly this reason. Restore keeps them consistent, and this check proves it did |
+| 3 | **Queue state consistent with the ledger** | [ADR-006](../../decisions/ADR-006.md) put jobs in the same Postgres for exactly this reason. Restore keeps them consistent, and this check proves it did |
 | 4 | **Replay self-audit green** over a sample of accounts | Stored `rule_states` re-derive identically, or the restore brought back state the engine does not vouch for |
 | 5 | **Wallet positions reconcile** per identity, and never negative | Two exits from one integer (GS-230), and a restore is where a position could land inconsistent |
 | 6 | **Last closed trading day is what you expect** | Determines what has to be re-ingested |

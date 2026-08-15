@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M19-kyc-identity.md, ../../DECISIONS.md]
+depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M19-kyc-identity.md, ../../decisions/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -21,8 +21,8 @@ last_updated: 2026-08-14
 1. **Confirm the payout path is unaffected.** Sample a verified identity's request end to end.
 2. **Queue new verifications** rather than failing them. The trader sees an honest queued status with a reason, not an error and not a silent spinner.
 3. **Do not fall back to a weaker check.** There is no manual verification path and adding one during an outage would create a permanent one.
-4. **Do not let accounts through the gate.** The composite trigger set ([ADR-021](../../DECISIONS.md)) exists so that verification happens before liability, and waiving it under time pressure is the one thing that makes the whole placement argument moot.
-5. **Watch the enrichment vendor separately.** [ADR-023](../../DECISIONS.md)'s checkout enrichment **fails open on timeout** in enforcement mode and is non-blocking in observe mode (GS-239). A checkout that cannot complete because a fraud signal timed out converts a fraud control into an outage, and that is by design not allowed to happen.
+4. **Do not let accounts through the gate.** The composite trigger set ([ADR-021](../../decisions/ADR-021.md)) exists so that verification happens before liability, and waiving it under time pressure is the one thing that makes the whole placement argument moot.
+5. **Watch the enrichment vendor separately.** [ADR-023](../../decisions/ADR-023.md)'s checkout enrichment **fails open on timeout** in enforcement mode and is non-blocking in observe mode (GS-239). A checkout that cannot complete because a fraud signal timed out converts a fraud control into an outage, and that is by design not allowed to happen.
 
 ## Comms
 

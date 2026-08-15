@@ -84,7 +84,7 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-**This machine carried `transferring` until 2026-08-15, and [ADR-028](../DECISIONS.md) retired that value from `payout_requests` on 2026-08-14.** The enum is `approved, settled, failed, frozen`; `transferring` is owned by `wallet_withdrawals` and its machine is section 3. ADR-028 named two sites it corrected, [DATA_MODEL](DATA_MODEL.md)'s second stale index predicate and [M05](../plans/M05-payout-system.md)'s freeze target, and **it missed this drawing, which is the authoritative one.** Corrected under [ADR-040](../DECISIONS.md) on ADR-028's own remedy: `frozen` releases to `settled`, which is what a released freeze does under the wallet, and the three `transferring` transitions with their guards `G-TRANSFER-QUEUED`, `G-SETTLEMENT-CONFIRMED` and `G-TRANSFER-EXHAUSTED` belong to the external leg. **`approved --> settled` carries a ledger fact rather than a guard name, and the absence is deliberate**: under [ADR-019](../DECISIONS.md) the internal leg is one transaction ([M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states and no guard exists to name. The guard is named when the machine is folded, not invented here.
+**This machine carried `transferring` until 2026-08-15, and [ADR-028](../decisions/ADR-028.md) retired that value from `payout_requests` on 2026-08-14.** The enum is `approved, settled, failed, frozen`; `transferring` is owned by `wallet_withdrawals` and its machine is section 3. ADR-028 named two sites it corrected, [DATA_MODEL](DATA_MODEL.md)'s second stale index predicate and [M05](../plans/M05-payout-system.md)'s freeze target, and **it missed this drawing, which is the authoritative one.** Corrected under [ADR-040](../decisions/ADR-040.md) on ADR-028's own remedy: `frozen` releases to `settled`, which is what a released freeze does under the wallet, and the three `transferring` transitions with their guards `G-TRANSFER-QUEUED`, `G-SETTLEMENT-CONFIRMED` and `G-TRANSFER-EXHAUSTED` belong to the external leg. **`approved --> settled` carries a ledger fact rather than a guard name, and the absence is deliberate**: under [ADR-019](../decisions/ADR-019.md) the internal leg is one transaction ([M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states and no guard exists to name. The guard is named when the machine is folded, not invented here.
 
 There is **no `pending_review` state and no `denied` state.** A request that does not satisfy G-ELIGIBLE is never created: the API returns the gate breakdown and emits `payout.blocked`, so the machine only ever starts from an approved fact.
 
@@ -98,14 +98,14 @@ There is **no `pending_review` state and no `denied` state.** A request that doe
 | From | To | Guard | Events |
 |---|---|---|---|
 | (start) | `approved` | G-ELIGIBLE and G-CLAMP | `payout.requested`, `payout.approved`, `ledger.transaction_posted` |
-| `approved` | `settled` | **none.** The internal leg is one transaction ([ADR-019](../DECISIONS.md), [M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states | `payout.settled`, `payout.win_days_reset`, `payout.floor_recomputed`, `ledger.transaction_posted` |
+| `approved` | `settled` | **none.** The internal leg is one transaction ([ADR-019](../decisions/ADR-019.md), [M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states | `payout.settled`, `payout.win_days_reset`, `payout.floor_recomputed`, `ledger.transaction_posted` |
 | `approved` | `frozen` | G-FREEZE-DURING-FLIGHT | `identity.payouts_frozen`, `payout.blocked` |
 | `frozen` | `settled` | G-FREEZE-CLEARED | `identity.payouts_unfrozen` |
 | `frozen` | `failed` | G-FREEZE-ENFORCED | `enforcement.applied`, `payout.transfer_failed` |
 
 **Win-day reset and floor recompute happen on settlement**, which under the wallet is the same transaction as approval, so there is no window in which a trader's progress is spent against a payout that has not landed.
 
-**The 2 to 3 day settlement window is no longer this machine's investigation hook and the hook is not lost, it moved.** It describes the rail, which is the external leg, and the internal leg has no window at all: a freeze opened after wallet credit is halted on `wallet_withdrawals` under [ADR-040](../DECISIONS.md), and a flag standing at request time holds the request **before** approval rather than during a flight that no longer exists. Freezes remain evidence-backed and are never a routine review step.
+**The 2 to 3 day settlement window is no longer this machine's investigation hook and the hook is not lost, it moved.** It describes the rail, which is the external leg, and the internal leg has no window at all: a freeze opened after wallet credit is halted on `wallet_withdrawals` under [ADR-040](../decisions/ADR-040.md), and a flag standing at request time holds the request **before** approval rather than during a flight that no longer exists. Freezes remain evidence-backed and are never a routine review step.
 
 ## 3. Payout transfer (sub-machine)
 
@@ -164,7 +164,7 @@ stateDiagram-v2
     confirmed --> [*]
 ```
 
-**Provisional ([ADR-005](../DECISIONS.md)):** G-VENDOR-CONFIRMED depends on what Rithmic actually returns as acknowledgement. The design assumes a confirmation artifact (a response file or a next-cycle acknowledgement); if none exists, `delivered` becomes terminal-optimistic and confirmation is inferred from the next EOD report showing the account, which the vendor call must settle.
+**Provisional ([ADR-005](../decisions/ADR-005.md)):** G-VENDOR-CONFIRMED depends on what Rithmic actually returns as acknowledgement. The design assumes a confirmation artifact (a response file or a next-cycle acknowledgement); if none exists, `delivered` becomes terminal-optimistic and confirmation is inferred from the next EOD report showing the account, which the vendor call must settle.
 
 ## 6. Ingest file
 
@@ -261,7 +261,7 @@ Each guard is evaluated against the [last closed day](../GLOSSARY.md#last-closed
 | **G-CHARGEBACK** | A `purchase.charged_back` fact exists for the account's purchase |
 | **G-ADMIN-CLOSE** | Admin action with reason, plus an evidence pack id when the close is an enforcement |
 | **G-ELIGIBLE** | All of: account `active` and phase `funded`; `not payouts_frozen` (account and identity); `not recon_blocked`; KYC state `verified`; `traded_days_count >= pv.min_trading_days`; `win_days_count >= pv.win_days.required_count`; `withdrawable_cents > 0`; G-CONSISTENCY-OK; `trading_days_since_last_settled_payout >= pv.cadence_gap_trading_days` (no gap requirement on the first payout); G-NO-IN-FLIGHT; `min(withdrawable, cap) >= pv.min_payout_cents` |
-| **G-CLAMP** | `approved_cents = min(effective_request_cents, withdrawable_cents, cap_cents_for_ordinal)` and `approved_cents >= min_payout_cents`, where `effective_request_cents` is the caller's optional `amount_cents` or, when omitted, `min(withdrawable_cents, cap_cents_for_ordinal)` ([ADR-009](../DECISIONS.md)) |
+| **G-CLAMP** | `approved_cents = min(effective_request_cents, withdrawable_cents, cap_cents_for_ordinal)` and `approved_cents >= min_payout_cents`, where `effective_request_cents` is the caller's optional `amount_cents` or, when omitted, `min(withdrawable_cents, cap_cents_for_ordinal)` ([ADR-009](../decisions/ADR-009.md)) |
 | **G-NO-IN-FLIGHT** | No `payout_requests` row for this account in status `approved`, `transferring`, or `frozen`. Part of G-ELIGIBLE. It is a liability control, not a convenience: win days and the consistency period reset on settlement, so concurrent requests would let one qualifying stretch fund several capped extractions |
 | **G-TRANSFER-QUEUED** | Ledger transaction for the approval committed, and a transfer row created with a fresh idempotency key |
 | **G-RISE-ACCEPTED** / **G-RISE-TRANSIENT** | Provider accepted the transfer / returned a retryable error |

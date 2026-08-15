@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M12-transparency-platform.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M12-transparency-platform.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 
 # M9: Marketing Site and Content
 
-Constitution section M9, Appendix B5 ten-section template, Appendix F (design and prose), and the [parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14). Non-money path under the [ADR-003](../DECISIONS.md) permissive regime, with one exception noted in 1.3 that is not permissive at all.
+Constitution section M9, Appendix B5 ten-section template, Appendix F (design and prose), and the [parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md). Non-money path under the [ADR-003](../decisions/ADR-003.md) permissive regime, with one exception noted in 1.3 that is not permissive at all.
 
 One sentence governs this module: **the marketing site is a rendering of the configuration the engine executes, and every place it stops being that is a place where a promise and a rule can disagree.**
 
@@ -45,15 +45,15 @@ Three of those surfaces are unlike the rest and deserve naming up front, because
 
 | ID | Invariant | Enforcement |
 |---|---|---|
-| INV-M9-01 | No plan parameter, price, cap, split, gap, win-day count, or ladder length is ever a literal in this codebase | Build-time lint (VG-M9-1): a numeric literal inside a plan, pricing, or rules component fails the build. Every such value arrives from `plan_versions` or `plan_version_sizes`. [Parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14) |
+| INV-M9-01 | No plan parameter, price, cap, split, gap, win-day count, or ladder length is ever a literal in this codebase | Build-time lint (VG-M9-1): a numeric literal inside a plan, pricing, or rules component fails the build. Every such value arrives from `plan_versions` or `plan_version_sizes`. [Parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md) |
 | INV-M9-02 | Rule text on a public page is the pinned `copy_blocks` of the plan version being displayed, verbatim | The rules page has no prose of its own. The plain-English explainer **is** the `copy_blocks` content, authored with the plan version and published with it, so the marketing sentence and the executed rule change in the same commit and the same publish action |
 | INV-M9-03 | Every published page states the plan version it renders and the moment it was built | Version label plus `built_at` in the page footer and in the JSON-LD. A public page that cannot say which version it describes is unciteable, and it will be cited (AS-M9-07) |
 | INV-M9-04 | A plan version publish invalidates every page derived from it, before the version is purchasable | The publish action ([M03](M03-billing-checkout.md), `POST /admin/plans/versions/:id/publish`) is not complete until revalidation returns. Ordering is the control, not a cache TTL (AS-M9-01, INV-M9-11) |
 | INV-M9-05 | The simulated-environment disclosure appears in the footer of every page, in checkout, in the ToS, and on every certificate | Constitution section 6 and Appendix F. A layout-level component, so a new page cannot omit it by being new |
 | INV-M9-06 | No number on the stats page is computed here | The page fetches M12's published aggregate and renders it with its window and as-of date attached. There is no arithmetic in this module (AS-M9-03) |
 | INV-M9-07 | Content pages (blog, FAQ) may not state a plan parameter in prose | Build-time lint (VG-M9-2) over MDX: a currency figure, a percentage, or a day count in content prose fails the build unless it is emitted by the `<PlanValue>` component, which reads config. This is the single most important control in the module and the one most likely to be argued with (AS-M9-02) |
-| INV-M9-08 | The published cadence for **Merit Rapid is about 3 trading days**, and the copy attributes it to the **win-day gate**, never to the 1 day cadence gap | [ADR-018](../DECISIONS.md), [EC-049](../EDGE_CASES.md). A dominated gate may not be published as the reason a plan is fast, and may not be published as a protection at all |
-| INV-M9-09 | Marketing prose never claims a payout timing the wallet does not deliver | [ADR-019](../DECISIONS.md). The internal leg is same day to the Merit Wallet; the external leg is 2 to 3 business days. Both are stated, and the second is never omitted to make the first read better (AS-M9-06) |
+| INV-M9-08 | The published cadence for **Merit Rapid is about 3 trading days**, and the copy attributes it to the **win-day gate**, never to the 1 day cadence gap | [ADR-018](../decisions/ADR-018.md), [EC-049](../EDGE_CASES.md). A dominated gate may not be published as the reason a plan is fast, and may not be published as a protection at all |
+| INV-M9-09 | Marketing prose never claims a payout timing the wallet does not deliver | [ADR-019](../decisions/ADR-019.md). The internal leg is same day to the Merit Wallet; the external leg is 2 to 3 business days. Both are stated, and the second is never omitted to make the first read better (AS-M9-06) |
 | INV-M9-10 | The marketing origin holds no session, no trader data, and no write path | [SECURITY](../architecture/SECURITY.md) C-08's separation logic applied downward: the most-attacked and least-privileged surface in the estate is also the one with nothing to steal |
 | INV-M9-11 | A page rendering a **superseded** plan version is reachable, labeled, and never the default | Permanent per-version URLs. A trader pinned to v1 must be able to read v1's public page, and a stranger must never land on it by accident (AS-M9-07) |
 
@@ -204,7 +204,7 @@ M9 is a leaf. It emits little and consumes the catalog.
 
 **Attack.** The adversary is time, and the victim is a sentence. A launch blog post says "our 50K plan pays up to $1,500 per payout and requires 5 winning days". Eighteen months later the cap schedule has moved and Merit Rapid runs 3 win days. The plans page is correct because it reads config. The rules page is correct because it renders `copy_blocks`. The blog post is wrong, is indexed, ranks well for exactly those queries, and is the first thing a prospective trader reads.
 
-**Why it is worse than it sounds.** The [parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14) makes every one of these numbers a **tunable launch candidate**, so this is not a hypothetical drift, it is the expected behavior of the system. And a stale marketing claim is not merely embarrassing: under a transparency positioning it is the exact accusation Merit's brand is built to be immune to, and it hands a competitor or a disgruntled community member a genuine artifact.
+**Why it is worse than it sounds.** The [parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md) makes every one of these numbers a **tunable launch candidate**, so this is not a hypothetical drift, it is the expected behavior of the system. And a stale marketing claim is not merely embarrassing: under a transparency positioning it is the exact accusation Merit's brand is built to be immune to, and it hands a competitor or a disgruntled community member a genuine artifact.
 
 **Counter, and it is a build-time control rather than a process.**
 - **VG-M9-2 lints MDX content** (INV-M9-07). A currency amount, a percentage, or a day count appearing in prose fails the build unless it is emitted by `<PlanValue plan="core_eod" size="50K" field="payout_cap_cents"/>`, which reads config at render. The component is deliberately verbose to use, because the friction is the point: an author who wants to state a number must state which number, from which plan, at which size.
@@ -247,7 +247,7 @@ M9 is a leaf. It emits little and consumes the catalog.
 
 ### AS-M9-06: Selling the fast leg and omitting the slow one (NOVEL)
 
-**Attack.** The adversary is Merit's own marketing instinct. [ADR-019](../DECISIONS.md) makes payout approval and wallet credit same day, which is a genuinely excellent claim. The external withdrawal to a bank remains 2 to 3 business days. Every incentive points at headlining "get paid the same day" and putting the withdrawal window in a footnote.
+**Attack.** The adversary is Merit's own marketing instinct. [ADR-019](../decisions/ADR-019.md) makes payout approval and wallet credit same day, which is a genuinely excellent claim. The external withdrawal to a bank remains 2 to 3 business days. Every incentive points at headlining "get paid the same day" and putting the withdrawal window in a footnote.
 
 **Why it is fatal rather than merely sharp.** Constitution 0 names payout-trust collapse as one of the four ways firms die, and specifies the mechanism as **one late cycle then a review-page death spiral**. A trader who reads "same day" and sees their bank credited on day three has experienced a late cycle, even though nothing was late. Merit would have manufactured the exact perception it built the wallet to prevent, using a true sentence.
 

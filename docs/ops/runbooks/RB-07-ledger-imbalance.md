@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, COMMS_TEMPLATES.md, ../../DECISIONS.md, ../../plans/M05-payout-system.md, ../../plans/M20-wallet.md]
+depends_on: [README.md, COMMS_TEMPLATES.md, ../../decisions/README.md, ../../plans/M05-payout-system.md, ../../plans/M20-wallet.md]
 last_updated: 2026-08-14
 ---
 
@@ -12,7 +12,7 @@ last_updated: 2026-08-14
 
 ## The rule, and why it is scoped
 
-[ADR-016](../../DECISIONS.md): **a per-transaction imbalance attributable to exactly one identity halts payouts for that identity only. A global sum mismatch halts everything.** The reason for scoping is that an unscoped halt is a denial-of-payouts trigger with a one cent activation energy: anyone who can make the books disagree stops every payout for every trader, without moving any money.
+[ADR-016](../../decisions/ADR-016.md): **a per-transaction imbalance attributable to exactly one identity halts payouts for that identity only. A global sum mismatch halts everything.** The reason for scoping is that an unscoped halt is a denial-of-payouts trigger with a one cent activation energy: anyone who can make the books disagree stops every payout for every trader, without moving any money.
 
 **The classifier proves locality before it grants it.** An imbalance spanning identities, one with ambiguous attribution, and one traceable to no transaction at all are **all global**. If you find yourself arguing that a global halt is probably local, the classifier already considered it and said no.
 

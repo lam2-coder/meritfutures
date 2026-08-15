@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../../research/calibration/README.md, ../plans/M01-rules-engine.md, ../DECISIONS.md, ../plans/M05-payout-system.md, ../plans/M06-admin-ops-console.md, ../plans/M07-risk-abuse.md, STRATEGY.md, GOLDEN_SCENARIOS.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../../research/calibration/README.md, ../plans/M01-rules-engine.md, ../decisions/README.md, ../plans/M05-payout-system.md, ../plans/M06-admin-ops-console.md, ../plans/M07-risk-abuse.md, STRATEGY.md, GOLDEN_SCENARIOS.md]
 last_updated: 2026-08-14
 ---
 
@@ -16,14 +16,14 @@ Constitution section 5.3: port the Monte Carlo trader population to TypeScript, 
 
 ## 1. The calibration source, and what is still missing
 
-**`research/calibration/mc_lifecycle.py`, plus the business-model workbook, are the source of record** for every calibrated number in the corpus ([DECISIONS](../DECISIONS.md#the-calibration-source-becomes-version-controlled)).
+**`research/calibration/mc_lifecycle.py`, plus the business-model workbook, are the source of record** for every calibrated number in the corpus ([DECISIONS](../decisions/gates/wave-3-batch-1-gate-closure-2026-08-14.md)).
 
 | Artifact | Status as of 2026-08-14 |
 |---|---|
 | `research/calibration/futures_prop_firm_model.xlsx` | **Committed**, with a provenance [README](../../research/calibration/README.md) |
 | `research/calibration/mc_lifecycle.py` | **Still outstanding.** The upload accompanying the workbook was an unrelated 12MB database dump and was not committed |
 
-**What the absence costs, precisely, because it is narrower than it sounds.** The workbook is the *output*, and it carries the numbers this document needs: the correlation table, the reserve rule, the ruin scenarios, and the selection math are all in it and are all quoted below. What it cannot do is **re-run**. Without the engine, a parameter change is a diff against a spreadsheet rather than against the model that produced it, the sensitivity sweeps cannot be recomputed, and [ADR-015](../DECISIONS.md)'s sourcing of plan parameters to `mc_lifecycle.py OUR_PLANS` stays a citation rather than a diff.
+**What the absence costs, precisely, because it is narrower than it sounds.** The workbook is the *output*, and it carries the numbers this document needs: the correlation table, the reserve rule, the ruin scenarios, and the selection math are all in it and are all quoted below. What it cannot do is **re-run**. Without the engine, a parameter change is a diff against a spreadsheet rather than against the model that produced it, the sensitivity sweeps cannot be recomputed, and [ADR-015](../decisions/ADR-015.md)'s sourcing of plan parameters to `mc_lifecycle.py OUR_PLANS` stays a citation rather than a diff.
 
 **So this document is finalized against the source that exists and carries a named checklist for the source that does not.** Section 8 is that checklist. The port can be built today: the population model, the band inventory, the output contract, and the CI wiring below are complete and none of them waits on the engine. What waits is the **re-derivation** of four figures that are currently conservative rather than exact, and section 8 names each one.
 
@@ -33,9 +33,9 @@ Constitution section 5.3: port the Monte Carlo trader population to TypeScript, 
 
 ### 2.1 Conservatism was relocated, and the harness reports it that way
 
-[ADR-013](../DECISIONS.md) recorded that the founder's lifecycle simulation was **basis anchored**, which made realized liability under the settlement anchor *at most* the modeled figure. The corpus carried that gap as a safety cushion. **[ADR-019](../DECISIONS.md) moved the cadence anchor back to the basis day**, so the model and the system are anchored the same way and the accidental cushion is gone.
+[ADR-013](../decisions/ADR-013.md) recorded that the founder's lifecycle simulation was **basis anchored**, which made realized liability under the settlement anchor *at most* the modeled figure. The corpus carried that gap as a safety cushion. **[ADR-019](../decisions/ADR-019.md) moved the cadence anchor back to the basis day**, so the model and the system are anchored the same way and the accidental cushion is gone.
 
-**It was relocated rather than lost** (founder ruling, [DECISIONS](../DECISIONS.md)), and the relocation is a requirement on this harness rather than a note about it:
+**It was relocated rather than lost** (founder ruling, [DECISIONS](../decisions/README.md)), and the relocation is a requirement on this harness rather than a note about it:
 
 | Output | What it is | How the harness must report it |
 |---|---|---|
@@ -54,13 +54,13 @@ Regime stress is the second leg. Combined revenue-shock plus extraction-wave rui
 
 ### 2.2 Cycle lengths changed on every plan, and the compression was intended
 
-[ADR-018](../DECISIONS.md) set Merit Rapid to 3 win days and [ADR-019](../DECISIONS.md) moved the anchor. The population port must use the **current** cycle lengths (Core EOD and Direct at **5 trading days**, Merit Rapid at **3**), because a harness modelling the old 7 to 8 day Core cycle under-produces extraction by roughly 40 percent and reports a reserve that looks comfortable.
+[ADR-018](../decisions/ADR-018.md) set Merit Rapid to 3 win days and [ADR-019](../decisions/ADR-019.md) moved the anchor. The population port must use the **current** cycle lengths (Core EOD and Direct at **5 trading days**, Merit Rapid at **3**), because a harness modelling the old 7 to 8 day Core cycle under-produces extraction by roughly 40 percent and reports a reserve that looks comfortable.
 
 **Confirmed at the batch 1 gate: the lineup-wide compression is by design, not a side effect.** Wallet-instant credit applies to every plan, and Core EOD's and Direct's economics under a 5 day cycle **equal the original simulation calibration**, which was basis anchored throughout. The harness is not being asked to model something new; it is being asked to stop modelling a settlement lag the system no longer has.
 
 ### 2.3 The wallet splits liability from cash
 
-Under [ADR-019](../DECISIONS.md) a payout credits an internal wallet instantly and cash leaves only on a separate external withdrawal. The harness needs **two distributions where it previously needed one**:
+Under [ADR-019](../decisions/ADR-019.md) a payout credits an internal wallet instantly and cash leaves only on a separate external withdrawal. The harness needs **two distributions where it previously needed one**:
 
 - **Liability**, deterministic from the gates and produced by the engine. Unchanged in kind.
 - **External withdrawal demand**, which depends on trader behavior: how much of a wallet balance is withdrawn, how quickly, and how much is spent internally on resets instead.
@@ -124,18 +124,18 @@ population model  ->  daily_marks per account per trading day
 | ID | Assertion | Band | Note |
 |---|---|---|---|
 | RE-S-01 | **Evaluation pass rate**, lineup blended | **12 to 20 percent**, central estimate 14.7 percent | Constitution section 5.3's band, corroborated by the workbook's blended figure |
-| RE-S-02 | **Funded to first payout** | **40 to 55 percent** | Constitution section 5.3. [ADR-018](../DECISIONS.md)'s `w=3` recalibration reports **48.1 percent**, which sits mid-band |
+| RE-S-02 | **Funded to first payout** | **40 to 55 percent** | Constitution section 5.3. [ADR-018](../decisions/ADR-018.md)'s `w=3` recalibration reports **48.1 percent**, which sits mid-band |
 | RE-S-03 | **Payouts per paying account** | **1.8 to 2.4** | ADR-018 reports **2.09** |
 | RE-S-04 | **Firm dollars per funded account**, per plan | Within band per plan | ADR-018 reports **$889** at `w=3`. The pre-`w=3` workbook figures are $698 Core EOD, $800 Rapid, $206 Direct, and section 8's first check is reproducing the older numbers from the older parameters |
 | RE-S-05 | **Per-day extraction at the ceiling** | Merit Rapid **30,000c**, Core EOD and Direct **27,000c** | Section 6. A divergence here is a harness bug rather than an open question |
-| RE-S-06 | **Lifetime extraction per account** never exceeds `max_payouts * cap` | Hard assertion, not a band | INV-17. At 50K: **750,000c gross and 675,000c to the trader** on Core EOD and Direct, **500,000c and 450,000c** on Merit Rapid ([ADR-024](../DECISIONS.md)) |
+| RE-S-06 | **Lifetime extraction per account** never exceeds `max_payouts * cap` | Hard assertion, not a band | INV-17. At 50K: **750,000c gross and 675,000c to the trader** on Core EOD and Direct, **500,000c and 450,000c** on Merit Rapid ([ADR-024](../decisions/ADR-024.md)) |
 | RE-S-07 | **Mean monthly payout** at baseline scale | Near **$45.3K**, flat across the `rho` sweep | The flatness is the assertion. A mean that moves with `rho` means the copula is wired wrong |
 | RE-S-08 | **CVaR99 at `rho = 0.30`** | Near **$132.9K**, roughly **2.93x** the mean | The reserve floor, emitted separately from RE-S-07 (HO-02) |
 | RE-S-09 | **Combined-regime 18 month ruin** | **6.28 percent at $150K, 1.64 percent at $250K, 0.36 percent at $350K, 0.01 percent at $500K** | The capital decision's evidence, and the one output the founder reads directly |
 | RE-S-10 | **Breach rate in the first funded cycle** | Elevated versus later cycles | PP-05's risk-up behavior showing up. A flat profile means the harness modelled constant sizing and the post-payout cluster is missing |
 | RE-S-11 | **Detected share of the adversarial cohort**, by detection lag | Reported against [M07](../plans/M07-risk-abuse.md)'s target | PP-10. Below target, the undetected residual feeds RE-S-08 and the reserve floor rises |
 
-**A band is a founder decision, not a tuning parameter.** When a band fails, the two available responses are "the engine regressed" and "the founder moved a plan parameter and the band moves with it, recorded in [DECISIONS](../DECISIONS.md)". Widening a band to make a nightly build green is TR-03 in [STRATEGY](STRATEGY.md), and it is the exact failure this harness exists to catch.
+**A band is a founder decision, not a tuning parameter.** When a band fails, the two available responses are "the engine regressed" and "the founder moved a plan parameter and the band moves with it, recorded in [DECISIONS](../decisions/README.md)". Widening a band to make a nightly build green is TR-03 in [STRATEGY](STRATEGY.md), and it is the exact failure this harness exists to catch.
 
 ---
 
@@ -143,11 +143,11 @@ population model  ->  daily_marks per account per trading day
 
 **Merit Rapid's per-day extraction ceiling is $300** (30,000 cents) at 50K: a 100,000c cap, a 9000bp split, a 3 trading day cycle. **Core EOD and Direct are 27,000 cents** on a 5 trading day cycle.
 
-This was briefly recorded as approximately $240 and flagged as an open reconciliation. It is settled: **the $240 figure was settlement-anchored commentary predating [ADR-019](../DECISIONS.md)**, and the `w=3` calibration was **basis anchored and already contained the 3 trading day cycle**. The correction is to a stale annotation and **carries no economic change**: the recalibrated unit economics ($889 firm dollars per funded account, 48.1 percent funded-to-payout, 2.09 payouts per payer, roughly 18 percent margin) were produced under the 3 day cycle and stand as recorded.
+This was briefly recorded as approximately $240 and flagged as an open reconciliation. It is settled: **the $240 figure was settlement-anchored commentary predating [ADR-019](../decisions/ADR-019.md)**, and the `w=3` calibration was **basis anchored and already contained the 3 trading day cycle**. The correction is to a stale annotation and **carries no economic change**: the recalibrated unit economics ($889 firm dollars per funded account, 48.1 percent funded-to-payout, 2.09 payouts per payer, roughly 18 percent margin) were produced under the 3 day cycle and stand as recorded.
 
 **What the harness owes here is a check, not a reconciliation** (RE-S-05). A divergence is now a harness bug rather than an open question, which is the useful state for it to be in.
 
-**And the lifetime figure is the one to publish, not the per-day one.** [ADR-018](../DECISIONS.md)'s defense of Merit Rapid's headline rate is that a fast per-day rate on a hard-capped, gated, short-lived ladder is a marketing advantage, and the ladder is what makes the lifetime figure the number that matters: **$4,500 to the trader over at most 15 trading days** on Merit Rapid, **$6,750 over 25** on Core EOD and Direct. RE-S-06 asserts the bound and RE-S-05 asserts the rate, and the harness reports them together so nobody quotes one without the other.
+**And the lifetime figure is the one to publish, not the per-day one.** [ADR-018](../decisions/ADR-018.md)'s defense of Merit Rapid's headline rate is that a fast per-day rate on a hard-capped, gated, short-lived ladder is a marketing advantage, and the ladder is what makes the lifetime figure the number that matters: **$4,500 to the trader over at most 15 trading days** on Merit Rapid, **$6,750 over 25** on Core EOD and Direct. RE-S-06 asserts the bound and RE-S-05 asserts the rate, and the harness reports them together so nobody quotes one without the other.
 
 ---
 
@@ -186,16 +186,16 @@ The [calibration README](../../research/calibration/README.md) tabulates six pla
 
 | # | Workbook | Corpus | Authority |
 |---|---|---|---|
-| 1 | "Rapid Daily" | **Merit Rapid** | [ADR-013](../DECISIONS.md) |
-| 2 | Rapid: 5 winning days | **3 win days** (`w=3`) | [ADR-018](../DECISIONS.md) |
+| 1 | "Rapid Daily" | **Merit Rapid** | [ADR-013](../decisions/ADR-013.md) |
+| 2 | Rapid: 5 winning days | **3 win days** (`w=3`) | [ADR-018](../decisions/ADR-018.md) |
 | 3 | Rapid: pay gap 1, marketed as daily | Gap 1, **dominated** by the 3 win-day gate | EC-049, PW-02b |
-| 4 | Core: min days to first payout "day 1" | Funded `min_trading_days` **0 on all plans**, disabled and visibly so | [ADR-015](../DECISIONS.md), CV-19 |
-| 5 | Settlement "2 to 3 business days" as the cadence anchor | **Instant wallet credit** is the anchor; 2 to 3 days is the external leg only | [ADR-019](../DECISIONS.md) |
+| 4 | Core: min days to first payout "day 1" | Funded `min_trading_days` **0 on all plans**, disabled and visibly so | [ADR-015](../decisions/ADR-015.md), CV-19 |
+| 5 | Settlement "2 to 3 business days" as the cadence anchor | **Instant wallet credit** is the anchor; 2 to 3 days is the external leg only | [ADR-019](../decisions/ADR-019.md) |
 | 6 | Profit split "90/9" | **9000bp (90/10)**. A typo, not a third split | [GLOSSARY](../GLOSSARY.md) |
 
 ### 8.2 The four figures that are currently conservative rather than exact
 
-[ADR-024](../DECISIONS.md) shortened the ladder from 8 to 5 after the `w=3` recalibration and the workbook's risk engine were both computed. **Liability is monotone-decreasing in `max_payouts`**, so every affected figure is now a bound in the safe direction rather than an estimate. **The direction of the error is known and it is the conservative one**, which is why this is a scheduled recalibration rather than a blocker.
+[ADR-024](../decisions/ADR-024.md) shortened the ladder from 8 to 5 after the `w=3` recalibration and the workbook's risk engine were both computed. **Liability is monotone-decreasing in `max_payouts`**, so every affected figure is now a bound in the safe direction rather than an estimate. **The direction of the error is known and it is the conservative one**, which is why this is a scheduled recalibration rather than a blocker.
 
 | Figure | Current status | What the re-run produces |
 |---|---|---|
@@ -204,7 +204,7 @@ The [calibration README](../../research/calibration/README.md) tabulates six pla
 | Payouts per paying account (**2.09**) | Same, and the shortened ladder truncates the upper tail | Exact |
 | **CVaR99 at `rho = 0.30`** (**$132.9K**) and the ruin table | Computed at the longer ladder, so the reserve floor is **at least** adequate | Exact, and this is the one the capital decision turns on |
 
-**On execution, every "at least" annotation in the corpus attached to these four figures is replaced with the exact value**, in this document, [ADR-018](../DECISIONS.md), [ADR-024](../DECISIONS.md), the [calibration README](../../research/calibration/README.md), and [STATE](../STATE.md).
+**On execution, every "at least" annotation in the corpus attached to these four figures is replaced with the exact value**, in this document, [ADR-018](../decisions/ADR-018.md), [ADR-024](../decisions/ADR-024.md), the [calibration README](../../research/calibration/README.md), and [STATE](../STATE.md).
 
 ### 8.3 The order of operations
 
@@ -213,7 +213,7 @@ The [calibration README](../../research/calibration/README.md) tabulates six pla
 3. **Walk the six divergences.** Each row disappears or becomes a founder decision.
 4. **Re-run at the current corpus parameters**, including `max_payouts = 5`, and produce the four exact figures in 8.2.
 5. **Replace every "at least" annotation** with the exact value, across the five documents named in 8.2.
-6. **Confirm [ADR-015](../DECISIONS.md)'s `OUR_PLANS` sourcing** is now a diff rather than a citation, and say so in the ADR.
+6. **Confirm [ADR-015](../decisions/ADR-015.md)'s `OUR_PLANS` sourcing** is now a diff rather than a citation, and say so in the ADR.
 7. **Clear the [STATE](../STATE.md) item.** It has narrowed twice and this is what closes it.
 8. **Then build the port**, using the engine as the reference implementation for the population model rather than this document's prose. A port whose source is prose is a port that quietly diverges.
 
@@ -251,7 +251,7 @@ Run **as committed** against its own `OUR_PLANS`, the engine reproduces the work
 | **Merit Rapid** | 16.55% | **48.11%** | **$904.07** | **2.13** | **16.9%** |
 | Direct | 100% | 12.07% | **$207.33** | 1.30 | **39.2%** |
 
-[ADR-018](../DECISIONS.md) carried $889, 48.1 percent, 2.09, and roughly 18 percent. **The funnel figure matches to two decimals; firm cost is 1.7 percent higher and margin 1.1 points lower.** Immaterial, and mildly unfavorable, which is what a decision made on round numbers is entitled to hope for rather than assume.
+[ADR-018](../decisions/ADR-018.md) carried $889, 48.1 percent, 2.09, and roughly 18 percent. **The funnel figure matches to two decimals; firm cost is 1.7 percent higher and margin 1.1 points lower.** Immaterial, and mildly unfavorable, which is what a decision made on round numbers is entitled to hope for rather than assume.
 
 **Core EOD's contribution margin is +0.25 percent**, which is not a rounding artifact and is not new: the workbook had it at **negative 0.88 percent**. Core EOD is a customer-acquisition plan whose economics live in rebuys and in the lineup, not in its own contribution line. That was always true and is now measured.
 
@@ -259,7 +259,7 @@ Run **as committed** against its own `OUR_PLANS`, the engine reproduces the work
 
 **Ladder 8 and 6 against ladder 5 and 4 return identical figures to every decimal place on Core EOD and Direct.** Mean payouts per payer are **1.54, 2.13 and 1.30**, nowhere near any ladder length under discussion.
 
-**[ADR-024](../DECISIONS.md) and Direct's ladder of 4 are therefore margin-neutral in the central estimate, and their whole value is tail protection.** Three consequences for this harness:
+**[ADR-024](../decisions/ADR-024.md) and Direct's ladder of 4 are therefore margin-neutral in the central estimate, and their whole value is tail protection.** Three consequences for this harness:
 
 1. **A calibration band derived from mean behavior will never show the ladder's value.** Any band that does is measuring something else.
 2. **The ladder must be exercised in the tail scenarios explicitly**, not left to the population to reach. A population whose mean account takes 1.5 payouts will exercise rung 4 rarely enough that a bug there survives calibration.

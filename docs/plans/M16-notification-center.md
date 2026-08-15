@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M15-discord-integration.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M15-discord-integration.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 
