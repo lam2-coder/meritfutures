@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M12-transparency-platform.md, M15-discord-integration.md, M16-notification-center.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M12-transparency-platform.md, M15-discord-integration.md, M16-notification-center.md]
 last_updated: 2026-08-14
 ---
 
@@ -40,7 +40,7 @@ The wiring layer between Merit's event stream and five bought services, plus the
 | Community Discord: roles, announcements, verification | [M15](M15-discord-integration.md) | IN-M10-05 is an internal alert firehose into an operations channel. The two share a protocol and nothing else, and conflating them is how a liability figure reaches a public server (AS-M10-05) |
 | Computing any published statistic | [M12](M12-transparency-platform.md) | A Metabase saved question is not a published number, and the distinction is enforced rather than assumed (AS-M10-02) |
 | Alerting policy and thresholds | [M6](M06-admin-ops-console.md) and each owning module | M10 delivers an alert. It never decides that something is alarming |
-| Storing support conversation content | Chatwoot | Merit stores a conversation reference on the identity, never the transcript ([DATA_MODEL](../architecture/DATA_MODEL.md)'s `Conversations` lateral branch is a pointer) |
+| Storing support conversation content | Chatwoot | Merit stores a conversation reference on the identity, never the transcript ([DATA_MODEL](../architecture/data-model/README.md)'s `Conversations` lateral branch is a pointer) |
 | Being on the critical path of anything | nobody, deliberately | See INV-M10-01 |
 
 ### 1.3 Invariants

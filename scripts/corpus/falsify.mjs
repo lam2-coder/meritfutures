@@ -259,7 +259,14 @@ const SEEDS = {
     what: 'a DATA_MODEL section for a table no migration creates',
     real: '50 tables had a migration and no design record, and nothing failed because nothing counted',
     expect: 'probe_phantom_table',
-    seed: (d) => edit(d, 'docs/architecture/DATA_MODEL.md', (b) => b + '\n### probe_phantom_table\nA table that does not exist.\n'),
+    // ADR-043 stage 3: one file per design record, so a phantom record is a
+    // phantom FILE. Watched reporting SEED IS STALE against the old path before
+    // it was moved, which is the second seed the rider's mechanism has caught.
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'docs/architecture/data-model/probe_phantom_table.md'),
+        '### probe_phantom_table\n\nA design record for a table no migration creates.\n',
+      ),
   },
   'CI-06j': {
     what: 'a trigger body reading a column that is not on the table it guards',

@@ -1,0 +1,426 @@
+---
+status: approved
+depends_on: [../../decisions/README.md, ../OVERVIEW.md]
+last_updated: 2026-08-15
+---
+
+# DATA MODEL
+
+# Data Model (Constitution §3, B1)
+
+Every table, every column, with type, constraints, indexes, retention, and the reason it exists. Terms are defined in [GLOSSARY.md](../../GLOSSARY.md). Migrations are sacred: once merged, a migration is never edited, only superseded.
+
+> **Amended under [ADR-026](../../decisions/ADR-026.md), 2026-08-14. The schema-delta reconciliation has landed.**
+>
+> All **94** approved schema changes are folded into one reviewed migration set at [`packages/db/migrations`](../../../packages/db/migrations), 27 files, verified to apply in order against PostgreSQL 16. Every delta is traced to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md), which is the file the completeness gate reads. **No delta was rejected.**
+>
+> **Where the two disagree, the migrations are the truth and this document is the design record.**
+>
+> **This document is at post-migration truth as of 2026-08-15.** §3 through §10 were rewritten table by table against the `.sql` rather than against the plan documents that proposed them: every table the migrations create has a `### <table>` section, and every section resolves to a `CREATE TABLE`. The reconciliation runs **in both directions** as [CI-06i](../../testing/STRATEGY.md), so the next table added without a design record is caught by a robot rather than by counting.
+>
+> **Two things found in the rewrite were not reconciled quietly. One is closed, one is still the founder's.** [ADR-035](../../decisions/ADR-035.md) recorded a defect in `0027`'s published-plan-version immutability trigger, proven by execution: plan retirement was impossible. **ACCEPTED and fixed 2026-08-15 by [`0028`](../../../packages/db/migrations/0028_supersede_plan_version_immutability.sql)**, which needs the founder's E2 read like every money-path file. **`OI-01` is OPEN and stays open**: `liability_snapshots` exists in one shape here and carried another in the approved design, with a recommendation in §8 and **no ruling, deliberately** — it is a founder call and no session takes it.
+>
+> **Four rulings changed a column or a value rather than adding one**, and each is folded rather than merely recorded: [ADR-027](../../decisions/ADR-027.md) (two distinct per-identity ledger classes, seven in total), [ADR-028](../../decisions/ADR-028.md) (`payout_requests.status` and **both** of its index predicates), [ADR-029](../../decisions/ADR-029.md) (`dedupe_matched_identity_id` dropped), and [ADR-030](../../decisions/ADR-030.md) (`max_payouts`, `kyc.triggers`). The sentence read "three" against a list of four and is corrected here.
+
+> **Further amended, 2026-08-14, by two rulings on `published_statistics`.** [ADR-031](../../decisions/ADR-031.md): `value_numeric numeric` becomes **`value bigint`** with a mandatory **`value_unit`**, retiring its no-floats exemption and leaving **two** columns on that list, none of them money. [ADR-032](../../decisions/ADR-032.md): **`measure`** joins the table and the window unique key, `statistic_definitions` gains **`measures`**, and **STAT-C1** in `0027` makes "neither figure of a pair is published alone" a database constraint rather than prose. Both amend approved `SD-M12-02`; the second touches the immutability contract on a public surface. Sections amended: §13 (invariants) and §17 (the no-floats exemption list, and the verification record), plus this header.
+
+Split to a file per table on 2026-08-15 by [ADR-043](../../decisions/ADR-043.md).
+Each `### <table>` design record is its own file; the conventions, the plan-config
+schema, the invariant table, migration policy, retention, the founder rulings and
+the delta provenance stay here, because they are about the whole model rather than
+about a table.
+
+## 1. Conventions (binding across every table)
+
+**Types**
+- Money: `bigint`, always **integer cents**, always non-negative unless the column explicitly represents a signed movement (`ledger_entries.amount_cents`, `daily_marks.realized_pnl_cents`). Never `numeric`, never `float`.
+- Ratios: `integer` **basis points**. Never a float, never a percentage string.
+- Timestamps: `timestamptz`, stored UTC. Trading dates: `date`, and always the exchange trading day, never a UTC calendar date derived from a timestamp.
+- Enums: Postgres native `enum` types for closed sets that change rarely (phases, statuses), `text` with a `check` constraint for sets expected to grow. Each choice is noted per column.
+- JSON: `jsonb` only, always with a documented shape, always validated by zod at the write boundary. `jsonb` is used for vendor payloads, rule configs, and evidence, never as a way to avoid designing columns.
+
+**Keys**
+- `uuid` (v7, time-ordered) primary keys for anything referenced in a URL or by an external system: `users`, `identities`, `accounts`, `payout_requests`, `purchases`, `risk_flags`, `affiliates`. Time-ordered so index locality is preserved; opaque so a compromised or curious client cannot enumerate neighbours. Enumeration protection is a defence in depth measure and never a substitute for identity scoping.
+- `bigint generated always as identity` for high-volume internal rows never exposed by URL: `fills`, `events`, `ledger_entries`, `daily_marks`, `raw_ingest_rows`.
+- Foreign keys are always declared with an explicit `on delete` action, and that action is `restrict` for every financial or evidentiary relationship. We do not cascade deletes anywhere in a money path.
+
+**Mutability**
+- **The append-only set is these eighteen tables**, and the list is exact rather than illustrative because [`0026_roles_and_grants`](../../../packages/db/migrations/0026_roles_and_grants.sql) revokes `UPDATE` and `DELETE` on exactly this set, from the application role **and from `PUBLIC`**: `ledger_entries`, `ledger_transactions`, `events`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `identity_merges`, `identity_links`, `tos_acceptances`, `account_status_history`, `wallet_entries`, `published_statistics`, `kyc_funnel_events`, `integration_dispatches`, `support_context_views`, `certificate_verifications`. The application role holds `INSERT` and `SELECT` only. Enforced by grants in the database, not by convention ([VG-8](../../../research/VIBE_FAILURE_POSTMORTEMS.md)).
+  - The approved list read `events`, `ledger_entries`, `ledger_transactions`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `eligibility` snapshots, `identity_merges`. **`eligibility` snapshots is not a table** (the eligibility snapshot is a `jsonb` column on `payout_requests`, §8), and the other nine tables above were added by the fold. This paragraph is the document half of `OI-03`: the CI check asserts `0026`'s revoke list against **this list**, so the two cannot drift apart in either direction.
+  - **Two single-column updates on append-only tables are legitimate and ruled** (`daily_marks.superseded_by`, `identity_links.suppressed`). They are performed by `SECURITY DEFINER` functions owned by the migrator role, each arriving with the module that owns the transition and with its negative-authz test. Those functions do not exist yet, so a naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug.
+- Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 96 tables carry `updated_at`**; the rest are either append-only or written once.
+- Nothing is ever soft-deleted with a boolean. Lifecycle is a status enum with an event trail. The one soft delete in the schema is `journal_entries.deleted_at`, and it is a **tombstone for a hard-delete job** rather than an end state (§10).
+
+**Naming**: `snake_case`, plural table names, `_cents` and `_bp` suffixes are mandatory on money and ratio columns, `_at` on timestamps, `_on` on dates. A column named `amount` without a unit suffix is a review reject.
+
+**Every table** carries `created_at timestamptz not null default now()`, **with exactly three ruled exceptions**, each of which carries a more specific timestamp instead and would gain nothing from a second one: `ledger_transactions` (`posted_at`), `treasury_balances` (`recorded_at`), and `liability_snapshots` (`computed_at`). Posting time, attestation time and computation time are the facts those rows exist to record, and a creation timestamp beside them would be a second answer to the same question. Mutable tables also carry `updated_at timestamptz not null default now()`.
+
+## 2. The spine
+
+Everything radiates from [trader identity](../../GLOSSARY.md#trader-identity), never from email and never from account.
+
+```mermaid
+erDiagram
+    IDENTITIES ||--o{ USERS : "authenticates as"
+    IDENTITIES ||--o{ IDENTITY_SIGNALS : "observed"
+    IDENTITIES ||--o{ IDENTITY_LINKS : "graph edges"
+    IDENTITIES ||--o| KYC_VERIFICATIONS : "verified by"
+    IDENTITIES ||--o{ PURCHASES : places
+    IDENTITIES ||--o{ RISK_FLAGS : "flagged"
+    PURCHASES ||--|| ACCOUNTS : provisions
+    PLAN_VERSIONS ||--o{ ACCOUNTS : "pinned to"
+    ACCOUNTS ||--o{ FILLS : produces
+    ACCOUNTS ||--o{ DAILY_MARKS : "closes into"
+    ACCOUNTS ||--o{ RULE_STATES : "advances"
+    ACCOUNTS ||--o{ PAYOUT_REQUESTS : requests
+    PAYOUT_REQUESTS ||--o{ LEDGER_TRANSACTIONS : "posts"
+    LEDGER_TRANSACTIONS ||--|{ LEDGER_ENTRIES : "balances to zero"
+```
+
+## 3. Identity, authentication and KYC
+
+Created by [`0002_identity`](../../../packages/db/migrations/0002_identity.sql) and [`0003_kyc`](../../../packages/db/migrations/0003_kyc.sql). Twelve tables. Both files are money path: identity is the row every cap and every aggregate liability figure keys off, and KYC is what stands between the payout rail and a fleet.
+
+| Table | |
+|---|---|
+| [`identities`](identities.md) | |
+| [`users`](users.md) | |
+| [`passkeys`](passkeys.md) | |
+| [`otp_challenges`](otp_challenges.md) | |
+| [`sessions`](sessions.md) | |
+| [`identity_signals`](identity_signals.md) | |
+| [`identity_links`](identity_links.md) | |
+| [`identity_merges`](identity_merges.md) | |
+| [`kyc_verifications`](kyc_verifications.md) | |
+| [`sanctions_screenings`](sanctions_screenings.md) | |
+| [`kyc_funnel_events`](kyc_funnel_events.md) | |
+| [`dedupe_matches`](dedupe_matches.md) | |
+
+## 4. Catalog and configuration
+
+Created by [`0004_catalog`](../../../packages/db/migrations/0004_catalog.sql). Eight tables, money path. `plan_versions` **is** the rule contract: the single source of truth the engine executes and the site renders, and the artifact behind the most valuable promise Merit can make in a market whose live case study is a firm destroyed by a retroactive rule change.
+
+| Table | |
+|---|---|
+| [`plans`](plans.md) | |
+| [`plan_versions`](plan_versions.md) | |
+| [`plan_version_sizes`](plan_version_sizes.md) | |
+| [`tos_versions`](tos_versions.md) | |
+| [`tos_acceptances`](tos_acceptances.md) | |
+| [`geo_restrictions`](geo_restrictions.md) | |
+| [`contract_specs`](contract_specs.md) | |
+| [`trading_calendar`](trading_calendar.md) | |
+
+## 5. Commerce
+
+Created by [`0006_commerce`](../../../packages/db/migrations/0006_commerce.sql), [`0012_disputes_and_affiliate_settlement`](../../../packages/db/migrations/0012_disputes_and_affiliate_settlement.sql) (`payment_disputes`) and [`0024_offers`](../../../packages/db/migrations/0024_offers.sql). Ten tables, money path. This is where money first enters the system.
+
+| Table | |
+|---|---|
+| [`coupons`](coupons.md) | |
+| [`purchases`](purchases.md) | |
+| [`coupon_redemptions`](coupon_redemptions.md) | |
+| [`psp_webhook_events`](psp_webhook_events.md) | |
+| [`mid_health`](mid_health.md) | |
+| [`payment_disputes`](payment_disputes.md) | |
+| [`offer_experiments`](offer_experiments.md) | |
+| [`price_floors`](price_floors.md) | |
+| [`offers`](offers.md) | |
+| [`promotional_credit_grants`](promotional_credit_grants.md) | |
+
+## 6. Accounts and platform
+
+Created by [`0007_accounts`](../../../packages/db/migrations/0007_accounts.sql). Five tables, money path. `accounts` is the object every rule runs against and every liability figure sums over.
+
+| Table | |
+|---|---|
+| [`accounts`](accounts.md) | |
+| [`account_status_history`](account_status_history.md) | |
+| [`platform_account_refs`](platform_account_refs.md) | |
+| [`provisioning_queue`](provisioning_queue.md) | |
+| [`platform_entitlements`](platform_entitlements.md) | |
+
+## 7. Ingest, marks and rule state
+
+Created by [`0013_ingest`](../../../packages/db/migrations/0013_ingest.sql), [`0014_marks`](../../../packages/db/migrations/0014_marks.sql) and [`0015_rule_states`](../../../packages/db/migrations/0015_rule_states.sql). Six tables. `0013` is not a money-path file by table and it is the file every money number is computed from; `0014` and `0015` are money path outright.
+
+| Table | |
+|---|---|
+| [`ingest_files`](ingest_files.md) | |
+| [`raw_ingest_rows`](raw_ingest_rows.md) | |
+| [`fills`](fills.md) | |
+| [`daily_marks`](daily_marks.md) | |
+| [`reconciliations`](reconciliations.md) | |
+| [`rule_states`](rule_states.md) | |
+
+## 8. Payouts, ledger, wallet and treasury controls
+
+Created by [`0009_ledger`](../../../packages/db/migrations/0009_ledger.sql), [`0010_payouts`](../../../packages/db/migrations/0010_payouts.sql), [`0011_wallet`](../../../packages/db/migrations/0011_wallet.sql) and [`0016_treasury_controls`](../../../packages/db/migrations/0016_treasury_controls.sql). Fifteen tables, all money path. `0010` is the file where money leaves.
+
+**Money movement is three objects, not one.** A [payout request](../../GLOSSARY.md) is a claim against an account evaluated by the engine. A wallet entry is what the trader is owed. A wallet withdrawal is the external rail moving it. Conflating any two of them makes the engine's gates and the rail's gates share a status column, and the first person to add a state breaks the other one.
+
+| Table | |
+|---|---|
+| [`ledger_accounts`](ledger_accounts.md) | |
+| [`ledger_transactions`](ledger_transactions.md) | |
+| [`ledger_entries`](ledger_entries.md) | |
+| [`treasury_balances`](treasury_balances.md) | |
+| [`liability_snapshots`](liability_snapshots.md) | |
+| [`payout_requests`](payout_requests.md) | |
+| [`payout_transfers`](payout_transfers.md) | |
+| [`wallet_entries`](wallet_entries.md) | |
+| [`wallet_withdrawals`](wallet_withdrawals.md) | |
+| [`wallet_spend_limits`](wallet_spend_limits.md) | |
+| [`wallet_dormancy`](wallet_dormancy.md) | |
+| [`ledger_halts`](ledger_halts.md) | |
+| [`plan_breaker_state`](plan_breaker_state.md) | |
+| [`alarm_suppressions`](alarm_suppressions.md) | |
+| [`dual_control_approvals`](dual_control_approvals.md) | |
+
+## 9. Risk and evidence
+
+Created by [`0008_risk`](../../../packages/db/migrations/0008_risk.sql). Five tables. Not a money-path file, because nothing here holds an amount, and it is read line by line for a different reason: every table below is **evidence**. A flag is an accusation, and an accusation without the numbers behind it is one Merit cannot defend in a dispute or act on with confidence.
+
+`risk_flags` is created in this file rather than later because `payout_requests.freeze_flag_id` (`SD-M5-01`) references it, and `0010` must have it. A freeze that cites no flag is an indefinite hold with a citation nobody can look up.
+
+| Table | |
+|---|---|
+| [`detector_definitions`](detector_definitions.md) | |
+| [`detector_runs`](detector_runs.md) | |
+| [`risk_flags`](risk_flags.md) | |
+| [`correlation_groups`](correlation_groups.md) | |
+| [`evidence_packs`](evidence_packs.md) | |
+
+## 10. Affiliate, system, and the module surfaces
+
+Thirty-five tables, created by [`0005`](../../../packages/db/migrations/0005_affiliate_program.sql), [`0012`](../../../packages/db/migrations/0012_disputes_and_affiliate_settlement.sql), [`0017`](../../../packages/db/migrations/0017_events_and_audit.sql), [`0018`](../../../packages/db/migrations/0018_integrations.sql), [`0019`](../../../packages/db/migrations/0019_notifications_and_community.sql), [`0020`](../../../packages/db/migrations/0020_public_surface.sql), [`0021`](../../../packages/db/migrations/0021_transparency.sql), [`0022`](../../../packages/db/migrations/0022_analytics_journal.sql), [`0023`](../../../packages/db/migrations/0023_loyalty_and_graduation.sql) and [`0025`](../../../packages/db/migrations/0025_reserved_sequence.sql). They are grouped below by the migration that creates them, which is also how they group by module.
+
+**Affiliate program (`0005`, `0012`).** The module is split across two migrations for a dependency reason rather than a design one: `coupons.affiliate_id` needs `affiliates`, `purchases` needs `coupons`, and `attributions` needs `purchases`. The settlement half lands in `0012` alongside `payment_disputes`, which is also where it belongs semantically, because a chargeback is what triggers a clawback.
+
+| Table | |
+|---|---|
+| [`affiliates`](affiliates.md) | |
+| [`affiliate_creatives`](affiliate_creatives.md) | |
+| [`affiliate_clicks`](affiliate_clicks.md) | |
+| [`attributions`](attributions.md) | |
+| [`affiliate_commissions`](affiliate_commissions.md) | |
+| [`affiliate_statements`](affiliate_statements.md) | |
+| [`events`](events.md) | |
+| [`admin_actions`](admin_actions.md) | |
+| [`idempotency_keys`](idempotency_keys.md) | |
+| [`integration_contracts`](integration_contracts.md) | |
+| [`integration_dispatches`](integration_dispatches.md) | |
+| [`support_context_views`](support_context_views.md) | |
+| [`notification_kinds`](notification_kinds.md) | |
+| [`notifications`](notifications.md) | |
+| [`notification_preferences`](notification_preferences.md) | |
+| [`contact_channels`](contact_channels.md) | |
+| [`discord_links`](discord_links.md) | |
+| [`discord_announcements`](discord_announcements.md) | |
+| [`content_documents`](content_documents.md) | |
+| [`page_revalidations`](page_revalidations.md) | |
+| [`certificates`](certificates.md) | |
+| [`statistic_definitions`](statistic_definitions.md) | |
+| [`published_statistics`](published_statistics.md) | |
+| [`review_requests`](review_requests.md) | |
+| [`proof_links`](proof_links.md) | |
+| [`round_trips`](round_trips.md) | |
+| [`journal_entries`](journal_entries.md) | |
+| [`analytics_snapshots`](analytics_snapshots.md) | |
+| [`loyalty_criteria`](loyalty_criteria.md) | |
+| [`loyalty_states`](loyalty_states.md) | |
+| [`loyalty_benefit_grants`](loyalty_benefit_grants.md) | |
+| [`graduation_benefits`](graduation_benefits.md) | |
+| [`identity_signal_weights`](identity_signal_weights.md) | |
+| [`graduation_invitations`](graduation_invitations.md) | |
+| [`certificate_verifications`](certificate_verifications.md) | |
+
+## 11. Plan config schema (the contract the engine executes)
+
+`plan_versions.rules` shape. Every ratio is bp, every amount is cents, and every field name here is the canonical one used in [GLOSSARY](../../GLOSSARY.md) and the engine.
+
+```jsonc
+{
+  "schema_version": 1,
+  "phase_eval": {
+    "enabled": true,
+    "profit_target_bp": 600,
+    "drawdown": {
+      "type": "trailing_eod",
+      "amount_bp": 500,
+      "lock": { "enabled": false, "at_profit_cents": null, "floor_at_cents": null }
+    },
+    "daily_loss_limit": { "type": "none", "amount_bp": null },
+    "min_trading_days": 1,
+    "consistency": { "enabled": false, "max_day_share_bp": null, "mode": "pass_time_dilutable" },
+    "max_days": null
+  },
+  "phase_funded": {
+    "drawdown": {
+      "type": "trailing_eod",
+      "amount_bp": 500,
+      "lock": { "enabled": true, "at_profit_cents": null, "floor_at_cents": null }
+    },
+    "daily_loss_limit": { "type": "none", "amount_bp": null },
+    "min_trading_days": 0,
+    "win_days": { "required_count": 5, "floor_bp": 30, "reset_on_payout": true },
+    "consistency": { "enabled": true, "max_day_share_bp": 3000, "mode": "payout_gated" },
+    "buffer_bp": 200,
+    "cadence_gap_trading_days": 5,
+    "payout_cap_schedule": [ { "from_ordinal": 1, "cap_bp": 300 } ],
+    "min_payout_cents": 10000,
+    "split_bp": 9000,
+    "max_payouts": 5,
+    "post_payout_floor_rule": { "mode": "none" }
+  },
+  "limits": { "max_accounts_per_entity": 10 },
+  "kyc": { "triggers": ["second_distinct_account_purchase", "pre_funded"] }
+}
+```
+
+**Re-materialized at the frozen configuration under [ADR-026](../../decisions/ADR-026.md), and [ADR-030](../../decisions/ADR-030.md)'s two key names are folded.** The example above is **Core EOD** (`core_eod`), which is what its `cadence_gap_trading_days: 5`, `cap_bp: 300` and `split_bp: 9000` have always been. Two changes and one correction:
+
+| Was | Now | Why |
+|---|---|---|
+| `"ladder": { "payouts_to_graduate": 8 }` | `"max_payouts": 5` | **[ADR-030](../../decisions/ADR-030.md)** rules the canonical name, matching [ADR-024](../../decisions/ADR-024.md) and every Appendix A table. The value is [ADR-024](../../decisions/ADR-024.md)'s **5** (Direct is **4**). The zod schema and the CV publish validations key off this name |
+| `"kyc": { "placement": "pre_funded" }` | `"kyc": { "triggers": [...] }` | **[ADR-030](../../decisions/ADR-030.md)**. Under [ADR-021](../../decisions/ADR-021.md) placement is a **set** firing at whichever trigger is reached first, and one fact cannot be split across two shapes. `U-05` widens the stored `kyc_verifications.placement` check to the same vocabulary in the same migration |
+
+**A correction to ADR-030's own stale list, recorded rather than applied silently.** That ADR also named `win_days.required_count: 5` and `phase_eval.min_trading_days: 1` as stale in this example. **They are not.** Both are Core EOD's frozen values per [M01 Appendix A.1](../../plans/M01-rules-engine.md), sourced to constitution 0.4. **`w = 3` is Merit Rapid's win-day count** ([ADR-018](../../decisions/ADR-018.md)), not Core EOD's, and the example was never a Merit Rapid example. The two key names were the real content of C-06 and they are folded; the two parameter values needed no change.
+
+**Every value here is a launch candidate re-confirmed at launch, never a constant.** There is no plan parameter anywhere in application code: these are rows in `plan_versions.rules` and `plan_version_sizes`.
+
+Notes that matter: `payout_cap_schedule` is an **array from day one** even though v1 has one step, because progressive cap release is a known v1.1 candidate and turning a scalar into a schedule later is a migration plus a config rewrite. `mode` on consistency is explicit so nobody has to remember which phase behaves how. `max_days: null` means unlimited.
+
+**Amended at the M1 gate (2026-08-13).** Two fields above changed and are called out because this document is `approved` and a silent edit to a money-path contract is exactly what the corpus exists to prevent. `phase_funded.min_trading_days` is **0** on all three plans, which disables the gate rather than setting it low ([ADR-015](../../decisions/ADR-015.md), CV-19). `post_payout_floor_rule.mode` is **`none`** and `amount_cents` is dropped, because settlement no longer touches the floor at all ([ADR-014](../../decisions/ADR-014.md), CV-18). The funded `lock` block is populated on all three plans, at `floor_at_cents = size_cents + 10000` and `at_profit_cents = drawdown_cents + 10000`.
+
+**M1's ten schema deltas are folded.** SD-01 through SD-10 in [M01 section 2.3](../../plans/M01-rules-engine.md) landed in the migration set under [ADR-026](../../decisions/ADR-026.md): `daily_marks.adjustment_cents` (`0014`); `rule_states.payout_anchor_day` and `cadence_anchor_day` replacing `last_payout_trading_day`, `floor_open_cents`, `engine_eligible` with the `engine_gates` / `context_gates` split, `consistency_period_start_day` and `state_hash` (all `0015`); `payout_requests.settled_trading_day` and `effective_trading_day`, the partial unique on `(account_id, payout_ordinal) where status <> 'failed'`, and the partial unique on `(account_id) where status in ('approved','frozen')` ([ADR-028](../../decisions/ADR-028.md)) (all `0010`); and the conditional not-null on the two `floor_lock_*` columns (`0004`).
+
+**Two of those needed a shape decision that the delta did not specify, and both are written down where they land rather than inferred at build time.** `SD-08`'s hash input list is [ADR-026](../../decisions/ADR-026.md) C-07, reproduced in full in `0015`. `SD-10`'s conditional not-null cannot be a CHECK over the parent's `rules` jsonb, so `floor_lock_enabled` is **materialized on `plan_version_sizes` at publish** alongside every other value that table materializes, and the reasoning is in `0004`.
+
+## 12. Reserved-now fields, and what each buys
+
+| Reservation | Where | Cost now | Migration avoided later |
+|---|---|---|---|
+| `platform`, `platform_account_ref`, `feed`, `front_end_permissions` | accounts | one enum, three columns | second platform adapter (Tradovate) |
+| `platform`, `order_id`, `venue`, `correction_of`, `recorded_at` | fills | five columns | correction handling and any second venue |
+| `ingest_files`, `platform_entitlements` | new tables | two small tables | quarantine machinery and entitlement cost hygiene retrofitted onto live data |
+| `payout_cap_schedule` array | plan config | array instead of scalar | progressive cap release (M14) |
+| `affiliates.parent_id`, `.level` | affiliates | two columns | sub-IB trees |
+| `identities.display_name`, `.leaderboard_opt_in` | identities | two columns | leaderboards and contests |
+| `notifications.channel = push` | notifications | one enum value | mobile push |
+| `risk_flags.source` | risk_flags | one column | vendor risk network bolt-on |
+| `ledger_entries.currency`, `purchases.currency` | ledger, purchases | two columns | multi-currency payouts |
+| `promotional_credit` ledger account class | ledger_accounts | one row | bonus/vault mechanics |
+| `graduated` phase plus invitation event | accounts, events | already present | live-program pipeline (M18) |
+| `identity_signal_weights`, `graduation_invitations`, `certificate_verifications` | three tables in `0025` | three empty tables | scored entity resolution, a live program, and the verify endpoint's abuse log, each retrofitted onto live data (§17) |
+| `feed`, `platform` value sets | accounts | two `check` lists | a second data feed or venue |
+| `wallet_withdrawal_status = transferring` | wallet_withdrawals | one enum value | the external rail growing a state the internal leg never had ([ADR-028](../../decisions/ADR-028.md)) |
+
+## 13. Invariants, and the test that enforces each
+
+| Invariant | Enforcement |
+|---|---|
+| Ledger sums to zero per transaction and globally | `ledger_entries_zero_sum`, a deferred constraint trigger in `0027`; property test; nightly assertion |
+| **No transaction debits and credits the same ledger account** | **LEDGER-C1** `ledger_entries_no_opposite_signs`, a deferred constraint trigger ([ADR-027](../../decisions/ADR-027.md)). The collapse it catches **passes** the zero-sum check |
+| **Every entry resolves to one of the seven declared classes** | **LEDGER-C2** `ledger_entries_class_declared`, a `BEFORE INSERT` trigger, plus the `CHECK` on `ledger_accounts.code` |
+| `withdrawable_cents >= 0` always | check constraint; property test over generated day sequences |
+| One live mark per account per trading day | partial unique index `daily_marks_live_per_account_day_uq` |
+| Replay reproduces stored rule_states byte-identically | nightly self-audit job; CI golden replay; `state_hash` (`SD-08`) is the comparison key |
+| A published plan_version never changes, and a retired one never changes again | `plan_versions_published_immutable`, an update trigger in `0027`. **DEFECTIVE AS MERGED, FIXED BY [`0028`](../../../packages/db/migrations/0028_supersede_plan_version_immutability.sql) under [ADR-035](../../decisions/ADR-035.md), accepted 2026-08-15.** As merged it read `NEW.config` on a table whose rule contract is `rules`, so the promise held by accident and the ruled `published -> retired` transition was refused too. `0028` pins the whole row rather than three columns, permits exactly `published -> retired` with `retired_at`, and makes retirement terminal. Probed by [`probe_plan_version_immutability.sql`](../../../scripts/db/probe_plan_version_immutability.sql), which **leads with the permitted transition succeeding**: a golden test attempting mutation would have passed against a guard that rejected everything, and that is precisely what happened |
+| Win-day count never decreases except on payout reset | property test |
+| `approved_cents <= min(requested, withdrawable, cap)` | check constraint plus engine property test |
+| An account's plan_version_id never changes | `accounts_plan_version_pinned`, an update trigger in `0027`. Verified to fire |
+| No account exceeds its entity's account cap | transactional check at purchase against resolved identity |
+| Quarantined file commits nothing | whole-file transaction; chaos test with a corrupt row |
+| **A `set_risk` provisioning operation never reaches `confirmed_inferred`** | `provisioning_queue_set_risk_never_inferred`, a check constraint (`U-06`, AS-M2-03) |
+| **A trader-audience evidence pack never carries detector detail** | `evidence_packs_trader_gets_no_detector_detail`, a check constraint (`SD-M6-04`) |
+| **A dual-control approver is not the requester** | `dual_control_approvals_second_person`, a check constraint (`SD-M6-05`) |
+| **`closing = opening + realized_pnl + adjustment`** (INV-18) | `daily_marks_balance_arithmetic`, checkable only because `SD-01` exists |
+| **No non-integer column exists outside the two ruled exemptions** | a `DO` block in `0027` reading `information_schema.columns`, asserted in both directions (§17) |
+| **Neither figure of a paired statistic is published alone** (ST-04 mean and median, ST-05 and ST-06 p50 and p95) | **STAT-C1**, a deferred constraint trigger ([ADR-032](../../decisions/ADR-032.md)): a publish run emitting one `measure` for a `stat_code` must emit every measure its definition declares. Probed against the database, both ways |
+
+## 14. Migration policy
+
+Migrations are forward-only, reviewed on `main`, and never edited after merge. The application role has no DDL. Every migration that touches a money table requires the founder's line-by-line read (constitution E2). Every new table ships in the same pull request as its negative-authz test ([VG-5](../../../research/VIBE_FAILURE_POSTMORTEMS.md)), or it does not merge.
+
+## 15. Retention summary
+
+| Class | Retention |
+|---|---|
+| Financial spine (ledger, payouts, purchases, accounts, marks, rule_states, fills, events, admin_actions, tos_acceptances) | forever |
+| Raw ingest rows and vendor webhook payloads | 24 months hot, then object-storage archive with digest |
+| Sessions, OTP challenges, idempotency keys | 90 / 30 / 30 days |
+| Affiliate clicks, notifications | 12 months |
+| IP-kind identity signals | 24 months rolling |
+| KYC status and refs | forever (AML), documents never stored |
+| `integration_dispatches` | **long, deliberately.** A privacy deletion request and a vendor breach ask the same question and a 30-day log answers neither (§10) |
+| `certificate_verifications` | 90 days, hashed inputs only |
+| `journal_entries` | the trader's own, deleted on request. `deleted_at` is a tombstone for a hard-delete job, never the end state |
+
+Privacy deletion requests redact PII columns (`users.email`, `country_code`, signal previews) and retain the financial spine with the identity pseudonymized, because the ledger cannot lie about money that moved.
+
+## 16. Founder rulings (Wave 2 gate, 2026-08-13)
+
+Walked line by line at the gate. All five confirmed as written; recorded in [DECISIONS.md](../../decisions/README.md).
+
+1. **`rule_states` stored per day rather than per account: confirmed.** It is the difference between an account timeline that reconstructs itself and one that has to be recomputed on demand. Costs roughly 250 rows per funded account per year.
+2. **Marks and corrections use supersession, never update: confirmed.** This is what makes "what did we believe when we approved that payout" answerable, and it is the mechanism behind the never-claw-back promise (B4 #5).
+3. **`payout_requests.status` has no `denied` value and no review state: confirmed.** That is the zero-denial policy expressed as a schema constraint rather than a process promise.
+4. **`identity_id` is denormalized onto `payout_requests`: confirmed.** Deliberate, for identity-level race safety and aggregate exposure.
+5. **The `promotional_credit` ledger class and the `currency` columns are reserved now: confirmed.** Both stay in the v1 schema and out of v1 math. `currency` defaults to `USD` on `ledger_entries` and `purchases` and is never read by any computation; `promotional_credit` exists as a `ledger_accounts` row with no entries. The cost is two columns and one row. The migration avoided is a multi-currency or bonus-mechanics retrofit onto a live, append-only ledger, which is the one table in the system where a retrofit cannot be rehearsed.
+
+## 17. Delta provenance (added under [ADR-026](../../decisions/ADR-026.md))
+
+**Every schema change in the migration set traces to the document that proposed it, and the trace lives in one file.** [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md) carries all 94 with a disposition, plus the migration sequence, the rejection table, and the reference cycles. **The completeness gate reads it**: every `SD-nn` and `U-nn` appearing anywhere in `docs/` must appear exactly once there. A count nobody can drift is better than a count someone remembers to update.
+
+**Inside the SQL, every folded column, index, constraint and table carries an inline `-- SD-nn` or `-- U-nn` marker.** A reader looking at a column does not have to leave the file to learn why it exists.
+
+### The 27 files, and which of them are money path
+
+`0001` extensions and enums, `0002` identity, `0003` kyc, `0004` catalog, `0005` affiliate program, `0006` commerce, `0007` accounts, `0008` risk, `0009` ledger, `0010` payouts, `0011` wallet, `0012` disputes and affiliate settlement, `0013` ingest, `0014` marks, `0015` rule states, `0016` treasury controls, `0017` events and audit, `0018` integrations, `0019` notifications and community, `0020` public surface, `0021` transparency, `0022` analytics journal, `0023` loyalty and graduation, `0024` offers, `0025` reserved sequence, `0026` roles and grants, `0027` triggers and invariants.
+
+**Sixteen carry an `E2 READ: MONEY PATH` header** naming what in the file needs the founder's line-by-line read and why. Money-path files carry their reasoning in comments, not only in DDL, because the constitution E2 read is on the diff and a diff that requires four other documents to interpret is one that gets skimmed.
+
+### The three tables that are created and deliberately empty
+
+`0025_reserved_sequence` holds `identity_signal_weights` (`U-01`), `graduation_invitations` (`SD-M18-03`) and `certificate_verifications` (`SD-M11-04`). **Marked, not deferred.** [ADR-026](../../decisions/ADR-026.md) rejected no delta, and a table that quietly failed to appear is indistinguishable from one that was dropped.
+
+### What §1's Mutability section now means operationally
+
+Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `UPDATE` and `DELETE` on eighteen tables from the application role **and from `PUBLIC`**, revokes `CREATE` on the schema from the application role, and makes the plan configuration unreadable by the analytics role at all ([M13](../../plans/M13-trader-analytics-journal.md)). **A second rulebook is prevented by permission rather than by care.** The two legitimate single-column updates on append-only tables (`daily_marks.superseded_by`, `identity_links.suppressed`) are performed by `SECURITY DEFINER` functions that arrive with the module that owns the transition, each with its negative-authz test ([VG-5](../../../research/VIBE_FAILURE_POSTMORTEMS.md), §14).
+
+### The no-floats exemption list
+
+**Money is `bigint` integer cents and ratios are integer basis points, never `numeric` and never a float (§1).** Exactly two columns in the schema are non-integer, each a **ruled exemption**: `correlation_groups.statistic` and `correlation_groups.threshold`. A correlation coefficient is not money and is not a ratio of two integers Merit controls, and the threshold must share the type of the statistic it is compared against. **A plain integer `rho` of `0.30` is `0`, and `rho = 0.30` is the reserve-critical figure** (§8, `correlation_groups`): CVaR99 nearly doubles across that range while mean monthly payouts stay flat.
+
+**No money-bearing column is on the list.** That, rather than its length, is the property it exists to hold.
+
+**The list is asserted, not documented.** `0027` carries a `DO` block that reads `information_schema.columns` and fails the migration if the set of `numeric`, `real` or `double precision` columns in `public` is anything other than exactly those two, **in both directions**: an unlisted column fails, and so does a stale entry naming a column that no longer exists. **Verified to bite in both directions**, not merely to run. Full per-column ruling in [DELTA_MANIFEST section 9](../../../packages/db/DELTA_MANIFEST.md).
+
+**The third entry was retired by [ADR-031](../../decisions/ADR-031.md).** `published_statistics.value_numeric` was authorized and did not survive inspection: all seven ruled statistics are exactly representable as integers under this document's own conventions (ST-01/02/07 rates in **integer basis points**, ST-03/04 money in **integer cents**, ST-05/06 durations in **whole seconds**), and for ST-03 and ST-04 the column held **money on a public surface**, which is the case §1 names directly. It is now **`value bigint`** with a mandatory **`value_unit`**, and it is renamed because a column called `value_numeric` holding a `bigint` is a lie that survives every grep. **An authorized exemption covering a money column is not an exemption; it is a hole with a ruling attached.**
+
+**Two further columns shipped outside that authorization and are corrected.** `published_statistics.numerator` and `.denominator` were `numeric` and are now `bigint` with a `numerator_unit` discriminator. The denominator is a count in all six statistics that have one and is compared against an integer `min_sample`; the numerator is a count, **integer cents**, or a whole-second duration, and for ST-03 and ST-04 it is a sum of `trader_cents`, which is money and does not stop being money because it is being published.
+
+**`value_unit` and `numerator_unit` share one type, `statistic_unit`** (`count`, `bp`, `cents`, `duration_seconds`), declared in `0001`. Two `text` columns with two `CHECK` lists would be two vocabularies for one concept, and that is how they drift.
+
+### Verification performed
+
+**All 27 files apply in order against PostgreSQL 16 with `ON_ERROR_STOP`**, producing 96 tables, 326 indexes, **347** check constraints and **6** triggers. No file was edited to make that pass. **This is a syntax and dependency check, not a semantic one**: it proves the set is installable and proves nothing at all about whether a delta was folded correctly, which is what the E2 read is for. **Every constraint that carries a ruling is separately probed against the database**, one perturbation per assertion, tabulated in [DELTA_MANIFEST section 10](../../../packages/db/DELTA_MANIFEST.md). That testing found a live defect a reading had passed: a `CHECK` written with `array_length` admitted the empty array, because `array_length` returns `NULL` there and **a `CHECK` evaluating to `NULL` passes**.
+
+### Verification performed on this rewrite (2026-08-15)
+
+**The migration set was re-installed from scratch against PostgreSQL 16 and reproduced the figures above exactly**: 96 tables, 326 indexes, 347 check constraints, 6 triggers. The rewrite was then checked against that live catalogue rather than against the plan documents:
+
+| Check | Method | Result |
+|---|---|---|
+| Every `CREATE TABLE` has a `### <table>` section, and every section has a `CREATE TABLE` | [CI-06i](../../testing/STRATEGY.md), both directions | **96 / 96, no orphan in either direction** |
+| Every column of every table appears in its section's column table | generated diff of the document against `information_schema.columns` | **zero undocumented columns, zero documented columns that do not exist** |
+| The no-floats exemption set | `0027`'s own `DO` block, on a clean install | **passes; the only two non-integer columns are the two named above** |
+| `plan_versions` published-row immutability, **against `0001` to `0027` only** | **executed**, not read: insert a published version, attempt the ruled `published -> retired` transition | **FAILED. [ADR-035](../../decisions/ADR-035.md)** |
+| The same, **against `0001` to `0028`** | [`probe_plan_version_immutability.sql`](../../../scripts/db/probe_plan_version_immutability.sql), 14 assertions, leading with the permitted transition | **14 / 14 pass** |
+| Every `NEW.`/`OLD.` column in every trigger body resolves | [CI-06j](../../testing/STRATEGY.md), from the tree, no database | **passes.** It found ADR-035 on its first run |
+| The seven `array_length` `CHECK`s reject the empty array | one empty-array `INSERT` each, before and after `0028` | **7 accepted before, 7 rejected after** |
+
+**The first row is why this section exists in this form.** The trigger read `NEW.config` and `OLD.config`, and `plan_versions` has no `config` column: the rule contract is `rules`. Every `UPDATE` against a published row therefore raised `record "new" has no field "config"`. The promise "a published plan version never changes" survived by accident, because the error rejects the write; **the permitted retirement transition was refused too, so a plan version could not be retired at all**. A draft row updates normally, which is why an install check and every existing probe missed it. **An invariant that was reviewed and not executed has not been checked**, which is the same lesson the `array_length` defect taught one file over, found the same way.
+
+**And the deeper one, which is now a gate.** Every probe in this corpus attempted a forbidden thing and asserted a rejection. A guard that rejects **everything** passes all of them. `probe_plan_version_immutability.sql` therefore leads with the **permitted** transition, and `0028` ships with it, per [ADR-035](../../decisions/ADR-035.md)'s own words: the missing test is the finding as much as the missing column is.

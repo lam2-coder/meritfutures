@@ -48,7 +48,7 @@ last_updated: 2026-08-15
 
 ### 2.3 Where plan parameters are structurally forbidden from living
 
-The rule is absolute and already written: **"There is no plan parameter anywhere in application code: these are rows in `plan_versions.rules` and `plan_version_sizes`"** ([DATA_MODEL section 12](../architecture/DATA_MODEL.md)), with [M01](M01-rules-engine.md) requiring every downstream surface to read from the account's pinned plan version at request time, and [DESIGN_SYSTEM](../design/DESIGN_SYSTEM.md) putting it as "a parameter is read, never copied".
+The rule is absolute and already written: **"There is no plan parameter anywhere in application code: these are rows in `plan_versions.rules` and `plan_version_sizes`"** ([DATA_MODEL section 12](../architecture/data-model/README.md)), with [M01](M01-rules-engine.md) requiring every downstream surface to read from the account's pinned plan version at request time, and [DESIGN_SYSTEM](../design/DESIGN_SYSTEM.md) putting it as "a parameter is read, never copied".
 
 **"Structurally forbidden" is a stronger claim than "linted", and the plan separates three tiers because only the first is actually structural.**
 

@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, DATA_MODEL.md]
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, data-model/README.md]
 last_updated: 2026-08-13
 ---
 
 # Events (Constitution §2 "everything is an event")
 
-Every event Merit emits: name, payload schema, producer, consumers. One append-only [`events`](DATA_MODEL.md#events) table drives the admin feed, analytics, lifecycle messaging, audit, and the [evidence pack](../GLOSSARY.md#evidence-pack). Terms are defined in [GLOSSARY.md](../GLOSSARY.md).
+Every event Merit emits: name, payload schema, producer, consumers. One append-only [`events`](data-model/events.md) table drives the admin feed, analytics, lifecycle messaging, audit, and the [evidence pack](../GLOSSARY.md#evidence-pack). Terms are defined in [GLOSSARY.md](../GLOSSARY.md).
 
 ## 1. Conventions
 

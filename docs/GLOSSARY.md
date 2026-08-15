@@ -20,7 +20,7 @@ Comparison operators are stated explicitly per rule and are binding: the publish
 
 ## trading day
 A date on the exchange session calendar for which a session existed. Trading days are the unit of every counter in the rule engine (minimum days, cadence gaps, win days). A calendar date with no session (weekend, full holiday) is not a trading day and advances no counter. Trading days advance even when a trader does not trade, and even when the market is halted or limit locked for the whole session (see [halted session](#halted-session)).
-Governing data: [trading_calendar](architecture/DATA_MODEL.md#trading_calendar).
+Governing data: [trading_calendar](architecture/data-model/trading_calendar.md).
 
 ## session
 The exchange trading period bounded by the CME session open and close for a trading day, expressed in exchange time (CT). Merit stores all timestamps in UTC and derives session membership from the calendar, never from wall-clock arithmetic. A fill belongs to the trading day whose session contains its execution timestamp.
@@ -54,10 +54,10 @@ A named product family (Core EOD, Merit Rapid, Direct), with codes `core_eod`, `
 An immutable, versioned rule configuration plus the published copy blocks that describe it. An account is permanently bound to the plan version it was sold under. Publishing a new version never mutates existing accounts. "The rules at the time" is always provable because the version is pinned on the account and snapshotted on every [eligibility snapshot](#eligibility-snapshot).
 
 ## plan config
-The rules JSON inside a plan version. It is the single source of truth executed by the engine and rendered by marketing. Canonical field names are fixed in this glossary and schema'd in [DATA_MODEL](architecture/DATA_MODEL.md#plan_versions). Ratios are bp, money is cents.
+The rules JSON inside a plan version. It is the single source of truth executed by the engine and rendered by marketing. Canonical field names are fixed in this glossary and schema'd in [DATA_MODEL](architecture/data-model/plan_versions.md). Ratios are bp, money is cents.
 
 ## account size
-The nominal capital of a simulated account (25K, 50K, 100K). Sizes derive from the canonical 50K parameters by scaling percentage-expressed rules. Because published numbers must be exact, each size's derived thresholds are materialized to integer cents in [plan_version_sizes](architecture/DATA_MODEL.md#plan_version_sizes) at publish time and never recomputed at runtime.
+The nominal capital of a simulated account (25K, 50K, 100K). Sizes derive from the canonical 50K parameters by scaling percentage-expressed rules. Because published numbers must be exact, each size's derived thresholds are materialized to integer cents in [plan_version_sizes](architecture/data-model/plan_version_sizes.md) at publish time and never recomputed at runtime.
 
 ## eval (evaluation phase)
 The phase in which a trader must reach a [profit target](#profit-target) without [breaching](#breach), subject to [minimum trading days](#minimum-trading-days) and optionally [eval consistency](#eval-consistency). Passing moves the account to [funded](#funded-phase).

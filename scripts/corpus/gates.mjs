@@ -202,6 +202,15 @@ const REGISTRIES = [
     // ADR-043's ruling that a table row is not a document.
     entry: (f) => /^docs\/edge-cases\/EC-\d{3}(-to-\d{3}-appendix-b4-battery)?\.md$/.test(f),
   },
+  {
+    id: 'data-model',
+    dir: 'docs/architecture/data-model',
+    readme: 'docs/architecture/data-model/README.md',
+    // A table design record. README.md is the only other file in the directory
+    // and it is a corpus document, so the predicate excludes it by shape rather
+    // than by name: a record is `<snake_case>.md`.
+    entry: (f) => /^docs\/architecture\/data-model\/[a-z][a-z0-9_]*\.md$/.test(f),
+  },
 ];
 
 // -----------------------------------------------------------------------------
@@ -834,11 +843,28 @@ const ci06i = {
       else inSql.set(table, file);
     }
 
-    const doc = read('docs/architecture/DATA_MODEL.md');
-    // A section is exactly `### <snake_case_name>` on its own line. Prose
-    // headings under §17 ("### Verification performed") do not match, which is
-    // intended: a design record is a heading that IS a table name.
-    const sections = [...doc.matchAll(/^### ([a-z][a-z0-9_]*)\s*$/gm)].map((m) => m[1]);
+    // ADR-043 stage 3: one file per design record. The heading is still what
+    // defines the record, read from the file rather than trusted from the
+    // filename, so a file whose name and heading disagree is visible here the way
+    // CI-06f made it visible for ADRs.
+    const dir = 'docs/architecture/data-model';
+    if (!existsSync(join(ROOT, dir))) {
+      throw new Error(`${dir} does not exist; the design records have moved or are gone`);
+    }
+    const recordFiles = readdirSync(join(ROOT, dir))
+      .filter((f) => /^[a-z][a-z0-9_]*\.md$/.test(f))
+      .sort();
+    if (recordFiles.length === 0) throw new Error(`no design records in ${dir}; the gate cannot run`);
+    const sections = [];
+    for (const f of recordFiles) {
+      const m = /^### ([a-z][a-z0-9_]*)\s*$/m.exec(read(join(dir, f)));
+      if (!m) {
+        findings.push(`${dir}/${f}: no \`### <table>\` heading; it is not a readable design record`);
+        continue;
+      }
+      if (`${m[1]}.md` !== f) findings.push(`${dir}/${f}: heading says ${m[1]}, so it belongs at ${m[1]}.md`);
+      sections.push(m[1]);
+    }
     const inDoc = new Set();
     for (const name of sections) {
       if (inDoc.has(name)) findings.push(`${name}: has more than one \`### ${name}\` section`);

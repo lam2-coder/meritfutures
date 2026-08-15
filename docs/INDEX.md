@@ -60,7 +60,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [OVERVIEW.md](architecture/OVERVIEW.md) | System diagram, module map, end-to-end data flow | approved | founder |
-| [DATA_MODEL.md](architecture/DATA_MODEL.md) | Every table, column, type, index, constraint, retention. **Amended under [ADR-026](decisions/ADR-026.md): the schema-delta reconciliation is folded** | approved | founder |
+| [DATA_MODEL.md](architecture/data-model/README.md) | Every table, column, type, index, constraint, retention. **Amended under [ADR-026](decisions/ADR-026.md): the schema-delta reconciliation is folded** | approved | founder |
 | [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors, the negative-authz matrix | approved | founder |
 | [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | approved | founder |
 | [STATE_MACHINES.md](architecture/STATE_MACHINES.md) | Account, payout, flag, identity lifecycles as Mermaid | approved | founder |

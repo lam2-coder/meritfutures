@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, DATA_MODEL.md, STATE_MACHINES.md, ../../research/SECURITY_LANDSCAPE.md]
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, STATE_MACHINES.md, ../../research/SECURITY_LANDSCAPE.md]
 last_updated: 2026-08-13
 ---
 
@@ -8,7 +8,7 @@ last_updated: 2026-08-13
 
 Every endpoint: auth, request schema, response schema, error shapes, idempotency, and rate limits. The portal, admin console, and site are the first clients of this API and have no privileged back door: **anything the UI can do, it does through these endpoints**, which is what makes the [Enrichlead failure](../../research/VIBE_FAILURE_POSTMORTEMS.md) untestable-by-omission impossible here.
 
-Schemas are written as TypeScript types because they map one to one onto the zod validators that enforce them at runtime. Terms from [GLOSSARY.md](../GLOSSARY.md), tables from [DATA_MODEL.md](DATA_MODEL.md).
+Schemas are written as TypeScript types because they map one to one onto the zod validators that enforce them at runtime. Terms from [GLOSSARY.md](../GLOSSARY.md), tables from [DATA_MODEL.md](data-model/README.md).
 
 ## 1. Conventions
 
@@ -325,7 +325,7 @@ Errors: `payout_not_eligible` (422, body includes the full `gates` object so the
 
 Server behavior, in order: re-evaluate eligibility against the last closed day, resolve the effective request (`amount_cents` when supplied, otherwise `max_payout_cents`), clamp server-side, persist the immutable snapshot, post the ledger transaction, approve, enqueue the transfer. The clamp is `approved_cents = min(effective_request, cap_cents_for_ordinal, withdrawable_cents)` and the result must satisfy `approved_cents >= min_payout_cents`; a supplied amount that clamps below the minimum returns `payout_not_eligible` with `minimum_amount` failing, never a partial payment and never a denial. The client's `amount_cents` can only ever reduce the payout, never increase it.
 
-**One payout in flight per account.** The `conflict` above is a liability control, not a convenience: [win days](../GLOSSARY.md#win-day) and the [consistency period](../GLOSSARY.md#consistency-period) reset on settlement, so allowing a second request before the first settles would let one qualifying stretch fund several capped extractions. The rule is stated here, enforced by a unique partial index in [DATA_MODEL](DATA_MODEL.md#payout_requests), and tested as a named golden scenario.
+**One payout in flight per account.** The `conflict` above is a liability control, not a convenience: [win days](../GLOSSARY.md#win-day) and the [consistency period](../GLOSSARY.md#consistency-period) reset on settlement, so allowing a second request before the first settles would let one qualifying stretch fund several capped extractions. The rule is stated here, enforced by a unique partial index in [DATA_MODEL](data-model/payout_requests.md), and tested as a named golden scenario.
 
 ### GET /payouts
 ```ts
@@ -386,7 +386,7 @@ type CreateLinkResponse = { url: string; click_token: string };
 
 ## 8. Admin (RBAC, admin origin only)
 
-Roles: `owner` (all), `ops` (read plus account actions, no config or role changes), `readonly`. Every mutating admin endpoint writes an [`admin_actions`](DATA_MODEL.md#admin_actions) row with actor, reason, before, and after, and requires a non-empty `reason`.
+Roles: `owner` (all), `ops` (read plus account actions, no config or role changes), `readonly`. Every mutating admin endpoint writes an [`admin_actions`](data-model/admin_actions.md) row with actor, reason, before, and after, and requires a non-empty `reason`.
 
 ### GET /admin/liability
 ```ts

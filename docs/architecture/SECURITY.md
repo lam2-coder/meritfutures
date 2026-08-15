@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, API_CONTRACT.md, DATA_MODEL.md, ../../research/SECURITY_LANDSCAPE.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md]
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, API_CONTRACT.md, data-model/README.md, ../../research/SECURITY_LANDSCAPE.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md]
 last_updated: 2026-08-14
 ---
 
@@ -16,7 +16,7 @@ Controls carry stable IDs so plans, tests, and code comments can cite them.
 
 | ID | Control | Where it lives |
 |---|---|---|
-| C-01 | Passwordless only: passkeys plus email OTP. No password column exists anywhere | [DATA_MODEL](DATA_MODEL.md) has no password table by construction |
+| C-01 | Passwordless only: passkeys plus email OTP. No password column exists anywhere | [DATA_MODEL](data-model/README.md) has no password table by construction |
 | C-02 | Short-lived access session, rotating refresh, httpOnly Secure SameSite cookies | `sessions` |
 | C-03 | Identity scoping through `scopedDb(identity)`; raw table access lint-blocked | every handler |
 | C-04 | Zod validation at every boundary, request and response allowlists | every endpoint |
@@ -183,7 +183,7 @@ The wallet changes the shape of the highest-value attack on a trader account, an
 
 - **What Merit stores:** identifiers, statuses, hashes, and money. **What Merit never stores:** identity documents, biometric templates, card numbers, or raw bank details.
 - **Encryption:** TLS 1.2 or higher in transit with HSTS; encryption at rest on the database and object storage; hashed signal values (C-13) so a database dump does not yield a usable device or payment identifier.
-- **Retention** is specified per table in [DATA_MODEL §15](DATA_MODEL.md#15-retention-summary). Financial spine forever, operational ephemera on short clocks.
+- **Retention** is specified per table in [DATA_MODEL §15](data-model/README.md). Financial spine forever, operational ephemera on short clocks.
 - **Deletion requests** redact PII columns and pseudonymize the identity while retaining the financial spine, because the ledger cannot lie about money that moved. The runbook records what was redacted and when.
 - **Logs** are structured, with token and PII redaction at the logger, and the audit trail is separate from debug logging so one cannot be muted with the other.
 

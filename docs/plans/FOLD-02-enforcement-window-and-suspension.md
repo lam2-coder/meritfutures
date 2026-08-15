@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../decisions/README.md, ../architecture/STATE_MACHINES.md, ../architecture/DATA_MODEL.md, ../architecture/SECURITY.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../legal/TOS_CLAUSES.md, ../DELIVERY_PLAN.md, ../ops/runbooks/CRON_INVENTORY.md, ../testing/STRATEGY.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M15-discord-integration.md, M20-wallet.md, FOLD-01-phone-identity.md, ../../packages/db/DELTA_MANIFEST.md]
+depends_on: [../decisions/README.md, ../architecture/STATE_MACHINES.md, ../architecture/data-model/README.md, ../architecture/SECURITY.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../legal/TOS_CLAUSES.md, ../DELIVERY_PLAN.md, ../ops/runbooks/CRON_INVENTORY.md, ../testing/STRATEGY.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M15-discord-integration.md, M20-wallet.md, FOLD-01-phone-identity.md, ../../packages/db/DELTA_MANIFEST.md]
 last_updated: 2026-08-15
 ---
 
@@ -229,7 +229,7 @@ Phase **P8**, so the surface exists when P9's beta community forms. DELIVERY_PLA
 
 **The two rulings name eight documents. The corpus's own gates force roughly twenty-six**, and the count is stated here rather than discovered mid-session.
 
-**Money path.** [DECISIONS](../decisions/README.md), the two migrations, [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md), [DATA_MODEL](../architecture/DATA_MODEL.md), [STATE_MACHINES](../architecture/STATE_MACHINES.md), [M05](M05-payout-system.md), [M20](M20-wallet.md), [M07](M07-risk-abuse.md), [M02](M02-rithmic-bridge.md), [SECURITY](../architecture/SECURITY.md) section 4.
+**Money path.** [DECISIONS](../decisions/README.md), the two migrations, [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md), [DATA_MODEL](../architecture/data-model/README.md), [STATE_MACHINES](../architecture/STATE_MACHINES.md), [M05](M05-payout-system.md), [M20](M20-wallet.md), [M07](M07-risk-abuse.md), [M02](M02-rithmic-bridge.md), [SECURITY](../architecture/SECURITY.md) section 4.
 
 **Non-money.** [M06](M06-admin-ops-console.md), [M03](M03-billing-checkout.md), [M04](M04-trader-portal.md), [M16](M16-notification-center.md), [M08](M08-affiliate-system.md) (confirm), [M15](M15-discord-integration.md), [DELIVERY_PLAN](../DELIVERY_PLAN.md), [API_CONTRACT](../architecture/API_CONTRACT.md), [EVENTS](../architecture/EVENTS.md), [TOS_CLAUSES](../legal/TOS_CLAUSES.md) clauses 5 and 13, [GUIDE_BRIEFING](../GUIDE_BRIEFING.md), [EDGE_CASES](../edge-cases/README.md), [GOLDEN_SCENARIOS](../testing/GOLDEN_SCENARIOS.md), [STRATEGY](../testing/STRATEGY.md), [CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md), [INDEX](../INDEX.md), [STATE](../STATE.md), [SESSION_LOG](../SESSION_LOG.md).
 

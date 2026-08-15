@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/PROP_TECH_LANDSCAPE.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M07-risk-abuse.md, M08-affiliate-system.md, M09-marketing-site.md, M12-transparency-platform.md, M14-loyalty-retention.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/PROP_TECH_LANDSCAPE.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M07-risk-abuse.md, M08-affiliate-system.md, M09-marketing-site.md, M12-transparency-platform.md, M14-loyalty-retention.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 

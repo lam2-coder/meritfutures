@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/TOP10_FIRMS.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/TOP10_FIRMS.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 
@@ -46,7 +46,7 @@ Recorded here and in [TOP10_FIRMS](../../research/TOP10_FIRMS.md) so "industry c
 
 **Why the evidence attachment is not optional.** A discretionary invitation is exactly the decision most likely to be challenged as unfair, and the only defensible answer is the account's own record. Building the pool without the evidence would produce a queue that invites judgment and supplies nothing to judge with.
 
-Constitution section §4-ADDENDUM ("ladder tracker, invitation workflow, vault and bonus display, **the marketing face of the payout cap**"), Appendix B5's ten-section template, and [M01](M01-rules-engine.md) INV-17's lifetime bound. The `graduated` phase and the invitation event are already present in the approved [DATA_MODEL](../architecture/DATA_MODEL.md) and [EVENTS](../architecture/EVENTS.md), reserved for this module.
+Constitution section §4-ADDENDUM ("ladder tracker, invitation workflow, vault and bonus display, **the marketing face of the payout cap**"), Appendix B5's ten-section template, and [M01](M01-rules-engine.md) INV-17's lifetime bound. The `graduated` phase and the invitation event are already present in the approved [DATA_MODEL](../architecture/data-model/README.md) and [EVENTS](../architecture/EVENTS.md), reserved for this module.
 
 **This plan opens with the finding rather than burying it in section 7, because it changes what the module is.**
 
@@ -237,7 +237,7 @@ stateDiagram-v2
 
 - **Routing a customer's orders** makes Merit an intermediary in a regulated market, with the registration, supervision, and disclosure regime that follows.
 - **Allocating firm capital against a trader's decisions** is a managed-account or adviser relationship, and if it is pooled it is a vehicle with its own regime.
-- **Either one imports custody, suitability, and disclosure obligations** that no document in this corpus addresses, and that [SECURITY](../architecture/SECURITY.md), [INFRA](../architecture/INFRA.md), and [DATA_MODEL](../architecture/DATA_MODEL.md) are not built for.
+- **Either one imports custody, suitability, and disclosure obligations** that no document in this corpus addresses, and that [SECURITY](../architecture/SECURITY.md), [INFRA](../architecture/INFRA.md), and [DATA_MODEL](../architecture/data-model/README.md) are not built for.
 - **And it breaks the disclosure Merit repeats everywhere**, which is worse than never having made it, because a firm that says "everything is simulated" and then operates a live program has a disclosure that is now conditionally false.
 
 **And the version that happens without anybody deciding.** Nobody proposes "let us become a broker". What happens is that the marketing site says "graduate to a live funded account", because it converts, and then the product has to mean something. The promise arrives first and the structure is asked to catch up, which is the reverse of the order this business can survive.

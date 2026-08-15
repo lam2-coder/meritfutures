@@ -1,6 +1,6 @@
 ---
 status: review
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/OVERVIEW.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/OVERVIEW.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md]
 last_updated: 2026-08-14
 ---
 
@@ -65,7 +65,7 @@ It implements the [platform adapter](../GLOSSARY.md#platform-adapter) interface 
 
 ## 2. Entities and schema deltas
 
-M2 consumes the tables in [DATA_MODEL sections 6 and 7](../architecture/DATA_MODEL.md) as approved, plus M1's approved SD-01 (`daily_marks.adjustment_cents`). Six deltas are proposed here, each because a rule or a failure mode below cannot be satisfied without it.
+M2 consumes the tables in [DATA_MODEL sections 6 and 7](../architecture/data-model/README.md) as approved, plus M1's approved SD-01 (`daily_marks.adjustment_cents`). Six deltas are proposed here, each because a rule or a failure mode below cannot be satisfied without it.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|

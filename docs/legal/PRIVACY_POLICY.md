@@ -28,7 +28,7 @@ last_updated: 2026-08-14
 
 ## Retention, and the carve-out that needs the most care
 
-**Ordinary retention** follows the schedule in [DATA_MODEL](../architecture/DATA_MODEL.md) and ends with account closure plus the applicable statutory tail.
+**Ordinary retention** follows the schedule in [DATA_MODEL](../architecture/data-model/README.md) and ends with account closure plus the applicable statutory tail.
 
 **The fraud-prevention carve-out is the exception and it is deliberate.** Banned-identity records **persist past account closure**, because an identity defense that forgets a banned operator when they close their account is not a defense at all. This must be disclosed as an explicit, bounded carve-out with its own purpose statement, not left implied by a general retention clause.
 

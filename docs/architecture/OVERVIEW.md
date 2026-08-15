@@ -8,7 +8,7 @@ last_updated: 2026-08-13
 
 The system in one place: what the pieces are, how data moves end to end, where the trust boundaries sit, and what runs when. Every term used here is defined in [GLOSSARY.md](../GLOSSARY.md); this document never redefines one.
 
-**Reading order for the Wave 2 gate:** this document, then [DATA_MODEL](DATA_MODEL.md), then [API_CONTRACT](API_CONTRACT.md). [EVENTS](EVENTS.md), [STATE_MACHINES](STATE_MACHINES.md), [SECURITY](SECURITY.md), and [INFRA](INFRA.md) are the detail behind them.
+**Reading order for the Wave 2 gate:** this document, then [DATA_MODEL](data-model/README.md), then [API_CONTRACT](API_CONTRACT.md). [EVENTS](EVENTS.md), [STATE_MACHINES](STATE_MACHINES.md), [SECURITY](SECURITY.md), and [INFRA](INFRA.md) are the detail behind them.
 
 ## 1. The system in one paragraph
 

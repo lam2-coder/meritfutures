@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../decisions/README.md, ../GLOSSARY.md, ../STATE.md, ../edge-cases/README.md, ../architecture/DATA_MODEL.md, ../architecture/INFRA.md, ../testing/STRATEGY.md, ../testing/GOLDEN_SCENARIOS.md, ../ops/runbooks/CRON_INVENTORY.md, P1-monorepo-scaffold.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, M12-statistic-definitions.md, FOLD-01-phone-identity.md, FOLD-02-enforcement-window-and-suspension.md, ../../packages/db/DELTA_MANIFEST.md]
+depends_on: [../decisions/README.md, ../GLOSSARY.md, ../STATE.md, ../edge-cases/README.md, ../architecture/data-model/README.md, ../architecture/INFRA.md, ../testing/STRATEGY.md, ../testing/GOLDEN_SCENARIOS.md, ../ops/runbooks/CRON_INVENTORY.md, P1-monorepo-scaffold.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, M12-statistic-definitions.md, FOLD-01-phone-identity.md, FOLD-02-enforcement-window-and-suspension.md, ../../packages/db/DELTA_MANIFEST.md]
 last_updated: 2026-08-15
 ---
 
@@ -27,7 +27,7 @@ The calendar decides what a trading day **is**, and every counter the engine kee
 | Zero rows, no loader, no seed mechanism | `grep -c 'INSERT INTO' packages/db/migrations/*.sql` is 0 across 28 files. [`packages/db/src/index.ts`](../../packages/db/src/index.ts) declares a branded type and an interface; `test/` holds one filename check |
 | A partial fixture calendar exists and **already commits to being derived** | [`fixtures/calendars/cme-2026.json`](../../packages/rules-engine/fixtures/calendars/cme-2026.json): five sessions, `status: "partial"`, and its own note reads "When S-E lands, this file is DERIVED from the seeded `trading_calendar` rows rather than maintained beside them: two hand-maintained calendars is the drift class this corpus has found thirteen times" |
 | **No migration derives a date from a clock** | Zero `::date`, zero `CAST(`, zero `interval` in any case across all 28 files. Every `now()` is a `DEFAULT now()` on a `timestamptz`, and **no `date` column carries a default at all** |
-| The schema holds **45 `date` columns** and nothing states which unit each is in | [`affiliate_commissions.payable_after`](../architecture/DATA_MODEL.md) and `chargeback_window_ends_on` are both wall clock and DATA_MODEL says so well ("Merit's own clock", "the card networks' rather than ours"). `published_statistics.window_start_day` has an **empty** Why cell and is a trading day only because [M12](M12-statistic-definitions.md) says "trailing 90 trading days" |
+| The schema holds **45 `date` columns** and nothing states which unit each is in | [`affiliate_commissions.payable_after`](../architecture/data-model/affiliate_commissions.md) and `chargeback_window_ends_on` are both wall clock and DATA_MODEL says so well ("Merit's own clock", "the card networks' rather than ours"). `published_statistics.window_start_day` has an **empty** Why cell and is a trading day only because [M12](M12-statistic-definitions.md) says "trailing 90 trading days" |
 
 ---
 
@@ -78,7 +78,7 @@ So the correction path is partitioned by whether anything depends on the day, an
 
 **The semantics are ruled and this plan does not reopen them.** A half day is a **full** trading day for every counter (B4 #3, [EC-005](../edge-cases/EC-005.md), GS-003, GS-032). A half day counting as half a day would make the minimum-trading-days gate a different promise in November. The only thing `is_half_day` changes is `session_close_at`.
 
-**The finding is that one close time cannot serve six symbols.** [`contract_specs`](../architecture/DATA_MODEL.md) lists `ES`, `MES`, `NQ`, `MNQ`, `CL`, `GC`, spanning CME, NYMEX and COMEX, whose **early closes differ by product group** while their regular hours agree. `trading_calendar` has one row per trading day and **no symbol dimension**, so one `session_close_at` is wrong for some group on every early-close day.
+**The finding is that one close time cannot serve six symbols.** [`contract_specs`](../architecture/data-model/contract_specs.md) lists `ES`, `MES`, `NQ`, `MNQ`, `CL`, `GC`, spanning CME, NYMEX and COMEX, whose **early closes differ by product group** while their regular hours agree. `trading_calendar` has one row per trading day and **no symbol dimension**, so one `session_close_at` is wrong for some group on every early-close day.
 
 **Recommended resolution, conservative and reversible: on an early-close day, `session_close_at` is the LATEST close across the listed groups**, with the per-group times recorded in `notes`.
 

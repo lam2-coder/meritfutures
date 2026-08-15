@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../plans/M01-rules-engine.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../edge-cases/README.md, ../decisions/README.md]
+depends_on: [../plans/M01-rules-engine.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../edge-cases/README.md, ../decisions/README.md]
 last_updated: 2026-08-15
 ---
 

@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../decisions/README.md, ../architecture/SECURITY.md, ../architecture/DATA_MODEL.md, ../legal/PRIVACY_POLICY.md, ../legal/COUNSEL_PACKET.md, ../testing/STRATEGY.md, M03-billing-checkout.md, M04-trader-portal.md, M07-risk-abuse.md, M10-integrations.md, M16-notification-center.md, M19-kyc-identity.md, ../../packages/db/DELTA_MANIFEST.md]
+depends_on: [../decisions/README.md, ../architecture/SECURITY.md, ../architecture/data-model/README.md, ../legal/PRIVACY_POLICY.md, ../legal/COUNSEL_PACKET.md, ../testing/STRATEGY.md, M03-billing-checkout.md, M04-trader-portal.md, M07-risk-abuse.md, M10-integrations.md, M16-notification-center.md, M19-kyc-identity.md, ../../packages/db/DELTA_MANIFEST.md]
 last_updated: 2026-08-15
 ---
 
@@ -44,7 +44,7 @@ Five readings changed this plan. Each is a live contradiction or a gap, not a nu
 | **1** | **[SECURITY section 2.7](../architecture/SECURITY.md) says "no SMS-based second factor anywhere in the stack"** | `SECURITY.md:122` | The ruling adds SMS OTP for traders. A direct textual contradiction, resolved explicitly in the ADR rather than glossed. **Section 2.7 sits under "The founder (the human asset)" and is rescoped to founder and admin credentials.** Admin auth stays hardware-key SSO (C-08) with no SMS path, ever |
 | **2** | **C-01 reads "Passwordless only: passkeys plus email OTP"** | `SECURITY.md:19` | C-01 widens to three factors. **The stuffing-immunity claim in section 2.6 is unchanged and is the reason**, and the ADR says so in those words so a later reader cannot mistake a widening for a weakening |
 | **3** | **[ADR-023](../decisions/ADR-023.md)'s vendor already buys phone footprint**: "email and **phone** digital-footprint... device, IP, VPN and datacenter detection" | `DECISIONS.md:483`, restated at `M03:311` and [M07](M07-risk-abuse.md) D-15 | Decision 1 below resolves on this evidence rather than on preference |
-| **4** | **`contact_channels.kind check in ('email','push')`**, and its live-uniqueness index is per `(identity_id, kind)` | [DATA_MODEL](../architecture/DATA_MODEL.md), `0019` | **The `INV-M16-03` prior-contact countermeasure cannot notify a prior number today.** (c) is unbuildable until `sms` joins that check |
+| **4** | **`contact_channels.kind check in ('email','push')`**, and its live-uniqueness index is per `(identity_id, kind)` | [DATA_MODEL](../architecture/data-model/README.md), `0019` | **The `INV-M16-03` prior-contact countermeasure cannot notify a prior number today.** (c) is unbuildable until `sms` joins that check |
 | **5** | **`OI-06`. There is no `payout_destinations` table anywhere in the merged 96 tables.** `destination_ref` is a column on `payout_transfers` (`0010:243`) and `wallet_withdrawals` (`0011:132`), the destination **of a transfer** | grep of `packages/db/migrations` | **C-11, C-24, [SECURITY section 4](../architecture/SECURITY.md) item 1, [M20](M20-wallet.md) `WF-M20-02` and [M04](M04-trader-portal.md)'s destination-cooling scenario all require "destination outside its 48 hour cooling window", and nothing in the schema can answer when a destination changed.** Found by trying to model (c) on the control (c) says to copy. See section 8 |
 
 ---
@@ -136,7 +136,7 @@ The ruling named nine documents. **The corpus's own gates force twenty-one, and 
 | File | Forced by |
 |---|---|
 | [COUNSEL_PACKET](../legal/COUNSEL_PACKET.md) | Section 3.2. Item 3 gains **3d** |
-| [DATA_MODEL](../architecture/DATA_MODEL.md) | **CI-06i, both directions.** Three new `### <table>` sections plus amended columns on five existing tables. A new table with no design record fails the gate |
+| [DATA_MODEL](../architecture/data-model/README.md) | **CI-06i, both directions.** Three new `### <table>` sections plus amended columns on five existing tables. A new table with no design record fails the gate |
 | [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md) | **[ADR-026](../decisions/ADR-026.md)'s completeness gate.** Every new delta appears exactly once with a disposition and takes its number here, the sequence table gains `0029`, and `manifest_changes` regenerates |
 | [EDGE_CASES](../edge-cases/README.md) | **CI-06e.** New entries continue from the registry's maximum, each naming a golden scenario that resolves |
 | [GOLDEN_SCENARIOS](../testing/GOLDEN_SCENARIOS.md) | **CI-06d.** New scenarios continue from the registry's maximum in a new section, one per (a) to (e) plus amendments 2 and 3 plus the authority boundary. **Eight minimum** |

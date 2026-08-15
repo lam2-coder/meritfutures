@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M12-transparency-platform.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M12-transparency-platform.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 
@@ -61,7 +61,7 @@ Three of those surfaces are unlike the rest and deserve naming up front, because
 
 ## 2. Entities and schema deltas
 
-M9 is overwhelmingly a consumer. It reads `plans`, `plan_versions`, `plan_version_sizes`, `tos_versions`, and `geo_restrictions` as approved in [DATA_MODEL](../architecture/DATA_MODEL.md), and M12's published aggregate. Three deltas.
+M9 is overwhelmingly a consumer. It reads `plans`, `plan_versions`, `plan_version_sizes`, `tos_versions`, and `geo_restrictions` as approved in [DATA_MODEL](../architecture/data-model/README.md), and M12's published aggregate. Three deltas.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|

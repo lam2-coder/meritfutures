@@ -26,7 +26,13 @@ import { join, dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const MOVED_FROM = 'docs'; // every split file used to resolve links from here
+// THE OLD BASE IS PER REGISTRY, not a constant. DECISIONS.md and EDGE_CASES.md
+// sat at docs/, so their links resolved from there. DATA_MODEL.md sat at
+// docs/architecture/, one level down, and re-basing its outbound links against
+// docs/ silently finds nothing to fix: `../decisions/ADR-026.md` resolves from
+// neither the old nor the new location, so `existsSync` on the wrong base returns
+// false and the link is left broken. It reported `outbound: 0` on a registry with
+// 96 files, which is the number that gave it away.
 
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
@@ -76,6 +82,7 @@ const NAMED_TARGETS = {
 // would agree for as long as nothing about the second registry differed.
 const REGISTRIES = {
   decisions: {
+    from: 'docs',
     map: 'docs/decisions/.map.json',
     dir: 'docs/decisions/',
     readme: 'docs/decisions/README.md',
@@ -88,7 +95,28 @@ const REGISTRIES = {
     self: /^\**\s*`?(docs\/)?DECISIONS(\.md)?`?\s*\**$/,
     named: NAMED_TARGETS,
   },
+  'data-model': {
+    from: 'docs/architecture',
+    map: 'docs/architecture/data-model/.map.json',
+    dir: 'docs/architecture/data-model/',
+    readme: 'docs/architecture/data-model/README.md',
+    target: /((?:\.\.\/)*(?:docs\/)?(?:architecture\/)?DATA_MODEL\.md)/,
+    // A link whose text is a bare `table_name`, or `table_name.column`, resolves
+    // to that table's record. Backticks and bold markers are stripped first
+    // because the corpus writes ``[`ledger_entries`](../architecture/DATA_MODEL.md)``
+    // and ``[`affiliate_commissions.payable_after`](...)``. The column half is
+    // dropped deliberately: a column is documented inside its table's record, so
+    // the record is the correct target and there is nothing finer to point at.
+    id: /^[\s*`]*([a-z][a-z0-9_]*)(?:\.[a-z][a-z0-9_]*)?[\s*`]*$/,
+    sub: null,
+    // `DATA_MODEL section 8` and `DATA_MODEL sections 4 and 5` point at the
+    // numbered domain sections, and ADR-043 keeps those in the README: they are
+    // groupings of tables rather than tables. 22 links take this branch.
+    self: /^\**\s*`?(docs\/)?(architecture\/)?DATA_MODEL(\.md)?`?(\s+sections?\b.*)?\s*\**$/,
+    named: {},
+  },
   'edge-cases': {
+    from: 'docs',
     map: 'docs/edge-cases/.map.json',
     dir: 'docs/edge-cases/',
     readme: 'docs/edge-cases/README.md',
@@ -146,7 +174,7 @@ function main() {
         if (!target) {
           // The overwhelmingly common case: the link TEXT is the identifier.
           // 732 links read `[ADR-nnn](../DECISIONS.md)`.
-          const id = reg.id.exec(text);
+          const id = reg.id.exec(text.trim());
           if (id && map.ids[id[1]]) {
             target = map.ids[id[1]];
             bucket = 'byId';
@@ -196,7 +224,7 @@ function main() {
         if (path.startsWith(reg.dir) || existsSync(resolve(ROOT, dirname(file), path))) {
           return whole; // already correct from the new location
         }
-        const old = resolve(ROOT, MOVED_FROM, path);
+        const old = resolve(ROOT, reg.from, path);
         if (!existsSync(old)) return whole; // not a path this move broke
         stats.rebased++;
         return `[${text}](${rel(file, relative(ROOT, old))}${frag ?? ''})`;
@@ -208,7 +236,7 @@ function main() {
       body = body.replace(/\[([^\]]*)\]\(#([A-Za-z0-9._-]*)\)/g, (whole, text, frag) => {
         let target = frag ? map.anchors[frag.toLowerCase()] : null;
         if (!target) {
-          const id = reg.id.exec(text);
+          const id = reg.id.exec(text.trim());
           if (id && map.ids[id[1]]) target = map.ids[id[1]];
         }
         if (!target || target === file) return whole;

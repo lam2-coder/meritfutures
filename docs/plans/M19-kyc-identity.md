@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/SECURITY_LANDSCAPE.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md, M17-offers-engine.md, M20-wallet.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/SECURITY_LANDSCAPE.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md, M17-offers-engine.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
 
@@ -79,7 +79,7 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 
 | Not M19 | Whose job | Why the boundary is here |
 |---|---|---|
-| Holding documents or biometrics | the provider | Merit stores status, `provider_applicant_id`, and match signals. Never a document, an image, or a template ([DATA_MODEL](../architecture/DATA_MODEL.md), [VG-10](../../research/VIBE_FAILURE_POSTMORTEMS.md), INV-M19-07) |
+| Holding documents or biometrics | the provider | Merit stores status, `provider_applicant_id`, and match signals. Never a document, an image, or a template ([DATA_MODEL](../architecture/data-model/README.md), [VG-10](../../research/VIBE_FAILURE_POSTMORTEMS.md), INV-M19-07) |
 | Deciding enforcement | [M7](M07-risk-abuse.md) | A dedupe hit raises a flag against **both** identities and changes no state by itself ([STATE_MACHINES](../architecture/STATE_MACHINES.md) already says so). AS-M19-05 |
 | Name matching at payout | [M5](M05-payout-system.md) | M19 supplies the verified name; M5 scores the match (its SD-M5-02, AS-M5-02) |
 | Geo-blocking | [M3](M03-billing-checkout.md) at checkout, [M9](M09-marketing-site.md) as disclosure | M19 checks **consistency** across three countries, which is a different question from whether a jurisdiction is restricted |
@@ -106,7 +106,7 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 
 ## 2. Entities and schema deltas
 
-M19 consumes the approved `kyc_verifications` ([DATA_MODEL section 3](../architecture/DATA_MODEL.md)), which already carries `placement`, the geo triangle, `biometric_dedupe_hit`, and `dedupe_matched_identity_id`. Four deltas.
+M19 consumes the approved `kyc_verifications` ([DATA_MODEL section 3](../architecture/data-model/README.md)), which already carries `placement`, the geo triangle, `biometric_dedupe_hit`, and `dedupe_matched_identity_id`. Four deltas.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|

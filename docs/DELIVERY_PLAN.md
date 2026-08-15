@@ -61,7 +61,7 @@ last_updated: 2026-08-14
 
 **Its own session. Money path. Strict [ADR-003](decisions/ADR-003.md) regime. Fresh context. This is the single highest-risk documentation session remaining and it is being split out rather than folded into the FREEZE gate.**
 
-**What it is.** Four waves of proposed schema changes reconciled into one reviewed migration set against the approved [DATA_MODEL](architecture/DATA_MODEL.md): **M01's ten deltas, batch 1's thirty-seven, and batch 2's forty-one: 88 numbered, plus 5 unnumbered schema changes that exist as rulings with no delta number, for a total of 93** ([ADR-026](decisions/ADR-026.md)). The link-confidence signal-weight table gets a home in the reserved sequence.
+**What it is.** Four waves of proposed schema changes reconciled into one reviewed migration set against the approved [DATA_MODEL](architecture/data-model/README.md): **M01's ten deltas, batch 1's thirty-seven, and batch 2's forty-one: 88 numbered, plus 5 unnumbered schema changes that exist as rulings with no delta number, for a total of 93** ([ADR-026](decisions/ADR-026.md)). The link-confidence signal-weight table gets a home in the reserved sequence.
 
 **Correction folded:** this line previously read "thirty-one" and named `ladders_completed_lifetime` and the SD-M19-03 widening as two further additions. Neither is a separate delta: `ladders_completed_lifetime` is already inside `SD-M14-01`'s column list, and the SD-M19-03 widening is an amendment to an existing delta. Both are folded and neither is counted twice.
 

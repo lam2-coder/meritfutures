@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md]
 last_updated: 2026-08-14
 ---
 
@@ -10,7 +10,7 @@ last_updated: 2026-08-14
 
 **Approved at the M1 gate on 2026-08-13.** All eleven open questions were ruled on; the rulings are recorded in [DECISIONS.md](../decisions/gates/m1-gate-closure-2026-08-13.md) and are folded into the body of this document rather than appended to it. Three of them changed the specification: [ADR-013](../decisions/ADR-013.md) fixed the cadence anchor and renamed Rapid Daily to **Merit Rapid**, [ADR-014](../decisions/ADR-014.md) removed the post-payout floor recompute and enabled the floor lock on all three plans, and [ADR-015](../decisions/ADR-015.md) sourced the previously unspecified plan parameters and set funded minimum trading days to 0. Section 10 now records what was decided and the one question the rulings themselves raised.
 
-This document exists to be implemented from, not interpreted from. The bar it is written to: a competent TypeScript engineer who has read [GLOSSARY.md](../GLOSSARY.md) and [DATA_MODEL.md](../architecture/DATA_MODEL.md) and nothing else about Merit can build the entire engine from this file without asking a question. Where a decision is genuinely still the founder's, it appears in section 10 and nowhere else, so the rest of the document contains no soft spots.
+This document exists to be implemented from, not interpreted from. The bar it is written to: a competent TypeScript engineer who has read [GLOSSARY.md](../GLOSSARY.md) and [DATA_MODEL.md](../architecture/data-model/README.md) and nothing else about Merit can build the entire engine from this file without asking a question. Where a decision is genuinely still the founder's, it appears in section 10 and nowhere else, so the rest of the document contains no soft spots.
 
 Every term is defined in [GLOSSARY.md](../GLOSSARY.md) and is never redefined here. Every comparison operator below is binding, is mirrored verbatim in the plan version's `copy_blocks`, and is pinned by a golden file.
 
@@ -241,7 +241,7 @@ interface PayoutEvaluation {
 
 ### 2.3 Schema deltas against the approved DATA_MODEL
 
-[DATA_MODEL](../architecture/DATA_MODEL.md) is `approved` as of the Wave 2 gate, so these are proposed amendments, folded in as a reviewed migration when this plan is approved. Each one exists because a rule above cannot be computed or proved without it.
+[DATA_MODEL](../architecture/data-model/README.md) is `approved` as of the Wave 2 gate, so these are proposed amendments, folded in as a reviewed migration when this plan is approved. Each one exists because a rule above cannot be computed or proved without it.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|

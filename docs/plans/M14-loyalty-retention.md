@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M17-offers-engine.md, M18-graduation-track.md, M20-wallet.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M17-offers-engine.md, M18-graduation-track.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
 
@@ -89,7 +89,7 @@ Three deltas. Two of them exist to make the module auditable and one exists to m
 
 **`ladders_completed_lifetime` is the only column [ADR-025](../decisions/ADR-025.md) required, and it is derived like everything else here.** A completed ladder is an account whose phase is `graduated` with `payouts_settled_count = max_payouts`, both of which the engine already writes, so the counter is a `count(*)` over an existing fact rather than a new piece of state anybody can set. That is what keeps LM-M14-05 inside INV-M14-03: the loyalty program's trigger is a thing the money path produced, not a thing the loyalty service decided.
 
-**Two reservations used rather than added, and one now deliberately unused.** `promotional_credit` is already a ledger account class ([ADR-019](../decisions/ADR-019.md)) and carries LM-M14-05's bonus credit. `payout_cap_schedule` is already an array in the plan config ([DATA_MODEL section 12](../architecture/DATA_MODEL.md), which names progressive cap release as the reason) and **stays an array with exactly one step in v1**: [ADR-025](../decisions/ADR-025.md) rejected the second step, not the shape. Keeping the shape costs nothing, keeps the publish-time validations exercised, and means a future founder who overrules the rejection is making a config decision through the dual-controlled publish path rather than a migration decision on a money-path table. This module still needs no new money path.
+**Two reservations used rather than added, and one now deliberately unused.** `promotional_credit` is already a ledger account class ([ADR-019](../decisions/ADR-019.md)) and carries LM-M14-05's bonus credit. `payout_cap_schedule` is already an array in the plan config ([DATA_MODEL section 12](../architecture/data-model/README.md), which names progressive cap release as the reason) and **stays an array with exactly one step in v1**: [ADR-025](../decisions/ADR-025.md) rejected the second step, not the shape. Keeping the shape costs nothing, keeps the publish-time validations exercised, and means a future founder who overrules the rejection is making a config decision through the dual-controlled publish path rather than a migration decision on a money-path table. This module still needs no new money path.
 
 ---
 
@@ -493,7 +493,7 @@ M14 supplies a panel on [M6](M06-admin-ops-console.md): benefits outstanding by 
 
 | ID | Dependency | Owner | Consequence if unmet |
 |---|---|---|---|
-| DEP-M14-01 | `payout_cap_schedule` remains an array and the publish path validates every step | M1, M3 | Progressive cap release needs a schema change on a money-path table, which is the migration [DATA_MODEL section 12](../architecture/DATA_MODEL.md)'s reservation exists to avoid |
+| DEP-M14-01 | `payout_cap_schedule` remains an array and the publish path validates every step | M1, M3 | Progressive cap release needs a schema change on a money-path table, which is the migration [DATA_MODEL section 12](../architecture/data-model/README.md)'s reservation exists to avoid |
 | DEP-M14-02 | [ADR-010](../decisions/ADR-010.md)'s dual control binds every cap edit regardless of origin | M3, M6 | INV-M14-02 is unenforceable and AS-M14-06 is available to anyone in a hurry |
 | DEP-M14-03 | M17 owns offer pricing, issuance, and redemption, and accepts a grant reference | M17 | Two places issue economic instruments, and one of them is a loyalty service |
 | DEP-M14-04 | M7 exposes flag severity and restriction state at both computation and send | M7, M10 | INV-M14-08 cannot evaluate and a win-back reaches somebody Merit enforced against |

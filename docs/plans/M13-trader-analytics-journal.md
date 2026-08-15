@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md, M04-trader-portal.md, M06-admin-ops-console.md, M07-risk-abuse.md, M11-certificates-social-proof.md, M12-transparency-platform.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md, M04-trader-portal.md, M06-admin-ops-console.md, M07-risk-abuse.md, M11-certificates-social-proof.md, M12-transparency-platform.md]
 last_updated: 2026-08-14
 ---
 
@@ -70,7 +70,7 @@ Three deltas, plus one derived table that exists for performance rather than for
 | SD-M13-02 | new `journal_entries` | `id`, `identity_id`, `account_id`, `scope check in ('day','round_trip')`, `reference_id`, `body text`, `tags text[]`, `created_at`, `updated_at`, `deleted_at null` | AN-M13-05. Soft delete with a hard-delete job, because a trader who deletes a note expects it gone and a note that survives deletion in a backup is the difference between a promise and a claim (INV-M13-07) |
 | SD-M13-03 | new `analytics_snapshots` | `account_id`, `as_of_trading_day`, `payload jsonb`, `inputs_digest bytea`, `computed_at`, primary key `(account_id, as_of_trading_day)` | INV-M13-06 and AS-M13-07. The expensive shapes are computed once per account per closed day in the batch, not per page load. `inputs_digest` is what makes INV-M13-10 checkable: if the digest changed, the marks changed, and the trader is told why |
 
-**One reservation used rather than added.** `fills` already reserves `order_id`, `venue`, and `correction_of` ([DATA_MODEL section 12](../architecture/DATA_MODEL.md)). Round-trip derivation reads all three, which is what that reservation was for.
+**One reservation used rather than added.** `fills` already reserves `order_id`, `venue`, and `correction_of` ([DATA_MODEL section 12](../architecture/data-model/README.md)). Round-trip derivation reads all three, which is what that reservation was for.
 
 ---
 

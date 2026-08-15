@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M15-discord-integration.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M15-discord-integration.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 
@@ -65,7 +65,7 @@ Every notification kind belongs to exactly one class, and the class decides what
 
 ## 2. Entities and schema deltas
 
-M16 consumes the approved `notifications` and `notification_preferences` ([DATA_MODEL section 10](../architecture/DATA_MODEL.md)) and adds three deltas.
+M16 consumes the approved `notifications` and `notification_preferences` ([DATA_MODEL section 10](../architecture/data-model/README.md)) and adds three deltas.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -348,7 +348,7 @@ M16 supplies a panel on [M6](M06-admin-ops-console.md): delivery health by class
 
 **OQ-M16-02. How long is the prior-contact notification window?** AS-M16-02's counter depends on it, and it trades an attacker's window against a genuinely-changed-address trader receiving messages at an address they abandoned. Proposed: **30 days**, matching the order of the 48 hour destination cooling but wide enough to cover a slow-noticing owner, with the old address receiving **security class only**, never money or account state.
 
-**OQ-M16-03. Does push ship at launch?** [DATA_MODEL](../architecture/DATA_MODEL.md) reserves the channel deliberately and there is no mobile surface yet. Proposed: **reserve it, do not ship it.** The reservation already bought the migration; shipping a channel needs an application to ship it from.
+**OQ-M16-03. Does push ship at launch?** [DATA_MODEL](../architecture/data-model/README.md) reserves the channel deliberately and there is no mobile surface yet. Proposed: **reserve it, do not ship it.** The reservation already bought the migration; shipping a channel needs an application to ship it from.
 
 **OQ-M16-04. Should Merit publish the class matrix?** Publishing "here is what we will always tell you, and you cannot turn it off" is a trust artifact of the same family as [M12](M12-transparency-platform.md)'s method pages, and it commits Merit publicly to over-communicating on money. Recommendation: **publish it**, on the rules or legal pages, because a commitment nobody can see is a commitment Merit can quietly relax.
 
