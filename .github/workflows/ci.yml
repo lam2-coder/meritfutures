@@ -103,6 +103,13 @@ env:
   # Verified against PyPI before it was written here, rather than guessed.
   SEMGREP_VERSION: '1.173.0'
 
+  # Every grype invocation in this workflow uses the database the CI-05 job
+  # explicitly fetched, INCLUDING THE ONE INSIDE falsify-ci.mjs, which is a
+  # child process and inherits this. Left at its default, the seeded-violation
+  # case re-downloads the whole database to scan a directory containing one
+  # package, and reintroduces the unbounded wait one step after it was removed.
+  GRYPE_DB_AUTO_UPDATE: 'false'
+
 jobs:
   # ===========================================================================
   # CI-01  Lint and types
@@ -331,8 +338,40 @@ jobs:
           syft scan dir:. -o cyclonedx-json=sbom.cdx.json -o spdx-json=sbom.spdx.json -q
           echo "SBOM components: $(node -e "process.stdout.write(String((JSON.parse(require('node:fs').readFileSync('sbom.cdx.json','utf8')).components||[]).length))")"
 
+      # ACQUIRING THE DATABASE IS A SEPARATE STEP FROM SCANNING WITH IT, and
+      # that is the whole point rather than tidiness. Folded into the scan, an
+      # unbounded download from an external CDN is indistinguishable from a scan
+      # that will not finish: this stage sat on one combined step for twenty
+      # minutes with nothing to read. Split, the download has its own name, its
+      # own bound, and its own cache, and the scan that follows is local
+      # arithmetic over an SBOM.
+      #
+      # The cache key rolls: `run_id` makes every run write a fresh entry and
+      # `restore-keys` reads the newest matching one, so the DB is warm without
+      # ever being pinned to a stale copy. Keyed on the grype version because
+      # the database schema is what a version bump changes, which is the
+      # failure this stage already hit once.
+      - name: VG-12 vulnerability database
+        timeout-minutes: 8
+        env:
+          GRYPE_DB_AUTO_UPDATE: 'true'
+        run: grype db update -v
+
+      - name: Cache the vulnerability database
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/grype/db
+          key: grype-db-${{ env.GRYPE_VERSION }}-${{ github.run_id }}
+          restore-keys: grype-db-${{ env.GRYPE_VERSION }}-
+
+      # `--db-auto-update=false`: the database is the step above's job. Left on,
+      # a scan silently re-downloads and this step inherits the unbounded wait
+      # the split exists to remove. A stale or missing database now fails LOUDLY
+      # here rather than being repaired invisibly.
       - name: VG-12 vulnerability scan
-        run: grype sbom:sbom.cdx.json --fail-on medium -o table
+        timeout-minutes: 5
+        run: grype sbom:sbom.cdx.json --fail-on medium --db-auto-update=false -o table
 
       # The SBOM is the artifact VG-12 asks for, and an SBOM that exists only
       # inside a finished job is an SBOM nobody can diff against last week's.
