@@ -811,6 +811,24 @@ LT-01 payout_approval
 - **Consequences:** [GLOSSARY](GLOSSARY.md) and [DATA_MODEL](architecture/DATA_MODEL.md) are amended to **add** `trader_wallet`, not to retire `trader_withdrawable`; the earlier "superseded name" edit is reverted in both. Migration file `0009_ledger` creates both classes. M14, M17 and M20's invariants against `trader_wallet` are unaffected, because nothing about the wallet's meaning changed; what changed is that it no longer swallows a second position.
 - **Alternatives considered:** one class named `trader_wallet` (**ruled and then reversed**, for the reasons above); one class named `trader_withdrawable` (same defect, different label); keeping both but netting them in reporting (rejected: Open Liability needs the wallet reportable per identity, INV-M5-15, and a netted view cannot be un-netted).
 
+### The collapse was reproduced against a real database (2026-08-15)
+
+**ADR-027's central claim is no longer an argument. It was executed.** Against PostgreSQL 16 with the full 27-file migration set installed, with **only `LEDGER-C1` disabled** and the zero-sum trigger left armed:
+
+```
+zero-sum verdict: transaction nets 0 cents (0 = passes)
+trader wallet net: 10000 cents DEBIT (drained by firm_cents)
+```
+
+The transaction **committed through the zero-sum trigger** and left the trader's position debited by the firm's share. With `LEDGER-C1` enabled the same fixture is rejected, and the rejection was checked **by error message rather than by exception class**, because a handler catching `check_violation` would report success if any other check had fired first:
+
+```
+ERROR:  LEDGER-C1: transaction ... posts opposite signs against ledger_account ...
+CONTEXT:  PL/pgSQL function assert_no_opposite_signs_same_account() line 14 at RAISE
+```
+
+**This is why LEDGER-C1 is not redundant with zero-sum, stated as a measurement rather than a claim.** Zero-sum is satisfied by the exact posting that drains the wallet. The two triggers do not overlap; one checks that the books balance and the other checks that a position's movement means what the event says it means, and only the second can see this defect.
+
 ### Two database constraints, because prose review is not the control here
 
 **Three direction-or-class errors landed on LT-01 in a single day**, and a fourth landed inside the ADR describing them: the `trader_withdrawable`/`trader_wallet` collapse, the invented `firm_payable` class, the `firm_treasury` debit that contradicted the recognition timing, and the inverted sign expression above. Every one was produced by careful reading and caught by more careful reading. **That line is too easy to get wrong for prose review to be the control.**

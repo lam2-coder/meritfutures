@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**25 ADRs. 140 edge cases. 257 golden scenarios. Four waves.**
+**<!--gen:adr_count-->34<!--/gen--> ADRs. <!--gen:ec_count-->140<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](DECISIONS.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -86,33 +86,25 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ---
 
-## The first build session
+## The first build session, as it was briefed
 
-**Schema-delta reconciliation. Money path. Strict [ADR-003](DECISIONS.md) regime: one objective, fresh context, no compounding. PLAN MODE IS MANDATORY.**
+**Kept for the record because the brief was met.** Schema-delta reconciliation, money path, strict [ADR-003](DECISIONS.md) regime, plan mode mandatory. The plan was reviewed and ruled on before a migration file was written; the two money-path findings that needed a ruling (C-01's ledger classes and C-02's payout enum) were ruled, and **C-01 was ruled, folded, committed, and then reversed** when the founder re-read the source. That reversal is [ADR-027](DECISIONS.md) and it is the clearest evidence in the corpus that the plan-mode gate did the job it was there for.
 
-**What it is.** Four waves of proposed schema deltas reconciled into one reviewed migration set against the approved [DATA_MODEL](architecture/DATA_MODEL.md): **M01's ten (SD-01 to SD-10), batch 1's thirty-seven (`SD-M2-nn` to `SD-M8-nn`), and batch 2's forty-one (`SD-M9-nn` to `SD-M20-nn`): 88 numbered, plus 5 unnumbered schema changes that exist as rulings with no delta number, for a total of 93.** SD-M19-03 widens to record which KYC trigger fired, and the link-confidence signal-weight table gets a home in the reserved sequence.
-
-**The counts above are corrected.** This document previously read "thirty-one" and "thirty-four", which had been wrong since Session 5 and were quoted onward by three other documents. [ADR-026](DECISIONS.md) records the correction and its provenance; the manifest completeness gate joins CI so a hand-maintained tally cannot drift again.
-
-**Why plan mode is mandatory rather than advised.** This session touches every money table at once; it is the only session whose output cannot be corrected by a later session without a migration against live data; and its failure mode is silent, because a delta folded wrongly produces a schema that works and is wrong. [DELIVERY_PLAN section 3.1](DELIVERY_PLAN.md) names the four specific reasons it is the highest-risk work remaining. **The plan is reviewed before a single migration file is written.**
-
-**Definition of done.** One migration set, every delta traced to the document that proposed it, every money-path column reviewed line by line by the founder per constitution E2, and no delta silently dropped. **A delta that is rejected is rejected in writing, in an ADR, never by omission.**
-
----
+**Definition of done, as briefed:** one migration set, every delta traced to the document that proposed it, every money-path column read line by line by the founder per constitution E2, and no delta silently dropped. **Three of the four are met. The E2 read is outstanding and is the only thing between this branch and a merge.**
 
 ---
 
 ## The schema-delta reconciliation has landed (2026-08-14, item 9)
 
-**All 93 schema changes are folded. 27 migration files at [`packages/db/migrations`](../packages/db/migrations), verified to apply in order against PostgreSQL 16** (96 tables, 326 indexes, **347** check constraints, **6** triggers, as of the two rulings below). **The figures here read 342 and 5 and were wrong when written**; DATA_MODEL carried 345 and 5 for the same set. Another hand-maintained tally, the exact class of drift [ADR-026](DECISIONS.md) caught in the delta counts, in the document that recorded the catch. Every delta traces to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../packages/db/DELTA_MANIFEST.md), which is the file [ADR-026](DECISIONS.md)'s completeness gate reads. **No delta was rejected.**
+**All <!--gen:manifest_changes-->94<!--/gen--> schema changes are folded. <!--gen:migration_files-->27<!--/gen--> migration files at [`packages/db/migrations`](../packages/db/migrations), verified to apply in order against PostgreSQL 16** (<!--gen:sql_tables-->96<!--/gen--> tables, <!--gen:sql_triggers-->6<!--/gen--> triggers; **index and check-constraint totals are emitted by the install job**, not stated here, because Postgres backs every primary key and unique constraint with an index and a grep of the DDL derives 219 where the database reports 326). **This line previously stated four hand-maintained figures and two of them were wrong when written**; DATA_MODEL carried different numbers for the same set. The exact class of drift [ADR-026](DECISIONS.md) caught in the delta counts, recurring in the document that recorded the catch, which is why the derivable two are now spans and the underivable two are gone. Every delta traces to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../packages/db/DELTA_MANIFEST.md), which is the file [ADR-026](DECISIONS.md)'s completeness gate reads. **No delta was rejected.**
 
-**Nothing merges without the founder's E2 line-by-line read.** Sixteen files carry an `E2 READ: MONEY PATH` header naming what in them needs it and why. The install check proves the set is installable and **proves nothing about whether a delta was folded correctly**, which is the whole reason E2 exists.
+**Nothing merges without the founder's E2 line-by-line read.** <!--gen:e2_files-->18<!--/gen--> files carry an `E2 READ: MONEY PATH` header naming what in them needs it and why. **This line read "Sixteen" against seventeen files on disk**, which is the seventh hand-maintained count found wrong, so it is a [CI-06g](testing/STRATEGY.md) span now. The install check proves the set is installable and **proves nothing about whether a delta was folded correctly**, which is the whole reason E2 exists.
 
 **Three things the fold produced that need a founder decision or a follow-on session:**
 
 | # | Item | Why it matters |
 |---|---|---|
-| **A** | **A sixth unnumbered change.** `provisioning_status` gains `confirmed_inferred` ([M02 section 3.2](plans/M02-rithmic-bridge.md), AS-M2-03), which ADR-026's table of five does not carry. **It is folded**; what is open is whether the count in scope is 93 or **94**, and `0001`'s inline marker cites `SD-M2-06` for it, which is the `reconciliations` delta | The manifest gate exists so an uncounted change cannot hide. It caught one. **Founder rules: a `U-06` entry, or a finding that a state-machine value in an approved plan is not a schema change for this purpose** |
+| **A** | ~~A sixth unnumbered change.~~ **RULED AND CLOSED.** It is **`U-06`** and the total in scope is **94**. `0001`'s inline marker read `SD-M2-06`, the `reconciliations` delta, and is corrected to `-- U-06` in `0001` and added in `0007` | **The manifest gate exists so an uncounted change cannot hide, and it caught one on its first run.** That is the gate justifying itself, not a defect |
 | **B** | **[ADR-030](DECISIONS.md)'s stale list is wrong in two of four.** `win_days.required_count: 5` and `phase_eval.min_trading_days: 1` are Core EOD's **frozen** values per [M01 Appendix A.1](plans/M01-rules-engine.md). `w = 3` is Merit Rapid's | Following the list would have put **Merit Rapid's cadence on Core EOD's contract**. Recorded in the amended section 11, not applied |
 | **C** | ~~**DATA_MODEL is only partly at post-migration truth.**~~ **CLOSED 2026-08-15.** §3 through §10 rewritten table by table against the `.sql`. **The scope was larger than this row described: the migrations create 96 tables and the document carried 46 sections, so 50 tables had no design record at all.** All 96 now do, the reconciliation runs both ways as [CI-06i](testing/STRATEGY.md), and the line-15 banner is gone | **It closed with two findings rather than none.** [ADR-035](DECISIONS.md) is a proven defect in a merged money-path migration; `OI-01` (`liability_snapshots`' two shapes) is surfaced with a recommendation and still needs a ruling |
 
@@ -131,7 +123,9 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## Blocked
 
-Nothing, and **one thing needs the founder's hand at merge rather than a session's**: **two open pull requests both claim `ADR-031`.** PR #4 (this branch) carries ADR-031 and ADR-032, both accepted; PR #5 carries a different, proposed ADR-031. Both branch from `main`, where the registry ends at 030. **Whichever merges second corrupts the registry**, and no session can fix it alone without risking the same collision on the next number. **The founder assigns at merge.** A CI check asserting unique, gapless ADR headings would have failed the second pull request instead.
+Nothing.
+
+**The ADR-031 collision is resolved.** Two open pull requests both claimed the number: PR #4 carried ADR-031 and ADR-032, PR #5 a different proposed ADR-031, and both branched from a `main` whose registry ended at 030. The founder assigned at merge, PR #5's became **ADR-033**, and **[ADR-034](DECISIONS.md) ruled that a number is claimed in an allocation table before the ADR is written**. [CI-06f](testing/STRATEGY.md) now **fails the second pull request to claim a number** rather than failing the corpus after both have merged, which is what this incident asked for in its own words.
 
 ## The DATA_MODEL rewrite landed, and found a defect (2026-08-15, item C)
 
@@ -150,6 +144,6 @@ Nothing, and **one thing needs the founder's hand at merge rather than a session
 
 ## Next 3 actions
 
-1. **The founder's E2 read** on the seventeen money-path migration files, and rulings on items A and B above. Nothing merges first.
+1. **The founder's E2 read** on the <!--gen:e2_files-->18<!--/gen--> money-path migration files, and a ruling on item **B** ([ADR-030](DECISIONS.md)'s stale config list, wrong in two of four). **A** and **C** are closed. Nothing merges first.
 2. **In parallel, the three calendar items**: book the vendor call, book the counsel sitting, and send the PSP applications the day the capital decision lands.
-3. **Rule [ADR-035](DECISIONS.md) and `OI-01`**, then the CI job that runs `gates.mjs` on every push plus the append-only-grant check (`OI-03`, whose document half is now exact in [DATA_MODEL §1](architecture/DATA_MODEL.md)), then the first module against this schema.
+3. **Rule `OI-01`** (`liability_snapshots`, surfaced with a recommendation and deliberately not decided by a session), then the append-only-grant check (`OI-03`, whose document half is now exact in [DATA_MODEL §1](architecture/DATA_MODEL.md)), then the first module against this schema. **[ADR-035](DECISIONS.md) is accepted and `0028` is written**; it needs the E2 read like every other money-path file, not a separate ruling.

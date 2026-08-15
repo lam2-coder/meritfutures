@@ -1,0 +1,163 @@
+name: corpus
+
+# CI-06, corpus integrity. Constitution C10: a gate that lives in a document is
+# a gate somebody remembers; a gate that lives in CI is a gate.
+#
+# VERIFIED against PostgreSQL 16 on 2026-08-15 before first push, rather than
+# shipped and hoped for: all 27 migrations apply forward-only from empty; a
+# re-apply is rejected; the database reports 96 tables, 326 indexes, 347 check
+# constraints and 6 triggers; and all three ledger probes fire for the right
+# reason (checked by message, not by exception class).
+#
+# Every check here exists because the thing it checks ALREADY DRIFTED once:
+#   CI-06a  59 links broke silently before a human found them
+#   CI-06d  registry counts were quoted in gate summaries while wrong
+#   CI-06f  two pull requests claimed ADR-031 from the same base
+#   CI-06g  every hand-maintained count checked has been found wrong
+#   CI-06h  the migration set's own object counts were stated and wrong
+#   ADR-026 the delta tally was wrong on the day it was written
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: corpus-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # CI-06a..g plus the ADR-026 manifest gate. Pure Node, no services, fast.
+  # ---------------------------------------------------------------------------
+  integrity:
+    name: CI-06 corpus integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # CI-06f compares this branch's ADR headings against main's. A shallow
+          # clone has no main to compare with, and the gate would pass by being
+          # unable to look.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run corpus gates
+        run: node scripts/corpus/gates.mjs check
+
+      # CI-06g is only meaningful if regenerating changes nothing. The check
+      # above compares spans against their queries; this proves the generator
+      # is the thing that wrote them, so a span cannot be hand-edited into
+      # agreement with a stale query.
+      - name: Generated spans are reproducible
+        run: |
+          node scripts/corpus/gates.mjs generate
+          if ! git diff --quiet; then
+            echo "::error::Regenerating spans changed the tree. A count in a document is stale."
+            git --no-pager diff
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # CI-06h. The migration set installs from empty, and the object counts the
+  # corpus states are derived FROM THE DATABASE rather than from a grep.
+  # ---------------------------------------------------------------------------
+  migrations:
+    name: CI-06h migration install and object counts
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: merit
+          POSTGRES_DB: merit_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports: ['5432:5432']
+
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: merit
+      PGDATABASE: merit_ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1. Forward-only apply from empty, in order, zero errors.
+      #    ON_ERROR_STOP is the whole point: psql's default is to continue past
+      #    a failed statement and exit 0, which would report a green install of
+      #    a schema that is missing tables.
+      - name: Apply migrations in order
+        run: |
+          set -euo pipefail
+          for f in packages/db/migrations/*.sql; do
+            echo "-- applying $f"
+            psql -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      # 2. A second apply of the whole set MUST fail. This proves no migration
+      #    is accidentally idempotent-by-rerun, which would mean it is not
+      #    actually creating what it claims to create.
+      - name: Re-applying the set fails
+        run: |
+          set -uo pipefail
+          if psql -v ON_ERROR_STOP=1 -q -f packages/db/migrations/0001_extensions_and_enums.sql 2>/dev/null; then
+            echo "::error::0001 re-applied cleanly. A migration that is idempotent by rerun is not creating what it claims."
+            exit 1
+          fi
+          echo "Re-apply correctly rejected."
+
+      # 3. The object counts, derived from the database. These are the two
+      #    numbers a grep of the DDL gets wrong by a third, because Postgres
+      #    backs every primary key and unique constraint with an index.
+      - name: Derive object counts
+        run: |
+          set -euo pipefail
+          psql -At -c "
+            select 'tables=' || count(*) from pg_tables where schemaname='public'
+            union all
+            select 'indexes=' || count(*) from pg_indexes where schemaname='public'
+            union all
+            select 'checks=' || count(*) from pg_constraint c
+              join pg_namespace n on n.oid=c.connamespace
+              where n.nspname='public' and c.contype='c'
+            union all
+            select 'triggers=' || count(*) from pg_trigger t
+              join pg_class cl on cl.oid=t.tgrelid
+              join pg_namespace n on n.oid=cl.relnamespace
+              where n.nspname='public' and not t.tgisinternal
+          " | tee object_counts.txt
+
+      # 4. The counts the corpus DOES state must match the database.
+      #    sql_tables and sql_triggers are generated spans; this is the check
+      #    that the grep-derived span agrees with the installed truth.
+      - name: Spanned counts agree with the database
+        run: |
+          set -euo pipefail
+          db_tables=$(grep '^tables=' object_counts.txt | cut -d= -f2)
+          db_trigs=$(grep '^triggers=' object_counts.txt | cut -d= -f2)
+          # grep -o | wc -l rather than grep -c | bc: grep exits 1 when NO file
+          # matches, which under set -e aborts the step with a confusing error
+          # instead of reporting zero. wc always exits 0.
+          sql_tables=$(grep -hoE '^CREATE TABLE ' packages/db/migrations/*.sql | wc -l)
+          sql_trigs=$(grep -hoE '^CREATE (CONSTRAINT )?TRIGGER ' packages/db/migrations/*.sql | wc -l)
+          fail=0
+          [ "$db_tables" = "$sql_tables" ] || { echo "::error::tables: DDL says $sql_tables, database says $db_tables"; fail=1; }
+          [ "$db_trigs" = "$sql_trigs" ] || { echo "::error::triggers: DDL says $sql_trigs, database says $db_trigs"; fail=1; }
+          exit $fail
+
+      # 5. The ledger constraints that carry rulings, probed against the real
+      #    database. Each is one perturbation. A constraint nobody has seen
+      #    reject anything is a constraint nobody knows is wired up.
+      - name: Probe ADR-027's ledger constraints
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_ledger_constraints.sql

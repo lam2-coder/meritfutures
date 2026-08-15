@@ -276,7 +276,28 @@ correlation_groups.threshold
 
 **One defect was found by this testing and not by reading.** `statistic_definitions_measures_nonempty` was first written `array_length(measures, 1) >= 1`. **`array_length` on an empty array returns `NULL`, `NULL >= 1` is `NULL`, and a `CHECK` evaluating to `NULL` passes**, so the constraint admitted the single value it existed to reject, and an empty declared set makes STAT-C1 vacuous. It is `cardinality(measures) >= 1`. Recorded because the lesson generalizes: **an invariant that was reviewed and not executed has not been checked.**
 
-## 11. Re-verification at the DATA_MODEL rewrite (2026-08-15)
+---
+
+## 11. Install verification against PostgreSQL 16 (2026-08-15)
+
+Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md) ships verified rather than hoped for.
+
+| Check | Result |
+|---|---|
+| All 27 migrations apply forward-only from empty, `ON_ERROR_STOP=1` | **pass**, zero errors |
+| Re-applying the set fails | **pass**, rejected as expected |
+| `LEDGER-C1` fires on opposite signs against one account | **pass**, verified by error message and function name |
+| `LEDGER-C2` fires on an undeclared class (`firm_payable`) | **pass** |
+| Zero-sum fires on an unbalanced transaction | **pass** |
+| **Counterfactual: C1 disabled, zero-sum armed** | **the collapse COMMITS.** Transaction nets 0; wallet net debited 10,000c. [ADR-027](../../docs/DECISIONS.md) proven empirically |
+
+**Object counts as reported by the database:** 96 tables, **326 indexes**, **347 check constraints**, 6 triggers.
+
+**The index figure is why those two counts are stated here and nowhere else.** A grep of the DDL finds **219** `CREATE INDEX` statements, because Postgres backs every primary key and unique constraint with an index that the DDL never names. A derivation that disagrees with its artifact by a third would pass CI while telling the reader something false, so `sql_tables` and `sql_triggers` are generated spans and these two are emitted by the install job.
+
+---
+
+## 12. Re-verification at the DATA_MODEL rewrite (2026-08-15)
 
 **The set was installed from scratch against PostgreSQL 16 again and reproduced section 10's figures exactly: 96 tables, 326 indexes, 347 check constraints, 6 triggers.** Nothing in `packages/db` was edited.
 
@@ -289,4 +310,7 @@ correlation_groups.threshold
 
 **The same lesson as the `array_length` defect, one file over and one gate later.** Section 10's probe table covers STAT-C1, the window uniqueness, the unit constraints and NO-FLOATS. It does not cover the immutability triggers, and **the one thing never executed is the one thing that was broken**. Any probe table is an inventory of what somebody thought to test; the gap in it is not visible from inside it.
 
-**Six further `CHECK` constraints are written in the `array_length` form and are correct today only because no code exists to write an empty array**: `correlation_groups_is_a_group` (`0008`), `page_revalidations_has_paths` (`0020`), `integration_contracts_enabled_has_fields` (`0018`), `notification_kinds_has_channels` (`0019`), `round_trips_has_entry` and `round_trips_closed_has_exit` (`0022`), plus `wallet_dormancy_review_was_noticed` (`0011`). Each admits the empty array by the `NULL`-passes rule. **Folded into [ADR-035](../../docs/DECISIONS.md)'s proposed superseding migration** rather than left as seven separate discoveries.
+**SEVEN further `CHECK` constraints are written in the `array_length` form and are correct today only because no code exists to write an empty array**: `correlation_groups_is_a_group` (`0008:223`), `wallet_dormancy_review_was_noticed` (`0011:277`), `integration_contracts_enabled_has_fields` (`0018:65`), `notification_kinds_has_channels` (`0019:73`), `page_revalidations_has_paths` (`0020:85`), `round_trips_has_entry` (`0022:64`) and `round_trips_closed_has_exit` (`0022:66`). Each admits the empty array by the `NULL`-passes rule. **Folded into [ADR-035](../../docs/DECISIONS.md)'s superseding migration** rather than left as seven separate discoveries.
+
+**This paragraph said "Six" above a list of seven when it was written, and the reconciliation brief quoted the six onward.** The eighth hand-maintained count found wrong, in the manifest section recording the seventh, written by a session whose subject was counts that drift. The list is now line-cited so the next reader can check it in one command: `grep -n 'array_length' packages/db/migrations/*.sql`. The three remaining hits are in `0027` and are the **correct** idiom, `IF array_length(...) IS NOT NULL`, which tests the `NULL` rather than being caught by it.
+
