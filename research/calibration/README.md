@@ -52,7 +52,7 @@ Known divergences as of 2026-08-14:
 
 **The finding that justifies where conservatism lives: the tail is all correlation.** Mean payouts barely move across the rho column (about $45.3K throughout), while the 1-in-100 month nearly doubles, from $79.6K at rho = 0.05 to $125.1K at rho = 0.30. Copy trading, stacked accounts, and one-directional index days *are* the risk; average winner volume is not. That is why `rho = 0.30` is a named, reported input rather than a constant buried in the model, and it is why [M07](../../docs/plans/M07-risk-abuse.md)'s correlation detectors are a reserve control and not only an abuse control.
 
-**The reserve rule, in the workbook's own words:** hold at least CVaR99 of monthly payouts, roughly **2.9x mean monthly payouts at rho = 0.30**, which is about **$135K ring-fenced from opex** at baseline scale. This replaces the industry's "3x average" heuristic and is the arithmetic behind the [RCR](../../docs/GLOSSARY.md#reserve-coverage-ratio) denominator.
+**The reserve rule, in the workbook's own words:** hold at least CVaR99 of monthly payouts, roughly **2.9x mean monthly payouts at rho = 0.30**, which is about **$135K ring-fenced from opex** at baseline scale. This replaces the industry's "3x average" heuristic and is the arithmetic behind the [RCR](../../docs/GLOSSARY.md#reserve-coverage-ratio-rcr) denominator.
 
 **18-month ruin probability at rho = 0.30, 8,000 paths**, which is the regime-stress leg of the conservatism ruling:
 

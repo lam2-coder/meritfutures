@@ -51,7 +51,7 @@ The scheduled job that ingests the day's [ingest files](#ingest-file), normalize
 A named product family (Core EOD, Merit Rapid, Direct), with codes `core_eod`, `merit_rapid`, `direct`. A plan has no rules of its own; its rules live in [plan versions](#plan-version). "Merit Rapid" was called "Rapid Daily" in the constitution and was renamed at the M1 gate ([ADR-013](DECISIONS.md)) because its real cadence is about one payout per 5 trading days, not one per day.
 
 ## plan version
-An immutable, versioned rule configuration plus the published copy blocks that describe it. An [account](#account) is permanently bound to the plan version it was sold under. Publishing a new version never mutates existing accounts. "The rules at the time" is always provable because the version is pinned on the account and snapshotted on every [eligibility snapshot](#eligibility-snapshot).
+An immutable, versioned rule configuration plus the published copy blocks that describe it. An account is permanently bound to the plan version it was sold under. Publishing a new version never mutates existing accounts. "The rules at the time" is always provable because the version is pinned on the account and snapshotted on every [eligibility snapshot](#eligibility-snapshot).
 
 ## plan config
 The rules JSON inside a plan version. It is the single source of truth executed by the engine and rendered by marketing. Canonical field names are fixed in this glossary and schema'd in [DATA_MODEL](architecture/DATA_MODEL.md#plan_versions). Ratios are bp, money is cents.
@@ -64,7 +64,7 @@ The phase in which a trader must reach a [profit target](#profit-target) without
 Config: `phase_eval`.
 
 ## funded phase
-The post-pass phase in which the trader trades a simulated funded account and can become eligible for [payouts](#payout-request) by clearing every [gate](#gate). Funded accounts operate exclusively in a simulated environment; this disclosure appears in the footer, checkout, ToS, and certificates.
+The post-pass phase in which the trader trades a simulated funded account and can become eligible for payouts by clearing every [gate](#gate). Funded accounts operate exclusively in a simulated environment; this disclosure appears in the footer, checkout, ToS, and certificates.
 Config: `phase_funded`.
 
 ## direct (instant funded)
@@ -183,7 +183,7 @@ The deterministic reduction of a requested amount to `min(requested, withdrawabl
 The conjunction of every [gate](#gate) for an account, evaluated against the [last closed day](#last-closed-day). Eligibility is computed by the pure engine and is server-authoritative; the client never decides it.
 
 ## eligibility snapshot
-The full gate-by-gate evaluation, input state, plan version, and computed clamp, persisted immutably with a [payout request](#payout-request). It is what makes an approval provable years later and is a required component of the [evidence pack](#evidence-pack).
+The full gate-by-gate evaluation, input state, plan version, and computed clamp, persisted immutably with a payout request. It is what makes an approval provable years later and is a required component of the [evidence pack](#evidence-pack).
 
 ## payout ladder
 The count of settled payouts after which a funded account automatically [graduates](#graduation). It bounds lifetime extraction per account and is the liability architecture's backstop.

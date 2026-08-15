@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../DECISIONS.md, ../EDGE_CASES.md, GOLDEN_SCENARIOS.md, SIMULATION_HARNESS.md, ../architecture/INFRA.md, ../architecture/SECURITY.md, ../architecture/API_CONTRACT.md, ../architecture/DATA_MODEL.md, ../plans/M01-rules-engine.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/SECURITY_LANDSCAPE.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-15
 ---
 
 # Testing Strategy
@@ -207,8 +207,28 @@ The batch 2 gate ruled that the docs link-check joins the inventory. It arrives 
 | CI-06e | **Every `EC-nnn` names a golden scenario reference, and it resolves** | merge | TR-04's second half. An edge case with no fixture is a decision nobody can test |
 | CI-06f | **ADR numbers are unique and gapless.** Every `## ADR-nnn` heading in [DECISIONS](../DECISIONS.md) is distinct; the allocated set runs 001 to the maximum with no holes; and **a pull request may not introduce a number already present on `main` or reserved in the allocation table** | merge | **Fails the second pull request to claim a number, rather than failing the corpus after both have merged.** The ADR number is the corpus's most-cited identifier, and two branches forking from the same `main` will both take "the next one" |
 | CI-06g | **COUNT GATE: no document states a quantity a script can derive**, unless the number sits inside a generated span the script rewrites. CI regenerates every span and fails if the tree changes, and scans for bare numerals adjacent to a registry noun | merge | **Every hand-maintained count in this corpus has drifted. Five for five.** A count is not a fact a document owns; it is a query result somebody pasted |
+| **CI-06i** | **DATA_MODEL and the migrations name the same table set, in BOTH directions.** Every `CREATE TABLE` in [`packages/db/migrations`](../../packages/db/migrations) has a `### <table>` section in [DATA_MODEL](../architecture/DATA_MODEL.md), and every `### <table>` section has a `CREATE TABLE` that creates it | merge | **At the fold the migrations created 96 tables and DATA_MODEL documented 46. Fifty tables had no design record at all and nothing failed, because nothing was counting.** The next module is built by reading DATA_MODEL rather than the DDL, so a table with no design record is a module built blind, and a section describing a table that does not exist is a module built against a fiction. **Only one of the two directions is the obvious one** |
 
 **A note on why these are merge blockers in a repository with no code.** They are cheap, they are deterministic, and they protect the artifact the entire pre-FREEZE phase produces. The corpus is the deliverable until STATE says FROZEN, and a deliverable with no CI is a deliverable held together by one person's attention.
+
+#### These gates are now a script, and it runs
+
+**[`scripts/corpus/gates.mjs`](../../scripts/corpus/gates.mjs), no dependencies, `node scripts/corpus/gates.mjs check`.** All eight of the gates above pass as of 2026-08-15. A gate with an install step is a gate that stops running on the day the install breaks, so the runner reads the tree and nothing else.
+
+```
+node scripts/corpus/gates.mjs check            every gate
+node scripts/corpus/gates.mjs check CI-06i     one gate
+node scripts/corpus/gates.mjs generate         rewrite every CI-06g span from its query
+node scripts/corpus/gates.mjs list             the gates, and what each one covers
+```
+
+**Each gate declares what it does NOT cover, in a `covers` line the `list` command prints.** Three coverage gaps are real and stated rather than implied: CI-06a resolves relative links and anchors and does **not** fetch external `http(s)` targets, which need network and stay with the lychee job; CI-06f checks uniqueness and gaplessness within `DECISIONS.md` against the allocation table and cannot check the cross-branch half, which needs a job that can see both refs; CI-06g compares the spans that exist and does **not** yet sweep for bare numerals adjacent to a registry noun. **A gate that cannot check the whole of its row says so rather than returning green for a check it did not perform.**
+
+**Writing the runner falsified two of its own gates before it found anything real, which is the part worth carrying.** CI-06a first reported **109 broken anchors** because the slug function collapsed runs of whitespace where GitHub maps each space to one hyphen; the corpus was right and the gate was wrong. CI-06e first reported **119 edge cases with no golden scenario** because it read only the `## EC-nnn` block form and the Appendix B4 battery lives as 22 table rows under one heading. **A gate is not trustworthy because it fails; it is trustworthy once you have checked what it fails on.** Both were caught by reading the failures instead of accepting them, and the same discipline is what found [ADR-035](../DECISIONS.md).
+
+**What the first honest run then found**, after those two fixes, was small and real: `docs/INDEX.md`'s `adr_count` span drifted the moment `ADR-035` was written (regenerated by the `generate` command, which is the half of CI-06g that did not exist before), and **27 genuinely broken anchors** across `DECISIONS`, `GLOSSARY`, `API_CONTRACT`, `OVERVIEW`, `INFRA`, `DATA_MODEL` and `M05`, now repaired.
+
+**CI-06e's one accepted exception, and it is printed rather than silent.** `EC-057` states `Golden scenario ref: none owned; covered by the refund-window unit suite and M7's velocity detector`. That is a considered answer, not a forgotten field, so the runner accepts the sentinel `none owned` **and names every entry it accepted in the output**, because an accepted exception nobody can see is how a gate quietly stops gating. **The sentinel is a convention introduced with the runner and is open to a founder ruling**: the alternative is that `EC-057` gets a golden scenario of its own and the sentinel is deleted.
 
 #### CI-06f, and why gaplessness is asserted over allocated **plus reserved**
 
