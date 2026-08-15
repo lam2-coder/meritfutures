@@ -192,7 +192,7 @@ const REGISTRIES = [
     readme: 'docs/decisions/README.md',
     // ALLOCATION.md is a corpus document, not an entry: three tables read AS
     // TABLES by CI-06f and CI-06h. Excluded here so CI-06b still checks it.
-    entry: (f) => /^docs\/decisions\/(ADR-(?:\d{3}|D1)\.md|gates\/[^/]+\.md)$/.test(f),
+    entry: (f) => /^docs\/decisions\/(ADR-(?:\d{3}|D\d+)\.md|gates\/[^/]+\.md)$/.test(f),
   },
 ];
 
@@ -248,7 +248,7 @@ function adrFiles() {
     throw new Error(`${dir} does not exist; the ADR registry has moved or is gone`);
   }
   const files = readdirSync(join(ROOT, dir))
-    .filter((f) => /^ADR-(?:\d{3}|D1)\.md$/.test(f))
+    .filter((f) => /^ADR-(?:\d{3}|D\d+)\.md$/.test(f))
     .sort()
     .map((f) => join(dir, f));
   if (files.length === 0) {
@@ -263,7 +263,7 @@ function adrFiles() {
 function adrEntries() {
   const out = [];
   for (const file of adrFiles()) {
-    const m = /^## ADR-(\d{3}|D1):/m.exec(read(file));
+    const m = /^## ADR-(\d{3}|D\d+):/m.exec(read(file));
     if (!m) {
       out.push({ file, id: null });
       continue;
@@ -575,7 +575,7 @@ const ci06f = {
         continue;
       }
       if (file !== expected) findings.push(`${file}: heading says ADR-${id}, so it belongs at ${expected}`);
-      if (id === 'D1') continue; // outside the numbered sequence, by name
+      if (/^D/.test(id)) continue; // outside the numbered sequence, by name
       const n = Number(id);
       if (seen.has(n)) findings.push(`ADR-${id} appears more than once`);
       seen.add(n);
@@ -612,7 +612,7 @@ const SPAN_QUERIES = {
   // counting files (ADR-043). Counting files would count ADR-D1, which is outside
   // the numbered sequence, and would count a stray file with no heading.
   adr_count: () =>
-    new Set(adrEntries().map((e) => e.id).filter((id) => id && id !== 'D1')).size,
+    new Set(adrEntries().map((e) => e.id).filter((id) => id && !/^D/.test(id))).size,
   // DISTINCT IDENTIFIERS, not headings. EC-012 to EC-033 are the Appendix B4
   // battery and live as TABLE ROWS under one heading, so counting `## EC-nnn`
   // gives 119 against the registry's 140. This is the exact trap STRATEGY names
@@ -899,7 +899,7 @@ const ci06h = {
       if (!alloc.has(n)) {
         findings.push(
           `${f}: ${pad(n)} is not claimed by the migration allocation table in ` +
-            'docs/DECISIONS.md. Claim the number there before writing the file (ADR-036)',
+            `${ALLOCATION_DOC}. Claim the number there before writing the file (ADR-036)`,
         );
       }
     }

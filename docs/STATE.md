@@ -338,7 +338,7 @@ Nothing.
 
 ## S-A landed: migration numbers are allocated (2026-08-15)
 
-**[ADR-036](decisions/ADR-036.md). [DECISIONS](decisions/README.md) now carries two allocation tables**, ADR numbers and migration numbers, and `CI-06h` asserts the second one by `CI-06f`'s rule: gapless over allocated plus reserved, and **a number on disk that no row claims fails.** `0001` to `0028` are allocated and merged; **nothing is reserved and `0029` is the next free number.**
+**[ADR-036](decisions/ADR-036.md). [ALLOCATION](decisions/ALLOCATION.md) carries three allocation tables**, ADR numbers, migration numbers and CI gate letters, and `CI-06h` asserts the migration one by `CI-06f`'s rule: gapless over allocated plus reserved, and **a number on disk that no row claims fails.** **The next free number is read from the last row of the table and is not stated here.** This sentence said "nothing is reserved and `0029` is the next free number" until 2026-08-15, when it was false in both halves: `0029` to `0032` were reserved and the claim had been deleted from the table itself under [ADR-034](decisions/ADR-034.md). It is the seventh site of that class and the reason `CI-06g` exists.
 
 **The registry that had no table was the one that could least afford a collision.** `CI-06h` derived the sequence from the tree, which is the check a branch can satisfy while colliding with its sibling: two branches both find `0028`, both write `0029`, both pass locally. [ADR-034](decisions/ADR-034.md) resolved the ADR collision by renumbering the cheaper branch, and **that remedy does not exist for a migration**, which E2 makes sacred once merged.
 
