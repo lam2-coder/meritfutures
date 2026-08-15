@@ -199,6 +199,21 @@ const SCOPE_CASES = [
         '# Probe\n\nA corpus document with no frontmatter block.\n',
       ),
   },
+  {
+    // The first fold of OQ-P1-04 put docs/INDEX.md inside the shared
+    // predicate's exclusion, which was CI-06c's rule (a list cannot contain
+    // itself) applied to the wrong question. INDEX's own frontmatter was then
+    // checked by nothing: `status: nearly` would have passed every gate.
+    // INDEX is a corpus document; only CI-06c has a reason to skip it.
+    name: 'CI-06b/index',
+    gate: 'CI-06b',
+    what: "INDEX's own frontmatter is checked, which the first fold silently lost",
+    expect: 'docs/INDEX.md: status "nearly" is not one of draft | review | approved | frozen',
+    seed: (d) => {
+      const f = join(d, 'docs/INDEX.md');
+      writeFileSync(f, readFileSync(f, 'utf8').replace(/^status: .*$/m, 'status: nearly'));
+    },
+  },
 ];
 
 function gateIds() {

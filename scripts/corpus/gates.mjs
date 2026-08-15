@@ -167,8 +167,15 @@ function frontmatter(body) {
 // checked by nothing. Stated rather than discovered later.
 const isCorpusDocument = (file) =>
   (/^(docs|research)\//.test(file) || file === 'packages/db/DELTA_MANIFEST.md') &&
-  file !== 'docs/INDEX.md' &&
   !/^docs\/reviews\//.test(file); // verdicts are overwritten artifacts
+
+// docs/INDEX.md is NOT excluded here, and the distinction is the ruling.
+// INDEX is a corpus document: it carries frontmatter and a gate status, and
+// CI-06b must check it. CI-06c skips it for an unrelated reason -- a list
+// cannot contain itself -- which is a property of that gate's mechanics
+// rather than of the document class. Folding the two together put INDEX's
+// own frontmatter beyond every gate, so a hand-edit to `status: nearly`
+// would have passed the whole runner.
 
 // -----------------------------------------------------------------------------
 // CI-06a  Link check
@@ -299,6 +306,10 @@ const ci06c = {
     // isCorpusDocument, which CI-06b reads from too (OQ-P1-04).
     for (const file of markdownFiles()) {
       if (!isCorpusDocument(file)) continue;
+      // Gate-local, not a scope rule: a list cannot contain itself. INDEX is a
+      // corpus document and CI-06b checks its frontmatter; only this gate has
+      // a reason to skip it.
+      if (file === 'docs/INDEX.md') continue;
       if (!linked.has(file)) findings.push(`not in INDEX: ${file}`);
     }
     return findings;
