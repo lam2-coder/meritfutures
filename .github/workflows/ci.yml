@@ -75,14 +75,31 @@ env:
   # dependency and is the thing VG-12 exists to stop. Pinning the scanners is
   # VG-12 applied to the tools that enforce VG-12.
   #
-  # `scripts/ci/install-pinned-tool.sh` resolves and prints the current upstream
-  # tag when a pin 404s, so a bump is one edit here informed by the error.
-  # It also prints each archive's sha256 and warns while the digest is
-  # unpinned; pinning the bytes is the next step and is named in the pull
-  # request rather than implied by the pin above it.
+  # A VERSION PIN SAYS WHICH RELEASE; A DIGEST SAYS WHICH BYTES. Only the second
+  # survives a re-tagged or replaced release asset, which is the supply-chain
+  # event VG-12 is about, aimed at the scanners rather than at the dependencies
+  # they scan. `install-pinned-tool.sh` enforces the digest when one is given
+  # and emits a `::warning::` when it is not, so an unpinned digest cannot look
+  # identical to a pinned one in the log.
+  #
+  # Each sha256 below was READ FROM THE RUN THAT DOWNLOADED IT, not from a
+  # release page. Bumping a version means the digest moves with it: take the
+  # new value from the same step's output. If a digest changes while the
+  # version does not, that is the event this pin exists to catch, and the fix
+  # is not to update the number.
   GITLEAKS_VERSION: '8.30.1'
-  SYFT_VERSION: '1.29.0'
-  GRYPE_VERSION: '0.95.0'
+  GITLEAKS_SHA256: '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb'
+  # 1.29.0 and 0.95.0 were the first guesses and both installed cleanly, which
+  # is why the drift step exists: nothing 404s and nothing complains. `grype`
+  # then failed to hydrate its own database ("unable to migrate: constraint
+  # failed ... operating_systems"), because the schema the current database is
+  # published in is not the one a grype 22 minors old can migrate. A SCANNER
+  # BEHIND ITS OWN DATABASE DOES NOT REPORT A SMALLER SET OF FINDINGS, IT
+  # REPORTS NONE.
+  SYFT_VERSION: '1.51.0'
+  SYFT_SHA256: ''
+  GRYPE_VERSION: '0.117.0'
+  GRYPE_SHA256: ''
   # Verified against PyPI before it was written here, rather than guessed.
   SEMGREP_VERSION: '1.173.0'
 
@@ -215,11 +232,11 @@ jobs:
           chmod +x scripts/ci/install-pinned-tool.sh
           status=0
           sudo -E scripts/ci/install-pinned-tool.sh gitleaks/gitleaks "$GITLEAKS_VERSION" \
-            'gitleaks_{v}_linux_x64.tar.gz' gitleaks || status=1
+            'gitleaks_{v}_linux_x64.tar.gz' gitleaks "$GITLEAKS_SHA256" || status=1
           sudo -E scripts/ci/install-pinned-tool.sh anchore/syft "$SYFT_VERSION" \
-            'syft_{v}_linux_amd64.tar.gz' syft || status=1
+            'syft_{v}_linux_amd64.tar.gz' syft "$SYFT_SHA256" || status=1
           sudo -E scripts/ci/install-pinned-tool.sh anchore/grype "$GRYPE_VERSION" \
-            'grype_{v}_linux_amd64.tar.gz' grype || status=1
+            'grype_{v}_linux_amd64.tar.gz' grype "$GRYPE_SHA256" || status=1
           python3 -m pip install --quiet "semgrep==${SEMGREP_VERSION}" || status=1
           semgrep --version || status=1
           exit $status
