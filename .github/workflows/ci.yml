@@ -351,27 +351,42 @@ jobs:
       # ever being pinned to a stale copy. Keyed on the grype version because
       # the database schema is what a version bump changes, which is the
       # failure this stage already hit once.
-      - name: VG-12 vulnerability database
-        timeout-minutes: 8
-        env:
-          GRYPE_DB_AUTO_UPDATE: 'true'
-        run: grype db update -v
-
+      #
+      # RESTORE BEFORE UPDATE, and the order is the whole value of the cache.
+      # `actions/cache` restores where the step sits and saves at post-job, so
+      # a restore placed after the update downloads the database every run and
+      # then unpacks an older copy over the fresh one. The first arrangement
+      # here did exactly that: the run log reads `downloaded vulnerability DB
+      # time=10.1s` followed by `Cache not found`, which is a cache that costs
+      # a save and returns nothing. Restored first, `db update` finds the
+      # database current and returns without a download.
       - name: Cache the vulnerability database
-        if: always()
         uses: actions/cache@v4
         with:
           path: ~/.cache/grype/db
           key: grype-db-${{ env.GRYPE_VERSION }}-${{ github.run_id }}
           restore-keys: grype-db-${{ env.GRYPE_VERSION }}-
 
-      # `--db-auto-update=false`: the database is the step above's job. Left on,
-      # a scan silently re-downloads and this step inherits the unbounded wait
-      # the split exists to remove. A stale or missing database now fails LOUDLY
-      # here rather than being repaired invisibly.
+      - name: VG-12 vulnerability database
+        timeout-minutes: 8
+        env:
+          GRYPE_DB_AUTO_UPDATE: 'true'
+        run: grype db update -v
+
+      # Auto-update is off for the scan because the database is the step above's
+      # job. Left on, a scan silently re-downloads and inherits the unbounded
+      # wait the split exists to remove.
+      #
+      # IT IS OFF VIA THE JOB-LEVEL `GRYPE_DB_AUTO_UPDATE` ENV, NOT A FLAG.
+      # `--db-auto-update` is not a flag grype 0.117.0 accepts: it exits 1 with
+      # `unknown flag`, which failed this stage four times. The env var is the
+      # supported surface and is already set at the top of this file; the step
+      # above overrides it to `true` for the one command that should download.
+      # Recorded because the flag reads as obviously correct and will be
+      # re-added by anyone who does not know it was tried.
       - name: VG-12 vulnerability scan
         timeout-minutes: 5
-        run: grype sbom:sbom.cdx.json --fail-on medium --db-auto-update=false -o table
+        run: grype sbom:sbom.cdx.json --fail-on medium -o table
 
       # The SBOM is the artifact VG-12 asks for, and an SBOM that exists only
       # inside a finished job is an SBOM nobody can diff against last week's.
