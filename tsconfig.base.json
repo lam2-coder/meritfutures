@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+
+  // Every package extends this file by relative path rather than through a
+  // `@merit/tooling` package reference, so `tsc` needs no install to resolve
+  // its own base config. P1 section 2.1's argument for the tooling package is
+  // that each application must not grow its own copy of the base config; one
+  // file at the root, extended everywhere, is the strongest form of that.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    // Type-check only. Nothing in this repository is built by `tsc`: the apps
+    // are bundled by their own frameworks and the libraries are consumed from
+    // source by Vitest. CI-01 runs `tsc --noEmit` and that is the whole job.
+    "noEmit": true,
+
+    "strict": true,
+
+    // The five that `strict` does not turn on, each of which has bitten a money
+    // path somewhere. `noUncheckedIndexedAccess` is the one that matters most
+    // here: `dayMarks[i]` is `DayMark | undefined`, which is the truth.
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+
+    // A file that cannot be understood alone cannot be transpiled alone, and
+    // every transform in this tree (Vitest, and whatever bundles the apps) is a
+    // single-file transform. `verbatimModuleSyntax` makes the import/export
+    // elision rules explicit instead of inferred.
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  }
+}

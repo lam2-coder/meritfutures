@@ -1,3 +1,19 @@
 __pycache__/
 *.pyc
 .venv/
+
+# The monorepo scaffold (P1). node_modules had no entry here until packages
+# existed to install into, and an untracked-but-not-ignored node_modules is a
+# `git status` nobody can read and an accidental commit waiting to happen.
+node_modules/
+dist/
+build/
+.next/
+*.tsbuildinfo
+
+# Coverage OUTPUT, not a coverage gate. Coverage is reported per package as a
+# trend and is not a merge blocker anywhere (STRATEGY section 2); RI-02 asserts
+# that no threshold exists in the tree.
+coverage/
+
+.DS_Store

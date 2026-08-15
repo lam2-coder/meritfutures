@@ -1,0 +1,19 @@
+{
+  "name": "@merit/rules-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure rule computation, zero I/O. (planConfigVersion, accountState, dayMarks[]) -> newState + events.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "THERE ARE NO `dependencies` AND THERE MUST NEVER BE ONE THAT RESOLVES INTO THIS WORKSPACE. RI-01 in packages/tooling asserts it across all four dependency fields, and merit/engine-purity asserts the source half. The three commitments that rest on it are the replay self-audit, the PT-nn property suites, and Stryker running here and nowhere else.",
+  "devDependencies": {
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
