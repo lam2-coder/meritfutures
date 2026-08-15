@@ -80,7 +80,7 @@ env:
   # It also prints each archive's sha256 and warns while the digest is
   # unpinned; pinning the bytes is the next step and is named in the pull
   # request rather than implied by the pin above it.
-  GITLEAKS_VERSION: '8.28.0'
+  GITLEAKS_VERSION: '8.30.1'
   SYFT_VERSION: '1.29.0'
   GRYPE_VERSION: '0.95.0'
   # Verified against PyPI before it was written here, rather than guessed.
@@ -204,18 +204,25 @@ jobs:
       - name: Install, frozen
         run: pnpm install --frozen-lockfile
 
+      # EVERY TOOL IS ATTEMPTED EVEN AFTER ONE FAILS, and the step fails at the
+      # end. A stale pin is reported by the installer with the tag upstream
+      # currently publishes; aborting on the first one would mean one run per
+      # stale pin, which on the first run of this workflow was three runs to
+      # learn three numbers.
       - name: Install the pinned scanners
         run: |
-          set -euo pipefail
+          set -uo pipefail
           chmod +x scripts/ci/install-pinned-tool.sh
+          status=0
           sudo -E scripts/ci/install-pinned-tool.sh gitleaks/gitleaks "$GITLEAKS_VERSION" \
-            'gitleaks_{v}_linux_x64.tar.gz' gitleaks
+            'gitleaks_{v}_linux_x64.tar.gz' gitleaks || status=1
           sudo -E scripts/ci/install-pinned-tool.sh anchore/syft "$SYFT_VERSION" \
-            'syft_{v}_linux_amd64.tar.gz' syft
+            'syft_{v}_linux_amd64.tar.gz' syft || status=1
           sudo -E scripts/ci/install-pinned-tool.sh anchore/grype "$GRYPE_VERSION" \
-            'grype_{v}_linux_amd64.tar.gz' grype
-          python3 -m pip install --quiet "semgrep==${SEMGREP_VERSION}"
-          semgrep --version
+            'grype_{v}_linux_amd64.tar.gz' grype || status=1
+          python3 -m pip install --quiet "semgrep==${SEMGREP_VERSION}" || status=1
+          semgrep --version || status=1
+          exit $status
 
       # -----------------------------------------------------------------------
       # VG-1, secret scan
@@ -275,8 +282,14 @@ jobs:
 
       # The SBOM is the artifact VG-12 asks for, and an SBOM that exists only
       # inside a finished job is an SBOM nobody can diff against last week's.
+      #
+      # The guard is `there is an SBOM`, not `the job is passing`: the run whose
+      # SBOM is most worth keeping is the one where grype went red. `always()`
+      # alone was wrong and the first CI run proved it, turning a failed scanner
+      # install into a SECOND red step complaining about a file that could not
+      # exist.
       - name: Keep the SBOM
-        if: always()
+        if: always() && hashFiles('sbom.cdx.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: sbom
@@ -303,7 +316,7 @@ jobs:
         run: |
           set -euo pipefail
           base="origin/${{ github.base_ref }}"
-          git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" >/dev/null 2>&1 || true
+          git fetch --no-tags origin "${{ github.base_ref }}" >/dev/null 2>&1 || true
           changed=$(git diff --name-only "$base"...HEAD -- \
             pnpm-lock.yaml pnpm-workspace.yaml .npmrc package.json \
             'apps/*/package.json' 'packages/*/package.json' || true)

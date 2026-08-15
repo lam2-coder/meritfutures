@@ -36,9 +36,14 @@
 
 set -euo pipefail
 
+# NO BRACES IN THESE MESSAGES. `${var:?word}` ends at the first unmatched `}`,
+# so a message mentioning the literal `{v}` placeholder terminated the expansion
+# early and the REST OF THE MESSAGE became part of the asset name. The first CI
+# run requested `gitleaks_{v}_linux_x64.tar.gz for the version}` and curl
+# reported an unmatched brace in the URL.
 repo="${1:?owner/repo}"
 version="${2:?version, without the leading v}"
-template="${3:?asset name template, with {v} for the version}"
+template="${3:?asset name template, with the version placeholder}"
 binary="${4:?the binary the archive contains}"
 expected_sha="${5:-}"
 
