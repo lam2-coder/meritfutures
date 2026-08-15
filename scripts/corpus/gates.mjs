@@ -7,6 +7,7 @@
 //   node scripts/corpus/gates.mjs check            run every gate
 //   node scripts/corpus/gates.mjs check CI-06i     run one gate
 //   node scripts/corpus/gates.mjs list             list the gates
+//   node scripts/corpus/gates.mjs anchors <f.md>   the anchors a file offers
 //
 // Exit code is 0 only when every gate that ran reported PASS.
 //
@@ -20,6 +21,30 @@
 //
 // No dependencies, on purpose: a gate with an install step is a gate that stops
 // running on the day the install breaks.
+//
+// PROVENANCE (2026-08-15 reconciliation of PR #7 and PR #8). Two sessions wrote
+// this file independently. The founder ruled PR #8's runner the base BECAUSE IT
+// HAD BEEN FALSIFIED: it produced 109 phantom broken anchors and 119 phantom
+// refless edge cases, both were traced to bugs in the runner rather than to the
+// corpus, both were fixed, and only then did it find 27 real broken anchors.
+// PR #7's runner had not been watched fail correctly, which is this phase's own
+// definition of done for a gate.
+//
+// Ported in from PR #7 rather than discarded with it, each one real added
+// coverage the base did not have:
+//   * the ADR-026 manifest completeness gate, which PR #8 had no equivalent of
+//   * CI-06h's tree half, and the sql_tables / sql_triggers / manifest_changes /
+//     index_entries span queries the install job cross-checks
+//   * CI-06d's contiguity check (EC and GS run 1..n with no holes)
+//   * CI-06b's depends_on resolution
+//   * CI-06a's duplicate-heading suffixes and <a name> anchors
+//   * the `anchors` dev subcommand
+// Deliberately NOT ported, in writing rather than by omission: PR #7's narrower
+// document scopes, its `failed += problems.length` exit accounting (it counts
+// findings where this runner counts gates), and its prose. See the session log.
+//
+// Added here, by neither branch: CI-06j, the trigger-body column resolution
+// gate. It is the check that would have caught ADR-035.
 // =============================================================================
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -57,6 +82,7 @@ const markdownFiles = () => allFiles().filter((p) => extname(p) === '.md');
 // is trusted to fail a build.
 function slug(heading) {
   return heading
+    .replace(/<[^>]+>/g, '') // inline HTML in a heading is not part of its text
     .trim()
     .toLowerCase()
     .replace(/`/g, '')
@@ -64,13 +90,38 @@ function slug(heading) {
     .replace(/ /g, '-');
 }
 
+// Two heading texts that slug identically get `-1`, `-2` on GitHub, and the
+// corpus deep-links into repeated section names. Ported from PR #7: without it
+// a legitimate `#foo-1` reads as dead. This can only ADD anchors, never remove
+// one, so it cannot make a real break pass unnoticed as a side effect.
+//
+// `<a name="x">` and `<a id="x">` are explicit anchors and count too.
 function headingSlugs(body) {
+  const seen = new Map();
   const out = new Set();
   for (const line of body.split('\n')) {
     const m = /^#{1,6}\s+(.*?)\s*$/.exec(line);
-    if (m) out.add(slug(m[1]));
+    if (!m) continue;
+    const base = slug(m[1]);
+    const n = seen.get(base) ?? 0;
+    seen.set(base, n + 1);
+    out.add(n === 0 ? base : `${base}-${n}`);
   }
+  for (const m of body.matchAll(/<a[^>]+(?:name|id)="([^"]+)"/g)) out.add(m[1]);
   return out;
+}
+
+// A registry that numbers 1..n with no holes and no duplicates. Ported from
+// PR #7's CI-06d. Takes the identifier strings, sorts numerically, reports what
+// is wrong rather than only that something is.
+function contiguity(ids, label) {
+  const ns = [...new Set(ids.map((s) => Number(s.slice(-3))))].sort((a, b) => a - b);
+  const bad = [];
+  if (ns.length && ns[0] !== 1) bad.push(`${label} registry starts at ${ns[0]}, not 1`);
+  for (let i = 1; i < ns.length; i++) {
+    if (ns[i] !== ns[i - 1] + 1) bad.push(`${label} registry gap: ${ns[i - 1]} -> ${ns[i]}`);
+  }
+  return bad;
 }
 
 function frontmatter(body) {
@@ -142,12 +193,15 @@ const ci06a = {
 const ci06b = {
   id: 'CI-06b',
   title: 'Frontmatter present and valid on every tracked document',
-  covers: 'status, depends_on and last_updated on every .md under docs/ and packages/.',
+  covers:
+    'status, depends_on and last_updated on every .md under docs/, research/ and ' +
+    'packages/, AND that every depends_on target resolves to a file that exists.',
   run() {
     const valid = new Set(['draft', 'review', 'approved', 'frozen']);
     const findings = [];
     for (const file of markdownFiles()) {
-      if (!/^(docs|packages)\//.test(file)) continue;
+      if (!/^(docs|research|packages)\//.test(file)) continue;
+      if (/^docs\/reviews\//.test(file)) continue; // verdicts are overwritten artifacts
       const fm = frontmatter(read(file));
       if (!fm) {
         findings.push(`${file}: no frontmatter block`);
@@ -161,6 +215,23 @@ const ci06b = {
       }
       if (fm.last_updated && !/^\d{4}-\d{2}-\d{2}$/.test(fm.last_updated)) {
         findings.push(`${file}: last_updated "${fm.last_updated}" is not YYYY-MM-DD`);
+      }
+      // Ported from PR #7. A `depends_on` naming a file that does not exist is
+      // a dependency nobody can follow, and the field is otherwise decoration.
+      //
+      // Resolved DOC-RELATIVE OR REPO-ROOT, deliberately. The corpus spells the
+      // constitution both ways (`MERIT_BUILD_MASTER_PROMPT.md` from a nested
+      // file, `../../MERIT_BUILD_MASTER_PROMPT.md` from a sibling) and both
+      // plainly mean the same file. The gate's job is to catch a dependency
+      // pointing at nothing, not to litigate a path convention nobody ruled.
+      for (const dep of (fm.depends_on ?? '')
+        .replace(/^\[|\]$/g, '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)) {
+        const found =
+          existsSync(resolve(ROOT, dirname(file), dep)) || existsSync(resolve(ROOT, dep));
+        if (!found) findings.push(`${file}: depends_on does not resolve -> ${dep}`);
       }
     }
     return findings;
@@ -185,8 +256,12 @@ const ci06c = {
       linked.add(target);
       if (!existsSync(join(ROOT, target))) findings.push(`INDEX row does not resolve: ${m[1]}`);
     }
+    // Scope widened at the reconciliation to match PR #7's: research/ and the
+    // DELTA_MANIFEST are tracked documents that INDEX already carries, and a
+    // gate that reads "every tracked document" while checking only docs/ is a
+    // gate reporting green for a check it did not perform.
     for (const file of markdownFiles()) {
-      if (!/^docs\//.test(file)) continue;
+      if (!/^(docs|research)\//.test(file) && file !== 'packages/db/DELTA_MANIFEST.md') continue;
       if (file === 'docs/INDEX.md') continue;
       if (/^docs\/reviews\//.test(file)) continue; // verdicts are overwritten artifacts
       if (!linked.has(file)) findings.push(`not in INDEX: ${file}`);
@@ -207,7 +282,8 @@ const ci06d = {
   title: 'Registry reconciliation: every cited GS-nnn and EC-nnn exists',
   covers:
     'every GS-nnn and EC-nnn cited anywhere in docs/ resolves to a definition in ' +
-    'its registry, counting DISTINCT IDENTIFIERS rather than table rows.',
+    'its registry, counting DISTINCT IDENTIFIERS rather than table rows, AND that ' +
+    'each registry runs 1..n with no holes and no duplicates.',
   run() {
     const findings = [];
     const gsBody = read('docs/testing/GOLDEN_SCENARIOS.md');
@@ -219,6 +295,11 @@ const ci06d = {
     if (gs.size === 0 || ec.size === 0) {
       throw new Error('registry parse produced zero identifiers; the gate cannot run');
     }
+    // CONTIGUITY, ported from PR #7. Resolving every citation proves nothing
+    // about the registry itself: a registry that skips EC-078 entirely has no
+    // dangling citation, and the missing edge case is invisible from the
+    // citation side. This is the half that looks at the registry.
+    findings.push(...contiguity([...ec], 'EC'), ...contiguity([...gs], 'GS'));
     for (const file of markdownFiles()) {
       if (!/^docs\//.test(file)) continue;
       const body = read(file);
@@ -369,18 +450,64 @@ const SPAN_QUERIES = {
   migration_files: () =>
     readdirSync(join(ROOT, 'packages/db/migrations')).filter((f) => extname(f) === '.sql').length,
   tables: () => tablesInMigrations().length,
+
+  // ---------------------------------------------------------------------------
+  // Ported from PR #7. These four spans are LIVE IN docs/STATE.md, which is why
+  // the merge of the two branches failed CI-06g on arrival: PR #7 wrote the
+  // spans into the document and PR #8's runner had no queries for them. That is
+  // the gate doing exactly its job across a merge, and it is worth recording.
+  // ---------------------------------------------------------------------------
+
+  // `sql_tables` and `tables` are the same number by two parsers, kept as two
+  // keys on purpose: the install job (CI-06h) cross-checks `^CREATE TABLE `
+  // against the live catalogue, so the grep form has to stay derivable here.
+  sql_tables: () => sqlMatchCount(/^CREATE TABLE /gm),
+  sql_triggers: () => sqlMatchCount(/^CREATE (?:CONSTRAINT )?TRIGGER /gm),
+
+  // ADR-026's manifest is the authority on how many schema changes are in
+  // scope. Counts SD-nn and U-nn rows whether or not the id is bolded.
+  manifest_changes: () =>
+    (
+      read('packages/db/DELTA_MANIFEST.md').match(
+        /^\|\s*\*{0,2}(?:SD|U)-[A-Za-z0-9-]+\*{0,2}\s*\|/gm,
+      ) || []
+    ).length,
+
+  index_entries: () => (read('docs/INDEX.md').match(/^\| \[/gm) || []).length,
+
+  // Added at the reconciliation. STATE said "Sixteen files carry an E2 READ"
+  // against seventeen on disk, which was the seventh hand-maintained count
+  // found wrong. The E2 set grows whenever a money-path migration lands, which
+  // is precisely when nobody is thinking about a sentence in STATE.
+  e2_files: () => sqlFiles().filter((f) => read(f).includes('E2 READ: MONEY PATH')).length,
 };
 
 // Keys STRATEGY names as derivable that this runner deliberately does not
 // implement, each with the reason, so a span using one fails loudly with the
 // reason rather than silently having no query.
+//
+// `triggers` stays deferred while `sql_triggers` is implemented, and the
+// distinction is the point: `sql_triggers` is what the DDL declares, `triggers`
+// is what Postgres ends up with. They agree today and CI-06h is what proves it;
+// a span asserting the second from a reading of the first would be a derivation
+// that looks checked and is not.
 const SPAN_DEFERRED = {
   indexes: 'needs a live apply; a reading of the .sql cannot count what Postgres builds',
   check_constraints: 'needs a live apply',
-  triggers: 'needs a live apply',
+  triggers: 'needs a live apply; use sql_triggers for the DDL-declared count',
   delta_count: 'needs the manifest disposition tables parsed, and that query is not yet ruled',
-  index_entries: 'needs a ruled definition of what counts as an INDEX entry',
 };
+
+const sqlFiles = () => {
+  const dir = 'packages/db/migrations';
+  return readdirSync(join(ROOT, dir))
+    .filter((f) => extname(f) === '.sql')
+    .sort()
+    .map((f) => join(dir, f));
+};
+
+const sqlMatchCount = (re) =>
+  sqlFiles().reduce((n, f) => n + (read(f).match(re) || []).length, 0);
 
 // Spans inside a fenced code block are DOCUMENTATION OF THE FORM, not spans.
 // STRATEGY's own CI-06g section shows `<!--gen:adr_count-->25<!--/gen-->` in a
@@ -522,9 +649,308 @@ const ci06i = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06h  MIGRATION INSTALL AND OBJECT COUNTS, the half a tree can check
+// -----------------------------------------------------------------------------
+// The install itself needs a database and lives in the `migrations` job of
+// .github/workflows/corpus.yml: forward-only apply from empty under
+// ON_ERROR_STOP, a re-apply that MUST fail, and the object counts read from
+// pg_indexes and pg_constraint rather than from a grep.
+//
+// What a tree can check is the two things that make that job meaningful, and
+// both have a real failure mode:
+//
+//   1. THE SEQUENCE. Migrations are applied in filename order, so a duplicated
+//      or missing number is an ordering nobody can reason about. Two files
+//      numbered 0028 apply in an order decided by the rest of the filename.
+//   2. THE WIRING STILL EXISTS. A gate whose CI job was deleted reports nothing
+//      at all, which reads identically to a gate that passed. This asserts the
+//      job is present and still carries the three steps that make it a check
+//      rather than a smoke test.
+const ci06h = {
+  id: 'CI-06h',
+  title: 'Migration sequence is gapless, and the install job that proves it exists',
+  covers:
+    'migration filenames number 1..n with no holes and no duplicates, and the ' +
+    'corpus workflow still carries the ON_ERROR_STOP apply, the must-fail ' +
+    're-apply and the database-derived counts. The install ITSELF needs a live ' +
+    'PostgreSQL and runs in CI, NOT here. A green result from this gate is not ' +
+    'a claim that the set installs.',
+  run() {
+    const findings = [];
+    const files = sqlFiles().map((p) => p.replace('packages/db/migrations/', ''));
+    if (files.length === 0) throw new Error('no migration files found; the gate cannot run');
+    const seen = new Map();
+    for (const f of files) {
+      const m = /^(\d{4})_/.exec(f);
+      if (!m) {
+        findings.push(`${f}: migration filename does not start with a 4-digit sequence number`);
+        continue;
+      }
+      const n = Number(m[1]);
+      if (seen.has(n)) findings.push(`${m[1]}: claimed by both ${seen.get(n)} and ${f}`);
+      else seen.set(n, f);
+    }
+    const ns = [...seen.keys()].sort((a, b) => a - b);
+    if (ns.length && ns[0] !== 1) findings.push(`migrations start at ${ns[0]}, not 0001`);
+    for (let i = 1; i < ns.length; i++) {
+      if (ns[i] !== ns[i - 1] + 1) findings.push(`migration gap: ${ns[i - 1]} -> ${ns[i]}`);
+    }
+
+    const wf = '.github/workflows/corpus.yml';
+    if (!existsSync(join(ROOT, wf))) {
+      findings.push(`${wf} is missing: CI-06h's install half is not wired anywhere`);
+      return findings;
+    }
+    const body = read(wf);
+    const required = [
+      ['ON_ERROR_STOP=1', 'the apply step no longer stops on the first error'],
+      ['Re-applying the set fails', 'the must-fail re-apply step is gone'],
+      ['pg_indexes', 'the counts are no longer derived from the database'],
+      ['probe_ledger_constraints.sql', 'the ledger constraint probes are no longer run'],
+    ];
+    for (const [needle, why] of required) {
+      if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// CI-06j  EVERY COLUMN A TRIGGER BODY NAMES MUST EXIST ON THE TABLE IT GUARDS
+// -----------------------------------------------------------------------------
+// THIS IS THE CHECK THAT WOULD HAVE CAUGHT ADR-035.
+//
+// `assert_published_plan_version_immutable()` reads `NEW.config`. `plan_versions`
+// has no `config` column; the rule contract is `rules`. PL/pgSQL resolves record
+// fields AT EXECUTION, not at CREATE FUNCTION, so the migration installs
+// cleanly, every existing probe passes, and the function is wrong only when it
+// fires. It fired on the one transition the design permits, and the result was
+// that no plan version could be retired.
+//
+// LEDGER-C2's idea applied to columns. LEDGER-C2 asserts that a ledger entry's
+// account class was declared; this asserts that a trigger's column was declared.
+// Both exist because "it reads correctly" is not a check.
+//
+// The catalogue is built from the tree rather than from a live database on
+// purpose, so this runs on every push with no service. That costs one thing and
+// it is stated: a column added by a migration this parser cannot read would
+// produce a false finding rather than a silent pass, which is the direction a
+// gate should fail in.
+
+// Remove SQL comments without eating the contents of strings or dollar-quoted
+// function bodies. Naive `--.*$` stripping mangles `'a--b'` and every RAISE
+// message in 0027.
+function stripSqlComments(sql) {
+  let out = '';
+  for (let i = 0; i < sql.length; ) {
+    if (sql.startsWith('--', i)) {
+      const nl = sql.indexOf('\n', i);
+      i = nl === -1 ? sql.length : nl;
+    } else if (sql.startsWith('/*', i)) {
+      const end = sql.indexOf('*/', i + 2);
+      i = end === -1 ? sql.length : end + 2;
+    } else if (sql[i] === "'") {
+      const end = sql.indexOf("'", i + 1);
+      const stop = end === -1 ? sql.length : end + 1;
+      out += sql.slice(i, stop);
+      i = stop;
+    } else {
+      const dollar = /^\$([A-Za-z_]*)\$/.exec(sql.slice(i, i + 40));
+      if (dollar) {
+        const tag = `$${dollar[1]}$`;
+        const end = sql.indexOf(tag, i + tag.length);
+        const stop = end === -1 ? sql.length : end + tag.length;
+        out += sql.slice(i, stop);
+        i = stop;
+      } else {
+        out += sql[i];
+        i++;
+      }
+    }
+  }
+  return out;
+}
+
+// table -> Set(column), from CREATE TABLE bodies and ALTER TABLE ADD COLUMN.
+function columnCatalogue() {
+  const cols = new Map();
+  const add = (t, c) => {
+    if (!cols.has(t)) cols.set(t, new Set());
+    cols.get(t).add(c);
+  };
+  const NOT_A_COLUMN = new Set([
+    'constraint', 'primary', 'unique', 'check', 'foreign', 'exclude', 'like', 'partition',
+  ]);
+  for (const file of sqlFiles()) {
+    const sql = stripSqlComments(read(file));
+    for (const m of sql.matchAll(/\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\s*\(/gi)) {
+      const table = m[1].toLowerCase();
+      if (!cols.has(table)) cols.set(table, new Set());
+      // Balanced scan from the opening paren, then split the top level on commas.
+      let depth = 0;
+      let i = m.index + m[0].length - 1;
+      const start = i + 1;
+      for (; i < sql.length; i++) {
+        if (sql[i] === '(') depth++;
+        else if (sql[i] === ')') {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+      const inner = sql.slice(start, i);
+      let d = 0;
+      let item = '';
+      const items = [];
+      for (const ch of inner) {
+        if (ch === '(') d++;
+        if (ch === ')') d--;
+        if (ch === ',' && d === 0) {
+          items.push(item);
+          item = '';
+        } else item += ch;
+      }
+      items.push(item);
+      for (const raw of items) {
+        const first = raw.trim().split(/\s/)[0];
+        if (!first) continue;
+        if (NOT_A_COLUMN.has(first.toLowerCase())) continue;
+        if (!/^[a-z_][a-z0-9_]*$/i.test(first)) continue;
+        add(table, first.toLowerCase());
+      }
+    }
+    for (const m of sql.matchAll(
+      /\bALTER\s+TABLE\s+(?:ONLY\s+)?([a-z_][a-z0-9_]*)\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/gi,
+    )) {
+      add(m[1].toLowerCase(), m[2].toLowerCase());
+    }
+  }
+  return cols;
+}
+
+// fn -> { file, body, tables:Set }, from CREATE FUNCTION and the CREATE TRIGGER
+// rows that attach it. A function attached to two tables must resolve against
+// both, because it runs for both.
+//
+// TWO PASSES, NOT ONE, and the harness is why. A superseding migration rebinds
+// a guard with CREATE OR REPLACE FUNCTION and does NOT recreate the trigger,
+// because the trigger already points at the name. Collecting definitions and
+// attachments in a single file-ordered pass makes the later definition wipe the
+// attachment the earlier file recorded, and the gate then reports a live guard
+// as orphaned. That is exactly what it did on 0028, on the first run of
+// falsify.mjs, which is the entire argument for owning a harness that runs the
+// gates against a deliberately broken tree.
+//
+// The LATEST definition wins for the body, because that is what the database
+// ends up executing. Attachments accumulate across every file.
+function triggerFunctions() {
+  const fns = new Map();
+  const attached = new Map();
+  for (const file of sqlFiles()) {
+    const sql = stripSqlComments(read(file));
+    for (const m of sql.matchAll(
+      /\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([a-z_][a-z0-9_]*)\s*\([^)]*\)\s+RETURNS\s+trigger\b([\s\S]*?)\$([A-Za-z_]*)\$([\s\S]*?)\$\3\$/gi,
+    )) {
+      fns.set(m[1].toLowerCase(), { file, body: m[4] });
+    }
+    for (const m of sql.matchAll(
+      /\bCREATE\s+(?:CONSTRAINT\s+)?TRIGGER\s+[a-z_][a-z0-9_]*\s+([\s\S]*?)EXECUTE\s+(?:FUNCTION|PROCEDURE)\s+([a-z_][a-z0-9_]*)\s*\(/gi,
+    )) {
+      const on = /\bON\s+([a-z_][a-z0-9_]*)/i.exec(m[1]);
+      if (!on) continue;
+      const fn = m[2].toLowerCase();
+      if (!attached.has(fn)) attached.set(fn, new Set());
+      attached.get(fn).add(on[1].toLowerCase());
+    }
+  }
+  for (const [name, def] of fns) def.tables = attached.get(name) ?? new Set();
+  return fns;
+}
+
+const ci06j = {
+  id: 'CI-06j',
+  title: 'Every NEW./OLD. column a trigger body names exists on the table it guards',
+  covers:
+    'record-field references in PL/pgSQL trigger functions, resolved against the ' +
+    'columns the migrations declare, plus trigger functions never attached to a ' +
+    'table. It does NOT resolve bare column references inside embedded SQL, which ' +
+    'need a real parser or a live catalogue. ADR-035 was a NEW. reference.',
+  run() {
+    const findings = [];
+    const cols = columnCatalogue();
+    const fns = triggerFunctions();
+    if (fns.size === 0) throw new Error('no trigger functions parsed; the gate cannot run');
+    for (const [name, { file, body, tables }] of [...fns].sort()) {
+      const refs = new Set([...body.matchAll(/\b(?:NEW|OLD)\.([a-z_][a-z0-9_]*)/gi)].map((m) => m[1].toLowerCase()));
+      if (tables.size === 0) {
+        if (refs.size) findings.push(`${name} (${file}): reads NEW./OLD. and no CREATE TRIGGER attaches it to a table`);
+        continue;
+      }
+      for (const table of [...tables].sort()) {
+        const known = cols.get(table);
+        if (!known) {
+          findings.push(`${name} (${file}): attached to ${table}, which no migration creates`);
+          continue;
+        }
+        for (const ref of [...refs].sort()) {
+          if (!known.has(ref)) {
+            findings.push(
+              `${name} (${file}): reads NEW/OLD.${ref}, and ${table} has no such column ` +
+                `(it has ${[...known].sort().join(', ')})`,
+            );
+          }
+        }
+      }
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// ADR-026  MANIFEST COMPLETENESS
+// -----------------------------------------------------------------------------
+// Ported from PR #7, which is the only branch that had it. Every SD-nn and U-nn
+// appearing anywhere in docs/ appears exactly once in DELTA_MANIFEST as a row
+// carrying a disposition. A count nobody can drift beats a count somebody
+// remembers to update, and this gate found `U-06` on its first run.
+const adr026 = {
+  id: 'ADR-026',
+  title: 'Manifest completeness: every SD-nn and U-nn has exactly one row, with a disposition',
+  covers:
+    'every delta id cited anywhere in docs/ has exactly one DELTA_MANIFEST row, and ' +
+    'every row states landed / reserved / deferred / rejected. It does NOT check ' +
+    'that the disposition is TRUE of the migrations, which is the E2 read.',
+  run() {
+    const findings = [];
+    const man = read('packages/db/DELTA_MANIFEST.md');
+    const rows = new Map();
+    for (const line of man.split('\n')) {
+      const m = /^\| \*{0,2}((?:SD|U)-[A-Za-z0-9-]+?)\*{0,2} \|/.exec(line);
+      if (!m) continue;
+      rows.set(m[1], (rows.get(m[1]) ?? 0) + 1);
+      if (!/\*\*(landed|reserved|deferred|rejected)/i.test(line)) {
+        findings.push(`${m[1]}: manifest row carries no disposition`);
+      }
+    }
+    if (rows.size === 0) throw new Error('no manifest rows parsed; the gate cannot run');
+    for (const [id, n] of rows) {
+      if (n > 1) findings.push(`${id}: appears in ${n} manifest rows, must be exactly one`);
+    }
+    const cited = new Set();
+    for (const file of markdownFiles()) {
+      if (!/^docs\//.test(file) && file !== 'packages/db/DELTA_MANIFEST.md') continue;
+      for (const m of read(file).matchAll(/\b((?:SD|U)-(?:\d{2}|M\d{1,2}-\d{2}))\b/g)) cited.add(m[1]);
+    }
+    for (const id of [...cited].sort()) {
+      if (!rows.has(id)) findings.push(`${id}: cited in docs/ but has no DELTA_MANIFEST row`);
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
-const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06i];
+const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06h, ci06i, ci06j, adr026];
 
 function main() {
   const [cmd, only] = process.argv.slice(2);
@@ -534,8 +960,23 @@ function main() {
     return 0;
   }
   if (cmd === 'generate') return generate();
+
+  // Dev affordance ported from PR #7: CI-06a tells you a link is dead, this
+  // tells you what to point it at instead.
+  if (cmd === 'anchors') {
+    if (!only) {
+      console.error('usage: node scripts/corpus/gates.mjs anchors <file.md> [filter]');
+      return 2;
+    }
+    const filter = (process.argv[4] ?? '').toLowerCase();
+    for (const a of [...headingSlugs(read(only))].sort()) if (!filter || a.includes(filter)) console.log(a);
+    return 0;
+  }
+
   if (cmd !== 'check') {
-    console.error('usage: node scripts/corpus/gates.mjs check [GATE-ID] | generate | list');
+    console.error(
+      'usage: node scripts/corpus/gates.mjs check [GATE-ID] | generate | list | anchors <file.md>',
+    );
     return 2;
   }
 
