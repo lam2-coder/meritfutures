@@ -189,6 +189,29 @@ Nothing.
 
 ---
 
+## FOLD-02 is planned and approved, and it collapses one of the two new states into a state that already exists (2026-08-15)
+
+**[FOLD-02](plans/FOLD-02-enforcement-window-and-suspension.md) is `approved`.** The payout enforcement window (a pre-approval `held_pending_review` with a hard 48 hour auto-release) and identity-level suspension, planned across roughly twenty-six files and eight sessions. **Plan only; nothing was folded**, which was the brief's stop condition. **ADR-038, ADR-039, `0030` and `0031` are claimed, and `0029` plus ADR-037 are reserved for FOLD-01 in the same rows**, because gaplessness is asserted over allocated plus reserved and FOLD-01 had claimed neither yet.
+
+**The founder's amendment 4 asked whether the new payout state is the bounded freeze under a second name. It is not, and the discriminator is whether the ledger has moved.** A held request has posted nothing: no LT-01, no wallet credit, nothing owed, so release means *approve and pay* and enforcement reverses nothing. A frozen request has posted LT-01 and the money is already the trader's. Two consequences are ruled rather than inherited: a held request **stores its full evaluated decision** so release re-evaluates nothing and every existing `NOT NULL` on `payout_requests` survives untouched, and **a hold that reaches expiry pays even if the account breached during it**, because the alternative is that Merit's own hold cost the trader money.
+
+**The same question applied to Ruling B and the answer went the other way, which is the plan's one departure from the brief's literal wording.** `identity_status` already carries a reversible `restricted` value, wired through the enum, the machine, the events, [M20](plans/M20-wallet.md)'s spend and withdrawal gates and the trader's own `GET /me`. **`suspended` is `restricted` under a second name**, and what is missing is not the state but its binding surface, so the plan enumerates and asserts the surface instead of adding a second value.
+
+| Finding | State |
+|---|---|
+| **The zero-denial sentence is not in [CLAUDE.md](../CLAUDE.md).** The words "no `denied` status and no review state" are [GUIDE_BRIEFING](GUIDE_BRIEFING.md)'s, and the constraint is restated in **ten** places, **two of them inside merged migrations that can never be edited** | **Folded by the ADR.** `0010`'s `COMMENT ON TABLE` is replaceable metadata and `0031` re-states it; the two `--` comments stand, and the ADR says so rather than implying the sweep was complete |
+| **The external leg's halt exists as columns with no state to sit in.** `wallet_withdrawals` carries the three freeze columns and its expiry index, and `wallet_withdrawal_status` has no frozen value, so a halted withdrawal still reads as open and nothing refuses settlement | **Folded by `0031`**, as enforcement rather than a state. The halt is orthogonal to the rail state, and collapsing it into that column is SD-M5-06's named mistake |
+| **`restricted` blocks the wallet and nothing else Ruling B names.** `G-ELIGIBLE` names `payouts_frozen` and not `identities.status`; checkout has no restriction check; nothing revokes platform trading | **Folded.** The surface is enumerated once, in one table, and asserted |
+| **`ALTER TYPE ... ADD VALUE` cannot be used in the transaction that adds it**, and every index predicate in the change is such a use | **Two migrations, `0030` and `0031`.** Proven by executing the counterfactual (the combined file must fail), not by citing the manual |
+
+**The auto-release is now the load-bearing control, so it is structural in three places and unsuppressible in one.** It joins the existing hourly freeze-expiry sweep and its S1 dead-man switch, its alarm fires on the query rather than on the job, and a hold or freeze past expiry becomes the **fourth unsuppressible alarm**, amending [M06](plans/M06-admin-ops-console.md) OQ-M6-01. A new gate, `CI-06l`, asserts from the tree that every expiry column names a release job.
+
+**The Rithmic revocation leg is marked PROVISIONAL, and the honest form is an asymmetry: suspension is always available and restoration is contingent on `V-M2-15`.** With neither an acknowledgement artifact nor a readable risk setting, a restored account cannot be confirmed, and INV-M2-13 means an unconfirmed account does not trade.
+
+**Four open questions for the founder**, none blocking the fold: the `suspended` versus `restricted` ruling, whether the 48 hour SLA also replaces the freeze's unruled 10 business days (as it stands Merit binds itself harder where nothing has moved than where the money is already owed), M15's partial versus full launch scope, and the fourth unsuppressible alarm.
+
+---
+
 ## Next 3 actions
 
 1. **The founder's E2 read** on the <!--gen:e2_files-->18<!--/gen--> money-path migration files, and a ruling on item **B** ([ADR-030](DECISIONS.md)'s stale config list, wrong in two of four). **A** and **C** are closed. Nothing merges first.
