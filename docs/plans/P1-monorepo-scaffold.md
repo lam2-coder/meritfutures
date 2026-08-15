@@ -185,7 +185,6 @@ FAIL   CI-06b  Frontmatter present and valid on every tracked document  (1)
 ```js
 const isCorpusDocument = (file) =>
   (/^(docs|research)\//.test(file) || file === 'packages/db/DELTA_MANIFEST.md')
-  && file !== 'docs/INDEX.md'
   && !/^docs\/reviews\//.test(file);
 ```
 

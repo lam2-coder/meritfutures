@@ -162,9 +162,6 @@ function frontmatter(body) {
 // class. Fine at one entry. If it reaches three it needs a rule instead of a
 // list.
 //
-// `docs/INDEX.md` is excluded because INDEX cannot carry a row pointing at
-// itself. That exclusion now reaches CI-06b too, so INDEX's own frontmatter is
-// checked by nothing. Stated rather than discovered later.
 const isCorpusDocument = (file) =>
   (/^(docs|research)\//.test(file) || file === 'packages/db/DELTA_MANIFEST.md') &&
   !/^docs\/reviews\//.test(file); // verdicts are overwritten artifacts
@@ -239,7 +236,8 @@ const ci06b = {
     'depends_on target resolves to a file that exists. The document set is ' +
     'isCorpusDocument, shared with CI-06c (OQ-P1-04). A markdown file under ' +
     'packages/ that is not on that list is a source file rather than a corpus ' +
-    'document and is NOT checked; neither is docs/INDEX.md.',
+    'document and is NOT checked. docs/INDEX.md IS checked here; only CI-06c ' +
+    'skips it, and for a reason about that gate rather than about the file.',
   run() {
     const valid = new Set(['draft', 'review', 'approved', 'frozen']);
     const findings = [];
