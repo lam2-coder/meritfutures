@@ -76,37 +76,36 @@ Transition detail:
 ```mermaid
 stateDiagram-v2
     [*] --> approved: G-ELIGIBLE and G-CLAMP
-    approved --> transferring: G-TRANSFER-QUEUED
-    transferring --> settled: G-SETTLEMENT-CONFIRMED
-    transferring --> failed: G-TRANSFER-EXHAUSTED
+    approved --> settled: LT-01 posted, wallet credited
     approved --> frozen: G-FREEZE-DURING-FLIGHT
-    frozen --> transferring: G-FREEZE-CLEARED
+    frozen --> settled: G-FREEZE-CLEARED
     frozen --> failed: G-FREEZE-ENFORCED
     settled --> [*]
     failed --> [*]
 ```
+
+**This machine carried `transferring` until 2026-08-15, and [ADR-028](../DECISIONS.md) retired that value from `payout_requests` on 2026-08-14.** The enum is `approved, settled, failed, frozen`; `transferring` is owned by `wallet_withdrawals` and its machine is section 3. ADR-028 named two sites it corrected, [DATA_MODEL](DATA_MODEL.md)'s second stale index predicate and [M05](../plans/M05-payout-system.md)'s freeze target, and **it missed this drawing, which is the authoritative one.** Corrected under [ADR-040](../DECISIONS.md) on ADR-028's own remedy: `frozen` releases to `settled`, which is what a released freeze does under the wallet, and the three `transferring` transitions with their guards `G-TRANSFER-QUEUED`, `G-SETTLEMENT-CONFIRMED` and `G-TRANSFER-EXHAUSTED` belong to the external leg. **`approved --> settled` carries a ledger fact rather than a guard name, and the absence is deliberate**: under [ADR-019](../DECISIONS.md) the internal leg is one transaction ([M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states and no guard exists to name. The guard is named when the machine is folded, not invented here.
 
 There is **no `pending_review` state and no `denied` state.** A request that does not satisfy G-ELIGIBLE is never created: the API returns the gate breakdown and emits `payout.blocked`, so the machine only ever starts from an approved fact.
 
 | State | Meaning | Money moved | Trader sees |
 |---|---|---|---|
 | `approved` | Engine approved instantly; ledger entries posted | withdrawable moved to a payable position | "Approved" with the exact amount |
-| `transferring` | Rise transfer queued or sent | funds in flight | "Sending, 2 to 3 business days" |
-| `settled` | Settlement webhook confirmed | complete | "Paid" with the rail and date |
-| `failed` | Retries exhausted, or enforcement during flight | reversed by compensating entries | honest status plus what happens next |
+| `settled` | The internal leg completed: LT-01 posted and the identity's `trader_wallet` credited, in the same transaction | complete | "Paid" with the date. The rail belongs to the external leg |
+| `failed` | Enforcement decided on a frozen request, with an exported evidence pack. **Rail exhaustion is not a path here**: it belongs to `wallet_withdrawals` with the rest of the external leg | reversed by compensating entries | honest status plus what happens next |
 | `frozen` | Investigation opened after approval, before settlement | held | review status with ToS citation |
 
 | From | To | Guard | Events |
 |---|---|---|---|
 | (start) | `approved` | G-ELIGIBLE and G-CLAMP | `payout.requested`, `payout.approved`, `ledger.transaction_posted` |
-| `approved` | `transferring` | G-TRANSFER-QUEUED | `payout.transfer_queued`, `payout.transfer_sent` |
-| `transferring` | `settled` | G-SETTLEMENT-CONFIRMED | `payout.settled`, `payout.win_days_reset`, `payout.floor_recomputed`, `ledger.transaction_posted` |
-| `transferring` | `failed` | G-TRANSFER-EXHAUSTED | `payout.transfer_failed`, `ledger.transaction_posted` (reversal) |
+| `approved` | `settled` | **none.** The internal leg is one transaction ([ADR-019](../DECISIONS.md), [M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states | `payout.settled`, `payout.win_days_reset`, `payout.floor_recomputed`, `ledger.transaction_posted` |
 | `approved` | `frozen` | G-FREEZE-DURING-FLIGHT | `identity.payouts_frozen`, `payout.blocked` |
-| `frozen` | `transferring` | G-FREEZE-CLEARED | `identity.payouts_unfrozen` |
+| `frozen` | `settled` | G-FREEZE-CLEARED | `identity.payouts_unfrozen` |
 | `frozen` | `failed` | G-FREEZE-ENFORCED | `enforcement.applied`, `payout.transfer_failed` |
 
-**The 2 to 3 day settlement window is the only investigation hook**, and it is used exclusively for freezes opened before or during flight on evidence, never as a routine review step. Win-day reset and floor recompute happen on **settlement**, not on approval, so a failed transfer does not cost the trader their progress.
+**Win-day reset and floor recompute happen on settlement**, which under the wallet is the same transaction as approval, so there is no window in which a trader's progress is spent against a payout that has not landed.
+
+**The 2 to 3 day settlement window is no longer this machine's investigation hook and the hook is not lost, it moved.** It describes the rail, which is the external leg, and the internal leg has no window at all: a freeze opened after wallet credit is halted on `wallet_withdrawals` under [ADR-040](../DECISIONS.md), and a flag standing at request time holds the request **before** approval rather than during a flight that no longer exists. Freezes remain evidence-backed and are never a routine review step.
 
 ## 3. Payout transfer (sub-machine)
 

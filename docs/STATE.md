@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->38<!--/gen--> ADRs. <!--gen:ec_count-->141<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](DECISIONS.md) exists to end.
+**<!--gen:adr_count-->42<!--/gen--> ADRs. <!--gen:ec_count-->141<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](DECISIONS.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -209,7 +209,7 @@ Nothing.
 
 **The Rithmic revocation leg is marked PROVISIONAL, and the honest form is an asymmetry: suspension is always available and restoration is contingent on `V-M2-15`.** With neither an acknowledgement artifact nor a readable risk setting, a restored account cannot be confirmed, and INV-M2-13 means an unconfirmed account does not trade.
 
-**Four open questions for the founder**, none blocking the fold: the `suspended` versus `restricted` ruling, whether the 48 hour SLA also replaces the freeze's unruled 10 business days (as it stands Merit binds itself harder where nothing has moved than where the money is already owed), M15's partial versus full launch scope, and the fourth unsuppressible alarm.
+~~**Four open questions for the founder**~~ **ALL FOUR RULED 2026-08-15**, recorded in [ADR-040](DECISIONS.md) and [ADR-041](DECISIONS.md). **OQ-F2-01: `restricted`**, no new enum value. **OQ-F2-02: OQ-M5-02 closes at 48 hours**, matching the hold, because the investigate-time justification is identical in both cases and the post-credit case holds money Merit has already recognised as owed. **OQ-F2-03: M15 partial, +3 to 5 days, P8**, on `INV-M15-06`. **OQ-F2-04: accepted, the list moves from three to four.**
 
 ---
 
@@ -223,11 +223,11 @@ Nothing.
 
 | Finding | State |
 |---|---|
-| **`is_holiday` is unwritable as designed.** `session_open_at` and `session_close_at` are `NOT NULL` under `CHECK (close > open)`, so a holiday row must carry a **fabricated** session interval while the CHECK immediately beside it says "a holiday has no session to contain fills in" | **OPEN, a founder ruling.** Recommended: supersede `0004`, make the columns nullable under `CHECK (is_holiday = (session_open_at IS NULL))`. A holiday becomes a positive fact rather than an absence |
-| **Coverage has no storage, so an exhausted calendar is indistinguishable from an unbroken holiday.** No row means not a trading day, so every counter quietly stops advancing, nothing breaches, nothing becomes eligible and **nothing raises** | **OPEN.** Recommended: a `trading_calendar_loads` fact, and the batch **fails closed** on a day outside coverage. Needed under either reading of the row above |
-| **A corrected row leaves no prior image**, so `INV-04`'s replay cannot distinguish a calendar correction from an engine regression and the nightly self-audit would page with no way to tell | **OPEN.** Recommended: an append-only revisions table. Git records what the **file** said and cannot prove what the **database** held when the mark was computed |
-| **One `session_close_at` cannot serve six symbols.** `contract_specs` lists ES, MES, NQ, MNQ, CL and GC across CME, NYMEX and COMEX, whose early closes differ by product group, and the calendar has no symbol dimension | **OPEN.** Recommended: the **latest** close, because R-01 is containment and the latest close is the one that cannot orphan a fill. The symbol dimension is rejected: it changes R-01's contract |
-| **FOLD-02 section 2 says its allocation rows "are written in the same commit as this fold's" and they are not in [DECISIONS](DECISIONS.md).** On the branch carrying **both** fold plans, the migration table still reads "Nothing is reserved today and `0029` is the next free number" and the ADR table still ends at 036 | **A hard prerequisite for S-E**, which cannot claim `0032` over a hole. **No gate can catch it**: no heading and no file exists for those numbers, so gaplessness holds vacuously and eleven of eleven pass. A hand-maintained claim about the registry that exists to end hand-maintained claims |
+| **`is_holiday` is unwritable as designed.** `session_open_at` and `session_close_at` are `NOT NULL` under `CHECK (close > open)`, so a holiday row must carry a **fabricated** session interval while the CHECK immediately beside it says "a holiday has no session to contain fills in" | **RULED 2026-08-15, F-1 accepted** ([ADR-042](DECISIONS.md)). Supersede `0004`, columns nullable under `CHECK (is_holiday = (session_open_at IS NULL))` with the ordering check made NULL-safe. A holiday becomes a positive fact rather than an absence |
+| **Coverage has no storage, so an exhausted calendar is indistinguishable from an unbroken holiday.** No row means not a trading day, so every counter quietly stops advancing, nothing breaches, nothing becomes eligible and **nothing raises** | **RULED 2026-08-15, F-4 accepted** ([ADR-042](DECISIONS.md)). A `trading_calendar_loads` fact, and the batch **fails closed** on a day outside coverage. Coverage is the current year plus two, with the horizon alarm at six months |
+| **A corrected row leaves no prior image**, so `INV-04`'s replay cannot distinguish a calendar correction from an engine regression and the nightly self-audit would page with no way to tell | **RULED 2026-08-15, F-2 accepted** ([ADR-042](DECISIONS.md)). An append-only revisions table. Git records what the **file** said and cannot prove what the **database** held when the mark was computed |
+| **One `session_close_at` cannot serve six symbols.** `contract_specs` lists ES, MES, NQ, MNQ, CL and GC across CME, NYMEX and COMEX, whose early closes differ by product group, and the calendar has no symbol dimension | **RULED 2026-08-15, F-3 accepted** ([ADR-042](DECISIONS.md)). The **latest** close across the listed groups, per-group times in `notes`, because R-01 is containment and the latest close is the one that cannot orphan a fill. The symbol dimension is rejected: it changes R-01's contract |
+| **FOLD-02 section 2 says its allocation rows "are written in the same commit as this fold's" and they are not in [DECISIONS](DECISIONS.md).** On the branch carrying **both** fold plans, the migration table still reads "Nothing is reserved today and `0029` is the next free number" and the ADR table still ends at 036 | **CLOSED 2026-08-15.** All eight rows written: ADR-039 to ADR-042 and `0029` to `0032`. **The "nothing is reserved" sentence is deleted rather than corrected**, on [ADR-034](DECISIONS.md)'s own remedy, because it was the only thing in the repository asserting it |
 
 **The wall-clock audit the plan was commissioned to run came back clean, and it is a measurement rather than a reassurance.** Across all <!--gen:migration_files-->28<!--/gen--> merged migrations: **zero `::date`, zero `CAST(`, zero `interval` in any case, no `date` column with any default, and every `now()` a `DEFAULT now()` on a `timestamptz`.** **No existing trading-day counter is computed against a wall clock.**
 
@@ -237,11 +237,37 @@ Nothing.
 
 ---
 
+## The registries are honest, and the four ADRs are written (2026-08-15)
+
+**[ADR-039](DECISIONS.md), [ADR-040](DECISIONS.md), [ADR-041](DECISIONS.md) and [ADR-042](DECISIONS.md) exist**, and so do the eight allocation rows the three approved plans each claimed and none had written. **Recording only: no migration, no schema, no module document and no golden scenario was touched.** The three folds may now write against their numbers, and a sibling branch reading `main` can see every claim.
+
+**The correction this session was commissioned to make had already been made, and the staleness had moved.** The brief named the `036` row as still reading `reserved, unmerged` after the pull request that merged it. It does not: `036` was corrected in the fold that landed ADR-037 and ADR-038, and the row records its own repair. **`037` and `038` were the stale ones**, merged by PR #15 and still claiming to be reserved on a branch that no longer exists. That is the **third and fourth** instance of this exact drift, it was found by reading `git log` against the table rather than by reading the table, and **a brief written against that column was wrong about it inside two days.** The remedy is not more care: the State column is prose, no gate can check it, and [ADR-036](DECISIONS.md) already said so.
+
+| What landed | Detail |
+|---|---|
+| **The ADR table** | Rows for **039 to 042**, and `037` and `038` corrected from `reserved, unmerged` to `allocated` |
+| **The migration table** | Rows for **`0029` to `0032`**. **The "nothing is reserved today and `0029` is the next free number" sentence is DELETED rather than corrected**, on [ADR-034](DECISIONS.md)'s own remedy: it was a hand-maintained claim about the registry that exists to end hand-maintained claims, and it was the only thing in the repository asserting it |
+| **A third allocation table** | **`CI-06` gate letters**, claiming `k` (FOLD-01, declared authority), `l` (FOLD-02, every expiry has a sweep) and `m` (S-E, the calendar's own counts). Three folds were claiming from an unregistered namespace at once, and **each plan hand-maintained the other two's letters in its own prose**. It also records that [ADR-036](DECISIONS.md)'s alternatives list names a **rejected** `CI-06k` that is not a reservation, which is the prose-reserves-a-number failure the shared parser was hardened against on the other two tables. **No gate reads this table yet and that is stated rather than implied** |
+
+**Nine founder rulings that existed nowhere in the corpus are now recorded.** The widest three:
+
+| Ruling | Where |
+|---|---|
+| **The cost breaker degrades, it does not stop.** Phone verification is mandatory at registration, so a tripped breaker means **no new customers**: the control protecting revenue becomes a cheap denial-of-service on it. **Fail-closed protects money on provisioning and destroys it on registration.** On trip, registration continues with verification deferred to a hard gate before first funding, which [ADR-021](DECISIONS.md)'s composite trigger set already makes real, so no new mechanism. **And it trips alarms**: a breaker that degrades silently is one nobody notices is stuck | [ADR-039](DECISIONS.md) |
+| **OQ-M5-02 closes at 48 hours**, matching the hold. The investigate-time justification is identical in both cases, and **the post-credit case holds money Merit has already recognised as owed**. Merit would otherwise have bound itself harder where nothing has moved than where the money is already the trader's | [ADR-040](DECISIONS.md) |
+| **"Business day" is the rail's language. Merit quotes it and never computes it.** [GLOSSARY](GLOSSARY.md) gains the term defined as exactly that; M05's "10 business days" becomes **48 wall-clock hours**; the published "2 to 3 business days" settlement claim is **unchanged**, because it is the rail's claim, quoted. **The 48 hour clocks are wall clock, and the obligation is to RELEASE, not to SETTLE** | [ADR-042](DECISIONS.md) |
+
+**One cross-cutting correction was folded here rather than recorded: [STATE_MACHINES section 2](architecture/STATE_MACHINES.md) still routed `frozen --> transferring`.** [ADR-028](DECISIONS.md) retired `transferring` from `payout_requests` on 2026-08-14 and named two sites it corrected, DATA_MODEL's second stale predicate and M05's machine. **It missed the authoritative drawing**, and the only reason it was found is that a founder read the machine rather than the ADR. **The sweep is still not complete and the remaining four sites are named in ADR-040 rather than left for a grep**: `G-NO-IN-FLIGHT` and `G-FREEZE-DURING-FLIGHT` in section 10, [M01](plans/M01-rules-engine.md)'s `SD-09` and its `hasPayoutInFlight` comment, [EDGE_CASES](EDGE_CASES.md) line 148, and [API_CONTRACT](architecture/API_CONTRACT.md)'s status union. All four are surfaces FOLD-02 must touch anyway to add `held_pending_review`.
+
+**Two `falsify.mjs` seeds were invalidated by the reservations, and one of them failed silently.** Both `CI-06h` scope cases were pinned to the literal `0029`: reserving it made the unallocated case write a file the table now claims, so its finding stopped firing and the harness said so, and made the reserved case insert a **second** row for an already-reserved number, so it passed while asserting nothing and **said nothing at all**. **One went silent and one went vacuous, and only the silent one announced itself.** Both are retargeted to `0033` with the maintenance cost recorded in the file, and all three `CI-06h` cases have been watched firing on their own findings again.
+
+---
+
 ## Next 3 actions
 
 1. **The founder's E2 read** on the <!--gen:e2_files-->18<!--/gen--> money-path migration files, and a ruling on item **B** ([ADR-030](DECISIONS.md)'s stale config list, wrong in two of four). **A** and **C** are closed. Nothing merges first.
 2. **In parallel, the three calendar items**: book the vendor call, book the counsel sitting, and send the PSP applications the day the capital decision lands.
-3. **Write the six missing allocation rows** (ADR-039, 040, 041 and `0029`, `0030`, `0031`), which FOLD-02 records as written and which are not in [DECISIONS](DECISIONS.md). **No fold in flight can claim a number until they exist**, and no gate can see that they do not.
+3. ~~Write the six missing allocation rows.~~ **DONE 2026-08-15.** Eight rows, not six: ADR-039 to ADR-042 and `0029` to `0032`, plus a **third allocation table for `CI-06` letters** claiming `k`, `l` and `m`. **The three folds may now write against their numbers.** Next in each: FOLD-01 session 3 (`0029`, DATA_MODEL, DELTA_MANIFEST), FOLD-02 session 3 (`0030`, `0031`), S-E session 2 (`0032`). **Each is money path and takes a fresh session, no exceptions.**
 4. **Rule `OI-01`** (`liability_snapshots`, surfaced with a recommendation and deliberately not decided by a session), then the rest of **P1** below. **[ADR-035](DECISIONS.md) is accepted and `0028` is written**; it needs the E2 read like every other money-path file, not a separate ruling. **S-B, S-C and S-D have landed and S-E is now planned**, so [P1 section 6](plans/P1-monorepo-scaffold.md) has nothing left to plan and five build sessions to run. This line read "S-C and S-E left" after S-C had already landed, which is the row below correcting it.
 
 ---
