@@ -27,9 +27,24 @@ The Open Decisions Register (constitution section 10) resolves into entries here
 | 001 to 032 | merged to `main` | **allocated.** 026 to 030 are the schema-delta fold; 031 and 032 are the `published_statistics` rulings. **They landed with PR #4 on 2026-08-14**, and their numbers are now cited inside merged migration comments, `DELTA_MANIFEST` and `DATA_MODEL`, which is why they were the ones that did not move |
 | **033** | merged to `main` (PR #5) | **allocated.** The citation-reviewer ADR, renumbered from `031` on that branch under the ruling below |
 | **034** | merged to `main` (PR #6) | **allocated.** The allocation ruling itself, and the COUNT GATE |
-| **035** | `claude/merit-futures-briefing-7auoor`, the PR #7 / PR #8 reconciliation | **reserved, unmerged. ACCEPTED 2026-08-15.** The `plan_versions` immutability-trigger defect, raised on `claude/builder-reviewer-loop-rykvhs` and ruled at the reconciliation that folded both branches into one. **The fix is `0028` and the structural fix is `CI-06j`** |
+| **035** | merged to `main` (PR #9) | **allocated.** The `plan_versions` immutability-trigger defect, ruled at the PR #7 / PR #8 reconciliation. **The fix is `0028`, which merged with it, and the structural fix is `CI-06j`.** This row said `reserved, unmerged` until 2026-08-15, four commits after the merge that made it false |
+| **036** | `claude/builder-reviewer-loop-rykvhs`, session S-A | **reserved, unmerged.** The migration number allocation table below, and `CI-06h`'s allocation half |
 
 **Gaplessness is asserted over allocated plus reserved**, so a branch holding a reserved number shows a hole in this file and passes. A branch inventing an unreserved number fails.
+
+**The State column is the one part of this table no gate can check**, and the `035` row is the proof: a reservation becomes an allocation at merge, and **a runner reading one ref cannot tell the two apart**, because the branch holding a reservation and the `main` that has absorbed it both show the heading present and the row claimed. `CI-06f` reads the Numbers column, which is the load-bearing half. The State column is prose for a reader, it drifts like all prose, and [ADR-036](#) records that rather than implying the whole row is enforced.
+
+## Migration number allocation, and why there are two tables
+
+**A migration number is claimed here before the file is written.** It is the same race as the one above, on the registry where it is least recoverable. [ADR-034](#) resolved the ADR collision by **renumbering the branch whose number was cited least**, and that remedy does not exist here: a migration is sacred once merged (constitution E2), so a number that has landed cannot be renamed, only superseded. **[ADR-036](#) rules the allocation and [CI-06h](testing/STRATEGY.md) enforces it**, by the same rule as `CI-06f` and against this table.
+
+| Numbers | Claimed by | State |
+|---|---|---|
+| 0001 to 0028 | merged to `main` | **allocated.** `0001` to `0027` are the schema-delta fold (PR #4); **`0028` is [ADR-035](#)'s superseding migration and it is written, merged and on `main`** as of PR #9, not reserved. `0025` is the marked reserved sequence, three tables created and unused at launch, which reserves *tables* and is an ordinary allocation of a *number* |
+
+**Nothing is reserved today and `0029` is the next free number.** A session that needs one adds its row here in the same commit that creates the file, and the row is what a sibling branch reads.
+
+**The same two-ref limit applies.** This table makes a collision visible to the second branch **that reads `main`**; it cannot stop a branch that never looks. The cross-branch assertion, that a pull request may not claim a number already on `main`, needs a job that can see both refs and belongs with `CI-06f`'s identical gap.
 
 ---
 
@@ -1124,3 +1139,37 @@ round_trips_closed_has_exit                -> EMPTY ARRAY PASSED THE CHECK
 ```
 
 **The gate that would have caught it now exists, and it has been watched failing.** [`scripts/corpus/falsify.mjs`](../scripts/corpus/falsify.mjs) runs every gate against the tree, where it must pass, and against a copy carrying one seeded violation aimed at it, where it must fail **on that finding** rather than merely exit non-zero. All eleven do both.
+
+---
+
+## ADR-036: Migration numbers are allocated, not guessed, and the allocation gate lives where the number set already lives  (2026-08-15, status: proposed)
+
+- **Context:** [ADR-034](#) ended the ADR-number race with an allocation table and `CI-06f`. **It left the second sequence in this repository unprotected.** Migration numbers have no allocation table. [CI-06h](testing/STRATEGY.md) asserts that the filenames are unique and gapless, but it derives the set **from the tree**, so it can only see the numbers a branch has in hand. Two branches forking from the same `main` both run `ls packages/db/migrations`, both find `0028`, and both write `0029`. Each passes `CI-06h` locally. **The collision surfaces at merge**, in a directory, as two files claiming one position in an ordered set.
+
+  **The remedy ADR-034 used is not available here, and that is the whole reason this is its own ADR rather than a footnote to it.** ADR-034 resolved PR #4 against PR #5 by renumbering the branch whose number was cited least: PR #5's `031` became `033` for the cost of a `sed`, because a migration comment, `DELTA_MANIFEST` and `DATA_MODEL` already cited PR #4's numbers and **a migration is sacred once merged** (constitution E2). Turn that reasoning on the migrations themselves and it has no exit. A merged migration number is in a filename, in `DELTA_MANIFEST`'s sequence, in `STATE`, in ADRs, in other migrations' header comments, and in the install order every replay depends on. **It cannot be renamed, only superseded.** The registry that can least afford a collision is the one with no table.
+
+  **The registry has had one writer so far, and that is the only reason it has not collided.** The ADR registry collided the first time two branches were open against it at once. The build phase opens branches per module by design (constitution C7), and [P1 section 6](plans/P1-monorepo-scaffold.md) already schedules `S-E`, TradingCalendar, as a session that writes migrations while other sessions run.
+
+  **A hand-maintained fact about this sequence was wrong in the brief that commissioned this ADR**, which is the evidence rather than an aside. The brief stated `0001-0027` allocated and `0028` **reserved and not yet written**. `0028_supersede_plan_version_immutability.sql` is written, committed and on `main`, merged in PR #9 with [ADR-035](#); `git ls-tree origin/main packages/db/migrations/` lists 28 files. **Eleventh hand-maintained count found wrong in this corpus, and the first one inside an instruction to build the gate against that class.** The `035` row of the table above was stale in the same way, four commits after the merge that falsified it.
+
+- **Decision:** three parts, and the third is the one that is not obvious.
+
+  1. **A second allocation table in [this file](#migration-number-allocation-and-why-there-are-two-tables), beside the ADR one.** One mechanism, one place to look. Claiming a migration number is a step in writing a migration, exactly as ADR-034 made it a step in writing an ADR.
+  2. **The assertion is `CI-06f`'s, verbatim: gapless over allocated PLUS reserved.** A hole matching a reservation passes, because a branch cannot see its siblings' files. A number on disk that no row claims fails.
+  3. **It extends `CI-06h` rather than arriving as a sibling gate, and this was decided on evidence rather than on tidiness.** See below.
+
+- **Why not a sibling gate, which is what the question asked for:** `CI-06h` **already computes the migration number set** and already asserts gaplessness over it. Add `CI-06k` beside it and the reservation semantics do not partition: a number reserved by an open branch has **no file on disk**, so `CI-06h`'s existing gap check fails on the exact hole `CI-06k` was written to permit. `CI-06h` has to become allocation-aware whether or not a sibling exists, and once it is, the sibling is a second expression of one concept. **That is [OQ-P1-04](plans/P1-monorepo-scaffold.md)'s defect reproduced deliberately, in the same session week it was ruled**, in the runner it was ruled about. The two gates would have agreed for exactly as long as nothing was ever reserved.
+
+  **One parser, not two, for the same reason.** `CI-06f` had its own inline scan of the allocation section and `CI-06h` would have needed one. Both now call `allocated(body, heading)`. The old scan read every three-digit numeral **in the section's prose**, not just the table, so a stray `031` in a sentence silently reserved 31; the shared parser reads the first cell of table rows only. **That is a strengthening, and it is the direction that matters**: a number reserved by accident is a hole the gate stops reporting.
+
+- **Alternatives considered:**
+  - **`CI-06k`, a sibling of `CI-06f`.** Rejected on the reasoning above: it cannot own the reservation semantics without `CI-06h` also owning them.
+  - **Extend `CI-06f` to cover both registries.** Rejected: `CI-06f`'s other assertions are about `DECISIONS.md` headings and `CI-06h`'s are about filenames, duplicate numbers and the install job's wiring. Splitting the migration number set across two gates is the same defect facing the other way.
+  - **Timestamp-prefixed migration names** (`20260815143000_...`), the standard framework answer, which is collision-free with no table at all. **Rejected on three specifics rather than on taste**: it renames nothing already merged, because E2 forbids that, so the tree would carry two naming schemes forever; roughly forty citations of `0027` and `0028` across the corpus, inside merged migration comments, would keep pointing at the old scheme; and it trades a readable ordinal that people say out loud for an opaque key, which is the trade ADR-034 already rejected for ADRs. **It is the right answer for a repository that adopts it on day one and the wrong answer for this one on day 29.**
+  - **Derive the reservations from open pull requests** instead of a table. Rejected: it needs a GitHub token and a network call inside a runner whose entire design is that it has no dependencies and no install step. **A gate that stops running when a token expires is not a gate**, and it fails in the silent direction.
+  - **Allocate at merge.** Rejected for ADR-034's reason, which is stronger here: the number is in the filename from the moment the file exists, and every citation written on the branch would have to be rewritten at merge, in files that become uneditable at that same moment.
+  - **Leave it to `CI-06h`'s existing tree-derived check.** Rejected: that check is why the collision is invisible until merge. It is not wrong, it is blind by construction, and no amount of care on one branch can see another branch's files.
+
+- **Consequences:** [STRATEGY section 4.4](testing/STRATEGY.md)'s `CI-06h` row is amended to carry the allocation half, and its stated coverage gap gains the cross-branch limitation `CI-06f` already declares. **The runner still holds eleven checks**, which is the extension rather than the sibling showing up in the count. `falsify.mjs` gains two scope cases, one per direction: a reserved hole must **pass**, an unallocated number on disk must **fail**. The next free migration number is `0029`, and it is stated in the table rather than derived by a reader from a directory listing.
+
+  **What this does not do, stated rather than implied.** It cannot stop a branch that never reads `main`, and it cannot verify the State column. Both are the two-ref problem `CI-06f` declares and neither is closed here.

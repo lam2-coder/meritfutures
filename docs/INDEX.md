@@ -10,7 +10,7 @@ last_updated: 2026-08-15
 
 **Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](DECISIONS.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
 
-**<!--gen:adr_count-->35<!--/gen--> ADRs. <!--gen:ec_count-->140<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](DECISIONS.md)).
+**<!--gen:adr_count-->36<!--/gen--> ADRs. <!--gen:ec_count-->140<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](DECISIONS.md)).
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
@@ -37,7 +37,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [STATE.md](STATE.md) | One screen: wave, gate, done / in-flight / blocked, next actions | approved | claude |
 | [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | approved | claude |
 | [GUIDE_BRIEFING.md](GUIDE_BRIEFING.md) | Orientation for the founder's strategy-desk chat: role boundaries, the gate loop, current state, the session queue | approved | founder |
-| [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives, the **number allocation table** ([ADR-034](DECISIONS.md), [CI-06f](testing/STRATEGY.md)), and the gate-closure records. Counts live in the file, not in this row | approved | founder |
+| [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives, the **two number allocation tables** (ADR numbers, [ADR-034](DECISIONS.md) and [CI-06f](testing/STRATEGY.md); migration numbers, [ADR-036](DECISIONS.md) and [CI-06h](testing/STRATEGY.md)), and the gate-closure records. Counts live in the file, not in this row | approved | founder |
 | [EDGE_CASES.md](EDGE_CASES.md) | Living registry, **140 entries**. EC-001 to EC-050 approved with M01; EC-051+ carry their module's status | approved | founder |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | approved | founder |
 | [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **New.** Constitution section 8 re-planned: 18 weeks, the launch-blocking triage across M11 to M20, the pre-FREEZE queue, and the one trade actually available | approved | founder |
@@ -102,7 +102,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 ## docs/testing/ (Wave 4)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
-| [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 now runs**: CI-06a to CI-06j plus [ADR-026](DECISIONS.md)'s manifest gate, all eleven passing clean and failing dirty under `falsify.mjs`. CI-06f and CI-06g are [ADR-034](DECISIONS.md)'s; CI-06j is [ADR-035](DECISIONS.md)'s | approved | founder |
+| [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 now runs**: CI-06a to CI-06j plus [ADR-026](DECISIONS.md)'s manifest gate, all eleven passing clean and failing dirty under `falsify.mjs`. CI-06f and CI-06g are [ADR-034](DECISIONS.md)'s; CI-06j is [ADR-035](DECISIONS.md)'s; **CI-06h's allocation half is [ADR-036](DECISIONS.md)'s** | approved | founder |
 | [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | **Consolidated. 257 scenarios**, contiguous, deduplicated, with an ownership partition, the reconciliation from 242, and the coverage map | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | **Written.** Port spec, ten population parameters, eleven calibration bands, eight outputs, and the `mc_lifecycle.py` checklist | approved | founder |
 
