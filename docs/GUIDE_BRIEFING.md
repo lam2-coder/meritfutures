@@ -137,7 +137,7 @@ Roughly, and in dependency order. Each is one Claude Code session unless noted.
 | [INDEX.md](INDEX.md) | Every document, one line each, with status and owner. **If a thing is not in INDEX, it does not exist** |
 | [DECISIONS.md](decisions/README.md) | Every ADR with rationale and alternatives, plus the gate-closure tables. The record of why anything is the way it is |
 | [MERIT_BUILD_MASTER_PROMPT.md](../MERIT_BUILD_MASTER_PROMPT.md) | The constitution. Read-only; amendments are ADRs |
-| [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal. **The landmines sections are the highest-value paragraphs in the corpus** for a reviewer, because they record what nearly went wrong |
+| [SESSION_LOG.md](sessions/README.md) | Append-only handoff journal. **The landmines sections are the highest-value paragraphs in the corpus** for a reviewer, because they record what nearly went wrong |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once. Canonical field names and comparison operators live here |
 | [research/calibration/README.md](../research/calibration/README.md) | The economic model: the risk engine's correlation table, the reserve rule, and the derived selection math |
 

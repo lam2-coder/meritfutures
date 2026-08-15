@@ -139,13 +139,13 @@ The ruling named nine documents. **The corpus's own gates force twenty-one, and 
 | [DATA_MODEL](../architecture/data-model/README.md) | **CI-06i, both directions.** Three new `### <table>` sections plus amended columns on five existing tables. A new table with no design record fails the gate |
 | [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md) | **[ADR-026](../decisions/ADR-026.md)'s completeness gate.** Every new delta appears exactly once with a disposition and takes its number here, the sequence table gains `0029`, and `manifest_changes` regenerates |
 | [EDGE_CASES](../edge-cases/README.md) | **CI-06e.** New entries continue from the registry's maximum, each naming a golden scenario that resolves |
-| [GOLDEN_SCENARIOS](../testing/GOLDEN_SCENARIOS.md) | **CI-06d.** New scenarios continue from the registry's maximum in a new section, one per (a) to (e) plus amendments 2 and 3 plus the authority boundary. **Eight minimum** |
+| [GOLDEN_SCENARIOS](../testing/golden-scenarios/README.md) | **CI-06d.** New scenarios continue from the registry's maximum in a new section, one per (a) to (e) plus amendments 2 and 3 plus the authority boundary. **Eight minimum** |
 | [STRATEGY](../testing/STRATEGY.md) | The new suites, and the gate in section 7 |
 | [API_CONTRACT](../architecture/API_CONTRACT.md) | The auth surface moves: `POST /auth/otp` gains a channel, phone verification and change endpoints are new, section 11's rate-limit table gains rows, and **section 12's negative-authz matrix gains a required-factor column.** No gate catches its absence, which is exactly why it is named here |
 | [EVENTS](../architecture/EVENTS.md) | `phone.verified`, `phone.change_requested`, `phone.reassignment_detected`, `sms.budget_breaker_tripped`. M16 and M7 both consume them |
 | [STATE_MACHINES](../architecture/STATE_MACHINES.md) | The phone-change machine that section 4's request table stores |
 | [INDEX](../INDEX.md) | **CI-06c and CI-06g** |
-| [STATE](../STATE.md), [SESSION_LOG](../SESSION_LOG.md) | The end ritual |
+| [STATE](../STATE.md), [SESSION_LOG](../sessions/README.md) | The end ritual |
 
 ---
 

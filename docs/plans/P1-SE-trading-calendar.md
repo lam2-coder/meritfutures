@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../decisions/README.md, ../GLOSSARY.md, ../STATE.md, ../edge-cases/README.md, ../architecture/data-model/README.md, ../architecture/INFRA.md, ../testing/STRATEGY.md, ../testing/GOLDEN_SCENARIOS.md, ../ops/runbooks/CRON_INVENTORY.md, P1-monorepo-scaffold.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, M12-statistic-definitions.md, FOLD-01-phone-identity.md, FOLD-02-enforcement-window-and-suspension.md, ../../packages/db/DELTA_MANIFEST.md]
+depends_on: [../decisions/README.md, ../GLOSSARY.md, ../STATE.md, ../edge-cases/README.md, ../architecture/data-model/README.md, ../architecture/INFRA.md, ../testing/STRATEGY.md, ../testing/golden-scenarios/README.md, ../ops/runbooks/CRON_INVENTORY.md, P1-monorepo-scaffold.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, M12-statistic-definitions.md, FOLD-01-phone-identity.md, FOLD-02-enforcement-window-and-suspension.md, ../../packages/db/DELTA_MANIFEST.md]
 last_updated: 2026-08-15
 ---
 

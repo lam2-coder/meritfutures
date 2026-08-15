@@ -25,7 +25,7 @@ Both hooks report failure loudly and exit zero rather than blocking, so a networ
 
 ## Start ritual (every session, no exceptions)
 1. **Pull first.** `git pull --ff-only` (the SessionStart hook does this; verify it ran).
-2. Read this file, then [docs/STATE.md](docs/STATE.md), then the tail (last 2 entries) of [docs/SESSION_LOG.md](docs/SESSION_LOG.md), then the active module plan if any.
+2. Read this file, then [docs/STATE.md](docs/STATE.md), then the tail (last 2 files) of [docs/sessions/](docs/sessions/README.md), then the active module plan if any.
 3. State back the session objective in one sentence; get confirmation.
 4. One objective per session.
 

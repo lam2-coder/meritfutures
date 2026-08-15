@@ -1,6 +1,6 @@
 # M1 gate closure (2026-08-13)
 
-The founder took [M01-rules-engine.md](../../plans/M01-rules-engine.md) for external review and returned rulings on all eleven open questions. The gate is **closed**. [M01](../../plans/M01-rules-engine.md), [GOLDEN_SCENARIOS](../../testing/GOLDEN_SCENARIOS.md), and [EDGE_CASES](../../edge-cases/README.md) move to `approved`. ADR-013, ADR-014, and ADR-015 above carry the three rulings that chose between alternatives or amended the constitution; the table records the rest.
+The founder took [M01-rules-engine.md](../../plans/M01-rules-engine.md) for external review and returned rulings on all eleven open questions. The gate is **closed**. [M01](../../plans/M01-rules-engine.md), [GOLDEN_SCENARIOS](../../testing/golden-scenarios/README.md), and [EDGE_CASES](../../edge-cases/README.md) move to `approved`. ADR-013, ADR-014, and ADR-015 above carry the three rulings that chose between alternatives or amended the constitution; the table records the rest.
 
 | OQ | Question | Ruling |
 |---|---|---|

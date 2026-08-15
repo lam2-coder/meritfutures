@@ -1,0 +1,13 @@
+## 16. GS-142 to GS-148: marketing site (M9)
+
+Defined by [M09](../../plans/M09-marketing-site.md) section 8.2. Every scenario here tests the boundary between a published sentence and an executed configuration, which is the only failure class this module owns.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-142 | A plan version publishes and revalidation fails | The new version does **not** become purchasable, the previous version keeps selling, and the failure pages. Asserts that the cure for a stale price page is publish ordering rather than a shorter cache lifetime, and that the failure direction costs Merit a delay rather than costing a trader a surprise. AS-M9-01, extends GS-041 (B4 #12) |
+| GS-143 | MDX content containing a bare parameter value | The build **fails**. The same sentence written with `<PlanValue>` builds and renders the live configured value. Asserts that the marketing-versus-implementation gap is closed by a compiler rather than by a copy reviewer, because prose decays and configuration moves. AS-M9-02, EC-083 |
+| GS-144 | A published statistic rendered without its trailing window | The build **fails**, including on the OG image path, which is where screenshots actually originate. Asserts that a transparency number and the window it was computed over are one indivisible unit. AS-M9-03 |
+| GS-145 | A restricted-country visitor, with and without a VPN | The notice renders and the call to action is suppressed on the direct visit; checkout refuses server side in **both** cases. Asserts the site notice is disclosure and the control is elsewhere, and that the VPN case is an expected outcome rather than a bypass. AS-M9-04, EC-084 |
+| GS-146 | A `copy_block` whose wording contradicts its rule's operator | Publish validation **fails**: "more than" against a `>=` comparison never reaches a page. Asserts that the plain-English explainer is versioned with the rule it explains, so the forensic reader finds no seam between the sentence and the operator. AS-M9-05 |
+| GS-147 | Payout copy with one leg omitted | The lint fails on a headline, a social card, an email subject, and an OG image alike. Asserts that same-day wallet credit and the 2 to 3 business day external withdrawal are always stated together at equal weight, because a true sentence that manufactures the perception of a late cycle is the failure constitution 0 names as fatal. AS-M9-06 |
+| GS-148 | A superseded plan version's public URL | Resolves forever, is labeled superseded, names its successor, and is excluded from indexing and from every navigational path. Asserts that a rules page cited inside an evidence pack cannot 404 and cannot silently become a different document at the same address. AS-M9-07, EC-085 |

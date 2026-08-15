@@ -115,6 +115,35 @@ const REGISTRIES = {
     self: /^\**\s*`?(docs\/)?(architecture\/)?DATA_MODEL(\.md)?`?(\s+sections?\b.*)?\s*\**$/,
     named: {},
   },
+  sessions: {
+    from: 'docs',
+    map: 'docs/sessions/.map.json',
+    dir: 'docs/sessions/',
+    readme: 'docs/sessions/README.md',
+    target: /((?:\.\.\/)*(?:docs\/)?SESSION_LOG\.md)/,
+    id: /\b(Session\s+\d+)\b/,
+    sub: null,
+    self: /^\**\s*`?(docs\/)?SESSION_LOG(\.md)?`?\s*\**$/,
+    named: {},
+  },
+  golden: {
+    from: 'docs/testing',
+    map: 'docs/testing/golden-scenarios/.map.json',
+    dir: 'docs/testing/golden-scenarios/',
+    readme: 'docs/testing/golden-scenarios/README.md',
+    target: /((?:\.\.\/)*(?:docs\/)?(?:testing\/)?GOLDEN_SCENARIOS\.md)/,
+    // A GS-nnn in link text resolves to the SECTION FILE that defines it. The
+    // splitter builds that mapping, so per-section filing costs no resolution.
+    id: /\b(GS-\d{3})\b/,
+    sub: null,
+    // `GOLDEN_SCENARIOS section 2` is a numbered section, and under ADR-043 a
+    // section IS the unit here, so these could resolve to a section file. They
+    // point at the README instead and the reason is the ruling: the numbering map
+    // and the fixture format (sections 1 to 3) are the README's own prose, which
+    // is what every one of these links is citing.
+    self: /^\**\s*`?(docs\/)?(testing\/)?GOLDEN_SCENARIOS(\.md)?`?(\s+sections?\b.*)?\s*\**$/,
+    named: {},
+  },
   'edge-cases': {
     from: 'docs',
     map: 'docs/edge-cases/.map.json',

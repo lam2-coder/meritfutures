@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [../plans/M01-rules-engine.md, ../testing/GOLDEN_SCENARIOS.md, ../GLOSSARY.md, ../decisions/README.md]
+depends_on: [../plans/M01-rules-engine.md, ../testing/golden-scenarios/README.md, ../GLOSSARY.md, ../decisions/README.md]
 last_updated: 2026-08-15
 ---
 
 # EDGE CASES (living registry)
 
-Every discovered edge case and (post-FREEZE) every bug becomes a numbered entry here plus a golden file in [docs/testing/GOLDEN_SCENARIOS.md](../testing/GOLDEN_SCENARIOS.md). Never delete entries; supersede them. Entry format:
+Every discovered edge case and (post-FREEZE) every bug becomes a numbered entry here plus a golden file in [docs/testing/GOLDEN_SCENARIOS.md](../testing/golden-scenarios/README.md). Never delete entries; supersede them. Entry format:
 
 ```
 ## EC-NNN: <one-line name>  (YYYY-MM-DD, module: Mx, status: open | specced | tested)

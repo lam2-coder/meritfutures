@@ -211,7 +211,41 @@ const REGISTRIES = [
     // than by name: a record is `<snake_case>.md`.
     entry: (f) => /^docs\/architecture\/data-model\/[a-z][a-z0-9_]*\.md$/.test(f),
   },
+  {
+    id: 'sessions',
+    dir: 'docs/sessions',
+    readme: 'docs/sessions/README.md',
+    entry: (f) => /^docs\/sessions\/\d{4}-\d{2}-\d{2}-session-\d{2}\.md$/.test(f),
+  },
+  {
+    id: 'golden-scenarios',
+    dir: 'docs/testing/golden-scenarios',
+    readme: 'docs/testing/golden-scenarios/README.md',
+    // Per SECTION, not per entry (ADR-043): 257 identifiers live as 301 table
+    // rows, and a row is not a document.
+    entry: (f) => /^docs\/testing\/golden-scenarios\/\d{2}-[a-z0-9-]+\.md$/.test(f),
+  },
 ];
+
+// -----------------------------------------------------------------------------
+// The golden-scenario registry, read from the directory (ADR-043 stage 5)
+// -----------------------------------------------------------------------------
+// Same rule-2 guard as the other directory readers: a glob matching nothing
+// returns an empty array rather than throwing, and CI-06d and CI-06e both derive
+// their GS set from this, so an empty read would make every citation resolve
+// against nothing and report a clean corpus.
+function goldenBody() {
+  const dir = 'docs/testing/golden-scenarios';
+  if (!existsSync(join(ROOT, dir))) {
+    throw new Error(`${dir} does not exist; the golden-scenario registry has moved or is gone`);
+  }
+  const files = readdirSync(join(ROOT, dir))
+    .filter((f) => /^\d{2}-.*\.md$/.test(f))
+    .sort()
+    .map((f) => join(dir, f));
+  if (files.length === 0) throw new Error(`no GS section files in ${dir}; the gate cannot run`);
+  return files.map((f) => read(f)).join('\n');
+}
 
 // -----------------------------------------------------------------------------
 // The edge-case registry, read from the directory (ADR-043 stage 2)
@@ -496,7 +530,7 @@ const ci06d = {
     'each registry runs 1..n with no holes and no duplicates.',
   run() {
     const findings = [];
-    const gsBody = read('docs/testing/GOLDEN_SCENARIOS.md');
+    const gsBody = goldenBody();
     const ecBody = edgeCaseBody();
     const defined = (body, re) => new Set([...body.matchAll(re)].map((m) => m[1]));
     // A definition is an identifier at the start of a registry row or heading.
@@ -536,9 +570,7 @@ const ci06e = {
     const findings = [];
     const ecBody = edgeCaseBody();
     const gs = new Set(
-      [...read('docs/testing/GOLDEN_SCENARIOS.md').matchAll(/^[|#\s]*\**\s*(GS-\d{3})\b/gm)].map(
-        (m) => m[1],
-      ),
+      [...goldenBody().matchAll(/^[|#\s]*\**\s*(GS-\d{3})\b/gm)].map((m) => m[1]),
     );
     // THE REGISTRY HAS TWO DEFINITION FORMS AND BOTH ARE VALID.
     //   block form: `## EC-nnn: <name>` with a `- Golden scenario ref:` field
@@ -659,10 +691,7 @@ const SPAN_QUERIES = {
   // gives 119 against the registry's 140. This is the exact trap STRATEGY names
   // when it says counting rows gives 22 and counting identifiers gives 140.
   ec_count: () => new Set([...edgeCaseBody().matchAll(/\b(EC-\d{3})\b/g)].map((m) => m[1])).size,
-  gs_count: () =>
-    new Set(
-      [...read('docs/testing/GOLDEN_SCENARIOS.md').matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1]),
-    ).size,
+  gs_count: () => new Set([...goldenBody().matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1])).size,
   migration_files: () =>
     readdirSync(join(ROOT, 'packages/db/migrations')).filter((f) => extname(f) === '.sql').length,
   tables: () => tablesInMigrations().length,

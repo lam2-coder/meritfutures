@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -14,7 +14,7 @@ This document exists to be implemented from, not interpreted from. The bar it is
 
 Every term is defined in [GLOSSARY.md](../GLOSSARY.md) and is never redefined here. Every comparison operator below is binding, is mirrored verbatim in the plan version's `copy_blocks`, and is pinned by a golden file.
 
-**Identifier conventions used throughout:** `R-nn` rules, `INV-nn` invariants, `SD-nn` schema deltas, `CV-nn` config validation rules, `DO-n` day-order steps, `FM-nn` failure modes, `AS-nn` adversarial scenarios, `OQ-nn` open questions, `D-Mx-n` dependencies on another module. `EC-nnn` and `GS-nnn` refer to [EDGE_CASES.md](../edge-cases/README.md) and [GOLDEN_SCENARIOS.md](../testing/GOLDEN_SCENARIOS.md).
+**Identifier conventions used throughout:** `R-nn` rules, `INV-nn` invariants, `SD-nn` schema deltas, `CV-nn` config validation rules, `DO-n` day-order steps, `FM-nn` failure modes, `AS-nn` adversarial scenarios, `OQ-nn` open questions, `D-Mx-n` dependencies on another module. `EC-nnn` and `GS-nnn` refer to [EDGE_CASES.md](../edge-cases/README.md) and [GOLDEN_SCENARIOS.md](../testing/golden-scenarios/README.md).
 
 ---
 

@@ -35,7 +35,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 |---|---|---|---|
 | [INDEX.md](INDEX.md) | This map | approved | claude |
 | [STATE.md](STATE.md) | One screen: wave, gate, done / in-flight / blocked, next actions | approved | claude |
-| [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | approved | claude |
+| [sessions/](sessions/README.md) | Append-only handoff journal (C3 ritual), one file per session since [ADR-043](decisions/ADR-043.md). Entry files are fragments indexed by that README under `CI-06n` | approved | claude |
 | [GUIDE_BRIEFING.md](GUIDE_BRIEFING.md) | Orientation for the founder's strategy-desk chat: role boundaries, the gate loop, current state, the session queue | approved | founder |
 | [decisions/](decisions/README.md) | The ADR registry, one file per entry since [ADR-043](decisions/ADR-043.md). Every choice with rationale and alternatives, plus the five gate-closure records in [gates/](decisions/gates/). Entry files are fragments rather than corpus documents and are indexed by that README under `CI-06n`, not by this row | approved | founder |
 | [decisions/ALLOCATION.md](decisions/ALLOCATION.md) | The **three number allocation tables** (ADR numbers, [ADR-034](decisions/ADR-034.md) and [CI-06f](testing/STRATEGY.md); migration numbers, [ADR-036](decisions/ADR-036.md) and [CI-06h](testing/STRATEGY.md); CI gate letters, no gate yet). Kept in one file because each is read as a table. Counts live in the file, not in this row | approved | founder |
@@ -107,7 +107,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 now runs**: CI-06a to CI-06j plus [ADR-026](decisions/ADR-026.md)'s manifest gate, all eleven passing clean and failing dirty under `falsify.mjs`. CI-06f and CI-06g are [ADR-034](decisions/ADR-034.md)'s; CI-06j is [ADR-035](decisions/ADR-035.md)'s; **CI-06h's allocation half is [ADR-036](decisions/ADR-036.md)'s** | approved | founder |
-| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | **Consolidated. 257 scenarios**, contiguous, deduplicated, with an ownership partition, the reconciliation from 242, and the coverage map | approved | founder |
+| [testing/golden-scenarios/](testing/golden-scenarios/README.md) | **Consolidated, <!--gen:gs_count-->257<!--/gen--> scenarios**, contiguous, deduplicated, with an ownership partition, the reconciliation from 242, and the coverage map. One file per SECTION since [ADR-043](decisions/ADR-043.md): 257 identifiers live as 301 table rows, and a row is not a document | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | **Written.** Port spec, ten population parameters, eleven calibration bands, eight outputs, and the `mc_lifecycle.py` checklist | approved | founder |
 
 ## docs/ops/runbooks/ (Wave 4)

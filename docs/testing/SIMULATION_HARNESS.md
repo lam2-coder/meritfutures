@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../../research/calibration/README.md, ../plans/M01-rules-engine.md, ../decisions/README.md, ../plans/M05-payout-system.md, ../plans/M06-admin-ops-console.md, ../plans/M07-risk-abuse.md, STRATEGY.md, GOLDEN_SCENARIOS.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../../research/calibration/README.md, ../plans/M01-rules-engine.md, ../decisions/README.md, ../plans/M05-payout-system.md, ../plans/M06-admin-ops-console.md, ../plans/M07-risk-abuse.md, STRATEGY.md, golden-scenarios/README.md]
 last_updated: 2026-08-14
 ---
 

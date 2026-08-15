@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [M12-transparency-platform.md, ../decisions/README.md, ../GLOSSARY.md, ../edge-cases/README.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M05-payout-system.md, M09-marketing-site.md, M20-wallet.md]
+depends_on: [M12-transparency-platform.md, ../decisions/README.md, ../GLOSSARY.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M05-payout-system.md, M09-marketing-site.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
 
