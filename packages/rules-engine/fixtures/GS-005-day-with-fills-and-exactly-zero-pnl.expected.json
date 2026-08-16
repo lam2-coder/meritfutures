@@ -1,0 +1,9 @@
+{
+  "end_state": {
+    "traded_days_count": 1,
+    "win_days_count": 0
+  },
+  "events": ["day.closed"],
+  "pins": "fills make a traded day at `> 0` and zero P&L is not a win day at `>= 15,000`, and the two operators are asserted against the same day",
+  "note": "TWO FIELDS BECAUSE THE REGISTRY ROW STATES TWO OPERATORS. Nothing else is pinned: the day moves no floor the scenario is about, and stating the floor here would be pinning a field this scenario does not exist to protect."
+}

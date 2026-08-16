@@ -1,0 +1,12 @@
+{
+  "end_state": {
+    "phase": "eval",
+    "breached": false,
+    "floor_open_cents": 4750000,
+    "floor_cents": 4750000,
+    "balance_cents": 4990000
+  },
+  "events": ["day.closed"],
+  "pins": "a low that touches the floor exactly is not a breach, because R-21's operator is a strict `<`",
+  "note": "`floor_open_cents` is stated as well as `floor_cents` so the expectation says WHICH floor the comparison used, which is what SD-04 added the column for. They are the same number here and that is the point: the day moved neither. The account is still in `eval` and still open, which is the outcome an engine carrying `<=` would not produce."
+}

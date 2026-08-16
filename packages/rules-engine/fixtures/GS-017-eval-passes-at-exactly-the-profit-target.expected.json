@@ -1,0 +1,10 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 5000000,
+    "floor_cents": 4750000
+  },
+  "events": ["rule.floor_locked", "phase.passed", "day.closed"],
+  "pins": "profit exactly at the eval target passes, because R-26's operator is `>=` and not `>`",
+  "note": "THE PASS IS PINNED BY THE RESET IT CAUSES, since `phase` alone would be satisfied by an engine that moved the phase and carried the eval profit with it. The three values are R-31's, and the floor of 4,750,000 is the registry's own number for the reset in the GS-019 row. `floor_locked` is deliberately NOT pinned: this day engages the lock at DO-7 and then R-31 rewrites the floor at DO-8, and no document in the corpus says whether the flag survives an event that moves the floor below the value it locked to. Pinning it would be choosing a reading, which is TR-01 inverted. GS-019 pins the reset in full; this file pins the boundary that reaches it."
+}

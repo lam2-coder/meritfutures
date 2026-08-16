@@ -1,0 +1,51 @@
+# GS-002  Counters advance on a day the trader did not trade
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01,
+# GOLDEN_SCENARIOS section 1). Every number below traces to a document:
+#
+#   "Counters advance only on trading days, and advance whether or not the
+#   trader traded"                                            M01 R-02
+#   traded day is `fill_count > 0`, strict `>`                M01 R-08
+#   "Trading days advance regardless of activity; traded days do not"
+#                                                             GOLDEN_SCENARIOS GS-002 row
+#   50K size            5,000,000c                            M01 Appendix A, sizes line
+#   Core EOD win day floor 15,000c at 50K, 30bp               M01 Appendix A.1
+#
+# TWO DAYS, BECAUSE ONE DAY CANNOT SHOW A CONTRAST. Day one is traded and day
+# two is not, so the end state carries a traded-day count that stopped while the
+# state's own trading day moved on. A single non-traded day would be satisfied
+# by an engine that did nothing at all with the day.
+#
+# THE SECOND DAY IS FLAT ON PURPOSE. No fills means no realized P&L, so high,
+# low, close and open are one number: a non-traded day with an intraday range
+# would be a day with fills. INV-18 holds across the boundary because the
+# opening balance is the prior close and the adjustment is zero.
+id: GS-002
+name: counters advance on a day the trader did not trade
+source: M01 R-02, R-08
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5030000
+    high_balance_cents: 5040000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5030000
+    closing_balance_cents: 5030000
+    high_balance_cents: 5030000
+    low_balance_cents: 5030000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+settlements: []

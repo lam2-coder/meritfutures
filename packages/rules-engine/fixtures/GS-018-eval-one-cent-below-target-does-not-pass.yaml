@@ -1,0 +1,33 @@
+# GS-018  Eval one cent below target does not pass
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   profit target  `closing_balance_cents - size_cents >= profit_target_cents`
+#                                                             M01 R-26
+#   eval profit target  300,000c at 50K, 600bp                M01 Appendix A.1
+#   "`299,999 >= 300,000` is false"                           GOLDEN_SCENARIOS GS-018 row
+#
+# ONE CENT IS THE ONLY DIFFERENCE FROM GS-017, and the closing balance moves
+# with the realized P&L because INV-19 ties them. The fill count, the high, the
+# low and the opening balance are identical, so the pair isolates R-26's
+# operator and nothing else. The day is traded, so R-27 is satisfied and cannot
+# be blamed for the deferral.
+id: GS-018
+name: eval one cent below target does not pass
+source: M01 R-26, R-27
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5299999
+    high_balance_cents: 5305000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 299999
+    fill_count: 6
+    traded_day: true
+settlements: []

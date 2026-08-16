@@ -1,0 +1,9 @@
+{
+  "end_state": {
+    "win_days_count": 0,
+    "traded_days_count": 1
+  },
+  "events": ["day.closed"],
+  "pins": "one cent below the win-day floor is not a win day, and the day is still a traded day",
+  "note": "THE SECOND FIELD IS WHAT STOPS THIS FIXTURE FROM PASSING FOR THE WRONG REASON. An engine that dropped the day on the floor would report zero win days too. Holding the traded-day count at 1 says the day was evaluated and only R-09 refused it."
+}
