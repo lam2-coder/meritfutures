@@ -484,6 +484,47 @@ const CASES = [
       from: 'return surplus > 0n ? surplus : 0n;',
       to: 'return surplus;',
     },
+    {
+      rule: 'R-42',
+      // The scan keeps the LAST matching rung. Taking the FIRST is the reading a
+      // single-rung lineup cannot distinguish: all three v1 plans carry one
+      // entry, so this mutant is invisible on every published config and changes
+      // the cap on the first plan that ladders one.
+      seeds: 'cap resolution taking the FIRST rung at or below the ordinal instead of the LAST, which no v1 plan can tell apart',
+      file: 'packages/rules-engine/src/payout/clamp.ts',
+      from: 'if (step.fromOrdinal <= ordinal) capCents = step.capCents;',
+      to: 'if (step.fromOrdinal <= ordinal && capCents === null) capCents = step.capCents;',
+    },
+    {
+      rule: 'R-43',
+      // INV-10 is `approved = min(effective_request, cap, withdrawable)`. Drop
+      // the cap term and a supplied amount is clamped only by the withdrawable,
+      // which is a per-request liability limit removed on the money path.
+      seeds: 'the clamp losing its cap term, so a supplied amount is bounded only by the withdrawable (INV-10, GS-026)',
+      file: 'packages/rules-engine/src/payout/clamp.ts',
+      from: 'const approvedCents = min(min(effectiveRequestCents, capCents), withdrawable);',
+      to: 'const approvedCents = min(effectiveRequestCents, withdrawable);',
+    },
+    {
+      rule: 'R-44',
+      // The ceiling is what makes the rounding favor the trader. Truncating
+      // moves at most one cent per payout to the firm, which is the direction
+      // R-44 forbids and the published copy denies.
+      seeds: 'the split truncating instead of ceiling, so the remainder cent goes to the firm (GS-029, RE-P-08)',
+      file: 'packages/rules-engine/src/payout/clamp.ts',
+      from: 'const traderCents = (approvedCents * BigInt(splitBp) + 9_999n) / 10_000n;',
+      to: 'const traderCents = (approvedCents * BigInt(splitBp)) / 10_000n;',
+    },
+    {
+      rule: 'R-45',
+      // AS-11 written into the engine: an ordinal counted from ATTEMPTS rather
+      // than settlements advances the cap schedule and the graduation counter
+      // for money that never arrived.
+      seeds: 'the payout ordinal counted from attempts rather than settlements, which is AS-11 and costs a ladder rung per failed transfer',
+      file: 'packages/rules-engine/src/payout/clamp.ts',
+      from: 'return state.payoutsSettledCount + 1;',
+      to: 'return state.payoutsSettledCount + 2;',
+    },
   ].map(({ rule, seeds, file, from, to }) => ({
     id: `CI-02/engine-${rule}`,
     stage: 'CI-02',

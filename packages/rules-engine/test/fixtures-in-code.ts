@@ -216,6 +216,28 @@ export function withDailyLossLimit(
   return { ...plan, funded: { ...plan.funded, dailyLossLimit: { type, limitCents } } };
 }
 
+/**
+ * A LADDERED cap schedule, which no v1 plan carries and CV-09 fully specifies.
+ *
+ * Appendix A gives all three plans a single rung ("Payout cap, ordinal 1 and
+ * up"), so R-42's "the LAST schedule entry whose `from_ordinal <= ordinal`" has
+ * no published input that can distinguish it from "the only entry". CV-09 is
+ * where the multi-rung shape is specified: "non-empty, starts at `from_ordinal:
+ * 1`, ordinals strictly increase, every `cap_cents > 0`".
+ *
+ * SAME JUSTIFICATION AS `withStaticDrawdown` AND `withDailyLossLimit`: a config
+ * the lineup does not use is still a config `validatePlan` will accept, "which
+ * is precisely why the operators have to be right before a plan enables one".
+ * The caller supplies the rungs, so no cap value is invented in this file and
+ * each test states where the numbers it uses come from.
+ */
+export function withCapSchedule(
+  plan: ResolvedPlan,
+  payoutCapSchedule: readonly { readonly fromOrdinal: number; readonly capCents: Cents }[],
+): ResolvedPlan {
+  return { ...plan, funded: { ...plan.funded, payoutCapSchedule } };
+}
+
 /** The lock off, so a trailing floor can be watched trailing past where it would lock. */
 export function withoutFloorLock(plan: ResolvedPlan): ResolvedPlan {
   return {

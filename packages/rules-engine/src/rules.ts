@@ -94,7 +94,7 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules the engine computes today. TWENTY-THREE OF FIFTY.
+ * The rules the engine computes today. TWENTY-SEVEN OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
@@ -123,6 +123,10 @@ export type RuleId =
  *   R-31  day/progression.ts, the funded reset, in the same step as the pass
  *   R-35  payout/gates.ts withdrawableCents, and DO-9, which is where the two
  *         terms it reads are final
+ *   R-42  payout/clamp.ts capForOrdinal, the last rung at or below the ordinal
+ *   R-43  payout/clamp.ts clampPayout, the three-way min and the four reasons
+ *   R-44  payout/clamp.ts clampPayout, the ceiling to the trader
+ *   R-45  payout/clamp.ts ordinalForNextPayout, derived from settlements
  *
  * NOT DECLARED AND WORTH NAMING, because their absence is the count being
  * honest rather than the list being short.
@@ -146,8 +150,9 @@ export type RuleId =
  *         forbids a shortcut path, so it stays absent from `RuleState` until
  *         every term exists. R-35 is declared alone because it is a value the
  *         state carries rather than a term in that conjunction
- *   R-42 to R-50
- *         groups G and H
+ *   R-46 to R-50
+ *         group H, and DO-2 refuses every day a settlement is effective on
+ *         until they land
  */
 export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-03',
@@ -173,4 +178,8 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-30',
   'R-31',
   'R-35',
+  'R-42',
+  'R-43',
+  'R-44',
+  'R-45',
 ];

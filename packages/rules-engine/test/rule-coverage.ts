@@ -58,6 +58,10 @@ export const RULE_ASSERTIONS = {
   'R-31': 'the eval pass resets the funded phase to size and carries no eval profit',
   'R-35':
     'withdrawable is max(0, balance - size - buffer), floored at zero, and the buffer is never in it',
+  'R-42': 'the cap is the LAST schedule entry whose from_ordinal <= ordinal',
+  'R-43': 'approved is min(effective_request, cap, withdrawable), and a tie names no term',
+  'R-44': 'the split ceilings to the trader and the legs sum to approved exactly',
+  'R-45': 'the ordinal is payoutsSettledCount + 1, so a failed attempt consumes none',
 } as const satisfies Partial<Record<RuleId, string>>;
 
 /** The rules this suite claims. `implemented-rules.test.ts` compares it to the engine's. */

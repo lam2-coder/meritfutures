@@ -28,12 +28,12 @@ test('the declared set is a set, and is ordered as M01 orders the rules', () => 
   expect([...IMPLEMENTED_RULES]).toEqual([...IMPLEMENTED_RULES].sort());
 });
 
-test('the count is reported rather than implied: twenty-three of M01’s fifty rules', () => {
+test('the count is reported rather than implied: twenty-seven of M01’s fifty rules', () => {
   // THIS ASSERTION IS THE HONEST COUNT IN EXECUTABLE FORM. It fails when a rule
   // is added, which is the point: the session that adds one updates the number
   // here and in `src/rules.ts`'s header, and a session that added a rule without
   // noticing it had is a session that cannot land.
-  expect(IMPLEMENTED_RULES.length).toBe(23);
+  expect(IMPLEMENTED_RULES.length).toBe(27);
 });
 
 test('`engineEligible` has no shortcut path, so R-41 is not declared before its terms', () => {
