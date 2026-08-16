@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->44<!--/gen--> ADRs. <!--gen:ec_count-->141<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->45<!--/gen--> ADRs. <!--gen:ec_count-->141<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -343,6 +343,51 @@ Nothing.
 
 ---
 
+## The AI and LLM policy is ruled (2026-08-16, ADR-044)
+
+**[ADR-044](decisions/ADR-044.md) is accepted.** Merit may use language models in
+four narrow classes and may not use them anywhere near a money decision. It was
+written by the review desk against a founder brief, and **four defects in the
+brief itself were found against the primary sources and ruled rather than
+inherited.** No migration, no schema, no engine behavior and no running gate
+changed.
+
+**The corpus said nothing about this before today.** A grep for `llm`, `genai`,
+`machine learning`, `generative` and `ml` across every document in `docs/`
+returned **zero hits**, so under FREEZE's own reading every AI feature was
+prohibited by omission, which nobody had decided.
+
+| # | The brief said | The source said | Ruled |
+|---|---|---|---|
+| **1** | M13 insights, "labeled advisory" | **[M13](plans/M13-trader-analytics-journal.md)'s governing sentence**: a second computation of anything the engine computes means **two rulebooks**, and its failure mode is a trader who believes something different from what the engine enforces | **The narration boundary.** A model may narrate, order and explain engine-computed numbers. It may not **derive** one. Checkable by fixture; "advisory" is not checkable at all |
+| **2** | Prohibit "unreviewed AI-generated user-facing copy" | The same ADR permits per-trader runtime narration in (a), **which can never be pre-reviewed**. The brief prohibited its own permission three lines later | Prohibition scoped to **published, static** surfaces. Class (a) is held by the narration boundary instead |
+| **3** | Support assistant reads live gate state, "per E3" | **[E3](../MERIT_BUILD_MASTER_PROMPT.md)** scopes the support bot to **published docs** *until a threat-model pass says otherwise*. Live gate state is internal per-identity data | **ADR-044 amends E3** and pays E3's own stated price. The threat-model pass is a named precondition on the M10 and M15 builds |
+| **4** | "Follows the ADR-020 pattern" | **[ADR-020](decisions/ADR-020.md)**'s indicative tier is nondeterministic in *freshness* only and always degrades to a correct stale value. A model layer has **no stale-but-correct fallback** | Degradation is stronger than ADR-020's: the deterministic surface must be **complete and usable with the model layer deleted** |
+
+**The ruling that matters most is section 1: the ADR adds no scope.** It is a
+permission boundary. Five frozen module plans (M06, M07, M10, M13, M15) describe
+no AI behavior, and an ADR that merely listed four permitted features would have
+converted them into four uncosted commitments in five frozen documents. Each still
+needs its own module amendment, which is where the per-feature cost, latency and
+failure-mode analysis lands.
+
+**`CI-06o` is claimed and unwritten, and the ADR says so.** A money-path model
+ban enforced by people remembering it is a control that exists, stays valid and
+enforces nothing. Until the gate runs and has been **watched failing on a seeded
+violation**, ADR-044's first prohibition is prose. It is cheapest now, while the
+payout, ledger and auth packages do not exist and it is close to vacuous, which
+is [ADR-042](decisions/ADR-042.md)'s argument for its SQL shape check.
+
+### Three findings from the desk's own verification pass
+
+| # | Finding | State |
+|---|---|---|
+| **`OI-09`** | **`CI-06n` matches any markdown link, not a table row.** Its `run()` scans the registry README with `/\[[^\]]*\]\(([^)\s#]+)[^)]*\)/g` and accepts a **prose mention**. Its title claims "has a README row"; its `covers` line honestly says "is linked from", and the check matches the weaker of the two. **Found because `ADR-043` had no row in [decisions/README](decisions/README.md) and CI-06n was green.** One ADR of 43 was missing from the registry index, and it was the ADR that wrote CI-06n to pay for its own `CI-06c` exemption | **Row added 2026-08-16; the gate is NOT fixed.** The parser tightening (require the link to sit in a table row) is a tooling change and must arrive with its own `falsify.mjs` seed, watched failing. **This is the `CI-06g` span-parser class a third time**: a gate whose parser is looser than the property it claims |
+| **`OI-10`** | **Keep-both merges duplicated four passages in this file and no gate could see it.** The schema-delta paragraph stood **twice** identically, the `CI-06, corpus integrity` row **three times**, action item 3 **three times with three different tails** (`0032` next, `0032` done, `0032` not started), and a **stale** P1 row asserted `0029` to `0031` were "reserved and unwritten" **after all three merged**. `CI-06g` cannot catch it: duplicated spans carrying the **same** value match their query, so the gate passes over a document containing a false sentence | **Deduplicated 2026-08-16.** The `Eleven checks` count was corrected to twelve in the same pass. **The gate that would catch it does not exist**: no restated span-carrying sentence may appear twice in one document. It needs a letter, and the desk did not claim one for a gate it had not scoped precisely |
+| **The ADR State column** | Rows `039` to `043` read **`written on the branch, unmerged`** after PR #17 and PR #18 merged them | **Corrected. Fifth through ninth instance**, in the column [ADR-036](decisions/ADR-036.md) already records as prose no gate can check |
+
+---
+
 ## Next 3 actions
 
 1. **The founder's E2 read** on the <!--gen:e2_files-->23<!--/gen--> money-path migration files, and a ruling on item **B** ([ADR-030](decisions/ADR-030.md)'s stale config list, wrong in two of four). **A** and **C** are closed. Nothing merges first.
@@ -352,6 +397,7 @@ Nothing.
 3. ~~Write the six missing allocation rows.~~ **DONE 2026-08-15.** Eight rows, not six: ADR-039 to ADR-042 and `0029` to `0032`, plus a **third allocation table for `CI-06` letters** claiming `k`, `l` and `m`. **The three folds may now write against their numbers.** Next in each: FOLD-01 session 3 (`0029`, DATA_MODEL, DELTA_MANIFEST), FOLD-02 session 3 (`0030`, `0031`), ~~S-E session 2 (`0032`)~~ **`0032` DONE 2026-08-16**, ~~S-E now at session 3 (the source file)~~ **S-E3 landed PARTIALLY 2026-08-16: the source contract, the generator and its eighteen seeded violations are written, and the transcription itself is BLOCKED on egress to `cmegroup.com`** ([session 32](sessions/2026-08-16-session-32.md)). **Each is money path and takes a fresh session, no exceptions.**
 
 **This item now has three near-identical copies above it**, one per parallel session that appended its own version of the same line rather than editing the shared one. It is left as found: the duplication is the record of how it happened, and the fix belongs with whoever rules on the `OI-06` collision that has the same cause.
+3. ~~Write the six missing allocation rows.~~ **DONE 2026-08-15.** Eight rows, not six: ADR-039 to ADR-042 and `0029` to `0032`, plus a **third allocation table for `CI-06` letters** claiming `k`, `l` and `m`. **All three folds have now written against their numbers and merged**: FOLD-01 session 3 (`0029`), FOLD-02 session 3 (`0030` and `0031`) and S-E session 2 (`0032`), all on 2026-08-16. **This item stood three times in this list with three different tails**, each a keep-both merge of a sentence a sibling branch had already advanced, and the three said `0032` was next, was done, and was not yet started. **Deduplicated 2026-08-16 and recorded as `OI-10`**, because no gate can see it. Next in each: FOLD-01 session 4, FOLD-02 session 4 (which waits on FOLD-01 s4), S-E session 3. **Each money-path session takes a fresh session, no exceptions.**
 4. **Rule `OI-01`** (`liability_snapshots`, surfaced with a recommendation and deliberately not decided by a session), then the rest of **P1** below. **[ADR-035](decisions/ADR-035.md) is accepted and `0028` is written**; it needs the E2 read like every other money-path file, not a separate ruling. **S-B, S-C and S-D have landed and S-E is now planned**, so [P1 section 6](plans/P1-monorepo-scaffold.md) has nothing left to plan and five build sessions to run. This line read "S-C and S-E left" after S-C had already landed, which is the row below correcting it.
 
 ---
@@ -363,9 +409,10 @@ Nothing.
 | P1 item | State | What is actually left |
 |---|---|---|
 | **The reconciled schema and migrations** | **DONE**, pending the E2 read | <!--gen:migration_files-->33<!--/gen--> files, <!--gen:sql_tables-->102<!--/gen--> tables, <!--gen:sql_triggers-->9<!--/gen--> triggers, verified on a clean PostgreSQL 16 install; **index and check-constraint totals are emitted by the install job**, for the reason line 99 gives. Nothing to build. **The founder's read is the remaining work and it is not engineering** |
-| **CI-06, corpus integrity** | **DONE and exceeded** | Eleven checks, all passing clean and failing dirty. The row's own definition of done is met **for CI-06 only** |
+| **CI-06, corpus integrity** | **DONE and exceeded** | **Twelve** checks, all passing clean and failing dirty. The row's own definition of done is met **for CI-06 only**. This row stood three times in this table and read "Eleven" against the twelve `gates.mjs` reports; both are `OI-10` |
 | **CI-06h, migration install** | **RUNS IN ACTIONS, green** | Corrected 2026-08-15 (S-B). This row read "WIRED, never executed by GitHub. **It has not run in Actions once**" and that was already false when it was written: run `31860712550`, job `94953489824`, commit `3082b61e`, **2026-08-15T03:01:16Z, success**, applying all <!--gen:migration_files-->33<!--/gen--> migrations against PostgreSQL 16 on a runner. It has since run on every push to this branch, and now carries ADR-035's probe as well (run `31862563569`) |
-| **CI-06, corpus integrity** | **DONE and exceeded** | Eleven checks, all passing clean and failing dirty. The row's own definition of done is met **for CI-06 only** |
+| **The reconciled schema and migrations** | **DONE**, pending the E2 read | <!--gen:migration_files-->33<!--/gen--> files, <!--gen:sql_tables-->102<!--/gen--> tables, <!--gen:sql_triggers-->9<!--/gen--> triggers, verified on a clean PostgreSQL 16 install; **index and check-constraint totals are emitted by the install job**, for the reason line 99 gives. Nothing to build. **The founder's read is the remaining work and it is not engineering** |
+| **CI-06h, migration install** | **RUNS IN ACTIONS, green** | Corrected 2026-08-15 (S-B). This row read "WIRED, never executed by GitHub. **It has not run in Actions once**" and that was already false when it was written: run `31860712550`, job `94953489824`, commit `3082b61e`, **2026-08-15T03:01:16Z, success**, applying all <!--gen:migration_files-->33<!--/gen--> migrations against PostgreSQL 16 on a runner. It has since run on every push to this branch, and now carries ADR-035's probe as well (run `31862563569`) |
 | **The reconciled schema and migrations** | **DONE**, pending the E2 read | <!--gen:migration_files-->33<!--/gen--> files, **98 tables, 332 indexes, 359 check constraints, 6 triggers**, verified on a clean PostgreSQL 16 install (`0001` to `0028` then `0032`; `0029` to `0031` are reserved and unwritten). The figures read 96 / 326 / 347 / 6 before `0032`. Nothing to build. **The founder's read is the remaining work and it is not engineering** |
 | **CI-06, corpus integrity** | **DONE and exceeded** | Eleven checks, all passing clean and failing dirty. The row's own definition of done is met **for CI-06 only** |
 | **The monorepo scaffold** | **DONE** (S-B, 2026-08-15) | Nine workspace-root files, three libraries, four deployables, two tooling packages, and a lockfile. `pnpm install --frozen-lockfile` from clean, `tsc --noEmit` across nine projects, four named Vitest projects each runnable alone. **Section 6's S-C, S-D and S-E are the remaining P1 sessions** |
