@@ -1065,6 +1065,23 @@ const ci06h = {
         'probe_calendar_revision_required.sql',
         "ADR-045's calendar prior-image guards are no longer probed (OI-06)",
       ],
+      // OQ-M10-06. AND THIS IS OI-07 A THIRD TIME, CAUGHT BEFORE THE MERGE
+      // RATHER THAN A DAY AFTER IT. probe_reversible_contact_addresses.sql was
+      // wired into corpus.yml in the commit that created it and NOT added to
+      // this list, which is the identical omission probe_payout_hold.sql made
+      // above and which left that file one `git rm` from being OI-07 again for
+      // a day. Wiring a probe and pinning it are two edits in two files and the
+      // second one is the one that makes the first one permanent.
+      //
+      // It carries the only assertions in this job that watch a GRANT, and the
+      // only ones that watch INV-M10-12: 0034's octet_length floor is what
+      // stops a plaintext telephone number being written into a bytea column
+      // that every reader will believe holds ciphertext.
+      [
+        'probe_reversible_contact_addresses.sql',
+        "ADR-046's sealed addresses, plaintext floor and dispatcher grants are " +
+          'no longer probed (OQ-M10-06)',
+      ],
       // OI-08. The NO-FLOATS assertion lived inside 0027 and could only ever
       // see 0001-0027, so five migrations sat outside the guard the corpus
       // believed protected every money column. It runs in the install job now,

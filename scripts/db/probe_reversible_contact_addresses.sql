@@ -39,6 +39,24 @@
 -- NULL against an unattributed dispatch, NULL is not TRUE, and the one check
 -- that exists to attribute the evidence would wave through the least attributed
 -- row in the table. The trigger uses IS DISTINCT FROM and R9 is what watches it.
+--
+-- THE PLAINTEXT FLOOR IS PINNED FROM BOTH SIDES, AND ONE SIDE OF IT IS A
+-- SUCCESS. 0034's `octet_length(...) >= 29` written as `> 29` or `>= 30`
+-- refuses the SMALLEST LEGAL ENVELOPE, and every rejection in this file still
+-- passes against that: an off-by-one that makes the constraint too STRICT is
+-- invisible to an inventory of refusals, and it would be found in production by
+-- a security notice that could not be written rather than here. S2b is exactly
+-- 29 bytes and R2a is exactly 28, so the boundary is pinned from both
+-- directions rather than approached from one.
+--
+-- AND EVERY FIXTURE IS SEALED TO 44 BYTES ON PURPOSE, THROUGH pg_temp.sealed().
+-- R1, R2 and R3 name the COMPLETENESS check, and the one-byte '\xaa' they were
+-- originally written with violates the FLOOR as well. Section 18 of the delta
+-- manifest already records two assertions, in a probe written before 0034, that
+-- were resting on which of two simultaneously violated constraints PostgreSQL
+-- happened to report, IN AN ORDER IT DOES NOT DOCUMENT. That is the same defect
+-- one file over and one day later, so each assertion below violates exactly the
+-- one constraint it names.
 -- =============================================================================
 
 \set ON_ERROR_STOP on
@@ -109,6 +127,66 @@ BEGIN
 END
 $fn$;
 
+-- A sealed value of the shape 0034's floor requires: a 12-byte nonce, sixteen
+-- bytes of sealed payload and a 16-byte GCM tag, 44 bytes in all. `marker` is
+-- one hex byte and exists only so two fixtures can be told apart in a dump.
+--
+-- EVERY FIXTURE SEALS THROUGH THIS RATHER THAN THROUGH A SHORT LITERAL, for the
+-- reason in the header: a fixture below the floor violates TWO constraints and
+-- the assertion then reports whichever one PostgreSQL reached first. The two
+-- assertions that deliberately test the boundary write their bytes out in full
+-- instead, because there the exact count IS the assertion.
+CREATE FUNCTION pg_temp.sealed(marker text)
+RETURNS bytea LANGUAGE sql IMMUTABLE AS $fn$
+  SELECT decode(repeat('a1', 12) || repeat(marker, 16) || repeat('f3', 16), 'hex');
+$fn$;
+
+-- THE TWO BOUNDARY FIXTURES, DEFINED ONCE BECAUSE THE CONSTRAINT IS WRITTEN
+-- THREE TIMES. 0034's floor is `>= 29` on contact_channels, identity_phones and
+-- phone_change_requests, and this file's own R4 comment records why that
+-- matters: a constraint written three times can be omitted once. A boundary
+-- written three times can be wrong once, and writing the byte counts out at six
+-- call sites is six chances to write one of them differently.
+--
+--   sealed_minimum() is 29 bytes: a 12-byte nonce, ONE byte of ciphertext and a
+--   16-byte GCM tag. The smallest envelope that can legally exist, and the
+--   value the floor must PERMIT.
+--
+--   sealed_empty() is 28: a nonce and a tag WITH NOTHING SEALED BETWEEN THEM,
+--   which is the envelope of the empty string. One byte under, carrying no
+--   address, and the value the floor must REFUSE.
+CREATE FUNCTION pg_temp.sealed_minimum()
+RETURNS bytea LANGUAGE sql IMMUTABLE AS $fn$
+  SELECT decode(repeat('a1', 12) || 'c7' || repeat('f3', 16), 'hex');
+$fn$;
+
+CREATE FUNCTION pg_temp.sealed_empty()
+RETURNS bytea LANGUAGE sql IMMUTABLE AS $fn$
+  SELECT decode(repeat('a1', 12) || repeat('f3', 16), 'hex');
+$fn$;
+
+-- AND THE HELPERS ARE CHECKED BEFORE ANYTHING RESTS ON THEM. Six assertions
+-- below pin 0034's floor from both sides, and every one of them is worthless if
+-- these two do not hold the byte counts their names claim: a sealed_minimum()
+-- of 30 bytes would report the floor correct at 29 AND at 30. The probe would
+-- pass either way and prove neither, which is the vacuous-pass shape this
+-- corpus has now found four times.
+DO $$
+BEGIN
+  IF octet_length(pg_temp.sealed_minimum()) <> 29
+     OR octet_length(pg_temp.sealed_empty()) <> 28
+     OR octet_length(pg_temp.sealed('aa')) < 29 THEN
+    RAISE EXCEPTION
+      'PROBE FAILED (H0): the fixture helpers do not hold the byte counts every '
+      'boundary assertion below reads them for. minimum=%, empty=%, sealed=%; '
+      'expected 29, 28 and at least 29.',
+      octet_length(pg_temp.sealed_minimum()),
+      octet_length(pg_temp.sealed_empty()),
+      octet_length(pg_temp.sealed('aa'));
+  END IF;
+  RAISE NOTICE 'PERMITTED  H0  the boundary fixtures are 29 and 28 bytes (nothing below rests on a guess)';
+END $$;
+
 \o /dev/null
 
 -- ---------------------------------------------------------------------------
@@ -161,7 +239,7 @@ SELECT pg_temp.permitted(
   'S2  a sealed address beside its hash (what OQ-M10-06 asked for)',
   $q$
   UPDATE contact_channels
-     SET value_ciphertext   = '\xdeadbeefcafe'::bytea,
+     SET value_ciphertext   = pg_temp.sealed('de'),
          value_key_id       = 'merit-kek-2026-08/1',
          value_encrypted_at = now()
    WHERE id = 'd1000000-0000-0000-0000-000000000001';
@@ -174,7 +252,7 @@ SELECT pg_temp.permitted(
   'S3  rotation: resealed under a new key id',
   $q$
   UPDATE contact_channels
-     SET value_ciphertext   = '\xfeedfacefeed'::bytea,
+     SET value_ciphertext   = pg_temp.sealed('fe'),
          value_key_id       = 'merit-kek-2026-11/2',
          value_encrypted_at = now()
    WHERE id = 'd1000000-0000-0000-0000-000000000001'
@@ -216,7 +294,7 @@ END $$;
 
 -- Reseal it, because the ceremony below is about an identity Merit can reach.
 UPDATE contact_channels
-   SET value_ciphertext   = '\xdeadbeefcafe'::bytea,
+   SET value_ciphertext   = pg_temp.sealed('de'),
        value_key_id       = 'merit-kek-2026-11/2',
        value_encrypted_at = now()
  WHERE id = 'd1000000-0000-0000-0000-000000000001';
@@ -224,11 +302,18 @@ UPDATE contact_channels
 -- R1 to R4: the completeness CHECKs, one per table plus the blank-key case.
 -- A ciphertext with no key identifier is an unopenable blob that every rotation
 -- sweep skips and every reader believes is an address.
+--
+-- THE CIPHERTEXTS HERE ARE SEALED RATHER THAN '\xaa', WHICH IS NOT COSMETIC.
+-- These three name the COMPLETENESS constraint. A one-byte ciphertext violates
+-- the plaintext FLOOR as well, and a write violating two constraints is
+-- reported against one of them in an order PostgreSQL does not document, so all
+-- three assertions would have been scoring whichever the planner reached first.
+-- That is the defect DELTA_MANIFEST section 18 recorded one file over.
 SELECT pg_temp.rejected(
   'R1  ciphertext with no key id',
   $q$
   UPDATE contact_channels
-     SET value_ciphertext = '\xaa'::bytea, value_key_id = NULL,
+     SET value_ciphertext = pg_temp.sealed('aa'), value_key_id = NULL,
          value_encrypted_at = now()
    WHERE id = 'd1000000-0000-0000-0000-000000000001';
   $q$,
@@ -238,20 +323,137 @@ SELECT pg_temp.rejected(
   'R2  a key id of whitespace (an empty string satisfies NOT NULL and answers nothing)',
   $q$
   UPDATE contact_channels
-     SET value_ciphertext = '\xaa'::bytea, value_key_id = '   ',
+     SET value_ciphertext = pg_temp.sealed('aa'), value_key_id = '   ',
          value_encrypted_at = now()
    WHERE id = 'd1000000-0000-0000-0000-000000000001';
   $q$,
   'contact_channels_ciphertext_is_complete');
 
+-- ---------------------------------------------------------------------------
+-- The plaintext floor: INV-M10-12 made a constraint (0034 header item 7)
+-- ---------------------------------------------------------------------------
+-- Every column above is bytea and EVERY BYTE STRING IS A VALID bytea, so a
+-- handler that skips the seal and writes the number itself satisfies the
+-- completeness CHECK, the uniqueness index and the foreign keys. Nothing
+-- objects, the row reads as sealed to every catalogue query, and the defect
+-- surfaces at DECRYPT time with the address in the clear at rest in the
+-- meantime. That is what INV-M10-12 forbids.
+
+-- S2b: THE SMALLEST ENVELOPE THAT CAN LEGALLY EXIST, and the reason it is a
+-- SUCCESS. A 12-byte nonce, one byte of ciphertext, a 16-byte GCM tag: 29 bytes
+-- exactly. Written `> 29` or `>= 30` the constraint refuses the minimum legal
+-- envelope, and every rejection in this file still passes: an off-by-one in the
+-- STRICT direction is invisible from inside an inventory of refusals, and it
+-- would be found in production by a security notice that could not be written.
+SELECT pg_temp.permitted(
+  'S2b the MINIMUM legal envelope: exactly 29 bytes (the off-by-one guard)',
+  $q$
+  UPDATE contact_channels
+     SET value_ciphertext   = pg_temp.sealed_minimum(),
+         value_key_id       = 'merit-kek-2026-11/2',
+         value_encrypted_at = now()
+   WHERE id = 'd1000000-0000-0000-0000-000000000001';
+  $q$);
+
+-- R2a: and 28 bytes is refused, which pins the boundary from the other side.
+-- 28 is a nonce and a tag WITH NOTHING SEALED BETWEEN THEM: the envelope of the
+-- empty string, which is the shortest thing that can be mistaken for an
+-- envelope and carries no address at all.
+SELECT pg_temp.rejected(
+  'R2a 28 bytes: a nonce and a tag with NOTHING sealed between them',
+  $q$
+  UPDATE contact_channels
+     SET value_ciphertext   = pg_temp.sealed_empty(),
+         value_key_id       = 'merit-kek-2026-11/2',
+         value_encrypted_at = now()
+   WHERE id = 'd1000000-0000-0000-0000-000000000001';
+  $q$,
+  'contact_channels_ciphertext_refuses_plaintext');
+
+-- R2b: THE ASSERTION THE WHOLE CONSTRAINT EXISTS FOR. convert_to() rather than
+-- a hex literal because the point is that this is a STRING, written by a
+-- handler that had the number and a bytea column to put it in.
+SELECT pg_temp.rejected(
+  'R2b a plaintext E.164 smuggled in as bytea (INV-M10-12, 12 bytes)',
+  $q$
+  UPDATE contact_channels
+     SET value_ciphertext   = convert_to('+14155550123', 'UTF8'),
+         value_key_id       = 'merit-kek-2026-11/2',
+         value_encrypted_at = now()
+   WHERE id = 'd1000000-0000-0000-0000-000000000001';
+  $q$,
+  'contact_channels_ciphertext_refuses_plaintext');
+
+-- S2c: THE IDENTITY TABLE'S SEALING SUCCESS, AND IT WAS MISSING. Until this
+-- assertion, every write this probe made to identity_phones.phone_ciphertext
+-- was one it expected to be REFUSED, so a constraint on that table that refused
+-- EVERYTHING passed all thirty-two assertions and reported nothing. That is the
+-- precise defect this file's header claims to defend against, one table over
+-- from where it was looking, and a seeded run rather than a reading found it.
+--
+-- It is also the SECURITY section 4.8 leg 2 class in one statement: a notice to
+-- the VERIFIED number, which Merit initiates and which had no destination until
+-- 0034. If this fails, that class is undeliverable again.
+-- It seals at the MINIMUM legal envelope rather than a comfortable 44 bytes, so
+-- that this table's floor is pinned from the permissive side by the same
+-- assertion that proves the table is writable at all.
+SELECT pg_temp.permitted(
+  'S2c identity_phones: the verified number sealed at the minimum envelope (SECURITY 4.8 leg 2)',
+  $q$
+  UPDATE identity_phones
+     SET phone_ciphertext   = pg_temp.sealed_minimum(),
+         phone_key_id       = 'merit-kek-2026-11/2',
+         phone_encrypted_at = now()
+   WHERE id = 'c1000000-0000-0000-0000-000000000001';
+  $q$);
+
+-- phone_encrypted_at IS CLEARED EXPLICITLY RATHER THAN LEFT UNSET, because S2c
+-- above now seals this row and an UPDATE that only omits the column would
+-- INHERIT the timestamp S2c wrote and satisfy the constraint it is meant to
+-- violate. An assertion that depends on a column being unset is an assertion
+-- one earlier fixture can silently disarm.
 SELECT pg_temp.rejected(
   'R3  identity_phones: sealed, with no record of when',
   $q$
   UPDATE identity_phones
-     SET phone_ciphertext = '\xbb'::bytea, phone_key_id = 'merit-kek-2026-11/2'
+     SET phone_ciphertext = pg_temp.sealed('bb'), phone_key_id = 'merit-kek-2026-11/2',
+         phone_encrypted_at = NULL
    WHERE id = 'c1000000-0000-0000-0000-000000000001';
   $q$,
   'identity_phones_ciphertext_is_complete');
+
+-- R3a: THE LONGEST E.164 THAT CAN EXIST, in the clear. E.164 is a '+' and at
+-- most fifteen digits, so 16 bytes is the CEILING of the entire address space
+-- this column holds. That makes it the strongest single plaintext case
+-- available: ANY FLOOR LOW ENOUGH TO ADMIT AN E.164 AT ALL ADMITS THIS ONE,
+-- where a typical twelve-byte number sails past a floor of 13 that still lets
+-- every 13-to-16-byte number in the world through.
+SELECT pg_temp.rejected(
+  'R3a identity_phones: the LONGEST E.164 that can exist, in the clear (16 bytes)',
+  $q$
+  UPDATE identity_phones
+     SET phone_ciphertext   = convert_to('+999999999999999', 'UTF8'),
+         phone_key_id       = 'merit-kek-2026-11/2',
+         phone_encrypted_at = now()
+   WHERE id = 'c1000000-0000-0000-0000-000000000001';
+  $q$,
+  'identity_phones_ciphertext_refuses_plaintext');
+
+-- R3b: and 28, so this table's floor is pinned to EXACTLY 29 rather than to
+-- "somewhere above the E.164 range". Without it a floor of 17 through 28 passes
+-- every assertion in this file, which a seeded run demonstrated rather than a
+-- reading: the constraint would still refuse every telephone number, and it
+-- would no longer be the envelope arithmetic 0034's comment says it is.
+SELECT pg_temp.rejected(
+  'R3b identity_phones: 28 bytes, one under the floor',
+  $q$
+  UPDATE identity_phones
+     SET phone_ciphertext   = pg_temp.sealed_empty(),
+         phone_key_id       = 'merit-kek-2026-11/2',
+         phone_encrypted_at = now()
+   WHERE id = 'c1000000-0000-0000-0000-000000000001';
+  $q$,
+  'identity_phones_ciphertext_refuses_plaintext');
 
 -- =============================================================================
 -- The notification obligation is discharged by evidence     ADR-046, EC-146
@@ -300,7 +502,7 @@ SELECT pg_temp.permitted(
   VALUES ('11000000-0000-0000-0000-000000000001',
           'a1000000-0000-0000-0000-000000000001', 'pending',
           'c1000000-0000-0000-0000-000000000001', '\x4e4557'::bytea,
-          '\xc0ffee'::bytea, 'merit-kek-2026-11/2', now());
+          pg_temp.sealed('c0'), 'merit-kek-2026-11/2', now());
   $q$);
 
 -- R4: the third table's completeness CHECK. All three are watched, because a
@@ -314,6 +516,39 @@ SELECT pg_temp.rejected(
    WHERE id = '11000000-0000-0000-0000-000000000001';
   $q$,
   'phone_change_requests_ciphertext_is_complete');
+
+-- R4a: the floor on the third table, and THIS IS THE COLUMN WHERE THE SMUGGLED
+-- PLAINTEXT IS LIKELIEST. The trader typed the number into the request, so the
+-- handler that opens this row is the one handler in the corpus holding a number
+-- in the clear and a bytea column to put it in. Every other sealed column is
+-- written by a path that had to fetch the address from somewhere first.
+SELECT pg_temp.rejected(
+  'R4a phone_change_requests: the proposed number, in the clear (13 bytes)',
+  $q$
+  UPDATE phone_change_requests
+     SET new_phone_ciphertext = convert_to('+442071838750', 'UTF8')
+   WHERE id = '11000000-0000-0000-0000-000000000001';
+  $q$,
+  'phone_change_requests_ciphertext_refuses_plaintext');
+
+-- R4b and S5b: the third table's boundary, so all three are pinned to exactly
+-- 29 and not one of them to "somewhere above a telephone number".
+SELECT pg_temp.rejected(
+  'R4b phone_change_requests: 28 bytes, one under the floor',
+  $q$
+  UPDATE phone_change_requests
+     SET new_phone_ciphertext = pg_temp.sealed_empty()
+   WHERE id = '11000000-0000-0000-0000-000000000001';
+  $q$,
+  'phone_change_requests_ciphertext_refuses_plaintext');
+
+SELECT pg_temp.permitted(
+  'S5b phone_change_requests: the minimum legal envelope, 29 bytes',
+  $q$
+  UPDATE phone_change_requests
+     SET new_phone_ciphertext = pg_temp.sealed_minimum()
+   WHERE id = '11000000-0000-0000-0000-000000000001';
+  $q$);
 
 -- S5a: PARTIAL EVIDENCE IS PERMITTED, and the one-directional CHECK is why.
 -- The two legs do not land in the same instant. A handler that has sent the SMS
@@ -475,7 +710,7 @@ DO $$
 BEGIN
   SET LOCAL ROLE merit_dispatcher;
   UPDATE contact_channels
-     SET value_ciphertext   = '\xb0b0'::bytea,
+     SET value_ciphertext   = pg_temp.sealed('b0'),
          value_key_id       = 'merit-kek-2027-02/3',
          value_encrypted_at = now()
    WHERE id = 'd1000000-0000-0000-0000-000000000001';

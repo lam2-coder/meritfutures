@@ -29,7 +29,9 @@
 | `created_at` | timestamptz | not null default now() | |
 
 Indexes: unique **`identity_phones_live_per_identity_uq (identity_id)`** where `verified_at is not null and superseded_at is null and released_at is null`; `identity_phones_live_number_idx (phone_hash)` on the same predicate and **deliberately not unique**; `identity_phones_history_idx (phone_hash, created_at desc)`; `identity_phones_identity_idx (identity_id, created_at desc)`; `identity_phones_key_rotation_idx (phone_key_id)` where `phone_ciphertext is not null`.
-Constraints: `identity_phones_supersession_is_complete`; `identity_phones_no_self_supersede`; `identity_phones_release_is_evidenced`; `identity_phones_one_ending`; `identity_phones_port_date_implies_ported`; `identity_phones_lookup_is_attributed`; **`identity_phones_ciphertext_is_complete`**.
+Constraints: `identity_phones_supersession_is_complete`; `identity_phones_no_self_supersede`; `identity_phones_release_is_evidenced`; `identity_phones_one_ending`; `identity_phones_port_date_implies_ported`; `identity_phones_lookup_is_attributed`; **`identity_phones_ciphertext_is_complete`**; **`identity_phones_ciphertext_refuses_plaintext`**.
+
+**`identity_phones_ciphertext_refuses_plaintext` is `INV-M10-12` as a constraint**, and on this table the refusal is **total**: `octet_length(phone_ciphertext) >= 29` when not null (a 12-byte nonce, a 16-byte GCM tag, one byte sealed), against a column that holds a telephone number and nothing else. E.164 is a `+` and at most fifteen digits, so 16 bytes is the ceiling of the entire address space this column can hold and every value of it is below the floor. See [`contact_channels`](contact_channels.md) for the full argument and for the one place the refusal is partial.
 Grants: `merit_dispatcher` holds `SELECT`, and `UPDATE` on the three sealed columns only. No `DELETE` ([ADR-046](../../decisions/ADR-046.md)).
 Retention: forever (fraud history), on `identity_signals`' `payment` and `kyc_identity` precedent.
 

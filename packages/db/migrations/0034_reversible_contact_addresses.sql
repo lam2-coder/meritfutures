@@ -21,7 +21,7 @@
 -- content a trader must receive. So the citing documents assumed a holder that
 -- did not exist. This file gives them one.
 --
--- SIX things need the founder's line-by-line read.
+-- SEVEN things need the founder's line-by-line read.
 --
 --   1. THE KEY IS THE CONTROL, NOT THE GRANT, AND merit_app CAN READ THE
 --      CIPHERTEXT. Every column added here is envelope-encrypted: the row holds
@@ -128,6 +128,36 @@
 --      every message MERIT ITSELF INITIATES, and those are the three tables
 --      below.
 --
+--   7. A PLAINTEXT ADDRESS IS STRUCTURALLY REFUSED, WHICH IS THE DIFFERENCE
+--      BETWEEN INV-M10-12 BEING A CONSTRAINT AND BEING A PROMISE. INV-M10-12
+--      says a telephone number exists in plaintext IN A REQUEST BODY AND NEVER
+--      AT REST. Nothing else in this file enforces it: every one of the columns
+--      above is bytea, EVERY BYTE STRING IS A VALID bytea, and a handler that
+--      skips the seal and writes the number itself satisfies every other
+--      constraint here. Nothing objects, the row reads as sealed to every
+--      reader and every catalogue query, and the defect surfaces at DECRYPT
+--      time -- with the address sitting in the clear at rest for however long
+--      that takes, which is exactly what INV-M10-12 forbids.
+--
+--      octet_length(...) >= 29 IS THE SMALLEST ENVELOPE THAT CAN EXIST: a
+--      12-byte nonce, a 16-byte GCM tag, and at least one byte of ciphertext
+--      under them. A raw E.164 number is AT MOST 16 bytes, a '+' and at most 15
+--      digits, so EVERY E.164 ADDRESS IN EXISTENCE SITS BELOW THE FLOOR and no
+--      telephone number can be smuggled through this column as bytea. It is a
+--      floor rather than an equality, so a longer nonce or a second tag stays
+--      inside it and no future scheme has to edit a merged migration to fit.
+--
+--      BE EXACT ABOUT WHAT IT DOES NOT CATCH, on item 2's discipline, because
+--      overclaiming a control is how the next reader stops looking.
+--      contact_channels.kind is ('email','push','sms') since 0029, so THAT
+--      column also holds email addresses and push tokens, and a plaintext email
+--      of 29 bytes or more clears the floor. THE REFUSAL IS TOTAL FOR TELEPHONE
+--      NUMBERS, which is the class INV-M10-12 names and the class OQ-M10-06 was
+--      about, and it is PARTIAL on contact_channels for the other two kinds,
+--      where it catches only the short ones. identity_phones and
+--      phone_change_requests hold a telephone number and nothing else, so on
+--      those two it is total.
+--
 -- No numbered delta lands here. ADR-046 is a ruling on an open question, not a
 -- module's schema delta, so ADR-026's manifest completeness gate has nothing to
 -- count and the record is DELTA_MANIFEST section 18 instead. 0033's precedent.
@@ -222,6 +252,27 @@ ALTER TABLE contact_channels
      AND value_encrypted_at IS NOT NULL AND btrim(value_key_id) <> '')
   );                                                              -- ADR-046
 
+-- THE PLAINTEXT FLOOR. Header item 7, and it is the assertion that makes
+-- INV-M10-12 a constraint rather than a promise: 29 bytes is a 12-byte nonce
+-- plus a 16-byte GCM tag plus one byte of ciphertext, and a raw E.164 number is
+-- at most 16 bytes, so a telephone number written here in the clear is refused
+-- by arithmetic rather than by review.
+--
+-- A SEPARATE CONSTRAINT RATHER THAN A CLAUSE INSIDE is_complete ABOVE, and the
+-- reason is the probe rather than taste. A write can violate both at once, and
+-- PostgreSQL reports one of the two IN AN ORDER IT DOES NOT DOCUMENT: section
+-- 18 of the delta manifest records two assertions in a probe written before
+-- this file that were resting on exactly that undocumented order. Named
+-- separately, every assertion can name the constraint it is actually watching,
+-- and dropping either one fails an assertion that says which one went.
+--
+-- NULL PASSES, on the same reasoning as the NULLABLE column above: a row
+-- written before 0034 has no ciphertext, and erasure is a NULL.
+ALTER TABLE contact_channels
+  ADD CONSTRAINT contact_channels_ciphertext_refuses_plaintext CHECK (
+    value_ciphertext IS NULL OR octet_length(value_ciphertext) >= 29
+  );                                                              -- ADR-046
+
 -- THE ROTATION SWEEP'S READ: everything still sealed under the key being
 -- retired. Partial, because the rows with no ciphertext are exactly the rows a
 -- rotation has no work to do on, and they are the majority until the backfill
@@ -234,7 +285,11 @@ COMMENT ON COLUMN contact_channels.value_ciphertext IS
   'ADR-046, OQ-M10-06. The delivery address, envelope-encrypted under the key '
   'named by value_key_id, which is not in this database. value_hash keeps '
   'matching and uniqueness; this column is never matched on, and making it '
-  'deterministic enough to match on would make a dump enumerable.';
+  'deterministic enough to match on would make a dump enumerable. At least 29 '
+  'bytes when present (12-byte nonce, 16-byte GCM tag, one byte sealed), which '
+  'refuses every plaintext E.164 because one is at most 16 bytes. kind is also '
+  '(email, push), where a plaintext value of 29 bytes or more clears the floor: '
+  'the refusal is total for telephone numbers and partial for the other two.';
 
 -- -----------------------------------------------------------------------------
 -- identity_phones.phone_ciphertext                               -- ADR-046
@@ -265,6 +320,15 @@ ALTER TABLE identity_phones
     OR
     (phone_ciphertext IS NOT NULL AND phone_key_id IS NOT NULL
      AND phone_encrypted_at IS NOT NULL AND btrim(phone_key_id) <> '')
+  );                                                              -- ADR-046
+
+-- The plaintext floor, header item 7. TOTAL ON THIS TABLE rather than partial:
+-- phone_ciphertext holds a telephone number and nothing else, so every value
+-- this column can legitimately hold in the clear is below 29 bytes and every
+-- one of them is refused.
+ALTER TABLE identity_phones
+  ADD CONSTRAINT identity_phones_ciphertext_refuses_plaintext CHECK (
+    phone_ciphertext IS NULL OR octet_length(phone_ciphertext) >= 29
   );                                                              -- ADR-046
 
 CREATE INDEX identity_phones_key_rotation_idx
@@ -298,6 +362,16 @@ ALTER TABLE phone_change_requests
     OR
     (new_phone_ciphertext IS NOT NULL AND new_phone_key_id IS NOT NULL
      AND new_phone_encrypted_at IS NOT NULL AND btrim(new_phone_key_id) <> '')
+  );                                                              -- ADR-046
+
+-- The plaintext floor, header item 7. TOTAL ON THIS TABLE, for
+-- identity_phones' reason, and this is the column where the smuggled plaintext
+-- is likeliest: the trader typed the number into the request, so THE HANDLER
+-- THAT OPENS THIS ROW IS THE ONE HANDLER IN THE CORPUS HOLDING A NUMBER IN THE
+-- CLEAR AND A bytea COLUMN TO PUT IT IN.
+ALTER TABLE phone_change_requests
+  ADD CONSTRAINT phone_change_requests_ciphertext_refuses_plaintext CHECK (
+    new_phone_ciphertext IS NULL OR octet_length(new_phone_ciphertext) >= 29
   );                                                              -- ADR-046
 
 CREATE INDEX phone_change_requests_key_rotation_idx
