@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md, M20-wallet.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, FOLD-02-enforcement-window-and-suspension.md]
 last_updated: 2026-08-16
 ---
 
@@ -11,6 +11,10 @@ Constitution section M7, Appendix A (the whole dossier), Appendix B4 items 16, 1
 Constitution Appendix A states the kill chain this module is one link of: **rings bound by rules, caught by detection, made unprofitable by both, and the reserve survives whatever leaks through.** M1 already did the bounding. M7 does the catching, and it does it under one absolute constraint that shapes every design choice here.
 
 **Detection never denies a payout.** Enforcement happens at detection time, per the ToS, with an evidence pack, against an account or an identity. It never happens at request time against a payment. That is [detection-time enforcement](../GLOSSARY.md#detection-time-enforcement) and it is the reason the zero-denial promise can be kept while abuse is still handled.
+
+**Amended by [ADR-040](../decisions/ADR-040.md), and the amendment is narrower than it first reads.** One of this module's flags can now hold a payout **at request time**: an unresolved severity 4+ flag puts the request into `held_pending_review` before it is approved. **Detection still never denies a payout, and detection still decides nothing.** What the flag does is start a clock that binds on Merit: the request either **pays within 48 hours** or produces the documented enforcement action this paragraph already required, per the ToS, with an evidence pack. The detector's output is unchanged, still `open` and nothing else (INV-M7-02), and **no detector puts a request on hold**, because entering `investigating` is a human act with a written reason and a ToS clause. **This is one of the ten zero-denial sites ADR-040 enumerates**, and two of the ten sit inside merged migrations and can never be edited (constitution E2).
+
+**The sentence that changed is "it never happens at request time", and the honest form is that it now happens at request time and cannot end there.** A hold is not an enforcement. It is a bounded pause with a deadline Merit owes the trader, and the only two ways out of it are **paying** and **a decision somebody signed**.
 
 **Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** The **copy-trading clause was ruled** (section 3.4), which gives D-01 consequences for the first time, and **three detectors were added** to close the gap AS-M7-01 identified and could not close on its own: **D-12** day-0 graph-prior pairing, **D-13** the young-account fast path, and **D-14** clique position-sum detection. Together they move this module from detecting persistence to detecting entry.
 
@@ -32,7 +36,7 @@ Two halves that share a graph.
 
 | Not M7 | Whose job | Why the boundary is here |
 |---|---|---|
-| Denying, delaying, or clawing back a payment | nobody | There is no such action anywhere in Merit. The most a flag can cause is a **bounded** freeze on an in-flight payout ([M05](M05-payout-system.md) SD-M5-01) plus a human decision |
+| Denying or clawing back a payment | nobody | There is no such action anywhere in Merit. **A flag can now cause three things and every one of them is bounded and ends in a payment or a signed decision:** a **pre-approval hold** ([M05](M05-payout-system.md) SD-M5-08, 48 wall-clock hours, expiry **pays**), a **bounded freeze** on an in-flight payout (SD-M5-01, same clock, expiry releases), and an **identity restriction** ([ADR-041](../decisions/ADR-041.md), reversible, and where a payout is pending its SLA binds the **restriction** so it cannot outlast the hold's own 48 hours). **Delaying is no longer in this row's title**, because two of the three are delays and pretending otherwise would make this cell the contradiction rather than the boundary |
 | Enforcing anything automatically | admin, via [M6](M06-admin-ops-console.md) | Detectors only ever produce `open`. [STATE_MACHINES section 7](../architecture/STATE_MACHINES.md) makes the absence of an automatic path to `enforced` binding |
 | Changing a rule | [M1](M01-rules-engine.md) | A detector never alters what the engine computes. If a pattern needs a rule, that is a plan-config change with a published diff |
 | Verifying identity documents | M19 | M7 consumes the verification result and the biometric dedupe hit as graph edges |
@@ -66,6 +70,10 @@ M7 consumes [DATA_MODEL sections 3 and 9](../architecture/data-model/README.md) 
 | SD-M7-03 | new `detector_definitions` | `(detector, version) pk`, `parameters jsonb not null`, `description`, `effective_from`, `effective_to null`, `is_sensitive boolean not null default true` | Three needs at once: INV-M7-04's provenance, [M06](M06-admin-ops-console.md)'s redaction strip list (DEP-M6-03), and the ability to tune a threshold as a **data change with a recorded effective date** rather than a deploy. `is_sensitive` marks the parameters that must never reach a trader |
 | SD-M7-04 | `identity_links` | add `disputed_at timestamptz null`, `dispute_note text null`, `suppressed boolean not null default false`, `suppressed_by text null` | INV-M7-09. Two housemates, a married couple sharing a card, and a father funding a son's evaluation all produce genuine edges between genuinely different humans. Without a dispute path the graph's errors are permanent and invisible to the person they harm (AS-M7-04) |
 | SD-M7-05 | new `correlation_groups` | `id`, `trading_day`, `member_account_ids uuid[]`, `method text`, `statistic numeric`, `threshold numeric`, `detector_run_id`, `evidence jsonb` | Pairwise correlation is defeated by rotating a third leg (AS-M7-02). Group-level results have no home in a schema built around pairwise `identity_links`, and inventing one at detection time means the result cannot be reviewed, replayed, or explained |
+
+**`identity_restriction_episodes` is deliberately not a row in this table, and it is not an omission.** [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql) creates it and [DELTA_MANIFEST section 14](../../packages/db/DELTA_MANIFEST.md) records it, so the migration registry has it; what it does not yet have is a **plan-level `SD-` identifier**, and the module that should own one is [M06](M06-admin-ops-console.md), because [ADR-041](../decisions/ADR-041.md) puts the entry point on M06's flags queue and identity drill-down and the episode is an **enforcement record** rather than a detection one (section 1.2: enforcing is not M7's). M06 is [FOLD-02](FOLD-02-enforcement-window-and-suspension.md)'s **session 5**. Taking the next free number in **this** module's series, to avoid a table that looks like it missed something, would put an enforcement table inside the detection module on the strength of a citation, which is the two-owners defect rather than a tidy one. **This module reads the table** (section 3.5 reads `opened_at`) and does not own it.
+
+**And the number is not written out here, deliberately.** `ADR-026`'s completeness gate reads **any** `SD-` identifier appearing anywhere under `docs/` as a claim and demands a manifest row for it, so naming the next free one even to say it is not being claimed **creates the claim the sentence is refusing to make**. Same class as [ADR-042](../decisions/ADR-042.md)'s finding that prose quoting a generated span's literal delimiters becomes a span: **on a registry with a mechanical reader, describing an identifier and claiming it are the same act**, and the only safe way to decline is by position rather than by name.
 
 ---
 
@@ -143,6 +151,23 @@ The machine is [STATE_MACHINES section 7](../architecture/STATE_MACHINES.md), un
 | 2 | Weak or ambiguous pattern needing corroboration | D-06 velocity alone |
 | 1 | Informational, aggregated in a digest rather than queued | D-04 single-window observations |
 
+**Severity 4 became load-bearing on 2026-08-15 and this is where that is recorded.** `G-HOLD-REQUIRED` ([STATE_MACHINES section 10](../architecture/STATE_MACHINES.md), [ADR-040](../decisions/ADR-040.md)) reads **an unresolved flag of severity 4 or above, in `open` or `investigating`**, and holds the payout request on it. So a number that was a queue-ordering judgment is now a **gate on money**, and three things follow.
+
+- **The band is not new and was not invented for the hold.** Severity 4 and 5 is already the set `SD-M7-02` gives `sla_due_at` to, and already the set `G-EXPIRY-OR-RETRIGGER` reads when it re-triggers KYC on "an open severity 4+ flag". **Reusing the existing band is the point**: a second high-severity threshold, defined elsewhere and drifting, is this repository's most repeated defect.
+- **Scoring is now a money-path decision and inherits that discipline.** Moving a detector's output from 3 to 4 changes who gets held, so it is a **data change with a recorded effective date** through `SD-M7-03`, never a deploy, and it is auditable after the fact from `detector_definitions`.
+- **The precision floor and the auto-demotion in AS-M7-03 now protect a payout rather than an inbox.** A detector whose precision collapses while sitting at severity 4 holds real payouts for real traders, and **`FM-M7-05`'s automatic demotion to digest severity is what stops that being a policy decision made under pressure.** The demotion is a data change, which means it can happen in the hour rather than the sprint.
+
+**And `OQ-M7-03` is no longer only about an inbox.** It asks the SLA on severity 5 and answers "24 hours still lands before settlement", which was reasoned against a 2 to 3 business day rail. Under [ADR-040](../decisions/ADR-040.md) the same flag now runs a **48 wall-clock hour** clock on Merit, so a 24 hour time-to-first-touch leaves 24 hours to investigate, decide, and export an evidence pack before the request **auto-releases and pays**. That is still the correct outcome when nobody decided, and it is a materially tighter operating window than the question was answered against. The number is not moved here; the changed footing is recorded so the founder is answering the question that now exists.
+
+**The three enforcement shapes, distinguished in one place**, because the fold created the third and two adjacent states are how a control gets applied to the wrong thing:
+
+| Shape | Scope | Clock | Reversal |
+|---|---|---|---|
+| **Hold** (`held_pending_review`) | **one payment**, before approval | 48 wall-clock hours, **expiry pays** | nothing to reverse; nothing was posted |
+| **Freeze** (`frozen`, and the `wallet_withdrawals` halt) | **one payment**, after the ledger moved | 48 wall-clock hours, expiry releases | LT-03 on the internal leg; the external halt just resumes the rail |
+| **Restriction** (`identities.status = 'restricted'`) | **one human**, every account they hold | none of its own. Reversed by a **documented restore**, and where a payout is pending its `sla_due_at` binds the restriction so it cannot outlast the hold's 48 hours | `identity_restriction_episodes.restored_at`, `restored_by` and `restore_evidence`, all-or-none |
+
+**Closure for cause is the fourth and it is terminal**, which is why it is not in that table: the three above all end with the trader still holding what they had.
 ### 3.3a The three enforcement outcomes, which are not interchangeable
 
 **M07 originates evidence; it never originates money movement.** What an `enforced` flag can produce is now three distinct things, and the corpus has confused them at least once, so they are tabulated rather than described.

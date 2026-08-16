@@ -10,7 +10,7 @@ last_updated: 2026-08-16
 
 **Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](decisions/ADR-005.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
 
-**<!--gen:adr_count-->43<!--/gen--> ADRs. <!--gen:ec_count-->141<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](decisions/ADR-034.md)).
+**<!--gen:adr_count-->45<!--/gen--> ADRs. <!--gen:ec_count-->141<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](decisions/ADR-034.md)).
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
@@ -73,14 +73,17 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 |---|---|---|---|
 | [M01-rules-engine.md](plans/M01-rules-engine.md) | The crown jewel: 50-rule taxonomy, pure library, replay self-audit. **Gate closed 2026-08-13** | approved | founder |
 | [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning, ingest, reconciliation, simulator, streaming path, **16 vendor-confirmation items**. Held at `review` by [ADR-005](decisions/ADR-005.md) | review | founder |
+| [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method, the registration lookup as a second call site and the two cost lines a signup drives | approved | founder |
+| [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, the C-27 authority boundary shown rather than hit, Appendix F gate | approved | founder |
+| [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, bounded freeze, reserve | approved | founder |
 | [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method | approved | founder |
 | [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, Appendix F gate | approved | founder |
-| [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, bounded freeze, reserve | approved | founder |
+| [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, the 48 hour enforcement window (pre-approval hold and bounded freeze), reserve | approved | founder |
 | [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard, CUSUM, breakers, two-tier evidence packs, dual control | approved | founder |
 | [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution, three link tiers, eighteen detectors, copy-trading clause, flags queue, canaries | approved | founder |
 | [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, destination cooling, creative approval | approved | founder |
 | [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans and rules, publish-ordered revalidation, versioned legal, geo disclosure | approved | founder |
-| [M10-integrations.md](plans/M10-integrations.md) | One outbound bus, send-time suppression, support-context scoping, vendor-down chaos | approved | founder |
+| [M10-integrations.md](plans/M10-integrations.md) | One outbound bus, send-time suppression, support-context scoping, vendor-down chaos, and the SMS sender as the first vendor on a critical path | approved | founder |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Issuance, key lifecycle, non-enumerable verification, revocation classes, opt-in leaderboard | approved | founder |
 | [M12-transparency-platform.md](plans/M12-transparency-platform.md) | **Launch differentiator.** Seven auto-computed statistics, versioned definitions, immutable history, proof links | approved | founder |
 | [M12-statistic-definitions.md](plans/M12-statistic-definitions.md) | The seven definitions as a founder sign-off table, drafted before any data exists. **Amended by [ADR-031](decisions/ADR-031.md) and [ADR-032](decisions/ADR-032.md):** each statistic now declares its measure set and its integer unit | approved | founder |
@@ -101,7 +104,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 
 | Artifact | Purpose | Status | Owner |
 |---|---|---|---|
-| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->32<!--/gen--> files, all <!--gen:manifest_changes-->103<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->22<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
+| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->33<!--/gen--> files, all <!--gen:manifest_changes-->105<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->23<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
 | [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), the no-floats exemption list (**two columns, no money**, under [ADR-031](decisions/ADR-031.md)), and the per-constraint verification table. **[ADR-026](decisions/ADR-026.md)'s completeness gate reads this file** | review | founder |
 
 ## docs/testing/ (Wave 4)
