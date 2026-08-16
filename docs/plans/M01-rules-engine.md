@@ -1244,7 +1244,12 @@ Divergence emits one `replay.divergence_detected` per diverging field, so the pa
 | A correction superseded a mark | yes | Divergence from the correction's day forward is expected. Stored states are rewritten, **settled snapshots are not** (INV-22), the delta is reported, and the payout is never clawed back |
 | A backdated mark arrived | yes | Same as above |
 | An engine upgrade changed a computation | yes, but only through B.4 | Never applied silently |
+| **A calendar correction changed the day sequence** | **yes, but only through B.4** | **[ADR-047](../decisions/ADR-047.md), closing `OQ-P2-02`.** Never applied silently, and never paged per account. The calendar revision is the engine's **second version-like input**, so B.4's protocol governs it **without amendment**: `rule_states.calendar_revision_id` ([`0035`](../../packages/db/migrations/0035_rule_states_calendar_revision.sql)) carries the calendar watermark each row was folded under, and step 1 scopes divergence detection to the current one exactly as it scopes by `engine_version` |
 | Anything else | **no** | Page. This is a bug in the engine, the batch, or the data, and it is exactly the case the job exists to catch |
+
+**Why the fourth row is not a small addition.** A mark correction changes one account's inputs. **A calendar correction changes the day sequence for every account at once**: every counter that advances per trading day, every cadence gap computed by sequence subtraction, every `nextTradingDayAfter`. Without the row above, a calendar correction fell into "anything else", so **the first holiday correction diverged the whole book and paged once per account.** At 5,000 accounts that is 5,000 pages on one morning, which is how B.5's own warning comes true: a self-audit that becomes slow becomes a self-audit that gets disabled. **The alarm does not fail by being wrong; it fails by being right five thousand times.**
+
+**And a calendar correction can insert or remove a day *between* two settled payouts**, changing a cadence-gap count retroactively and so making a settled payout retroactively ineligible. **Nothing new is ruled for that case**, and it is written here precisely because the arithmetic looks novel enough that somebody would rule it again, differently, at speed: B.3's first row and `AS-05` already say a correction under a settled payout is **absorbed, flagged, reported, never clawed back**, and B.4 #5 and #6 are the same sentence in the protocol's own form.
 
 ### B.4 The engine upgrade protocol
 
@@ -1258,6 +1263,8 @@ Without this, the first legitimate bugfix produces thousands of divergences, bur
 6. If step 2 shows a changed day under a settled payout, the change is treated as a correction (AS-05, B4 #5): absorbed, flagged, reported, never clawed back.
 
 OQ-11 asks whether this gate applies to every such change, including ones purely in the trader's favor. The recommendation is yes, because "it favors the trader" is a judgment and the whole point of the gate is that a human makes it deliberately.
+
+**This protocol governs a CALENDAR correction too, and is not amended to do it** ([ADR-047](../decisions/ADR-047.md), `OQ-P2-02`). `engine_version` is **the code the fold runs**; the calendar revision is **the data it folds over**, and both are version-like inputs that a stored state row must name for step 1's scoping to mean anything. So read the six steps twice, once per input: **step 1** scopes to rows carrying the current `rule_states.calendar_revision_id` ([`0035`](../../packages/db/migrations/0035_rule_states_calendar_revision.sql)); **step 2**'s dry run is triggered by a new `trading_calendar_revisions` row; **step 3**'s report must state whether any changed day underlies a settled payout; **step 4**'s rewrite restamps the watermark; and **steps 5 and 6** are unchanged, because INV-22 does not care which input moved. **A second protocol for the same shape would be two expressions of one concept**, which is the alternative ADR-047 rejects by name.
 
 ### B.5 Cost
 

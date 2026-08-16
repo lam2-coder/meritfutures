@@ -368,19 +368,37 @@ END $$;
 -- ---------------------------------------------------------------------------
 -- `TRUNCATE trading_calendar` alone fails on the revisions foreign key, and a
 -- probe that stopped there would be testing PostgreSQL rather than this
--- migration. The form below names both tables, so the foreign key has no
--- objection left and the only thing standing between an operator and an empty
--- calendar with an empty audit trail is CALENDAR-C2.
+-- migration. The form below defeats the foreign key, so the only thing standing
+-- between an operator and an empty calendar with an empty audit trail is
+-- CALENDAR-C2.
+--
+-- IT WAS A HAND-MAINTAINED TABLE LIST UNTIL `0035`, and `0035` broke it. The
+-- statement read `TRUNCATE trading_calendar, trading_calendar_revisions`, which
+-- named every table in the dependency graph AS OF `0033`. ADR-047 added
+-- `rule_states.calendar_revision_id`, a third table entered the graph, and the
+-- statement started failing with `cannot truncate a table referenced in a
+-- foreign key constraint` BEFORE CALENDAR-C2 could fire. The guard was intact
+-- the whole time; the probe had gone blind to it, and the wrong-finding check
+-- two lines down is what said so rather than a silent pass.
+--
+-- CASCADE IS THE FIX BECAUSE IT IS NOT A LIST. PostgreSQL derives the
+-- referencing set itself, so the next migration to reference either table
+-- cannot break this assertion the way `0035` did. It is also the STRONGER test:
+-- CASCADE is the form an operator with a deadline actually reaches for, and it
+-- is the one that empties the audit trail and the states along with the
+-- calendar. This is the positional-assertion lesson (OI-08) in a new costume: a
+-- hand-maintained list does not fail when it goes stale, it keeps passing
+-- against less, and here it did not even do that.
 DO $$
 BEGIN
   BEGIN
-    TRUNCATE trading_calendar, trading_calendar_revisions;
-    RAISE EXCEPTION 'PROBE FAILED: the calendar and its revisions were truncated together';
+    TRUNCATE trading_calendar CASCADE;
+    RAISE EXCEPTION 'PROBE FAILED: the calendar was truncated together with everything referencing it';
   EXCEPTION WHEN check_violation THEN
     IF SQLERRM NOT LIKE '%CALENDAR-C2%may not be truncated%' THEN
       RAISE EXCEPTION 'PROBE FAILED: wrong finding for the truncate: %', SQLERRM;
     END IF;
-    RAISE NOTICE 'REJECTION 8: CALENDAR-C2 refused a truncate that the foreign key would have allowed';
+    RAISE NOTICE 'REJECTION 8: CALENDAR-C2 refused a cascading truncate that the foreign keys would have allowed';
   END;
 END $$;
 
