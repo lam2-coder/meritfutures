@@ -199,6 +199,47 @@ test(reU('R-15'), () => {
   expect(after.state.floorCents).toBe(5_010_000n);
   expect(after.state.highWaterBalanceCents).toBe(atTrigger.state.highWaterBalanceCents);
   expect(after.events.map((e) => e.type)).not.toContain('rule.floor_locked');
+
+  // -----------------------------------------------------------------------------
+  // A DAY THAT JUMPS PAST THE TRIGGER, WHICH IS THE CASE THIS TEST DID NOT HAVE
+  // -----------------------------------------------------------------------------
+  // The two cases above land ON the trigger and one cent below it, which is
+  // where CV-12's "the floor never jumps" is true and where M01 calls section
+  // 3.4's `max` redundant. R-15's operator is `>=`, so a single day can clear
+  // the trigger by any amount, AND EVERY V1 EVAL PASS DOES: the lock triggers at
+  // 260,000c of profit and the eval target is 300,000c.
+  //
+  // Here the account closes 300,000c up. The trail has already put the floor at
+  // 5,300,000 - 250,000 = 5,050,000, which is 40,000c ABOVE the locked value of
+  // 5,010,000. Section 3.4's `max` keeps 5,050,000; assigning the locked value
+  // would move the floor DOWN on the account's best day, which is INV-06.
+  const overshoot = fold(
+    CORE_50K,
+    {
+      tradingDay: day('2026-11-03'),
+      openingBalanceCents: 5_000_000n,
+      realizedPnlCents: 300_000n,
+    },
+    fundedPrior(CORE_50K),
+  );
+  expect(overshoot.state.floorLocked).toBe(true);
+  expect(overshoot.state.floorCents).toBe(5_050_000n);
+  expect(overshoot.state.highWaterBalanceCents).toBe(5_300_000n);
+
+  // AND THE LOCK IS STILL PERMANENT AT THE HIGHER NUMBER. `hwb` is frozen, so
+  // the expression returns 5,050,000 every subsequent day and INV-07 holds: the
+  // lock is a floor under the floor, not a cap on it.
+  const later = fold(
+    CORE_50K,
+    {
+      tradingDay: day('2026-11-04'),
+      openingBalanceCents: 5_300_000n,
+      realizedPnlCents: 500_000n,
+    },
+    overshoot.state,
+  );
+  expect(later.state.floorCents).toBe(5_050_000n);
+  expect(later.state.highWaterBalanceCents).toBe(5_300_000n);
 });
 
 // -----------------------------------------------------------------------------
