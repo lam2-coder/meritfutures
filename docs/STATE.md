@@ -213,6 +213,19 @@ Nothing.
 
 **Two open questions leave this session and neither blocks session 5.** **`OQ-M7-05`:** "hard link" means *auto-enforce* in section 7.9 and [ADR-029](decisions/ADR-029.md) and *flag-and-no-state-change* in section 3.1 and `INV-M19-04`. **ADR-039 settled it for the phone and only for the phone**, and this session refused to extend one ruling's reach by inheritance. And **session 6 owes two citations**: `CI-06d` fails on any unresolvable `GS` or `EC` identifier, so `AS-M19-09` and `AS-M16-07` name session 6 in prose rather than claiming numbers, and session 6 must go back and wire them.
 
+### FOLD-01 session 5: the portal, the vendors and the legal surface (2026-08-16)
+
+**[M04](plans/M04-trader-portal.md), [M03](plans/M03-billing-checkout.md), [M10](plans/M10-integrations.md), [PRIVACY_POLICY](legal/PRIVACY_POLICY.md) and [COUNSEL_PACKET](legal/COUNSEL_PACKET.md) are folded.** Non-money, no migration, no registry entry, no manifest row. `SD-M4-04` recorded against `0029`; `INV-M4-14` and `INV-M4-15` and a new section 3.7, **the authority boundary shown rather than hit**; `AS-M4-05` gains the SIM-swap shape; `FM-M4-10`; `IN-M10-06` the SMS sender and `INV-M10-12`; M03 §7.9.1 the registration lookup and §7.9.2 the Cost Stack lines; counsel item **3d** and the privacy policy's telephony row **citing** it.
+
+**Two findings leave this session and one of them is a proven gap in a shipped control.**
+
+**`OQ-M10-06`: nothing in the schema holds an address the dispatcher can send to.** There is **no plaintext telephone number in any of the twenty-nine migrations**, `users.email` is overwritten on change, and `contact_channels.value_hash` is one-way. Both `0019` and the `contact_channels` design record say the value is hashed because **"the sending path holds the address"**; the sending path is [M10](plans/M10-integrations.md), it holds nothing, and it may not delegate to a vendor under `AS-M10-06` part 3. So `INV-M16-03`'s prior-contact notification, [SECURITY §4.8](architecture/SECURITY.md) leg 2 and every Merit-initiated security SMS have no destination. **`phone_change_requests_applied_is_complete` can only assert that `prior_notified_at` exists**, so a handler with no address will fill it and the control reads as enforced in every document and every row-level test while never sending. This is `OI-06`'s shape and it is recorded, not fixed. **No `OI-nn` claimed**: that series already carries two rows numbered `OI-06`.
+
+**`OQ-M10-05`: C-28's degradation ruling is about the cost breaker and says nothing about a vendor outage.** `IN-M10-06` is the first bought vendor on the critical path of anything, by design and on day one, because phone verification is mandatory at registration. The shape is identical and the mechanism is already built, but degrading on a vendor outage means anyone who can take an SMS provider offline can turn off Merit's phone verification, which is a different bargain and the founder's to make.
+
+**One identifier was allocated and it is reversible.** `SC-M4-11`, the security and sessions screen, for a surface `AS-M4-05` counter 2 and `GS-104` already committed to and that had no row in section 3.1. Unlike `SD-nn` it has no allocation table and no gate, and nothing outside M04 section 3.7 cites it.
+
+**Next is FOLD-01 session 6**, the registries and the gates: `EDGE_CASES`, `GOLDEN_SCENARIOS`, `STRATEGY`, `CI-06k`, `API_CONTRACT`, `EVENTS`, `STATE_MACHINES`, `INDEX`. **It carries a growing debt of citations no session may claim before it**: session 4 owes `AS-M19-09` and `AS-M16-07` their scenario references, and session 5 owes three more, named in words in [M04 §8.2](plans/M04-trader-portal.md). It also owes the endpoints M04 consumes and has never had, including the session-list endpoint owed since `AS-M4-05` was approved.
 
 ---
 
