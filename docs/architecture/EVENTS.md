@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, data-model/README.md]
-last_updated: 2026-08-13
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, data-model/README.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md]
+last_updated: 2026-08-16
 ---
 
 # Events (Constitution §2 "everything is an event")
@@ -57,8 +57,22 @@ Every event Merit emits: name, payload schema, producer, consumers. One append-o
 | `kyc.rejected` | Provider webhook | `{ identity_id, rejection_reason_code }` | FEED, MAIL, RISK, ALERT |
 | `kyc.expired` | Worker | `{ identity_id, expired_at }` | MAIL, NOTIF |
 | `kyc.dedupe_hit` | Provider webhook | `{ identity_id, matched_identity_id, provider }` | RISK, ALERT, EVID |
+| `phone.verified` | API on verification | `{ identity_id, phone_id, line_type, carrier_country, ported, footprint_present, lookup_provider, is_reassignment_candidate }` | FEED, TL, RISK, EVID, BI |
+| `phone.change_requested` | API | `{ identity_id, change_request_id, old_phone_id, withdrawal_hold_until }` | FEED, TL, NOTIF, RISK, EVID |
+| `phone.reassignment_detected` | Worker on the recycling guard | `{ identity_id, phone_id, prior_phone_id, last_ported_at, release_evidence_ref, resolved }` | RISK, ALERT, EVID |
+| `sms.budget_breaker_tripped` | Worker on `otp_send_budget` | `{ scope_kind, scope_key, evaluated_on, state, sends, send_limit, spend_cents, budget_cents, deferred_registrations }` | ALERT, FEED, BI, EVID |
 
 `kyc.dedupe_hit` is the fleet-killer signal from the [adversary dossier](../../research/ADVERSARY_DOSSIER.md) scheme 6. It fires before any liability exists, which is the entire point of verifying pre-funded.
+
+**The four phone and SMS events are [ADR-039](../decisions/ADR-039.md)'s, and both [M16](../plans/M16-notification-center.md) and [M07](../plans/M07-risk-abuse.md) consume them.** Four things about their payloads are decisions rather than shapes.
+
+**No payload carries a number, a hash of one, or a preview of one.** The convention in §1 forbids PII in a forever-retained table, and a phone number is the most re-identifying field Merit holds. `phone_id` references the row; anything sensitive is fetched through an authorized read at display time. This is stricter than it looks: `identity_phones.phone_preview` exists and is deliberately not carried here, because "enough to recognise" in a permanent event stream is enough to correlate.
+
+**`phone.verified` fires on the second identity too, and `is_reassignment_candidate` is why it can.** `INV-M19-13` rules that a second identity verifying a live number **completes**, writes the edge at the hard-link confidence ceiling and opens a severity-5 flag against both, changing no state. The event is therefore emitted on an ordinary success and on a contested one, and the flag carries the difference. **The trader-facing surfaces never see that field**, because telling either party about the other is what `AS-M19-05` counter 4 forbids.
+
+**`phone.reassignment_detected` carries `resolved` and it is the field the investigation needs.** The recycling guard has three outcomes and only one is a release: the port date falls after the restriction date and the prior row is released with evidence; the port date falls before it and the link stands; or **there is no portability record at all**, which is `EC-143`'s residual and leaves a severity-5 flag open with nothing enforced. A boolean that flattened the third case into the second would make the corpus unable to count the cases the vendor could not answer, which is the number `DEP-M19-09` is judged on.
+
+**`sms.budget_breaker_tripped` is an ALERT event first and that is a ruling, not an ordering.** [ADR-039](../decisions/ADR-039.md)'s breaker **degrades rather than stopping**, and a degraded mode nobody is watching becomes the normal mode. `otp_send_budget_degraded_is_alarmed` refuses to store a silent trip at the schema level and this is the same obligation on the event side. It fires on the trip, on the degraded window and on the recovery, distinguished by `state`, and it carries `deferred_registrations` because **the number of registrations that completed unverified during the window is a reported figure**: a queue nobody drains is a fail-open with extra steps. `EC-142`, `GS-271`.
 
 ## 4. Commerce
 

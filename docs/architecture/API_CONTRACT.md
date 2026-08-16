@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, STATE_MACHINES.md, ../../research/SECURITY_LANDSCAPE.md]
-last_updated: 2026-08-13
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, STATE_MACHINES.md, SECURITY.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md, ../../research/SECURITY_LANDSCAPE.md]
+last_updated: 2026-08-16
 ---
 
 # API Contract (Constitution B2)
@@ -75,22 +75,51 @@ Errors never include stack traces, SQL, vendor payloads, or another identity's d
 ## 3. Auth
 
 ### POST /auth/otp
-Request an email one-time code. Deliberately does not reveal whether the address exists.
+Request a one-time code. Deliberately does not reveal whether the destination exists.
+
+**`channel` takes no default** ([ADR-039](../decisions/ADR-039.md), `SD-M16-05`). The schema below mirrors `otp_challenges_exactly_one_destination`: exactly one destination is set and it is the one the channel names. A default would let a caller that forgot the field write a well-formed email challenge and leave a `CHECK` doing a type's job.
 
 ```ts
-// request
-type OtpRequest = { email: string; turnstile_token: string };
+// request. Exactly one of email / phone, and it must match `channel`.
+type OtpRequest = {
+  channel: "email" | "sms";
+  email?: string;
+  phone?: string;              // E.164
+  turnstile_token: string;
+};
 // response 202 (always, whether or not the account exists)
 type OtpResponse = { sent: true; expires_in_seconds: number };
 ```
-Auth: none. Rate limit: 5 per hour per IP, 5 per hour per normalized email. Errors: `validation_failed`, `rate_limited`.
+Auth: none. Rate limit: see §11; the `sms` channel is **pre-identity** and carries per-number, per-IP and per-country velocity plus the cost breaker (`INV-M16-12`, [SECURITY](SECURITY.md) C-28). Errors: `validation_failed`, `rate_limited`.
+
+**A `202` on the `sms` channel does not mean a message was sent.** When `otp_send_budget` is degraded the response is unchanged and `deferred` is set, because [ADR-039](../decisions/ADR-039.md)'s breaker **degrades rather than stopping**: registration continues and phone verification is deferred to the `pre_funded` funding gate. Distinguishing the degraded response for an unauthenticated caller would tell an attacker exactly when their own traffic tripped the breaker.
+
+```ts
+type OtpResponse202 = { sent: true; expires_in_seconds: number; deferred?: true };
+```
 
 ### POST /auth/verify
 ```ts
-type VerifyRequest = { email: string; code: string };
-type VerifyResponse = { identity_id: string; user_id: string; is_new: boolean };
+type VerifyRequest = { channel: "email" | "sms"; email?: string; phone?: string; code: string };
+type VerifyResponse = {
+  identity_id: string;
+  user_id: string;
+  is_new: boolean;
+  auth_factor: "email_otp" | "sms_otp" | "passkey";   // sessions.auth_factor
+};
 ```
-Sets the session cookie. Auth: none. Rate limit: 10 per hour per IP; the challenge locks after 5 attempts. Errors: `validation_failed`, `unauthenticated` (bad or expired code, deliberately indistinguishable), `rate_limited`.
+Sets the session cookie and records `sessions.auth_factor`, which is what makes C-27 enforceable: a handler cannot refuse an SMS-established session for a sensitive action if the session never recorded how it was established. Auth: none. Rate limit: 10 per hour per IP; the challenge locks after 5 attempts. Errors: `validation_failed`, `unauthenticated` (bad or expired code, deliberately indistinguishable), `rate_limited`.
+
+### POST /auth/elevate
+Elevates the current session for a sensitive action. **It does not re-establish the session and it never issues a new one.**
+
+```ts
+type ElevateRequest =
+  | { factor: "passkey"; credential: PublicKeyCredentialJSON }
+  | { factor: "dual_channel"; challenge_id: string; code: string };
+type ElevateResponse = { elevated_at: string; elevated_by_factor: "passkey" | "dual_channel" };
+```
+**The factor vocabulary is C-27 and it is closed.** `sessions.elevated_by_factor` admits `passkey` and `dual_channel` and nothing else, so **an SMS-established session cannot elevate itself at all**: "never SMS alone" is a vocabulary rather than a handler, and a SIM-swapped session can see everything and change nothing because the database has no value for the thing it would have to write. Auth: session. Errors: `validation_failed`, `unauthenticated`, `forbidden` (a single factor offered where C-27 requires elevation), `rate_limited`.
 
 ### POST /auth/passkey/register/options, /auth/passkey/register/verify
 ### POST /auth/passkey/login/options, /auth/passkey/login/verify
@@ -118,9 +147,73 @@ type Me = {
   accounts_count: number;
   max_accounts: number;
   affiliate: { is_affiliate: boolean; code: string | null };
+
+  // FOLD-01. The boundary is SHOWN rather than hit: the client reads what this
+  // session may do from one server declaration instead of inferring it.
+  phone: { verified: boolean; preview: string | null; verified_at: string | null };
+  session: {
+    auth_factor: "email_otp" | "sms_otp" | "passkey";
+    elevated: boolean;
+    elevated_by_factor: "passkey" | "dual_channel" | null;
+  };
 };
 ```
 Auth: session. Rate limit: 120 per minute.
+
+### 3.1 Phone verification and change (FOLD-01)
+
+[ADR-039](../decisions/ADR-039.md) (b), (c) and (d). The tables are `identity_phones` and `phone_change_requests` (`0029`), and the machine is [STATE_MACHINES §12](STATE_MACHINES.md).
+
+#### POST /phone/verify
+Completes verification of a number challenged through `POST /auth/otp` with `channel: "sms"`. Writes the `identity_phones` row and the ADR-022 graph edge.
+
+```ts
+type PhoneVerifyRequest = { challenge_id: string; code: string };
+type PhoneVerifyResponse = {
+  phone_id: string;
+  preview: string;                  // enough to recognise, never enough to reconstruct
+  verified_at: string;
+  line_type: "mobile" | "landline" | "voip" | "prepaid" | "unknown";
+};
+```
+**A `voip` line type is returned and never refused** ((a): VoIP is scored, never rejected). Auth: session. Errors: `validation_failed`, `unauthenticated`, `conflict` (this identity already holds a live verified phone; the change ceremony below is the only way to replace one), `rate_limited`.
+
+**A number already live on another identity still verifies.** `INV-M19-13`: the edge is written at the hard-link confidence ceiling and a severity-5 flag opens against both identities, and no state changes automatically. **The response is indistinguishable from an ordinary success**, because telling this caller that the number belongs to another account discloses the prior holder, which `AS-M19-05` counter 4 forbids.
+
+#### POST /phone/change, GET /phone/change, POST /phone/change/:id/cancel
+(c)'s D4 ceremony as a resource. Opening a request is a sensitive action: it requires an **elevated** session, and `phone_change_requests_open_per_identity_uq` means a second open request is a `conflict` rather than a second ceremony.
+
+```ts
+type PhoneChangeRequest = { new_phone: string };            // E.164
+type PhoneChange = {
+  id: string;
+  state: "pending" | "dual_channel_verified" | "applied" | "cancelled";
+  new_phone_preview: string;
+  dual_channel_verified_at: string | null;
+  prior_notified_at: string | null;
+  withdrawal_hold_until: string | null;                     // the 48 hour external-withdrawal hold
+  applied_at: string | null;
+  cancelled_at: string | null;
+  cancelled_reason: string | null;
+};
+```
+`GET` is a read and takes any single factor. **The hold is exposed rather than inferred**: `withdrawal_hold_until` is the same value the payout and wallet-withdrawal paths read before they move money, so the portal shows the trader the running hold instead of surprising them with a refusal at the end of it. Errors: `validation_failed`, `unauthenticated`, `forbidden` (session not elevated), `conflict`, `rate_limited`.
+
+#### GET /sessions, POST /sessions/:id/revoke
+The active-sessions surface `AS-M4-05` has required since it was approved, and **the establishing factor is shown on every row**, which is what makes a SIM-swapped session visible to the person it was taken from.
+
+```ts
+type SessionRow = {
+  id: string;
+  auth_factor: "email_otp" | "sms_otp" | "passkey";
+  elevated: boolean;
+  created_at: string;
+  last_seen_at: string;
+  user_agent_family: string;        // coarse, never the raw string
+  is_current: boolean;
+};
+```
+`GET` is a read and takes any single factor, deliberately: **a session you cannot see is one you cannot revoke**, and requiring elevation to look would lock a compromised account's real owner out of the one screen that helps them. Revoking another session is a **contact-class sensitive action** and requires elevation. Errors: `unauthenticated`, `forbidden`, `not_found`.
 
 ## 4. Catalog (public)
 
@@ -513,8 +606,13 @@ Unverified signatures return `401` and are logged as security events; they never
 
 | Surface | Limit |
 |---|---|
-| `POST /auth/otp` | 5/hour/IP, 5/hour/email |
+| `POST /auth/otp` (`channel: "email"`) | 5/hour/IP, 5/hour/email |
+| `POST /auth/otp` (`channel: "sms"`) | **pre-identity, and the limits are data rather than prose.** Per-number, per-IP and per-country velocity plus a global cost breaker, held as `otp_send_budget` rows (`send_limit`, `budget_cents`) so the values are config the way every other plan parameter is. **Never rate-limit exempt**: `notification_kinds.rate_limit_exempt` is generated from `class` and `pre_identity_auth` is not in the exempt set. C-28, `INV-M16-12` |
 | `POST /auth/verify` | 10/hour/IP, 5 attempts/challenge |
+| `POST /auth/elevate` | 10/hour/session, 5 attempts/challenge |
+| `POST /phone/verify` | 10/hour/identity |
+| `POST /phone/change` | 3/day/identity; one open request per identity is a schema constraint rather than a limit |
+| `POST /sessions/:id/revoke` | 20/day/identity |
 | `POST /checkout` | 10/hour/identity, 20/hour/IP |
 | `POST /accounts/:id/payout` | 10/day/account, 20/day/identity |
 | `POST /accounts/:id/reset` | 10/day/identity |
@@ -527,20 +625,41 @@ Unverified signatures return `401` and are logged as security events; they never
 
 Every row is a named test that must exist before the endpoint ships ([VG-5](../../research/VIBE_FAILURE_POSTMORTEMS.md)).
 
-| Test | Expected |
+**The required-factor column is [ADR-039](../decisions/ADR-039.md) amendment 4 made checkable, and `CI-06k` is what reads it.** C-27 is enforced by a **server-side declaration per endpoint** rather than by discipline, and a declaration that lives only in a handler is one no reviewer can audit. Every row below therefore states the factor the endpoint requires, drawn from a **closed vocabulary**, and the sensitive actions C-27 names carry a `C-27:` tag naming which one.
+
+| Token | Meaning |
 |---|---|
-| Unauthenticated request to any `/accounts/*`, `/payouts`, `/affiliate/*`, `/admin/*` | 401 |
-| User B reads `GET /accounts/{A}` and every subresource (`/marks`, `/timeline`, `/eligibility`) | 404 |
-| User B posts `POST /accounts/{A}/payout` | 404 |
-| Trader session calls any `/admin/*` | 403 |
-| Trader session calls `/internal/*` from the public origin | 404 |
-| Admin session from a non-allowlisted IP | 403 at the edge |
-| `readonly` role calls any admin mutation | 403 |
-| Payout body with `amount_cents` greater than cap | approved amount clamped, never the requested value |
-| Payout body omitting `amount_cents` entirely | approved amount equals `min(cap, withdrawable)`, `amount_supplied` false |
-| Payout body with `amount_cents` below `min_payout_cents` | `payout_not_eligible` with `minimum_amount` failing; no partial payment |
-| Checkout with a client-supplied price field | field ignored; server price used |
-| `/docs`, `/openapi.json`, `/swagger` in production | 404 |
+| `none` | Unauthenticated surface. No session is required and none is trusted |
+| `session` | **Any single factor**, which is every read surface. Email OTP, SMS OTP or passkey, indistinguishable here on purpose |
+| `passkey` | A passkey assertion specifically |
+| `dual_channel` | A second independent channel specifically |
+| `passkey or dual_channel` | C-27's elevation: either, never a single factor, and **never SMS alone**. `sessions.elevated_by_factor` admits exactly these two values |
+| `admin_sso` | The operator surface. Hardware-key SSO under C-08, which has **no SMS path, ever** ([SECURITY §2.7](SECURITY.md), rescoped) |
+
+**`session` and `passkey or dual_channel` are the load-bearing pair**, and the gate's second assertion is that no row tagged `C-27:` declares the first. A sensitive endpoint added later with no factor declared fails the first assertion; one added with a single factor declared fails the second.
+
+| Test | Required factor | Expected |
+|---|---|---|
+| Unauthenticated request to any `/accounts/*`, `/payouts`, `/affiliate/*`, `/admin/*` | `none` | 401 |
+| User B reads `GET /accounts/{A}` and every subresource (`/marks`, `/timeline`, `/eligibility`) | `session` | 404 |
+| User B posts `POST /accounts/{A}/payout` | `session` | 404 |
+| Trader session calls any `/admin/*` | `admin_sso` | 403 |
+| Trader session calls `/internal/*` from the public origin | `admin_sso` | 404 |
+| Admin session from a non-allowlisted IP | `admin_sso` | 403 at the edge |
+| `readonly` role calls any admin mutation | `admin_sso` | 403 |
+| Payout body with `amount_cents` greater than cap | `session` | approved amount clamped, never the requested value |
+| Payout body omitting `amount_cents` entirely | `session` | approved amount equals `min(cap, withdrawable)`, `amount_supplied` false |
+| Payout body with `amount_cents` below `min_payout_cents` | `session` | `payout_not_eligible` with `minimum_amount` failing; no partial payment |
+| Checkout with a client-supplied price field | `session` | field ignored; server price used |
+| `/docs`, `/openapi.json`, `/swagger` in production | `none` | 404 |
+| `GET /auth/otp` with `channel: "sms"` driven past the per-number velocity | `none` | `rate_limited`. The pre-identity class is **not** exempt, and a `202` carrying `deferred` is the degraded path rather than a refusal |
+| `POST /auth/elevate` offering an SMS-established factor | `passkey or dual_channel` | `validation_failed`. **There is no such value to send**: the factor union admits `passkey` and `dual_channel` only, which is "never SMS alone" expressed as a type rather than as a check |
+| Changing a payout destination from a session whose only factor is SMS OTP | `passkey or dual_channel` (C-27: payout destination change) | 403 `forbidden`, and the response names the factor required so the client can offer it. The read that showed the destination succeeded, which is the boundary working |
+| Changing an email or phone contact from a non-elevated session | `passkey or dual_channel` (C-27: contact change) | 403 `forbidden`. **Either kind**, which is why `POST /phone/change` and the email equivalent share one row |
+| `POST /sessions/:id/revoke` against another session, non-elevated | `passkey or dual_channel` (C-27: contact change) | 403 `forbidden`. Revocation is a credential-surface change and takes the contact-change factor |
+| External withdrawal from a non-elevated session | `passkey or dual_channel` (C-27: external withdrawal) | 403 `forbidden`, on both the payout external leg and the wallet withdrawal, because C-27 names the action and not the endpoint |
+| External withdrawal from an **elevated** session while a phone-change hold runs | `passkey or dual_channel` (C-27: external withdrawal) | refused for the duration of `withdrawal_hold_until`. **Elevation is necessary and not sufficient**: (c)'s hold is a separate gate, and a test that only covers the factor would pass a build that dropped the hold |
+| `GET /sessions` and `GET /phone/change` from a single-factor session | `session` | 200. **The quiet direction, asserted deliberately**: requiring elevation to *look* would lock a compromised account's real owner out of the one screen that helps them, and a boundary tested only where it refuses is indistinguishable from a boundary that refuses everything |
 
 ## 13. Founder rulings (Wave 2 gate, 2026-08-13)
 

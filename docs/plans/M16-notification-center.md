@@ -337,7 +337,7 @@ Every notice about steps 2 and 3 now arrives at an address the attacker controls
 
 **The residual, stated rather than defended away.** `otp_send_budget` is **daily** state and that granularity is deliberate: it is the durable, reviewable budget, the same job `plan_breaker_state` does for sales. It is **not** the burst control. Sub-minute velocity belongs at the edge, where it can refuse a send **before one is paid for**, alongside Turnstile on the auth surface ([SECURITY](../architecture/SECURITY.md) C-07). A reader who takes this table for the whole defence has left the first minute of an attack uncontrolled.
 
-**The edge case and golden scenario for this are allocated in [FOLD-01](FOLD-01-phone-identity.md) session 6, which owns both registries**, together with the degraded-path fixture [ADR-039](../decisions/ADR-039.md) names by name: a breaker-tripped registration completes, the identity reaches `pre_funded`, and the funding gate refuses it until phone verification lands. **A degraded path with no fixture is a path that gets removed by whoever finds it confusing.**
+**The edge case and golden scenarios are allocated and these citations are now live: [EC-144](../edge-cases/EC-144.md) and GS-270 for the pumping attempt, [EC-142](../edge-cases/EC-142.md) and GS-271 for the degraded path** [ADR-039](../decisions/ADR-039.md) names by name, where a breaker-tripped registration completes, the identity reaches `pre_funded`, and the funding gate refuses it until phone verification lands. **A degraded path with no fixture is a path that gets removed by whoever finds it confusing**, which is why the ruling named it rather than leaving it to the registries session's judgment.
 
 ## 7.9 Verification notifications
 

@@ -720,6 +720,15 @@ const SPAN_QUERIES = {
 
   index_entries: () => (read('docs/INDEX.md').match(/^\| \[/gm) || []).length,
 
+  // HOW MANY CHECKS THIS RUNNER RUNS, which STRATEGY 4.4 stated by hand and got
+  // wrong. It read "All ten of the gates above, plus ADR-026's ... eleven checks"
+  // against eleven gate rows plus ADR-026, which is twelve, and it had been wrong
+  // since CI-06n was added. A count of the gates, written beside the gates, is the
+  // one place that cannot drift from them. Reads GATES rather than counting
+  // STRATEGY's table rows, because the runner is the artifact and the table is the
+  // description of it.
+  gate_count: () => GATES.length,
+
   // Added at the reconciliation. STATE said "Sixteen files carry an E2 READ"
   // against seventeen on disk, which was the seventh hand-maintained count
   // found wrong. The E2 set grows whenever a money-path migration lands, which
@@ -1293,6 +1302,230 @@ const adr026 = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06k  DECLARED AUTHORITY
+// -----------------------------------------------------------------------------
+// ADR-039 amendment 4 (C-27) and amendment 2, made checkable from the tree.
+//
+// C-27 is enforced "by a server-side required-factor declaration per endpoint,
+// not by discipline". A declaration nothing reads is discipline with extra
+// steps, so this gate reads it. Three assertions, no database:
+//
+//   1. Every row of API_CONTRACT section 12's matrix carries a required-factor
+//      cell. This is the one that catches a SENSITIVE ENDPOINT ADDED LATER: the
+//      author who adds a row has to answer the question, and an empty cell is a
+//      finding rather than an omission nobody sees.
+//   2. Every sensitive action C-27 names -- payout destination change, contact
+//      change, external withdrawal -- appears in that matrix and declares a
+//      NON-SINGLE factor. `session` is the single-factor token, and a C-27 row
+//      declaring it is the SIM-swap hole the invariant exists to close.
+//   3. No notification_kinds class outside the post-identity security and money
+//      classes is rate_limit_exempt. This is amendment 2: INV-M16-11 was
+//      written for authenticated recipients, and applied to an attacker-supplied
+//      number it funds SMS pumping (AS-M16-07).
+//
+// WHY ASSERTION 3 READS THE GENERATED EXPRESSION RATHER THAN COUNTING ROWS.
+// `rate_limit_exempt` is GENERATED ALWAYS AS (class IN (...)) STORED, which is
+// SD-M16-07 making the exemption unforgeable at the seed-row level. The only
+// place the policy can change is that expression, so that is what is read. A
+// gate reading seed rows would be checking the half the schema already makes
+// impossible while ignoring the half a migration can still move.
+//
+// THE C-27 ACTION LIST IS HARDCODED HERE, and that is the one hand-maintained
+// thing in this gate. It is three strings from a frozen invariant; if C-27 ever
+// names a fourth, this list is where it goes, and the gate fails loudly on the
+// missing row rather than silently passing a matrix that never grew.
+const API_CONTRACT_DOC = 'docs/architecture/API_CONTRACT.md';
+const NEGATIVE_AUTHZ_HEADING = '## 12. Negative-authz test matrix';
+
+// C-27's own words, in C-27's order.
+const C27_SENSITIVE_ACTIONS = [
+  'payout destination change',
+  'contact change',
+  'external withdrawal',
+];
+
+// The closed vocabulary API_CONTRACT section 12 publishes. `session` is the
+// single-factor token and is the whole point of the partition: any single factor
+// establishes a session sufficient for every READ surface, and no single factor
+// is sufficient for a sensitive action.
+const SINGLE_FACTOR_TOKENS = new Set(['none', 'session']);
+const ELEVATING_FACTOR_TOKENS = new Set(['passkey', 'dual_channel']);
+const FACTOR_TOKENS = new Set([...SINGLE_FACTOR_TOKENS, ...ELEVATING_FACTOR_TOKENS, 'admin_sso']);
+
+// Rows of the matrix, as [cells]. Bounded to its own section for the same reason
+// falsify.mjs's addMigrationRow is: unbounded, this runs into section 13 and
+// starts reading a table that answers a different question.
+function negativeAuthzRows(body) {
+  const start = body.indexOf(NEGATIVE_AUTHZ_HEADING);
+  if (start === -1) {
+    throw new Error(`negative-authz matrix not found: "${NEGATIVE_AUTHZ_HEADING}"`);
+  }
+  const after = body.slice(start + NEGATIVE_AUTHZ_HEADING.length);
+  const end = after.search(/\n## /);
+  const section = end === -1 ? after : after.slice(0, end);
+  const rows = [];
+  for (const line of section.split('\n')) {
+    if (!line.trim().startsWith('|')) continue;
+    const cells = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    rows.push({ line: line.trim(), cells });
+  }
+  return rows;
+}
+
+// The factor tokens a cell declares, and nothing else.
+//
+// BACKTICKS ARE STRIPPED RATHER THAN MATCHED THROUGH, and the first version of
+// this gate got that wrong in a way worth recording. It read /`([a-z_]+)`/, which
+// requires each token to be its own code span. The document writes C-27's
+// elevation as ONE span, `passkey or dual_channel`, because that is how it reads
+// to a human; the pattern matched nothing inside it and the gate reported every
+// sensitive row as carrying no declaration. The corpus was right and the gate was
+// wrong, which is CI-06a's 109 phantom anchors in a new place, so the tokens are
+// now matched as words against the closed vocabulary.
+const factorTokensIn = (cell) => {
+  const bare = cell.replace(/`/g, '');
+  return [...new Set([...bare.matchAll(/\b([a-z_]+)\b/g)].map((m) => m[1]))].filter((t) =>
+    FACTOR_TOKENS.has(t),
+  );
+};
+
+const ci06k = {
+  id: 'CI-06k',
+  title: 'Declared authority: every endpoint declares a factor, and no sensitive action accepts a single one',
+  covers:
+    "ADR-039 amendment 4 (C-27) and amendment 2, from the tree with no database. " +
+    'Every row of API_CONTRACT section 12 carries a required-factor cell drawn from ' +
+    'the published vocabulary; every sensitive action C-27 names appears there and ' +
+    'declares a non-single factor; and notification_kinds.rate_limit_exempt is ' +
+    'generated over the post-identity security and money classes only. ' +
+    'THREE THINGS IT DOES NOT DO. It does not check that a HANDLER honours the ' +
+    'declaration, which needs the running server and is the negative-authz suite ' +
+    "itself. It does not know which endpoints are sensitive beyond C-27's three " +
+    'named actions, so an endpoint nobody classified is invisible to assertion 2. ' +
+    'And it reads the generated expression rather than seed rows, because the ' +
+    'generated column is what makes a seed row unable to lie.',
+  run() {
+    const findings = [];
+
+    // --- assertions 1 and 2: the required-factor column ----------------------
+    const rows = negativeAuthzRows(read(API_CONTRACT_DOC));
+    if (rows.length === 0) {
+      throw new Error('negative-authz matrix parsed to zero rows; the gate cannot run');
+    }
+    // The header names the column, so the position is read rather than assumed.
+    // A matrix whose columns are reordered still checks the right cell, and a
+    // matrix that LOST the column reports that instead of checking cell 1 of
+    // something else.
+    const headerAt = rows.findIndex((r) => /required.factor/i.test(r.cells.join('|')));
+    if (headerAt === -1) {
+      throw new Error(
+        `no "Required factor" column in ${API_CONTRACT_DOC} section 12; ` +
+          'CI-06k is asserting nothing about the matrix',
+      );
+    }
+    const header = rows[headerAt];
+    const col = header.cells.findIndex((c) => /required.factor/i.test(c));
+    const testCol = col === 0 ? 1 : 0;
+    const seenActions = new Map();
+    let checked = 0;
+    // ONLY THE ROWS BELOW THE HEADER. The section also carries the vocabulary
+    // legend, a two-column table ABOVE the matrix, and reading the whole section
+    // as one table reported every legend row as an endpoint with no declaration.
+    // The matrix is the table the header opens; anything above it answers a
+    // different question.
+    for (const { cells } of rows.slice(headerAt + 1)) {
+      if (cells.every((c) => /^:?-+:?$/.test(c))) continue; // the |---|---| separator
+      if (cells.length <= col) continue;
+      checked++;
+      const cell = cells[col];
+      const test = cells[testCol] ?? '(unnamed row)';
+      const tokens = factorTokensIn(cell);
+      if (tokens.length === 0) {
+        findings.push(
+          `${API_CONTRACT_DOC} section 12: "${test.slice(0, 60)}" carries no required-factor ` +
+            `cell drawn from the published vocabulary (cell reads "${cell.slice(0, 40)}")`,
+        );
+        continue;
+      }
+      // A `C-27:` tag is what makes a row a sensitive action rather than a row
+      // that happens to mention one. Reading the prose instead would classify
+      // the elevation endpoint's own row, which is not a sensitive action.
+      const tagged = /C-27:\s*([^)|]+)/.exec(cell);
+      if (!tagged) continue;
+      const action = tagged[1].trim().toLowerCase();
+      if (!C27_SENSITIVE_ACTIONS.includes(action)) {
+        findings.push(
+          `${API_CONTRACT_DOC} section 12: "${test.slice(0, 60)}" tags C-27 action ` +
+            `"${action}", which C-27 does not name (it names ${C27_SENSITIVE_ACTIONS.join(', ')})`,
+        );
+        continue;
+      }
+      seenActions.set(action, (seenActions.get(action) ?? 0) + 1);
+      const single = tokens.filter((t) => SINGLE_FACTOR_TOKENS.has(t));
+      const elevating = tokens.filter((t) => ELEVATING_FACTOR_TOKENS.has(t));
+      if (single.length || elevating.length === 0) {
+        findings.push(
+          `${API_CONTRACT_DOC} section 12: "${test.slice(0, 60)}" is the C-27 sensitive action ` +
+            `"${action}" and declares ${tokens.map((t) => `\`${t}\``).join(', ')}, which is a ` +
+            'single factor. C-27 requires a passkey assertion or a dual-channel confirmation, ' +
+            'and specifically never SMS alone',
+        );
+      }
+    }
+    if (checked === 0) {
+      throw new Error('negative-authz matrix has a header and no data rows; the gate cannot run');
+    }
+    for (const action of C27_SENSITIVE_ACTIONS) {
+      if (!seenActions.has(action)) {
+        findings.push(
+          `${API_CONTRACT_DOC} section 12: C-27 names "${action}" as a sensitive action and no ` +
+            'row of the matrix declares a required factor for it',
+        );
+      }
+    }
+
+    // --- assertion 3: the rate-limit exemption, from the DDL -----------------
+    // Rule 2 of this file. The column is created by a migration; if no migration
+    // creates it, this gate has lost its input and says so rather than passing.
+    let expr = null;
+    for (const file of sqlFiles()) {
+      const m = /ADD\s+COLUMN\s+rate_limit_exempt\s+boolean\s+GENERATED\s+ALWAYS\s+AS\s*\(([\s\S]*?)\)\s*STORED/i.exec(
+        stripSqlComments(read(file)),
+      );
+      if (m) expr = { file, text: m[1] };
+    }
+    if (expr === null) {
+      throw new Error(
+        'no generated notification_kinds.rate_limit_exempt column found in the migrations; ' +
+          "CI-06k's third assertion cannot run",
+      );
+    }
+    const exempted = [...expr.text.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    if (exempted.length === 0) {
+      throw new Error(
+        `rate_limit_exempt is generated from "${expr.text.trim()}", which names no class; ` +
+          'the gate cannot tell what is exempt',
+      );
+    }
+    // THE POST-IDENTITY CLASSES, and they are exactly INV-M16-11's two. Anything
+    // else in this expression is a pre-identity or lower class inheriting an
+    // exemption written for authenticated recipients.
+    const POST_IDENTITY_EXEMPT = new Set(['security', 'money']);
+    for (const cls of exempted) {
+      if (!POST_IDENTITY_EXEMPT.has(cls)) {
+        findings.push(
+          `${expr.file}: notification_kinds.rate_limit_exempt is generated over "${cls}", which ` +
+            'is outside the post-identity security and money classes. INV-M16-11 was written for ' +
+            'authenticated recipients at an address Merit already holds; applied to an ' +
+            'attacker-supplied destination the exemption funds SMS pumping (ADR-039 amendment 2)',
+        );
+      }
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // CI-06n  REGISTRY INDEX COMPLETENESS, BOTH DIRECTIONS
 // -----------------------------------------------------------------------------
 // THIS GATE IS THE PRICE OF ADR-043's INDEX EXEMPTION, and it is written down as
@@ -1367,7 +1600,7 @@ const ci06n = {
 // -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
-const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06h, ci06i, ci06j, ci06n, adr026];
+const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06h, ci06i, ci06j, ci06k, ci06n, adr026];
 
 function main() {
   const [cmd, only] = process.argv.slice(2);
