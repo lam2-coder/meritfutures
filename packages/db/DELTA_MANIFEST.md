@@ -16,9 +16,11 @@ last_updated: 2026-08-16
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
+**This file has its own allocation table, and it is [section 16](#16-allocation-oi-nn-identifiers-and-section-numbers).** `OI-nn` identifiers and section numbers are claimed there before they are written, on [ADR-034](../../docs/decisions/ADR-034.md)'s rule. It is at the end rather than here because the sections are in numeric order and section 16 is a section; it is announced here because **the two collisions that produced it were both made by sessions reading this file from the top**.
+
 ## 1. The migration sequence
 
-<!--gen:migration_files-->32<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->33<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -231,6 +233,8 @@ Both fold. Neither is counted twice.
 
 Items found while folding that are **not schema deltas** and are **not closed**. They are here rather than only in a session log because this is the file the next session reads first.
 
+**`OI-nn` is claimed in [section 16](#16-allocation-oi-nn-identifiers-and-section-numbers) before the row is written, and so is a section number.** That table exists because this one collided: **two rows below are numbered `OI-06`**, written on the same day by two sessions that each read this section, each found `OI-05` as the maximum and each took `06`. They are **not renumbered**, they are cited with their subject attached, and section 16 records why.
+
 | # | Item | Status |
 |---|---|---|
 | **OI-01** | **`liability_snapshots` exists in two shapes.** The migration (`0009`) follows `SD-M6-01`: keyed on `as_of timestamptz`, carrying `open_liability_cents`, `bounded_near_term_cents`, `remaining_ladder_exposure_cents`, `wallet_balances_cents`, `absorbed_corrections_cents`. [DATA_MODEL section 8](../../docs/architecture/data-model/README.md) still shows the earlier shape keyed on `snapshot_on date` with `funded_accounts`, `reserve_cents`, `cvar99_cents`, `rcr_bp` and `per_plan`. **The migration is the truth.** The four RCR and CVaR fields have **no home in the folded shape** and need one before [M06](../../docs/plans/M06-admin-ops-console.md) is built: the reserve coverage ratio is the number that decides whether sales pause | **OPEN**, founder ruling (2026-08-14) that it is tracked here |
@@ -238,11 +242,12 @@ Items found while folding that are **not schema deltas** and are **not closed**.
 | **OI-03** | **`0026`'s append-only revoke list is a list, and a list drifts.** Eighteen tables are named there against [DATA_MODEL section 1](../../docs/architecture/data-model/README.md)'s Mutability set. The CI check must assert the revoke list **against the document** rather than trusting either | **OPEN**, CI not yet built |
 | **OI-04** | **Two legitimate single-column updates on append-only tables** (`daily_marks.superseded_by`, `identity_links.suppressed`) are forbidden by the grants and require `SECURITY DEFINER` functions that **do not exist yet**. A naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug | **OPEN**, arrives with the owning module |
 | **OI-05** | **`0027`'s published-plan-version immutability trigger reads `NEW.config`, and `plan_versions` has no `config` column.** The rule contract is `rules`. PL/pgSQL resolves record fields at execution, so the migration installs cleanly and the function is wrong only when it fires. **Proven by execution, not by reading**: every `UPDATE` against a published row raises `record "new" has no field "config"`. The immutability promise survives by accident, because the error rejects the write; **the ruled `published -> retired` transition is refused too, so no plan version can be retired.** A draft row updates normally, which is why the install check and every probe in section 10 missed it. **`0027` is merged and is not edited**: the fix is a superseding migration, which takes the set from 27 files to 28 | **CLOSED** 2026-08-15. [ADR-035](../../docs/decisions/ADR-035.md) **accepted**; fixed by `0028`, which carries an `E2 READ` header and still needs the founder's read. **Two amendments at acceptance are larger than the ADR as proposed** (the whole row is pinned rather than a list of columns, and a retired row is now frozen absolutely per STATE_MACHINES section 9). The structural fix is **[CI-06j](../../docs/testing/STRATEGY.md)**, which found it from the tree with no database |
-| **OI-06** | **The 48 hour payout-destination cooling window has no storage.** [FOLD-01](../../docs/plans/FOLD-01-phone-identity.md) finding 5, found by trying to model (c) on the control (c) says to copy. `destination_ref` on `payout_transfers` (`0010:243`) and `wallet_withdrawals` (`0011:132`) is the destination **of a transfer**; **no table records that a destination changed or when**. C-11, C-24, [SECURITY section 4](../../docs/architecture/SECURITY.md) item 1, `WF-M20-02` and [M04](../../docs/plans/M04-trader-portal.md)'s destination-cooling scenario all cite a control whose input does not exist. **Recommendation, offered without deciding it**: a `payout_destinations` registry keyed on `(identity_id, destination_ref)` carrying `first_seen_at` and `cooling_until`, read by both payout legs and by the affiliate rail under C-24, in its own migration after its own session. **`0029` builds the phone hold on its own storage and does not touch this**, because folding a change nobody asked for into the diff the founder reads line by line is how a review stops being a review | **OPEN**, deliberately not decided |
+| **OI-06** **(payout destinations)** | **The 48 hour payout-destination cooling window has no storage.** [FOLD-01](../../docs/plans/FOLD-01-phone-identity.md) finding 5, found by trying to model (c) on the control (c) says to copy. `destination_ref` on `payout_transfers` (`0010:243`) and `wallet_withdrawals` (`0011:132`) is the destination **of a transfer**; **no table records that a destination changed or when**. C-11, C-24, [SECURITY section 4](../../docs/architecture/SECURITY.md) item 1, `WF-M20-02` and [M04](../../docs/plans/M04-trader-portal.md)'s destination-cooling scenario all cite a control whose input does not exist. **Recommendation, offered without deciding it**: a `payout_destinations` registry keyed on `(identity_id, destination_ref)` carrying `first_seen_at` and `cooling_until`, read by both payout legs and by the affiliate rail under C-24, in its own migration after its own session. **`0029` builds the phone hold on its own storage and does not touch this**, because folding a change nobody asked for into the diff the founder reads line by line is how a review stops being a review | **OPEN**, deliberately not decided |
+| **OI-06** **(calendar prior image)** | **Nothing in the database forces an `UPDATE` to `trading_calendar` to write a `trading_calendar_revisions` row.** `0032` creates the prior-image table [ADR-042](../../docs/decisions/ADR-042.md) F-2 ruled and the loader writes to it; a hand-run `UPDATE` against the calendar leaves no prior image and `INV-04`'s replay is back where F-2 found it. **A trigger would make it a control rather than a rule somebody follows**, and `0027` is where the invariant triggers live. **ADR-042 is silent on it**, so `0032` does not add a money-path trigger on its own authority: per CLAUDE.md, silence means propose an ADR and proceed on approval. The same question covers whether a `DELETE` from `trading_calendar` should be forbidden outright, which today only the revisions foreign key partly prevents | **CLOSED** 2026-08-16. [ADR-044](../../docs/decisions/ADR-044.md) **accepted**; the guards are `CALENDAR-C1` and `CALENDAR-C2` in [`0033`](migrations/0033_trading_calendar_revision_required.sql), which carries an `E2 READ` header and still needs the founder's read. **The ruling is larger than the row as raised**: the `DELETE` half this row calls "the same question" is answered too, because `DELETE` then `INSERT` is an `UPDATE` with the audit trail removed, and `TRUNCATE` is named beside it because it fires no row triggers at all. **And `dependent_row_count` is now counted rather than reported**, which section 17 records as the half that was proven by watching a zero pass without it |
 | **OI-07** | **`0029` has no committed probe.** [FOLD-01](../../docs/plans/FOLD-01-phone-identity.md)'s definition of done names `scripts/db/probe_phone_identity.sql`, and section 14 below records 48 assertions **executed** against the installed schema on 2026-08-16. They were executed ad hoc and are **not re-runnable in CI**, because the session brief's stop condition was the migration, its data-model files and its manifest rows. **That is the exact object section 13 names**: a probe that ships beside a fix and never runs again is the same thing as the golden test that was missing. Owed: the probe file, leading with the success case, plus its step in [`corpus.yml`](../../.github/workflows/corpus.yml) beside the ledger and ADR-035 probes | **CLOSED** 2026-08-16. [`scripts/db/probe_phone_identity.sql`](../../scripts/db/probe_phone_identity.sql), wired into CI-06h. Section 15 records what it asserts and how it was watched failing. **It leads with the success case and the ruling is a permission**: a second identity verifying a live number must COMPLETE, and an absence (no unique index on `phone_hash`) is asserted as an absence, because "completing the pair" looks like tightening a constraint in a diff. **The step is pinned by [CI-06h](../../scripts/corpus/gates.mjs)**, so deleting it is itself a gate failure: an unpinned probe is one delete away from the object this row exists to name |
 | **OI-08** | **The NO-FLOATS `DO` block is positional, and everything after `0027` is outside it.** Section 9 says the assertion "fails the migration" if any column in `public` is `numeric`, `real` or `double precision` outside the two exempt ones. It lives in `0027` and therefore reads the schema **as of `0027`**: `0028` and `0029` both land after it, and **a future migration adding a `numeric` money column would sail past the guard the corpus believes protects it.** It was checked by hand for `0029` (section 14) and the set is still exactly the two `correlation_groups` columns. **Recommendation**: re-assert it in the install job after the whole set applies, beside the object-count derivation, so it is positionally last by construction rather than by whoever remembers. It is a two-line step and it belongs with the gate work, not inside a money-path migration | **CLOSED** 2026-08-16. [`scripts/db/assert_no_floats.sql`](../../scripts/db/assert_no_floats.sql), run in the install job after every migration applies, so it is positionally last **by construction**. **By the time it was fixed the gap had reached five migrations** (`0028` to `0032`), not the two this row was written against. `0027`'s block is **deliberately left in place**, per E2: migrations are sacred, once merged never edited. The exemption list is still exactly `correlation_groups.statistic` and `.threshold` on the full 32-file schema, **and it now fails in both directions with each direction watched firing** |
+| **OI-09** | **`CI-06n` accepts a link in prose where its own title says a row.** The gate matches **any markdown link anywhere in a registry README**, so [ADR-043](../../docs/decisions/ADR-043.md) sat outside the ADR registry table for a day while being linked from a sentence in its preamble, and nothing reported it. Its `covers` line is honest ("is linked from") and its **title** is not, which is why a merged ADR could fall out of the registry it belongs to with twelve gates green. **The missing row is added; the gate is not narrowed here**, because narrowing it needs a sweep of every registry directory [ADR-043](../../docs/decisions/ADR-043.md) created plus a seeded violation it has been watched failing on, and this session's stop condition was `0033` | **OPEN**, and the first number allocated from section 16 |
 
-| **OI-06** | **Nothing in the database forces an `UPDATE` to `trading_calendar` to write a `trading_calendar_revisions` row.** `0032` creates the prior-image table [ADR-042](../../docs/decisions/ADR-042.md) F-2 ruled and the loader writes to it; a hand-run `UPDATE` against the calendar leaves no prior image and `INV-04`'s replay is back where F-2 found it. **A trigger would make it a control rather than a rule somebody follows**, and `0027` is where the invariant triggers live. **ADR-042 is silent on it**, so `0032` does not add a money-path trigger on its own authority: per CLAUDE.md, silence means propose an ADR and proceed on approval. The same question covers whether a `DELETE` from `trading_calendar` should be forbidden outright, which today only the revisions foreign key partly prevents | **OPEN**, needs a ruling. Raised by the session that wrote `0032` (2026-08-16) |
 
 ## 9. NO-FLOATS EXEMPTION LIST
 
@@ -382,7 +387,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->32<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->33<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->9<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -624,7 +629,7 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 ### The steps are pinned, because that is what "closed" has to mean
 
-**[CI-06h](../../scripts/corpus/gates.mjs) now requires all four probe filenames plus `assert_no_floats.sql` to appear in the workflow.** Deleting a step is a gate failure rather than a silent regression. Verified by deleting each and watching CI-06h report it.
+**[CI-06h](../../scripts/corpus/gates.mjs) now requires all four probe filenames plus `assert_no_floats.sql` to appear in the workflow.** Deleting a step is a gate failure rather than a silent regression. Verified by deleting each and watching CI-06h report it. **A fifth probe joined the list in section 17**, and this sentence is left saying four because it is what was true when it was written; the list itself is the count.
 
 **`probe_payout_hold.sql` was never pinned**, from the day it landed on 2026-08-16 until this session. It was one delete from being `OI-07` again, and it is pinned now with the other two. **The probe file existing was never the fix; the file being unable to stop running is.**
 
@@ -632,4 +637,132 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the full 32-file set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->102<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**, across <!--gen:migration_files-->32<!--/gen--> files.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->102<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->9<!--/gen--> triggers**, across <!--gen:migration_files-->33<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+
+---
+
+## 16. Allocation: `OI-nn` identifiers and section numbers
+
+**This file is the fourth numbered registry in the repository and it was the last one with no table. It collided twice in one day.** [ADR-034](../../docs/decisions/ADR-034.md) rules the allocation for every registry: **a number is claimed in a table before the artifact is written**, because two branches forking from one `main` both read the maximum, both take the next value, and neither is wrong locally. [ALLOCATION](../../docs/decisions/ALLOCATION.md) carries the other three, and the argument for the third one there was that three folds were claiming `CI-06` letters from an unregistered namespace in one week. **The argument here is stronger, because this namespace has already collided rather than nearly collided.**
+
+**It lives in this file rather than in `ALLOCATION.md`, and that is a decision rather than a default.** `OI-nn` and the section numbers are **this document's own namespace**, and both collisions happened between sessions that were editing **this document** and no other. A claim a writer cannot see while writing is a claim that does not bind. It also cannot join the other three mechanically: `allocated()` in [`gates.mjs`](../../scripts/corpus/gates.mjs) parses a three or four digit first cell, `OI-06` does not parse, and a fourth table in that file that the shared parser silently skips is exactly the reserved-by-prose hazard that parser was hardened against.
+
+### The two collisions this table exists to end
+
+| Collision | What happened |
+|---|---|
+| **Two rows numbered `OI-06`** | The payout-destination cooling window's missing storage ([FOLD-01](../../docs/plans/FOLD-01-phone-identity.md) finding 5, landed with `0029`) and the `trading_calendar` prior-image trigger (landed with `0032`). **Both were written on 2026-08-16 by different sessions**, each reading section 8, each finding `OI-05` as the maximum in the table it could see, each taking `06`. The second row was appended **outside the table** and rendered as a stray one-row table, which is how it survived a reading |
+| **Three sections numbered `14`** | `0029`'s record, `0030` and `0031`'s record, and `0032`'s record. **Same day, same cause, three ways.** The file also carries a `4a`, which is the precedent for adding a section **without taking a number**, and is the alternative nobody reached for because nobody knew what the maximum was |
+
+**Neither is renumbered, and that is a ruling rather than an omission.** Both `OI-06`s are cited from module plans, [STATE](../../docs/STATE.md), a migration header and a session log; renumbering either breaks every citation of whichever one moves, and choosing which one moves is a decision about two open findings that has nothing to do with the defect. **The collision is left in place and the table allocates forward.**
+
+**So `OI-06` is cited with its subject attached**: `OI-06 (payout destinations)` and `OI-06 (calendar prior image)`. Two rows sharing an identifier is a defect; two rows sharing an identifier with no way to say which one you mean is a worse one, and it costs three words to close.
+
+### `OI-nn`
+
+**Claim the next free number here in the commit that opens the item.**
+
+| `OI-nn` | Claimed by | State |
+|---|---|---|
+| `OI-01` | the schema-delta fold | **allocated.** `liability_snapshots`' two shapes. Open, founder ruling |
+| `OI-02` | the schema-delta fold | **allocated.** `published_statistics` and the missing measure. Closed by [ADR-032](../../docs/decisions/ADR-032.md) |
+| `OI-03` | the schema-delta fold | **allocated.** `0026`'s append-only revoke list against DATA_MODEL. Open |
+| `OI-04` | the schema-delta fold | **allocated.** Two legitimate updates on append-only tables. Open |
+| `OI-05` | the schema-delta fold | **allocated.** The plan-version immutability defect. Closed by [ADR-035](../../docs/decisions/ADR-035.md) and `0028` |
+| **`OI-06`** | **CLAIMED TWICE, 2026-08-16, and left that way.** FOLD-01's session and S-E's session | **allocated twice.** `OI-06 (payout destinations)` is **open**; `OI-06 (calendar prior image)` is **closed** by [ADR-044](../../docs/decisions/ADR-044.md) and `0033` |
+| `OI-07` | FOLD-01 session 3 | **allocated.** `0029` had no committed probe. Closed 2026-08-16 |
+| `OI-08` | FOLD-01 session 3 | **allocated.** The positional NO-FLOATS block. Closed 2026-08-16 |
+| **`OI-09`** | this session | **allocated.** `CI-06n` accepts a link in prose where its own title says a row. Open, and section 17 records how it was found |
+
+### Section numbers
+
+**Claim the next free number here in the commit that writes the section.** Sections are append-only records of what landed and when, so the sequence only ever grows and the maximum is the only thing anybody needs.
+
+| Section | Claimed by | State |
+|---|---|---|
+| 1 to 13 | the schema-delta fold and its follow-ons | **allocated** |
+| **14** | **CLAIMED THREE TIMES, 2026-08-16, and left that way.** `0029`, then `0030` and `0031`, then `0032` | **allocated three times.** Cite as `section 14 (0029)`, `section 14 (0030 and 0031)`, `section 14 (0032)` |
+| 15 | `OI-07` and `OI-08`'s closure | **allocated** |
+| **16** | this session | **allocated.** This table |
+| **17** | this session | **allocated.** `0033` lands |
+
+**`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
+
+### What no gate checks, stated rather than implied
+
+**Nothing reads this table.** `CI-06f` and `CI-06h` parse `ALLOCATION.md`'s first two tables and nothing parses this file's structure at all; the `manifest_changes` span counts delta rows and cannot see a section heading. The table binds a reader today, which is the position the `CI-06` letter table shipped in and is stated the same way here.
+
+**The cheap version of the gate is the one to write, and it is two assertions**: every `## <n>.` heading in this file is unique and gapless, and every `OI-nn` appearing anywhere in `docs/` or `packages/` has exactly one row above. That is `ADR-026`'s manifest-completeness check with a different identifier prefix, and it would have caught both collisions on the day they were written. **It is not written here**, because a gate arrives with a seeded violation it has been watched failing on, and this session's stop condition is `0033`.
+
+---
+
+## 17. `0033` lands, and the counted half was proven by watching a zero pass without it (2026-08-16)
+
+**[`0033_trading_calendar_revision_required.sql`](migrations/0033_trading_calendar_revision_required.sql), with its `E2 READ: MONEY PATH` header and the founder's read still to come.** [ADR-044](../../docs/decisions/ADR-044.md) closes `OI-06 (calendar prior image)`: [ADR-042](../../docs/decisions/ADR-042.md) F-2 ruled the prior-image **table** and ruled nothing about what obliges anybody to write to it, so F-2 landed as a table nobody was required to use. **It edits nothing.** `0004`, `0027` and `0032` are untouched on disk, and `0029` to `0032` are other folds' files.
+
+**It asserts and it does not write, which is `0027`'s idiom rather than a preference.** Not one guard in `0027` repairs anything. A trigger that wrote the prior image itself would have to invent an `actor` and a `reason`, and a reason nobody gave is precisely what `trading_calendar_revisions.reason` exists to refuse.
+
+| Guard | What it refuses |
+|---|---|
+| **`CALENDAR-C1`** | An `UPDATE` that commits with no `trading_calendar_revisions` row carrying **that row's** prior image, `to_jsonb(OLD)`, compared as `jsonb` |
+| **`CALENDAR-C1`, counted half** | A prior image whose `dependent_row_count` is not the number **the database itself counts** across `fills`, `daily_marks` and `rule_states` |
+| **`CALENDAR-C2`** | A `DELETE` from `trading_calendar`, and a `TRUNCATE` of it |
+
+### Install verification, from empty
+
+**All <!--gen:migration_files-->33<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+
+| | Before `0033` | After `0033` |
+|---|---|---|
+| Tables | 102 | **102** |
+| Indexes | 351 | **351** |
+| Check constraints | 397 | **397** |
+| Triggers | 6 | **9** |
+
+**Three of the four figures do not move, and that is the shape of the change.** `0033` creates no table, no index and no constraint. It adds two functions and three triggers to a schema that already had every column it needs, which is what a control that was **missing** rather than **wrong** looks like in a diff.
+
+### The probe, and why it forces a check that would otherwise never run
+
+[`scripts/db/probe_calendar_revision_required.sql`](../../scripts/db/probe_calendar_revision_required.sql), **12 assertions, 12 / 12, and the first four are successes** on section 13's lesson: a probe that only ever attempts forbidden things passes against a guard that rejects everything.
+
+**`CALENDAR-C1` is `DEFERRABLE INITIALLY DEFERRED` and the probe ends in `ROLLBACK`, so a success case left to fire "at commit" would be checked by nothing at all.** The file would print four green successes having verified none of them. `SET CONSTRAINTS ... IMMEDIATE` applies the pending checks retroactively, and every assertion in the file runs because of it. **This is the vacuous-pass shape a third time**: it has now been found in a `CHECK` that evaluated to `NULL` ([ADR-035](../../docs/decisions/ADR-035.md)), in a `DO` block that read a prefix of the schema (`OI-08`), and in a `falsify.mjs` seed that inserted a duplicate row.
+
+| # | Assertion | What it proves |
+|---|---|---|
+| **S1** | An `INSERT` of a calendar day needs no image | A guard demanding an image for a day that did not exist would refuse the first load of the calendar |
+| **S2** | A correction carrying its image commits, image written **first** | F-2's own machinery is still usable |
+| **S3** | The image may be written **after** the update | What the deferral buys. A non-deferred trigger would refuse this and say nothing about why |
+| **S4** | A day with three dependents, counted, naming an incident | The **incident path working** rather than being refused |
+| **R1** | No image at all | `OI-06` in one statement |
+| **R2** | An image of a state that never was | A row exists, so a reviewer counting rows sees one |
+| **R3** | An image assembled by hand with the four required keys | The image is `to_jsonb(OLD)` or it is a hand-written column list wearing a JSON costume |
+| **R4** | A correct image claiming `dependent_row_count = 0` on a day with three | **The bypass the counted half exists to close** |
+| **R5** | Two corrections in one transaction, one image | A per-transaction check would lose an intermediate state from the replay record |
+| **R6** | An update that changes nothing | There is no exempt column and no exempt update |
+| **R7** | `DELETE` | `CALENDAR-C1`'s bypass is otherwise one extra statement |
+| **R8** | `TRUNCATE trading_calendar, trading_calendar_revisions` | **The form that defeats the foreign key.** `TRUNCATE trading_calendar` alone fails on the revisions foreign key, and a probe that stopped there would be testing PostgreSQL rather than this migration |
+
+**Rejections are checked by message, never by exception class.** Both halves of `CALENDAR-C1` raise `check_violation`, so a handler catching the class cannot tell "no prior image" from "the count is wrong", and the counted half could be deleted with every rejection still passing. That is not a hypothetical: it is exactly what the seeded run below did.
+
+### Four counterfactuals, each watched failing on its own finding
+
+| Seeded schema | Result |
+|---|---|
+| `0033` absent entirely | **`ERROR: constraint "trading_calendar_revision_required" does not exist`**, on the first success case. The probe cannot pass vacuously against a schema with no guard in it |
+| The **counted half** removed, everything else intact | **`R4` reports `PROBE FAILED: a day with 3 dependent rows was corrected claiming 0`.** Every other assertion still passes, which is what makes this the assertion that owns that half |
+| `CALENDAR-C2`'s two triggers dropped | **`R7` reports `PROBE FAILED: a calendar day was deleted`** |
+| A guard that **refuses everything** | **`S2` fails.** The positive control catching the failure mode an inventory of refusals cannot see from inside itself |
+
+### What `0033` does not do
+
+**It does not add an index on `rule_states (trading_day)`**, and the count query therefore scans that table. `rule_states` is written once per account per day by the engine, so an index serving a query that runs only on a calendar **correction** would be paid for on every mark of every account forever. It is a trade and it is written down rather than discovered.
+
+**It does not count `reconciliations` or `ingest_files`**, both of which carry a `trading_day`. [P1 S-E section 4](../../docs/plans/P1-SE-trading-calendar.md)'s partition names three tables; widening it is a founder's call rather than a migration's.
+
+**It does not touch `OI-06 (payout destinations)`**, which is the other row with this number and is still open and still undecided.
+
+### `OI-09`, found while wiring this session's own registry row
+
+**[ADR-043](../../docs/decisions/ADR-043.md)'s own ADR has no row in the ADR registry table.** It is linked from a sentence in the README's preamble, and `CI-06n` accepted that: the gate matches **any markdown link anywhere in the README**, while its title says "every registry entry has a README **row**". Its `covers` line is honest and says "is linked from", so the implementation matches its stated coverage and the title overstates it, which is how nobody noticed that a merged ADR had fallen out of the registry it belongs to.
+
+**The row is added here. The gate is not narrowed here**, because a gate arrives with a seeded violation it has been watched failing on, and narrowing this one needs a sweep of every registry directory the split created rather than a one-line regex. Carried as `OI-09`.

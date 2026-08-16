@@ -282,3 +282,23 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_phone_identity.sql
+
+      # 9. ADR-044, the calendar prior-image guards installed by 0033. OI-06.
+      #
+      # IT FORCES THE DEFERRED CHECK INSTEAD OF WAITING FOR A COMMIT THAT NEVER
+      # COMES. CALENDAR-C1 is a deferrable constraint trigger and the probe ends
+      # in ROLLBACK like every other probe here, so its four success cases would
+      # otherwise be checked by nothing at all: the file would print four green
+      # successes having verified none of them, which is the vacuous-pass shape
+      # this corpus has now found in a CHECK, in a DO block and in a falsify
+      # seed. `SET CONSTRAINTS ... IMMEDIATE` applies the pending checks
+      # retroactively, and every assertion in the file runs because of it.
+      #
+      # Rejections are checked BY MESSAGE. Both halves of CALENDAR-C1 raise
+      # check_violation, so a handler catching the class cannot tell "no prior
+      # image" from "the count is wrong", and the counted half could be deleted
+      # with every rejection still passing.
+      - name: Probe ADR-044's calendar prior-image guards (OI-06)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_calendar_revision_required.sql
