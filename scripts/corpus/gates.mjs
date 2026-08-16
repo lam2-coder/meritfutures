@@ -526,8 +526,12 @@ const ci06d = {
   title: 'Registry reconciliation: every cited GS-nnn and EC-nnn exists',
   covers:
     'every GS-nnn and EC-nnn cited anywhere in docs/ resolves to a definition in ' +
-    'its registry, counting DISTINCT IDENTIFIERS rather than table rows, AND that ' +
-    'each registry runs 1..n with no holes and no duplicates.',
+    'its registry, counting DISTINCT IDENTIFIERS rather than table rows; that ' +
+    'each registry runs 1..n with no holes and no duplicates; AND that the golden ' +
+    'ownership partition in section 33.1 covers every GS-nnn EXACTLY ONCE, in both ' +
+    "directions, with each owner's declared count agreeing with its own cell. " +
+    'It does NOT judge whether an owner is the RIGHT one, which is a reading and ' +
+    'not a parse.',
   run() {
     const findings = [];
     const gsBody = goldenBody();
@@ -544,6 +548,91 @@ const ci06d = {
     // dangling citation, and the missing edge case is invisible from the
     // citation side. This is the half that looks at the registry.
     findings.push(...contiguity([...ec], 'EC'), ...contiguity([...gs], 'GS'));
+
+    // THE OWNERSHIP PARTITION, ASSERTED IN BOTH DIRECTIONS.
+    //
+    // Section 33.1 calls itself a partition and says so in its own first
+    // sentence: "the counts sum to the registry total rather than to something
+    // larger. That is the property that makes the table checkable."
+    //
+    // IT WAS NOT CHECKABLE, IT WAS MERELY CHECKED-SOUNDING. The same paragraph
+    // claimed the sum agreed with the registry "or the build fails", and NO
+    // CHECK EXISTED. So when FOLD-01 and FOLD-02 added GS-258 to GS-284, the
+    // table went on summing to 257 and TWENTY-SEVEN SCENARIOS WERE OWNED BY
+    // NOBODY, while the document kept describing itself as a partition. The
+    // claim survived being false for exactly as long as nobody added up a
+    // column by hand.
+    //
+    // A coverage figure nobody can add up is a coverage figure nobody should
+    // quote, and P2's done-condition quotes this one: it owes M1's owned set
+    // rather than the registry total, so an unowned scenario is a scenario no
+    // phase has promised to make green.
+    //
+    // Both directions, because a partition fails in two ways and only one of
+    // them is visible from the registry: a scenario owned by nobody, and a
+    // scenario owned twice. The second is the one that inflates a coverage
+    // claim while every individual row still looks right.
+    const OWNERSHIP =
+      'docs/testing/golden-scenarios/33-ownership-index-and-coverage-reconciliation.md';
+    if (!existsSync(join(ROOT, OWNERSHIP))) {
+      throw new Error(`${OWNERSHIP} does not exist; the ownership partition cannot be checked`);
+    }
+    const ownedBy = new Map();
+    const dupes = [];
+    // Bounded to 33.1. Unbounded, this reads 33.2's co-ownership table, whose
+    // whole purpose is to name a scenario a SECOND time, and every row there
+    // would be reported as a duplicate.
+    const ownBody = read(OWNERSHIP).split('### 33.2')[0];
+    let ownerRows = 0;
+    for (const line of ownBody.split('\n')) {
+      const m = /^\|\s*\*\*(.+?)\*\*\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|$/.exec(line.trim());
+      if (!m) continue;
+      ownerRows++;
+      const [, owner, ranges, declared] = m;
+      const ids = [];
+      for (const part of ranges.split(',')) {
+        const t = part.trim();
+        const range = /^GS-(\d{3})\s+to\s+GS-(\d{3})$/.exec(t);
+        const one = /^GS-(\d{3})$/.exec(t);
+        if (range) for (let n = Number(range[1]); n <= Number(range[2]); n++) ids.push(n);
+        else if (one) ids.push(Number(one[1]));
+        else
+          findings.push(
+            `${OWNERSHIP}: ${owner}'s cell holds "${t}", which is not a GS-nnn or a range`,
+          );
+      }
+      // The declared count is the second independent statement of one number,
+      // and it is what catches a range edited at one end only.
+      if (ids.length !== Number(declared)) {
+        findings.push(
+          `${OWNERSHIP}: ${owner} declares ${declared} against ${ids.length} scenarios in its own cell`,
+        );
+      }
+      for (const n of ids) {
+        const id = `GS-${String(n).padStart(3, '0')}`;
+        if (ownedBy.has(id)) dupes.push(`${id}: owned by both ${ownedBy.get(id)} and ${owner}`);
+        else ownedBy.set(id, owner);
+      }
+    }
+    // Rule 2 on a derived input: a parser that stopped matching would report a
+    // corpus in which nobody owns anything as fully partitioned.
+    if (ownerRows === 0) {
+      throw new Error(
+        `${OWNERSHIP}: section 33.1 parsed to zero owner rows; the partition is asserting nothing`,
+      );
+    }
+    findings.push(...dupes);
+    for (const id of gs) {
+      if (!ownedBy.has(id))
+        findings.push(`${OWNERSHIP}: ${id} is in the registry and owned by nobody`);
+    }
+    for (const id of ownedBy.keys()) {
+      if (!gs.has(id))
+        findings.push(
+          `${OWNERSHIP}: ${id} is owned by ${ownedBy.get(id)} and is not in the registry`,
+        );
+    }
+
     for (const file of markdownFiles()) {
       if (!/^docs\//.test(file)) continue;
       const body = read(file);

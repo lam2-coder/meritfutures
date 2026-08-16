@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->45<!--/gen--> ADRs. <!--gen:ec_count-->156<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->48<!--/gen--> ADRs. <!--gen:ec_count-->156<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -405,6 +405,22 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 **Two units, and the founder's ruling stated so a future reader cannot assume one governs the other.** Trading days, answered only by `TradingCalendar`. Wall-clock hours, answered only by `now()`. **A 48 hour hold that expires at 03:00 on Christmas Day releases at 03:00 on Christmas Day**, because releasing is Merit's own act and needs no exchange, no bank and no calendar. **Nothing Merit computes is measured in business days**, which is the third unit the corpus uses in ten documents, defines in none, and has no table for.
 
 ---
+
+## P2 is unblocked: its four rulings are closed and two records are repaired (2026-08-16)
+
+**[P2](plans/P2-rules-engine.md) section 8 listed four items, each blocking `P2-1`, none an engineering call. All four are closed** ([session 40](sessions/2026-08-16-session-40.md)), and the three ADRs landed **in one commit** rather than three sessions, because three sessions each appending to `docs/decisions/` is three collisions in the registry [ADR-043](decisions/ADR-043.md) split to end.
+
+| # | Ruling |
+|---|---|
+| **[ADR-046](decisions/ADR-046.md)** | **`CalendarSlice` is a VALUE, not an interface.** The three purity mechanisms cannot see an interface whose implementation reads a database: it is a capability, and a caller could satisfy it with a live query while every mechanism stayed green. A value has no behavior to smuggle. A **fourth** mechanism, a no-function-valued-property compile assertion, lands beside `PlanConfigVersionIsClosed`. **A lookup miss is a typed refusal into `DayOutput.assertions`**, never a throw and never a null |
+| **[ADR-047](decisions/ADR-047.md)** | **The calendar revision is the engine's second version-like input**, and Appendix B.4's protocol governs it unamended. **`0034` is claimed and unwritten**: money path, its own session. Until it lands, a calendar correction is still the 5,000-page event, which is a stated exposure rather than a solved one |
+| **[ADR-048](decisions/ADR-048.md)** | **CI-03's polarity is derived per fixture** from the rules it cites, so the stage does not go red for the rest of P2 the moment rule one lands. **It carries a prerequisite**: the resolvable-citation `L-nn` rule lands first, because a fixture citing nothing makes the polarity test vacuously true |
+| **`OQ-P2-04`** | **Closed both ways.** P2's done-condition names **seven** properties; `PT-03` moves to P3 whole; **the R-44 arithmetic is P2's under its own name** |
+
+**Twenty-seven golden scenarios were owned by nobody, and the table that lost them claimed to be checked.** `FOLD-01` and `FOLD-02` added `GS-258` to `GS-284`; neither touched [the ownership partition](testing/golden-scenarios/33-ownership-index-and-coverage-reconciliation.md), which went on summing to **257** against a registry of **284**. Its own paragraph said the sum agreed with the registry "**or the build fails**" and **no check existed**, which is how the claim survived being false. The twenty-seven are assigned and **`CI-06d` now asserts the partition in both directions**, plus each owner's declared count against its own cell, watched failing on all three. **P2's done-condition quotes this table** — it owes M1's owned set of 73 rather than the registry total — so an unowned scenario is one no phase has promised to make green.
+
+---
+
 
 ## S-E5: ADR-042's three mechanisms are wired, and each has been watched failing (2026-08-16)
 
