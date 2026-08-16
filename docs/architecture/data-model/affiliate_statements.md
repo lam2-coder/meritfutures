@@ -3,7 +3,7 @@
 |---|---|---|---|
 | `id` | uuid | pk | |
 | `affiliate_id` | uuid | fk affiliates, not null, on delete restrict | |
-| `period_start`, `period_end` | date | not null | |
+| `period_start`, `period_end` | date | not null | **Unit: wall clock**, a statement period is a billing period on Merit’s calendar. |
 | `total_cents` | bigint | not null | **signed**: a clawback-heavy month is negative |
 | `status` | text | not null default `draft`, check in (`draft`,`issued`,`paid`,`void`) | |
 | `paid_transfer_ref` | text | null | |

@@ -4,7 +4,7 @@
 | Column | Type | Constraints | Why |
 |---|---|---|---|
 | `account_id` | uuid | fk accounts, not null, on delete restrict, pk part | |
-| `as_of_trading_day` | date | not null, pk part | |
+| `as_of_trading_day` | date | not null, pk part | **Unit: trading day**, the day the snapshot describes. |
 | `payload` | jsonb | not null | |
 | `inputs_digest` | bytea | not null | **`SD-M13-03`.** What makes INV-M13-10 checkable: if the digest changed, the marks changed, and the trader is told why. Without it, a corrected mark silently changes a trader's historical statistics and the only evidence is that they remember a different number |
 | `computed_at` | timestamptz | not null default now() | |

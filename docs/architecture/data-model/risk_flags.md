@@ -12,7 +12,7 @@ Flags attach to **humans**, not to accounts. `account_id` is set when a flag is 
 | `source` | text | not null default `internal` | **reserved**: `internal` or `vendor:<name>`, so a QuantSentry-class detector plugs in without a migration |
 | `detector_run_id` | uuid | fk detector_runs, null, on delete restrict | provenance |
 | `evidence` | jsonb | not null | the numbers behind the accusation, never a bare label |
-| `first_detected_on` | date | not null | |
+| `first_detected_on` | date | not null | **Unit: wall clock**, when Merit first saw it. |
 | `resolved_at` | timestamptz | null | |
 | `resolved_by`, `resolution_note` | text | null | |
 | `sla_due_at` | timestamptz | null | **`SD-M7-02`** |

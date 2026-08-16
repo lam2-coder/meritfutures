@@ -5,7 +5,7 @@ The only input the rules engine reads.
 |---|---|---|---|
 | `id` | bigint | pk, generated always as identity | |
 | `account_id` | uuid | fk accounts, not null, on delete restrict | |
-| `trading_day` | date | not null | |
+| `trading_day` | date | not null | **Unit: trading day**, the day this mark closes. |
 | `opening_balance_cents` | bigint | not null | |
 | `closing_balance_cents` | bigint | not null | |
 | `high_balance_cents` | bigint | not null | |

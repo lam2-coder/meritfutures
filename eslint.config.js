@@ -78,6 +78,49 @@ export default [
   },
 
   {
+    // -------------------------------------------------------------------------
+    // ADR-042. THE HOLD, EXPIRY AND SWEEP PATH, WHICH DOES NOT EXIST YET.
+    // -------------------------------------------------------------------------
+    // A release deadline is measured in WALL-CLOCK HOURS and answered by
+    // `now()`. The trading calendar is a different set of days, and there is no
+    // business-day calendar in this system because ADR-042 ruled that Merit
+    // quotes that unit and never computes it.
+    //
+    // THIS GLOB MATCHES ZERO FILES TODAY, AND SAYING SO IS THE POINT. The sweep
+    // is P2 code. A gate wired while it is green, and watched failing on a
+    // seeded violation, is the cheapest it will ever be; wired afterwards it
+    // arrives to find the defect already shipped. `packages/eslint-plugin-merit/
+    // test/no-calendar-in-expiry-path.test.ts` is where the rule is watched
+    // firing, and `RI-06` is what stops this block being quietly deleted while
+    // the rule file stays behind looking like a control.
+    //
+    // THE GLOB IS THE RULE'S SCOPE AND THE RULE DOES NOT GUESS. Naming the
+    // paths here rather than sniffing filenames inside the rule is
+    // `merit/no-raw-db-client`'s shape exactly: a rule whose whole meaning is
+    // the path it is scoped to belongs beside its glob, in the file whose
+    // subject is which rules apply where. When the sweep lands somewhere these
+    // patterns do not reach, THE LINE TO CHANGE IS THIS ONE, and it is a diff a
+    // reviewer reads.
+    files: [
+      'apps/**/payout*/**/*.ts',
+      'apps/**/payouts/**/*.ts',
+      'apps/**/wallet/**/*.ts',
+      'apps/**/*sweep*.ts',
+      'apps/**/*expiry*.ts',
+      'apps/**/*freeze*.ts',
+      'apps/**/*hold*.ts',
+      'packages/**/*sweep*.ts',
+      'packages/**/*expiry*.ts',
+      'packages/**/*freeze*.ts',
+    ],
+    ignores: ['**/test/**'],
+    plugins: { merit },
+    rules: {
+      'merit/no-calendar-in-expiry-path': 'error',
+    },
+  },
+
+  {
     // Test files may assert against `any`-shaped fixtures and may name a
     // construct the source is banned from using. STRATEGY section 4.5 scopes
     // the type-assertion ban to "outside test fixtures" for exactly this

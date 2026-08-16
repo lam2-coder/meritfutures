@@ -15,6 +15,7 @@ checks it.
 |---|---|
 | `merit/engine-purity` | `packages/rules-engine` has zero I/O, no ambient nondeterminism and no floating-point literals |
 | `merit/no-raw-db-client` | **VG-4.** Only `packages/db` imports a database client; everything else reads through `scopedDb(identity)` |
+| `merit/no-calendar-in-expiry-path` | **ADR-042.** The hold, expiry and sweep path may not import the trading calendar. A release deadline is wall-clock hours |
 
 `engine-purity` is the **source-level half** of the engine's purity boundary.
 The manifest half is `RI-01` in
@@ -58,3 +59,38 @@ Both halves are watched: `test/no-raw-db-client.test.ts` proves the rule works,
 and `CI-01/vg4` in
 [`scripts/ci/falsify-ci.mjs`](../../scripts/ci/falsify-ci.mjs) seeds a real file
 into `apps/portal/src/` and proves the **stage** fails on this rule's name.
+
+## ADR-042, and the rule whose glob matches nothing yet
+
+`no-calendar-in-expiry-path` is the strongest of that ruling's three mechanisms,
+for one reason: **an import is checkable and an intention is not.**
+
+The ruling is that an obligation Merit binds itself to is measured in exactly one
+of two units. **Trading days**, answered only by `TradingCalendar`, for every
+engine counter. **Wall-clock hours**, answered only by `now()`, for every release
+deadline. Nothing Merit computes is measured in business days; that is the rail's
+language, quoted where the rail's leg is described and never calculated.
+
+The failure it exists for is specific. `payout_requests.freeze_expires_at` and
+`wallet_withdrawals.freeze_expires_at` are `timestamptz`, and M05 described them
+in prose as "10 business days". **There is no business-day calendar anywhere in
+this system.** So whoever implements the sweep reaches for the only calendar in
+the database, which is the trading calendar, which is a different set of days:
+the exchange trades on days banks are shut and shuts on days banks trade. The
+substitution is wrong on roughly 104 days a year and it **looks exactly right in
+review**, because the import resolves, the types line up, and the code reads as
+though somebody thought about holidays.
+
+**Its glob matches zero files today and that is the argument for wiring it now.**
+The hold, expiry and sweep paths are P2 code. A rule wired while it is green, and
+watched failing on a seeded violation, is the cheapest it will ever be; wired
+afterwards it arrives to find the defect already shipped. Every message it can
+emit is watched firing in `test/no-calendar-in-expiry-path.test.ts`, including
+the exact scenario the ruling predicted, `addTradingDays(from, 5)` inside a
+freeze sweep.
+
+**A rule scoped to nothing and a rule unplugged produce byte-identical lint
+output**, so `RI-06` in `packages/tooling/checks/repo-invariants.mjs` asserts the
+wiring in both directions: every rule this plugin registers is attached to a glob
+in the workspace root `eslint.config.js`, and every `merit/*` rule that config
+names is one this plugin registers.

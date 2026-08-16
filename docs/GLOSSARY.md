@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-16
 ---
 
 # GLOSSARY
@@ -33,6 +33,20 @@ A trading day on which the market is halted or limit locked such that a trader c
 
 ## trading calendar
 The maintained dataset of trading days, session open/close times, half days, holidays, and DST transitions. One module (`TradingCalendar`) reads it and everything else calls that module. Rule code never calls `new Date()` arithmetic.
+
+## business day
+**The rail's language. Merit quotes it and never computes it** ([ADR-042](decisions/ADR-042.md)). A business day is whatever the bank, card network or payment processor on the far leg of a transfer means by it, on their calendar and under their holiday schedule, and Merit has no calendar that can answer the question. It appears in exactly one place in Merit's own prose: **quoted, on the surface where an external leg is described**, such as the published "2 to 3 business days" settlement claim, which is the rail's claim repeated rather than Merit's promise made.
+
+**Nothing Merit computes is measured in business days, and there is no business-day calendar anywhere in the system.** An obligation Merit binds itself to is measured in exactly one of two units:
+
+| Unit | Answered only by | Used for |
+|---|---|---|
+| **[trading day](#trading-day)** | [`TradingCalendar`](#trading-calendar), over `trading_calendar` rows | every engine counter: minimum days, cadence gaps, win days, consistency periods |
+| **wall-clock hours** | `now()` | every release deadline: the payout hold, the withdrawal freeze, every `*_expires_at` |
+
+**A trading day is not a business day in either direction**: the exchange trades on days banks are shut and shuts on days banks trade. Whoever implements an expiry sweep and reaches for "the only calendar in the database" reaches for a different set of days, and that substitution is wrong on roughly 104 days a year while looking exactly right in review. Three mechanisms exist because that mistake is invisible in prose: the `merit/no-calendar-in-expiry-path` lint rule, the SQL shape check over the migrations, and [`CI-06m`](testing/STRATEGY.md)'s unit-declaration half.
+
+**The 48 hour clocks are wall clock, and the obligation is to RELEASE rather than to SETTLE** ([ADR-040](decisions/ADR-040.md), [ADR-042](decisions/ADR-042.md)). Release ends the hold; settlement follows the rail on the rail's own schedule. [M05](plans/M05-payout-system.md)'s freeze window was proposed as "10 business days" and is **48 wall-clock hours**; `payout.freeze_expiring`'s lead was "2 business days" and was **retired rather than converted**, because a two-day lead inside a 48 hour window fires before the thing it warns about. **A 48 hour hold that expires at 03:00 on Christmas Day releases at 03:00 on Christmas Day.** That is the reason the unit was chosen rather than an oversight in it: releasing is Merit's own act and needs no exchange, no bank and no calendar, which is exactly what makes it a promise Merit can keep. An obligation that waited for the rail would be a promise about somebody else's schedule.
 
 ## last closed day
 The most recent trading day for which the [nightly batch](#nightly-batch) has completed and marks are final. Every rule evaluation, eligibility check, and payout decision is computed against the last closed day and nothing more recent. This is the semantic that makes a payout request at 23:59:59 and a batch at 00:05 deterministic (B4 scenario 6).

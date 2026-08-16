@@ -9,7 +9,7 @@ Built on [`plan_breaker_state`](plan_breaker_state.md)'s pattern rather than a n
 |---|---|---|---|
 | `scope_kind` | text | not null, check in (`phone`,`ip`,`country`,`global`), pk part | the three velocity scopes amendment 2 names, plus the cost circuit breaker. The breaker is `global` because Merit's SMS bill is one number and a per-country breaker cannot see an attack spread across ten |
 | `scope_key` | text | not null, check `<> ''`, pk part | for `phone` this is `encode(phone_hash,'hex')` and **never the number**: a rate-limit table is not a reason to keep the one plaintext copy the rest of the schema refuses to keep. For `ip` the address, for `country` the alpha-2, for `global` the literal `global` |
-| `evaluated_on` | date | not null, pk part | |
+| `evaluated_on` | date | not null, pk part | **Unit: wall clock**, a budget day is a calendar day of Merit’s own, and the exchange has no opinion about SMS spend. |
 | `sends` | integer | not null default 0, check >= 0 | the velocity half |
 | `send_limit` | integer | not null, check > 0 | |
 | `spend_cents` | bigint | not null default 0, check >= 0 | the cost half. Integer cents, per §1 |

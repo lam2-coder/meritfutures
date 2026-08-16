@@ -7,7 +7,7 @@ The quarantine machine for B4 #4.
 | `file_name` | text | not null | |
 | `sha256` | bytea | not null | |
 | `kind` | text | not null, check in (`eod_report`,`fills`,`positions`,`unknown`) | **provisional**: the real set depends on what Rithmic delivers |
-| `trading_day` | date | null | parsed from content, null until known |
+| `trading_day` | date | null | parsed from content, null until known **Unit: trading day**, the day the file reports. |
 | `byte_size` | bigint | not null, check >= 0 | |
 | `received_at` | timestamptz | not null default now() | |
 | `status` | `ingest_file_status` enum(`received`,`parsing`,`parsed`,`quarantined`,`applied`) | not null default `received` | |

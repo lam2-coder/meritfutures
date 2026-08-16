@@ -438,7 +438,90 @@ const ri05 = {
 // -----------------------------------------------------------------------------
 
 /** @type {Invariant[]} */
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05];
+// -----------------------------------------------------------------------------
+// RI-06  The three merit rules are registered AND attached to a glob
+// -----------------------------------------------------------------------------
+// ADR-042 wires `merit/no-calendar-in-expiry-path` to a glob that MATCHES ZERO
+// FILES, because the hold, expiry and sweep path is P2 code. That is the right
+// time to wire it and it creates a specific hazard: a rule scoped to nothing
+// looks identical, in every CI run, to a rule that has been unplugged.
+//
+// The rule file could be deleted, or its `plugins`/`rules` block in
+// eslint.config.js could be dropped in a merge, and LINT WOULD STAY GREEN AND
+// SAY NOTHING, because there is no file for it to have an opinion about. This
+// check is the difference between "the control is armed" and "the control is a
+// file in the repository".
+//
+// It asserts the wiring, in both directions, for all three rules rather than
+// just the new one: a plugin rule that nothing attaches, and an attachment
+// naming a rule the plugin does not export, are the same defect mirrored.
+
+/** @type {Invariant} */
+const ri06 = {
+  id: 'RI-06',
+  title: 'Every merit ESLint rule is exported by the plugin and attached in eslint.config.js',
+  covers:
+    'both directions between packages/eslint-plugin-merit/index.js and the workspace root ' +
+    'eslint.config.js: every rule the plugin registers is attached to at least one glob, and ' +
+    'every `merit/*` rule the config names is one the plugin registers. It exists because ' +
+    '`merit/no-calendar-in-expiry-path` is scoped to a path that does not exist yet (ADR-042), ' +
+    'so an unplugged rule and an armed one produce byte-identical lint output. It does NOT ' +
+    'check that a glob matches files, which for that rule is expected to be false until P2.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const pluginPath = 'packages/eslint-plugin-merit/index.js';
+    const configPath = 'eslint.config.js';
+    for (const rel of [pluginPath, configPath]) {
+      if (!existsSync(join(root, rel))) throw new Error(`${rel} does not exist; RI-06 cannot run`);
+    }
+
+    const plugin = read(root, pluginPath);
+    // The `rules: { ... }` map of the plugin, read as the source of truth for
+    // what exists. Parsed from the text rather than imported, because this file
+    // is a checker and importing an ESLint plugin to ask its name is a heavier
+    // dependency than the question deserves.
+    const block = /rules\s*:\s*\{([\s\S]*?)\}/.exec(plugin);
+    if (!block?.[1]) throw new Error(`${pluginPath}: no \`rules\` map found; RI-06 cannot run`);
+    const registered = [...block[1].matchAll(/'([a-z][a-z0-9-]*)'\s*:/g)].map((m) => m[1]);
+    if (registered.length === 0) {
+      throw new Error(
+        `${pluginPath}: the \`rules\` map parsed to zero rules; RI-06 is asserting nothing`,
+      );
+    }
+
+    const config = read(root, configPath);
+    const attached = new Set(
+      [...config.matchAll(/'merit\/([a-z][a-z0-9-]*)'\s*:/g)].map((m) => m[1]),
+    );
+    if (attached.size === 0) {
+      throw new Error(
+        `${configPath}: no \`merit/*\` rule is attached anywhere; RI-06 is asserting nothing`,
+      );
+    }
+
+    for (const rule of registered) {
+      if (!attached.has(rule)) {
+        findings.push(
+          `${pluginPath} registers \`merit/${rule}\` and ${configPath} attaches it to nothing. ` +
+            'A rule nothing attaches is a file, not a control',
+        );
+      }
+    }
+    for (const rule of attached) {
+      if (!registered.includes(rule)) {
+        findings.push(
+          `${configPath} attaches \`merit/${rule}\`, which ${pluginPath} does not register. ` +
+            'ESLint fails at load on this, so it is caught either way; it is here so the ' +
+            'failure names the cause rather than a resolution error',
+        );
+      }
+    }
+    return findings;
+  },
+};
+
+export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06];
 
 function main() {
   const [arg] = process.argv.slice(2);

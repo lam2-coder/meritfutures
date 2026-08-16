@@ -8,7 +8,7 @@
 | `instrument` | text | not null | |
 | `opened_at` | timestamptz | not null | |
 | `closed_at` | timestamptz | null | null while the position is open |
-| `trading_day` | date | not null | |
+| `trading_day` | date | not null | **Unit: trading day**, the day the round trip closed on. |
 | `direction` | text | not null, check in (`long`,`short`) | |
 | `max_size` | integer | not null, check > 0 | |
 | `entry_fills` | bigint[] | not null | arrays rather than a join table because the grouping **is** the finding: which fills belong together is precisely what `derivation_version` pins |

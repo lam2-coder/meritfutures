@@ -4,7 +4,7 @@
 | Column | Type | Constraints | Why |
 |---|---|---|---|
 | `id` | bigint | pk, generated always as identity | internal, never in a URL |
-| `trading_day` | date | fk [`trading_calendar`](trading_calendar.md), not null, on delete restrict | **the exchange CT trading day** the correction moved. `restrict` because a calendar day with a revision history is a day something already depended on |
+| `trading_day` | date | fk [`trading_calendar`](trading_calendar.md), not null, on delete restrict | **Unit: trading day**, the day the correction moved. `restrict` because a calendar day with a revision history is a day something already depended on |
 | `prior_row` | jsonb | not null | `to_jsonb(OLD)` of the whole `trading_calendar` row. **Derived, not listed**, so a column a future migration adds is captured automatically. A hand-written column list is the same object as a hand-maintained count, and this corpus has now found nine of those wrong |
 | `actor` | text | not null, non-blank | who. Free text on `identity_links`' `actor` idiom: this is written by the loader and by an operator, neither of which is a `users` row |
 | `reason` | text | not null, non-blank | why. **A prior image with no reason records that the calendar moved and not that anybody decided it should** |

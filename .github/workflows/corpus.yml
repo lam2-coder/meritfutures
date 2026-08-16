@@ -81,6 +81,29 @@ jobs:
       - name: Gates are falsifiable
         run: node scripts/corpus/falsify.mjs
 
+      # ADR-042's SECOND MECHANISM, and it needs no database because it is a
+      # check on the SHAPE of the DDL rather than on anything installed: no
+      # `interval` arithmetic against a `date` column, and no `timestamptz` cast
+      # to `date`.
+      #
+      # IT IS VACUOUSLY TRUE TODAY, which is the argument for wiring it now
+      # rather than against it. `0029` to `0031` made `interval '48 hours'`
+      # idiomatic on the money path, so the next session that needs "five
+      # trading days from now" has a working pattern sitting right there that
+      # produces a wrong answer on roughly 104 days a year and reads as though
+      # somebody thought about it.
+      #
+      # `--falsify` runs FIRST and is not decoration: this check has no natural
+      # failures to observe, so the only evidence it works is watching it fire
+      # on each seeded violation and leave four legitimate constructs alone,
+      # including `interval '48 hours'` against a `timestamptz`, which is the
+      # ruled unit and must never be a finding.
+      - name: The date-unit shape check is falsifiable
+        run: node scripts/db/assert_date_unit_shape.mjs --falsify
+
+      - name: No interval arithmetic against a date column
+        run: node scripts/db/assert_date_unit_shape.mjs
+
       # CI-06g is only meaningful if regenerating changes nothing. The check
       # above compares spans against their queries; this proves the generator
       # is the thing that wrote them, so a span cannot be hand-edited into

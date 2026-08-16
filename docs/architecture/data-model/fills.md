@@ -13,13 +13,13 @@
 | `price_numerator` | bigint | not null | exact rational price, never a float, for the same reason money is integer cents: a price that rounds is a P&L that disagrees with the vendor's |
 | `price_denominator` | bigint | not null, check > 0 | |
 | `executed_at` | timestamptz | not null | vendor execution time |
-| `trading_day` | date | not null | resolved through the calendar, never from the timestamp's UTC date. **Our** answer, because the engine must be deterministic |
+| `trading_day` | date | not null | resolved through the calendar, never from the timestamp's UTC date. **Our** answer, because the engine must be deterministic **Unit: trading day**, resolved through the calendar by R-01 containment. |
 | `correction_of` | bigint | fk fills, null, on delete restrict | **B3 reservation.** A correction references the original |
 | `is_corrected` | boolean | not null default false | set on the original when a correction arrives |
 | `ingest_file_id` | uuid | fk ingest_files, not null, on delete restrict | provenance |
 | `raw_row_id` | bigint | fk raw_ingest_rows, not null, on delete restrict | provenance |
 | `recorded_at` | timestamptz | not null default now() | **arrival** time, which differs from `executed_at` on corrections. Both, because "when did it happen" and "when did we learn it" are different questions and a correction is exactly where they diverge |
-| `trading_day_vendor` | date | null | **`SD-M2-04`** |
+| `trading_day_vendor` | date | null | **`SD-M2-04`** **Unit: trading day**, the vendor's own answer to the same question, kept so AS-M2-06 can compare the two. |
 | `trading_day_source` | text | not null default `calendar`, check in (`calendar`,`vendor`,`agreed`) | **`SD-M2-04`.** When the vendor states a session date and our calendar containment disagrees, that disagreement is the single most valuable ingest signal available, and it is invisible if we overwrite with our own answer. Divergence alarms rather than being silently resolved in our favour (AS-M2-06, FM-M2-04) |
 | `created_at` | timestamptz | not null default now() | |
 

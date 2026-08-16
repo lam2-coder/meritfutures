@@ -13,13 +13,13 @@
 | `platform_account_ref` | text | null | unique among **live** accounts only (see `platform_account_refs`) |
 | `feed` | text | null, check in (`rithmic`,`cqg`,`dxfeed`) | **B3 reservation.** Marketing needs it even when ingest does not |
 | `front_end_permissions` | jsonb | not null default `'[]'` | NinjaTrader, Quantower, ATAS and friends; a provisioning input |
-| `opened_on` | date | not null | trading day, not a timestamp. The calendar is authoritative (B4 #1) |
-| `funded_on` | date | null | set at eval pass |
-| `closed_on` | date | null | |
+| `opened_on` | date | not null | **Unit: trading day**, and this row already said so in words before [`CI-06m`](../../testing/STRATEGY.md) made it a token: a trading day, not a timestamp, and the calendar is authoritative (B4 #1). An account's whole lifecycle is measured against the exchange, because every counter it carries is |
+| `funded_on` | date | null | **Unit: trading day**, set at eval pass, which happens on a session. The funded phase's counters start from it |
+| `closed_on` | date | null | **Unit: trading day**, the session the account stopped trading on |
 | `close_reason` | text | null | |
 | `payouts_frozen` | boolean | not null default false | account-level freeze, in addition to the identity-level flag. Both exist because an investigation can be about one account or about a person |
 | `recon_blocked` | boolean | not null default false | set by a failed [reconciliation](../../GLOSSARY.md#reconciliation); a **context gate**, never part of the replayed state (INV-23) |
-| `expires_on` | date | null | eval expiry when configured (v1 unlimited on all three) |
+| `expires_on` | date | null | **Unit: trading day**, an eval expiry when configured (v1 unlimited on all three). It bounds a phase whose progress is counted in trading days, so counting it in anything else would let an eval expire mid-requirement |
 | `graduated_at` | timestamptz | null | **`SD-M18-01`** |
 | `graduation_path` | text | null, check in (`continuation`,`third_party_intro`,`live_program`) | **`SD-M18-01`.** `live_program` is in the vocabulary and **no live program exists at launch** (OQ-M18-01 as ruled at the FREEZE gate). The value is present so the shape is decided before commercial pressure decides it, and zero live-program copy ships until counsel rules |
 | `terminal_settlement_id` | uuid | null, **fk added in `0010`** | **`SD-M18-01`.** Without it, a graduated account holding a balance is indistinguishable from one that paid out fully (INV-M18-05). One of the three ruled reference cycles (§17) |

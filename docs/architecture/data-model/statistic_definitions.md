@@ -16,7 +16,7 @@
 | `measures` | `statistic_measure[]` | not null | **[ADR-032](../../decisions/ADR-032.md).** The declared measure set, and what STAT-C1 checks a publish run against. ST-01/02/07 `{rate}`; ST-03 `{total}`; ST-04 `{mean, median}`; ST-05/06 `{p50, p95}` |
 | `method_body_mdx` | text | not null | the published methodology page |
 | `adr_ref` | text | null | the ruling that fixed this definition |
-| `effective_from` | date | not null | **always in the future at write time** (INV-M12-07). A definition that takes effect retroactively is a definition chosen after seeing the number it produces |
+| `effective_from` | date | not null | **always in the future at write time** (INV-M12-07). A definition that takes effect retroactively is a definition chosen after seeing the number it produces **Unit: wall clock**, a definition validity window. |
 | `superseded_by` | uuid | fk statistic_definitions, null, on delete restrict | |
 | `created_at` | timestamptz | not null default now() | |
 

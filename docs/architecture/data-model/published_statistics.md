@@ -6,8 +6,8 @@
 | `id` | uuid | pk | |
 | `stat_code` | text | not null | |
 | `definition_version` | integer | not null, check > 0 | |
-| `window_start_day`, `window_end_day` | date | not null | |
-| `as_of_trading_day` | date | not null | |
+| `window_start_day`, `window_end_day` | date | not null | **Unit: trading day**, both of them. [M12](../../plans/M12-statistic-definitions.md)'s window is "trailing 90 **trading** days", so these are the window's first and last, and **this cell was empty until 2026-08-16** while the unit lived only in M12. It sits one row from `as_of_trading_day`, whose unit is in its name, in the same table: the pair is why the unit is declared rather than inferred. |
+| `as_of_trading_day` | date | not null | **Unit: trading day**, the day the figure is stated as of. |
 | `measure` | `statistic_measure` | not null | **[ADR-032](../../decisions/ADR-032.md).** Which figure this row carries. Without it ST-04's mean and median, and ST-05's and ST-06's p50 and p95, collide on the window unique index and the second is unwritable |
 | `value` | bigint | null | **[ADR-031](../../decisions/ADR-031.md).** Renamed from `value_numeric numeric`, and its no-floats exemption is retired |
 | `value_unit` | `statistic_unit` | null | **[ADR-031](../../decisions/ADR-031.md).** 1470 is 14.70 percent or $14.70 depending on a column nobody made mandatory |

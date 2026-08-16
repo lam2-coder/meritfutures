@@ -4,7 +4,7 @@
 | `id` | uuid | pk | |
 | `detector` | text | not null | |
 | `detector_version` | text | not null | |
-| `trading_day` | date | not null | |
+| `trading_day` | date | not null | **Unit: trading day**, the day the detector ran over. |
 | `started_at`, `finished_at` | timestamptz | null | |
 | `rows_scanned` | integer | not null default 0, check >= 0 | |
 | `flags_raised` | integer | not null default 0, check >= 0 | |

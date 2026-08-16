@@ -5,8 +5,8 @@
 |---|---|---|---|
 | `id` | bigint | pk, generated always as identity | internal, never in a URL |
 | `source_id` | text | not null, non-blank | which source publication this load came from, e.g. the CME 2026 calendar. `text` rather than an enum: the set grows about once a year, which is the case section 1 sends to `text` with a check |
-| `coverage_start_day` | date | not null | **inclusive lower bound, in exchange CT trading-day space**, the same domain as `trading_calendar.trading_day`. Never a UTC calendar date |
-| `coverage_end_day` | date | not null, check >= `coverage_start_day` | **inclusive upper bound, same unit.** The horizon alarm warns when the maximum runs less than six months ahead ([ADR-042](../../decisions/ADR-042.md), OQ-SE-02) |
+| `coverage_start_day` | date | not null | **Unit: trading day**, inclusive lower bound, the same domain as `trading_calendar.trading_day`. Never a UTC calendar date |
+| `coverage_end_day` | date | not null, check >= `coverage_start_day` | **Unit: trading day**, inclusive upper bound, the same domain as `trading_calendar.trading_day`. The horizon alarm warns when the maximum runs less than six months ahead ([ADR-042](../../decisions/ADR-042.md), OQ-SE-02). It read "same unit" until [`CI-06m`](../../testing/STRATEGY.md) landed, which is a declaration by reference to the row above and exactly what a closed vocabulary exists to stop |
 | `source_digest` | bytea | not null, check `length = 32` | SHA-256 of the source file as committed. The loader re-reads the rows it wrote, re-canonicalizes and asserts the digests match |
 | `actor` | text | not null, non-blank | who ran the load |
 | `created_at` | timestamptz | not null default now() | **[ADR-042](../../decisions/ADR-042.md)'s "loaded at".** The row's creation **is** the load, so there is deliberately no second timestamp beside it |
