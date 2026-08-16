@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../decisions/README.md, ../OVERVIEW.md]
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # DATA MODEL
@@ -12,7 +12,7 @@ Every table, every column, with type, constraints, indexes, retention, and the r
 
 > **Amended under [ADR-026](../../decisions/ADR-026.md), 2026-08-14. The schema-delta reconciliation has landed.**
 >
-> All **94** approved schema changes are folded into one reviewed migration set at [`packages/db/migrations`](../../../packages/db/migrations), 27 files, verified to apply in order against PostgreSQL 16. Every delta is traced to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md), which is the file the completeness gate reads. **No delta was rejected.**
+> All <!--gen:manifest_changes-->103<!--/gen--> approved schema changes are folded into one reviewed migration set at [`packages/db/migrations`](../../../packages/db/migrations), <!--gen:migration_files-->29<!--/gen--> files, verified to apply in order against PostgreSQL 16. **This sentence read "94 approved schema changes" and "27 files" until 2026-08-16**, two hand-maintained figures in the header of the document that records how often they drift: `0028` had merged and neither moved. Both are [CI-06g](../../testing/STRATEGY.md) spans now, which is [ADR-034](../../decisions/ADR-034.md)'s remedy applied where it was found. Every delta is traced to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md), which is the file the completeness gate reads. **No delta was rejected.**
 >
 > **Where the two disagree, the migrations are the truth and this document is the design record.**
 >
@@ -23,6 +23,8 @@ Every table, every column, with type, constraints, indexes, retention, and the r
 > **Four rulings changed a column or a value rather than adding one**, and each is folded rather than merely recorded: [ADR-027](../../decisions/ADR-027.md) (two distinct per-identity ledger classes, seven in total), [ADR-028](../../decisions/ADR-028.md) (`payout_requests.status` and **both** of its index predicates), [ADR-029](../../decisions/ADR-029.md) (`dedupe_matched_identity_id` dropped), and [ADR-030](../../decisions/ADR-030.md) (`max_payouts`, `kyc.triggers`). The sentence read "three" against a list of four and is corrected here.
 
 > **Further amended, 2026-08-14, by two rulings on `published_statistics`.** [ADR-031](../../decisions/ADR-031.md): `value_numeric numeric` becomes **`value bigint`** with a mandatory **`value_unit`**, retiring its no-floats exemption and leaving **two** columns on that list, none of them money. [ADR-032](../../decisions/ADR-032.md): **`measure`** joins the table and the window unique key, `statistic_definitions` gains **`measures`**, and **STAT-C1** in `0027` makes "neither figure of a pair is published alone" a database constraint rather than prose. Both amend approved `SD-M12-02`; the second touches the immutability contract on a public surface. Sections amended: §13 (invariants) and §17 (the no-floats exemption list, and the verification record), plus this header.
+
+> **Further amended, 2026-08-16, by [ADR-039](../../decisions/ADR-039.md) and [`0029`](../../../packages/db/migrations/0029_phone_identity_and_auth.sql).** Passwordless auth widens to three factors and **a verified phone becomes a first-class identity signal rather than a contact field**. **Three new tables** ([`identity_phones`](identity_phones.md), [`phone_change_requests`](phone_change_requests.md), [`otp_send_budget`](otp_send_budget.md)) and **amended columns on six existing ones** ([`otp_challenges`](otp_challenges.md), [`sessions`](sessions.md), [`contact_channels`](contact_channels.md), [`identity_signals`](identity_signals.md), [`notification_kinds`](notification_kinds.md), [`kyc_verifications`](kyc_verifications.md)). **[FOLD-01](../../plans/FOLD-01-phone-identity.md) section 6.2 said five existing tables above a list of six**, which is the same hand-maintained-count class the manifest has now recorded nine times; the count here is the one taken from the diff. Three things in the set are load bearing and are named at the top of `0029` for the E2 read: **the unique index on `phone_hash` is deliberately absent** (ADR-039 splits the hard link and only the identity-to-phone half is a constraint), **`otp_send_budget` has no stopping state** (the cost breaker degrades, because a breaker that stops registration is a denial of service on customer acquisition), and **`sessions.elevated_by_factor`'s check list is C-27** (`passkey` or `dual_channel`, so a SIM-swapped session can see everything and change nothing).
 
 Split to a file per table on 2026-08-15 by [ADR-043](../../decisions/ADR-043.md).
 Each `### <table>` design record is its own file; the conventions, the plan-config
@@ -79,7 +81,7 @@ erDiagram
 
 ## 3. Identity, authentication and KYC
 
-Created by [`0002_identity`](../../../packages/db/migrations/0002_identity.sql) and [`0003_kyc`](../../../packages/db/migrations/0003_kyc.sql). Twelve tables. Both files are money path: identity is the row every cap and every aggregate liability figure keys off, and KYC is what stands between the payout rail and a fleet.
+Created by [`0002_identity`](../../../packages/db/migrations/0002_identity.sql), [`0003_kyc`](../../../packages/db/migrations/0003_kyc.sql) and [`0029_phone_identity_and_auth`](../../../packages/db/migrations/0029_phone_identity_and_auth.sql). Fifteen tables. All three files are money path: identity is the row every cap and every aggregate liability figure keys off, KYC is what stands between the payout rail and a fleet, and `0029` is where [ADR-039](../../decisions/ADR-039.md)'s authority boundary stops being prose.
 
 | Table | |
 |---|---|
@@ -87,8 +89,11 @@ Created by [`0002_identity`](../../../packages/db/migrations/0002_identity.sql) 
 | [`users`](users.md) | |
 | [`passkeys`](passkeys.md) | |
 | [`otp_challenges`](otp_challenges.md) | |
+| [`otp_send_budget`](otp_send_budget.md) | `0029` |
 | [`sessions`](sessions.md) | |
 | [`identity_signals`](identity_signals.md) | |
+| [`identity_phones`](identity_phones.md) | `0029` |
+| [`phone_change_requests`](phone_change_requests.md) | `0029` |
 | [`identity_links`](identity_links.md) | |
 | [`identity_merges`](identity_merges.md) | |
 | [`kyc_verifications`](kyc_verifications.md) | |
@@ -371,15 +376,17 @@ Walked line by line at the gate. All five confirmed as written; recorded in [DEC
 
 ## 17. Delta provenance (added under [ADR-026](../../decisions/ADR-026.md))
 
-**Every schema change in the migration set traces to the document that proposed it, and the trace lives in one file.** [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md) carries all 94 with a disposition, plus the migration sequence, the rejection table, and the reference cycles. **The completeness gate reads it**: every `SD-nn` and `U-nn` appearing anywhere in `docs/` must appear exactly once there. A count nobody can drift is better than a count someone remembers to update.
+**Every schema change in the migration set traces to the document that proposed it, and the trace lives in one file.** [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md) carries all <!--gen:manifest_changes-->103<!--/gen--> with a disposition, plus the migration sequence, the rejection table, and the reference cycles. **The completeness gate reads it**: every `SD-nn` and `U-nn` appearing anywhere in `docs/` must appear exactly once there. A count nobody can drift is better than a count someone remembers to update.
 
 **Inside the SQL, every folded column, index, constraint and table carries an inline `-- SD-nn` or `-- U-nn` marker.** A reader looking at a column does not have to leave the file to learn why it exists.
 
-### The 27 files, and which of them are money path
+### The <!--gen:migration_files-->29<!--/gen--> files, and which of them are money path
 
-`0001` extensions and enums, `0002` identity, `0003` kyc, `0004` catalog, `0005` affiliate program, `0006` commerce, `0007` accounts, `0008` risk, `0009` ledger, `0010` payouts, `0011` wallet, `0012` disputes and affiliate settlement, `0013` ingest, `0014` marks, `0015` rule states, `0016` treasury controls, `0017` events and audit, `0018` integrations, `0019` notifications and community, `0020` public surface, `0021` transparency, `0022` analytics journal, `0023` loyalty and graduation, `0024` offers, `0025` reserved sequence, `0026` roles and grants, `0027` triggers and invariants.
+`0001` extensions and enums, `0002` identity, `0003` kyc, `0004` catalog, `0005` affiliate program, `0006` commerce, `0007` accounts, `0008` risk, `0009` ledger, `0010` payouts, `0011` wallet, `0012` disputes and affiliate settlement, `0013` ingest, `0014` marks, `0015` rule states, `0016` treasury controls, `0017` events and audit, `0018` integrations, `0019` notifications and community, `0020` public surface, `0021` transparency, `0022` analytics journal, `0023` loyalty and graduation, `0024` offers, `0025` reserved sequence, `0026` roles and grants, `0027` triggers and invariants, `0028` supersede plan version immutability, `0029` phone identity and auth.
 
-**Sixteen carry an `E2 READ: MONEY PATH` header** naming what in the file needs the founder's line-by-line read and why. Money-path files carry their reasoning in comments, not only in DDL, because the constitution E2 read is on the diff and a diff that requires four other documents to interpret is one that gets skimmed.
+<!--gen:e2_files-->19<!--/gen--> **carry an `E2 READ: MONEY PATH` header** naming what in the file needs the founder's line-by-line read and why. Money-path files carry their reasoning in comments, not only in DDL, because the constitution E2 read is on the diff and a diff that requires four other documents to interpret is one that gets skimmed.
+
+**This heading read "The 27 files" and this paragraph read "Sixteen carry" until 2026-08-16.** `0028` had merged and neither moved; the E2 figure was already a span in [STATE](../../STATE.md) and [INDEX](../../INDEX.md) after it was found wrong there, and this third copy of it was not converted at the same time. Both are spans now.
 
 ### The three tables that are created and deliberately empty
 
@@ -424,3 +431,40 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 **The first row is why this section exists in this form.** The trigger read `NEW.config` and `OLD.config`, and `plan_versions` has no `config` column: the rule contract is `rules`. Every `UPDATE` against a published row therefore raised `record "new" has no field "config"`. The promise "a published plan version never changes" survived by accident, because the error rejects the write; **the permitted retirement transition was refused too, so a plan version could not be retired at all**. A draft row updates normally, which is why an install check and every existing probe missed it. **An invariant that was reviewed and not executed has not been checked**, which is the same lesson the `array_length` defect taught one file over, found the same way.
 
 **And the deeper one, which is now a gate.** Every probe in this corpus attempted a forbidden thing and asserted a rejection. A guard that rejects **everything** passes all of them. `probe_plan_version_immutability.sql` therefore leads with the **permitted** transition, and `0028` ships with it, per [ADR-035](../../decisions/ADR-035.md)'s own words: the missing test is the finding as much as the missing column is.
+
+### Verification performed on `0029` (2026-08-16)
+
+**The full <!--gen:migration_files-->29<!--/gen--> file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`**, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->99<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**. `0029` adds three tables, fourteen indexes and thirty-four check constraints, and **no trigger and no function**, so the trigger count is unchanged. The index and check figures are **emitted by the install job**, not derived from the DDL, for the reason [section 11 of DELTA_MANIFEST](../../../packages/db/DELTA_MANIFEST.md) records: a grep of `CREATE INDEX` misses every index Postgres builds behind a primary key or a unique constraint.
+
+**Forty-eight assertions, executed against the installed schema, one perturbation each. The probe leads with the success case**, which is `0028`'s transferable lesson: a probe that only ever attempts forbidden things passes against a guard that rejects everything.
+
+| Assertion | Result |
+|---|---|
+| An identity verifies a phone | **permitted** |
+| **A second identity verifies a number already live on the first** | **permitted, and this is the ruling.** [ADR-039](../../decisions/ADR-039.md)'s phone-to-identity half completes and flags; it does not refuse |
+| The same identity verifies a second live phone | rejected: `identity_phones_live_per_identity_uq` |
+| A release with no evidence | rejected: `identity_phones_release_is_evidenced` |
+| **A released row frees the live index** | **permitted**: the identity verifies a new phone with no operator intervention |
+| A row both superseded and released | rejected: `identity_phones_one_ending` |
+| A port date with no port flag / a lookup time with no provider | rejected, each by its own constraint |
+| **VoIP at capture** | **permitted.** Scored, never rejected |
+| Applying a phone change with any one D4 control missing, or with an already-expired hold | rejected: `phone_change_requests_applied_is_complete`, three ways |
+| Applying with all three and a running hold | **permitted** |
+| A second open change request for one identity | rejected: `phone_change_requests_open_per_identity_uq` |
+| **Elevating a session by SMS** | **rejected by the check list itself.** C-27 |
+| Elevating the same SMS-established session by dual channel | **permitted** |
+| A session with no `auth_factor` | rejected |
+| An OTP challenge with both destinations, or with neither | rejected: `otp_challenges_exactly_one_destination` |
+| **A budget row in a state named `paused`** | **rejected. There is no stopping state** |
+| A breaker trip with no alarm raised | rejected: `otp_send_budget_degraded_is_alarmed` |
+| Deferred registrations with no trip behind them | rejected: `otp_send_budget_deferrals_have_a_trip` |
+| **`pre_identity_auth` is generated non-exempt and non-mutable** | **confirmed by reading the generated columns back** |
+| The `security` class is still `rate_limit_exempt` | confirmed. `INV-M16-11` unchanged |
+| Writing `rate_limit_exempt` directly, or coalescing a pre-identity kind | rejected |
+| `reverify_phone_change` superseding nothing | rejected by `kyc_verifications_supersession_matches_purpose`, **a constraint written before the value existed** |
+
+**Rejections are checked by message text, not by exception class**, per `0028`: a handler catching "any error" scores a wrong-reason failure as the constraint working, which is how ADR-035's defect stayed invisible through a founder-grade review.
+
+**Grants were verified rather than assumed.** `0026`'s `ALTER DEFAULT PRIVILEGES` covers the three new tables: `merit_app` holds `SELECT, INSERT, UPDATE, DELETE` on each and `merit_analytics` holds nothing, which is the ruled default. None of the three is append-only, for [`contact_channels`](contact_channels.md)' reason: supersession is written by `UPDATE` on the superseded row.
+
+**The no-floats set is unchanged and still exactly the two `correlation_groups` columns**, confirmed by querying `information_schema.columns` on the installed schema. It was confirmed by query rather than by the `DO` block, and the reason is `OI-08`: the block lives in `0027` and runs before `0028` and `0029` exist.

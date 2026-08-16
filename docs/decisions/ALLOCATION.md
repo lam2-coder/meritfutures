@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [README.md]
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # Number allocation
@@ -43,7 +43,7 @@ row. A table split into a file per row is not a table, which is the same reason
 | Numbers | Claimed by | State |
 |---|---|---|
 | 0001 to 0028 | merged to `main` | **allocated.** `0001` to `0027` are the schema-delta fold (PR #4); **`0028` is [ADR-035](ADR-035.md)'s superseding migration and it is written, merged and on `main`** as of PR #9, not reserved. `0025` is the marked reserved sequence, three tables created and unused at launch, which reserves *tables* and is an ordinary allocation of a *number* |
-| **0029** | `claude/corpus-workflow-founder-rulings-py70hi`, [FOLD-01](../plans/FOLD-01-phone-identity.md) section 4 | **reserved, unwritten.** `0029_phone_identity_and_auth.sql`, [ADR-039](ADR-039.md)'s nine changes, with an `E2 READ: MONEY PATH` header |
+| **0029** | `claude/builder-reviewer-loop-rykvhs`, [FOLD-01](../plans/FOLD-01-phone-identity.md) section 4 | **written on the branch, unmerged.** [`0029_phone_identity_and_auth.sql`](../../packages/db/migrations/0029_phone_identity_and_auth.sql), [ADR-039](ADR-039.md)'s nine changes, with an `E2 READ: MONEY PATH` header. **This cell was corrected in the same commit that created the file**, which is the discipline the four stale rows above exist to teach |
 | **0030** | `claude/corpus-workflow-founder-rulings-py70hi`, [FOLD-02](../plans/FOLD-02-enforcement-window-and-suspension.md) section 6 | **reserved, unwritten.** `0030_payout_hold_enum.sql`, the `ALTER TYPE ... ADD VALUE` and nothing else, deliberately without `BEGIN`/`COMMIT`. It is its own file because PostgreSQL refuses to use a new enum value inside the transaction that added it, and every index predicate in `0031` is such a use |
 | **0031** | `claude/corpus-workflow-founder-rulings-py70hi`, [FOLD-02](../plans/FOLD-02-enforcement-window-and-suspension.md) section 6 | **reserved, unwritten.** `0031_payout_hold_and_identity_restriction.sql`, [ADR-040](ADR-040.md)'s hold and [ADR-041](ADR-041.md)'s restriction episode |
 | **0032** | `claude/corpus-workflow-founder-rulings-py70hi`, [S-E](../plans/P1-SE-trading-calendar.md) section 10 | **reserved, unwritten.** `0032_trading_calendar_holidays_coverage_revisions.sql`, [ADR-042](ADR-042.md)'s F-1 through F-4 |
