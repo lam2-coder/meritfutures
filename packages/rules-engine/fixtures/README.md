@@ -105,30 +105,24 @@ Each is asserted from both sides in [`test/loader.test.ts`](../../golden-loader/
 
 ---
 
-## Three readings this directory does not choose, and where each one bites
+## Two readings this directory does not choose, and where each one bites a fixture
 
-**A fixture that pins a contested value is a fixture that ratifies a ruling nobody made.** Each of these was found by writing a fixture that would have had to state one, and each is recorded here rather than settled. **None of them is a defect in a file in this directory**; two of them are places where M01 says two things.
+**A fixture that pins a contested value is a fixture that ratifies a ruling nobody made.** **Neither of these is a new finding.** [Session 45](../../../docs/sessions/2026-08-16-session-45.md) recorded both while writing batch 1 and the engine's DO-7, and [session 44](../../../docs/sessions/2026-08-16-session-44.md) recorded M01's third self-disagreement, on R-22's operator, which section 3.5 then settles outright ("the operator column is the contract") and `RE-U-022` asserts. **They are restated here because this is the file a fixture author reads**, and both of them decide whether a given expectation may state a floor.
 
 ### 1. The funded reset lowers the floor, and INV-06 forbids the floor from decreasing
 
-**Three files already state a value that depends on the resolution: GS-019, GS-020 and GS-023**, all of which pin `floor_cents: 4750000` after an eval pass. Every one of them landed before the question was raised, and none is edited here.
+R-31 sets `floor = size_cents - funded drawdown_cents` at the pass. On any 50K plan that is 4,750,000c. But the pass day's own close must clear a 300,000c target, so DO-7 has already trailed the floor to at least 5,050,000c **on that same day** before DO-8 rewrites it downward. INV-06 reads "the floor never decreases, no exception, no phase qualifier", and the pseudocode's tripwire cannot see this one: `if (floor < s.floorCents) throw` runs at DO-7, strictly before the progression block that lowers it.
 
-R-31 sets `floor = size_cents - funded drawdown_cents` at the pass. On any 50K plan that is 4,750,000c. But the pass day's own close must clear a 300,000c target, so DO-7 has already trailed the floor to at least 5,050,000c **on that same day** before DO-8 rewrites it downward. INV-06 and R-14 say the floor never retreats, and the pseudocode's tripwire cannot see it: `if (floor < s.floorCents) throw` runs at DO-7, strictly before the progression block that lowers it.
+**R-12, R-31 and the GS-019 registry row all state 4,750,000c**, so the fixtures follow them; what is unsettled is INV-06's **scope**, per account or per phase, and session 45 records that `RE-P-01` cannot be written until it is ruled.
 
-**The reading is genuinely open** and the two candidates give different published promises: either INV-06 is scoped to the floor machine within a phase, and the funded reset is a new account's initial floor rather than a decrease, or the reset is an exception INV-06 has to name. **Batch 3 wrote no fixture that depends on it.**
+**Three files already state a value that depends on the resolution: GS-019, GS-020 and GS-023**, each pinning `floor_cents: 4750000` after an eval pass. All three landed in earlier batches and **none is edited here**, because changing them either way would ratify the ruling as surely as writing a fourth. **Batch 3 wrote no fixture that depends on it.**
 
 ### 2. The floor lock disagrees with itself when the trigger is crossed by a jump
 
-[M01 section 3.4](../../../docs/plans/M01-rules-engine.md) gives the founder's binding expression, `floor = max(hwb - drawdown, floorLocked ? lock_floor : size - drawdown)`, and says the `max` is redundant "by CV-12". [Section 3.6](../../../docs/plans/M01-rules-engine.md)'s pseudocode instead **assigns** `floor = floorLockFloorAtCents`.
+[M01 section 3.4](../../../docs/plans/M01-rules-engine.md) gives the founder's binding expression, `floor = max(hwb - drawdown, floorLocked ? lock_floor : size - drawdown)`, and calls the `max` redundant "by CV-12". [Section 3.6](../../../docs/plans/M01-rules-engine.md)'s pseudocode instead **assigns** `floor = floorLockFloorAtCents`.
 
-CV-12 makes them agree only when the closing balance lands **exactly** on the trigger, which is GS-015's case. On a close that overshoots, they do not. At 50K with a close of 5,400,000c the trailing floor is 5,150,000c and the locked floor is 5,010,000c, so section 3.4 gives 5,150,000c and section 3.6 gives 5,010,000c, a difference of 140,000c on the value every later breach compares against.
+CV-12 makes them agree only when the closing balance lands **exactly** on the trigger, which is GS-015's case and is what GS-015 exists to pin. On a close that overshoots, they do not. At 50K with a close of 5,400,000c the trailing floor is 5,150,000c and the locked floor is 5,010,000c: 140,000c apart, on the value every later breach compares against.
 
-**INV-06 survives either way and that is why this is quiet rather than loud.** The prior day's floor can never exceed the locked floor while the account is unlocked, because a floor above it would require a close that would already have triggered the lock, so the cross-day tripwire never fires. The disagreement is **within the locking day** and it is invisible until a later low lands between the two candidates.
+**The engine already resolved this in its own layer and that does not resolve it here.** Session 45 landed the `max` and `CI-02/engine-R-15` seeds the assignment back. But TR-01 is the whole reason this directory exists: **a fixture that took its floor from the engine would be proving the code agrees with itself.** M01 still says two things, so an expectation still states neither.
 
-GS-069 is the fixture that would have had to state one. It states neither, and every low on its later days is set above **both** candidates.
-
-### 3. R-22's operator is `>` in the rule taxonomy and `>=` in the pseudocode
-
-[R-22](../../../docs/plans/M01-rules-engine.md) reads `-realized_pnl_cents > daily_loss_limit_cents` (**strict `>`**, "a loss exactly at the limit survives"), and records that this was aligned with R-21's strict `<` at the M1 gate under OQ-6, **amending the approved STATE_MACHINES guard**, and that it is published as "more than". Section 3.6's `dllBreach` line reads `-mark.realizedPnlCents >= rules.dailyLossLimitCents!`.
-
-**No v1 plan configures a daily loss limit**, so nothing reachable turns on it today, and that is exactly why it is worth writing down: the day a plan enables one is the day a trader loses an account on a boundary Merit publishes the other way. GS-079 is the fixture for it and is held back for an unrelated reason (no plan record can state a limit without inventing one), so this discrepancy currently has **no fixture and no gate** standing over it.
+Where it bites: **GS-069** is a four-day stream whose lock engages 140,000c past the trigger. It pins no floor, and every low on its later days is set above **both** candidates, so its breach outcome is the same under either reading. **GS-055** is the counter-case and shows what the resolution costs: its minimum-variance path tops out 10,000c short of the trigger, the lock never engages, there is only one reading, and it pins `floor_cents` and `floor_locked: false` outright.
