@@ -74,3 +74,4 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 45](2026-08-16-session-45.md) | golden fixtures batch 1: three to eighteen of 284, and two disagreements inside M01 |
 | [2026-08-16 - Session 45](2026-08-16-session-45.md) | DO-8, the eval progression: twenty-two of fifty, and the floor defect group E found |
 | [2026-08-16 - Session 45](2026-08-16-session-45.md) | the synthetic Rithmic simulator, file mode, and the vendor-call diff made executable |
+| [2026-08-16 - Session 46](2026-08-16-session-46.md) | the simulator's streaming mode, ADR-020's tier 2 |
