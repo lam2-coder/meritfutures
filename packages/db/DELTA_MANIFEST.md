@@ -8,11 +8,11 @@ last_updated: 2026-08-16
 
 **The completeness gate reads this file.** [ADR-026](../../docs/decisions/ADR-026.md) requires that every `SD-nn` and `U-nn` appearing anywhere in `docs/` appears **exactly once** here with a disposition. A count nobody can drift is better than a count someone remembers to update.
 
-<!--gen:manifest_changes-->103<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+<!--gen:manifest_changes-->105<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
 
 **The count moved from 93 to 94 by founder ruling (2026-08-14).** `U-06` is the sixth unnumbered change, found while folding. [ADR-026](../../docs/decisions/ADR-026.md)'s table of five did not carry it. See section 5.
 
-**It moved from 94 to <!--gen:manifest_changes-->103<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+**It moved from 94 to <!--gen:manifest_changes-->105<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
@@ -111,6 +111,8 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M5-05 | `ledger_transactions` | add `reversal_of` | 0009 | **landed** |
 | SD-M5-06 | new `wallet_withdrawals` | the external leg as its own object | 0011 | **landed** |
 | SD-M5-07 | `ledger_accounts` | **add** the `trader_wallet` class (ADR-027) | 0009 | **landed** |
+| SD-M5-08 | `payout_requests` | add `held_at`, `hold_flag_id`, `hold_expires_at`, `hold_tos_clause`, `hold_reason`, `payout_requests_hold_is_complete`, `payout_requests_hold_expiry_idx`, and **both** `SD-09` predicates widened to include `held_pending_review` (ADR-040) | 0030, 0031 | **landed** |
+| SD-M5-09 | `wallet_withdrawals` | add `wallet_withdrawals_live_freeze_blocks_settlement`, open index re-created so a halted row stays visible (ADR-040) | 0031 | **landed** |
 | SD-M6-01 | `liability_snapshots` | identity max, absorbed corrections, bounded open liability | 0009 | **landed** |
 | SD-M6-02 | new `plan_breaker_state` | breaker with a recorded sample size | 0016 | **landed** |
 | SD-M6-03 | new `alarm_suppressions` | mandatory expiry on every suppression | 0016 | **landed** |

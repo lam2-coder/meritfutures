@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/golden-scenarios/README.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M08-affiliate-system.md, M14-loyalty-retention.md, M17-offers-engine.md, M19-kyc-identity.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-16
 ---
 
 # M20: Merit Wallet
@@ -59,7 +59,7 @@ The `trader_wallet` ledger position per identity ([M05](M05-payout-system.md) SD
 | INV-M20-03 | **Promotional credit can never become wallet balance, and no chain of transactions may convert it into one** | AS-M20-01. The ledger separation blocks the direct route; the **provenance rule** in section 3.4 blocks the route through a funded account |
 | INV-M20-04 | Every debit records its **cause and reference**, and every credit records its **provenance class** | SD-M20-01. A balance whose components are indistinguishable cannot be governed by any of the rules below |
 | INV-M20-05 | A refund is returned to the **payment method that funded the purchase**, always. A card purchase never refunds to the wallet | AS-M20-03. Crossing rails converts card money into withdrawable cash and bypasses the card network's own protections |
-| INV-M20-06 | A **payouts-frozen** identity cannot spend wallet value either | AS-M20-02. A freeze that stops the cash door and leaves the product door open is not a freeze |
+| INV-M20-06 | **Every context gate that blocks the external leg blocks wallet spend too**, and the set is enumerated rather than described: `payouts_frozen` on the account or the identity, `recon_blocked`, KYC not `verified`, and **`identities.status = 'restricted'`** | AS-M20-02. **A freeze that stops the cash door and leaves the product door open is not a freeze**, and the same sentence is true of a restriction. **The restriction leg is [ADR-041](../decisions/ADR-041.md) and it is a widening, stated as one.** This invariant named `payouts_frozen` and nothing else; the restriction appeared only in AS-M20-02's counter prose, with **no invariant binding it and nothing asserting it**. That is the same finding one table over from `G-ELIGIBLE` not naming `identities.status`, and it is why ADR-041 reads as asking for a new state when the state already existed: **`restricted` did almost nothing, in almost every place it was cited as doing something** |
 | INV-M20-07 | Wallet spend carries a per-identity velocity limit, with excess **delayed rather than refused** | [SECURITY](../architecture/SECURITY.md) C-23, [M05](M05-payout-system.md) OQ-M5-06 |
 | INV-M20-08 | Wallet balances are **segregated in reporting and in fact**, and the float is never treated as working capital | AS-M20-08. [ADR-019](../decisions/ADR-019.md) says liquidity improves and liability does not, and this is the invariant that keeps the second half true |
 | INV-M20-09 | A wallet balance is **payable on demand forever**, and dormancy never forfeits it | AS-M20-07. A forfeiture clause on money already earned is the single most brand-destroying term available to this firm |
@@ -106,6 +106,8 @@ flowchart LR
 stateDiagram-v2
     [*] --> requested: checkout with payment_method = wallet
     requested --> refused: identity payouts_frozen (INV-M20-06)
+    requested --> refused: identity restricted (INV-M20-06, ADR-041)
+    requested --> refused: recon_blocked or KYC not verified (INV-M20-06)
     requested --> refused: target account belongs to another identity (INV-M20-02)
     requested --> refused: insufficient position (INV-M20-01)
     requested --> delayed: velocity limit exceeded (INV-M20-07)
@@ -136,6 +138,16 @@ sequenceDiagram
     M5-->>T: settles, LT-07
     Note over M20: FIFO composition is what makes<br/>source_provenance_summary meaningful.<br/>SD-M20-03, AS-M20-01, AS-M20-05.
 ```
+
+**Two enforcement points [ADR-040](../decisions/ADR-040.md) and [ADR-041](../decisions/ADR-041.md) add to this leg, and neither is a new state.**
+
+**At request time, a restricted identity cannot open a withdrawal at all** (INV-M20-06). That is the same gate as spend and it is checked in the same place, because **a restriction is per human and halts everything**, which is precisely what distinguishes it from a per-account freeze.
+
+**After approval, a flag raised before the rail settles halts the withdrawal in place.** `wallet_withdrawals` has carried `frozen_at`, `freeze_flag_id` and `freeze_expires_at` since [`0011`](../../packages/db/migrations/0011_wallet.sql), and until [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql) **nothing refused settlement on them**: the columns were writable, the row still matched the open index, and the halt existed only as an intention. [M05](M05-payout-system.md) `SD-M5-09` and `INV-M5-19` are the enforcement, and three properties of it belong here rather than only there:
+
+1. **The halt is not a status**, because it is orthogonal to the rail state. A halted withdrawal is still `approved` or `transferring` as far as Rise is concerned, and collapsing an orthogonal hold into the rail's status column is `SD-M5-06`'s named mistake, which this module inherits directly since `wallet_withdrawals` is that delta's table.
+2. **The row stays visible.** `wallet_withdrawals_open_idx` is re-created under its own name with the halted row still inside its predicate, because a halt that removes the row from the only index anyone scans is a halt nobody can find.
+3. **Release resumes the rail and does not re-pay.** The money is already the trader's: LT-06 debited the wallet at approval, so the halt is holding a **transfer**, not a claim, and there is nothing to credit back. This is the same 48 wall-clock hour clock on the same hourly sweep as the internal leg's hold, and **it is the whole of the difference between the two legs**: the internal one holds a decision that has posted nothing, and this one holds a payment whose ledger entry already exists.
 
 ### 3.4 The provenance rule, which is this module's central control
 
@@ -204,7 +216,7 @@ stateDiagram-v2
 |---|---|---|---|---|
 | FM-M20-01 | Concurrent debits overdraw a balance | Merit pays out money that was already spent | Position check inside the transaction, per-identity advisory lock | INV-M20-01. Structurally prevented, and asserted by a concurrency test rather than assumed |
 | FM-M20-02 | Promotional credit reaches cash through a funded account | A marketing instrument becomes withdrawable money at scale | Provenance composition (SD-M20-01), P-1 | Hold for review on first such withdrawal. AS-M20-01 |
-| FM-M20-03 | A frozen identity spends the balance the freeze was about | The freeze protected the cash door and left the product door open | Freeze checked at spend authorization (INV-M20-06) | AS-M20-02 |
+| FM-M20-03 | A frozen **or restricted** identity spends the balance the enforcement was about | The enforcement protected the cash door and left the product door open. **On a restriction this is worse than on a freeze**, because a restriction is per human and halts everything, so a spendable wallet is the one surface that would still be open | The **whole context-gate set** checked at spend authorization (INV-M20-06), not the freeze alone | AS-M20-02, [ADR-041](../decisions/ADR-041.md) |
 | FM-M20-04 | A card purchase refunds to the wallet | Card money becomes withdrawable cash, bypassing the card network's protections | Refund routing asserted by the funding method (INV-M20-05) | AS-M20-03 |
 | FM-M20-05 | A wallet-funded account pays out, then the funding card charges back | Cash left on a payment that came back | `earliest_credit_at` and the funding purchase's window (SD-M20-03), P-3 | Hold until the window closes. AS-M20-05 |
 | FM-M20-06 | A compromised session spends the balance | Real loss to a real victim, contained inside Merit's books | Velocity limits, spend pattern, `wallet.spend_delayed` bursts | Delay rather than refuse (C-23); reversal is a ledger entry. [SECURITY](../architecture/SECURITY.md) §4.7 |
@@ -251,7 +263,7 @@ stateDiagram-v2
 
 **Counter.**
 1. **A payouts-frozen identity cannot spend either** (INV-M20-06). The freeze covers both exits, because a freeze that covers one is not a freeze. This is the module's most important single line.
-2. **The same applies to every context gate that blocks the external leg**: expired KYC, `recon_blocked`, and an active restriction all block spend as well as withdrawal. The rule is that the wallet's two doors share their context gates even though they differ in their mechanical ones.
+2. **The same applies to every context gate that blocks the external leg**: expired KYC, `recon_blocked`, and an active restriction all block spend as well as withdrawal. The rule is that the wallet's two doors share their context gates even though they differ in their mechanical ones. **This sentence was true and unenforced until [ADR-041](../decisions/ADR-041.md)**, and saying so is the point: it named the restriction in a counter-argument while `INV-M20-06`, the invariant the counter cites, named only `payouts_frozen`. **A control that exists in the paragraph explaining why the attack fails, and nowhere that binds, is the attack succeeding on schedule.** The gate set is now enumerated in `INV-M20-06` itself and asserted in section 3.2's machine.
 3. **The velocity limit is a rate control and not a freeze substitute** (INV-M20-07). Conflating them would leave a frozen identity able to drain slowly, which is the same attack with patience.
 4. **Accounts purchased while an identity was under any hold are marked**, and their eventual payouts carry that provenance into P-1's review path, so the laundering chain does not launder the provenance along with the value. EC-133, GS-223.
 

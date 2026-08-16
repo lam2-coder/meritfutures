@@ -75,7 +75,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning, ingest, reconciliation, simulator, streaming path, **16 vendor-confirmation items**. Held at `review` by [ADR-005](decisions/ADR-005.md) | review | founder |
 | [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method | approved | founder |
 | [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, Appendix F gate | approved | founder |
-| [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, bounded freeze, reserve | approved | founder |
+| [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, the 48 hour enforcement window (pre-approval hold and bounded freeze), reserve | approved | founder |
 | [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard, CUSUM, breakers, two-tier evidence packs, dual control | approved | founder |
 | [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution, three link tiers, eighteen detectors, copy-trading clause, flags queue, canaries | approved | founder |
 | [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, destination cooling, creative approval | approved | founder |
@@ -101,7 +101,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 
 | Artifact | Purpose | Status | Owner |
 |---|---|---|---|
-| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->32<!--/gen--> files, all <!--gen:manifest_changes-->103<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->22<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
+| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->32<!--/gen--> files, all <!--gen:manifest_changes-->105<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->22<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
 | [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), the no-floats exemption list (**two columns, no money**, under [ADR-031](decisions/ADR-031.md)), and the per-constraint verification table. **[ADR-026](decisions/ADR-026.md)'s completeness gate reads this file** | review | founder |
 
 ## docs/testing/ (Wave 4)

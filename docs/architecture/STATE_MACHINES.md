@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, EVENTS.md]
-last_updated: 2026-08-13
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, EVENTS.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, ../decisions/ADR-042.md, ../plans/FOLD-02-enforcement-window-and-suspension.md]
+last_updated: 2026-08-16
 ---
 
 # State Machines (Constitution B5 §3)
@@ -75,7 +75,10 @@ Transition detail:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> approved: G-ELIGIBLE and G-CLAMP
+    [*] --> approved: G-ELIGIBLE and G-CLAMP, not G-HOLD-REQUIRED
+    [*] --> held_pending_review: G-ELIGIBLE and G-CLAMP and G-HOLD-REQUIRED
+    held_pending_review --> approved: G-HOLD-RELEASED
+    held_pending_review --> failed: G-HOLD-ENFORCED
     approved --> settled: LT-01 posted, wallet credited
     approved --> frozen: G-FREEZE-DURING-FLIGHT
     frozen --> settled: G-FREEZE-CLEARED
@@ -84,12 +87,17 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-**This machine carried `transferring` until 2026-08-15, and [ADR-028](../decisions/ADR-028.md) retired that value from `payout_requests` on 2026-08-14.** The enum is `approved, settled, failed, frozen`; `transferring` is owned by `wallet_withdrawals` and its machine is section 3. ADR-028 named two sites it corrected, [DATA_MODEL](data-model/README.md)'s second stale index predicate and [M05](../plans/M05-payout-system.md)'s freeze target, and **it missed this drawing, which is the authoritative one.** Corrected under [ADR-040](../decisions/ADR-040.md) on ADR-028's own remedy: `frozen` releases to `settled`, which is what a released freeze does under the wallet, and the three `transferring` transitions with their guards `G-TRANSFER-QUEUED`, `G-SETTLEMENT-CONFIRMED` and `G-TRANSFER-EXHAUSTED` belong to the external leg. **`approved --> settled` carries a ledger fact rather than a guard name, and the absence is deliberate**: under [ADR-019](../decisions/ADR-019.md) the internal leg is one transaction ([M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states and no guard exists to name. The guard is named when the machine is folded, not invented here.
+**This machine carried `transferring` until 2026-08-15, and [ADR-028](../decisions/ADR-028.md) retired that value from `payout_requests` on 2026-08-14.** The enum is `approved, settled, failed, frozen`, plus `held_pending_review` from [`0030`](../../packages/db/migrations/0030_payout_hold_enum.sql); `transferring` is owned by `wallet_withdrawals` and belongs to the external leg. ADR-028 named two sites it corrected, [DATA_MODEL](data-model/README.md)'s second stale index predicate and [M05](../plans/M05-payout-system.md)'s freeze target, and **it missed this drawing, which is the authoritative one.** Corrected under [ADR-040](../decisions/ADR-040.md) on ADR-028's own remedy: `frozen` releases to `settled`, which is what a released freeze does under the wallet. **`approved --> settled` carries a ledger fact rather than a guard name, and the absence is deliberate**: under [ADR-019](../decisions/ADR-019.md) the internal leg is one transaction ([M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states and no guard exists to name. The guard is named when the machine is folded, not invented here.
 
-There is **no `pending_review` state and no `denied` state.** A request that does not satisfy G-ELIGIBLE is never created: the API returns the gate breakdown and emits `payout.blocked`, so the machine only ever starts from an approved fact.
+**Two things that correction said were true and were not, corrected here in the same idiom.** It sent the reader to section 3 for `transferring`, and **section 3 draws `payout_transfers`, not `wallet_withdrawals`**: its five states are exactly `payout_transfers.status`'s CHECK in [`0010`](../../packages/db/migrations/0010_payouts.sql), while `wallet_withdrawal_status` in [`0001`](../../packages/db/migrations/0001_extensions_and_enums.sql) carries seven values and **has no drawing anywhere in this document**. And it named `G-SETTLEMENT-CONFIRMED` and `G-TRANSFER-EXHAUSTED`, which section 10 has never defined under those names; the guards that exist are `G-WEBHOOK-SETTLED` and `G-RETRY-BUDGET-EXHAUSTED`. **The missing `wallet_withdrawals` machine is recorded rather than drawn here**, because drawing a seven-state machine is a fold of its own and not [FOLD-02](../plans/FOLD-02-enforcement-window-and-suspension.md)'s; what this fold owes the external leg is its halt, which is section 3's orthogonal blocker below.
+
+**The zero-denial policy is amended by [ADR-040](../decisions/ADR-040.md), and the amendment has two halves that are not interchangeable.** **The substance survives: there is still no `denied` state, and no payout is denied.** Every hold either pays inside 48 hours or produces a documented enforcement action carrying a cited flag, a ToS clause and an evidence pack. **The mechanism changes:** zero denial was expressed here as "no `pending_review` state exists", and it is now expressed as **a review state exists and it expires**. A constraint aimed at the founder's own future self, quietly reinterpreted, is the failure it was built against, so this is recorded as an amendment rather than absorbed as a clarification. This is one of the **ten** sites ADR-040 enumerates, and **two of the ten sit inside merged migrations and can never be edited** (`0001:73` and `0010:77`, constitution E2).
+
+A request that does not satisfy G-ELIGIBLE is still never created: the API returns the gate breakdown and emits `payout.blocked`. **A held request has satisfied G-ELIGIBLE and G-CLAMP in full** and stores the whole evaluated decision, the eligibility snapshot, `approved_cents`, the split, the ordinal and the pinned plan version; only the ledger posting is deferred. So the machine still only ever starts from an evaluated fact, and release is mechanical rather than a second evaluation (`INV-M5-02`).
 
 | State | Meaning | Money moved | Trader sees |
 |---|---|---|---|
+| `held_pending_review` | **Pre-approval.** An unresolved high-severity flag stood at request time. The decision is evaluated and stored; only the posting waits | **none.** Nothing is owed and no wallet credit exists | the fact, the ToS clause, and **the date it resolves**, never worded as a rejection ([M04](../plans/M04-trader-portal.md)'s copy rule) |
 | `approved` | Engine approved instantly; ledger entries posted | withdrawable moved to a payable position | "Approved" with the exact amount |
 | `settled` | The internal leg completed: LT-01 posted and the identity's `trader_wallet` credited, in the same transaction | complete | "Paid" with the date. The rail belongs to the external leg |
 | `failed` | Enforcement decided on a frozen request, with an exported evidence pack. **Rail exhaustion is not a path here**: it belongs to `wallet_withdrawals` with the rest of the external leg | reversed by compensating entries | honest status plus what happens next |
@@ -97,13 +105,18 @@ There is **no `pending_review` state and no `denied` state.** A request that doe
 
 | From | To | Guard | Events |
 |---|---|---|---|
+| (start) | `held_pending_review` | G-ELIGIBLE and G-CLAMP and G-HOLD-REQUIRED | `payout.requested`, `payout.held` |
+| `held_pending_review` | `approved` | G-HOLD-RELEASED | `payout.hold_released`, `payout.approved`, `ledger.transaction_posted` |
+| `held_pending_review` | `failed` | G-HOLD-ENFORCED | `enforcement.applied`, `payout.hold_enforced` |
 | (start) | `approved` | G-ELIGIBLE and G-CLAMP | `payout.requested`, `payout.approved`, `ledger.transaction_posted` |
 | `approved` | `settled` | **none.** The internal leg is one transaction ([ADR-019](../decisions/ADR-019.md), [M05 section 1.1](../plans/M05-payout-system.md)), so no gate stands between the two states | `payout.settled`, `payout.win_days_reset`, `payout.floor_recomputed`, `ledger.transaction_posted` |
 | `approved` | `frozen` | G-FREEZE-DURING-FLIGHT | `identity.payouts_frozen`, `payout.blocked` |
 | `frozen` | `settled` | G-FREEZE-CLEARED | `identity.payouts_unfrozen` |
 | `frozen` | `failed` | G-FREEZE-ENFORCED | `enforcement.applied`, `payout.transfer_failed` |
 
-**Win-day reset and floor recompute happen on settlement**, which under the wallet is the same transaction as approval, so there is no window in which a trader's progress is spent against a payout that has not landed.
+**The three hold events are introduced in [M05 section 5](../plans/M05-payout-system.md) and are not in [EVENTS](EVENTS.md) yet**, which is stated here rather than left for a reader to discover, because this document's own header says events are named **from** EVENTS. `payout.held`, `payout.hold_released` and `payout.hold_enforced` follow M05's established route for a new event, the same one `payout.freeze_expiring` took, and EVENTS is [FOLD-02](../plans/FOLD-02-enforcement-window-and-suspension.md)'s session 6. Universal rule 1 admits no transition without an event, so the alternative was a machine with three silent edges, which is worse than a named forward reference.
+
+**Win-day reset and floor recompute happen on settlement**, which under the wallet is the same transaction as approval, so there is no window in which a trader's progress is spent against a payout that has not landed. **A hold moves neither**: nothing has settled, so no anchor advances and no win-day count resets while a request is held. That is the ledger discriminator (`held_pending_review` versus `frozen`) showing up as a behavioural difference rather than a definitional one.
 
 **The 2 to 3 day settlement window is no longer this machine's investigation hook and the hook is not lost, it moved.** It describes the rail, which is the external leg, and the internal leg has no window at all: a freeze opened after wallet credit is halted on `wallet_withdrawals` under [ADR-040](../decisions/ADR-040.md), and a flag standing at request time holds the request **before** approval rather than during a flight that no longer exists. Freezes remain evidence-backed and are never a routine review step.
 
@@ -124,6 +137,17 @@ stateDiagram-v2
 ```
 
 Every transition to `sent` reuses the **same** `idempotency_key`, so a retry after an ambiguous network failure can never double-pay. A replayed settlement webhook (50 times, B4 #8) resolves to exactly one `settled` because the provider event id is uniquely indexed.
+
+**This machine is `payout_transfers.status` and not `wallet_withdrawals.status`**, which is the correction section 2 records. `wallet_withdrawal_status` carries `requested, cooling, approved, transferring, settled, failed, cancelled` and has no drawing here.
+
+**One orthogonal blocker rides alongside the external leg**, in the shape section 1's two already have, and [ADR-040](../decisions/ADR-040.md) makes the shape deliberate rather than incidental:
+
+| | |
+|---|---|
+| **What it is** | a **halt**, not a state. `wallet_withdrawals` carries `frozen_at`, `freeze_flag_id` and `freeze_expires_at` from [`0011`](../../packages/db/migrations/0011_wallet.sql), and enforcement arrives in [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql) as `wallet_withdrawals_live_freeze_blocks_settlement`: a withdrawal carrying a live freeze **cannot be `settled`** |
+| **Why not a status** | the halt is **orthogonal** to the rail state. A halted withdrawal is still `approved` or `transferring` as far as the rail is concerned, and collapsing an orthogonal hold into the rail's status column is `SD-M5-06`'s named mistake, where the engine's gates and the rail's gates share one column |
+| **What it was before** | **representable and unenforced.** The three columns existed, `wallet_withdrawal_status` had no frozen value, a halted row still matched `wallet_withdrawals_open_idx`, and **nothing refused settlement.** `0031` re-creates that index under its own name so a halted row **stays visible**: a halt that hides the row from the only index anyone scans is a halt nobody can find |
+| **Its clock** | the same **48 wall-clock hours** ([ADR-040](../decisions/ADR-040.md), unit ruled by [ADR-042](../decisions/ADR-042.md)) on the same hourly sweep. **Release resumes the rail; it does not re-pay**, because the money is already the trader's |
 
 ## 4. Purchase and provisioning saga
 
@@ -230,6 +254,26 @@ stateDiagram-v2
     }
 ```
 
+**The drawing did not move and everything under it did** ([ADR-041](../decisions/ADR-041.md)). `restricted` has been a reversible third value since [`0001`](../../packages/db/migrations/0001_extensions_and_enums.sql), and the ruling refused to add `suspended` beside it, because two expressions of one concept is this repository's most repeated defect. **What was missing was never the state. It was the binding surface and the episode record**, and `G-ELIGIBLE` not naming `identities.status` is the whole finding.
+
+**What `restricted` binds, enumerated once.** A restriction is **per human, halts everything, and is reversed by a documented restore**, which is what distinguishes it from its two neighbours: closure for cause is terminal, and a freeze is per payment and expires.
+
+| Surface | Behavior | Where it binds |
+|---|---|---|
+| Payout requests | blocked | **`G-ELIGIBLE`, section 10.** It named `payouts_frozen` and not `status`, which is the finding |
+| Wallet spend | blocked | [M20](../plans/M20-wallet.md) `INV-M20-06` |
+| External withdrawal | blocked | [M20](../plans/M20-wallet.md) `INV-M20-06`, same source |
+| Purchases and resets | refused at checkout, **server side** | [M03](../plans/M03-billing-checkout.md), joining the existing `geo_restricted` and `account_cap_reached` refusal set. **[FOLD-02](../plans/FOLD-02-enforcement-window-and-suspension.md) session 5** |
+| Affiliate settlement | blocked | [ADR-017](../decisions/ADR-017.md) put every outbound payment on one rail, and a restriction that stops one door and not the other is not a restriction |
+| Platform trading | revoked through the Rithmic bridge | [M02](../plans/M02-rithmic-bridge.md), **PROVISIONAL** under [ADR-005](../decisions/ADR-005.md). Revocation is always available; **restoration is contingent on `V-M2-15`** |
+| Account state | **preserved intact.** No account status moves, no ladder rung is consumed, no entitlement history is rewritten | The restriction is a **layer over** the account machine, exactly as `payouts_frozen` and `recon_blocked` already are (section 1) |
+
+**The episode is a row, not a column.** `identities` carries `status` and `status_reason` and nothing else, while `accounts` has had `account_status_history` since `0007`, so a repeat restriction would overwrite its predecessor and **a restore would be unprovable at exactly the moment it is contested**. [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql) adds `identity_restriction_episodes`, with `identity_restriction_open_uq` giving **at most one open episode per identity** and `identity_restriction_restore_is_complete` making a restore with no actor or no evidence unwritable.
+
+**`sla_due_at` binds the restriction, never the payout.** Where a payout is held, [ADR-040](../decisions/ADR-040.md)'s 48 hours run against the **episode**, so a restriction cannot hold a held payout past its own clock. **That is the property that stops an identity restriction from becoming a route around the payout enforcement window**, and it is asserted rather than intended.
+
+**`G-ENFORCEMENT-CLOSE` is named by this machine and is defined nowhere, and this fold does not define it.** Section 10 has never carried a row for it, and the corpus does not agree on what it closes: [ADR-041](../decisions/ADR-041.md) says closure for cause is "terminal and **per account**", while this drawing routes an **identity** to `closed`. Those are two different acts. Settling it by writing a definition here would be one ruling's words used as evidence about another, which is the defect [M07](../plans/M07-risk-abuse.md) `OQ-M7-05` exists to refuse. **Recorded as a gap, for an ADR rather than an edit.**
+
 ```mermaid
 stateDiagram-v2
     state "plan_versions.status" as P {
@@ -260,17 +304,22 @@ Each guard is evaluated against the [last closed day](../GLOSSARY.md#last-closed
 | **G-LADDER-COMPLETE** | `payouts_settled_count >= pv.phase_funded.ladder.payouts_to_graduate` evaluated **after** a settlement |
 | **G-CHARGEBACK** | A `purchase.charged_back` fact exists for the account's purchase |
 | **G-ADMIN-CLOSE** | Admin action with reason, plus an evidence pack id when the close is an enforcement |
-| **G-ELIGIBLE** | All of: account `active` and phase `funded`; `not payouts_frozen` (account and identity); `not recon_blocked`; KYC state `verified`; `traded_days_count >= pv.min_trading_days`; `win_days_count >= pv.win_days.required_count`; `withdrawable_cents > 0`; G-CONSISTENCY-OK; `trading_days_since_last_settled_payout >= pv.cadence_gap_trading_days` (no gap requirement on the first payout); G-NO-IN-FLIGHT; `min(withdrawable, cap) >= pv.min_payout_cents` |
+| **G-ELIGIBLE** | All of: account `active` and phase `funded`; **`identities.status <> 'restricted'`** ([ADR-041](../decisions/ADR-041.md): this gate named `payouts_frozen` on the account and on the identity and did **not** name the identity's own status, so the one state that halts a human across every account they hold did not reach the payout gate); `not payouts_frozen` (account and identity); `not recon_blocked`; KYC state `verified`; `traded_days_count >= pv.min_trading_days`; `win_days_count >= pv.win_days.required_count`; `withdrawable_cents > 0`; G-CONSISTENCY-OK; `trading_days_since_last_settled_payout >= pv.cadence_gap_trading_days` (no gap requirement on the first payout); G-NO-IN-FLIGHT; `min(withdrawable, cap) >= pv.min_payout_cents` |
 | **G-CLAMP** | `approved_cents = min(effective_request_cents, withdrawable_cents, cap_cents_for_ordinal)` and `approved_cents >= min_payout_cents`, where `effective_request_cents` is the caller's optional `amount_cents` or, when omitted, `min(withdrawable_cents, cap_cents_for_ordinal)` ([ADR-009](../decisions/ADR-009.md)) |
-| **G-NO-IN-FLIGHT** | No `payout_requests` row for this account in status `approved`, `transferring`, or `frozen`. Part of G-ELIGIBLE. It is a liability control, not a convenience: win days and the consistency period reset on settlement, so concurrent requests would let one qualifying stretch fund several capped extractions |
+| **G-NO-IN-FLIGHT** | No `payout_requests` row for this account in status `approved`, `frozen`, or **`held_pending_review`**. Part of G-ELIGIBLE. It is a liability control, not a convenience: win days and the consistency period reset on settlement, so concurrent requests would let one qualifying stretch fund several capped extractions. **`transferring` is removed here** ([ADR-028](../decisions/ADR-028.md), swept by [ADR-040](../decisions/ADR-040.md)): it left `payout_requests` in 2026-08-14 and a predicate naming a value no row can hold **enforces nothing and fails no test**, which is the `C-02` defect. **A held request is outstanding**, and both `SD-09` objects say so under their own names in [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql), adjacent, moved together |
 | **G-TRANSFER-QUEUED** | Ledger transaction for the approval committed, and a transfer row created with a fresh idempotency key |
 | **G-RISE-ACCEPTED** / **G-RISE-TRANSIENT** | Provider accepted the transfer / returned a retryable error |
 | **G-WEBHOOK-SETTLED** | Signature-verified settlement webhook, within the replay window, matching an existing transfer by provider transfer id |
 | **G-WEBHOOK-FAILED-RETRYABLE / TERMINAL** | Provider failure classified retryable or terminal |
 | **G-RETRY-DUE** | Backoff elapsed and attempts below budget |
 | **G-RETRY-BUDGET-EXHAUSTED** | Attempts at budget; operations paged |
-| **G-FREEZE-DURING-FLIGHT** | An investigation opened (flag moved to `investigating`) while the payout was `approved` or `transferring` |
-| **G-FREEZE-CLEARED / G-FREEZE-ENFORCED** | Investigation dismissed / enforcement decided with an evidence pack |
+| **G-FREEZE-DURING-FLIGHT** | An investigation opened (flag moved to `investigating`) while the payout was `approved`. **`transferring` is removed here for the same reason as above.** Under [ADR-019](../decisions/ADR-019.md) the internal leg is one transaction, so the window this guard describes is the one the wallet closed: [ADR-040](../decisions/ADR-040.md) routes the two remaining cases elsewhere, **a flag standing at request time to `G-HOLD-REQUIRED`, and a flag raised after wallet credit to the external leg's halt** (section 3). The edge stays drawn because the state is reachable and a machine that omits a reachable edge is worse than one that keeps a narrow one |
+| **G-FREEZE-CLEARED / G-FREEZE-ENFORCED** | Investigation dismissed, **or `freeze_expires_at` reached** / enforcement decided with an evidence pack. **Expiry releases the payout, it never extends the hold**, and the window is **48 wall-clock hours** ([ADR-040](../decisions/ADR-040.md) closing `OQ-M5-02`, unit ruled by [ADR-042](../decisions/ADR-042.md)) |
+| **G-HOLD-REQUIRED** | An unresolved `risk_flags` row of **severity 4 or above**, in status `open` or `investigating`, against the account or the identity at request time. **The band is the corpus's existing high-severity band rather than a new one**: it is the set [M07](../plans/M07-risk-abuse.md) `SD-M7-02` gives `sla_due_at` to, and the same set `G-EXPIRY-OR-RETRIGGER` below already reads. Evaluated **after** G-ELIGIBLE and G-CLAMP and never instead of them, so a held request carries a complete evaluated decision ([ADR-040](../decisions/ADR-040.md)) |
+| **G-HOLD-RELEASED** | The cited flag left `open` and `investigating` without an enforcement, **or `now() >= hold_expires_at`**, which is **48 wall-clock hours** from `held_at`. The stored decision posts unchanged, because release re-evaluates nothing (`INV-M5-02`). **A held request that reaches auto-release pays even if the account breached during the hold**: `INV-M5-09`'s first clause governs, since the alternative is that Merit's own hold cost the trader money, which is the exact shape zero denial exists to make impossible |
+| **G-HOLD-ENFORCED** | A documented enforcement action recorded inside the hold window: closure for cause per the ToS, with an **exported evidence pack id**, against the flag cited in `hold_flag_id`. **Nothing is reversed, because nothing was posted.** The request goes to `failed`, which releases its ladder ordinal (EC-037), since `payout_requests_account_ordinal_uq` is `WHERE status <> 'failed'` and is deliberately unchanged |
+| **G-ENFORCEMENT-RESTRICT** | Admin action on the flag lifecycle's `investigating` to `enforced` path (section 7), carrying a cited open `risk_flags` id, a ToS clause, a written reason and an actor, and written as an `identity_restriction_episodes` row ([ADR-041](../decisions/ADR-041.md), [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql)). At most one open episode per identity (`identity_restriction_open_uq`). Revocation is **fail-closed on the way out**: `disable_entitlement`, then `disable_account`, both already `provisioning_queue.operation` values in `0007` |
+| **G-RESTRICTION-LIFTED** | A **documented restore**: `restored_at`, `restored_by` and `restore_evidence` all written, which `identity_restriction_restore_is_complete` makes all-or-none. Provisioning is **fail-closed on the way back**: `set_risk` at the account's current floor **confirmed first**, then entitlement, then permissions, because re-enabling an entitlement against an unconfirmed setpoint is an unenforced funded account and `INV-M2-13` forbids it. **PROVISIONAL under [ADR-005](../decisions/ADR-005.md) and the honest form is an asymmetry rather than a caveat: restriction is always available, restoration is contingent on `V-M2-15`** |
 | **G-DIGEST-NEW / G-DIGEST-DUPLICATE** | `sha256` unseen / already present in `ingest_files` |
 | **G-VALIDATION-PASSED / FAILED** | Every row parses, account refs resolve, totals internally consistent / any failure at all |
 | **G-APPLY-COMMITTED** | Fills, marks, and rule states committed for every account in the file, in one transaction per account |
@@ -292,3 +341,7 @@ Each guard is evaluated against the [last closed day](../GLOSSARY.md#last-closed
 | Identity merge after both identities were funded (B4 #17) | Existing accounts grandfathered, new purchases blocked at the cap, `identity.merged` records `accounts_at_merge` |
 | Plan v2 published while a checkout is open on v1 (B4 #12) | The purchase pins the version resolved at checkout start; v1 is honored and provable |
 | Batch crashes at account 2,341 of 5,000 (B4 #18) | Per-account transactions plus a cursor make the run resumable with no double-applied day |
+| **A restriction opens while a payout is held** ([ADR-041](../decisions/ADR-041.md)) | The episode's `sla_due_at` binds the **restriction**, so the hold still expires on its own 48 hours and **pays**. A restriction cannot hold a held payout past that clock, which is what stops the identity-level state from becoming a route around the payout enforcement window |
+| **The account breaches while its payout is held** ([ADR-040](../decisions/ADR-040.md)) | The hold releases at expiry and **pays**, then the account closes. Same resolution as `FM-M5-10` one state earlier: the snapshot was true when taken, and the alternative is that Merit's own hold cost the trader money |
+| **A second payout is requested while the first is held** | Refused. A held request is **outstanding**, so `G-NO-IN-FLIGHT` refuses it and `payout_requests_no_in_flight_uq` refuses it again, because the engine is not the only writer (EC-040) |
+| **The hourly release sweep stalls** ([ADR-040](../decisions/ADR-040.md)) | Two independent detections, deliberately. The sweep's **S1 dead-man switch** fires on the job's absence ([CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md)), and a nightly assertion fires on **the query**: no request sits past its hold expiry, evaluated whether or not the sweep reported success. **A job that reports success is not evidence that the work happened** ([M02](../plans/M02-rithmic-bridge.md) `FM-M2-11`'s idiom). Both are **unsuppressible** |

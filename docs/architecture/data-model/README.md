@@ -12,7 +12,7 @@ Every table, every column, with type, constraints, indexes, retention, and the r
 
 > **Amended under [ADR-026](../../decisions/ADR-026.md), 2026-08-14. The schema-delta reconciliation has landed.**
 >
-> All <!--gen:manifest_changes-->103<!--/gen--> approved schema changes are folded into one reviewed migration set at [`packages/db/migrations`](../../../packages/db/migrations), <!--gen:migration_files-->32<!--/gen--> files, verified to apply in order against PostgreSQL 16. **This sentence read "94 approved schema changes" and "27 files" until 2026-08-16**, two hand-maintained figures in the header of the document that records how often they drift: `0028` had merged and neither moved. Both are [CI-06g](../../testing/STRATEGY.md) spans now, which is [ADR-034](../../decisions/ADR-034.md)'s remedy applied where it was found. Every delta is traced to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md), which is the file the completeness gate reads. **No delta was rejected.**
+> All <!--gen:manifest_changes-->105<!--/gen--> approved schema changes are folded into one reviewed migration set at [`packages/db/migrations`](../../../packages/db/migrations), <!--gen:migration_files-->32<!--/gen--> files, verified to apply in order against PostgreSQL 16. **This sentence read "94 approved schema changes" and "27 files" until 2026-08-16**, two hand-maintained figures in the header of the document that records how often they drift: `0028` had merged and neither moved. Both are [CI-06g](../../testing/STRATEGY.md) spans now, which is [ADR-034](../../decisions/ADR-034.md)'s remedy applied where it was found. Every delta is traced to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md), which is the file the completeness gate reads. **No delta was rejected.**
 >
 > **Where the two disagree, the migrations are the truth and this document is the design record.**
 >
@@ -383,7 +383,7 @@ Walked line by line at the gate. All five confirmed as written; recorded in [DEC
 
 ## 17. Delta provenance (added under [ADR-026](../../decisions/ADR-026.md))
 
-**Every schema change in the migration set traces to the document that proposed it, and the trace lives in one file.** [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md) carries all <!--gen:manifest_changes-->103<!--/gen--> with a disposition, plus the migration sequence, the rejection table, and the reference cycles. **The completeness gate reads it**: every `SD-nn` and `U-nn` appearing anywhere in `docs/` must appear exactly once there. A count nobody can drift is better than a count someone remembers to update.
+**Every schema change in the migration set traces to the document that proposed it, and the trace lives in one file.** [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md) carries all <!--gen:manifest_changes-->105<!--/gen--> with a disposition, plus the migration sequence, the rejection table, and the reference cycles. **The completeness gate reads it**: every `SD-nn` and `U-nn` appearing anywhere in `docs/` must appear exactly once there. A count nobody can drift is better than a count someone remembers to update.
 
 **Inside the SQL, every folded column, index, constraint and table carries an inline `-- SD-nn` or `-- U-nn` marker.** A reader looking at a column does not have to leave the file to learn why it exists.
 
