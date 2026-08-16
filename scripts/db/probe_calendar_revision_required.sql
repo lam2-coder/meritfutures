@@ -1,5 +1,5 @@
 -- =============================================================================
--- Probe: ADR-044's CALENDAR-C1 and CALENDAR-C2, installed by 0033.
+-- Probe: ADR-045's CALENDAR-C1 and CALENDAR-C2, installed by 0033.
 -- =============================================================================
 -- IT LEADS WITH THE SUCCESS CASES, on the lesson DELTA_MANIFEST section 13
 -- records: every probe that only ever attempts forbidden things passes against
@@ -181,7 +181,7 @@ END $$;
 -- REJECTION 1: an update with no prior image at all
 -- ---------------------------------------------------------------------------
 -- OI-06 in one statement. This is what a hand-run UPDATE against the calendar
--- did on 2026-08-16, and it is what ADR-044 exists to stop.
+-- did on 2026-08-16, and it is what ADR-045 exists to stop.
 DO $$
 BEGIN
   SET CONSTRAINTS trading_calendar_revision_required IMMEDIATE;

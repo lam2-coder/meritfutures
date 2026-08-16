@@ -6,7 +6,7 @@
 -- R-02, R-05, R-34, R-37, R-47), and A WRONG ROW CHANGES RULE OUTCOMES WITH NO
 -- CHANGE TO A LINE OF ENGINE CODE.
 --
--- ADR-044, ACCEPTED 2026-08-16. It closes OI-06 as raised by the session that
+-- ADR-045, ACCEPTED 2026-08-16. It closes OI-06 as raised by the session that
 -- wrote 0032: ADR-042 F-2 ruled the prior-image TABLE and ruled nothing about
 -- what obliges anybody to write to it, so F-2 landed as a table nobody is
 -- required to use. The loader writes the image because its own code says so.
@@ -29,7 +29,7 @@
 -- sacred once merged (constitution E2), which is a rule about editing them and
 -- not a rule against correcting them. 0028's precedent, applied a third time.
 --
--- No numbered delta lands here. ADR-044 is a ruling on an open item, not a
+-- No numbered delta lands here. ADR-045 is a ruling on an open item, not a
 -- schema delta, so ADR-026's manifest completeness gate has nothing to count
 -- and the record is DELTA_MANIFEST section 17 instead.
 --
@@ -89,7 +89,7 @@
 -- evidence that any row satisfies it; scripts/db/probe_calendar_revision_
 -- required.sql is where the evidence is, and it runs in CI on every push.
 --
--- Rulings: ADR-044 (CALENDAR-C1, CALENDAR-C2). Supersedes nothing on disk: it
+-- Rulings: ADR-045 (CALENDAR-C1, CALENDAR-C2). Supersedes nothing on disk: it
 --          adds guards to what 0004 and 0032 installed, and 0027 is where the
 --          invariant triggers live, which is the idiom this file follows.
 -- =============================================================================
@@ -100,7 +100,7 @@ BEGIN;
 -- CALENDAR-C1: a correction to trading_calendar leaves a prior image, or it
 --              does not commit
 -- -----------------------------------------------------------------------------
--- ADR-044, closing OI-06. INV-04 is "replaying every mark from day one
+-- ADR-045, closing OI-06. INV-04 is "replaying every mark from day one
 -- reproduces stored state byte-identically", and it is defined against a table
 -- whose rows can move. trading_calendar carries updated_at and notes and no
 -- prior image, so on its own IT CANNOT ANSWER WHAT THE CALENDAR SAID ON THE DAY
@@ -150,7 +150,7 @@ BEGIN
       'with no prior image cannot be told from an engine regression at replay '
       '(INV-04), which is what ADR-042 F-2 exists to prevent. Write '
       'to_jsonb(OLD) of the row, in this transaction, with an actor and a '
-      'reason. See ADR-044.',
+      'reason. See ADR-045.',
       OLD.trading_day
       USING ERRCODE = 'check_violation';
   END IF;
@@ -164,7 +164,7 @@ BEGIN
       'CALENDAR-C1: trading_calendar day % has % dependent row(s) across '
       'fills, daily_marks and rule_states and its prior image claims %. The '
       'count decides whether this is a data change or an incident '
-      '(P1 S-E section 4), so it is counted rather than reported. See ADR-044.',
+      '(P1 S-E section 4), so it is counted rather than reported. See ADR-045.',
       OLD.trading_day, actual, claimed
       USING ERRCODE = 'check_violation';
   END IF;
@@ -184,7 +184,7 @@ CREATE CONSTRAINT TRIGGER trading_calendar_revision_required
 -- -----------------------------------------------------------------------------
 -- CALENDAR-C2: a trading_calendar row is corrected, never removed
 -- -----------------------------------------------------------------------------
--- ADR-044. CALENDAR-C1 without this is a guard whose bypass is one extra
+-- ADR-045. CALENDAR-C1 without this is a guard whose bypass is one extra
 -- statement: DELETE the row, INSERT the corrected one, and the day has changed
 -- with no prior image and no revision row anywhere.
 --
@@ -211,7 +211,7 @@ BEGIN
       'CALENDAR-C2: trading_calendar day % may not be deleted. A calendar day '
       'is CORRECTED, never removed: mark it is_holiday with no session, which '
       'leaves a prior image (ADR-042 F-1). DELETE then INSERT is an UPDATE with '
-      'the audit trail removed. See ADR-044.',
+      'the audit trail removed. See ADR-045.',
       OLD.trading_day
       USING ERRCODE = 'check_violation';
   END IF;
@@ -219,7 +219,7 @@ BEGIN
   RAISE EXCEPTION
     'CALENDAR-C2: trading_calendar may not be truncated. TRUNCATE fires no row '
     'triggers, so it is the one statement that walks past CALENDAR-C1 and '
-    'leaves no prior image for any day at once. See ADR-044.'
+    'leaves no prior image for any day at once. See ADR-045.'
     USING ERRCODE = 'check_violation';
 END;
 $$;

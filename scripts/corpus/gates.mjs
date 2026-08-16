@@ -1033,7 +1033,7 @@ const ci06h = {
         'probe_phone_identity.sql',
         "ADR-039's phone identity and auth probe is no longer run (OI-07)",
       ],
-      // OI-06. ADR-044's guards are the only thing that makes ADR-042 F-2's
+      // OI-06. ADR-045's guards are the only thing that makes ADR-042 F-2's
       // prior image obligatory, and they are DEFERRED constraint triggers, so
       // the probe that proves they fire is the only place the deferred check is
       // ever forced. Arriving pinned rather than being pinned later: the probe
@@ -1041,7 +1041,7 @@ const ci06h = {
       // this list exists to end and it was found one file over.
       [
         'probe_calendar_revision_required.sql',
-        "ADR-044's calendar prior-image guards are no longer probed (OI-06)",
+        "ADR-045's calendar prior-image guards are no longer probed (OI-06)",
       ],
       // OI-08. The NO-FLOATS assertion lived inside 0027 and could only ever
       // see 0001-0027, so five migrations sat outside the guard the corpus
