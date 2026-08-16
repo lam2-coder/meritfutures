@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/golden-scenarios/README.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/SECURITY_LANDSCAPE.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md, M17-offers-engine.md, M20-wallet.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-16
 ---
 
 # M19: KYC and Identity Verification
@@ -101,12 +101,18 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 | INV-M19-10 | Geo-consistency produces a **signal, never an automatic refusal** | AS-M19-03. Travelers, expatriates, migrants, and dual nationals are the majority of triangle mismatches, and a hard rule here is a fairness failure aimed at the same population [M5](M05-payout-system.md) AS-M5-02 identifies |
 | INV-M19-11 | Every verification's **placement, cost, and funnel position are recorded** at the time it happens | Constitution (g). The section 10 decision is to be settled by data, and data not captured at the time cannot be reconstructed |
 | INV-M19-12 | Enforcement resting on a dedupe hit carries evidence Merit can produce **independently of the provider relationship** | AS-M19-07. Minimization is right and it creates an evidence dependency that must be handled deliberately |
+| INV-M19-13 | **The phone hard link binds the graph and never enforces alone.** *Identity to phone* is a genuine database constraint: one live verified phone per identity. *Phone to identity* is not: a second identity verifying a number already live on another **completes verification**, writes the edge at the hard-link confidence ceiling, and opens a **severity-5 flag against both identities**. No state changes automatically | [ADR-039](../decisions/ADR-039.md) (b) as ruled at plan approval. The constraint half is `identity_phones_live_per_identity_uq`; **the other half is an index that is deliberately not unique** (`identity_phones_live_number_idx`), and its absence is the enforcement. A reader who "finishes the pair" refuses the innocent owner of a recycled number at the door, before INV-M19-14 can rescue them. Same posture as INV-M19-04, and AS-M19-05 already says that person belongs in a review queue |
+| INV-M19-14 | **The recycling guard is wired to portability history, and a release is an evidenced decision or it is not a release.** Carriers reassign numbers; a number whose portability record shows reassignment **after** the linked identity's restriction date is not the same graph node, and the prior holder's row is **released** rather than superseded | [ADR-039](../decisions/ADR-039.md) amendment 3. Input: `identity_phones.ported` and `last_ported_at`, bought by (a) and made a **disqualifying vendor selection criterion** by DEP-M19-09, because this guard has no input without it. Output: `released_at` plus `release_evidence`, which `identity_phones_release_is_evidenced` refuses to leave empty. `identity_phones_one_ending` keeps **released** and **superseded** distinct, because conflating "the carrier took it back" with "the trader replaced it" loses the only distinction the amendment turns on. AS-M19-09 |
+
+**INV-M19-13 and INV-M19-14 are one control read from two ends, and neither is safe alone.** The hard link is what makes a phone worth having in the graph; the recycling guard is what makes the hard link safe to bind automatically. **Bind without the guard and the corpus punishes whoever legitimately inherits a banned operator's number. Guard without the bind and the strongest cheap identity signal available is not used at all.** The pairing is why (b) was buildable as a constraint on one side and a review queue on the other rather than as a refusal on both.
 
 ---
 
 ## 2. Entities and schema deltas
 
-M19 consumes the approved `kyc_verifications` ([DATA_MODEL section 3](../architecture/data-model/README.md)), which already carries `placement`, the geo triangle, `biometric_dedupe_hit`, and `dedupe_matched_identity_id`. Four deltas.
+M19 consumes the approved `kyc_verifications` ([DATA_MODEL section 3](../architecture/data-model/README.md)), which already carries `placement`, the geo triangle, and `biometric_dedupe_hit`. **Seven deltas: four at the schema-delta reconciliation and three at [FOLD-01](FOLD-01-phone-identity.md).**
+
+*(This sentence previously also named `dedupe_matched_identity_id`. [ADR-029](../decisions/ADR-029.md) ruled that column is **never created** and that `dedupe_matches` is authoritative, because a dedupe hit is an auto-enforcement input and a system with two sources for that decision will eventually enforce on whichever is read first. Corrected here rather than left as a citation to a column no migration contains.)*
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -114,6 +120,14 @@ M19 consumes the approved `kyc_verifications` ([DATA_MODEL section 3](../archite
 | SD-M19-02 | new `sanctions_screenings` | `id`, `identity_id`, `provider`, `list_refs text[]`, `match_strength`, `status check in ('clear','possible_match','confirmed_match','cleared_on_review')`, `reviewed_by null`, `reviewed_at null`, `review_note null`, `screened_at` | INV-M19-05, AS-M19-04. A sanctions hit is the one outcome Merit **must** act on and the one most likely to be a name collision, so it needs its own object with a review trail. Folding it into `kyc_verifications.rejection_reason` would put a legally mandatory refusal in the same field as a blurry-photo rejection |
 | SD-M19-03 | new `kyc_funnel_events` | `id`, `identity_id`, `placement`, `plan_code`, `step check in ('gate_reached','session_created','provider_opened','submitted','decided','abandoned')`, `occurred_at`, `attempt_number`, `cost_cents null` | Constitution (g) and INV-M19-11. Drop-off per placement cannot be reconstructed from `kyc_verifications`, because the traders who matter most are the ones who never created a verification row at all. The abandonment is the measurement (AS-M19-08) |
 | SD-M19-04 | new `dedupe_matches` | `id`, `identity_a`, `identity_b`, `match_strength`, `provider_ref`, `observed_at`, `disposition check in ('open','confirmed_same_person','distinct_persons','inconclusive')`, `disposition_note null`, `evidence_snapshot jsonb` | INV-M19-04 and INV-M19-12. A match is a **relationship between two identities**, not a property of one, and the approved single-column `dedupe_matched_identity_id` cannot express a face matching three identities. `evidence_snapshot` holds the provider's decision metadata (scores, method, timestamps, never images) so an enforcement survives the provider relationship ending (AS-M19-07) |
+
+**The three FOLD-01 deltas**, from [ADR-039](../decisions/ADR-039.md) and landed in [`0029_phone_identity_and_auth`](../../packages/db/migrations/0029_phone_identity_and_auth.sql). **A verified phone is an identity signal and not a contact field**, which is why they are M19's and not [M16](M16-notification-center.md)'s: the delivery address is `contact_channels`, and collapsing the two is how a contact-preference edit becomes an identity change.
+
+| ID | Table | Change | Why it is not optional |
+|---|---|---|---|
+| SD-M19-05 | new `identity_phones` | `identity_id`, `phone_hash`, `phone_preview`, `country_code`, `verified_at`, `superseded_at` / `superseded_by`, **`released_at` / `release_evidence`**, plus carrier metadata at capture: `line_type check in ('mobile','landline','voip','prepaid','unknown')`, `carrier_name`, `carrier_country`, `ported`, `last_ported_at`, `footprint_present`, `lookup_provider`, `lookup_at`. Unique **`identity_phones_live_per_identity_uq (identity_id)`** over live rows; `phone_hash` **deliberately not unique** | ADR-039 (a), (b) and amendment 3, and it is three things at once. The **node**: emails are free to mint and real mobile numbers are scarce, so the number is worth more to [ADR-022](../decisions/ADR-022.md)'s graph than to M16 as an address. The **constraint**: one live verified phone per identity, INV-M19-13's uncontested half. The **guard**: `released_at` is amendment 3's output and `ported` / `last_ported_at` are its input, INV-M19-14. `line_type` carries no refusal anywhere, because **VoIP is scored and never rejected**, and `unknown` is the default because the lookup fails open |
+| SD-M19-06 | new `phone_change_requests` | `state check in ('pending','dual_channel_verified','applied','cancelled')`, `old_phone_id not null`, `new_phone_hash`, `dual_channel_verified_at`, `prior_notified_at`, `withdrawal_hold_until`, `applied_at`, `cancelled_at`, `cancelled_reason` | ADR-039 (c) and (d). The D4 ceremony **as state**, so that `phone_change_requests_applied_is_complete` makes dual-channel verification, prior-contact notification and a **still-running** withdrawal hold preconditions of the write rather than steps a handler is trusted to have taken. The attack it refuses is three moves long: take the number, change the number, drain the wallet. [SECURITY §4.8](../architecture/SECURITY.md) is the control narrative |
+| SD-M19-07 | `kyc_verifications` | `verification_purpose` check widened: `reverify_phone_change` | INV-M19-06 and section 3.2. A phone change is a re-verification trigger, and a trigger with no purpose value cannot write the new row the invariant requires. `kyc_verifications_supersession_matches_purpose` (`0003`) binds the new value correctly **with no change**, because it was written against the shape rather than against a list: any non-`initial` purpose must supersede something |
 
 ---
 
@@ -134,6 +148,7 @@ The machine in [STATE_MACHINES](../architecture/STATE_MACHINES.md) is approved a
 ```mermaid
 stateDiagram-v2
     verified --> reverify_pending: destination change (D4, 48h cooling)
+    verified --> reverify_pending: PHONE change (D4, dual channel + withdrawal hold)
     verified --> reverify_pending: active risk flag at severity threshold
     verified --> reverify_pending: dormant reactivation
     verified --> reverify_pending: expires_at reached
@@ -147,6 +162,19 @@ stateDiagram-v2
       INV-M19-06, AS-M19-06.
     end note
 ```
+
+**The phone-change trigger, which is the fifth and is new with [ADR-039](../decisions/ADR-039.md) (c).** It writes `verification_purpose = 'reverify_phone_change'` (SD-M19-07) and behaves exactly like its four siblings, which is the point: **it is a new row with its own liveness result, not a re-read**, and the constraint `kyc_verifications_supersession_matches_purpose` refuses one that supersedes nothing.
+
+Four properties are inherited rather than reinvented, and each is inherited from a control that already exists.
+
+| Property | Inherited from |
+|---|---|
+| **The gated action is blocked, not the identity.** A pending phone-change re-verification stops the phone change. It does not downgrade the trader's status and it does not stop ordinary payouts to the existing destination | AS-M19-02 counter 2, AS-M19-06 counter 3 |
+| **The withdrawal hold runs regardless of the re-verification result.** A successful re-verification does not shorten it, and `phone_change_requests_applied_is_complete` requires it to be **still running** at the moment the change applies | AS-M19-06 counter 4, where the same independence is asserted for destination cooling. Two controls, neither able to short-circuit the other |
+| **Both the prior number and the email are notified**, which is the leg that survives a defeated liveness check | [M16](M16-notification-center.md) `INV-M16-03`, buildable on a *number* only since `SD-M16-06` |
+| **Never SMS alone.** The confirmation is a passkey assertion or a second independent channel | [SECURITY](../architecture/SECURITY.md) C-27, and `sessions.elevated_by_factor` has no `sms_otp` value to write |
+
+**Why a phone change earns the same ceremony as a payout-destination change**, which is not obvious and is the whole justification: **under ADR-039 the phone is an authentication factor**, so changing it is a credential change wearing the clothes of a settings edit. An attacker who can move the number without the ceremony has not stolen a contact preference, they have minted a login.
 
 ### 3.3 Biometric dedupe
 
@@ -235,7 +263,7 @@ stateDiagram-v2
 
 ## 7. Adversarial scenarios
 
-**Eight listed, eight novel.**
+**Nine listed, nine novel.**
 
 ### AS-M19-01: The placement decision quietly sets the size of the fleet-killer (NOVEL, and it amends the constitution's own tradeoff)
 
@@ -355,6 +383,32 @@ stateDiagram-v2
 5. **The beta's answer may be "insufficient data", and that is an acceptable outcome.** A beta of 50 to 100 traders will produce very few fraud incidents, which is good news and is also a small sample; concluding "no fraud, keep pre-funded" from it would be [M12](M12-transparency-platform.md) AS-M12-07's sample-floor error made in private. GS-219.
 
 ---
+
+### AS-M19-09: The recycled number, and the innocent owner it would otherwise convict (NOVEL)
+
+**Attack.** There is no adversary in the first half of this scenario, which is what makes it the phone analogue of AS-M19-04 and AS-M19-05: the harm falls entirely on somebody who did nothing.
+
+A fleet operator is restricted. Their verified number sits in `identity_phones`, live, hard-linked to a banned identity, and Merit's retention on that row is **forever**, correctly, because it is fraud history. Ninety days later the carrier reclaims the number and reassigns it, which is ordinary carrier behaviour in every market Merit operates in and is not an edge case. A new customer buys that number, registers at Merit, verifies it honestly, and **the strongest identity signal in the system now says they are a banned fleet operator.**
+
+**Both obvious implementations are wrong, and they are wrong in opposite directions.**
+
+**Refusing at the door** is the tempting one, and it is one line: make `phone_hash` unique. The number is already live on another identity, so the second verification fails and no bad link is ever written. It is also the version that puts the innocent owner into a support ticket **before** any check that could rescue them has run, and the support ticket is worse than it sounds: the refusal message cannot explain itself. Telling this person "that number belongs to another account" discloses the existence and participation of the prior holder, which is exactly what AS-M19-05's counter 4 forbids. So the honest refusal is an unexplained one, which is the anti-pattern the entire corpus is built against.
+
+**Binding silently** is the other one, and it hands the new customer a ban they cannot see the reason for, on evidence Merit would defend in public as its strongest.
+
+**Counter, and amendment 3 is what pays for it.**
+
+1. **Verification completes** (INV-M19-13). The edge is written at the hard-link confidence ceiling and a **severity-5 flag opens against both identities**, and **no state changes automatically**. `identity_phones_live_number_idx` is deliberately **not unique**, and that missing index is the counter: it is what buys the time for step 2 to run.
+2. **The portability check runs on evidence (a) already bought** (INV-M19-14). If `last_ported_at` falls **after** the prior holder's restriction date, this is not the same graph node. The prior holder's row is **released** rather than superseded, with `release_evidence` carrying the portability record, and `identity_phones_release_is_evidenced` refuses a release that asserts this without showing it. **A released row frees `identity_phones_live_per_identity_uq`**, so the new customer verifies normally and no operator unpicks anything by hand.
+3. **The unresolvable case is a real state and it routes to a human rather than to a guess.** `identity_phones_port_date_implies_ported` asserts that a port date implies the port flag and **deliberately does not assert the converse**, because a vendor may report that a number was ported without saying when. That is precisely the state the guard cannot resolve. Forbidding it would force the writer to invent a date, and an invented date in an evidence chain is worse than a missing one.
+4. **Neither person is ever told about the other**, on AS-M19-05 counter 4 exactly. If enforcement follows for the prior holder it rests on their own conduct, and the new customer's registration is simply a registration.
+5. **A release ends the live link and never the history.** The row stays forever; `identity_phones_history_idx` is the read that asks "has this number ever been held", which is a different question from "who holds it now" and is the one an investigation needs.
+
+**And there is an adversarial half, which is the part this scenario would be incomplete without.** The recycling guard is a **link-breaker**, and a link-breaker can be invoked on purpose. An operator who understands it can cycle numbers deliberately: acquire, verify, abandon to the carrier, re-acquire a fresh one, and let portability history release each edge in turn, laundering the graph one number at a time. **The guard built to protect the innocent owner is the same mechanism that dissolves a fleet's phone edges.**
+
+Three things bound it and none of them is the guard itself. **A release is evidenced or it does not happen**, so an operator cannot release an edge by asserting it. **Every release is a permanent row**, so serial recycling is not invisible, it is a count: an identity with four released phones in a year is a pattern, and the schema stores it whether or not a detector reads it yet. And **the phone is one node in a scored graph, not a verdict**; [M07](M07-risk-abuse.md)'s D-16 aggregates it with device, payment and footprint edges that recycling a number does not touch. The residual, stated plainly: **a number reassigned with no portability record at all leaves the guard with no input**, and that case ends where every unresolvable identity case in this module ends, in a review queue with a severity-5 flag open and nothing enforced. This is the failure mode DEP-M19-09 exists to make rare, and it is why portability history is a disqualifying vendor criterion rather than a preference.
+
+**The edge case and golden scenario for this are allocated in [FOLD-01](FOLD-01-phone-identity.md) session 6, which owns both registries.** No identifier is claimed here, for the reason [FOLD-01 section 4](FOLD-01-phone-identity.md) records about the delta numbers: pre-claiming in a registry that has no claim mechanism is the drift [ADR-034](../decisions/ADR-034.md) and [ADR-036](../decisions/ADR-036.md) were built to stop.
 
 ## 7.9 Verification UX: a milestone, never an accusation
 
@@ -482,3 +536,4 @@ M19 owns the funnel dashboard the section 10 decision will be settled from: cove
 | DEP-M19-06 | M20's external withdrawal leg requires `verified` and honors the re-verification scoping | M20 | Either the wallet's external leg is unverified, or a pending re-check blocks ordinary withdrawals |
 | DEP-M19-07 | The provider contract carries retention and export commitments aligned with Merit's AML retention | founder, procurement | AS-M19-07: enforcement evidence expires or leaves with the vendor |
 | DEP-M19-08 | Counsel rules on the sanctions runbook and the expiry period | founder, legal | The one mandatory refusal in the corpus has no operating procedure behind it |
+| DEP-M19-09 | **[ADR-023](../decisions/ADR-023.md)'s vendor supplies portability history**, recorded as a **disqualifying** selection criterion in that procurement: a vendor that cannot supply it cannot be selected | founder, procurement | **INV-M19-14 has no input**, and without the guard the (b) hard link is unsafe to bind automatically. AS-M19-09's counter collapses to its two rejected implementations: refuse the innocent owner at the door, or bind them silently. Three of (a)'s four signal classes already sit inside the vendor's purchased scope; **this is the separable one**, which is exactly why it has to be a condition of acceptance rather than an assumption about the datasheet |

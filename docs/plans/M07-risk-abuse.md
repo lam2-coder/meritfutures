@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-16
 ---
 
 # M7: Risk and Abuse
@@ -75,14 +75,19 @@ M7 consumes [DATA_MODEL sections 3 and 9](../architecture/data-model/README.md) 
 
 Signals, per the approved model: normalized email, device fingerprint, IP and ASN, payment fingerprint, verified KYC identity, and settlement-rail identity. Each is stored hashed with an observation count (INV-M7-08).
 
-**Resolution has two tiers, and conflating them is the mistake.**
+**Resolution has three tiers, and conflating them is the mistake.** It had two until [ADR-039](../decisions/ADR-039.md) ruled the verified phone, which fits neither and forced the third.
 
 | Tier | What it does | Signals that qualify |
 |---|---|---|
 | **Hard merge** | Two identities become one. Caps aggregate. Requires a decision | Biometric dedupe hit from M19, or an explicit admin merge with evidence |
-| **Soft link** | An edge with a confidence. Caps do **not** aggregate. Surfaces in the graph and feeds detectors | Shared device, shared payment fingerprint, shared normalized email, shared IP or ASN |
+| **Hard link, reviewed** | An edge written at the **hard-link confidence ceiling**. Caps do **not** aggregate and **no state changes automatically**. A **severity-5 flag opens against both identities** | **A verified phone found live on a second identity** ([M19](M19-kyc-identity.md) `INV-M19-13`, ADR-039 (b)). Signals stored on `identity_phones` under `U-07`'s `phone` and `phone_carrier` kinds |
+| **Soft link** | An edge with a confidence. Caps do **not** aggregate. Surfaces in the graph and feeds detectors | Shared device, shared payment fingerprint, shared normalized email, shared IP or ASN, and D-15's and D-18's footprint signals |
 
 **Only a hard merge changes what a trader may buy.** A shared IP is a coffee shop; a shared device is a household; a shared card is a family. None of them is a person, and treating them as one is AS-M7-04. What a soft link does is make the cluster **visible**, and visibility is what the detectors and the admin need.
+
+**The middle tier is not a hedge, and it is worth saying why it earns its own row rather than being filed under one of its neighbours.** A verified phone is genuinely stronger than a soft link: real mobile numbers are scarce where emails are free to mint, which is the whole premise of ADR-039, so the edge deserves the hard ceiling. It is genuinely weaker than a merge: **carriers reassign numbers**, so the same edge that catches a fleet operator also catches whoever legitimately inherits their number ninety days later ([M19](M19-kyc-identity.md) AS-M19-09). Filing it under **soft link** would waste the strongest cheap identity signal available. Filing it under **hard merge** would aggregate an innocent person's caps on a carrier's administrative decision. **The third tier is what a signal looks like when it is strong evidence about a number and weak evidence about a human**, and `identity_phones`' deliberately non-unique `phone_hash` index is that distinction expressed in DDL.
+
+**One thing this tier makes visible rather than fixes, recorded rather than resolved.** ADR-039 ruled the phone case in those exact terms, and the corpus's older phrase for the same class does not agree with itself: section 7.9's table says hard links **auto-enforce** and [ADR-029](../decisions/ADR-029.md) says a hard link "bans an account without human review", while the hard-merge row above says "requires a decision" and [M19](M19-kyc-identity.md) `INV-M19-04` says a biometric dedupe hit "raises a flag against both identities and changes no state". **For the phone, ADR-039 settled it. For biometric dedupe, the two readings are still both in the corpus**, and this plan does not extend one ruling's reach by assumption. **OQ-M7-05.**
 
 ### 3.2 The detector set
 
@@ -107,6 +112,20 @@ Each detector states its input, its statistic, its threshold, and what it is act
 | **D-12** | **Day-0 graph-prior pairing** | `identity_links`, `identity_signals` | Candidate pairs and groups formed from graph priors **at funding time, with zero trading data**. Output is a watched-cluster set, not a flag: it seeds D-13 and D-14 rather than accusing anyone | The ring that funds and extracts inside one cycle. This is the direct answer to AS-M7-01: a detector that needs history cannot defend the first cycle, so the first cycle is defended by what we knew before it started |
 | **D-13** | **Young-account fast path** | `daily_marks`, `fills`, over a **5 trading day** window | Correlation below **-0.95**, **and** size mirroring, **and** timing mirroring. All three, not any of three | The hedged pair, caught inside the extraction window. Deliberately **precise rather than sensitive**: on five days of data a -0.8 threshold is noise, and requiring near-perfect inverse correlation together with mirrored size and timing is what makes a short window usable at all |
 | **D-14** | **Clique position-sum** | live and end-of-day positions across a D-12 clique | Summed positions across the clique at or near zero | Third-leg rotation, detected **inside the day** rather than after it closes. Complements D-03 by working on positions rather than realized P&L, and is invariant to which pair carries the hedge, which is exactly what AS-M7-02 defeats in a pairwise detector |
+| **D-18** | **Registration phone lookup** | `identity_phones` carrier metadata at capture (`SD-M19-05`), joined to the checkout enrichment D-15 already buys | The **fleet signature** as a **named composite**, defined below, scored by **D-16** and never evaluated as a refusal. **No threshold anywhere refuses a line type**, and no CHECK in `0029` can express one | A fleet at the **earliest** and cheapest moment it is observable. D-15 sees the card and the email at checkout; D-18 sees the number at **registration**, which is upstream of a purchase, and the number is the one signal in the set that a fleet operator cannot mint in bulk for free |
+
+**D-18's fleet signature, stated as a composite because no leg of it means anything alone.** [ADR-039](../decisions/ADR-039.md) (a) names it: **VoIP plus a fresh email plus a datacenter IP plus no digital footprint.** Four legs, all four required.
+
+| Leg | Column | Why it is worthless alone |
+|---|---|---|
+| VoIP line type | `identity_phones.line_type = 'voip'` | A legitimate customer's only number, in several markets and for most people who moved country. **VoIP is scored, never rejected**, and that is the ruling rather than a tolerance |
+| A fresh email | D-15's footprint age | Everybody's email was new once |
+| A datacenter or VPN origin | D-15's IP reputation | A privacy-conscious trader, or an office |
+| No digital footprint | `identity_phones.footprint_present = false` | A young person, or somebody who is simply not online |
+
+**The one implementation trap, and it is a mass-false-positive trap rather than a missed-detection one.** `footprint_present` and `ported` are **nullable on purpose and the null is not a `false`**. Three-valued because the lookup **fails open**: `null` means "we did not find out", `false` means "the vendor looked and there is none". **A detector written against `IS NOT TRUE` scores every vendor timeout as a fleet member**, which converts a supplier outage into a flood of flags against real customers on the day Merit can least afford it. D-18 tests `footprint_present IS FALSE`, and the difference between those two expressions is the whole reliability of the detector. The same discipline applies to `ported`, which INV-M19-14 reads.
+
+**The call site inherits checkout's failure posture verbatim, and this is not a new decision.** Non-blocking, fail-open on timeout, VoIP scored and never rejected, the same as D-15's. `lookup_provider` and `lookup_at` are recorded on every row for `kyc_verifications.liveness_method`'s reason exactly: an enforcement decided in 2027 on a carrier lookup needs to know whose lookup it was, or a bare value ages into an assertion nobody can re-evaluate.
 
 **D-11 is the clearest example of why the engine's transparency is also a detection asset**, and it is the counter recorded in [M04 AS-M4-01](M04-trader-portal.md): the same number that helps a ring compute its minimum manufactured profit is the number that makes their pattern arithmetic to detect.
 
@@ -142,6 +161,26 @@ Ruled at the batch 1 gate ([DECISIONS](../decisions/README.md)), closing OQ-M7-0
 **Cross-identity copy is now a violation in its own right**, which changes what the flag has to prove. Previously D-01's output was evidence toward some other conclusion, usually coordinated hedging, and the flag's strength rested on a statistical argument. Now the conduct **is** the violation, so the evidence is the conduct: these fills, on these accounts, held by these two identities, at these timestamps, against this ToS clause. That is exactly the form [AS-M7-07](#as-m7-07-enforcement-contested-in-public-extends-dossier-item-5) says survives a public argument, and it discloses no threshold.
 
 **The legal dependency is now specific rather than open.** DEP-M7-05 previously asked for clauses "covering coordinated trading, common control, and copy trading", which is not a standard anyone can comply with. The clause is now enumerable in the four rows above, and it is filed as a drafting note in [legal/](../legal/README.md).
+
+### 3.5 Portability history wired to the recycling decision, and the delta that turned out not to exist
+
+[ADR-039](../decisions/ADR-039.md) amendment 3 is M19's invariant ([`INV-M19-14`](M19-kyc-identity.md)) and M7's obligation. **Carriers reassign numbers**, so the phone edge that binds a fleet operator also binds whoever legitimately inherits their number, and the guard's whole job is to tell those two apart: **reassignment after the linked identity's restriction date means it is not the same node.** M19 owns the decision. M7 owns what the graph does with the answer, which is the half that actually stops an innocent person being enforced against.
+
+**The wiring, by the question the guard asks, because "wire it up" is not a specification.**
+
+| Question | Where the answer lives | What put it there |
+|---|---|---|
+| Was this number ported, and when | `identity_phones.ported`, `identity_phones.last_ported_at` | `SD-M19-05`, [`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql) |
+| When was the prior holder restricted | `identity_restriction_episodes.opened_at` | [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql), [ADR-041](../decisions/ADR-041.md). One row per restriction of one human, which is why a repeat restriction does not overwrite the date this guard reads |
+| Is this number live on somebody else **right now** | `identity_phones_live_number_idx`, **deliberately not unique** | `SD-M19-05` |
+| Has it **ever** been held, including by an identity now banned | `identity_phones_history_idx (phone_hash, created_at desc)` | `SD-M19-05`. A different question from the one above, and the guard needs the history rather than the live set, because the whole point is that the prior holder is gone |
+| Record the release | `identity_phones.released_at`, `release_evidence`, refused when empty by `identity_phones_release_is_evidenced` | `SD-M19-05` |
+| Stop the phone edge contributing to enforcement | `identity_links.suppressed`, `identity_links.suppressed_by`, read through `identity_links_live_idx` | **`SD-M7-04`**, `0002`. Written through the `SECURITY DEFINER` function that arrives with this module, never by the application role |
+| Keep the edge as history anyway | `identity_links` is append-only and the edge is **never deleted** | `SD-M7-04`. "We decided this edge was wrong" is itself evidence, which is the same reason the dispute path never deletes |
+
+**The finding, and it is a finding rather than an omission.** [FOLD-01 section 6.1](FOLD-01-phone-identity.md) promised this module "the M7 delta wiring portability history to the recycling decision". **There is no such delta and there should not be.** Section 4 of that same plan enumerates nine schema changes and **not one of them is M7's**; session 3 wrote `0029` against that list and it contains no M7 change. Every input and every output the decision needs already exists: five from `SD-M19-05` in that very migration, and the suppression pair from `SD-M7-04`, which has been in `0002` since the schema-delta reconciliation and was written for AS-M7-04's housemates. `identity_links.link_kind` is `text NOT NULL` with **no CHECK constraint**, so the phone edge needs a vocabulary value rather than a migration, and that value is claimed with the `identity_links` data-model row rather than here.
+
+**So no delta identifier is claimed**, for the reason [FOLD-01 section 4](FOLD-01-phone-identity.md) already records against its own first draft: **only ADR numbers and migration numbers have an allocation table**, a delta is claimed by its `DELTA_MANIFEST` row existing, and writing one into a plan first is pre-claiming in a registry with no claim mechanism. Inventing a number for a change with nothing in it would be worse than pre-claiming: it would be a **deferred delta that a later session has to open, read, and discover is empty**, which is the same defect as a stale count with a migration attached. The prose in section 6.1 was a reasonable expectation at plan time and the migration is the primary source. **The primary source wins.**
 
 ---
 
@@ -290,7 +329,12 @@ The pack gives the trader every fill, mark, rule state, and gate result of their
 | Link class | Signals | Behavior |
 |---|---|---|
 | **Hard** | Biometric dedupe hit ([M19](M19-kyc-identity.md) SD-M19-04), same payout destination (D-09), same payment fingerprint (D-08), a `confirmed_same_person` disposition | **Auto-enforce.** These are facts, not inferences |
-| **Soft** | Shared device or IP, behavioral similarity, timing correlation, shared address components, D-15's footprint signals | **Queue a pre-funding review.** Never auto-enforce |
+| **Hard, reviewed** | **A verified phone live on a second identity** ([M19](M19-kyc-identity.md) `INV-M19-13`, [ADR-039](../decisions/ADR-039.md) (b)) | **The edge is written at the hard-link confidence ceiling and a severity-5 flag opens against both identities. No state changes automatically** |
+| **Soft** | Shared device or IP, behavioral similarity, timing correlation, shared address components, D-15's and D-18's footprint signals | **Queue a pre-funding review.** Never auto-enforce |
+
+**The middle row is [ADR-039](../decisions/ADR-039.md)'s ruling and it is section 3.1's third tier seen from the confidence side.** A verified phone earns the hard ceiling because real mobile numbers are scarce where emails are free to mint, and it cannot earn auto-enforcement because **carriers reassign numbers**: the guard in section 3.5 needs time to run, and a refusal at the door happens before it can. That is also why `identity_phones` has a unique index on `identity_id` and **deliberately none on `phone_hash`**.
+
+**And it is the row that makes an older ambiguity visible.** "Auto-enforce" in the row above it means, per [ADR-029](../decisions/ADR-029.md), "bans an account without human review"; [M19](M19-kyc-identity.md)'s `INV-M19-04` says a biometric dedupe hit "raises a flag against both identities and changes no state", and section 3.1's hard-merge tier says it "requires a decision". **Those are not the same behaviour.** ADR-039 settled it for the phone in exactly the words above. It is unsettled for biometric dedupe, and this plan records that rather than assuming one ruling reaches the other. **OQ-M7-05.**
 
 **The review is pre-funding, and the timing is the point.** A soft cluster caught before an account is funded costs a review. The same cluster caught at payout costs a dispute, an evidence pack, and a trader who earned money and is being told to wait. [M07 AS-M7-01](#) established that the minimum extraction path is short; the corollary is that identity review has to happen upstream of funding or it happens too late to be cheap.
 
@@ -314,7 +358,7 @@ The pack gives the trader every fill, mark, rule state, and gate result of their
 
 | Suite | Prefix | Count | Runs | Blocks |
 |---|---|---|---|---|
-| Detector unit tests, each against a hand-built positive and a hand-built near-miss | `M7-D-nn` | 22, two per detector | every commit | merge |
+| Detector unit tests, each against a hand-built positive and a hand-built near-miss | `M7-D-nn` | **two per detector in section 3.2** | every commit | merge |
 | Resolution tests (soft link versus hard merge, per signal kind) | `M7-R-nn` | 12 | every commit | merge |
 | Precision harness over a labelled fixture population | `M7-P-nn` | 1 per detector | nightly | nightly alarm |
 | Synthetic canary integration | `M7-S-nn` | 1 per detector | every run, in prod | **page** in prod |
@@ -322,6 +366,10 @@ The pack gives the trader every fill, mark, rule state, and gate result of their
 | Golden fixtures | `GS-nnn` | 5 owned (GS-118 to GS-122), plus GS-046, GS-050, GS-054, GS-060, GS-062 shared | every commit | merge |
 
 **Every detector needs a near-miss fixture, not only a positive.** A detector tested only against a case that should fire proves nothing about its threshold, and threshold errors are how a detector becomes either noise or nothing.
+
+**D-18's near-miss fixture is named here because it is the one a reader would build wrong.** The positive is the four-leg fleet signature. The near-miss is **a vendor timeout**: `line_type = 'unknown'`, `footprint_present IS NULL`, everything else identical. It must **not** fire, and a detector written against `footprint_present IS NOT TRUE` fires on it. That fixture is the difference between a supplier outage and a flood of flags against real customers.
+
+**The count in this table was a number and is now the rule that produces it.** It read "22, two per detector" against a section 3.2 that has held more than eleven detectors since the batch 1 gate added D-12 to D-14 and D-15 to D-17, and this session's D-18 would have made it wrong by one more. [ADR-034](../decisions/ADR-034.md)'s remedy is to generate the number or delete it and point at the source; there is no CI span for a test count, so this is the second. Same class as the counts [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md) section 4a records, and it is not tallied there for the reason that section gives: the tally of hand-maintained counts is itself a hand-maintained count.
 
 ### 8.1 Named scenarios owned by this module
 
@@ -361,6 +409,8 @@ The pack gives the trader every fill, mark, rule state, and gate result of their
 **OQ-M7-03. What is the SLA on severity 5?** Proposed: **4 hours to first touch during business hours, 24 hours otherwise.** Money can leave in 2 to 3 business days, so 24 hours still lands before settlement. Anything longer means the flag documents a loss rather than preventing one.
 
 **OQ-M7-04. Do we tell a trader they are linked?** SD-M7-04's dispute path requires that they can find out. Telling them also tells a ring which signal we resolved on, which is a real cost. Recommendation: **tell them the fact and not the signal**: "this account is associated with another account under our terms", with a contest route. That preserves the dispute path and discloses nothing about the graph.
+
+**OQ-M7-05 (NEW, raised by [FOLD-01](FOLD-01-phone-identity.md) session 4). Does "hard link" mean auto-enforce, or does it mean a flag against both and no state change?** The corpus currently answers both. Section 7.9's hard row and [ADR-029](../decisions/ADR-029.md) say auto-enforce, explicitly "bans an account without human review". Section 3.1's hard-merge tier says "requires a decision", and [M19](M19-kyc-identity.md) `INV-M19-04` says a biometric dedupe hit raises a flag against both identities and changes no state. **[ADR-039](../decisions/ADR-039.md) ruled the phone case** and gave it the flag-and-review behaviour, which is now section 3.1's third tier, and it ruled **only** the phone case. Recommendation: **settle it the same way for biometric dedupe, in an ADR rather than by inheritance.** The argument that decided the phone applies with almost the same force to a face: FM-M19-02 and AS-M19-05 establish that dedupe produces false matches on siblings, twins, poor captures and at demographically uneven rates, so the population an auto-ban would hit wrongly is the same sympathetic population AS-M7-04 protects. **The counter-argument is real and belongs in the ruling**: a face is not reassigned by a carrier, so the phone's specific rescue mechanism has no analogue, and "hard links auto-enforce" is load bearing in ADR-022's economics. **Not settled here.** One ruling's words are not evidence about another signal, and the whole reason this question exists is that a phrase was reused without being re-derived.
 
 ---
 
