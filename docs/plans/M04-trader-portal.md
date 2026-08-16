@@ -361,7 +361,15 @@ GS-105.
 | GS-104 | Payout destination change enters a 48 hour cooling window | The change is accepted, does not take effect, is notified to the existing contact, and is visible in the active-session and security views. AS-M4-05 |
 | GS-105 | Eligibility notification names its trading day and links to the gates screen | The notification body carries "as of <trading day>" and deep-links to eligibility rather than to a request action. AS-M4-06 |
 
-**The scenarios for the authority boundary are not claimed here, deliberately.** `CI-06d` fails on any `GS-nnn` cited anywhere in `docs/` that does not resolve to a definition in the registry, and the registry is the registries session's work under [FOLD-01 §6.2](FOLD-01-phone-identity.md). The three this module owes are named in words so the session that allocates them has the list: **a sensitive action rendered disabled to a single-factor session with its reason and its route**; **the same endpoint refusing that session on the server regardless of what the client rendered** (INV-M4-15, which is the half a rendering test cannot cover); and **the phone-change ceremony visible on SC-M4-11 while its hold runs**. Writing the identifiers before the registry rows exist would break the build, which is the same constraint session 4 met and recorded.
+**The scenarios for the authority boundary are allocated and these citations are now live.** They were named in words rather than in identifiers until the registries session wrote the rows, because `CI-06d` fails on any `GS-nnn` cited anywhere in `docs/` that does not resolve, and writing an identifier before its row exists breaks the build. The three this module owed, in the order they were listed:
+
+| Owed | Allocated | What it pins |
+|---|---|---|
+| A sensitive action **rendered disabled** to a single-factor session with its reason and its route | **GS-267** | The boundary is **shown rather than hit**. Every read surface renders and each sensitive action carries its route to elevation, so a trader learns what they must do before they act |
+| The same endpoint **refusing that session on the server** regardless of what the client rendered | **GS-266** | `INV-M4-15`, and it is the half a rendering test cannot cover. The refusal is a vocabulary rather than a check: `sessions.elevated_by_factor` has no `sms_otp` value to write |
+| The **phone-change ceremony visible on SC-M4-11** while its hold runs | **GS-269** | `withdrawal_hold_until` is exposed as a running time rather than inferred, so the trader meets the hold on the security screen instead of as an unexplained refusal at the end of it |
+
+**GS-266 and GS-267 are a pair and neither is sufficient**, which is why the module owed both: a boundary tested only where it refuses is indistinguishable from one that refuses everything. [GS-268](../testing/golden-scenarios/34-gs-258-to-gs-272-phone-identity-and-the-authority-boundary.md) runs the SIM-swapped session end to end and pins C-27's own sentence, that it can see everything and change nothing.
 
 ### 8.3 Coverage rule
 

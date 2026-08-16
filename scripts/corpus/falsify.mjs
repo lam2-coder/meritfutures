@@ -143,6 +143,88 @@ const addMigrationRow = (body, number, state) => {
 const nextFreeMigration = (dir) => String(nextFree(dir, '## Migration number allocation')).padStart(4, '0');
 const nextFreeAdr = (dir) => String(nextFree(dir, '## Number allocation')).padStart(3, '0');
 
+// =============================================================================
+// CI-06k's seeds, and why every one of them is DERIVED
+// =============================================================================
+// Same rider as the migration seeds above, applied to a different registry. The
+// three things this gate reads are all things the corpus edits: the rows of
+// API_CONTRACT section 12, the C-27 action names, and the class list the
+// rate-limit exemption is generated over. A seed naming any of them by literal
+// goes stale the first time one is reworded, and it goes stale SILENTLY, because
+// a row that no longer matches is a seed that plants nothing.
+//
+// So each helper below finds its target by SHAPE and throws if the shape is
+// gone. `seed anchor not found` is a harness problem and reads nothing like a
+// gate problem, which is the whole value of the distinction.
+const AUTHZ_DOC = 'docs/architecture/API_CONTRACT.md';
+const AUTHZ_HEADING = '## 12. Negative-authz test matrix';
+
+// The matrix as [before, headerLine, ...rows, after], so a seed can rewrite one
+// cell of one row and put the file back together unchanged everywhere else.
+function authzMatrix(dir) {
+  const body = readFileSync(join(dir, AUTHZ_DOC), 'utf8');
+  const start = body.indexOf(AUTHZ_HEADING);
+  if (start === -1) throw new Error(`seed anchor not found: the "${AUTHZ_HEADING}" section`);
+  const after = body.slice(start + AUTHZ_HEADING.length);
+  const end = after.search(/\n## /);
+  const section = end === -1 ? after : after.slice(0, end);
+  const lines = section.split('\n');
+  const headerAt = lines.findIndex((l) => l.trim().startsWith('|') && /required.factor/i.test(l));
+  if (headerAt === -1) throw new Error('seed anchor not found: the required-factor column header');
+  const col = lines[headerAt]
+    .trim().replace(/^\||\|$/g, '').split('|')
+    .findIndex((c) => /required.factor/i.test(c));
+  return { body, section, lines, headerAt, col, replace: (next) => body.replace(section, next) };
+}
+
+const isSeparator = (l) => l.trim().replace(/^\||\|$/g, '').split('|').every((c) => /^\s*:?-+:?\s*$/.test(c));
+
+// Rewrite cell `col` of the first row below the header that satisfies `pick`.
+function editFactorCell(dir, pick, rewrite) {
+  const m = authzMatrix(dir);
+  for (let i = m.headerAt + 1; i < m.lines.length; i++) {
+    const line = m.lines[i];
+    if (!line.trim().startsWith('|') || isSeparator(line)) continue;
+    const cells = line.trim().replace(/^\||\|$/g, '').split('|');
+    if (cells.length <= m.col) continue;
+    if (!pick(cells[m.col])) continue;
+    const next = rewrite(cells[m.col]);
+    if (next === null) continue;
+    cells[m.col] = next;
+    m.lines[i] = `| ${cells.map((c) => c.trim()).join(' | ')} |`;
+    writeFileSync(join(dir, AUTHZ_DOC), m.replace(m.lines.join('\n')));
+    return cells;
+  }
+  throw new Error('seed anchor not found: no matrix row matched the seed predicate');
+}
+
+// The migration that creates the generated exemption column, found rather than
+// named: the file number is an allocated identifier and the rider forbids pinning
+// to one. This is the same rule the migration seeds follow, one registry over.
+function exemptionSite(dir) {
+  const dir_ = join(dir, 'packages/db/migrations');
+  for (const f of readdirSync(dir_).sort().reverse()) {
+    if (!f.endsWith('.sql')) continue;
+    const body = readFileSync(join(dir_, f), 'utf8');
+    if (/ADD\s+COLUMN\s+rate_limit_exempt\s+boolean\s+GENERATED/i.test(body)) return { f, body };
+  }
+  throw new Error('seed anchor not found: no migration creates a generated rate_limit_exempt');
+}
+
+// A notification class that is NOT one of the two post-identity exempt classes,
+// read from the same file at seed time. Today this is the pre-identity class the
+// whole amendment is about; if it is ever renamed, this moves with it and the
+// seed stays a real violation instead of quietly seeding a class nobody has.
+function nonExemptClass(body) {
+  const classes = new Set();
+  for (const m of body.matchAll(/class\s+(?:NOT\s+)?IN\s*\(([^)]*)\)/gi)) {
+    for (const q of m[1].matchAll(/'([a-z_]+)'/g)) classes.add(q[1]);
+  }
+  const found = [...classes].find((c) => c !== 'security' && c !== 'money');
+  if (!found) throw new Error('seed anchor not found: no notification class outside security and money');
+  return found;
+}
+
 // One seeded violation per gate. Each is the SMALLEST edit that the gate's own
 // row says must fail, and each names the real failure it stands in for.
 //
@@ -293,6 +375,17 @@ const SEEDS = {
       );
     },
   },
+  'CI-06k': {
+    what: 'an endpoint in the negative-authz matrix with no required-factor cell',
+    real:
+      'C-27 is enforced by a server-side required-factor declaration per endpoint rather ' +
+      'than by discipline, and a sensitive endpoint added later with nothing declared is ' +
+      'the error a reading has to catch',
+    // Assertion 1. The target is the first row that declares anything at all,
+    // found by shape, so this survives any rewording of the matrix.
+    expect: 'carries no required-factor cell drawn from the published vocabulary',
+    seed: (d) => editFactorCell(d, (c) => c.trim().length > 0, () => ''),
+  },
   'ADR-026': {
     what: 'a delta cited in docs with no manifest row',
     real: 'the delta tally was wrong on the day it was written, and U-06 was uncounted',
@@ -408,6 +501,75 @@ const SCOPE_CASES = [
         join(d, 'docs/decisions/ADR-D2.md'),
         '## ADR-D2: probe  (2026-08-15, status: proposed)\n\nAn entry. No frontmatter, on purpose.\n',
       ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06k. THE GATE HAS THREE ASSERTIONS AND SEEDS CARRY ONE EACH.
+  //
+  // `SEEDS` holds exactly one violation per gate, so a gate asserting three
+  // things is watched failing on one of them and taken on trust for the other
+  // two. That is the shape this whole harness exists to refuse. The seeded
+  // violation covers assertion 1; the two cases below cover assertions 2 and 3,
+  // and assertion 2 is asserted in BOTH directions because it is a partition
+  // rather than a rule: `session` on a read surface is correct and `session` on a
+  // sensitive action is the SIM-swap hole, and a gate that cannot tell them apart
+  // is either useless or refuses everything.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06k/single-factor-read',
+    gate: 'CI-06k',
+    what: 'a READ surface declaring a single factor, which must NOT be a finding',
+    expect: 'PASS',
+    // The control is the same token on the other side of the line. Without it,
+    // a gate that had simply stopped reading the matrix would pass this case and
+    // report nothing, which is a vacuous PASS of exactly the kind the CI-06h
+    // reserved case was rewritten to stop producing.
+    control: {
+      expect: 'is a single factor',
+      seed: (d) =>
+        editFactorCell(
+          d,
+          (c) => /C-27:/.test(c),
+          // The C-27 tag is PRESERVED and only the factor is downgraded. Replacing
+          // the whole cell would untag the row, assertion 2 would report the action
+          // as missing instead, and the case would fail off-target while looking
+          // like it worked.
+          (c) => `\`session\` ${/\(C-27:[^)]*\)/.exec(c)[0]}`,
+        ),
+    },
+    seed: (d) => {
+      const m = authzMatrix(d);
+      const row =
+        '| A probe read surface reached by a session established with one factor | `session` | 200 |';
+      m.lines.splice(m.headerAt + 2, 0, row);
+      writeFileSync(join(d, AUTHZ_DOC), m.replace(m.lines.join('\n')));
+    },
+  },
+  {
+    name: 'CI-06k/exempt-class',
+    gate: 'CI-06k',
+    what: 'a notification class outside security and money made rate-limit exempt, which MUST be a finding',
+    // Assertion 3, and this is amendment 2's whole content: INV-M16-11 exempts
+    // the post-identity security and money classes, and the same exemption
+    // applied to an attacker-supplied destination funds SMS pumping. The class is
+    // read from the migration at seed time rather than named here.
+    expect: (d) => {
+      const { body } = exemptionSite(d);
+      return `rate_limit_exempt is generated over "${nonExemptClass(body)}"`;
+    },
+    // The quiet direction is the CLEAN TREE run at the top of this harness, where
+    // the expression names security and money and the gate must pass. It is not
+    // repeated as a case here because it is already asserted, on every run,
+    // against the real corpus rather than against a seeded copy of it.
+    seed: (d) => {
+      const { f, body } = exemptionSite(d);
+      const cls = nonExemptClass(body);
+      const next = body.replace(
+        /(ADD\s+COLUMN\s+rate_limit_exempt\s+boolean\s+GENERATED\s+ALWAYS\s+AS\s*\(\s*\n?\s*class\s+IN\s*\()([^)]*)\)/i,
+        (_, head, list) => `${head}${list.trimEnd()}, '${cls}')`,
+      );
+      if (next === body) throw new Error('seed anchor not found: the rate_limit_exempt class list');
+      writeFileSync(join(d, `packages/db/migrations/${f}`), next);
+    },
   },
   {
     name: 'CI-06h/reserved',

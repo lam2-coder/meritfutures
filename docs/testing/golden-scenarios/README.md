@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../decisions/README.md, ../../edge-cases/README.md]
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # GOLDEN SCENARIOS
@@ -10,11 +10,11 @@ last_updated: 2026-08-15
 
 Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never prose. Per [GLOSSARY](../../GLOSSARY.md#golden-file) and constitution C10, every scenario here derives from a plan doc or an approved constitution scenario and **never** from implementation output. That rule is the whole defence against the self-grading trap: if a fixture was written by reading the code, it proves only that the code agrees with itself.
 
-**Seeded in Wave 3 by [M01](../../plans/M01-rules-engine.md), and GS-001 to GS-083 approved with it at the M1 gate on 2026-08-13.** Each later module plan appends its own block and those scenarios carry that plan's status. Constitution section 5.2 requires at least 40 golden files and the registry defines **257**. **GS-001 to GS-083 are M1's**, of which 67 are executable against the pure engine with zero I/O, plus 5 (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives. The numbering map below is the current total and section 33 is the reconciliation behind it.
+**Seeded in Wave 3 by [M01](../../plans/M01-rules-engine.md), and GS-001 to GS-083 approved with it at the M1 gate on 2026-08-13.** Each later module plan appends its own block and those scenarios carry that plan's status. Constitution section 5.2 requires at least 40 golden files and the registry defines <!--gen:gs_count-->272<!--/gen-->. **GS-001 to GS-083 are M1's**, of which 67 are executable against the pure engine with zero I/O, plus 5 (GS-034, GS-035, GS-041, GS-047, GS-050) where M1 owns an assertion inside a scenario another module drives. The numbering map below is the current total and section 33 is the reconciliation behind it.
 
 **Five scenarios were added and four rewritten by the M1 gate rulings** ([ADR-013](../../decisions/ADR-013.md), [ADR-014](../../decisions/ADR-014.md), [ADR-015](../../decisions/ADR-015.md)). **Fourteen more were added and four rewritten by the Wave 3 batch 1 gate rulings** ([ADR-016](../../decisions/ADR-016.md) through [ADR-020](../../decisions/ADR-020.md)). A golden file that pinned a behavior the founder overruled is not quietly deleted: it is rewritten to pin what was actually decided, and the row says so, because a fixture that silently changes meaning is how a suite stops being a specification.
 
-**Consolidated in Wave 4, and the registry now stands at 257** (section 33 carries the full reconciliation, the ownership partition, and the coverage map). Four things were repaired in that pass and each is worth naming, because a registry whose defects are fixed silently is a registry nobody can trust the next count from. **The section numbering was duplicated at 25, 26 and 27** and is now contiguous through 33. **Section 6's stated range said GS-071 to GS-083 while its table ended at GS-078**, which overlapped section 7. **GS-139 to GS-141 were listed out of order.** And **GS-206 through GS-209 were claimed by two different blocks at once**, the M18 graduation scenarios and the addendum's verification-UX scenarios; the verification-UX pair is renumbered to GS-256 and GS-257, and the collision note stays in section 28 rather than being erased.
+**Consolidated in Wave 4, and the registry now holds <!--gen:gs_count-->272<!--/gen-->** (section 33 carries that pass's reconciliation, the ownership partition, and the coverage map; sections added after it carry their own). Four things were repaired in that pass and each is worth naming, because a registry whose defects are fixed silently is a registry nobody can trust the next count from. **The section numbering was duplicated at 25, 26 and 27** and is now contiguous through 33. **Section 6's stated range said GS-071 to GS-083 while its table ended at GS-078**, which overlapped section 7. **GS-139 to GS-141 were listed out of order.** And **GS-206 through GS-209 were claimed by two different blocks at once**, the M18 graduation scenarios and the addendum's verification-UX scenarios; the verification-UX pair is renumbered to GS-256 and GS-257, and the collision note stays in section 28 rather than being erased.
 
 **Two blocks were added in the same pass.** GS-246 to GS-255 are the **Appendix D0 attack battery**, discharging the obligation [SECURITY section 9](../../architecture/SECURITY.md) recorded for Wave 4. GS-243 to GS-245 carry [ADR-025](../../decisions/ADR-025.md).
 
@@ -23,8 +23,12 @@ Hand-built scenario fixtures, numbered. **Tests cite scenario numbers**, never p
 **GS-055 is the one to read if you read only one row of that rewrite.** It pinned the extraction ceiling under the settlement anchor and carried the basis-anchored case as an expected-to-fail counterfactual. [ADR-019](../../decisions/ADR-019.md) made the counterfactual live, so the fixture now pins the opposite direction. That is exactly the situation this file's rule about rewriting rather than deleting exists for: the number changed because a decision changed, and both the number and the decision are on the record.
 
 The fixture registry, one file per SECTION since [ADR-043](../../decisions/ADR-043.md).
-Per section rather than per entry because 257 identifiers live as 301 table rows: a
-row is not a document, and the batteries only mean anything read together.
+Per section rather than per entry because the identifiers outnumber the sections by
+two orders of magnitude and live as table rows: a row is not a document, and the
+batteries only mean anything read together. **The count is <!--gen:gs_count-->272<!--/gen-->
+and the row total is not stated**, because it is the one of the two that no query in
+`gates.mjs` derives, and this line carried both as hand-maintained numerals until
+the FOLD-01 registries session added a section and made them wrong.
 
 ## Entries
 
@@ -63,3 +67,4 @@ row is not a document, and the batteries only mean anything read together.
 | [31. GS-246 to GS-255](31-gs-246-to-gs-255-the-appendix-d0-attack-battery.md) | the Appendix D0 attack battery |
 | [32. GS-256 to GS-257](32-gs-256-to-gs-257-verification-ux-m19.md) | verification UX (M19) |
 | [33. Ownership index and coverage reconciliation](33-ownership-index-and-coverage-reconciliation.md) |  |
+| [34. GS-258 to GS-272](34-gs-258-to-gs-272-phone-identity-and-the-authority-boundary.md) | phone identity and the authority boundary (FOLD-01) |

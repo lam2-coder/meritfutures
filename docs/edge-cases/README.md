@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../plans/M01-rules-engine.md, ../testing/golden-scenarios/README.md, ../GLOSSARY.md, ../decisions/README.md]
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # EDGE CASES (living registry)
@@ -17,7 +17,9 @@ Every discovered edge case and (post-FREEZE) every bug becomes a numbered entry 
 
 Seed sources: constitution M1 edge-case list, Appendix B4 battery (22 scenarios), Appendix A adversary taxonomy. **Seeded in Wave 3 by [M01](../plans/M01-rules-engine.md).** `status: specced` means the behavior is decided and written down; it becomes `tested` when the golden file exists and passes in CI, which cannot happen before FREEZE.
 
-Numbering blocks: EC-001 to EC-011 are the constitution's own M1 list, EC-012 to EC-033 are the B4 battery in order (`EC-(011 + n)` is B4 item `n`), EC-034 upward are discovered during the build. **EC-083 to EC-138 were added by Wave 3 batch 2 (M09 through M20)** and carry those plans' `review` status. **EC-139 and EC-140 were added by [ADR-025](../decisions/ADR-025.md) at the pre-Wave-4 fold.** The registry now holds <!--gen:ec_count-->141<!--/gen--> entries, a generated span under [CI-06g](../testing/STRATEGY.md) since this line stated a hand-maintained count and [ADR-034](../decisions/ADR-034.md) is what that class ends.
+Numbering blocks: EC-001 to EC-011 are the constitution's own M1 list, EC-012 to EC-033 are the B4 battery in order (`EC-(011 + n)` is B4 item `n`), EC-034 upward are discovered during the build. **EC-083 to EC-138 were added by Wave 3 batch 2 (M09 through M20)** and carry those plans' `review` status. **EC-139 and EC-140 were added by [ADR-025](../decisions/ADR-025.md) at the pre-Wave-4 fold.** The registry now holds <!--gen:ec_count-->149<!--/gen--> entries, a generated span under [CI-06g](../testing/STRATEGY.md) since this line stated a hand-maintained count and [ADR-034](../decisions/ADR-034.md) is what that class ends.
+
+**EC-142 to EC-149 are [FOLD-01](../plans/FOLD-01-phone-identity.md)'s**, added by the registries session with the golden scenarios that resolve them. **EC-146 is the one to read if you read one**, because it is the only entry here recording a control the schema can express and cannot enforce, found while modelling the ceremony rather than while reviewing it.
 
 **EC-141 is the first post-FREEZE entry and the first written against the build rather than against the corpus.** The registry's own preamble says every discovered edge case **and, post-FREEZE, every bug** becomes an entry here, and EC-141 is neither: it is an **ambiguity between two frozen documents**, found by the first session that had to implement against both. That is a third kind and it belongs here for the reason the other two do, which is that it is otherwise rediscovered by every reader in turn.
 
@@ -195,3 +197,11 @@ The three below were produced by the founder's rulings rather than by drafting. 
 | [EC-139](EC-139.md) | Cross-account loyalty rewards the population that completes ladders reliably  (2026-08-14, module: M14, status: specced) |
 | [EC-140](EC-140.md) | A rejected mechanic returns as a roadmap item nobody re-prices  (2026-08-14, module: M14, status: specced) |
 | [EC-141](EC-141.md) | Two approved documents disagree on where a golden file's expectation lives  (2026-08-15, module: M1, status: specced) |
+| [EC-142](EC-142.md) | A control that protects revenue becomes a denial-of-service on it  (2026-08-16, module: M16, status: specced) |
+| [EC-143](EC-143.md) | A recycled phone number convicts the innocent person who inherits it  (2026-08-16, module: M19, status: specced) |
+| [EC-144](EC-144.md) | The one abuse that pays the attacker, funded by an exemption written for somebody else  (2026-08-16, module: M16, status: specced) |
+| [EC-145](EC-145.md) | A widening that is safe for login is a hole at the point of action  (2026-08-16, module: M04, status: specced) |
+| [EC-146](EC-146.md) | A control a database can only half-enforce reads as fully enforced in every document that cites it  (2026-08-16, module: M19, status: specced) |
+| [EC-147](EC-147.md) | The first bought vendor on the critical path of anything, on day one  (2026-08-16, module: M10, status: specced) |
+| [EC-148](EC-148.md) | A composite signal is a score or it is an accusation, and the schema cannot tell which  (2026-08-16, module: M07, status: specced) |
+| [EC-149](EC-149.md) | A per-message cost on the acquisition path is a unit economic, and it arrives untracked  (2026-08-16, module: M03, status: specced) |

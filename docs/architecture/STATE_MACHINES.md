@@ -1,7 +1,6 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, EVENTS.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, ../decisions/ADR-042.md, ../plans/FOLD-02-enforcement-window-and-suspension.md]
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, EVENTS.md]
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, EVENTS.md, ../decisions/ADR-039.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, ../decisions/ADR-042.md, ../plans/FOLD-01-phone-identity.md, ../plans/FOLD-02-enforcement-window-and-suspension.md]
 last_updated: 2026-08-16
 ---
 
@@ -462,3 +461,53 @@ Each guard is evaluated against the [last closed day](../GLOSSARY.md#last-closed
 | **Enforcement lands on a held request** | To `failed`, which **frees the ordinal** under `payout_requests_account_ordinal_uq`'s partial predicate. A hold that consumed a rung would silently shorten a finite ladder (5 / 5 / 4) |
 | **A restriction is lifted while the platform leg cannot confirm** | The restore **does not complete**. `set_risk` must reach `confirmed` before entitlement, and `0007` makes `confirmed_inferred` unwritable for that operation. Under INV-M2-13 an unconfirmed account does not trade, so the honest statement is the asymmetry: **suspension is always available, restoration is contingent on `V-M2-15`** |
 | **The hourly sweep stalls with holds outstanding** | The **S1 dead-man switch** fires, and separately the **nightly assertion on the query** fires: no request may sit past its hold expiry, evaluated independently of whether the sweep reported success. A job that reports success is not evidence that the work happened ([M02](../plans/M02-rithmic-bridge.md) FM-M2-11's idiom applied to the releaser) |
+
+## 12. Phone change (FOLD-01)
+
+`phone_change_requests.state`, stored by `SD-M19-06` in [`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql). [ADR-039](../decisions/ADR-039.md) (c)'s D4 ceremony as a machine.
+
+**It is numbered 12 rather than slotted beside the other identity machines**, because the sections below §9 are deep-linked from seven documents and renumbering them to put this one in reading order would buy tidiness and cost a link sweep. The same trade [CI-06f](../testing/STRATEGY.md) records for ADR heading order, taken the same way.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending: G-CHANGE-OPENED
+    pending --> dual_channel_verified: G-DUAL-CHANNEL
+    pending --> cancelled: G-CHANGE-CANCELLED
+    dual_channel_verified --> applied: G-CHANGE-COMPLETE
+    dual_channel_verified --> cancelled: G-CHANGE-CANCELLED
+    applied --> [*]
+    cancelled --> [*]
+```
+
+**Both terminal states are terminal, per the universal rules.** A cancelled request is never reopened; the trader opens a new one. That is not ceremony for its own sake: `phone_change_requests_open_per_identity_uq` permits **one open request per identity**, and a reopenable request is a way to run two holds and pick the shorter one.
+
+**Opening the request is itself a sensitive action.** C-27 classes a contact change as one, so `G-CHANGE-OPENED` requires an **elevated** session, which means a passkey assertion or a dual-channel confirmation and **never SMS alone**. A SIM-swapped session cannot start the ceremony that would make the swap durable, and that is the whole point of placing the elevation at the open rather than at the apply.
+
+**`dual_channel_verified` is a real state and not an implementation detail.** It exists because (c)'s legs complete at different times and the request has to be durable between them, and because the 48 hour hold is measured against the apply rather than against the open. Without the intermediate state, a request that verified and then waited would be indistinguishable from one that never verified.
+
+### Guards
+
+**These four are defined here rather than in §10, and it is a deliberate deviation from this document's own convention.** §9's preamble rules that guards are defined once in §10 so the same condition is never written twice, and that is the right rule. **§10 currently defines seven guards twice with non-identical bodies**, a keep-both merge artifact recorded as a landmine in [session 36](../sessions/2026-08-16-session-36.md) and owned by the session that deduplicates it. Adding four rows to a table mid-repair would collide with that work and make the dedup harder to read. **These move to §10 when it is repaired**, and the deviation is written down rather than left for a reader to notice as an inconsistency.
+
+| Guard | Condition |
+|---|---|
+| **G-CHANGE-OPENED** | An **elevated** session (`sessions.elevated_by_factor IN ('passkey','dual_channel')`, C-27), a live `identity_phones` row to supersede (`old_phone_id` is `NOT NULL`, because a change with no prior phone is a registration), and no open request for this identity |
+| **G-DUAL-CHANNEL** | A passkey assertion or a second independent channel has confirmed the change, recorded as `dual_channel_verified_at`. `phone_change_requests_verified_state_is_earned` refuses the state without the timestamp |
+| **G-CHANGE-COMPLETE** | **Every D4 leg, and the hold still running.** `dual_channel_verified_at`, `prior_notified_at` and `withdrawal_hold_until` are all set, `applied_at` is set, and `withdrawal_hold_until > applied_at`. This is `phone_change_requests_applied_is_complete` verbatim, and the last clause is the one that matters: a hold expiring on application protected nothing |
+| **G-CHANGE-CANCELLED** | `cancelled_at` set and `cancelled_reason` **not null**. `phone_change_requests_cancellation_is_explained`, because an unexplained cancellation on a control this shape is indistinguishable from an attacker abandoning a probe |
+
+**`G-CHANGE-COMPLETE` is enforceable in storage and not in delivery, and the machine says so rather than implying otherwise.** `prior_notified_at` is a precondition of `applied` and **a database can only assert that a timestamp exists**. The obligation is discharged by an `integration_dispatches` row addressed to the prior channel, never by the column alone, and `GS-265` is written to fail against the timestamp on its own. **Storage-enforceable is not send-enforceable**, this corpus has no gate that can tell them apart, and `EC-146` is where that is recorded.
+
+### What the hold does to the machines below it
+
+`withdrawal_hold_until` is read by the **external leg** (§3.1 and §3.2) and refuses an external withdrawal while it is in the future. Three consequences are worth stating because each is a different machine.
+
+| Interaction | Resolution |
+|---|---|
+| An external withdrawal is attempted while a hold runs | **Refused for the duration**, on both the payout external leg and the wallet withdrawal, because C-27 names the **action** and not the endpoint. Elevation is necessary and **not sufficient**: the hold is a separate gate, and a test covering only the factor would pass a build that dropped it |
+| A hold runs while a payout sits in the [ADR-040](../decisions/ADR-040.md) enforcement window | Independent clocks, and they do not compose. The payout's `hold_expires_at` still expires on its own 48 hours and **pays**, because the ledger has not moved and the enforcement window's ruling is that Merit's own hold may not cost the trader money. The phone hold gates the **external leg**, which is a later moment |
+| A change request is cancelled while its hold runs | The hold **stands until it expires**. It is measured from the apply and cancelling the ceremony does not unwind the window in which a compromised session could have acted, which is the window the hold exists for |
+
+### Events
+
+`phone.change_requested` fires on entry to `pending` with `withdrawal_hold_until`, and `phone.verified` fires when the new number's `identity_phones` row is written at **apply**, not at open: an abandoned request leaves no half-verified phone behind. Both are defined in [EVENTS §3](EVENTS.md). `GS-264`, `GS-265` and `GS-269` pin this machine.
