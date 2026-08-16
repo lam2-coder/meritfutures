@@ -67,3 +67,4 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 40](2026-08-16-session-40.md) | the three P2 ADRs, and the ownership partition made checkable |
 | [2026-08-16 - Session 40](2026-08-16-session-40.md) | `OQ-M10-06`: the reversible address, and the notice that became evidence |
 | [2026-08-16 - Session 41](2026-08-16-session-41.md) | `0034`'s plaintext floor, and a probe that was wired and not pinned |
+| [2026-08-16 - Session 42](2026-08-16-session-42.md) | the arbitrary day-sequence generator, and two arithmetics for one row |

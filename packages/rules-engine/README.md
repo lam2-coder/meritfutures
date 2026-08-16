@@ -63,7 +63,37 @@ parameter is read, never copied.
 | `test/evaluate.test.ts` | `unit` | CI-02 |
 | `test/evaluate.property.test.ts` | `property` | CI-02 |
 | `test/evaluate.golden.test.ts` | `golden` | CI-03 |
+| `test/generators/plan.property.test.ts` | `property` | CI-02 |
+| `test/generators/day-sequence.property.test.ts` | `property` | CI-02 |
 
 The golden file is a placeholder holding the stage open. The fixture loader and
 the fixtures are session S-D in
 [P1 section 6](../../docs/plans/P1-monorepo-scaffold.md).
+
+## The generators
+
+[P2 section 5](../../docs/plans/P2-rules-engine.md) names three `fast-check`
+generators as "the expensive half" and the one thing genuinely buildable before
+the engine. Two exist.
+
+| Generator | Emits | Oracle |
+|---|---|---|
+| `test/generators/plan.ts` | a materialized plan satisfying `CV-01` to `CV-19` | `validate-plan.ts` |
+| `test/generators/day-sequence.ts` | one account's run of live marks over a calendar window | `validate-day-sequence.ts` |
+
+**The arbitrary settlement-sequence generator is deliberately absent.** A
+`SettlementFact` carries an ordinal that is `payouts_settled_count + 1` at
+request time (R-45) and two distinct trading days (SD-02, SD-03), so generating
+one coherently means generating payout eligibility, which means the engine.
+
+**Each generator is proved both ways.** The oracle shares no code with the
+generator, and every rule's construction step is individually removable so the
+counterfactual can watch it emit a value the oracle rejects, citing that rule.
+Without that second direction, `fc.constant(SOMETHING_KNOWN_GOOD)` satisfies the
+first one forever.
+
+**Neither generator is engine code and neither is blocked on the calendar
+transcription.** `day-sequence.ts` emits arbitrary calendars rather than the
+CME's, and it emits the INPUT to `CalendarSlice`'s constructor rather than the
+slice, because [ADR-046](../../docs/decisions/ADR-046.md) puts that constructor
+in `calendar.ts` and `src/` is still the identity stub.

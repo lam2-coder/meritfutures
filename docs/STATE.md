@@ -29,8 +29,8 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->48<!--/gen--> ADRs. <!--gen:ec_count-->156<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->48<!--/gen--> ADRs. <!--gen:ec_count-->156<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->48<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->48<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -419,6 +419,19 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 | **`OQ-P2-04`** | **Closed both ways.** P2's done-condition names **seven** properties; `PT-03` moves to P3 whole; **the R-44 arithmetic is P2's under its own name** |
 
 **Twenty-seven golden scenarios were owned by nobody, and the table that lost them claimed to be checked.** `FOLD-01` and `FOLD-02` added `GS-258` to `GS-284`; neither touched [the ownership partition](testing/golden-scenarios/33-ownership-index-and-coverage-reconciliation.md), which went on summing to **257** against a registry of **284**. Its own paragraph said the sum agreed with the registry "**or the build fails**" and **no check existed**, which is how the claim survived being false. The twenty-seven are assigned and **`CI-06d` now asserts the partition in both directions**, plus each owner's declared count against its own cell, watched failing on all three. **P2's done-condition quotes this table** — it owes M1's owned set of 73 rather than the registry total — so an unowned scenario is one no phase has promised to make green.
+
+---
+
+## Two of P2's three generators exist, and the second one found a money-path contradiction (2026-08-16)
+
+**P2 section 5's `fast-check` generators are "the expensive half" and the one thing genuinely buildable before the engine.** The plan generator landed with `CV-01` to `CV-19` executable ([session 40](sessions/2026-08-16-session-40.md)); the **arbitrary day-sequence generator** lands now that `ADR-046` has settled `DayInput`'s shape ([session 42](sessions/2026-08-16-session-42.md)), which is why it was deferred rather than built twice. **The settlement-sequence generator remains unbuilt on purpose**: a `SettlementFact` carries an ordinal that is `payouts_settled_count + 1` at request time and two distinct trading days, so generating one coherently means generating payout eligibility, which means the engine.
+
+**Sixteen rules, every id a citation rather than a new identifier series**, and each watched failing **32 ways**: sixteen with the generator's inversion removed, sixteen with the oracle blinded to that rule. Direction 2 asserts the omitted rule is violated **and nothing else**, which the plan generator asserts for one sampled rule and which a chained structure needs for all of them.
+
+| Open | Where |
+|---|---|
+| **[EC-157](edge-cases/EC-157.md), and it is money path** | **`INV-18`, `INV-19` and `daily_marks_balance_arithmetic` have exactly one common solution: `adjustment_cents = 0`.** The two invariants put the adjustment at the open (`R-10`, `EC-034`, and `0014`'s own column comment); the `CHECK` puts it inside the day. On a 250,000c payout against a 5,000,000c prior close with 30,000c made, the identities give an opening of 4,750,000 and a closing of 4,780,000 and the constraint demands 4,530,000, so **the mark for every settled payout is unwritable as specified**. Nothing noticed because every mark in the tree carries a zero adjustment. **Not ruled here**: one repair supersedes a merged migration and the other reopens what `SD-01` closed. **`GS-065`'s fixture cannot be written until it is ruled**, and `P2-2`'s group-B fixtures reach `DO-3` |
+| **`ADR-046` is allocated twice, and every gate reads past the second one** | [`docs/decisions/ADR-046.md`](decisions/ADR-046.md) carries **two `## ADR-046` headings for two unrelated decisions**: `OQ-P2-01`'s `CalendarSlice` ruling and `OQ-M10-06`'s reversible contact address, written on two branches that merged the same day. **[ALLOCATION](decisions/ALLOCATION.md) has a row for each**, and the second one's note reads "**every remote ref was read before this number was taken, which is the manual step the `044` collision below exists to teach**". **Nothing reads the table as a uniqueness constraint.** `adrEntries()` in [`gates.mjs`](../scripts/corpus/gates.mjs) matches `## ADR-nnn` with a **non-global** regex, so it takes the FIRST heading in each file and the second decision is invisible to `adr_count`, to `CI-06f`'s file-is-named-for-its-heading check and to `CI-06n`. **Fifty decisions exist under forty-nine identifiers**, and the corpus reports **48**. The [decisions README](decisions/README.md) listing `ADR-046` on two rows is the only place both are visible, and it reads as a formatting slip. **No renumber is attempted here**: `ADR-046` is cited from `0034`, `EC-146`, `M10`, three design records and `P2`, so moving it is a sweep and a session of its own. **No `CI-06` letter is claimed** for the gate that would catch it, because a gate arrives with a letter and a seeded violation of its own |
 
 ---
 
