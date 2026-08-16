@@ -37,6 +37,7 @@ import { EngineInvariantError } from '../errors.js';
 import type {
   BasisPoints,
   Cents,
+  ClampReason,
   FundedPhaseRules,
   GateInputState,
   ResolvedPlan,
@@ -51,8 +52,12 @@ import type {
  * them landed on the same figure. `engine.clamp_reason_distribution` (section
  * 9.1) is read as a product metric off exactly this discrimination: "a high
  * `cap` share means traders routinely leave money behind".
+ *
+ * IT IS DECLARED IN `types.ts` because M01 section 2.2 names it inside
+ * `PayoutEvaluation`, and re-exported here so a reader of the clamp finds it
+ * beside the arithmetic that produces it.
  */
-export type ClampReason = 'none' | 'cap' | 'withdrawable' | 'requested';
+export type { ClampReason } from '../types.js';
 
 /** Everything R-42 to R-45 decide about one payout request. */
 export interface PayoutClamp {

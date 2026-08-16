@@ -24,12 +24,13 @@ import * as engine from '../src/index.js';
 // that THE ENTRY POINT IS THE WHOLE PUBLIC SURFACE, so the loader has no route to
 // an internal. M01 section 1.3 names the surface -- six functions, "and nothing
 // else is exported, because every additional export is a way for a caller to
-// reimplement a rule slightly differently" -- and three of those six are now
+// reimplement a rule slightly differently" -- and four of those six are now
 // written. So the list below is exact rather than open, and adding an export
 // without adding it here is still a red stage.
 //
-//   advanceDay, initialState   M01 section 1.3, three of the six.
-//   applySettlement            `clampPayout` is NOT among them, and section 3.6
+//   advanceDay, initialState   M01 section 1.3, four of the six. `resolvePlan`
+//   applySettlement            and `validatePlan` are P2-1.
+//   evaluatePayout             `clampPayout` is NOT among them, and section 3.6
 //                              writes `export function clampPayout` all the
 //                              same: section 1.3's list wins, so the clamp is
 //                              reachable only through `evaluatePayout`
@@ -55,6 +56,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'applySettlement',
     'buildCalendarSlice',
     'evaluate',
+    'evaluatePayout',
     'initialState',
     'lookupCalendarDay',
     'nextTradingDayAfter',

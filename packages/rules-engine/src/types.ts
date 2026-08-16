@@ -536,6 +536,81 @@ export interface MinimumAmountGate {
   readonly minPayoutCents: Cents;
 }
 
+// -----------------------------------------------------------------------------
+// The context gates (R-38, R-40), which are NEVER part of the replayed state
+// -----------------------------------------------------------------------------
+// INV-23: "Context gates (frozen, recon, KYC, in flight) NEVER ENTER THE
+// REPLAYED STATE OR ITS HASH", and SD-06 splits `gate_results` in two for the
+// same reason: "they were true on the day and may not be true now. Mixing them
+// into the replayed state guarantees NIGHTLY FALSE DIVERGENCES."
+//
+// So nothing below appears on `RuleState`. It is computed at read time by
+// `evaluatePayout` from an `ExternalGates` the caller supplies, and it is
+// combined with the engine gates only in the returned evaluation.
+
+/** M01 section 2.1's `accounts.status` vocabulary. */
+export type AccountStatus =
+  'active' | 'breached' | 'expired' | 'closed_admin' | 'closed_chargeback' | 'graduated';
+
+/** M01 section 2.1's KYC vocabulary. D-M19-1 supplies it at read time. */
+export type KycState = 'kyc_required' | 'pending' | 'verified' | 'rejected' | 'expired';
+
+/**
+ * Context, never replayed (INV-23). Every field is resolved by the CALLER.
+ *
+ * M01 section 2.1 verbatim, and two fields carry a note that is part of the
+ * contract rather than commentary: `payoutsFrozen` is "account level OR identity
+ * level, RESOLVED BY THE CALLER", and `hasPayoutInFlight` is an outstanding
+ * external-leg withdrawal for this identity.
+ */
+export interface ExternalGates {
+  readonly accountStatus: AccountStatus;
+  readonly kycState: KycState;
+  /** Account level OR identity level, already resolved. */
+  readonly payoutsFrozen: boolean;
+  readonly reconBlocked: boolean;
+  /** R-38. An outstanding external-leg withdrawal exists for this identity. */
+  readonly hasPayoutInFlight: boolean;
+}
+
+/** R-40. Account `active` AND phase `funded`. */
+export interface AccountActiveGate {
+  readonly pass: boolean;
+  readonly status: AccountStatus;
+  /** The engine half of R-40's first clause, reported so a failure is legible. */
+  readonly phase: Phase;
+}
+
+/** R-40. D-M19-1: "KYC state is supplied as a context gate at read time." */
+export interface KycVerifiedGate {
+  readonly pass: boolean;
+  readonly state: KycState;
+}
+
+/** R-40. The engine cannot say WHICH level froze the payout, and says so. */
+export interface NotFrozenGate {
+  readonly pass: boolean;
+  readonly reason: string | null;
+}
+
+/** R-40. FM-04's `recon_blocked` excludes an account from eligibility. */
+export interface ReconClearGate {
+  readonly pass: boolean;
+}
+
+/**
+ * R-40's four gates, in API_CONTRACT's `GET /accounts/:id/eligibility` order.
+ *
+ * R-38 IS NOT ONE OF THEM AND THAT IS API_CONTRACT's SHAPE RATHER THAN AN
+ * OMISSION. See `PayoutEvaluation.noPayoutInFlight`.
+ */
+export interface ContextGateResults {
+  readonly accountActive: AccountActiveGate;
+  readonly kycVerified: KycVerifiedGate;
+  readonly notFrozen: NotFrozenGate;
+  readonly reconClear: ReconClearGate;
+}
+
 /**
  * SD-06's `engine_gates`. Every gate R-41 conjoins, and nothing that is context.
  *
@@ -595,6 +670,58 @@ export interface RuleState {
   readonly breached: boolean;
   readonly breachKind: BreachKind | null;
   readonly engineVersion: string;
+}
+
+/**
+ * The engine gates plus the context gates, in API_CONTRACT's
+ * `GET /accounts/:id/eligibility` shape (M01 section 2.2).
+ *
+ * R-38 IS ABSENT AND THAT IS THE PUBLISHED SHAPE. API_CONTRACT's `gates` object
+ * carries no in-flight entry; the condition surfaces as `POST`'s `conflict`
+ * error and as the SD-09 partial unique index. `PayoutEvaluation` reports R-38's
+ * verdict on its own field so the rule still binds without widening a contract
+ * other modules render.
+ */
+export interface FullGateResults extends ContextGateResults, EngineGateResults {}
+
+/** R-43's four values, and `none` is an EXACT TIE rather than an absence. */
+export type ClampReason = 'none' | 'cap' | 'withdrawable' | 'requested';
+
+/**
+ * What `evaluatePayout` returns to both payout endpoints (M01 section 2.2).
+ *
+ * NOTHING HERE IS EVER STORED IN `rule_states`. INV-23 keeps the context half
+ * out of the replayed state, and SD-06 is the column split that enforces it. A
+ * settled payout's `eligibility_snapshot` is a serialization of this value, and
+ * INV-22 makes that snapshot append-only: "the snapshot is what was true when
+ * the money moved, and an upgrade cannot retroactively make a payment wrong."
+ */
+export interface PayoutEvaluation {
+  /** R-06. The last closed day, and never anything more recent. */
+  readonly asOfTradingDay: TradingDay;
+  readonly engineEligible: boolean;
+  readonly contextEligible: boolean;
+  /** R-41. `engineEligible && contextEligible`, with no shortcut path. */
+  readonly eligible: boolean;
+  readonly gates: FullGateResults;
+  /** R-38. Reported separately because API_CONTRACT's `gates` has no slot. */
+  readonly noPayoutInFlight: { readonly pass: boolean };
+  /** `min(withdrawable, cap)`, and `0n` when not eligible. */
+  readonly maxPayoutCents: Cents;
+  readonly capCents: Cents;
+  /** R-45. `payoutsSettledCount + 1`. */
+  readonly ordinal: number;
+  /** CV-15. Carried so a caller never re-reads config to render the floor. */
+  readonly minPayoutCents: Cents;
+  /** R-43 and R-44. The amount and its split, computed whatever the verdict. */
+  readonly clamp: {
+    readonly effectiveRequestCents: Cents;
+    readonly approvedCents: Cents;
+    readonly reason: ClampReason;
+    readonly traderCents: Cents;
+    readonly firmCents: Cents;
+    readonly splitBp: BasisPoints;
+  };
 }
 
 /**

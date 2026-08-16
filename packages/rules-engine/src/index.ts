@@ -28,9 +28,9 @@ export type {
 // -----------------------------------------------------------------------------
 // M01 section 1.3 names six exported functions and says "nothing else is
 // exported, because every additional export is a way for a caller to reimplement
-// a rule slightly differently". Three of the six are here: `initialState`,
-// `advanceDay` and `applySettlement`. `resolvePlan` and `validatePlan` are P2-1
-// and `evaluatePayout` arrives with R-38 and R-40, the context half of group F.
+// a rule slightly differently". Four of the six are here: `initialState`,
+// `advanceDay`, `applySettlement` and `evaluatePayout`. `resolvePlan` and
+// `validatePlan` are P2-1.
 //
 // `clampPayout` IS DELIBERATELY NOT HERE AND M01 DISAGREES WITH ITSELF ABOUT IT.
 // Section 3.6's reference algorithm writes `export function clampPayout`, and
@@ -49,7 +49,9 @@ export type {
 // constructor a caller cannot reach is a value a caller cannot make.
 
 export type {
+  AccountActiveGate,
   AccountGraduatedEvent,
+  AccountStatus,
   AssertionFailure,
   AssertionKind,
   BreachDetectedEvent,
@@ -65,19 +67,28 @@ export type {
   DayClosedEvent,
   DayInput,
   DayOutput,
+  ClampReason,
   ConsistencyGate,
+  ContextGateResults,
   DrawdownRules,
   DrawdownType,
   EngineGateResults,
   EvalPhaseRules,
+  ExternalGates,
   FloorLockedEvent,
   FloorLockRules,
+  FullGateResults,
   FundedPhaseRules,
   GateInputState,
+  KycState,
+  KycVerifiedGate,
   MinimumAmountGate,
+  NotFrozenGate,
   PassDeferredConsistencyEvent,
+  PayoutEvaluation,
   Phase,
   PhaseDayRules,
+  ReconClearGate,
   PhasePassedEvent,
   ResolvedPlan,
   RuleState,
@@ -103,6 +114,8 @@ export type { RuleId } from './rules.js';
 
 export { advanceDay, initialState } from './day/advance.js';
 export { applySettlement } from './payout/settle.js';
+export { evaluatePayout } from './payout/evaluate.js';
+export type { PayoutContext } from './payout/evaluate.js';
 export type { SettlementOutput } from './payout/settle.js';
 
 import type { EngineInput, EngineResult } from './types.js';

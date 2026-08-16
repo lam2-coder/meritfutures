@@ -94,7 +94,7 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules the engine computes today. THIRTY-NINE OF FIFTY.
+ * The rules the engine computes today. FORTY-ONE OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
@@ -143,6 +143,11 @@ export type RuleId =
  *   R-48  payout/settle.ts. R-19 from the settlement's side
  *   R-49  payout/settle.ts, the ladder, evaluated immediately after
  *   R-50  payout/settle.ts, lifetime accounting, which INV-17 bounds
+ *   R-38  payout/evaluate.ts, the external leg's one-in-flight control. It
+ *         binds through `contextEligible` and is reported on its own field,
+ *         because API_CONTRACT's `gates` object has no in-flight entry
+ *   R-40  payout/evaluate.ts, the four context gates, read at request time and
+ *         never stored (INV-23)
  *
  * NOT DECLARED AND WORTH NAMING, because their absence is the count being
  * honest rather than the list being short.
@@ -163,11 +168,6 @@ export type RuleId =
  *         and the platform setpoint. R-19 LEFT THIS LIST when group H landed,
  *         because settlement is where it is discharged and settlement is now
  *         code
- *   R-38, R-40
- *         the CONTEXT half of group F. Both read `ExternalGates`, which M01
- *         section 2.1 marks "context, never replayed (INV-23)", so neither can
- *         be a term in `engineGates` without putting an unreplayable fact into
- *         the replayed state. They land with `evaluatePayout`
  */
 export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-03',
@@ -198,7 +198,9 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-35',
   'R-36',
   'R-37',
+  'R-38',
   'R-39',
+  'R-40',
   'R-41',
   'R-42',
   'R-43',
