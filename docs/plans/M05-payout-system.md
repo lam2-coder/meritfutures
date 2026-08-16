@@ -37,7 +37,7 @@ POST /accounts/:id/payout
        yes -> status: held_pending_review    [nothing posted, 48h clock starts]
        no  -> continue
   -> post LT-01 ledger transaction, crediting the identity's wallet position
-  -> status: settled_to_wallet              [instant, irrevocable, atomic]
+  -> status: settled                        [instant, irrevocable, atomic]
   -> call M1's applySettlement exactly once  (anchors advance, win days reset)
   -> notify
 ```
@@ -58,6 +58,12 @@ POST /wallet/withdrawals
 There is no approval step in either list because there is no approver. That absence is the module's entire product thesis, and the wallet sharpens it: the leg the trader experiences as "getting paid" now has **no external party in it at all**, so there is not even a rail that could be slow.
 
 **The single most important consequence, because it reorganizes this whole document.** Every control that used to live "after settlement" now lives after the *external* settlement, and the internal leg has effectively no after. The controls did not weaken; they moved to the leg where the money actually leaves Merit, which is where they were always aimed.
+
+> **Both listings above said `status: settled_to_wallet`, and that value does not exist.** [ADR-028](../decisions/ADR-028.md) considered it and **rejected it by name**: "settlement to the wallet is the only settlement the internal leg has, and a status naming its destination invites a second one." [`0001`](../../packages/db/migrations/0001_extensions_and_enums.sql) records the rejection in its own comment block, and the enum has never carried it.
+>
+> **ADR-028 believed it had corrected this file.** Its context paragraph quotes this very sentence as evidence for the ruling, and it names M05's freeze target as one of two sites it fixed. It read past the phantom on the way there, twice, in the file it was reading. **[ADR-040](../decisions/ADR-040.md)'s list of four remaining `transferring` sites does not carry it either**, because that list was assembled by grepping for `transferring` and this defect is a different word.
+>
+> Corrected to `settled`. **The transferable part is that a sweep scoped to the symptom finds only the symptom**: the failure here was one enum's worth of values written from memory, and only one of them was the value anybody searched for.
 
 ### 1.2 What this module is not
 
@@ -148,7 +154,7 @@ The payout request machine ([STATE_MACHINES section 2](../architecture/STATE_MAC
 
 **Under [ADR-019](../decisions/ADR-019.md) there are two settlements and they are very different animals.** The internal one is a transaction; the external one is a conversation with a third party. The steps below are the **external** leg, preserved as written because a webhook from a rail is exactly as untrustworthy as it always was.
 
-**The internal leg, for contrast, has no step list worth the name**, and that is the point: approval, LT-01, the wallet credit, both anchor advances, the win-day reset, and `applySettlement` all commit in **one database transaction**. Idempotency is the transaction plus the request's idempotency key. There is no webhook to replay, no ordering to defend, no partial state to reconcile, and no window in which a second request can arrive. Every failure mode from FM-M5-02 through FM-M5-04 is inapplicable to it by construction rather than by control, which is the strongest form of not having a bug. `payout_requests.status` reaches `settled_to_wallet` and stops.
+**The internal leg, for contrast, has no step list worth the name**, and that is the point: approval, LT-01, the wallet credit, both anchor advances, the win-day reset, and `applySettlement` all commit in **one database transaction**. Idempotency is the transaction plus the request's idempotency key. There is no webhook to replay, no ordering to defend, no partial state to reconcile, and no window in which a second request can arrive. Every failure mode from FM-M5-02 through FM-M5-04 is inapplicable to it by construction rather than by control, which is the strongest form of not having a bug. `payout_requests.status` reaches `settled` and stops.
 
 Settlement on the external leg is still the most consequential transition involving an outside party, so its steps are ordered and each is idempotent.
 
