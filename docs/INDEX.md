@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # INDEX: The Map
@@ -29,6 +29,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [scripts/corpus/falsify.mjs](../scripts/corpus/falsify.mjs) | **Runs every gate against a tree carrying one seeded violation aimed at it, and fails if the gate does not fail on that finding.** A gate nobody has watched fail is not a gate ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
 | [scripts/db/probe_ledger_constraints.sql](../scripts/db/probe_ledger_constraints.sql) | LEDGER-C1, LEDGER-C2 and zero-sum probed against a real database, checked by error message rather than by exception class, plus the counterfactual that proves C1 is not redundant ([ADR-027](decisions/ADR-027.md)) | approved | founder |
 | [scripts/db/probe_plan_version_immutability.sql](../scripts/db/probe_plan_version_immutability.sql) | 14 assertions on `plan_versions` immutability and the seven `cardinality()` conversions. **Leads with the permitted transition succeeding**, which is the probe that did not exist ([ADR-035](decisions/ADR-035.md)) | approved | founder |
+| [scripts/db/probe_payout_hold.sql](../scripts/db/probe_payout_hold.sql) | 11 assertions on the payout hold, the widened `SD-09` predicates, the external leg's settlement guard and the restriction episode ([ADR-040](decisions/ADR-040.md), [ADR-041](decisions/ADR-041.md)). **Six success cases before any rejection** | approved | founder |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |
@@ -100,7 +101,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 
 | Artifact | Purpose | Status | Owner |
 |---|---|---|---|
-| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->28<!--/gen--> files, all <!--gen:manifest_changes-->94<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->18<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
+| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->30<!--/gen--> files, all <!--gen:manifest_changes-->94<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->18<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
 | [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), the no-floats exemption list (**two columns, no money**, under [ADR-031](decisions/ADR-031.md)), and the per-constraint verification table. **[ADR-026](decisions/ADR-026.md)'s completeness gate reads this file** | review | founder |
 
 ## docs/testing/ (Wave 4)

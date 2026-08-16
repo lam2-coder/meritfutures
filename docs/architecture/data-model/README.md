@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../decisions/README.md, ../OVERVIEW.md]
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # DATA MODEL
@@ -48,7 +48,7 @@ about a table.
 - **The append-only set is these eighteen tables**, and the list is exact rather than illustrative because [`0026_roles_and_grants`](../../../packages/db/migrations/0026_roles_and_grants.sql) revokes `UPDATE` and `DELETE` on exactly this set, from the application role **and from `PUBLIC`**: `ledger_entries`, `ledger_transactions`, `events`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `identity_merges`, `identity_links`, `tos_acceptances`, `account_status_history`, `wallet_entries`, `published_statistics`, `kyc_funnel_events`, `integration_dispatches`, `support_context_views`, `certificate_verifications`. The application role holds `INSERT` and `SELECT` only. Enforced by grants in the database, not by convention ([VG-8](../../../research/VIBE_FAILURE_POSTMORTEMS.md)).
   - The approved list read `events`, `ledger_entries`, `ledger_transactions`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `eligibility` snapshots, `identity_merges`. **`eligibility` snapshots is not a table** (the eligibility snapshot is a `jsonb` column on `payout_requests`, §8), and the other nine tables above were added by the fold. This paragraph is the document half of `OI-03`: the CI check asserts `0026`'s revoke list against **this list**, so the two cannot drift apart in either direction.
   - **Two single-column updates on append-only tables are legitimate and ruled** (`daily_marks.superseded_by`, `identity_links.suppressed`). They are performed by `SECURITY DEFINER` functions owned by the migrator role, each arriving with the module that owns the transition and with its negative-authz test. Those functions do not exist yet, so a naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug.
-- Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 96 tables carry `updated_at`**; the rest are either append-only or written once.
+- Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 97 tables carry `updated_at`**; the rest are either append-only or written once. (`identity_restriction_episodes`, added by `0031`, does not: an episode is opened once and closed once, and both transitions carry their own actor and timestamp.)
 - Nothing is ever soft-deleted with a boolean. Lifecycle is a status enum with an event trail. The one soft delete in the schema is `journal_entries.deleted_at`, and it is a **tombstone for a hard-delete job** rather than an end state (§10).
 
 **Naming**: `snake_case`, plural table names, `_cents` and `_bp` suffixes are mandatory on money and ratio columns, `_at` on timestamps, `_on` on dates. A column named `amount` without a unit suffix is a review reject.
@@ -179,7 +179,7 @@ Created by [`0009_ledger`](../../../packages/db/migrations/0009_ledger.sql), [`0
 
 ## 9. Risk and evidence
 
-Created by [`0008_risk`](../../../packages/db/migrations/0008_risk.sql). Five tables. Not a money-path file, because nothing here holds an amount, and it is read line by line for a different reason: every table below is **evidence**. A flag is an accusation, and an accusation without the numbers behind it is one Merit cannot defend in a dispute or act on with confidence.
+Created by [`0008_risk`](../../../packages/db/migrations/0008_risk.sql), plus one added by [`0031`](../../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql). Six tables. Not a money-path file, because nothing here holds an amount, and it is read line by line for a different reason: every table below is **evidence**. A flag is an accusation, and an accusation without the numbers behind it is one Merit cannot defend in a dispute or act on with confidence.
 
 `risk_flags` is created in this file rather than later because `payout_requests.freeze_flag_id` (`SD-M5-01`) references it, and `0010` must have it. A freeze that cites no flag is an indefinite hold with a citation nobody can look up.
 
@@ -190,6 +190,7 @@ Created by [`0008_risk`](../../../packages/db/migrations/0008_risk.sql). Five ta
 | [`risk_flags`](risk_flags.md) | |
 | [`correlation_groups`](correlation_groups.md) | |
 | [`evidence_packs`](evidence_packs.md) | |
+| [`identity_restriction_episodes`](identity_restriction_episodes.md) | `0031`, [ADR-041](../../decisions/ADR-041.md). Grouped here rather than with identity because it is an **enforcement** record: it cites a `risk_flags` row, carries a ToS clause, and ends in either a documented restore or an evidence pack |
 
 ## 10. Affiliate, system, and the module surfaces
 
@@ -424,3 +425,15 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 **The first row is why this section exists in this form.** The trigger read `NEW.config` and `OLD.config`, and `plan_versions` has no `config` column: the rule contract is `rules`. Every `UPDATE` against a published row therefore raised `record "new" has no field "config"`. The promise "a published plan version never changes" survived by accident, because the error rejects the write; **the permitted retirement transition was refused too, so a plan version could not be retired at all**. A draft row updates normally, which is why an install check and every existing probe missed it. **An invariant that was reviewed and not executed has not been checked**, which is the same lesson the `array_length` defect taught one file over, found the same way.
 
 **And the deeper one, which is now a gate.** Every probe in this corpus attempted a forbidden thing and asserted a rejection. A guard that rejects **everything** passes all of them. `probe_plan_version_immutability.sql` therefore leads with the **permitted** transition, and `0028` ships with it, per [ADR-035](../../decisions/ADR-035.md)'s own words: the missing test is the finding as much as the missing column is.
+
+### Verification performed on `0030` and `0031` (2026-08-16)
+
+**The full 30-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, zero errors**, producing **97 tables, 331 indexes, 351 check constraints and 6 triggers**. The four new check constraints and the one new table are enumerated against the previous figures in [DELTA_MANIFEST section 14](../../../packages/db/DELTA_MANIFEST.md), which also carries the probe table.
+
+| Check | Method | Result |
+|---|---|---|
+| A **combined** `0030`+`0031` cannot run | executed, not cited | **`ERROR: unsafe use of new value "held_pending_review"`, exit 3.** The split form then applied cleanly to the same database |
+| The hold, the widened `SD-09` predicates, the external-leg guard and the restriction episode | [`probe_payout_hold.sql`](../../../scripts/db/probe_payout_hold.sql), **six success cases first**, then five rejections | **11 / 11** |
+| Re-application of either file | `psql -f` a second time against the installed database | **rejected, exit 3, both files** |
+
+**The counterfactual's first harness reported the wrong verdict**, because `if psql ... | tee` tests `tee`'s exit status and never `psql`'s. The migration was correct throughout; only the thing measuring it was broken. That is the same finding as the row above about probes that only ever attempt forbidden things: **an assertion that cannot fail looks exactly like an assertion that passed.**

@@ -1,0 +1,57 @@
+-- =============================================================================
+-- 0030_payout_hold_enum
+-- =============================================================================
+-- E2 READ: MONEY PATH. One statement. It widens payout_status, which is the
+-- type ADR-028 ruled and the type the zero-denial policy is expressed in.
+--
+-- ADR-040. `held_pending_review` is a PRE-APPROVAL state entered when an
+-- unresolved high-severity flag exists at request time. Hard SLA: auto-release
+-- and pay within 48 hours unless a documented enforcement action is recorded.
+--
+-- THE ZERO-DENIAL POLICY IS AMENDED, NOT ABANDONED, AND BOTH HALVES MATTER:
+--
+--   The substance survives. No payout is denied. Every hold either pays inside
+--   48 hours or produces a documented enforcement action carrying a cited
+--   flag, a ToS clause and an evidence pack.
+--
+--   The mechanism changes. Zero denial was expressed as "no review state
+--   exists". It is now expressed as "a review state exists and it expires". A
+--   constraint aimed at the founder's own future self, quietly reinterpreted,
+--   is the failure it was built against, so the reinterpretation is recorded
+--   as an amendment rather than absorbed as a clarification.
+--
+-- Ten sites carry the old sentence and TWO OF THEM CAN NEVER BE EDITED:
+-- `0001:73` and `0010:77` are `--` comments inside merged migrations and stay
+-- as written forever (constitution E2). `0010:225` is a COMMENT ON TABLE,
+-- which is replaceable metadata, so `0031` re-states it. A reader arriving
+-- from either permanent comment lands here, which is why this header carries
+-- the amendment in full rather than a pointer.
+--
+-- -----------------------------------------------------------------------------
+-- WHY THIS FILE HAS NO BEGIN/COMMIT, AND WHY IT IS ALONE
+-- -----------------------------------------------------------------------------
+-- PostgreSQL refuses to USE a new enum value inside the transaction that ADDED
+-- it. Every other migration in this set opens with BEGIN and closes with
+-- COMMIT; this one deliberately does neither, so `psql -f` runs it in
+-- autocommit and the value is durable before anything reads it.
+--
+-- `0031` drops and re-creates both SD-09 predicates with 'held_pending_review'
+-- inside them. EVERY ONE OF THOSE PREDICATES IS SUCH A USE. Combining the two
+-- files does not produce a slower migration or a riskier one; it produces a
+-- migration that CANNOT RUN.
+--
+-- THIS IS PROVEN BY EXECUTION, NOT BY CITING THE MANUAL. A combined form was
+-- written and applied against PostgreSQL 16 and its failure is recorded in
+-- DELTA_MANIFEST section 12, on `0028`'s transferable lesson: a probe that
+-- only ever attempts forbidden things passes against a guard that rejects
+-- everything, so the split is proven by watching the combined form break.
+--
+-- The install job (corpus.yml, CI-06h) applies each file with
+-- `psql -v ON_ERROR_STOP=1 -f`, one file per invocation, so this file's lack
+-- of an explicit transaction is exactly what it needs and nothing else in the
+-- set is affected.
+--
+-- Migrations are sacred: once merged, never edited, only superseded.
+-- =============================================================================
+
+ALTER TYPE payout_status ADD VALUE 'held_pending_review';
