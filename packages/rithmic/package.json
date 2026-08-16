@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Platform adapter: provision, entitle, ingestFills, ingestEOD, reconcile.",
+  "description": "Platform adapter: provision, entitle, ingestFills, ingestEOD, reconcile. Plus the synthetic simulator, file mode: deterministic EOD report and per-fill CSV from a seeded account population.",
   "exports": {
     ".": "./src/index.ts"
   },
