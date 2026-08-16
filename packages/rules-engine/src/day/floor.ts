@@ -89,25 +89,70 @@ export function advanceFloor(input: FloorInput): FloorOutcome {
         : highWaterBalanceCents;
     floorCents = highWaterBalanceCents - drawdown.drawdownCents;
   }
+  neverRetreats('R-13', input.priorFloorCents, floorCents);
 
   // R-15, strictly after the trail.
+  const trailedFloorCents = floorCents;
   const profitCents = input.closingBalanceCents - input.sizeCents;
   if (!floorLocked && drawdown.lock.enabled && profitCents >= drawdown.lock.atProfitCents) {
-    floorCents = drawdown.lock.floorAtCents;
+    // THE `max` IS SECTION 3.4's BINDING FORMULATION AND IT IS NOT REDUNDANT.
+    //
+    //   floor(d) = max( hwb(d) - drawdown_cents,
+    //                   floorLocked ? floor_lock_floor_at_cents
+    //                               : size_cents - drawdown_cents )
+    //
+    // M01 calls the `max` "redundant given the update order", on the reasoning
+    // that "the lock freezes `hwb` EXACTLY WHERE THE TRAILING FLOOR ALREADY
+    // EQUALS THE LOCKED VALUE, by CV-12". THAT HOLDS ONLY WHEN THE BALANCE LANDS
+    // ON THE TRIGGER AND NOT WHEN IT JUMPS PAST IT, which R-15's own `>=` allows
+    // and which every eval pass on the v1 lineup does: Core EOD locks at
+    // 260,000c of profit and its eval target is 300,000c, so the pass day clears
+    // the trigger by 40,000c or more. At a 5,300,000c close the trail has
+    // already put the floor at 5,050,000c and the locked value is 5,010,000c.
+    //
+    // M01 SECTION 3.6's PSEUDOCODE ASSIGNS RATHER THAN TAKING THE max, AND THAT
+    // IS THE HALF THIS FILE DOES NOT FOLLOW. The assignment drops the floor by
+    // 40,000c on the account's best day, which is INV-06 ("no exception, no
+    // phase qualifier") and RE-P-01 violated on a reachable input. Section 3.4
+    // is the founder's binding formulation and says so; section 3.5's R-14 row
+    // and INV-06 agree with it; only the sketch disagrees. Same shape as R-22,
+    // where the table and the pseudocode disagreed and the table won.
+    //
+    // ONCE LOCKED, `hwb` IS FROZEN, so this expression returns the same number
+    // every subsequent day and INV-07 ("a locked floor never changes again")
+    // still holds. The lock is a floor under the floor, not a cap on it.
+    floorCents =
+      trailedFloorCents > drawdown.lock.floorAtCents
+        ? trailedFloorCents
+        : drawdown.lock.floorAtCents;
     floorLocked = true;
     lockEngagedAtProfitCents = profitCents;
   }
-
-  // R-14's tripwire, INV-06. NO INPUT CAN REACH THIS; only a future edit to the
-  // two blocks above can. It throws rather than returning an `AssertionFailure`
-  // because it is not a data problem: at DO-3 the vendor's arithmetic is what
-  // failed, and here the engine's own would have.
-  if (floorCents < input.priorFloorCents) {
-    throw new EngineInvariantError(
-      'INV-06',
-      `the floor moved down, from ${String(input.priorFloorCents)} to ${String(floorCents)}`,
-    );
-  }
+  neverRetreats('R-15', trailedFloorCents, floorCents);
 
   return { floorCents, highWaterBalanceCents, floorLocked, lockEngagedAtProfitCents };
+}
+
+/**
+ * R-14's tripwire, INV-06, CHECKED AFTER EACH SUB-STEP RATHER THAN ONCE AT THE
+ * END, and the difference is a defect this file shipped with.
+ *
+ * The single end-of-function check compared the final floor against the floor at
+ * the START OF THE DAY, so a step that lowered the floor below where the
+ * PRECEDING step had just raised it was invisible: the trail lifted 4,750,000 to
+ * 5,050,000, the lock dropped it to 5,010,000, and 5,010,000 is still above
+ * 4,750,000, so nothing fired. A monotonicity check that only samples the
+ * endpoints cannot see a retreat inside the interval.
+ *
+ * It throws rather than returning an `AssertionFailure` because it is not a data
+ * problem: at DO-3 the vendor's arithmetic is what failed, and here the engine's
+ * own would have.
+ */
+function neverRetreats(step: string, before: Cents, after: Cents): void {
+  if (after < before) {
+    throw new EngineInvariantError(
+      'INV-06',
+      `${step} moved the floor down, from ${String(before)} to ${String(after)}`,
+    );
+  }
 }

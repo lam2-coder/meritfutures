@@ -1,0 +1,14 @@
+{
+  "end_state": {
+    "phase": "closed",
+    "breached": true,
+    "breach_kind": "trailing_eod_floor",
+    "floor_open_cents": 4850000,
+    "floor_cents": 4850000,
+    "high_water_balance_cents": 5100000,
+    "balance_cents": 5200000
+  },
+  "events": ["day.closed", "breach.detected"],
+  "pins": "the breach compares the low against the floor the day opened with, and the day's new closing high never trails the floor or the high-water balance because DO-4 returns before DO-7 runs",
+  "note": "THE THREE UNMOVED FIELDS ARE THE SECOND HALF OF THE PIN. `floor_cents` and `high_water_balance_cents` still carry day one's values while `balance_cents` carries day two's close of 5,200,000, which is M01 section 3.6's breach branch: it writes the trading day, the phase, the breach, the floor at open and the closing balance, and it carries the floor, the high-water balance and the lock through untouched. An engine that trailed before checking would report a high-water balance of 5,200,000 and a floor of 4,950,000, and it would still breach. `breach_kind` is `trailing_eod_floor` because CORE-50K's drawdown type is `trailing_eod` (M01 Appendix A.1); section 3.6 chooses `static_floor` only for a static drawdown. Two events rather than three: day one closes, day two returns at DO-5 and never reaches DO-9's `day.closed`."
+}

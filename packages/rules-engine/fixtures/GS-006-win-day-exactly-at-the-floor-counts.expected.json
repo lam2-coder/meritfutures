@@ -1,0 +1,9 @@
+{
+  "end_state": {
+    "win_days_count": 1,
+    "traded_days_count": 1
+  },
+  "events": ["day.closed"],
+  "pins": "realized P&L exactly at the win-day floor counts, because R-09's operator is `>=` and not `>`",
+  "note": "The traded-day count is stated because a win day that did not also count as a traded day would satisfy the pinned field while being wrong about the same day, and the two counters advance from the same mark. GS-007 is this file with 14,999c."
+}

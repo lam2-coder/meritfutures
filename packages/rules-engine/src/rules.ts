@@ -94,7 +94,7 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules `advanceDay` computes today. SIXTEEN OF FIFTY.
+ * The rules `advanceDay` computes today. TWENTY-TWO OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
@@ -115,13 +115,32 @@ export type RuleId =
  *   R-23  day/breach.ts checkBreach, and the fact `advanceDay` emits
  *   R-24  day/advance.ts, the terminal return and DO-1's account_closed refusal
  *   R-25  day/advance.ts, DO-4 returning before DO-8 can run
+ *   R-26  day/progression.ts, the profit target at DO-8
+ *   R-27  day/progression.ts, the eval minimum-trading-days gate
+ *   R-28  day/progression.ts, the deferral: tested only once R-26 and R-27 hold
+ *   R-29  day/consistency.ts, the cross multiplication
+ *   R-30  day/consistency.ts, the denominator rule, before any arithmetic
+ *   R-31  day/progression.ts, the funded reset, in the same step as the pass
  *
  * NOT DECLARED AND WORTH NAMING, because their absence is the count being
- * honest rather than the list being short: R-02 needs sequence subtraction over
- * a real calendar (group A, blocked on the calendar data); R-10, R-11, R-17,
- * R-19 and R-20 are discharged outside the day fold (ingest, publish validation,
- * settlement, the platform setpoint); everything from R-26 is groups E, F, G
- * and H.
+ * honest rather than the list being short.
+ *
+ *   R-32  REFUSES rather than being absent, and it is the one worth reading.
+ *         "Elapsed trading days `>` the limit expires the account", and elapsed
+ *         trading days is NOT DERIVABLE from `RuleState`: M01 section 2.2's
+ *         record carries no account-open day, and `tradedDaysCount` counts days
+ *         with fills, which R-08 makes a different quantity. Adding the field
+ *         is a column on `rule_states`, so it is a schema delta and an ADR
+ *         rather than a diff. `max_days` is null on all three v1 plans; a plan
+ *         that set it makes the day refuse, because folding it would trade an
+ *         account past its own expiry with a green state row
+ *   R-02  needs `sequence` subtraction over a real calendar (group A, blocked
+ *         on the calendar data)
+ *   R-10, R-11, R-17, R-19, R-20
+ *         discharged outside the day fold: ingest, publish validation,
+ *         settlement, the platform setpoint
+ *   R-33 to R-50
+ *         groups F, G and H
  */
 export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-03',
@@ -140,4 +159,10 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-23',
   'R-24',
   'R-25',
+  'R-26',
+  'R-27',
+  'R-28',
+  'R-29',
+  'R-30',
+  'R-31',
 ];

@@ -1,0 +1,12 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "floor_cents": 4850000,
+    "high_water_balance_cents": 5100000,
+    "balance_cents": 5020000,
+    "breached": false
+  },
+  "events": ["day.closed", "day.closed"],
+  "pins": "a losing day lowers the balance and leaves the floor and the high-water balance where the previous close put them",
+  "note": "THE BALANCE IS PINNED BESIDE THE FLOOR BECAUSE THE SCENARIO IS THE GAP BETWEEN THEM. A balance of 5,020,000 against a floor of 4,850,000 is the whole content of R-14: the account gave back 80,000c and its loss room did not grow back. An expectation stating only the floor would also be satisfied by an engine that ignored the second day."
+}

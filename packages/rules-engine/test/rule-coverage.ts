@@ -40,7 +40,8 @@ export const RULE_ASSERTIONS = {
   'R-12': 'the initial floor is size_cents - drawdown_cents',
   'R-13': 'the trailing floor follows the CLOSING balance and never the intraday high',
   'R-14': 'the floor never retreats, and an attempt to lower it throws INV-06',
-  'R-15': 'the lock engages at closing - size >= at_profit_cents, and is permanent',
+  'R-15':
+    'the lock engages at closing - size >= at_profit_cents, is permanent, and never lowers the trailed floor',
   'R-16': 'a static drawdown holds floor = size_cents - drawdown_cents for life',
   'R-18': 'the breach comparator is the floor AT THE OPEN, trailed strictly afterwards',
   'R-21': 'a floor breach is low_balance_cents < floorOpen, strict: touching survives',
@@ -49,6 +50,12 @@ export const RULE_ASSERTIONS = {
   'R-23': 'a soft daily loss limit is never a breach and emits a fact',
   'R-24': 'breach is terminal: no state is ever advanced after it',
   'R-25': 'breach beats every other outcome the same day could also have had',
+  'R-26': 'the eval target is closing - size >= profit_target_cents, so exactly at it passes',
+  'R-27': 'the eval minimum-trading-days gate is tradedDaysCount >= min_trading_days',
+  'R-28': 'an eval consistency violation DEFERS the pass and never fails the account',
+  'R-29': 'consistency is best * 10000 <= max_bp * profit, cross multiplied, so a tie passes',
+  'R-30': 'the denominator rule skips the gate unless period profit > 0, strict',
+  'R-31': 'the eval pass resets the funded phase to size and carries no eval profit',
 } as const satisfies Partial<Record<RuleId, string>>;
 
 /** The rules this suite claims. `implemented-rules.test.ts` compares it to the engine's. */

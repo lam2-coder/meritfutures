@@ -409,6 +409,69 @@ const CASES = [
       from: 'closingBalanceCents: mark.closingBalanceCents,',
       to: 'closingBalanceCents: mark.highBalanceCents,',
     },
+    {
+      rule: 'R-15',
+      // THIS MUTANT IS A DEFECT THE ENGINE SHIPPED WITH, seeded back. R-15
+      // assigned the locked value where section 3.4's binding expression takes
+      // a `max`, so a day that jumped past the trigger dropped the floor below
+      // where R-13 had just trailed it. It survived because `RE-U-015` only
+      // landed ON the trigger, where the two numbers agree by CV-12.
+      //
+      // It now fails TWICE OVER, which is the point of keeping it: the
+      // expectation goes red, and R-14's tripwire throws INV-06 before it gets
+      // there. A mutant that only one of the two catches would not have proved
+      // the tripwire was strengthened.
+      seeds: "the floor lock assigning `floor_lock_floor_at_cents` instead of taking section 3.4's `max`, which lowers the floor on a day that jumps past the trigger",
+      file: 'packages/rules-engine/src/day/floor.ts',
+      from:
+        'floorCents =\n' +
+        '      trailedFloorCents > drawdown.lock.floorAtCents\n' +
+        '        ? trailedFloorCents\n' +
+        '        : drawdown.lock.floorAtCents;',
+      to: 'floorCents = drawdown.lock.floorAtCents;',
+    },
+    {
+      rule: 'R-26',
+      seeds: 'the eval profit target tightened from `>=` to `>`, so an account exactly at its target stops passing (GS-017)',
+      file: 'packages/rules-engine/src/day/progression.ts',
+      from: 'const targetMet = profitCents >= evalRules.profitTargetCents;',
+      to: 'const targetMet = profitCents > evalRules.profitTargetCents;',
+    },
+    {
+      rule: 'R-27',
+      seeds: 'the eval minimum-trading-days gate tightened from `>=` to `>`, so an account exactly at the minimum stops passing',
+      file: 'packages/rules-engine/src/day/progression.ts',
+      from: 'const daysMet = state.tradedDaysCount >= evalRules.minTradingDays;',
+      to: 'const daysMet = state.tradedDaysCount > evalRules.minTradingDays;',
+    },
+    {
+      rule: 'R-28',
+      seeds: 'the consistency deferral turned into a pass, which is the half of R-28 that gets lost: it delays, it never fails, and it must not silently allow either',
+      file: 'packages/rules-engine/src/day/progression.ts',
+      from: 'if (!verdict.ok) {',
+      to: 'if (false && !verdict.ok) {',
+    },
+    {
+      rule: 'R-29',
+      seeds: 'the consistency comparison tightened from `<=` to `<`, so a best day exactly at the threshold stops passing (GS-023)',
+      file: 'packages/rules-engine/src/day/consistency.ts',
+      from: 'const ok = bestDayCents * 10_000n <= limitBp * periodProfitCents;',
+      to: 'const ok = bestDayCents * 10_000n < limitBp * periodProfitCents;',
+    },
+    {
+      rule: 'R-30',
+      seeds: "the denominator rule relaxed from `<= 0n` to `< 0n`, so a zero-profit period is EVALUATED instead of skipped, which is GS-021 and the near miss of FM-15's divide by zero",
+      file: 'packages/rules-engine/src/day/consistency.ts',
+      from: 'if (periodProfitCents <= 0n) {',
+      to: 'if (periodProfitCents < 0n) {',
+    },
+    {
+      rule: 'R-31',
+      seeds: "the funded reset carrying the eval profit instead of resetting to `size_cents`, which is AS-14 written into the engine rather than arriving from the platform",
+      file: 'packages/rules-engine/src/day/progression.ts',
+      from: 'balanceCents: plan.sizeCents,',
+      to: 'balanceCents: mark.closingBalanceCents,',
+    },
   ].map(({ rule, seeds, file, from, to }) => ({
     id: `CI-02/engine-${rule}`,
     stage: 'CI-02',

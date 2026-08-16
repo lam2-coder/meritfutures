@@ -507,8 +507,10 @@ export type AssertionKind =
   | 'calendar_coverage_miss'
   /** DO-2. `applySettlement` is group H and is not written. */
   | 'settlement_unimplemented'
-  /** DO-8. The eval progression is group E and is not written. */
-  | 'eval_progression_unimplemented';
+  /** DO-8, R-32. `phase_eval.max_days` is set and eval expiry is not computable. */
+  | 'eval_expiry_unimplemented'
+  /** DO-8. The state claims the eval phase on a plan that has no eval phase. */
+  | 'eval_phase_without_eval_rules';
 
 export interface AssertionFailure {
   readonly kind: AssertionKind;
@@ -574,4 +576,66 @@ export interface SoftDailyLossLimitEvent extends EngineEvent {
   readonly type: 'rule.soft_dll_exceeded';
   readonly realizedPnlCents: Cents;
   readonly limitCents: Cents;
+}
+
+/**
+ * DO-8, R-31. The eval passed and the funded reset is applied in the same step.
+ *
+ * EVENTS.md's payload is `{ account_id, from_phase, to_phase, trading_day,
+ * closing_balance_cents, target_cents, consistency: { best_day_share_bp,
+ * max_bp, satisfied } }`, and this carries all of it but `account_id`, for the
+ * reason stated at the top of this section.
+ *
+ * M01 section 5.2: "Includes the funded reset values, so the trader's own
+ * timeline shows the balance returning to size AND WHY." So the reset's three
+ * numbers travel with it rather than being re-derived by a consumer from the
+ * plan, which is the client-recomputes-a-rule failure FM-16 names.
+ *
+ * `closingBalanceCents` IS THE EVAL DAY'S CLOSE AND `resetBalanceCents` IS
+ * `size_cents`. They are different numbers on purpose: R-31 is "the single
+ * largest trader-facing fact in this document", and an event that carried only
+ * one of them could not say what was lost.
+ */
+export interface PhasePassedEvent extends EngineEvent {
+  readonly type: 'phase.passed';
+  readonly fromPhase: 'eval';
+  readonly toPhase: 'funded';
+  /** The eval day's own close, before the reset. */
+  readonly closingBalanceCents: Cents;
+  /** R-26's right-hand side, so the payload states the target it cleared. */
+  readonly targetCents: Cents;
+  /** R-31's funded reset values. */
+  readonly resetBalanceCents: Cents;
+  readonly resetFloorCents: Cents;
+  readonly consistencyPeriodStartDay: TradingDay;
+  /** R-28's verdict at pass time. `null` shares mean disabled or skipped (R-30). */
+  readonly consistency: {
+    readonly bestDayShareBp: number | null;
+    readonly maxDayShareBp: number | null;
+    readonly satisfied: boolean;
+    readonly skipped: boolean;
+  };
+}
+
+/**
+ * DO-8, R-28. The target and the day count are met and consistency is not, so
+ * the pass DEFERS.
+ *
+ * "An eval consistency violation NEVER FAILS AN ACCOUNT. It delays the pass, the
+ * trader keeps trading, and every day the engine re-tests." The account stays in
+ * `eval` and no state field moves, which is why this event is the only thing the
+ * day emits about the progression.
+ *
+ * `shortfallCents` IS `profit_needed_to_dilute_cents` UNDER EVENTS.md's NAME.
+ * The catalogue is a contract other modules read (M10 throttles this event to
+ * once per account per week, and the copy rule is "explain the dilution mechanic
+ * honestly"), so the field is spelled as the catalogue spells it and the
+ * engine-side name is recorded here rather than in a translation layer.
+ */
+export interface PassDeferredConsistencyEvent extends EngineEvent {
+  readonly type: 'phase.pass_deferred_consistency';
+  readonly bestDayShareBp: number;
+  readonly maxDayShareBp: number;
+  /** Additional period profit that would dilute the best day under the limit. */
+  readonly shortfallCents: Cents;
 }

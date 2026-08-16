@@ -1,0 +1,41 @@
+# GS-063  Breach and profit target on the same day
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "Breach beats everything on the same day. Ordering law DO-4 before DO-8.
+#   No `phase.passed`, no eligibility, no graduation"         M01 R-25
+#   "Breach is terminal and immediate"                        M01 R-24
+#   floor breach  `low_balance_cents < floorOpenCents`, strict M01 R-21
+#   "Breach is terminal: no state advances after it"          M01 INV-12
+#   profit target 300,000c at 50K; floor at open 4,750,000c   M01 Appendix A.1, R-12
+#   "Breach wins, account closes, no `phase.passed`, no funded state written"
+#                                                             GOLDEN_SCENARIOS GS-063 row
+#
+# THIS IS GS-019'S DAY WITH A LOW THAT DOES NOT SURVIVE, and the pair is the
+# assertion. Every other measurement is identical: the same opening balance, the
+# same 400,000c of profit, the same close well past the eval target. GS-019
+# passes the eval and resets to funded; this file breaches and closes, and the
+# only input that differs is the intraday low. A reader who wants to know what
+# DO-4 running before DO-8 buys can diff the two files and see one number.
+#
+# 4,700,000c IS BELOW THE FLOOR THE ACCOUNT OPENED WITH, so R-21 fires on the
+# floor at open of 4,750,000c and nothing later in the pipeline runs.
+id: GS-063
+name: breach and profit target on the same day
+source: M01 R-21, R-24, R-25
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5400000
+    high_balance_cents: 5410000
+    low_balance_cents: 4700000
+    realized_pnl_cents: 400000
+    fill_count: 7
+    traded_day: true
+settlements: []

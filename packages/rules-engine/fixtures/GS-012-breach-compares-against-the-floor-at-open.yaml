@@ -1,0 +1,58 @@
+# GS-012  Breach compares against the floor at open, not the floor after trailing
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "The breach comparator is the floor at the open. `floorOpenCents =
+#   prior.floorCents`. Trailing happens at DO-7, strictly after the breach
+#   check at DO-4"                                            M01 R-18
+#   floor breach  `low_balance_cents < floorOpenCents`, strict M01 R-21
+#   "Breach beats everything on the same day. Ordering law DO-4 before DO-8"
+#                                                             M01 R-25
+#   "Day closes at a new high and dipped below the previous floor: breach wins,
+#   and the new high is never used to rescue the day"         GOLDEN_SCENARIOS GS-012 row
+#   4,850,000 = 5,100,000 - 250,000                           M01 R-13, Appendix A.1 at 50K
+#
+# THE SECOND DAY'S LOW IS CHOSEN TO SIT BETWEEN TWO FLOORS, AND THAT IS THE
+# ENTIRE FIXTURE. 4,800,000c is ABOVE the floor the account opened its life with
+# (4,750,000c, R-12) and BELOW the floor day one trailed to (4,850,000c, R-13),
+# so three engines give three different answers and only one of them is R-18's:
+#
+#   compares against the account-open floor   4,800,000 < 4,750,000 is false, survives
+#   compares against the floor AFTER trailing 4,800,000 < 4,950,000 is true, breaches
+#                                             but reports floor_open_cents 4,950,000
+#   compares against the floor AT OPEN        4,800,000 < 4,850,000 is true, breaches
+#                                             and reports floor_open_cents 4,850,000
+#
+# A day that merely breaches cannot separate these, because trailing only ever
+# raises the floor and so only ever makes a breach more likely. The separation
+# has to come from a low that lands in the gap between two floors and from
+# `floor_open_cents` being stated in the expectation.
+id: GS-012
+name: breach compares against the floor at open, not the floor after trailing
+source: M01 R-18, R-21, R-25
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5100000
+    high_balance_cents: 5110000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 100000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5210000
+    low_balance_cents: 4800000
+    realized_pnl_cents: 100000
+    fill_count: 5
+    traded_day: true
+    adjustment_cents: 0
+settlements: []
