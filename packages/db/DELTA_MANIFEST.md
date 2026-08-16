@@ -18,7 +18,10 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->29<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->31<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+**The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+
+**Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
 
 | # | File | Money path | Contents |
 |---|---|---|---|
@@ -374,7 +377,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->29<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->99<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->31<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->100<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -434,3 +437,61 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 **Grants.** `0026`'s `ALTER DEFAULT PRIVILEGES` covers all three new tables with no line in `0029`: `merit_app` holds `SELECT, INSERT, UPDATE, DELETE` on each and `merit_analytics` holds nothing, which is the ruled default that a table added later is invisible to analytics until someone grants it deliberately. **None of the three is append-only**, for `contact_channels`' reason: supersession is written by `UPDATE` on the superseded row, so `0026`'s revoke list is unchanged and `OI-03` gains nothing to reconcile.
 
 **No floats.** The non-integer set on the installed schema is still exactly `correlation_groups.statistic` and `correlation_groups.threshold`. It was confirmed by querying `information_schema.columns` **rather than by the `DO` block**, and the difference is `OI-08`: the block lives in `0027` and cannot see a column that `0029` adds.
+## 14. `0030` and `0031` land, and the split is proven by watching the combined form break (2026-08-16)
+
+**[ADR-040](../../docs/decisions/ADR-040.md) (the payout enforcement window) and [ADR-041](../../docs/decisions/ADR-041.md) (identity-level restriction), FOLD-02.** Two files, and the second one is not a stylistic preference.
+
+| # | File | Money path | Contents |
+|---|---|---|---|
+| 0030 | `payout_hold_enum` | yes | `ALTER TYPE payout_status ADD VALUE 'held_pending_review'`. **One statement, no `BEGIN`/`COMMIT`** |
+| 0031 | `payout_hold_and_identity_restriction` | yes | the five hold columns and `payout_requests_hold_is_complete`; **both** `SD-09` predicates dropped and re-created under their own names; `payout_requests_hold_expiry_idx`; `wallet_withdrawals_live_freeze_blocks_settlement` and the re-created open index; `identity_restriction_episodes`; the replacement `COMMENT ON TABLE payout_requests` |
+
+**Two files because one is impossible, and that is executed rather than cited.** A combined form was written and applied against PostgreSQL 16:
+
+```
+BEGIN
+ALTER TYPE
+DROP INDEX
+ERROR:  unsafe use of new value "held_pending_review" of enum type payout_status
+LINE 3:   WHERE status IN ('approved', 'frozen', 'held_pending_revie...
+HINT:  New enum values must be committed before they can be used.
+```
+
+`psql` exited **3**. The split form was then applied to the **same database** and succeeded. PostgreSQL refuses to *use* a new enum value inside the transaction that *added* it, and `0031` re-creates both `SD-09` predicates with the new value inside them, so every one of those predicates is such a use. Combining the files does not produce a slower migration; it produces one that **cannot run**.
+
+**The first run of that counterfactual reported the wrong verdict, and the harness was the defect rather than the migration.** It was written `if psql ... | tee out.txt; then`, which tests **`tee`**'s exit status and never `psql`'s, so a failing migration scored as a pass. Rewritten to capture `rc=$?` from `psql` directly. Recorded here because it is section 13's lesson in a new costume: **the assertion that cannot fail is worth nothing, and it looks exactly like the assertion that passed.**
+
+### Install verification, from empty
+
+**All 30 files apply forward-only against PostgreSQL 16 with `ON_ERROR_STOP=1`, one file per `psql -f` invocation, zero errors.**
+
+| | `0001`-`0028` | `0001`-`0031` | Delta |
+|---|---|---|---|
+| tables | 96 | **97** | `identity_restriction_episodes` |
+| indexes | 326 | **331** | its primary key and three indexes, plus `payout_requests_hold_expiry_idx`. The four dropped-and-re-created indexes net zero, which is the point of re-creating them under the same names |
+| check constraints | 347 | **351** | `payout_requests_hold_is_complete`, `wallet_withdrawals_live_freeze_blocks_settlement`, `identity_restriction_restore_is_complete`, `identity_restriction_restore_follows_open` |
+| triggers | 6 | **6** | unchanged |
+
+**Re-application is rejected on both files.** `0031` fails at `column "held_at" of relation "payout_requests" already exists`; `0030` fails at `enum label "held_pending_review" already exists`. Both exit **3**. Neither file is idempotent and neither pretends to be: the migration runner applies each file once, and a file that silently tolerates a second application is a file that cannot tell a fresh database from a corrupted one.
+
+### Probe: [`probe_payout_hold.sql`](../../scripts/db/probe_payout_hold.sql), 11 assertions, **11 / 11**
+
+**It leads with six success cases and section 13 is why.** A guard that rejects everything passes every rejection test ever written against it, so the successes come first.
+
+| | Assertion | Result |
+|---|---|---|
+| SUCCESS 1 | a held request stores the full evaluated decision: snapshot, `approved_cents`, the split, the ordinal, the pinned plan version. Only the ledger posting is deferred | **passes** |
+| SUCCESS 2 | the hold auto-releases to `approved` and pays, re-evaluating nothing (INV-M5-02) | **passes** |
+| SUCCESS 3 | enforcement sends the request to `failed`, which **frees the ordinal** for a new request (EC-037) | **passes** |
+| SUCCESS 4 | a restriction episode opens with its cited flag, its ToS clause and its clock | **passes** |
+| SUCCESS 5 | a documented restore is provable from the episode row, by actor and evidence | **passes** |
+| SUCCESS 6 | a restored episode frees the partial unique, so the same human can be restricted again with the earlier episode intact | **passes** |
+| REJECTION 1 | `payout_requests_no_in_flight_uq` refuses a second request beside a **held** one | **fires** |
+| REJECTION 2 | `payout_requests_hold_is_complete` refuses a hold with no cited flag | **fires** |
+| REJECTION 3 | `wallet_withdrawals_live_freeze_blocks_settlement` refuses settlement under a live freeze | **fires** |
+| REJECTION 4 | at most one open episode per identity | **fires** |
+| REJECTION 5 | `identity_restriction_restore_is_complete` refuses a restore with no actor | **fires** |
+
+**REJECTION 3 is the one worth naming.** `0011` gave `wallet_withdrawals` a freeze clock, a freeze flag and a freeze-expiry index, and `wallet_withdrawal_status` has no frozen value. **The halt was representable and entirely unenforced**: a halted withdrawal still matched the open index and nothing whatsoever refused settlement. Nobody had to write the defect; it arrived by writing half the mechanism and reading the other half as done.
+
+**The probe cost five fixture corrections before it ran, and every one was a constraint this set already enforced** (`users.email`; a severity-5 `risk_flags` row needing `sla_due_at`; `plan_versions` needing `public_slug`, `created_by` and a publish transition; `purchases` needing its four money columns plus a PSP reference; a funded `accounts` row needing `funded_on`). Each was fixed by reading the DDL rather than guessing at it. **A schema that is hard to write a fixture against by guessing is the schema working**, and it is also the reason CI-03's golden fixtures load from a declared file rather than from a session's memory.

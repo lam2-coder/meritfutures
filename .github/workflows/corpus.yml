@@ -4,10 +4,16 @@ name: corpus
 # a gate somebody remembers; a gate that lives in CI is a gate.
 #
 # VERIFIED against PostgreSQL 16 on 2026-08-15 before first push, rather than
-# shipped and hoped for: all 27 migrations apply forward-only from empty; a
-# re-apply is rejected; the database reports 96 tables, 326 indexes, 347 check
-# constraints and 6 triggers; and all three ledger probes fire for the right
-# reason (checked by message, not by exception class).
+# shipped and hoped for: the migrations apply forward-only from empty; a
+# re-apply is rejected; and all three ledger probes fire for the right reason
+# (checked by message, not by exception class).
+#
+# THE OBJECT COUNTS ARE NOT REPEATED HERE, and that is deliberate. They read
+# "96 tables, 326 indexes, 347 check constraints and 6 triggers" until
+# 2026-08-16, when 0030 and 0031 made three of the four wrong in a comment
+# nobody reads while the job that emits them stayed correct. The job below
+# prints the live figures on every run; the current set is 30 files and
+# 97 / 331 / 351 / 6, recorded in DELTA_MANIFEST section 14 where it is dated.
 #
 # Every check here exists because the thing it checks ALREADY DRIFTED once:
 #   CI-06a  59 links broke silently before a human found them
@@ -197,3 +203,21 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_plan_version_immutability.sql
+
+      # 7. ADR-040 and ADR-041, the payout enforcement window and the identity
+      # restriction episode, probed against the real database.
+      #
+      # ELEVEN ASSERTIONS AND THE FIRST SIX ARE SUCCESSES. Section 13 of the
+      # delta manifest is why: every probe that only ever attempts a forbidden
+      # thing passes against a guard that rejects everything, so the successes
+      # come first and the rejections come after them.
+      #
+      # This probe also covers the one defect this fold inherited rather than
+      # introduced: 0011 gave wallet_withdrawals a freeze clock, a freeze flag
+      # and an expiry index while wallet_withdrawal_status has no frozen value,
+      # so THE HALT WAS REPRESENTABLE AND ENTIRELY UNENFORCED. 0031 is the
+      # enforcement and REJECTION 3 is what watches it fire.
+      - name: Probe ADR-040 and ADR-041's payout hold and restriction episode
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_payout_hold.sql

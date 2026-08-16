@@ -12,7 +12,7 @@ Every table, every column, with type, constraints, indexes, retention, and the r
 
 > **Amended under [ADR-026](../../decisions/ADR-026.md), 2026-08-14. The schema-delta reconciliation has landed.**
 >
-> All <!--gen:manifest_changes-->103<!--/gen--> approved schema changes are folded into one reviewed migration set at [`packages/db/migrations`](../../../packages/db/migrations), <!--gen:migration_files-->29<!--/gen--> files, verified to apply in order against PostgreSQL 16. **This sentence read "94 approved schema changes" and "27 files" until 2026-08-16**, two hand-maintained figures in the header of the document that records how often they drift: `0028` had merged and neither moved. Both are [CI-06g](../../testing/STRATEGY.md) spans now, which is [ADR-034](../../decisions/ADR-034.md)'s remedy applied where it was found. Every delta is traced to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md), which is the file the completeness gate reads. **No delta was rejected.**
+> All <!--gen:manifest_changes-->103<!--/gen--> approved schema changes are folded into one reviewed migration set at [`packages/db/migrations`](../../../packages/db/migrations), <!--gen:migration_files-->31<!--/gen--> files, verified to apply in order against PostgreSQL 16. **This sentence read "94 approved schema changes" and "27 files" until 2026-08-16**, two hand-maintained figures in the header of the document that records how often they drift: `0028` had merged and neither moved. Both are [CI-06g](../../testing/STRATEGY.md) spans now, which is [ADR-034](../../decisions/ADR-034.md)'s remedy applied where it was found. Every delta is traced to the document that proposed it in [`packages/db/DELTA_MANIFEST.md`](../../../packages/db/DELTA_MANIFEST.md), which is the file the completeness gate reads. **No delta was rejected.**
 >
 > **Where the two disagree, the migrations are the truth and this document is the design record.**
 >
@@ -50,7 +50,7 @@ about a table.
 - **The append-only set is these eighteen tables**, and the list is exact rather than illustrative because [`0026_roles_and_grants`](../../../packages/db/migrations/0026_roles_and_grants.sql) revokes `UPDATE` and `DELETE` on exactly this set, from the application role **and from `PUBLIC`**: `ledger_entries`, `ledger_transactions`, `events`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `identity_merges`, `identity_links`, `tos_acceptances`, `account_status_history`, `wallet_entries`, `published_statistics`, `kyc_funnel_events`, `integration_dispatches`, `support_context_views`, `certificate_verifications`. The application role holds `INSERT` and `SELECT` only. Enforced by grants in the database, not by convention ([VG-8](../../../research/VIBE_FAILURE_POSTMORTEMS.md)).
   - The approved list read `events`, `ledger_entries`, `ledger_transactions`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `eligibility` snapshots, `identity_merges`. **`eligibility` snapshots is not a table** (the eligibility snapshot is a `jsonb` column on `payout_requests`, §8), and the other nine tables above were added by the fold. This paragraph is the document half of `OI-03`: the CI check asserts `0026`'s revoke list against **this list**, so the two cannot drift apart in either direction.
   - **Two single-column updates on append-only tables are legitimate and ruled** (`daily_marks.superseded_by`, `identity_links.suppressed`). They are performed by `SECURITY DEFINER` functions owned by the migrator role, each arriving with the module that owns the transition and with its negative-authz test. Those functions do not exist yet, so a naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug.
-- Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 96 tables carry `updated_at`**; the rest are either append-only or written once.
+- Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 97 tables carry `updated_at`**; the rest are either append-only or written once. (`identity_restriction_episodes`, added by `0031`, does not: an episode is opened once and closed once, and both transitions carry their own actor and timestamp.)
 - Nothing is ever soft-deleted with a boolean. Lifecycle is a status enum with an event trail. The one soft delete in the schema is `journal_entries.deleted_at`, and it is a **tombstone for a hard-delete job** rather than an end state (§10).
 
 **Naming**: `snake_case`, plural table names, `_cents` and `_bp` suffixes are mandatory on money and ratio columns, `_at` on timestamps, `_on` on dates. A column named `amount` without a unit suffix is a review reject.
@@ -184,7 +184,7 @@ Created by [`0009_ledger`](../../../packages/db/migrations/0009_ledger.sql), [`0
 
 ## 9. Risk and evidence
 
-Created by [`0008_risk`](../../../packages/db/migrations/0008_risk.sql). Five tables. Not a money-path file, because nothing here holds an amount, and it is read line by line for a different reason: every table below is **evidence**. A flag is an accusation, and an accusation without the numbers behind it is one Merit cannot defend in a dispute or act on with confidence.
+Created by [`0008_risk`](../../../packages/db/migrations/0008_risk.sql), plus one added by [`0031`](../../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql). Six tables. Not a money-path file, because nothing here holds an amount, and it is read line by line for a different reason: every table below is **evidence**. A flag is an accusation, and an accusation without the numbers behind it is one Merit cannot defend in a dispute or act on with confidence.
 
 `risk_flags` is created in this file rather than later because `payout_requests.freeze_flag_id` (`SD-M5-01`) references it, and `0010` must have it. A freeze that cites no flag is an indefinite hold with a citation nobody can look up.
 
@@ -195,6 +195,7 @@ Created by [`0008_risk`](../../../packages/db/migrations/0008_risk.sql). Five ta
 | [`risk_flags`](risk_flags.md) | |
 | [`correlation_groups`](correlation_groups.md) | |
 | [`evidence_packs`](evidence_packs.md) | |
+| [`identity_restriction_episodes`](identity_restriction_episodes.md) | `0031`, [ADR-041](../../decisions/ADR-041.md). Grouped here rather than with identity because it is an **enforcement** record: it cites a `risk_flags` row, carries a ToS clause, and ends in either a documented restore or an evidence pack |
 
 ## 10. Affiliate, system, and the module surfaces
 
@@ -380,7 +381,7 @@ Walked line by line at the gate. All five confirmed as written; recorded in [DEC
 
 **Inside the SQL, every folded column, index, constraint and table carries an inline `-- SD-nn` or `-- U-nn` marker.** A reader looking at a column does not have to leave the file to learn why it exists.
 
-### The <!--gen:migration_files-->29<!--/gen--> files, and which of them are money path
+### The <!--gen:migration_files-->31<!--/gen--> files, and which of them are money path
 
 `0001` extensions and enums, `0002` identity, `0003` kyc, `0004` catalog, `0005` affiliate program, `0006` commerce, `0007` accounts, `0008` risk, `0009` ledger, `0010` payouts, `0011` wallet, `0012` disputes and affiliate settlement, `0013` ingest, `0014` marks, `0015` rule states, `0016` treasury controls, `0017` events and audit, `0018` integrations, `0019` notifications and community, `0020` public surface, `0021` transparency, `0022` analytics journal, `0023` loyalty and graduation, `0024` offers, `0025` reserved sequence, `0026` roles and grants, `0027` triggers and invariants, `0028` supersede plan version immutability, `0029` phone identity and auth.
 
@@ -434,7 +435,7 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 
 ### Verification performed on `0029` (2026-08-16)
 
-**The full <!--gen:migration_files-->29<!--/gen--> file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`**, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->99<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**. `0029` adds three tables, fourteen indexes and thirty-four check constraints, and **no trigger and no function**, so the trigger count is unchanged. The index and check figures are **emitted by the install job**, not derived from the DDL, for the reason [section 11 of DELTA_MANIFEST](../../../packages/db/DELTA_MANIFEST.md) records: a grep of `CREATE INDEX` misses every index Postgres builds behind a primary key or a unique constraint.
+**The full <!--gen:migration_files-->31<!--/gen--> file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`**, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->100<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**. `0029` adds three tables, fourteen indexes and thirty-four check constraints, and **no trigger and no function**, so the trigger count is unchanged. The index and check figures are **emitted by the install job**, not derived from the DDL, for the reason [section 11 of DELTA_MANIFEST](../../../packages/db/DELTA_MANIFEST.md) records: a grep of `CREATE INDEX` misses every index Postgres builds behind a primary key or a unique constraint.
 
 **Forty-eight assertions, executed against the installed schema, one perturbation each. The probe leads with the success case**, which is `0028`'s transferable lesson: a probe that only ever attempts forbidden things passes against a guard that rejects everything.
 
@@ -468,3 +469,14 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 **Grants were verified rather than assumed.** `0026`'s `ALTER DEFAULT PRIVILEGES` covers the three new tables: `merit_app` holds `SELECT, INSERT, UPDATE, DELETE` on each and `merit_analytics` holds nothing, which is the ruled default. None of the three is append-only, for [`contact_channels`](contact_channels.md)' reason: supersession is written by `UPDATE` on the superseded row.
 
 **The no-floats set is unchanged and still exactly the two `correlation_groups` columns**, confirmed by querying `information_schema.columns` on the installed schema. It was confirmed by query rather than by the `DO` block, and the reason is `OI-08`: the block lives in `0027` and runs before `0028` and `0029` exist.
+### Verification performed on `0030` and `0031` (2026-08-16)
+
+**The full 30-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, zero errors**, producing **97 tables, 331 indexes, 351 check constraints and 6 triggers**. The four new check constraints and the one new table are enumerated against the previous figures in [DELTA_MANIFEST section 14](../../../packages/db/DELTA_MANIFEST.md), which also carries the probe table.
+
+| Check | Method | Result |
+|---|---|---|
+| A **combined** `0030`+`0031` cannot run | executed, not cited | **`ERROR: unsafe use of new value "held_pending_review"`, exit 3.** The split form then applied cleanly to the same database |
+| The hold, the widened `SD-09` predicates, the external-leg guard and the restriction episode | [`probe_payout_hold.sql`](../../../scripts/db/probe_payout_hold.sql), **six success cases first**, then five rejections | **11 / 11** |
+| Re-application of either file | `psql -f` a second time against the installed database | **rejected, exit 3, both files** |
+
+**The counterfactual's first harness reported the wrong verdict**, because `if psql ... | tee` tests `tee`'s exit status and never `psql`'s. The migration was correct throughout; only the thing measuring it was broken. That is the same finding as the row above about probes that only ever attempt forbidden things: **an assertion that cannot fail looks exactly like an assertion that passed.**
