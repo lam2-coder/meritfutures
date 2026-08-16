@@ -850,6 +850,16 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 **This is the third time in three days that a claim written into a comment was wrong in the direction of understating a control, and the second time execution rather than review found it.** The rule it argues for is not "write more careful comments". It is that a seeded violation is worth running even when you are confident you know what it will say.
 
+### `0034` broke a probe written before it, and CI is what said so
+
+**`probe_phone_identity.sql`'s `S6` applies a phone change with all three D4 controls and a running hold, and it sets `prior_notified_at` because that is what (c) required in `0029`.** After `0034` that write cites no evidence, `phone_change_requests_prior_notice_is_evidenced` refuses it, and the probe fails. **It failed on CI and not locally**, because this session ran its own probe against the new schema and not the other five.
+
+**The fix is not a loosening and the distinction matters.** `S6` is the positive control for the legitimate path, and ADR-046 made the legitimate path **narrower**: an application now has to produce two artifacts it previously did not need. `S6` produces them. `R7`, which applies with no notification at all, is untouched and still rejects.
+
+**And it exposed two assertions that were resting on an undocumented detail.** `R6` (no dual-channel verification) and `R8` (an expired hold) each set `prior_notified_at` while violating `phone_change_requests_applied_is_complete`, so after `0034` they violate **two** constraints at once and PostgreSQL reports one of them in an order it does not document. Both happened to report the one they name. Given the evidence rows they now violate exactly one, and each asserts the constraint it names rather than the constraint the planner reached first.
+
+**The transferable rule: run every probe, not the new one.** The probe suite is a single body of evidence about one schema, and a migration that changes a shared table changes what every probe touching it is asserting.
+
 ### What `0034` does not do
 
 **It does not touch `otp_challenges`.** An OTP is challenge-response: the trader types the number into the request, so the address is held by the request and is deliverable today. `destination_hash` stays one-way. The exposed class is every message **Merit itself initiates**.

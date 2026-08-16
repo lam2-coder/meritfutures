@@ -321,6 +321,47 @@ VALUES ('d1000000-0000-0000-0000-000000000001',
         'c3000000-0000-0000-0000-000000000003',
         '\x4348414e474544'::bytea);
 
+-- ---------------------------------------------------------------------------
+-- ADR-046 CHANGED WHAT A LEGITIMATE APPLICATION LOOKS LIKE, AND THIS IS THAT
+-- CHANGE ARRIVING IN A PROBE WRITTEN BEFORE IT.
+-- ---------------------------------------------------------------------------
+-- 0034 added phone_change_requests_prior_notice_is_evidenced: prior_notified_at
+-- may not be set without citing the dispatch record and the notification that
+-- carried the two legs (EC-146, GS-265). Every assertion below that sets that
+-- timestamp needs the evidence, and S6 FAILED WITHOUT IT, on CI, which is the
+-- probe doing its job one migration later than it was written.
+--
+-- THE ROWS ARE CREATED HERE RATHER THAN INSIDE S6 BECAUSE THE REJECTIONS NEED
+-- THEM TOO, AND THAT IS THE PART WORTH READING. R6 and R8 each set
+-- prior_notified_at while violating phone_change_requests_applied_is_complete,
+-- so after 0034 they violate TWO constraints at once and PostgreSQL reports
+-- one of them in an order it does not document. Both happened to report the
+-- one they name on the run that found this, which is an assertion resting on
+-- an undocumented detail rather than on the schema. Given their evidence they
+-- violate exactly one constraint, and each asserts the constraint it names.
+--
+-- This is NOT the probe being loosened to accommodate a new constraint. The
+-- legitimate path is strictly narrower than it was: S6 now has to produce two
+-- artifacts it previously did not need, and R7, which applies with no
+-- notification at all, is untouched.
+INSERT INTO notification_kinds (kind, class, title, template_code) VALUES
+  ('security.contact_changed', 'security', 'Your contact details changed',
+   'probe-contact-changed');
+
+INSERT INTO integration_dispatches
+  (id, integration, identity_id, fields_sent, status, dispatched_at,
+   idempotency_key)
+VALUES ('e1000000-0000-0000-0000-000000000001', 'sms-vendor',
+        'a1000000-0000-0000-0000-000000000001', ARRAY['phone'], 'sent', now(),
+        'probe-phone-identity-prior-notice');
+
+INSERT INTO notifications
+  (id, identity_id, kind, channel, class, template_version, sent_at,
+   delivery_status, delivered_at)
+VALUES ('f1000000-0000-0000-0000-000000000001',
+        'a1000000-0000-0000-0000-000000000001', 'security.contact_changed',
+        'email', 'security', 1, now(), 'delivered', now());
+
 -- REJECTION 6: applying with no dual-channel verification. (d), never SMS alone.
 SELECT pg_temp.rejected(
   'R6  applying a phone change with no dual-channel verification',
@@ -328,6 +369,8 @@ SELECT pg_temp.rejected(
   UPDATE phone_change_requests
      SET state = 'applied', applied_at = now(),
          prior_notified_at = now(),
+         prior_notified_sms_dispatch_id = 'e1000000-0000-0000-0000-000000000001',
+         prior_notified_email_notification_id = 'f1000000-0000-0000-0000-000000000001',
          withdrawal_hold_until = now() + interval '48 hours'
    WHERE id = 'd1000000-0000-0000-0000-000000000001';
   $q$,
@@ -356,19 +399,25 @@ SELECT pg_temp.rejected(
      SET state = 'applied', applied_at = now(),
          dual_channel_verified_at = now(),
          prior_notified_at = now(),
+         prior_notified_sms_dispatch_id = 'e1000000-0000-0000-0000-000000000001',
+         prior_notified_email_notification_id = 'f1000000-0000-0000-0000-000000000001',
          withdrawal_hold_until = now() - interval '1 hour'
    WHERE id = 'd1000000-0000-0000-0000-000000000001';
   $q$,
   'phone_change_requests_applied_is_complete');
 
--- SUCCESS 6: all three D4 controls and a running hold.
+-- SUCCESS 6: all three D4 controls, a running hold, AND the evidence for the
+-- notification leg, which ADR-046 made a precondition of the timestamp. This
+-- is the legitimate path and it is narrower than it was in 0029.
 SELECT pg_temp.permitted(
-  'S6  applying with all three D4 controls and a running hold',
+  'S6  applying with all three D4 controls, a running hold and the notice evidenced',
   $q$
   UPDATE phone_change_requests
      SET state = 'applied', applied_at = now(),
          dual_channel_verified_at = now(),
          prior_notified_at = now(),
+         prior_notified_sms_dispatch_id = 'e1000000-0000-0000-0000-000000000001',
+         prior_notified_email_notification_id = 'f1000000-0000-0000-0000-000000000001',
          withdrawal_hold_until = now() + interval '48 hours'
    WHERE id = 'd1000000-0000-0000-0000-000000000001';
   $q$);
