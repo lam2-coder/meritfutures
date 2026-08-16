@@ -1,0 +1,44 @@
+{
+  "id": "MERIT-RAPID-50K",
+  "source": "docs/plans/M01-rules-engine.md Appendix A.2, the 50K column",
+  "note": "TRANSCRIBED FROM APPENDIX A.2 AND FROM NOWHERE ELSE, on the same terms as CORE-50K.json: a config record owns a value rather than restating one, and ADR-037 extended CI-06g's rule from counts to parameters for exactly that reason. THIS PLAN EXISTS BECAUSE CORE EOD DISABLES EVAL CONSISTENCY. Appendix A.1 carries `Eval consistency: disabled` at every size, so R-28, R-29 and R-30 have nothing to act on there and no Core EOD fixture can pin them. Appendix A.2 carries 3000bp, which is what makes GS-020, GS-023 and GS-024 expressible at all. The plan is named Merit Rapid and not Rapid Daily per ADR-013: the plan is fast relative to the lineup, it is not daily, and the name may not claim it is.",
+  "plan_code": "merit_rapid",
+  "size_label": "50K",
+  "plan_version_id": "0199c7a1-0000-7000-8000-000000000002",
+  "rules": {
+    "drawdown": { "type": "trailing_eod", "amount_bp": 500 },
+    "eval": {
+      "profit_target_bp": 600,
+      "min_trading_days": 2,
+      "consistency": { "max_day_share_bp": 3000 }
+    },
+    "funded": { "consistency_bp": 4000, "min_trading_days": 0 },
+    "win_days": { "required_count": 3, "floor_bp": 30 },
+    "buffer_bp": 200,
+    "cadence_gap_trading_days": 1,
+    "payout": {
+      "cap_bp": 200,
+      "min_payout_cents": 10000,
+      "split_bp": 9000,
+      "max_payouts": 5
+    },
+    "floor_lock": {
+      "enabled": true,
+      "at_profit_cents": 260000,
+      "locked_floor_offset_cents": 10000
+    },
+    "post_payout_floor_rule": { "mode": "none" },
+    "daily_loss_limit": null,
+    "max_accounts_per_entity": 5
+  },
+  "size": {
+    "size_cents": 5000000,
+    "eval_drawdown_cents": 250000,
+    "eval_profit_target_cents": 300000,
+    "funded_drawdown_cents": 250000,
+    "win_day_floor_cents": 15000,
+    "buffer_cents": 100000,
+    "payout_cap_cents": 100000,
+    "min_payout_cents": 10000
+  }
+}

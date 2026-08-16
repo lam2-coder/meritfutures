@@ -1,0 +1,19 @@
+{
+  "end_state": {
+    "phase": "eval",
+    "balance_cents": 5500000,
+    "floor_cents": 5010000
+  },
+  "events": [
+    "day.closed",
+    "rule.floor_locked",
+    "phase.pass_deferred_consistency",
+    "day.closed",
+    "phase.pass_deferred_consistency",
+    "day.closed",
+    "phase.pass_deferred_consistency",
+    "day.closed"
+  ],
+  "pins": "one cent over the threshold defers the pass rather than failing the account, because R-29's operator is `<=` and R-28 makes a consistency failure a delay",
+  "note": "PHASE IS THE ASSERTION AND THE OTHER TWO STOP IT BEING SATISFIED BY AN ENGINE THAT DID NOTHING. `phase: eval` alone is what an engine that never ran would also produce, so the balance shows the fold consumed all four days and the floor shows it locked on the way. 5,500,000 is the day-four close, and 5,010,000 is Appendix A.2's locked floor of size + 10,000, engaged on day two when profit first reached 300,001 against the 260,000 trigger. THE PAIR IS THE POINT: this file and GS-023 have identical period profit of 500,000 and differ only in which day carries one cent, so an engine that computed the ratio with division, or that wrote `<` for `<=`, cannot satisfy both. The third `phase.pass_deferred_consistency` is the one GS-023 does not have: there the fourth day passes, here it defers again. `profit_needed_to_dilute_cents` is 4 by M01 section 3.6's `ceilDiv`, and it is not pinned because the expectation format has no field for a gate result."
+}

@@ -1,0 +1,20 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 5000000,
+    "floor_cents": 4750000
+  },
+  "events": [
+    "day.closed",
+    "day.closed",
+    "rule.floor_locked",
+    "phase.pass_deferred_consistency",
+    "day.closed",
+    "phase.pass_deferred_consistency",
+    "day.closed",
+    "phase.passed",
+    "day.closed"
+  ],
+  "pins": "an eval consistency violation defers the pass and dilution later clears it, so the gate delays an account and never fails one",
+  "note": "THE EVENT LIST IS THE ASSERTION HERE, more than the end state is. Two deferrals followed by a pass is the shape R-28 rules and it is the shape an engine that treated consistency as a failure cannot produce: that engine emits a breach or a close on day three and never reaches day five. The end state is R-31's reset, with 4,750,000 = 5,000,000 - 250,000 from M01 Appendix A.2's funded drawdown at 50K. THE DILUTION IS IN THE DENOMINATOR AND THAT IS WHY THE BEST DAY IS REPEATED: 160,000 appears on day one and day three, so the numerator is already at its maximum before the first test and days four and five move only the total. A fixture whose later days were smaller than the best day by accident would pass for a reason it did not state. `floor_locked` is not pinned, for the reason GS-017's sibling records: the lock engages at DO-7 on day three and R-31 rewrites the floor at DO-8 on day five, and no document says whether the flag survives that."
+}

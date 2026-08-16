@@ -68,18 +68,22 @@ Each is asserted from both sides in [`test/loader.test.ts`](../../golden-loader/
 
 ## What the fixture directory does not yet hold
 
-**Eighteen scenarios, against a registry that defines 284.** The count is the stage's own, re-derived on every run rather than written here, and the honest form of it is **18 of 284**.
+**Twenty-one scenarios, against a registry that defines 284.** The count is the stage's own, re-derived on every run rather than written here, and the honest form of it is **21 of 284**.
 
-**Why writing them does not need an engine, and why it never did.** TR-01 puts the derivation in the plan document rather than in the implementation: every value in a fixture is read out of [M01](../../../docs/plans/M01-rules-engine.md)'s rule taxonomy, its Appendix A.1 column and the scenario's own registry row, by somebody reading prose. An engine is what the fixtures are eventually run against; it is not where their numbers come from. [ADR-048](../../../docs/decisions/ADR-048.md) is what makes writing them early **inert rather than premature**: polarity is derived per fixture from the rules the fixture cites, so a fixture for a rule the engine has not implemented is asserted to fail and is not a false red.
+**Why writing them does not need an engine, and why it never did.** TR-01 puts the derivation in the plan document rather than in the implementation: every value in a fixture is read out of [M01](../../../docs/plans/M01-rules-engine.md)'s rule taxonomy, its Appendix A column and the scenario's own registry row, by somebody reading prose. An engine is what the fixtures are eventually run against; it is not where their numbers come from.
+
+**[ADR-048](../../../docs/decisions/ADR-048.md) is ruled and is NOT yet wired, and this paragraph said otherwise until batch 2 checked it.** It read that polarity "is derived per fixture from the rules the fixture cites, so a fixture for a rule the engine has not implemented is asserted to fail and is not a false red". The ruling says that; the code does not do it yet. [`run.ts`](../../golden-loader/src/run.ts) still folds `evaluate`, which is still the scaffold's identity stub, and `engineIsIdentityStub()` still decides the direction **globally** for the whole directory. So **every fixture here is inverted today**, including the ones that cite only implemented rules, and the stage's skip count equals the fixture count. **The ADR's stated prerequisite is also still open**: it requires `source:` to become a resolvable citation enforced by a new `L-nn` rule "before or with the polarity change, never after it", and no rule checks `source` beyond refusing an empty string (`L-02`).
 
 **The batch of fifteen that took this directory from three to eighteen** is the part of GS-001 to GS-029 plus GS-063 that the current fixture format can state without inventing an input: GS-002, GS-005, GS-006, GS-007, GS-010, GS-012, GS-013, GS-014, GS-015, GS-016, GS-017, GS-018, GS-019, GS-025 and GS-063.
+
+**The batch of three that took it from eighteen to twenty-one** is the eval-consistency block: **GS-020, GS-023 and GS-024**, on a second plan record [`plans/MERIT-RAPID-50K.json`](plans/MERIT-RAPID-50K.json) transcribed from [M01 Appendix A.2](../../../docs/plans/M01-rules-engine.md), because Core EOD disables eval consistency and no Core EOD fixture can pin R-28, R-29 or R-30. GS-023 and GS-024 are a **boundary pair on one cent**: identical period profit of 500,000c, differing only in which day carries the cent, so an engine that computed the ratio by division or wrote `<` for `<=` cannot satisfy both.
 
 **What the format cannot yet reach, named rather than left as an absence:**
 
 | Held back | Why |
 |---|---|
 | GS-001, GS-003, GS-004, GS-030 to GS-032 | They turn on a session's **kind**: a fill timestamp inside a session, a half day, a halted day. [`calendars/cme-2026.json`](calendars/cme-2026.json) declares five full sessions and no fill stream, and inventing either would be transcription from recollection |
-| GS-020 to GS-024 | Consistency, which Core EOD **disables in the eval phase** ([M01 Appendix A.1](../../../docs/plans/M01-rules-engine.md)). They need a second plan record, transcribed from the Merit Rapid column |
+| GS-021, GS-022 | The consistency **denominator** rule (R-30), which skips the gate unless period profit is `> 0`. Reaching a zero or negative denominator at a moment the gate is tested requires the period to have been **reset by a settlement** (R-47), so these are funded consistency (R-36) rather than eval: R-36 is group F and unimplemented, and `L-11` refuses a fixture that states any settlement. **GS-020, GS-023 and GS-024 landed in batch 2** on the Merit Rapid record |
 | GS-026 to GS-029, GS-042 | Payout arithmetic. `evaluatePayout` and `clampPayout` are not the day fold, and the expectation sibling has no shape for a clamp result |
 | Everything from GS-071 | Replay, upgrade, and the module scenarios, which are not one account's day stream |
 
