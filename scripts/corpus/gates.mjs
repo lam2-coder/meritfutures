@@ -1174,6 +1174,23 @@ const ci06h = {
         'probe_calendar_revision_required.sql',
         "ADR-045's calendar prior-image guards are no longer probed (OI-06)",
       ],
+      // EC-157. PINNED IN THE SAME COMMIT THAT WIRES IT, which is the first
+      // time that has happened in this list. Every earlier entry records the
+      // opposite: probe_payout_hold.sql, probe_calendar_revision_required.sql
+      // and probe_reversible_contact_addresses.sql were each wired and left
+      // unpinned, three instances of OI-07, and the third was caught only
+      // because somebody went looking one file over.
+      //
+      // The reason this one matters as much as any: it is the only probe here
+      // whose failure mode is a constraint REFUSING a legitimate row. Delete it
+      // and the whole of EC-157 reverts to being a paragraph, because nothing
+      // else in the job would notice a migration putting the adjustment back
+      // into the closing identity.
+      [
+        'probe_daily_marks_identities.sql',
+        "EC-157's mark identities are no longer probed; nothing would catch the " +
+          'adjustment returning to the closing identity (Repair A, 0036)',
+      ],
       // OQ-M10-06. AND THIS IS OI-07 A THIRD TIME, CAUGHT BEFORE THE MERGE
       // RATHER THAN A DAY AFTER IT. probe_reversible_contact_addresses.sql was
       // wired into corpus.yml in the commit that created it and NOT added to
