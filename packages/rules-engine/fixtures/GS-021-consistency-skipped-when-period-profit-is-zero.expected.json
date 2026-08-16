@@ -1,0 +1,11 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 5000000,
+    "consistency_best_day_cents": 40000,
+    "consistency_period_profit_cents": 0
+  },
+  "events": ["day.closed", "day.closed"],
+  "pins": "a consistency period whose profit is exactly zero skips the gate instead of evaluating it, so R-29's cross-multiplication is never reached and no division is ever attempted",
+  "note": "THE TWO ACCUMULATORS ARE THE PIN AND THEY HAVE TO BE PINNED TOGETHER. `consistency_period_profit_cents: 0` alone is satisfied by an engine that never accumulated anything, and `consistency_best_day_cents: 40000` alone says nothing about the denominator. The pair is the state R-30 exists for: a numerator of 40,000 against a denominator of 0, which is the one combination where R-29 and R-30 disagree. THE BEST DAY IS 40,000 AND NOT -40,000 BECAUSE THE MAXIMUM IS TAKEN, NOT THE LAST VALUE: M01 section 3.6 updates it as `mark.realizedPnlCents > bestDay ? mark.realizedPnlCents : bestDay`, and -40,000 is not greater than 40,000, so the losing day moves the denominator without moving the numerator. `balance_cents: 5000000` states that the account is back at exactly its size, which is what makes the period profit zero rather than merely small: the two days cancel to the cent. TWO `day.closed` EVENTS AND NOTHING ELSE is the second half of the pin. The losing day is not a breach (4,995,000 is above the floor at open of 4,790,000), not a win day (-40,000 is not `>= 15,000`), and not a deferral, because a funded account has no pass to defer. An engine that crashed on the zero denominator, or emitted a gate failure as an event, produces a different list. WHAT THIS FIXTURE CANNOT YET PIN, stated rather than left as an absence: R-30's `skipped: true` flag lives in `engine_gates`, which is a nested object, and `diffEndState` compares flat fields with `Object.is`. A nested expectation would never match by reference, so the flag is unreachable from an expectation sibling until the comparison grows a path syntax. GS-080 is the row that needs that shape and is held back for the same reason."
+}
