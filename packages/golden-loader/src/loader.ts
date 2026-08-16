@@ -27,7 +27,6 @@ import { fileURLToPath } from 'node:url';
 import type {
   AccountId,
   AccountState,
-  Cents,
   DayMark,
   EngineInput,
   PlanConfigVersion,
@@ -574,38 +573,41 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
       );
     }
 
+    // MONEY CROSSES INTO THE ENGINE AS `bigint`, AND JSON HAS NO LITERAL FOR
+    // ONE. `Cents` is `bigint` (M01 section 2.1, INV-02: "all money is `bigint`
+    // integer cents at every boundary"), and a fixture is a text file where
+    // 5_000_000 is a JSON number. `requireInteger` is what makes the conversion
+    // safe rather than a cast: it has already rejected a non-integer and
+    // anything outside the safe range, so `BigInt` here widens a checked integer
+    // and cannot lose a cent. THE BOUNDARY IS THIS LINE and there is no other:
+    // nothing downstream of it holds money as a `number`.
     dayMarks.push({
       tradingDay: tradingDay as TradingDay,
-      openingBalanceCents: requireInteger(
-        row['opening_balance_cents'],
-        'L-10',
-        yamlFile,
-        `${where}.opening_balance_cents`,
-      ) as Cents,
-      closingBalanceCents: requireInteger(
-        row['closing_balance_cents'],
-        'L-10',
-        yamlFile,
-        `${where}.closing_balance_cents`,
-      ) as Cents,
-      highBalanceCents: requireInteger(
-        row['high_balance_cents'],
-        'L-10',
-        yamlFile,
-        `${where}.high_balance_cents`,
-      ) as Cents,
-      lowBalanceCents: requireInteger(
-        row['low_balance_cents'],
-        'L-10',
-        yamlFile,
-        `${where}.low_balance_cents`,
-      ) as Cents,
-      realizedPnlCents: requireInteger(
-        row['realized_pnl_cents'],
-        'L-10',
-        yamlFile,
-        `${where}.realized_pnl_cents`,
-      ) as Cents,
+      openingBalanceCents: BigInt(
+        requireInteger(
+          row['opening_balance_cents'],
+          'L-10',
+          yamlFile,
+          `${where}.opening_balance_cents`,
+        ),
+      ),
+      closingBalanceCents: BigInt(
+        requireInteger(
+          row['closing_balance_cents'],
+          'L-10',
+          yamlFile,
+          `${where}.closing_balance_cents`,
+        ),
+      ),
+      highBalanceCents: BigInt(
+        requireInteger(row['high_balance_cents'], 'L-10', yamlFile, `${where}.high_balance_cents`),
+      ),
+      lowBalanceCents: BigInt(
+        requireInteger(row['low_balance_cents'], 'L-10', yamlFile, `${where}.low_balance_cents`),
+      ),
+      realizedPnlCents: BigInt(
+        requireInteger(row['realized_pnl_cents'], 'L-10', yamlFile, `${where}.realized_pnl_cents`),
+      ),
       fillCount: requireInteger(row['fill_count'], 'L-10', yamlFile, `${where}.fill_count`),
       tradedDay,
     });
@@ -626,7 +628,7 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
   const accountState: AccountState = {
     accountId: id as AccountId,
     planVersionId: planConfig['planVersionId'] as PlanVersionId,
-    sizeCents: sizeCents as Cents,
+    sizeCents: BigInt(sizeCents),
   };
 
   return {

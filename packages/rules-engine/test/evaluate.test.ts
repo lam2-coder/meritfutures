@@ -18,7 +18,8 @@ const input: EngineInput = {
   accountState: {
     accountId: ACCOUNT,
     planVersionId: PLAN_VERSION,
-    sizeCents: 5_000_000 as Cents,
+    // `Cents` is `bigint` since the fold landed (M01 section 2.1, INV-02).
+    sizeCents: 5_000_000n as Cents,
   },
   dayMarks: [],
 };

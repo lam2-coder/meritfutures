@@ -18,8 +18,24 @@
 // compile error every time cents are handed to something expecting basis
 // points, which is a mistake that reads correctly in a diff.
 
-/** A quantity of money. Integer cents, always. Never a float, never a string. */
-export type Cents = number & { readonly __brand: 'Cents' };
+/**
+ * A quantity of money. Integer cents, always. Never a float, never a string.
+ *
+ * IT IS `bigint` AND IT WAS A BRANDED `number` UNTIL THE FOLD LANDED. M01
+ * section 2.1 declares `type Cents = bigint` and INV-02 is "all money is
+ * `bigint` integer cents AT EVERY BOUNDARY", enforced by "types plus a lint
+ * rule banning `number` in money-suffixed fields". The scaffold's branded
+ * number satisfied the second half of that sentence and not the first, which
+ * was correct while nothing computed with it and is not correct now: `advanceDay`
+ * adds, subtracts and compares these values on the breach path.
+ *
+ * THE BRAND IS NOT LOST, IT MOVED INTO THE TYPE ITSELF. What branding bought
+ * was a compile error when cents were handed to something expecting basis
+ * points; `Cents` is `bigint` and `BasisPoints` is `number`, so that error is
+ * now structural rather than nominal, and it costs no cast at the arithmetic
+ * sites where a brand would have cost one per expression.
+ */
+export type Cents = bigint;
 
 /** One hundredth of one percent. The unit every ruled threshold is stated in. */
 export type BasisPoints = number & { readonly __brand: 'BasisPoints' };
@@ -153,4 +169,409 @@ export interface EngineInput {
 export interface EngineResult {
   readonly newState: AccountState;
   readonly events: readonly EngineEvent[];
+}
+
+// =============================================================================
+// M01 SECTION 2: THE FOLD'S TYPES
+// =============================================================================
+// Everything above this line is the scaffold's `evaluate` surface, which the
+// golden loader imports and which exists so CI-03 can assert its inversion
+// against an engine that computes nothing. Everything below is M01's, and the
+// two meet on `Cents`, `TradingDay` and `EngineEvent` and nowhere else.
+//
+// WHAT IS DELIBERATELY ABSENT FROM `RuleState` BELOW, because a field the
+// engine cannot fill is worse than a field it does not declare:
+//
+//   withdrawableCents            R-35, group F, DO-9
+//   engineEligible, engineGates  R-33..R-41, group F, DO-9
+//   stateHash                    SD-08, and `hash.ts`, which replay needs and
+//                                the day fold does not
+//
+// Each lands with the rules that compute it, and widening a record nothing
+// outside this package reads yet is a diff rather than a migration.
+
+// -----------------------------------------------------------------------------
+// The calendar, as a VALUE (ADR-049)
+// -----------------------------------------------------------------------------
+
+/** One row of the trading calendar. M01 section 2.1. */
+export interface CalendarDay {
+  readonly tradingDay: TradingDay;
+  /** R-03: a half day is a full trading day for every counter. */
+  readonly isHalfDay: boolean;
+  /** R-04: on a halted session, day counters advance and win days do not. */
+  readonly halted: boolean;
+  /** Dense index into the calendar. Gap counting is subtraction, never date math (R-02). */
+  readonly sequence: number;
+}
+
+/**
+ * The window of calendar the caller loaded, and the interval it is entitled to
+ * answer for.
+ *
+ * ADR-049: a value, not an interface. "An interface carrying `get()` and
+ * `nextAfter()` is a CAPABILITY: a caller could satisfy it with a live query,
+ * with a memoiser, or with something that consults the clock, and every
+ * [purity] mechanism would stay green while the engine's output became a
+ * function of what the caller happened to do. A value has no behavior to
+ * smuggle."
+ *
+ * `coverage` is load bearing and is not derivable from `days`: a day INSIDE
+ * coverage that is not in `days` is positively not a trading day, and a day
+ * OUTSIDE coverage is UNKNOWN. Those two answers differ and only one of them is
+ * safe to act on (ADR-042 F-4, `0032`, and the fixture calendar's own L-08).
+ */
+export interface CalendarSlice {
+  /** Ascending by `tradingDay`, and by `sequence` with it. Built by `buildCalendarSlice`. */
+  readonly days: readonly CalendarDay[];
+  /** `tradingDay` to its position in `days`. Plain data, so it carries no behavior. */
+  readonly index: Readonly<Record<string, number>>;
+  readonly coverage: { readonly from: TradingDay; readonly to: TradingDay };
+}
+
+/**
+ * `true` when no property of `T` is function-valued.
+ *
+ * The probe is a call signature rather than `Function`: `(...args: never[]) =>
+ * unknown` is the widest callable there is, because a parameter list of `never`
+ * is assignable to every parameter list and `unknown` accepts every return.
+ */
+type NoFunctionValuedProperties<T> = {
+  [K in keyof T]-?: T[K] extends (...args: never[]) => unknown ? false : true;
+}[keyof T] extends true
+  ? true
+  : false;
+
+/**
+ * ADR-049's FOURTH MECHANISM, and it belongs here because the other three
+ * cannot cover it.
+ *
+ * `merit/engine-purity` bans every non-relative import and every clock
+ * spelling, `RI-01` asserts the manifest declares no workspace dependency, and
+ * the package's `types: []` deletes the ambient globals. NONE OF THE THREE SEES
+ * AN INTERFACE WHOSE IMPLEMENTATION READS A DATABASE, because that impurity
+ * arrives as an argument.
+ *
+ * If this line stops type-checking, `CalendarSlice` grew a callable property
+ * and the calendar stopped being data.
+ */
+export type CalendarSliceIsData = Assert<NoFunctionValuedProperties<CalendarSlice>>;
+
+// -----------------------------------------------------------------------------
+// The plan, resolved
+// -----------------------------------------------------------------------------
+// What `resolvePlan(rules, size)` produces and what `advanceDay` reads. THAT
+// FUNCTION IS NOT IN THIS SESSION (P2 section 7 gives it its own, P2-1); the
+// type is here because the fold cannot be typed without it, and it mirrors
+// `test/generators/plan-config.ts`'s `MaterializedPlan` field for field so that
+// the resolution is a mechanical transcription when it lands.
+//
+// NO FIELD IS OPTIONAL AND NO VALUE IS NULLABLE WHERE A UNION SAYS IT BETTER.
+// M01's own sketch writes `floorLockAtProfitCents!` and `dailyLossLimitCents!`,
+// which is a non-null assertion standing in for a rule CV-16 and CV-11 state
+// exactly: the value is present precisely when the feature is enabled. A
+// discriminated union says that in the type system, so the engine never asserts
+// non-null on a money field.
+
+/** CV-01's vocabulary. `intraday_trailing` is rejected at publish and never reaches here. */
+export type DrawdownType = 'trailing_eod' | 'static';
+
+/** R-15. Disabled carries no values, which is CV-11 and CV-12 made structural. */
+export type FloorLockRules =
+  | { readonly enabled: false }
+  | {
+      readonly enabled: true;
+      /** CV-12's left-hand side: profit at which the lock engages. */
+      readonly atProfitCents: Cents;
+      /** The floor the lock pins, permanently (R-15). */
+      readonly floorAtCents: Cents;
+    };
+
+export interface DrawdownRules {
+  readonly type: DrawdownType;
+  /** Materialized from `amount_bp` at publish. CV-02. */
+  readonly drawdownCents: Cents;
+  readonly lock: FloorLockRules;
+}
+
+/** CV-16. The limit is present exactly when the type is not `none`. */
+export type DailyLossLimitRules =
+  { readonly type: 'none' } | { readonly type: 'soft' | 'hard'; readonly limitCents: Cents };
+
+/** CV-06. Disabled carries no share, which is why R-29 can never read a null. */
+export type ConsistencyRules =
+  { readonly enabled: false } | { readonly enabled: true; readonly maxDayShareBp: BasisPoints };
+
+/** CV-09. `from_ordinal` strictly increasing, first entry at ordinal 1. */
+export interface CapScheduleStep {
+  readonly fromOrdinal: number;
+  readonly capCents: Cents;
+}
+
+/**
+ * What the day fold reads whichever phase the account is in.
+ *
+ * M01 section 3.6 picks one of these per day (`const rules = s.phase === 'eval'
+ * ? plan.eval : plan.funded`) and then reads `drawdown`, `dailyLossLimit` and
+ * `winDayFloorCents` off it.
+ *
+ * `winDayFloorCents` IS CARRIED ON BOTH PHASES AND `MaterializedPlan` CARRIES IT
+ * ON ONE. `plan_versions.rules.win_days` is a plan-level block and Appendix A
+ * lists one "win day floor" per plan rather than one per phase, so resolution
+ * copies the single published value onto both phases. The alternative, reading
+ * `plan.funded.winDays` from inside an eval-phase day, would put a funded
+ * parameter on the eval path where no rule says it belongs.
+ */
+export interface PhaseDayRules {
+  readonly drawdown: DrawdownRules;
+  readonly dailyLossLimit: DailyLossLimitRules;
+  /** R-09's right-hand side, materialized from `floor_bp`. CV-05. */
+  readonly winDayFloorCents: Cents;
+}
+
+export interface EvalPhaseRules extends PhaseDayRules {
+  /** CV-03. R-26's right-hand side. */
+  readonly profitTargetCents: Cents;
+  /** CV-04. R-27. */
+  readonly minTradingDays: number;
+  /** R-28, pass-time and dilutable. */
+  readonly consistency: ConsistencyRules;
+  /** R-32. `null` on all three v1 plans, so expiry is unreachable. */
+  readonly maxDays: number | null;
+}
+
+export interface FundedPhaseRules extends PhaseDayRules {
+  /** CV-19. Zero disables the gate and it reports `skipped: true` (R-33). */
+  readonly minTradingDays: number;
+  /** CV-05. R-34. */
+  readonly winDaysRequiredCount: number;
+  /** R-36, payout-gated. */
+  readonly consistency: ConsistencyRules;
+  /** CV-07, CV-11. R-35. Permanent, and never withdrawable. */
+  readonly bufferCents: Cents;
+  /** CV-08. R-37. */
+  readonly cadenceGapTradingDays: number;
+  /** CV-09, CV-10, CV-17. R-42. */
+  readonly payoutCapSchedule: readonly CapScheduleStep[];
+  /** CV-15. Fixed at 10,000c and never scaled by size. R-39. */
+  readonly minPayoutCents: Cents;
+  /** CV-13. R-44. */
+  readonly splitBp: BasisPoints;
+  /** CV-14 under ADR-030's canonical name. R-49. */
+  readonly maxPayouts: number;
+}
+
+/**
+ * One published plan at one size, as the engine reads it.
+ *
+ * `eval` is `null` exactly when the plan has no evaluation phase, which is
+ * Direct (Appendix A.3, "Eval phase: disabled"). M01's sketch writes
+ * `plan.eval!` throughout; the null is the same fact without the assertion.
+ */
+export interface ResolvedPlan {
+  readonly planVersionId: PlanVersionId;
+  readonly sizeCents: Cents;
+  readonly eval: EvalPhaseRules | null;
+  readonly funded: FundedPhaseRules;
+}
+
+// -----------------------------------------------------------------------------
+// The day's inputs
+// -----------------------------------------------------------------------------
+
+/**
+ * Exactly the live row from `daily_marks` (M01 section 2.1).
+ *
+ * `tradedDay` and `winDay` are NOT here and `0014_marks.sql` stores both. They
+ * are stored because the batch writes what it observed; the engine DERIVES them
+ * (R-08 is `fill_count > 0`, R-09 is `realized_pnl_cents >= win_day_floor_cents`
+ * at the account's pinned plan), and an engine that read them would be an engine
+ * whose breach and win-day arithmetic depended on the ingester agreeing with it.
+ * `test/generators/day-input.ts` emits them because a generator emits rows the
+ * database can hold; the fold reads the columns the rules are stated against.
+ */
+export interface DailyMark {
+  readonly tradingDay: TradingDay;
+  readonly openingBalanceCents: Cents;
+  readonly closingBalanceCents: Cents;
+  readonly highBalanceCents: Cents;
+  readonly lowBalanceCents: Cents;
+  /** Signed, from fills only. */
+  readonly realizedPnlCents: Cents;
+  /** SD-01. Signed non-trading movement, applied BETWEEN sessions (R-10). */
+  readonly adjustmentCents: Cents;
+  readonly fillCount: number;
+  readonly sourceHash: string;
+}
+
+/** M01 section 2.1. Consumed at DO-2 by `applySettlement`, which is group H. */
+export interface SettlementFact {
+  readonly payoutRequestId: string;
+  /** `payoutsSettledCount + 1` at request time (R-45). */
+  readonly ordinal: number;
+  readonly approvedCents: Cents;
+  /** What the decision was computed against (R-46, R-47). */
+  readonly basisTradingDay: TradingDay;
+  /** First trading day whose opening balance reflects the withdrawal (SD-03). */
+  readonly effectiveTradingDay: TradingDay;
+}
+
+/**
+ * One trading day for one account, and everything the fold is allowed to read.
+ *
+ * `calendar` is a `CalendarSlice` rather than M01's single `CalendarDay`, which
+ * is the widening ADR-049 authorises: R-37 counts a cadence gap by sequence
+ * subtraction from an anchor that may be months old, and R-47 needs the trading
+ * day AFTER a basis day, and neither is computable from one row.
+ */
+export interface DayInput {
+  readonly engineVersion: string;
+  readonly plan: ResolvedPlan;
+  /** `null` only on the account's first trading day. */
+  readonly prior: RuleState | null;
+  readonly mark: DailyMark;
+  readonly calendar: CalendarSlice;
+  /** Those whose `effectiveTradingDay` equals `mark.tradingDay`. */
+  readonly settlements: readonly SettlementFact[];
+}
+
+// -----------------------------------------------------------------------------
+// The day's outputs
+// -----------------------------------------------------------------------------
+
+export type Phase = 'eval' | 'funded' | 'closed' | 'graduated';
+
+export type BreachKind = 'trailing_eod_floor' | 'static_floor' | 'hard_daily_loss_limit';
+
+/**
+ * One row of `rule_states`: the whole fold accumulator, minus the three field
+ * groups named at the top of this section.
+ */
+export interface RuleState {
+  readonly tradingDay: TradingDay;
+  readonly phase: Phase;
+  readonly balanceCents: Cents;
+  /** SD-04. The floor THIS day's breach check compared against (R-18). */
+  readonly floorOpenCents: Cents;
+  /** The floor carried into the next day. */
+  readonly floorCents: Cents;
+  readonly floorLocked: boolean;
+  readonly highWaterBalanceCents: Cents;
+  /** Phase scoped (R-33). */
+  readonly tradedDaysCount: number;
+  /** Anchor scoped (R-34, R-47). */
+  readonly winDaysCount: number;
+  readonly consistencyBestDayCents: Cents;
+  readonly consistencyPeriodProfitCents: Cents;
+  /** SD-07. `null` before any period has been anchored. */
+  readonly consistencyPeriodStartDay: TradingDay | null;
+  readonly payoutsSettledCount: number;
+  /** SD-02. Basis day of the last settled payout (R-46). */
+  readonly payoutAnchorDay: TradingDay | null;
+  /** SD-02. Wallet-credit day of the last settled payout (R-46, ADR-019). */
+  readonly cadenceAnchorDay: TradingDay | null;
+  readonly lifetimeSettledCents: Cents;
+  readonly breached: boolean;
+  readonly breachKind: BreachKind | null;
+  readonly engineVersion: string;
+}
+
+/**
+ * Why the engine refused to compute a day.
+ *
+ * THE ENGINE REFUSES RATHER THAN GUESSING, and it refuses without throwing.
+ * M01 FM-05: "This is the one place the engine refuses to compute rather than
+ * computing something plausible." ADR-049 extends the same channel to a
+ * calendar lookup that lands outside coverage, "identical to DO-3's INV-18
+ * handling: no state is written for the day, reconciliation is raised, and
+ * nothing throws".
+ *
+ * WHEN AN `AssertionFailure` IS RETURNED, NO STATE IS WRITTEN FOR THE DAY. The
+ * `state` on the output is the state the fold arrived with, carried so the
+ * caller can report which day refused and against what.
+ */
+export type AssertionKind =
+  /** INV-18. `opening == prior.balance + adjustment` (R-07, EC-047). */
+  | 'opening_mismatch'
+  /** INV-19. `closing == opening + realized_pnl`. */
+  | 'closing_mismatch'
+  /** INV-20. The first funded mark opens at exactly `size_cents` (AS-14). */
+  | 'funded_start_not_size'
+  /** DO-1. The account is `closed` or `graduated`; breach is terminal (R-24). */
+  | 'account_closed'
+  /** DO-1. The mark is not strictly after the prior state's day (INV-14). */
+  | 'not_forward'
+  /** DO-1, FM-13. The day is inside coverage and is not a session. */
+  | 'day_not_a_session'
+  /** ADR-049. The day is outside the slice's coverage, so the answer is UNKNOWN. */
+  | 'calendar_coverage_miss'
+  /** DO-2. `applySettlement` is group H and is not written. */
+  | 'settlement_unimplemented'
+  /** DO-8. The eval progression is group E and is not written. */
+  | 'eval_progression_unimplemented';
+
+export interface AssertionFailure {
+  readonly kind: AssertionKind;
+  readonly tradingDay: TradingDay;
+  /** Present on the arithmetic identities, which are the ones with two numbers. */
+  readonly expected?: Cents;
+  readonly got?: Cents;
+  /** Prose naming the finding, so a page says what refused rather than that something did. */
+  readonly detail: string;
+}
+
+export interface DayOutput {
+  readonly state: RuleState;
+  /** Facts, in emission order (M01 section 5). */
+  readonly events: readonly EngineEvent[];
+  /** Non-empty means NO STATE IS WRITTEN for this day and reconciliation is raised. */
+  readonly assertions: readonly AssertionFailure[];
+}
+
+// -----------------------------------------------------------------------------
+// The events the day fold emits
+// -----------------------------------------------------------------------------
+// M01 section 5.2, and every payload below is that table's. NO EVENT CARRIES AN
+// ACCOUNT ID: `DayInput` does not contain one, because the fold is per account
+// by construction and the caller that supplied the marks is the one that knows
+// whose they are.
+
+/** DO-9, once per account per trading day. */
+export interface DayClosedEvent extends EngineEvent {
+  readonly type: 'day.closed';
+  readonly closingBalanceCents: Cents;
+  /** SD-01, carried because a settled payout is not a trading loss (AS-10). */
+  readonly adjustmentCents: Cents;
+  /** SD-04, so the evidence pack can show WHICH floor the day was judged against. */
+  readonly floorOpenCents: Cents;
+  readonly floorCents: Cents;
+  readonly tradedDaysCount: number;
+  readonly winDaysCount: number;
+  /** SD-07. */
+  readonly consistencyPeriodStartDay: TradingDay | null;
+}
+
+/** DO-5. */
+export interface BreachDetectedEvent extends EngineEvent {
+  readonly type: 'breach.detected';
+  readonly breachKind: BreachKind;
+  readonly lowBalanceCents: Cents;
+  /** The floor at the open, which is the one the decision compared against (R-18). */
+  readonly floorCents: Cents;
+  /** How far under. Zero on a daily-loss-limit breach, where the floor was not the cause. */
+  readonly shortfallCents: Cents;
+}
+
+/** R-15. The lock is permanent and changes the trader's risk profile for good. */
+export interface FloorLockedEvent extends EngineEvent {
+  readonly type: 'rule.floor_locked';
+  readonly atProfitCents: Cents;
+  readonly lockedFloorCents: Cents;
+}
+
+/** R-23. A fact, never a breach. Enforcement, if any, is the platform's. */
+export interface SoftDailyLossLimitEvent extends EngineEvent {
+  readonly type: 'rule.soft_dll_exceeded';
+  readonly realizedPnlCents: Cents;
+  readonly limitCents: Cents;
 }

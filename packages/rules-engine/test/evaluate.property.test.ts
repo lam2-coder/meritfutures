@@ -20,8 +20,11 @@ import type {
 // first impurity that reaches it. The `PT-nn` suites over the actual rules are
 // M01's, per STRATEGY section 3.1.
 
+// `Cents` is `bigint` since the fold landed (M01 section 2.1, INV-02), so the
+// arbitrary draws an integer and widens it rather than branding it. The bounds
+// are unchanged: they are a plausible money range, not a type constraint.
 const cents = (): fc.Arbitrary<Cents> =>
-  fc.integer({ min: -100_000_000, max: 100_000_000 }).map((n) => n as Cents);
+  fc.integer({ min: -100_000_000, max: 100_000_000 }).map((n) => BigInt(n));
 
 const dayMark = (): fc.Arbitrary<DayMark> =>
   fc.record({
