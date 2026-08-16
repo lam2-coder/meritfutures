@@ -434,6 +434,33 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## The synthetic simulator emits files, and the vendor-call diff is now executable (2026-08-16)
+
+**[M02](plans/M02-rithmic-bridge.md) section 1.1's second implementation of the platform adapter exists, in file mode** ([session 45](sessions/2026-08-16-session-45.md)). `packages/rithmic/src/simulator/` emits **EOD report files and their per-fill sibling** in the vendor's publicly described CSV shape, from a seeded account population, deterministically. Non-money. `pnpm run verify` green: **390 tests, 6 invariants, 15 gates clean and dirty.**
+
+**It emits FILES rather than objects**, which is INV-M2-11 made architectural rather than promised: the simulator writes CSV into the ingest directory and nothing downstream can tell it apart from a vendor delivery (GS-084). A mock at the parser boundary would leave the parser untested by every test that appears to test it, which is what [STRATEGY section 2](testing/STRATEGY.md) rejected by name.
+
+| Claim | How it is held |
+|---|---|
+| **Same seed, byte-identical output** | Four assertions, each catching what the others cannot: two renders in one process agree, the **committed** canonical bytes still match, a **different** seed produces **different** bytes, and growing the population does not move an existing account's rows |
+| **Draws are keyed, not streamed** | Account `i` is a pure function of `(seed, i)` and a day is a pure function of `(seed, account, day, purpose)`. A stream reproduces one program run and moves every draw after an inserted account, so every fixture derived against it moves for a reason that has nothing to do with its scenario |
+| **No clock, no locale, no ambient randomness** | `no-clock.test.ts` scans `src/` for twelve constructs and is **watched firing on a seeded violation** and watched **not** firing on the prose that explains the ban. `time.ts` does instant arithmetic without `Date`, which accepts the 30th of February and returns Invalid Date rather than throwing |
+| **Integer throughout** | `bigint` cents, exact rational prices, tick excursions. `formatMoney` places the sign by hand because BigInt division truncates toward zero and a naive implementation renders minus one cent as `0.01` |
+| **The comment list is the diff** | `assumptions.ts` classifies **every** row of M02 section 11, and `vendor-assumptions.test.ts` **parses section 11** and closes three ways: the in-scope and out-of-scope lists partition it exactly, every in-scope row is cited in `src/`, and every citation names a row that exists. **No count is written anywhere** ([ADR-034](decisions/ADR-034.md)). A row added to section 11 fails the suite until it is classified |
+
+**Two gaps found while building, recorded and deliberately not fixed here.**
+
+| Gap | Why it is recorded rather than ruled |
+|---|---|
+| **`V-M2-01` names four report fields and a mark needs six.** `daily_marks` (0014) declares `high_balance_cents` and `low_balance_cents` **NOT NULL** and the low is *the breach comparison input*. [GLOSSARY](GLOSSARY.md)'s definition of a mark carries both; `V-M2-01`'s summary of the field list does not name them | If the real report omits them they are **not derivable** from closed round trips, so the row's blast becomes **design** rather than **edit**: either the fills file carries the path or tier 2 stops being indicative, which `INV-M2-14` forbids. **Adding a seventeenth row to M02 section 11 is an ADR, not a commit**: M02 is at `status: review` under [ADR-005](decisions/ADR-005.md) and a session that adds a row to another document's registry while building against it has claimed an identifier it does not own |
+| **Inbound file naming is relied on and no row asserts it.** Section 3.3's `merit_<operation>_...` is the **outbound** provisioning name. Section 3.4's disposition table branches on whether a **vendor** filename has been seen before, so a convention is assumed | Same reason. `V-M2-03` and `V-M2-04` are the rows that move if it is wrong, and both are cited at the naming code |
+
+**Streaming mode is NOT built and the seam is named.** [ADR-020](decisions/ADR-020.md)'s tier 2 (`V-M2-16`) is a later session by the standing brief. The seam is `SimDay.waypoints`, the intraday equity path file mode summarises into `high_balance` and `low_balance` and discards: **one day model, two consumers**, which is the only arrangement in which the two modes cannot disagree about what happened on a day. `session.ts` names the three things that session owns and this one did not touch, including that `LiveAccountTick` must not become a rename of `SimWaypoint`.
+
+**`PlatformAdapter` is still unimplemented, and that is the boundary rather than an omission.** `ingestEOD` and `ingestFills` **consume** files; the simulator **produces** them. **No `GS-nnn` is claimed**: GS-084 to GS-093 each need a parser to assert against, and this package can now emit the files several of them want.
+
+---
+
 ## `advanceDay` exists: sixteen of M01's fifty rules, and the other thirty-four say so out loud (2026-08-16)
 
 **[P2](plans/P2-rules-engine.md) section 7's `P2-3` has landed** ([session 44](sessions/2026-08-16-session-44.md)). The fold is real code, the day-evaluation order is M01 section 3.1's and no other, and `pnpm run verify` is green: **312 tests, 15 corpus gates clean and dirty, 6 CI-02 seeded violations.**
