@@ -105,18 +105,26 @@ Two of the three ways out are already closed. Landing all fifty rules in one ses
 
 ---
 
-## 5. The eight `PT-nn`
+## 5. The `PT-nn`, and P2's done-condition names SEVEN of them
 
 **Seven of the eight need the engine, and the eighth is not an engine property at all.** That is not a scheduling accident; it is what "longest pole" means.
+
+> **RULED (2026-08-16). `OQ-P2-04` is closed BOTH ways rather than either way, because both halves of the question were real.**
+>
+> **P2's done-condition names SEVEN properties.** `PT-03` is ledger zero-sum, it tests ledger transactions in aggregate, and **the ledger does not exist until P3**. A done-condition naming a property nothing in the phase can express is a done-condition that can never be met, and the honest repair is to stop naming it.
+>
+> **AND P2 owns the R-44 half.** `trader_cents + firm_cents == approved_cents` is **engine arithmetic in `clampPayout`**, it needs no ledger, and it is `INV-11`. It lands in P2 with group G, asserted by `GS-029`, **under its own name rather than as a fragment of `PT-03`**. Calling it half of `PT-03` is what made the property look half-expressible: it is not half of a ledger property, it is a whole engine one.
+>
+> **`PT-03` itself moves to P3 intact**, where the ledger it tests exists, keeping its pairing with `GS-231`.
 
 | Property | Expressible before the engine? |
 |---|---|
 | PT-01 floor monotonicity, PT-02 win-day reset, PT-04 withdrawable floor, PT-07 idempotence | **No.** Each asserts over engine output |
 | PT-05 clamp inequality, PT-08 lifetime bound | **No**, but each lands early: `clampPayout` and `applySettlement` are small pure functions with no calendar dependency |
 | PT-06 replay determinism | **Harness yes, assertion no.** The `TZ` and `LC_ALL` randomization and the `RE-D-03` dependency-graph assertion are expressible and meaningful today; the determinism claim is vacuous against a stub |
-| **PT-03 ledger zero-sum** | **Not an engine property.** It tests ledger transactions in aggregate and pairs with GS-231, an M20 wallet scenario. The ledger does not exist until P3 |
+| **PT-03 ledger zero-sum** | **Not an engine property, and NOT in P2's done-condition** (ruled 2026-08-16). It tests ledger transactions in aggregate and pairs with GS-231, an M20 wallet scenario. The ledger does not exist until P3, so it moves there whole. **The R-44 arithmetic half (`trader + firm == approved`, `INV-11`) is P2's and lands with group G under its own name** |
 
-**PT-03 makes P2's stated done-condition unsatisfiable as written.** It needs a ruling: either P2 owns the R-44 half only (`trader + firm == approved`, which is engine arithmetic), or the done-condition names seven.
+**PT-03 made P2's stated done-condition unsatisfiable as written, and the ruling above closes it.** The done-condition names **seven**, `PT-03` moves to P3 whole, and the R-44 arithmetic P2 genuinely owns is asserted under its own name instead of as a fragment of a property whose other half needs a ledger.
 
 **What is genuinely buildable before the engine is the expensive half.** The `fast-check` generators: arbitrary day sequences, arbitrary settlement sequences, and arbitrary plans **satisfying CV-01 to CV-19**. A generator that emits only valid plans is the config contract made executable, it depends on nothing but the ruled parameter set, and every one of the eight consumes it.
 
@@ -157,12 +165,12 @@ Four items, each blocking, none an engineering call.
 
 | # | Item | Form |
 |---|---|---|
-| **OQ-P2-01** | `CalendarSlice` as a value, its coverage interval, and a miss returning an assertion. Widens `DayInput` in an approved document | ADR |
-| **OQ-P2-02** | The calendar revision on `rule_states`, and Appendix B.4's protocol extended to it | ADR plus a migration in its own money-path session |
-| **OQ-P2-03** | Per-fixture polarity derived from the declared rule set. It changes what a green CI-03 means, which is what [ADR-038](../decisions/ADR-038.md) exists to keep honest | ADR |
-| **OQ-P2-04** | PT-03's status in P2's done-condition | Founder ruling |
+| **OQ-P2-01** | `CalendarSlice` as a value, its coverage interval, and a miss returning an assertion. Widens `DayInput` in an approved document | **CLOSED**, [ADR-046](../decisions/ADR-046.md) |
+| **OQ-P2-02** | The calendar revision on `rule_states`, and Appendix B.4's protocol extended to it | **CLOSED**, [ADR-047](../decisions/ADR-047.md). **`0034` is claimed and unwritten**: the migration is money path and takes its own session |
+| **OQ-P2-03** | Per-fixture polarity derived from the declared rule set. It changes what a green CI-03 means, which is what [ADR-038](../decisions/ADR-038.md) exists to keep honest | **CLOSED**, [ADR-048](../decisions/ADR-048.md). **It carries a stated prerequisite**: section 2's resolvable-citation `L-nn` rule lands before or with it, because a fixture citing nothing makes the polarity test **vacuously true** |
+| **OQ-P2-04** | PT-03's status in P2's done-condition | **CLOSED** (2026-08-16), section 5. The done-condition names **seven**; `PT-03` moves to P3 whole; the R-44 arithmetic half is P2's under its own name |
 
-**Two records also need correcting, and neither is P2's to fix silently.** The ownership partition in [golden-scenarios section 33](../testing/golden-scenarios/33-ownership-index-and-coverage-reconciliation.md) sums to 257 and does not cover `GS-258` to `GS-284`; and P2 owes M1's owned set rather than the registry total.
+**Two records also needed correcting, and neither was P2's to fix silently. Both are fixed as of 2026-08-16.** The ownership partition in [golden-scenarios section 33](../testing/golden-scenarios/33-ownership-index-and-coverage-reconciliation.md) summed to 257 and did not cover `GS-258` to `GS-284`; the twenty-seven are now assigned and the partition sums to the registry. And **P2 owes M1's owned set of 73** rather than the registry total, which section 33 now states where the partition is read rather than only here.
 
 ---
 

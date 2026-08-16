@@ -50,6 +50,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
+const OWNERSHIP_DOC =
+  'docs/testing/golden-scenarios/33-ownership-index-and-coverage-reconciliation.md';
+
 const edit = (dir, file, fn) => {
   const p = join(dir, file);
   writeFileSync(p, fn(readFileSync(p, 'utf8')));
@@ -839,6 +842,40 @@ const SCOPE_CASES = [
       row.cells[1] = `${row.cells[1]} probe`;
       s.lines[row.i] = `| ${row.cells.join(' | ')} |`;
       s.write(s.lines);
+    },
+  },
+  {
+    name: 'CI-06d/unowned-scenario',
+    gate: 'CI-06d',
+    what: 'a scenario dropped from the ownership partition, which MUST be a finding',
+    // THE DRIFT THIS ACTUALLY CAUGHT, kept as a case so it cannot recur. The
+    // partition read 257 against a registry of 284 for as long as GS-258 to
+    // GS-284 existed, and section 33.1 went on calling itself a partition while
+    // twenty-seven scenarios were owned by nobody. Its own paragraph claimed the
+    // sum agreed "or the build fails" and NO CHECK EXISTED.
+    //
+    // The target is DERIVED: whichever scenario the LAST owner row happens to
+    // claim last, so a seed pinned to a number cannot go stale the way the two
+    // pinned to `0029` did.
+    expect: 'is in the registry and owned by nobody',
+    seed: (d) => {
+      const p = join(d, OWNERSHIP_DOC);
+      const lines = readFileSync(p, 'utf8').split('\n');
+      const cut = lines.findIndex((l) => l.startsWith('### 33.2'));
+      let last = -1;
+      for (let i = 0; i < (cut === -1 ? lines.length : cut); i++) {
+        if (/^\|\s*\*\*.+?\*\*\s*\|\s*.*GS-\d{3}.*\|\s*\d+\s*\|$/.test(lines[i].trim())) last = i;
+      }
+      if (last === -1) throw new Error('seed anchor not found: no owner row in section 33.1');
+      const cells = lines[last].trim().replace(/^\|/, '').replace(/\|$/, '').split('|');
+      const parts = cells[1].split(',');
+      parts.pop();
+      cells[1] = ` ${parts.join(',').trim()} `;
+      // The declared count drops with it, so this seeds the UNOWNED direction
+      // rather than tripping the declared-count assertion instead.
+      cells[2] = ` ${Number(cells[2].trim()) - 1} `;
+      lines[last] = `|${cells.join('|')}|`;
+      writeFileSync(p, lines.join('\n'));
     },
   },
   {
