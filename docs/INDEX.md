@@ -42,7 +42,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [decisions/ALLOCATION.md](decisions/ALLOCATION.md) | The **three number allocation tables** (ADR numbers, [ADR-034](decisions/ADR-034.md) and [CI-06f](testing/STRATEGY.md); migration numbers, [ADR-036](decisions/ADR-036.md) and [CI-06h](testing/STRATEGY.md); CI gate letters, no gate yet). Kept in one file because each is read as a table. Counts live in the file, not in this row | approved | founder |
 | [edge-cases/](edge-cases/README.md) | Living registry, one file per entry since [ADR-043](decisions/ADR-043.md), holding <!--gen:ec_count-->141<!--/gen--> entries. The Appendix B4 battery stays one file: 22 table rows are not 22 documents. EC-001 to EC-050 approved with M01; EC-051+ carry their module status. Entry files are fragments indexed by that README under `CI-06n` | approved | founder |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | approved | founder |
-| [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **New.** Constitution section 8 re-planned: 18 weeks, the launch-blocking triage across M11 to M20, the pre-FREEZE queue, and the one trade actually available | approved | founder |
+| [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **New.** Constitution section 8 re-planned: **18 weeks plus 3 to 5 days**, the launch-blocking triage across M11 to M20, the pre-FREEZE queue, and the one trade actually available. [ADR-041](decisions/ADR-041.md)'s M15 partial is the sixth addition and the first since FREEZE | approved | founder |
 
 ## research/ (Wave 1: APPROVED)
 | Doc | Purpose | Status | Owner |
@@ -89,7 +89,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M12-statistic-definitions.md](plans/M12-statistic-definitions.md) | The seven definitions as a founder sign-off table, drafted before any data exists. **Amended by [ADR-031](decisions/ADR-031.md) and [ADR-032](decisions/ADR-032.md):** each statistic now declares its measure set and its integer unit | approved | founder |
 | [M13-trader-analytics-journal.md](plans/M13-trader-analytics-journal.md) | Per-account analytics from engine tables, private journal, load isolation from the payout path | approved | founder |
 | [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | **Amended by [ADR-025](decisions/ADR-025.md):** cap release rejected, cross-account loyalty added, INV-M14-11 bounds invariance | approved | founder |
-| [M15-discord-integration.md](plans/M15-discord-integration.md) | Per-role consent, a link that is never a credential, template-only announcements. Post-launch | approved | founder |
+| [M15-discord-integration.md](plans/M15-discord-integration.md) | Per-role consent, a link that is never a credential, template-only announcements. **The link and the announcements are launch scope at P8 by [ADR-041](decisions/ADR-041.md); role sync stays post-launch** | approved | founder |
 | [M16-notification-center.md](plans/M16-notification-center.md) | Five classes deciding what a preference may silence, contact-change ceremony, template allowlist | approved | founder |
 | [M17-offers-engine.md](plans/M17-offers-engine.md) | Server-authoritative pricing, dual-controlled floors, identity-bound offers, credit provenance | approved | founder |
 | [M18-graduation-track.md](plans/M18-graduation-track.md) | Ladder finiteness disclosed pre-purchase, countdown tracker, mechanical graduation, terminal settlement. **No live program at launch** | approved | founder |
