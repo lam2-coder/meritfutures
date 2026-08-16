@@ -1,7 +1,20 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+
+    // `src/seed/calendars/generate.mjs` is plain JS because it is a BUILD STEP
+    // WITH A COMMAND LINE: CI-06m and the loader both invoke it as
+    // `node generate.mjs`, and nothing in this repository builds TypeScript
+    // (`noEmit` is the whole job, base config). `allowJs` lets the test suite
+    // import it and get its inferred types.
+    //
+    // `checkJs` is deliberately OFF and `allowJs` deliberately ON, rather than
+    // a hand-written `.d.mts` beside the generator. A declaration file is a
+    // second statement of one API, maintained by hand, which is the drift class
+    // this session exists to remove one table over. Inference has no second
+    // copy to go stale.
+    "allowJs": true
   },
 
   // `migrations/` IS NOT INCLUDED AND NEVER WILL BE. Migrations are plain

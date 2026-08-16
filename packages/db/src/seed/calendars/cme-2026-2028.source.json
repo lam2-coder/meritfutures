@@ -1,0 +1,38 @@
+{
+  "id": "cme-2026-2028",
+  "status": "awaiting-transcription",
+  "_status_note": "NOT LOADABLE AND NOT GENERATABLE. `generate.mjs` refuses this file on `source-not-transcribed` and on `exception-list-not-transcribed`, deliberately and by design. The shape, the coverage bounds and the session rule are settled and reviewable here; the VALUES are not present because the CME publication could not be retrieved in the session that wrote this file (see README.md, `The retrieval that did not happen`). NULL IS NOT THE EMPTY LIST: `holidays: null` says nobody has read the publication, `holidays: []` would assert the exchange closes on no day of the year and would load clean while making every counter advance through Christmas. This is ADR-042 F-1's lesson, that a holiday is a positive fact rather than an absence, applied one layer earlier to the file.",
+
+  "provenance": {
+    "_note": "ADR-042 verbatim: source URL, retrieval date, the retrieved artifact committed beside it, and its SHA-256. `artifact` names a file in this directory. `artifact_sha256` is the digest of THE BYTES THE EXCHANGE SERVED, and it is NOT the digest the loader writes to `trading_calendar_loads.source_digest`, which is the digest of THIS FILE. Both are needed and neither substitutes for the other.",
+    "source_url": null,
+    "retrieved_at": null,
+    "retrieved_by": null,
+    "artifact": null,
+    "artifact_sha256": null
+  },
+
+  "coverage": {
+    "_note": "ADR-042 OQ-SE-02, ruled: the current year plus two, which is about as far as CME publishes, so it is the honest maximum rather than a chosen one. Written 2026-08-16, so 2026 through 2028. Inclusive bounds, in exchange CT trading-day space, the same domain as `trading_calendar.trading_day`, never a UTC calendar date derived from a timestamp. The horizon alarm warns when coverage runs less than six months ahead.",
+    "from": "2026-01-01",
+    "to": "2028-12-31"
+  },
+
+  "session_rule": {
+    "_note": "P1 S-E section 3.1, verbatim: every weekday inside coverage that is not a holiday, 17:00 CT on the prior calendar day to 16:00 CT on the trading day. This lives in the file rather than in the generator because a rule that changes should move as a reviewed data change, not as a code edit that silently rewrites every historical row on the next regeneration. `open_day_offset: -1` is why Monday's session opens on Sunday evening.",
+    "timezone": "America/Chicago",
+    "open_ct": "17:00",
+    "open_day_offset": -1,
+    "close_ct": "16:00"
+  },
+
+  "holidays": null,
+  "early_closes": null,
+
+  "declared": {
+    "_note": "The transcriber's own count, stated independently of the lists so the two must agree. `checkRows` rejects a disagreement on `declared-count-disagrees`. Two independent statements of one number is the point of stating it twice, and it is the check that catches a row deleted while editing.",
+    "holiday_count": null,
+    "early_close_count": null,
+    "session_count": null
+  }
+}
