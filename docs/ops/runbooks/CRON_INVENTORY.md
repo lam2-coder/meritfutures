@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [README.md, ../../architecture/INFRA.md, ../../decisions/README.md, ../../plans/M01-rules-engine.md, ../../plans/M12-transparency-platform.md]
-last_updated: 2026-08-14
+depends_on: [README.md, ../../architecture/INFRA.md, ../../decisions/README.md, ../../decisions/ADR-040.md, ../../decisions/ADR-041.md, ../../plans/M01-rules-engine.md, ../../plans/M06-admin-ops-console.md, ../../plans/M12-transparency-platform.md, ../../plans/M14-loyalty-retention.md, ../../plans/M16-notification-center.md, ../../plans/M17-offers-engine.md, ../../plans/M18-graduation-track.md, ../../plans/M19-kyc-identity.md, ../../testing/STRATEGY.md]
+last_updated: 2026-08-16
 ---
 
 # Cron inventory and dead-man switches
@@ -30,7 +30,52 @@ Constitution section 7: **cron inventory with alerting on non-run (dead-man swit
 | **Simulation harness** | nightly | 10:00 CT | run absent | S3, band breach pages ([SIMULATION_HARNESS](../../testing/SIMULATION_HARNESS.md) section 7.2) |
 | **Reserve coverage and top-up trigger** | daily | 09:00 CT | evaluation absent | S2. [ADR-011](../../decisions/ADR-011.md)'s same-day trigger is the control against a correlated wave inside the funding week |
 | **Backup verification** | nightly | 04:00 CT | verification absent | S2. An unverified backup is a hope |
-| **Freeze expiry sweep** | hourly | continuous | sweep absent | **S1 in effect.** A freeze that reaches expiry **releases** (GS-109), and a stalled sweep converts a bounded hold into an unbounded one, which is a denial nobody authorized |
+| **Freeze expiry sweep** | hourly | continuous | sweep absent | **S1 in effect.** A freeze that reaches expiry **releases** (GS-109), and a stalled sweep converts a bounded hold into an unbounded one, which is a denial nobody authorized. **It carries three clocks since [ADR-040](../../decisions/ADR-040.md)**, and it is one job rather than three: `payout_requests.freeze_expires_at`, `payout_requests.hold_expires_at` and `wallet_withdrawals.freeze_expires_at` |
+| **Hold and freeze expiry assertion** | nightly | 05:00 CT | assertion absent | **S1, and unsuppressible.** [ADR-040](../../decisions/ADR-040.md). **It asserts the query, not the job**: no row sits past its own expiry, evaluated independently of whether the sweep above reported success. A job that reports success is not evidence that the work happened ([M02](../../plans/M02-rithmic-bridge.md) `FM-M2-11`), and the releaser is now the only thing standing between a bounded hold and an indefinite one |
+
+**Four alarms are unsuppressible**, and the fourth arrived with the row above: ledger global imbalance, replay divergence, payout balance-reflection missing, and **a hold, a freeze or a wallet-withdrawal freeze standing past its own expiry** ([ADR-040](../../decisions/ADR-040.md), closing [M06](../../plans/M06-admin-ops-console.md) `OQ-M6-01`). The first three mean Merit cannot safely pay anyone; the fourth means Merit has stopped paying and nobody is being told. **The honest limit is recorded where the set is defined rather than here**: `alarm_suppressions.alarm_key` carries no CHECK and no reference list, so nothing in the schema refuses a row muting any of the four ([M06](../../plans/M06-admin-ops-console.md) `AS-M6-03`). The set is a list in code that does not exist yet.
+
+---
+
+## Expiry columns and their release jobs
+
+**Every `*_expires_at` column in the migration set is on this page**, either in the table below with the job that releases it, or on the exemption list under it with a reason. `CI-06l` reads the DDL and this document and asserts exactly that, in both directions ([STRATEGY section 4.4](../../testing/STRATEGY.md)).
+
+**The failure it exists for is the one [ADR-040](../../decisions/ADR-040.md) made structural.** A clock in the schema with nothing scheduled to reach it is a hold that becomes indefinite in silence: the column is there, the index is there, the constraint that made the clock mandatory is there, and every one of those reads as a control. **A bounded hold with no releaser is a denial nobody had to authorize**, and it fails no test, because there is no test a schema can fail by omission.
+
+| Column | Release job | Why that job |
+|---|---|---|
+| `payout_requests.freeze_expires_at` | Freeze expiry sweep | The original clock the sweep was written for. A freeze reaching expiry **releases** (GS-109) |
+| `payout_requests.hold_expires_at` | Freeze expiry sweep | [ADR-040](../../decisions/ADR-040.md). The hold **joins the existing job** rather than getting its own: one job, one row, one switch. A second sweep is a second thing to stall |
+| `wallet_withdrawals.freeze_expires_at` | Freeze expiry sweep | [ADR-040](../../decisions/ADR-040.md) section 4.5. The external leg carries the same 48 hour clock on the same hourly job. Release resumes the rail and does not re-pay, because the money is already the trader's |
+| `kyc_verifications.expires_at` | Nightly batch | [M19](../../plans/M19-kyc-identity.md) section 5 consumes `day.closed` as the **expiry sweep**, and M19 section 3.2 makes `expires_at` a re-verification trigger in its own right. Reaching it blocks the next gated action and prompts a new verification; it never closes an account |
+
+## The expiry exemption list
+
+**In the [NO-FLOATS list](../../../scripts/db/assert_no_floats.sql)'s idiom, and it fails in both directions for that list's reason.** An unlisted column with no job is the obvious failure. **A stale entry for a column that no longer exists is how an allowlist silently grants more than it names**: the entry stays, the column is renamed, and the new spelling is unguarded while the list still looks complete.
+
+**The discriminator is which way a missing job fails.** A clock that **releases** something held must be reached by a job, because nothing reaching it leaves a trader waiting on Merit indefinitely. A clock that is **read where the row is used** needs no job at all: expiry takes effect as a predicate, with no write to schedule and therefore nothing to stall. **The second kind is the stronger form, and adding a sweep to one of these would create the failure mode it does not currently have.**
+
+| Column | Why it is exempt |
+|---|---|
+| `otp_challenges.expires_at` | Read at verification. [`0002`](../../../packages/db/migrations/0002_identity.sql) gives it a short TTL and a single-use unique index over the unconsumed row; a challenge past its expiry is refused where it is presented, and nothing is held pending a write |
+| `sessions.expires_at` | Read at authentication, the same shape. An unswept expired session is not an authenticated one |
+| `coupons.expires_at` | Read at redemption ([`0006`](../../../packages/db/migrations/0006_commerce.sql)). A lapsed coupon buys nothing; no entitlement is withheld while the clock runs |
+| `offers.expires_at` | Read at redemption. [M17](../../plans/M17-offers-engine.md) `SD-M17-01`, and `GET /me/offers` returns the live set rather than a swept one |
+| `promotional_credit_grants.expires_at` | [M17](../../plans/M17-offers-engine.md) `SD-M17-03`. A lapsed grant stops being spendable. **The money fact is in the ledger and the clock does not move it**, which is the whole reason the entitlement and the money are two records |
+| `loyalty_benefit_grants.expires_at` | [M14](../../plans/M14-loyalty-retention.md) `SD-M14-02`. A lapsed benefit is unconsumable, and `consumed_ref` rather than a sweep is what stops one being spent twice |
+| `graduation_invitations.expires_at` | Read at acceptance. [M18](../../plans/M18-graduation-track.md) `SD-M18-03`, and the table exists only if `GP-M18-01` or `GP-M18-02` ever ships, which no launch-scope decision has committed to |
+| `dual_control_approvals.expires_at` | [M06](../../plans/M06-admin-ops-console.md) `SD-M6-05` and `INV-M6-08`. Dual control is resolved **server side by payload hash at the point of use**, so an approval past its window is refused there. A sweep writing the `expired` status would be a report of a refusal that has already happened |
+| `alarm_suppressions.expires_at` | [M06](../../plans/M06-admin-ops-console.md) `AS-M6-03`: **expiry restores the alarm without anyone acting.** This is the case where a job would be the defect rather than the fix, because a stalled sweep here leaves a control muted and the mute is exactly what the mandatory expiry exists to end |
+| `plan_breaker_state.override_expires_at` | Keyed `(plan_id, evaluated_on)` ([M06](../../plans/M06-admin-ops-console.md) `SD-M6-02`). **A later evaluation does not carry an expired override forward**, so the override lapses by being recomputed rather than by being released, and M06 section 9 pages on one standing past its expiry |
+| `otp_send_budget.override_expires_at` | Keyed `(scope_kind, scope_key, evaluated_on)` ([M16](../../plans/M16-notification-center.md) `SD-M16-04`), the same shape one module over, and M16 section 9.2 **pages** on an override past `override_expires_at`: an indefinite override is a disabled breaker with a nicer name |
+
+**Two things this page does not yet carry, named rather than left for a grep.**
+
+1. **The daily evaluations the last two rows depend on have no row in the scheduled table above.** `plan_breaker_state` and `otp_send_budget` are both keyed by evaluation date and both lapse by being recomputed, and **the recomputation is a scheduled job nobody has inventoried**. Neither exemption is wrong, and both rest on a job that this document's own opening rule says does not exist until it has a row. Found by writing `CI-06l` and **not closed here**, because adding a scheduled job to the estate is a change to the estate rather than to a gate.
+2. **`identity_restriction_episodes.sla_due_at` is a clock this page covers and `CI-06l` cannot see**, because the gate matches `*_expires_at` and this column is named for a due date. It is swept and alarmed like the others ([ADR-041](../../decisions/ADR-041.md), and M06 section 8 alerts on an episode open past it), so the corpus is right and the gate is narrow ([M06](../../plans/M06-admin-ops-console.md) section 9 alerts on an episode open past it). **Widening the pattern to catch it would also catch every `starts_at` and `verified_at` in the schema**, so the narrowness is deliberate and is declared in the gate's `covers` line rather than fixed.
+
+---
 
 ## Calendar work, not cron
 

@@ -225,6 +225,81 @@ function nonExemptClass(body) {
   return found;
 }
 
+// =============================================================================
+// CI-06l's seeds, and why every one of them is DERIVED
+// =============================================================================
+// The same rider, a third registry over. The things this gate reads are the
+// `*_expires_at` columns the migrations declare and the two lists in
+// CRON_INVENTORY that disposition them, and BOTH SIDES MOVE: a migration adds a
+// clock, a fold gives one a job, a rename changes a spelling. A seed naming
+// `payout_requests.hold_expires_at` by literal would go stale the day that
+// column is superseded, and it would go stale SILENTLY, because a row that no
+// longer matches is a seed that plants nothing.
+//
+// So each helper finds its target by SHAPE at seed time and throws if the shape
+// is gone.
+const CRON_DOC_F = 'docs/ops/runbooks/CRON_INVENTORY.md';
+const CRON_COVERAGE_F = '## Expiry columns and their release jobs';
+const CRON_EXEMPT_F = '## The expiry exemption list';
+
+// The rows of one section, with the offsets needed to put the file back
+// together after rewriting exactly one of them.
+function cronSection(dir, heading) {
+  const body = readFileSync(join(dir, CRON_DOC_F), 'utf8');
+  const start = body.indexOf(heading);
+  if (start === -1) throw new Error(`seed anchor not found: the "${heading}" section`);
+  const after = body.slice(start + heading.length);
+  const end = after.search(/\n## /);
+  const section = end === -1 ? after : after.slice(0, end);
+  const lines = section.split('\n');
+  const rows = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (!l.startsWith('|')) continue;
+    const cells = l.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    if (cells.every((c) => /^:?-+:?$/.test(c))) continue;
+    const m = /^`?([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*)`?$/.exec(cells[0]);
+    if (!m) continue; // the header row, and anything that is not an entry
+    rows.push({ i, column: m[1], cells });
+  }
+  if (rows.length === 0) throw new Error(`seed anchor found no entries in "${heading}"`);
+  return {
+    body,
+    lines,
+    rows,
+    write: (next) => writeFileSync(join(dir, CRON_DOC_F), body.replace(section, next.join('\n'))),
+  };
+}
+
+// The first column the coverage table claims, whatever it is called today.
+const firstCoveredColumn = (dir) => cronSection(dir, CRON_COVERAGE_F).rows[0].column;
+const firstExemptColumn = (dir) => cronSection(dir, CRON_EXEMPT_F).rows[0].column;
+
+// THE SAME COLUMN, READ LOOSELY, AND THE DISTINCTION IS A BUG THIS HARNESS HIT.
+//
+// `expect` is resolved against the SEEDED tree, after the seed has run. A seed
+// that removes or rewrites the first coverage row therefore changes what
+// `firstCoveredColumn` returns, and the case reports FAILED OFF-TARGET while
+// the gate is doing exactly the right thing: it named the column the seed
+// broke, and the harness had gone on to ask about a different one.
+//
+// This reads the first row's column whether or not that row still parses as an
+// entry, so it names the same column before and after the seed. The strict
+// reader above is what the GATE uses to decide coverage; this one is what the
+// HARNESS uses to describe its own target, and they must not be the same
+// function.
+function firstCoverageColumnLoose(dir) {
+  const body = readFileSync(join(dir, CRON_DOC_F), 'utf8');
+  const start = body.indexOf(CRON_COVERAGE_F);
+  if (start === -1) throw new Error(`seed anchor not found: the "${CRON_COVERAGE_F}" section`);
+  const after = body.slice(start + CRON_COVERAGE_F.length);
+  const end = after.search(/\n## /);
+  const section = end === -1 ? after : after.slice(0, end);
+  const m = /^\|\s*`?([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*expires_at)`?[^|]*\|/m.exec(section);
+  if (!m) throw new Error('seed anchor not found: no column row in the coverage table');
+  return m[1];
+}
+
 // One seeded violation per gate. Each is the SMALLEST edit that the gate's own
 // row says must fail, and each names the real failure it stands in for.
 //
@@ -385,6 +460,35 @@ const SEEDS = {
     // found by shape, so this survives any rewording of the matrix.
     expect: 'carries no required-factor cell drawn from the published vocabulary',
     seed: (d) => editFactorCell(d, (c) => c.trim().length > 0, () => ''),
+  },
+  'CI-06l': {
+    what: 'a coverage row whose column cell stops naming a column, so the clock is dispositioned nowhere',
+    real:
+      'ADR-040 made the auto-release the load-bearing control of the whole enforcement ' +
+      'window, and a clock with nothing scheduled to reach it is a bounded hold that ' +
+      'becomes indefinite in silence. It fails no test, because there is no test a schema ' +
+      'can fail by omission',
+    // Assertion 1, and the target is DERIVED: whichever column the coverage
+    // table happens to list first.
+    //
+    // THE SEED TAGS THE CELL RATHER THAN DELETING THE ROW, and that is not
+    // squeamishness. `expect` is resolved after the seed, so a deleted row makes
+    // the harness ask about the NEXT column while the gate correctly reports the
+    // one that was deleted. Tagging leaves the row in place for the loose reader
+    // to find, and it seeds the same violation: the gate's column reference is
+    // ANCHORED, so a cell carrying prose beside the identifier is not a
+    // disposition, and the column is then on neither list. That anchoring is
+    // itself worth a test, because the alternative reading -- any cell
+    // MENTIONING a column counts as covering it -- is how this gate would come
+    // to pass on a table of commentary.
+    expect: (d) => `${firstCoverageColumnLoose(d)}: an expiry column that names no release job`,
+    seed: (d) => {
+      const s = cronSection(d, CRON_COVERAGE_F);
+      const row = s.rows[0];
+      row.cells[0] = `${row.cells[0]} and see the note below`;
+      s.lines[row.i] = `| ${row.cells.join(' | ')} |`;
+      s.write(s.lines);
+    },
   },
   'ADR-026': {
     what: 'a delta cited in docs with no manifest row',
@@ -569,6 +673,92 @@ const SCOPE_CASES = [
       );
       if (next === body) throw new Error('seed anchor not found: the rate_limit_exempt class list');
       writeFileSync(join(d, `packages/db/migrations/${f}`), next);
+    },
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06l. FOUR ASSERTIONS, AND SEEDS CARRIES ONE.
+  //
+  // Same arithmetic as CI-06k one gate over: `SEEDS` holds one violation per
+  // gate, so three of this gate's four assertions would be taken on trust. The
+  // seeded violation covers the uncovered column; the three cases below cover
+  // the exemption list being READ, the stale entry, and the phantom job.
+  //
+  // The stale-entry case is the one worth having. Assertion 1 alone reports a
+  // tree with a renamed column and a leftover row as CLEAN: the list still names
+  // something, so nothing looks missing, and the column under its new spelling
+  // is covered by nothing. That is the NO-FLOATS list's own stated second
+  // direction, and an allowlist only ever decays that way.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06l/exempt',
+    gate: 'CI-06l',
+    what: 'a column moved from the coverage table to the written exemption list, which must NOT be a finding',
+    expect: 'PASS',
+    // The control is the SAME move with the reason left blank. A `PASS` case
+    // proves nothing unless the near-identical tree fails, and pairing it this
+    // way tests two things at once: that the exemption list is read at all, and
+    // that an exemption nobody defended is not an exemption. Seeding the control
+    // as "move it and write no exemption row" would only have re-run the SEEDS
+    // violation in a second tree.
+    control: {
+      // Resolved after the seed, where the column now sits at the top of the
+      // exemption list, which is where the seed put it.
+      expect: (d) => `${firstExemptColumn(d)}: on the exemption list with no reason`,
+      seed: (d) => {
+        const col = firstCoveredColumn(d);
+        const s = cronSection(d, CRON_COVERAGE_F);
+        s.lines.splice(s.rows[0].i, 1);
+        s.write(s.lines);
+        const e = cronSection(d, CRON_EXEMPT_F);
+        e.lines.splice(e.rows[0].i, 0, `| \`${col}\` | |`);
+        e.write(e.lines);
+      },
+    },
+    seed: (d) => {
+      const col = firstCoveredColumn(d);
+      const s = cronSection(d, CRON_COVERAGE_F);
+      s.lines.splice(s.rows[0].i, 1);
+      s.write(s.lines);
+      const e = cronSection(d, CRON_EXEMPT_F);
+      e.lines.splice(e.rows[0].i, 0, `| \`${col}\` | A probe exemption, and this cell is its reason. |`);
+      e.write(e.lines);
+    },
+  },
+  {
+    name: 'CI-06l/stale-entry',
+    gate: 'CI-06l',
+    what: 'an exemption for a column no migration declares, which MUST be a finding',
+    // Derived from a real entry's table, so the probe name moves with the
+    // corpus and can never accidentally become a column somebody declares.
+    expect: (d) => `the exemption list names ${firstExemptColumn(d).split('.')[0]}.probe_renamed_expires_at`,
+    seed: (d) => {
+      const table = firstExemptColumn(d).split('.')[0];
+      const e = cronSection(d, CRON_EXEMPT_F);
+      e.lines.splice(
+        e.rows[0].i,
+        0,
+        `| \`${table}.probe_renamed_expires_at\` | A row left behind by a rename. |`,
+      );
+      e.write(e.lines);
+    },
+  },
+  {
+    name: 'CI-06l/unknown-job',
+    gate: 'CI-06l',
+    what: 'a coverage row naming a release job the scheduled table does not carry, which MUST be a finding',
+    // Assertion 4. "A job in this table without a dead-man switch is a job that
+    // does not exist", and a coverage row citing a job with no row at all is the
+    // original failure wearing the fix's clothing: the column looks dispositioned
+    // and nothing is scheduled to reach it.
+    expect: (d) => `${firstCoveredColumn(d)}: its coverage row names the release job`,
+    seed: (d) => {
+      const s = cronSection(d, CRON_COVERAGE_F);
+      const row = s.rows[0];
+      // The real job name plus a suffix, so the probe moves with whatever that
+      // job is called and stays a job nobody scheduled.
+      row.cells[1] = `${row.cells[1]} probe`;
+      s.lines[row.i] = `| ${row.cells.join(' | ')} |`;
+      s.write(s.lines);
     },
   },
   {

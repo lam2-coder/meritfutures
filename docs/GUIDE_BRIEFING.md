@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [INDEX.md, STATE.md, decisions/README.md, ../MERIT_BUILD_MASTER_PROMPT.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-16
 ---
 
 # Guide Briefing
@@ -146,6 +146,6 @@ Roughly, and in dependency order. Each is one Claude Code session unless noted.
 1. **Money is integer cents, thresholds in basis points. No floats in financial paths**, including in document examples.
 2. **The engine is pure and EOD.** Intraday enforcement is delegated to the vendor's auto-liquidator; Merit's own state reflects the last closed trading day. Every trader-facing surface must say so.
 3. **The ladder is a limit, not a promise.** Completing it sets graduation eligibility, which is a review-pool flag. Merit publishes Lucid's framing verbatim: the ladder is "the maximum payout level, not a guaranteed minimum for live eligibility." Topstep's live selectivity is 0.71 percent, which is what makes any other framing dishonest.
-4. **Zero denial is a policy with teeth.** `payout_requests` has no `denied` status and no review state. The freeze endpoint requires a cited open flag. These are schema constraints deliberately aimed at the founder's own future self under pressure.
+4. **Zero denial is a policy with teeth, and [ADR-040](decisions/ADR-040.md) amended how it is expressed without touching what it promises.** `payout_requests` still has no `denied` status. **This line read "and no review state" until 2026-08-16**, and it is the sentence the amendment was written against: the corpus stated zero denial in ten places and this was the only one that stated it in full. **The substance survives**: no payout is denied, and every hold either pays inside 48 hours or produces a documented enforcement action carrying a cited flag, a ToS clause and an evidence pack. **The mechanism changed**: zero denial was expressed as "no review state exists" and is now expressed as "a review state exists **and it expires**". The hold requires a cited open flag, a stated clause, a written reason and a published expiry, all five columns together or none of them, and reaching expiry **releases and pays**. These are still schema constraints deliberately aimed at the founder's own future self under pressure, and **a constraint aimed at your own future self, quietly reinterpreted, is the failure it was built against**, which is why this reads as an amendment rather than as a clarification.
 5. **The payout tail is all correlation.** Mean monthly payouts barely move with trader correlation; the 1-in-100 month nearly doubles. This is why the identity and abuse detectors are a **reserve control**, not only an abuse control, and it is the strongest argument for funding them properly.
 6. **Roughly 93 percent of the funded book has zero or negative true edge.** The funded time-gates work precisely because they let that population revert before cash leaves. Pass rate is a **price knob, not a quality filter**, and any copy implying otherwise is the kind of marketing-versus-implementation gap the constitution exists to prevent.
