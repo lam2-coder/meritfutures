@@ -462,6 +462,52 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## Groups F, G and H: forty-one of M01's fifty rules, and the nine that are left say why (2026-08-16)
+
+**[P2](plans/P2-rules-engine.md) section 7's `P2-6` and the group F and H sessions have landed** ([session 47](sessions/2026-08-16-session-47.md)), in one branch and five commits. **`pnpm run verify` is green: 460 tests, 15 corpus gates clean and dirty, 43 falsify cases with 40 watched failing on their own finding** (the three that error are scanners absent from this container's PATH, unchanged).
+
+**Every rule M01 states that the engine can compute without the calendar data or a new ADR is now computed.** The nine that remain are blocked, not unwritten, and `implemented-rules.test.ts` asserts them **by name** and asserts that the two lists sum to fifty, so the honest count is checkable rather than stated.
+
+| Landed | Rules | Where |
+|---|---|---|
+| **Group G**, payout arithmetic | R-42, R-43, R-44, R-45 | [`payout/clamp.ts`](../packages/rules-engine/src/payout/clamp.ts). No calendar, which is why P2 section 2 sequences it first |
+| **Group F**, the engine gates | R-33, R-34, R-35, R-36, R-37, R-39, R-41 | [`payout/gates.ts`](../packages/rules-engine/src/payout/gates.ts), wired at DO-9 |
+| **Group F**, the context gates | R-38, R-40 | [`payout/evaluate.ts`](../packages/rules-engine/src/payout/evaluate.ts), at read time, never stored |
+| **Group H**, settlement | R-19, R-46, R-47, R-48, R-49, R-50 | [`payout/settle.ts`](../packages/rules-engine/src/payout/settle.ts), wired at DO-2 |
+
+**The nine that are not implemented, each with the thing it waits on.** `R-01`, `R-02`, `R-05` and `R-06` are group A and wait on the **calendar transcription**, which is a founder item ([P2](plans/P2-rules-engine.md) section 6). `R-10`, `R-11`, `R-17` and `R-20` are discharged outside the engine entirely: ingest, publish validation, and the platform setpoint. `R-32` **refuses** rather than being absent, because elapsed trading days is not derivable from `RuleState` and adding the field is a schema delta and an ADR.
+
+**Four of M01's six exported functions now exist**: `initialState`, `advanceDay`, `applySettlement` and `evaluatePayout`. `resolvePlan` and `validatePlan` are `P2-1`.
+
+### Three things the engine now does that M01's pseudocode does not
+
+**All three are the R-15 and R-22 shape, and all three are reported rather than edited.** Section 3.5 makes the operator column and the invariant table the contract; section 3.6 is "pseudocode close enough to real that the diff should be mechanical", and where it disagrees with a binding statement the binding statement wins.
+
+| Disagreement | Consequence if the sketch is followed |
+|---|---|
+| **`INV-18` at DO-3 compares against the POST-settlement balance in section 3.6, and `INV-18`'s own row says `PRIOR.balance_cents + adjustment`** | **The most expensive of the three, because it fires on every payout day.** `SD-01` puts the settled withdrawal in `adjustment_cents` at the open of the effective day (`R-10`, `AS-10`), so the sketch counts it twice: on a 150,000c Core EOD payout it expects an opening 150,000c below the real one, raises `opening_mismatch`, and **writes no state for the day**. No account could ever have a `rule_states` row on the day it was paid. Following the row makes the two readings identical instead of contradictory |
+| **`clampPayout` is `export`ed in section 3.6 and is not among section 1.3's six** | Section 1.3 wins, so the clamp is reachable only through `evaluatePayout`. That is what makes "the identical function with the identical inputs" structural rather than a convention `FM-16` relies on being followed |
+| **`account.live_invitation_issued` sits beside `account.graduated` on section 5.2's `R-49` row** | `R-49`'s own text rules it out by name ([ADR-024](decisions/ADR-024.md): eligibility is a review-pool flag and invitation is a discretionary operator action **outside the engine**). The engine emits only `account.graduated`, and the test asserts the absence |
+
+### Two rulings this session made rather than found, both reported
+
+| Item | What was adopted, and why it is safe |
+|---|---|
+| **`R-35` has no operator, and API_CONTRACT publishes a `buffer` gate anyway** | `R-35` is a formula, not a comparison, and it is the only group F row with an empty operator column. Adopted: `pass` is `withdrawable > 0`, which is `R-35`'s own `max` read as a question. **It cannot move a payout**, because `R-39` requires `min(withdrawable, cap) >= 10,000c` and therefore dominates it in exactly `PW-01`'s sense. It stays in the conjunction because `INV-15` is "AND(**every** engine gate)" and a gate reported to the trader but excluded from the conjunction is the shortcut path `INV-15` forbids |
+| **`R-38` is filed under group F and its input is context** | `hasPayoutInFlight` lives in `ExternalGates`, which `INV-23` keeps out of the replayed state, and **API_CONTRACT's `gates` object carries no in-flight entry at all**, surfacing the condition as `POST`'s `conflict` error and the `SD-09` index. `AS-01` calls it "part of eligibility". So it binds through `contextEligible` and is reported on `PayoutEvaluation.noPayoutInFlight`, and the ten-key `gates` object is asserted exactly so a later session cannot widen a published shape quietly |
+
+### What was NOT done, named rather than implied
+
+**CI-03's polarity is untouched**, for the fourth session running. `engineIsIdentityStub()` still governs, every golden fixture is still asserted to fail, and [ADR-048](decisions/ADR-048.md)'s stated prerequisite, the resolvable-citation `L-nn` rule, is still unwritten. **The fixture-wiring session is now the single largest unblocking left in P2**: the `L-nn` rule, the loader's `bigint` comparison, then the per-fixture derivation, in that order.
+
+**`RE-P-01` and the floor-monotonicity property were not written**, because `INV-06`'s scope is unruled and that ruling decides whether the generator may cross an eval pass. Unchanged from [session 45](sessions/2026-08-16-session-45.md).
+
+**No golden fixture was written and no `EC-nnn` was claimed.** P2 section 2 alternates fixture sessions and engine sessions: "a session doing both has derived its expectations from its own output."
+
+**`hash.ts` and `SD-08` are still absent**, so `RuleState` carries no `stateHash` and `replay` does not exist. Both are the replay session's, and `OI-14` ([ADR-047](decisions/ADR-047.md)) is still P2's to discharge.
+
+---
+
 ## `advanceDay` exists: sixteen of M01's fifty rules, and the other thirty-four say so out loud (2026-08-16)
 
 **[P2](plans/P2-rules-engine.md) section 7's `P2-3` and `P2-5` have landed** ([session 44](sessions/2026-08-16-session-44.md), [session 45](sessions/2026-08-16-session-45.md)). The fold is real code, the day-evaluation order is M01 section 3.1's and no other, and `pnpm run verify` is green: **322 tests, 15 corpus gates clean and dirty, 13 CI-02 seeded violations.**
@@ -469,19 +515,19 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 | Step | State |
 |---|---|
 | **DO-1** preconditions | Implemented, including ADR-049's calendar lookup over a `CalendarSlice` **value** |
-| **DO-2** settlements | **REFUSES.** `applySettlement` is group H (R-46 to R-50) and is unwritten |
+| **DO-2** settlements | ~~**REFUSES**~~ **IMPLEMENTED** as of session 47: R-46 to R-50 in ordinal order, and a graduating settlement returns without folding the day |
 | **DO-3** mark identities | Implemented: `INV-18`, `INV-19`, `INV-20`, as typed refusals that write no state |
 | **DO-4, DO-5** breach | Implemented: R-21 strict `<`, R-22 strict `>`, R-23's fact, R-24, R-25 |
 | **DO-6** counters | Implemented: R-08, R-09 with R-04's halted clause, the consistency accumulators |
 | **DO-7** floor | Implemented: R-13 or R-16, then R-15, then R-14's `INV-06` tripwire |
 | **DO-8** progression | **Implemented for the eval half**: R-26, R-27, R-28's deferral, R-29, R-30, R-31's funded reset. **R-32 REFUSES.** The funded half is R-49's ladder, which fires only after a settlement, so DO-2's refusal already covers every day that could reach it |
-| **DO-9** gates | The day closes and `day.closed` is emitted. **The engine gates are NOT evaluated**: R-33 to R-41 are group F, and `RuleState` carries no `engineEligible`, `engineGates` or `withdrawableCents` until they land |
+| **DO-9** gates | ~~**The engine gates are NOT evaluated**~~ **IMPLEMENTED** as of session 47: R-33 to R-37, R-39 and R-41's conjunction, and `day.closed` now carries `gate_results`. `stateHash` (`SD-08`) is still absent and belongs to `hash.ts` |
 
 **A refusal is not a skip, and that distinction is the fold's main structural claim.** Each unimplemented step returns a typed `AssertionFailure` naming the group behind it, which means no state is written for the day and the caller raises reconciliation. A fold that quietly omitted a settlement would return a balance 150,000c too high and pay a second time against it; refusing is `FM-05`'s idiom applied to an unfinished engine rather than to a bad vendor row.
 
 **R-32 is the clearest case of it, and it is the one worth reading.** "Elapsed trading days `>` `phase_eval.max_days` expires the account", and **elapsed trading days is not derivable from `RuleState`**: M01 section 2.2's record carries no account-open day, and `tradedDaysCount` counts days *with fills*, which R-08 makes a different quantity. Giving the record that field is a column on `rule_states`, so it is a **schema delta and an ADR rather than a diff**, and `SD-01` to `SD-10` do not contain it. `max_days` is `null` on all three v1 plans, so nothing in the lineup reaches it; a plan that set it now **refuses the day** rather than folding it and expiring nothing, which would trade an account past its own expiry with a green state row.
 
-**The declared set is `IMPLEMENTED_RULES`, exported, and it is ADR-048's engine half arriving without ADR-048's flip.** CI-03's polarity is **unchanged**: `engineIsIdentityStub()` still governs, every fixture is still asserted to fail, and the derivation waits on the resolvable-citation `L-nn` rule ADR-048 names as its prerequisite. **Eleven of the twenty-two are watched failing on a mutant of themselves** (R-09, R-13, R-15, R-21, R-22, R-26 to R-31) in [`falsify-ci.mjs`](../scripts/ci/falsify-ci.mjs), because a test that still passes when its operator is flipped is a test asserting nothing, and ADR-048's polarity rests on that series being real.
+**The declared set is `IMPLEMENTED_RULES`, exported, and it is ADR-048's engine half arriving without ADR-048's flip.** CI-03's polarity is **unchanged**: `engineIsIdentityStub()` still governs, every fixture is still asserted to fail, and the derivation waits on the resolvable-citation `L-nn` rule ADR-048 names as its prerequisite. **Eleven of the twenty-two were watched failing on a mutant of themselves** (R-09, R-13, R-15, R-21, R-22, R-26 to R-31), and **session 47 took that to twenty-eight of forty-one**: every rule it declared arrived with its own seeded mutant in [`falsify-ci.mjs`](../scripts/ci/falsify-ci.mjs), because a test that still passes when its operator is flipped is a test asserting nothing, and ADR-048's polarity rests on that series being real.
 
 **`Cents` is now `bigint`** (M01 section 2.1, `INV-02`). The scaffold's branded `number` satisfied the lint half of that invariant and not the type half, which was harmless while nothing computed with it. The golden loader converts once, at the line where a JSON number crosses into the engine.
 
@@ -502,7 +548,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 | **M01 disagrees with itself on R-15's lock effect** | Section 3.4's `max` against section 3.6's assignment, above. Recorded here for the same reason and left for the same authority |
 | **`rule.floor_locked` fires on a day the account then leaves** | Every v1 eval pass locks the floor at DO-7 and is reset out of the lock at DO-8, in that order, because DO-7 precedes DO-8 and neither step may be reordered. The event is true of the eval account and is **noise on a timeline the trader reads as funded**. The engine is faithful to the ordering law; whether M10 suppresses the event is not the engine's call |
 | **The golden loader cannot fold `advanceDay` yet, and the reason is a comparison rather than a wiring** | `diffEndState` compares with `Object.is`, the expectations are JSON numbers, and the engine's state fields are `bigint`. `Object.is(4750000, 4750000n)` is **false**. The fixture-wiring session owns that conversion, and it is the same session that lands the `L-nn` citation rule and ADR-048's polarity derivation |
-| **`RuleState` is a subset of M01 section 2.2** | `withdrawableCents`, `engineEligible`, `engineGates` and `stateHash` are absent, each named in `types.ts` with the rule or the appendix that fills it. `hash.ts` and `SD-08` are replay's, not the day fold's |
+| ~~**`RuleState` is a subset of M01 section 2.2**~~ **CLOSED but for one field** | `withdrawableCents`, `engineEligible` and `engineGates` landed with groups F and G (session 47). **`stateHash` remains absent**: `hash.ts` and `SD-08` are replay's, not the day fold's |
 
 ---
 
