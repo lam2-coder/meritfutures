@@ -325,3 +325,27 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_calendar_revision_required.sql
+
+      # 10. ADR-046, the reversible contact addresses and the dispatcher role
+      # installed by 0034. OQ-M10-06.
+      #
+      # HALF OF WHAT THIS ONE PROVES IS A GRANT, WHICH NO OTHER PROBE IN THIS
+      # JOB TOUCHES. The founder's amendment to ADR-046 is that the sending path
+      # gets SELECT, INSERT and a rotation UPDATE and NEVER DELETE, and a
+      # migration that grants DELETE by accident installs cleanly, satisfies
+      # every constraint in the file, and is wrong in the exact way the
+      # amendment exists to prevent. So the assertions `SET LOCAL ROLE
+      # merit_dispatcher` and attempt the write, because a catalogue query
+      # proves what was written and an attempted write proves what the database
+      # will do.
+      #
+      # IT LEADS WITH ERASURE, and that is the assertion to read. Withholding
+      # DELETE is only defensible if erasure is expressible WITHOUT it, so S4
+      # clears the three sealed columns and then checks that the value_hash
+      # INV-M16-03 matches on is still there. A NOT NULL on any of the three
+      # would have made DELETE the only way to erase, on the tables that no
+      # longer have it.
+      - name: Probe ADR-046's reversible addresses and dispatcher grants (OQ-M10-06)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_reversible_contact_addresses.sql
