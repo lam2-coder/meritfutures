@@ -68,6 +68,19 @@ Each is asserted from both sides in [`test/loader.test.ts`](../../golden-loader/
 
 ## What the fixture directory does not yet hold
 
-**Three scenarios, against a registry that defines every `GS-nnn`.** [`packages/rules-engine`](../src/index.ts) is a stub whose `evaluate` returns the state it was given, so **there is no engine to derive an expected end state against**, and the remaining fixtures arrive with P2. Writing them now would produce expectations derived from nothing, which is the failure TR-01 exists to prevent arrived at by being thorough.
+**Eighteen scenarios, against a registry that defines 284.** The count is the stage's own, re-derived on every run rather than written here, and the honest form of it is **18 of 284**.
+
+**Why writing them does not need an engine, and why it never did.** TR-01 puts the derivation in the plan document rather than in the implementation: every value in a fixture is read out of [M01](../../../docs/plans/M01-rules-engine.md)'s rule taxonomy, its Appendix A.1 column and the scenario's own registry row, by somebody reading prose. An engine is what the fixtures are eventually run against; it is not where their numbers come from. [ADR-048](../../../docs/decisions/ADR-048.md) is what makes writing them early **inert rather than premature**: polarity is derived per fixture from the rules the fixture cites, so a fixture for a rule the engine has not implemented is asserted to fail and is not a false red.
+
+**The batch of fifteen that took this directory from three to eighteen** is the part of GS-001 to GS-029 plus GS-063 that the current fixture format can state without inventing an input: GS-002, GS-005, GS-006, GS-007, GS-010, GS-012, GS-013, GS-014, GS-015, GS-016, GS-017, GS-018, GS-019, GS-025 and GS-063.
+
+**What the format cannot yet reach, named rather than left as an absence:**
+
+| Held back | Why |
+|---|---|
+| GS-001, GS-003, GS-004, GS-030 to GS-032 | They turn on a session's **kind**: a fill timestamp inside a session, a half day, a halted day. [`calendars/cme-2026.json`](calendars/cme-2026.json) declares five full sessions and no fill stream, and inventing either would be transcription from recollection |
+| GS-020 to GS-024 | Consistency, which Core EOD **disables in the eval phase** ([M01 Appendix A.1](../../../docs/plans/M01-rules-engine.md)). They need a second plan record, transcribed from the Merit Rapid column |
+| GS-026 to GS-029, GS-042 | Payout arithmetic. `evaluatePayout` and `clampPayout` are not the day fold, and the expectation sibling has no shape for a clamp result |
+| Everything from GS-071 | Replay, upgrade, and the module scenarios, which are not one account's day stream |
 
 **The inventory check is the half that stays off until then.** [STRATEGY section 3.2](../../../docs/testing/STRATEGY.md)'s second loader rule has two directions: a fixture whose id is not in the registry fails to load, which `L-03` does, and a registry row with no fixture fails the inventory check, which is CI-06's and would today fail on every scenario in the registry.

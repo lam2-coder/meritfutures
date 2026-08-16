@@ -1,0 +1,10 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "withdrawable_cents": 0,
+    "balance_cents": 5090000
+  },
+  "events": ["day.closed"],
+  "pins": "a balance inside the buffer yields a withdrawable of exactly zero rather than the negative the subtraction produces",
+  "note": "THE ZERO IS REACHABLE BY TWO ROUTES AND ONLY ONE OF THEM IS THIS SCENARIO, so the phase is pinned beside it. R-35 returns 0 for any account that is not funded, which means an engine folding this day in the eval phase reports the pinned zero for a reason that has nothing to do with the buffer. `phase: funded` is what separates them, and it can only separate them once `account.phase` is an engine input: the loader lists it among the fields that reach none today (`AWAITING_M01_INPUT`, L-09), so a fold that begins in `eval` fails on the phase field rather than passing quietly on the zero. The balance is stated so the fixture also says the account was profitable while withdrawing nothing, which is what makes the zero worth pinning."
+}

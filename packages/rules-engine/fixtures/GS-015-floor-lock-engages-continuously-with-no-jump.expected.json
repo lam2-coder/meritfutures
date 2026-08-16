@@ -1,0 +1,13 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "floor_cents": 5010000,
+    "floor_locked": true,
+    "high_water_balance_cents": 5260000,
+    "balance_cents": 5260000,
+    "breached": false
+  },
+  "events": ["rule.floor_locked", "day.closed"],
+  "pins": "the lock engages on the first close that satisfies `>=` the trigger, and the floor it locks to is the value the trailing floor had already reached, so no discontinuity exists",
+  "note": "CONTINUITY IS PINNED BY ONE NUMBER SERVING TWO DERIVATIONS. 5,010,000 is both `hwb - drawdown` under R-13 and `floor_lock_floor_at_cents` under R-15, so a floor of 5,010,000 beside `floor_locked: true` is the statement that the lock changed the flag and not the number. The event order is M01 section 3.1's: `rule.floor_locked` is pushed inside DO-7 and `day.closed` at DO-9. The high-water balance is stated because R-15 freezes it here, and 5,260,000 is the value it freezes at."
+}

@@ -1,0 +1,13 @@
+{
+  "end_state": {
+    "phase": "closed",
+    "breached": true,
+    "breach_kind": "trailing_eod_floor",
+    "floor_open_cents": 4750000,
+    "floor_cents": 4750000,
+    "balance_cents": 5400000
+  },
+  "events": ["breach.detected"],
+  "pins": "a day that breaches and clears the eval target closes the account, and the pass never happens, because DO-4 returns before DO-8 can run",
+  "note": "THE SINGLE EVENT IS THE PIN AS MUCH AS THE PHASE IS. `breach.detected` alone says the pipeline stopped at DO-5: no `rule.floor_locked` from DO-7 even though a close of 5,400,000 is 400,000c past the lock trigger, no `phase.passed` from DO-8 even though the profit clears the target, and no `day.closed` from DO-9. `phase: closed` rather than `funded` is the same statement from the state side. The floor is unmoved for the same reason: DO-7 never ran, so nothing trailed and nothing locked."
+}

@@ -1,0 +1,52 @@
+# GS-016  Locked floor does not move on a later high
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "`hwb` stops updating once `floorLocked`"                 M01 R-13
+#   "Effect: `floor = floor_lock_floor_at_cents`, `floorLocked = true`, `hwb`
+#   frozen, all permanently"                                  M01 R-15
+#   "A locked floor never changes again for the life of the account"
+#                                                             M01 INV-07
+#   "Locking is permanent for the life of the account"        M01 section 3.4
+#   locked floor  size + 10,000c = 5,010,000c                 M01 Appendix A.1
+#   "Once locked, a new closing high leaves the floor at `size + 10,000`
+#   forever"                                                  GOLDEN_SCENARIOS GS-016 row
+#
+# DAY ONE IS GS-015 EXACTLY. That is deliberate: GS-015 pins the engagement and
+# this file pins the permanence, so the day that engages the lock must be the
+# same day in both files or the pair proves two different things.
+#
+# DAY TWO IS A NEW CLOSING HIGH AND IT IS A LARGE ONE. 5,400,000c is 140,000c
+# above the frozen high-water balance, so an engine that kept trailing after the
+# lock reports a floor of 5,150,000c and a high-water balance of 5,400,000c.
+# Both numbers are wrong in the direction that costs the trader loss room, which
+# is why the scenario is worth a fixture rather than a comment.
+id: GS-016
+name: locked floor does not move on a later high
+source: M01 R-13, R-15
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5260000
+    high_balance_cents: 5265000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 260000
+    fill_count: 5
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5260000
+    closing_balance_cents: 5400000
+    high_balance_cents: 5410000
+    low_balance_cents: 5255000
+    realized_pnl_cents: 140000
+    fill_count: 4
+    traded_day: true
+    adjustment_cents: 0
+settlements: []

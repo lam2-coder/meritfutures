@@ -1,0 +1,11 @@
+{
+  "end_state": {
+    "phase": "eval",
+    "balance_cents": 5299999,
+    "traded_days_count": 1,
+    "breached": false
+  },
+  "events": ["rule.floor_locked", "day.closed"],
+  "pins": "one cent below the eval target does not pass, and the balance stays where the day left it because no funded reset ran",
+  "note": "THE EVENT LIST CARRIES THE OTHER HALF: no `phase.passed` is emitted, which is what separates this from an engine that passed the account and reported the phase late. The traded-day count is stated so the deferral cannot be attributed to R-27, which this day satisfies. THE FLOOR IS DELIBERATELY NOT PINNED, and the reason is a disagreement inside M01 rather than a gap in this scenario: a close of 5,299,999 OVERSHOOTS the 260,000c lock trigger, and on an overshoot day section 3.6's DO-7 assigns `floor = floor_lock_floor_at_cents` (5,010,000) after trailing had already reached `hwb - drawdown` (5,049,999), while section 3.4's `floor(d) = max(hwb - drawdown, locked value)` yields the higher of the two and calls the `max` redundant. CV-12 makes the two agree only where the trigger is met exactly, which is GS-015's day and not this one. The pinned fields are the ones R-26 decides, and the floor is left to whoever rules the disagreement."
+}

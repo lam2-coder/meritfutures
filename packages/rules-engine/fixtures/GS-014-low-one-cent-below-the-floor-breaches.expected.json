@@ -1,0 +1,12 @@
+{
+  "end_state": {
+    "phase": "closed",
+    "breached": true,
+    "breach_kind": "trailing_eod_floor",
+    "floor_open_cents": 4750000,
+    "balance_cents": 4990000
+  },
+  "events": ["breach.detected"],
+  "pins": "one cent below the floor is a breach, the account closes on that day, and the day never reaches `day.closed`",
+  "note": "THE EVENT LIST IS HALF THE ASSERTION. A breaching day emits `breach.detected` and nothing else, because M01 section 3.1 returns at DO-5 and `day.closed` is emitted at DO-9. An expectation carrying both events would be satisfied by an engine that recorded a breach and then carried on evaluating the day, which is exactly what R-24 and R-25 forbid. `balance_cents` is the day's closing balance, which section 3.6's breach branch writes even on a terminal day."
+}

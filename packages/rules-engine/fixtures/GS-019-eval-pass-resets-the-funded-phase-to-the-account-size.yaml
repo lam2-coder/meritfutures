@@ -1,0 +1,44 @@
+# GS-019  Eval pass resets the funded phase to the account size
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   Phase to `funded`; `balance = size_cents`; `hwb = size_cents`;
+#   `floor = size_cents - funded drawdown_cents`; traded days, win days, and
+#   consistency accumulators to zero; `consistencyPeriodStartDay = the day
+#   after the pass day`. Eval profit is not carried               M01 R-31
+#   funded drawdown  250,000c at 50K, 500bp                       M01 Appendix A.1
+#   4,750,000 = 5,000,000 - 250,000                               M01 R-12, Appendix A.1
+#   "Balance to 5,000,000, floor to 4,750,000, all funded counters to zero.
+#   Eval profit is not carried"                                   GOLDEN_SCENARIOS GS-019 row
+#   the day after 2026-11-03 is 2026-11-04                        fixtures/calendars/cme-2026.json
+#
+# THE CLOSE IS WELL PAST THE TARGET ON PURPOSE. GS-017 owns the boundary at
+# exactly 300,000c; this scenario owns the effects, so the day clears the target
+# by 100,000c and the pass condition is never the interesting part. What is
+# interesting is that 400,000c of eval profit reaches the funded phase as
+# nothing at all: the balance returns to the account size and the floor returns
+# to the account-open floor.
+#
+# THE PASS DAY ALSO ENGAGES THE FLOOR LOCK, which is unavoidable on this plan:
+# the lock trigger is 260,000c of profit and the eval target is 300,000c, so no
+# Core EOD eval pass can happen below the trigger. DO-7 precedes DO-8, so the
+# lock event is emitted before the pass event.
+id: GS-019
+name: eval pass resets the funded phase to the account size
+source: M01 R-26, R-31
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5400000
+    high_balance_cents: 5410000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 400000
+    fill_count: 7
+    traded_day: true
+settlements: []
