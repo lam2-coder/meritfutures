@@ -24,8 +24,11 @@
 //   DO-5  implemented: R-24, R-25
 //   DO-6  implemented: R-08, R-09, R-04, and the consistency accumulators
 //   DO-7  implemented: R-13, R-15, R-16, R-14's tripwire
-//   DO-8  REFUSES on an eval-phase day. The eval progression is group E
-//         (R-26..R-31) and is not written
+//   DO-8  implemented for the EVAL half: R-26..R-31, in `day/progression.ts`.
+//         R-32 REFUSES, because elapsed trading days is not derivable from
+//         `RuleState`. The FUNDED half is R-49's ladder, which fires only after
+//         a settlement, so DO-2's refusal already covers every day that could
+//         reach it
 //   DO-9  the day closes and `day.closed` is emitted. THE ENGINE GATES ARE NOT
 //         EVALUATED: R-33..R-41 are group F, and `RuleState` carries no
 //         `engineEligible`, `engineGates` or `withdrawableCents` until they land
@@ -59,6 +62,7 @@ import type {
 import { checkBreach } from './breach.js';
 import { advanceConsistency, isTradedDay, isWinDay } from './counters.js';
 import { advanceFloor, initialFloorCents } from './floor.js';
+import { advanceEvalProgression } from './progression.js';
 
 /**
  * The state an account has the instant it opens, before any mark exists.
@@ -274,7 +278,7 @@ export function advanceDay(input: DayInput): DayOutput {
     events.push(locked);
   }
 
-  const state: RuleState = {
+  let state: RuleState = {
     ...prior,
     tradingDay: mark.tradingDay,
     balanceCents: mark.closingBalanceCents,
@@ -292,21 +296,56 @@ export function advanceDay(input: DayInput): DayOutput {
   // ---------------------------------------------------------------------------
   // DO-8  progression
   // ---------------------------------------------------------------------------
-  // GROUP E IS NOT WRITTEN. On an eval-phase day the pass condition must be
-  // tested every day (R-26, R-27, R-28), and a day the engine folded without
-  // testing it is a day a trader passed and was not told. So an eval-phase day
-  // refuses AFTER the day is computed rather than before: the refusal names the
-  // missing step rather than the phase, and DO-4 to DO-7 having already run is
-  // what makes the returned state worth inspecting when it lands.
+  // THE EVAL HALF IS `day/progression.ts` AND THE FUNDED HALF IS NOT REACHABLE.
+  // Section 3.1's funded clause is "test the ladder, which can also fire here if
+  // a settlement graduated the account"; R-49 fires only after a settlement, and
+  // DO-2 above refuses every day a settlement is effective on. So a funded day
+  // passes through DO-8 with nothing to do, and that is a statement about R-49's
+  // trigger rather than a step being skipped.
   //
-  // A FUNDED-PHASE DAY REACHES DO-8 AND DO-8 HAS NOTHING TO DO FOR IT until the
-  // ladder arrives with group H, which fires only after a settlement.
+  // R-25 IS WHY THIS RUNS AFTER DO-4 AND NOT BEFORE IT. "Breach beats everything
+  // on the same day. Ordering law DO-4 before DO-8. No `phase.passed`, no
+  // eligibility, no graduation" (GS-063, GS-064, EC-004). The breach path above
+  // returns, so an account that broke its floor on the day it met its target
+  // never reaches this line.
   if (state.phase === 'eval') {
-    return refuse(state, {
-      kind: 'eval_progression_unimplemented',
-      tradingDay: mark.tradingDay,
-      detail: 'the eval progression (R-26 to R-31, group E) is not implemented',
+    if (plan.eval === null) {
+      // A state claiming the eval phase on a plan that has none. The caller
+      // assembled a `prior` that cannot exist: `initialState` puts an account in
+      // `funded` exactly when `plan.eval` is null (Direct, Appendix A.3). This
+      // refuses rather than falling back to `plan.funded`, because folding an
+      // eval day against funded rules would compute a real number against the
+      // wrong parameters, which is worse than refusing to compute.
+      return refuse(state, {
+        kind: 'eval_phase_without_eval_rules',
+        tradingDay: mark.tradingDay,
+        detail: "the prior state's phase is `eval` and the plan has no evaluation phase",
+      });
+    }
+
+    const progression = advanceEvalProgression({
+      state,
+      plan,
+      evalRules: plan.eval,
+      mark,
+      calendar: input.calendar,
     });
+
+    switch (progression.kind) {
+      case 'refused':
+        return refuse(state, progression.assertion);
+      case 'deferred':
+        // R-28. The account stays in `eval` and no field moves; the day still
+        // closes, because a deferral is not a refusal and not a breach.
+        events.push(progression.event);
+        break;
+      case 'passed':
+        state = progression.state;
+        events.push(progression.event);
+        break;
+      case 'unchanged':
+        break;
+    }
   }
 
   // ---------------------------------------------------------------------------

@@ -203,10 +203,13 @@ test(reU('R-25'), () => {
   expect(out.assertions).toEqual([]);
   expect(out.events.map((e) => e.type)).toEqual(['breach.detected']);
 
-  // THE OTHER SIDE: the identical day whose low stays above the floor is not a
-  // breach, and reaches DO-8, where the eval progression refuses because group E
-  // is not written. That refusal arriving is what proves DO-4 short-circuited
-  // above rather than the day being uninteresting.
+  // THE OTHER SIDE, AND GROUP E MADE IT THE REAL ONE. The identical day whose
+  // low stays above the floor is not a breach, reaches DO-8, and PASSES THE
+  // EVAL: 400,000c of profit clears the 300,000c target and two traded days
+  // clear the 1-day minimum. So the breaching run above discarded a genuine
+  // `phase.passed`, which is exactly what R-25 claims ("no `phase.passed`, no
+  // eligibility, no graduation") and what this pair now proves rather than
+  // asserts. Until group E landed, this half could only observe a refusal.
   const survived = fold(
     CORE_50K,
     {
@@ -217,6 +220,16 @@ test(reU('R-25'), () => {
     },
     priorEval,
   );
+  expect(survived.assertions).toEqual([]);
   expect(survived.state.breached).toBe(false);
-  expect(survived.assertions.map((a) => a.kind)).toEqual(['eval_progression_unimplemented']);
+  expect(survived.state.phase).toBe('funded');
+  expect(survived.events.map((e) => e.type)).toEqual([
+    'rule.floor_locked',
+    'phase.passed',
+    'day.closed',
+  ]);
+
+  // And the breaching day emitted none of them. EC-004: "No `phase.passed` is
+  // emitted and no funded state is written."
+  expect(out.events.map((e) => e.type)).not.toContain('phase.passed');
 });

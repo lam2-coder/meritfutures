@@ -16,13 +16,23 @@
 //
 // WHAT IS HERE AND WHAT IS NOT
 //
-//   here    the constructor, and the lookup DO-1 needs
-//   not     `nextTradingDayAfter` (R-47) and sequence-gap counting (R-37, R-02)
+//   here    the constructor, the lookup DO-1 needs, and `nextTradingDayAfter`
+//   not     sequence-gap counting (R-37, R-02)
 //
-// The second pair belongs to groups A and H, which P2 section 2 puts AFTER the
+// THE GAP COUNT BELONGS TO GROUPS A AND F, which P2 section 2 puts AFTER the
 // real calendar data lands ("There is not one calendar row in the repository").
-// Writing them now would mean writing them against no data, which is the
+// Writing it now would mean writing it against no data, which is the
 // transcription-from-recollection TR-01 forbids.
+//
+// `nextTradingDayAfter` MOVED ACROSS THAT LINE WHEN GROUP E ARRIVED, and the
+// distinction is worth stating because this header previously grouped it with
+// the gap count. R-02 and R-37 count trading days ACROSS A RANGE, so they need
+// a calendar that spans the range and there is no such data. This function
+// takes ONE STEP along the slice the caller already supplied, which R-31 needs
+// today ("`consistencyPeriodStartDay` = the day after the pass day") and R-47
+// will need identically. A step is correct or incorrect against the slice's own
+// ordering, which `buildCalendarSlice` already establishes, so nothing here is
+// written from recollection about which days the CME trades.
 // =============================================================================
 
 import type { CalendarDay, CalendarSlice, TradingDay } from './types.js';
@@ -124,4 +134,39 @@ export function lookupCalendarDay(slice: CalendarSlice, tradingDay: TradingDay):
   const day = slice.days[position];
   if (day === undefined) return { found: false, reason: 'not_a_session' };
   return { found: true, day };
+}
+
+/**
+ * The trading day STRICTLY AFTER `tradingDay`, which is AS-12's whole subject.
+ *
+ * R-31 sets `consistencyPeriodStartDay` to "the day after the pass day" and
+ * R-47 sets it to "the next trading day after `payoutAnchorDay`". AS-12 is what
+ * happens when the anchor is included instead of excluded: "the very day that
+ * funded a payout counts against the next cycle ... it looks like the
+ * consistency rule working rather than a bug."
+ *
+ * RUNNING OFF THE END OF THE SLICE IS `outside_coverage` AND NOT A NULL, and
+ * that is ADR-049's ruling applied where it bites rather than a defensive
+ * choice. The alternatives were both rejected there: returning null "silently
+ * weakens a money gate", and throwing makes "the fold's behavior depend on how
+ * much calendar the caller loaded, which is a caller decision leaking into
+ * engine output". A typed miss travels to `DayOutput.assertions`, no state is
+ * written for the day, and the caller is told to load more calendar.
+ *
+ * THE LAST DAY IN `days` IS A MISS EVEN WHEN COVERAGE EXTENDS PAST IT. Coverage
+ * says the slice can answer "is this day a session", not "is there another
+ * session after this one": a slice covering a week and holding Monday alone
+ * knows Tuesday is not a session and knows nothing about the week after. Both
+ * are UNKNOWN in the only sense that matters here.
+ */
+export function nextTradingDayAfter(slice: CalendarSlice, tradingDay: TradingDay): CalendarLookup {
+  const here = lookupCalendarDay(slice, tradingDay);
+  if (!here.found) return here;
+
+  const position = slice.index[tradingDay];
+  if (position === undefined) return { found: false, reason: 'not_a_session' };
+
+  const next = slice.days[position + 1];
+  if (next === undefined) return { found: false, reason: 'outside_coverage' };
+  return { found: true, day: next };
 }

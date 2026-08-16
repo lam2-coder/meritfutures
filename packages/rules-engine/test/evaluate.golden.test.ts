@@ -31,7 +31,9 @@ import * as engine from '../src/index.js';
 //   advanceDay, initialState   M01 section 1.3, two of the six
 //   buildCalendarSlice         ADR-049: the slice is "built by a pure exported
 //   lookupCalendarDay          constructor", with "the calendar queries as free
-//   CalendarSliceError         functions in `calendar.ts` over that value"
+//   nextTradingDayAfter        functions in `calendar.ts` over that value".
+//   CalendarSliceError         The third is R-31's and R-47's `the next trading
+//                              day after`, which AS-12 is the off-by-one in
 //   EngineInvariantError       R-14's tripwire is useless if a caller cannot
 //                              catch it by type
 //   IMPLEMENTED_RULES          ADR-048: "the engine exports the set of rule
@@ -50,6 +52,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'evaluate',
     'initialState',
     'lookupCalendarDay',
+    'nextTradingDayAfter',
   ]);
   expect(typeof engine.evaluate).toBe('function');
   expect(typeof engine.advanceDay).toBe('function');

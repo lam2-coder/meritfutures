@@ -49,6 +49,12 @@ export const RULE_ASSERTIONS = {
   'R-23': 'a soft daily loss limit is never a breach and emits a fact',
   'R-24': 'breach is terminal: no state is ever advanced after it',
   'R-25': 'breach beats every other outcome the same day could also have had',
+  'R-26': 'the eval target is closing - size >= profit_target_cents, so exactly at it passes',
+  'R-27': 'the eval minimum-trading-days gate is tradedDaysCount >= min_trading_days',
+  'R-28': 'an eval consistency violation DEFERS the pass and never fails the account',
+  'R-29': 'consistency is best * 10000 <= max_bp * profit, cross multiplied, so a tie passes',
+  'R-30': 'the denominator rule skips the gate unless period profit > 0, strict',
+  'R-31': 'the eval pass resets the funded phase to size and carries no eval profit',
 } as const satisfies Partial<Record<RuleId, string>>;
 
 /** The rules this suite claims. `implemented-rules.test.ts` compares it to the engine's. */

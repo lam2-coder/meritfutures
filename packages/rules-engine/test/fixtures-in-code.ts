@@ -31,7 +31,14 @@ import type {
 
 export const day = (iso: string): TradingDay => iso as TradingDay;
 
-const bp = (n: number): BasisPoints => n as BasisPoints;
+/**
+ * The one cast that makes a basis point a `BasisPoints`.
+ *
+ * EXPORTED SO THERE IS ONE OF THEM. The brand exists to make "cents handed to
+ * something expecting basis points" a compile error, and a suite that casts
+ * inline wherever it needs a threshold has as many holes as it has call sites.
+ */
+export const bp = (n: number): BasisPoints => n as BasisPoints;
 
 /**
  * CORE-50K, from M01 Appendix A.1's 50K column.
@@ -94,6 +101,91 @@ export const CORE_50K: ResolvedPlan = {
     maxPayouts: 5,
   },
 };
+
+/**
+ * MERIT RAPID at 50K, from M01 Appendix A.2's 50K column.
+ *
+ * IT IS HERE FOR ONE REASON AND THE REASON IS A GATE NO OTHER V1 PLAN HAS.
+ * Core EOD and Direct both carry `Eval consistency: disabled`; Merit Rapid
+ * carries 3000bp. R-28, R-29 and R-30 are the eval consistency rules, so a
+ * suite holding only CORE-50K could exercise them nowhere except through a
+ * config it invented, and an invented config is a number with no source.
+ *
+ *   size                       5,000,000c   Appendix A, sizes line
+ *   eval drawdown, trailing      250,000c   500bp
+ *   eval profit target           300,000c   600bp
+ *   eval minimum trading days           2   constitution 0.4
+ *   eval consistency               3000bp   constitution 0.4
+ *   funded drawdown, trailing    250,000c   500bp
+ *   floor lock at profit         260,000c   = drawdown + 10,000 by CV-12
+ *   locked floor               5,010,000c   size + 10,000, X = $100 (ADR-014)
+ *   win days required                   3   ADR-018, and it sets the cadence
+ *   win day floor                 15,000c   30bp
+ *   buffer                       100,000c   200bp
+ *   funded consistency             4000bp
+ *   funded minimum trading days         0   ADR-015, gate disabled
+ *   cadence gap, trading days           1   dominated by the win-day gate
+ *   payout cap                   100,000c   200bp
+ *   split to trader                9000bp
+ *   ladder                              5   ADR-024
+ *   minimum payout                10,000c   CV-15, never scaled by size
+ *   daily loss limit                 none
+ */
+export const MERIT_RAPID_50K: ResolvedPlan = {
+  planVersionId: '0199c7a1-0000-7000-8000-000000000002' as PlanVersionId,
+  sizeCents: 5_000_000n,
+  eval: {
+    drawdown: {
+      type: 'trailing_eod',
+      drawdownCents: 250_000n,
+      lock: { enabled: true, atProfitCents: 260_000n, floorAtCents: 5_010_000n },
+    },
+    dailyLossLimit: { type: 'none' },
+    winDayFloorCents: 15_000n,
+    profitTargetCents: 300_000n,
+    minTradingDays: 2,
+    consistency: { enabled: true, maxDayShareBp: bp(3000) },
+    maxDays: null,
+  },
+  funded: {
+    drawdown: {
+      type: 'trailing_eod',
+      drawdownCents: 250_000n,
+      lock: { enabled: true, atProfitCents: 260_000n, floorAtCents: 5_010_000n },
+    },
+    dailyLossLimit: { type: 'none' },
+    winDayFloorCents: 15_000n,
+    minTradingDays: 0,
+    winDaysRequiredCount: 3,
+    consistency: { enabled: true, maxDayShareBp: bp(4000) },
+    bufferCents: 100_000n,
+    cadenceGapTradingDays: 1,
+    payoutCapSchedule: [{ fromOrdinal: 1, capCents: 100_000n }],
+    minPayoutCents: 10_000n,
+    splitBp: bp(9000),
+    maxPayouts: 5,
+  },
+};
+
+/**
+ * R-27's boundary, on both sides, without inventing a plan.
+ *
+ * CV-04 is `phase_eval.min_trading_days >= 1`, so both values this is called
+ * with are configs `validatePlan` accepts. Moving the THRESHOLD rather than the
+ * counter is what keeps the two sides of `>=` comparable: the same prior state
+ * and the same mark produce a pass at N and no pass at N+1, so the only thing
+ * that changed is the number the operator is applied to.
+ */
+export function withEvalMinTradingDays(plan: ResolvedPlan, minTradingDays: number): ResolvedPlan {
+  if (plan.eval === null) throw new Error('the plan has no evaluation phase');
+  return { ...plan, eval: { ...plan.eval, minTradingDays } };
+}
+
+/** R-32's configuration, which no published plan carries: `max_days` is null on all three. */
+export function withEvalMaxDays(plan: ResolvedPlan, maxDays: number): ResolvedPlan {
+  if (plan.eval === null) throw new Error('the plan has no evaluation phase');
+  return { ...plan, eval: { ...plan.eval, maxDays } };
+}
 
 /**
  * A variant, and the two departures from CORE-50K are the only two.
@@ -200,6 +292,51 @@ export function fundedPrior(plan: ResolvedPlan, overrides: Partial<RuleState> = 
     highWaterBalanceCents: plan.sizeCents,
     tradedDaysCount: 1,
     ...overrides,
+  };
+}
+
+/**
+ * An eval account partway through its evaluation, which is what group E is
+ * stated against.
+ *
+ * THE FIVE NUMBERS ARE NOT INDEPENDENT and stating them as overrides one at a
+ * time is how a fixture drifts into a state the fold could never have produced.
+ * The caller gives the balance and the consistency accumulators; the floor and
+ * the high-water balance FOLLOW from R-12 and R-13 on an unlocked trailing plan,
+ * so a prior built here is a prior `advanceDay` could have returned.
+ *
+ * `tradedDaysCount` defaults to 1 for the same reason `fundedPrior`'s does: an
+ * account with zero traded days is a start state, and a test whose subject is
+ * R-26 should not be answering an INV-20 question.
+ */
+export function evalPrior(
+  plan: ResolvedPlan,
+  fields: {
+    readonly tradingDay?: TradingDay;
+    readonly balanceCents?: Cents;
+    readonly tradedDaysCount?: number;
+    readonly consistencyBestDayCents?: Cents;
+    readonly consistencyPeriodProfitCents?: Cents;
+  } = {},
+): RuleState {
+  if (plan.eval === null) throw new Error('the plan has no evaluation phase');
+  const balanceCents = fields.balanceCents ?? plan.sizeCents;
+
+  // R-13 on an unlocked trailing plan: `hwb` is the running closing high, which
+  // for a monotone climb is the current balance, and the floor is `hwb - dd`.
+  const highWaterBalanceCents =
+    balanceCents > plan.sizeCents ? balanceCents : (plan.sizeCents as Cents);
+  const floorCents = highWaterBalanceCents - plan.eval.drawdown.drawdownCents;
+
+  return {
+    ...initialState(plan, fields.tradingDay ?? day('2026-11-02'), ENGINE_VERSION),
+    balanceCents,
+    floorOpenCents: floorCents,
+    floorCents,
+    highWaterBalanceCents,
+    tradedDaysCount: fields.tradedDaysCount ?? 1,
+    consistencyBestDayCents: fields.consistencyBestDayCents ?? 0n,
+    consistencyPeriodProfitCents: fields.consistencyPeriodProfitCents ?? 0n,
   };
 }
 

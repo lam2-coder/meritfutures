@@ -109,16 +109,24 @@ test('DO-2  a settlement effective today refuses, because group H is not written
   expect(out.state.payoutsSettledCount).toBe(0);
 });
 
-test('DO-8  an eval-phase day refuses AFTER the day is computed, and names group E', () => {
+test('DO-8  an eval-phase day that meets no condition folds and closes, unchanged', () => {
+  // THIS TEST REFUSED UNTIL GROUP E LANDED and it now closes, which is the diff
+  // worth reading: `eval_progression_unimplemented` is gone from `AssertionKind`
+  // because nothing can emit it, and a kind nothing can emit is a lie about what
+  // the engine refuses.
   const priorEval = initialState(CORE_50K, day('2026-11-02'), ENGINE_VERSION);
   expect(priorEval.phase).toBe('eval');
 
   const out = fold({ prior: priorEval });
-  expect(out.assertions.map((a) => a.kind)).toEqual(['eval_progression_unimplemented']);
+  expect(out.assertions).toEqual([]);
 
-  // DO-4 to DO-7 ran: the state carried back has the day's floor and counters on
-  // it, which is what makes the refusal a boundary rather than a wall. It is
-  // still a refusal, so the caller writes none of it.
+  // 20,000c of profit against a 300,000c target: R-26 is false, so DO-8 does
+  // nothing at all and the day emits only `day.closed`. R-28's deferral event is
+  // NOT emitted, because consistency is tested only once R-26 and R-27 hold.
+  expect(out.state.phase).toBe('eval');
+  expect(out.events.map((e) => e.type)).toEqual(['day.closed']);
+
+  // DO-4 to DO-7 ran, and their numbers are unchanged by DO-8 having run.
   expect(out.state.floorCents).toBe(4_770_000n);
   expect(out.state.tradedDaysCount).toBe(1);
 });

@@ -57,15 +57,22 @@ export type {
   FloorLockedEvent,
   FloorLockRules,
   FundedPhaseRules,
+  PassDeferredConsistencyEvent,
   Phase,
   PhaseDayRules,
+  PhasePassedEvent,
   ResolvedPlan,
   RuleState,
   SettlementFact,
   SoftDailyLossLimitEvent,
 } from './types.js';
 
-export { buildCalendarSlice, CalendarSliceError, lookupCalendarDay } from './calendar.js';
+export {
+  buildCalendarSlice,
+  CalendarSliceError,
+  lookupCalendarDay,
+  nextTradingDayAfter,
+} from './calendar.js';
 export type { CalendarLookup, CalendarSource } from './calendar.js';
 
 export { EngineInvariantError } from './errors.js';
