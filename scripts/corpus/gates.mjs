@@ -1172,10 +1172,38 @@ function columnCatalogue() {
         add(table, first.toLowerCase());
       }
     }
-    for (const m of sql.matchAll(
-      /\bALTER\s+TABLE\s+(?:ONLY\s+)?([a-z_][a-z0-9_]*)\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/gi,
-    )) {
-      add(m[1].toLowerCase(), m[2].toLowerCase());
+    // A MULTI-COLUMN `ALTER TABLE` DECLARED ONE COLUMN TO THIS PARSER UNTIL
+    // 2026-08-16, and CI-06l is what found it on its first run.
+    //
+    // The expression here required ADD COLUMN to follow the table name
+    // immediately, so `ALTER TABLE payout_requests ADD COLUMN a, ADD COLUMN b,
+    // ADD COLUMN c` contributed `a` and nothing else. 0031 adds five hold
+    // columns in one statement and FOUR OF THEM WERE INVISIBLE, including
+    // `hold_expires_at`, which is the clock ADR-040's whole enforcement window
+    // rests on.
+    //
+    // IT FAILS IN THE SAFE DIRECTION AND THAT IS WHY IT SURVIVED. A column
+    // missing from this catalogue makes CI-06j report a live trigger reference
+    // as a phantom, which is a false finding somebody investigates, not a false
+    // pass nobody sees. No trigger has named one of the four yet, so nothing
+    // fired. It would have fired on the first guard written over the hold.
+    // Widening a catalogue can only ever remove CI-06j findings, never add one.
+    for (const m of sql.matchAll(/\bALTER\s+TABLE\s+(?:ONLY\s+)?([a-z_][a-z0-9_]*)/gi)) {
+      const table = m[1].toLowerCase();
+      // The statement runs to the first `;` at paren depth zero. A CHECK body
+      // holds parentheses and never a statement terminator, so depth is enough.
+      let depth = 0;
+      let i = m.index + m[0].length;
+      for (; i < sql.length; i++) {
+        if (sql[i] === '(') depth++;
+        else if (sql[i] === ')') depth--;
+        else if (sql[i] === ';' && depth === 0) break;
+      }
+      for (const c of sql
+        .slice(m.index + m[0].length, i)
+        .matchAll(/\bADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)/gi)) {
+        add(table, c[1].toLowerCase());
+      }
     }
   }
   return cols;
@@ -1526,6 +1554,224 @@ const ci06k = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06l  EVERY EXPIRY HAS A SWEEP
+// -----------------------------------------------------------------------------
+// ADR-040, made checkable from the tree. No database.
+//
+// THE FAILURE IT EXISTS FOR. A clock in the schema with nothing scheduled to
+// reach it is a hold that becomes indefinite in silence. The column is there,
+// the index is there, the CHECK that made the clock mandatory is there, and
+// every one of those reads as a control. A bounded hold with no releaser is a
+// denial nobody had to authorize, and IT FAILS NO TEST, because there is no
+// test a schema can fail by omission. ADR-040 made the auto-release the
+// load-bearing control of the whole enforcement window; this is the part of
+// that control a reading can check.
+//
+// Each `*_expires_at` column the migrations declare either names a release job
+// in CRON_INVENTORY's coverage table, or appears on that document's written
+// exemption list with a reason.
+//
+// FOUR ASSERTIONS, and the last two are the ones an allowlist decays through:
+//
+//   1. Every expiry column is covered, by exactly one of the two lists. A
+//      column on neither is the finding the gate is named for.
+//   2. No column is on BOTH. Two dispositions for one clock is the same defect
+//      as two expressions of one concept, and the ambiguity always resolves in
+//      whichever direction the reader already believed.
+//   3. NO STALE ENTRY, in either list. This is the NO-FLOATS list's own second
+//      direction, and it is the one that decays quietly: the entry stays, the
+//      column is renamed, and the new spelling is unguarded while the list
+//      still looks complete. Assertion 1 alone would report that tree as clean.
+//   4. A named release job EXISTS as a row of the scheduled table. A coverage
+//      row pointing at a job nobody scheduled is the original failure wearing
+//      the fix's clothing, and it is one rename away at all times.
+//
+// WHY `*_expires_at` AND NOT EVERY CLOCK. `identity_restriction_episodes.
+// sla_due_at` is a real clock this gate cannot see, and CRON_INVENTORY says so
+// rather than leaving it to a grep. Widening the pattern to catch it would also
+// catch every `starts_at`, `verified_at` and `created_at` in the schema, and a
+// gate that fails on correct DDL is a gate that gets switched off. The
+// narrowness is declared here instead of being fixed badly.
+const CRON_DOC = 'docs/ops/runbooks/CRON_INVENTORY.md';
+const CRON_SCHEDULED = '## Scheduled work';
+const CRON_COVERAGE = '## Expiry columns and their release jobs';
+const CRON_EXEMPT = '## The expiry exemption list';
+
+// Rows of one `##` section, as [cells]. Bounded to its own section for the same
+// reason negativeAuthzRows is: unbounded, this runs on into the next table and
+// starts reading rows that answer a different question.
+function cronRows(body, heading) {
+  const start = body.indexOf(heading);
+  if (start === -1) throw new Error(`${CRON_DOC}: section not found: "${heading}"`);
+  const after = body.slice(start + heading.length);
+  const end = after.search(/\n## /);
+  const rows = [];
+  for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
+    if (!line.trim().startsWith('|')) continue;
+    const cells = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    if (cells.every((c) => /^:?-+:?$/.test(c))) continue; // the |---|---| separator
+    rows.push(cells);
+  }
+  return rows;
+}
+
+// A job name, comparable across the two tables that spell it differently.
+// Links flatten to their text, emphasis and code spans are stripped, and
+// PARENTHETICALS GO: the scheduled table writes "Nightly batch (day close, rule
+// fold, eligibility)" and a coverage row cites "Nightly batch". Matching on the
+// raw cell would make every citation of that job a phantom finding, which is
+// CI-06a's 109 phantom anchors one table over.
+const normJob = (cell) =>
+  cell
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[*`]/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+// `table.column` out of a cell, and nothing else. Anchored so a cell of prose
+// mentioning a column in passing is not read as a list entry: an entry is a
+// cell that IS the identifier, optionally in a code span.
+const columnRef = (cell) => {
+  const m = /^`?([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)`?$/.exec(cell.trim());
+  return m ? `${m[1]}.${m[2]}` : null;
+};
+
+// Every `*_expires_at` column the migrations declare, as `table.column`. Reads
+// the same catalogue CI-06j builds, so the two gates cannot disagree about what
+// a column is: one parser, called twice, which is OQ-P1-04's ruling applied
+// before the second expression exists rather than after.
+function expiryColumns() {
+  const out = [];
+  for (const [table, cols] of columnCatalogue()) {
+    for (const col of cols) if (/expires_at$/.test(col)) out.push(`${table}.${col}`);
+  }
+  return out.sort();
+}
+
+const ci06l = {
+  id: 'CI-06l',
+  title: 'Every expiry has a sweep: each *_expires_at column names a release job or a written exemption',
+  covers:
+    'every `*_expires_at` column the migrations declare is dispositioned exactly once in ' +
+    `${CRON_DOC}, either in the coverage table with a release job that is itself a row of ` +
+    'the scheduled table, or on the written exemption list with a reason. Stale entries in ' +
+    'either list are findings, which is the direction an allowlist decays in. ' +
+    'THREE THINGS IT DOES NOT DO. It does not check that the named job RUNS, which is what ' +
+    'the dead-man switch is for and needs the estate. It does not read any clock whose ' +
+    'column is not named `*_expires_at`, so `identity_restriction_episodes.sla_due_at` is ' +
+    'covered by the document and invisible to the gate, declared rather than fixed because ' +
+    'a wider pattern would match every timestamp in the schema. And it does not judge ' +
+    'whether an exemption reason is GOOD, only that one was written.',
+  run() {
+    const findings = [];
+    const columns = expiryColumns();
+    // Rule 2 on a derived input. A catalogue parser that silently stopped
+    // matching would report a corpus with no clocks in it as fully covered.
+    if (columns.length === 0) {
+      throw new Error('no *_expires_at columns found in the migrations; the gate cannot run');
+    }
+    const body = read(CRON_DOC);
+
+    const scheduled = new Set(cronRows(body, CRON_SCHEDULED).slice(1).map((r) => normJob(r[0])));
+    if (scheduled.size === 0) {
+      throw new Error(`${CRON_DOC}: the scheduled table parsed to zero jobs; the gate cannot run`);
+    }
+
+    // `.slice(1)` drops the header row of each table. A header whose first cell
+    // happens to parse as a column reference would otherwise be an entry.
+    const covered = new Map();
+    for (const cells of cronRows(body, CRON_COVERAGE).slice(1)) {
+      const col = columnRef(cells[0] ?? '');
+      if (col === null) continue;
+      covered.set(col, { job: (cells[1] ?? '').trim(), line: cells.join(' | ') });
+    }
+    const exempt = new Map();
+    for (const cells of cronRows(body, CRON_EXEMPT).slice(1)) {
+      const col = columnRef(cells[0] ?? '');
+      if (col === null) continue;
+      exempt.set(col, (cells[1] ?? '').trim());
+    }
+    if (covered.size === 0 && exempt.size === 0) {
+      throw new Error(
+        `${CRON_DOC}: neither the coverage table nor the exemption list parsed to a single ` +
+          '`table.column` entry, so CI-06l is asserting nothing about either',
+      );
+    }
+
+    const declared = new Set(columns);
+    for (const col of columns) {
+      const hasJob = covered.has(col);
+      const isExempt = exempt.has(col);
+      // Assertion 1.
+      if (!hasJob && !isExempt) {
+        findings.push(
+          `${col}: an expiry column that names no release job in ${CRON_DOC} and is not on ` +
+            'its exemption list. A bounded hold with no releaser is a denial nobody had to ' +
+            'authorize (ADR-040). Give it a job, or exempt it in writing with a reason',
+        );
+        continue;
+      }
+      // Assertion 2.
+      if (hasJob && isExempt) {
+        findings.push(
+          `${col}: dispositioned twice in ${CRON_DOC}, once with the release job ` +
+            `"${normJob(covered.get(col).job)}" and once on the exemption list. One clock, one ` +
+            'disposition: two of them is an ambiguity that resolves in whichever direction the ' +
+            'reader already believed',
+        );
+        continue;
+      }
+      // Assertion 4.
+      if (hasJob) {
+        const job = normJob(covered.get(col).job);
+        if (job === '') {
+          findings.push(`${col}: its coverage row names no release job (row reads "${covered.get(col).line.slice(0, 70)}")`);
+        } else if (!scheduled.has(job)) {
+          findings.push(
+            `${col}: its coverage row names the release job "${job}", which is not a row of ` +
+              `${CRON_DOC}'s scheduled table. "A job in this table without a dead-man switch is ` +
+              'a job that does not exist", and a job with no row at all is one rename away at ' +
+              'all times',
+          );
+        }
+      }
+      // An exemption with no reason is an exemption nobody has to defend.
+      if (isExempt && exempt.get(col) === '') {
+        findings.push(
+          `${col}: on the exemption list with no reason written beside it. The list is only ` +
+            'worth its exemptions if each one states why no job is needed',
+        );
+      }
+    }
+
+    // Assertion 3, BOTH LISTS. The quiet direction: an entry naming a column no
+    // migration declares means the list looks complete while the real column,
+    // under its new spelling, is covered by nothing.
+    for (const [col] of covered) {
+      if (!declared.has(col)) {
+        findings.push(
+          `${CRON_DOC}: the coverage table names ${col}, which no migration declares as an ` +
+            '`*_expires_at` column. A stale entry is how a list silently grants more than it ' +
+            'names: the row stays, the column is renamed, and the new name is covered by nothing',
+        );
+      }
+    }
+    for (const [col] of exempt) {
+      if (!declared.has(col)) {
+        findings.push(
+          `${CRON_DOC}: the exemption list names ${col}, which no migration declares as an ` +
+            '`*_expires_at` column. Same stale-entry failure, on the list where it is cheaper ' +
+            'to leave a row behind',
+        );
+      }
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // CI-06n  REGISTRY INDEX COMPLETENESS, BOTH DIRECTIONS
 // -----------------------------------------------------------------------------
 // THIS GATE IS THE PRICE OF ADR-043's INDEX EXEMPTION, and it is written down as
@@ -1600,7 +1846,7 @@ const ci06n = {
 // -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
-const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06h, ci06i, ci06j, ci06k, ci06n, adr026];
+const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06h, ci06i, ci06j, ci06k, ci06l, ci06n, adr026];
 
 function main() {
   const [cmd, only] = process.argv.slice(2);

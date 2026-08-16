@@ -66,11 +66,14 @@ Canonical codes:
 | `kyc_required` | 422 | Verification needed before this action |
 | `geo_restricted` | 422 | Jurisdiction blocked at checkout |
 | `account_cap_reached` | 422 | Entity-level cap would be exceeded |
+| `identity_restricted` | 422 | The identity is restricted. Refused **server side** at the resolved-identity step, on **every** payment method and on every surface [ADR-041](../decisions/ADR-041.md) enumerates |
 | `rate_limited` | 429 | Too many requests |
 | `internal_error` | 500 | Unexpected; correlation id in `instance` |
 | `service_unavailable` | 503 | Dependency down (PSP, Rise), safe to retry |
 
 Errors never include stack traces, SQL, vendor payloads, or another identity's data.
+
+**`identity_restricted` is a distinct code and not a reuse of `payouts_frozen`, and the distinction is load-bearing in two directions.** `payouts_frozen` is **per account or per payment** and blocks one door; a restriction is **per human**, halts every surface at once, and is reversed by a documented restore. A client that cannot tell them apart renders the wrong remedy, and the remedies are genuinely different. **It was proposed in [M03](../plans/M03-billing-checkout.md) section 3.5 and stated in one direction only until this fold**: the plan refused with a code this contract did not define, which is the shape where an implementer either invents a second spelling or reuses the nearest existing code. It is defined here now, and checkout, payouts, wallet spend, external withdrawal and affiliate settlement all refuse with this one code rather than with five near-synonyms.
 
 ## 3. Auth
 
@@ -144,6 +147,16 @@ type Me = {
   identity_status: "active" | "restricted" | "closed";
   payouts_frozen: boolean;
   frozen_reason: string | null;      // ToS-cited, trader-safe text
+
+  // FOLD-02, ADR-041. The state was already here and said nothing about itself.
+  // A trader reading `restricted` learned that something had happened and not
+  // what, which surfaces are affected, or whether it ends.
+  restriction: {
+    reason: string;                  // ToS-cited, trader-safe. Never the detector
+    tos_clause: string;
+    opened_at: string;
+    resolves_by: string | null;      // sla_due_at: set only where a payout is pending
+  } | null;
   accounts_count: number;
   max_accounts: number;
   affiliate: { is_affiliate: boolean; code: string | null };
@@ -401,7 +414,7 @@ Auth: session, owner. Rate limit: 60 per minute.
 type PayoutRequestBody = { amount_cents?: number };
 type PayoutResponse = {
   payout_request_id: string;
-  status: "approved";                 // the only success value that exists
+  status: "approved" | "held_pending_review";   // there is still no denial value
   requested_cents: number;            // echoes the effective request: the supplied amount, or max_payout_cents when omitted
   amount_supplied: boolean;           // false when the caller took the default
   approved_cents: number;
@@ -411,10 +424,19 @@ type PayoutResponse = {
   payout_ordinal: number;
   estimated_settlement: { min_business_days: number; max_business_days: number };
   eligibility_snapshot_id: string;
+  hold: {                             // present only when status is held_pending_review
+    held_at: string;
+    resolves_by: string;              // hold_expires_at, 48 hours. ADR-040
+    tos_clause: string;
+  } | null;
 };
 ```
 Auth: session, owner. Idempotency: required. Rate limit: 10 per day per account, 20 per day per identity. Anti-bot: Turnstile.
-Errors: `payout_not_eligible` (422, body includes the full `gates` object so the client shows exactly what is missing), `payouts_frozen`, `kyc_required`, `validation_failed` (amount non-integer, zero, or negative), `conflict` (a payout is already in flight for this account).
+Errors: `payout_not_eligible` (422, body includes the full `gates` object so the client shows exactly what is missing), `payouts_frozen`, `identity_restricted`, `kyc_required`, `validation_failed` (amount non-integer, zero, or negative), `conflict` (a payout is already in flight for this account, **and a held request is in flight**).
+
+**A hold is a 200 carrying `held_pending_review`, not an error.** [ADR-040](../decisions/ADR-040.md): the hold is entered when an unresolved high-severity flag stands at request time, and **the request succeeded** — it exists, it holds its ordinal, it carries a full evaluated decision, and it has a deadline. Returning a 422 would put a state with a clock into the vocabulary of a refusal, which is the reading zero denial exists to prevent. **Every money field is populated on a held response**, because the decision is computed and frozen at request time and only the ledger posting is deferred: release is mechanical and re-evaluates nothing, which is `INV-M5-02`, the number shown is the number sent.
+
+**`conflict` now covers a held request too**, since the widened `payout_requests_no_in_flight_uq` predicate makes a held request **outstanding**. That is the same liability control stated below, one state wider.
 
 Server behavior, in order: re-evaluate eligibility against the last closed day, resolve the effective request (`amount_cents` when supplied, otherwise `max_payout_cents`), clamp server-side, persist the immutable snapshot, post the ledger transaction, approve, enqueue the transfer. The clamp is `approved_cents = min(effective_request, cap_cents_for_ordinal, withdrawable_cents)` and the result must satisfy `approved_cents >= min_payout_cents`; a supplied amount that clamps below the minimum returns `payout_not_eligible` with `minimum_amount` failing, never a partial payment and never a denial. The client's `amount_cents` can only ever reduce the payout, never increase it.
 
@@ -425,12 +447,24 @@ Server behavior, in order: re-evaluate eligibility against the last closed day, 
 type PayoutListItem = {
   payout_request_id: string; account_id: string;
   approved_cents: number; trader_cents: number;
-  status: "approved" | "transferring" | "settled" | "failed" | "frozen";
-  approved_at: string; settled_at: string | null;
+  status: "approved" | "held_pending_review" | "settled" | "failed" | "frozen";
+  approved_at: string | null;         // null while held: the hold is PRE-approval
+  settled_at: string | null;
+  hold: {                             // present only when status is held_pending_review
+    held_at: string;
+    resolves_by: string;              // hold_expires_at. The date, always
+    tos_clause: string;
+  } | null;
   timeline: Array<{ state: string; at: string }>;
   failure_note: string | null;        // honest, trader-readable
 };
 ```
+
+**This union typed `transferring` and not `held_pending_review` until [ADR-040](../decisions/ADR-040.md)**, and it is one of the four sites [ADR-028](../decisions/ADR-028.md)'s own sweep named and did not reach. `transferring` left `payout_requests` on 2026-08-14 and is owned by `wallet_withdrawals`, so this field advertised a value the table cannot hold while omitting the one it can. **A client written against it would have had a branch that never fires and no branch for the state that does.**
+
+**`approved_at` becomes nullable in the same edit, and that is the hold's whole shape in one field.** The hold is entered **before** approval, so a held request has no approval time; a client that types it as non-null will render an epoch date or crash on the one state that most needs to render correctly.
+
+**`resolves_by` is required in the response and is not optional.** [M05](../plans/M05-payout-system.md) section 3.4: a review the trader cannot see the end of is indistinguishable from a refusal. The trader is shown **the fact, the ToS clause and the date it resolves**, never the evidence and never the detector, and [M04](../plans/M04-trader-portal.md)'s copy rule binds so it is **never worded as a rejection**.
 
 ### GET /accounts/:accountId/certificate?kind=pass|payout
 Returns a signed, verifiable share card.

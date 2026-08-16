@@ -48,7 +48,8 @@ Every event Merit emits: name, payload schema, producer, consumers. One append-o
 | `identity.signal_observed` | API, worker | `{ identity_id, kind, value_hash_prefix, first_seen }` | RISK, EVID |
 | `identity.linked` | Detector, admin | `{ identity_a, identity_b, link_kind, confidence_bp, evidence_ref }` | FEED, RISK, EVID |
 | `identity.merged` | Admin, resolver | `{ surviving_identity_id, merged_identity_id, accounts_at_merge, reason }` | FEED, RISK, EVID, ALERT |
-| `identity.restricted` | Admin | `{ identity_id, reason, tos_clause, evidence_pack_id }` | FEED, MAIL, EVID, ALERT |
+| `identity.restricted` | Admin | `{ identity_id, restriction_episode_id, flag_id, reason, tos_clause, evidence_pack_id, sla_due_at }` | FEED, MAIL, EVID, ALERT |
+| `identity.restriction_lifted` **NEW** | Admin | `{ identity_id, restriction_episode_id, restored_by, restore_evidence, restored_at }` | FEED, MAIL, NOTIF, EVID, ALERT |
 | `identity.payouts_frozen` | Admin | `{ identity_id, reason, tos_clause, flag_ids[] }` | FEED, NOTIF, EVID, ALERT |
 | `identity.payouts_unfrozen` | Admin | `{ identity_id, resolution_note }` | FEED, NOTIF, EVID |
 | `kyc.required` | API per placement config | `{ identity_id, placement }` | MAIL, NOTIF, BI |
@@ -63,6 +64,10 @@ Every event Merit emits: name, payload schema, producer, consumers. One append-o
 | `sms.budget_breaker_tripped` | Worker on `otp_send_budget` | `{ scope_kind, scope_key, evaluated_on, state, sends, send_limit, spend_cents, budget_cents, deferred_registrations }` | ALERT, FEED, BI, EVID |
 
 `kyc.dedupe_hit` is the fleet-killer signal from the [adversary dossier](../../research/ADVERSARY_DOSSIER.md) scheme 6. It fires before any liability exists, which is the entire point of verifying pre-funded.
+
+**`identity.restriction_lifted` closes a gap that had existed since `identity.restricted` was written, and [ADR-041](../decisions/ADR-041.md) is what made it load-bearing.** `identity.payouts_frozen` has `identity.payouts_unfrozen` beside it; the restriction had **nothing**. So `G-RESTRICTION-LIFTED` was a transition with no event, against [STATE_MACHINES](STATE_MACHINES.md) universal rule 1, and **the hold half of three consumers worked while the release half did not**: [M02](../plans/M02-rithmic-bridge.md) could not re-enable trading, [M06](../plans/M06-admin-ops-console.md) could not put the restore on the feed, and [M08](../plans/M08-affiliate-system.md) could not release a held statement. **That failure presents as a trader who was cleared and is still locked out**, which is the worst version of it, because every operator involved believes the restore happened.
+
+**Both restriction events now carry `restriction_episode_id`, and the episode row is the authority rather than either payload.** `identity.restricted` deliberately carries **no account list** while `enforcement.applied` does, and the asymmetry is correct: the set of accounts an identity holds can change between the two events, so a consumer must resolve the set **at consume time** rather than trust a payload written earlier. `sla_due_at` is carried because a restriction opened over a held payout inherits that payout's deadline, and a consumer rendering the restriction without it will render an enforcement that looks open-ended when it is not.
 
 **The four phone and SMS events are [ADR-039](../decisions/ADR-039.md)'s, and both [M16](../plans/M16-notification-center.md) and [M07](../plans/M07-risk-abuse.md) consume them.** Four things about their payloads are decisions rather than shapes.
 
@@ -224,6 +229,12 @@ Breach uses strict `<` against the floor: touching the floor exactly is not a br
 | `payout.transfer_failed` | Rise webhook, worker | `{ transfer_id, error_code, attempts, will_retry }` | ALERT, FEED, NOTIF |
 | `payout.name_mismatch_detected` | Worker | `{ payout_request_id, identity_id, kyc_name_hash, rise_name_hash }` | ALERT, RISK, EVID |
 | `payout.win_days_reset` | Worker on settlement | `{ account_id, previous_count, reset_to: 0, trigger_payout_id, anchor_trading_day }` | TL, EVID |
+| `payout.held` **NEW** | API (engine) | `{ payout_request_id, account_id, identity_id, hold_flag_id, tos_clause, hold_expires_at, approved_cents, payout_ordinal, plan_version_id }` | FEED, TL, MAIL, NOTIF, EVID, ALERT |
+| `payout.hold_released` **NEW** | Worker (the expiry sweep), Admin | `{ payout_request_id, account_id, identity_id, released_by: "expiry"\|"actor", actor?, hold_flag_id, held_at, hold_expires_at }` | FEED, TL, MAIL, NOTIF, BI, EVID |
+| `payout.hold_enforced` **NEW** | Admin | `{ payout_request_id, account_id, identity_id, hold_flag_id, tos_clause, evidence_pack_id, reason, freed_ordinal }` | FEED, TL, MAIL, NOTIF, BI, EVID, ALERT |
+| `payout.expiry_overdue` **NEW** | Worker (the nightly assertion) | `{ subject_kind: "payout_hold"\|"payout_freeze"\|"withdrawal_freeze", subject_id, account_id?, identity_id, expires_at, overdue_seconds }` | ALERT, FEED, EVID |
+| `wallet.withdrawal_halted` **NEW** | Admin, detector | `{ withdrawal_id, identity_id, freeze_flag_id, tos_clause, freeze_expires_at, rail_status }` | FEED, TL, NOTIF, EVID, ALERT |
+| `wallet.withdrawal_halt_released` **NEW** | Worker (the expiry sweep), Admin | `{ withdrawal_id, identity_id, released_by: "expiry"\|"actor", actor?, rail_status }` | FEED, TL, NOTIF, EVID |
 | `payout.floor_recomputed` | **retired, no producer** | `{ account_id, mode, previous_floor_cents, new_floor_cents }` | none |
 | `rule.floor_locked` | Engine, via the batch, R-15 | `{ account_id, trading_day, at_profit_cents, locked_floor_cents }` | TL, EVID, RISK, BI |
 | `rule.soft_dll_exceeded` | Engine, via the batch, R-23 | `{ account_id, trading_day, realized_pnl_cents, limit_cents }` | RISK, TL |
@@ -231,6 +242,16 @@ Breach uses strict `<` against the floor: touching the floor exactly is not a br
 **Three amendments from the M1 gate (2026-08-13).** `rule.floor_locked` and `rule.soft_dll_exceeded` are added: the first because the lock permanently changes an account's risk profile and belongs on the trader timeline and in the evidence pack, the second so that enabling a soft daily loss limit is a config change rather than a code change (no v1 plan configures one). `payout.floor_recomputed` is **retired** rather than deleted, because [ADR-014](../decisions/ADR-014.md) removed the post-payout floor recompute and left it with no producer. The name stays in the catalogue with its payload intact so that a reader who finds it in an old design note learns it is dead, instead of concluding the catalogue is incomplete. `payout.win_days_reset` gains `anchor_trading_day`, because "reset to zero" without the anchor does not explain the next cycle.
 
 There is no `payout.denied` event in this catalogue, and that absence is deliberate: the system has no path that produces one. `payout.blocked` exists only for the three pre-existing conditions a trader can see coming (frozen account under investigation, unresolved reconciliation, KYC not verified) and for a request that simply has not cleared its gates yet.
+
+**Six events are added by [ADR-040](../decisions/ADR-040.md), and `payout.held` is not `payout.blocked` under a second name.** `payout.blocked` says the request was refused and no row is outstanding; `payout.held` says the request exists, carries a full evaluated decision, and **has a deadline**. Collapsing them would put a state with a clock into the vocabulary of a state without one.
+
+**Every hold event carries its own expiry in the payload**, which is unusual for this catalogue and is the point: a consumer that renders the trader-facing status must show the date the hold resolves, and one that has to join back to `payout_requests` to find it will eventually render the hold without it. [M05](../plans/M05-payout-system.md) section 3.4's rule governs, **a review the trader cannot see the end of is indistinguishable from a refusal**, and the payload is where that rule becomes hard to get wrong.
+
+**`payout.hold_released` names who released it, and `expiry` is a first-class value rather than a null actor.** The two cases are operationally different, since one is the SLA working and the other is a human deciding early, and a release with no actor is otherwise indistinguishable from a release whose actor was not recorded.
+
+**`payout.expiry_overdue` is the only event here produced by an assertion rather than by a state change**, which is a deliberate exception to this document's own delivery rule. Every other event is written in the same transaction as the fact it records, so the event exists if and only if the fact does. **This one records that a fact did NOT happen**, and there is no transaction for an absence. It is the alarm that fires on the query rather than on the job ([EC-151](../edge-cases/EC-151.md)), it is the fourth unsuppressible alarm, and its `subject_kind` is what lets one assertion cover all three clocks the hourly sweep carries.
+
+**The wallet halt gets events and does not get a status**, because on `wallet_withdrawals` the halt is orthogonal to the rail state. `rail_status` is carried in the payload for exactly that reason: a halted withdrawal is still `approved` or `transferring` as far as the rail is concerned, and a consumer that infers the halt from the status will infer wrong. **These are the first `wallet.*` rows in this catalogue**, and the three the [STATE_MACHINES section 3.2](STATE_MACHINES.md) transition table already names (`wallet.withdrawal_sent`, `wallet.withdrawal_settled`, `wallet.withdrawal_failed`) are **still missing from it**. That gap is [M20](../plans/M20-wallet.md)'s to close and is recorded here rather than quietly filled, because inventing three event shapes for a machine this fold did not draw is how a catalogue acquires rows nobody ruled on.
 
 ## 7. Ledger
 
@@ -293,6 +314,9 @@ The pack is reproducible: regenerating it for the same account and the same as-o
 | `payout.approved` | Approved instantly, settlement window | none |
 | `payout.settled` | Paid, with the amount and the rail | none |
 | `payout.transfer_failed` | Honest status and what happens next | always send; silence is what kills payout trust |
+| `payout.held` | The fact, the ToS clause, and **the date it resolves** | always send. The fact, the clause and the date, never the evidence and never the detector. [M04](../plans/M04-trader-portal.md)'s copy rule binds: it is **never worded as a rejection** |
+| `payout.hold_released` | Released and paying, with the amount | none. It is the good news and it is the message that closes the loop the hold opened |
+| `identity.restriction_lifted` | Access restored, and what is available again | always send. **A restore nobody was told about is, from the trader's side, still a restriction** |
 | `account.graduated` | Ladder complete and live invitation | none |
 | `kyc.rejected` | What to do next | never state the provider's internal reason verbatim |
 

@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [README.md, COUNSEL_PACKET.md, AFFILIATE_TERMS.md, ../plans/M07-risk-abuse.md, ../plans/M19-kyc-identity.md, ../plans/M20-wallet.md, ../plans/M05-payout-system.md, ../plans/M18-graduation-track.md, ../plans/M03-billing-checkout.md, ../decisions/README.md]
-last_updated: 2026-08-14
+depends_on: [README.md, COUNSEL_PACKET.md, AFFILIATE_TERMS.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, ../plans/M02-rithmic-bridge.md, ../plans/M07-risk-abuse.md, ../plans/M19-kyc-identity.md, ../plans/M20-wallet.md, ../plans/M05-payout-system.md, ../plans/M18-graduation-track.md, ../plans/M03-billing-checkout.md, ../decisions/README.md]
+last_updated: 2026-08-16
 ---
 
 # Terms of Service: clause inventory
@@ -22,7 +22,7 @@ last_updated: 2026-08-14
 | 2 | **Verification and re-verification rights** | Merit may require identity verification at defined trigger points, and may re-verify on destination change, flag, dormancy, or document expiry | [ADR-021](../decisions/ADR-021.md), [M19](../plans/M19-kyc-identity.md) SD-M19-01. **Trigger points are disclosed in advance** on plan pages, so verification is never a surprise after payment |
 | 3 | **Monitoring consent** | Trading behavior, device and network signals are analyzed for rule evaluation **and** for fraud and abuse detection | The dual purpose must be explicit. Folding the fraud purpose into "providing the service" is the gap that makes a later enforcement contestable |
 | 4 | **Copy trading and account management** | Same-identity copying across one's own Merit accounts is permitted. **Cross-identity copying, third-party signal and copy services, and account management by another person are prohibited** | The batch 1 copy-trading ruling. This is the clause D-01 was waiting for, and the enumeration is the point: "coordinated trading" is not a standard anyone can comply with |
-| 5 | **Enforcement process** | What Merit may do on a confirmed violation, in what order, with what notice, and what the trader's route of response is | **A process clause protects Merit more than a discretion clause does.** "Decisions are final" language is explicitly rejected: it is false, because a human can reverse, and it is what a wronged trader screenshots |
+| 5 | **Enforcement process** | What Merit may do on a confirmed violation, in what order, with what notice, and what the trader's route of response is. **Three outcomes, not two**, and they are distinguished by scope and reversibility: a **freeze** is per payment and expires; a **restriction** is per person, halts activity across every account that person holds, and **is reversed by a documented restore**; **closure for cause** is terminal and per account. Every one carries a cited flag, a stated clause and a written reason | **A process clause protects Merit more than a discretion clause does.** "Decisions are final" language is explicitly rejected: it is false, because a human can reverse, and it is what a wronged trader screenshots. **[ADR-041](../decisions/ADR-041.md) is why this clause now enumerates three.** The corpus previously had a bounded freeze and terminal closure and **nothing between them**, which is the gap an operator under pressure improvises into. A restriction is the proportionate middle action, and drafting it as a distinct, **reversible** outcome is what makes the reversal a term the trader can hold Merit to rather than a favour. See section 8 |
 | 6 | **Eligibility representation** | The trader represents they have **no outstanding balances or unresolved disputes with other proprietary trading firms** | **Lucid-style.** A cheap, self-executing filter against operators cycling between firms, and it makes a later discovery a breach of representation rather than an argument about house rules |
 | 7 | **Wallet terms** | The wallet is a **payable balance**. It bears **no interest**, permits **no peer-to-peer transfer**, and **accepts no deposits** (`INV-WALLET-NO-DEPOSITS`). Funds originate only from payouts, promotional credit, and refunds. Two exits: spend on Merit products, or withdraw to a verified destination in the trader's own name | [ADR-019](../decisions/ADR-019.md), [M20](../plans/M20-wallet.md). **The no-deposit property is what the payable framing rests on**, so it is a term and not only an implementation detail. See section 4 for the full property list counsel needs |
 | 8 | **Ladder and live eligibility** | The payout ladder is **the maximum payout level, not a guaranteed minimum for live eligibility**. Ladder completion sets graduation eligibility only; any live invitation is **at Merit's sole discretion** | [ADR-024](../decisions/ADR-024.md), Lucid's framing adopted verbatim. **This clause exists to be quoted back**, so it is written to be quotable. See section 3 |
@@ -30,7 +30,7 @@ last_updated: 2026-08-14
 | 10 | **Simulated environment** | The product is **evaluation and funded trading in a simulated environment**. No order reaches a live market, no customer funds are traded, and a payout is a contractual performance-based payment rather than trading profit | Constitution section 6. This is the clause the entire regulatory posture rests on, and it must be consistent with every disclosure block in section 2 rather than merely compatible with them |
 | 11 | **Eligibility, jurisdiction, and restricted territories** | Who may buy, the geographic restrictions, and that enforcement is **server side at checkout** rather than a notice | **The restricted list is a placeholder pending counsel.** See section 5, which is written so the list can be dropped in without redrafting the clause |
 | 12 | **Rules, plan versions, and pinning** | An account is governed by the **plan version pinned at purchase**. A later published version never applies to it, in either direction | [M01](../plans/M01-rules-engine.md), B4 #12, GS-041, GS-221. Without this clause the retroactive-change protection is an implementation detail rather than a promise, and it is the single most valuable promise Merit can make in a market whose live case study is a firm destroyed by a retroactive rule change |
-| 13 | **Payout mechanics** | Approval is **mechanical against published gates with no discretionary denial**. Where a payout is held, the hold requires a **cited open flag, a stated clause, a written reason, and a published expiry**, and reaching expiry **releases** | [M05](../plans/M05-payout-system.md) INV-M5-01 and INV-M5-10, GS-109. The freeze contract is a constraint on Merit and it should be drafted as one, because a clause that binds the firm is worth more to a reader than three that bind them |
+| 13 | **Payout mechanics** | Approval is **mechanical against published gates with no discretionary denial**. Where a payout is held, the hold requires a **cited open flag, a stated clause, a written reason, and a published expiry**, and reaching expiry **releases and pays**. **The expiry is 48 hours and it is one number for both holds**: the pre-approval review hold and the post-approval freeze. The same rule and the same clock apply to a withdrawal halted before settlement | [M05](../plans/M05-payout-system.md) INV-M5-01 and INV-M5-10, GS-109, and **[ADR-040](../decisions/ADR-040.md), which is what put a number in this row.** The freeze contract is a constraint on Merit and it should be drafted as one, because a clause that binds the firm is worth more to a reader than three that bind them. See section 8 |
 | 14 | **Fees, refunds, resets, and chargebacks** | What is charged, what is refundable and in what window, that a **refund returns to the funding payment method** and never to the wallet, and the consequence of a chargeback on a funded account | [M03](../plans/M03-billing-checkout.md), [M20](../plans/M20-wallet.md) INV-M20-05, GS-224, GS-096. The refund-routing rule is a term because crossing the rails turns card money into withdrawable cash outside the card network's protections |
 | 15 | **Acceptance, versioning, and changes to these terms** | Acceptance is recorded **per version with IP and timestamp**; changes are notified before taking effect and **never applied to conduct that predates them** | [M03](../plans/M03-billing-checkout.md) INV-M3-09. The acceptance record is the first artifact any enforcement dispute asks for, and clause 12's protection would be hollow if the terms themselves could move retroactively |
 
@@ -115,7 +115,7 @@ Counsel packet item 2 asks whether the wallet is a payable or a regulated stored
 - **Any live-program or funded-capital representation.** [OQ-M18-01](../decisions/gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md). Clause 8 is the only permitted statement touching live eligibility.
 - **Any rule Merit does not implement.** The publish-time validations ([M01](../plans/M01-rules-engine.md) PW-01 to PW-04) exist to catch the reverse case, where a page describes a rule the config does not carry. This is the same discipline applied to prose, in the direction nobody checks.
 - **Any performance representation, guarantee, or implied likelihood of passing.** The corpus's own selection math puts durable edge in the population at 1 to 3 percent and P(skilled given funded) at 6.8 percent, and **pass rate is a price knob rather than a quality filter**. A clause implying otherwise would contradict the firm's own model.
-- **A discretionary payout-denial power.** There is no `denied` status in `payout_requests` and no review state. Drafting a power the system cannot exercise would create a liability with no corresponding capability, which is the worst of both.
+- **A discretionary payout-denial power.** There is no `denied` status in `payout_requests`. **This bullet read "and no review state" until [ADR-040](../decisions/ADR-040.md)**, and it is one of the ten sites that amendment names. A review state now exists and **it expires**; what does not exist, and what counsel must not draft, is a power to deny. Drafting a power the system cannot exercise would create a liability with no corresponding capability, which is the worst of both. **The distinction is the whole of section 8** and it is not a quibble: a hold that pays on a clock and a denial are different powers, and only one of them is real.
 - **Blanket indemnification for anything Merit controls.** A clause that reads as though the firm accepts no operational risk on a product whose entire promise is operational reliability is a clause that undercuts the product.
 
 ---
@@ -129,3 +129,45 @@ Merit's planned scope **sits at or below the published practice** of Tradeify, T
 **One market practice is explicitly refused rather than positioned against:** payout-time fraud friction, of which Apex's two-day screen-recording requirement is the named example. Merit moves identity friction upstream of funding so that **nothing new is ever demanded at payout** ([M05](../plans/M05-payout-system.md) section 7.9). Clause 2's trigger points are the mechanism, and clause 13 is the promise it enables.
 
 **The point of recording all this: Merit's clauses are not novel.** That is the useful fact when a clause is challenged as overreach, and it is worth counsel having before they read clause 1.
+
+---
+
+## 8. Clauses 5 and 13, and the two clocks counsel must not soften
+
+**[ADR-040](../decisions/ADR-040.md) and [ADR-041](../decisions/ADR-041.md) put a clock that binds Merit into a gap where the corpus previously had nothing**, and both clauses get their own section for clause 8's reason: they are the sentences most likely to be softened in drafting, and softening either one deletes the thing being disclosed.
+
+### The hold is a promise about a deadline, not a disclosure of a power
+
+**The obvious drafting instinct is wrong here.** A lawyer reading "Merit may hold a payout pending review" will reach for the familiar shape, which is a reserved discretion with an indefinite window and a best-efforts sentence. **That is the opposite of what the system does**, and drafting it that way would create the discretionary denial power section 6 forbids while describing a mechanism that cannot exercise it.
+
+**What the system actually does, and therefore what the clause must say:**
+
+| The fact | Why it belongs in the clause rather than in a policy page |
+|---|---|
+| A hold is entered **before approval**, only when an unresolved high-severity flag already stands | It is not a discretion exercised after a decision. There is no decision yet, which is what makes it not a denial |
+| It **expires in 48 hours**, and the expiry is published | An unpublished expiry is a promise Merit can quietly extend. The number is the clause's whole value to a reader |
+| Reaching expiry **releases and pays** | The verb is "pays", not "resumes review". A clause that says the hold "lapses" leaves open what happens next, and what happens next is the point |
+| The only alternative outcome is a **documented enforcement action** carrying a cited flag, a stated clause and an evidence pack | Two outcomes and no third. "Or such further period as Merit may reasonably require" is the drafting that would delete this clause |
+| A hold **pays at expiry even if the account has since breached** | This is the one counsel is most likely to query, and the answer is that the alternative is Merit's own hold costing the trader money |
+
+**The same clock and the same rule apply to a withdrawal halted after the money is already in the trader's wallet**, with one difference that must survive drafting: **release there resumes the transfer and does not re-pay**, because the money is already owed and recognised. Counsel should not collapse the two into one sentence that implies a second payment.
+
+### The restriction is defined by its reversal
+
+**Clause 5's three outcomes are distinguished by scope and by reversibility, and the second property is the one that is easy to lose.** A restriction that is drafted as "Merit may suspend access" is indistinguishable to a reader from closure, and a trader who cannot tell them apart behaves as though the terminal one has happened.
+
+**What the clause must carry:**
+
+1. **It is per person, not per account.** It halts purchases and resets, payout requests, wallet spend, external withdrawal, affiliate settlement, and platform trading, across every account that person holds.
+2. **Account state is preserved intact.** No account status moves, no ladder position is lost, no entitlement history is rewritten. This is a term, not an implementation detail, because it is the difference between a pause and a forfeiture.
+3. **It is reversed by a documented restore**, recorded with an actor, a time and evidence. The reversal is the property that makes it proportionate, and a clause that omits it has described closure under a gentler word.
+4. **Where a payout is pending, [ADR-040](../decisions/ADR-040.md)'s 48 hours still runs.** A restriction cannot hold a held payout past its own deadline. Counsel should draft this as an express limit rather than leaving it to inference, because the inference a reader draws from two overlapping enforcement powers is that the longer one governs.
+
+**One honest limit to state to counsel rather than hide.** The platform-trading leg of a restriction is **provisional** on a vendor capability Merit does not yet have ([ADR-005](../decisions/ADR-005.md), `V-M2-15`). Revocation works; **restoration of platform access depends on an artifact the vendor has not committed to supply.** Until it exists, the clause should not promise a restoration timeframe for that leg specifically, and it should not promise one implicitly by promising one for the others.
+
+### What must not appear in either clause
+
+- **Any indefinite or extendable hold period.** The expiry is the control. A clause permitting extension deletes it, and this is the single most likely amendment to be proposed in redlining.
+- **"Pending investigation" with no stated end.** A review the trader cannot see the end of is indistinguishable from a refusal ([M05](../plans/M05-payout-system.md) section 3.4), which is the rule the trader-facing copy already runs on.
+- **A suspension power described without its reversal.**
+- **Any wording implying that a hold reaching expiry results in a further review** rather than in payment.

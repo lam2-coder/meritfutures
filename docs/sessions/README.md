@@ -61,3 +61,4 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 36](2026-08-16-session-36.md) | FOLD-02 session 5, the surfaces (M02, M06, M03, M08) |
 | [2026-08-16 - Session 34](2026-08-16-session-34.md) | FOLD-02 session 8, DELIVERY_PLAN and M15's scope move |
 | [2026-08-16 - Session 37](2026-08-16-session-37.md) | FOLD-01 session 6, the registries and `CI-06k` |
+| [2026-08-16 - Session 38](2026-08-16-session-38.md) | FOLD-02 sessions 6 and 7, the registries and `CI-06l` |
