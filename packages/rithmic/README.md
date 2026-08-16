@@ -42,6 +42,7 @@ writeFiles(renderRun(run), '/path/to/ingest');
 | `types.ts` | Every input, and the list of things the simulator refuses to know |
 | `population.ts` | The seeded population. Account `i` is a pure function of `(seed, i)` |
 | `session.ts` | The day model, and the seam ADR-020's tier 2 attaches to |
+| `stream.ts` | Streaming mode: the same path replayed as ticks, and sampled for a polled feed |
 | `csv.ts` | RFC 4180 rendering, integer money formatting, the hostile-but-legal quirks |
 | `eod-report.ts` | The EOD summary's columns |
 | `fills-report.ts` | The per-fill sibling's columns (`V-M2-11`) |
@@ -95,17 +96,12 @@ applied to this package.
 **Out of scope for file mode, said here so nobody concludes the list is five
 short:** `V-M2-06` and `V-M2-07` are outbound provisioning, `V-M2-09`'s billing
 reconciliation is modelled only as far as a user ref, `V-M2-14` is server-side
-copy, `V-M2-15` is a commercial precondition on the provisioning saga, and
-`V-M2-16` is the streaming tier.
+copy, `V-M2-15` is a commercial precondition on the provisioning saga. **`V-M2-16` was
+on that list and is not any more**: streaming mode landed, so it moved into
+`STREAM_MODE_VENDOR_ASSUMPTIONS`, which is what its out-of-scope entry said would
+happen on the day.
 
 ### What is not built, named rather than implied
-
-**Streaming mode.** ADR-020's tier 2 (`V-M2-16`) is a later session. The seam it
-attaches to is `SimDay.waypoints`: the intraday equity path that file mode
-summarises into `high_balance` and `low_balance` and discards. One day model,
-two consumers, which is the only arrangement in which the two modes cannot
-disagree about what happened on a day. `session.ts` names the three things that
-session owns and this one did not touch.
 
 **`PlatformAdapter` is still unimplemented, and that is the boundary rather than
 an omission.** `ingestEOD` and `ingestFills` **consume** files; the simulator
@@ -160,3 +156,19 @@ candidates and live as rows in `plan_version_sizes`, never as constants), and
 `SIM1`/`SIM2` are **not CME contracts**. All three are picked to be obviously not
 the real thing, so no reader and no later session can mistake this package for a
 source of configuration.
+
+## Streaming mode (ADR-020 tier 2)
+
+`stream.ts`. It attaches at the seam file mode left, which is `SimDay.waypoints`: the intraday equity path file mode summarises into `high_balance` and `low_balance`. **The two modes are two views of one path rather than two producers**, so nothing in `stream.ts` draws and nothing re-derives a balance. That is what makes them agree by construction rather than by care.
+
+| Function | What it is |
+|---|---|
+| `streamRun` | Every tick a run produces, in delivery order. `time` interleaves accounts (one vendor connection); `account` groups them (per-account polling). Both are orderings of one set |
+| `sampleTicks` | The same path at a fixed cadence, which is what a **polled** mechanism delivers. Carries the last observation forward, and **always delivers the close** |
+| `foldStream` | Summarises ticks the way file mode summarises the path. Knows nothing about `SimDay`, deliberately |
+
+**The equivalence is the test worth having.** `stream.test.ts` folds the stream and compares it to the **rendered EOD CSV**, field by field, in the vendor's own decimal spelling. It does not compare the stream to `SimDay`: both are in-memory objects from one `simulate` call, and comparing them would assert that the run equals itself.
+
+**Nothing here is authoritative.** ADR-020's hard rule is that indicative data never feeds an eligibility, breach or money decision (`INV-M2-14`, SECURITY `C-26`). This file cannot enforce that: the boundary is a database grant and a consumer that never reaches for the engine. What it can do is refuse to be mistaken for the authoritative path, which is why `LiveAccountTick.indicative` is a required `true` literal rather than an optional flag.
+
+**`V-M2-16` is unconfirmed and it is the mechanism itself**, not a detail of one. M02 section 3.5 names three candidates and chooses none. The simulator assumes none of the three: `streamRun` is the push shape and `sampleTicks` is the polled shape, both expressible today, so a mechanism answer moves `stream.ts` and nothing upstream of it. If the answer is that no mechanism exists at all, tier 2 does not ship and the blast radius is the live dashboard rather than this package (`OQ-M2-05` carries that question and its cost).

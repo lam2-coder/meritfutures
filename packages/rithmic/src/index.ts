@@ -35,10 +35,28 @@
 // would be a mock at the parser boundary, which is the one thing STRATEGY
 // section 2 rejected by name.
 //
-// **STREAMING MODE IS NOT HERE.** ADR-020's tier 2 is a later session by the
-// standing brief. The seam it attaches to is `SimDay.waypoints`, and
-// `simulator/session.ts` states what that session owns and this one did not
-// touch.
+// -----------------------------------------------------------------------------
+// AND STREAMING MODE, ADR-020's TIER 2, WHICH ATTACHED AT THAT SEAM
+// -----------------------------------------------------------------------------
+// This header read "STREAMING MODE IS NOT HERE" and named `SimDay.waypoints` as
+// the seam a later session would attach to. That session landed and it attached
+// exactly there.
+//
+// **The two modes are two views of one path rather than two producers.** File
+// mode summarises the waypoints into opening, closing, high and low; streaming
+// mode replays them as ticks. `stream.test.ts` folds the stream and compares it
+// to the RENDERED EOD CSV field by field, which is the equivalence worth having:
+// a live dashboard that disagreed with the closing file would be a number the
+// trader sees Merit contradict at settlement.
+//
+// **Nothing here is authoritative and the type says so.** ADR-020's hard rule is
+// that indicative data never feeds an eligibility, breach or money decision
+// (INV-M2-14, SECURITY C-26). `LiveAccountTick.indicative` is a required `true`
+// literal so a consumer cannot destructure one without meeting the word.
+//
+// **`V-M2-16` is the mechanism and it is unconfirmed**, so it moved from
+// `OUT_OF_SCOPE_FOR_FILE_MODE` into `STREAM_MODE_VENDOR_ASSUMPTIONS` on the day
+// this landed, which is what its out-of-scope entry said would happen.
 // =============================================================================
 
 /** An account on the trading platform, as the vendor identifies it. */
@@ -65,12 +83,13 @@ export interface PlatformAdapter {
 }
 
 // -----------------------------------------------------------------------------
-// The synthetic simulator, file mode
+// The synthetic simulator: file mode and streaming mode
 // -----------------------------------------------------------------------------
 
 export {
   FILE_MODE_VENDOR_ASSUMPTIONS,
   OUT_OF_SCOPE_FOR_FILE_MODE,
+  STREAM_MODE_VENDOR_ASSUMPTIONS,
   type OutOfScopeAssumption,
   type VendorAssumption,
 } from './simulator/assumptions.js';
@@ -103,6 +122,16 @@ export { fillsReportTable, FILLS_REPORT_COLUMNS } from './simulator/fills-report
 export { buildPopulation, PopulationSpecError } from './simulator/population.js';
 export { drawKey, draws, DrawError, type Draws, type Range } from './simulator/rng.js';
 export { contractsTraded, simulate, SimulationError } from './simulator/session.js';
+export {
+  foldStream,
+  sampleTicks,
+  streamRun,
+  DECLARED_STREAM_OPTIONS,
+  StreamError,
+  type LiveAccountTick,
+  type StreamFold,
+  type StreamOptions,
+} from './simulator/stream.js';
 export {
   civilFromDays,
   compactTradingDay,

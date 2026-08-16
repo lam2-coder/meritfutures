@@ -200,11 +200,38 @@ export const OUT_OF_SCOPE_FOR_FILE_MODE: readonly OutOfScopeAssumption[] = Objec
       'conformance case asserts the CONSEQUENCE (fail-closed provisioning, INV-M2-13 and ' +
       'INV-M2-15), which lives in the provisioning saga and not here.',
   },
+]);
+
+/**
+ * The rows the synthetic simulator's STREAMING MODE depends on.
+ *
+ * SEPARATE FROM THE FILE-MODE LIST RATHER THAN MERGED INTO IT, because the two
+ * modes fail differently at the vendor call. A file-mode row moving changes a
+ * column or a format; `V-M2-16` moving changes whether tier 2 exists at all.
+ * Collapsing them into one list would make "what does the simulator assume"
+ * answerable and "what does the LIVE layer assume" unanswerable.
+ *
+ * `V-M2-16` moved here from `OUT_OF_SCOPE_FOR_FILE_MODE` on the day streaming
+ * mode landed, which is exactly what that entry said would happen: "the
+ * assumption becomes in-scope on the day that session lands."
+ */
+export const STREAM_MODE_VENDOR_ASSUMPTIONS: readonly VendorAssumption[] = Object.freeze([
   {
     id: 'V-M2-16',
-    why:
-      "ADR-020's tier 2. Streaming mode is a LATER SESSION by the standing brief; the seam " +
-      'it attaches to is SimDay.waypoints in session.ts and the assumption becomes in-scope ' +
-      'on the day that session lands.',
+    assumed:
+      'A streaming or high-frequency snapshot mechanism EXISTS AT ALL, and delivers per-account ' +
+      'equity observations during the session. M02 section 3.5 names three candidates and does ' +
+      'not choose: an R|API+ admin connection, a market-data entitlement already paid for, or ' +
+      'frequent report snapshots. THE SIMULATOR ASSUMES NONE OF THE THREE. It replays the path ' +
+      'as ticks (a push feed) and can sample that path at a fixed cadence (a polled feed), so ' +
+      'both shapes are expressible before the call rather than after it. What it does assume is ' +
+      'that equity is observable intraday at all, which is the claim the row is really about.',
+    whatMoves:
+      'stream.ts, and nothing upstream of it. `simulate` and file mode are untouched by any ' +
+      'answer, because the stream reads waypoints rather than re-deriving them. If the answer ' +
+      'is that NO mechanism exists, ADR-020 tier 2 does not ship and the blast radius is the ' +
+      'whole live dashboard rather than this package: OQ-M2-05 carries that question and its ' +
+      'cost. If a mechanism exists with a shape neither push nor polled, `streamRun` and ' +
+      '`sampleTicks` are the two functions that move.',
   },
 ]);

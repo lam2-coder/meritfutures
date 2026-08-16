@@ -7,6 +7,7 @@ import { expect, test } from 'vitest';
 import {
   FILE_MODE_VENDOR_ASSUMPTIONS,
   OUT_OF_SCOPE_FOR_FILE_MODE,
+  STREAM_MODE_VENDOR_ASSUMPTIONS,
 } from '../src/simulator/assumptions.js';
 
 // CI-02, the `unit` project.
@@ -80,7 +81,14 @@ function declaredRows(): readonly string[] {
 }
 
 const DECLARED = declaredRows();
-const IN_SCOPE = FILE_MODE_VENDOR_ASSUMPTIONS.map((row) => row.id);
+// IN SCOPE IS BOTH MODES. Streaming mode landed with V-M2-16, which the
+// out-of-scope list had said would move here on that day. Keeping the two
+// producer lists separate and the CLOSURE CHECK over their union is what lets
+// "what does the live layer assume" stay answerable without letting a row
+// escape classification.
+const IN_SCOPE = [...FILE_MODE_VENDOR_ASSUMPTIONS, ...STREAM_MODE_VENDOR_ASSUMPTIONS].map(
+  (row) => row.id,
+);
 const OUT_OF_SCOPE = OUT_OF_SCOPE_FOR_FILE_MODE.map((row) => row.id);
 
 test('section 11 parses to a gapless V-M2-01..nn run', () => {
@@ -134,7 +142,7 @@ test('every classified row carries the two sentences that make it actionable', (
   // A row that says only "V-M2-08" tells a reader nothing at the moment the
   // call happens. Each in-scope row states what was ASSUMED and what MOVES, and
   // each out-of-scope row states why it cannot bite here.
-  for (const row of FILE_MODE_VENDOR_ASSUMPTIONS) {
+  for (const row of [...FILE_MODE_VENDOR_ASSUMPTIONS, ...STREAM_MODE_VENDOR_ASSUMPTIONS]) {
     expect(row.id).toMatch(/^V-M2-\d{2}$/);
     expect(row.assumed.length).toBeGreaterThan(40);
     expect(row.whatMoves.length).toBeGreaterThan(40);
