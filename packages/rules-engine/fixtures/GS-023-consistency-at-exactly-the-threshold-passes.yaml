@@ -1,0 +1,85 @@
+# GS-023  Consistency at exactly the threshold passes
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   consistency arithmetic  `best_day_cents * 10000 <= max_day_share_bp *
+#                           period_profit_cents`, integer cross-multiplication
+#                           in bigint, no division anywhere        M01 R-29
+#   consistency is tested only on days where R-26 and R-27 already hold, and
+#   failing DEFERS the pass and never fails an account             M01 R-28
+#   eval consistency  3000bp                            M01 Appendix A.2 at 50K
+#   eval profit target  300,000c                        M01 Appendix A.2 at 50K
+#   eval minimum trading days  2                        M01 Appendix A.2 at 50K
+#   eval drawdown  250,000c, funded drawdown 250,000c   M01 Appendix A.2 at 50K
+#   floor lock at profit  260,000c, locked floor size + 10,000c
+#                                                       M01 Appendix A.2 at 50K
+#   eval pass effects: phase `funded`, `balance = size_cents`,
+#   `floor = size_cents - funded drawdown_cents`                   M01 R-31
+#   "`best * 10000 == max_bp * profit` satisfies `<=`"
+#                                          GOLDEN_SCENARIOS GS-023 row
+#
+# THE STREAM IS BUILT SO THE EQUALITY IS EXACT ON THE LAST DAY.
+#   period profit  150,000 + 150,000 + 150,000 + 50,000  =   500,000c
+#   best day                                             =   150,000c
+#   150,000 * 10000                                      = 1,500,000,000
+#   3000    *  500,000                                   = 1,500,000,000
+#   equal, so `<=` holds and the gate passes on the operator's own boundary.
+#
+# FOUR DAYS IS THE MINIMUM AND THAT IS ARITHMETIC RATHER THAN TASTE. Equality
+# needs the best day to be exactly 30 percent of the total, so the other days
+# must carry 70 percent while none of them exceeds the best. Two days needs
+# 70 <= 30 and three needs 70 <= 60; four is the first that fits.
+#
+# THE PASS IS DEFERRED TWICE ON THE WAY, which is R-28 working rather than a
+# complication: the target is met on day two at 50 percent and on day three at
+# 33.3 percent, and each deferral emits its own event. GS-024 is this file with
+# one cent moved from the last day to the first.
+#
+# THIS STREAM ALSO CROSSES THE FLOOR-LOCK TRIGGER on day two, which is not
+# avoidable when the eval target is 300,000c and the lock sits at 260,000c
+# (M01 Appendix A.2). DO-7 runs before DO-8, so `rule.floor_locked` is emitted
+# before the deferral on that day. `floor_locked` is not pinned, for the reason
+# GS-017's sibling records.
+id: GS-023
+name: consistency at exactly the threshold passes
+source: M01 R-28, R-29, R-31
+plan: MERIT-RAPID-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5150000
+    high_balance_cents: 5155000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 150000
+    fill_count: 5
+    traded_day: true
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5150000
+    closing_balance_cents: 5300000
+    high_balance_cents: 5305000
+    low_balance_cents: 5145000
+    realized_pnl_cents: 150000
+    fill_count: 4
+    traded_day: true
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5300000
+    closing_balance_cents: 5450000
+    high_balance_cents: 5455000
+    low_balance_cents: 5295000
+    realized_pnl_cents: 150000
+    fill_count: 6
+    traded_day: true
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5450000
+    closing_balance_cents: 5500000
+    high_balance_cents: 5505000
+    low_balance_cents: 5445000
+    realized_pnl_cents: 50000
+    fill_count: 3
+    traded_day: true
+settlements: []

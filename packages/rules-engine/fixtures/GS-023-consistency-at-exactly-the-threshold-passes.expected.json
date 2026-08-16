@@ -1,0 +1,19 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 5000000,
+    "floor_cents": 4750000
+  },
+  "events": [
+    "day.closed",
+    "rule.floor_locked",
+    "phase.pass_deferred_consistency",
+    "day.closed",
+    "phase.pass_deferred_consistency",
+    "day.closed",
+    "phase.passed",
+    "day.closed"
+  ],
+  "pins": "consistency exactly at the threshold passes, because R-29's operator is `<=` and the comparison is integer cross-multiplication rather than division",
+  "note": "THE PASS IS PINNED BY THE RESET IT CAUSES, on GS-017's reasoning: `phase` alone would be satisfied by an engine that moved the phase and carried the eval profit forward. The three values are R-31's, and 4,750,000 = 5,000,000 - 250,000 is the funded drawdown from M01 Appendix A.2 at 50K. THE EQUALITY IS THE WHOLE FIXTURE: 150,000 * 10000 and 3000 * 500,000 are both 1,500,000,000, so an engine that wrote `<` where R-29 says `<=` defers on this stream forever and never passes the account. The two `phase.pass_deferred_consistency` events are R-28's deferrals at 50 percent and 33.3 percent, emitted from the `else` branch of M01 section 3.6's progression block, which pushes one on every day the target and day gates hold and consistency does not. `floor_locked` is NOT pinned: the lock engages at DO-7 on day two and R-31 rewrites the floor at DO-8 on day four, and no document states whether the flag survives an event that moves the floor below the value it locked to. Pinning it would be choosing a reading, which is TR-01 inverted."
+}
