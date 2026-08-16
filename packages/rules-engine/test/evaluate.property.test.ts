@@ -72,14 +72,24 @@ test('evaluation is deterministic: the same input twice gives the same result', 
 // The snapshot is a JSON string rather than `structuredClone`, because this
 // package compiles with `types: []` and no DOM lib: neither `structuredClone`
 // nor any other ambient global exists here, which is the same boundary that
-// makes an I/O call a compile error. Every field of `EngineInput` is a number,
-// string or boolean, so the round trip is lossless.
+// makes an I/O call a compile error.
+//
+// THE REPLACER IS FM-12 ARRIVING ON A TEST INSTEAD OF ON A PAYLOAD. `Cents`
+// became `bigint` when the fold landed (M01 section 2.1, INV-02), and
+// `JSON.stringify` throws on a `bigint` rather than losing it, which is the
+// safe direction and is exactly why the ban exists: "a serialization test
+// asserting `bigint` round-trips as a STRING, never as a JSON number". So money
+// is rendered as a base-10 string with an `n`, which is Appendix B.2's canonical
+// serialization rule one file early, and the snapshot stays lossless.
+const snapshot = (value: unknown): string =>
+  JSON.stringify(value, (_key, v: unknown) => (typeof v === 'bigint' ? `${v.toString()}n` : v));
+
 test('evaluation does not mutate its input', () => {
   fc.assert(
     fc.property(engineInput(), (input) => {
-      const before = JSON.stringify(input);
+      const before = snapshot(input);
       evaluate(input);
-      expect(JSON.stringify(input)).toBe(before);
+      expect(snapshot(input)).toBe(before);
     }),
   );
 });
