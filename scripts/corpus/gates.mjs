@@ -338,12 +338,29 @@ function adrFiles() {
 function adrEntries() {
   const out = [];
   for (const file of adrFiles()) {
-    const m = /^## ADR-(\d{3}|D\d+):/m.exec(read(file));
-    if (!m) {
+    // GLOBAL, AND THAT IS THE WHOLE OF A DEFECT THIS FILE CARRIED FOR THIRTY
+    // ENTRIES. It was `/^## ADR-(\d{3}|D\d+):/m.exec(...)`, a NON-GLOBAL exec
+    // returning the FIRST heading and nothing else, so a file with two headings
+    // produced one entry.
+    //
+    // CI-06f has always carried `if (seen.has(n)) findings.push("... appears
+    // more than once")`. IT COULD NEVER FIRE: two headings in one file gave one
+    // entry and `seen` never collided. `docs/decisions/ADR-046.md` carried two
+    // `## ADR-046` headings for two unrelated rulings and fifteen gates passed
+    // over it.
+    //
+    // The assertion did not need writing. The parser needed to be capable of
+    // reaching it, which is a different repair and a smaller one, and it is why
+    // `CI-06f/duplicate-heading` in falsify.mjs was written and watched NOT
+    // firing before this line changed.
+    const ms = [...read(file).matchAll(/^## ADR-(\d{3}|D\d+):/gm)];
+    if (ms.length === 0) {
       out.push({ file, id: null });
       continue;
     }
-    out.push({ file, id: m[1], expected: `docs/decisions/ADR-${m[1]}.md` });
+    for (const m of ms) {
+      out.push({ file, id: m[1], expected: `docs/decisions/ADR-${m[1]}.md` });
+    }
   }
   return out;
 }
