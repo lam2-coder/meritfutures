@@ -1,16 +1,18 @@
 ---
 status: review
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/OVERVIEW.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md]
-last_updated: 2026-08-14
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/OVERVIEW.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../ops/runbooks/CRON_INVENTORY.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, FOLD-02-enforcement-window-and-suspension.md]
+last_updated: 2026-08-16
 ---
 
 # M2: Rithmic Bridge
 
 Constitution section M2, Appendix B3, Appendix B5 ten-section template, Appendix C5 escalation tier (money path).
 
-**Everything in this module that touches the vendor's wire format is provisional under [ADR-005](../decisions/ADR-005.md).** The vendor call is deferred by the founder's choice. This document therefore designs the bridge **fully**, from the public CSV/SFTP description, and marks every single thing the call must confirm with a `V-M2-nn` identifier in section 11. There are **sixteen** of them. The design's whole shape is chosen so that all fourteen are bounded edits at the adapter boundary rather than redesigns, and section 11 states for each one what changes if the assumption is wrong.
+**Everything in this module that touches the vendor's wire format is provisional under [ADR-005](../decisions/ADR-005.md).** The vendor call is deferred by the founder's choice. This document therefore designs the bridge **fully**, from the public CSV/SFTP description, and marks every single thing the call must confirm with a `V-M2-nn` identifier in section 11. The design's whole shape is chosen so that **every one of them** is a bounded edit at the adapter boundary rather than a redesign, and section 11 states for each one what changes if the assumption is wrong. **The count is the number of rows in section 11's table and is not restated anywhere in this document**: it read "fourteen" in five places against a table of sixteen, which is [ADR-034](../decisions/ADR-034.md)'s hand-maintained-count class, and the remedy [ADR-037](../decisions/ADR-037.md) settled is to state the rule rather than correct the numeral.
 
 **Amended at the Wave 3 batch 1 gate (2026-08-14).** Three rulings changed this module: **fail-closed provisioning is design law** (section 3.2 and the new INV-M2-13), **[ADR-020](../decisions/ADR-020.md)'s indicative realtime layer** adds a streaming path through this module's adapter (section 3.5), and **`V-M2-15` and `V-M2-16` join the vendor agenda**. The document stays at `status: review` because [ADR-005](../decisions/ADR-005.md) forbids it reaching `approved` while the vendor call is outstanding, which is by design rather than an oversight.
+
+**Amended by [ADR-041](../decisions/ADR-041.md) ([FOLD-02](FOLD-02-enforcement-window-and-suspension.md) session 5, 2026-08-16).** An identity-level restriction revokes platform trading through this bridge and a documented restore re-enables it, which is **section 3.6** and **INV-M2-15**. The whole leg is **PROVISIONAL** and its honest form is an asymmetry rather than a caveat: **revocation is always available, restoration is contingent on `V-M2-15`.** Nothing about the wire format, the parser, the ingest path or the streaming layer moves.
 
 **Identifier conventions:** `INV-M2-nn` invariants, `SD-M2-nn` schema deltas, `ST-M2-n` stages of the batch, `FM-M2-nn` failure modes, `AS-M2-nn` adversarial scenarios, `OQ-M2-nn` open questions, `DEP-M2-nn` dependencies on other modules, `V-M2-nn` **vendor-confirmation dependencies**. `EC-nnn` and `GS-nnn` refer to [EDGE_CASES.md](../edge-cases/README.md) and [GOLDEN_SCENARIOS.md](../testing/golden-scenarios/README.md).
 
@@ -60,6 +62,7 @@ It implements the [platform adapter](../GLOSSARY.md#platform-adapter) interface 
 | INV-M2-12 | Non-trading balance movements never appear as `realized_pnl_cents` | The normalizer classifies every balance delta as trading or non-trading and refuses to guess. An unclassifiable delta quarantines (V-M2-05, EC-051) |
 | INV-M2-13 | **No account trades until its risk settings are confirmed**, by acknowledgement artifact or by successful read-back | **Fail-closed provisioning, ruled design law at the batch 1 gate.** The account is held out of trading entirely; an unconfirmed setpoint is a hard block, never a dashboard marker. Enforced at the provisioning saga's exit rather than by the engine, because an account that cannot trade never produces a mark to evaluate. GS-138 |
 | INV-M2-14 | Streaming ingest is **write-only into the live cache** and never into `fills`, `daily_marks`, or anything the engine reads | [ADR-020](../decisions/ADR-020.md)'s hard rule, made structural: the streaming path has no grant on the authoritative tables. Tier 2 cannot contaminate tier 1 even by mistake. GS-132 |
+| INV-M2-15 | **A restored account does not trade until its `set_risk` is confirmed**, and the restore order is `set_risk` confirmed, then entitlement, then permissions | [ADR-041](../decisions/ADR-041.md), section 3.6. This is **INV-M2-13 applied to the way back in** rather than a second rule: re-enabling an entitlement against an unconfirmed setpoint is an unenforced funded account whichever direction the account arrived from. Enforced by `provisioning_queue_set_risk_never_inferred` in [`0007`](../../packages/db/migrations/0007_accounts.sql), which already makes `confirmed_inferred` unwritable for `set_risk`, plus the saga's own ordering. **PROVISIONAL on `V-M2-15`** |
 
 ---
 
@@ -183,6 +186,43 @@ Mechanism is vendor-dependent and is `V-M2-16`: an **R|API+ admin connection** w
 3. **Feed loss is a first-class state, not an error.** On loss the cache stops serving and every consumer falls back to last-closed values with its label changed to match (GS-133). A live surface that silently freezes at its last value is the failure mode here, because it looks exactly like a quiet market.
 4. **The simulator streams too.** The synthetic simulator gains a streaming mode alongside its file output, so the live layer is developable and testable before any vendor agreement exists. This is INV-M2-11's discipline extended to tier 2, and it is what stops ADR-020 from becoming a second reason the vendor call blocks engineering.
 
+### 3.6 Revocation and restoration on an identity restriction (ADR-041, PROVISIONAL)
+
+[ADR-041](../decisions/ADR-041.md) gives `identities.status = 'restricted'` the enforcement surface it never had, and **platform trading is the one leg of that surface Merit does not own.** Every other leg (checkout, the payout gate, wallet spend, external withdrawal) is a Merit-side check on a Merit-side write. This one is an intent handed to a vendor.
+
+**No new operation and no new state.** Both directions are compositions of `provisioning_queue.operation` values already in [`0007`](../../packages/db/migrations/0007_accounts.sql)'s CHECK list, and the machine in section 3.2 is unchanged.
+
+| Direction | Order | Why the order is this way |
+|---|---|---|
+| **Revocation** | `disable_entitlement`, then `disable_account` | **Fail-closed on the way out.** The entitlement is what costs money and what carries the platform login, so it goes first; if the second operation fails the account is already unable to reach the platform |
+| **Restoration** | `set_risk` at the account's current floor **confirmed**, then `set_entitlement`, then `set_permissions` | **Fail-closed on the way back** (INV-M2-15). `provisioning_queue_set_risk_never_inferred` in `0007` already makes it unwritable for a `set_risk` row to reach `confirmed_inferred`, which is exactly the guarantee restoration needs: re-enabling an entitlement against an unconfirmed setpoint is an unenforced funded account, and INV-M2-13 forbids it |
+
+**The queue is per account and a restriction is per human**, so one `identity_restriction_episodes` row fans out to one operation pair per account the identity holds. `provisioning_queue.account_id` is `NOT NULL`, so there is no identity-level row to enqueue and there should not be: the episode is the authority on the enforcement and the queue is the authority on what was sent to the vendor for each account. **The fan-out is a set materialized at a moment**, and the set of accounts an identity holds can change while an episode is open, which is one of the reasons ADR-041 rejected "apply a per-account freeze to every account" as the mechanism.
+
+**The account state itself is untouched.** No `accounts.status` moves, no `account_status_history` row is written, no ladder rung is consumed. The restriction is a layer over the account machine in exactly the way `payouts_frozen` and `recon_blocked` already are, and the entitlement being off is what stops trading, not the account having changed state. That is what makes restoration a re-enable rather than a reconstruction.
+
+#### 3.6.1 "At once" is true of every leg except this one, and the gap has a number
+
+Ruling B's words are "halting all activity across every linked account **at once**". For the four Merit-side legs that is literally true: they are synchronous checks in the request that would otherwise write. **For the platform leg it is not, and the number is available rather than unknown.** The **provisioning CSV push runs every 15 minutes** ([CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md)), so the floor on revocation latency is the queue cycle, plus the SFTP round trip, plus whatever the vendor takes to apply it, plus the confirmation.
+
+**A restricted trader therefore keeps trading for a bounded but non-zero window, and no document in the corpus states the bound or alarms on it.** This is recorded rather than solved because both plausible solutions are decisions rather than transcriptions: an out-of-cycle push on a restriction (which gives the enforcement path its own cadence and its own failure mode), or an accepted and published latency with an alarm above it. `OQ-M2-06` asks for the second. What it must not become is a sentence in a module plan claiming an instantaneous revocation the mechanism cannot perform, which is the shape [ADR-041](../decisions/ADR-041.md) itself found three times in the fold that produced it.
+
+#### 3.6.2 The confirmation ban covers one operation of the three that need it
+
+**Finding, recorded and not fixed here, because fixing it is a migration.** `provisioning_queue_set_risk_never_inferred` names `set_risk` alone. `disable_account` and `disable_entitlement` may both reach `confirmed_inferred`, and section 3.2's inference rule is **`G-INFERRED`: the account appears in the next EOD report.**
+
+For `create_account` that inference is strong. For a **disable** it is inverted: an account appearing in the vendor's next EOD report is evidence that it is still live, which is the opposite of the fact being confirmed. Section 3.2 already states the general form of this argument, that inferred confirmation is "worthless for `set_risk`", and **the same argument reaches the two disable operations and the CHECK reaches only one.** ADR-041 makes revocation fail-closed on the way out, and fail-closed means knowing the revocation landed.
+
+**Recommended, not decided:** a superseding migration extending the CHECK to `operation NOT IN ('set_risk','disable_account','disable_entitlement') OR status <> 'confirmed_inferred'`. It is not written here because `0007` is merged and sacred, a superseding migration is money path under [ADR-003](../decisions/ADR-003.md), and **[ADR-041](../decisions/ADR-041.md) is silent on it**, which is the same restraint [`0032`](../../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql) exercised and [ADR-045](../decisions/ADR-045.md) subsequently paid for at the cost of one open item for one day.
+
+#### 3.6.3 The asymmetry, stated as an asymmetry
+
+> **Revocation is always available. Restoration is contingent on `V-M2-15`.**
+
+With neither an acknowledgement artifact nor a readable current risk setting, a restored account's `set_risk` cannot be confirmed. Under INV-M2-13 an unconfirmed account does not trade, so **a restricted trader would be revocable and not restorable**, and the reversible enforcement ADR-041 specified would be terminal in practice on this leg alone.
+
+That is not a degradation of the restriction, it is a degradation of the **restore**, and the difference matters for how it is disclosed: Merit can always stop a trader, and until `V-M2-15` is answered Merit cannot promise to start them again on the same day. It joins the vendor agenda as a dependency of `V-M2-15` rather than as a new item, because it is the same missing artifact.
+
 ---
 
 ## 4. API endpoints touched
@@ -224,6 +264,8 @@ All exist in the approved [EVENTS.md](../architecture/EVENTS.md) catalogue (sect
 | `phase.passed` (M1) | Enqueues the funded reset or the new funded account, and a `set_risk` at the new floor. **This is DEP-M2-01 and it is the highest-consequence thing M2 does**, because getting it wrong is AS-14 and the engine will refuse the day |
 | `rule.floor_locked`, `day.closed` (M1) | A changed floor enqueues a `set_risk` push (INV-M2-08) |
 | `breach.detected`, `account.closed`, `account.graduated` (M1, M6) | Enqueues `disable_account` and `disable_entitlement`, and retires the platform ref |
+| `identity.restricted` (M6) | **NEW, [ADR-041](../decisions/ADR-041.md).** Enqueues the revocation pair for **every account the identity holds** (section 3.6). **It does not retire the platform ref**, and that is the distinction from the row above: a restriction is reversible and a burned ref (INV-M2-10) can never be reissued, so retiring on a restriction would make the restore impossible on the one identifier the restore needs. **The payload carries no account list.** [EVENTS](../architecture/EVENTS.md) types `identity.restricted` as `{ identity_id, reason, tos_clause, evidence_pack_id }`, so M2 resolves the account set itself at consume time; `enforcement.applied` is the event that carries `account_ids[]`, and the two would disagree the moment an account is opened or closed between them. **The episode row is the authority, not either payload** |
+| **the restore**, which has no event | **A gap, named rather than assumed.** `identity.payouts_frozen` has `identity.payouts_unfrozen` beside it in the catalogue and **`identity.restricted` has no counterpart at all**, so the transition `G-RESTRICTION-LIFTED` ([STATE_MACHINES section 10](../architecture/STATE_MACHINES.md)) has no event to be admitted by, against that document's universal rule 1. M2 cannot consume what does not exist, and inventing a name here would claim in a registry this session does not own. **[EVENTS](../architecture/EVENTS.md) is [FOLD-02](FOLD-02-enforcement-window-and-suspension.md) session 6** and this is the same forward reference session 4 recorded for `payout.held`, `payout.hold_released` and `payout.hold_enforced` |
 | `payout.settled` (M5) | Supplies the `effective_trading_day` and amount that must appear as `adjustment_cents` on a mark. M2 does not create the adjustment; it **verifies** that the vendor's balance movement matches one Merit knows about, and quarantines if it does not (INV-M2-12) |
 
 ---
@@ -246,6 +288,8 @@ All exist in the approved [EVENTS.md](../architecture/EVENTS.md) catalogue (sect
 | FM-M2-12 | Simulator and vendor diverge | Every test passes and production breaks | The simulator emits **files** through the same parser (INV-M2-11), and a conformance suite runs both adapters over the same scenario | Update the simulator from real files the moment any exist; the conformance suite is the artifact the vendor call updates first (AS-M2-01) |
 | FM-M2-13 | A balance delta cannot be classified as trading or non-trading | A payout looks like a loss, or a loss looks like a payout | INV-M2-12 refuses to guess | Quarantine the account's day, alarm, resolve against M5's settlement record (EC-051) |
 | FM-M2-14 | Contract spec missing or stale for a traded symbol | Every P&L number on that account is wrong by a multiplier | Normalizer refuses a fill whose `symbol` has no `contract_specs` row effective on `trading_day` | Quarantine, add the spec with its effective date, reprocess. Never assume a multiplier (EC-025, GS-043) |
+| FM-M2-15 | **A restriction is opened and the revocation pair never reaches the vendor** | The trader is blocked on every Merit surface and **is still trading on the platform**, which is the one surface where a restricted human can still lose the firm money. It is also the least visible, because every Merit-side gate reports the enforcement as applied | The existing provisioning alarms see a queue item, not an unenforced restriction. **The assertion that binds is on the query**: any open `identity_restriction_episodes` row whose accounts do not all carry a confirmed `disable_entitlement`, evaluated independently of whether the push cycle reported success (FM-M2-11's idiom, and the same idiom [ADR-040](../decisions/ADR-040.md) applied to the release sweep) | Re-enqueue with the same `payload_hash` and the same filename (section 3.3). **Escalate rather than retry silently**: an enforcement that did not land is an incident, not a backlog item |
+| FM-M2-16 | **A restore completes on Merit and the account cannot be brought back** | A trader whose restriction was lifted, who can request payouts and buy again, and **cannot trade**. Merit has said the enforcement is over and the platform has not | INV-M2-15's ordering refuses to proceed past an unconfirmed `set_risk`, so this fails **loudly at the restore rather than quietly afterwards** | Nothing engineering can recover: this is the `V-M2-15` asymmetry arriving in a specific trader's account (section 3.6.3). The restore is left incomplete and visible rather than reported as done, because a restore that reports success and leaves the account untradeable is the worse of the two |
 
 ---
 
@@ -262,7 +306,7 @@ Constitution B5 requires at least five not found in the constitution. **Seven ar
 **Counter, designed in.**
 1. **The simulator emits files, not objects** (INV-M2-11). It writes CSV into the ingest directory and the pipeline cannot tell it apart. Everything downstream of the parser is therefore tested against the same code path production uses.
 2. **The parser is written to be strict and loud, not tolerant.** Any unexpected column, missing field, or unparseable value quarantines. A tolerant parser is what turns a wrong assumption into silently wrong data; a strict one turns it into a phone call.
-3. **A conformance suite is a first-class deliverable**, not a test file: a list of the fourteen `V-M2-nn` assumptions, each with the fixture that encodes it and the assertion that would fail if it is wrong. **The vendor call's output is a diff against that suite**, which is what makes the call a bounded edit rather than a rewrite.
+3. **A conformance suite is a first-class deliverable**, not a test file: **one entry per `V-M2-nn` row in section 11**, each with the fixture that encodes it and the assertion that would fail if it is wrong. **The vendor call's output is a diff against that suite**, which is what makes the call a bounded edit rather than a rewrite.
 4. The simulator deliberately emits **hostile-but-legal** files: rows in a different order, an extra trailing column, a day with zero accounts, a 200MB file, CRLF line endings, a BOM.
 
 **Honest residual.** This reduces the blast radius; it does not eliminate it. The only real fix is a real file, and getting one is a founder action, not an engineering one. GS-084, GS-085.
@@ -333,7 +377,7 @@ GS-088.
 | Suite | Prefix | Count | Runs | Blocks |
 |---|---|---|---|---|
 | Parser and normalizer units | `M2-U-nn` | 24 | every commit | merge |
-| Adapter conformance (Rithmic versus simulator over identical scenarios) | `M2-C-nn` | 14, one per `V-M2-nn` | every commit | merge |
+| Adapter conformance (Rithmic versus simulator over identical scenarios) | `M2-C-nn` | **one per `V-M2-nn` row in section 11** | every commit | merge |
 | Ingest integration (whole-file transaction, quarantine, disposition) | `M2-I-nn` | 12 | every commit | merge |
 | Provisioning saga integration | `M2-P-nn` | 9 | every commit | merge |
 | Golden fixtures | `GS-nnn` | 10 owned (GS-084 to GS-093), plus GS-033, GS-043, GS-047 shared with M1 | every commit | merge |
@@ -341,7 +385,9 @@ GS-088.
 
 ### 8.2 The conformance suite, which is the important one
 
-`M2-C-01` through `M2-C-14` map one-to-one onto the fourteen vendor assumptions in section 11. Each is a fixture encoding the assumption and an assertion that fails loudly if it is violated. **The suite's purpose is not to pass.** Its purpose is to be the document the vendor call is run against: fourteen questions, fourteen fixtures, and a diff at the end. When a real file arrives, the first commit is a conformance fixture built from it, and every failure is a scoped edit with a named test.
+**`M2-C-nn` maps one-to-one onto section 11's rows**, ordered by `V-M2-nn`, and the suite grows when the table grows rather than when someone remembers. Each case is a fixture encoding the assumption and an assertion that fails loudly if it is violated. **The suite's purpose is not to pass.** Its purpose is to be the document the vendor call is run against: one question, one fixture, and a diff at the end. When a real file arrives, the first commit is a conformance fixture built from it, and every failure is a scoped edit with a named test.
+
+**Two rows do not encode a wire-format assumption and they are covered rather than skipped.** `V-M2-15` is a commercial precondition, so its case asserts the **consequence**: fail-closed provisioning refuses to bring an account online with neither an acknowledgement nor a read-back (INV-M2-13, GS-138), and under [ADR-041](../decisions/ADR-041.md) the same case asserts the restore half (INV-M2-15). `V-M2-16` has no production feed to conform to, so its case runs against the simulator's streaming mode and asserts INV-M2-14's grant boundary. **Neither is a fixture built from a vendor file, and saying so here is cheaper than a later reader concluding the suite is two cases short.**
 
 ### 8.3 Named scenarios owned by this module
 
@@ -360,7 +406,7 @@ GS-088.
 
 ### 8.4 Coverage rule
 
-Not a percentage. **Every one of the fourteen vendor assumptions has a conformance fixture, and every disposition branch in section 3.4 has an integration test.** A `V-M2-nn` without a fixture is an assumption nobody will remember making.
+Not a percentage. **Every `V-M2-nn` row in section 11 has a conformance case, and every disposition branch in section 3.4 has an integration test.** A `V-M2-nn` without one is an assumption nobody will remember making. **The rule is stated and the count is not**, because a count restated beside a table is the thing that goes stale while the table moves ([ADR-034](../decisions/ADR-034.md)).
 
 ---
 
@@ -411,13 +457,15 @@ One page, five panels: today's file timeline (expected, received, applied, quara
 
 **OQ-M2-04 (RULED, 2026-08-14). Do we accept a vendor relationship with no acknowledgement artifact?** **No.** Fail-closed provisioning is design law: no account trades without an acknowledgement or a successful read-back (INV-M2-13, section 3.2). The question is therefore no longer whether Merit accepts the gap but what the vendor must supply, which is why it became **`V-M2-15`, a commercial precondition** on the call rather than an item on an agenda. The recommendation in the original text was to raise it as a requirement; the ruling went further and made trading itself contingent on it.
 
+**OQ-M2-06 (NEW, from [ADR-041](../decisions/ADR-041.md)). What is the acceptable revocation latency on a restriction, and what alarms above it?** Section 3.6.1. Every Merit-owned leg of a restriction binds synchronously; the platform leg waits on a **15 minute** push cycle plus the vendor's own latency, so Ruling B's "at once" is true of four legs and not of the fifth. Two answers are available and they are different bargains. **An out-of-cycle push on a restriction** makes the enforcement path fast and gives it its own cadence, its own failure mode and a second way for the queue to be driven, which is a new mechanism on a path whose whole design argument is that there is exactly one. **A published bound with an alarm above it** adds no mechanism and accepts the window as a stated property. Recommendation: **the second, at one push cycle plus a stated vendor margin, with FM-M2-15's query assertion as the alarm.** The window is the same one a breached account already lives in between the breach and the nightly `disable_account`, so accepting it here is consistent rather than novel, and it is the founder's call because the answer is a number Merit will be held to.
+
 **OQ-M2-05 (NEW, from [ADR-020](../decisions/ADR-020.md)). What is the streaming mechanism, and what does it cost?** `V-M2-16`. R|API+ admin is $100 per month per API ID ([ADR-002](../decisions/ADR-002.md) priced it when rejecting it as an ingest path), which is affordable for one connection and is a different proposition per-account. High-frequency snapshot polling has no incremental licence cost and a worse latency profile. The choice is a call output, not a design decision, and tier 1 is unaffected either way. Recommendation: **price both on the call**, and ship the simulator-backed layer regardless, because the labeling and degradation behavior are the hard parts and neither depends on which mechanism wins.
 
 ---
 
 ## 11. Vendor-confirmation dependencies (ADR-005)
 
-**The point of this section is that the vendor call has an agenda and a definition of done.** Sixteen items, one of which (V-M2-15) is a commercial precondition rather than a question. Each states the assumption, what depends on it, and what changes if it is wrong. `Blast` is how much of this module moves if the assumption fails: **edit** (a parser change), **design** (a component changes shape), **model** (the data model changes).
+**The point of this section is that the vendor call has an agenda and a definition of done, and the agenda is the table below rather than a number stated above it.** One row is a commercial precondition rather than a question (`V-M2-15`); the rest are questions. Each states the assumption, what depends on it, and what changes if it is wrong. `Blast` is how much of this module moves if the assumption fails: **edit** (a parser change), **design** (a component changes shape), **model** (the data model changes).
 
 | ID | Assumption | What depends on it | If wrong | Blast |
 |---|---|---|---|---|
@@ -435,7 +483,7 @@ One page, five panels: today's file timeline (expected, received, applied, quara
 | V-M2-12 | Corrections reference the original fill | `fills.correction_of`, replay determinism, B4 #5 | The ingest layer synthesizes a correction row from a restatement. Already designed for; the mitigation is what makes this an edit rather than a redesign | edit |
 | V-M2-13 | No sandbox is available before contract | The simulator is a v1 requirement; AS-M2-01's residual | A sandbox collapses AS-M2-01's residual to near zero and is worth real money to obtain | design |
 | V-M2-14 | Server-side copy configuration is out of scope for v1 | Module scope | In scope means a second provisioning surface. **Admin R\|API+ is no longer out of scope**: [ADR-020](../decisions/ADR-020.md) makes it a candidate mechanism for the streaming layer, so this row narrowed to server-side copy alone | design |
-| **V-M2-15** | **A provisioning acknowledgement artifact exists, or the account's current risk setting is readable** | **Fail-closed provisioning (INV-M2-13), which is now design law.** Every funded account's ability to trade at all | **No account can be brought online.** This is not a degradation, it is a stop. Raise it on the call as a **requirement**, not a question: without one of the two, the relationship cannot support Merit's risk posture. Supersedes OQ-M2-04, which asked whether Merit would accept the gap; the answer is no | **commercial** |
+| **V-M2-15** | **A provisioning acknowledgement artifact exists, or the account's current risk setting is readable** | **Fail-closed provisioning (INV-M2-13), which is now design law.** Every funded account's ability to trade at all. **And, since [ADR-041](../decisions/ADR-041.md), every restoration from an identity restriction** (INV-M2-15, section 3.6) | **No account can be brought online, and no restricted trader can be brought back.** This is not a degradation, it is a stop. Raise it on the call as a **requirement**, not a question: without one of the two, the relationship cannot support Merit's risk posture. Supersedes OQ-M2-04, which asked whether Merit would accept the gap; the answer is no. **The restoration half is the same missing artifact and is deliberately not a new row**, but it changes what the gap costs: the original reading is that Merit cannot start, and the second is that Merit's one reversible identity-level enforcement is **irreversible on this leg**, which is a live-operations consequence rather than a launch one | **commercial** |
 | **V-M2-16** | **A streaming or high-frequency snapshot mechanism is available**, whether R\|API+ admin, a market-data entitlement we already pay for, or frequent report snapshots | [ADR-020](../decisions/ADR-020.md)'s tier 2 in its entirety: live P&L, projected floor distance, live win-day tracking, live Open Liability | The indicative layer ships against the simulator and has no production feed. Tier 1 is unaffected, so this is a **product** gap rather than a correctness one, and the honest fallback is to ship tier 1 surfaces alone and label them | design |
 
 ### Dependencies on other modules
@@ -447,3 +495,4 @@ One page, five panels: today's file timeline (expected, received, applied, quara
 | DEP-M2-03 | M1 emits a floor change (via `day.closed`, `rule.floor_locked`) that M2 turns into a `set_risk` push | M1, M2 | The setpoint drifts below the real floor. Since [ADR-014](../decisions/ADR-014.md) the floor only moves up, so drift is always permissive, which is safe for the trader and a measurable cost to the firm |
 | DEP-M2-04 | `contract_specs` is populated and versioned for every symbol traded | M6 admin, seed data | FM-M2-14: fills refused, day quarantined |
 | DEP-M2-05 | M7 consumes fill-level data for clustering detectors | M7 | Contingent on V-M2-11 |
+| DEP-M2-06 | [M6](M06-admin-ops-console.md) emits `identity.restricted` on opening an episode, and emits the restore event once [EVENTS](../architecture/EVENTS.md) carries one | M6 | **The platform leg of a restriction never fires.** Every Merit-side gate reports the enforcement as applied and the trader keeps trading (FM-M2-15). The restore half is worse in a quieter way: with no event, a lifted restriction leaves the accounts revoked and nothing re-enables them, so the reversible enforcement is reversible everywhere except where it mattered |

@@ -72,16 +72,16 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [M01-rules-engine.md](plans/M01-rules-engine.md) | The crown jewel: 50-rule taxonomy, pure library, replay self-audit. **Gate closed 2026-08-13** | approved | founder |
-| [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning, ingest, reconciliation, simulator, streaming path, **16 vendor-confirmation items**. Held at `review` by [ADR-005](decisions/ADR-005.md) | review | founder |
-| [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method, the registration lookup as a second call site and the two cost lines a signup drives | approved | founder |
+| [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning, ingest, reconciliation, simulator, streaming path, the provisional revocation and restoration leg, and the vendor-confirmation agenda whose count is its own table. Held at `review` by [ADR-005](decisions/ADR-005.md) | review | founder |
+| [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method, the registration lookup as a second call site and the two cost lines a signup drives, and the restriction refusal that closes the card leg the wallet leg already refused | approved | founder |
 | [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, the C-27 authority boundary shown rather than hit, Appendix F gate | approved | founder |
 | [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, bounded freeze, reserve | approved | founder |
 | [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method | approved | founder |
 | [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, Appendix F gate | approved | founder |
 | [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, the 48 hour enforcement window (pre-approval hold and bounded freeze), reserve | approved | founder |
-| [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard, CUSUM, breakers, two-tier evidence packs, dual control | approved | founder |
+| [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard, CUSUM, breakers, two-tier evidence packs, dual control, the identity drill-down, restriction and restore as launch-available actions, and the fourth unsuppressible alarm | approved | founder |
 | [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution, three link tiers, eighteen detectors, copy-trading clause, flags queue, canaries | approved | founder |
-| [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, destination cooling, creative approval | approved | founder |
+| [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, destination cooling, creative approval, and the restriction gate one rail did not supply | approved | founder |
 | [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans and rules, publish-ordered revalidation, versioned legal, geo disclosure | approved | founder |
 | [M10-integrations.md](plans/M10-integrations.md) | One outbound bus, send-time suppression, support-context scoping, vendor-down chaos, and the SMS sender as the first vendor on a critical path | approved | founder |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Issuance, key lifecycle, non-enumerable verification, revocation classes, opt-in leaderboard | approved | founder |

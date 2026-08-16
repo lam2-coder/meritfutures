@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M03-billing-checkout.md, M05-payout-system.md, M07-risk-abuse.md]
-last_updated: 2026-08-14
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M03-billing-checkout.md, M05-payout-system.md, M07-risk-abuse.md, M06-admin-ops-console.md, FOLD-02-enforcement-window-and-suspension.md]
+last_updated: 2026-08-16
 ---
 
 # M8: Affiliate System
@@ -13,6 +13,8 @@ Affiliates are the cheapest acquisition channel in this industry and the one wit
 Two facts shape everything below. **Commission is the only outflow in Merit that is paid on a promise rather than on a settled fact**, because a purchase can charge back for months after the commission is payable. And **NFA I-26-12 makes a promoter's claims the firm's problem**, so creative approval is a compliance control rather than a brand preference.
 
 **Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** [ADR-017](../decisions/ADR-017.md) was accepted with one addition that lands here: **affiliate payout destinations carry the same 48 hour cooling window on change** as trader destinations (INV-M8-11). The one-rail rule this module argued for in AS-M8-05 is now a numbered ADR binding every module that ever pays anybody.
+
+**Confirmed against [ADR-041](../decisions/ADR-041.md), and the confirmation came back half true** ([FOLD-02](FOLD-02-enforcement-window-and-suspension.md) session 5, 2026-08-16). ADR-041 lists affiliate settlement among the surfaces a restriction blocks and marks this module **confirmed rather than amended**, on the reasoning that [ADR-017](../decisions/ADR-017.md) already put every outbound payment on one rail. **Two of the three things that claim needs are real and the third was not there.** The join exists: `affiliates.identity_id` is `NOT NULL` and references `identities` in [`0005`](../../packages/db/migrations/0005_affiliate_program.sql), so "the affiliate is a human Merit has restricted" is a query and not an inference. The rail is one rail: settlement rides [M5](M05-payout-system.md)'s transfer machinery and [M7](M07-risk-abuse.md)'s D-09 sees both payment types (INV-M8-10). **And nothing anywhere gated a statement on that identity's status**, which is section 3.4 and `INV-M8-12`. One rail makes the **destination** shared and the **detector** shared; it says nothing about the **authorization to pay**, and those are three different controls that the phrase "one rail" reads as one.
 
 **Identifier conventions:** `INV-M8-nn` invariants, `SD-M8-nn` schema deltas, `FM-M8-nn` failure modes, `AS-M8-nn` adversarial scenarios, `OQ-M8-nn` open questions, `DEP-M8-nn` dependencies.
 
@@ -49,6 +51,7 @@ Codes, click and purchase attribution, the commission engine, monthly statements
 | INV-M8-09 | An affiliate statement is immutable once issued; corrections are new lines on the next statement | Approved DATA_MODEL. The same discipline as the ledger, for the same reason |
 | INV-M8-10 | Affiliate payouts and trader payouts share one destination-concentration check | [M07](M07-risk-abuse.md) D-09 sees both. An affiliate destination that also receives trader payouts from unrelated identities is the same signal wearing a different hat (AS-M8-05) |
 | INV-M8-11 | An affiliate destination change enters a **48 hour cooling window** with re-verification and notification to the contact already on file | [ADR-017](../decisions/ADR-017.md) as accepted. One rail is only one control if the destination-change path is also one control; an affiliate destination that could be repointed instantly would be the soft side of the same rail, and a compromised affiliate account would be the fast route to the same money. Identical mechanics to C-11, differing only in which screen initiates it. GS-140 |
+| INV-M8-12 | **An affiliate whose identity is `restricted` is not paid, and the statement is HELD rather than voided** | [ADR-041](../decisions/ADR-041.md), section 3.4. The gate reads `identities.status` through `affiliates.identity_id`, at statement issue **and** again at settlement, in `INV-M8-07`'s place in the sequence. **Held, not voided, and that is the load-bearing half**: a restriction is reversible by design, so voiding a statement would make a reversible enforcement cost the affiliate money permanently, which is [ADR-040](../decisions/ADR-040.md)'s "Merit's own hold cost the trader money" one door over. **A restriction is not a clawback**: the commission was earned on sales that happened, and whether those sales were arm's length is `INV-M8-03`'s question and answered separately |
 
 ---
 
@@ -125,6 +128,24 @@ stateDiagram-v2
 
 That automatic withdrawal is the part worth building carefully. A disclosure requirement that changes and leaves a hundred approved creatives carrying the old text is a compliance gap that looks like a healthy control from the inside.
 
+### 3.4 The restriction gate, which is what the ADR-041 confirmation actually found
+
+[ADR-041](../decisions/ADR-041.md) marks this module **confirmed**, and the confirmation was performed rather than accepted. Here is what each of its three premises turned out to be.
+
+| Premise | State | Evidence |
+|---|---|---|
+| **An affiliate is a human Merit can restrict** | **TRUE, and structurally so** | `affiliates.identity_id uuid NOT NULL REFERENCES identities(id)` in [`0005`](../../packages/db/migrations/0005_affiliate_program.sql), with the comment "an affiliate is an identity. That is what makes the self-deal check possible at all". The join `INV-M8-12` needs is the join B4 #16 already needed |
+| **There is one outbound rail and one destination check** | **TRUE** | [ADR-017](../decisions/ADR-017.md), `INV-M8-10`, `INV-M8-11`, AS-M8-05. Settlement rides [M5](M05-payout-system.md)'s transfer machinery; D-09 reads every outbound destination regardless of which module produced it |
+| **A restriction therefore blocks affiliate settlement** | **FALSE until `INV-M8-12`** | Nothing read `identities.status` on this path. The gates that existed are `INV-M8-07` (a current ToS acceptance, a `NOT NULL` column), AS-M8-01's chargeback-rate payment gate, and section 5's consumed `flag.status_changed`, which is prose reading "an enforced affiliate stops being paid" with no stated mechanism |
+
+**"One rail" is a claim about the destination and the detector, not about the authorization.** `G-ELIGIBLE` is the payout gate, and it is evaluated on `payout_requests`; an affiliate statement is not a payout request and never traverses it. So the identity status that [ADR-041](../decisions/ADR-041.md) added to `G-ELIGIBLE` reached the trader's door and not this one, and **riding a shared rail was doing the work of a shared gate in the reading and none of it in the mechanism.**
+
+> **This is the third instance of one shape in one fold**, after `G-ELIGIBLE` naming `payouts_frozen` and never `identities.status`, and `INV-M20-06` doing the same while AS-M20-02's counter-argument cited the restriction as though something enforced it. Here the sentence doing the work was in an **ADR**, which is worse rather than better: an ADR is where a reader stops looking. **A control that exists in the paragraph explaining why the attack fails, and nowhere that binds, is the attack succeeding on schedule.**
+
+**Why held rather than voided, stated once so a later reader does not re-derive it as a preference.** ADR-041's whole design is a **reversible** enforcement whose neighbours are a terminal closure and a per-payment freeze, and it preserves account state intact for restoration. Voiding a statement would make the reversible enforcement irreversible on the one axis that is money, so a restriction that was later restored with a documented restore would still have cost the affiliate a month's commission. That is the exact shape [ADR-040](../decisions/ADR-040.md) refused for the trader when it ruled that a held request reaching auto-release **pays**, and the reasoning transfers without modification because it is about Merit's own hold rather than about who is holding it.
+
+**What is deliberately not decided here is the clock**, and it is `OQ-M8-05`.
+
 ---
 
 ## 4. API endpoints touched
@@ -155,7 +176,9 @@ Per [EVENTS section 9](../architecture/EVENTS.md), plus three NEW.
 | `affiliate.creative_status_changed` **NEW** | SD-M8-03 | `{ affiliate_id, creative_id, from_status, to_status, disclosure_version_id, reviewed_by }`. Compliance evidence has to be an event, not a column read at audit time (AS-M8-04) |
 | `affiliate.suspicious_click_pattern` **NEW** | cookie-stuffing detection | `{ affiliate_id, window, click_count, direct_landing_share, distinct_referrers, conversion_rate_bp }`. Consumers: RISK, ALERT, FEED (AS-M8-03) |
 
-**Consumed:** `purchase.paid` (accrue), `purchase.refunded` and `purchase.charged_back` (claw back, and update `chargeback_rate_bp`), `identity.merged` (a merge can retroactively make a past attribution a self-deal, see FM-M8-06), and `flag.status_changed` (an enforced affiliate stops being paid).
+**Consumed:** `purchase.paid` (accrue), `purchase.refunded` and `purchase.charged_back` (claw back, and update `chargeback_rate_bp`), `identity.merged` (a merge can retroactively make a past attribution a self-deal, see FM-M8-06), `flag.status_changed` (an enforced affiliate stops being paid), and **`identity.restricted`** (hold every unsettled statement for that identity, INV-M8-12).
+
+**The restore has no event and this module is the second to say so.** `identity.restricted` has no counterpart in the approved [EVENTS](../architecture/EVENTS.md) catalogue, while `identity.payouts_frozen` has `identity.payouts_unfrozen` sitting beside it, so **the hold has a trigger and the release does not** (FM-M8-11). [M06](M06-admin-ops-console.md) and [M02](M02-rithmic-bridge.md) record the same gap from their own ends and each needs it for a different reason: M02 to re-enable trading, M06 to put the restore on the feed, and M08 to release money. **EVENTS is [FOLD-02](FOLD-02-enforcement-window-and-suspension.md) session 6**, and no name is claimed here, on `CI-06d`'s discipline and session 4's precedent with `payout.held`. **Three consumers with no producer is the argument for that session writing it first rather than last.**
 
 ---
 
@@ -172,6 +195,8 @@ Per [EVENTS section 9](../architecture/EVENTS.md), plus three NEW.
 | FM-M8-07 | An affiliate is also a trader and shares a payout destination with unrelated identities | A mule structure with a commission cover story | [M07](M07-risk-abuse.md) D-09 sees both payout types (INV-M8-10) | Flag, freeze the affiliate statement, investigate (AS-M8-05) |
 | FM-M8-08 | A statement is issued with a wrong number | Immutable, so it cannot be edited | Reconciliation of statement totals against commission rows before issue | Correct on the **next** statement as a named line. Never edit an issued statement (INV-M8-09) |
 | FM-M8-09 | An affiliate ToS version changes and payments continue on the old acceptance | The compliance basis of every payment is stale | INV-M8-07 blocks payment until re-acceptance | Re-acceptance flow, with the statement held rather than the commission voided |
+| FM-M8-10 | **A restricted human is paid through the affiliate door** | Merit halted a human on every trader surface and **kept paying them on the commercial one**, which is AS-M8-05's mule structure with Merit's own enforcement providing the cover story. It is also the worst possible artifact in an enforcement dispute: a payment record dated after the restriction | INV-M8-12, checked at issue **and** at settlement rather than only at issue, because a restriction opened between the two would otherwise settle a statement that was clean when it was cut | Hold the statement, notify, and release on a documented restore. **Never void**, section 3.4 |
+| FM-M8-11 | **A restriction is restored and the held statement is never released** | The reversible enforcement was reversed everywhere except where the money was, and nobody notices because a held statement raises nothing on its own. **This is the quieter half of FM-M8-10 and it is the one that will actually happen** | The affiliate asks. **That is not a detection**, so the release is driven from the restore rather than from the statement: closing an episode re-evaluates every held statement for that identity | Release and settle on the next cycle. **The release has no event to hang on today** (section 5), which is why this row exists rather than being assumed |
 
 ---
 
@@ -267,6 +292,7 @@ The design rule this generalizes to, worth carrying into M9 through M19: **every
 | Statement immutability and correction-by-next-statement | `M8-S-nn` | 5 | every commit | merge |
 | Compliance: creative lifecycle and disclosure supersession | `M8-K-nn` | 6 | every commit | merge |
 | Negative authz (an affiliate reads only their own data) | `M8-N-nn` | 5 | every commit | merge |
+| Restriction gate: hold at issue, hold at settlement, release on restore | `M8-R-nn` | 4 | every commit | merge |
 | Golden fixtures | `GS-nnn` | 5 owned (GS-123 to GS-127), plus GS-045 shared | every commit | merge |
 
 ### 8.1 Named scenarios owned by this module
@@ -278,6 +304,8 @@ The design rule this generalizes to, worth carrying into M9 through M19: **every
 | GS-125 | Ten thousand clicks with a near-zero conversion rate | `affiliate.suspicious_click_pattern` fires on the clicks-to-conversions ratio and the distinct-referrer count, routes to the risk queue, and does **not** auto-suspend. The 30 day window is unchanged. AS-M8-03 |
 | GS-126 | A required disclosure version is superseded | Every creative bound to the old version is withdrawn automatically, and an approved landing page whose content later changes reverts to `pending` on re-check. AS-M8-04 |
 | GS-127 | An affiliate destination also receives trader payouts from unrelated identities | The shared destination-concentration detector fires across both payment types, because affiliate payments ride the same transfer machinery. AS-M8-05 |
+
+**One golden scenario is owed and no `GS-nnn` is claimed here**, on `CI-06d`'s rule and session 4's precedent: [GOLDEN_SCENARIOS](../testing/golden-scenarios/README.md) is [FOLD-02](FOLD-02-enforcement-window-and-suspension.md) session 7. Named in words so that session has it: **an affiliate whose identity is restricted has their statement held rather than voided, is not settled while the restriction stands, and is settled in full on the next cycle after a documented restore** (INV-M8-12, FM-M8-10, FM-M8-11). **The positive control is the half that matters**, because a gate asserted only on the refusal passes just as well when it refuses everybody, which is the shape [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql)'s probe leads with six success cases to avoid.
 
 ---
 
@@ -294,7 +322,7 @@ The design rule this generalizes to, worth carrying into M9 through M19: **every
 | `affiliate.buyer_signal_concentration` per affiliate | AS-M8-02 |
 | Attribution mix: code override versus last touch versus none | A shift toward last touch with flat code use is what cookie stuffing looks like in aggregate |
 
-**Alerts:** chargeback rate above the payment-gate threshold (holds the statement); suspicious click pattern; a creative pending beyond its SLA; any affiliate destination appearing in the shared concentration check; and any statement whose total does not reconcile against its commission rows, which blocks issue rather than warning after.
+**Alerts:** chargeback rate above the payment-gate threshold (holds the statement); suspicious click pattern; a creative pending beyond its SLA; any affiliate destination appearing in the shared concentration check; **any statement settling to an affiliate whose identity is `restricted`, which is impossible under INV-M8-12 and therefore pages if it happens**; **any statement held on a restriction whose episode has since been restored** (FM-M8-11, the quiet half); and any statement whose total does not reconcile against its commission rows, which blocks issue rather than warning after.
 
 ---
 
@@ -305,6 +333,17 @@ The design rule this generalizes to, worth carrying into M9 through M19: **every
 **OQ-M8-02. The commission rate, and whether it varies by plan.** The constitution says "% of net sale" without fixing it. A flat rate is simple and explicable. A rate that varies by plan lets Merit steer acquisition toward the plans whose economics it prefers, and immediately creates an incentive for affiliates to push a trader onto a plan that suits the affiliate rather than the trader. Recommendation: **flat across plans in v1.** Steering acquisition through commission is a lever that is hard to un-pull once partners have built around it.
 
 **OQ-M8-03. Do affiliates see per-trader outcomes?** They will ask, because knowing which referrals passed is genuinely useful to a content affiliate. It is also a privacy exposure and a ring-coordination tool: an affiliate who can see which of their referrals reached funded status can time a coordinated request wave. Recommendation: **aggregate only**, no per-trader outcomes, no names, no timing. This should be decided before the dashboard is built rather than removed after affiliates have relied on it.
+
+**OQ-M8-05 (NEW, from [ADR-041](../decisions/ADR-041.md)'s confirmation). Does a held affiliate statement start the restriction episode's 48 hour SLA?** `identity_restriction_episodes.sla_due_at` is specified, in [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql)'s own comment, as ADR-040's 48 hour SLA "**where a payout is pending**", and it binds the **restriction** rather than the payment, which is what stops Ruling B becoming a route around Ruling A ([M05](M05-payout-system.md) INV-M5-20).
+
+**A held statement is money Merit has recognised as owed to a party it has halted, which is the same sentence with a different counterparty.** ADR-040's own argument for closing OQ-M5-02 at 48 hours was that the investigate-time justification is identical on both sides of the ledger posting, and that argument does not obviously stop at the trader.
+
+| Read | Consequence |
+|---|---|
+| **`sla_due_at` covers a held statement** | A restriction opened over an unsettled statement is bounded at 48 hours like every other enforcement in this fold, and Merit cannot hold an affiliate's earned commission indefinitely by restricting them |
+| **`sla_due_at` means a trader payout only** | An affiliate can be held with no clock at all, since a restriction has no clock of its own. **That is the unbounded hold this entire fold exists to abolish, surviving in the one place nobody looked** |
+
+Recommendation: **the first**, and the founder should rule it rather than a session inheriting it, because `sla_due_at` is a column in a merged migration whose comment says "payout" and **widening what a merged money-path column means is not a thing a non-money session grants itself.** This is the restraint [`0032`](../../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql) exercised and [ADR-045](../decisions/ADR-045.md) subsequently paid for at the price of one open item for one day. **No new column is needed on either reading**; what changes is which rows set the clock.
 
 **OQ-M8-04. What happens to unpaid commission on termination for cause?** The affiliate ToS needs to say, in advance. Forfeiting everything is standard and defensible when the cause is fraud; applying it to a disclosure breach is disproportionate and will be argued publicly. Recommendation: **graduated, matching the enforcement ladder**: forfeit on fraud or self-deal, pay out earned commission on a compliance termination, with both stated in the ToS before the first affiliate signs.
 
@@ -319,3 +358,4 @@ The design rule this generalizes to, worth carrying into M9 through M19: **every
 | DEP-M8-03 | M3 supplies `amount_paid_cents` and both dispute webhooks | M3 | Commission is computed on the wrong base, and clawbacks never fire |
 | DEP-M8-04 | Legal supplies the affiliate ToS, the required disclosure text, and the prohibited-claim classes | Wave 4 legal | INV-M8-07 and INV-M8-08 have nothing to enforce, and NFA I-26-12 exposure is unmanaged |
 | DEP-M8-05 | M7's D-09 accepts affiliate destinations as input | M7 | INV-M8-10 is unenforced |
+| DEP-M8-06 | [M6](M06-admin-ops-console.md) writes `identities.status = 'restricted'` and its episode row, and emits the restore once [EVENTS](../architecture/EVENTS.md) carries one | M6 | INV-M8-12's hold has nothing to fire on, and its **release** has nothing to fire on even after the event exists on the hold side. FM-M8-10 and FM-M8-11 are the two halves |
