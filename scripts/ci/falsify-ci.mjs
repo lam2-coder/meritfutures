@@ -472,6 +472,18 @@ const CASES = [
       from: 'balanceCents: plan.sizeCents,',
       to: 'balanceCents: mark.closingBalanceCents,',
     },
+    {
+      rule: 'R-35',
+      // THE `max` IS THE RULE AND NOT DEFENSIVE CODE. Dropping it turns a
+      // profitable account sitting inside its buffer into a NEGATIVE
+      // withdrawable, which is INV-05 ("`withdrawable_cents >= 0` always")
+      // violated by the one expression M01 says enforces it: "Formula floors at
+      // zero (R-35)". GS-025 is exactly this input, at -10,000c.
+      seeds: 'the withdrawable formula stripped of its floor, so a balance inside the buffer reports a negative amount (GS-025, INV-05)',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'return surplus > 0n ? surplus : 0n;',
+      to: 'return surplus;',
+    },
   ].map(({ rule, seeds, file, from, to }) => ({
     id: `CI-02/engine-${rule}`,
     stage: 'CI-02',

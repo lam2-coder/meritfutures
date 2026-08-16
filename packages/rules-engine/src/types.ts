@@ -182,13 +182,20 @@ export interface EngineResult {
 // WHAT IS DELIBERATELY ABSENT FROM `RuleState` BELOW, because a field the
 // engine cannot fill is worse than a field it does not declare:
 //
-//   withdrawableCents            R-35, group F, DO-9
 //   engineEligible, engineGates  R-33..R-41, group F, DO-9
 //   stateHash                    SD-08, and `hash.ts`, which replay needs and
 //                                the day fold does not
 //
 // Each lands with the rules that compute it, and widening a record nothing
 // outside this package reads yet is a diff rather than a migration.
+//
+// `withdrawableCents` WAS ON THAT LIST AND HAS LANDED, ahead of the rest of
+// group F and for a stated reason: M01 section 3.6's `clampPayout` reads it off
+// the state, and P2 section 2 sequences group G (payout arithmetic, no calendar
+// needed) BEFORE group F (which needs the full slice and real data). The field
+// travels with the rule that computes it, R-35 in `payout/gates.ts`, and the two
+// eligibility fields stay absent until the conjunction R-41 asserts has all of
+// its terms.
 
 // -----------------------------------------------------------------------------
 // The calendar, as a VALUE (ADR-049)
@@ -457,6 +464,13 @@ export interface RuleState {
   readonly floorCents: Cents;
   readonly floorLocked: boolean;
   readonly highWaterBalanceCents: Cents;
+  /**
+   * R-35. `max(0, balance - size - buffer)`, and `0n` outside the funded phase.
+   *
+   * INV-05 is that this is NEVER negative, and the formula is where that is
+   * enforced rather than a check downstream of it.
+   */
+  readonly withdrawableCents: Cents;
   /** Phase scoped (R-33). */
   readonly tradedDaysCount: number;
   /** Anchor scoped (R-34, R-47). */

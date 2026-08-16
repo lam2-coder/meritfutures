@@ -59,6 +59,7 @@ import type {
   SoftDailyLossLimitEvent,
   TradingDay,
 } from '../types.js';
+import { withdrawableCents } from '../payout/gates.js';
 import { checkBreach } from './breach.js';
 import { advanceConsistency, isTradedDay, isWinDay } from './counters.js';
 import { advanceFloor, initialFloorCents } from './floor.js';
@@ -91,7 +92,7 @@ export function initialState(
   const rules: PhaseDayRules = plan.eval ?? plan.funded;
   const floorCents = initialFloorCents(plan.sizeCents, rules.drawdown.drawdownCents);
 
-  return {
+  const opened: RuleState = {
     tradingDay: openedOn,
     phase,
     balanceCents: plan.sizeCents,
@@ -99,6 +100,11 @@ export function initialState(
     floorCents,
     floorLocked: false,
     highWaterBalanceCents: plan.sizeCents,
+    // R-35 is applied below rather than written as the `0n` it provably is. An
+    // account opens at `size_cents` and CV-07 makes the buffer non-negative, so
+    // the formula yields zero on both phases; a literal here would be a second
+    // derivation of R-35 that a later change to the buffer rule would not reach.
+    withdrawableCents: 0n,
     tradedDaysCount: 0,
     winDaysCount: 0,
     consistencyBestDayCents: 0n,
@@ -112,6 +118,8 @@ export function initialState(
     breachKind: null,
     engineVersion,
   };
+
+  return { ...opened, withdrawableCents: withdrawableCents(opened, plan) };
 }
 
 /** A refusal: the state the fold arrived with, no events, and the finding. */
@@ -219,7 +227,7 @@ export function advanceDay(input: DayInput): DayOutput {
     // R-24 and R-25. Terminal and immediate: nothing after this runs, and breach
     // beats every pass, target and eligibility condition the same day might also
     // satisfy. The balance still moves to the close, because it did.
-    const state: RuleState = {
+    const closedState: RuleState = {
       ...prior,
       tradingDay: mark.tradingDay,
       phase: 'closed',
@@ -228,6 +236,13 @@ export function advanceDay(input: DayInput): DayOutput {
       breached: true,
       breachKind: breach.kind,
       engineVersion,
+    };
+    // R-35 on a closed account is `0n`, and it is recomputed rather than carried
+    // from `prior`: a breached account that was withdrawable-positive yesterday
+    // must not present a positive withdrawable on the row that closed it.
+    const state: RuleState = {
+      ...closedState,
+      withdrawableCents: withdrawableCents(closedState, plan),
     };
     const detected: BreachDetectedEvent = {
       type: 'breach.detected',
@@ -355,6 +370,14 @@ export function advanceDay(input: DayInput): DayOutput {
   // carries what the implemented rules computed; `gate_results` joins it when
   // R-33 to R-41 land, which is the same commit that gives `RuleState` its
   // `engineEligible`.
+  //
+  // R-35 IS EVALUATED HERE AND NOT AT DO-7, which is where M01 section 3.6 puts
+  // it too. DO-8 can change both terms the formula reads: an eval pass moves the
+  // phase to `funded` and the balance to `size_cents` in the same step (R-31),
+  // so a withdrawable computed before the progression would be the eval day's
+  // number attached to a funded row, and on the pass day it would be a positive
+  // amount against a balance the reset had just taken back to size.
+  state = { ...state, withdrawableCents: withdrawableCents(state, plan) };
   const closed: DayClosedEvent = {
     type: 'day.closed',
     tradingDay: mark.tradingDay,

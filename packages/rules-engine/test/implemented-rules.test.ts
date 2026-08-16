@@ -28,12 +28,21 @@ test('the declared set is a set, and is ordered as M01 orders the rules', () => 
   expect([...IMPLEMENTED_RULES]).toEqual([...IMPLEMENTED_RULES].sort());
 });
 
-test('the count is reported rather than implied: twenty-two of M01’s fifty rules', () => {
+test('the count is reported rather than implied: twenty-three of M01’s fifty rules', () => {
   // THIS ASSERTION IS THE HONEST COUNT IN EXECUTABLE FORM. It fails when a rule
   // is added, which is the point: the session that adds one updates the number
   // here and in `src/rules.ts`'s header, and a session that added a rule without
   // noticing it had is a session that cannot land.
-  expect(IMPLEMENTED_RULES.length).toBe(22);
+  expect(IMPLEMENTED_RULES.length).toBe(23);
+});
+
+test('`engineEligible` has no shortcut path, so R-41 is not declared before its terms', () => {
+  // INV-15: "`engine_eligible == AND(every engine gate)` with no shortcut path."
+  // R-35 is a value the state carries and is declarable alone; R-41 is the
+  // conjunction and is not declarable until R-33, R-34, R-36, R-37 and R-39 all
+  // exist. Asserting the absence is what stops a session from declaring the
+  // conjunction over the subset it happened to finish.
+  expect(IMPLEMENTED_RULES).not.toContain('R-41');
 });
 
 test('R-32 is NOT declared, and the refusal is what makes that safe', () => {

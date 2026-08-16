@@ -94,7 +94,7 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules `advanceDay` computes today. TWENTY-TWO OF FIFTY.
+ * The rules the engine computes today. TWENTY-THREE OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
@@ -121,6 +121,8 @@ export type RuleId =
  *   R-29  day/consistency.ts, the cross multiplication
  *   R-30  day/consistency.ts, the denominator rule, before any arithmetic
  *   R-31  day/progression.ts, the funded reset, in the same step as the pass
+ *   R-35  payout/gates.ts withdrawableCents, and DO-9, which is where the two
+ *         terms it reads are final
  *
  * NOT DECLARED AND WORTH NAMING, because their absence is the count being
  * honest rather than the list being short.
@@ -139,8 +141,13 @@ export type RuleId =
  *   R-10, R-11, R-17, R-19, R-20
  *         discharged outside the day fold: ingest, publish validation,
  *         settlement, the platform setpoint
- *   R-33 to R-50
- *         groups F, G and H
+ *   R-33, R-34, R-36 to R-41
+ *         the rest of group F. `engineEligible` is R-41's CONJUNCTION and INV-15
+ *         forbids a shortcut path, so it stays absent from `RuleState` until
+ *         every term exists. R-35 is declared alone because it is a value the
+ *         state carries rather than a term in that conjunction
+ *   R-42 to R-50
+ *         groups G and H
  */
 export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-03',
@@ -165,4 +172,5 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-29',
   'R-30',
   'R-31',
+  'R-35',
 ];

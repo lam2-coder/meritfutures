@@ -56,6 +56,8 @@ export const RULE_ASSERTIONS = {
   'R-29': 'consistency is best * 10000 <= max_bp * profit, cross multiplied, so a tie passes',
   'R-30': 'the denominator rule skips the gate unless period profit > 0, strict',
   'R-31': 'the eval pass resets the funded phase to size and carries no eval profit',
+  'R-35':
+    'withdrawable is max(0, balance - size - buffer), floored at zero, and the buffer is never in it',
 } as const satisfies Partial<Record<RuleId, string>>;
 
 /** The rules this suite claims. `implemented-rules.test.ts` compares it to the engine's. */
