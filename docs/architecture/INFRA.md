@@ -18,7 +18,7 @@ Environments, the deploy pipeline with every [VG gate](../../research/VIBE_FAILU
 
 ## 2. Hosting and platform choices
 
-Proposed as [ADR-007](../DECISIONS.md): **Neon (managed Postgres) plus Railway (apps and worker) plus Cloudflare (edge, WAF, DNS) plus S3-compatible object storage.**
+Proposed as [ADR-007](../decisions/ADR-007.md): **Neon (managed Postgres) plus Railway (apps and worker) plus Cloudflare (edge, WAF, DNS) plus S3-compatible object storage.**
 
 | Concern | Choice | Why this over the alternative |
 |---|---|---|
@@ -26,8 +26,8 @@ Proposed as [ADR-007](../DECISIONS.md): **Neon (managed Postgres) plus Railway (
 | Apps and worker | Railway services: `site`, `portal-api`, `admin`, `worker` | One platform, per-service environment variables, private networking between services, no OS to patch. Vercel would be marginally better for the static site and would add a second platform for no gain at this size |
 | Edge | Cloudflare in front of every origin | WAF, bot rules, rate limiting, DDoS, and the admin-origin IP allowlist all land in one place |
 | Object storage | S3-compatible bucket, private by default | certificates and evidence packs only; signed time-limited URLs (VG-10) |
-| Queue | pg-boss inside the same Postgres ([ADR-006](../DECISIONS.md)) | one datastore to back up and restore; enqueue joins the same transaction as the state change |
-| ORM | Drizzle ([ADR-008](../DECISIONS.md)) | migrations are plain reviewable SQL, which matters because the founder reads every money-path migration line by line |
+| Queue | pg-boss inside the same Postgres ([ADR-006](../decisions/ADR-006.md)) | one datastore to back up and restore; enqueue joins the same transaction as the state change |
+| ORM | Drizzle ([ADR-008](../decisions/ADR-008.md)) | migrations are plain reviewable SQL, which matters because the founder reads every money-path migration line by line |
 
 Rejected for v1: Kubernetes, a self-managed database, a service mesh, multi-region anything, and any custom deployment tooling.
 
@@ -43,7 +43,7 @@ Rejected for v1: Kubernetes, a self-managed database, a service mesh, multi-regi
 **Hard rules:**
 1. Production credentials exist in exactly one place: the platform vault. They are never in `.env`, never in a preview environment, never in an agent's session.
 2. Preview and dev databases contain **synthetic data only**, produced by the seed script and the [synthetic Rithmic simulator](../GLOSSARY.md#platform-adapter). No production dump ever lands in a lower environment.
-3. The admin app is deployed as its own service on `ADMIN_ORIGIN`, a **separate apex domain** ([ADR-012](../DECISIONS.md)), with its own Cloudflare rules and its own IP allowlist (C-08). Cookie scope, CORS, and the CSP never span the two origins, so an XSS on the portal cannot reach the admin surface even in principle.
+3. The admin app is deployed as its own service on `ADMIN_ORIGIN`, a **separate apex domain** ([ADR-012](../decisions/ADR-012.md)), with its own Cloudflare rules and its own IP allowlist (C-08). Cookie scope, CORS, and the CSP never span the two origins, so an XSS on the portal cannot reach the admin surface even in principle.
 
 ## 4. Deploy pipeline and the VG gates
 
@@ -159,14 +159,14 @@ Bill creep is the quiet vibe-infra tax, and in Merit's case the platform charges
 
 ## 10. Claude Code hook set (C10, with the playbook refinement)
 
-Configured in `.claude/settings.json`, **which now exists and is committed to the repository** ([ADR-D1](../DECISIONS.md)). Hooks are deterministic; CLAUDE.md is advisory. Anything that must always happen is here.
+Configured in `.claude/settings.json`, **which now exists and is committed to the repository** ([ADR-D1](../decisions/ADR-D1.md)). Hooks are deterministic; CLAUDE.md is advisory. Anything that must always happen is here.
 
 **The file currently carries the corpus-phase set only.** `SessionStart` (pull, then echo STATE) and `Stop` (push) are live today, because they are the two that matter while the deliverables are documents. The rest of the table below lands at FREEZE, when there is a test command to run and a `payout/` path to guard. Wiring `PostToolUse` to a test command that does not exist yet would be a hook that fails on every edit, and a hook everyone learns to ignore is worse than one that is not there.
 
 | Hook | Action | Notes |
 |---|---|---|
-| `SessionStart` | **`git pull --ff-only`** ([ADR-D1](../DECISIONS.md)), then echo `docs/STATE.md` and the last `SESSION_LOG` entry | **Live.** The start ritual, automated. A session never begins on a stale tree |
-| `Stop` | **`git push origin HEAD`** ([ADR-D1](../DECISIONS.md)) | **Live.** A session never ends with unpushed commits. Reports failure and exits zero rather than blocking, so a network outage cannot wedge a session; the softening is recorded in the ADR |
+| `SessionStart` | **`git pull --ff-only`** ([ADR-D1](../decisions/ADR-D1.md)), then echo `docs/STATE.md` and the last `SESSION_LOG` entry | **Live.** The start ritual, automated. A session never begins on a stale tree |
+| `Stop` | **`git push origin HEAD`** ([ADR-D1](../decisions/ADR-D1.md)) | **Live.** A session never ends with unpushed commits. Reports failure and exits zero rather than blocking, so a network outage cannot wedge a session; the softening is recorded in the ADR |
 | `PreToolUse` | *(at FREEZE)* Block dangerous shell patterns (`rm -rf`, production connection strings, force-push) and any write into `payout/` or `ledger/` paths without the confirm flag | The Replit lesson, enforced |
 | `PostToolUse` | *(at FREEZE)* Run the module's test command after every file edit | Highest-value hook in community consensus |
 | `Stop` (extended) | *(at FREEZE)* Completion gate: lint, typecheck, tests must pass before the turn can end, in addition to the push above | Deterministic definition of done |
@@ -185,12 +185,12 @@ Configured in `.claude/settings.json`, **which now exists and is committed to th
 | Payout requests | **2,000 to 5,000 per day** |
 | Nightly batch | 50,000 accounts, against the 10 minute budget written for 5,000 |
 
-**Nothing in that table requires a different architecture.** Four changes cover it, and every one of them is a standard operation on the stack [ADR-007](../DECISIONS.md) already chose:
+**Nothing in that table requires a different architecture.** Four changes cover it, and every one of them is a standard operation on the stack [ADR-007](../decisions/ADR-007.md) already chose:
 
 1. **Table partitioning on `fills` and `daily_marks`**, by trading day or by month. These are the two append-only tables whose row counts grow without bound, and partitioning them is a migration plus a retention policy, not a redesign. Everything else in the schema is bounded by account count rather than by fill volume.
 2. **The nightly batch fans out to a parallel worker pool.** The batch is already per-account and per-trading-day inside one transaction each ([M02](../plans/M02-rithmic-bridge.md) ST-M2-5), which means it is embarrassingly parallel by construction. This was a design property from the beginning and it is the reason a ten-times account count is a concurrency setting rather than a rewrite.
 3. **Metabase moves to a read replica.** It already runs as `merit_readonly` (§5); the change is which host that role connects to.
-4. **pg-boss stays.** [ADR-006](../DECISIONS.md) chose it partly on the reasoning that Postgres handles this scale of job volume comfortably, and 5,000 payout requests a day is not close to the point where that stops being true. If it ever is, the job interface is deliberately narrow enough that the swap is contained, which was also part of that ADR's acceptance.
+4. **pg-boss stays.** [ADR-006](../decisions/ADR-006.md) chose it partly on the reasoning that Postgres handles this scale of job volume comfortably, and 5,000 payout requests a day is not close to the point where that stops being true. If it ever is, the job interface is deliberately narrow enough that the swap is contained, which was also part of that ADR's acceptance.
 
 **All four are standard and non-architectural.** None changes a module boundary, a table's meaning, or a rule. They are things you do to a working system, in an afternoon each, when the numbers say to.
 
@@ -211,7 +211,7 @@ The SFTP mechanics below are designed from the public description and must be co
 
 ## 13. Founder rulings (Wave 2 gate, 2026-08-13) and remaining questions
 
-1. **ADR-007 (hosting) and ADR-008 (ORM): both ACCEPTED.** Neon plus Railway plus Cloudflare plus an S3-compatible private bucket; Drizzle with the `scopedDb(identity)` wrapper and the VG-4 lint rule. Recorded in [DECISIONS.md](../DECISIONS.md).
-2. **Domain and origin split: RULED.** `meritfutures.com` (site) and `app.meritfutures.com` (portal and API) stand. The admin console does **not** live on a Merit subdomain: it is served from a **separate apex domain**, unrelated to the brand in name, chosen at infrastructure setup ([ADR-012](../DECISIONS.md)). The reason is that a subdomain satisfies "separate origin" but not D3's "unlinked from public surfaces": `ops.meritfutures.com` is guessable and appears in certificate transparency logs beside the brand.
+1. **ADR-007 (hosting) and ADR-008 (ORM): both ACCEPTED.** Neon plus Railway plus Cloudflare plus an S3-compatible private bucket; Drizzle with the `scopedDb(identity)` wrapper and the VG-4 lint rule. Recorded in [DECISIONS.md](../decisions/README.md).
+2. **Domain and origin split: RULED.** `meritfutures.com` (site) and `app.meritfutures.com` (portal and API) stand. The admin console does **not** live on a Merit subdomain: it is served from a **separate apex domain**, unrelated to the brand in name, chosen at infrastructure setup ([ADR-012](../decisions/ADR-012.md)). The reason is that a subdomain satisfies "separate origin" but not D3's "unlinked from public surfaces": `ops.meritfutures.com` is guessable and appears in certificate transparency logs beside the brand.
    **Placeholder convention, binding from here on:** every document, configuration file, and code reference uses **`ADMIN_ORIGIN`**, resolved from the platform vault at deploy time. The real hostname is never written into this corpus, the repository, or any public artifact. It gets its own registrar lock and its own renewal reminder, because a lapsed admin domain is an outage with a hostile finder.
 3. **Status page** hosting: managed (Statuspage class) or a static page on Cloudflare. Recommend managed, because the one time you need it is the one time your platform is down. **Still open**; decide with M10.

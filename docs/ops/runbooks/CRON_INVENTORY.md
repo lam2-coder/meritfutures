@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, ../../architecture/INFRA.md, ../../DECISIONS.md, ../../plans/M01-rules-engine.md, ../../plans/M12-transparency-platform.md]
+depends_on: [README.md, ../../architecture/INFRA.md, ../../decisions/README.md, ../../plans/M01-rules-engine.md, ../../plans/M12-transparency-platform.md]
 last_updated: 2026-08-14
 ---
 
@@ -28,7 +28,7 @@ Constitution section 7: **cron inventory with alerting on non-run (dead-man swit
 | **Loyalty derivation and divergence check** | nightly | 09:00 CT | divergence check absent | S2. It is the module's tamper detector |
 | **Wallet dormancy scan** | daily | 09:00 CT | scan absent | S3, and it drives a 12 month notice schedule that cannot be reconstructed later |
 | **Simulation harness** | nightly | 10:00 CT | run absent | S3, band breach pages ([SIMULATION_HARNESS](../../testing/SIMULATION_HARNESS.md) section 7.2) |
-| **Reserve coverage and top-up trigger** | daily | 09:00 CT | evaluation absent | S2. [ADR-011](../../DECISIONS.md)'s same-day trigger is the control against a correlated wave inside the funding week |
+| **Reserve coverage and top-up trigger** | daily | 09:00 CT | evaluation absent | S2. [ADR-011](../../decisions/ADR-011.md)'s same-day trigger is the control against a correlated wave inside the funding week |
 | **Backup verification** | nightly | 04:00 CT | verification absent | S2. An unverified backup is a hope |
 | **Freeze expiry sweep** | hourly | continuous | sweep absent | **S1 in effect.** A freeze that reaches expiry **releases** (GS-109), and a stalled sweep converts a bounded hold into an unbounded one, which is a denial nobody authorized |
 
@@ -42,7 +42,7 @@ On the ops calendar with a named owner and a written result.
 | **Key rotation drill** | quarterly | Which credentials, and any that could not be rotated cleanly |
 | **Break-glass existence check** | quarterly | Seal intact, credential located. **Does not unseal** ([RB-09](RB-09-break-glass.md)) |
 | **Secret rotation** | 90 days | Vault inventory against the rotation calendar |
-| **Admin domain renewal** | annual, with a reminder | [ADR-012](../../DECISIONS.md): a lapsed admin domain is an outage with a hostile finder |
+| **Admin domain renewal** | annual, with a reminder | [ADR-012](../../decisions/ADR-012.md): a lapsed admin domain is an outage with a hostile finder |
 | **Signing key rotation** ([M11](../../plans/M11-certificates-social-proof.md)) | 90 days | Historical certificates still verify (GS-157), which is what stops the calendar quietly skipping this key forever |
 | **Breach-notification contacts** | annual | Counsel contact and jurisdiction clocks current, per [RB-08](RB-08-security-incident.md) |
 | **C8 monthly retro** | monthly | Thresholds reviewed: the top-up trigger, the escalation window, detector precision, the perk budget |

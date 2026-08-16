@@ -164,7 +164,114 @@ function frontmatter(body) {
 //
 const isCorpusDocument = (file) =>
   (/^(docs|research)\//.test(file) || file === 'packages/db/DELTA_MANIFEST.md') &&
-  !/^docs\/reviews\//.test(file); // verdicts are overwritten artifacts
+  !/^docs\/reviews\//.test(file) && // verdicts are overwritten artifacts
+  !isRegistryEntry(file);
+
+// -----------------------------------------------------------------------------
+// The registries, and what an ENTRY is (ADR-043)
+// -----------------------------------------------------------------------------
+// A registry is a directory of entry files plus a README that indexes them. An
+// ENTRY IS A FRAGMENT, NOT A DOCUMENT: it carries no frontmatter and gets no
+// INDEX.md row, because splitting four registries per entry would take the corpus
+// from 72 documents to roughly 340 and INDEX from 85 rows to about 400, which
+// destroys the one artifact whose entire value is being readable.
+//
+// THAT EXEMPTION IS PAID FOR RATHER THAN TAKEN, and CI-06n is the payment.
+// CI-06c's guarantee is "if a thing is not in INDEX.md, it does not exist", and
+// exempting 340 files from it with nothing in its place is weakening a gate to
+// pass it. CI-06n asserts, in both directions, that every entry has a row in its
+// registry README and every README row resolves. The guarantee becomes transitive
+// rather than lost: INDEX carries the README, the README carries the entry.
+//
+// THE README IS NOT AN ENTRY. It is an ordinary corpus document, checked by
+// CI-06b and required in INDEX by CI-06c, which is what anchors the chain.
+const REGISTRIES = [
+  {
+    id: 'decisions',
+    dir: 'docs/decisions',
+    readme: 'docs/decisions/README.md',
+    // ALLOCATION.md is a corpus document, not an entry: three tables read AS
+    // TABLES by CI-06f and CI-06h. Excluded here so CI-06b still checks it.
+    entry: (f) => /^docs\/decisions\/(ADR-(?:\d{3}|D\d+)\.md|gates\/[^/]+\.md)$/.test(f),
+  },
+  {
+    id: 'edge-cases',
+    dir: 'docs/edge-cases',
+    readme: 'docs/edge-cases/README.md',
+    // The battery file is an entry too: one file holding 22 identifiers, per
+    // ADR-043's ruling that a table row is not a document.
+    entry: (f) => /^docs\/edge-cases\/EC-\d{3}(-to-\d{3}-appendix-b4-battery)?\.md$/.test(f),
+  },
+  {
+    id: 'data-model',
+    dir: 'docs/architecture/data-model',
+    readme: 'docs/architecture/data-model/README.md',
+    // A table design record. README.md is the only other file in the directory
+    // and it is a corpus document, so the predicate excludes it by shape rather
+    // than by name: a record is `<snake_case>.md`.
+    entry: (f) => /^docs\/architecture\/data-model\/[a-z][a-z0-9_]*\.md$/.test(f),
+  },
+  {
+    id: 'sessions',
+    dir: 'docs/sessions',
+    readme: 'docs/sessions/README.md',
+    entry: (f) => /^docs\/sessions\/\d{4}-\d{2}-\d{2}-session-\d{2}\.md$/.test(f),
+  },
+  {
+    id: 'golden-scenarios',
+    dir: 'docs/testing/golden-scenarios',
+    readme: 'docs/testing/golden-scenarios/README.md',
+    // Per SECTION, not per entry (ADR-043): 257 identifiers live as 301 table
+    // rows, and a row is not a document.
+    entry: (f) => /^docs\/testing\/golden-scenarios\/\d{2}-[a-z0-9-]+\.md$/.test(f),
+  },
+];
+
+// -----------------------------------------------------------------------------
+// The golden-scenario registry, read from the directory (ADR-043 stage 5)
+// -----------------------------------------------------------------------------
+// Same rule-2 guard as the other directory readers: a glob matching nothing
+// returns an empty array rather than throwing, and CI-06d and CI-06e both derive
+// their GS set from this, so an empty read would make every citation resolve
+// against nothing and report a clean corpus.
+function goldenBody() {
+  const dir = 'docs/testing/golden-scenarios';
+  if (!existsSync(join(ROOT, dir))) {
+    throw new Error(`${dir} does not exist; the golden-scenario registry has moved or is gone`);
+  }
+  const files = readdirSync(join(ROOT, dir))
+    .filter((f) => /^\d{2}-.*\.md$/.test(f))
+    .sort()
+    .map((f) => join(dir, f));
+  if (files.length === 0) throw new Error(`no GS section files in ${dir}; the gate cannot run`);
+  return files.map((f) => read(f)).join('\n');
+}
+
+// -----------------------------------------------------------------------------
+// The edge-case registry, read from the directory (ADR-043 stage 2)
+// -----------------------------------------------------------------------------
+// Same rule-2 problem as adrFiles: the input is a glob, and a glob that matches
+// nothing returns an empty array rather than throwing, so the emptiness check is
+// the whole of "a gate that cannot run is not a gate that passed" here.
+//
+// It returns the concatenated BODY rather than a list of identifiers, because
+// CI-06d and CI-06e each parse it differently: one wants definitions, the other
+// wants the two entry FORMS and their golden-scenario fields. Handing both the
+// same text keeps one reader rather than two that agree until they do not.
+function edgeCaseBody() {
+  const dir = 'docs/edge-cases';
+  if (!existsSync(join(ROOT, dir))) {
+    throw new Error(`${dir} does not exist; the edge-case registry has moved or is gone`);
+  }
+  const files = readdirSync(join(ROOT, dir))
+    .filter((f) => /^EC-\d{3}.*\.md$/.test(f))
+    .sort()
+    .map((f) => join(dir, f));
+  if (files.length === 0) throw new Error(`no EC entry files in ${dir}; the gate cannot run`);
+  return files.map((f) => read(f)).join('\n');
+}
+
+const isRegistryEntry = (file) => REGISTRIES.some((r) => r.entry(file));
 
 // docs/INDEX.md is NOT excluded here, and the distinction is the ruling.
 // INDEX is a corpus document: it carries frontmatter and a gate status, and
@@ -193,8 +300,53 @@ const isCorpusDocument = (file) =>
 // whole section with /\b(\d{3})\b/, so any three-digit numeral in the
 // surrounding PROSE reserved that number. That is the dangerous direction: a
 // number reserved by accident is a hole this gate stops reporting.
+// ADR-043 moved these from docs/DECISIONS.md to docs/decisions/ALLOCATION.md.
+// The three tables stayed in ONE file precisely because this parser reads them as
+// tables; a table split into a file per row is not a table.
+const ALLOCATION_DOC = 'docs/decisions/ALLOCATION.md';
 const ADR_ALLOCATION = '## Number allocation';
 const MIGRATION_ALLOCATION = '## Migration number allocation';
+
+// -----------------------------------------------------------------------------
+// The ADR registry, read from the directory (ADR-043)
+// -----------------------------------------------------------------------------
+// THE FAILURE MODE THIS SHAPE EXISTS TO PREVENT: a gate whose input path no
+// longer exists finds nothing and PASSES. Before the split, `read('docs/
+// DECISIONS.md')` threw ENOENT and the runner reported ERROR, which is rule 2
+// working. After the split the input is a GLOB, and a glob that matches nothing
+// returns an empty array rather than throwing. So the emptiness check is not
+// decoration: it is the whole of rule 2 on a directory-shaped input, and every
+// reader below is written to go through this one function.
+function adrFiles() {
+  const dir = 'docs/decisions';
+  if (!existsSync(join(ROOT, dir))) {
+    throw new Error(`${dir} does not exist; the ADR registry has moved or is gone`);
+  }
+  const files = readdirSync(join(ROOT, dir))
+    .filter((f) => /^ADR-(?:\d{3}|D\d+)\.md$/.test(f))
+    .sort()
+    .map((f) => join(dir, f));
+  if (files.length === 0) {
+    throw new Error(`no ADR entry files in ${dir}; the gate cannot run`);
+  }
+  return files;
+}
+
+// The heading inside an entry file is still the definition, so the ADR-nnn form
+// is read from the TEXT rather than trusted from the filename. A file named
+// ADR-041.md whose heading says ADR-014 is a real defect and this is what sees it.
+function adrEntries() {
+  const out = [];
+  for (const file of adrFiles()) {
+    const m = /^## ADR-(\d{3}|D\d+):/m.exec(read(file));
+    if (!m) {
+      out.push({ file, id: null });
+      continue;
+    }
+    out.push({ file, id: m[1], expected: `docs/decisions/ADR-${m[1]}.md` });
+  }
+  return out;
+}
 
 function allocated(body, heading) {
   const start = body.indexOf(heading);
@@ -378,8 +530,8 @@ const ci06d = {
     'each registry runs 1..n with no holes and no duplicates.',
   run() {
     const findings = [];
-    const gsBody = read('docs/testing/GOLDEN_SCENARIOS.md');
-    const ecBody = read('docs/EDGE_CASES.md');
+    const gsBody = goldenBody();
+    const ecBody = edgeCaseBody();
     const defined = (body, re) => new Set([...body.matchAll(re)].map((m) => m[1]));
     // A definition is an identifier at the start of a registry row or heading.
     const gs = defined(gsBody, /^[|#\s]*\**\s*(GS-\d{3})\b/gm);
@@ -416,11 +568,9 @@ const ci06e = {
     'TR-04\'s second half. An edge case with no fixture is a decision nobody can test.',
   run() {
     const findings = [];
-    const ecBody = read('docs/EDGE_CASES.md');
+    const ecBody = edgeCaseBody();
     const gs = new Set(
-      [...read('docs/testing/GOLDEN_SCENARIOS.md').matchAll(/^[|#\s]*\**\s*(GS-\d{3})\b/gm)].map(
-        (m) => m[1],
-      ),
+      [...goldenBody().matchAll(/^[|#\s]*\**\s*(GS-\d{3})\b/gm)].map((m) => m[1]),
     );
     // THE REGISTRY HAS TWO DEFINITION FORMS AND BOTH ARE VALID.
     //   block form: `## EC-nnn: <name>` with a `- Golden scenario ref:` field
@@ -481,23 +631,33 @@ const ci06f = {
   id: 'CI-06f',
   title: 'ADR numbers are unique and gapless over allocated plus reserved',
   covers:
-    'uniqueness and gaplessness within DECISIONS.md, against the allocation table. ' +
+    'uniqueness and gaplessness across the docs/decisions/ entry files, against the '+
+    'allocation table, plus that each entry file is named for the ADR its heading declares. ' +
     'The cross-branch half (a PR may not claim a number already on main) belongs ' +
     'to the CI job, which can see both refs; this run cannot.',
   run() {
     const findings = [];
-    const body = read('docs/DECISIONS.md');
-    const headings = [...body.matchAll(/^## ADR-(\d{3}):/gm)].map((m) => Number(m[1]));
     const seen = new Set();
-    for (const n of headings) {
-      if (seen.has(n)) findings.push(`ADR-${String(n).padStart(3, '0')} appears more than once`);
+    // ADDED AT THE SPLIT (ADR-043): the filename must agree with the heading.
+    // Before the move, "which ADR is this" had one answer because there was one
+    // file. Now there are two answers and they can disagree, so a file whose name
+    // and heading differ is a new defect class that arrived WITH the directory.
+    for (const { file, id, expected } of adrEntries()) {
+      if (id === null) {
+        findings.push(`${file}: no "## ADR-nnn:" heading; it is not a readable entry`);
+        continue;
+      }
+      if (file !== expected) findings.push(`${file}: heading says ADR-${id}, so it belongs at ${expected}`);
+      if (/^D/.test(id)) continue; // outside the numbered sequence, by name
+      const n = Number(id);
+      if (seen.has(n)) findings.push(`ADR-${id} appears more than once`);
       seen.add(n);
     }
-    if (seen.size === 0) throw new Error('no ADR headings found; the gate cannot run');
+    if (seen.size === 0) throw new Error('no numbered ADR entries found; the gate cannot run');
     // The allocation table is the reserved set: any number it names is allowed
-    // to be absent from this file, because a sibling branch holds it. Shared
-    // with CI-06h since ADR-036; see `allocated` for why it is one function.
-    const alloc = allocated(body, ADR_ALLOCATION);
+    // to be absent, because a sibling branch holds it. Shared with CI-06h since
+    // ADR-036; see `allocated` for why it is one function.
+    const alloc = allocated(read(ALLOCATION_DOC), ADR_ALLOCATION);
     const max = Math.max(...seen, ...alloc);
     for (let n = 1; n <= max; n++) {
       if (!seen.has(n) && !alloc.has(n)) {
@@ -521,18 +681,17 @@ const ci06f = {
 // IDENTIFIERS gives the corpus's 140 and 257. Both are "a script deriving it"
 // and one is wrong, so the query is written down beside the key.
 const SPAN_QUERIES = {
+  // DISTINCT NUMBERED IDENTIFIERS, read from the entry headings rather than by
+  // counting files (ADR-043). Counting files would count ADR-D1, which is outside
+  // the numbered sequence, and would count a stray file with no heading.
   adr_count: () =>
-    new Set([...read('docs/DECISIONS.md').matchAll(/^## ADR-(\d{3}):/gm)].map((m) => m[1])).size,
+    new Set(adrEntries().map((e) => e.id).filter((id) => id && !/^D/.test(id))).size,
   // DISTINCT IDENTIFIERS, not headings. EC-012 to EC-033 are the Appendix B4
   // battery and live as TABLE ROWS under one heading, so counting `## EC-nnn`
   // gives 119 against the registry's 140. This is the exact trap STRATEGY names
   // when it says counting rows gives 22 and counting identifiers gives 140.
-  ec_count: () =>
-    new Set([...read('docs/EDGE_CASES.md').matchAll(/\b(EC-\d{3})\b/g)].map((m) => m[1])).size,
-  gs_count: () =>
-    new Set(
-      [...read('docs/testing/GOLDEN_SCENARIOS.md').matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1]),
-    ).size,
+  ec_count: () => new Set([...edgeCaseBody().matchAll(/\b(EC-\d{3})\b/g)].map((m) => m[1])).size,
+  gs_count: () => new Set([...goldenBody().matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1])).size,
   migration_files: () =>
     readdirSync(join(ROOT, 'packages/db/migrations')).filter((f) => extname(f) === '.sql').length,
   tables: () => tablesInMigrations().length,
@@ -713,11 +872,28 @@ const ci06i = {
       else inSql.set(table, file);
     }
 
-    const doc = read('docs/architecture/DATA_MODEL.md');
-    // A section is exactly `### <snake_case_name>` on its own line. Prose
-    // headings under §17 ("### Verification performed") do not match, which is
-    // intended: a design record is a heading that IS a table name.
-    const sections = [...doc.matchAll(/^### ([a-z][a-z0-9_]*)\s*$/gm)].map((m) => m[1]);
+    // ADR-043 stage 3: one file per design record. The heading is still what
+    // defines the record, read from the file rather than trusted from the
+    // filename, so a file whose name and heading disagree is visible here the way
+    // CI-06f made it visible for ADRs.
+    const dir = 'docs/architecture/data-model';
+    if (!existsSync(join(ROOT, dir))) {
+      throw new Error(`${dir} does not exist; the design records have moved or are gone`);
+    }
+    const recordFiles = readdirSync(join(ROOT, dir))
+      .filter((f) => /^[a-z][a-z0-9_]*\.md$/.test(f))
+      .sort();
+    if (recordFiles.length === 0) throw new Error(`no design records in ${dir}; the gate cannot run`);
+    const sections = [];
+    for (const f of recordFiles) {
+      const m = /^### ([a-z][a-z0-9_]*)\s*$/m.exec(read(join(dir, f)));
+      if (!m) {
+        findings.push(`${dir}/${f}: no \`### <table>\` heading; it is not a readable design record`);
+        continue;
+      }
+      if (`${m[1]}.md` !== f) findings.push(`${dir}/${f}: heading says ${m[1]}, so it belongs at ${m[1]}.md`);
+      sections.push(m[1]);
+    }
     const inDoc = new Set();
     for (const name of sections) {
       if (inDoc.has(name)) findings.push(`${name}: has more than one \`### ${name}\` section`);
@@ -798,7 +974,7 @@ const ci06h = {
     // that used to live here is subsumed: a missing 0001 that nobody reserved
     // is the n = 1 hole.
     const pad = (n) => String(n).padStart(4, '0');
-    const alloc = allocated(read('docs/DECISIONS.md'), MIGRATION_ALLOCATION);
+    const alloc = allocated(read(ALLOCATION_DOC), MIGRATION_ALLOCATION);
     const max = Math.max(...seen.keys(), ...alloc);
     for (let n = 1; n <= max; n++) {
       if (!seen.has(n) && !alloc.has(n)) {
@@ -809,7 +985,7 @@ const ci06h = {
       if (!alloc.has(n)) {
         findings.push(
           `${f}: ${pad(n)} is not claimed by the migration allocation table in ` +
-            'docs/DECISIONS.md. Claim the number there before writing the file (ADR-036)',
+            `${ALLOCATION_DOC}. Claim the number there before writing the file (ADR-036)`,
         );
       }
     }
@@ -1074,9 +1250,81 @@ const adr026 = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06n  REGISTRY INDEX COMPLETENESS, BOTH DIRECTIONS
+// -----------------------------------------------------------------------------
+// THIS GATE IS THE PRICE OF ADR-043's INDEX EXEMPTION, and it is written down as
+// a price rather than assumed.
+//
+// CI-06c guarantees "if a thing is not in INDEX.md, it does not exist". ADR-043
+// exempts registry ENTRY files from that, because four registries split per entry
+// would take INDEX from 85 rows to about 400 and destroy the one artifact whose
+// whole value is being readable. An exemption with nothing in its place is
+// weakening a gate to pass it, which rule 1 of this file forbids.
+//
+// So the guarantee becomes TRANSITIVE instead of lost: CI-06c puts the registry
+// README in INDEX, and this gate puts every entry in the README. An entry file
+// that nothing indexes fails here exactly as it used to fail there.
+//
+// BOTH DIRECTIONS, and the second is the one that matters after a split. A README
+// row pointing at a file that was renamed or never written is a registry claiming
+// coverage it does not have, which reads identically to coverage.
+const ci06n = {
+  id: 'CI-06n',
+  title: 'Every registry entry has a README row, and every README row resolves',
+  covers:
+    'the transitive half of CI-06c for the registries ADR-043 split. Every entry ' +
+    'file in a registry directory is linked from that registry README, and every ' +
+    'entry link in the README resolves to a file that exists. It does NOT check the ' +
+    'entry contents; CI-06f checks that an ADR entry is named for its own heading.',
+  run() {
+    const findings = [];
+    let checked = 0;
+    for (const reg of REGISTRIES) {
+      if (!existsSync(join(ROOT, reg.dir))) {
+        findings.push(`${reg.dir}: registry directory does not exist`);
+        continue;
+      }
+      if (!existsSync(join(ROOT, reg.readme))) {
+        findings.push(`${reg.readme}: registry README does not exist`);
+        continue;
+      }
+      const onDisk = walk(reg.dir).filter((f) => reg.entry(f));
+      // Rule 2 on a directory-shaped input. A registry whose entry predicate
+      // matches nothing is a gate asserting nothing, and it must say so rather
+      // than report the empty set as agreement.
+      if (onDisk.length === 0) {
+        findings.push(
+          `${reg.dir}: no entry files match this registry's entry pattern, so ` +
+            'CI-06n is asserting nothing about it',
+        );
+        continue;
+      }
+      const body = read(reg.readme);
+      const linked = new Set();
+      for (const m of body.matchAll(/\[[^\]]*\]\(([^)\s#]+)[^)]*\)/g)) {
+        const target = relative(ROOT, resolve(join(ROOT, dirname(reg.readme)), m[1]));
+        if (!reg.entry(target)) continue; // rows pointing elsewhere are not entry rows
+        linked.add(target);
+        if (!existsSync(join(ROOT, target))) {
+          findings.push(`${reg.readme}: row does not resolve -> ${m[1]}`);
+        }
+      }
+      for (const f of onDisk) {
+        if (!linked.has(f)) findings.push(`${f}: entry file with no row in ${reg.readme}`);
+      }
+      checked += onDisk.length;
+    }
+    if (REGISTRIES.length === 0 || checked === 0) {
+      findings.push('no registry entries checked; CI-06n is asserting nothing');
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
-const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06h, ci06i, ci06j, adr026];
+const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06h, ci06i, ci06j, ci06n, adr026];
 
 function main() {
   const [cmd, only] = process.argv.slice(2);

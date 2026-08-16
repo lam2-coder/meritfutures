@@ -1,18 +1,18 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/PROP_TECH_LANDSCAPE.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M07-risk-abuse.md, M08-affiliate-system.md, M09-marketing-site.md, M12-transparency-platform.md, M14-loyalty-retention.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/PROP_TECH_LANDSCAPE.md, M01-rules-engine.md, M03-billing-checkout.md, M05-payout-system.md, M07-risk-abuse.md, M08-affiliate-system.md, M09-marketing-site.md, M12-transparency-platform.md, M14-loyalty-retention.md, M19-kyc-identity.md]
 last_updated: 2026-08-14
 ---
 
 # M17: Offers Engine
 
-Constitution section §4-ADDENDUM ("contextual reset pricing, bundles, every offer a config, A/B-able"), Appendix B5's ten-section template, **[ADR-019a](../DECISIONS.md)'s gamification bright line**, and the **[parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14)**, both of which name this module. Free-trial accounts and rule-based promotional campaigns enter as drafting inputs from the Axcera brochure ([PROP_TECH_LANDSCAPE](../../research/PROP_TECH_LANDSCAPE.md) section 1.2, SHOULD rather than v1 MUST).
+Constitution section §4-ADDENDUM ("contextual reset pricing, bundles, every offer a config, A/B-able"), Appendix B5's ten-section template, **[ADR-019a](../decisions/ADR-019.md)'s gamification bright line**, and the **[parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md)**, both of which name this module. Free-trial accounts and rule-based promotional campaigns enter as drafting inputs from the Axcera brochure ([PROP_TECH_LANDSCAPE](../../research/PROP_TECH_LANDSCAPE.md) section 1.2, SHOULD rather than v1 MUST).
 
-**Money path under [ADR-003](../DECISIONS.md)'s strict regime.** Every offer changes what somebody pays, several change what the ledger records, and one class of them would change what the engine computes if this plan did not forbid it.
+**Money path under [ADR-003](../decisions/ADR-003.md)'s strict regime.** Every offer changes what somebody pays, several change what the ledger records, and one class of them would change what the engine computes if this plan did not forbid it.
 
 One sentence governs this module: **an offer changes the price of a known thing, and it may never change the thing.**
 
-That sentence draws the only line that matters here. A discount on an evaluation is an offer. A larger payout cap this weekend is a **rule change wearing a promotion's clothes**, and the [parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14) already decided that a structural ruling is never marketed as a tunable and that a parameter is read from a published plan version rather than adjusted by a campaign.
+That sentence draws the only line that matters here. A discount on an evaluation is an offer. A larger payout cap this weekend is a **rule change wearing a promotion's clothes**, and the [parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md) already decided that a structural ruling is never marketed as a tunable and that a parameter is read from a published plan version rather than adjusted by a campaign.
 
 **Identifier conventions:** `INV-M17-nn` invariants, `SD-M17-nn` schema deltas, `OF-M17-nn` offer types, `FM-M17-nn` failure modes, `AS-M17-nn` adversarial scenarios, `OQ-M17-nn` open questions, `DEP-M17-nn` dependencies.
 
@@ -37,7 +37,7 @@ One engine that decides **who may be offered what, at what price, until when**, 
 
 | Not M17 | Whose job | Why the boundary is here |
 |---|---|---|
-| Changing any plan parameter | [M1](M01-rules-engine.md) config, published through [M3](M03-billing-checkout.md) with [ADR-010](../DECISIONS.md) dual control | An offer prices a plan version. It never edits one (INV-M17-01, AS-M17-01) |
+| Changing any plan parameter | [M1](M01-rules-engine.md) config, published through [M3](M03-billing-checkout.md) with [ADR-010](../decisions/ADR-010.md) dual control | An offer prices a plan version. It never edits one (INV-M17-01, AS-M17-01) |
 | Taking payment | [M3](M03-billing-checkout.md) | M17 computes and authorizes a price; M3 charges it. Server-authoritative pricing stays [SECURITY](../architecture/SECURITY.md) C-21's, in one place |
 | Deciding who has earned a benefit | [M14](M14-loyalty-retention.md) | M14 derives entitlement; M17 prices and issues. One engine issues economic instruments and it is this one |
 | Sending the offer | [M16](M16-notification-center.md) and [M10](M10-integrations.md) | Including the send-time guards ([M10](M10-integrations.md) AS-M10-03). M17 authorizes; it does not deliver |
@@ -48,13 +48,13 @@ One engine that decides **who may be offered what, at what price, until when**, 
 | ID | Invariant | Enforcement |
 |---|---|---|
 | INV-M17-01 | **No offer changes any value the engine reads.** Not a cap, split, gap, drawdown, target, win-day count, consistency ratio, buffer, or ladder length | The offers service holds no write grant on `plan_versions`, `plan_version_sizes`, or `accounts.plan_version_id`, identically to [M14](M14-loyalty-retention.md) INV-M14-01. AS-M17-01 |
-| INV-M17-02 | Every offer states its **exact contents and exact price before payment** | [ADR-019a](../DECISIONS.md). No mystery bundles, no randomized contents, no randomized discount resolving into a purchase ([M14](M14-loyalty-retention.md) AS-M14-03's composition rule applies here unchanged) |
+| INV-M17-02 | Every offer states its **exact contents and exact price before payment** | [ADR-019a](../decisions/ADR-019.md). No mystery bundles, no randomized contents, no randomized discount resolving into a purchase ([M14](M14-loyalty-retention.md) AS-M14-03's composition rule applies here unchanged) |
 | INV-M17-03 | An offer is **bound to an identity** and to a redemption count before it exists | SD-M17-01. An unbound code is a code that will leak, and leaked promo codes are [dossier item 9](../../research/ADVERSARY_DOSSIER.md) (AS-M17-05) |
 | INV-M17-04 | Price is computed **server side**, from the offer record, at checkout; the client can never influence it | [SECURITY](../architecture/SECURITY.md) C-21. The client supplies an offer reference and nothing else |
 | INV-M17-05 | Stacking is **explicit and bounded**: a floor price exists per product, and no combination can reach or cross it | SD-M17-02, AS-M17-04. `stackable=false` on coupons ([M3](M03-billing-checkout.md)) is necessary and is not sufficient once credit, loyalty grants, and campaigns coexist |
 | INV-M17-06 | A published price on a public surface is the price the offer-free path charges | [M09](M09-marketing-site.md) INV-M9-01. A price experiment must not desync the config-rendered public page (AS-M17-03) |
 | INV-M17-07 | Experiments never vary a rule, a gate, or anything the engine reads | AS-M17-03, AS-M17-07. Two live plan versions is a legitimate product decision made through the publish path; it is not an experiment this module can run |
-| INV-M17-08 | `promotional_credit` is spendable at checkout and has **no path to `trader_wallet` and no path to a withdrawal** | [ADR-019](../DECISIONS.md), [M14](M14-loyalty-retention.md) INV-M14-10, asserted by ledger test |
+| INV-M17-08 | `promotional_credit` is spendable at checkout and has **no path to `trader_wallet` and no path to a withdrawal** | [ADR-019](../decisions/ADR-019.md), [M14](M14-loyalty-retention.md) INV-M14-10, asserted by ledger test |
 | INV-M17-09 | Offer targeting excludes the same populations [M14](M14-loyalty-retention.md) INV-M14-08 excludes, evaluated at authorization **and** again at send | Open severity 4+ flag, restriction, chargeback in the window, and the reset-velocity ceiling ([M14](M14-loyalty-retention.md) AS-M14-04's inversion) |
 | INV-M17-10 | Every offer has an expiry, and an expired offer is refused at checkout rather than honored quietly | An offer with no expiry is a permanent price change nobody published |
 | INV-M17-11 | Promotional credit issued against a purchase is **revoked if that purchase is charged back or refunded**, and revocation may make the balance negative | SD-M17-03, AS-M17-06. A credit funded by a payment that was reversed is a credit Merit gave away |
@@ -64,11 +64,11 @@ One engine that decides **who may be offered what, at what price, until when**, 
 
 ## 2. Entities and schema deltas
 
-M17 consumes [M3](M03-billing-checkout.md)'s approved `coupons` and `coupon_redemptions` and the `promotional_credit` ledger class activated by [ADR-019](../DECISIONS.md). Four deltas.
+M17 consumes [M3](M03-billing-checkout.md)'s approved `coupons` and `coupon_redemptions` and the `promotional_credit` ledger class activated by [ADR-019](../decisions/ADR-019.md). Four deltas.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
-| SD-M17-01 | new `offers` | `id`, `offer_type`, `identity_id null`, `scope check in ('identity','segment','public')`, `product_ref`, `contents jsonb`, `price_cents`, `list_price_cents`, `currency`, `max_redemptions`, `redemptions_used`, `expires_at`, `criteria_version null`, `loyalty_grant_id null`, `experiment_arm null`, `created_by`, `revoked_at null` | INV-M17-02 and INV-M17-03. `contents` is explicit rather than derived because [ADR-019a](../DECISIONS.md) requires stated contents before payment, and a bundle whose contents are computed at redemption is a bundle whose contents were not stated. `list_price_cents` is stored alongside `price_cents` so the discount is a fact rather than a comparison against a value that may since have moved |
+| SD-M17-01 | new `offers` | `id`, `offer_type`, `identity_id null`, `scope check in ('identity','segment','public')`, `product_ref`, `contents jsonb`, `price_cents`, `list_price_cents`, `currency`, `max_redemptions`, `redemptions_used`, `expires_at`, `criteria_version null`, `loyalty_grant_id null`, `experiment_arm null`, `created_by`, `revoked_at null` | INV-M17-02 and INV-M17-03. `contents` is explicit rather than derived because [ADR-019a](../decisions/ADR-019.md) requires stated contents before payment, and a bundle whose contents are computed at redemption is a bundle whose contents were not stated. `list_price_cents` is stored alongside `price_cents` so the discount is a fact rather than a comparison against a value that may since have moved |
 | SD-M17-02 | new `price_floors` | `product_ref`, `floor_cents`, `reason`, `effective_from`, `approved_by` | INV-M17-05 and INV-M17-12. Stacking arithmetic needs a hard stop that is not "the sum of the discounts we happened to configure", and the floor for a Direct plan is a **liability** decision rather than a margin one, which is why it carries a written reason and an approver |
 | SD-M17-03 | `ledger_entries` usage plus new `promotional_credit_grants` | `id`, `identity_id`, `amount_cents`, `source_offer_id null`, `funding_purchase_id null`, `expires_at`, `consumed_cents`, `revoked_at null`, `revoked_reason null` | INV-M17-08 and INV-M17-11. A credit needs to know what funded it, or a chargeback cannot claw back the credit it paid for (AS-M17-06). The ledger records the money; this table records the entitlement's provenance and expiry |
 | SD-M17-04 | new `offer_experiments` | `id`, `name`, `hypothesis`, `arms jsonb`, `varies check in ('price','presentation','bundle_contents')`, `started_at`, `ended_at null`, `winner_arm null` | INV-M17-07. The `varies` check is the schema enforcing the rule: there is **no enum value for a rule, a gate, or a plan parameter**, so an experiment that varies one cannot be written down, let alone run (AS-M17-07) |
@@ -147,7 +147,7 @@ stateDiagram-v2
 | `POST /internal/offers/authorize` **NEW** | Owns | Campaign and rule-based issuance. Admin origin or worker. Writes `offers`, evaluates INV-M17-09's exclusions |
 | `POST /checkout` | Consumes | [M3](M03-billing-checkout.md)'s, gaining an optional `offer_ref`. Price resolution is section 3.2 |
 | `GET /admin/offers` and `POST /admin/offers/:id/revoke` **NEW** | Owns | Reason required, writes `admin_actions` |
-| `POST /admin/price-floors` **NEW** | Owns | **Dual control**, on the same footing as [ADR-010](../DECISIONS.md)'s set: a floor is the control that stops AS-M17-04, and a floor anyone can lower is not a control |
+| `POST /admin/price-floors` **NEW** | Owns | **Dual control**, on the same footing as [ADR-010](../decisions/ADR-010.md)'s set: a floor is the control that stops AS-M17-04, and a floor anyone can lower is not a control |
 | `GET /admin/experiments` **NEW** | Owns | Arms, allocation, and results. `varies` is constrained by SD-M17-04 |
 
 ---
@@ -189,18 +189,18 @@ stateDiagram-v2
 
 ### AS-M17-01: The rule change sold as a promotion (NOVEL)
 
-**Attack.** The adversary is a good marketing idea. Every lever in this business that would actually move conversion is a **rule**, not a price: a bigger payout cap this weekend, consistency waived for new accounts in October, a shorter cadence gap for Black Friday buyers, a ninth rung on the ladder for the anniversary. Each is more compelling than any discount, each is trivially expressible as a config value, and each is the thing the [parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14) forbids: **a structural ruling is never marketed as a tunable**, and a parameter is read from a published plan version rather than adjusted by a campaign.
+**Attack.** The adversary is a good marketing idea. Every lever in this business that would actually move conversion is a **rule**, not a price: a bigger payout cap this weekend, consistency waived for new accounts in October, a shorter cadence gap for Black Friday buyers, a ninth rung on the ladder for the anniversary. Each is more compelling than any discount, each is trivially expressible as a config value, and each is the thing the [parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md) forbids: **a structural ruling is never marketed as a tunable**, and a parameter is read from a published plan version rather than adjusted by a campaign.
 
 **Three ways it does damage, and the third is the one that persists.**
 - **It breaks the rules page.** [M09](M09-marketing-site.md) INV-M9-02 renders `copy_blocks` from the account's pinned plan version. An account bought under a promotional cap either shows a rules page that disagrees with its engine behavior, or forces a per-account override, which is [M14](M14-loyalty-retention.md) AS-M14-06's failure arriving from a second direction.
-- **It bypasses [ADR-010](../DECISIONS.md).** Cap, split, and gap are dual-control changes because they are the parameters through which economic sabotage is silent. A campaign flag that moves any of them is that surface with a marketing approval instead of a second hardware key.
+- **It bypasses [ADR-010](../decisions/ADR-010.md).** Cap, split, and gap are dual-control changes because they are the parameters through which economic sabotage is silent. A campaign flag that moves any of them is that surface with a marketing approval instead of a second hardware key.
 - **It makes every future rule negotiable.** Once a cap has been raised for a weekend, it is a number Merit chose rather than a number Merit computed, and every support conversation about a cap from that day forward has a precedent in it.
 
 **Counter, and the good news is that the compliant version is a better product.**
 1. **No write grant** (INV-M17-01), so the temptation cannot be acted on by this service.
 2. **The legitimate version of every one of those campaigns is a plan version**: published through [M3](M03-billing-checkout.md) with dual control, validated by the CV suite, visible on the rules page **before purchase**, and pinned to the accounts that bought it. That is a real product, honestly marketed, and it is exactly the mechanism [M14](M14-loyalty-retention.md) section 3.2 already specifies for progressive cap release.
 3. **The offer copy rule**: an offer may describe the plan's published rules and may never describe them as changed, conditional, or temporary. Enforced in review, in the same pass as [M08](M08-affiliate-system.md)'s creative approval.
-4. **"Caps exist" is not a promotion** ([parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14)). A structural property may not be offered, waived, or framed as a limited-time condition, and the cap's *value* being a config does not make its *existence* one. EC-117, GS-198.
+4. **"Caps exist" is not a promotion** ([parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md)). A structural property may not be offered, waived, or framed as a limited-time condition, and the cap's *value* being a config does not make its *existence* one. EC-117, GS-198.
 
 ### AS-M17-02: The free trial removes the identity signal it most needs (NOVEL)
 

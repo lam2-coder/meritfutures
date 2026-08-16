@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, TOS_CLAUSES.md, ../plans/M08-affiliate-system.md, ../plans/M05-payout-system.md, ../DECISIONS.md]
+depends_on: [README.md, TOS_CLAUSES.md, ../plans/M08-affiliate-system.md, ../plans/M05-payout-system.md, ../decisions/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -8,7 +8,7 @@ last_updated: 2026-08-14
 
 **DRAFT FOR COUNSEL. Not publishable text.** Same discipline as [TOS_CLAUSES](TOS_CLAUSES.md): requirements, not prose.
 
-**Why affiliates get their own document.** An affiliate is not a customer and the failure modes are different in kind. A trader can breach a rule and cost Merit an account; **an affiliate can make a claim Merit has to answer for**, to a regulator, in a market whose regulatory characterization is already contested. [M08 AS-M8-04](../plans/M08-affiliate-system.md) and [EC-082](../EDGE_CASES.md) both land on the same finding: the promoter's claim becomes the firm's problem, and the only defense is a disclosure regime that is enforced per asset rather than accepted once at signup.
+**Why affiliates get their own document.** An affiliate is not a customer and the failure modes are different in kind. A trader can breach a rule and cost Merit an account; **an affiliate can make a claim Merit has to answer for**, to a regulator, in a market whose regulatory characterization is already contested. [M08 AS-M8-04](../plans/M08-affiliate-system.md) and [EC-082](../edge-cases/EC-082.md) both land on the same finding: the promoter's claim becomes the firm's problem, and the only defense is a disclosure regime that is enforced per asset rather than accepted once at signup.
 
 ---
 
@@ -49,8 +49,8 @@ last_updated: 2026-08-14
 | 2 | **Fabricated, unverified, or unrepresentative results** | Including real results presented without their base rate. [M11](../plans/M11-certificates-social-proof.md)'s signed certificates exist so a real result can be shown verifiably, which removes the excuse |
 | 3 | **Omitted simulated-environment disclosure** | Section 2 |
 | 4 | **Implied partnership, employment, or agency with Merit** | "Merit's official partner", a Merit-branded email address, or copy written in Merit's voice. [M15](../plans/M15-discord-integration.md) GS-188 is the same failure through a stolen bot token, and the harm is identical: a claim in the firm's own voice |
-| 5 | **Any statement about live capital, funded-capital programs, or graduation to live trading** | [OQ-M18-01](../DECISIONS.md). **Zero live-program copy exists anywhere**, and an affiliate is the most likely source of the first instance |
-| 6 | **Any rule, price, cap, or parameter stated as a literal** | The [parameter-status ruling](../DECISIONS.md): a parameter is read, never copied. An affiliate quoting a cap that later changes has published a rule Merit does not have |
+| 5 | **Any statement about live capital, funded-capital programs, or graduation to live trading** | [OQ-M18-01](../decisions/gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md). **Zero live-program copy exists anywhere**, and an affiliate is the most likely source of the first instance |
+| 6 | **Any rule, price, cap, or parameter stated as a literal** | The [parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md): a parameter is read, never copied. An affiliate quoting a cap that later changes has published a rule Merit does not have |
 | 7 | **Comparative claims against a competitor's figures** | [M12](../plans/M12-transparency-platform.md) GS-169: comparing a rigorous number to an unmethodical one concedes the argument to win a sentence. **Comparisons about the practice are permitted**; comparisons of value to value are not |
 | 8 | **Incentivized or misrepresented reviews** | The review-request flow is compliance-constrained on Merit's own surfaces ([M12](../plans/M12-transparency-platform.md) GS-164) and an affiliate route around it would defeat it |
 
@@ -79,7 +79,7 @@ last_updated: 2026-08-14
 | **Chargeback clawback** | A chargeback on a referred purchase **claws back the commission**, and the affiliate balance may go negative and nets against future commission (GS-123). This is the accepted consequence of paying before the chargeback window closes, which is the only commercially available option |
 | **Chargeback-rate hold** | A chargeback rate above the threshold **holds the next statement pending review** rather than merely appearing on a dashboard |
 | **Self-referral** | Attribution voided and the account flagged (GS-045). Extended by the linking clause: **a buyer linked to the affiliate above the confidence ceiling** is treated the same way, while a genuine family referral below the ceiling is **not** voided (GS-124) |
-| **Payment rail** | Commissions pay through **the same transfer machinery as trader payouts** ([ADR-017](../DECISIONS.md)): one rail, one destination table, one detector. **Affiliate destination changes carry the same 48 hour cooling window** (GS-140) |
+| **Payment rail** | Commissions pay through **the same transfer machinery as trader payouts** ([ADR-017](../decisions/ADR-017.md)): one rail, one destination table, one detector. **Affiliate destination changes carry the same 48 hour cooling window** (GS-140) |
 | **Unpaid commission on termination** | **This needs counsel's judgment and it is the one commercial term this document does not propose.** The options are forfeit, pay out, or pay out net of clawbacks and holds. Merit's brand position argues against forfeiture as a default; the fraud cases in step 4 argue for it as an available remedy. Recommendation to draft: **pay out net, except on termination for fraud** |
 
 ---

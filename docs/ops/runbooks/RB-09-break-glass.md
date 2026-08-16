@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, ../../architecture/SECURITY.md, ../../DECISIONS.md, RB-08-security-incident.md]
+depends_on: [README.md, ../../architecture/SECURITY.md, ../../decisions/README.md, RB-08-security-incident.md]
 last_updated: 2026-08-14
 ---
 
@@ -12,7 +12,7 @@ last_updated: 2026-08-14
 
 ## What dual control is, honestly
 
-[ADR-010](../../DECISIONS.md): both credentials are founder-held on physically separate hardware keys, and the control's own documentation says what it is. **At launch scale this is compromise resistance, not insider resistance.** One phished session or one owned laptop cannot move the cap, the split, the gap, or the payout rail on its own. It becomes real separation of duties on the first operations hire, with no code change.
+[ADR-010](../../decisions/ADR-010.md): both credentials are founder-held on physically separate hardware keys, and the control's own documentation says what it is. **At launch scale this is compromise resistance, not insider resistance.** One phished session or one owned laptop cannot move the cap, the split, the gap, or the payout rail on its own. It becomes real separation of duties on the first operations hire, with no code change.
 
 Three keys exist: **working key A**, **working key B**, and a **sealed physical backup** stored separately from both (batch 1 gate ruling).
 

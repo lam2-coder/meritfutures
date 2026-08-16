@@ -40,7 +40,7 @@ The arrow also points the right way: `RI-01` asserts `packages/rules-engine` dec
 
 ## The stage says what it currently proves, and the claims are measured
 
-[ADR-038](../../docs/DECISIONS.md#adr-038-a-ci-stage-states-in-its-own-output-what-it-currently-proves--2026-08-15-status-accepted). While the polarity is inverted, `CI-03 golden files: pass` means three things its name contradicts:
+[ADR-038](../../docs/decisions/ADR-038.md). While the polarity is inverted, `CI-03 golden files: pass` means three things its name contradicts:
 
 | | |
 |---|---|
@@ -66,7 +66,7 @@ All three were correct, and all three were stated **only in a pull request body*
 **Why not the `yaml` package.** VG-12 makes every new dependency a human admission decision ([STRATEGY section 4.2](../../docs/testing/STRATEGY.md), [`.npmrc`](../../.npmrc)) and a session cannot grant itself that approval. **Swapping this file for `yaml` is a founder call and a small diff.** Two things to weigh before making it:
 
 1. **A fixture the loader MISREADS is worse than a fixture the loader rejects.** It is a golden file pinning something nobody wrote. A refusing parser has no such failure mode.
-2. **An unquoted `2026-11-03` is a string here and a `Date` under a real YAML library**, because YAML's core schema resolves timestamps. [GOLDEN_SCENARIOS section 2](../../docs/testing/GOLDEN_SCENARIOS.md) prints trading days unquoted and the fixtures are written the way the corpus prints them. **Anyone swapping in `yaml` must quote every date in every fixture in the same commit**, or the loader starts handing the engine a clock reading, in the one package whose entire contract is that it has none.
+2. **An unquoted `2026-11-03` is a string here and a `Date` under a real YAML library**, because YAML's core schema resolves timestamps. [GOLDEN_SCENARIOS section 2](../../docs/testing/golden-scenarios/README.md) prints trading days unquoted and the fixtures are written the way the corpus prints them. **Anyone swapping in `yaml` must quote every date in every fixture in the same commit**, or the loader starts handing the engine a clock reading, in the one package whose entire contract is that it has none.
 
 Against that: a hand-written parser is a hand-written parser. It is ~250 lines, it refuses rather than guesses, and `test/yaml.test.ts` asserts fifteen out-of-subset constructs throw.
 

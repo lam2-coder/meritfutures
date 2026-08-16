@@ -1,0 +1,13 @@
+## 18. GS-155 to GS-161: certificates and social proof (M11)
+
+Defined by [M11](../../plans/M11-certificates-social-proof.md) section 8.2. [M04](../../plans/M04-trader-portal.md)'s GS-102 covers the basic valid, unknown, and revoked lookups and stays where it is; these extend it into the system behind the card.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-155 | A per-trade certificate is requested | v1 exposes **no such kind**. If the deferred kind is later enabled, the card renders the account's period aggregate alongside the trade or it does not render at all. Asserts the bright line that Merit signs facts about accounts and periods, never facts about selected events. AS-M11-01, EC-090 |
+| GS-156 | A shared payout card is revoked after enforcement | The live re-render shows revoked, the verify code printed inside the image resolves to the class sentence, and the `account_enforced` sentence does **not** claim the payout did not happen. Asserts that a screenshot cannot be recalled and that the design optimizes for the recoverable case instead of pretending otherwise. AS-M11-02, extends GS-102 |
+| GS-157 | Key rotation with historical certificates outstanding | A card signed under the **retired** key still verifies, and a card signed under a **revoked** key still verifies through the row. Asserts that rotation costs nothing historically, which is what stops the 90 day calendar from quietly skipping this key forever. AS-M11-03 |
+| GS-158 | Enumeration attempt against the verification endpoint | Known and unknown codes respond in indistinguishable time, rate limits engage per IP and per ASN, and `certificate.verify_anomaly` fires on the distinct-code and unknown-rate signature. Asserts the public oracle is unwalkable rather than merely throttled. AS-M11-04, EC-091 |
+| GS-159 | Enforcement on an account holding a pass card and a payout card | Both revoke as `account_enforced` with the standing-claim sentence; neither revokes as `fact_untrue`. Asserts that revoking proof of a thing that remains true is a retroactive denial, which is the shape zero denial exists to make impossible. AS-M11-05 |
+| GS-160 | A leaderboard participant opts out | The identity disappears from the current publish **and** from historical entries, and no plan size was exposed at any point. Asserts that a leaderboard nobody can leave is a publication rather than a feature. AS-M11-06, EC-092 |
+| GS-161 | A public surface attempts a cross-account aggregate | The response contains no count, sum, or average across accounts; the trader's own list may total the trader's own cards. Asserts the routing rule that sends every public aggregate to M12, which has a method page, a window, and a sample-size floor. AS-M11-07, EC-093 |

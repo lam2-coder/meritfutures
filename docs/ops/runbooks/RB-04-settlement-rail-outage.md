@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M05-payout-system.md, ../../plans/M20-wallet.md, ../../DECISIONS.md]
+depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M05-payout-system.md, ../../plans/M20-wallet.md, ../../decisions/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -12,7 +12,7 @@ last_updated: 2026-08-14
 
 ## What the wallet changed, and it is a lot
 
-Under [ADR-019](../../DECISIONS.md) a payout is two legs. **The internal leg is instant and does not touch this rail.** A trader requesting a payout during a total rail outage still receives their wallet credit, in the same transaction as the approval, with no external party in the path (GS-128).
+Under [ADR-019](../../decisions/ADR-019.md) a payout is two legs. **The internal leg is instant and does not touch this rail.** A trader requesting a payout during a total rail outage still receives their wallet credit, in the same transaction as the approval, with no external party in the path (GS-128).
 
 **So the honest message is much better than it used to be:** payouts are working, withdrawals to bank are delayed. That distinction is real, it is the reason the wallet exists, and it must be stated in exactly those terms rather than blurred into "payouts are delayed", which would be both false and self-harming.
 
@@ -28,7 +28,7 @@ Under [ADR-019](../../DECISIONS.md) a payout is two legs. **The internal leg is 
 
 - **Update on a schedule you commit to and keep**, even when the update is "no change". A promised update that arrives saying nothing is worth more than a useful update that arrives late.
 - Watch the **reserve coverage ratio**: a queued backlog is liability that has not left. Wallet balances are already in Open Liability and the RCR denominator (GS-130), so the number does not move when transfers stall, which is correct and worth knowing before somebody reads the dashboard as reassuring.
-- **Never offer an alternative rail.** [ADR-017](../../DECISIONS.md) is one rail and one transfer table, and a second path opened during an incident is a permanent blind spot in the destination-concentration detector.
+- **Never offer an alternative rail.** [ADR-017](../../decisions/ADR-017.md) is one rail and one transfer table, and a second path opened during an incident is a permanent blind spot in the destination-concentration detector.
 
 ## Recovery
 

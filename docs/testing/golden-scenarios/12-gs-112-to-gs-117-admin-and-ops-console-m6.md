@@ -1,0 +1,12 @@
+## 12. GS-112 to GS-117: admin and ops console (M6)
+
+Defined by [M06](../../plans/M06-admin-ops-console.md) section 8.2. Three of these pin controls against Merit's own future behavior rather than against an external adversary, which is deliberate: the failure this module actually suffers is a control that gets ignored.
+
+| ID | Name | Pins |
+|---|---|---|
+| GS-112 | Evidence pack redaction by declared audience | A `trader` pack carries every fill, mark, rule state, gate result, the plan's rule text, and the fact and ToS clause of any flag, and carries **no** detector parameter, threshold, or other identity. An `internal` pack carries everything. Asserts that answering a dispute cannot also publish the detection thresholds to the ring that triggered them. AS-M6-01 |
+| GS-113 | Loss ratio computed on a sample below the minimum | State is `insufficient_data`, sales are **not** paused, and the alert carries the sample size. Asserts the breaker's first firing is not a false one, because a control that is wrong the first time is a control that gets overridden every time after. AS-M6-02 |
+| GS-114 | Alarm suppression expires and the alarm returns by itself | Suppression requires a written reason and a mandatory expiry; expiry restores automatically; ledger imbalance, replay divergence, and payout balance-reflection-missing cannot be suppressed at all. Asserts that "temporarily off" is a dated fact rather than a thing people tell themselves. AS-M6-03 |
+| GS-115 | The three liability numbers diverge on one book | An account with 500,000c withdrawable, a 150,000c cap, and 6 ladder rungs left contributes 500,000c to open liability, 150,000c to bounded near-term liability, and 900,000c to remaining ladder exposure. Asserts they are named separately and never conflated, which is the precise failure that killed FTT. AS-M6-04 |
+| GS-116 | Evidence pack export burst | Ten exports inside an hour alerts; signed URLs are short-lived and single-use; no screen returns a bulk identity list. Asserts the admin console's read surface is treated as a crown jewel, not only its write surface. AS-M6-05 |
+| GS-117 | Reversing a protective state requires the reason typed first | Unfreeze, breaker override, and entitlement re-enable each require a reason before the confirm control enables; a breaker override with no expiry is rejected; no route edits a verified identity at all. Asserts that the dangerous actions are slow by design, because the operator being social-engineered is the founder on a phone. AS-M6-06 |

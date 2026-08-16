@@ -1,6 +1,6 @@
 # Merit Futures: Session Brain
 
-**Constitution:** [MERIT_BUILD_MASTER_PROMPT.md](MERIT_BUILD_MASTER_PROMPT.md) (read-only; amendments via docs/DECISIONS.md). Read it in full once; re-read the section governing your current task.
+**Constitution:** [MERIT_BUILD_MASTER_PROMPT.md](MERIT_BUILD_MASTER_PROMPT.md) (read-only; amendments via docs/decisions/). Read it in full once; re-read the section governing your current task.
 
 ## Git workflow (POST-FREEZE, from 2026-08-14)
 
@@ -8,7 +8,7 @@
 
 **Every code change runs on a branch and lands through a pull request.** Money-path modules (rules engine, payout, ledger, auth) are reviewed line by line by the founder per constitution E2 before merge.
 
-**Session-origin rule** ([ADR-D1](docs/DECISIONS.md), as amended at the FREEZE gate):
+**Session-origin rule** ([ADR-D1](docs/decisions/ADR-D1.md), as amended at the FREEZE gate):
 
 | Session origin | Workflow |
 |---|---|
@@ -25,7 +25,7 @@ Both hooks report failure loudly and exit zero rather than blocking, so a networ
 
 ## Start ritual (every session, no exceptions)
 1. **Pull first.** `git pull --ff-only` (the SessionStart hook does this; verify it ran).
-2. Read this file, then [docs/STATE.md](docs/STATE.md), then the tail (last 2 entries) of [docs/SESSION_LOG.md](docs/SESSION_LOG.md), then the active module plan if any.
+2. Read this file, then [docs/STATE.md](docs/STATE.md), then the tail (last 2 files) of [docs/sessions/](docs/sessions/README.md), then the active module plan if any.
 3. State back the session objective in one sentence; get confirmation.
 4. One objective per session.
 
@@ -49,12 +49,12 @@ See [docs/STATE.md](docs/STATE.md) for the post-FREEZE position, the nine surviv
 - Money is integer cents; thresholds in basis points / integer cents. No floats in financial paths (applies to all doc examples too).
 - Timestamps UTC in storage; trading day follows the exchange session calendar (CT), maintained as data.
 - Avoid em-dashes in all Merit prose, site and docs (Appendix F).
-- When the constitution is ambiguous, ASK. When it is silent, propose an ADR in docs/DECISIONS.md and proceed on approval.
+- When the constitution is ambiguous, ASK. When it is silent, propose an ADR in docs/decisions/ and proceed on approval.
 
 ## Working agreements (from section 9, applicable pre-FREEZE)
 - Plan before content: waves advance only through founder-approved gates.
 - Small conventional commits referencing the constitution section or doc.
-- Never weaken a gate to pass it; every discovered gap becomes a docs/EDGE_CASES.md entry.
+- Never weaken a gate to pass it; every discovered gap becomes a docs/edge-cases/ entry.
 
 ## Session-length regime (ADR-003)
 - **Money paths** (rules-engine, payout, ledger, auth): one objective per session, fresh session per slice, `/clear` between unrelated tasks. Context poisoning on these diffs is catastrophic.

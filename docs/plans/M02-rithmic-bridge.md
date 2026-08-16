@@ -1,6 +1,6 @@
 ---
 status: review
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/OVERVIEW.md, ../architecture/INFRA.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/OVERVIEW.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md]
 last_updated: 2026-08-14
 ---
 
@@ -8,11 +8,11 @@ last_updated: 2026-08-14
 
 Constitution section M2, Appendix B3, Appendix B5 ten-section template, Appendix C5 escalation tier (money path).
 
-**Everything in this module that touches the vendor's wire format is provisional under [ADR-005](../DECISIONS.md).** The vendor call is deferred by the founder's choice. This document therefore designs the bridge **fully**, from the public CSV/SFTP description, and marks every single thing the call must confirm with a `V-M2-nn` identifier in section 11. There are **sixteen** of them. The design's whole shape is chosen so that all fourteen are bounded edits at the adapter boundary rather than redesigns, and section 11 states for each one what changes if the assumption is wrong.
+**Everything in this module that touches the vendor's wire format is provisional under [ADR-005](../decisions/ADR-005.md).** The vendor call is deferred by the founder's choice. This document therefore designs the bridge **fully**, from the public CSV/SFTP description, and marks every single thing the call must confirm with a `V-M2-nn` identifier in section 11. There are **sixteen** of them. The design's whole shape is chosen so that all fourteen are bounded edits at the adapter boundary rather than redesigns, and section 11 states for each one what changes if the assumption is wrong.
 
-**Amended at the Wave 3 batch 1 gate (2026-08-14).** Three rulings changed this module: **fail-closed provisioning is design law** (section 3.2 and the new INV-M2-13), **[ADR-020](../DECISIONS.md)'s indicative realtime layer** adds a streaming path through this module's adapter (section 3.5), and **`V-M2-15` and `V-M2-16` join the vendor agenda**. The document stays at `status: review` because [ADR-005](../DECISIONS.md) forbids it reaching `approved` while the vendor call is outstanding, which is by design rather than an oversight.
+**Amended at the Wave 3 batch 1 gate (2026-08-14).** Three rulings changed this module: **fail-closed provisioning is design law** (section 3.2 and the new INV-M2-13), **[ADR-020](../decisions/ADR-020.md)'s indicative realtime layer** adds a streaming path through this module's adapter (section 3.5), and **`V-M2-15` and `V-M2-16` join the vendor agenda**. The document stays at `status: review` because [ADR-005](../decisions/ADR-005.md) forbids it reaching `approved` while the vendor call is outstanding, which is by design rather than an oversight.
 
-**Identifier conventions:** `INV-M2-nn` invariants, `SD-M2-nn` schema deltas, `ST-M2-n` stages of the batch, `FM-M2-nn` failure modes, `AS-M2-nn` adversarial scenarios, `OQ-M2-nn` open questions, `DEP-M2-nn` dependencies on other modules, `V-M2-nn` **vendor-confirmation dependencies**. `EC-nnn` and `GS-nnn` refer to [EDGE_CASES.md](../EDGE_CASES.md) and [GOLDEN_SCENARIOS.md](../testing/GOLDEN_SCENARIOS.md).
+**Identifier conventions:** `INV-M2-nn` invariants, `SD-M2-nn` schema deltas, `ST-M2-n` stages of the batch, `FM-M2-nn` failure modes, `AS-M2-nn` adversarial scenarios, `OQ-M2-nn` open questions, `DEP-M2-nn` dependencies on other modules, `V-M2-nn` **vendor-confirmation dependencies**. `EC-nnn` and `GS-nnn` refer to [EDGE_CASES.md](../edge-cases/README.md) and [GOLDEN_SCENARIOS.md](../testing/golden-scenarios/README.md).
 
 ---
 
@@ -59,13 +59,13 @@ It implements the [platform adapter](../GLOSSARY.md#platform-adapter) interface 
 | INV-M2-11 | Simulator output and vendor output are consumed by the **same** parser and the same normalizer | The simulator emits files, not objects. Enforced by architecture: the simulator writes to the ingest directory and nothing downstream can tell the difference (AS-M2-01) |
 | INV-M2-12 | Non-trading balance movements never appear as `realized_pnl_cents` | The normalizer classifies every balance delta as trading or non-trading and refuses to guess. An unclassifiable delta quarantines (V-M2-05, EC-051) |
 | INV-M2-13 | **No account trades until its risk settings are confirmed**, by acknowledgement artifact or by successful read-back | **Fail-closed provisioning, ruled design law at the batch 1 gate.** The account is held out of trading entirely; an unconfirmed setpoint is a hard block, never a dashboard marker. Enforced at the provisioning saga's exit rather than by the engine, because an account that cannot trade never produces a mark to evaluate. GS-138 |
-| INV-M2-14 | Streaming ingest is **write-only into the live cache** and never into `fills`, `daily_marks`, or anything the engine reads | [ADR-020](../DECISIONS.md)'s hard rule, made structural: the streaming path has no grant on the authoritative tables. Tier 2 cannot contaminate tier 1 even by mistake. GS-132 |
+| INV-M2-14 | Streaming ingest is **write-only into the live cache** and never into `fills`, `daily_marks`, or anything the engine reads | [ADR-020](../decisions/ADR-020.md)'s hard rule, made structural: the streaming path has no grant on the authoritative tables. Tier 2 cannot contaminate tier 1 even by mistake. GS-132 |
 
 ---
 
 ## 2. Entities and schema deltas
 
-M2 consumes the tables in [DATA_MODEL sections 6 and 7](../architecture/DATA_MODEL.md) as approved, plus M1's approved SD-01 (`daily_marks.adjustment_cents`). Six deltas are proposed here, each because a rule or a failure mode below cannot be satisfied without it.
+M2 consumes the tables in [DATA_MODEL sections 6 and 7](../architecture/data-model/README.md) as approved, plus M1's approved SD-01 (`daily_marks.adjustment_cents`). Six deltas are proposed here, each because a rule or a failure mode below cannot be satisfied without it.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -92,7 +92,7 @@ export interface PlatformAdapter {
 
 Three rules about this interface, the first two learned from B3's own warning that a second platform must be a new adapter and never a rewrite. **Nothing above returns a `DailyMark`.** Marks are computed by shared, adapter-independent code from `NormalizedFill[]` plus `VendorEodRow[]`, so a second platform inherits the mark logic instead of reimplementing it. And **nothing above takes a plan config.** An adapter that could read a plan config would eventually apply a rule.
 
-The third rule arrives with [ADR-020](../DECISIONS.md): **`streamLive` returns `LiveAccountTick`, a type that appears nowhere in the authoritative pipeline.** It is deliberately not a `NormalizedFill` and deliberately not convertible into one. The two tiers do not share a data type, which is what makes "the stream never feeds a money decision" a thing the compiler enforces rather than a thing a reviewer remembers (INV-M2-14).
+The third rule arrives with [ADR-020](../decisions/ADR-020.md): **`streamLive` returns `LiveAccountTick`, a type that appears nowhere in the authoritative pipeline.** It is deliberately not a `NormalizedFill` and deliberately not convertible into one. The two tiers do not share a data type, which is what makes "the stream never feeds a money decision" a thing the compiler enforces rather than a thing a reviewer remembers (INV-M2-14).
 
 ---
 
@@ -167,7 +167,7 @@ The last row is the one that earns its place. A file that silently restates a cl
 
 ### 3.5 The streaming path (ADR-020, tier 2)
 
-[ADR-020](../DECISIONS.md) adds an **indicative realtime layer** and it enters Merit through this module, because M2 is still the only code that knows a vendor exists. The adapter interface gains one method and the architecture gains one hard boundary.
+[ADR-020](../decisions/ADR-020.md) adds an **indicative realtime layer** and it enters Merit through this module, because M2 is still the only code that knows a vendor exists. The adapter interface gains one method and the architecture gains one hard boundary.
 
 ```ts
   // added to PlatformAdapter
@@ -187,7 +187,7 @@ Mechanism is vendor-dependent and is `V-M2-16`: an **R|API+ admin connection** w
 
 ## 4. API endpoints touched
 
-M2 owns no trader-facing endpoint. It owns three internal ones, all on the admin origin behind [ADR-012](../DECISIONS.md)'s `ADMIN_ORIGIN`, and it is a consumer of one.
+M2 owns no trader-facing endpoint. It owns three internal ones, all on the admin origin behind [ADR-012](../decisions/ADR-012.md)'s `ADMIN_ORIGIN`, and it is a consumer of one.
 
 | Endpoint | M2's role | Contract |
 |---|---|---|
@@ -232,7 +232,7 @@ All exist in the approved [EVENTS.md](../architecture/EVENTS.md) catalogue (sect
 
 | ID | Failure | Blast radius | Detection | Recovery |
 |---|---|---|---|---|
-| FM-M2-01 | EOD file arrives hours late or not at all | Every account's counters stall; no eligibility advances; traders see stale data | `ingest.file_late` on an expected-window timer, plus the batch dead-man switch | Batch is arrival-triggered, so late is late and not wrong. Trader surfaces already say "as of last closed session" ([ADR-002](../DECISIONS.md)). Escalate to the vendor after the alarm window |
+| FM-M2-01 | EOD file arrives hours late or not at all | Every account's counters stall; no eligibility advances; traders see stale data | `ingest.file_late` on an expected-window timer, plus the batch dead-man switch | Batch is arrival-triggered, so late is late and not wrong. Trader surfaces already say "as of last closed session" ([ADR-002](../decisions/ADR-002.md)). Escalate to the vendor after the alarm window |
 | FM-M2-02 | File corrupt mid-row | Would be partial state if committed | Whole-file validation before any write | Quarantine, alert, request redelivery. Zero rows committed (INV-M2-01, GS-033) |
 | FM-M2-03 | Vendor redelivers a corrected file without correction markers | Silent double-application of a trading day, corrupting floors and counters from that day forward | Disposition table in section 3.4; a row touching an applied day without `correction_of` quarantines | Human decides `full_replacement` explicitly; replay recomputes forward; settled snapshots untouched (AS-M2-02) |
 | FM-M2-04 | A fill lands on the wrong trading day | Win-day counts, minimum days, and the breach comparison all shift by a day for that account | SD-M2-04 keeps the vendor's stated day beside ours and alarms on divergence | Correct the calendar or the parser, supersede affected marks, replay (AS-M2-06) |
@@ -279,7 +279,7 @@ Constitution B5 requires at least five not found in the constitution. **Seven ar
 
 ### AS-M2-03: The setpoint that was never applied (NOVEL)
 
-**Attack.** Merit's entire intraday risk posture is one number pushed to the vendor: the auto-liquidation setpoint at the account's floor (M1 R-20, the [Wave 2 gate ruling](../DECISIONS.md)). If that push is accepted at the transport layer but not applied at the platform, or applied to the wrong account, or applied at a stale value, then Merit has **no intraday enforcement at all** for that account and does not know it. The EOD model is explicitly built on the assumption that the vendor stops the trader before the floor ([ADR-002](../DECISIONS.md)'s T+1 tradeoff). An adversary who can detect an unenforced account, by probing a small excursion below the expected setpoint and observing no liquidation, has found an account with an unbounded loss and a bounded, already-paid-for cost.
+**Attack.** Merit's entire intraday risk posture is one number pushed to the vendor: the auto-liquidation setpoint at the account's floor (M1 R-20, the [Wave 2 gate ruling](../decisions/README.md)). If that push is accepted at the transport layer but not applied at the platform, or applied to the wrong account, or applied at a stale value, then Merit has **no intraday enforcement at all** for that account and does not know it. The EOD model is explicitly built on the assumption that the vendor stops the trader before the floor ([ADR-002](../decisions/ADR-002.md)'s T+1 tradeoff). An adversary who can detect an unenforced account, by probing a small excursion below the expected setpoint and observing no liquidation, has found an account with an unbounded loss and a bounded, already-paid-for cost.
 
 **Why it nearly works.** Delivery confirms transport, not effect. Nothing in the outbound path proves the setting exists on the vendor's side, and the failure is silent by construction: an unenforced account looks exactly like an enforced account that never got close to its floor.
 
@@ -322,7 +322,7 @@ GS-088.
 
 **Attack.** M1's AS-05 covers the adversary who can influence which fills get restated. The M2 extension is about **volume and timing**: corrections are our only mechanism for the vendor being wrong, they arrive on the vendor's schedule, and Merit absorbs every one that lands after a settlement. A correction stream that is merely *sloppy* rather than adversarial produces the same balance-sheet outcome, and it is far more likely.
 
-**Counter, which is measurement rather than prevention.** Every correction records `delta_cents`. The **signed sum of absorbed corrections** is a line on M6's liability dashboard ([OQ-10 ruling](../DECISIONS.md)), and a per-identity signed sum that drifts away from zero is an M7 flag. The important design consequence for M2: `ingest.correction_received` must carry the delta, and the delta must be computed against the **superseded** mark rather than recomputed later, because after replay runs the original number is only recoverable from the superseded row. GS-091, GS-057, GS-058.
+**Counter, which is measurement rather than prevention.** Every correction records `delta_cents`. The **signed sum of absorbed corrections** is a line on M6's liability dashboard ([OQ-10 ruling](../decisions/gates/m1-gate-closure-2026-08-13.md)), and a per-identity signed sum that drifts away from zero is an M7 flag. The important design consequence for M2: `ingest.correction_received` must carry the delta, and the delta must be computed against the **superseded** mark rather than recomputed later, because after replay runs the original number is only recoverable from the superseded row. GS-091, GS-057, GS-058.
 
 ---
 
@@ -411,7 +411,7 @@ One page, five panels: today's file timeline (expected, received, applied, quara
 
 **OQ-M2-04 (RULED, 2026-08-14). Do we accept a vendor relationship with no acknowledgement artifact?** **No.** Fail-closed provisioning is design law: no account trades without an acknowledgement or a successful read-back (INV-M2-13, section 3.2). The question is therefore no longer whether Merit accepts the gap but what the vendor must supply, which is why it became **`V-M2-15`, a commercial precondition** on the call rather than an item on an agenda. The recommendation in the original text was to raise it as a requirement; the ruling went further and made trading itself contingent on it.
 
-**OQ-M2-05 (NEW, from [ADR-020](../DECISIONS.md)). What is the streaming mechanism, and what does it cost?** `V-M2-16`. R|API+ admin is $100 per month per API ID ([ADR-002](../DECISIONS.md) priced it when rejecting it as an ingest path), which is affordable for one connection and is a different proposition per-account. High-frequency snapshot polling has no incremental licence cost and a worse latency profile. The choice is a call output, not a design decision, and tier 1 is unaffected either way. Recommendation: **price both on the call**, and ship the simulator-backed layer regardless, because the labeling and degradation behavior are the hard parts and neither depends on which mechanism wins.
+**OQ-M2-05 (NEW, from [ADR-020](../decisions/ADR-020.md)). What is the streaming mechanism, and what does it cost?** `V-M2-16`. R|API+ admin is $100 per month per API ID ([ADR-002](../decisions/ADR-002.md) priced it when rejecting it as an ingest path), which is affordable for one connection and is a different proposition per-account. High-frequency snapshot polling has no incremental licence cost and a worse latency profile. The choice is a call output, not a design decision, and tier 1 is unaffected either way. Recommendation: **price both on the call**, and ship the simulator-backed layer regardless, because the labeling and degradation behavior are the hard parts and neither depends on which mechanism wins.
 
 ---
 
@@ -434,9 +434,9 @@ One page, five panels: today's file timeline (expected, received, applied, quara
 | V-M2-11 | Per-fill detail is available, in the EOD file or a sibling | Fill-level detectors in M7 (same-second clustering is a self-join over fills), evidence packs | M7's strongest detector class is gone and the evidence pack degrades from trade-level to day-level. This is a **product** consequence, not only a technical one | design |
 | V-M2-12 | Corrections reference the original fill | `fills.correction_of`, replay determinism, B4 #5 | The ingest layer synthesizes a correction row from a restatement. Already designed for; the mitigation is what makes this an edit rather than a redesign | edit |
 | V-M2-13 | No sandbox is available before contract | The simulator is a v1 requirement; AS-M2-01's residual | A sandbox collapses AS-M2-01's residual to near zero and is worth real money to obtain | design |
-| V-M2-14 | Server-side copy configuration is out of scope for v1 | Module scope | In scope means a second provisioning surface. **Admin R\|API+ is no longer out of scope**: [ADR-020](../DECISIONS.md) makes it a candidate mechanism for the streaming layer, so this row narrowed to server-side copy alone | design |
+| V-M2-14 | Server-side copy configuration is out of scope for v1 | Module scope | In scope means a second provisioning surface. **Admin R\|API+ is no longer out of scope**: [ADR-020](../decisions/ADR-020.md) makes it a candidate mechanism for the streaming layer, so this row narrowed to server-side copy alone | design |
 | **V-M2-15** | **A provisioning acknowledgement artifact exists, or the account's current risk setting is readable** | **Fail-closed provisioning (INV-M2-13), which is now design law.** Every funded account's ability to trade at all | **No account can be brought online.** This is not a degradation, it is a stop. Raise it on the call as a **requirement**, not a question: without one of the two, the relationship cannot support Merit's risk posture. Supersedes OQ-M2-04, which asked whether Merit would accept the gap; the answer is no | **commercial** |
-| **V-M2-16** | **A streaming or high-frequency snapshot mechanism is available**, whether R\|API+ admin, a market-data entitlement we already pay for, or frequent report snapshots | [ADR-020](../DECISIONS.md)'s tier 2 in its entirety: live P&L, projected floor distance, live win-day tracking, live Open Liability | The indicative layer ships against the simulator and has no production feed. Tier 1 is unaffected, so this is a **product** gap rather than a correctness one, and the honest fallback is to ship tier 1 surfaces alone and label them | design |
+| **V-M2-16** | **A streaming or high-frequency snapshot mechanism is available**, whether R\|API+ admin, a market-data entitlement we already pay for, or frequent report snapshots | [ADR-020](../decisions/ADR-020.md)'s tier 2 in its entirety: live P&L, projected floor distance, live win-day tracking, live Open Liability | The indicative layer ships against the simulator and has no production feed. Tier 1 is unaffected, so this is a **product** gap rather than a correctness one, and the honest fallback is to ship tier 1 surfaces alone and label them | design |
 
 ### Dependencies on other modules
 
@@ -444,6 +444,6 @@ One page, five panels: today's file timeline (expected, received, applied, quara
 |---|---|---|---|
 | DEP-M2-01 | On `phase.passed`, the platform account is reset to `size_cents` (or a new account provisioned at `size_cents`) before the next session | M2 owns the action; M1 owns the assertion | The engine refuses the day, the trader cannot trade funded, and the account is stuck until an operator resolves it (AS-14, GS-070) |
 | DEP-M2-02 | M5 publishes `payout.settled` with `effective_trading_day` and `approved_cents` before that day's file is processed | M5 | M2 cannot classify the balance movement and quarantines the account's day (INV-M2-12). This is a **sequencing** requirement, not just a data one |
-| DEP-M2-03 | M1 emits a floor change (via `day.closed`, `rule.floor_locked`) that M2 turns into a `set_risk` push | M1, M2 | The setpoint drifts below the real floor. Since [ADR-014](../DECISIONS.md) the floor only moves up, so drift is always permissive, which is safe for the trader and a measurable cost to the firm |
+| DEP-M2-03 | M1 emits a floor change (via `day.closed`, `rule.floor_locked`) that M2 turns into a `set_risk` push | M1, M2 | The setpoint drifts below the real floor. Since [ADR-014](../decisions/ADR-014.md) the floor only moves up, so drift is always permissive, which is safe for the trader and a measurable cost to the firm |
 | DEP-M2-04 | `contract_specs` is populated and versioned for every symbol traded | M6 admin, seed data | FM-M2-14: fills refused, day quarantined |
 | DEP-M2-05 | M7 consumes fill-level data for clustering detectors | M7 | Contingent on V-M2-11 |

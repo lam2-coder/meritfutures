@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M12-transparency-platform.md, M15-discord-integration.md, M16-notification-center.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M12-transparency-platform.md, M15-discord-integration.md, M16-notification-center.md]
 last_updated: 2026-08-14
 ---
 
@@ -40,14 +40,14 @@ The wiring layer between Merit's event stream and five bought services, plus the
 | Community Discord: roles, announcements, verification | [M15](M15-discord-integration.md) | IN-M10-05 is an internal alert firehose into an operations channel. The two share a protocol and nothing else, and conflating them is how a liability figure reaches a public server (AS-M10-05) |
 | Computing any published statistic | [M12](M12-transparency-platform.md) | A Metabase saved question is not a published number, and the distinction is enforced rather than assumed (AS-M10-02) |
 | Alerting policy and thresholds | [M6](M06-admin-ops-console.md) and each owning module | M10 delivers an alert. It never decides that something is alarming |
-| Storing support conversation content | Chatwoot | Merit stores a conversation reference on the identity, never the transcript ([DATA_MODEL](../architecture/DATA_MODEL.md)'s `Conversations` lateral branch is a pointer) |
+| Storing support conversation content | Chatwoot | Merit stores a conversation reference on the identity, never the transcript ([DATA_MODEL](../architecture/data-model/README.md)'s `Conversations` lateral branch is a pointer) |
 | Being on the critical path of anything | nobody, deliberately | See INV-M10-01 |
 
 ### 1.3 Invariants
 
 | ID | Invariant | Enforcement |
 |---|---|---|
-| INV-M10-01 | **No vendor is ever on the critical path of a purchase, a provisioning, a rule evaluation, or a payout** | Every outbound dispatch is asynchronous, enqueued through pg-boss ([ADR-006](../DECISIONS.md)) after the transaction that caused it commits. A vendor outage produces a delayed message and never a failed sale or a delayed payout (AS-M10-06) |
+| INV-M10-01 | **No vendor is ever on the critical path of a purchase, a provisioning, a rule evaluation, or a payout** | Every outbound dispatch is asynchronous, enqueued through pg-boss ([ADR-006](../decisions/ADR-006.md)) after the transaction that caused it commits. A vendor outage produces a delayed message and never a failed sale or a delayed payout (AS-M10-06) |
 | INV-M10-02 | Every outbound payload passes one redaction pass, and the allowlist is per integration and per field | SD-M10-01's `integration_contracts`. Not a denylist. A field added to an event next year is **not** sent to any vendor until somebody adds it to that vendor's contract (AS-M10-04) |
 | INV-M10-03 | Every dispatch writes an audit row: which vendor, which event, which fields, when, and the response | SD-M10-02 `integration_dispatches`. "What did we tell that vendor about this trader" is a query, answerable during a privacy request or a vendor breach |
 | INV-M10-04 | No document, no biometric, no PAN, no full device fingerprint, and no raw IP leaves Merit through any integration | [SECURITY](../architecture/SECURITY.md) C-13 extended to egress. The contract allowlists make it structural rather than a review item |
@@ -191,7 +191,7 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 
 ### AS-M10-01: The support console is an unlisted door into the identity graph (NOVEL treatment of dossier item 9)
 
-**Attack.** [SECURITY](../architecture/SECURITY.md) puts the admin console behind a separate apex domain, an IP allowlist, hardware-key SSO, and RBAC ([ADR-012](../DECISIONS.md), C-08). The support sidebar reads much of the same data, through a service credential, from a self-hosted Chatwoot instance, over the public internet, for an agent authenticated by Chatwoot rather than by Merit. Every control that makes the admin console safe is absent, and the data is roughly the same data.
+**Attack.** [SECURITY](../architecture/SECURITY.md) puts the admin console behind a separate apex domain, an IP allowlist, hardware-key SSO, and RBAC ([ADR-012](../decisions/ADR-012.md), C-08). The support sidebar reads much of the same data, through a service credential, from a self-hosted Chatwoot instance, over the public internet, for an agent authenticated by Chatwoot rather than by Merit. Every control that makes the admin console safe is absent, and the data is roughly the same data.
 
 **Two ways it is exploited, and the second is the one that will actually happen.** The direct way is a compromised agent account or a compromised Chatwoot instance, which yields a bulk read of the identity graph. The realistic way is [dossier item 9](../../research/ADVERSARY_DOSSIER.md): **social engineering the support process itself**. A caller who can get an agent to open a conversation "for" a trader gets Merit's own tool to display that trader's account context, and everything the agent then reads back is authoritative because it came from Merit.
 
@@ -246,7 +246,7 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 **Counter.**
 - **Two integrations, no shared anything.** IN-M10-05 and [M15](M15-discord-integration.md) have separate applications, separate credentials, separate servers, and separate code paths. They are not one Discord integration with two purposes, and section 1.2 says so.
 - **The channel id is asserted at startup and on every send.** A misconfigured target fails closed and pages rather than posting.
-- **Alerts carry severity, class, and a link, never a figure.** "Reserve coverage below threshold, see the admin console" conveys everything an operator needs to act and nothing a reader can quote. The number lives behind [ADR-012](../DECISIONS.md)'s admin origin, which is where the controls are. This costs an operator one click and removes an entire disclosure class.
+- **Alerts carry severity, class, and a link, never a figure.** "Reserve coverage below threshold, see the admin console" conveys everything an operator needs to act and nothing a reader can quote. The number lives behind [ADR-012](../decisions/ADR-012.md)'s admin origin, which is where the controls are. This costs an operator one click and removes an entire disclosure class.
 - **The webhook credential is on the 90 day rotation calendar** like every other (INV-M10-11). GS-153.
 
 ### AS-M10-06: The vendor that quietly becomes load bearing (NOVEL)
@@ -256,7 +256,7 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 **Why it is the most likely failure in this module.** It has no attacker, no incident, and no moment where anybody could have said no. It is discovered during a vendor outage, when a purchase fails and the reason is that a marketing platform returned a 500.
 
 **Counter, structural, because a policy against this decays exactly as fast as the drift does.**
-1. **All dispatch is post-commit and asynchronous** (INV-M10-01). A saga step cannot await a vendor because the dispatcher runs after the transaction, and the enqueue participates in that transaction ([ADR-006](../DECISIONS.md)'s stated benefit).
+1. **All dispatch is post-commit and asynchronous** (INV-M10-01). A saga step cannot await a vendor because the dispatcher runs after the transaction, and the enqueue participates in that transaction ([ADR-006](../decisions/ADR-006.md)'s stated benefit).
 2. **A chaos test in CI runs the four critical flows with every vendor returning 500 and every vendor timing out**, asserting the flows complete. Purchase, provisioning, payout request, and payout settlement. This is the control: an assertion that fails when the drift happens, rather than a paragraph that everyone agrees with.
 3. **Content that a trader must receive is Merit's**, rendered from [M16](M16-notification-center.md)'s templates and stored in `notifications`, with the vendor as a delivery channel. A message whose text exists only inside a vendor is a message Merit cannot reproduce in an evidence pack or resend after a vendor migration.
 4. **The quarterly integration review asks one question**: for each vendor, what breaks if they are gone for a day. The answer must remain "messages are late". EC-089, GS-154.

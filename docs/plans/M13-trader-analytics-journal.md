@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md, M04-trader-portal.md, M06-admin-ops-console.md, M07-risk-abuse.md, M11-certificates-social-proof.md, M12-transparency-platform.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M04-trader-portal.md, M06-admin-ops-console.md, M07-risk-abuse.md, M11-certificates-social-proof.md, M12-transparency-platform.md]
 last_updated: 2026-08-14
 ---
 
 # M13: Trader Analytics and Journal
 
-Constitution section §4-ADDENDUM ("per-account performance breakdowns, a retention driver"), Appendix B5 ten-section template, and [ADR-020](../DECISIONS.md)'s two-tier data plane. Non-money path by the [ADR-003](../DECISIONS.md) classification, and section 1.3 explains why one invariant in it is nonetheless held to money-path standard.
+Constitution section §4-ADDENDUM ("per-account performance breakdowns, a retention driver"), Appendix B5 ten-section template, and [ADR-020](../decisions/ADR-020.md)'s two-tier data plane. Non-money path by the [ADR-003](../decisions/ADR-003.md) classification, and section 1.3 explains why one invariant in it is nonetheless held to money-path standard.
 
 One sentence governs this module: **every number here is a different view of the same closed-session facts the engine used, and the moment it becomes a second computation of anything the engine also computes, Merit has two rulebooks.**
 
@@ -38,7 +38,7 @@ Per-account performance analysis and a private trading journal, both computed fr
 | Not M13 | Whose job | Why the boundary is here |
 |---|---|---|
 | Computing any rule, gate, or eligibility value | [M1](M01-rules-engine.md) | M13 **renders** `rule_states`. It contains no threshold and no comparison against a plan config (INV-M13-01) |
-| Live intraday numbers | [M4](M04-trader-portal.md) via [ADR-020](../DECISIONS.md)'s tier 2 | The dashboard shows indicative live state, labeled. Analytics are as-of last closed session, labeled, and the two never blend in one chart (AS-M13-04) |
+| Live intraday numbers | [M4](M04-trader-portal.md) via [ADR-020](../decisions/ADR-020.md)'s tier 2 | The dashboard shows indicative live state, labeled. Analytics are as-of last closed session, labeled, and the two never blend in one chart (AS-M13-04) |
 | Publishing anything | [M12](M12-transparency-platform.md) | Nothing here is public, aggregate, or comparative against other traders (AS-M13-06) |
 | Detecting abuse | [M7](M07-risk-abuse.md) | M13 produces no flag and feeds no detector. Section 3.4 and AS-M13-03 explain why that boundary is drawn harder here than anywhere else in the corpus |
 | Storing the trader's strategy | nobody | Journal text is the trader's, minimized, exportable, and deletable (INV-M13-07) |
@@ -49,7 +49,7 @@ Per-account performance analysis and a private trading journal, both computed fr
 |---|---|---|
 | INV-M13-01 | Any value the engine also computes is **read from `rule_states`**, never recomputed here | The module has no access to plan config at all. Not a convention: the analytics service's database role cannot read `plan_versions` or `plan_version_sizes`. **This one invariant is held to money-path standard** despite the module's classification, because a second implementation of a gate is a second rulebook (AS-M13-01) |
 | INV-M13-02 | Realized P&L, per day and cumulative, is the value in `daily_marks`, to the cent | No re-derivation from fills, ever, even where fill detail exists. Fills group into round trips for **presentation**; the money number is the mark's |
-| INV-M13-03 | Every surface states its as-of trading day, and no surface blends authoritative and indicative values | [ADR-020](../DECISIONS.md)'s labeling rule, and [M04](M04-trader-portal.md) INV-M4-02's test. A chart with a live final point and closed history is two datasets wearing one line (AS-M13-04) |
+| INV-M13-03 | Every surface states its as-of trading day, and no surface blends authoritative and indicative values | [ADR-020](../decisions/ADR-020.md)'s labeling rule, and [M04](M04-trader-portal.md) INV-M4-02's test. A chart with a live final point and closed history is two datasets wearing one line (AS-M13-04) |
 | INV-M13-04 | Every metric has a **stated definition** reachable from the surface, including its treatment of fees, commissions, and partial fills | AS-M13-01. A trader who cannot find out what "win rate" counts will assume the flattering reading and be wrong at the worst time |
 | INV-M13-05 | A metric that cannot be computed from available data is **absent and explained**, never approximated | AS-M13-05. An R-multiple inferred from realized loss is not an R-multiple, and a sophisticated-looking undefined number is worse than a missing one |
 | INV-M13-06 | Analytics run against the read path only, and can never contend with the nightly batch or the payout request path | Read replica or a resource-capped role, plus precomputation for the expensive shapes (AS-M13-07). No trader action degrades another trader's payout |
@@ -70,7 +70,7 @@ Three deltas, plus one derived table that exists for performance rather than for
 | SD-M13-02 | new `journal_entries` | `id`, `identity_id`, `account_id`, `scope check in ('day','round_trip')`, `reference_id`, `body text`, `tags text[]`, `created_at`, `updated_at`, `deleted_at null` | AN-M13-05. Soft delete with a hard-delete job, because a trader who deletes a note expects it gone and a note that survives deletion in a backup is the difference between a promise and a claim (INV-M13-07) |
 | SD-M13-03 | new `analytics_snapshots` | `account_id`, `as_of_trading_day`, `payload jsonb`, `inputs_digest bytea`, `computed_at`, primary key `(account_id, as_of_trading_day)` | INV-M13-06 and AS-M13-07. The expensive shapes are computed once per account per closed day in the batch, not per page load. `inputs_digest` is what makes INV-M13-10 checkable: if the digest changed, the marks changed, and the trader is told why |
 
-**One reservation used rather than added.** `fills` already reserves `order_id`, `venue`, and `correction_of` ([DATA_MODEL section 12](../architecture/DATA_MODEL.md)). Round-trip derivation reads all three, which is what that reservation was for.
+**One reservation used rather than added.** `fills` already reserves `order_id`, `venue`, and `correction_of` ([DATA_MODEL section 12](../architecture/data-model/README.md)). Round-trip derivation reads all three, which is what that reservation was for.
 
 ---
 
@@ -226,9 +226,9 @@ The reasoning is in AS-M13-03 and it is worth one sentence here: a trading journ
 
 ### AS-M13-04: The chart with one live point (NOVEL)
 
-**Attack.** [ADR-020](../DECISIONS.md) ships an indicative live layer, and the trader dashboard shows live P&L and projected floor distance, labeled. The equity curve on the analytics page is closed-session data. The obviously nice feature is to append today's live value to the curve so the line reaches the present. It looks better, it is what every trading platform does, and it silently produces a chart in which the last point obeys different rules from every other point: it can move, it can reverse, it is not what any gate will be evaluated against, and it will disagree with the same chart tomorrow.
+**Attack.** [ADR-020](../decisions/ADR-020.md) ships an indicative live layer, and the trader dashboard shows live P&L and projected floor distance, labeled. The equity curve on the analytics page is closed-session data. The obviously nice feature is to append today's live value to the curve so the line reaches the present. It looks better, it is what every trading platform does, and it silently produces a chart in which the last point obeys different rules from every other point: it can move, it can reverse, it is not what any gate will be evaluated against, and it will disagree with the same chart tomorrow.
 
-**Why the label does not save it.** [ADR-020](../DECISIONS.md)'s labeling rule is at the point of use, and a single line on a chart is one visual unit. A footnote saying the last point is indicative does not stop a trader reading the line as a line, and the specific harm is that **floor distance is the number traders watch to decide whether to keep trading today** ([M04](M04-trader-portal.md) SC-M4-02 says so explicitly). A blended chart is most misleading precisely where it is most consulted.
+**Why the label does not save it.** [ADR-020](../decisions/ADR-020.md)'s labeling rule is at the point of use, and a single line on a chart is one visual unit. A footnote saying the last point is indicative does not stop a trader reading the line as a line, and the specific harm is that **floor distance is the number traders watch to decide whether to keep trading today** ([M04](M04-trader-portal.md) SC-M4-02 says so explicitly). A blended chart is most misleading precisely where it is most consulted.
 
 **Counter.**
 - **Authoritative and indicative never share a visual unit** (INV-M13-03). Live state is the dashboard's; the analytics curve ends at the last closed session and says so.
@@ -261,7 +261,7 @@ The reasoning is in AS-M13-03 and it is worth one sentence here: a trading journ
 
 ### AS-M13-07: The retention feature that competes with the payout path (NOVEL)
 
-**Attack.** The adversary is a load pattern. Analytics is by a wide margin the heaviest read workload in the estate: a funded trader with a year of history pulls tens of thousands of fills, and the interesting queries are aggregations across all of them. [ADR-006](../DECISIONS.md) and [ADR-007](../DECISIONS.md) put jobs, marks, fills, and the ledger in **one Postgres instance**, deliberately, so that restore and backup are one procedure. The consequence is that an analytics query and a payout request contend for the same resources.
+**Attack.** The adversary is a load pattern. Analytics is by a wide margin the heaviest read workload in the estate: a funded trader with a year of history pulls tens of thousands of fills, and the interesting queries are aggregations across all of them. [ADR-006](../decisions/ADR-006.md) and [ADR-007](../decisions/ADR-007.md) put jobs, marks, fills, and the ledger in **one Postgres instance**, deliberately, so that restore and backup are one procedure. The consequence is that an analytics query and a payout request contend for the same resources.
 
 **The timing is the attack even without an attacker.** Traders open analytics after the session closes and around the daily reset, which is when the nightly batch is running and when [M05](M05-payout-system.md) FM-M5-12's promo-day payout spike lands. The constitution's own load target is payout request p95 under 500ms, and the module most likely to break it is the one nobody classified as a money path. A trader with ten accounts refreshing analytics during a wave is a denial of service with an innocent explanation, and a competitor who works this out has a very cheap way to make Merit's payouts slow on the day it hurts most.
 
@@ -344,7 +344,7 @@ M13 supplies a panel rather than owning a console: parity status, query-time p99
 
 **OQ-M13-01. Is the journal's privacy promise absolute, and is Merit willing to publish it?** AS-M13-03 recommends yes on both, and the second half is the part that needs a decision: publishing "we never read your journal" is a commitment that constrains Merit permanently and that a future incident may make uncomfortable. The argument for publishing is that an unpublished privacy property buys none of the candour it exists to protect, so an unpublished promise is a cost with no benefit. Recommendation: **publish it, with the lawful-compulsion carve-out stated in the same sentence rather than hidden in the ToS.**
 
-**OQ-M13-02. Which fill-dependent surfaces are launch scope, given that V-M2-11 is unconfirmed?** [M02](M02-rithmic-bridge.md)'s vendor call has not happened, and AN-M13-02 and AN-M13-03 do not exist without per-fill detail. Proposed: **build AN-M13-01 and AN-M13-04 as launch scope**, since they need only `daily_marks` and `rule_states` and already deliver the retention core, and treat the trade-level surfaces as a fast follow that ships the week the fill data is confirmed. This means the module ships regardless of the vendor call, which is the same posture [ADR-005](../DECISIONS.md) took everywhere else.
+**OQ-M13-02. Which fill-dependent surfaces are launch scope, given that V-M2-11 is unconfirmed?** [M02](M02-rithmic-bridge.md)'s vendor call has not happened, and AN-M13-02 and AN-M13-03 do not exist without per-fill detail. Proposed: **build AN-M13-01 and AN-M13-04 as launch scope**, since they need only `daily_marks` and `rule_states` and already deliver the retention core, and treat the trade-level surfaces as a fast follow that ships the week the fill data is confirmed. This means the module ships regardless of the vendor call, which is the same posture [ADR-005](../decisions/ADR-005.md) took everywhere else.
 
 **OQ-M13-03. Does the trader-facing export include the round-trip derivation, or only raw data?** Including it is more useful and pins Merit to a derivation the trader can then hold against a later version. Proposed: **include it, with `derivation_version` stamped in the export**, on the reasoning that a version-stamped derivation is exactly what makes a later change explicable rather than suspicious.
 

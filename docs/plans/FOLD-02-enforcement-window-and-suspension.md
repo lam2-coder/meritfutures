@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [../DECISIONS.md, ../architecture/STATE_MACHINES.md, ../architecture/DATA_MODEL.md, ../architecture/SECURITY.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../legal/TOS_CLAUSES.md, ../DELIVERY_PLAN.md, ../ops/runbooks/CRON_INVENTORY.md, ../testing/STRATEGY.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M15-discord-integration.md, M20-wallet.md, FOLD-01-phone-identity.md, ../../packages/db/DELTA_MANIFEST.md]
+depends_on: [../decisions/README.md, ../architecture/STATE_MACHINES.md, ../architecture/data-model/README.md, ../architecture/SECURITY.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../legal/TOS_CLAUSES.md, ../DELIVERY_PLAN.md, ../ops/runbooks/CRON_INVENTORY.md, ../testing/STRATEGY.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M15-discord-integration.md, M20-wallet.md, FOLD-01-phone-identity.md, ../../packages/db/DELTA_MANIFEST.md]
 last_updated: 2026-08-15
 ---
 
 # FOLD-02: the payout enforcement window, and identity-level suspension
 
-**A fold plan, not a module plan**, in [FOLD-01](FOLD-01-phone-identity.md)'s idiom. Two founder rulings, two ADRs, one superseded-never-edited schema change. Money path under the [ADR-003](../DECISIONS.md) strict regime.
+**A fold plan, not a module plan**, in [FOLD-01](FOLD-01-phone-identity.md)'s idiom. Two founder rulings, two ADRs, one superseded-never-edited schema change. Money path under the [ADR-003](../decisions/ADR-003.md) strict regime.
 
 It is approved before the fold begins and it is what the fold is scored against. **It writes no ADR number into a filename it cannot rename, and it allocates no delta identifier**, per FOLD-01 section 4's finding.
 
@@ -24,7 +24,7 @@ It is approved before the fold begins and it is what the fold is scored against.
 
 ## 2. Number allocation, claimed BEFORE anything is written
 
-Per [ADR-034](../DECISIONS.md) and [ADR-036](../DECISIONS.md), and read against [`gates.mjs`](../../scripts/corpus/gates.mjs)'s `allocated()`, which parses **the first cell of table rows only**.
+Per [ADR-034](../decisions/ADR-034.md) and [ADR-036](../decisions/ADR-036.md), and read against [`gates.mjs`](../../scripts/corpus/gates.mjs)'s `allocated()`, which parses **the first cell of table rows only**.
 
 | Registry | Claim |
 |---|---|
@@ -42,13 +42,13 @@ Per [ADR-034](../DECISIONS.md) and [ADR-036](../DECISIONS.md), and read against 
 
 **This plan first claimed 038 and 039, and both were already taken.** `claude/builder-reviewer-loop-rykvhs`, open as **PR #15**, reserved **037 and 038** in its own copy of the allocation table for the S-D review rulings. Nothing on this branch could see that: `git rev-list origin/main...HEAD` shows this branch is one commit ahead of a `main` whose table ends at 036, and **every gate here passed against that table**.
 
-**This is `CI-06f`'s and `CI-06h`'s own declared gap, met in the wild inside two days of being declared.** [ADR-036](../DECISIONS.md) states it in as many words: the table "cannot stop a branch that never reads `main`", and the cross-branch assertion "needs a job that can see both refs". The remedy that worked was reading the open pull request list before writing a number, which is a human step in a process whose whole argument is that human steps drift.
+**This is `CI-06f`'s and `CI-06h`'s own declared gap, met in the wild inside two days of being declared.** [ADR-036](../decisions/ADR-036.md) states it in as many words: the table "cannot stop a branch that never reads `main`", and the cross-branch assertion "needs a job that can see both refs". The remedy that worked was reading the open pull request list before writing a number, which is a human step in a process whose whole argument is that human steps drift.
 
-**The numbers move here rather than at merge**, on [ADR-034](../DECISIONS.md)'s own tiebreak: the branch whose numbers are cited least is the one that moves, and PR #15's are cited across a landed fold while this fold's exist only inside this file.
+**The numbers move here rather than at merge**, on [ADR-034](../decisions/ADR-034.md)'s own tiebreak: the branch whose numbers are cited least is the one that moves, and PR #15's are cited across a landed fold while this fold's exist only inside this file.
 
 **Every remote branch was checked, not just the one with an open pull request.** `claude/merit-futures-briefing-7auoor`, `claude/p1-scaffold-plan`, `p10` and `s-d` all carry tables ending at 035 or 036; `dev` and `premain` predate the table. **`0029` is still the next free migration number on every branch**, so only the ADR half moved.
 
-**And a correction while in the table.** The `036` row on `main` reads "reserved, unmerged". [ADR-036](../DECISIONS.md) merged in PR #11. That is the same staleness the `035` row was corrected for on 2026-08-15, recurring four rows later in the file that records it, and it is corrected in the same commit. **The sibling branch corrected it independently**, which is two branches fixing one row and is its own small argument for the cross-ref job.
+**And a correction while in the table.** The `036` row on `main` reads "reserved, unmerged". [ADR-036](../decisions/ADR-036.md) merged in PR #11. That is the same staleness the `035` row was corrected for on 2026-08-15, recurring four rows later in the file that records it, and it is corrected in the same commit. **The sibling branch corrected it independently**, which is two branches fixing one row and is its own small argument for the cross-ref job.
 
 ---
 
@@ -58,7 +58,7 @@ Six readings changed this plan. Each is a live contradiction or a proven gap, no
 
 | # | Finding | Source | Consequence |
 |---|---|---|---|
-| **1** | **The zero-denial sentence is not in [CLAUDE.md](../../CLAUDE.md).** The words "no `denied` status and no review state" are [GUIDE_BRIEFING](../GUIDE_BRIEFING.md) line 149. CLAUDE.md carries no zero-denial paragraph at all | grep of the tree | The amendment must name **every** site, and there are ten: `0001:73`, `0010:77`, `0010:225`, [STATE_MACHINES](../architecture/STATE_MACHINES.md) line 89, [M05](M05-payout-system.md) INV-M5-01, [M06](M06-admin-ops-console.md) section 1.2, [M07](M07-risk-abuse.md) line 13, [TOS_CLAUSES](../legal/TOS_CLAUSES.md) line 118, GUIDE_BRIEFING line 149, [SESSION_LOG](../SESSION_LOG.md) line 46. Amending one leaves the corpus contradicting itself in nine places |
+| **1** | **The zero-denial sentence is not in [CLAUDE.md](../../CLAUDE.md).** The words "no `denied` status and no review state" are [GUIDE_BRIEFING](../GUIDE_BRIEFING.md) line 149. CLAUDE.md carries no zero-denial paragraph at all | grep of the tree | The amendment must name **every** site, and there are ten: `0001:73`, `0010:77`, `0010:225`, [STATE_MACHINES](../architecture/STATE_MACHINES.md) line 89, [M05](M05-payout-system.md) INV-M5-01, [M06](M06-admin-ops-console.md) section 1.2, [M07](M07-risk-abuse.md) line 13, [TOS_CLAUSES](../legal/TOS_CLAUSES.md) line 118, GUIDE_BRIEFING line 149, [SESSION_LOG](../sessions/README.md) line 46. Amending one leaves the corpus contradicting itself in nine places |
 | **2** | **Two of those ten sit inside MERGED migrations** and can never be edited | constitution E2, [`0001`](../../packages/db/migrations/0001_extensions_and_enums.sql), [`0010`](../../packages/db/migrations/0010_payouts.sql) | `0010:225` is a `COMMENT ON TABLE`, which is **replaceable metadata**, so `0031` re-states it. `0001:73` and `0010:77` are `--` comments and stay as written forever. The ADR says so rather than implying the sweep was complete, and `0031`'s header cites the ADR so a reader arriving from `0010` lands somewhere |
 | **3** | **The external leg's halt already exists as columns with no state to sit in.** [`0011`](../../packages/db/migrations/0011_wallet.sql) gives `wallet_withdrawals` its `frozen_at`, `freeze_flag_id`, `freeze_expires_at` and a freeze-expiry index, and `wallet_withdrawal_status` has **no** frozen or halted value | grep of `0011` and `0001` | A halted withdrawal still matches `wallet_withdrawals_open_idx` and nothing refuses settlement. **The halt is representable and unenforced.** Section 4.5 rules how |
 | **4** | **`identity_status` already carries a reversible `restricted` state**, wired end to end: the enum in `0001`, the column and its explained-reason CHECK in [`0002`](../../packages/db/migrations/0002_identity.sql), the machine with `G-ENFORCEMENT-RESTRICT` and `G-RESTRICTION-LIFTED` in [STATE_MACHINES section 9](../architecture/STATE_MACHINES.md), the `identity.restricted` event and `enforcement.applied`'s `restrict` action in [EVENTS](../architecture/EVENTS.md), wallet spend and withdrawal both blocked by it ([M20](M20-wallet.md) INV-M20-06 and section 3.4), and it is already on the trader's own `GET /me` in [API_CONTRACT](../architecture/API_CONTRACT.md) | grep of the tree | **`suspended` is `restricted` under a second name.** Section 5.1 rules it |
@@ -105,7 +105,7 @@ payout_requests_no_in_flight_uq   WHERE status IN ('approved','frozen','held_pen
 payout_requests_outstanding_idx   WHERE status IN ('approved','frozen','held_pending_review')
 ```
 
-**This is the `C-02` defect verbatim** ([ADR-028](../DECISIONS.md)): a predicate that stops matching is a gate that still exists, is still valid, enforces nothing, and fails no test. The other objects on the table were each read and dispositioned rather than assumed:
+**This is the `C-02` defect verbatim** ([ADR-028](../decisions/ADR-028.md)): a predicate that stops matching is a gate that still exists, is still valid, enforces nothing, and fails no test. The other objects on the table were each read and dispositioned rather than assumed:
 
 | Object | Disposition |
 |---|---|
@@ -159,7 +159,7 @@ The ruling asks for a reversible identity-level state halting all activity acros
 | Payout requests | blocked | **`G-ELIGIBLE` gains the identity status**. It names `payouts_frozen` today and not `status`, which is finding 5 |
 | Wallet spend | blocked | Already true. [M20](M20-wallet.md) INV-M20-06 and section 3.4 rule 2 |
 | External withdrawal | blocked | Already true, same source |
-| Affiliate settlement | blocked | [ADR-017](../DECISIONS.md) put every outbound payment on one rail, and a restriction that stops one door and not the other is not a restriction. **Confirmed against [M08](M08-affiliate-system.md) during the fold** |
+| Affiliate settlement | blocked | [ADR-017](../decisions/ADR-017.md) put every outbound payment on one rail, and a restriction that stops one door and not the other is not a restriction. **Confirmed against [M08](M08-affiliate-system.md) during the fold** |
 | Platform trading | revoked through the Rithmic bridge | [M02](M02-rithmic-bridge.md), **PROVISIONAL**. Section 5.4 |
 | Account state | **preserved intact.** No account status moves, no ladder rung is consumed, no entitlement history is rewritten | The restriction is a layer over the account machine, exactly as `payouts_frozen` and `recon_blocked` already are ([STATE_MACHINES section 1](../architecture/STATE_MACHINES.md)) |
 
@@ -179,15 +179,15 @@ Distinct from its two neighbours, in the ADR's own words: **closure for cause is
 
 **Restoration**, fail-closed on the way back: `set_risk` at the account's current floor **confirmed first**, then entitlement, then permissions. `0007` already makes it unwritable for a `set_risk` row to reach `confirmed_inferred`, which is exactly the guarantee restoration needs. Re-enabling an entitlement against an unconfirmed setpoint is an unenforced funded account, which **INV-M2-13 forbids** and which [M02](M02-rithmic-bridge.md) section 3.2 made design law.
 
-**The whole platform leg is marked PROVISIONAL under [ADR-005](../DECISIONS.md), and the honest form of that is an asymmetry rather than a caveat:**
+**The whole platform leg is marked PROVISIONAL under [ADR-005](../decisions/ADR-005.md), and the honest form of that is an asymmetry rather than a caveat:**
 
 > Suspension is always available. **Restoration is contingent on `V-M2-15`.** With neither an acknowledgement artifact nor a readable current risk setting, a restored account cannot be confirmed, and under INV-M2-13 an unconfirmed account does not trade. A suspended trader would be revocable and not restorable.
 
-`V-M2-15` is the corpus's one open **commercial precondition**, [M02](M02-rithmic-bridge.md) is still at `status: review` by [ADR-005](../DECISIONS.md), and this fold does not move either. It adds a row to the vendor agenda instead.
+`V-M2-15` is the corpus's one open **commercial precondition**, [M02](M02-rithmic-bridge.md) is still at `status: review` by [ADR-005](../decisions/ADR-005.md), and this fold does not move either. It adds a row to the vendor agenda instead.
 
 ### 5.5 The entry point
 
-[ADR-022](../DECISIONS.md) tiers [M06](M06-admin-ops-console.md)'s identity-graph explorer to **v1.x**, so the one-click-from-a-cluster affordance cannot be the only way in.
+[ADR-022](../decisions/ADR-022.md) tiers [M06](M06-admin-ops-console.md)'s identity-graph explorer to **v1.x**, so the one-click-from-a-cluster affordance cannot be the only way in.
 
 - **Launch-available:** restriction is an action on M06's **flags queue** and **identity drill-down**, both v1 surfaces, sitting on the `investigating` to `enforced` path that already requires an exported evidence pack, a ToS clause and a written reason.
 - **v1.x:** the graph one-click arrives with the explorer, beside its one-click evidence pack.
@@ -197,12 +197,12 @@ Distinct from its two neighbours, in the ADR's own words: **closure for cause is
 
 **The connection is INV-M15-06**, not a roadmap preference: role removal is silent, batched, and never coincident with an enforcement, because a role disappearing at the moment an account closes publishes the enforcement to everyone in the server ([M15](M15-discord-integration.md) AS-M15-05). Ruling B creates an enforcement that halts every linked account at once. If roles sync and M15 ships later, suspension is built with no counterpart discipline and the first suspension broadcasts itself.
 
-**The weeks are recorded**, per [DELIVERY_PLAN](../DELIVERY_PLAN.md)'s own discipline: [ADR-020](../DECISIONS.md) is "+2 to 4 weeks" precisely so it can be traded.
+**The weeks are recorded**, per [DELIVERY_PLAN](../DELIVERY_PLAN.md)'s own discipline: [ADR-020](../decisions/ADR-020.md) is "+2 to 4 weeks" precisely so it can be traded.
 
 | Option | Weeks | Contents |
 |---|---|---|
 | **Partial (recommended)** | **+3 to 5 days** | The link and the announcement templates, per M15's own OQ-M15-01. Role sync stays post-launch. Matches the "MUST, partially" idiom already used for M16 and M18 |
-| Full | +1 to 1.5 weeks | Adds role sync and its moderation surface. Comparable to [ADR-019](../DECISIONS.md)'s M20 line |
+| Full | +1 to 1.5 weeks | Adds role sync and its moderation surface. Comparable to [ADR-019](../decisions/ADR-019.md)'s M20 line |
 
 Phase **P8**, so the surface exists when P9's beta community forms. DELIVERY_PLAN sections 1, 2, 4 and 5 all move, and the 18 week headline is restated with the delta rather than left implied.
 
@@ -219,7 +219,7 @@ Phase **P8**, so the surface exists when P9's beta community forms. DELIVERY_PLA
 | **`0030_payout_hold_enum.sql`** | `ALTER TYPE payout_status ADD VALUE 'held_pending_review';` and nothing else. **No `BEGIN`/`COMMIT`**, deliberately, with the reason in the `E2 READ: MONEY PATH` header: PostgreSQL refuses to use a new enum value inside the transaction that added it, and every index predicate in `0031` is such a use |
 | **`0031_payout_hold_and_identity_restriction.sql`** | The hold columns and their completeness CHECK; both SD-09 predicates dropped and re-created under the same names; the hold-expiry index; the external leg's settlement guard and its re-created open index; the restriction-episode table with its partial unique and its completeness CHECK; and the replacement `COMMENT ON TABLE payout_requests` carrying the amended zero-denial sentence. An `E2 READ: MONEY PATH` header naming all six |
 
-**Two disciplines inherited from defects this corpus already paid for.** Every CHECK over an array uses `cardinality()` and never `array_length`, because a CHECK evaluating to `NULL` passes ([ADR-035](../DECISIONS.md)). Every trigger body names only columns the migrations declare, which is what `CI-06j` asserts from the tree.
+**Two disciplines inherited from defects this corpus already paid for.** Every CHECK over an array uses `cardinality()` and never `array_length`, because a CHECK evaluating to `NULL` passes ([ADR-035](../decisions/ADR-035.md)). Every trigger body names only columns the migrations declare, which is what `CI-06j` asserts from the tree.
 
 **Neither file edits anything.** `0001`, `0002`, `0010` and `0011` are merged and stay exactly as they are. Migrations are sacred: superseded, never edited.
 
@@ -229,11 +229,11 @@ Phase **P8**, so the surface exists when P9's beta community forms. DELIVERY_PLA
 
 **The two rulings name eight documents. The corpus's own gates force roughly twenty-six**, and the count is stated here rather than discovered mid-session.
 
-**Money path.** [DECISIONS](../DECISIONS.md), the two migrations, [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md), [DATA_MODEL](../architecture/DATA_MODEL.md), [STATE_MACHINES](../architecture/STATE_MACHINES.md), [M05](M05-payout-system.md), [M20](M20-wallet.md), [M07](M07-risk-abuse.md), [M02](M02-rithmic-bridge.md), [SECURITY](../architecture/SECURITY.md) section 4.
+**Money path.** [DECISIONS](../decisions/README.md), the two migrations, [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md), [DATA_MODEL](../architecture/data-model/README.md), [STATE_MACHINES](../architecture/STATE_MACHINES.md), [M05](M05-payout-system.md), [M20](M20-wallet.md), [M07](M07-risk-abuse.md), [M02](M02-rithmic-bridge.md), [SECURITY](../architecture/SECURITY.md) section 4.
 
-**Non-money.** [M06](M06-admin-ops-console.md), [M03](M03-billing-checkout.md), [M04](M04-trader-portal.md), [M16](M16-notification-center.md), [M08](M08-affiliate-system.md) (confirm), [M15](M15-discord-integration.md), [DELIVERY_PLAN](../DELIVERY_PLAN.md), [API_CONTRACT](../architecture/API_CONTRACT.md), [EVENTS](../architecture/EVENTS.md), [TOS_CLAUSES](../legal/TOS_CLAUSES.md) clauses 5 and 13, [GUIDE_BRIEFING](../GUIDE_BRIEFING.md), [EDGE_CASES](../EDGE_CASES.md), [GOLDEN_SCENARIOS](../testing/GOLDEN_SCENARIOS.md), [STRATEGY](../testing/STRATEGY.md), [CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md), [INDEX](../INDEX.md), [STATE](../STATE.md), [SESSION_LOG](../SESSION_LOG.md).
+**Non-money.** [M06](M06-admin-ops-console.md), [M03](M03-billing-checkout.md), [M04](M04-trader-portal.md), [M16](M16-notification-center.md), [M08](M08-affiliate-system.md) (confirm), [M15](M15-discord-integration.md), [DELIVERY_PLAN](../DELIVERY_PLAN.md), [API_CONTRACT](../architecture/API_CONTRACT.md), [EVENTS](../architecture/EVENTS.md), [TOS_CLAUSES](../legal/TOS_CLAUSES.md) clauses 5 and 13, [GUIDE_BRIEFING](../GUIDE_BRIEFING.md), [EDGE_CASES](../edge-cases/README.md), [GOLDEN_SCENARIOS](../testing/golden-scenarios/README.md), [STRATEGY](../testing/STRATEGY.md), [CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md), [INDEX](../INDEX.md), [STATE](../STATE.md), [SESSION_LOG](../sessions/README.md).
 
-Each addition beyond the eight is forced by a named gate: `CI-06i` in both directions on DATA_MODEL, [ADR-026](../DECISIONS.md)'s completeness gate on DELTA_MANIFEST, `CI-06d` and `CI-06e` on the two registries, `CI-06c` and `CI-06g` on INDEX.
+Each addition beyond the eight is forced by a named gate: `CI-06i` in both directions on DATA_MODEL, [ADR-026](../decisions/ADR-026.md)'s completeness gate on DELTA_MANIFEST, `CI-06d` and `CI-06e` on the two registries, `CI-06c` and `CI-06g` on INDEX.
 
 **No identifier is invented here.** `SD-nn`, `INV-nn`, `EC-nnn` and `GS-nnn` are claimed by their registry row existing and take the next free number in the owning series **when that row is written**, per FOLD-01 section 4: only ADR numbers and migration numbers have an allocation table, so a plan that pre-names a delta has claimed in a registry with no claim mechanism.
 
@@ -243,7 +243,7 @@ Each addition beyond the eight is forced by a named gate: `CI-06i` in both direc
 
 ## 8. Session sequence
 
-[ADR-003](../DECISIONS.md) strict. **This is not one session.**
+[ADR-003](../decisions/ADR-003.md) strict. **This is not one session.**
 
 | # | Session | Scope |
 |---|---|---|

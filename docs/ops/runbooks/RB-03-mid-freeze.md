@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M03-billing-checkout.md, ../../DECISIONS.md]
+depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M03-billing-checkout.md, ../../decisions/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -12,7 +12,7 @@ last_updated: 2026-08-14
 
 ## What this is not
 
-**This is not a payout problem.** Merit's outbound rail is separate from its inbound processing ([ADR-017](../../DECISIONS.md): one outbound rail, one transfer table). A frozen MID stops sales and does not touch a single payout. Say that internally before anybody starts improvising, and say it to traders if the question comes up, because "our payment processor froze us" is a sentence this market reads as a firm dying.
+**This is not a payout problem.** Merit's outbound rail is separate from its inbound processing ([ADR-017](../../decisions/ADR-017.md): one outbound rail, one transfer table). A frozen MID stops sales and does not touch a single payout. Say that internally before anybody starts improvising, and say it to traders if the question comes up, because "our payment processor froze us" is a sentence this market reads as a firm dying.
 
 ## Immediate actions
 

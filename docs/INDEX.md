@@ -8,9 +8,9 @@ last_updated: 2026-08-15
 
 # **CORPUS FROZEN 2026-08-14**
 
-**Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](DECISIONS.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
+**Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](decisions/ADR-005.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
 
-**<!--gen:adr_count-->42<!--/gen--> ADRs. <!--gen:ec_count-->141<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](DECISIONS.md)).
+**<!--gen:adr_count-->43<!--/gen--> ADRs. <!--gen:ec_count-->141<!--/gen--> edge cases. <!--gen:gs_count-->257<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](decisions/ADR-034.md)).
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
@@ -22,23 +22,24 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [MERIT_BUILD_MASTER_PROMPT.md](../MERIT_BUILD_MASTER_PROMPT.md) | The constitution. Read-only; amendments via DECISIONS.md | approved | founder |
 | [CLAUDE.md](../CLAUDE.md) | Lean session brain: rituals, git workflow, conventions, model routing | draft | founder |
 | [README.md](../README.md) | Repository front door | draft | founder |
-| [.claude/settings.json](../.claude/settings.json) | Committed hook set. Corpus phase: `SessionStart` pull, `Stop` push ([ADR-D1](DECISIONS.md)) | approved | founder |
-| [.claude/agents/reviewer.md](../.claude/agents/reviewer.md) | The citation reviewer. Verifies every factual claim against a primary source at `file:line`; verdicts to `docs/reviews/` ([ADR-033](DECISIONS.md)) | proposed | founder |
+| [.claude/settings.json](../.claude/settings.json) | Committed hook set. Corpus phase: `SessionStart` pull, `Stop` push ([ADR-D1](decisions/ADR-D1.md)) | approved | founder |
+| [.claude/agents/reviewer.md](../.claude/agents/reviewer.md) | The citation reviewer. Verifies every factual claim against a primary source at `file:line`; verdicts to `docs/reviews/` ([ADR-033](decisions/ADR-033.md)) | proposed | founder |
 | [.github/workflows/corpus.yml](../.github/workflows/corpus.yml) | The CI wiring. `integrity` runs `gates.mjs` and proves the spans regenerate to nothing; `migrations` is **CI-06h**: the forward-only apply under `ON_ERROR_STOP`, the must-fail re-apply, the counts read from `pg_indexes` and `pg_constraint`, and the ledger probes | approved | founder |
-| [scripts/corpus/gates.mjs](../scripts/corpus/gates.mjs) | The corpus-integrity gates as a runnable check, no dependencies. `check` runs **CI-06a to CI-06j plus [ADR-026](DECISIONS.md)'s manifest gate, eleven in all**; `generate` rewrites every CI-06g span from its named query; `anchors` lists what a file offers ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
+| [scripts/corpus/gates.mjs](../scripts/corpus/gates.mjs) | The corpus-integrity gates as a runnable check, no dependencies. `check` runs **CI-06a to CI-06j plus [ADR-026](decisions/ADR-026.md)'s manifest gate, eleven in all**; `generate` rewrites every CI-06g span from its named query; `anchors` lists what a file offers ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
 | [scripts/corpus/falsify.mjs](../scripts/corpus/falsify.mjs) | **Runs every gate against a tree carrying one seeded violation aimed at it, and fails if the gate does not fail on that finding.** A gate nobody has watched fail is not a gate ([STRATEGY section 4.4](testing/STRATEGY.md)) | approved | founder |
-| [scripts/db/probe_ledger_constraints.sql](../scripts/db/probe_ledger_constraints.sql) | LEDGER-C1, LEDGER-C2 and zero-sum probed against a real database, checked by error message rather than by exception class, plus the counterfactual that proves C1 is not redundant ([ADR-027](DECISIONS.md)) | approved | founder |
-| [scripts/db/probe_plan_version_immutability.sql](../scripts/db/probe_plan_version_immutability.sql) | 14 assertions on `plan_versions` immutability and the seven `cardinality()` conversions. **Leads with the permitted transition succeeding**, which is the probe that did not exist ([ADR-035](DECISIONS.md)) | approved | founder |
+| [scripts/db/probe_ledger_constraints.sql](../scripts/db/probe_ledger_constraints.sql) | LEDGER-C1, LEDGER-C2 and zero-sum probed against a real database, checked by error message rather than by exception class, plus the counterfactual that proves C1 is not redundant ([ADR-027](decisions/ADR-027.md)) | approved | founder |
+| [scripts/db/probe_plan_version_immutability.sql](../scripts/db/probe_plan_version_immutability.sql) | 14 assertions on `plan_versions` immutability and the seven `cardinality()` conversions. **Leads with the permitted transition succeeding**, which is the probe that did not exist ([ADR-035](decisions/ADR-035.md)) | approved | founder |
 
 ## Tracking (living docs, updated every session)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [INDEX.md](INDEX.md) | This map | approved | claude |
 | [STATE.md](STATE.md) | One screen: wave, gate, done / in-flight / blocked, next actions | approved | claude |
-| [SESSION_LOG.md](SESSION_LOG.md) | Append-only handoff journal (C3 ritual) | approved | claude |
+| [sessions/](sessions/README.md) | Append-only handoff journal (C3 ritual), one file per session since [ADR-043](decisions/ADR-043.md). Entry files are fragments indexed by that README under `CI-06n` | approved | claude |
 | [GUIDE_BRIEFING.md](GUIDE_BRIEFING.md) | Orientation for the founder's strategy-desk chat: role boundaries, the gate loop, current state, the session queue | approved | founder |
-| [DECISIONS.md](DECISIONS.md) | ADRs: every choice with rationale and alternatives, the **two number allocation tables** (ADR numbers, [ADR-034](DECISIONS.md) and [CI-06f](testing/STRATEGY.md); migration numbers, [ADR-036](DECISIONS.md) and [CI-06h](testing/STRATEGY.md)), and the gate-closure records. Counts live in the file, not in this row | approved | founder |
-| [EDGE_CASES.md](EDGE_CASES.md) | Living registry, **140 entries**. EC-001 to EC-050 approved with M01; EC-051+ carry their module's status | approved | founder |
+| [decisions/](decisions/README.md) | The ADR registry, one file per entry since [ADR-043](decisions/ADR-043.md). Every choice with rationale and alternatives, plus the five gate-closure records in [gates/](decisions/gates/). Entry files are fragments rather than corpus documents and are indexed by that README under `CI-06n`, not by this row | approved | founder |
+| [decisions/ALLOCATION.md](decisions/ALLOCATION.md) | The **three number allocation tables** (ADR numbers, [ADR-034](decisions/ADR-034.md) and [CI-06f](testing/STRATEGY.md); migration numbers, [ADR-036](decisions/ADR-036.md) and [CI-06h](testing/STRATEGY.md); CI gate letters, no gate yet). Kept in one file because each is read as a table. Counts live in the file, not in this row | approved | founder |
+| [edge-cases/](edge-cases/README.md) | Living registry, one file per entry since [ADR-043](decisions/ADR-043.md), holding <!--gen:ec_count-->141<!--/gen--> entries. The Appendix B4 battery stays one file: 22 table rows are not 22 documents. EC-001 to EC-050 approved with M01; EC-051+ carry their module status. Entry files are fragments indexed by that README under `CI-06n` | approved | founder |
 | [GLOSSARY.md](GLOSSARY.md) | Every domain term defined once; all docs link here | approved | founder |
 | [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **New.** Constitution section 8 re-planned: 18 weeks, the launch-blocking triage across M11 to M20, the pre-FREEZE queue, and the one trade actually available | approved | founder |
 
@@ -59,7 +60,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [OVERVIEW.md](architecture/OVERVIEW.md) | System diagram, module map, end-to-end data flow | approved | founder |
-| [DATA_MODEL.md](architecture/DATA_MODEL.md) | Every table, column, type, index, constraint, retention. **Amended under [ADR-026](DECISIONS.md): the schema-delta reconciliation is folded** | approved | founder |
+| [DATA_MODEL.md](architecture/data-model/README.md) | Every table, column, type, index, constraint, retention. **Amended under [ADR-026](decisions/ADR-026.md): the schema-delta reconciliation is folded** | approved | founder |
 | [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors, the negative-authz matrix | approved | founder |
 | [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | approved | founder |
 | [STATE_MACHINES.md](architecture/STATE_MACHINES.md) | Account, payout, flag, identity lifecycles as Mermaid | approved | founder |
@@ -70,7 +71,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
 | [M01-rules-engine.md](plans/M01-rules-engine.md) | The crown jewel: 50-rule taxonomy, pure library, replay self-audit. **Gate closed 2026-08-13** | approved | founder |
-| [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning, ingest, reconciliation, simulator, streaming path, **16 vendor-confirmation items**. Held at `review` by [ADR-005](DECISIONS.md) | review | founder |
+| [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning, ingest, reconciliation, simulator, streaming path, **16 vendor-confirmation items**. Held at `review` by [ADR-005](decisions/ADR-005.md) | review | founder |
 | [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method | approved | founder |
 | [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, Appendix F gate | approved | founder |
 | [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, bounded freeze, reserve | approved | founder |
@@ -81,9 +82,9 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M10-integrations.md](plans/M10-integrations.md) | One outbound bus, send-time suppression, support-context scoping, vendor-down chaos | approved | founder |
 | [M11-certificates-social-proof.md](plans/M11-certificates-social-proof.md) | Issuance, key lifecycle, non-enumerable verification, revocation classes, opt-in leaderboard | approved | founder |
 | [M12-transparency-platform.md](plans/M12-transparency-platform.md) | **Launch differentiator.** Seven auto-computed statistics, versioned definitions, immutable history, proof links | approved | founder |
-| [M12-statistic-definitions.md](plans/M12-statistic-definitions.md) | The seven definitions as a founder sign-off table, drafted before any data exists. **Amended by [ADR-031](DECISIONS.md) and [ADR-032](DECISIONS.md):** each statistic now declares its measure set and its integer unit | approved | founder |
+| [M12-statistic-definitions.md](plans/M12-statistic-definitions.md) | The seven definitions as a founder sign-off table, drafted before any data exists. **Amended by [ADR-031](decisions/ADR-031.md) and [ADR-032](decisions/ADR-032.md):** each statistic now declares its measure set and its integer unit | approved | founder |
 | [M13-trader-analytics-journal.md](plans/M13-trader-analytics-journal.md) | Per-account analytics from engine tables, private journal, load isolation from the payout path | approved | founder |
-| [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | **Amended by [ADR-025](DECISIONS.md):** cap release rejected, cross-account loyalty added, INV-M14-11 bounds invariance | approved | founder |
+| [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | **Amended by [ADR-025](decisions/ADR-025.md):** cap release rejected, cross-account loyalty added, INV-M14-11 bounds invariance | approved | founder |
 | [M15-discord-integration.md](plans/M15-discord-integration.md) | Per-role consent, a link that is never a credential, template-only announcements. Post-launch | approved | founder |
 | [M16-notification-center.md](plans/M16-notification-center.md) | Four classes deciding what a preference may silence, contact-change ceremony, template allowlist | approved | founder |
 | [M17-offers-engine.md](plans/M17-offers-engine.md) | Server-authoritative pricing, dual-controlled floors, identity-bound offers, credit provenance | approved | founder |
@@ -100,13 +101,13 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | Artifact | Purpose | Status | Owner |
 |---|---|---|---|
 | [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->28<!--/gen--> files, all <!--gen:manifest_changes-->94<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->18<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
-| [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), the no-floats exemption list (**two columns, no money**, under [ADR-031](DECISIONS.md)), and the per-constraint verification table. **[ADR-026](DECISIONS.md)'s completeness gate reads this file** | review | founder |
+| [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), the no-floats exemption list (**two columns, no money**, under [ADR-031](decisions/ADR-031.md)), and the per-constraint verification table. **[ADR-026](decisions/ADR-026.md)'s completeness gate reads this file** | review | founder |
 
 ## docs/testing/ (Wave 4)
 | Doc | Purpose | Status | Owner |
 |---|---|---|---|
-| [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 now runs**: CI-06a to CI-06j plus [ADR-026](DECISIONS.md)'s manifest gate, all eleven passing clean and failing dirty under `falsify.mjs`. CI-06f and CI-06g are [ADR-034](DECISIONS.md)'s; CI-06j is [ADR-035](DECISIONS.md)'s; **CI-06h's allocation half is [ADR-036](DECISIONS.md)'s** | approved | founder |
-| [GOLDEN_SCENARIOS.md](testing/GOLDEN_SCENARIOS.md) | **Consolidated. 257 scenarios**, contiguous, deduplicated, with an ownership partition, the reconciliation from 242, and the coverage map | approved | founder |
+| [STRATEGY.md](testing/STRATEGY.md) | **Written.** Section 5 instantiated: tooling with rejected alternatives, eight engine properties, and the complete CI gate inventory across ten stages, VG-1 to VG-12, the D0 battery, anti-slop gates, and corpus integrity. **Section 4.4 now runs**: CI-06a to CI-06j plus [ADR-026](decisions/ADR-026.md)'s manifest gate, all eleven passing clean and failing dirty under `falsify.mjs`. CI-06f and CI-06g are [ADR-034](decisions/ADR-034.md)'s; CI-06j is [ADR-035](decisions/ADR-035.md)'s; **CI-06h's allocation half is [ADR-036](decisions/ADR-036.md)'s** | approved | founder |
+| [testing/golden-scenarios/](testing/golden-scenarios/README.md) | **Consolidated, <!--gen:gs_count-->257<!--/gen--> scenarios**, contiguous, deduplicated, with an ownership partition, the reconciliation from 242, and the coverage map. One file per SECTION since [ADR-043](decisions/ADR-043.md): 257 identifiers live as 301 table rows, and a row is not a document | approved | founder |
 | [SIMULATION_HARNESS.md](testing/SIMULATION_HARNESS.md) | **Written.** Port spec, ten population parameters, eleven calibration bands, eight outputs, and the `mc_lifecycle.py` checklist | approved | founder |
 
 ## docs/ops/runbooks/ (Wave 4)

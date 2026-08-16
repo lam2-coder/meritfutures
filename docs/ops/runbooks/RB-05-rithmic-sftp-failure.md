@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M02-rithmic-bridge.md, ../../DECISIONS.md]
+depends_on: [README.md, COMMS_TEMPLATES.md, ../../plans/M02-rithmic-bridge.md, ../../decisions/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -15,7 +15,7 @@ last_updated: 2026-08-14
 | Tier | What it is | If it fails |
 |---|---|---|
 | **Tier 1, authoritative** | EOD report files over SFTP. Every rule, gate, breach, eligibility, and money decision | States stay at the last closed session. Nothing is wrong, everything is stale, and the surfaces already say so |
-| **Tier 2, indicative** | The streaming feed behind live P&L, projected floor distance, and live counters ([ADR-020](../../DECISIONS.md)) | **Live surfaces degrade to last-closed values and the label changes with them, in the same render** (GS-133). A live number that silently freezes at its last value is a failure, not a fallback |
+| **Tier 2, indicative** | The streaming feed behind live P&L, projected floor distance, and live counters ([ADR-020](../../decisions/ADR-020.md)) | **Live surfaces degrade to last-closed values and the label changes with them, in the same render** (GS-133). A live number that silently freezes at its last value is a failure, not a fallback |
 
 **Tier 2 failing is not a money incident.** Indicative data never feeds an eligibility, breach, or money decision, and GS-132 asserts the engine's output is byte-identical with the live cache poisoned. Say this out loud before anybody treats a feed drop as urgent.
 

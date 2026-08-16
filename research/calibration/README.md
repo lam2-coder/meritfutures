@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [../../docs/DECISIONS.md, ../../docs/testing/SIMULATION_HARNESS.md, ../../docs/plans/M01-rules-engine.md]
+depends_on: [../../docs/decisions/README.md, ../../docs/testing/SIMULATION_HARNESS.md, ../../docs/plans/M01-rules-engine.md]
 last_updated: 2026-08-14
 ---
 
 # Calibration source of record
 
-Per [ADR-015](../../docs/DECISIONS.md) and the calibration-source ruling, **every calibrated number in the corpus traces to the artifacts in this directory.** Before they lived here, "the source of record" was a filename rather than something anyone could diff.
+Per [ADR-015](../../docs/decisions/ADR-015.md) and the calibration-source ruling, **every calibrated number in the corpus traces to the artifacts in this directory.** Before they lived here, "the source of record" was a filename rather than something anyone could diff.
 
 ## What is here
 
@@ -19,7 +19,7 @@ Per [ADR-015](../../docs/DECISIONS.md) and the calibration-source ruling, **ever
 
 The upload accompanying the workbook on 2026-08-14 was **not** `mc_lifecycle.py`. It was a 12MB PostgreSQL dump (`fpacpre...sql`) of an unrelated accounting-operations system, schemas `fpac_acctops` and `fpac_close`, containing 36 tables of real data. It was **not committed**, for three reasons, recorded so the decision is not re-litigated: it is not the artifact the corpus references; a 12MB dump does not belong in a planning-corpus repository; and a database dump of a live system may carry data that has no business being in version control.
 
-**Consequence, stated plainly.** The workbook is the *output*. Without the engine, a parameter change is a diff against a spreadsheet rather than against the model that produced it, and the sensitivity sweeps the workbook cites cannot be re-run. [ADR-015](../../docs/DECISIONS.md) sources plan parameters to `mc_lifecycle.py OUR_PLANS` specifically, and that reference remains a citation rather than a diff until the file lands. Tracked in [STATE](../../docs/STATE.md).
+**Consequence, stated plainly.** The workbook is the *output*. Without the engine, a parameter change is a diff against a spreadsheet rather than against the model that produced it, and the sensitivity sweeps the workbook cites cannot be re-run. [ADR-015](../../docs/decisions/ADR-015.md) sources plan parameters to `mc_lifecycle.py OUR_PLANS` specifically, and that reference remains a citation rather than a diff until the file lands. Tracked in [STATE](../../docs/STATE.md).
 
 ## The workbook predates several approved ADRs, and this matters
 
@@ -29,18 +29,18 @@ Known divergences as of 2026-08-14:
 
 | Workbook says | Corpus says | Authority |
 |---|---|---|
-| "Rapid Daily" | **Merit Rapid** | [ADR-013](../../docs/DECISIONS.md) renamed it; the plan cannot be published as daily |
-| Rapid: 5 winning days | **3 win days** (`w=3`) | [ADR-018](../../docs/DECISIONS.md), and the `w=3` recalibration is the founder's own re-run |
+| "Rapid Daily" | **Merit Rapid** | [ADR-013](../../docs/decisions/ADR-013.md) renamed it; the plan cannot be published as daily |
+| Rapid: 5 winning days | **3 win days** (`w=3`) | [ADR-018](../../docs/decisions/ADR-018.md), and the `w=3` recalibration is the founder's own re-run |
 | Rapid: pay gap 1 (daily) | Gap 1, but **dominated** by the 3 win-day gate | EC-049, [M01](../../docs/plans/M01-rules-engine.md) PW-02b |
-| Core: min days to first payout "day 1" | Funded `min_trading_days` **0 on all three plans**, gate disabled and visibly so | [ADR-015](../../docs/DECISIONS.md), CV-19 |
-| Settlement "2-3 biz days via Rise" as the cadence anchor | Two legs: **instant wallet credit** is the anchor; 2 to 3 days applies to the **external** withdrawal only | [ADR-019](../../docs/DECISIONS.md) |
+| Core: min days to first payout "day 1" | Funded `min_trading_days` **0 on all three plans**, gate disabled and visibly so | [ADR-015](../../docs/decisions/ADR-015.md), CV-19 |
+| Settlement "2-3 biz days via Rise" as the cadence anchor | Two legs: **instant wallet credit** is the anchor; 2 to 3 days applies to the **external** withdrawal only | [ADR-019](../../docs/decisions/ADR-019.md) |
 | Profit split "90/9" | **9000bp (90/10)**. The workbook's shorthand is a typo, not a third split | [GLOSSARY](../../docs/GLOSSARY.md) |
 
 **When `mc_lifecycle.py` lands and is re-run, this table is the checklist**, and every row should either disappear or become a founder decision to change the corpus.
 
 ## The Risk Engine tab is the exception: it is current, and it is load bearing
 
-`Risk Engine (VaR)` is the artifact behind the conservatism ruling ([DECISIONS](../../docs/DECISIONS.md)), and unlike the plans tab it says exactly what the corpus says. Its baseline is 500 signups per month, a 0.16 blended eval pass, 2.2 month average funded life, and a resulting **176 active funded accounts**.
+`Risk Engine (VaR)` is the artifact behind the conservatism ruling ([DECISIONS](../../docs/decisions/README.md)), and unlike the plans tab it says exactly what the corpus says. Its baseline is 500 signups per month, a 0.16 blended eval pass, 2.2 month average funded life, and a resulting **176 active funded accounts**.
 
 **Monthly payout distribution by correlation, 20,000 simulations:**
 

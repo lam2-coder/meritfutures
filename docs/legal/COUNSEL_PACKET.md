@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [README.md, TOS_CLAUSES.md, PRIVACY_POLICY.md, AFFILIATE_TERMS.md, ../plans/M18-graduation-track.md, ../plans/M19-kyc-identity.md, ../plans/M20-wallet.md, ../DECISIONS.md]
+depends_on: [README.md, TOS_CLAUSES.md, PRIVACY_POLICY.md, AFFILIATE_TERMS.md, ../plans/M18-graduation-track.md, ../plans/M19-kyc-identity.md, ../plans/M20-wallet.md, ../decisions/README.md]
 last_updated: 2026-08-14
 ---
 
@@ -24,9 +24,9 @@ last_updated: 2026-08-14
 
 ### What is decided and not in question
 
-- **No live program exists at launch.** [OQ-M18-01](../DECISIONS.md) ruled it and the module was renamed from "live-graduation pipeline" to "graduation track" to match shipped behavior rather than an aspiration.
+- **No live program exists at launch.** [OQ-M18-01](../decisions/gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md) ruled it and the module was renamed from "live-graduation pipeline" to "graduation track" to match shipped behavior rather than an aspiration.
 - **Zero live-program copy is written until this question is answered.** That is a standing prohibition across every surface, and it is enforced by a copy lint that fails the build ([M18](../plans/M18-graduation-track.md) GS-205), not by an editorial habit.
-- **The ladder and the live invitation are already decoupled.** [ADR-024](../DECISIONS.md): completing the payout ladder sets **graduation eligibility**, which is a review-pool flag and nothing else. Any invitation is at Merit's sole discretion. **The engine does not emit an invitation event**, deliberately, because an engine that emits one has already made the promise.
+- **The ladder and the live invitation are already decoupled.** [ADR-024](../decisions/ADR-024.md): completing the payout ladder sets **graduation eligibility**, which is a review-pool flag and nothing else. Any invitation is at Merit's sole discretion. **The engine does not emit an invitation event**, deliberately, because an engine that emits one has already made the promise.
 - **The one sentence Merit intends to publish**, adopted verbatim from Lucid: the ladder is **"the maximum payout level, not a guaranteed minimum for live eligibility."** [TOS_CLAUSES](TOS_CLAUSES.md) clause 8.
 
 ### The facts the answer turns on
@@ -53,7 +53,7 @@ Is the Merit Wallet a **payable balance** rather than a regulated stored-value o
 Four sub-questions, so the sitting has an agenda:
 
 1. Does holding trader balances in these terms constitute **regulated money transmission or deposit-taking**, and **does the answer change with balance size or holding period**?
-2. Do the balances need to be **segregated**, and if so how does that interact with the payout wallet's weekly funding rhythm plus its same-day top-up trigger ([ADR-011](../DECISIONS.md))?
+2. Do the balances need to be **segregated**, and if so how does that interact with the payout wallet's weekly funding rhythm plus its same-day top-up trigger ([ADR-011](../decisions/ADR-011.md))?
 3. What must be **disclosed at the moment a trader first receives a wallet credit**, as distinct from what lives in the ToS?
 4. What happens to a balance on **account closure, on enforcement, and on an unresponsive trader** after a long period?
 

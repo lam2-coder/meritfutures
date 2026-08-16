@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [../DECISIONS.md, ../GLOSSARY.md, ../STATE.md, ../EDGE_CASES.md, ../architecture/DATA_MODEL.md, ../architecture/INFRA.md, ../testing/STRATEGY.md, ../testing/GOLDEN_SCENARIOS.md, ../ops/runbooks/CRON_INVENTORY.md, P1-monorepo-scaffold.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, M12-statistic-definitions.md, FOLD-01-phone-identity.md, FOLD-02-enforcement-window-and-suspension.md, ../../packages/db/DELTA_MANIFEST.md]
+depends_on: [../decisions/README.md, ../GLOSSARY.md, ../STATE.md, ../edge-cases/README.md, ../architecture/data-model/README.md, ../architecture/INFRA.md, ../testing/STRATEGY.md, ../testing/golden-scenarios/README.md, ../ops/runbooks/CRON_INVENTORY.md, P1-monorepo-scaffold.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, M12-statistic-definitions.md, FOLD-01-phone-identity.md, FOLD-02-enforcement-window-and-suspension.md, ../../packages/db/DELTA_MANIFEST.md]
 last_updated: 2026-08-15
 ---
 
 # P1 S-E: TradingCalendar as data
 
-**A session plan, not a module plan**, in [FOLD-01](FOLD-01-phone-identity.md)'s and [FOLD-02](FOLD-02-enforcement-window-and-suspension.md)'s idiom. It is [P1 section 6](P1-monorepo-scaffold.md)'s last engineering item, it is money path under the [ADR-003](../DECISIONS.md) strict regime, and it was written in plan mode as that section requires.
+**A session plan, not a module plan**, in [FOLD-01](FOLD-01-phone-identity.md)'s and [FOLD-02](FOLD-02-enforcement-window-and-suspension.md)'s idiom. It is [P1 section 6](P1-monorepo-scaffold.md)'s last engineering item, it is money path under the [ADR-003](../decisions/ADR-003.md) strict regime, and it was written in plan mode as that section requires.
 
 It is approved before the fold begins and it is what the fold is scored against. **It writes no number into a file it cannot rename and it allocates no delta identifier**, per FOLD-01 section 4's finding: only ADR numbers and migration numbers have an allocation table.
 
@@ -27,7 +27,7 @@ The calendar decides what a trading day **is**, and every counter the engine kee
 | Zero rows, no loader, no seed mechanism | `grep -c 'INSERT INTO' packages/db/migrations/*.sql` is 0 across 28 files. [`packages/db/src/index.ts`](../../packages/db/src/index.ts) declares a branded type and an interface; `test/` holds one filename check |
 | A partial fixture calendar exists and **already commits to being derived** | [`fixtures/calendars/cme-2026.json`](../../packages/rules-engine/fixtures/calendars/cme-2026.json): five sessions, `status: "partial"`, and its own note reads "When S-E lands, this file is DERIVED from the seeded `trading_calendar` rows rather than maintained beside them: two hand-maintained calendars is the drift class this corpus has found thirteen times" |
 | **No migration derives a date from a clock** | Zero `::date`, zero `CAST(`, zero `interval` in any case across all 28 files. Every `now()` is a `DEFAULT now()` on a `timestamptz`, and **no `date` column carries a default at all** |
-| The schema holds **45 `date` columns** and nothing states which unit each is in | [`affiliate_commissions.payable_after`](../architecture/DATA_MODEL.md) and `chargeback_window_ends_on` are both wall clock and DATA_MODEL says so well ("Merit's own clock", "the card networks' rather than ours"). `published_statistics.window_start_day` has an **empty** Why cell and is a trading day only because [M12](M12-statistic-definitions.md) says "trailing 90 trading days" |
+| The schema holds **45 `date` columns** and nothing states which unit each is in | [`affiliate_commissions.payable_after`](../architecture/data-model/affiliate_commissions.md) and `chargeback_window_ends_on` are both wall clock and DATA_MODEL says so well ("Merit's own clock", "the card networks' rather than ours"). `published_statistics.window_start_day` has an **empty** Why cell and is a trading day only because [M12](M12-statistic-definitions.md) says "trailing 90 trading days" |
 
 ---
 
@@ -51,7 +51,7 @@ Hand-maintaining a full year is two hundred and fifty chances to be wrong. The s
 |---|---|---|
 | **Structural, offline** | A transcription slip | Coverage contiguous; no Saturday row; every full session's bounds match the stated CT rule; no holiday carries a session; the file's declared `session_count` equals its own generated array length. **Two independent statements of one number that must agree**, which is this corpus's own idiom |
 | **Cross-source, offline** | A DST error, the one class a careful reader still gets wrong | The file states **both** the CT wall time and the UTC instant for every session. The loader **verifies rather than computes**: it converts CT to UTC through `Intl` with `timeZone: 'America/Chicago'` (Node ships the IANA database with full ICU, and `.nvmrc` pins the Node version and therefore the tzdata) and refuses any row where the two disagree. The DST transitions inside coverage are asserted to land on exactly the days IANA declares and **nowhere else** |
-| **Against reality, in production** | A row that is simply wrong about a day that has already happened | [`SD-M2-04`](M02-rithmic-bridge.md)'s `fills.trading_day_vendor` and `trading_day_source` already exist for this, and AS-M2-06's divergence alarm is already specified ([EC-056](../EDGE_CASES.md), GS-090). **This plan wires the calendar to that alarm rather than inventing a second one.** It is the only mechanism in the system that can falsify a calendar row from outside the calendar |
+| **Against reality, in production** | A row that is simply wrong about a day that has already happened | [`SD-M2-04`](M02-rithmic-bridge.md)'s `fills.trading_day_vendor` and `trading_day_source` already exist for this, and AS-M2-06's divergence alarm is already specified ([EC-056](../edge-cases/EC-056.md), GS-090). **This plan wires the calendar to that alarm rather than inventing a second one.** It is the only mechanism in the system that can falsify a calendar row from outside the calendar |
 
 The third layer is the only one that can catch a wrong row, and it is retrospective by construction. That is not a shortfall to be engineered away; it is why the first two layers exist.
 
@@ -76,9 +76,9 @@ So the correction path is partitioned by whether anything depends on the day, an
 
 ## 5. Half-day sessions
 
-**The semantics are ruled and this plan does not reopen them.** A half day is a **full** trading day for every counter (B4 #3, [EC-005](../EDGE_CASES.md), GS-003, GS-032). A half day counting as half a day would make the minimum-trading-days gate a different promise in November. The only thing `is_half_day` changes is `session_close_at`.
+**The semantics are ruled and this plan does not reopen them.** A half day is a **full** trading day for every counter (B4 #3, [EC-005](../edge-cases/EC-005.md), GS-003, GS-032). A half day counting as half a day would make the minimum-trading-days gate a different promise in November. The only thing `is_half_day` changes is `session_close_at`.
 
-**The finding is that one close time cannot serve six symbols.** [`contract_specs`](../architecture/DATA_MODEL.md) lists `ES`, `MES`, `NQ`, `MNQ`, `CL`, `GC`, spanning CME, NYMEX and COMEX, whose **early closes differ by product group** while their regular hours agree. `trading_calendar` has one row per trading day and **no symbol dimension**, so one `session_close_at` is wrong for some group on every early-close day.
+**The finding is that one close time cannot serve six symbols.** [`contract_specs`](../architecture/data-model/contract_specs.md) lists `ES`, `MES`, `NQ`, `MNQ`, `CL`, `GC`, spanning CME, NYMEX and COMEX, whose **early closes differ by product group** while their regular hours agree. `trading_calendar` has one row per trading day and **no symbol dimension**, so one `session_close_at` is wrong for some group on every early-close day.
 
 **Recommended resolution, conservative and reversible: on an early-close day, `session_close_at` is the LATEST close across the listed groups**, with the per-group times recorded in `notes`.
 
@@ -90,7 +90,7 @@ R-01 is a containment lookup, so the only thing at stake is whether a fill can f
 
 ## 6. How the loader proves it loaded what the source said
 
-**The loader lives in `packages/db/src/seed/`** because `packages/db` is the only package permitted to import the database client ([ADR-008](../DECISIONS.md), `merit/no-raw-db-client`, whose single `ignores` entry is this package). Putting it anywhere else needs a second lint exception, and the exception is the control.
+**The loader lives in `packages/db/src/seed/`** because `packages/db` is the only package permitted to import the database client ([ADR-008](../decisions/ADR-008.md), `merit/no-raw-db-client`, whose single `ignores` entry is this package). Putting it anywhere else needs a second lint exception, and the exception is the control.
 
 | Proof | What it catches |
 |---|---|
@@ -123,7 +123,7 @@ Three checks:
 
 ### 7.2 The `migrations` job, extended rather than duplicated
 
-[ADR-036](../DECISIONS.md)'s precedent is explicit: a sibling job would need a second copy of the source parser, and two expressions of one concept agree exactly until they do not. So the existing job gains, after its apply step, a loader run against the real PostgreSQL 16 service, the digest round-trip assertion, and `scripts/db/probe_trading_calendar.sql` beside the two probes already there. One perturbation each, **checked by message rather than by exception class**: a holiday carrying a session is rejected, `session_close_at <= session_open_at` is rejected, a duplicate `trading_day` is rejected.
+[ADR-036](../decisions/ADR-036.md)'s precedent is explicit: a sibling job would need a second copy of the source parser, and two expressions of one concept agree exactly until they do not. So the existing job gains, after its apply step, a loader run against the real PostgreSQL 16 service, the digest round-trip assertion, and `scripts/db/probe_trading_calendar.sql` beside the two probes already there. One perturbation each, **checked by message rather than by exception class**: a holiday carrying a session is rejected, `session_close_at <= session_open_at` is rejected, a duplicate `trading_day` is rejected.
 
 ### 7.3 Production, against the exchange
 
@@ -180,7 +180,7 @@ Three mechanisms, each watched failing on its own seeded violation:
 |---|---|---|
 | **1** | **An import ban** in [`packages/eslint-plugin-merit`](../../packages/eslint-plugin-merit/README.md), beside `no-raw-db-client` and `engine-purity`: the hold, expiry and sweep code path may not import `TradingCalendar` | The strongest of the three. **An import is checkable and an intention is not**, and this is the same shape as the two rules already in that plugin |
 | **2** | **A SQL shape check** over `packages/db/migrations`: no `interval` arithmetic against a `date` column, and no `timestamptz` cast to `date` | Vacuously true today, which is precisely the argument for wiring it now. A gate wired while it is green and watched failing on a seed is the cheapest it will ever be |
-| **3** | **The unit declaration gate** in `CI-06m`: every `date` column has a DATA_MODEL row naming its unit | `payable_after` and `chargeback_window_ends_on` are the model to copy. And the transparency surface already got this right **in the type rather than in the prose**: `statistic_unit` carries `duration_seconds`, not `days`, per [ADR-031](../DECISIONS.md) |
+| **3** | **The unit declaration gate** in `CI-06m`: every `date` column has a DATA_MODEL row naming its unit | `payable_after` and `chargeback_window_ends_on` are the model to copy. And the transparency surface already got this right **in the type rather than in the prose**: `statistic_unit` carries `duration_seconds`, not `days`, per [ADR-031](../decisions/ADR-031.md) |
 
 **One place both units legitimately appear**: the trader's screen, where `next_eligible_trading_day` and a hold's `expires_at` can sit together. The rule there is copy rather than code, and each is labelled with its unit. M04 and M16.
 
@@ -194,7 +194,7 @@ Three mechanisms, each watched failing on its own seeded violation:
 | **F-2** | **A corrected calendar row leaves no prior image** (section 4), so replay cannot distinguish a calendar correction from an engine regression, and `INV-04` is defined against a value that can move | An append-only `trading_calendar_revisions` table: prior row image, actor, reason, source digest, incident reference. **The cheaper alternative, git as the history, is real but incomplete**: git records what the **file** said and cannot prove what the **database** held when the mark was computed |
 | **F-3** | **One `session_close_at` cannot serve six symbols across three exchanges on an early-close day** (section 5) | Latest close across the listed groups, per-group times in `notes`. Reject the symbol dimension, which changes R-01's contract |
 | **F-4** | **Coverage has no storage**, so an exhausted calendar reads as an unbroken holiday and every counter silently stops (section 7.3) | A `trading_calendar_loads` fact: source id, coverage bounds, source digest, loaded at, actor. It serves fail-closed, the horizon alarm and the digest round-trip at once. **Needed under either reading of F-1** |
-| **F-5** | **[FOLD-02 section 2](FOLD-02-enforcement-window-and-suspension.md) states its allocation rows "are written in the same commit as this fold's". They are not in [DECISIONS](../DECISIONS.md) on this branch.** The migration table still reads "Nothing is reserved today and `0029` is the next free number" and the ADR table still ends at 036, on the branch that carries **both** fold plans. A sibling reading this branch sees `0029` and ADR-037 free | Write the six reservation rows before S-E claims anything. **A hand-maintained claim about the registry that exists to end hand-maintained claims**, which is exactly where this corpus keeps finding them |
+| **F-5** | **[FOLD-02 section 2](FOLD-02-enforcement-window-and-suspension.md) states its allocation rows "are written in the same commit as this fold's". They are not in [DECISIONS](../decisions/README.md) on this branch.** The migration table still reads "Nothing is reserved today and `0029` is the next free number" and the ADR table still ends at 036, on the branch that carries **both** fold plans. A sibling reading this branch sees `0029` and ADR-037 free | Write the six reservation rows before S-E claims anything. **A hand-maintained claim about the registry that exists to end hand-maintained claims**, which is exactly where this corpus keeps finding them |
 
 ---
 
@@ -218,7 +218,7 @@ Claimed at fold time and not in the planning session, read against `gates.mjs`'s
 
 ## 11. Session sequence
 
-[ADR-003](../DECISIONS.md) strict regime: money path, one objective per session, fresh session each time, `/clear` between.
+[ADR-003](../decisions/ADR-003.md) strict regime: money path, one objective per session, fresh session each time, `/clear` between.
 
 | # | Session | Regime | Produces |
 |---|---|---|---|

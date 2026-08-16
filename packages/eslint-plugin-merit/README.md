@@ -43,7 +43,7 @@ subject is which rules apply where.
 
 It is attached to `apps/**` **and** `packages/**` rather than to app paths
 alone. [STRATEGY section 4.2](../../docs/testing/STRATEGY.md) phrases VG-4 over
-"app paths"; [ADR-008](../../docs/DECISIONS.md) and `packages/db`'s own header
+"app paths"; [ADR-008](../../docs/decisions/ADR-008.md) and `packages/db`'s own header
 phrase the invariant over the complement, and the wider set is the correct one.
 A raw connection opened in `packages/rithmic` is exactly as unscoped as one
 opened in `apps/portal`.

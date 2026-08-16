@@ -47,7 +47,7 @@ So on any availability event, in parallel with mitigating it and **before** it i
 
 1. **Revoke sessions** on the affected surface. All of them, not the suspicious ones.
 2. **Rotate the implicated credential immediately.** Not after confirming it was used.
-3. **Take the admin origin off the allowlist** if the admin surface is implicated. It is a separate apex domain with its own allowlist precisely so this is one change ([ADR-012](../../DECISIONS.md)).
+3. **Take the admin origin off the allowlist** if the admin surface is implicated. It is a separate apex domain with its own allowlist precisely so this is one change ([ADR-012](../../decisions/ADR-012.md)).
 4. **Halt payouts** if the payout path, its configuration, or a destination is implicated. An outage is recoverable and a fraudulent settlement is not.
 5. **Preserve logs off-box first.** Audit logs ship off-box tamper-evident, and containment steps that overwrite them are the first thing to get wrong.
 
@@ -66,7 +66,7 @@ Everything the implicated credential could reach, not everything you believe it 
 
 ## Post-mortem
 
-Within a week, written, blameless, and specific. It produces: an [EDGE_CASES](../../EDGE_CASES.md) entry, a golden file where the failure is testable, and at least one change to this runbook. **A post-mortem that changes no procedure did not find the cause.**
+Within a week, written, blameless, and specific. It produces: an [EDGE_CASES](../../edge-cases/README.md) entry, a golden file where the failure is testable, and at least one change to this runbook. **A post-mortem that changes no procedure did not find the cause.**
 
 ## Standing controls this runbook depends on
 

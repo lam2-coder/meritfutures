@@ -6,7 +6,7 @@ last_updated: 2026-08-13
 
 # Claude Code Playbook (Constitution Appendix C0)
 
-Current community and Anthropic practice for running Claude Code on a solo+AI money-app build, merged into an actionable playbook and checked against the constitution (Appendix C). Researched 2026-08-13. Where community practice contradicts the constitution, it is flagged for a DECISIONS.md amendment rather than silently adopted (§0.5 gate). Refresh monthly per C0.
+Current community and Anthropic practice for running Claude Code on a solo+AI money-app build, merged into an actionable playbook and checked against the constitution (Appendix C). Researched 2026-08-13. Where community practice contradicts the constitution, it is flagged for a docs/decisions/ amendment rather than silently adopted (§0.5 gate). Refresh monthly per C0.
 
 **Note on this being a `research/` doc.** The constitution's §0.5 skeleton places this file in `research/`; Appendix C0 says `docs/CLAUDE_CODE_PLAYBOOK.md`. The skeleton won ("nothing lives anywhere else"), logged as a Session-1 landmine. If the founder prefers `docs/`, moving it is a one-line INDEX change (flagged again in §7 below).
 
@@ -56,7 +56,7 @@ Documented 2026 failure catalog and the Merit control each implies:
 - **Agent with full filesystem/permissions destroying reachable data**; attacker-controlled project overriding `ANTHROPIC_BASE_URL` to exfiltrate the API key. → C10 sandbox posture + VG-7/VG-8 (agent never holds prod creds; dangerous-shell PreToolUse block); workspace boundary explicit. ([Docker horror stories](https://www.docker.com/blog/ai-coding-agent-horror-stories-security-risks/), [Straiker on the base-URL vector](https://www.straiker.ai/blog/claude-code-source-leak-with-great-agency-comes-great-responsibility))
 - **Self-grading trap** (model writes impl + tests, shares blind spots). → C10 writer/reviewer split + spec-derived golden files (from plan docs/B4, never from implementation output). This is existential for M1 and the research reinforces it strongly.
 
-## 7. Contradictions with the constitution (flagged for DECISIONS.md)
+## 7. Contradictions with the constitution (flagged for docs/decisions/)
 
 **C0 gate: where community practice contradicts the constitution, propose an amendment, don't silently adopt.** Two genuine tensions surfaced; both are proposed as amendments (not yet acted on):
 
@@ -79,6 +79,6 @@ Everything else in current practice **agrees with or is already exceeded by** th
 
 ## Contradictions / notes summary
 
-- **Two proposed amendments** (session-length policy; playbook file location) carried to DECISIONS.md as ADR-003 and ADR-004 candidates. Neither acted on; both await the founder.
+- **Two proposed amendments** (session-length policy; playbook file location) carried to docs/decisions/ as ADR-003 and ADR-004 candidates. Neither acted on; both await the founder.
 - **No hard blockers.** Current practice validates the constitution's operating model; the only real divergences (worktree cap, session resets) are places where the constitution is *deliberately stricter* for money-code safety, and Merit should keep the stricter rule.
 - **One adopted refinement** (no amendment needed, it is additive): hooks must emit terse output and route verbose artifacts to `test-results/`, to protect the context budget. Fold into INFRA.md's hook specs in Wave 2.

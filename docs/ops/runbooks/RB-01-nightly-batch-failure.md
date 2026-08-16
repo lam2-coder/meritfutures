@@ -33,7 +33,7 @@ The batch is **resumable and idempotent by design** (GS-047, PT-07 in [STRATEGY]
 
 ## Recovery
 
-**The run completes or it does not run.** There is no partial acceptance. If the batch cannot complete for the trading day, leave yesterday's states in place, tell traders the dashboard is as of the prior session, and resume when the blocker clears. **Stale is a state Merit's surfaces already label** ([ADR-002](../../DECISIONS.md)'s T+1 disclosure); wrong is not.
+**The run completes or it does not run.** There is no partial acceptance. If the batch cannot complete for the trading day, leave yesterday's states in place, tell traders the dashboard is as of the prior session, and resume when the blocker clears. **Stale is a state Merit's surfaces already label** ([ADR-002](../../decisions/ADR-002.md)'s T+1 disclosure); wrong is not.
 
 ## Comms
 
@@ -51,4 +51,4 @@ Only if states are still stale after the morning. Use [COMMS_TEMPLATES](COMMS_TE
 
 ## Post-incident
 
-Every distinct cause becomes an [EDGE_CASES](../../EDGE_CASES.md) entry and a golden file (TR-04). A batch failure that produced no registry entry was not diagnosed.
+Every distinct cause becomes an [EDGE_CASES](../../edge-cases/README.md) entry and a golden file (TR-04). A batch failure that produced no registry entry was not diagnosed.

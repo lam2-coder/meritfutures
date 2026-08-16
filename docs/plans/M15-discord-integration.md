@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/TOP10_FIRMS.md, M07-risk-abuse.md, M10-integrations.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M16-notification-center.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/TOP10_FIRMS.md, M07-risk-abuse.md, M10-integrations.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M16-notification-center.md]
 last_updated: 2026-08-14
 ---
 
@@ -321,7 +321,7 @@ M15 supplies a small panel: opt-in shares per role, unlink rate, sync drift, and
 
 **OQ-M15-03. Where is the boundary between moderation and enforcement, in published words?** AS-M15-04 proposes that server rules govern the room and account conduct governs the account, and that a member banned from Discord keeps their funded account. That is an unusual position and it should be stated deliberately, because the alternative reading, that public solicitation of a prohibited arrangement is itself evidence, is defensible and would change both this module and [M07](M07-risk-abuse.md). Recommendation: **keep them separate and publish the separation**, on the grounds that surveillance of the community catches the careless, misses the organized, and costs the retention value the server exists for.
 
-**OQ-M15-04. Should Discord ever be a notification channel?** [DATA_MODEL](../architecture/DATA_MODEL.md) reserves `push` on `notifications` and Discord is not among the channels. Proposed: **no.** A payout notice arriving in a chat application the trader shares with strangers is a disclosure risk for a convenience already served by email and in-app, and adding a channel to [M16](M16-notification-center.md)'s matrix that Merit does not control is a preference nobody can honor reliably.
+**OQ-M15-04. Should Discord ever be a notification channel?** [DATA_MODEL](../architecture/data-model/README.md) reserves `push` on `notifications` and Discord is not among the channels. Proposed: **no.** A payout notice arriving in a chat application the trader shares with strangers is a disclosure risk for a convenience already served by email and in-app, and adding a channel to [M16](M16-notification-center.md)'s matrix that Merit does not control is a preference nobody can honor reliably.
 
 ---
 

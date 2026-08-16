@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md]
 last_updated: 2026-08-14
 ---
 
@@ -31,7 +31,7 @@ The issuance and verification system for signed claims Merit makes about an acco
 | CT-M11-03 | **Graduation** | This account completed its payout ladder | v1, and it is the ladder's public face alongside [M18](M18-graduation-track.md) |
 | CT-M11-04 | **Per-trade** | This account took this trade, with entry, exit, size, and result | **Deferred, OQ-M11-01.** The Axcera brochure ships these; AS-M11-01 is the reason Merit should not, in the shape they ship |
 
-Plus: the public verification page, the signing key lifecycle, the render pipeline, and the opt-in leaderboard surface reserved in [DATA_MODEL section 12](../architecture/DATA_MODEL.md) (`identities.display_name`, `.leaderboard_opt_in`).
+Plus: the public verification page, the signing key lifecycle, the render pipeline, and the opt-in leaderboard surface reserved in [DATA_MODEL section 12](../architecture/data-model/README.md) (`identities.display_name`, `.leaderboard_opt_in`).
 
 ### 1.2 What this module is not
 
@@ -56,8 +56,8 @@ Plus: the public verification page, the signing key lifecycle, the render pipeli
 | INV-M11-07 | Revocation distinguishes **"the fact is not true"** from **"the account was later enforced"**, and the public text differs | SD-M11-02's `revocation_class`. Collapsing the two lets an enforcement retroactively deny an achievement that did happen, which is a claw-back in a different costume (AS-M11-05) |
 | INV-M11-08 | A rendered image is re-generated on fetch from the live row, and its URL is short lived | The image is never a static artifact Merit keeps serving after the row changed. This is what makes revocation reach the surface that actually circulates (AS-M11-02) |
 | INV-M11-09 | No certificate is issued for an account with an open severity 4+ flag, and issuance is **deferred rather than denied** | The account's achievement is real and the card can be issued when the flag closes. Deferral with a visible reason is the zero-denial posture applied to a non-money surface |
-| INV-M11-10 | Leaderboard participation is **opt in**, reversible, and shows a display name that is not the trader's legal name | [DATA_MODEL](../architecture/DATA_MODEL.md)'s reserved columns. A leaderboard is a targeting list for paid-passing services if it is not (AS-M11-06) |
-| INV-M11-11 | Every value on a certificate is read from the account's **pinned plan version** and its stored facts, never recomputed | [Parameter-status ruling](../DECISIONS.md#parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14). A card issued in March must still say what was true in March after the plan is retuned in June |
+| INV-M11-10 | Leaderboard participation is **opt in**, reversible, and shows a display name that is not the trader's legal name | [DATA_MODEL](../architecture/data-model/README.md)'s reserved columns. A leaderboard is a targeting list for paid-passing services if it is not (AS-M11-06) |
+| INV-M11-11 | Every value on a certificate is read from the account's **pinned plan version** and its stored facts, never recomputed | [Parameter-status ruling](../decisions/gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md). A card issued in March must still say what was true in March after the plan is retuned in June |
 
 ---
 
@@ -171,7 +171,7 @@ stateDiagram-v2
 | `certificate.verify_anomaly` **NEW** | enumeration signature detected | `{ window, distinct_codes, unknown_rate, ip_hash_count }`. Consumers: ALERT, RISK. AS-M11-04 |
 | `leaderboard.opt_changed` **NEW** | opt in or out | `{ identity_id, opted_in }`. Consumers: FEED, BI |
 
-**Consumed:** `phase.passed` (CT-M11-01), `wallet.credited` (CT-M11-02, because [ADR-019](../DECISIONS.md) makes the wallet credit the moment the trader experiences as being paid), `account.graduated` (CT-M11-03), `flag.status_changed` (deferral resolution), and `enforcement.applied` (revocation).
+**Consumed:** `phase.passed` (CT-M11-01), `wallet.credited` (CT-M11-02, because [ADR-019](../decisions/ADR-019.md) makes the wallet credit the moment the trader experiences as being paid), `account.graduated` (CT-M11-03), `flag.status_changed` (deferral resolution), and `enforcement.applied` (revocation).
 
 **One consumption choice worth stating.** The payout certificate fires on `wallet.credited`, not on `payout.settled`. Under the two-leg design the wallet credit is instant and irrevocable, and the external settlement may not happen for days or at all if the trader leaves the balance in the wallet. Issuing on external settlement would mean a trader who was paid has no card, which is exactly backwards.
 
@@ -266,7 +266,7 @@ stateDiagram-v2
 
 ### AS-M11-06: The leaderboard is a shopping list (NOVEL)
 
-**Attack.** [DATA_MODEL](../architecture/DATA_MODEL.md) reserves `display_name` and `leaderboard_opt_in` for leaderboards and contests, and every competitor has one. A public leaderboard of top-performing funded traders is, from the other side, a curated and continuously updated list of **the most valuable targets in the estate**: the accounts with the largest balances, the traders most worth impersonating, and the people a paid-passing service most wants to recruit or advertise against ([dossier item 3](../../research/ADVERSARY_DOSSIER.md)).
+**Attack.** [DATA_MODEL](../architecture/data-model/README.md) reserves `display_name` and `leaderboard_opt_in` for leaderboards and contests, and every competitor has one. A public leaderboard of top-performing funded traders is, from the other side, a curated and continuously updated list of **the most valuable targets in the estate**: the accounts with the largest balances, the traders most worth impersonating, and the people a paid-passing service most wants to recruit or advertise against ([dossier item 3](../../research/ADVERSARY_DOSSIER.md)).
 
 **Three concrete uses, none of which require breaking anything.** Recruit the top names into an account-management arrangement, which is now explicitly prohibited by the copy-trading clause but is only detectable after it starts. Target them for account takeover, since a leaderboard tells an attacker exactly which sessions are worth stealing. Or simply advertise against them: "our service passed three of Merit's top ten".
 
@@ -363,7 +363,7 @@ M11 supplies a card on [M6](M06-admin-ops-console.md): issuance by kind, deferre
 
 **OQ-M11-02. What exactly does the `account_enforced` revocation sentence say?** AS-M11-05 fixes the principle: the claim stands and the account was later closed under a named ToS clause. The wording is a legal and brand question. Proposed draft, for counsel: *"This certificate records a real event. The account it refers to was later closed under section X of the Terms of Service."* Naming the clause is deliberate and follows the same reasoning as [M07](M07-risk-abuse.md)'s enforcement posture: an enforcement a trader can read in advance is one they can dispute on the merits.
 
-**OQ-M11-03. Does the leaderboard ship at launch?** AS-M11-06 shows it is a retention feature with a real security cost and a real targeting cost. Proposed: **no at launch**, revisit once retention is measured rather than assumed, and if it ships, ship it with ranks rather than balances and with [M7](M07-risk-abuse.md) treating participants as elevated ATO exposure. The columns stay reserved either way, which is what the [DATA_MODEL](../architecture/DATA_MODEL.md) reservation bought.
+**OQ-M11-03. Does the leaderboard ship at launch?** AS-M11-06 shows it is a retention feature with a real security cost and a real targeting cost. Proposed: **no at launch**, revisit once retention is measured rather than assumed, and if it ships, ship it with ranks rather than balances and with [M7](M07-risk-abuse.md) treating participants as elevated ATO exposure. The columns stay reserved either way, which is what the [DATA_MODEL](../architecture/data-model/README.md) reservation bought.
 
 **OQ-M11-04. Should a certificate be issuable for an evaluation pass on an account that later breached?** The pass happened; the account is now closed. Proposed: **yes, and it is not revoked**, on the same reasoning as `account_enforced`: a fact that occurred stays true. This is worth an explicit ruling because the alternative reading, that a certificate should describe current status rather than a past event, is defensible and would change the whole module's semantics. Recommendation is firmly the first reading: **a certificate is a dated claim about a day, not a statement about now**, and every invariant in this plan follows from that.
 

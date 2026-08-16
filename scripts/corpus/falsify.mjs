@@ -47,8 +47,12 @@ const edit = (dir, file, fn) => {
   const p = join(dir, file);
   writeFileSync(p, fn(readFileSync(p, 'utf8')));
 };
+// Accepts a string or a RegExp, and CHECKS THE ANCHOR EXISTS either way. A seed
+// whose anchor has moved must announce itself rather than replace nothing and
+// report a gate that cannot fail.
 const once = (body, needle, replacement) => {
-  if (!body.includes(needle)) throw new Error(`seed anchor not found: ${needle}`);
+  const found = typeof needle === 'string' ? body.includes(needle) : needle.test(body);
+  if (!found) throw new Error(`seed anchor not found: ${needle}`);
   return body.replace(needle, replacement);
 };
 
@@ -72,6 +76,73 @@ const bumpSpan = (body, name) => {
   return body.replace(pattern, `<!--gen:${name}-->${Number(found[1]) + 1}<!--/gen-->`);
 };
 
+// =============================================================================
+// A SEED MAY NOT PIN TO A LIVE IDENTIFIER (founder rider, 2026-08-15)
+// =============================================================================
+// Two seeds were pinned to the literal `0029`. When ADR-039 to ADR-042 reserved
+// 0029 through 0032, one seed started writing a file the table now claimed and
+// STOPPED FIRING ITS FINDING, and the other inserted a second row for an
+// already-reserved number and PASSED WHILE ASSERTING NOTHING. One went silent and
+// one went vacuous, and only the silent one announced itself.
+//
+// Retargeting them to `0033` fixed both for exactly as long as nobody reserves
+// 0033, which is the same bug with a later expiry date. The rule now is: A SEED
+// DERIVES ITS IDENTIFIER FROM THE REGISTRY AT SEED TIME, so it moves with the
+// table by construction and there is no literal left to go stale.
+//
+// The identifier is read from the tree copy rather than from ROOT, because the
+// copy is what the gate will read. Reading ROOT would reintroduce the same class
+// one level down: a number free in the source tree and claimed in the seeded one.
+const nextFree = (dir, heading) => {
+  const body = readFileSync(join(dir, 'docs/decisions/ALLOCATION.md'), 'utf8');
+  const start = body.indexOf(heading);
+  if (start === -1) throw new Error(`seed anchor not found: the "${heading}" table`);
+  const rest = body.slice(start + heading.length);
+  const next = rest.search(/\n## /);
+  const claimed = new Set();
+  let rows = 0;
+  for (const line of (next === -1 ? rest : rest.slice(0, next)).split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const m = /^\s*\*{0,2}(\d{3,4})\*{0,2}(?:\s+to\s+\*{0,2}(\d{3,4})\*{0,2})?\s*$/.exec(
+      line.split('|')[1] ?? '',
+    );
+    if (!m) continue;
+    rows++;
+    const to = m[2] ? Number(m[2]) : Number(m[1]);
+    for (let n = Number(m[1]); n <= to; n++) claimed.add(n);
+  }
+  // Rule 2 of gates.mjs, applied to the harness: a parser that reads nothing has
+  // lost its input, and returning 1 here would seed a violation against a table
+  // nobody parsed.
+  if (rows === 0) throw new Error(`seed anchor found no rows in the "${heading}" table`);
+  let n = 1;
+  while (claimed.has(n)) n++;
+  return n;
+};
+
+// Insert a migration allocation row. The anchor is the LAST row of the table
+// rather than a literal, so this does not become the next pinned identifier.
+const addMigrationRow = (body, number, state) => {
+  const heading = '## Migration number allocation';
+  const start = body.indexOf(heading);
+  if (start === -1) throw new Error('seed anchor not found: the migration allocation table');
+  // BOUNDED TO ITS OWN SECTION. Unbounded, `rest` runs to the end of the file and
+  // the last table row belongs to the CI gate letter table BELOW this one, so the
+  // reservation lands outside the section the parser reads and the seed quietly
+  // reserves nothing. That is the vacuous class again, inside the fix for it.
+  const after = body.slice(start + heading.length);
+  const end = after.search(/\n## /);
+  const section = end === -1 ? after : after.slice(0, end);
+  const rows = [...section.matchAll(/^\|.*\|$/gm)];
+  if (rows.length < 3) throw new Error('seed anchor found no rows in the migration table');
+  const last = rows[rows.length - 1];
+  const at = start + heading.length + last.index + last[0].length;
+  return `${body.slice(0, at)}\n| ${number} | falsify probe | **reserved.** ${state} |${body.slice(at)}`;
+};
+
+const nextFreeMigration = (dir) => String(nextFree(dir, '## Migration number allocation')).padStart(4, '0');
+const nextFreeAdr = (dir) => String(nextFree(dir, '## Number allocation')).padStart(3, '0');
+
 // One seeded violation per gate. Each is the SMALLEST edit that the gate's own
 // row says must fail, and each names the real failure it stands in for.
 //
@@ -84,8 +155,16 @@ const SEEDS = {
   'CI-06a': {
     what: 'a link to a heading that does not exist',
     real: '27 anchors broke silently across seven documents',
-    expect: 'no-such-heading-anywhere',
-    seed: (d) => edit(d, 'docs/STATE.md', (b) => b + '\n[probe](DECISIONS.md#no-such-heading-anywhere)\n'),
+    // TARGETED AT A FILE THAT EXISTS, and ADR-043 is why it had to move. This
+    // read `DECISIONS.md#no-such-heading-anywhere` until the split deleted that
+    // file. The link would still have produced a finding, and the finding would
+    // still have contained this `expect` string, so the harness would have gone
+    // on reporting success -- while asserting the "no such file" branch instead
+    // of the anchor branch it exists to test. Exactly the rider's vacuous class,
+    // caught before it could report green.
+    expect: 'ADR-034.md#no-such-heading-anywhere (no such heading)',
+    seed: (d) =>
+      edit(d, 'docs/STATE.md', (b) => b + '\n[probe](decisions/ADR-034.md#no-such-heading-anywhere)\n'),
   },
   'CI-06b': {
     what: 'a document whose status is not one of the four',
@@ -118,21 +197,34 @@ const SEEDS = {
     // paragraph above EC-001, the gate correctly ignores it, and the harness
     // reports a gate that cannot fail. The seed was wrong and the gate was
     // right, which is the same shape as the 109 phantom anchors.
+    // ADR-043 stage 2 moved the registry to a directory, so the seed targets the
+    // ENTRY FILE. It no longer needs to slice past the convention paragraph: the
+    // paragraph lives in the README and the entry file is only the entry, which is
+    // the split making a seed simpler rather than harder.
+    //
+    // The stale version of this seed was watched failing as SEED IS STALE before
+    // it was fixed, which is the mechanism the founder's rider asked for doing its
+    // job on the first seed to need it.
     seed: (d) =>
-      edit(d, 'docs/EDGE_CASES.md', (b) => {
-        const at = b.indexOf('## EC-001:');
-        if (at === -1) throw new Error('EC-001 block not found');
-        return (
-          b.slice(0, at) +
-          b.slice(at).replace(/^- Golden scenario ref:.*$/m, '- Golden scenario ref:')
-        );
-      }),
+      edit(d, 'docs/edge-cases/EC-001.md', (b) =>
+        once(b, /^- Golden scenario ref:.*$/m, '- Golden scenario ref:'),
+      ),
   },
   'CI-06f': {
     what: 'an ADR claiming a number nobody reserved',
     real: 'two pull requests claimed ADR-031 from the same base',
-    expect: 'a hole',
-    seed: (d) => edit(d, 'docs/DECISIONS.md', (b) => b + '\n## ADR-099: probe  (2026-08-15, status: proposed)\n'),
+    // DERIVED, not pinned. `ADR-099` worked only while the registry was short of
+    // 99, and the registry is the thing that grows. The seed writes an entry five
+    // past the first free number, which opens a hole AT the first free number
+    // whatever the table currently claims.
+    expect: (d) => `ADR-${nextFreeAdr(d)} is neither present nor reserved (a hole)`,
+    seed: (d) => {
+      const n = String(Number(nextFreeAdr(d)) + 5).padStart(3, '0');
+      writeFileSync(
+        join(d, `docs/decisions/ADR-${n}.md`),
+        `## ADR-${n}: probe  (2026-08-15, status: proposed)\n`,
+      );
+    },
   },
   'CI-06g': {
     what: 'a generated span hand-edited away from its query',
@@ -154,18 +246,27 @@ const SEEDS = {
     // legitimate reservation, so the gate correctly passed and the seed proved
     // nothing. It was watched not failing before it was retargeted. 0033 is the
     // first number the table does not claim.
-    expect: '0033 is neither on disk nor reserved',
-    seed: (d) =>
+    expect: (d) => `${nextFreeMigration(d)} is neither on disk nor reserved`,
+    seed: (d) => {
+      const n = String(Number(nextFreeMigration(d)) + 5).padStart(4, '0');
       renameSync(
         join(d, 'packages/db/migrations/0028_supersede_plan_version_immutability.sql'),
-        join(d, 'packages/db/migrations/0034_supersede_plan_version_immutability.sql'),
-      ),
+        join(d, `packages/db/migrations/${n}_supersede_plan_version_immutability.sql`),
+      );
+    },
   },
   'CI-06i': {
     what: 'a DATA_MODEL section for a table no migration creates',
     real: '50 tables had a migration and no design record, and nothing failed because nothing counted',
     expect: 'probe_phantom_table',
-    seed: (d) => edit(d, 'docs/architecture/DATA_MODEL.md', (b) => b + '\n### probe_phantom_table\nA table that does not exist.\n'),
+    // ADR-043 stage 3: one file per design record, so a phantom record is a
+    // phantom FILE. Watched reporting SEED IS STALE against the old path before
+    // it was moved, which is the second seed the rider's mechanism has caught.
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'docs/architecture/data-model/probe_phantom_table.md'),
+        '### probe_phantom_table\n\nA design record for a table no migration creates.\n',
+      ),
   },
   'CI-06j': {
     what: 'a trigger body reading a column that is not on the table it guards',
@@ -175,6 +276,22 @@ const SEEDS = {
       edit(d, 'packages/db/migrations/0027_triggers_invariants.sql', (b) =>
         once(b, 'NEW.plan_version_id IS DISTINCT FROM OLD.plan_version_id', 'NEW.plan_versoin_id IS DISTINCT FROM OLD.plan_version_id'),
       ),
+  },
+  'CI-06n': {
+    what: 'a registry entry file that its registry README does not list',
+    real:
+      'ADR-043 exempted entry files from INDEX, and an exemption with nothing in its ' +
+      'place is a document that exists and nothing indexes',
+    // Derived, so it cannot collide with a real ADR the way a pinned 999 would
+    // the day the registry reaches it.
+    expect: (d) => `docs/decisions/ADR-${String(Number(nextFreeAdr(d)) + 7).padStart(3, '0')}.md: entry file with no row`,
+    seed: (d) => {
+      const n = String(Number(nextFreeAdr(d)) + 7).padStart(3, '0');
+      writeFileSync(
+        join(d, `docs/decisions/ADR-${n}.md`),
+        `## ADR-${n}: an entry nothing indexes  (2026-08-15, status: proposed)\n`,
+      );
+    },
   },
   'ADR-026': {
     what: 'a delta cited in docs with no manifest row',
@@ -262,39 +379,116 @@ const SCOPE_CASES = [
   // finding that no longer fires). One had gone vacuous and one had gone silent,
   // and only the silent one announced itself. 0033 is the first free number.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // ADR-043's boundary: an ENTRY is a fragment, a README is a document.
+  // ---------------------------------------------------------------------------
+  // The split moved 48 files into docs/decisions/ and exempted them from CI-06b
+  // and CI-06c. An exemption tested only from the quiet side is indistinguishable
+  // from a gate switched off, which is the same argument OQ-P1-04 settled for
+  // CI-06b's document set, so both directions are asserted here.
+  {
+    name: 'CI-06b/entry-out',
+    gate: 'CI-06b',
+    what: 'an ADR entry file with no frontmatter, which must NOT be a finding',
+    expect: 'PASS',
+    // The control is the other side of the same line: a NON-entry file in the very
+    // same directory must still be checked. Without it, a predicate that
+    // accidentally matched all of docs/decisions/ would pass this case silently
+    // and take ALLOCATION.md and the README out of every gate with it.
+    control: {
+      expect: 'docs/decisions/PROBE_NOT_AN_ENTRY.md: no frontmatter block',
+      seed: (d) =>
+        writeFileSync(
+          join(d, 'docs/decisions/PROBE_NOT_AN_ENTRY.md'),
+          '# Probe\n\nIn the registry directory, but not an entry. Still a corpus document.\n',
+        ),
+    },
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'docs/decisions/ADR-D2.md'),
+        '## ADR-D2: probe  (2026-08-15, status: proposed)\n\nAn entry. No frontmatter, on purpose.\n',
+      ),
+  },
   {
     name: 'CI-06h/reserved',
     gate: 'CI-06h',
-    what: 'a number reserved by a sibling branch, with no file here, which must NOT be a finding',
+    what: 'a hole a sibling branch has reserved, which must NOT be a finding',
     expect: 'PASS',
-    seed: (d) =>
-      edit(d, 'docs/DECISIONS.md', (b) => {
-        const m = /^\| 0001 to 0028 \|.*$/m.exec(b);
-        if (!m) throw new Error('seed anchor not found: the 0001 to 0028 allocation row');
-        const at = m.index + m[0].length;
-        return (
-          b.slice(0, at) +
-          '\n| 0033 | a sibling branch, unmerged | **reserved.** No file on disk here, which is ' +
-          'the whole case: a branch cannot see its siblings |' +
-          b.slice(at)
+    // A CONTROL, BECAUSE A `PASS` CASE PROVES NOTHING ON ITS OWN. The old version
+    // of this case inserted a reservation row and asserted the gate stayed quiet.
+    // When the number it pinned to was reserved for real, the row became a
+    // DUPLICATE of an existing reservation, the case went on passing, and it was
+    // asserting nothing at all. Nothing announced that, because a vacuous PASS
+    // and a real PASS are the same output.
+    //
+    // So the pair is run together: `control` seeds the SAME hole WITHOUT the
+    // reservation and must produce the named finding. If the control goes quiet,
+    // the hole is not a hole, the PASS below is vacuous, and the harness says so
+    // instead of reporting green.
+    control: {
+      expect: (d) => `${nextFreeMigration(d)} is neither on disk nor reserved`,
+      seed: (d) => {
+        const n = String(Number(nextFreeMigration(d)) + 1).padStart(4, '0');
+        writeFileSync(
+          join(d, `packages/db/migrations/${n}_probe_opens_a_hole.sql`),
+          '-- On disk above an unclaimed number, which is what makes the gap a hole.\n',
         );
-      }),
+        edit(d, 'docs/decisions/ALLOCATION.md', (b) =>
+          addMigrationRow(b, n, 'the file above, so only the hole below it is at issue'),
+        );
+      },
+    },
+    seed: (d) => {
+      const free = nextFreeMigration(d);
+      const above = String(Number(free) + 1).padStart(4, '0');
+      writeFileSync(
+        join(d, `packages/db/migrations/${above}_probe_opens_a_hole.sql`),
+        '-- Identical to the control tree.\n',
+      );
+      edit(d, 'docs/decisions/ALLOCATION.md', (b) => {
+        const withAbove = addMigrationRow(b, above, 'the file above');
+        // The only difference from the control: the hole is now reserved.
+        return addMigrationRow(
+          withAbove,
+          free,
+          'a sibling branch, unmerged. No file on disk here, which is the whole ' +
+            'case: a branch cannot see its siblings',
+        );
+      });
+    },
   },
   {
     name: 'CI-06h/unallocated',
     gate: 'CI-06h',
     what: 'a migration on disk that no allocation row claims, which MUST be a finding',
-    // 0033 follows the last reserved number, so this opens NO hole. The
-    // allocation finding is the only one it can produce, which is what makes it
-    // a test of that half rather than of the contiguity half.
-    expect: '0033 is not claimed by the migration allocation table',
+    // The first free number, so the file opens NO hole and the allocation finding
+    // is the only one it can produce. That is what makes this a test of the
+    // allocation half rather than of the contiguity half.
+    expect: (d) => `${nextFreeMigration(d)} is not claimed by the migration allocation table`,
     seed: (d) =>
       writeFileSync(
-        join(d, 'packages/db/migrations/0033_probe_unallocated.sql'),
+        join(d, `packages/db/migrations/${nextFreeMigration(d)}_probe_unallocated.sql`),
         '-- A migration whose number came from `ls` rather than from the table.\n',
       ),
   },
 ];
+
+// `expect` may be a string or a function of the seeded tree, because a seed that
+// derives its identifier cannot name its own finding in advance.
+const resolveExpect = (e, dir) => (typeof e === 'function' ? e(dir) : e);
+
+// SEEDING IS THE STEP THAT GOES STALE, so a throw from it is reported as its own
+// outcome rather than crashing the run or, worse, being caught and treated as an
+// ordinary failure. `seed anchor not found` means the harness no longer describes
+// the corpus, which is a harness problem and reads nothing like a gate problem.
+function trySeed(fn, dir) {
+  try {
+    fn(dir);
+    return null;
+  } catch (err) {
+    return err.message;
+  }
+}
 
 function gateIds() {
   const out = execFileSync('node', [join(ROOT, 'scripts/corpus/gates.mjs'), 'list'], { encoding: 'utf8' });
@@ -349,10 +543,18 @@ function main() {
     const dir = mkdtempSync(join(tmpdir(), 'merit-falsify-'));
     try {
       copyTree(dir);
-      SEEDS[id].seed(dir);
+      const stale = trySeed(SEEDS[id].seed, dir);
+      if (stale) {
+        bad++;
+        console.log(`  SEED IS STALE       ${id}  <- seeded: ${SEEDS[id].what}`);
+        console.log(`        ${stale}`);
+        console.log('        The harness no longer describes the corpus. Fix the seed.');
+        continue;
+      }
+      const expect = resolveExpect(SEEDS[id].expect, dir);
       const { pass, stdout } = runGate(dir, id);
       const findings = stdout.split('\n').filter((l) => l.startsWith('       ')).map((l) => l.trim());
-      const onTarget = findings.some((f) => f.includes(SEEDS[id].expect));
+      const onTarget = findings.some((f) => f.includes(expect));
       if (pass) {
         bad++;
         console.log(`  DID NOT FAIL        ${id}  <- seeded: ${SEEDS[id].what}`);
@@ -360,11 +562,11 @@ function main() {
       } else if (!onTarget) {
         bad++;
         console.log(`  FAILED OFF-TARGET   ${id}  <- seeded: ${SEEDS[id].what}`);
-        console.log(`        Expected a finding containing "${SEEDS[id].expect}". Got:`);
+        console.log(`        Expected a finding containing "${expect}". Got:`);
         for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
       } else {
         console.log(`  failed as required  ${id}  <- ${SEEDS[id].what}`);
-        console.log(`        ${findings.find((f) => f.includes(SEEDS[id].expect)).slice(0, 150)}`);
+        console.log(`        ${findings.find((f) => f.includes(expect)).slice(0, 150)}`);
       }
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -376,10 +578,45 @@ function main() {
     const dir = mkdtempSync(join(tmpdir(), 'merit-scope-'));
     try {
       copyTree(dir);
-      c.seed(dir);
+      // THE CONTROL RUNS FIRST AND IN ITS OWN TREE. A `PASS` case only means
+      // something if the same situation WITHOUT the exempting condition fails, so
+      // a control that goes quiet turns the case below from evidence into
+      // decoration, and that is reported here rather than discovered later.
+      if (c.control) {
+        const cdir = mkdtempSync(join(tmpdir(), 'merit-control-'));
+        try {
+          copyTree(cdir);
+          const cstale = trySeed(c.control.seed, cdir);
+          const cexpect = cstale ? null : resolveExpect(c.control.expect, cdir);
+          const r = cstale ? null : runGate(cdir, c.gate);
+          const cf = r ? r.stdout.split('\n').filter((l) => l.startsWith('       ')).map((l) => l.trim()) : [];
+          if (cstale || r.pass || !cf.some((f) => f.includes(cexpect))) {
+            bad++;
+            console.log(`  CONTROL DID NOT FIRE  ${c.name}  <- ${c.what}`);
+            console.log(
+              cstale
+                ? `        seeding the control failed: ${cstale}`
+                : `        Without the exemption this must fail with "${cexpect}". It did not, ` +
+                  'so the PASS below asserts nothing.',
+            );
+            continue;
+          }
+          console.log(`  control fires         ${c.name}`);
+        } finally {
+          rmSync(cdir, { recursive: true, force: true });
+        }
+      }
+      const sstale = trySeed(c.seed, dir);
+      if (sstale) {
+        bad++;
+        console.log(`  SEED IS STALE         ${c.name}  <- ${c.what}`);
+        console.log(`        ${sstale}`);
+        continue;
+      }
+      const cExpect = resolveExpect(c.expect, dir);
       const { pass, stdout } = runGate(dir, c.gate);
       const findings = stdout.split('\n').filter((l) => l.startsWith('       ')).map((l) => l.trim());
-      if (c.expect === 'PASS') {
+      if (cExpect === 'PASS') {
         if (pass) {
           console.log(`  out of scope, passed  ${c.name}  <- ${c.what}`);
         } else {
@@ -388,13 +625,13 @@ function main() {
           console.log(`        ${c.gate} reported FAIL on a tree that does not violate it:`);
           for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
         }
-      } else if (!pass && findings.some((f) => f.includes(c.expect))) {
+      } else if (!pass && findings.some((f) => f.includes(cExpect))) {
         console.log(`  in scope, failed      ${c.name}  <- ${c.what}`);
-        console.log(`        ${findings.find((f) => f.includes(c.expect)).slice(0, 150)}`);
+        console.log(`        ${findings.find((f) => f.includes(cExpect)).slice(0, 150)}`);
       } else {
         bad++;
         console.log(`  ${pass ? 'DID NOT FAIL         ' : 'FAILED OFF-TARGET    '} ${c.name}  <- ${c.what}`);
-        console.log(`        Expected a finding containing "${c.expect}". Got ${findings.length} finding(s):`);
+        console.log(`        Expected a finding containing "${cExpect}". Got ${findings.length} finding(s):`);
         for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
       }
     } finally {

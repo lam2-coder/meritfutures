@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, API_CONTRACT.md, DATA_MODEL.md, ../../research/SECURITY_LANDSCAPE.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md]
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, API_CONTRACT.md, data-model/README.md, ../../research/SECURITY_LANDSCAPE.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md]
 last_updated: 2026-08-14
 ---
 
@@ -16,7 +16,7 @@ Controls carry stable IDs so plans, tests, and code comments can cite them.
 
 | ID | Control | Where it lives |
 |---|---|---|
-| C-01 | Passwordless only: passkeys plus email OTP. No password column exists anywhere | [DATA_MODEL](DATA_MODEL.md) has no password table by construction |
+| C-01 | Passwordless only: passkeys plus email OTP. No password column exists anywhere | [DATA_MODEL](data-model/README.md) has no password table by construction |
 | C-02 | Short-lived access session, rotating refresh, httpOnly Secure SameSite cookies | `sessions` |
 | C-03 | Identity scoping through `scopedDb(identity)`; raw table access lint-blocked | every handler |
 | C-04 | Zod validation at every boundary, request and response allowlists | every endpoint |
@@ -39,9 +39,9 @@ Controls carry stable IDs so plans, tests, and code comments can cite them.
 | C-21 | Server-authoritative pricing, eligibility, and clamping; the client can only ever reduce a payout | checkout, payout endpoints |
 | C-22 | OpenAPI and docs endpoints return 404 in production; `/internal/*` only on the admin origin | API |
 | C-23 | **Wallet-spend velocity limits** per identity, with excess delayed rather than refused | wallet-funded checkout ([M03](../plans/M03-billing-checkout.md) section 3.4), §4.7 |
-| C-24 | **Affiliate destination changes carry the same 48 hour cooling as trader destinations** | [ADR-017](../DECISIONS.md), [M08](../plans/M08-affiliate-system.md) INV-M8-11 |
+| C-24 | **Affiliate destination changes carry the same 48 hour cooling as trader destinations** | [ADR-017](../decisions/ADR-017.md), [M08](../plans/M08-affiliate-system.md) INV-M8-11 |
 | C-25 | **Sealed physical backup of the second `owner` credential**, with a documented unseal procedure, a quarterly existence check, and a lost-key rotation runbook | §8, ops calendar |
-| C-26 | **The indicative realtime layer holds no write grant on any authoritative table** and feeds no eligibility, breach, or money decision | [ADR-020](../DECISIONS.md), [M02](../plans/M02-rithmic-bridge.md) INV-M2-14 |
+| C-26 | **The indicative realtime layer holds no write grant on any authoritative table** and feeds no eligibility, breach, or money decision | [ADR-020](../decisions/ADR-020.md), [M02](../plans/M02-rithmic-bridge.md) INV-M2-14 |
 
 ## 2. Crown jewels and STRIDE
 
@@ -60,7 +60,7 @@ The asset: the ability to cause money to leave Merit.
 | I | Payout history of one trader visible to another | C-03, C-18 |
 | D | Payout endpoint flooded on a promo day | C-07, and the queue absorbs transfer work asynchronously |
 | E | Ops role escalates to change split or cap | C-08, C-10, C-20 |
-| S | **Stolen session spends a wallet balance on evaluations and resets** | C-23, and the containment analysis in §4.7. This is the [ADR-019](../DECISIONS.md) failure mode that stays inside Merit's books |
+| S | **Stolen session spends a wallet balance on evaluations and resets** | C-23, and the containment analysis in §4.7. This is the [ADR-019](../decisions/ADR-019.md) failure mode that stays inside Merit's books |
 | T | **Indicative feed manipulated to move a money decision** | C-26. Structurally impossible rather than defended: the engine has no read path to the live cache |
 
 Additional payout-specific hardening (D4) is detailed in §4.
@@ -157,7 +157,7 @@ The [D0 checklist](../../research/SECURITY_LANDSCAPE.md) mapped onto the real en
 4. **Rise credentials** are minimum-scope and IP-pinned, held only by the worker, rotated on the 90 day calendar, and changing them requires dual control plus a delay window.
 5. **Anomaly alerting on admin actions** outside normal hours or geography, specifically freeze, unfreeze, close, and any plan-config change.
 6. **The freeze contract:** a freeze requires at least one cited open flag and a ToS clause. This is enforced by the API, not by discipline, because the pressure to "just hold this one" arrives exactly when the money is largest.
-7. **Affiliate destinations are trader destinations.** Any change to an affiliate payout destination enters the same 48 hour cooling window with re-verification and notification (C-24). [ADR-017](../DECISIONS.md) put every outbound payment on one rail, and a rail with one slow door and one fast door is a rail with one door.
+7. **Affiliate destinations are trader destinations.** Any change to an affiliate payout destination enters the same 48 hour cooling window with re-verification and notification (C-24). [ADR-017](../decisions/ADR-017.md) put every outbound payment on one rail, and a rail with one slow door and one fast door is a rail with one door.
 
 ## 4.7 The Merit Wallet: account-takeover blast radius (ADR-019)
 
@@ -183,7 +183,7 @@ The wallet changes the shape of the highest-value attack on a trader account, an
 
 - **What Merit stores:** identifiers, statuses, hashes, and money. **What Merit never stores:** identity documents, biometric templates, card numbers, or raw bank details.
 - **Encryption:** TLS 1.2 or higher in transit with HSTS; encryption at rest on the database and object storage; hashed signal values (C-13) so a database dump does not yield a usable device or payment identifier.
-- **Retention** is specified per table in [DATA_MODEL §15](DATA_MODEL.md#15-retention-summary). Financial spine forever, operational ephemera on short clocks.
+- **Retention** is specified per table in [DATA_MODEL §15](data-model/README.md). Financial spine forever, operational ephemera on short clocks.
 - **Deletion requests** redact PII columns and pseudonymize the identity while retaining the financial spine, because the ledger cannot lie about money that moved. The runbook records what was redacted and when.
 - **Logs** are structured, with token and PII redaction at the logger, and the audit trail is separate from debug logging so one cannot be muted with the other.
 
@@ -215,11 +215,11 @@ The ten D0 scenarios are specified in [research/SECURITY_LANDSCAPE.md §4](../..
 2. **Device and payment fingerprints are signals, never proof.** Every enforcement path requires human judgment plus an evidence pack, and no detector enforces on its own.
 3. **T+1 visibility** means our own view of an account lags live trading by one batch cycle. Rithmic's auto-liquidator, not Merit, is the intraday control.
 4. **A solo operator is a single point of failure** for admin access and dual control. The second `owner` credential (a separately stored hardware key) is the mitigation, and it is a real operational burden the founder is choosing on purpose. **The availability half of this is now addressed by the break-glass procedure in §8.1**, which does not remove the limitation and does stop it from becoming an outage.
-5. **Dual control at launch scale is compromise resistance, not insider resistance.** Both `owner` credentials are held by the same person ([ADR-010](../DECISIONS.md)). What C-10 actually buys today is that one phished session or one owned laptop cannot move the cap, the split, the gap, or the payout rail alone. It is not separation of duties and must never be described as such in an audit, a policy document, or a customer conversation. It becomes separation of duties on the first operations hire, with no code change.
+5. **Dual control at launch scale is compromise resistance, not insider resistance.** Both `owner` credentials are held by the same person ([ADR-010](../decisions/ADR-010.md)). What C-10 actually buys today is that one phished session or one owned laptop cannot move the cap, the split, the gap, or the payout rail alone. It is not separation of duties and must never be described as such in an audit, a policy document, or a customer conversation. It becomes separation of duties on the first operations hire, with no code change.
 
 ### 8.1 Break-glass for the second `owner` credential (ruled 2026-08-14)
 
-[ADR-010](../DECISIONS.md) puts both dual-control credentials in one person's hands, honestly documented as compromise resistance rather than separation of duties. That leaves an **availability** gap rather than a security one: if the founder loses both keys, or is unreachable during an incident, no sensitive change can be made at all, and the sensitive set includes the payout rail's credentials.
+[ADR-010](../decisions/ADR-010.md) puts both dual-control credentials in one person's hands, honestly documented as compromise resistance rather than separation of duties. That leaves an **availability** gap rather than a security one: if the founder loses both keys, or is unreachable during an incident, no sensitive change can be made at all, and the sensitive set includes the payout rail's credentials.
 
 Ruled at the Wave 3 batch 1 gate ([M06 OQ-M6-03](../plans/M06-admin-ops-console.md)), in four parts. All four are required before launch, and the fourth exists because the first three describe a control that is only real if it is exercised.
 
@@ -232,6 +232,6 @@ Ruled at the Wave 3 batch 1 gate ([M06 OQ-M6-03](../plans/M06-admin-ops-console.
 
 ## 9. Founder rulings (Wave 2 gate, 2026-08-13) and remaining questions
 
-1. **Second `owner` credential for dual control: CONFIRMED.** Two hardware keys, held by the founder in separate physical locations, before launch. The launch-scale limitation is recorded above as limitation 5 and in [ADR-010](../DECISIONS.md). **Extended at the Wave 3 batch 1 gate with the break-glass procedure in §8.1**, which closes the availability gap that two founder-held keys leave open.
-2. **Admin IP allowlist practicality:** confirm you operate from stable addresses, or accept a VPN or bastion as the allowlisted origin. **Still open**, and it now interacts with [ADR-012](../DECISIONS.md): the allowlist protects `ADMIN_ORIGIN`, a separate apex domain rather than a Merit subdomain.
-3. **WAF vendor:** Cloudflare, **confirmed** with [ADR-007](../DECISIONS.md).
+1. **Second `owner` credential for dual control: CONFIRMED.** Two hardware keys, held by the founder in separate physical locations, before launch. The launch-scale limitation is recorded above as limitation 5 and in [ADR-010](../decisions/ADR-010.md). **Extended at the Wave 3 batch 1 gate with the break-glass procedure in §8.1**, which closes the availability gap that two founder-held keys leave open.
+2. **Admin IP allowlist practicality:** confirm you operate from stable addresses, or accept a VPN or bastion as the allowlisted origin. **Still open**, and it now interacts with [ADR-012](../decisions/ADR-012.md): the allowlist protects `ADMIN_ORIGIN`, a separate apex domain rather than a Merit subdomain.
+3. **WAF vendor:** Cloudflare, **confirmed** with [ADR-007](../decisions/ADR-007.md).

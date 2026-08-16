@@ -1,12 +1,12 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../DECISIONS.md, ../EDGE_CASES.md, ../legal/README.md, ../testing/GOLDEN_SCENARIOS.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/SECURITY_LANDSCAPE.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md, M17-offers-engine.md, M20-wallet.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/golden-scenarios/README.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/SECURITY_LANDSCAPE.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M12-transparency-platform.md, M17-offers-engine.md, M20-wallet.md]
 last_updated: 2026-08-14
 ---
 
 # M19: KYC and Identity Verification
 
-Constitution section §4-ADDENDUM's M19 specification, points (a) through (g), section 10's open placement decision, Appendix D2's data-minimization rules, Appendix A items 6 and 7, and Appendix B5's ten-section template. **Money path under [ADR-003](../DECISIONS.md)'s strict regime**, because verification is a gate on funding and on every external withdrawal.
+Constitution section §4-ADDENDUM's M19 specification, points (a) through (g), section 10's open placement decision, Appendix D2's data-minimization rules, Appendix A items 6 and 7, and Appendix B5's ten-section template. **Money path under [ADR-003](../decisions/ADR-003.md)'s strict regime**, because verification is a gate on funding and on every external withdrawal.
 
 The constitution's own justification is the sentence to hold onto: **Merit's zero-denial policy means fraud must be caught before anyone is in the money, and identity is the chokepoint.** Every other module in the corpus is arranged so that an eligible request is paid mechanically. That arrangement is only survivable if the people holding accounts are who they say they are and are not each other, and this module is the only place that is established.
 
@@ -45,7 +45,7 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 | PL-M19-03 | `direct_purchase` | At purchase, always, on Direct and any instant-funded plan | 100 percent of Direct buyers | **Not configurable.** Funding is immediate, so there is no later moment |
 | n/a | payout-only | n/a | n/a | **Rejected by the constitution**: too late under a zero-denial policy |
 
-**Superseded by [ADR-021](../DECISIONS.md): placement is a composite trigger set, not a single point.** The three rows above remain the vocabulary and the cost model, but the configuration is now a **set of trigger events** and verification fires at whichever is reached **first**. AS-M19-01 is the reason: placement also decides how much of the population enters the biometric dedupe corpus, and the corpus is the fleet-killer.
+**Superseded by [ADR-021](../decisions/ADR-021.md): placement is a composite trigger set, not a single point.** The three rows above remain the vocabulary and the cost model, but the configuration is now a **set of trigger events** and verification fires at whichever is reached **first**. AS-M19-01 is the reason: placement also decides how much of the population enters the biometric dedupe corpus, and the corpus is the fleet-killer.
 
 ### 1.2.1 The composite trigger set (ADR-021)
 
@@ -79,7 +79,7 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 
 | Not M19 | Whose job | Why the boundary is here |
 |---|---|---|
-| Holding documents or biometrics | the provider | Merit stores status, `provider_applicant_id`, and match signals. Never a document, an image, or a template ([DATA_MODEL](../architecture/DATA_MODEL.md), [VG-10](../../research/VIBE_FAILURE_POSTMORTEMS.md), INV-M19-07) |
+| Holding documents or biometrics | the provider | Merit stores status, `provider_applicant_id`, and match signals. Never a document, an image, or a template ([DATA_MODEL](../architecture/data-model/README.md), [VG-10](../../research/VIBE_FAILURE_POSTMORTEMS.md), INV-M19-07) |
 | Deciding enforcement | [M7](M07-risk-abuse.md) | A dedupe hit raises a flag against **both** identities and changes no state by itself ([STATE_MACHINES](../architecture/STATE_MACHINES.md) already says so). AS-M19-05 |
 | Name matching at payout | [M5](M05-payout-system.md) | M19 supplies the verified name; M5 scores the match (its SD-M5-02, AS-M5-02) |
 | Geo-blocking | [M3](M03-billing-checkout.md) at checkout, [M9](M09-marketing-site.md) as disclosure | M19 checks **consistency** across three countries, which is a different question from whether a jurisdiction is restricted |
@@ -106,7 +106,7 @@ Constitution section 10 leaves this open and states the tradeoff in detail. This
 
 ## 2. Entities and schema deltas
 
-M19 consumes the approved `kyc_verifications` ([DATA_MODEL section 3](../architecture/DATA_MODEL.md)), which already carries `placement`, the geo triangle, `biometric_dedupe_hit`, and `dedupe_matched_identity_id`. Four deltas.
+M19 consumes the approved `kyc_verifications` ([DATA_MODEL section 3](../architecture/data-model/README.md)), which already carries `placement`, the geo triangle, `biometric_dedupe_hit`, and `dedupe_matched_identity_id`. Four deltas.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -293,7 +293,7 @@ stateDiagram-v2
 **Counter, and the distinction is the deliverable.**
 1. **A confirmed sanctions match is a legal prohibition on the relationship, not a denial of a request** (INV-M19-05). Merit is not judging their trading; Merit is prohibited from transacting. It is scoped to the relationship, it is the **only** exception in the corpus, and it is written down here precisely so it is never cited as precedent for a general refusal power.
 2. **Possible matches never auto-refuse.** They enter a review queue with `match_strength` recorded, and the disposition, either way, is recorded with a reviewer and a reason (SD-M19-02).
-3. **Confirmation is dual controlled** (section 4), on the same footing as [ADR-010](../DECISIONS.md)'s set, because it is the single irreversible refusal in the system.
+3. **Confirmation is dual controlled** (section 4), on the same footing as [ADR-010](../decisions/ADR-010.md)'s set, because it is the single irreversible refusal in the system.
 4. **`kyc.sanctions_confirmed` triggers a legal runbook, not an automated action.** Freezing funds, reporting obligations, and what a trader may be told are legal questions with jurisdiction-specific answers, and a confirmed match is rare enough that a human process is affordable and appropriate. A counsel item is filed in [legal/](../legal/README.md).
 5. **The screening event payload carries no name** (section 5), because a sanctions-screening alert channel that carries names is a PII channel with a wide audience. EC-128, GS-215.
 
@@ -376,7 +376,7 @@ Ruled at the batch 2 gate and binding on this module, [M04](M04-trader-portal.md
 | **A permanent Verified badge** | The status is a thing the trader keeps and can see, not a gate they passed once and cannot confirm |
 | **One contextual prompt plus a persistent dashboard card** | One prompt at the trigger moment, then a card that waits. Repeated prompting reads as accusation regardless of wording |
 
-**Why this is in a risk module rather than a design document.** Every item above is a decision about what the *detection system* is allowed to say out loud, and the failure it prevents is not an aesthetic one: it is a legitimate trader, correctly flagged for review by a soft link, who reads "your account is under review for fraud" and posts the screenshot. [ADR-022](../DECISIONS.md)'s soft-link review queue makes that population larger, not smaller, which is exactly why the language rule tightens as the graph gets better.
+**Why this is in a risk module rather than a design document.** Every item above is a decision about what the *detection system* is allowed to say out loud, and the failure it prevents is not an aesthetic one: it is a legitimate trader, correctly flagged for review by a soft link, who reads "your account is under review for fraud" and posts the screenshot. [ADR-022](../decisions/ADR-022.md)'s soft-link review queue makes that population larger, not smaller, which is exactly why the language rule tightens as the graph gets better.
 
 ## 8. Test plan
 
@@ -456,7 +456,7 @@ M19 owns the funnel dashboard the section 10 decision will be settled from: cove
 
 ## 10. Open questions for the founder
 
-**OQ-M19-01. RESOLVED at the batch 2 gate by [ADR-021](../DECISIONS.md): yes, and the answer is a composite trigger set rather than a different single point.** The corpus-coverage telemetry and the pre-agreed per-plan escalation are both adopted as proposed. Section 1.2.1 carries the implementation. The original question is preserved below.
+**OQ-M19-01. RESOLVED at the batch 2 gate by [ADR-021](../decisions/ADR-021.md): yes, and the answer is a composite trigger set rather than a different single point.** The corpus-coverage telemetry and the pre-agreed per-plan escalation are both adopted as proposed. Section 1.2.1 carries the implementation. The original question is preserved below.
 
 **OQ-M19-01 (as asked). Does AS-M19-01's finding change the placement recommendation?** The constitution's tradeoff prices cost and conversion and omits corpus coverage, and AS-M19-01 shows `pre_funded` puts roughly 85 percent of buyers outside the dedupe corpus, which is the control the same section calls the fleet-killer. Proposed: **launch `pre_funded` as directed, add corpus coverage to the telemetry, and pre-agree the escalation** as a per-plan move to `pre_eval` on the plan and size combinations the beta shows fleets using, rather than as a lineup-wide switch. This is a genuine amendment to a constitution section and it needs a ruling rather than an assumption.
 

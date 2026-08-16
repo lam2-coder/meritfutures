@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/DATA_MODEL.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../DECISIONS.md, ../EDGE_CASES.md, ../testing/GOLDEN_SCENARIOS.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md]
 last_updated: 2026-08-14
 ---
 
@@ -57,7 +57,7 @@ Two halves that share a graph.
 
 ## 2. Entities and schema deltas
 
-M7 consumes [DATA_MODEL sections 3 and 9](../architecture/DATA_MODEL.md) as approved. Five deltas.
+M7 consumes [DATA_MODEL sections 3 and 9](../architecture/data-model/README.md) as approved. Five deltas.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -100,8 +100,8 @@ Each detector states its input, its statistic, its threshold, and what it is act
 | D-08 | Payment velocity | `identity_signals` | Distinct cards or BINs per identity, and identities per payment fingerprint, over a window | Stolen-card evaluation purchasing (dossier item 7) |
 | D-09 | Destination concentration | `payout_transfers` | One `destination_ref` receiving payouts from more than one unrelated identity | **The strongest mule detector available** ([M05 AS-M5-02](M05-payout-system.md)), and it is a query rather than an inference |
 | D-10 | Affiliate self-deal | attributions | Purchase attributed to a code whose affiliate identity is linked to the buyer | B4 #16, voids attribution and flags |
-| D-15 | **Digital-footprint enrichment** | checkout enrichment adapter | Email and phone footprint age and connectedness, device and IP reputation, VPN or datacenter origin, BIN intelligence, from a SEON-class vendor ([ADR-023](../DECISIONS.md)). **Observe mode at launch**, thresholds tuned on beta data, then soft-decline plus review queue. Never a silent decline | A fresh identity with a clean card is invisible to every other detector at checkout, which is the cheapest moment to see it |
-| D-16 | **Link-confidence score** | all identity signals | Not a detector so much as the **aggregation of every other one** ([ADR-022](../DECISIONS.md)). Hard links auto-enforce; soft clusters queue a **pre-funding** review. The signal-weight table is config | Asks the question the detector list never asked: how confident are we that these two accounts are one person |
+| D-15 | **Digital-footprint enrichment** | checkout enrichment adapter | Email and phone footprint age and connectedness, device and IP reputation, VPN or datacenter origin, BIN intelligence, from a SEON-class vendor ([ADR-023](../decisions/ADR-023.md)). **Observe mode at launch**, thresholds tuned on beta data, then soft-decline plus review queue. Never a silent decline | A fresh identity with a clean card is invisible to every other detector at checkout, which is the cheapest moment to see it |
+| D-16 | **Link-confidence score** | all identity signals | Not a detector so much as the **aggregation of every other one** ([ADR-022](../decisions/ADR-022.md)). Hard links auto-enforce; soft clusters queue a **pre-funding** review. The signal-weight table is config | Asks the question the detector list never asked: how confident are we that these two accounts are one person |
 | D-17 | **Behavioral fingerprint against the banned corpus** | `fills`, `daily_marks` | A returning banned operator recognized by how they trade. **Flag-and-review only, never auto-enforce**, and the output must be evidence-grade | **post-launch tier.** Requires a banned corpus, which requires having banned people |
 | D-11 | Dilution timing | `rule_states.engine_gates` | Small positive days appearing precisely while consistency is the only failing gate, with an inverse-correlated sibling | [M01 AS-02](M01-rules-engine.md)'s manufactured dilution. Cheap **only** because the engine already stores `profit_needed_to_dilute_cents` |
 | **D-12** | **Day-0 graph-prior pairing** | `identity_links`, `identity_signals` | Candidate pairs and groups formed from graph priors **at funding time, with zero trading data**. Output is a watched-cluster set, not a flag: it seeds D-13 and D-14 rather than accusing anyone | The ring that funds and extracts inside one cycle. This is the direct answer to AS-M7-01: a detector that needs history cannot defend the first cycle, so the first cycle is defended by what we knew before it started |
@@ -126,7 +126,7 @@ The machine is [STATE_MACHINES section 7](../architecture/STATE_MACHINES.md), un
 
 ### 3.4 The copy-trading clause, and what it does to D-01
 
-Ruled at the batch 1 gate ([DECISIONS](../DECISIONS.md)), closing OQ-M7-01.
+Ruled at the batch 1 gate ([DECISIONS](../decisions/README.md)), closing OQ-M7-01.
 
 | | Status |
 |---|---|
@@ -212,7 +212,7 @@ Emitted per [EVENTS section 8](../architecture/EVENTS.md), plus three NEW.
 
 **The margin is materially better and the residual is unchanged in kind.** A ring with genuinely clean separation produces no D-12 candidate set, and D-13 and D-14 both operate on D-12's clusters. The first cycle is now defended against rings that share any signal, which is most of them, and undefended against rings that share none, which is the same residual as AS-M7-06 and has the same answer: bounded by caps, priced into the reserve.
 
-**And the extraction timeline itself moved under this scenario's feet.** [ADR-018](../DECISIONS.md) and [ADR-019](../DECISIONS.md) shortened the minimum path: Core EOD's cycle is now 5 trading days and Merit Rapid's is 3, and under the wallet a payout reaches the trader's Merit balance the **same day** it is approved. The external withdrawal still takes 2 to 3 business days, so cash still leaves on roughly the old clock, but **the arithmetic in this scenario must be re-run against the new cycle lengths rather than the ones above**, and D-13's 5 day window is now the same length as Core EOD's entire cycle rather than comfortably inside it. GS-118 is re-pinned accordingly.
+**And the extraction timeline itself moved under this scenario's feet.** [ADR-018](../decisions/ADR-018.md) and [ADR-019](../decisions/ADR-019.md) shortened the minimum path: Core EOD's cycle is now 5 trading days and Merit Rapid's is 3, and under the wallet a payout reaches the trader's Merit balance the **same day** it is approved. The external withdrawal still takes 2 to 3 business days, so cash still leaves on roughly the old clock, but **the arithmetic in this scenario must be re-run against the new cycle lengths rather than the ones above**, and D-13's 5 day window is now the same length as Core EOD's entire cycle rather than comfortably inside it. GS-118 is re-pinned accordingly.
 
 GS-118.
 
@@ -269,7 +269,7 @@ GS-122.
 
 **Attack.** Long at Merit, short at another firm. Invisible to any single firm's data by construction. The dossier's own conclusion is "accept, bound, budget".
 
-**Counter, which is honest rather than clever.** Nothing in M7 detects this and nothing will. What bounds it is already built: the per-request cap, the [consistency](../GLOSSARY.md#funded-consistency) gate that forces multi-day extraction, the cadence gap, and the **5-payout ladder** that bounds lifetime extraction per account (INV-17, [ADR-024](../DECISIONS.md)). What prices it is the reserve. What could eventually detect it is a shared-vendor risk network, which the flag schema already accommodates through `risk_flags.source` accepting `vendor:<name>` without a migration.
+**Counter, which is honest rather than clever.** Nothing in M7 detects this and nothing will. What bounds it is already built: the per-request cap, the [consistency](../GLOSSARY.md#funded-consistency) gate that forces multi-day extraction, the cadence gap, and the **5-payout ladder** that bounds lifetime extraction per account (INV-17, [ADR-024](../decisions/ADR-024.md)). What prices it is the reserve. What could eventually detect it is a shared-vendor risk network, which the flag schema already accommodates through `risk_flags.source` accepting `vendor:<name>` without a migration.
 
 **The one thing M7 owes here is not pretending.** The metric that matters is the share of realized payout liability attributable to accounts with **no** internal ring signal, tracked over time. If that share climbs, cross-firm activity is growing and the reserve assumption needs revisiting. Nobody can detect the scheme; anyone can watch its footprint.
 
@@ -285,7 +285,7 @@ The pack gives the trader every fill, mark, rule state, and gate result of their
 
 ## 7.9 Link-confidence scoring, and the tiers it ships in
 
-[ADR-022](../DECISIONS.md), folded here because it changes what this module *is*: a set of independent detectors becomes a **scored identity graph**, and enforcement grades by confidence rather than by which detector happened to fire.
+[ADR-022](../decisions/ADR-022.md), folded here because it changes what this module *is*: a set of independent detectors becomes a **scored identity graph**, and enforcement grades by confidence rather than by which detector happened to fire.
 
 | Link class | Signals | Behavior |
 |---|---|---|

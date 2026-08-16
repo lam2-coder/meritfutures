@@ -17,7 +17,7 @@ Deep profiles of the ten biggest futures props as of 2026-08-13, plus the table-
 ---
 
 
-## Live-path structures and ladder lengths (2026-08-14, for [ADR-024](../docs/DECISIONS.md))
+## Live-path structures and ladder lengths (2026-08-14, for [ADR-024](../docs/decisions/ADR-024.md))
 
 Recorded because "industry consensus is 5" is a claim that should be checkable rather than remembered, and because the **live path is where firms differ most in honesty**.
 
@@ -128,7 +128,7 @@ Recorded because "industry consensus is 5" is a claim that should be checkable r
 5. **Honest liability mechanics disclosed** (caps/gaps/ladders explained as what they are). Firms hide these in help centers; Merit can publish the why.
 6. **A serious trader-facing eligibility breakdown** (gate-by-gate "here's exactly what's missing for your payout", our `GET /accounts/:id/eligibility`). Current dashboards show progress bars but not the full gate logic.
 
-## Contradictions / notes for DECISIONS.md
+## Contradictions / notes for docs/decisions/
 
 - **No constitution contradictions.** The §1B firm list needed one swap (Alpha Futures in, FuturesElite to watchlist), which §1B explicitly authorizes.
 - **Market drift worth noting (no amendment required):** (a) several top firms now run CQG or dxFeed rather than Rithmic (TradeDay is 100% CQG; MFF is dual CQG+dxFeed), so Rithmic-native remains valid but the B3 adapter-interface directive is more important than the constitution implies; (b) payout-cap direction across the market is tightening (Topstep cuts) while consistency direction is loosening (Apex 30→50%), so Merit's plan parameters sit comfortably inside current market norms; (c) win-day/qualifying-day resets after payout (Tradeify pattern cited in constitution M1) confirmed still current.

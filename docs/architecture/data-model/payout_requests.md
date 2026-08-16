@@ -1,0 +1,33 @@
+### payout_requests
+| Column | Type | Constraints | Why |
+|---|---|---|---|
+| `id` | uuid | pk | |
+| `account_id` | uuid | fk accounts, not null, on delete restrict | |
+| `identity_id` | uuid | fk identities, not null, on delete restrict | denormalized deliberately (Wave 2 gate ruling 4): "how much is this human extracting right now" cannot be a join if it is being asked inside the race it is protecting against (B4 #7) |
+| `requested_cents` | bigint | not null, check > 0 | what the trader asked for |
+| `approved_cents` | bigint | not null, check >= 0 | after the [clamp](../../GLOSSARY.md#clamp), `min(requested, withdrawable, cap)` |
+| `trader_cents` | bigint | not null, check >= 0 | split leg; becomes the **wallet** payable |
+| `firm_cents` | bigint | not null, check >= 0 | split leg; becomes revenue |
+| `basis_trading_day` | date | not null | the [last closed day](../../GLOSSARY.md#last-closed-day) the decision used. Not a wall clock |
+| `plan_version_id` | uuid | fk plan_versions, not null, on delete restrict | the contract in force, copied for provability. The account pins it too; this copy is what makes the payout explicable without reading the account |
+| `eligibility_snapshot` | jsonb | not null | full gate-by-gate evaluation and inputs, immutable |
+| `status` | `payout_status` enum(`approved`,`settled`,`failed`,`frozen`) | not null | **the ruled enum ([ADR-028](../../decisions/ADR-028.md)).** There is no `denied` and no review state **by design**; `transferring` was retired to `wallet_withdrawals`. Adding a value requires an ADR against the zero-denial policy |
+| `idempotency_key` | text | not null | client-supplied |
+| `payout_ordinal` | integer | not null, check > 0 | 1-based per account; drives the ladder and the cap schedule. R-45 defines it as `payouts_settled_count + 1`, so it is derived from **settlements** rather than attempts |
+| `approved_at` | timestamptz | not null default now() | |
+| `settled_at` | timestamptz | null | |
+| `settled_trading_day` | date | null | **`SD-03`.** When the settlement happened |
+| `effective_trading_day` | date | null | **`SD-03`.** The **first trading day whose opening balance reflects the withdrawal**. The adjustment is applied at the open of this day, never inside a session (R-10, `SD-01`), which is half of why a settled payout can never breach the account that earned it (INV-21). Replay must not depend on a wall clock, and storing both days makes the fold deterministic years later |
+| `frozen_at` | timestamptz | null | **`SD-M5-01`** |
+| `freeze_flag_id` | uuid | fk risk_flags, null, on delete restrict | **`SD-M5-01`** |
+| `freeze_expires_at` | timestamptz | null | **`SD-M5-01`.** A freeze with a cited flag but no clock is an indefinite hold, which is a denial with extra steps and is exactly what a zero-denial policy must not permit itself (AS-M5-04). The expiry is what makes the control bind on **Merit** rather than on the trader |
+| `balance_reflection_status` | text | not null default `pending`, check in (`pending`,`observed`,`missing`) | **`SD-M5-04`**, INV-M5-13. A settled payout whose withdrawal never appears in the platform balance leaves the trader able to withdraw the same money twice. `missing` is a real state, not an error: the money left our ledger and did not arrive in theirs, and somebody has to be told |
+| `reflected_on_trading_day` | date | null | **`SD-M5-04`** |
+| `created_at`, `updated_at` | timestamptz | not null default now() | |
+
+Indexes: unique `payout_requests_account_idempotency_uq (account_id, idempotency_key)`; unique `payout_requests_account_ordinal_uq (account_id, payout_ordinal)` where `status <> 'failed'` (**`SD-05`**); unique `payout_requests_no_in_flight_uq (account_id)` where `status in ('approved','frozen')` (**`SD-09`**, predicate per [ADR-028](../../decisions/ADR-028.md)); `payout_requests_outstanding_idx (status)` where the **same** predicate; `payout_requests_identity_approved_idx (identity_id, approved_at desc)`; `payout_requests_freeze_expiry_idx (freeze_expires_at)` where `status = 'frozen'`; `payout_requests_reflection_pending_idx (settled_trading_day)` where settled and not observed.
+Constraints: `payout_requests_split_sums` (`trader_cents + firm_cents = approved_cents`); `payout_requests_approved_within_requested`; `payout_requests_freeze_is_complete`; `payout_requests_settled_has_days`; `payout_requests_effective_after_settled`; `payout_requests_reflection_needs_settlement`; `payout_requests_observed_has_day`.
+Retention: forever.
+Design note for the founder: `eligibility_snapshot` is a `jsonb` column rather than a separate table because it is written exactly once, always read with its parent, and must never drift from it. A join here would add a way for the proof and the decision to disagree.
+**Why `SD-05`'s ordinal index is partial.** A failed transfer must not consume a ladder rung or advance the cap schedule (EC-037). With a total unique index a failure would burn the ordinal and the retry would need a new one, which silently shortens a finite ladder (5 / 5 / 4).
+**Why the `SD-09` predicate is the dangerous half, and why the two indexes sit adjacent.** The partial unique enforces G-NO-IN-FLIGHT in the database because the engine is not the only writer (FM-11, EC-040, GS-052). If `transferring` had stayed in the predicate after [ADR-028](../../decisions/ADR-028.md) retired the value, the index would still exist, still be valid, and enforce **nothing**, because no row would ever match, and no test would fail. **A predicate fixed in one of two places is a uniqueness guarantee that holds on Tuesdays**, so both are written in one file, adjacent, with the same predicate, precisely so a future change to one is visibly a change to one of two.
