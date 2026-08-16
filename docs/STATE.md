@@ -205,6 +205,15 @@ Nothing.
 
 **And the tally of hand-maintained counts turned out to be double-booked.** Two findings claim "eighth" and two claim "ninth". No ordinal is claimed for this session's (the plan's five-existing-tables against six), and the reason is recorded in the manifest: **a running total with no allocation table is [ADR-034](decisions/ADR-034.md)'s race one registry over.** Four further stale figures from `0028` landing were converted to spans rather than tallied.
 
+### FOLD-01 session 4: the invariants and the adversarial scenarios (2026-08-16)
+
+**[SECURITY](architecture/SECURITY.md), [M19](plans/M19-kyc-identity.md), [M07](plans/M07-risk-abuse.md) and [M16](plans/M16-notification-center.md) are folded.** Non-money, no migration, no registry entry, no manifest row. C-01 widened to three factors with the stuffing-immunity claim preserved verbatim; **C-27** the authority boundary and **C-28** the pre-identity breaker; §2.7 rescoped to founder and admin credentials with its prior wording quoted; a new §4.8. `INV-M19-13` and `INV-M19-14`, `AS-M19-09`, `DEP-M19-09`. A **third resolution tier** in M07 with `D-18` and the fleet signature. `NC-M16-05`, `INV-M16-12`, `AS-M16-07`, and **`INV-M16-11` recorded as CONFIRMED rather than amended, in those words**.
+
+**The brief named an `SD-M7-nn` that does not exist, and the finding is that it should not.** FOLD-01 section 6.1 promised M07 a delta wiring portability history to the recycling decision. **Section 4 of the same plan enumerates nine changes and none is M7's, and `0029` contains none.** Every input and output already exists: five columns and two indexes from `SD-M19-05`, `identity_restriction_episodes.opened_at` from `0031`, and the suppression pair from **`SD-M7-04`**, in `0002` since the reconciliation. `identity_links.link_kind` carries no CHECK, so a phone edge kind is a vocabulary value. Writing the identifier would have failed `ADR-026`'s gate on the spot, and a `deferred` row for a change with nothing in it is a delta a later session opens and discovers is empty. **Recorded in M07 section 3.5.** The founder may overrule; it would need a migration to be about.
+
+**Two open questions leave this session and neither blocks session 5.** **`OQ-M7-05`:** "hard link" means *auto-enforce* in section 7.9 and [ADR-029](decisions/ADR-029.md) and *flag-and-no-state-change* in section 3.1 and `INV-M19-04`. **ADR-039 settled it for the phone and only for the phone**, and this session refused to extend one ruling's reach by inheritance. And **session 6 owes two citations**: `CI-06d` fails on any unresolvable `GS` or `EC` identifier, so `AS-M19-09` and `AS-M16-07` name session 6 in prose rather than claiming numbers, and session 6 must go back and wire them.
+
+
 ---
 
 ## FOLD-02 is planned and approved, and it collapses one of the two new states into a state that already exists (2026-08-15)

@@ -1,12 +1,12 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M15-discord-integration.md, M19-kyc-identity.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-16
 ---
 
 # M16: Notification Center
 
-Constitution section §4-ADDENDUM ("in-app, email, and push preference matrix, event driven"), [EVENTS section 11](../architecture/EVENTS.md)'s lifecycle triggers and their suppression guards, Appendix B5's ten-section template, and Appendix D4's destination-change controls. Non-money path, with two exceptions named in 1.4 that are held to a higher standard because a notification is sometimes the only control standing between an attacker and a payout.
+Constitution section §4-ADDENDUM ("in-app, email, and push preference matrix, event driven"), [EVENTS section 11](../architecture/EVENTS.md)'s lifecycle triggers and their suppression guards, Appendix B5's ten-section template, and Appendix D4's destination-change controls. Non-money path, with three exceptions named in 1.4 that are held to a higher standard because a notification is sometimes the only control standing between an attacker and a payout. **The third arrived with [ADR-039](../decisions/ADR-039.md)**: the pre-identity class is not about a payout at all, and it is held to that standard because its send path spends money on an attacker-supplied destination.
 
 One sentence governs this module: **a preference is a promise about what Merit will send, and there is a small set of messages a trader must never be able to switch off, so the entire design is the argument about where that line sits.**
 
@@ -22,16 +22,25 @@ Two failures bracket this module. Sending too much trains traders to ignore Meri
 
 The preference matrix, the templates, the in-app inbox, and the decision about **who gets told what, on which channel, and whether they may decline.**
 
-### 1.2 The four classes, which are the module's real specification
+### 1.2 The five classes, which are the module's real specification
 
 Every notification kind belongs to exactly one class, and the class decides what a preference can do to it.
 
 | ID | Class | Mutable? | Channels | Examples |
 |---|---|---|---|---|
-| NC-M16-01 | **Security** | **No.** Not by preference, not by any setting | Every verified channel on file, **and every prior one** (AS-M16-02) | Destination change, KYC state change, new device sign-in, password-equivalent credential change, role or access change |
+| NC-M16-01 | **Security** | **No.** Not by preference, not by any setting | Every verified channel on file, **and every prior one** (AS-M16-02) | Destination change, **phone change**, KYC state change, new device sign-in, password-equivalent credential change, role or access change |
 | NC-M16-02 | **Money** | **No** | Email plus in-app, always | Payout approved, wallet credited, withdrawal settled, **withdrawal failed**, freeze applied, freeze expiring, chargeback, refund |
 | NC-M16-03 | **Account state** | Channel choice only; cannot be silenced entirely | Trader's choice among email and in-app | Passed, breached, graduated, plan version pinned at purchase, reset available |
 | NC-M16-04 | **Marketing and lifecycle** | **Fully mutable**, including off | Trader's choice | Win-backs, offers, product news, community |
+| NC-M16-05 | **Pre-identity auth** **NEW** | **No, and there is nobody to hold a preference.** The generated `mutable` column already says so: `pre_identity_auth` is not in (`account_state`, `marketing`), so nobody may opt out of the OTP proving they hold the number they are registering | SMS or email, to the destination supplied at registration and to nothing else | Registration OTP, phone-verification OTP |
+
+**NC-M16-05 is [ADR-039](../decisions/ADR-039.md) amendment 2 and it is the module's first class that is not about a customer.** It exists because the four above were all written for a **known recipient**, and a registration OTP has none.
+
+**Three properties follow, and the third is the one that would be got wrong.**
+
+1. **It is never rate-limit exempt.** `notification_kinds.rate_limit_exempt` is a **generated** column, `class IN ('security','money')`, so the new class is non-exempt **by construction** rather than by anybody remembering (`SD-M16-07`). INV-M16-12.
+2. **It is never coalesced.** `notification_kinds_immutable_never_coalesced` was dropped and re-added to include it. Three OTP requests are three codes, and collapsing a burst of them into one message delivers one code for three challenges, which is a broken login rather than a tidy inbox.
+3. **It is a policy row and never a `notifications` row, and the reason is structural rather than an omission.** `notifications.identity_id` is `NOT NULL` (`0019`), so a pre-identity message **cannot be a `notifications` row at all**: there is no identity yet, which is what "pre-identity" means. The kind exists here so the SMS sender can ask whether to consult `otp_send_budget`; the **delivery record** is `otp_challenges` plus an `integration_dispatches` row. **A later session "completing the pair" by widening `notifications.class` would be adding a value that no row can ever legally carry.**
 
 **The line sits between NC-M16-03 and NC-M16-04, and between "which channel" and "whether at all".** A trader may always choose a channel. A trader may only choose silence on the marketing class. That is a stronger commitment than most products make and it is the one the constitution's payout-trust doctrine requires: [EVENTS section 11](../architecture/EVENTS.md) says of `payout.transfer_failed`, "always send; silence is what kills payout trust", and a preference matrix that could mute it would be a control with a hole shaped exactly like the failure it exists to prevent.
 
@@ -59,19 +68,33 @@ Every notification kind belongs to exactly one class, and the class decides what
 | INV-M16-08 | A new notification kind defaults to its **class default**, never to enabled-for-everyone | AS-M16-06. Shipping a kind that switches itself on for every existing trader is how a product spams the people who trusted it longest |
 | INV-M16-09 | `read_at` is a convenience, never evidence of notice | AS-M16-05. Proof of notice is the dispatch record plus the delivery receipt, and the distinction matters the first time a freeze or a ToS change is disputed |
 | INV-M16-10 | Every trader-facing message about money states the two legs honestly | [M09](M09-marketing-site.md) INV-M9-09 and AS-M9-06 applied to transactional copy: wallet credit is same day, external withdrawal is 2 to 3 business days, and neither appears alone |
-| INV-M16-11 | Rate limiting and coalescing never apply to the security or money classes | A quota that can drop a freeze notice is a quota that will, on the busiest day, which is the day it matters |
+| INV-M16-11 | Rate limiting and coalescing never apply to the security or money classes | A quota that can drop a freeze notice is a quota that will, on the busiest day, which is the day it matters. **[ADR-039](../decisions/ADR-039.md) records this invariant as CONFIRMED, not amended**, and `rate_limit_exempt` is generated as `class IN ('security','money')`, which is this sentence in DDL |
+| INV-M16-12 | **The exemption is post-identity, and the split is the invariant.** A message to an authenticated recipient at an address Merit already holds is `INV-M16-11`'s subject. A message to an **attacker-supplied destination before any identity exists** is not, and it carries per-number, per-IP and per-country velocity plus a **global cost circuit breaker** | NC-M16-05, `SD-M16-04`'s `otp_send_budget`, and `SD-M16-07`'s generated `rate_limit_exempt`. **The breaker degrades rather than stopping**, and its trip, its degraded window and its recovery each alarm. [SECURITY](../architecture/SECURITY.md) C-28, AS-M16-07 |
+
+**`INV-M16-11` is CONFIRMED, not amended, and [ADR-039](../decisions/ADR-039.md) says so in those words.** Nothing about it moves: the security and money classes stay exempt from rate limiting and coalescing, for exactly the reason written beside it. **What changed is that a fifth class exists which is neither of them**, so the exemption no longer reaches the pre-identity surface by default.
+
+**The distinction it was always making, now stated.** `INV-M16-11` was written for **post-identity** messages: the recipient is authenticated and the address is one Merit already verified, so an exemption there costs Merit a message it wanted to send anyway. Registration OTP is the opposite on both counts. **The recipient is unauthenticated and the destination is chosen by whoever is at the keyboard**, so a rate-limit exemption there is not a promise to a customer, it is a blank cheque written to a stranger. **Applied to an attacker-supplied number, the exemption funds the attack** (AS-M16-07). Two classes, and the invariant that was right stays exactly as it was.
 
 ---
 
 ## 2. Entities and schema deltas
 
-M16 consumes the approved `notifications` and `notification_preferences` ([DATA_MODEL section 10](../architecture/data-model/README.md)) and adds three deltas.
+M16 consumes the approved `notifications` and `notification_preferences` ([DATA_MODEL section 10](../architecture/data-model/README.md)). **Seven deltas: three at the schema-delta reconciliation and four at [FOLD-01](FOLD-01-phone-identity.md).**
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
 | SD-M16-01 | new `notification_kinds` | `kind`, `class check in ('security','money','account_state','marketing')`, `title`, `template_code`, `template_version`, `default_channels text[]`, `mutable boolean generated from class`, `coalesce_key_spec text null` | INV-M16-01, INV-M16-02, INV-M16-08. The class is the module's entire policy and it belongs in data, where it can be reviewed in one query, rather than distributed across handlers. `mutable` is generated from `class` so the two can never disagree, which is the sort of drift that produces a mutable money notification eighteen months from now |
 | SD-M16-02 | `notifications` | add `class`, `template_version`, `rendered_body text`, `coalesce_key text null`, `dispatch_ref uuid null fk integration_dispatches`, `delivery_status`, `delivered_at null` | INV-M16-05 and INV-M16-09. `rendered_body` is what makes a message reproducible years later, and the split between `sent_at`, `delivery_status`, and `read_at` is what makes AS-M16-05's distinction between dispatch, delivery, and reading expressible at all |
 | SD-M16-03 | new `contact_channels` | `id`, `identity_id`, `kind check in ('email','push')`, `value_hash`, `verified_at null`, `superseded_at null`, `superseded_by null` | INV-M16-03. Notifying "the previous contact" requires the previous contact to exist as a row rather than as a value that was overwritten. This is the schema that makes the classic account-takeover countermeasure possible, and its absence is why that countermeasure is so often missing |
+
+**The four FOLD-01 deltas**, from [ADR-039](../decisions/ADR-039.md) and landed in [`0029_phone_identity_and_auth`](../../packages/db/migrations/0029_phone_identity_and_auth.sql).
+
+| ID | Table | Change | Why it is not optional |
+|---|---|---|---|
+| SD-M16-04 | new `otp_send_budget` | pk `(scope_kind, scope_key, evaluated_on)` over `phone`, `ip`, `country` and `global`; `sends` / `send_limit`, `spend_cents` / `budget_cents`, `state check in ('armed','degraded','manually_overridden')`, `tripped_at`, `alarm_raised_at`, `recovered_at`, `deferred_registrations`, and a dated override | INV-M16-12, AS-M16-07. Built on `plan_breaker_state`'s pattern from `0016` rather than a new idiom. **`state` has no stopping value and the absence is the founder's ruling**, not an oversight. `otp_send_budget_degraded_is_alarmed` refuses to store a silent trip, and `deferred_registrations` is the reported figure ADR-039 requires, given somewhere to live so it is not a control citing an input that does not exist |
+| SD-M16-05 | `otp_challenges` | add `channel check in ('email','sms')` and `destination_hash`; `email_normalized` relaxed to nullable under `otp_challenges_exactly_one_destination` | SMS OTP. **Exactly one destination, and it is the one the channel names**: two destinations on one challenge is a code delivered twice, which halves the work of intercepting it, and zero is a challenge nobody can answer. `channel` takes **no default** deliberately, because `DEFAULT 'email'` would let a handler that forgot to set it write a well-formed email challenge and leave a CHECK doing a type's job |
+| SD-M16-06 | `contact_channels` | `kind` check widened to `('email','push','sms')`, dropped and re-added under an explicit name | **[FOLD-01](FOLD-01-phone-identity.md) finding 4: `INV-M16-03` could not notify a prior *number*.** `0019` wrote the check inline with no row shape for a phone, so ADR-039 (c)'s "notify the prior number **and** email" had nothing to notify and was unbuildable. `contact_channels_live_uq` is already per `(identity_id, kind)`, so it needs no change and now means one live SMS destination per identity, which is what (b) implies for the delivery side |
+| SD-M16-07 | `notification_kinds` | `class` gains `pre_identity_auth`; new **`rate_limit_exempt boolean` generated from `class`**; `notification_kinds_immutable_never_coalesced` widened to the new class | NC-M16-05, INV-M16-12. **Generated, on `mutable`'s precedent from `SD-M16-01` and for the same reason**: as an ordinary boolean, one careless seed row marking the registration-OTP kind exempt restores SMS pumping and nothing objects. Generated, the two facts cannot disagree at all. `mutable` then gives the right answer for the new class **without being touched**, which is worth naming as the payoff of the original decision |
 
 ---
 
@@ -115,6 +138,34 @@ sequenceDiagram
     Note over M16,Old: For a configured window after the change,<br/>every security-class message goes to BOTH.<br/>INV-M16-03, AS-M16-02.
     Note over M16: Preference changes are themselves<br/>security class and confirm to the OLD<br/>contact first. INV-M16-04.
 ```
+
+**The phone leg, which is the same ceremony with two extra locks and one different reason.** [ADR-039](../decisions/ADR-039.md) (c) and (d). It is a heavier ceremony than the email leg above and the justification is one sentence: **under ADR-039 the phone is an authentication factor**, so changing it is a credential change wearing the clothes of a settings edit. M16 owns the notification legs; the ceremony's state lives in `phone_change_requests` (`SD-M19-06`) and its full control narrative is [SECURITY §4.8](../architecture/SECURITY.md).
+
+```mermaid
+sequenceDiagram
+    participant T as Trader session
+    participant M16
+    participant Old as Prior NUMBER (contact_channels kind=sms)
+    participant Mail as Email on file
+    participant New as New number
+    T->>M16: request phone change
+    M16->>Old: security-class notice, immediate, unmutable
+    M16->>Mail: security-class notice, immediate, unmutable
+    Note over M16,Mail: BOTH legs, not either. (c) requires both and<br/>a change that notified one has not satisfied it.<br/>ONE timestamp records the pair: prior_notified_at.
+    M16->>New: pre-identity-class OTP (NC-M16-05, budget consulted)
+    New-->>M16: verified
+    M16->>M16: dual channel or passkey, NEVER SMS alone (C-27)
+    M16->>M16: withdrawal hold set, and it must STILL be running at apply
+    M16->>M16: supersede the prior identity_phones row, keep it
+```
+
+| Leg | What M16 owes it |
+|---|---|
+| **Both prior legs, never one** | `prior_notified_at` is a single timestamp for the number **and** the email, because (c) requires both and there is no partial satisfaction. `INV-M16-03` on a *number* is what `SD-M16-06` bought |
+| **The new number's OTP is NC-M16-05, not NC-M16-01** | It is addressed to a destination nobody has verified yet, so it consults `otp_send_budget` like any other pre-identity send. INV-M16-12 |
+| **The confirmation is never SMS alone** | [SECURITY](../architecture/SECURITY.md) C-27, and `sessions.elevated_by_factor` has no `sms_otp` value to write. A SIM-swapped session cannot start this ceremony, let alone finish it |
+| **The prior row survives** | Supersession rather than update, `SD-M19-05`, for `SD-M16-03`'s reason exactly: a prior contact that was overwritten cannot be notified next time |
+| **The hold is not M16's to shorten** | The external-withdrawal hold runs on its own clock and a notification neither starts nor ends it. `phone_change_requests_applied_is_complete` asserts the ordering, and the duration is config under [ADR-037](../decisions/ADR-037.md) |
 
 ### 3.3 Coalescing
 
@@ -178,7 +229,7 @@ stateDiagram-v2
 
 ## 7. Adversarial scenarios
 
-**Six listed, six novel.**
+**Seven listed, seven novel.**
 
 ### AS-M16-01: The freeze notice that is also an investigation tip-off (NOVEL)
 
@@ -265,6 +316,29 @@ Every notice about steps 2 and 3 now arrives at an address the attacker controls
 
 ---
 
+### AS-M16-07: The pumping attempt, where the abuse pays the attacker rather than costing them (NOVEL)
+
+**Attack.** SMS pumping, also sold as artificially inflated traffic. The attacker controls, or revenue-shares with whoever controls, a block of premium-rate or high-settlement-cost numbers. They point Merit's registration form at those numbers and drive volume. **Every OTP Merit sends is revenue to them and a line item to Merit.** No account is taken over, no data leaves, nothing is stolen in the sense the rest of this module is written about, and Merit's invoice goes up until somebody looks at it.
+
+**Why it lands specifically here, and it is a classification error rather than a coding one.** `INV-M16-11` exempts the security class from rate limiting, for an excellent reason: a quota that can drop a freeze notice will drop one on the day it matters. Registration OTP looks **exactly** like a security message. It is about authentication, it is time-critical, dropping it breaks a real customer's signup, and it would be classified `security` by any careful person applying this module's own four classes. **That classification is the vulnerability.** The exemption was written for a recipient Merit has already verified; the registration form hands the destination to the attacker.
+
+**And this attack has a property nothing else in the corpus has.** Every other abuse here costs the adversary something to attempt: an evaluation fee, a stolen card, a burned identity, an hour of manufactured trades. **Pumping pays.** The attacker's revenue is Merit's cost, in the same transaction, which means there is no volume at which they stop voluntarily and no threshold below which the attempt is uneconomic for them.
+
+**Counter, and the fourth one is the ruling a careful implementer would have got backwards.**
+
+1. **The class splits, and the split is the finding** (NC-M16-05, INV-M16-12). Registration OTP is `pre_identity_auth`, not `security`. **`INV-M16-11` is confirmed and unchanged** for the post-identity messages it was written about; what it stops doing is reaching a surface it was never about.
+2. **The exemption is unforgeable rather than merely correct.** `rate_limit_exempt` is **generated** from `class` (`SD-M16-07`), so the new class is non-exempt by construction. This is the whole argument `SD-M16-01` already made for `mutable`, applied a second time: as an ordinary boolean, a single seed row re-exempts the pre-identity class eighteen months from now and **nothing objects**, and the person who writes that row will be doing something that looks like fixing a bug.
+3. **Four scopes, and `global` is the one that is not obvious.** `otp_send_budget` carries per-number, per-IP and per-country velocity plus a **global cost breaker**. Per-country matters because pumping concentrates on specific destinations; **global matters because Merit's SMS bill is one number and a per-country breaker cannot see an attack spread across ten.** And the breaker is denominated in **`spend_cents` against `budget_cents`**, not only in message counts, because the attacker's yield is money and a control that counts attempts is measuring the wrong quantity.
+4. **The breaker degrades, it does not stop, and this is the founder's ruling** ([ADR-039](../decisions/ADR-039.md)). Phone verification is mandatory at registration, so a breaker that **stops** means no new customers: **the control protecting revenue becomes a cheap denial of service on it.** Worse, it is cheap in exactly the currency the attacker is already spending, since the traffic that trips the breaker is the traffic they were sending anyway. **Fail-closed protects money on provisioning and destroys it on registration.** On trip, registration **continues** with verification deferred to a hard gate before first funding, which is [ADR-021](../decisions/ADR-021.md)'s existing `pre_funded` trigger and not a new mechanism. Degrading converts a denial of service into a queue.
+5. **And it trips alarms, which is the half that decays.** The trip, the degraded window and the recovery each alarm, `otp_send_budget_degraded_is_alarmed` refuses to store a trip that was not alarmed, and **`deferred_registrations` is a reported figure**, because a queue nobody drains is a fail-open with extra steps. A degraded mode nobody is watching becomes the normal mode.
+6. **An OTP is never coalesced and never silenceable.** Three requests are three codes. And `pre_identity_auth` is outside the generated `mutable` set, so nobody opts out of the message proving they hold the number they are registering.
+
+**The second-order attack, which exists only because of counter 4 and has to be priced with it.** An attacker who reads this document trips the breaker **on purpose**, cheaply, and registers fleet identities during the degraded window while phone verification is deferred. That is a real consequence of choosing degradation and it is not a reason to reverse it. **It buys them registrations and not funded accounts**: `pre_funded` fires before the funded account exists, which is before Merit's own capital is at risk, and an identity that registered under a tripped breaker cannot reach a funded account without the verification it skipped. The degraded window is **alarmed while it runs**, so it is not a quiet door. And the identities that registered inside it are a **named cohort** rather than an anonymous inflow: `deferred_registrations` counts them, and [M07](M07-risk-abuse.md)'s D-12 forms candidate clusters from graph priors at funding with no trading data, which is precisely the population this window produces. **The attack converts a cost problem into a review queue, which is the trade the ruling is making on purpose.**
+
+**The residual, stated rather than defended away.** `otp_send_budget` is **daily** state and that granularity is deliberate: it is the durable, reviewable budget, the same job `plan_breaker_state` does for sales. It is **not** the burst control. Sub-minute velocity belongs at the edge, where it can refuse a send **before one is paid for**, alongside Turnstile on the auth surface ([SECURITY](../architecture/SECURITY.md) C-07). A reader who takes this table for the whole defence has left the first minute of an attack uncontrolled.
+
+**The edge case and golden scenario for this are allocated in [FOLD-01](FOLD-01-phone-identity.md) session 6, which owns both registries**, together with the degraded-path fixture [ADR-039](../decisions/ADR-039.md) names by name: a breaker-tripped registration completes, the identity reaches `pre_funded`, and the funding gate refuses it until phone verification lands. **A degraded path with no fixture is a path that gets removed by whoever finds it confusing.**
+
 ## 7.9 Verification notifications
 
 Bound by [M19 section 7.9](M19-kyc-identity.md)'s milestone-not-accusation rule. Verification is the one notification class where the *tone* is a control rather than a preference.
@@ -324,6 +398,10 @@ Bound by [M19 section 7.9](M19-kyc-identity.md)'s milestone-not-accusation rule.
 | Prior-contact security notices sent | AS-M16-02's control firing. A non-zero count here is the countermeasure working, and each one deserves a look |
 | Contact-change-then-preference-change sequences | The takeover pattern, counted rather than merely alerted, because the rate is the input to tuning the risk severity |
 | Bounce and complaint rate by sending domain | Deliverability of the money class depends on the reputation the marketing class spends |
+| **Pre-identity OTP spend, against budget, by country and globally** | AS-M16-07. **The attacker's yield is denominated in money, so the control has to be too.** A count of sends cannot distinguish a busy signup day from a pumping campaign aimed at the most expensive destinations available |
+| **Pre-identity OTP sends per number and per IP, distribution** | The three velocity scopes as a distribution rather than a threshold. The shape of the tail is what tunes `send_limit`, and there is no data to tune it on before beta |
+| **Time spent degraded, and `deferred_registrations` during each window** | The founder ruling's reported figure. **A queue nobody drains is a fail-open with extra steps**, and the count is the only thing that makes the queue visible |
+| **OTP completion rate, by channel** | The honest denominator for everything above: a falling completion rate on SMS with steady send volume is either an attack or a deliverability failure, and both need looking at |
 
 ### 9.2 Alerts
 
@@ -335,6 +413,11 @@ Bound by [M19 section 7.9](M19-kyc-identity.md)'s milestone-not-accusation rule.
 | Contact change followed by preference change within the window | any | **page** to risk, and it is a flag input |
 | Template lint bypass or unclassified kind reaching send | any | **page** |
 | Complaint rate on the sending domain | above the provider threshold | warn, then page. The money class rides this reputation |
+| **Cost breaker trips** | any | **page**. Registration continues degraded, and the page is what stops that becoming the normal mode |
+| **Cost breaker still degraded** | for as long as it runs | **page on a repeating cadence, not once.** A trip that pages and a recovery that pages still leave the window between them silent, and the window is where the unverified registrations are |
+| **Cost breaker recovers** | any | alert, with the window's `deferred_registrations` in the message. The recovery is where the queue becomes somebody's work |
+| **A `pre_identity_auth` kind observed `rate_limit_exempt`** | any | **page**. It is a generated column, so this cannot happen without the generation having been dropped, which is `SD-M16-01`'s stated failure mode arriving on the newer column |
+| **An override on `otp_send_budget` past its `override_expires_at`** | any | **page**. An indefinite override is a disabled breaker with a nicer name, which is `0016`'s ruling |
 
 ### 9.3 Dashboard
 

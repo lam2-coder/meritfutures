@@ -77,7 +77,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, Appendix F gate | approved | founder |
 | [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, bounded freeze, reserve | approved | founder |
 | [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard, CUSUM, breakers, two-tier evidence packs, dual control | approved | founder |
-| [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution, 14 detectors, copy-trading clause, flags queue, canaries | approved | founder |
+| [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution, three link tiers, eighteen detectors, copy-trading clause, flags queue, canaries | approved | founder |
 | [M08-affiliate-system.md](plans/M08-affiliate-system.md) | Attribution, commissions, clawbacks, destination cooling, creative approval | approved | founder |
 | [M09-marketing-site.md](plans/M09-marketing-site.md) | Config-rendered plans and rules, publish-ordered revalidation, versioned legal, geo disclosure | approved | founder |
 | [M10-integrations.md](plans/M10-integrations.md) | One outbound bus, send-time suppression, support-context scoping, vendor-down chaos | approved | founder |
@@ -87,7 +87,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M13-trader-analytics-journal.md](plans/M13-trader-analytics-journal.md) | Per-account analytics from engine tables, private journal, load isolation from the payout path | approved | founder |
 | [M14-loyalty-retention.md](plans/M14-loyalty-retention.md) | **Amended by [ADR-025](decisions/ADR-025.md):** cap release rejected, cross-account loyalty added, INV-M14-11 bounds invariance | approved | founder |
 | [M15-discord-integration.md](plans/M15-discord-integration.md) | Per-role consent, a link that is never a credential, template-only announcements. Post-launch | approved | founder |
-| [M16-notification-center.md](plans/M16-notification-center.md) | Four classes deciding what a preference may silence, contact-change ceremony, template allowlist | approved | founder |
+| [M16-notification-center.md](plans/M16-notification-center.md) | Five classes deciding what a preference may silence, contact-change ceremony, template allowlist | approved | founder |
 | [M17-offers-engine.md](plans/M17-offers-engine.md) | Server-authoritative pricing, dual-controlled floors, identity-bound offers, credit provenance | approved | founder |
 | [M18-graduation-track.md](plans/M18-graduation-track.md) | Ladder finiteness disclosed pre-purchase, countdown tracker, mechanical graduation, terminal settlement. **No live program at launch** | approved | founder |
 | [M19-kyc-identity.md](plans/M19-kyc-identity.md) | Composite trigger set, verification as milestone, dedupe with dispositions, sanctions carve-out, funnel telemetry | approved | founder |
