@@ -381,3 +381,22 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_rule_states_calendar_revision.sql
+
+      # EC-157, RULED REPAIR A. THIS PROBE LEADS WITH THREE SUCCESS CASES AND
+      # THAT IS THE WHOLE POINT OF IT.
+      #
+      # The defect it guards was a CONSTRAINT REFUSING A LEGITIMATE ROW:
+      # `daily_marks_balance_arithmetic` added the adjustment a second time,
+      # inside the day, so the mark for EVERY SETTLED PAYOUT was unwritable as
+      # specified. An inventory of rejections passed against it for twenty-two
+      # migrations, because every mark in the repository carries a zero
+      # adjustment and at zero the constraint and both M01 identities agree.
+      #
+      # REJECTION 2 asserts from the CATALOGUE that the retired name is gone
+      # rather than merely quiet. `0036` drops it rather than redefining it, so
+      # a reader who greps `daily_marks_balance_arithmetic` finds nothing
+      # instead of finding a statement whose meaning changed underneath them.
+      - name: Probe EC-157's mark identities (Repair A, 0036)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_daily_marks_identities.sql

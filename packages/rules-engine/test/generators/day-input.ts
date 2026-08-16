@@ -14,7 +14,7 @@
 // -----------------------------------------------------------------------------
 // WHAT `CalendarSource` IS, AND WHY IT IS DELIBERATELY NOT `CalendarSlice`
 // -----------------------------------------------------------------------------
-// ADR-046 rules that `CalendarSlice` is A VALUE: "a frozen ordered array of
+// ADR-049 rules that `CalendarSlice` is A VALUE: "a frozen ordered array of
 // `CalendarDay` plus a precomputed index and a declared coverage interval,
 // BUILT BY A PURE EXPORTED CONSTRUCTOR, with the calendar queries as free
 // functions in `calendar.ts` over that value."
@@ -27,7 +27,7 @@
 // paid to avoid.
 //
 // The coverage interval is carried here rather than left implicit because it is
-// the half of ADR-046 that is load bearing: a day INSIDE coverage that is not a
+// the half of ADR-049 that is load bearing: a day INSIDE coverage that is not a
 // session is positively not a trading day, and a day OUTSIDE coverage is
 // UNKNOWN. Those two answers differ and only one of them is safe to act on
 // (ADR-042 F-4, `0032`, and the loader's L-08 on the fixture calendar).
@@ -83,10 +83,10 @@ export interface CalendarDay {
 }
 
 /**
- * The input to ADR-046's `CalendarSlice` constructor: the ordered days, and the
+ * The input to ADR-049's `CalendarSlice` constructor: the ordered days, and the
  * interval the calendar declares it can answer for.
  *
- * A day outside `coverage` is UNKNOWN, and under ADR-046 a lookup that lands
+ * A day outside `coverage` is UNKNOWN, and under ADR-049 a lookup that lands
  * there returns a typed refusal into `DayOutput.assertions` rather than
  * throwing or returning null.
  */

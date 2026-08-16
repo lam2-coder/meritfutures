@@ -37,7 +37,7 @@ import { describe, expect, test } from 'vitest';
 import { daySequenceArbitrary } from './day-sequence.js';
 import type { DaySequence } from './day-input.js';
 import {
-  checkStoredBalanceArithmetic,
+  checkStoredClosingIdentity,
   DS_RULE_IDS,
   DS_RULE_SOURCES,
   validateDaySequence,
@@ -203,7 +203,7 @@ describe('the support reaches the cases the engine rules are about', () => {
     expect(seen.gapOfOne).toBeGreaterThan(0);
   });
 
-  test('ADR-046: coverage is sometimes wider than the sessions and sometimes exact', () => {
+  test('ADR-049: coverage is sometimes wider than the sessions and sometimes exact', () => {
     // The wider case is the one the ruling turns on: a day inside coverage and
     // absent from the session list is positively NOT a trading day, while the
     // same day outside coverage is UNKNOWN.
@@ -291,7 +291,7 @@ describe('direction 2: each rule removed is watched being violated', () => {
   // run, so the shape is asserted directly, per rule, and names itself.
   const PRECONDITIONS: ReadonlyArray<readonly [DsRuleId, (s: DaySequence) => boolean, string]> = [
     [
-      'ADR-046/inside-coverage',
+      'ADR-049/inside-coverage',
       (s) => s.calendar.days.length >= 2,
       'two sessions, so one can fall outside the interval',
     ],
@@ -356,7 +356,7 @@ describe('direction 2: each rule removed is watched being violated', () => {
     // and an eighth added to one and not the other fails here by name rather
     // than surfacing later as an unexplained flake.
     const FORCED_MINIMUM: readonly DsRuleId[] = [
-      'ADR-046/inside-coverage',
+      'ADR-049/inside-coverage',
       'R-02/calendar-is-ordered',
       'R-02/sequence-is-dense',
       'DO-1/day-is-a-session',
@@ -409,19 +409,23 @@ describe('the oracle is not vacuous either', () => {
 // -----------------------------------------------------------------------------
 // THE FINDING, MADE EXECUTABLE
 // -----------------------------------------------------------------------------
-// `0014`'s `daily_marks_balance_arithmetic` and M01's INV-18 plus INV-19 have
+// `0014`'s `daily_marks_balance_arithmetic` and M01's INV-18 plus INV-19 had
 // exactly one common solution: `adjustment_cents = 0`. That is the day the
 // column does not exist for.
 //
-// NOTHING IS RULED HERE AND NOTHING IS FIXED HERE. `0014` is merged and
-// migrations are superseded rather than edited (constitution E2); M01 is
-// approved and moves by ADR. What this session can do is stop the conflict
-// being a paragraph in a document nobody re-reads, and these two tests are
-// that: whoever rules it will find them failing, in the file whose generator
-// cannot be written without knowing the answer.
+// EC-157 IS RULED: REPAIR A, 2026-08-16. The constraint was wrong and the
+// invariants were right, and `0036` supersedes it with INV-19 alone.
+//
+// THESE TESTS ARE FLIPPED RATHER THAN DELETED, and that is deliberate. They
+// were written to fail the moment either side moved, and a side moved; the
+// cheap response is to delete them as "the bug is fixed" and the correct one is
+// to keep watching the same marks against the same constraint with the opposite
+// expectation. What they guard now is the reintroduction: a later migration
+// that puts the adjustment back into the closing identity fails here, in the
+// file whose generator cannot be written without knowing the answer.
 
-describe('the arithmetic the database checks is not the arithmetic M01 asserts', () => {
-  test('a mark with a non-zero adjustment satisfies INV-18 and INV-19 and violates the CHECK', () => {
+describe('the arithmetic the database checks is the arithmetic M01 asserts (EC-157, Repair A)', () => {
+  test('a mark with a non-zero adjustment satisfies INV-18, INV-19 AND the stored CHECK', () => {
     let sawNonZero = 0;
 
     fc.assert(
@@ -432,22 +436,20 @@ describe('the arithmetic the database checks is not the arithmetic M01 asserts',
         expect(validateDaySequence(seq)).toEqual([]);
 
         for (const mark of seq.marks) {
-          const storedHolds = checkStoredBalanceArithmetic(mark);
-          if (mark.adjustmentCents === 0) {
-            // Where the adjustment is zero the three agree exactly, which is
-            // why nothing has noticed: every mark written so far in this
-            // repository's fixtures carries a zero adjustment.
-            expect(storedHolds, JSON.stringify(mark, null, 2)).toBe(true);
-          } else {
-            sawNonZero++;
-            expect(
-              storedHolds,
-              'daily_marks_balance_arithmetic accepted a mark that satisfies INV-18 and ' +
-                'INV-19 with a non-zero adjustment. If this now passes, the conflict has ' +
-                'been ruled and this test is the record that must be updated: ' +
-                JSON.stringify(mark, null, 2),
-            ).toBe(false);
-          }
+          const storedHolds = checkStoredClosingIdentity(mark);
+          if (mark.adjustmentCents !== 0) sawNonZero++;
+          // UNCONDITIONAL NOW, and the disappearance of the branch is the
+          // finding. Under `0014` this had to split on whether the adjustment
+          // was zero, because that was the only value at which the constraint
+          // and the two invariants agreed. Under `0036` they agree everywhere,
+          // so there is one expectation rather than two.
+          expect(
+            storedHolds,
+            'daily_marks_inv19_closing_identity refused a mark that satisfies INV-18 ' +
+              'and INV-19. Under EC-157 Repair A the three agree for every adjustment, ' +
+              'so this means the closing identity has drifted back toward 0014: ' +
+              JSON.stringify(mark, null, 2),
+          ).toBe(true);
         }
       }),
       { numRuns: 200 },
@@ -471,12 +473,16 @@ describe('the arithmetic the database checks is not the arithmetic M01 asserts',
     expect(opening).toBe(4_750_000);
     expect(closing).toBe(4_780_000);
 
-    // `0014`: closing = opening + realized_pnl + adjustment.
+    // `0014` required 4,530,000 for this row and therefore REFUSED it. The
+    // arithmetic is kept because it is the whole finding: the constraint
+    // subtracted the settled payout a second time, inside the day.
     expect(opening + pnl + adjustment).toBe(4_530_000);
     expect(closing).not.toBe(opening + pnl + adjustment);
 
-    // And the one place they agree.
-    const noAdjustment = 5_000_000 + 0 + pnl;
-    expect(noAdjustment).toBe(5_000_000 + pnl + 0);
+    // `0036`: closing = opening + realized_pnl, and the row commits. Executed
+    // against a real PostgreSQL 16 in probe_daily_marks_identities.sql, whose
+    // SUCCESS 1 is this exact row and whose counterfactual is this exact row
+    // failing against 0001-0035.
+    expect(closing).toBe(opening + pnl);
   });
 });

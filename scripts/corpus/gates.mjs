@@ -338,12 +338,29 @@ function adrFiles() {
 function adrEntries() {
   const out = [];
   for (const file of adrFiles()) {
-    const m = /^## ADR-(\d{3}|D\d+):/m.exec(read(file));
-    if (!m) {
+    // GLOBAL, AND THAT IS THE WHOLE OF A DEFECT THIS FILE CARRIED FOR THIRTY
+    // ENTRIES. It was `/^## ADR-(\d{3}|D\d+):/m.exec(...)`, a NON-GLOBAL exec
+    // returning the FIRST heading and nothing else, so a file with two headings
+    // produced one entry.
+    //
+    // CI-06f has always carried `if (seen.has(n)) findings.push("... appears
+    // more than once")`. IT COULD NEVER FIRE: two headings in one file gave one
+    // entry and `seen` never collided. `docs/decisions/ADR-046.md` carried two
+    // `## ADR-046` headings for two unrelated rulings and fifteen gates passed
+    // over it.
+    //
+    // The assertion did not need writing. The parser needed to be capable of
+    // reaching it, which is a different repair and a smaller one, and it is why
+    // `CI-06f/duplicate-heading` in falsify.mjs was written and watched NOT
+    // firing before this line changed.
+    const ms = [...read(file).matchAll(/^## ADR-(\d{3}|D\d+):/gm)];
+    if (ms.length === 0) {
       out.push({ file, id: null });
       continue;
     }
-    out.push({ file, id: m[1], expected: `docs/decisions/ADR-${m[1]}.md` });
+    for (const m of ms) {
+      out.push({ file, id: m[1], expected: `docs/decisions/ADR-${m[1]}.md` });
+    }
   }
   return out;
 }
@@ -1156,6 +1173,23 @@ const ci06h = {
       [
         'probe_calendar_revision_required.sql',
         "ADR-045's calendar prior-image guards are no longer probed (OI-06)",
+      ],
+      // EC-157. PINNED IN THE SAME COMMIT THAT WIRES IT, which is the first
+      // time that has happened in this list. Every earlier entry records the
+      // opposite: probe_payout_hold.sql, probe_calendar_revision_required.sql
+      // and probe_reversible_contact_addresses.sql were each wired and left
+      // unpinned, three instances of OI-07, and the third was caught only
+      // because somebody went looking one file over.
+      //
+      // The reason this one matters as much as any: it is the only probe here
+      // whose failure mode is a constraint REFUSING a legitimate row. Delete it
+      // and the whole of EC-157 reverts to being a paragraph, because nothing
+      // else in the job would notice a migration putting the adjustment back
+      // into the closing identity.
+      [
+        'probe_daily_marks_identities.sql',
+        "EC-157's mark identities are no longer probed; nothing would catch the " +
+          'adjustment returning to the closing identity (Repair A, 0036)',
       ],
       // OQ-M10-06. AND THIS IS OI-07 A THIRD TIME, CAUGHT BEFORE THE MERGE
       // RATHER THAN A DAY AFTER IT. probe_reversible_contact_addresses.sql was

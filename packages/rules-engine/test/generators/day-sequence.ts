@@ -9,7 +9,7 @@
 // It was deferred from the session that built `plan.ts`, which said so in its
 // own header: the day-sequence generator "depends on `DayInput`'s shape, which
 // OQ-P2-01 is about to widen, and building them now means building them twice".
-// ADR-046 closed OQ-P2-01, so it is built once, here.
+// ADR-049 closed OQ-P2-01, so it is built once, here.
 //
 // IT BUILDS VALID SEQUENCES BY CONSTRUCTION AND NEVER BY REJECTION SAMPLING,
 // for `plan.ts`'s reason: `fc.filter` over a sixteen-rule contract discards
@@ -62,7 +62,7 @@
 // mark and is drawn here.
 //
 // NO ENGINE CODE. `CalendarSlice`'s constructor, its precomputed index and the
-// free functions ADR-046 puts in `calendar.ts` are a separate session's. This
+// free functions ADR-049 puts in `calendar.ts` are a separate session's. This
 // file emits that constructor's INPUT.
 // =============================================================================
 
@@ -139,7 +139,7 @@ const firstSessionDay = (): fc.Arbitrary<string> =>
 // expensive way: two of its nineteen counterfactuals passed vacuously on the
 // first run because a conditional rule's precondition was left free.
 //
-//   ADR-046/inside-coverage     needs two sessions, so one can fall outside
+//   ADR-049/inside-coverage     needs two sessions, so one can fall outside
 //   R-02/calendar-is-ordered    needs two sessions to put out of order
 //   R-02/sequence-is-dense      needs two sequence numbers to break the step between
 //   DO-1/day-advances           needs two marks to disorder
@@ -153,7 +153,7 @@ const firstSessionDay = (): fc.Arbitrary<string> =>
 // is what fails by name if an eighth appears and nobody updates a comment.
 
 const needsTwoSessions = (omit: ReadonlySet<DsRuleId>): boolean =>
-  has(omit, 'ADR-046/inside-coverage') ||
+  has(omit, 'ADR-049/inside-coverage') ||
   has(omit, 'R-02/calendar-is-ordered') ||
   has(omit, 'R-02/sequence-is-dense');
 
@@ -206,7 +206,7 @@ export function daySequenceArbitrary(
         gaps: fc.array(gapArb, { minLength: minSessions - 1, maxLength: 24 }),
         halfDays: fc.array(fc.boolean(), { minLength: 25, maxLength: 25 }),
         halted: fc.array(fc.boolean(), { minLength: 25, maxLength: 25 }),
-        // ADR-046's coverage is at least the span of the sessions and is often
+        // ADR-049's coverage is at least the span of the sessions and is often
         // wider. Both cases are reachable and both matter: coverage wider than
         // the session set is what makes a day INSIDE it "positively not a
         // trading day" rather than "unknown", which is the distinction the
@@ -383,15 +383,15 @@ function buildCalendar(
   // first and last rows, because R-02/calendar-is-ordered's inversion leaves
   // those two different things. Read positionally, that inversion would push
   // `days[1]` outside a coverage anchored on a later `days[0]` and report
-  // ADR-046/inside-coverage as collateral, which is the counterfactual grading
+  // ADR-049/inside-coverage as collateral, which is the counterfactual grading
   // itself on the wrong rule.
   const ordered = [...days].map((d) => d.tradingDay).sort();
   const first = ordered[0]!;
   const last = ordered[ordered.length - 1]!;
 
-  // ADR-046/inside-coverage: the interval starts one session late, so the
+  // ADR-049/inside-coverage: the interval starts one session late, so the
   // calendar declares a session its own coverage disowns.
-  const from = has(omit, 'ADR-046/inside-coverage')
+  const from = has(omit, 'ADR-049/inside-coverage')
     ? ordered[1]!
     : addCalendarDays(first, -cal.coverageBefore);
 

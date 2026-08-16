@@ -154,6 +154,24 @@ const nextFreeMigration = (dir) =>
   String(nextFree(dir, '## Migration number allocation')).padStart(4, '0');
 const nextFreeAdr = (dir) => String(nextFree(dir, '## Number allocation')).padStart(3, '0');
 
+/**
+ * The HIGHEST numbered ADR entry file that exists in the tree.
+ *
+ * Derived rather than pinned: `CI-06f/duplicate-heading` duplicates a heading
+ * inside a file that already exists, so it plants a DUPLICATE and not a hole.
+ * Pinning a number would eventually name a file that is not there, and the seed
+ * would then plant nothing while still reporting a tidy `did not fire`.
+ */
+const lastAdrId = (dir) => {
+  const ids = readdirSync(join(dir, 'docs/decisions'))
+    .map((f) => /^ADR-(\d{3})\.md$/.exec(f))
+    .filter(Boolean)
+    .map((m) => m[1])
+    .sort();
+  if (ids.length === 0) throw new Error('seed anchor not found: no numbered ADR entry files');
+  return ids[ids.length - 1];
+};
+
 // =============================================================================
 // CI-06k's seeds, and why every one of them is DERIVED
 // =============================================================================
@@ -804,6 +822,41 @@ const SCOPE_CASES = [
         `| \`${col}\` | A probe exemption, and this cell is its reason. |`,
       );
       e.write(e.lines);
+    },
+  },
+  {
+    // ---------------------------------------------------------------------
+    // THE ASSERTION ALREADY EXISTS. THE PARSER MADE IT UNREACHABLE.
+    // ---------------------------------------------------------------------
+    // CI-06f has carried `if (seen.has(n)) findings.push("ADR-nnn appears more
+    // than once")` since it was written. It had never once been able to fire,
+    // because `adrEntries()` read each file with a NON-GLOBAL `exec` and
+    // returned AT MOST ONE entry per file: two headings in one file produced
+    // one entry, and `seen` never collided.
+    //
+    // So `docs/decisions/ADR-046.md` carried TWO `## ADR-046` headings for two
+    // unrelated rulings and every gate passed. This case is the seed that was
+    // written BEFORE the parser was tightened and watched NOT firing, which is
+    // the order the founder ruled: tightening a parser without one is how 109
+    // phantom anchors happened.
+    //
+    // DERIVED, not pinned. It duplicates whatever the LAST numbered entry is,
+    // so it cannot go stale against a registry that grows, and it appends to a
+    // file that already exists rather than inventing a number the allocation
+    // table would then flag instead (which would make this case pass for
+    // CI-06f's OTHER assertion and prove nothing about duplicates).
+    name: 'CI-06f/duplicate-heading',
+    gate: 'CI-06f',
+    what: 'two headings for one ADR number in one file, which MUST be a finding',
+    expect: (d) => `ADR-${lastAdrId(d)} appears more than once`,
+    seed: (d) => {
+      const id = lastAdrId(d);
+      const f = join(d, `docs/decisions/ADR-${id}.md`);
+      writeFileSync(
+        f,
+        readFileSync(f, 'utf8') +
+          `\n## ADR-${id}: a second ruling under the same number  (2026-08-16, status: accepted)\n`,
+      );
     },
   },
   {

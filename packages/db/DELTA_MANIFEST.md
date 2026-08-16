@@ -20,7 +20,7 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->35<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->36<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -389,7 +389,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->35<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->36<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -639,7 +639,7 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->102<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**, across <!--gen:migration_files-->35<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->102<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**, across <!--gen:migration_files-->36<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
 
 ---
 
@@ -719,7 +719,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->35<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->36<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
 
 | | Before `0033` | After `0033` |
 |---|---|---|
@@ -794,7 +794,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->35<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->36<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
 
 | | Before `0034` | After `0034` |
 |---|---|---|
@@ -1013,3 +1013,73 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 **The repair removes the list rather than extending it.** `TRUNCATE trading_calendar CASCADE` makes PostgreSQL derive the referencing set, so the next migration to reference either table cannot break the assertion the way `0035` did. It is also the **stronger** test: `CASCADE` is the form an operator with a deadline reaches for, and it is the one that empties the audit trail **and the rule states** along with the calendar. **This is `OI-08`'s lesson in a new costume**: a hand-maintained list does not fail when it goes stale, it keeps passing against less. Here it did not even manage that, which is the better failure of the two. Watched failing dirty with `trading_calendar_no_truncate` dropped.
 
 **All seven probes and the NO-FLOATS assertion pass against the `0035` schema.**
+
+---
+
+## 20. `0036` lands, and the executable artifact was the one that was wrong (2026-08-16)
+
+**[`0036_supersede_daily_marks_balance_arithmetic.sql`](migrations/0036_supersede_daily_marks_balance_arithmetic.sql), [EC-157](../../docs/edge-cases/EC-157.md)'s Repair A, ruled by the founder 2026-08-16.** `0014` is untouched on disk. **No numbered delta lands here**: this is a correction to a constraint, not a schema change any `SD-nn` proposed.
+
+| | |
+|---|---|
+| Dropped | `daily_marks_balance_arithmetic` — `closing = opening + realized_pnl + adjustment` |
+| Added | `daily_marks_inv19_closing_identity` — `closing = opening + realized_pnl` |
+
+**The name is retired with the statement rather than reused.** Redefining `daily_marks_balance_arithmetic` in place would leave every reference to that name pointing at a constraint whose meaning had silently changed, which is `C-02` ([ADR-028](../../docs/decisions/ADR-028.md)) in a new costume. The replacement is named for the identity it carries.
+
+### The arithmetic, and why five artifacts could not all be right
+
+A settled payout of 250,000c against a prior close of 5,000,000c, on a day that makes 30,000c:
+
+| Source | Says | Gives |
+|---|---|---|
+| `INV-18` | `opening == prior.balance + adjustment` | opening **4,750,000** |
+| `INV-19` | `closing == opening + realized_pnl` | closing **4,780,000** |
+| `0014`'s CHECK | `closing = opening + realized_pnl + adjustment` | requires **4,530,000** |
+
+**The three have exactly one common solution and it is `adjustment_cents = 0`**, which is the one value `SD-01` was added to make impossible to assume. **The mark for every settled payout was unwritable as specified.** Nothing had noticed because every mark in the repository carries a zero adjustment, and at zero the three agree exactly.
+
+**Four artifacts put the adjustment at the open and one put it inside the day**: `INV-18`, `R-10` ("the withdrawal lands at the open of `effectiveTradingDay`, never inside a session"), `EC-034`, and **`0014`'s own comment on the column** ("applied at the **open** ... never inside a session"), against `daily_marks_balance_arithmetic`.
+
+**M02 settles it from the other side, and this is the citation the ruling turns on.** `INV-M2-06`: "Every mark satisfies M1's identities ... **asserted by M2 before handing the mark to the engine**." The ingest module is specified to produce marks already in the identity form, so `daily_marks` is a **normalized** record rather than a raw vendor dump, and `INV-M2-12` has the normalizer classify every balance delta as trading or non-trading and refuse to guess. Both invariants name `mark.` columns, so both are claims about the **stored row**.
+
+**Repair B was rejected on the record.** Moving the adjustment inside the day contradicts `R-10` and `EC-034`, reopens the question `SD-01` closed, and breaks `INV-21`: a withdrawal applied inside a session is one the intraday low can be measured against, so `INV-21` would stop following from `CV-11` and `CV-17`.
+
+### The cost, accepted rather than discovered later
+
+**The schema stops asserting the adjustment at all.** `INV-18` reads `prior.balance_cents`, which lives in `rule_states`, and a `CHECK` cannot see across rows. The identity moves to where it was always asserted: M02 before the engine sees the mark (`INV-M2-06`), and the engine at `DO-3`, which returns an `AssertionFailure` and raises reconciliation rather than throwing (`R-07`, `EC-047`). `INV-19` is intra-row and stays a `CHECK`.
+
+That is a real loss of a database-level guarantee and it is the price of the ruling. The alternative was keeping an executable statement of an identity that no document asserts.
+
+### The mislabel, which is the transferable part
+
+`0014`'s comment above the constraint reads **"INV-18, now checkable because SD-01 exists"**, and the [`daily_marks` design record](../../docs/architecture/data-model/daily_marks.md) said the same. **It is neither identity.** `INV-18` is the opening identity, `INV-19` the closing one, and `closing = opening + realized_pnl + adjustment` appears nowhere in M01.
+
+**A wrong label on an executable artifact is how the wrong identity became authoritative.** A reader checking whether the schema enforced `INV-18` found a constraint that said it did. The design record is corrected in the same commit; `0014`'s `--` comment can never be edited (constitution E2), so `0036` replaces the **column comment**, which is metadata rather than migration text, exactly as `0031` replaced `0010:225`.
+
+**The one artifact of five that was never read against the other four was the executable one**, and the reading a session under pressure re-derives is that the constraint must be authoritative *because* it is executable. It is worth stating the opposite plainly: an executable statement of the wrong identity is still the wrong identity.
+
+### Verification
+
+**All 36 files apply forward-only from empty against PostgreSQL 16, zero errors: 102 tables, 404 check constraints.**
+
+[`probe_daily_marks_identities.sql`](../../scripts/db/probe_daily_marks_identities.sql), **three success cases first, then three rejections, 6 / 6.** It leads with the success case because here that is the entire finding: **a legitimate row was refused**, and a probe that only attempted forbidden things passed against this constraint for twenty-two migrations.
+
+| | Assertion | Result |
+|---|---|---|
+| SUCCESS 1 | the settled-payout mark satisfying `INV-18` and `INV-19` is writable | **passes** |
+| SUCCESS 2 | a positive adjustment (the promotional-credit direction) | **passes** |
+| SUCCESS 3 | the zero-adjustment day, unchanged | **passes** |
+| REJECTION 1 | `daily_marks_inv19_closing_identity` refuses a broken closing | **fires** |
+| REJECTION 2 | the retired name is **gone from the catalogue**, not merely quiet | **fires** |
+| REJECTION 3 | `daily_marks_high_bounds_day` is untouched and still binds | **fires** |
+
+**THE COUNTERFACTUAL, EXECUTED.** The same probe against `0001`-`0035` fails at SUCCESS 1:
+
+```
+ERROR:  new row for relation "daily_marks" violates check constraint "daily_marks_balance_arithmetic"
+```
+
+`psql` exits **3**. Under `0036` the same row commits. That is EC-157's claim, run rather than argued.
+
+**The day-sequence property suite is flipped in the same commit rather than deleted.** It watched every non-zero-adjustment mark **violate** the stored constraint; it now watches them **pass**, and the branch on whether the adjustment is zero is gone, which is itself the finding: under `0014` that branch existed because zero was the only value at which the constraint and the two invariants agreed. Kept rather than removed as redundant, because it is what fails if a later migration puts the adjustment back into the closing identity.
