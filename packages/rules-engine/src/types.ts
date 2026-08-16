@@ -182,20 +182,26 @@ export interface EngineResult {
 // WHAT IS DELIBERATELY ABSENT FROM `RuleState` BELOW, because a field the
 // engine cannot fill is worse than a field it does not declare:
 //
-//   engineEligible, engineGates  R-33..R-41, group F, DO-9
 //   stateHash                    SD-08, and `hash.ts`, which replay needs and
 //                                the day fold does not
 //
-// Each lands with the rules that compute it, and widening a record nothing
+// It lands with the rules that compute it, and widening a record nothing
 // outside this package reads yet is a diff rather than a migration.
 //
-// `withdrawableCents` WAS ON THAT LIST AND HAS LANDED, ahead of the rest of
-// group F and for a stated reason: M01 section 3.6's `clampPayout` reads it off
-// the state, and P2 section 2 sequences group G (payout arithmetic, no calendar
-// needed) BEFORE group F (which needs the full slice and real data). The field
-// travels with the rule that computes it, R-35 in `payout/gates.ts`, and the two
-// eligibility fields stay absent until the conjunction R-41 asserts has all of
-// its terms.
+// `withdrawableCents`, `engineGates` AND `engineEligible` WERE ON THAT LIST AND
+// HAVE LANDED. R-35 arrived first and alone, ahead of the rest of group F,
+// because M01 section 3.6's `clampPayout` reads it off the state and P2 section
+// 2 sequences group G before group F. The two eligibility fields waited for
+// EVERY term of R-41's conjunction, because INV-15 is "`engine_eligible ==
+// AND(every engine gate)` with no shortcut path" and a conjunction over a subset
+// is not a weaker answer, it is a wrong one that reads as an answer.
+//
+// THE CONTEXT GATES ARE STILL ABSENT AND ALWAYS WILL BE. SD-06 splits
+// `gate_results` into `engine_gates` and `context_gates` precisely so freeze,
+// recon, KYC and in-flight never enter the replayed state: "they were true on
+// the day and may not be true now. Mixing them into the replayed state
+// guarantees nightly false divergences" (INV-23). They are combined at read time
+// by `evaluatePayout` and they are never a field here.
 
 // -----------------------------------------------------------------------------
 // The calendar, as a VALUE (ADR-049)
@@ -450,6 +456,103 @@ export type Phase = 'eval' | 'funded' | 'closed' | 'graduated';
 
 export type BreachKind = 'trailing_eod_floor' | 'static_floor' | 'hard_daily_loss_limit';
 
+// -----------------------------------------------------------------------------
+// The engine gates (R-33 to R-39), gate by gate
+// -----------------------------------------------------------------------------
+// M01 section 4: "The gate-breakdown response is A PRODUCT FEATURE, NOT DEBUG
+// OUTPUT. Competitors show a progress bar; Merit shows the whole rule, including
+// the exact amount of additional profit that would fix a consistency shortfall."
+// So every gate below carries the two numbers that made its verdict and not just
+// the verdict, and the field names are API_CONTRACT's
+// `GET /accounts/:id/eligibility` shape in this package's camel case.
+//
+// `skipped` IS NOT `!pass` AND IT IS NOT `!enabled`. CV-19 fixed the vocabulary:
+// a gate that was NOT EVALUATED reports `pass: true, skipped: true` and "must be
+// visibly disabled in the eligibility breakdown ... so no trader or support
+// agent ever sees a gate that reads as satisfied when it was never evaluated".
+
+/** R-33. `tradedDaysCount >= min_trading_days`, and 0 DISABLES the gate (CV-19). */
+export interface TradedDaysGate {
+  readonly pass: boolean;
+  /** CV-19, ADR-015: `true` on all three v1 plans, where the minimum is 0. */
+  readonly skipped: boolean;
+  readonly have: number;
+  readonly need: number;
+}
+
+/** R-34. `winDaysCount >= required_count`, counted strictly after `payoutAnchorDay`. */
+export interface WinDaysGate {
+  readonly pass: boolean;
+  readonly have: number;
+  readonly need: number;
+  /** R-09's threshold, carried so the breakdown says what counts as a win day. */
+  readonly floorCents: Cents;
+}
+
+/** R-35 in its gate form: has the balance cleared the permanent buffer. */
+export interface BufferGate {
+  readonly pass: boolean;
+  /** `balance - size`: the profit standing above the account size. */
+  readonly haveCents: Cents;
+  /** `buffer_cents`, which is permanent and never withdrawable. */
+  readonly needCents: Cents;
+}
+
+/** R-36 over the R-47 period, using R-29's arithmetic and R-30's denominator rule. */
+export interface ConsistencyGate {
+  readonly pass: boolean;
+  /** R-30. The period profit was not positive, so nothing was evaluated. */
+  readonly skipped: boolean;
+  readonly bestDayShareBp: number | null;
+  readonly maxDayShareBp: number | null;
+  /** AS-13, OQ-9: displayed AT ALL TIMES, not only when the gate fails. */
+  readonly profitNeededToDiluteCents: Cents;
+}
+
+/** R-37. Trading days strictly after `cadenceAnchorDay`, by `sequence` subtraction. */
+export interface CadenceGapGate {
+  readonly pass: boolean;
+  /** `true` when there is no anchor: the first payout has no gap to clear. */
+  readonly skipped: boolean;
+  /** `null` when skipped. Never a date difference (AS-06). */
+  readonly tradingDaysSinceLastPayout: number | null;
+  readonly need: number;
+  /**
+   * AS-06's resolved date, so the trader never does trading-day arithmetic.
+   *
+   * `null` when the gate is not waiting on anything, and `null` when the day
+   * falls outside the slice the caller loaded. A REPORTED date, never compared.
+   */
+  readonly nextEligibleTradingDay: TradingDay | null;
+}
+
+/** R-39. `min(withdrawable, cap) >= min_payout_cents`, `>=` (GS-042). */
+export interface MinimumAmountGate {
+  readonly pass: boolean;
+  readonly withdrawableCents: Cents;
+  /** R-42's rung for the ordinal this state would request at. */
+  readonly capCents: Cents;
+  /** CV-15. 10,000c, fixed, and never scaled by size. */
+  readonly minPayoutCents: Cents;
+}
+
+/**
+ * SD-06's `engine_gates`. Every gate R-41 conjoins, and nothing that is context.
+ *
+ * THE ORDER OF THE FIELDS IS THE ORDER `engineEligible` READS THEM, which
+ * matters because SD-08's canonical serialization hashes fields in a fixed
+ * declared order and the determinism contract bans "iteration over an object's
+ * keys where the result affects output".
+ */
+export interface EngineGateResults {
+  readonly tradedDays: TradedDaysGate;
+  readonly winDays: WinDaysGate;
+  readonly buffer: BufferGate;
+  readonly consistency: ConsistencyGate;
+  readonly cadenceGap: CadenceGapGate;
+  readonly minimumAmount: MinimumAmountGate;
+}
+
 /**
  * One row of `rule_states`: the whole fold accumulator, minus the three field
  * groups named at the top of this section.
@@ -485,10 +588,30 @@ export interface RuleState {
   /** SD-02. Wallet-credit day of the last settled payout (R-46, ADR-019). */
   readonly cadenceAnchorDay: TradingDay | null;
   readonly lifetimeSettledCents: Cents;
+  /** SD-06. Engine gates only: context is combined at read time (INV-23). */
+  readonly engineGates: EngineGateResults;
+  /** R-41, INV-15. The conjunction of every gate above, with no shortcut path. */
+  readonly engineEligible: boolean;
   readonly breached: boolean;
   readonly breachKind: BreachKind | null;
   readonly engineVersion: string;
 }
+
+/**
+ * A `RuleState` with the two fields group F computes removed.
+ *
+ * NOTHING THAT COMPUTES A GATE MAY READ ONE. INV-15 is "`engine_eligible ==
+ * AND(every engine gate)` with NO SHORTCUT PATH", and the cheapest shortcut
+ * there is would be an evaluator that carried a prior row's answer forward on
+ * some branch. Taking the fields out of the parameter type makes that a compile
+ * error rather than a review note, which is the same idiom
+ * `PlanConfigVersionIsClosed` and `CalendarSliceIsData` use one file over.
+ *
+ * It is also what lets `initialState` build a state in one pass: the gates are
+ * computed from the record that does not yet carry them, so there is no
+ * placeholder gate set for a later edit to leave behind.
+ */
+export type GateInputState = Omit<RuleState, 'engineGates' | 'engineEligible'>;
 
 /**
  * Why the engine refused to compute a day.
@@ -565,6 +688,20 @@ export interface DayClosedEvent extends EngineEvent {
   readonly winDaysCount: number;
   /** SD-07. */
   readonly consistencyPeriodStartDay: TradingDay | null;
+  /** R-35, so a consumer never recomputes a payable amount (FM-16). */
+  readonly withdrawableCents: Cents;
+  /**
+   * M01 section 5.2: `day.closed` "carries the full mark payload PLUS
+   * `gate_results`".
+   *
+   * ENGINE GATES ONLY, which is SD-06 rather than an omission: the context gates
+   * "were true on the day and may not be true now", so an event carrying them
+   * would hand every consumer a freeze state with no expiry. `engine.gate_
+   * failure_distribution` (section 9.1), which M01 calls "the most useful product
+   * metric in the system", is read off exactly this payload.
+   */
+  readonly engineGates: EngineGateResults;
+  readonly engineEligible: boolean;
 }
 
 /** DO-5. */

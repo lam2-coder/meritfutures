@@ -217,6 +217,22 @@ export function withDailyLossLimit(
 }
 
 /**
+ * R-33's boundary, on both sides, without inventing a plan.
+ *
+ * All three v1 plans configure funded `min_trading_days: 0`, which DISABLES the
+ * gate (CV-19, ADR-015), so the published lineup can show the `skipped` half and
+ * neither side of the `>=`. CV-19 admits any value `>= 0`, so both values this
+ * is called with are configs `validatePlan` accepts.
+ *
+ * SAME SHAPE AS `withEvalMinTradingDays`: moving the THRESHOLD rather than the
+ * counter is what keeps the two sides of `>=` comparable, because the same prior
+ * and the same mark then pass at N and fail at N+1.
+ */
+export function withFundedMinTradingDays(plan: ResolvedPlan, minTradingDays: number): ResolvedPlan {
+  return { ...plan, funded: { ...plan.funded, minTradingDays } };
+}
+
+/**
  * A LADDERED cap schedule, which no v1 plan carries and CV-09 fully specifies.
  *
  * Appendix A gives all three plans a single rung ("Payout cap, ordinal 1 and

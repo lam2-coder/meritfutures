@@ -485,6 +485,58 @@ const CASES = [
       to: 'return surplus;',
     },
     {
+      rule: 'R-33',
+      // CV-19's zero DISABLES the gate. Reading the zero as an ordinary
+      // threshold makes it pass for the wrong reason and, worse, report
+      // `skipped: false`, so GS-080's disabled gate renders as a satisfied one
+      // on every eligibility screen in the lineup.
+      seeds: 'the funded minimum-days gate treating a configured zero as a threshold rather than as disabled (CV-19, GS-080)',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'const tradedDaysSkipped = funded.minTradingDays === 0;',
+      to: 'const tradedDaysSkipped = false;',
+    },
+    {
+      rule: 'R-34',
+      seeds: 'the win-day gate tightened from `>=` to `>`, so an account exactly at its required count stops being eligible',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'pass: state.winDaysCount >= funded.winDaysRequiredCount,',
+      to: 'pass: state.winDaysCount > funded.winDaysRequiredCount,',
+    },
+    {
+      rule: 'R-36',
+      // The funded gate reading the EVAL consistency block. On Core EOD that is
+      // `enabled: false`, so the gate would pass unconditionally and the 3000bp
+      // funded limit would stop existing, silently, on the plan that carries it.
+      seeds: 'funded consistency reading the EVAL consistency block, which is disabled on Core EOD and would delete the gate',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: '    funded.consistency,\n  );',
+      to: '    plan.eval?.consistency ?? funded.consistency,\n  );',
+    },
+    {
+      rule: 'R-37',
+      seeds: 'the cadence gap relaxed from `>=` to `>` against a count that is already a difference, so a cleared gap reads as one day short',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'const pass = counted.tradingDays >= needTradingDays;',
+      to: 'const pass = counted.tradingDays > needTradingDays;',
+    },
+    {
+      rule: 'R-39',
+      seeds: 'the minimum-payout gate tightened from `>=` to `>`, so exactly 100.00 stops being eligible (GS-042, CV-15)',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'pass: payable >= funded.minPayoutCents,',
+      to: 'pass: payable > funded.minPayoutCents,',
+    },
+    {
+      rule: 'R-41',
+      // INV-15 is "with NO SHORTCUT PATH". Dropping one term from the
+      // conjunction is that shortcut, and the win-day gate is the term a v1
+      // plan can actually fail while every other one holds.
+      seeds: 'the eligibility conjunction losing its win-day term, which is INV-15’s shortcut path in one line',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: '    gates.winDays.pass &&\n',
+      to: '',
+    },
+    {
       rule: 'R-42',
       // The scan keeps the LAST matching rung. Taking the FIRST is the reading a
       // single-rung lineup cannot distinguish: all three v1 plans carry one

@@ -28,21 +28,22 @@ test('the declared set is a set, and is ordered as M01 orders the rules', () => 
   expect([...IMPLEMENTED_RULES]).toEqual([...IMPLEMENTED_RULES].sort());
 });
 
-test('the count is reported rather than implied: twenty-seven of M01’s fifty rules', () => {
+test('the count is reported rather than implied: thirty-three of M01’s fifty rules', () => {
   // THIS ASSERTION IS THE HONEST COUNT IN EXECUTABLE FORM. It fails when a rule
   // is added, which is the point: the session that adds one updates the number
   // here and in `src/rules.ts`'s header, and a session that added a rule without
   // noticing it had is a session that cannot land.
-  expect(IMPLEMENTED_RULES.length).toBe(27);
+  expect(IMPLEMENTED_RULES.length).toBe(33);
 });
 
-test('`engineEligible` has no shortcut path, so R-41 is not declared before its terms', () => {
-  // INV-15: "`engine_eligible == AND(every engine gate)` with no shortcut path."
-  // R-35 is a value the state carries and is declarable alone; R-41 is the
-  // conjunction and is not declarable until R-33, R-34, R-36, R-37 and R-39 all
-  // exist. Asserting the absence is what stops a session from declaring the
-  // conjunction over the subset it happened to finish.
-  expect(IMPLEMENTED_RULES).not.toContain('R-41');
+test('R-38 and R-40 are NOT declared, because their inputs are context', () => {
+  // Both read `ExternalGates`, which M01 section 2.1 marks "context, never
+  // replayed (INV-23)". Declaring either while `advanceDay` is the only
+  // evaluator would claim the engine computes a gate no field of `RuleState`
+  // can hold. They arrive with `evaluatePayout`, which is where read-time
+  // context is combined (R-41's `contextEligible` half).
+  expect(IMPLEMENTED_RULES).not.toContain('R-38');
+  expect(IMPLEMENTED_RULES).not.toContain('R-40');
 });
 
 test('R-32 is NOT declared, and the refusal is what makes that safe', () => {

@@ -34,7 +34,13 @@
 // =============================================================================
 
 import { EngineInvariantError } from '../errors.js';
-import type { BasisPoints, Cents, FundedPhaseRules, ResolvedPlan, RuleState } from '../types.js';
+import type {
+  BasisPoints,
+  Cents,
+  FundedPhaseRules,
+  GateInputState,
+  ResolvedPlan,
+} from '../types.js';
 
 /**
  * R-43's four values. `none` is an EXACT TIE, not an absence.
@@ -93,7 +99,7 @@ export interface PayoutClamp {
  * engine's half is that the number is DERIVED FROM SETTLEMENTS rather than
  * counted from attempts.
  */
-export function ordinalForNextPayout(state: RuleState): number {
+export function ordinalForNextPayout(state: GateInputState): number {
   return state.payoutsSettledCount + 1;
 }
 
@@ -161,7 +167,7 @@ function min(a: Cents, b: Cents): Cents {
  * inputs.
  */
 export function clampPayout(
-  state: RuleState,
+  state: GateInputState,
   plan: ResolvedPlan,
   requestedCents: Cents | null,
 ): PayoutClamp {

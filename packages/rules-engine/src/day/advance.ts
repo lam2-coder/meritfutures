@@ -14,8 +14,8 @@
 // -----------------------------------------------------------------------------
 // WHAT THIS SESSION IMPLEMENTS, STATED HERE RATHER THAN DISCOVERED IN A DIFF
 // -----------------------------------------------------------------------------
-// P2 section 7 sequences the engine sessions and this file is `P2-3`: "advanceDay
-// DO-1 to DO-7 for groups B, C, D". So:
+// P2 section 7 sequences the engine sessions, and eight of the nine steps are
+// now real code:
 //
 //   DO-1  implemented, including ADR-049's calendar lookup
 //   DO-2  REFUSES. `applySettlement` is group H (R-46..R-50) and is not written
@@ -29,9 +29,14 @@
 //         `RuleState`. The FUNDED half is R-49's ladder, which fires only after
 //         a settlement, so DO-2's refusal already covers every day that could
 //         reach it
-//   DO-9  the day closes and `day.closed` is emitted. THE ENGINE GATES ARE NOT
-//         EVALUATED: R-33..R-41 are group F, and `RuleState` carries no
-//         `engineEligible`, `engineGates` or `withdrawableCents` until they land
+//   DO-9  implemented: R-33 to R-37, R-39 and R-41's conjunction, in
+//         `payout/gates.ts`, then `day.closed` with `gate_results` on it. What
+//         DO-9 still does not compute is `stateHash`: SD-08 belongs to
+//         `hash.ts`, which replay needs and the day fold does not
+//
+// R-38 AND R-40 ARE NOT DO-9's. Both read `ExternalGates`, which M01 section 2.1
+// marks "context, never replayed", and INV-23 keeps context out of the state and
+// out of its hash. They belong to `evaluatePayout`, at read time.
 //
 // A REFUSAL IS NOT A SILENT PASS. Each one returns a typed `AssertionFailure`
 // naming the group that is missing, which means no state is written for the day
@@ -42,6 +47,7 @@
 // =============================================================================
 
 import { lookupCalendarDay } from '../calendar.js';
+import { EngineInvariantError } from '../errors.js';
 import type {
   AssertionFailure,
   BreachDetectedEvent,
@@ -53,13 +59,14 @@ import type {
   DayOutput,
   EngineEvent,
   FloorLockedEvent,
+  GateInputState,
   PhaseDayRules,
   ResolvedPlan,
   RuleState,
   SoftDailyLossLimitEvent,
   TradingDay,
 } from '../types.js';
-import { withdrawableCents } from '../payout/gates.js';
+import { evaluateEngineGates, gatesAfterBreach, withdrawableCents } from '../payout/gates.js';
 import { checkBreach } from './breach.js';
 import { advanceConsistency, isTradedDay, isWinDay } from './counters.js';
 import { advanceFloor, initialFloorCents } from './floor.js';
@@ -92,7 +99,7 @@ export function initialState(
   const rules: PhaseDayRules = plan.eval ?? plan.funded;
   const floorCents = initialFloorCents(plan.sizeCents, rules.drawdown.drawdownCents);
 
-  const opened: RuleState = {
+  const opened: GateInputState = {
     tradingDay: openedOn,
     phase,
     balanceCents: plan.sizeCents,
@@ -119,10 +126,50 @@ export function initialState(
     engineVersion,
   };
 
-  return { ...opened, withdrawableCents: withdrawableCents(opened, plan) };
+  // `GateInputState` IS WHY THIS BUILDS IN ONE PASS. The two fields group F
+  // computes are not on the record the computation reads, so there is no
+  // placeholder gate set here for a later edit to leave behind, and the type
+  // system is what says so.
+  const stated: GateInputState = {
+    ...opened,
+    withdrawableCents: withdrawableCents(opened, plan),
+  };
+
+  // R-33 to R-41 on an account that has done nothing yet. Every counter is zero
+  // and the withdrawable is zero, so `engineEligible` is false and the gates say
+  // which ones: an account at open has not traded, has no win days, and has not
+  // cleared its buffer. That is the honest breakdown rather than an empty one.
+  const evaluated = evaluateEngineGates({ state: stated, plan, calendar: null });
+  if (evaluated.kind === 'refused') {
+    // UNREACHABLE, AND IT THROWS FOR THE REASON R-14's TRIPWIRE DOES. The only
+    // gate that can refuse is R-37, and it refuses only when a cadence anchor
+    // exists; this object sets `cadenceAnchorDay` to null four lines up. Reaching
+    // here means a future edit gave a freshly opened account an anchor, which is
+    // the engine's own arithmetic being wrong rather than a bad day of data.
+    throw new EngineInvariantError('R-37', evaluated.assertion.detail);
+  }
+
+  return {
+    ...stated,
+    engineGates: evaluated.gates,
+    engineEligible: evaluated.engineEligible,
+  };
 }
 
-/** A refusal: the state the fold arrived with, no events, and the finding. */
+/**
+ * A refusal: the state the fold arrived with, no events, and the finding.
+ *
+ * EVERY CALL SITE PASSES `prior`, INCLUDING THE THREE THAT REFUSE HALFWAY
+ * THROUGH THE DAY. DO-8's two refusals and DO-9's used to pass the partially
+ * folded state, which is a state no rule ever produced: the counters had
+ * advanced and the floor had trailed against a day the fold then declined to
+ * write. `types.ts` states the contract the other way -- "the `state` on the
+ * output is the state the fold arrived with, carried so the caller can report
+ * which day refused and against what" -- and a caller that logged
+ * `output.state` on a refusal would otherwise be shown a row that never
+ * existed. Nothing is written on a refusal either way; what changes is that the
+ * carried state is now the one the contract promises.
+ */
 function refuse(state: RuleState, assertion: AssertionFailure): DayOutput {
   return { state, events: [], assertions: [assertion] };
 }
@@ -240,9 +287,18 @@ export function advanceDay(input: DayInput): DayOutput {
     // R-35 on a closed account is `0n`, and it is recomputed rather than carried
     // from `prior`: a breached account that was withdrawable-positive yesterday
     // must not present a positive withdrawable on the row that closed it.
+    //
+    // The gates are STATED rather than evaluated, which is M01 section 3.6's own
+    // breach branch (`engineEligible: false`, nothing computed) plus the record
+    // the type requires. `gatesAfterBreach` says why it is not a call into
+    // `evaluateEngineGates`: R-37 can refuse a day, and a breach must be
+    // recorded whatever the caller's calendar window happens to cover.
+    const withdrawable = withdrawableCents(closedState, plan);
     const state: RuleState = {
       ...closedState,
-      withdrawableCents: withdrawableCents(closedState, plan),
+      withdrawableCents: withdrawable,
+      engineGates: gatesAfterBreach({ ...closedState, withdrawableCents: withdrawable }, plan),
+      engineEligible: false,
     };
     const detected: BreachDetectedEvent = {
       type: 'breach.detected',
@@ -331,7 +387,7 @@ export function advanceDay(input: DayInput): DayOutput {
       // refuses rather than falling back to `plan.funded`, because folding an
       // eval day against funded rules would compute a real number against the
       // wrong parameters, which is worse than refusing to compute.
-      return refuse(state, {
+      return refuse(prior, {
         kind: 'eval_phase_without_eval_rules',
         tradingDay: mark.tradingDay,
         detail: "the prior state's phase is `eval` and the plan has no evaluation phase",
@@ -348,7 +404,7 @@ export function advanceDay(input: DayInput): DayOutput {
 
     switch (progression.kind) {
       case 'refused':
-        return refuse(state, progression.assertion);
+        return refuse(prior, progression.assertion);
       case 'deferred':
         // R-28. The account stays in `eval` and no field moves; the day still
         // closes, because a deferral is not a refusal and not a breach.
@@ -366,18 +422,27 @@ export function advanceDay(input: DayInput): DayOutput {
   // ---------------------------------------------------------------------------
   // DO-9  the day closes
   // ---------------------------------------------------------------------------
-  // The engine gates are group F and are not evaluated here. `day.closed`
-  // carries what the implemented rules computed; `gate_results` joins it when
-  // R-33 to R-41 land, which is the same commit that gives `RuleState` its
-  // `engineEligible`.
+  // M01 section 3.1: "Evaluate every engine gate, compute `engineEligible`,
+  // compute `stateHash`, emit `day.closed` with the full payload." Two of the
+  // three are here; `stateHash` is SD-08 and belongs to `hash.ts`, which replay
+  // needs and the day fold does not.
   //
-  // R-35 IS EVALUATED HERE AND NOT AT DO-7, which is where M01 section 3.6 puts
-  // it too. DO-8 can change both terms the formula reads: an eval pass moves the
-  // phase to `funded` and the balance to `size_cents` in the same step (R-31),
-  // so a withdrawable computed before the progression would be the eval day's
-  // number attached to a funded row, and on the pass day it would be a positive
-  // amount against a balance the reset had just taken back to size.
+  // A GATE CAN REFUSE THE DAY, AND ONLY ONE OF THEM CAN. R-37 counts the cadence
+  // gap by sequence subtraction from an anchor that may be months old, and P2
+  // section 1 rules that an anchor outside the slice is a typed refusal rather
+  // than a gate that quietly passes: "it silently weakens R-37, a money gate."
+  //
+  // EVERYTHING HERE IS EVALUATED AFTER DO-8 AND THAT IS THE ORDERING LAW, not a
+  // convenience. An eval pass moves the phase to `funded`, the balance to
+  // `size_cents` and every counter to zero in one step (R-31), so gates computed
+  // before the progression would describe the eval day and be written on a
+  // funded row: a positive withdrawable against a balance the reset had already
+  // taken back, and win-day and traded-day counts the pass had already cleared.
   state = { ...state, withdrawableCents: withdrawableCents(state, plan) };
+
+  const evaluated = evaluateEngineGates({ state, plan, calendar: input.calendar });
+  if (evaluated.kind === 'refused') return refuse(prior, evaluated.assertion);
+  state = { ...state, engineGates: evaluated.gates, engineEligible: evaluated.engineEligible };
   const closed: DayClosedEvent = {
     type: 'day.closed',
     tradingDay: mark.tradingDay,
@@ -388,6 +453,9 @@ export function advanceDay(input: DayInput): DayOutput {
     tradedDaysCount: state.tradedDaysCount,
     winDaysCount: state.winDaysCount,
     consistencyPeriodStartDay: state.consistencyPeriodStartDay,
+    withdrawableCents: state.withdrawableCents,
+    engineGates: state.engineGates,
+    engineEligible: state.engineEligible,
   };
   events.push(closed);
 

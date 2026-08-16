@@ -94,7 +94,7 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules the engine computes today. TWENTY-SEVEN OF FIFTY.
+ * The rules the engine computes today. THIRTY-THREE OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
@@ -121,8 +121,15 @@ export type RuleId =
  *   R-29  day/consistency.ts, the cross multiplication
  *   R-30  day/consistency.ts, the denominator rule, before any arithmetic
  *   R-31  day/progression.ts, the funded reset, in the same step as the pass
+ *   R-33  payout/gates.ts, the funded minimum-days gate, skipped at zero
+ *   R-34  payout/gates.ts, the win-day gate over the anchored counter
  *   R-35  payout/gates.ts withdrawableCents, and DO-9, which is where the two
  *         terms it reads are final
+ *   R-36  payout/gates.ts, funded consistency, sharing R-29's function
+ *   R-37  payout/gates.ts and calendar.ts, the cadence gap by sequence
+ *         subtraction. An anchor the slice cannot answer for REFUSES the day
+ *   R-39  payout/gates.ts, min(withdrawable, cap) against the minimum payout
+ *   R-41  payout/gates.ts allGatesPass, the conjunction, listed not reduced
  *   R-42  payout/clamp.ts capForOrdinal, the last rung at or below the ordinal
  *   R-43  payout/clamp.ts clampPayout, the three-way min and the four reasons
  *   R-44  payout/clamp.ts clampPayout, the ceiling to the trader
@@ -145,11 +152,11 @@ export type RuleId =
  *   R-10, R-11, R-17, R-19, R-20
  *         discharged outside the day fold: ingest, publish validation,
  *         settlement, the platform setpoint
- *   R-33, R-34, R-36 to R-41
- *         the rest of group F. `engineEligible` is R-41's CONJUNCTION and INV-15
- *         forbids a shortcut path, so it stays absent from `RuleState` until
- *         every term exists. R-35 is declared alone because it is a value the
- *         state carries rather than a term in that conjunction
+ *   R-38, R-40
+ *         the CONTEXT half of group F. Both read `ExternalGates`, which M01
+ *         section 2.1 marks "context, never replayed (INV-23)", so neither can
+ *         be a term in `engineGates` without putting an unreplayable fact into
+ *         the replayed state. They land with `evaluatePayout`
  *   R-46 to R-50
  *         group H, and DO-2 refuses every day a settlement is effective on
  *         until they land
@@ -177,7 +184,13 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-29',
   'R-30',
   'R-31',
+  'R-33',
+  'R-34',
   'R-35',
+  'R-36',
+  'R-37',
+  'R-39',
+  'R-41',
   'R-42',
   'R-43',
   'R-44',
