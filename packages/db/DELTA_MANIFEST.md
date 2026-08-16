@@ -18,10 +18,13 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->31<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->32<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
+**The fold's 27 files, and this table is closed at 27.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+
+**A superseding migration does not get a row here**, and saying so is the point: `0028` ([ADR-035](../../docs/decisions/ADR-035.md)) and `0032` ([ADR-042](../../docs/decisions/ADR-042.md)) are recorded in sections 13 and 14, because this table describes **what the fold created** and a superseding file describes **what changed afterwards**. Appending to it would make the sequence and the file count two hand-maintained numbers in a document written to end them. The count that is checked is the `migration_files` span in [STATE](../../docs/STATE.md) and [INDEX](../../docs/INDEX.md), derived from the directory by [CI-06g](../../docs/testing/STRATEGY.md); this line read a bare "27 files" against 28 on disk until `0032` landed, which is the ninth hand-maintained count found wrong.
 
 | # | File | Money path | Contents |
 |---|---|---|---|
@@ -239,6 +242,8 @@ Items found while folding that are **not schema deltas** and are **not closed**.
 | **OI-07** | **`0029` has no committed probe.** [FOLD-01](../../docs/plans/FOLD-01-phone-identity.md)'s definition of done names `scripts/db/probe_phone_identity.sql`, and section 14 below records 48 assertions **executed** against the installed schema on 2026-08-16. They were executed ad hoc and are **not re-runnable in CI**, because the session brief's stop condition was the migration, its data-model files and its manifest rows. **That is the exact object section 13 names**: a probe that ships beside a fix and never runs again is the same thing as the golden test that was missing. Owed: the probe file, leading with the success case, plus its step in [`corpus.yml`](../../.github/workflows/corpus.yml) beside the ledger and ADR-035 probes | **OPEN**, one commit, owner unassigned |
 | **OI-08** | **The NO-FLOATS `DO` block is positional, and everything after `0027` is outside it.** Section 9 says the assertion "fails the migration" if any column in `public` is `numeric`, `real` or `double precision` outside the two exempt ones. It lives in `0027` and therefore reads the schema **as of `0027`**: `0028` and `0029` both land after it, and **a future migration adding a `numeric` money column would sail past the guard the corpus believes protects it.** It was checked by hand for `0029` (section 14) and the set is still exactly the two `correlation_groups` columns. **Recommendation**: re-assert it in the install job after the whole set applies, beside the object-count derivation, so it is positionally last by construction rather than by whoever remembers. It is a two-line step and it belongs with the gate work, not inside a money-path migration | **OPEN**, found while folding `0029` |
 
+| **OI-06** | **Nothing in the database forces an `UPDATE` to `trading_calendar` to write a `trading_calendar_revisions` row.** `0032` creates the prior-image table [ADR-042](../../docs/decisions/ADR-042.md) F-2 ruled and the loader writes to it; a hand-run `UPDATE` against the calendar leaves no prior image and `INV-04`'s replay is back where F-2 found it. **A trigger would make it a control rather than a rule somebody follows**, and `0027` is where the invariant triggers live. **ADR-042 is silent on it**, so `0032` does not add a money-path trigger on its own authority: per CLAUDE.md, silence means propose an ADR and proceed on approval. The same question covers whether a `DELETE` from `trading_calendar` should be forbidden outright, which today only the revisions foreign key partly prevents | **OPEN**, needs a ruling. Raised by the session that wrote `0032` (2026-08-16) |
+
 ## 9. NO-FLOATS EXEMPTION LIST
 
 **Constitution and [DATA_MODEL section 1](../../docs/architecture/data-model/README.md): money is `bigint` integer cents, ratios are integer basis points, never `numeric` and never a float, in any financial path.**
@@ -377,7 +382,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->31<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->100<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->32<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->6<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -495,3 +500,77 @@ HINT:  New enum values must be committed before they can be used.
 **REJECTION 3 is the one worth naming.** `0011` gave `wallet_withdrawals` a freeze clock, a freeze flag and a freeze-expiry index, and `wallet_withdrawal_status` has no frozen value. **The halt was representable and entirely unenforced**: a halted withdrawal still matched the open index and nothing whatsoever refused settlement. Nobody had to write the defect; it arrived by writing half the mechanism and reading the other half as done.
 
 **The probe cost five fixture corrections before it ran, and every one was a constraint this set already enforced** (`users.email`; a severity-5 `risk_flags` row needing `sla_due_at`; `plan_versions` needing `public_slug`, `created_by` and a publish transition; `purchases` needing its four money columns plus a PSP reference; a funded `accounts` row needing `funded_on`). Each was fixed by reading the DDL rather than guessing at it. **A schema that is hard to write a fixture against by guessing is the schema working**, and it is also the reason CI-03's golden fixtures load from a declared file rather than from a session's memory.
+## 14. `0032` lands, and the weak reading of F-1 is falsified by execution (2026-08-16)
+
+**[`0032_trading_calendar_holidays_coverage_revisions.sql`](migrations/0032_trading_calendar_holidays_coverage_revisions.sql), [ADR-042](../../docs/decisions/ADR-042.md) accepted.** F-1 through F-4, and **the four are one migration or none**. It supersedes `0004_catalog`'s `trading_calendar` constraints and `0026_roles_and_grants`' append-only revoke list. **Neither file is edited.**
+
+**No numbered delta lands here.** F-1 to F-4 are ADR-042 findings rather than `SD-nn` rows, so [ADR-026](../../docs/decisions/ADR-026.md)'s completeness gate has nothing to count and this section is the record instead. The manifest's 94 stands.
+
+**The set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, zero errors.** `0029` to `0031` are reserved and unwritten ([ALLOCATION](../../docs/decisions/ALLOCATION.md)), so the applied sequence is `0001` to `0028` then `0032`, which is the same order `corpus.yml`'s glob produces.
+
+| Object counts | After `0028` | After `0032` |
+|---|---|---|
+| tables | 96 | **98** |
+| indexes | 326 | **332** |
+| check constraints | 347 | **359** |
+| triggers | 6 | **6** |
+
+### What each finding actually carries
+
+| # | In `0032` | In the schema |
+|---|---|---|
+| **F-1** | `session_open_at` and `session_close_at` lose `NOT NULL`; `trading_calendar_session_ordered` is **dropped and rewritten under its own name**; `trading_calendar_holiday_has_no_session` is added | A holiday is writable, and it is a **positive fact rather than an absence** |
+| **F-2** | `trading_calendar_revisions`, append-only by grant | Replay can tell a calendar correction from an engine regression |
+| **F-3** | `COMMENT ON COLUMN session_close_at` carrying the latest-close semantics, plus `trading_calendar_half_day_records_group_closes` | The per-group times are recorded. **No symbol dimension**: it changes R-01's contract |
+| **F-4** | `trading_calendar_loads`, append-only by grant | A day outside coverage is **unknown**, and the batch fails closed rather than reading it as an unbroken holiday |
+
+### The counterfactual, because the weak reading of F-1 looks correct and is not
+
+**Dropping `NOT NULL` from a column named inside an existing `CHECK` does not make the `CHECK` null-safe. It makes it vacuous on exactly the rows that now carry `NULL`**, because `session_close_at > session_open_at` evaluates to `NULL` when either side is `NULL`, and **a `CHECK` that evaluates to `NULL` passes**. That is the identical defect [ADR-035](../../docs/decisions/ADR-035.md) found seven times in the `array_length` form and fixed in `0028`, arriving a second time through a different door.
+
+It was **executed rather than reasoned about**, on [ADR-027](../../docs/decisions/ADR-027.md)'s counterfactual idiom. A scratch schema carrying `0004`'s table with `NOT NULL` dropped, F-1's ruled `CHECK (is_holiday = (session_open_at IS NULL))` added and **the ordering `CHECK` left alone**, was given a holiday with a `session_close_at` and no `session_open_at`:
+
+```
+insert into tc(trading_day, session_close_at, is_holiday)
+values ('2026-01-01','2026-01-01 21:00Z', true);
+-- COUNTERFACTUAL COMMITTED: 1 row(s)
+```
+
+**A fabricated close instant, on a day the exchange is shut, in a containment table, past both ruled constraints.** The ruled `CHECK` names `session_open_at` only, so it cannot see a stray close; the ordering `CHECK` returns `NULL` and passes. `0032`'s rewritten constraint admits the two legitimate states and nothing else: both columns `NULL`, or both non-`NULL` and ordered.
+
+### Perturbations, one per assertion, checked by message rather than by exception class
+
+**36 assertions against the full applied set. Every group leads with its positive control**, which is `0028`'s transferable lesson: a probe that only attempts forbidden things passes against a guard that rejects everything.
+
+| Attempt | Result |
+|---|---|
+| An ordinary session day; a holiday with both session columns `NULL`; a half day with per-group notes | **all three commit** |
+| A holiday carrying a session | `trading_calendar_holiday_has_no_session` |
+| A non-holiday with no session | `trading_calendar_holiday_has_no_session` |
+| An open with no close | `trading_calendar_session_ordered` |
+| A close with no open (the counterfactual's row) | `trading_calendar_session_ordered` |
+| `session_close_at <= session_open_at` | `trading_calendar_session_ordered` |
+| A duplicate `trading_day` | `trading_calendar_pkey` |
+| A holiday that is also a half day | `trading_calendar_holiday_not_half_day`, `0004`'s constraint still armed |
+| A half day with no notes, and a half day whose notes are whitespace | `trading_calendar_half_day_records_group_closes`, both |
+| A correction to a day nothing depends on; a correction to a day with 41 dependents naming an incident | **both commit** |
+| `{}` as the prior image, and a prior image missing `session_close_at` | `trading_calendar_revisions_prior_row_is_a_row`, both |
+| Dependents with no incident named, and dependents with a blank one | `trading_calendar_revisions_incident_named_when_dependent`, both |
+| A blank actor; a blank reason; a digest that is not SHA-256; a negative dependent count | the four named constraints, each |
+| A revision for a day the calendar does not carry | `trading_calendar_revisions_trading_day_fkey` |
+| A load | **commits** |
+| Coverage that ends before it starts | `trading_calendar_loads_coverage_ordered` |
+| The same source loaded twice at the same digest | `trading_calendar_loads_source_digest_uq` |
+| A blank source id; a load digest that is not SHA-256 | the two named constraints |
+| `merit_app` UPDATEs or DELETEs a revision or a load, four ways | **`permission denied`**, all four |
+| `merit_app` INSERTs and SELECTs a load; `merit_app` UPDATEs `trading_calendar` itself | **both commit.** The revoke is narrow and the calendar stays mutable |
+
+**Two of those rows were written expecting the wrong constraint and the schema corrected the expectation, not the other way round.** "An open with no close" was expected to fail on `trading_calendar_holiday_has_no_session` and fails on `trading_calendar_session_ordered`, which is right: `is_holiday = false` and `session_open_at IS NOT NULL` satisfies the first, and the pairing in the second is the only thing that rejects it. "A holiday that is also a half day" first failed on the new notes constraint because the test row had no notes, and names `0004`'s constraint once the notes are supplied. **Checking by message is what made both visible**; an exception-class check would have scored both green and proven nothing about which constraint is load-bearing.
+
+**These perturbations are not yet a committed probe file.** `scripts/db/probe_trading_calendar.sql` is S-E4's deliverable, beside the loader it exists to test ([P1 S-E](../../docs/plans/P1-SE-trading-calendar.md) sections 7.2 and 11). This section records what was run; **a run that is recorded and not wired is exactly the "ships beside a fix and never runs again" shape RIDER 2 in [`corpus.yml`](../../.github/workflows/corpus.yml) was added to end**, and it is stated here so that S-E4 is what closes it rather than a later reader assuming it already is.
+
+### What `0032` does not do
+
+**No loader, no source file, no rows, no probe file, no `CI-06m`, no lint rule.** Those are S-E3, S-E4 and S-E5 under [ADR-003](../../docs/decisions/ADR-003.md)'s strict regime, one objective per session. `trading_calendar` still holds **zero rows**, so every `ADD CONSTRAINT` above validated against an empty table and none of them is evidence that any row satisfies it.
+
+**And `0029` to `0031` are untouched.** They are FOLD-01's and FOLD-02's reservations and this session does not write them.

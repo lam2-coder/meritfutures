@@ -758,9 +758,18 @@ const sqlMatchCount = (re) =>
 // STRATEGY's own CI-06g section shows `<!--gen:adr_count-->25<!--/gen-->` in a
 // fence as the worked example; regenerating it would rewrite the explanation of
 // the mechanism to match the mechanism.
+//
+// THE NAME CLASS CARRIES DIGITS, AND IT DID NOT UNTIL 2026-08-16. It was
+// `[a-z_]+`, so `<!--gen:e2_files-->` matched NOTHING: the only span in the
+// corpus with a digit in its name was invisible to both halves of CI-06g, the
+// gate passed while the number was wrong, and `generate` had nothing to rewrite.
+// INDEX.md said 18 files carry an `E2 READ: MONEY PATH` header against 19 on
+// disk, in the same sentence that says "all three are generated spans now".
+// Found when 0032 became the nineteenth. A span that cannot be parsed is worse
+// than a hand-maintained number, because it reads as checked.
 function spansIn(body) {
   const masked = body.replace(/^```[\s\S]*?^```/gm, (block) => block.replace(/</g, '\0'));
-  return [...masked.matchAll(/<!--gen:([a-z_]+)-->(.*?)<!--\/gen-->/gs)];
+  return [...masked.matchAll(/<!--gen:([a-z0-9_]+)-->(.*?)<!--\/gen-->/gs)];
 }
 
 const ci06g = {
