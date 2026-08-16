@@ -63,4 +63,5 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 37](2026-08-16-session-37.md) | FOLD-01 session 6, the registries and `CI-06k` |
 | [2026-08-16 - Session 38](2026-08-16-session-38.md) | FOLD-02 sessions 6 and 7, the registries and `CI-06l` |
 | [2026-08-16 - Session 39](2026-08-16-session-39.md) | S-E session 5: `CI-06m`, the import ban, the SQL shape check |
+| [2026-08-16 - Session 40](2026-08-16-session-40.md) | the fast-check plan generator, CV-01 to CV-19 made executable |
 | [2026-08-16 - Session 40](2026-08-16-session-40.md) | the three P2 ADRs, and the ownership partition made checkable |
