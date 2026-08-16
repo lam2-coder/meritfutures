@@ -70,3 +70,4 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 42](2026-08-16-session-42.md) | `OQ-P2-02`: the calendar watermark on `rule_states`, and `0034` claimed twice |
 | [2026-08-16 - Session 42](2026-08-16-session-42.md) | the arbitrary day-sequence generator, and two arithmetics for one row |
 | [2026-08-16 - Session 43](2026-08-16-session-43.md) | EC-157's Repair A (`0036`), and the duplicate `ADR-046` heading no gate could see |
+| [2026-08-16 - Session 44](2026-08-16-session-44.md) | `advanceDay`: DO-1 to DO-7, sixteen of fifty rules, and the thirty-four that say so |

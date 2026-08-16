@@ -434,6 +434,35 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## `advanceDay` exists: sixteen of M01's fifty rules, and the other thirty-four say so out loud (2026-08-16)
+
+**[P2](plans/P2-rules-engine.md) section 7's `P2-3` has landed** ([session 44](sessions/2026-08-16-session-44.md)). The fold is real code, the day-evaluation order is M01 section 3.1's and no other, and `pnpm run verify` is green: **312 tests, 15 corpus gates clean and dirty, 6 CI-02 seeded violations.**
+
+| Step | State |
+|---|---|
+| **DO-1** preconditions | Implemented, including ADR-049's calendar lookup over a `CalendarSlice` **value** |
+| **DO-2** settlements | **REFUSES.** `applySettlement` is group H (R-46 to R-50) and is unwritten |
+| **DO-3** mark identities | Implemented: `INV-18`, `INV-19`, `INV-20`, as typed refusals that write no state |
+| **DO-4, DO-5** breach | Implemented: R-21 strict `<`, R-22 strict `>`, R-23's fact, R-24, R-25 |
+| **DO-6** counters | Implemented: R-08, R-09 with R-04's halted clause, the consistency accumulators |
+| **DO-7** floor | Implemented: R-13 or R-16, then R-15, then R-14's `INV-06` tripwire |
+| **DO-8** progression | **REFUSES on an eval-phase day.** The eval progression is group E (R-26 to R-31) |
+| **DO-9** gates | The day closes and `day.closed` is emitted. **The engine gates are NOT evaluated**: R-33 to R-41 are group F, and `RuleState` carries no `engineEligible`, `engineGates` or `withdrawableCents` until they land |
+
+**A refusal is not a skip, and that distinction is the session's main structural claim.** Each unimplemented step returns a typed `AssertionFailure` naming the group behind it, which means no state is written for the day and the caller raises reconciliation. A fold that quietly omitted a settlement would return a balance 150,000c too high and pay a second time against it; refusing is `FM-05`'s idiom applied to an unfinished engine rather than to a bad vendor row.
+
+**The declared set is `IMPLEMENTED_RULES`, exported, and it is ADR-048's engine half arriving without ADR-048's flip.** CI-03's polarity is **unchanged**: `engineIsIdentityStub()` still governs, every fixture is still asserted to fail, and the derivation waits on the resolvable-citation `L-nn` rule ADR-048 names as its prerequisite. **Each of the sixteen is watched failing on a mutant of itself** for four of them (R-09, R-13, R-21, R-22) in [`falsify-ci.mjs`](../scripts/ci/falsify-ci.mjs), because a test that still passes when its operator is flipped is a test asserting nothing, and ADR-048's polarity rests on that series being real.
+
+**`Cents` is now `bigint`** (M01 section 2.1, `INV-02`). The scaffold's branded `number` satisfied the lint half of that invariant and not the type half, which was harmless while nothing computed with it. The golden loader converts once, at the line where a JSON number crosses into the engine.
+
+| Open | Where |
+|---|---|
+| **M01 disagrees with itself on R-22's operator, and this is a defect in a frozen document** | Section 3.6's pseudocode writes the hard daily-loss-limit comparison as `>=`; **R-22's operator column, `OQ-6`'s ruling and section 10.1 all write `>`** ("exactly at the limit survives"). Section 3.5 makes the operator column the contract, so the engine implements `>` and `RE-U-022` pins it. **Moving the pseudocode is an ADR, not a commit**, and no ADR is attempted on a session's own authority. **No v1 plan configures a daily loss limit**, so nothing exercises it until one does, which is exactly why it is recorded now |
+| **The golden loader cannot fold `advanceDay` yet, and the reason is a comparison rather than a wiring** | `diffEndState` compares with `Object.is`, the expectations are JSON numbers, and the engine's state fields are `bigint`. `Object.is(4750000, 4750000n)` is **false**. The fixture-wiring session owns that conversion, and it is the same session that lands the `L-nn` citation rule and ADR-048's polarity derivation |
+| **`RuleState` is a subset of M01 section 2.2** | `withdrawableCents`, `engineEligible`, `engineGates` and `stateHash` are absent, each named in `types.ts` with the rule or the appendix that fills it. `hash.ts` and `SD-08` are replay's, not the day fold's |
+
+---
+
 
 ## S-E5: ADR-042's three mechanisms are wired, and each has been watched failing (2026-08-16)
 

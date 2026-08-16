@@ -18,7 +18,39 @@ import * as engine from '../src/index.js';
 // engine's public entry point only": if the entry point stops being the whole
 // public surface, the loader gains a route to the internals and TR-01 stops
 // being enforceable by construction.
-test('the engine has one public entry point, and it exports the evaluation and nothing else', () => {
-  expect(Object.keys(engine)).toEqual(['evaluate']);
+// WHAT CHANGED WHEN THE FOLD LANDED, and why this is not the guard being
+// loosened. The assertion was `['evaluate']` while the engine was the scaffold's
+// identity stub, and the property it was defending was never "one export": it is
+// that THE ENTRY POINT IS THE WHOLE PUBLIC SURFACE, so the loader has no route to
+// an internal. M01 section 1.3 names the surface -- six functions, "and nothing
+// else is exported, because every additional export is a way for a caller to
+// reimplement a rule slightly differently" -- and two of those six are now
+// written. So the list below is exact rather than open, and adding an export
+// without adding it here is still a red stage.
+//
+//   advanceDay, initialState   M01 section 1.3, two of the six
+//   buildCalendarSlice         ADR-049: the slice is "built by a pure exported
+//   lookupCalendarDay          constructor", with "the calendar queries as free
+//   CalendarSliceError         functions in `calendar.ts` over that value"
+//   EngineInvariantError       R-14's tripwire is useless if a caller cannot
+//                              catch it by type
+//   IMPLEMENTED_RULES          ADR-048: "the engine exports the set of rule
+//                              identifiers it implements, and that export is
+//                              part of its public contract"
+//   evaluate                   the scaffold's stub, still what CI-03's polarity
+//                              probe folds, retired when the loader moves to
+//                              `advanceDay`
+test('the engine entry point is the whole public surface, and it is this exact list', () => {
+  expect(Object.keys(engine).sort()).toEqual([
+    'CalendarSliceError',
+    'EngineInvariantError',
+    'IMPLEMENTED_RULES',
+    'advanceDay',
+    'buildCalendarSlice',
+    'evaluate',
+    'initialState',
+    'lookupCalendarDay',
+  ]);
   expect(typeof engine.evaluate).toBe('function');
+  expect(typeof engine.advanceDay).toBe('function');
 });

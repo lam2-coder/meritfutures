@@ -23,6 +23,58 @@ export type {
   TradingDay,
 } from './types.js';
 
+// -----------------------------------------------------------------------------
+// M01's surface, as far as it is built
+// -----------------------------------------------------------------------------
+// M01 section 1.3 names six exported functions and says "nothing else is
+// exported, because every additional export is a way for a caller to reimplement
+// a rule slightly differently". Two of the six are here: `initialState` and
+// `advanceDay`. `resolvePlan`, `validatePlan`, `applySettlement` and
+// `evaluatePayout` are P2-1, P2-6 and the group H session, and each arrives with
+// the rules it computes.
+//
+// `buildCalendarSlice` is a seventh name and is not a seventh rule: ADR-049
+// requires the slice to be "built by a pure exported constructor", and a
+// constructor a caller cannot reach is a value a caller cannot make.
+
+export type {
+  AssertionFailure,
+  AssertionKind,
+  BreachDetectedEvent,
+  BreachKind,
+  CalendarDay,
+  CalendarSlice,
+  CapScheduleStep,
+  ConsistencyRules,
+  DailyLossLimitRules,
+  DailyMark,
+  DayClosedEvent,
+  DayInput,
+  DayOutput,
+  DrawdownRules,
+  DrawdownType,
+  EvalPhaseRules,
+  FloorLockedEvent,
+  FloorLockRules,
+  FundedPhaseRules,
+  Phase,
+  PhaseDayRules,
+  ResolvedPlan,
+  RuleState,
+  SettlementFact,
+  SoftDailyLossLimitEvent,
+} from './types.js';
+
+export { buildCalendarSlice, CalendarSliceError, lookupCalendarDay } from './calendar.js';
+export type { CalendarLookup, CalendarSource } from './calendar.js';
+
+export { EngineInvariantError } from './errors.js';
+
+export { IMPLEMENTED_RULES } from './rules.js';
+export type { RuleId } from './rules.js';
+
+export { advanceDay, initialState } from './day/advance.js';
+
 import type { EngineInput, EngineResult } from './types.js';
 
 /**
