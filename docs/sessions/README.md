@@ -57,3 +57,4 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 32](2026-08-16-session-32.md) | The AI and LLM policy (ADR-044), written by the review desk |
 | [2026-08-16 - Session 33](2026-08-16-session-33.md) | `0033` closes the calendar prior-image gap, and DELTA_MANIFEST gets the fourth allocation table |
 | [2026-08-16 - Session 33](2026-08-16-session-33.md) | FOLD-01 session 5, the portal, the vendors and the legal surface |
+| [2026-08-16 - Session 33](2026-08-16-session-33.md) | FOLD-02 session 4, the machines and the invariants |
