@@ -5,8 +5,8 @@
 | `attribution_id` | uuid | fk attributions, not null, on delete restrict | |
 | `amount_cents` | bigint | not null, check `<> 0` | **signed**: a clawback row is negative. The clawback is a compensating row, never an update to the original, for the same reason a ledger reversal is |
 | `status` | text | not null default `accrued`, check in (`accrued`,`payable`,`paid`,`clawed_back`) | |
-| `payable_after` | date | not null | the **refund** window. Merit's own clock |
-| `chargeback_window_ends_on` | date | not null | **`SD-M8-01`.** The second clock, and it is the card networks' rather than ours |
+| `payable_after` | date | not null | the **refund** window. Merit's own clock **Unit: wall clock**, the refund window, and it is Merit's own. |
+| `chargeback_window_ends_on` | date | not null | **`SD-M8-01`.** The second clock, and it is the card networks' rather than ours **Unit: rail clock**, the card networks' window and not Merit's, which is the whole reason it is a second column. |
 | `clawback_of` | uuid | fk affiliate_commissions, null, on delete restrict | **`SD-M8-01`.** Null on an accrual |
 | `paid_in_statement_id` | uuid | fk affiliate_statements, null, on delete restrict | **`SD-M8-01`.** Makes "when did we pay this, and on what statement" a lookup rather than a reconstruction |
 | `created_at`, `updated_at` | timestamptz | not null default now() | |

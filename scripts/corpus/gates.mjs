@@ -49,7 +49,7 @@
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, relative, resolve, extname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -564,14 +564,11 @@ const ci06d = {
 const ci06e = {
   id: 'CI-06e',
   title: 'Every edge case names a golden scenario reference, and it resolves',
-  covers:
-    'TR-04\'s second half. An edge case with no fixture is a decision nobody can test.',
+  covers: "TR-04's second half. An edge case with no fixture is a decision nobody can test.",
   run() {
     const findings = [];
     const ecBody = edgeCaseBody();
-    const gs = new Set(
-      [...goldenBody().matchAll(/^[|#\s]*\**\s*(GS-\d{3})\b/gm)].map((m) => m[1]),
-    );
+    const gs = new Set([...goldenBody().matchAll(/^[|#\s]*\**\s*(GS-\d{3})\b/gm)].map((m) => m[1]));
     // THE REGISTRY HAS TWO DEFINITION FORMS AND BOTH ARE VALID.
     //   block form: `## EC-nnn: <name>` with a `- Golden scenario ref:` field
     //   table form: `| EC-nnn | ... | GS-nnn |`, the Appendix B4 battery, which
@@ -612,7 +609,8 @@ const ci06e = {
         findings.push(`${id}: names no golden scenario (${scope.trim().slice(0, 70)})`);
         continue;
       }
-      for (const g of cited) if (!gs.has(g)) findings.push(`${id}: cites ${g}, which does not exist`);
+      for (const g of cited)
+        if (!gs.has(g)) findings.push(`${id}: cites ${g}, which does not exist`);
     }
     if (accepted.length) {
       console.log(
@@ -631,7 +629,7 @@ const ci06f = {
   id: 'CI-06f',
   title: 'ADR numbers are unique and gapless over allocated plus reserved',
   covers:
-    'uniqueness and gaplessness across the docs/decisions/ entry files, against the '+
+    'uniqueness and gaplessness across the docs/decisions/ entry files, against the ' +
     'allocation table, plus that each entry file is named for the ADR its heading declares. ' +
     'The cross-branch half (a PR may not claim a number already on main) belongs ' +
     'to the CI job, which can see both refs; this run cannot.',
@@ -647,7 +645,8 @@ const ci06f = {
         findings.push(`${file}: no "## ADR-nnn:" heading; it is not a readable entry`);
         continue;
       }
-      if (file !== expected) findings.push(`${file}: heading says ADR-${id}, so it belongs at ${expected}`);
+      if (file !== expected)
+        findings.push(`${file}: heading says ADR-${id}, so it belongs at ${expected}`);
       if (/^D/.test(id)) continue; // outside the numbered sequence, by name
       const n = Number(id);
       if (seen.has(n)) findings.push(`ADR-${id} appears more than once`);
@@ -685,7 +684,11 @@ const SPAN_QUERIES = {
   // counting files (ADR-043). Counting files would count ADR-D1, which is outside
   // the numbered sequence, and would count a stray file with no heading.
   adr_count: () =>
-    new Set(adrEntries().map((e) => e.id).filter((id) => id && !/^D/.test(id))).size,
+    new Set(
+      adrEntries()
+        .map((e) => e.id)
+        .filter((id) => id && !/^D/.test(id)),
+    ).size,
   // DISTINCT IDENTIFIERS, not headings. EC-012 to EC-033 are the Appendix B4
   // battery and live as TABLE ROWS under one heading, so counting `## EC-nnn`
   // gives 119 against the registry's 140. This is the exact trap STRATEGY names
@@ -760,8 +763,7 @@ const sqlFiles = () => {
     .map((f) => join(dir, f));
 };
 
-const sqlMatchCount = (re) =>
-  sqlFiles().reduce((n, f) => n + (read(f).match(re) || []).length, 0);
+const sqlMatchCount = (re) => sqlFiles().reduce((n, f) => n + (read(f).match(re) || []).length, 0);
 
 // Spans inside a fenced code block are DOCUMENTATION OF THE FORM, not spans.
 // STRATEGY's own CI-06g section shows `<!--gen:adr_count-->25<!--/gen-->` in a
@@ -839,7 +841,9 @@ function generate() {
     }
     if (next !== body) writeFileSync(join(ROOT, file), next);
   }
-  console.log(changed ? `\n${changed} span(s) rewritten.` : 'every span already matches its query.');
+  console.log(
+    changed ? `\n${changed} span(s) rewritten.` : 'every span already matches its query.',
+  );
   return 0;
 }
 
@@ -886,7 +890,8 @@ const ci06i = {
     if (created.length === 0) throw new Error('no CREATE TABLE found; the gate cannot run');
     const inSql = new Map();
     for (const { table, file } of created) {
-      if (inSql.has(table)) findings.push(`${table}: CREATE TABLE in both ${inSql.get(table)} and ${file}`);
+      if (inSql.has(table))
+        findings.push(`${table}: CREATE TABLE in both ${inSql.get(table)} and ${file}`);
       else inSql.set(table, file);
     }
 
@@ -901,15 +906,19 @@ const ci06i = {
     const recordFiles = readdirSync(join(ROOT, dir))
       .filter((f) => /^[a-z][a-z0-9_]*\.md$/.test(f))
       .sort();
-    if (recordFiles.length === 0) throw new Error(`no design records in ${dir}; the gate cannot run`);
+    if (recordFiles.length === 0)
+      throw new Error(`no design records in ${dir}; the gate cannot run`);
     const sections = [];
     for (const f of recordFiles) {
       const m = /^### ([a-z][a-z0-9_]*)\s*$/m.exec(read(join(dir, f)));
       if (!m) {
-        findings.push(`${dir}/${f}: no \`### <table>\` heading; it is not a readable design record`);
+        findings.push(
+          `${dir}/${f}: no \`### <table>\` heading; it is not a readable design record`,
+        );
         continue;
       }
-      if (`${m[1]}.md` !== f) findings.push(`${dir}/${f}: heading says ${m[1]}, so it belongs at ${m[1]}.md`);
+      if (`${m[1]}.md` !== f)
+        findings.push(`${dir}/${f}: heading says ${m[1]}, so it belongs at ${m[1]}.md`);
       sections.push(m[1]);
     }
     const inDoc = new Set();
@@ -919,10 +928,12 @@ const ci06i = {
     }
 
     for (const [table, file] of inSql) {
-      if (!inDoc.has(table)) findings.push(`${table} (${file}): created by a migration, no design record`);
+      if (!inDoc.has(table))
+        findings.push(`${table} (${file}): created by a migration, no design record`);
     }
     for (const name of inDoc) {
-      if (!inSql.has(name)) findings.push(`${name}: has a design record, no CREATE TABLE creates it`);
+      if (!inSql.has(name))
+        findings.push(`${name}: has a design record, no CREATE TABLE creates it`);
     }
     return findings;
   },
@@ -996,7 +1007,9 @@ const ci06h = {
     const max = Math.max(...seen.keys(), ...alloc);
     for (let n = 1; n <= max; n++) {
       if (!seen.has(n) && !alloc.has(n)) {
-        findings.push(`${pad(n)} is neither on disk nor reserved (a hole in the migration sequence)`);
+        findings.push(
+          `${pad(n)} is neither on disk nor reserved (a hole in the migration sequence)`,
+        );
       }
     }
     for (const [n, f] of [...seen].sort((a, b) => a[0] - b[0])) {
@@ -1096,7 +1109,7 @@ const ci06h = {
 // message in 0027.
 function stripSqlComments(sql) {
   let out = '';
-  for (let i = 0; i < sql.length; ) {
+  for (let i = 0; i < sql.length;) {
     if (sql.startsWith('--', i)) {
       const nl = sql.indexOf('\n', i);
       i = nl === -1 ? sql.length : nl;
@@ -1133,11 +1146,20 @@ function columnCatalogue() {
     cols.get(t).add(c);
   };
   const NOT_A_COLUMN = new Set([
-    'constraint', 'primary', 'unique', 'check', 'foreign', 'exclude', 'like', 'partition',
+    'constraint',
+    'primary',
+    'unique',
+    'check',
+    'foreign',
+    'exclude',
+    'like',
+    'partition',
   ]);
   for (const file of sqlFiles()) {
     const sql = stripSqlComments(read(file));
-    for (const m of sql.matchAll(/\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\s*\(/gi)) {
+    for (const m of sql.matchAll(
+      /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\s*\(/gi,
+    )) {
       const table = m[1].toLowerCase();
       if (!cols.has(table)) cols.set(table, new Set());
       // Balanced scan from the opening paren, then split the top level on commas.
@@ -1262,9 +1284,14 @@ const ci06j = {
     const fns = triggerFunctions();
     if (fns.size === 0) throw new Error('no trigger functions parsed; the gate cannot run');
     for (const [name, { file, body, tables }] of [...fns].sort()) {
-      const refs = new Set([...body.matchAll(/\b(?:NEW|OLD)\.([a-z_][a-z0-9_]*)/gi)].map((m) => m[1].toLowerCase()));
+      const refs = new Set(
+        [...body.matchAll(/\b(?:NEW|OLD)\.([a-z_][a-z0-9_]*)/gi)].map((m) => m[1].toLowerCase()),
+      );
       if (tables.size === 0) {
-        if (refs.size) findings.push(`${name} (${file}): reads NEW./OLD. and no CREATE TRIGGER attaches it to a table`);
+        if (refs.size)
+          findings.push(
+            `${name} (${file}): reads NEW./OLD. and no CREATE TRIGGER attaches it to a table`,
+          );
         continue;
       }
       for (const table of [...tables].sort()) {
@@ -1320,7 +1347,8 @@ const adr026 = {
     const cited = new Set();
     for (const file of markdownFiles()) {
       if (!/^docs\//.test(file) && file !== 'packages/db/DELTA_MANIFEST.md') continue;
-      for (const m of read(file).matchAll(/\b((?:SD|U)-(?:\d{2}|M\d{1,2}-\d{2}))\b/g)) cited.add(m[1]);
+      for (const m of read(file).matchAll(/\b((?:SD|U)-(?:\d{2}|M\d{1,2}-\d{2}))\b/g))
+        cited.add(m[1]);
     }
     for (const id of [...cited].sort()) {
       if (!rows.has(id)) findings.push(`${id}: cited in docs/ but has no DELTA_MANIFEST row`);
@@ -1394,7 +1422,12 @@ function negativeAuthzRows(body) {
   const rows = [];
   for (const line of section.split('\n')) {
     if (!line.trim().startsWith('|')) continue;
-    const cells = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    const cells = line
+      .trim()
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .map((c) => c.trim());
     rows.push({ line: line.trim(), cells });
   }
   return rows;
@@ -1419,9 +1452,10 @@ const factorTokensIn = (cell) => {
 
 const ci06k = {
   id: 'CI-06k',
-  title: 'Declared authority: every endpoint declares a factor, and no sensitive action accepts a single one',
+  title:
+    'Declared authority: every endpoint declares a factor, and no sensitive action accepts a single one',
   covers:
-    "ADR-039 amendment 4 (C-27) and amendment 2, from the tree with no database. " +
+    'ADR-039 amendment 4 (C-27) and amendment 2, from the tree with no database. ' +
     'Every row of API_CONTRACT section 12 carries a required-factor cell drawn from ' +
     'the published vocabulary; every sensitive action C-27 names appears there and ' +
     'declares a non-single factor; and notification_kinds.rate_limit_exempt is ' +
@@ -1517,9 +1551,10 @@ const ci06k = {
     // creates it, this gate has lost its input and says so rather than passing.
     let expr = null;
     for (const file of sqlFiles()) {
-      const m = /ADD\s+COLUMN\s+rate_limit_exempt\s+boolean\s+GENERATED\s+ALWAYS\s+AS\s*\(([\s\S]*?)\)\s*STORED/i.exec(
-        stripSqlComments(read(file)),
-      );
+      const m =
+        /ADD\s+COLUMN\s+rate_limit_exempt\s+boolean\s+GENERATED\s+ALWAYS\s+AS\s*\(([\s\S]*?)\)\s*STORED/i.exec(
+          stripSqlComments(read(file)),
+        );
       if (m) expr = { file, text: m[1] };
     }
     if (expr === null) {
@@ -1608,7 +1643,12 @@ function cronRows(body, heading) {
   const rows = [];
   for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
     if (!line.trim().startsWith('|')) continue;
-    const cells = line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    const cells = line
+      .trim()
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .map((c) => c.trim());
     if (cells.every((c) => /^:?-+:?$/.test(c))) continue; // the |---|---| separator
     rows.push(cells);
   }
@@ -1652,7 +1692,8 @@ function expiryColumns() {
 
 const ci06l = {
   id: 'CI-06l',
-  title: 'Every expiry has a sweep: each *_expires_at column names a release job or a written exemption',
+  title:
+    'Every expiry has a sweep: each *_expires_at column names a release job or a written exemption',
   covers:
     'every `*_expires_at` column the migrations declare is dispositioned exactly once in ' +
     `${CRON_DOC}, either in the coverage table with a release job that is itself a row of ` +
@@ -1674,7 +1715,11 @@ const ci06l = {
     }
     const body = read(CRON_DOC);
 
-    const scheduled = new Set(cronRows(body, CRON_SCHEDULED).slice(1).map((r) => normJob(r[0])));
+    const scheduled = new Set(
+      cronRows(body, CRON_SCHEDULED)
+        .slice(1)
+        .map((r) => normJob(r[0])),
+    );
     if (scheduled.size === 0) {
       throw new Error(`${CRON_DOC}: the scheduled table parsed to zero jobs; the gate cannot run`);
     }
@@ -1727,7 +1772,9 @@ const ci06l = {
       if (hasJob) {
         const job = normJob(covered.get(col).job);
         if (job === '') {
-          findings.push(`${col}: its coverage row names no release job (row reads "${covered.get(col).line.slice(0, 70)}")`);
+          findings.push(
+            `${col}: its coverage row names no release job (row reads "${covered.get(col).line.slice(0, 70)}")`,
+          );
         } else if (!scheduled.has(job)) {
           findings.push(
             `${col}: its coverage row names the release job "${job}", which is not a row of ` +
@@ -1844,9 +1891,495 @@ const ci06n = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06m  THE CALENDAR'S OWN COUNTS, ITS DERIVATION, AND THE UNIT OF EVERY DATE
+// -----------------------------------------------------------------------------
+// ADR-042, P1 S-E section 7.1. Three checks, one subject: THE TRADING DAY IS
+// DATA, AND A DATE COLUMN WITHOUT A UNIT IS A NUMBER WITHOUT ONE.
+//
+// THE FAILURE IT EXISTS FOR, and it is two failures wearing one face.
+//
+// The calendar decides what a trading day IS, and every counter the engine
+// keeps is counted in trading days. The engine is a pure function of the
+// calendar it is handed and cannot go and check: `types: []`,
+// `merit/engine-purity` and `RI-01` each guarantee that. SO A WRONG ROW CHANGES
+// RULE OUTCOMES WITH NO CHANGE TO A LINE OF ENGINE CODE, silently.
+//
+// And the schema holds 49 `date` columns whose unit is NOT derivable from their
+// type and only sometimes from their name. `published_statistics` carries
+// `as_of_trading_day`, whose unit is in the name, beside `window_start_day`,
+// whose unit lived only in M12 and whose design-record cell was EMPTY, in one
+// table. The exposure is not historical: `0029` to `0031` made
+// `interval '48 hours'` idiomatic on the money path, so the next session that
+// needs "five trading days from now" has a working pattern sitting right there
+// that is wrong on roughly 104 days a year.
+//
+// WHY THREE CHECKS AND NOT THREE GATES. They share one input set and one
+// ruling. Splitting them would make the calendar's counts, its derivation and
+// its units three rows that can each be disabled without the other two moving,
+// which is the arrangement ADR-034 and ADR-036 were each written to end.
+//
+// WHAT IT DOES NOT DO. It does not check a transcribed value against the CME
+// publication, which no gate can: that is OQ-SE-04's second blind transcription
+// and `generate.mjs --diff`. It does not judge whether a declared unit is the
+// RIGHT one, only that one of the three is declared. And it reads the DDL
+// rather than a live catalogue, so a column that exists only in a database is
+// invisible here exactly as it is to CI-06i.
+const CAL_SOURCE_DIR = 'packages/db/src/seed/calendars';
+const CAL_FIXTURE_DIR = 'packages/rules-engine/fixtures/calendars';
+
+// THE CLOSED UNIT VOCABULARY, and it is closed on purpose. ADR-042 rules that
+// an obligation Merit binds itself to is measured in exactly one of two units,
+// and that the third thing the corpus says is the RAIL'S, quoted and never
+// computed. Three tokens, therefore, and a date column declares one of them.
+//
+// An open vocabulary would defeat the check within a release: every cell would
+// declare its own phrasing, no two would agree, and "the unit is named" would
+// become "some words about time are present".
+const UNIT_TOKENS = [
+  { token: 'trading day', why: 'the exchange CT trading day, answered only by TradingCalendar' },
+  { token: 'wall clock', why: "Merit's own clock, answered only by now()" },
+  { token: 'rail clock', why: "the rail's own clock, quoted and never computed by Merit" },
+];
+// THE DECLARATION IS A MARKER, NOT A MENTION, and that distinction was learned
+// rather than designed. The first version of this check matched the token
+// anywhere in the row, and three rows passed it by accident: `basis_trading_day`
+// says "Not a wall clock", `effective_trading_day` explains what it is not, and
+// `accounts.opened_on` said "trading day, not a timestamp" in prose while the
+// cell beside it had been given the WRONG unit. Prose that mentions a unit and a
+// row that declares one are different things, and only the second is checkable.
+//
+// So the form is exactly `**Unit: <token>**`. It also makes the seeded violation
+// honest: stripping the marker removes the declaration no matter what the
+// surrounding sentence happens to say.
+const UNIT_MARKER = /\*\*Unit:\s*([a-z ]+?)\s*\*\*/i;
+const unitDeclared = (text) => {
+  const m = UNIT_MARKER.exec(text);
+  if (!m) return null;
+  const token = m[1].trim().toLowerCase();
+  return UNIT_TOKENS.some((u) => u.token === token) ? token : { invalid: token };
+};
+
+// "business day" is not a unit Merit computes (ADR-042): it is the rail's
+// language, quoted where the rail's leg is described and never calculated. So it
+// can never BE the declaration, and a row that tries is the finding. It may
+// still appear in the PROSE of a cell that quotes the rail, which is why this
+// reads the marker rather than banning the word.
+const BUSINESS_DAY = /business[ -]day/i;
+
+/** Every `date` column the migrations declare, as `table.column`. */
+function dateColumns() {
+  const out = [];
+  for (const file of sqlFiles()) {
+    const sql = stripSqlComments(read(file));
+    for (const m of sql.matchAll(
+      /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\s*\(/gi,
+    )) {
+      const table = m[1].toLowerCase();
+      let depth = 0;
+      let i = m.index + m[0].length - 1;
+      const start = i + 1;
+      for (; i < sql.length; i++) {
+        if (sql[i] === '(') depth++;
+        else if (sql[i] === ')') {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+      let d = 0;
+      let item = '';
+      const items = [];
+      for (const ch of sql.slice(start, i)) {
+        if (ch === '(') d++;
+        if (ch === ')') d--;
+        if (ch === ',' && d === 0) {
+          items.push(item);
+          item = '';
+        } else item += ch;
+      }
+      items.push(item);
+      for (const raw of items) {
+        const p = raw.trim().split(/\s+/);
+        if (!p[0] || !/^[a-z_][a-z0-9_]*$/i.test(p[0])) continue;
+        if (
+          [
+            'constraint',
+            'primary',
+            'unique',
+            'check',
+            'foreign',
+            'exclude',
+            'like',
+            'partition',
+          ].includes(p[0].toLowerCase())
+        )
+          continue;
+        // `date` exactly. `timestamptz` is a different unit question and
+        // `daterange` is not a day.
+        if (/^date$/i.test(p[1] ?? '')) out.push(`${table}.${p[0].toLowerCase()}`);
+      }
+    }
+    for (const m of sql.matchAll(
+      /ALTER\s+TABLE\s+([a-z_][a-z0-9_]*)\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\s+date\b/gi,
+    ))
+      out.push(`${m[1].toLowerCase()}.${m[2].toLowerCase()}`);
+  }
+  return [...new Set(out)].sort();
+}
+
+/**
+ * The design-record row for `column` in `table`, as its raw line. Matches the
+ * column inside a code span so a row that MENTIONS another column in prose is
+ * not mistaken for that column's row; a record may declare two columns in one
+ * row (`created_at`, `updated_at`) and that row answers for both.
+ */
+function designRow(table, column) {
+  const path = `docs/architecture/data-model/${table}.md`;
+  if (!existsSync(join(ROOT, path))) return { path, row: null, missingFile: true };
+  for (const line of read(path).split('\n')) {
+    const t = line.trim();
+    if (!t.startsWith('|')) continue;
+    const first = t.replace(/^\|/, '').split('|')[0] ?? '';
+    if (new RegExp('`[^`]*\\b' + column + '\\b[^`]*`').test(first)) return { path, row: t };
+  }
+  return { path, row: null };
+}
+
+const ci06m = {
+  id: 'CI-06m',
+  title:
+    'The calendar declares its own counts, its generated file is derived, and every date column names its unit',
+  covers:
+    'THREE CHECKS. (1) Every calendar source file is internally coherent: its transcription ' +
+    'state, its exception lists and its declared counts agree with each other and with its own ' +
+    "contents, through `generate.mjs`'s own parser rather than a second copy of it. " +
+    '(2) Every generated calendar and every fixture is DERIVED and reproduces: a transcribed ' +
+    'source regenerates byte-identically, and an untranscribed one has no generated file at all, ' +
+    'because a generated artifact nobody can reproduce is the drift the derivation exists to end. ' +
+    '(3) Every `date` column the migrations declare has a design-record row naming its unit from ' +
+    'the closed vocabulary trading day | wall clock | rail clock. ' +
+    'IT DOES NOT check a transcribed value against the CME publication, which no gate can: that ' +
+    "is OQ-SE-04's blind second transcription. It does not judge whether the declared unit is the " +
+    'RIGHT one, only that one is declared.',
+  run() {
+    const findings = [];
+
+    // -------------------------------------------------------------------------
+    // 1. The source file's declared counts agree with its own contents
+    // -------------------------------------------------------------------------
+    if (!existsSync(join(ROOT, CAL_SOURCE_DIR))) {
+      throw new Error(`${CAL_SOURCE_DIR} does not exist; the calendar source has moved or is gone`);
+    }
+    const sources = readdirSync(join(ROOT, CAL_SOURCE_DIR))
+      .filter((f) => f.endsWith('.source.json'))
+      .sort();
+    // Rule 2 on a derived input. A directory that stopped matching would report
+    // a repository with no calendar in it as fully checked.
+    if (sources.length === 0) {
+      throw new Error(
+        `${CAL_SOURCE_DIR} holds no *.source.json, so CI-06m is asserting nothing about the calendar`,
+      );
+    }
+
+    for (const file of sources) {
+      const path = `${CAL_SOURCE_DIR}/${file}`;
+      let src;
+      try {
+        src = JSON.parse(read(path));
+      } catch (e) {
+        findings.push(`${path}: is not parseable JSON (${e.message})`);
+        continue;
+      }
+
+      const awaiting = src.status === 'awaiting-transcription';
+      if (src.status !== 'transcribed' && !awaiting) {
+        findings.push(
+          `${path}: status "${src.status}" is neither "transcribed" nor "awaiting-transcription"`,
+        );
+        continue;
+      }
+
+      // NULL IS NOT THE EMPTY LIST, and this is the assertion that keeps it so.
+      // `holidays: null` says nobody has read the publication; `holidays: []`
+      // asserts the exchange closes on no day of the year, and it would load
+      // clean while making every counter advance through Christmas. ADR-042
+      // F-1's lesson, that a holiday is a positive fact rather than an absence,
+      // applied one layer earlier to the file. BOTH DIRECTIONS: a file claiming
+      // to await transcription while carrying values is the same defect
+      // mirrored, and it is the one a half-finished edit produces.
+      const nulls = ['holidays', 'early_closes'].filter((k) => src[k] === null);
+      const declared = src.declared ?? {};
+      const declaredNulls = ['holiday_count', 'early_close_count', 'session_count'].filter(
+        (k) => declared[k] === null,
+      );
+      if (awaiting && (nulls.length !== 2 || declaredNulls.length !== 3)) {
+        findings.push(
+          `${path}: status is "awaiting-transcription" but the file carries values. ` +
+            'An untranscribed source states null for holidays, early_closes and every declared count',
+        );
+      }
+      if (!awaiting && (nulls.length > 0 || declaredNulls.length > 0)) {
+        findings.push(
+          `${path}: status is "transcribed" but ${[...nulls, ...declaredNulls].join(', ')} is null. ` +
+            'Null means nobody has read the publication, and it is not the empty list',
+        );
+      }
+
+      // The declared-count agreement itself is `checkRows`'s
+      // `declared-count-disagrees`, and it is called through the generator
+      // rather than reimplemented here: two expressions of one concept agree
+      // exactly until they do not (OQ-P1-04).
+      if (!awaiting) {
+        try {
+          calendarGenerator().build(read(path), { sourceFile: path });
+        } catch (e) {
+          findings.push(
+            `${path}: ${e.finding ? `REJECTED [${e.finding}] ` : ''}${e.detail ?? e.message}`,
+          );
+        }
+      }
+
+      // ---------------------------------------------------------------------
+      // 2. The generated file is derived, and reproduces
+      // ---------------------------------------------------------------------
+      const generatedPath = `${CAL_SOURCE_DIR}/${file.replace(/\.source\.json$/, '.generated.json')}`;
+      const generatedExists = existsSync(join(ROOT, generatedPath));
+      if (awaiting && generatedExists) {
+        findings.push(
+          `${generatedPath} exists beside an untranscribed source. A generated file nobody can ` +
+            'reproduce is the hand-maintained calendar the derivation exists to abolish',
+        );
+      }
+      if (!awaiting && !generatedExists) {
+        findings.push(
+          `${generatedPath} is missing. A transcribed source without its generated file means the ` +
+            'reviewable artifact does not exist and git holds no history of it',
+        );
+      }
+      if (!awaiting && generatedExists) {
+        try {
+          const g = calendarGenerator();
+          if (g.serialize(g.build(read(path), { sourceFile: path })) !== read(generatedPath)) {
+            findings.push(
+              `${generatedPath} is not what ${path} generates. Regenerate with ` +
+                `\`node ${CAL_SOURCE_DIR}/generate.mjs ${path} --out ${generatedPath}\` and commit the result`,
+            );
+          }
+        } catch {
+          /* the build failure is already a finding above */
+        }
+      }
+    }
+
+    // The fixture calendars, which are the OTHER hand-maintained calendar and
+    // the reason this check is the load-bearing one. cme-2026.json says in its
+    // own note that two hand-maintained calendars is the drift class this
+    // corpus has found repeatedly. Deriving it is S-E's commitment; until the
+    // publication is transcribed it cannot be derived from anything, so what is
+    // asserted today is that it declares its own counts and that they agree
+    // with its own contents, which is the same two-statements-of-one-number
+    // discipline one file over.
+    if (!existsSync(join(ROOT, CAL_FIXTURE_DIR))) {
+      throw new Error(
+        `${CAL_FIXTURE_DIR} does not exist; the golden fixtures cannot resolve a session`,
+      );
+    }
+    const fixtures = readdirSync(join(ROOT, CAL_FIXTURE_DIR))
+      .filter((f) => f.endsWith('.json'))
+      .sort();
+    if (fixtures.length === 0) {
+      throw new Error(
+        `${CAL_FIXTURE_DIR} holds no calendar fixture; CI-06m is asserting nothing about it`,
+      );
+    }
+    for (const file of fixtures) {
+      const path = `${CAL_FIXTURE_DIR}/${file}`;
+      let fx;
+      try {
+        fx = JSON.parse(read(path));
+      } catch (e) {
+        findings.push(`${path}: is not parseable JSON (${e.message})`);
+        continue;
+      }
+      const sessions = Array.isArray(fx.sessions) ? fx.sessions : null;
+      if (sessions === null) {
+        findings.push(`${path}: has no \`sessions\` array`);
+        continue;
+      }
+      // THE VACUITY DIRECTION, AND IT WAS FOUND BY EXECUTION RATHER THAN BY
+      // READING. Every per-session assertion below is a loop, and every loop
+      // over an empty array succeeds. A fixture emptied to `"sessions": []`
+      // with `"session_count": 0` satisfied the declared-count check (0 equals
+      // 0), the coverage check (nothing to fall outside it) and the weekend
+      // check (nothing to land on a Saturday), and CI-06m REPORTED PASS. A
+      // derivation that reproduces nothing read exactly like one that
+      // reproduces correctly, which is what this gate exists to tell apart.
+      //
+      // It is the same defect the corpus has now found four times in four
+      // costumes: `array_length` on an empty array returning NULL and the CHECK
+      // passing (ADR-035, seven constraints), `{}` accepted as a
+      // `trading_calendar_revisions` prior image, an allowlist that decays by
+      // keeping a stale entry (CI-06l), and this. THE EMPTY CASE IS NEVER THE
+      // SAFE DEFAULT: it is the single value the assertion exists to reject,
+      // and it is the one value that skips the assertion entirely.
+      if (sessions.length === 0) {
+        findings.push(
+          `${path}: declares zero sessions. Every check below this one is a loop, so an empty ` +
+            'array satisfies all of them and the fixture asserts NOTHING while reading as ' +
+            'derived. A calendar with no sessions cannot resolve the day a golden fixture ' +
+            'names, and L-08 would refuse every lookup rather than one',
+        );
+        continue;
+      }
+      if (typeof fx.session_count !== 'number') {
+        findings.push(
+          `${path}: declares no \`session_count\`. The declared count is the second independent ` +
+            'statement of one number, and it is what catches a row deleted while editing',
+        );
+      } else if (fx.session_count !== sessions.length) {
+        findings.push(
+          `${path}: declares session_count ${fx.session_count} against ${sessions.length} sessions`,
+        );
+      }
+      const from = fx.coverage?.from;
+      const to = fx.coverage?.to;
+      if (typeof from !== 'string' || typeof to !== 'string') {
+        findings.push(
+          `${path}: has no \`coverage\` interval, which L-08 needs to refuse a day it does not hold`,
+        );
+      } else {
+        for (const s of sessions) {
+          const day = s.trading_day;
+          if (typeof day !== 'string') {
+            findings.push(`${path}: a session has no trading_day`);
+            continue;
+          }
+          if (day < from || day > to)
+            findings.push(`${path}: session ${day} is outside coverage ${from}..${to}`);
+          // A weekend row is the transcription slip this catches without any
+          // knowledge of the exchange: Saturday has no session, ever.
+          const dow = new Date(`${day}T00:00:00Z`).getUTCDay();
+          if (dow === 0 || dow === 6) findings.push(`${path}: session ${day} falls on a weekend`);
+        }
+      }
+      // A fixture that is not `partial` claims to be a real calendar, and a real
+      // calendar is derived rather than typed.
+      if (fx.status !== 'partial' && !fx.generated_by) {
+        findings.push(
+          `${path}: status "${fx.status}" is not "partial" and the file names no generator. ` +
+            "Two hand-maintained calendars is the drift class this file's own note describes",
+        );
+      }
+      // THE CITATION MUST RESOLVE, which is `CI-06l/unknown-job`'s assertion one
+      // registry over: a coverage row naming a release job nobody scheduled is
+      // the original failure wearing the fix's clothing. A fixture naming a
+      // generator that has moved is the same shape and is worse, because
+      // `generated_by` is the ONE field that distinguishes a derived calendar
+      // from a typed one. Left unchecked, a file goes on claiming derivation
+      // from a script that no longer exists, and the claim is what a reader
+      // trusts instead of re-deriving.
+      if (typeof fx.generated_by === 'string' && !existsSync(join(ROOT, fx.generated_by))) {
+        findings.push(
+          `${path}: names generator "${fx.generated_by}", which does not exist. A file that ` +
+            'claims to be derived from a script nobody can run is hand-maintained with a ' +
+            'provenance line on top',
+        );
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. Every date column names its unit
+    // -------------------------------------------------------------------------
+    const dates = dateColumns();
+    if (dates.length === 0) {
+      throw new Error('no `date` columns found in the migrations; the unit check cannot run');
+    }
+    for (const ref of dates) {
+      const [table, column] = ref.split('.');
+      const { path, row, missingFile } = designRow(table, column);
+      if (missingFile) {
+        // CI-06i owns "a table with no design record" and would report this
+        // too. Named here rather than skipped, because a silent skip is how a
+        // whole table's date columns leave the gate's sight.
+        findings.push(`${ref}: no design record at ${path} (CI-06i owns the table-level finding)`);
+        continue;
+      }
+      if (row === null) {
+        findings.push(`${ref}: ${path} has no row for the column`);
+        continue;
+      }
+      const declared = unitDeclared(row);
+      if (declared === null) {
+        findings.push(
+          `${ref}: its row in ${path} names no unit. A date column's unit is not derivable from ` +
+            `its type and only sometimes from its name. Declare one, as \`**Unit: <token>**\`, ` +
+            `from: ${UNIT_TOKENS.map((u) => u.token).join(' | ')}`,
+        );
+        continue;
+      }
+      if (typeof declared === 'object') {
+        findings.push(
+          `${ref}: its row declares \`**Unit: ${declared.invalid}**\`, which is not one of ` +
+            `${UNIT_TOKENS.map((u) => u.token).join(' | ')}.` +
+            (BUSINESS_DAY.test(declared.invalid)
+              ? ' "business day" is the rail\'s language (ADR-042): Merit quotes it and never' +
+                ' computes it, and there is no business-day calendar in this system.'
+              : ' The vocabulary is closed so that two rows cannot declare the same unit in two' +
+                ' spellings and agree only by accident.'),
+        );
+      }
+    }
+
+    return findings;
+  },
+};
+
+// THE GENERATOR IS IMPORTED, NEVER REIMPLEMENTED. `checkRows` already owns
+// `declared-count-disagrees` and `build` already owns the session rule; a
+// second copy here would be two expressions of one concept, which agree exactly
+// until they do not (OQ-P1-04, and ADR-036's stated precedent for extending the
+// migrations job rather than adding a sibling with its own parser).
+//
+// Top-level await, so the failure mode of a moved or broken generator is this
+// gate reporting ERROR rather than every gate failing to load.
+let _calendarGenerator = null;
+let _calendarGeneratorError = null;
+try {
+  _calendarGenerator = await import(
+    pathToFileURL(join(ROOT, `${CAL_SOURCE_DIR}/generate.mjs`)).href
+  );
+} catch (e) {
+  _calendarGeneratorError = e;
+}
+function calendarGenerator() {
+  if (_calendarGenerator === null) {
+    throw new Error(
+      `${CAL_SOURCE_DIR}/generate.mjs could not be loaded, so CI-06m cannot check the calendar ` +
+        `against its own parser: ${_calendarGeneratorError?.message ?? 'unknown error'}`,
+    );
+  }
+  return _calendarGenerator;
+}
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
-const GATES = [ci06a, ci06b, ci06c, ci06d, ci06e, ci06f, ci06g, ci06h, ci06i, ci06j, ci06k, ci06l, ci06n, adr026];
+const GATES = [
+  ci06a,
+  ci06b,
+  ci06c,
+  ci06d,
+  ci06e,
+  ci06f,
+  ci06g,
+  ci06h,
+  ci06i,
+  ci06j,
+  ci06k,
+  ci06l,
+  ci06m,
+  ci06n,
+  adr026,
+];
 
 function main() {
   const [cmd, only] = process.argv.slice(2);
@@ -1865,7 +2398,8 @@ function main() {
       return 2;
     }
     const filter = (process.argv[4] ?? '').toLowerCase();
-    for (const a of [...headingSlugs(read(only))].sort()) if (!filter || a.includes(filter)) console.log(a);
+    for (const a of [...headingSlugs(read(only))].sort())
+      if (!filter || a.includes(filter)) console.log(a);
     return 0;
   }
 

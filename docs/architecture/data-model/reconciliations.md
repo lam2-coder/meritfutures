@@ -3,7 +3,7 @@
 |---|---|---|---|
 | `id` | bigint | pk, generated always as identity | |
 | `account_id` | uuid | fk accounts, not null, on delete restrict | |
-| `trading_day` | date | not null | |
+| `trading_day` | date | not null | **Unit: trading day**, the day being reconciled. |
 | `our_balance_cents` | bigint | not null | |
 | `platform_balance_cents` | bigint | not null | |
 | `delta_cents` | bigint | **generated always as** `our_balance_cents - platform_balance_cents` **stored** | generated, so the two sides and their difference can never disagree |

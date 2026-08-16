@@ -7,7 +7,7 @@
 | `identity_id` | uuid | fk identities, not null, on delete restrict | |
 | `benefit_code` | text | not null | |
 | `criteria_version` | integer | not null | **`SD-M14-02`.** Which published criteria version earned it. Composite FK to `loyalty_criteria (benefit_code, version)`, so a grant can never cite a version that was never published |
-| `earned_on_trading_day` | date | not null | |
+| `earned_on_trading_day` | date | not null | **Unit: trading day**, the day the benefit was earned. |
 | `expires_at` | timestamptz | null | |
 | `consumed_at` | timestamptz | null | |
 | `consumed_ref` | uuid | null | **`SD-M14-02`.** Polymorphic: an offer id or a purchase id. Not a foreign key because it is two kinds; the single-spend guarantee is the partial unique index |

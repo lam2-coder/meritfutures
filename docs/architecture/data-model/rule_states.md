@@ -5,7 +5,7 @@ Per account **per trading day**, not a single current row. Roughly 250 rows per 
 |---|---|---|---|
 | `id` | bigint | pk, generated always as identity | |
 | `account_id` | uuid | fk accounts, not null, on delete restrict | |
-| `trading_day` | date | not null | |
+| `trading_day` | date | not null | **Unit: trading day**, the day this state closes. |
 | `phase` | text | not null | phase as of end of this day |
 | `floor_cents` | bigint | not null | the [floor](../../GLOSSARY.md#floor) that **survived** this day |
 | `floor_locked` | boolean | not null default false | |
@@ -17,10 +17,10 @@ Per account **per trading day**, not a single current row. Roughly 250 rows per 
 | `win_days_count` | integer | not null, check >= 0 | resets to 0 after a settled payout, anchored on `payout_anchor_day` |
 | `consistency_best_day_cents` | bigint | not null default 0 | numerator |
 | `consistency_period_profit_cents` | bigint | not null default 0 | denominator; the gate is skipped when this is <= 0, which is why it is stored rather than inferred from a sign |
-| `consistency_period_start_day` | date | null | **`SD-07`.** Derivable and stored anyway: it makes `engine_gates` self-describing in the portal and the evidence pack, and turns a class of off-by-one bugs into a visible field (EC-045, GS-068) |
+| `consistency_period_start_day` | date | null | **`SD-07`.** Derivable and stored anyway: it makes `engine_gates` self-describing in the portal and the evidence pack, and turns a class of off-by-one bugs into a visible field (EC-045, GS-068) **Unit: trading day**, the consistency window is counted in trading days from it. |
 | `payouts_settled_count` | integer | not null, check >= 0 | drives the [ladder](../../GLOSSARY.md#payout-ladder) and the cap schedule. **Settlements, not attempts** (R-45, `SD-05`) |
-| `payout_anchor_day` | date | null | **`SD-02`.** The last settled payout's **basis** day. Resets win days and starts the consistency period |
-| `cadence_anchor_day` | date | null | **`SD-02`.** That payout's **effective** day. Drives the [cadence gap](../../GLOSSARY.md#cadence-gap) |
+| `payout_anchor_day` | date | null | **`SD-02`.** The last settled payout's **basis** day. Resets win days and starts the consistency period **Unit: trading day**, win days reset from it and the consistency period starts at it. |
+| `cadence_anchor_day` | date | null | **`SD-02`.** That payout's **effective** day. Drives the [cadence gap](../../GLOSSARY.md#cadence-gap) **Unit: trading day**, the cadence gap is counted in trading days from it. |
 | `engine_eligible` | boolean | not null | **`SD-06`.** The engine's verdict from **engine gates only**, replayable by construction |
 | `engine_gates` | jsonb | not null | **`SD-06`.** Profit target, drawdown, win days, minimum days, consistency, cadence, cap, minimum payout. Replayable, **in the hash** |
 | `context_gates` | jsonb | not null | **`SD-06`.** Freeze, recon, KYC, in-flight. Not replayable, **not in the hash** (INV-23) |

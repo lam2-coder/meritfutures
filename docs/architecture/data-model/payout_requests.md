@@ -8,7 +8,7 @@
 | `approved_cents` | bigint | not null, check >= 0 | after the [clamp](../../GLOSSARY.md#clamp), `min(requested, withdrawable, cap)` |
 | `trader_cents` | bigint | not null, check >= 0 | split leg; becomes the **wallet** payable |
 | `firm_cents` | bigint | not null, check >= 0 | split leg; becomes revenue |
-| `basis_trading_day` | date | not null | the [last closed day](../../GLOSSARY.md#last-closed-day) the decision used. Not a wall clock |
+| `basis_trading_day` | date | not null | the [last closed day](../../GLOSSARY.md#last-closed-day) the decision used. Not a wall clock **Unit: trading day**, the day the eligibility was judged against. |
 | `plan_version_id` | uuid | fk plan_versions, not null, on delete restrict | the contract in force, copied for provability. The account pins it too; this copy is what makes the payout explicable without reading the account |
 | `eligibility_snapshot` | jsonb | not null | full gate-by-gate evaluation and inputs, immutable |
 | `status` | `payout_status` enum(`approved`,`settled`,`failed`,`frozen`,**`held_pending_review`**) | not null | **the ruled enum ([ADR-028](../../decisions/ADR-028.md)), widened once by [ADR-040](../../decisions/ADR-040.md)** in `0030`. There is still **no `denied`**, and adding a value still requires an ADR against the zero-denial policy; `transferring` was retired to `wallet_withdrawals`. **The zero-denial policy is amended rather than abandoned:** its substance is unchanged (no payout is denied; every hold pays inside 48 hours or produces a documented enforcement action), and its **mechanism** moves from "no review state exists" to "a review state exists and it expires" |
@@ -16,8 +16,8 @@
 | `payout_ordinal` | integer | not null, check > 0 | 1-based per account; drives the ladder and the cap schedule. R-45 defines it as `payouts_settled_count + 1`, so it is derived from **settlements** rather than attempts |
 | `approved_at` | timestamptz | not null default now() | |
 | `settled_at` | timestamptz | null | |
-| `settled_trading_day` | date | null | **`SD-03`.** When the settlement happened |
-| `effective_trading_day` | date | null | **`SD-03`.** The **first trading day whose opening balance reflects the withdrawal**. The adjustment is applied at the open of this day, never inside a session (R-10, `SD-01`), which is half of why a settled payout can never breach the account that earned it (INV-21). Replay must not depend on a wall clock, and storing both days makes the fold deterministic years later |
+| `settled_trading_day` | date | null | **`SD-03`.** When the settlement happened **Unit: trading day**, the day the settlement happened. |
+| `effective_trading_day` | date | null | **`SD-03`.** The **first trading day whose opening balance reflects the withdrawal**. The adjustment is applied at the open of this day, never inside a session (R-10, `SD-01`), which is half of why a settled payout can never breach the account that earned it (INV-21). Replay must not depend on a wall clock, and storing both days makes the fold deterministic years later **Unit: trading day**, the day the movement applies at the open of. |
 | `frozen_at` | timestamptz | null | **`SD-M5-01`** |
 | `freeze_flag_id` | uuid | fk risk_flags, null, on delete restrict | **`SD-M5-01`** |
 | `freeze_expires_at` | timestamptz | null | **`SD-M5-01`.** A freeze with a cited flag but no clock is an indefinite hold, which is a denial with extra steps and is exactly what a zero-denial policy must not permit itself (AS-M5-04). The expiry is what makes the control bind on **Merit** rather than on the trader |
@@ -27,7 +27,7 @@
 | `hold_tos_clause` | text | null | **`0031`.** [ADR-040](../../decisions/ADR-040.md) requires the clause as well as the flag, so an enforcement names the rule it enforces |
 | `hold_reason` | text | null | **`0031`** |
 | `balance_reflection_status` | text | not null default `pending`, check in (`pending`,`observed`,`missing`) | **`SD-M5-04`**, INV-M5-13. A settled payout whose withdrawal never appears in the platform balance leaves the trader able to withdraw the same money twice. `missing` is a real state, not an error: the money left our ledger and did not arrive in theirs, and somebody has to be told |
-| `reflected_on_trading_day` | date | null | **`SD-M5-04`** |
+| `reflected_on_trading_day` | date | null | **`SD-M5-04`** **Unit: trading day**, the day the platform showed the withdrawal. |
 | `created_at`, `updated_at` | timestamptz | not null default now() | |
 
 Indexes: unique `payout_requests_account_idempotency_uq (account_id, idempotency_key)`; unique `payout_requests_account_ordinal_uq (account_id, payout_ordinal)` where `status <> 'failed'` (**`SD-05`**); unique `payout_requests_no_in_flight_uq (account_id)` where `status in ('approved','frozen','held_pending_review')` (**`SD-09`**, predicate per [ADR-028](../../decisions/ADR-028.md) as widened by [ADR-040](../../decisions/ADR-040.md) in `0031`); `payout_requests_outstanding_idx (status)` where the **same** predicate; `payout_requests_identity_approved_idx (identity_id, approved_at desc)`; `payout_requests_freeze_expiry_idx (freeze_expires_at)` where `status = 'frozen'`; `payout_requests_hold_expiry_idx (hold_expires_at)` where `status = 'held_pending_review'` (`0031`, beside the freeze-expiry index rather than widening it: two clocks, two sweeps, two indexes, and neither one silently covering the other); `payout_requests_reflection_pending_idx (settled_trading_day)` where settled and not observed.

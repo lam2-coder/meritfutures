@@ -5,7 +5,7 @@ The trading day is data, never arithmetic.
 
 | Column | Type | Constraints | Why |
 |---|---|---|---|
-| `trading_day` | date | pk | **the exchange CT trading day**, never a UTC calendar date derived from a timestamp (B4 #1). Unit stated here because the type cannot state it |
+| `trading_day` | date | pk | **Unit: trading day**, the exchange CT trading day, never a UTC calendar date derived from a timestamp (B4 #1). It is the column the whole vocabulary is defined against, and it states its unit like every other because the type cannot |
 | `session_open_at`, `session_close_at` | timestamptz | **null exactly when `is_holiday`** (`0032`, was `not null`) | UTC instants derived from CT session definitions, so DST is a row rather than a calculation (B4 #1). No engine rule ever derives a trading day from a timestamp's UTC date. **`0004` made these `not null` under `check (close > open)`, so a holiday row had to carry a fabricated session interval** while the check beside it said a holiday has no session to contain fills in. R-01 is a containment lookup, so a fabricated interval is not inert: it is an interval a fill can fall inside |
 | `is_half_day` | boolean | not null default false | counts as a **full day** (B4 #3). A half day counting as half a day would make the minimum-trading-days gate a different promise in November. The only thing it changes is `session_close_at` |
 | `is_holiday` | boolean | not null default false | not a trading day at all. **A positive fact rather than an absence** since `0032`: a row with no session must be a holiday, and a holiday must have no session |

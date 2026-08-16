@@ -7,8 +7,8 @@
 | `version` | text | not null, pk part | |
 | `parameters` | jsonb | not null | |
 | `description` | text | not null | |
-| `effective_from` | date | not null | |
-| `effective_to` | date | null | null means current |
+| `effective_from` | date | not null | **Unit: wall clock**, a configuration validity window. |
+| `effective_to` | date | null | null means current **Unit: wall clock**, the same. |
 | `is_sensitive` | boolean | not null default **true** | marks parameters that must never reach a trader. Default true, because a detector parameter that leaks tells the adversary exactly where the line is, and defaulting to safe means a new detector is protected before anyone remembers to protect it |
 | `created_at` | timestamptz | not null default now() | |
 

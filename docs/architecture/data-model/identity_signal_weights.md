@@ -9,8 +9,8 @@
 | `weight_bp` | integer | not null, check between 0 and 10000 | basis points, like every ratio in this schema |
 | `tier` | text | not null, check in (`v1`,`v1x`,`post_launch`) | so a v1.x weight cannot be switched on by a config edit that predates the data it needs |
 | `rationale` | text | not null | |
-| `effective_from` | date | not null | |
-| `effective_to` | date | null | |
+| `effective_from` | date | not null | **Unit: wall clock**, a configuration validity window. |
+| `effective_to` | date | null | **Unit: wall clock**, the same. |
 | `approved_by` | text | not null | |
 | `created_at` | timestamptz | not null default now() | |
 

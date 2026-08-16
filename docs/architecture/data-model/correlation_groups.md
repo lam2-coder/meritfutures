@@ -4,7 +4,7 @@
 | Column | Type | Constraints | Why |
 |---|---|---|---|
 | `id` | uuid | pk | |
-| `trading_day` | date | not null | |
+| `trading_day` | date | not null | **Unit: trading day**, the day the group was detected on. |
 | `member_account_ids` | uuid[] | not null | the group **as a set**. An array rather than a join table because the group is the finding: decomposing it into rows makes "which accounts did this result cover" a query rather than a fact |
 | `method` | text | not null | |
 | `statistic` | **numeric** | not null | **one of the two ruled no-floats exemptions (§17).** A correlation coefficient is not money and is not a ratio of two integers Merit controls |

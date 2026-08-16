@@ -55,6 +55,19 @@ function cleanTree(): string {
   for (const app of ['site', 'portal', 'admin', 'worker']) {
     write(root, `apps/${app}/package.json`, JSON.stringify({ name: `@merit/${app}` }));
   }
+  // RI-06's two inputs. The fixture registers one rule and attaches it, which is
+  // the shape the invariant demands; the seeded cases below break it in each
+  // direction separately.
+  write(
+    root,
+    'packages/eslint-plugin-merit/index.js',
+    "const plugin = { rules: {\n  'engine-purity': enginePurity,\n} };\n",
+  );
+  write(
+    root,
+    'eslint.config.js',
+    "export default [{ rules: { 'merit/engine-purity': 'error' } }];\n",
+  );
   return root;
 }
 
@@ -85,6 +98,30 @@ describe('clean tree: every invariant holds', () => {
 // The dirty direction, one seeded violation per invariant
 // -----------------------------------------------------------------------------
 describe('seeded tree: each invariant fails on the violation it names', () => {
+  // RI-06 EXISTS FOR A RULE WHOSE GLOB MATCHES NOTHING, so both directions are
+  // seeded. An unplugged rule and an armed one produce byte-identical lint
+  // output when there are no files for the rule to have an opinion about, and
+  // that is precisely `merit/no-calendar-in-expiry-path`'s situation until P2.
+  test('RI-06 catches a plugin rule that eslint.config.js attaches to nothing', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'packages/eslint-plugin-merit/index.js',
+      "const plugin = { rules: {\n  'engine-purity': enginePurity,\n  'no-calendar-in-expiry-path': noCalendarInExpiryPath,\n} };\n",
+    );
+    expect(findings('RI-06', root).join('\n')).toContain('attaches it to nothing');
+  });
+
+  test('RI-06 catches a config attaching a rule the plugin does not register', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'eslint.config.js',
+      "export default [{ rules: { 'merit/no-such-rule': 'error' } }];\n",
+    );
+    expect(findings('RI-06', root).join('\n')).toContain('does not register');
+  });
+
   test('RI-01 catches a workspace dependency added to the engine', () => {
     const root = cleanTree();
     write(

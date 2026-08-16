@@ -4,7 +4,7 @@
 | Column | Type | Constraints | Why |
 |---|---|---|---|
 | `plan_id` | uuid | fk plans, not null, on delete restrict, pk part | |
-| `evaluated_on` | date | not null, pk part | |
+| `evaluated_on` | date | not null, pk part | **Unit: wall clock**, the breaker evaluates on Merit’s own schedule. |
 | `metric` | text | not null | |
 | `numerator_cents` | bigint | not null | |
 | `denominator_cents` | bigint | not null | |

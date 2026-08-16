@@ -34,7 +34,14 @@
 // =============================================================================
 
 import {
-  cpSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync, readdirSync,
+  cpSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  renameSync,
+  readdirSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, dirname, resolve } from 'node:path';
@@ -140,7 +147,8 @@ const addMigrationRow = (body, number, state) => {
   return `${body.slice(0, at)}\n| ${number} | falsify probe | **reserved.** ${state} |${body.slice(at)}`;
 };
 
-const nextFreeMigration = (dir) => String(nextFree(dir, '## Migration number allocation')).padStart(4, '0');
+const nextFreeMigration = (dir) =>
+  String(nextFree(dir, '## Migration number allocation')).padStart(4, '0');
 const nextFreeAdr = (dir) => String(nextFree(dir, '## Number allocation')).padStart(3, '0');
 
 // =============================================================================
@@ -172,12 +180,19 @@ function authzMatrix(dir) {
   const headerAt = lines.findIndex((l) => l.trim().startsWith('|') && /required.factor/i.test(l));
   if (headerAt === -1) throw new Error('seed anchor not found: the required-factor column header');
   const col = lines[headerAt]
-    .trim().replace(/^\||\|$/g, '').split('|')
+    .trim()
+    .replace(/^\||\|$/g, '')
+    .split('|')
     .findIndex((c) => /required.factor/i.test(c));
   return { body, section, lines, headerAt, col, replace: (next) => body.replace(section, next) };
 }
 
-const isSeparator = (l) => l.trim().replace(/^\||\|$/g, '').split('|').every((c) => /^\s*:?-+:?\s*$/.test(c));
+const isSeparator = (l) =>
+  l
+    .trim()
+    .replace(/^\||\|$/g, '')
+    .split('|')
+    .every((c) => /^\s*:?-+:?\s*$/.test(c));
 
 // Rewrite cell `col` of the first row below the header that satisfies `pick`.
 function editFactorCell(dir, pick, rewrite) {
@@ -185,7 +200,10 @@ function editFactorCell(dir, pick, rewrite) {
   for (let i = m.headerAt + 1; i < m.lines.length; i++) {
     const line = m.lines[i];
     if (!line.trim().startsWith('|') || isSeparator(line)) continue;
-    const cells = line.trim().replace(/^\||\|$/g, '').split('|');
+    const cells = line
+      .trim()
+      .replace(/^\||\|$/g, '')
+      .split('|');
     if (cells.length <= m.col) continue;
     if (!pick(cells[m.col])) continue;
     const next = rewrite(cells[m.col]);
@@ -221,7 +239,8 @@ function nonExemptClass(body) {
     for (const q of m[1].matchAll(/'([a-z_]+)'/g)) classes.add(q[1]);
   }
   const found = [...classes].find((c) => c !== 'security' && c !== 'money');
-  if (!found) throw new Error('seed anchor not found: no notification class outside security and money');
+  if (!found)
+    throw new Error('seed anchor not found: no notification class outside security and money');
   return found;
 }
 
@@ -256,7 +275,11 @@ function cronSection(dir, heading) {
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i].trim();
     if (!l.startsWith('|')) continue;
-    const cells = l.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim());
+    const cells = l
+      .replace(/^\|/, '')
+      .replace(/\|$/, '')
+      .split('|')
+      .map((c) => c.trim());
     if (cells.every((c) => /^:?-+:?$/.test(c))) continue;
     const m = /^`?([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*)`?$/.exec(cells[0]);
     if (!m) continue; // the header row, and anything that is not an entry
@@ -321,7 +344,11 @@ const SEEDS = {
     // caught before it could report green.
     expect: 'ADR-034.md#no-such-heading-anywhere (no such heading)',
     seed: (d) =>
-      edit(d, 'docs/STATE.md', (b) => b + '\n[probe](decisions/ADR-034.md#no-such-heading-anywhere)\n'),
+      edit(
+        d,
+        'docs/STATE.md',
+        (b) => b + '\n[probe](decisions/ADR-034.md#no-such-heading-anywhere)\n',
+      ),
   },
   'CI-06b': {
     what: 'a document whose status is not one of the four',
@@ -431,7 +458,11 @@ const SEEDS = {
     expect: 'plan_versoin_id',
     seed: (d) =>
       edit(d, 'packages/db/migrations/0027_triggers_invariants.sql', (b) =>
-        once(b, 'NEW.plan_version_id IS DISTINCT FROM OLD.plan_version_id', 'NEW.plan_versoin_id IS DISTINCT FROM OLD.plan_version_id'),
+        once(
+          b,
+          'NEW.plan_version_id IS DISTINCT FROM OLD.plan_version_id',
+          'NEW.plan_versoin_id IS DISTINCT FROM OLD.plan_version_id',
+        ),
       ),
   },
   'CI-06n': {
@@ -441,7 +472,8 @@ const SEEDS = {
       'place is a document that exists and nothing indexes',
     // Derived, so it cannot collide with a real ADR the way a pinned 999 would
     // the day the registry reaches it.
-    expect: (d) => `docs/decisions/ADR-${String(Number(nextFreeAdr(d)) + 7).padStart(3, '0')}.md: entry file with no row`,
+    expect: (d) =>
+      `docs/decisions/ADR-${String(Number(nextFreeAdr(d)) + 7).padStart(3, '0')}.md: entry file with no row`,
     seed: (d) => {
       const n = String(Number(nextFreeAdr(d)) + 7).padStart(3, '0');
       writeFileSync(
@@ -459,7 +491,12 @@ const SEEDS = {
     // Assertion 1. The target is the first row that declares anything at all,
     // found by shape, so this survives any rewording of the matrix.
     expect: 'carries no required-factor cell drawn from the published vocabulary',
-    seed: (d) => editFactorCell(d, (c) => c.trim().length > 0, () => ''),
+    seed: (d) =>
+      editFactorCell(
+        d,
+        (c) => c.trim().length > 0,
+        () => '',
+      ),
   },
   'CI-06l': {
     what: 'a coverage row whose column cell stops naming a column, so the clock is dispositioned nowhere',
@@ -488,6 +525,44 @@ const SEEDS = {
       row.cells[0] = `${row.cells[0]} and see the note below`;
       s.lines[row.i] = `| ${row.cells.join(' | ')} |`;
       s.write(s.lines);
+    },
+  },
+  'CI-06m': {
+    what: 'a date column whose design-record row stops naming its unit',
+    real:
+      'the schema holds 49 `date` columns whose unit is not derivable from their type and only ' +
+      'sometimes from their name. `published_statistics` carried `as_of_trading_day`, whose unit ' +
+      'is in its name, beside `window_start_day`, whose design-record cell was EMPTY and whose ' +
+      'unit lived only in M12, IN ONE TABLE. A sweep that reaches for the only calendar in the ' +
+      'database gets the trading calendar, which is a different set of days, and the answer is ' +
+      'wrong on roughly 104 days a year while reading as though somebody thought about it',
+    // The target is DERIVED, like CI-06l's: whichever declared row the gate
+    // happens to reach first. A seed naming `rule_states.trading_day` by literal
+    // would go stale the day that column is superseded, and it would go stale
+    // SILENTLY, because a row that no longer matches plants nothing.
+    //
+    // IT STRIPS THE UNIT TOKEN AND LEAVES THE PROSE, which is the realistic
+    // shape of the defect: nobody deletes a Why cell, they reword it. The
+    // vocabulary is closed precisely so a reworded cell stops declaring.
+    expect: 'names no unit',
+    seed: (d) => {
+      const dir = join(d, 'docs/architecture/data-model');
+      for (const f of readdirSync(dir).sort()) {
+        if (!f.endsWith('.md')) continue;
+        const p = join(dir, f);
+        const lines = readFileSync(p, 'utf8').split('\n');
+        const i = lines.findIndex((l) =>
+          /\*\*Unit: (trading day|wall clock|rail clock)\*\*/.test(l),
+        );
+        if (i === -1) continue;
+        lines[i] = lines[i].replace(
+          /\*\*Unit: (?:trading day|wall clock|rail clock)\*\*,?/,
+          'It records',
+        );
+        writeFileSync(p, lines.join('\n'));
+        return;
+      }
+      throw new Error('seed anchor not found: no design-record row declares a unit');
     },
   },
   'ADR-026': {
@@ -720,7 +795,11 @@ const SCOPE_CASES = [
       s.lines.splice(s.rows[0].i, 1);
       s.write(s.lines);
       const e = cronSection(d, CRON_EXEMPT_F);
-      e.lines.splice(e.rows[0].i, 0, `| \`${col}\` | A probe exemption, and this cell is its reason. |`);
+      e.lines.splice(
+        e.rows[0].i,
+        0,
+        `| \`${col}\` | A probe exemption, and this cell is its reason. |`,
+      );
       e.write(e.lines);
     },
   },
@@ -730,7 +809,8 @@ const SCOPE_CASES = [
     what: 'an exemption for a column no migration declares, which MUST be a finding',
     // Derived from a real entry's table, so the probe name moves with the
     // corpus and can never accidentally become a column somebody declares.
-    expect: (d) => `the exemption list names ${firstExemptColumn(d).split('.')[0]}.probe_renamed_expires_at`,
+    expect: (d) =>
+      `the exemption list names ${firstExemptColumn(d).split('.')[0]}.probe_renamed_expires_at`,
     seed: (d) => {
       const table = firstExemptColumn(d).split('.')[0];
       const e = cronSection(d, CRON_EXEMPT_F);
@@ -759,6 +839,117 @@ const SCOPE_CASES = [
       row.cells[1] = `${row.cells[1]} probe`;
       s.lines[row.i] = `| ${row.cells.join(' | ')} |`;
       s.write(s.lines);
+    },
+  },
+  {
+    name: 'CI-06m/small-is-not-empty',
+    gate: 'CI-06m',
+    what: 'a fixture cut to a single session, which is small and legitimate and must NOT be a finding',
+    // THE CONTROL FOR THE TWO CASES BELOW, and it is the one that keeps the
+    // vacuity check honest. `sessions.length === 0` is rejected because an
+    // empty array skips every assertion after it; SMALL is not the same
+    // property and must stay legal, because `cme-2026.json` is deliberately
+    // five sessions and `status: partial` says so.
+    //
+    // Without this direction the gate could be "hardened" into requiring a full
+    // year, every seeded case above would still fire, and the harness would
+    // report success while the fixture that actually exists had become illegal.
+    // That is the failure mode falsify.mjs's own header names: a narrowing
+    // tested only from the noisy side.
+    //
+    // THE CONTROL IS THE SAME EDIT CUT ONE FURTHER, to zero. Without it this
+    // case is decoration: a gate that had simply stopped reading the fixture
+    // directory would report PASS here and the harness would score it as
+    // evidence. The two together say the boundary is at EMPTY and not at SMALL,
+    // which is the only reading that leaves `cme-2026.json` legal.
+    control: {
+      expect: 'declares zero sessions',
+      seed: (d) => {
+        const dir = join(d, 'packages/rules-engine/fixtures/calendars');
+        const file = readdirSync(dir)
+          .filter((f) => f.endsWith('.json'))
+          .sort()[0];
+        if (!file) throw new Error('seed anchor not found: no calendar fixture');
+        const p = join(dir, file);
+        const fx = JSON.parse(readFileSync(p, 'utf8'));
+        fx.sessions = [];
+        fx.session_count = 0;
+        writeFileSync(p, `${JSON.stringify(fx, null, 2)}\n`);
+      },
+    },
+    expect: 'PASS',
+    seed: (d) => {
+      const dir = join(d, 'packages/rules-engine/fixtures/calendars');
+      const file = readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .sort()[0];
+      if (!file) throw new Error('seed anchor not found: no calendar fixture');
+      const p = join(dir, file);
+      const fx = JSON.parse(readFileSync(p, 'utf8'));
+      if (!Array.isArray(fx.sessions) || fx.sessions.length === 0) {
+        throw new Error('seed anchor not found: the fixture declares no sessions to cut');
+      }
+      const first = fx.sessions[0];
+      fx.sessions = [first];
+      fx.session_count = 1;
+      // Coverage narrows with it, so this stays a COHERENT small calendar
+      // rather than one that trips the containment check for another reason.
+      fx.coverage = { from: first.trading_day, to: first.trading_day };
+      writeFileSync(p, `${JSON.stringify(fx, null, 2)}\n`);
+    },
+  },
+  {
+    name: 'CI-06m/vacuous-derivation',
+    gate: 'CI-06m',
+    what: 'a fixture emptied to zero sessions, which reproduces NOTHING and MUST be a finding',
+    // THE THIRD DIRECTION, and it is here because the gate did not have it and
+    // the hole was proven by execution rather than argued: the fixture was
+    // emptied to `"sessions": []` with `"session_count": 0` and CI-06m REPORTED
+    // PASS. Every check after the count is a loop, and every loop over an empty
+    // array succeeds, so a derivation that reproduces nothing read exactly like
+    // one that reproduces correctly.
+    //
+    // It is CI-06l/stale-entry's lesson in a different costume. That case
+    // covers the direction an ALLOWLIST decays in; this covers the direction a
+    // DERIVATION decays in. Both are the quiet direction, and both pass the
+    // gate's headline assertion while asserting nothing.
+    expect: 'declares zero sessions',
+    seed: (d) => {
+      const dir = join(d, 'packages/rules-engine/fixtures/calendars');
+      const file = readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .sort()[0];
+      if (!file) throw new Error('seed anchor not found: no calendar fixture');
+      const p = join(dir, file);
+      const fx = JSON.parse(readFileSync(p, 'utf8'));
+      // The count is emptied WITH the array, on purpose. Emptying only the array
+      // would trip the declared-count check instead, and this case exists to
+      // prove the gate catches the version where the file is internally
+      // consistent and says nothing.
+      fx.sessions = [];
+      fx.session_count = 0;
+      writeFileSync(p, `${JSON.stringify(fx, null, 2)}\n`);
+    },
+  },
+  {
+    name: 'CI-06m/phantom-generator',
+    gate: 'CI-06m',
+    what: 'a fixture claiming derivation from a generator that does not exist, which MUST be a finding',
+    // CI-06l/unknown-job's assertion, one registry over. `generated_by` is the
+    // one field separating a derived calendar from a typed one, so a citation
+    // that resolves to nothing lets a hand-maintained file keep a provenance
+    // line on top of it.
+    expect: 'which does not exist',
+    seed: (d) => {
+      const dir = join(d, 'packages/rules-engine/fixtures/calendars');
+      const file = readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .sort()[0];
+      if (!file) throw new Error('seed anchor not found: no calendar fixture');
+      const p = join(dir, file);
+      const fx = JSON.parse(readFileSync(p, 'utf8'));
+      fx.generated_by = 'packages/db/src/seed/calendars/generate-that-moved.mjs';
+      writeFileSync(p, `${JSON.stringify(fx, null, 2)}\n`);
     },
   },
   {
@@ -843,7 +1034,9 @@ function trySeed(fn, dir) {
 }
 
 function gateIds() {
-  const out = execFileSync('node', [join(ROOT, 'scripts/corpus/gates.mjs'), 'list'], { encoding: 'utf8' });
+  const out = execFileSync('node', [join(ROOT, 'scripts/corpus/gates.mjs'), 'list'], {
+    encoding: 'utf8',
+  });
   return [...out.matchAll(/^(\S+)\s\s/gm)].map((m) => m[1]);
 }
 
@@ -886,7 +1079,12 @@ function main() {
     console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${id}`);
     if (!pass) {
       bad++;
-      console.log(stdout.split('\n').map((l) => `        ${l}`).join('\n'));
+      console.log(
+        stdout
+          .split('\n')
+          .map((l) => `        ${l}`)
+          .join('\n'),
+      );
     }
   }
 
@@ -905,7 +1103,10 @@ function main() {
       }
       const expect = resolveExpect(SEEDS[id].expect, dir);
       const { pass, stdout } = runGate(dir, id);
-      const findings = stdout.split('\n').filter((l) => l.startsWith('       ')).map((l) => l.trim());
+      const findings = stdout
+        .split('\n')
+        .filter((l) => l.startsWith('       '))
+        .map((l) => l.trim());
       const onTarget = findings.some((f) => f.includes(expect));
       if (pass) {
         bad++;
@@ -941,7 +1142,12 @@ function main() {
           const cstale = trySeed(c.control.seed, cdir);
           const cexpect = cstale ? null : resolveExpect(c.control.expect, cdir);
           const r = cstale ? null : runGate(cdir, c.gate);
-          const cf = r ? r.stdout.split('\n').filter((l) => l.startsWith('       ')).map((l) => l.trim()) : [];
+          const cf = r
+            ? r.stdout
+                .split('\n')
+                .filter((l) => l.startsWith('       '))
+                .map((l) => l.trim())
+            : [];
           if (cstale || r.pass || !cf.some((f) => f.includes(cexpect))) {
             bad++;
             console.log(`  CONTROL DID NOT FIRE  ${c.name}  <- ${c.what}`);
@@ -949,7 +1155,7 @@ function main() {
               cstale
                 ? `        seeding the control failed: ${cstale}`
                 : `        Without the exemption this must fail with "${cexpect}". It did not, ` +
-                  'so the PASS below asserts nothing.',
+                    'so the PASS below asserts nothing.',
             );
             continue;
           }
@@ -967,7 +1173,10 @@ function main() {
       }
       const cExpect = resolveExpect(c.expect, dir);
       const { pass, stdout } = runGate(dir, c.gate);
-      const findings = stdout.split('\n').filter((l) => l.startsWith('       ')).map((l) => l.trim());
+      const findings = stdout
+        .split('\n')
+        .filter((l) => l.startsWith('       '))
+        .map((l) => l.trim());
       if (cExpect === 'PASS') {
         if (pass) {
           console.log(`  out of scope, passed  ${c.name}  <- ${c.what}`);
@@ -982,8 +1191,12 @@ function main() {
         console.log(`        ${findings.find((f) => f.includes(cExpect)).slice(0, 150)}`);
       } else {
         bad++;
-        console.log(`  ${pass ? 'DID NOT FAIL         ' : 'FAILED OFF-TARGET    '} ${c.name}  <- ${c.what}`);
-        console.log(`        Expected a finding containing "${cExpect}". Got ${findings.length} finding(s):`);
+        console.log(
+          `  ${pass ? 'DID NOT FAIL         ' : 'FAILED OFF-TARGET    '} ${c.name}  <- ${c.what}`,
+        );
+        console.log(
+          `        Expected a finding containing "${cExpect}". Got ${findings.length} finding(s):`,
+        );
         for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
       }
     } finally {

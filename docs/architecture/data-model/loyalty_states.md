@@ -4,7 +4,7 @@
 | Column | Type | Constraints | Why |
 |---|---|---|---|
 | `identity_id` | uuid | fk identities, not null, on delete restrict, pk part | |
-| `as_of_trading_day` | date | not null, pk part | |
+| `as_of_trading_day` | date | not null, pk part | **Unit: trading day**, the day the state describes. |
 | `payouts_lifetime` | integer | not null, check >= 0 | |
 | `consecutive_payout_cycles` | integer | not null, check >= 0 | |
 | `accounts_funded_lifetime` | integer | not null, check >= 0 | |

@@ -10,7 +10,7 @@
 | `terms_body_mdx` | text | not null | |
 | `expiry_rule` | text | not null | |
 | `breaks_on` | text[] | not null default `'{}'` | **`SD-M14-03`.** Enumerated, not implied. "What breaks my streak" is the question a trader asks **after** it breaks, and answering it then is too late (AS-M14-07) |
-| `effective_from` | date | not null | |
+| `effective_from` | date | not null | **Unit: wall clock**, a configuration validity window. |
 | `superseded_by` | text | null | the `benefit_code` of the successor, when renamed |
 | `created_at` | timestamptz | not null default now() | |
 

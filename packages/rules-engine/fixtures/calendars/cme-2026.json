@@ -2,7 +2,9 @@
   "id": "cme-2026",
   "status": "partial",
   "note": "FIVE SESSIONS, NOT A YEAR. TradingCalendar as data is session S-E (P1 section 6) and there is not one calendar row anywhere in this repository yet. This file exists so the three example fixtures can resolve a session, and it declares a `coverage` interval the loader enforces (L-08) precisely so it cannot quietly be mistaken for the CME year. When S-E lands, this file is DERIVED from the seeded trading_calendar rows rather than maintained beside them: two hand-maintained calendars is the drift class this corpus has found thirteen times.",
+  "derivation": "NOT DERIVED YET, AND THAT IS NOW A CHECKED FACT RATHER THAN A PROMISE IN THE NOTE ABOVE. `CI-06m` asserts what can be asserted about a hand-maintained fixture: that `session_count` and the `sessions` array are two independent statements of one number and agree, that every session falls inside `coverage`, and that no session falls on a weekend. It cannot assert the DAYS are right, because the CME publication has not been transcribed: `packages/db/src/seed/calendars/cme-2026-2028.source.json` carries `holidays: null`, `generate.mjs` refuses it on `source-not-transcribed`, and there is nothing to derive from. The day the founder transcribes it, this file becomes `generated_by` output and `CI-06m`'s second check regenerates and diffs it, which is the pattern `corpus.yml` already uses for generated spans. `status: partial` is what says the derivation has not happened; a fixture that is not `partial` and names no generator is a finding.",
   "coverage": { "from": "2026-11-02", "to": "2026-11-06" },
+  "session_count": 5,
   "sessions": [
     { "trading_day": "2026-11-02", "kind": "full" },
     { "trading_day": "2026-11-03", "kind": "full" },

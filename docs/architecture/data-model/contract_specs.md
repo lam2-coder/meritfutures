@@ -10,8 +10,8 @@ Tick values per contract. B4 #14 exists because someone always hardcodes a multi
 | `tick_value_cents` | bigint | not null, check > 0 | |
 | `currency` | char(3) | not null default `'USD'` | |
 | `is_micro` | boolean | not null default false | |
-| `effective_from` | date | not null, pk part | |
-| `effective_to` | date | null | null means current |
+| `effective_from` | date | not null, pk part | **Unit: wall clock**, a configuration validity window, not a session. |
+| `effective_to` | date | null | null means current **Unit: wall clock**, the same. |
 | `created_at` | timestamptz | not null default now() | |
 
 Primary key: composite `(symbol, effective_from)`, not `symbol` alone. A spec is versioned, so the symbol cannot be the key.
