@@ -24,11 +24,15 @@ import * as engine from '../src/index.js';
 // that THE ENTRY POINT IS THE WHOLE PUBLIC SURFACE, so the loader has no route to
 // an internal. M01 section 1.3 names the surface -- six functions, "and nothing
 // else is exported, because every additional export is a way for a caller to
-// reimplement a rule slightly differently" -- and two of those six are now
+// reimplement a rule slightly differently" -- and three of those six are now
 // written. So the list below is exact rather than open, and adding an export
 // without adding it here is still a red stage.
 //
-//   advanceDay, initialState   M01 section 1.3, two of the six
+//   advanceDay, initialState   M01 section 1.3, three of the six.
+//   applySettlement            `clampPayout` is NOT among them, and section 3.6
+//                              writes `export function clampPayout` all the
+//                              same: section 1.3's list wins, so the clamp is
+//                              reachable only through `evaluatePayout`
 //   buildCalendarSlice         ADR-049: the slice is "built by a pure exported
 //   lookupCalendarDay          constructor", with "the calendar queries as free
 //   nextTradingDayAfter        functions in `calendar.ts` over that value".
@@ -48,6 +52,7 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'EngineInvariantError',
     'IMPLEMENTED_RULES',
     'advanceDay',
+    'applySettlement',
     'buildCalendarSlice',
     'evaluate',
     'initialState',

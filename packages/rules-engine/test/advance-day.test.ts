@@ -88,7 +88,18 @@ test('DO-1  the calendar answers three ways, and two of them are not the same re
   expect(unknown.state.tradingDay).toBe(day('2026-11-02'));
 });
 
-test('DO-2  a settlement effective today refuses, because group H is not written', () => {
+test('DO-2  a settlement effective today is APPLIED, and the day still closes', () => {
+  // THIS TEST REFUSED UNTIL GROUP H LANDED, which is the same diff group E left
+  // behind one step earlier: `settlement_unimplemented` is gone from
+  // `AssertionKind` because nothing can emit it, and a kind nothing can emit is
+  // a lie about what the engine refuses.
+  //
+  // What it asserted then was the reason for the refusal, and that reason is
+  // what it asserts now from the other side: the settled amount reaches the
+  // balance exactly once. Folding the day WITHOUT applying it produced a state
+  // 150,000c too high, which is a second payout waiting to happen; applying it
+  // TWICE -- once in the fold and once through the mark's `adjustment_cents` --
+  // produces one 150,000c too low, which breaches the account that earned it.
   const settlement: SettlementFact = {
     payoutRequestId: '0199c7a1-0000-7000-8000-00000000000f',
     ordinal: 1,
@@ -97,16 +108,25 @@ test('DO-2  a settlement effective today refuses, because group H is not written
     effectiveTradingDay: day('2026-11-03'),
   };
 
-  const out = fold({ settlements: [settlement] });
-  expect(out.assertions.map((a) => a.kind)).toEqual(['settlement_unimplemented']);
-  expect(out.assertions[0]?.detail).toContain('R-46');
-  expect(out.events).toEqual([]);
+  // SD-01 and R-10: the withdrawal lands at the OPEN of the effective day and is
+  // carried in `adjustment_cents`, never inside the session.
+  //   opening 4,850,000 = prior 5,000,000 + adjustment -150,000   (INV-18)
+  //   closing 4,870,000 = opening + realized 20,000               (INV-19)
+  const out = fold({
+    settlements: [settlement],
+    mark: mark({
+      tradingDay: day('2026-11-03'),
+      openingBalanceCents: 4_850_000n,
+      adjustmentCents: -150_000n,
+      realizedPnlCents: 20_000n,
+    }),
+  });
 
-  // THE POINT OF THE REFUSAL, and the reason it is not a skip: the settled
-  // amount never reaches the balance, so folding the day anyway would produce a
-  // state 150,000c too high and pay a second time against it.
-  expect(out.state.balanceCents).toBe(5_000_000n);
-  expect(out.state.payoutsSettledCount).toBe(0);
+  expect(out.assertions).toEqual([]);
+  expect(out.state.payoutsSettledCount).toBe(1);
+  expect(out.state.balanceCents).toBe(4_870_000n);
+  expect(out.state.lifetimeSettledCents).toBe(150_000n);
+  expect(out.events.map((e) => e.type)).toEqual(['payout.win_days_reset', 'day.closed']);
 });
 
 test('DO-8  an eval-phase day that meets no condition folds and closes, unchanged', () => {

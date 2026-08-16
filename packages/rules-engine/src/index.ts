@@ -28,20 +28,34 @@ export type {
 // -----------------------------------------------------------------------------
 // M01 section 1.3 names six exported functions and says "nothing else is
 // exported, because every additional export is a way for a caller to reimplement
-// a rule slightly differently". Two of the six are here: `initialState` and
-// `advanceDay`. `resolvePlan`, `validatePlan`, `applySettlement` and
-// `evaluatePayout` are P2-1, P2-6 and the group H session, and each arrives with
-// the rules it computes.
+// a rule slightly differently". Three of the six are here: `initialState`,
+// `advanceDay` and `applySettlement`. `resolvePlan` and `validatePlan` are P2-1
+// and `evaluatePayout` arrives with R-38 and R-40, the context half of group F.
+//
+// `clampPayout` IS DELIBERATELY NOT HERE AND M01 DISAGREES WITH ITSELF ABOUT IT.
+// Section 3.6's reference algorithm writes `export function clampPayout`, and
+// section 1.3's "nothing else is exported" does not list it among the six.
+// Section 1.3 wins, so the clamp is reachable only through `evaluatePayout`,
+// which is what M01 section 4 names for both endpoints and what makes "the
+// identical function with the identical inputs" true rather than aspirational.
+//
+// `applySettlement` TAKES A FOURTH ARGUMENT M01's SIGNATURE DOES NOT SHOW, and
+// ADR-049 is what authorises it: R-47 needs the trading day AFTER the basis day,
+// P2 section 1 names this function while closing OQ-P2-01, and "neither rule can
+// be computed from one row".
 //
 // `buildCalendarSlice` is a seventh name and is not a seventh rule: ADR-049
 // requires the slice to be "built by a pure exported constructor", and a
 // constructor a caller cannot reach is a value a caller cannot make.
 
 export type {
+  AccountGraduatedEvent,
   AssertionFailure,
   AssertionKind,
   BreachDetectedEvent,
   BreachKind,
+  BufferGate,
+  CadenceGapGate,
   CalendarDay,
   CalendarSlice,
   CapScheduleStep,
@@ -51,12 +65,16 @@ export type {
   DayClosedEvent,
   DayInput,
   DayOutput,
+  ConsistencyGate,
   DrawdownRules,
   DrawdownType,
+  EngineGateResults,
   EvalPhaseRules,
   FloorLockedEvent,
   FloorLockRules,
   FundedPhaseRules,
+  GateInputState,
+  MinimumAmountGate,
   PassDeferredConsistencyEvent,
   Phase,
   PhaseDayRules,
@@ -65,6 +83,9 @@ export type {
   RuleState,
   SettlementFact,
   SoftDailyLossLimitEvent,
+  TradedDaysGate,
+  WinDaysGate,
+  WinDaysResetEvent,
 } from './types.js';
 
 export {
@@ -81,6 +102,8 @@ export { IMPLEMENTED_RULES } from './rules.js';
 export type { RuleId } from './rules.js';
 
 export { advanceDay, initialState } from './day/advance.js';
+export { applySettlement } from './payout/settle.js';
+export type { SettlementOutput } from './payout/settle.js';
 
 import type { EngineInput, EngineResult } from './types.js';
 

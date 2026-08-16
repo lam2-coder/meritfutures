@@ -642,8 +642,6 @@ export type AssertionKind =
   | 'day_not_a_session'
   /** ADR-049. The day is outside the slice's coverage, so the answer is UNKNOWN. */
   | 'calendar_coverage_miss'
-  /** DO-2. `applySettlement` is group H and is not written. */
-  | 'settlement_unimplemented'
   /** DO-8, R-32. `phase_eval.max_days` is set and eval expiry is not computable. */
   | 'eval_expiry_unimplemented'
   /** DO-8. The state claims the eval phase on a plan that has no eval phase. */
@@ -766,6 +764,40 @@ export interface PhasePassedEvent extends EngineEvent {
     readonly satisfied: boolean;
     readonly skipped: boolean;
   };
+}
+
+/**
+ * R-47. The win-day counter reset at settlement, anchored to the BASIS day.
+ *
+ * M01 section 5.2: the payload "carries `previous_count`, `reset_to`, and now
+ * also `anchor_trading_day`, because 'reset to zero' WITHOUT THE ANCHOR IS NOT
+ * ENOUGH TO EXPLAIN THE NEXT CYCLE".
+ */
+export interface WinDaysResetEvent extends EngineEvent {
+  readonly type: 'payout.win_days_reset';
+  readonly previousCount: number;
+  readonly resetTo: number;
+  /** The settled payout's basis day, which is what the next cycle counts from. */
+  readonly anchorTradingDay: TradingDay;
+  /** SD-07. The trading day STRICTLY after the anchor (AS-12). */
+  readonly consistencyPeriodStartDay: TradingDay;
+}
+
+/**
+ * R-49. The ladder is finished and the account closes.
+ *
+ * NO LIVE INVITATION TRAVELS WITH IT ([ADR-024](../../../docs/decisions/ADR-024.md)).
+ * R-49: "the `graduation_eligible` flag set. NO LIVE INVITATION IS EMITTED:
+ * eligibility is a review-pool flag, and invitation is a discretionary operator
+ * action taken from that pool, OUTSIDE THE ENGINE."
+ */
+export interface AccountGraduatedEvent extends EngineEvent {
+  readonly type: 'account.graduated';
+  readonly payoutsSettledCount: number;
+  /** CV-14 under ADR-030's canonical name. The rung count that was reached. */
+  readonly maxPayouts: number;
+  /** R-50. INV-17 bounds it at `ladder * max cap in the schedule`. */
+  readonly lifetimeSettledCents: Cents;
 }
 
 /**

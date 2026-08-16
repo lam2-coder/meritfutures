@@ -94,7 +94,7 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules the engine computes today. THIRTY-THREE OF FIFTY.
+ * The rules the engine computes today. THIRTY-NINE OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
@@ -134,6 +134,15 @@ export type RuleId =
  *   R-43  payout/clamp.ts clampPayout, the three-way min and the four reasons
  *   R-44  payout/clamp.ts clampPayout, the ceiling to the trader
  *   R-45  payout/clamp.ts ordinalForNextPayout, derived from settlements
+ *   R-19  payout/settle.ts, and it is discharged by an ABSENCE: the floor, the
+ *         high-water balance and the lock are the three fields settlement does
+ *         not write. RE-U-019 asserts the absence, because an absence is the one
+ *         kind of rule a reader cannot check by finding the line
+ *   R-46  payout/settle.ts, both anchors, and they are different dates
+ *   R-47  payout/settle.ts, the win-day and consistency reset at the basis day
+ *   R-48  payout/settle.ts. R-19 from the settlement's side
+ *   R-49  payout/settle.ts, the ladder, evaluated immediately after
+ *   R-50  payout/settle.ts, lifetime accounting, which INV-17 bounds
  *
  * NOT DECLARED AND WORTH NAMING, because their absence is the count being
  * honest rather than the list being short.
@@ -149,17 +158,16 @@ export type RuleId =
  *         account past its own expiry with a green state row
  *   R-02  needs `sequence` subtraction over a real calendar (group A, blocked
  *         on the calendar data)
- *   R-10, R-11, R-17, R-19, R-20
- *         discharged outside the day fold: ingest, publish validation,
- *         settlement, the platform setpoint
+ *   R-10, R-11, R-17, R-20
+ *         discharged outside the engine entirely: ingest, publish validation,
+ *         and the platform setpoint. R-19 LEFT THIS LIST when group H landed,
+ *         because settlement is where it is discharged and settlement is now
+ *         code
  *   R-38, R-40
  *         the CONTEXT half of group F. Both read `ExternalGates`, which M01
  *         section 2.1 marks "context, never replayed (INV-23)", so neither can
  *         be a term in `engineGates` without putting an unreplayable fact into
  *         the replayed state. They land with `evaluatePayout`
- *   R-46 to R-50
- *         group H, and DO-2 refuses every day a settlement is effective on
- *         until they land
  */
 export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-03',
@@ -173,6 +181,7 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-15',
   'R-16',
   'R-18',
+  'R-19',
   'R-21',
   'R-22',
   'R-23',
@@ -195,4 +204,9 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-43',
   'R-44',
   'R-45',
+  'R-46',
+  'R-47',
+  'R-48',
+  'R-49',
+  'R-50',
 ];

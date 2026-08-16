@@ -18,17 +18,17 @@
 // now real code:
 //
 //   DO-1  implemented, including ADR-049's calendar lookup
-//   DO-2  REFUSES. `applySettlement` is group H (R-46..R-50) and is not written
+//   DO-2  implemented: R-46 to R-50, in `payout/settle.ts`, in ordinal order
 //   DO-3  implemented: INV-18, INV-19, INV-20
 //   DO-4  implemented: R-21, R-22, R-23
 //   DO-5  implemented: R-24, R-25
 //   DO-6  implemented: R-08, R-09, R-04, and the consistency accumulators
 //   DO-7  implemented: R-13, R-15, R-16, R-14's tripwire
-//   DO-8  implemented for the EVAL half: R-26..R-31, in `day/progression.ts`.
+//   DO-8  implemented: R-26..R-31 for the eval half, in `day/progression.ts`,
+//         and the funded half is R-49's ladder, which DO-2 now fires because
+//         "it can also fire here if a settlement graduated the account".
 //         R-32 REFUSES, because elapsed trading days is not derivable from
-//         `RuleState`. The FUNDED half is R-49's ladder, which fires only after
-//         a settlement, so DO-2's refusal already covers every day that could
-//         reach it
+//         `RuleState`
 //   DO-9  implemented: R-33 to R-37, R-39 and R-41's conjunction, in
 //         `payout/gates.ts`, then `day.closed` with `gate_results` on it. What
 //         DO-9 still does not compute is `stateHash`: SD-08 belongs to
@@ -67,6 +67,7 @@ import type {
   TradingDay,
 } from '../types.js';
 import { evaluateEngineGates, gatesAfterBreach, withdrawableCents } from '../payout/gates.js';
+import { applySettlement } from '../payout/settle.js';
 import { checkBreach } from './breach.js';
 import { advanceConsistency, isTradedDay, isWinDay } from './counters.js';
 import { advanceFloor, initialFloorCents } from './floor.js';
@@ -231,32 +232,69 @@ export function advanceDay(input: DayInput): DayOutput {
   // ---------------------------------------------------------------------------
   // DO-2  settlements effective today, in ordinal order
   // ---------------------------------------------------------------------------
-  // GROUP H IS NOT WRITTEN. A settlement reduces the balance, advances both
-  // anchors, increments the settled count, resets win days and the consistency
-  // period, and may graduate the account (R-46..R-50). Folding the day WITHOUT
-  // applying it would produce a state that then fails INV-18 tomorrow, or worse,
-  // one that pays a second time against a balance the first payout already left.
-  if (settlements.length > 0) {
-    return refuse(prior, {
-      kind: 'settlement_unimplemented',
-      tradingDay: mark.tradingDay,
-      detail:
-        `${String(settlements.length)} settlement(s) are effective today and applySettlement ` +
-        `(R-46 to R-50, group H) is not implemented`,
-    });
+  // "For each settlement whose `effectiveTradingDay` equals today, call
+  // `applySettlement` IN ORDINAL ORDER." The order is the rule: R-42 resolves a
+  // cap per ordinal and R-49 graduates at a rung count, so two settlements
+  // applied out of order can graduate an account against the wrong one.
+  //
+  // THE SORT CARRIES AN EXPLICIT TOTAL COMPARATOR, which the determinism
+  // contract requires ("`Array.prototype.sort` without a total comparator" is
+  // banned, because "sort stability differences change output"). Ordinals are
+  // unique per account by SD-05, so numeric order is total here.
+  let settledState = prior;
+  for (const fact of [...settlements].sort((a, b) => a.ordinal - b.ordinal)) {
+    const applied = applySettlement(settledState, plan, fact, input.calendar);
+    if (applied.assertions.length > 0) {
+      // A settlement that could not be applied is not a day that can be folded:
+      // every counter after this point would be computed against a balance the
+      // payout has already left. FM-05's idiom, on the money path it was written
+      // for.
+      return { state: prior, events: [], assertions: applied.assertions };
+    }
+    settledState = applied.state;
+    events.push(...applied.events);
+  }
+
+  if (settledState.phase === 'graduated') {
+    // R-49, and M01 section 3.6 returns here for the same reason: "no trading
+    // day follows". The ladder is finished, the account is closed, and folding
+    // the rest of the day would advance counters on an account that has none.
+    return { state: settledState, events, assertions: [] };
   }
 
   // ---------------------------------------------------------------------------
   // DO-3  mark identities
   // ---------------------------------------------------------------------------
+  // INV-18 COMPARES AGAINST `prior`, THE PRE-SETTLEMENT BALANCE, AND M01's
+  // SKETCH COMPARES AGAINST THE POST-SETTLEMENT ONE. This is a third place where
+  // section 3.6's pseudocode disagrees with a binding statement, and it is the
+  // most expensive of the three because it fires on every payout day.
+  //
+  // INV-18's own row reads `mark.opening_balance_cents == PRIOR.balance_cents +
+  // mark.adjustment_cents`, and SD-01 puts the settled withdrawal in
+  // `adjustment_cents` ("a settled withdrawal today, a promotional credit
+  // later"), applied at the open of the effective day (R-10, AS-10). So on a
+  // settlement day the withdrawal appears TWICE if the comparison is made after
+  // DO-2: once in the reduced balance and once in the adjustment. On a 150,000c
+  // Core EOD payout the sketch's check expects an opening 150,000c below the
+  // real one, raises `opening_mismatch`, and writes NO STATE FOR THE DAY -- so
+  // no account could ever have a state row on the day it was paid.
+  //
+  // Following INV-18's row makes the two readings identical instead of
+  // contradictory: `prior.balance + adjustment` IS the post-settlement balance,
+  // because the adjustment is the negated approved amount. Same shape as R-15
+  // and R-22: the binding statement wins, the sketch is reported.
   const assertions = markIdentityFailures(prior, mark, plan);
   if (assertions.length > 0) return { state: prior, events: [], assertions };
 
-  const rules: PhaseDayRules = prior.phase === 'eval' ? (plan.eval ?? plan.funded) : plan.funded;
+  const rules: PhaseDayRules =
+    settledState.phase === 'eval' ? (plan.eval ?? plan.funded) : plan.funded;
 
   // R-18. Captured HERE, before anything trails, and written to the state so the
   // evidence pack can show which floor the decision compared against (SD-04).
-  const floorOpenCents = prior.floorCents;
+  // R-48 is why reading it after DO-2 is safe: a settlement does not touch the
+  // floor, so this is the same number `prior` carried.
+  const floorOpenCents = settledState.floorCents;
 
   // ---------------------------------------------------------------------------
   // DO-4 and DO-5  breach
@@ -275,7 +313,7 @@ export function advanceDay(input: DayInput): DayOutput {
     // beats every pass, target and eligibility condition the same day might also
     // satisfy. The balance still moves to the close, because it did.
     const closedState: RuleState = {
-      ...prior,
+      ...settledState,
       tradingDay: mark.tradingDay,
       phase: 'closed',
       balanceCents: mark.closingBalanceCents,
@@ -315,25 +353,35 @@ export function advanceDay(input: DayInput): DayOutput {
   // ---------------------------------------------------------------------------
   // DO-6  counters
   // ---------------------------------------------------------------------------
-  const tradedDaysCount = prior.tradedDaysCount + (isTradedDay(mark) ? 1 : 0);
+  // EVERY COUNTER ADVANCES FROM THE POST-SETTLEMENT STATE, WHICH IS R-47's
+  // FAIRNESS POINT IN CODE. DO-2 has already reset the win-day count and the
+  // consistency accumulators to the basis day, so a win day earned TODAY is
+  // counted after the reset rather than confiscated by it: "progress earned
+  // during the transfer window is KEPT, because it happened after the snapshot
+  // the payout was based on" (R-47, EC-039). Reading `prior` here would zero the
+  // day's own win day on every settlement day.
+  const tradedDaysCount = settledState.tradedDaysCount + (isTradedDay(mark) ? 1 : 0);
   const winDaysCount =
-    prior.winDaysCount + (isWinDay(mark, calendarDay, rules.winDayFloorCents) ? 1 : 0);
+    settledState.winDaysCount + (isWinDay(mark, calendarDay, rules.winDayFloorCents) ? 1 : 0);
   const consistency = advanceConsistency(
     {
-      bestDayCents: prior.consistencyBestDayCents,
-      periodProfitCents: prior.consistencyPeriodProfitCents,
+      bestDayCents: settledState.consistencyBestDayCents,
+      periodProfitCents: settledState.consistencyPeriodProfitCents,
     },
     mark,
-    prior.consistencyPeriodStartDay,
+    settledState.consistencyPeriodStartDay,
   );
 
   // ---------------------------------------------------------------------------
   // DO-7  trail, then lock
   // ---------------------------------------------------------------------------
   const floor = advanceFloor({
-    priorFloorCents: prior.floorCents,
-    priorHighWaterBalanceCents: prior.highWaterBalanceCents,
-    priorFloorLocked: prior.floorLocked,
+    // R-48 again: these three are the same values `prior` carried, because a
+    // settlement does not touch any of them. Read off the post-settlement state
+    // so that stays true by construction rather than by a reader remembering it.
+    priorFloorCents: settledState.floorCents,
+    priorHighWaterBalanceCents: settledState.highWaterBalanceCents,
+    priorFloorLocked: settledState.floorLocked,
     closingBalanceCents: mark.closingBalanceCents,
     sizeCents: plan.sizeCents,
     drawdown: rules.drawdown,
@@ -350,7 +398,7 @@ export function advanceDay(input: DayInput): DayOutput {
   }
 
   let state: RuleState = {
-    ...prior,
+    ...settledState,
     tradingDay: mark.tradingDay,
     balanceCents: mark.closingBalanceCents,
     floorOpenCents,
@@ -367,12 +415,13 @@ export function advanceDay(input: DayInput): DayOutput {
   // ---------------------------------------------------------------------------
   // DO-8  progression
   // ---------------------------------------------------------------------------
-  // THE EVAL HALF IS `day/progression.ts` AND THE FUNDED HALF IS NOT REACHABLE.
-  // Section 3.1's funded clause is "test the ladder, which can also fire here if
-  // a settlement graduated the account"; R-49 fires only after a settlement, and
-  // DO-2 above refuses every day a settlement is effective on. So a funded day
-  // passes through DO-8 with nothing to do, and that is a statement about R-49's
-  // trigger rather than a step being skipped.
+  // THE EVAL HALF IS `day/progression.ts` AND THE FUNDED HALF ALREADY RAN.
+  // Section 3.1's funded clause is "test the ladder, WHICH CAN ALSO FIRE HERE IF
+  // A SETTLEMENT GRADUATED THE ACCOUNT", and R-49 fires only after a settlement,
+  // so `applySettlement` evaluates it at DO-2 and a graduated account returns
+  // there. A funded day that reaches this line therefore has nothing left for
+  // DO-8 to do, which is a statement about R-49's trigger rather than a step
+  // being skipped.
   //
   // R-25 IS WHY THIS RUNS AFTER DO-4 AND NOT BEFORE IT. "Breach beats everything
   // on the same day. Ordering law DO-4 before DO-8. No `phase.passed`, no

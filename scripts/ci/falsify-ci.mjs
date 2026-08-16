@@ -577,6 +577,72 @@ const CASES = [
       from: 'return state.payoutsSettledCount + 1;',
       to: 'return state.payoutsSettledCount + 2;',
     },
+    {
+      rule: 'R-19',
+      // ADR-014's whole ruling in one line, reinstated. A settlement that
+      // recomputes the floor under the dropped balance hands back the loss room
+      // the founder deliberately removed, and it moves the floor DOWN, which is
+      // INV-06 with no exception and no settlement carve-out.
+      seeds: "a post-payout floor recompute reinstated, which ADR-014 removed and CV-18 pins to `none`",
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: '    balanceCents: state.balanceCents - fact.approvedCents,',
+      to:
+        '    balanceCents: state.balanceCents - fact.approvedCents,\n' +
+        '    floorCents: state.balanceCents - fact.approvedCents - plan.funded.drawdown.drawdownCents,',
+    },
+    {
+      rule: 'R-46',
+      // SD-02: "the two anchors are genuinely different dates and conflating
+      // them is a silent liability change of 40 percent (EC-039)". On the v1
+      // lineup the two dates coincide, so this mutant is invisible on every
+      // published scenario and bites the first time settlement stops being
+      // instant.
+      seeds: 'the cadence anchor set from the BASIS day instead of the wallet-credit day, conflating SD-02’s two anchors (EC-039)',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: 'cadenceAnchorDay: fact.effectiveTradingDay,',
+      to: 'cadenceAnchorDay: fact.basisTradingDay,',
+    },
+    {
+      rule: 'R-47',
+      // AS-12 exactly: "if the basis day is included in the new consistency
+      // period, the very day that funded a payout counts against the next
+      // cycle ... and it looks like the consistency rule working rather than a
+      // bug."
+      seeds: 'the consistency period starting ON the basis day rather than strictly after it, which is AS-12’s off-by-one',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: 'consistencyPeriodStartDay: periodStart.day.tradingDay,\n\n    payoutsSettledCount:',
+      to: 'consistencyPeriodStartDay: fact.basisTradingDay,\n\n    payoutsSettledCount:',
+    },
+    {
+      rule: 'R-48',
+      // R-19's other two fields. The floor is the obvious one; the HIGH-WATER
+      // BALANCE is the one a recompute would reach for next, and dropping it to
+      // the post-payout balance would let R-13 re-trail from a lower high on
+      // every subsequent day, which lowers the floor by a route the floor's own
+      // tripwire never sees.
+      seeds: 'the high-water balance dropped to the post-payout balance, so R-13 re-trails from a lower high forever after',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: '    payoutsSettledCount: state.payoutsSettledCount + 1,',
+      to:
+        '    highWaterBalanceCents: state.balanceCents - fact.approvedCents,\n' +
+        '    payoutsSettledCount: state.payoutsSettledCount + 1,',
+    },
+    {
+      rule: 'R-49',
+      seeds: 'the ladder tightened from `>=` to `>`, so an account settles one payout past its own graduation rung',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: 'const graduated = settled.payoutsSettledCount >= plan.funded.maxPayouts;',
+      to: 'const graduated = settled.payoutsSettledCount > plan.funded.maxPayouts;',
+    },
+    {
+      rule: 'R-50',
+      // INV-17's bound is `ladder * max cap`, and a lifetime counter that does
+      // not accumulate makes RE-P-17 assert nothing at all.
+      seeds: 'lifetime settled failing to accumulate, which is the counter INV-17’s liability bound is asserted against',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: 'lifetimeSettledCents: state.lifetimeSettledCents + fact.approvedCents,',
+      to: 'lifetimeSettledCents: fact.approvedCents,',
+    },
   ].map(({ rule, seeds, file, from, to }) => ({
     id: `CI-02/engine-${rule}`,
     stage: 'CI-02',
