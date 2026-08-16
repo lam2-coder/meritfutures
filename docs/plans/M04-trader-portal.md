@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../architecture/data-model/README.md, ../design/DESIGN_SYSTEM.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M03-billing-checkout.md]
-last_updated: 2026-08-14
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../architecture/data-model/README.md, ../design/DESIGN_SYSTEM.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M03-billing-checkout.md, M19-kyc-identity.md]
+last_updated: 2026-08-16
 ---
 
 # M4: Trader Portal
@@ -12,6 +12,8 @@ The portal is where Merit's product promise either lands or does not. Everything
 
 **Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** Two rulings changed this module materially: **[ADR-019](../decisions/ADR-019.md)'s Merit Wallet adds a tenth screen** (SC-M4-10, section 3.5), and **[ADR-020](../decisions/ADR-020.md)'s indicative realtime layer supersedes this plan's "polling, not websockets, in v1" position** (section 3.6) and adds two invariants about labeling. The module's governing sentence is unchanged and now carries more weight, not less: render exactly what the engine computed, never recompute it, never round it, **and never let a live number look like a decided one.**
 
+**Amended again by [ADR-039](../decisions/ADR-039.md) (FOLD-01 session 5, 2026-08-16), and this one adds a second governing sentence rather than qualifying the first.** Auth widens to three factors and a session now has two levels rather than one, so the portal has to render an **authority boundary** it never had to render before: [SECURITY](../architecture/SECURITY.md) C-27 says any single factor sees every read surface and no single factor changes anything sensitive. The whole of this module's share of that ruling is one word. **The boundary is shown, never hit.** A trader whose session cannot perform a sensitive action learns it from a disabled control carrying its own reason, in the same render as the action, and never from a refusal after they committed to it. That is section 3.7, INV-M4-14 and INV-M4-15, and it is the same idiom this module already uses twice: INV-M4-03's payout button carries its failing gate's text, and INV-M4-05 renders a skipped gate as disabled rather than as satisfied. **A third instance of an existing pattern, not a new one**, which is the reason it is cheap to get right and would have been expensive to get wrong.
+
 **Identifier conventions:** `INV-M4-nn` invariants, `SD-M4-nn` schema deltas, `SC-M4-nn` screens, `FM-M4-nn` failure modes, `AS-M4-nn` adversarial scenarios, `OQ-M4-nn` open questions, `DEP-M4-nn` dependencies.
 
 ---
@@ -20,7 +22,7 @@ The portal is where Merit's product promise either lands or does not. Everything
 
 ### 1.1 What this module is
 
-`apps/portal`, a Next.js App Router application, mobile first, consuming `/api/v1` and nothing else. Passwordless auth (passkeys plus OTP). **Ten** screens, listed in section 3.1.
+`apps/portal`, a Next.js App Router application, mobile first, consuming `/api/v1` and nothing else. Passwordless auth: **passkeys plus email OTP plus SMS OTP**, any single factor sufficient for login ([ADR-039](../decisions/ADR-039.md), [SECURITY](../architecture/SECURITY.md) C-01), and **what a single factor may then do is C-27's question rather than this section's**. **Eleven** screens, listed in section 3.1.
 
 ### 1.2 What this module is not
 
@@ -49,28 +51,31 @@ The portal is where Merit's product promise either lands or does not. Everything
 | INV-M4-11 | Every value sourced from the indicative layer is rendered with an **indicative** label, in the same component, at the point of use | [ADR-020](../decisions/ADR-020.md). Enforced the same way INV-M4-02 enforces `as_of_trading_day`: an indicative component takes a required `tier` prop and a component that renders a live value without it does not compile. A label in a page footer is not a label on a number |
 | INV-M4-12 | On feed loss, a live surface falls back to last-closed values **and changes its label in the same render** | The failure this prevents is a live number that silently freezes, which is indistinguishable from a quiet market and is therefore worse than an honest stale number. GS-133 |
 | INV-M4-13 | No indicative value is ever an input to a request the portal sends | The payout confirm flow reads eligibility from the authoritative endpoint only, even when a live floor distance is on screen beside it. [ADR-020](../decisions/ADR-020.md)'s hard rule, applied at the one place in the portal where a number becomes a money decision |
+| INV-M4-14 | A sensitive action the current session is not elevated for renders **disabled**, carrying C-27's reason and the route to elevate, in the same component | [ADR-039](../decisions/ADR-039.md) amendment 4. Enforced the way INV-M4-02 and INV-M4-11 are enforced: a sensitive-action component takes a required `required_factor` prop and a required `session_elevation` prop, and one that renders the control without both does not compile. **The boundary is shown, never hit.** Section 3.7 |
+| INV-M4-15 | The portal never computes whether a session is elevated, and the disabled state is a convenience rather than a control | The server declares the required factor per endpoint and reports the session's own factor and elevation; the portal renders both and decides nothing. Asserted by the negative-authz suite, which calls every sensitive endpoint from a **single-factor session that the client rendered as disabled** and requires the refusal to come from the server anyway. This is INV-M4-06 and section 1.2's "not rendering a link is a convenience, never a control" applied to the one new boundary, and it is stated separately because it fails differently: INV-M4-14 fails at compile time and INV-M4-15 fails in a test |
 
 ---
 
 ## 2. Entities and schema deltas
 
-M4 owns no table outright. Three deltas, one of which closes a real gap in the approved model.
+M4 owns no table outright. Four deltas, one of which closes a real gap in the approved model and one of which is the only thing that makes C-27 enforceable at all.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
 | SD-M4-01 | new `certificates` | `id`, `account_id`, `identity_id`, `kind check in ('pass','payout')`, `payout_request_id null`, `claims jsonb`, `signature bytea`, `signing_key_id`, `issued_at`, `revoked_at null`, `revoked_reason null` | [API_CONTRACT section 6](../architecture/API_CONTRACT.md) returns a `certificate_id` and a `verify_url`, and the approved DATA_MODEL has no table behind either. Without a row there is nothing to verify against, and a "verifiable" share card that verifies nothing is worse than no card at all (AS-M4-03) |
 | SD-M4-02 | `purchases` | add `rule_diff_acknowledged_at timestamptz null` | [M3](M03-billing-checkout.md)'s AS-M3-05 requires a reset onto a changed plan version to be explicitly acknowledged. M4 renders the diff and captures the acknowledgement, and the timestamp is the artifact that settles the dispute later |
 | SD-M4-03 | `sessions` | add `created_ip inet`, `created_user_agent text`, `last_seen_at timestamptz`, `last_seen_ip inet` | Account takeover leading to payout redirection is the highest-value attack on a trader account ([SECURITY section 2.6](../architecture/SECURITY.md)). The trader-visible active-sessions list, and the ability to revoke one, both need this, and so does the anomaly signal that a session moved country mid-life (AS-M4-05) |
+| SD-M4-04 | `sessions` | add `auth_factor text NOT NULL check in ('passkey','email_otp','sms_otp')`, `elevated_at timestamptz null`, `elevated_by_factor text null check in ('passkey','dual_channel')`, plus `sessions_elevation_is_complete` refusing one of the pair without the other | **C-27 is unenforceable without it**: a handler cannot refuse an SMS-established session for a sensitive action if the session never recorded how it was established, and an emergent property of two rules is not enforceable. Landed in [`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql). **`elevated_by_factor`'s check list is the enforcement and its absences are the ruling**: there is no `sms_otp` value and no `email_otp` value, so a session established by either has nothing to write and cannot elevate itself. There is deliberately **no `elevation_expires_at`**: the window is a launch parameter the config owns ([ADR-037](../decisions/ADR-037.md)), evaluated against `elevated_at` at the moment of the action, so the portal reads a boolean it was given and never a clock it interprets |
 
 ---
 
 ## 3. Screens and state machines
 
-### 3.1 The ten screens
+### 3.1 The eleven screens
 
 | ID | Screen | The one thing it must get right |
 |---|---|---|
-| SC-M4-01 | Auth (passkey, OTP fallback) | No password field exists anywhere. There is no password database to stuff (D2) |
+| SC-M4-01 | Auth (passkey, email OTP, SMS OTP) | No password field exists anywhere. There is no password database to stuff (D2), and widening to a third factor did not change that, which is [SECURITY](../architecture/SECURITY.md) §2.6's claim and the reason C-01 could widen at all |
 | SC-M4-02 | Account list | Floor distance, because it is the number traders actually watch, and it is the number that decides whether they trade tomorrow |
 | SC-M4-03 | Account detail and equity chart | Every gate, gate by gate, with numbers. Never a single progress bar |
 | SC-M4-04 | Payout center | The exact clamped amount, before submit, matching what will be sent (INV-M4-04) |
@@ -80,6 +85,9 @@ M4 owns no table outright. Three deltas, one of which closes a real gap in the a
 | SC-M4-08 | Certificates | Signed, verifiable, disclosure-bearing |
 | SC-M4-09 | Referral panel | [M8](M08-affiliate-system.md)'s trader-facing surface, with the required NFA I-26-12 disclosure |
 | SC-M4-10 | **Merit Wallet** | The balance, its two directions, and the honest statement of what a wallet balance is: money already earned and already yours, held by Merit until you withdraw it. Section 3.5 |
+| SC-M4-11 | **Security and sessions** | Every active session with the factor that established it, revocation, the verified phone, and the phone-change ceremony's state while it runs. Section 3.7 |
+
+**SC-M4-11 records a surface this module had already committed to and never gave a row.** AS-M4-05 counter 2 says "the trader sees every active session with its creation IP, user agent, and last-seen time, and can revoke any of them", and GS-104 asserts a destination change is "visible in the active-session and **security** views". Both are commitments in the approved text; neither had a screen id, and `SD-M4-03` was written in section 2 to serve a screen that section 3.1 did not list. [ADR-039](../decisions/ADR-039.md) forces the omission into the open because the surface now has to carry new content: the establishing factor, and the elevation control that every sensitive action routes through. **The row is allocated here rather than left to whoever builds it**, and the founder can reverse the allocation without any other part of this fold moving, since nothing outside section 3.7 and this table cites `SC-M4-11`. Unlike `SD-nn`, `SC-M4-nn` has no allocation table and no gate, so claiming one costs nothing and leaving a required surface homeless costs a build.
 
 ### 3.2 The payout request flow, which is the one that has to be perfect
 
@@ -150,6 +158,30 @@ The wallet is where the trader's money sits between earning it and withdrawing i
 
 **Nothing here touches the payout center.** The confirm flow re-fetches authoritative eligibility exactly as section 3.2 already specifies, and no indicative value enters the request body (INV-M4-13). The socket could be entirely down and the payout path would be unaffected, which is the property that makes shipping tier 2 safe at all.
 
+### 3.7 The authority boundary, shown rather than hit (ADR-039)
+
+[SECURITY](../architecture/SECURITY.md) C-27 gives a session two levels where it had one. Any single factor establishes a session sufficient for **every read surface**; no single factor, and specifically never SMS alone, is sufficient for a **sensitive action**. The portal's entire share of that ruling is the difference between a trader learning it before they act and learning it after.
+
+**The three sensitive actions C-27 names, and where each one surfaces here.**
+
+| Sensitive action | Where the trader meets it | What non-elevated renders as |
+|---|---|---|
+| **Payout destination change** | SC-M4-11, and the withdraw path on SC-M4-10 | The field is disabled and says a passkey or a second channel is needed to change where money goes, **before** the trader types a destination |
+| **Contact change of either kind**, email or number | SC-M4-11 | The change control is disabled with the same sentence. A phone change additionally states the ceremony ahead of it, below |
+| **External withdrawal** | SC-M4-10's withdraw direction | The amount field stays usable and the submit is disabled, because a trader who cannot yet submit can still legitimately want to know what they would be withdrawing |
+
+**The failure this prevents is specific and it is not a niceties problem.** A trader logs in by SMS on a phone, opens the wallet, types a destination, confirms it, and receives a `403`. Nothing was stolen and no control failed, and the trader has still learned that Merit's UI offers actions its API refuses, which is the same lesson AS-M4-02 exists to avoid teaching about numbers. **Worse, it teaches the wrong lesson to the one population that matters**: the trader who is actually being attacked sees an identical refusal, so the refusal carries no information. A boundary that is only ever discovered by hitting it is indistinguishable from a bug, and users route around bugs.
+
+**The disabled state is a convenience and the server is the control** (INV-M4-15). The portal renders `required_factor` and the session's own elevation exactly as it renders a failing gate: the server decided, the client displays. The negative-authz suite calls every sensitive endpoint from a single-factor session **that the client rendered as disabled** and requires the server's refusal anyway, because the moment the disabled attribute is the only thing standing between a session and a destination change, C-27 has moved into the client and stopped existing.
+
+**Elevation is a step up, never a re-login.** `elevated_at` and `elevated_by_factor` sit on the session that already exists (SD-M4-04), so the trader does not lose their place, and the elevation window is a config value the server evaluates rather than a countdown the portal renders. **The portal shows that an action is currently available and does not show when it stops being available**, because a visible countdown is a prompt to hurry and hurrying is the attacker's ally on exactly these three actions.
+
+**One thing the elevation prompt must not become, and it is the reason the copy is specified rather than left to the builder.** A prompt that says "approve this on your other device" and nothing more is training the trader to approve prompts, which is the whole mechanism of push-fatigue attacks: the attacker supplies the volume and the trader supplies the tap. **Every elevation prompt names the action it is elevating, and where an amount or a destination is involved it names those too**, so an approval is an approval of one specific thing. A trader who receives an elevation prompt for a destination change they did not start must be able to read what it is for without opening the portal, which is also what makes it a takeover alarm rather than an inconvenience.
+
+**The phone-change ceremony is visible while it runs.** [SECURITY §4.8](../architecture/SECURITY.md) stores it as six enforced legs in `phone_change_requests`, and a ceremony whose state the trader cannot see is one they experience as a change that did not happen. SC-M4-11 renders the request's state, that the prior number and the email were both notified, and **that an external-withdrawal hold is running with the date it lifts** ([M19](M19-kyc-identity.md) owns the ceremony; M4 owns the rendering). The hold is stated as a date rather than a duration for EC-046's reason: a trader can act on a date and cannot evaluate a countdown of business hours.
+
+**What a SIM-swapped session still sees, stated because it is the residual and not a gap.** Everything. Balance, withdrawable, floor distance, and history, which is enough for an attacker to decide whether the account is worth the next step. That is C-27's deliberate trade and AS-M4-05 prices it: read access is the cost of any-single-factor login, the controls that matter sit on the change, and the trader's own defence is SC-M4-11's session list, which is why revocation is on the same screen as the factor that established the session.
+
 ---
 
 ## 4. API endpoints consumed
@@ -167,6 +199,11 @@ M4 owns no endpoint. It consumes [API_CONTRACT sections 3, 5, 6, and 7](../archi
 | `GET /accounts/:id/certificate` | See AS-M4-03 |
 | `GET /plans/:id/versions/:v` | The rules page for an account reads the **pinned** version, not the current one |
 | `POST /kyc/session`, `GET /kyc/status` | Four states, four different pieces of advice. `rejected` is the hard one and gets a support route, never a dead end |
+| `POST /auth/otp` | Carries the **channel**. The portal offers email and SMS as peers rather than as a fallback, because C-01 makes any single factor sufficient and a UI that calls one of them "fallback" is describing a hierarchy the server does not have |
+| `GET /me` | The session's **own** `auth_factor` and its current elevation. This is the input to every INV-M4-14 render, and it is the reason the portal never has to reason about factors: it is told |
+| The sensitive-action endpoints | Each declares its **required factor** in its own response, so a control's disabled state and the server's refusal are read from one declaration rather than two lists that drift. [API_CONTRACT §12](../architecture/API_CONTRACT.md)'s negative-authz matrix gains the required-factor column, and `CI-06k` asserts every sensitive action C-27 names declares a non-single factor |
+
+**The contract rows for the auth and phone surface land with [API_CONTRACT](../architecture/API_CONTRACT.md) in the registries session, not here.** `POST /auth/otp`'s channel, the phone verification and change endpoints, the session-list and revocation endpoints SC-M4-11 needs, and §11's rate-limit rows are all that session's work; this table records **M4's obligation against each**, which is what section 4 has always been for. Naming them is deliberate: [FOLD-01 §6.2](FOLD-01-phone-identity.md) records that no gate catches a missing endpoint, and the session-list endpoint in particular has been owed since AS-M4-05 was approved and has never appeared in the contract.
 
 ---
 
@@ -184,6 +221,7 @@ M4 emits no domain events. It **consumes** them for live UI, and it is the surfa
 | `rule.floor_locked` | A timeline entry explaining that the floor is now permanent, and what the loss room is from here ([ADR-014](../decisions/ADR-014.md)) |
 | `kyc.*` | The status card |
 | `account.graduated` | The ladder completion, with the live-invitation state |
+| `phone.verified`, `phone.change_requested` | SC-M4-11's timeline. A phone change is a credential change and the trader's own record of it is what makes an unauthorized one visible to them. The event definitions land with [EVENTS](../architecture/EVENTS.md) in the registries session; what M4 records here is that it consumes them |
 
 **Delivery of domain events is via polling, not websockets.** These events are T+1 by construction; a socket to deliver a number that changes once a day is infrastructure with no purchaser. Polling on focus plus a 60 second interval on the dashboard is sufficient.
 
@@ -204,6 +242,7 @@ M4 emits no domain events. It **consumes** them for live UI, and it is the surfa
 | FM-M4-07 | Notification says eligible, the portal says not | The highest-volume support wave available | Notifications carry `as_of_trading_day`; the portal is authoritative | The email states the day it was true on. See AS-M4-06 |
 | FM-M4-08 | Mobile layout hides the failing gate below the fold | Traders conclude the rule is arbitrary because they never saw it | Mobile-first design, plus a visual test asserting the failing gate is above the fold at 375px | Layout fix; this is a correctness bug, not a polish item |
 | FM-M4-09 | The portal ships a visual AI tell | A skeptical trader reads "another AI-generated prop firm", which for a firm holding payouts is a trust wound | Appendix F's hard-fail checklist as a review gate, plus a Playwright slop-score pass | Reject in review. Appendix F is binding, not advisory |
+| FM-M4-10 | A sensitive action renders **enabled** to a non-elevated session | C-27 becomes a `403` the trader meets after committing, which reads as a broken product to the honest trader and tells the attacker nothing they did not already know. The asymmetry is the whole point: hitting the boundary costs the honest trader a wasted attempt and costs the attacker nothing | INV-M4-14's required props fail the build; the negative-authz suite asserts the server refuses regardless (INV-M4-15) | Structural on the render side. **The refusal is never the recovery**, because a refusal the trader reached is the failure |
 
 ---
 
@@ -250,11 +289,19 @@ GS-102.
 
 **Attack.** D4 names the classic vector. Its portal-specific shape is sharper than the generic case because of two Merit properties: payouts are **instant and mechanical** with no human in the loop, and a funded account's `withdrawable` is publicly visible on the dashboard, so an attacker with any session can see immediately whether the account is worth taking. Passwordless auth removes credential stuffing (there is no password database to stuff) but does not remove session theft, OTP interception, or a passkey registered on a device the attacker controls.
 
+**The SIM-swap shape, added by [ADR-039](../decisions/ADR-039.md), and it is the cheapest entry this list has ever carried.** SMS OTP is now a login factor, so an attacker who ports the trader's number does not need to steal a session or phish a passkey: they authenticate as the trader, first try, with a code the carrier delivers to them. **The swap is a social-engineering attack on a third party Merit has no relationship with**, which is what separates it from every other row here, and [SECURITY §2.6](../architecture/SECURITY.md) carries it and OTP interception as two rows rather than one because interception leaves the number where it is, so the phone-change controls never fire and C-27 is the whole defence.
+
+**What the attacker gets, and it is worth stating exactly rather than reassuringly.** A complete read of the account: balance, withdrawable, floor distance, plan, history, and enough to decide whether to continue. **What they do not get is any change**, because `sessions.elevated_by_factor` accepts `passkey` and `dual_channel` and has no `sms_otp` value to write (SD-M4-04). The destination cannot move, the contacts cannot move, and the withdrawal cannot be submitted. **The attacker's next move is therefore the phone-change ceremony**, which is where [SECURITY §4.8](../architecture/SECURITY.md)'s six legs meet them, and the second of those legs notifies the number they just took **and** the email they did not.
+
 **Counter, layered, because no single one survives a valid session.**
 1. **Payout destination changes trigger a 48 hour cooling window plus re-verification** (D4). The attacker's session is valid and the change still does not take effect today, which converts an instant theft into a detectable one.
 2. **The trader sees every active session** with its creation IP, user agent, and last-seen time, and can revoke any of them (SD-M4-03). This is the control that lets the victim act before the firm notices.
 3. **Passkey registration is itself a notified event**, because a new authenticator on the account is the quietest possible takeover step.
 4. A session whose country changes mid-life is a signal to [M7](M07-risk-abuse.md), not a block, since traders travel and blocking on geography would generate more harm than it prevents.
+5. **C-27, which is the only one of these that is a database vocabulary rather than a rule somebody implemented** (SD-M4-04, section 3.7). A single-factor session sees everything and changes nothing, and the portal shows that boundary rather than letting the attacker discover it, which costs nothing: **the attacker learns the same thing from one `403` that the honest trader learns from a disabled button**, so showing it gives away no defence and removes the failure the honest trader would otherwise take.
+6. **Every session now carries the factor that established it** (`sessions.auth_factor`), so the session list is the surface where a trader sees a login by SMS that they did not perform, which is the SIM swap's only trader-visible symptom **before** the phone-change notice arrives.
+
+**And the residual, named rather than argued away.** A trader whose number is swapped, who has no passkey and does not read the email, is protected by the 48 hour hold and by nothing else. That is the case §4.8 leg 3 exists for, and it is the reason the hold's ordering is asserted by a database constraint rather than by a handler.
 
 GS-104.
 
@@ -293,11 +340,13 @@ GS-105.
 | Suite | Prefix | Count | Runs | Blocks |
 |---|---|---|---|---|
 | Component render contracts (every field maps to one API field) | `M4-R-nn` | 22 | every commit | merge |
-| Negative authz, D5 matrix | `M4-N-nn` | 14, one per endpoint per resource | every commit | merge |
+| Negative authz, D5 matrix | `M4-N-nn` | **one per endpoint per resource, plus one per sensitive action from a single-factor session** (INV-M4-15) | every commit | merge |
 | E2E happy path (buy, pass, request, settle) | `M4-E-nn` | 1 plus the 10 highest-value unhappy paths | every commit | merge |
-| Visual and layout, 375px and 1280px | `M4-V-nn` | 9, one per screen | every commit | merge |
+| Visual and layout, 375px and 1280px | `M4-V-nn` | **one per screen in section 3.1** | every commit | merge |
 | Appendix F slop score | `M4-F-01` | 1 | every commit | merge |
 | Golden fixtures | `GS-nnn` | 6 owned (GS-100 to GS-105) | every commit | merge |
+
+**Two counts in that table were replaced by the rule that produces them, and one of them was already wrong.** The visual suite read "9, one per screen" against a section 3.1 that has listed **ten** screens since [ADR-019](../decisions/ADR-019.md) added the wallet, so the stated count and the stated rule disagreed and the rule was the true one. Rather than write "11" and wait for the next screen, both rows now carry the rule, per [ADR-034](../decisions/ADR-034.md): a hand-maintained count with no CI span is a number that drifts silently, and this one had. **No ordinal is claimed for the finding**, on session 31's ruling that the tally of hand-maintained counts is itself double-booked.
 
 **`M4-F-01` deserves a sentence** because a lint rule for design taste sounds unserious and is not. It is a Playwright pass asserting the absence of the specific, enumerable tells in Appendix F: an indigo-to-purple gradient, a 3 to 4px colored left border on a card, Inter or Poppins as the body face, a centered hero with a pill badge above the H1, and uniform 16px radius across every surface. These are mechanically detectable, and the constitution classes each as a hard fail, so they are a test rather than an opinion.
 
@@ -311,6 +360,8 @@ GS-105.
 | GS-103 | Breach screen ordering at every breakpoint | Floor, low, shortfall, and rule name appear above the reset call to action at 375px and 1280px, with no countdown and no pre-selected option. AS-M4-04 |
 | GS-104 | Payout destination change enters a 48 hour cooling window | The change is accepted, does not take effect, is notified to the existing contact, and is visible in the active-session and security views. AS-M4-05 |
 | GS-105 | Eligibility notification names its trading day and links to the gates screen | The notification body carries "as of <trading day>" and deep-links to eligibility rather than to a request action. AS-M4-06 |
+
+**The scenarios for the authority boundary are not claimed here, deliberately.** `CI-06d` fails on any `GS-nnn` cited anywhere in `docs/` that does not resolve to a definition in the registry, and the registry is the registries session's work under [FOLD-01 §6.2](FOLD-01-phone-identity.md). The three this module owes are named in words so the session that allocates them has the list: **a sensitive action rendered disabled to a single-factor session with its reason and its route**; **the same endpoint refusing that session on the server regardless of what the client rendered** (INV-M4-15, which is the half a rendering test cannot cover); and **the phone-change ceremony visible on SC-M4-11 while its hold runs**. Writing the identifiers before the registry rows exist would break the build, which is the same constraint session 4 met and recorded.
 
 ### 8.3 Coverage rule
 
@@ -329,6 +380,9 @@ GS-105.
 | `portal.confirm_amount_changed_rate` | AS-M4-02 firing in the wild. Should be small; a spike means batch timing and trader behavior overlap more than modelled |
 | `portal.404_on_owned_resource` | A trader hitting 404 on something that is theirs is an authorization bug wearing a not-found costume |
 | `portal.session_country_change` | AS-M4-05 signal, routed to M7 |
+| `portal.sensitive_action_403_rate` | **FM-M4-10 firing in the wild, and it should be near zero.** A trader reaching a refusal means a control rendered enabled that INV-M4-14 says renders disabled, so this is a rendering bug metric wearing an authorization costume, which is the inverse of `portal.404_on_owned_resource` one row up |
+| `portal.elevation_prompted` versus `portal.elevation_completed`, by action | The friction the boundary actually costs. A wide gap on the withdraw path is the one place where a security control and the wallet's whole promise are in tension, and it is better measured than argued |
+| `portal.sms_established_session_share` | The share of sessions established by SMS, which is the population C-27 bounds. A rise is not an incident and a **sudden** rise on accounts with a wallet balance is AS-M4-05's shape |
 | `portal.certificate_verify_lookups`, and the unknown-code rate | A rising unknown-code rate means forged cards are circulating (AS-M4-03) |
 | `portal.p95_dashboard_ttfb` | Constitution 5.7's only portal-relevant budget |
 | `portal.mobile_share` | Decides where layout effort goes, and constitution M4 says mobile first |
@@ -342,6 +396,7 @@ GS-105.
 | Certificate unknown-code rate | more than 5 per day | warn |
 | Confirm-amount-changed rate | more than 2 sigma week over week | warn |
 | Payout request 5xx | any | **page** |
+| A sensitive endpoint refusing a session the portal rendered as enabled | any | **page**. FM-M4-10, and it is a page for `portal.404_on_owned_resource`'s reason: it is a rendering bug until proven otherwise and an authorization bug if it is not |
 
 ### 9.3 Dashboard
 
@@ -361,6 +416,8 @@ Not a separate one. The portal's health belongs on M6's ops page as three lines:
 
 **OQ-M4-05 (NEW, from [ADR-020](../decisions/ADR-020.md)). How is "indicative" said, in one word, to a trader who will not read a sentence?** The invariants fix that a label exists and where it lives; they do not fix its wording, and this is a place where a bad word is worse than no word. "Indicative" is precise and is not a word most traders use. "Live" is the word they use and it carries exactly the wrong implication, since live is what they will assume the rules run on. "Estimated" implies imprecision that is not really the issue, because the number is accurate and merely not the one enforcement used. Recommendation: **"live (not used for rules)"** on first appearance, shortened to a persistent visual treatment plus "live" thereafter, and tested on real traders during the private beta rather than decided in this document. The one thing that must not happen is the label degrading to a tooltip, which is INV-M4-11's whole purpose.
 
+**OQ-M4-06 (NEW, from [ADR-039](../decisions/ADR-039.md)). Does the portal offer to register a passkey at the moment a trader first meets the boundary, and is that a dark pattern?** C-27 makes a passkey the only factor that both establishes and elevates, so the trader who has one never meets a disabled control at all. The efficient moment to say so is the moment they are blocked, which is also the moment they most want to proceed, and "you are blocked, here is a thing to install" is structurally the shape AS-M4-04 spends a whole scenario refusing on the breach screen. **Recommendation: offer it, and hold it to the breach screen's rules rather than to the funnel's.** The explanation comes first, the offer sits below it, there is no countdown, and the dual-channel route stays visible and equal rather than being made the slow option to push the fast one. The distinction from AS-M4-04 is real and worth stating: a reset purchase takes the trader's money and a passkey costs them nothing, so the incentive that makes the breach screen dangerous is absent here. **What makes it a question rather than a decision is that the incentive is absent today**, and a support-cost or a fraud-loss number would create one, which is exactly how the breach screen would have gone wrong too.
+
 ---
 
 ### Dependencies on other modules
@@ -373,3 +430,5 @@ Not a separate one. The portal's health belongs on M6's ops page as three lines:
 | DEP-M4-04 | `scopedDb(identity)` is the only data accessor, lint-enforced | packages/db, [ADR-008](../decisions/ADR-008.md) | FM-M4-03, which is the most common vibe-code fatality in the corpus's own research |
 | DEP-M4-05 | Certificates are signed rows with a public verification endpoint | M11 builds it, M4 renders it | AS-M4-03 has no defensible position |
 | DEP-M4-06 | Notifications carry `as_of_trading_day` | M10, M16 | AS-M4-06 becomes a recurring support wave |
+| DEP-M4-07 | Every sensitive endpoint **declares** its required factor, and the session endpoint reports the session's own factor and elevation | API_CONTRACT §12, [M19](M19-kyc-identity.md) | INV-M4-14 has nothing to render, so the portal either guesses at the boundary or lets the trader hit it, and both are FM-M4-10. **A declaration the client reads is the only version of this that does not become a second copy of C-27 maintained in the portal** |
+| DEP-M4-08 | Elevation is a step up on the existing session, not a re-login, and the window is a server-evaluated config value | M19, [ADR-037](../decisions/ADR-037.md) | The trader loses their place on every sensitive action, and the portal starts rendering a countdown it has to keep correct, which is a clock the client does not own (section 3.7) |
