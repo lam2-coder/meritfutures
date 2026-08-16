@@ -32,13 +32,18 @@
 // identifier series one transposition apart is a footgun with no upside.
 //
 // -----------------------------------------------------------------------------
-// THE ONE RULE THAT IS NOT IN `validateDaySequence`, AND WHY
+// THE STORED CLOSING IDENTITY IS EXPORTED SEPARATELY, AND IT NO LONGER CONFLICTS
 // -----------------------------------------------------------------------------
-// `0014`'s `daily_marks_balance_arithmetic` CANNOT BE SATISFIED AT THE SAME
-// TIME AS INV-18 AND INV-19 unless `adjustment_cents` is zero. It is exported
-// separately, as `checkStoredBalanceArithmetic`, and the contradiction is
-// asserted executably in the property test rather than described here. See the
-// comment on that function.
+// `checkStoredClosingIdentity` transcribes the CHECK the database actually
+// carries. Until EC-157 was ruled that was `0014`'s
+// `daily_marks_balance_arithmetic`, which COULD NOT be satisfied at the same
+// time as INV-18 and INV-19 unless `adjustment_cents` was zero, and the
+// property test watched every non-zero-adjustment mark violate it.
+//
+// EC-157 IS RULED (REPAIR A, 2026-08-16) and `0036` supersedes that constraint
+// with INV-19 alone. The same test now watches those marks PASS. It is kept,
+// rather than deleted as redundant, because it is the thing that fails if a
+// later migration reintroduces the adjustment into the closing identity.
 // =============================================================================
 
 import type { CalendarDay, DailyMark, DaySequence } from './day-input.js';
@@ -438,41 +443,40 @@ function checkMarkArithmetic(seq: DaySequence, out: DsViolation[]): void {
 }
 
 /**
- * `0014_marks.sql`'s `daily_marks_balance_arithmetic`, transcribed verbatim:
+ * `0036_supersede_daily_marks_balance_arithmetic.sql`'s
+ * `daily_marks_inv19_closing_identity`, transcribed verbatim:
  *
- *   CHECK (closing_balance_cents = opening_balance_cents
- *                                + realized_pnl_cents
- *                                + adjustment_cents)
+ *   CHECK (closing_balance_cents = opening_balance_cents + realized_pnl_cents)
  *
- * IT IS NOT PART OF `validateDaySequence` AND THAT IS THE FINDING, NOT AN
- * OVERSIGHT. It cannot hold at the same time as INV-18 and INV-19 unless
- * `adjustment_cents` is zero, which is exactly the day the column exists for.
+ * EC-157 IS RULED: REPAIR A, 2026-08-16. THE CONSTRAINT WAS WRONG AND THE
+ * INVARIANTS WERE RIGHT.
  *
- * INV-18 puts the adjustment BEFORE the open (`opening = prior.closing +
- * adjustment`, and R-10 puts the movement "at the open ... never inside a
- * session"). INV-19 then closes the day with `closing = opening + pnl`. The
- * constraint adds the adjustment a second time, INSIDE the day. Worked, in
- * integer cents, on the case SD-01 was added for:
+ * `0014` carried `closing = opening + realized_pnl + adjustment`, which added
+ * the adjustment a SECOND time, inside the day. INV-18 has already put it
+ * before the open (`opening = prior.closing + adjustment`, and R-10 puts the
+ * movement "at the open ... never inside a session"). Worked, in integer cents,
+ * on the case SD-01 was added for:
  *
  *   prior closing 5,000,000; a settled payout of 250,000; the day makes 30,000
- *   INV-18       -> opening = 5,000,000 - 250,000     = 4,750,000
- *   INV-19       -> closing = 4,750,000 + 30,000      = 4,780,000
- *   the CHECK    -> closing = 4,750,000 + 30,000 - 250,000 = 4,530,000
+ *   INV-18       -> opening = 5,000,000 - 250,000            = 4,750,000
+ *   INV-19       -> closing = 4,750,000 + 30,000             = 4,780,000
+ *   0014's CHECK -> closing = 4,750,000 + 30,000 - 250,000   = 4,530,000
  *
- * The database refuses the row the two invariants require, so the mark for
- * every settled payout is unwritable as specified. The `0014` comment above the
- * constraint labels it INV-18, and the `daily_marks` design record labels it
- * INV-18 too; it is neither identity.
+ * The database refused the row the two invariants require, so the mark for
+ * every settled payout was unwritable as specified. `0036` drops that
+ * constraint and adds INV-19 alone, which is the half a CHECK can see: INV-18
+ * reads `prior.balance`, which lives in `rule_states`, and a CHECK cannot see
+ * across rows. INV-18 is asserted by M02 before the engine sees the mark
+ * (INV-M2-06) and by the engine at DO-3 (R-07).
  *
- * NOTHING IS RULED HERE. This function exists so the conflict is an executable
- * assertion in `day-sequence.property.test.ts` rather than a paragraph, and so
- * that whoever rules it has a test that fails the moment either side moves.
+ * THE OLD NAME IS GONE RATHER THAN REDEFINED, so a reader who greps for
+ * `daily_marks_balance_arithmetic` finds nothing rather than finding a
+ * statement whose meaning changed underneath it. Both `0014`'s comment and the
+ * `daily_marks` design record labelled it "INV-18" and it was neither identity,
+ * which is how the wrong arithmetic became the authoritative one.
  */
-export function checkStoredBalanceArithmetic(mark: DailyMark): boolean {
-  return (
-    mark.closingBalanceCents ===
-    mark.openingBalanceCents + mark.realizedPnlCents + mark.adjustmentCents
-  );
+export function checkStoredClosingIdentity(mark: DailyMark): boolean {
+  return mark.closingBalanceCents === mark.openingBalanceCents + mark.realizedPnlCents;
 }
 
 /** Convenience for the common assertion. */
