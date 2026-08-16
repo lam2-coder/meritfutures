@@ -244,6 +244,24 @@ Nothing.
 
 **Nothing else in FOLD-02 is folded.** The engine gates, the sweep, the API contract, `STATE_MACHINES` and the four remaining `transferring` sites named in [ADR-040](decisions/ADR-040.md) are session 4 onward. **`0029` and `0032` were not touched**: they are FOLD-01's and S-E's.
 
+### FOLD-02 session 4: the machines and the invariants (2026-08-16)
+
+**[STATE_MACHINES](architecture/STATE_MACHINES.md), [M05](plans/M05-payout-system.md), [M20](plans/M20-wallet.md), [M07](plans/M07-risk-abuse.md) and [SECURITY](architecture/SECURITY.md) section 4 are folded.** The payout machine gains `held_pending_review` and its three guards; `G-ELIGIBLE` gains the identity status it never named; M05 gains INV-M5-17 to INV-M5-20, M20 gains INV-M20-12 to INV-M20-14, M07 tabulates the four enforcement outcomes, and SECURITY section 4 gains five items whose load-bearing sentence is that **the expiry is the security control rather than the flag**.
+
+**Three defects found by folding rather than by a gate, all in the sweep [ADR-028](decisions/ADR-028.md) believed it had finished.**
+
+| Finding | State |
+|---|---|
+| **`G-NO-IN-FLIGHT` and `G-FREEZE-DURING-FLIGHT` still read `transferring`.** The section 2 drawing had been corrected; **the guards behind it had not**, which is the more dangerous half because the guard is what the engine reads | **CLOSED.** Both rewritten, and `G-NO-IN-FLIGHT` now matches `payout_requests_no_in_flight_uq`'s predicate word for word |
+| **Section 2 pointed at "section 3" for `wallet_withdrawals`, and section 3 was `payout_transfers`.** `wallet_withdrawals` had **no drawing anywhere in the authoritative document**, which is how `0011`'s representable-but-unenforced halt survived a founder-grade review | **CLOSED.** Section 3 is two sub-machines and 3.2 is written |
+| **M05 said `status: settled_to_wallet` in two places, a value ADR-028 explicitly REJECTED** and `0001`'s comment block records rejecting. ADR-028 names M05 as one of two files it corrected | **CLOSED.** The fifth site of that sweep, and **not on ADR-040's list of four remaining sites either** |
+
+**`G-ENFORCEMENT-RESTRICT` and `G-RESTRICTION-LIFTED` were named by section 9 and defined nowhere**, in a document whose own opening sentence says guards are defined once in section 10 so the same condition is never written twice. Both are defined now.
+
+**Two things this session deliberately did not do, and both are session 7's.** **`CI-06l` is not written**: four documents now assert that every expiry has a sweep and **nothing checks it from the tree**, so the auto-release is load-bearing by assertion until that gate lands. **No `EC-nnn` or `GS-nnn` was claimed**; the five cross-machine rows added to STATE_MACHINES section 11 are those scenarios' content, filed where a reader of the machine will find it.
+
+**A registry with no allocation table has started to race.** Four session-log entries are numbered 31 and two are numbered 32, written by parallel sessions each taking the next number it could see. `CI-06n` cannot see it because every one of those rows resolves. This is [ADR-034](decisions/ADR-034.md)'s failure one registry over, and it is recorded rather than fixed here because renumbering merged entries is not this session's call.
+
 ~~**Four open questions for the founder**~~ **ALL FOUR RULED 2026-08-15**, recorded in [ADR-040](decisions/ADR-040.md) and [ADR-041](decisions/ADR-041.md). **OQ-F2-01: `restricted`**, no new enum value. **OQ-F2-02: OQ-M5-02 closes at 48 hours**, matching the hold, because the investigate-time justification is identical in both cases and the post-credit case holds money Merit has already recognised as owed. **OQ-F2-03: M15 partial, +3 to 5 days, P8**, on `INV-M15-06`. **OQ-F2-04: accepted, the list moves from three to four.**
 
 ---
