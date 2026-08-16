@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # SESSION LOG
@@ -48,3 +48,4 @@ must be recoverable from its own file alone.
 | [2026-08-15 - Session 28](2026-08-15-session-28.md) | S-E planned, TradingCalendar as data and the wall-clock unit boundary |
 | [2026-08-15 - Session 29](2026-08-15-session-29.md) | the allocation registries made honest, and the four fold ADRs |
 | [2026-08-15 - Session 30](2026-08-15-session-30.md) | DECISIONS.md becomes a directory (ADR-043, stage 1 of 5) |
+| [2026-08-16 - Session 31](2026-08-16-session-31.md) | FOLD-01 session 3, migration `0029` and the phone-identity schema |
