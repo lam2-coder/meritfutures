@@ -20,7 +20,7 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->33<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->34<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -389,7 +389,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->33<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->9<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->34<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -639,7 +639,7 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->102<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->9<!--/gen--> triggers**, across <!--gen:migration_files-->33<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->102<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**, across <!--gen:migration_files-->34<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
 
 ---
 
@@ -712,7 +712,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->33<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->34<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
 
 | | Before `0033` | After `0033` |
 |---|---|---|
@@ -768,3 +768,146 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 **[ADR-043](../../docs/decisions/ADR-043.md)'s own ADR has no row in the ADR registry table.** It is linked from a sentence in the README's preamble, and `CI-06n` accepted that: the gate matches **any markdown link anywhere in the README**, while its title says "every registry entry has a README **row**". Its `covers` line is honest and says "is linked from", so the implementation matches its stated coverage and the title overstates it, which is how nobody noticed that a merged ADR had fallen out of the registry it belongs to.
 
 **The row is added here. The gate is not narrowed here**, because a gate arrives with a seeded violation it has been watched failing on, and narrowing this one needs a sweep of every registry directory the split created rather than a one-line regex. Carried as `OI-09`.
+
+---
+
+## 18. `0034` lands, and the REVOKE that was called decoration turned out to be a control (2026-08-16)
+
+**[`0034_reversible_contact_addresses.sql`](migrations/0034_reversible_contact_addresses.sql), with its `E2 READ: MONEY PATH` header and the founder's read still to come.** [ADR-046](../../docs/decisions/ADR-046.md) closes `OQ-M10-06`: `INV-M16-03`'s prior-contact notification, [SECURITY section 4.8](../../docs/architecture/SECURITY.md) leg 2 and every security-class message Merit itself initiates had **no address to send to**, in any of the thirty-three migrations before this one. **It edits nothing.** `0018`, `0019`, `0026` and `0029` are untouched on disk; this file changes what they installed, which is `0028`'s precedent applied a fourth time.
+
+**No numbered delta lands here.** ADR-046 is a ruling on an open question rather than a module's schema delta, so [ADR-026](../../docs/decisions/ADR-026.md)'s manifest completeness gate has nothing to count. `0033`'s precedent, and this section is the record instead.
+
+| Change | What it is |
+|---|---|
+| Three sealed columns, three times | `*_ciphertext`, `*_key_id`, `*_encrypted_at` on `contact_channels`, `identity_phones` and `phone_change_requests`, each with a completeness `CHECK`, a **plaintext floor** and a partial index serving the rotation sweep |
+| The plaintext floor | `octet_length(<col>) >= 29` when the column is not null, three times. **`INV-M10-12` as a constraint rather than as a promise**, and the founder's second amendment |
+| `merit_dispatcher` | The fourth role. `0026` created three and none of them is a sending path, and **you cannot withhold `DELETE` from a principal the database cannot name** |
+| The evidence foreign keys | `prior_notified_at` may not be set without citing an `integration_dispatches` row **and** a `notifications` row, both `ON DELETE RESTRICT`, both **explicitly named** |
+| The identity-match trigger | Both cited rows belong to the same identity as the request. Separately rejectable |
+
+### Install verification, from empty
+
+**All <!--gen:migration_files-->34<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+
+| | Before `0034` | After `0034` |
+|---|---|---|
+| Tables | 102 | **102** |
+| Indexes | 351 | **354** |
+| Check constraints | 397 | **404** |
+| Foreign keys | 141 | **143** |
+| Triggers | 9 | **10** |
+
+**No table moves, and that is the shape of the change.** `OQ-M10-06` is not a missing entity. It is three tables that each held a value they could recognise and not use, so the fix is columns beside the columns that were already right, plus the one thing a column cannot be: a role.
+
+### The probe
+
+[`scripts/db/probe_reversible_contact_addresses.sql`](../../scripts/db/probe_reversible_contact_addresses.sql), **37 assertions, 37 / 37**, wired into `corpus.yml` as step 10 **and pinned by `CI-06h`**. Fifteen are successes, on section 13's lesson: a probe that only attempts forbidden things passes perfectly against a guard that refuses everything.
+
+**It was wired and not pinned, which is `OI-07` a third time**, and this one was caught before the merge rather than a day after it. See the subsection below.
+
+**Half of what it proves is a grant, which no other probe in this job touches.** A migration that grants `DELETE` by accident installs cleanly, satisfies every constraint in the file, and is wrong in the exact way the founder's amendment exists to prevent. So six assertions `SET LOCAL ROLE merit_dispatcher` and attempt the write: **a catalogue query proves what was written and an attempted write proves what the database will do.**
+
+| # | Assertion | What it proves |
+|---|---|---|
+| **H0** | The two boundary fixtures really are 29 and 28 bytes | Six assertions below read them for their byte counts. A `sealed_minimum()` of 30 would report the floor correct **at 29 and at 30**, passing either way and proving neither: the vacuous-pass shape, pre-empted |
+| **S1** | A contact channel with **no ciphertext at all** | Every row written before `0034`. A `NOT NULL` would have refused them and forced a backfill to invent ciphertext for addresses nobody has |
+| **S2** | A sealed address beside its hash | The shape `OQ-M10-06` asked for |
+| **S2b** | **Exactly 29 bytes is permitted** | The off-by-one guard. `> 29` or `>= 30` refuses the smallest legal envelope and **every rejection in the file still passes**: an error in the STRICT direction is invisible to an inventory of refusals |
+| **S2c** | `identity_phones` sealed at the minimum envelope | **The success case that was missing.** Until it existed, every write this probe made to `phone_ciphertext` was one it expected to be refused, so a guard on that table refusing **everything** passed all thirty-two assertions. Found by a seeded run, not by reading |
+| **S3** | Resealed under a new key id | Rotation, which is the entire reason `UPDATE` survived the amendment |
+| **S5b** | `phone_change_requests` at exactly 29 bytes | The third table's permissive boundary, so all three are pinned to 29 rather than one of them to "somewhere above a telephone number" |
+| **S4** | **Erasure: the three columns clear and the row stays** | **The assertion the amendment rests on.** Withholding `DELETE` is defensible only if erasure is expressible without it |
+| **S4b** | The `value_hash` survived the erasure | An erasure that took the hash would disarm `INV-M16-03` **through the privacy path**, which is the trade this design refuses |
+| **S5pre** | The change request opens with a sealed new number | See the counterfactuals: this was a bare fixture `INSERT` until a seeded run showed why it must be a labelled one |
+| **S5a** | Evidence cited with **no** `prior_notified_at` yet | Why the `CHECK` is one-directional. The two legs do not land in the same instant |
+| **S5** | **The ceremony reaches `applied` with both legs evidenced** | The positive control. A tightening that refuses the legitimate path is worse than the gap it closed |
+| **S6, S7, S8** | `merit_dispatcher` reads a sealed address, rotates it, records a dispatch | `SELECT`, `UPDATE`, `INSERT`: the three verbs the amendment keeps |
+| **R1, R2** | Ciphertext with no key id; a key id of whitespace | An unopenable blob every rotation sweep skips and every reader believes is an address. The blank case is `trading_calendar_revisions.reason`'s argument: an empty string satisfies `NOT NULL` and answers nothing |
+| **R3, R4** | The same `CHECK` on the other two tables | A constraint written three times can be omitted once, and the omission is one missing paragraph in a five-hundred-line file |
+| **R2b, R3a, R4a** | **A plaintext E.164 written into each sealed column** | `INV-M10-12`, which nothing else in `0034` enforces: every one of these columns is `bytea` and every byte string is a valid `bytea`. `R3a` uses the **longest E.164 that can exist** (16 bytes, the ceiling of the whole address space), because any floor low enough to admit an E.164 at all admits that one |
+| **R2a, R3b, R4b** | 28 bytes refused, on all three | A nonce and a tag **with nothing sealed between them**: the envelope of the empty string. Paired with `S2b`/`S2c`/`S5b` this pins each floor to **exactly 29**. Without them a floor of 17 through 28 passes the whole file, which a seeded run demonstrated |
+| **R5** | **`prior_notified_at` claimed with no evidence** | `EC-146` in one statement. This is the write `0029` accepted |
+| **R6** | Claimed on the SMS leg alone | ADR-039 (c) requires both |
+| **R7, R8** | Citing another identity's dispatch; another identity's notification | Named separately because **both raise `check_violation` from one function**, so a handler catching the class could not tell them apart and either half could be deleted with the other still passing |
+| **R9** | **Citing a dispatch attributed to nobody** | The `IS DISTINCT FROM` case. See below |
+| **R10, R11** | Deleting a **cited** notification; a cited dispatch | The founder's note, watched rather than asserted: the retention-sweep collision, in the output of a job that runs on every push |
+| **R12, R13** | `merit_dispatcher` deleting a contact channel; an identity phone | **The amendment.** The assertions that fail the day somebody widens the grant to make an erasure ticket easier |
+| **R14** | `merit_dispatcher` rewriting `value_hash` | The `UPDATE` grant is **column-scoped**, so the send path cannot blank the value `INV-M16-03` matches on without deleting anything |
+| **R15** | `merit_dispatcher` rewriting a dispatch record | `0026` made `integration_dispatches` append-only. The dispatcher must not become the one role that can rewrite the audit trail of what left the building |
+| **R16** | `merit_dispatcher` reading `identity_signals` | `0034` grants five tables by name and adds **no** default privilege, so a table created by a later migration is invisible to the sending path until somebody grants it |
+
+**`R9` is the assertion that would not exist if the trigger had been written the obvious way.** `integration_dispatches.identity_id` is nullable, because `0018` rules that not every dispatch is about a person. `evidence_identity <> NEW.identity_id` yields `NULL` against an unattributed dispatch, `NULL` is not `TRUE`, and **the one check that exists to attribute the evidence would wave through the least attributed row in the table.**
+
+### Eighteen counterfactuals, each watched failing on its own finding
+
+| Seeded schema | Result |
+|---|---|
+| `0034` absent entirely | **`S2` fails**: `column "value_ciphertext" of relation "contact_channels" does not exist`. Two assertions run. The probe cannot pass vacuously against a schema with none of this in it |
+| The identity-match trigger dropped | **`R7` reports the write was ACCEPTED.** Thirteen assertions pass first, which is what makes `R7` the one that owns that half |
+| `phone_change_requests_prior_notice_is_evidenced` dropped | **`R5` fails.** `EC-146`'s remedy, watched being absent |
+| **Table-wide `UPDATE`** instead of column-scoped | **`R14` reports `merit_dispatcher rewrote value_hash`.** Twenty-four assertions pass first: every constraint is intact and the role can disarm the countermeasure anyway |
+| `DELETE` granted to `merit_dispatcher` **after** the `REVOKE` | **`R12` reports `merit_dispatcher DELETED a contact channel`** |
+| `<>` instead of `IS DISTINCT FROM` | **`R9` fails and nothing else does.** Fifteen assertions pass, including `R7` and `R8` |
+| A `CHECK` that **refuses everything** | **`S5pre` fails.** The positive control catching what an inventory of refusals cannot see from inside itself |
+| `0026`'s `ALTER DEFAULT PRIVILEGES` line copied to this role | **`R16` reports `merit_dispatcher read identity_signals`.** Thirty-six assertions pass first |
+| The plaintext floor dropped from `contact_channels` | **`R2a` reports the write was ACCEPTED.** Nine pass first |
+| The plaintext floor dropped from `identity_phones` | **`R3a` reports the write was ACCEPTED.** Thirteen pass first |
+| The plaintext floor dropped from `phone_change_requests` | **`R4a` reports the write was ACCEPTED.** Seventeen pass first |
+| The floor written `>= 30` (or `> 29`), the off-by-one **in the strict direction** | **`S2b` fails**, and on the other two tables `S2c` and `S5b` do. Every rejection in the file still passes: only a success case can see this |
+| The floor written `>= 17`: above every E.164, below the envelope | **`R3b` and `R4b` report the write was ACCEPTED.** Before they existed **nothing failed and all 33 assertions passed**, which is what added them |
+| A floor that **refuses everything**, per table | `S2` on `contact_channels`, **`S2c` on `identity_phones`**, `S5pre` on `phone_change_requests`. The middle one had no success case at all until this run |
+| A fixture helper returning 30 bytes instead of 29 | **`H0` fails** before any assertion rests on it |
+
+### The `REVOKE` was described as decoration, and the seeded run proved otherwise
+
+**The ninth counterfactual is the one that changed the file.** The trailing `REVOKE DELETE ... FROM merit_dispatcher` was written with a comment calling it "a statement rather than a mechanism", on the reasoning that nothing above it grants `DELETE`, so it revokes a privilege the role does not hold and changes no catalogue row.
+
+**Then the seed added `DELETE` to the grant list above it and the probe still passed, all twenty-seven assertions it carried at the time.** The `REVOKE` had already taken it back. **A privilege granted earlier in this file cannot survive to `COMMIT`**, which makes it a real control against the likeliest mistake: an absent-minded verb added to a grant list somebody was already editing. The comment now says that, and the seed was rewritten to add the grant **after** the `REVOKE`, which is how the defect actually arrives, and `R12` catches that one.
+
+**This is the third time in three days that a claim written into a comment was wrong in the direction of understating a control, and the second time execution rather than review found it.** The rule it argues for is not "write more careful comments". It is that a seeded violation is worth running even when you are confident you know what it will say.
+
+### The plaintext floor, which is `INV-M10-12` becoming a constraint
+
+**Founder ruling, 2026-08-16, at the same sitting that approved the redesign.** `0034` gained `CHECK (octet_length(<col>) >= 29)` on each of the three sealed columns, guarded so it applies only when the column is not null. `ADR-046` carries the ruling and the reasoning; what belongs here is what it costs and what it does not reach.
+
+**Every sealed column is `bytea` and every byte string is a valid `bytea`.** A handler that skipped the seal and wrote the address itself satisfied the completeness `CHECK`, the uniqueness indexes and the foreign keys. Nothing objected, the row read as sealed to every catalogue query, and the defect would have surfaced at **decrypt** time with the address in the clear at rest in the meantime. `INV-M10-12` says plaintext lives in a request body and never at rest; before this it was a promise the schema made and could not keep.
+
+**29 is a 12-byte nonce, a 16-byte GCM tag and one byte of ciphertext.** A raw E.164 is at most 16 bytes, so the entire telephone-number address space sits below the floor. **The reach is stated exactly rather than rounded up**: `contact_channels.kind` is `('email','push','sms')`, so a plaintext email of 29 bytes or more clears it. Total for telephone numbers, partial on that one table for the other two kinds, total on `identity_phones` and `phone_change_requests`.
+
+**It is a separate constraint rather than a clause inside `*_ciphertext_is_complete`, and the reason is the paragraph below this one.** Two constraints on one column mean a write can violate both, and PostgreSQL reports one of them in an order it does not document. **That is not a hypothetical here: it is the defect this same section recorded one day earlier**, and the three fixtures that name the completeness `CHECK` were rewritten from `'\xaa'` to a 44-byte envelope so that each violates exactly the constraint it names.
+
+### `OI-07` a third time, caught before the merge instead of a day after it
+
+**`probe_reversible_contact_addresses.sql` was wired into `corpus.yml` and never added to `CI-06h`'s required-needle list**, which is the identical omission `probe_payout_hold.sql` made and which left that file one `git rm` from being `OI-07` again for a day. It is pinned now, and the pin was watched failing: deleting the workflow step makes `CI-06h` report `ADR-046's sealed addresses, plaintext floor and dispatcher grants are no longer probed`.
+
+**Wiring a probe and pinning it are two edits in two files, and only the second makes the first permanent.** Three occurrences is a pattern rather than a slip, and the shape of the fix is a gate that reads `corpus.yml` and asserts that every `scripts/db/probe_*.sql` on disk is both run and pinned. **No gate is claimed here**, because a gate arrives with a `CI-06` letter and a seeded violation, and this one needs neither `0034` nor the founder's read to land first.
+
+### A guard that refused everything on `identity_phones` passed all thirty-two assertions
+
+**And that is this file's own stated defence, failing on the table it was not looking at.** The probe leads with success cases precisely because an inventory of refusals passes against a guard that rejects everything. But every write it made to `identity_phones.phone_ciphertext` was one it expected to be **refused**: `R3` and `R3a` are both rejections and no assertion ever sealed an identity phone successfully. A `CHECK` on that table reading `phone_ciphertext IS NULL` therefore passed the entire file and reported nothing.
+
+**A seeded run found it, not a reading**, which is the second time in two days that executing a counterfactual corrected a claim this corpus had already written down. `S2c` is the missing success, it seals at the minimum legal envelope so it pins the floor's permissive side at the same time, and it is what fails now when that table's guard refuses everything.
+
+**It also moved an assertion that was resting on an absence.** `R3` set `phone_ciphertext` and `phone_key_id` and relied on `phone_encrypted_at` being **unset** to violate the completeness `CHECK`. With `S2c` sealing the row first, the omitted column would have inherited `S2c`'s timestamp and `R3` would have reported the write accepted. It clears the column explicitly now: **an assertion that depends on a column being unset is an assertion one earlier fixture can silently disarm.**
+
+### `0034` broke a probe written before it, and CI is what said so
+
+**`probe_phone_identity.sql`'s `S6` applies a phone change with all three D4 controls and a running hold, and it sets `prior_notified_at` because that is what (c) required in `0029`.** After `0034` that write cites no evidence, `phone_change_requests_prior_notice_is_evidenced` refuses it, and the probe fails. **It failed on CI and not locally**, because this session ran its own probe against the new schema and not the other five.
+
+**The fix is not a loosening and the distinction matters.** `S6` is the positive control for the legitimate path, and ADR-046 made the legitimate path **narrower**: an application now has to produce two artifacts it previously did not need. `S6` produces them. `R7`, which applies with no notification at all, is untouched and still rejects.
+
+**And it exposed two assertions that were resting on an undocumented detail.** `R6` (no dual-channel verification) and `R8` (an expired hold) each set `prior_notified_at` while violating `phone_change_requests_applied_is_complete`, so after `0034` they violate **two** constraints at once and PostgreSQL reports one of them in an order it does not document. Both happened to report the one they name. Given the evidence rows they now violate exactly one, and each asserts the constraint it names rather than the constraint the planner reached first.
+
+**The transferable rule: run every probe, not the new one.** The probe suite is a single body of evidence about one schema, and a migration that changes a shared table changes what every probe touching it is asserting.
+
+### What `0034` does not do
+
+**It does not touch `otp_challenges`.** An OTP is challenge-response: the trader types the number into the request, so the address is held by the request and is deliverable today. `destination_hash` stays one-way. The exposed class is every message **Merit itself initiates**.
+
+**It does not prove the notice was addressed to the prior number.** `integration_dispatches` records `fields_sent` and never values (`INV-M10-03`), so no column anywhere holds a dispatch's destination, and adding one would make the audit record of a disclosure into a second copy of the thing disclosed. `GS-265`'s wording is "addressed to the prior channel" and the database can assert the citation and the identity, not the address.
+
+**It does not scope `merit_app`'s read.** PostgreSQL cannot subtract a column from a table-level `SELECT`, and the alternative is a hand-maintained column list. The key is the control; the sidecar table that would make the grant the control is named in [ADR-046](../../docs/decisions/ADR-046.md) and is not built here.
+
+**It does not backfill.** Every row written before `0034` has a hash and no ciphertext, and sealing one requires the plaintext, which for a **prior** address Merit does not have. **The backfill is forward-only by construction** and the addresses already lost stay lost.
+
+**And there is no gate.** `CI-06h`'s job runs the probe, which proves this schema. Nothing asserts that the **next** table carrying an address hash arrives with a sendable sibling, or that a later migration has not granted `DELETE` to this role. Both are checkable and neither is claimed here, because a gate arrives with a `CI-06` letter and a seeded violation it has been watched failing on.
