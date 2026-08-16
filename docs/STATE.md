@@ -29,8 +29,8 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->48<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->48<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->49<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->49<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -413,7 +413,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 | # | Ruling |
 |---|---|
-| **[ADR-046](decisions/ADR-046.md)** | **`CalendarSlice` is a VALUE, not an interface.** The three purity mechanisms cannot see an interface whose implementation reads a database: it is a capability, and a caller could satisfy it with a live query while every mechanism stayed green. A value has no behavior to smuggle. A **fourth** mechanism, a no-function-valued-property compile assertion, lands beside `PlanConfigVersionIsClosed`. **A lookup miss is a typed refusal into `DayOutput.assertions`**, never a throw and never a null |
+| **[ADR-049](decisions/ADR-049.md)** | **`CalendarSlice` is a VALUE, not an interface.** The three purity mechanisms cannot see an interface whose implementation reads a database: it is a capability, and a caller could satisfy it with a live query while every mechanism stayed green. A value has no behavior to smuggle. A **fourth** mechanism, a no-function-valued-property compile assertion, lands beside `PlanConfigVersionIsClosed`. **A lookup miss is a typed refusal into `DayOutput.assertions`**, never a throw and never a null |
 | **[ADR-047](decisions/ADR-047.md)** | **The calendar revision is the engine's second version-like input**, and Appendix B.4's protocol governs it unamended. **`0034` is claimed and unwritten**: money path, its own session. Until it lands, a calendar correction is still the 5,000-page event, which is a stated exposure rather than a solved one |
 | **[ADR-048](decisions/ADR-048.md)** | **CI-03's polarity is derived per fixture** from the rules it cites, so the stage does not go red for the rest of P2 the moment rule one lands. **It carries a prerequisite**: the resolvable-citation `L-nn` rule lands first, because a fixture citing nothing makes the polarity test vacuously true |
 | **`OQ-P2-04`** | **Closed both ways.** P2's done-condition names **seven** properties; `PT-03` moves to P3 whole; **the R-44 arithmetic is P2's under its own name** |

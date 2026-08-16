@@ -165,7 +165,7 @@ Four items, each blocking, none an engineering call.
 
 | # | Item | Form |
 |---|---|---|
-| **OQ-P2-01** | `CalendarSlice` as a value, its coverage interval, and a miss returning an assertion. Widens `DayInput` in an approved document | **CLOSED**, [ADR-046](../decisions/ADR-046.md) |
+| **OQ-P2-01** | `CalendarSlice` as a value, its coverage interval, and a miss returning an assertion. Widens `DayInput` in an approved document | **CLOSED**, [ADR-049](../decisions/ADR-049.md) |
 | **OQ-P2-02** | The calendar revision on `rule_states`, and Appendix B.4's protocol extended to it | **CLOSED**, [ADR-047](../decisions/ADR-047.md). **`0034` is claimed and unwritten**: the migration is money path and takes its own session |
 | **OQ-P2-03** | Per-fixture polarity derived from the declared rule set. It changes what a green CI-03 means, which is what [ADR-038](../decisions/ADR-038.md) exists to keep honest | **CLOSED**, [ADR-048](../decisions/ADR-048.md). **It carries a stated prerequisite**: section 2's resolvable-citation `L-nn` rule lands before or with it, because a fixture citing nothing makes the polarity test **vacuously true** |
 | **OQ-P2-04** | PT-03's status in P2's done-condition | **CLOSED** (2026-08-16), section 5. The done-condition names **seven**; `PT-03` moves to P3 whole; the R-44 arithmetic half is P2's under its own name |

@@ -203,7 +203,7 @@ describe('the support reaches the cases the engine rules are about', () => {
     expect(seen.gapOfOne).toBeGreaterThan(0);
   });
 
-  test('ADR-046: coverage is sometimes wider than the sessions and sometimes exact', () => {
+  test('ADR-049: coverage is sometimes wider than the sessions and sometimes exact', () => {
     // The wider case is the one the ruling turns on: a day inside coverage and
     // absent from the session list is positively NOT a trading day, while the
     // same day outside coverage is UNKNOWN.
@@ -291,7 +291,7 @@ describe('direction 2: each rule removed is watched being violated', () => {
   // run, so the shape is asserted directly, per rule, and names itself.
   const PRECONDITIONS: ReadonlyArray<readonly [DsRuleId, (s: DaySequence) => boolean, string]> = [
     [
-      'ADR-046/inside-coverage',
+      'ADR-049/inside-coverage',
       (s) => s.calendar.days.length >= 2,
       'two sessions, so one can fall outside the interval',
     ],
@@ -356,7 +356,7 @@ describe('direction 2: each rule removed is watched being violated', () => {
     // and an eighth added to one and not the other fails here by name rather
     // than surfacing later as an unexplained flake.
     const FORCED_MINIMUM: readonly DsRuleId[] = [
-      'ADR-046/inside-coverage',
+      'ADR-049/inside-coverage',
       'R-02/calendar-is-ordered',
       'R-02/sequence-is-dense',
       'DO-1/day-is-a-session',

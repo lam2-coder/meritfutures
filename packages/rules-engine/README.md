@@ -95,5 +95,5 @@ first one forever.
 **Neither generator is engine code and neither is blocked on the calendar
 transcription.** `day-sequence.ts` emits arbitrary calendars rather than the
 CME's, and it emits the INPUT to `CalendarSlice`'s constructor rather than the
-slice, because [ADR-046](../../docs/decisions/ADR-046.md) puts that constructor
+slice, because [ADR-049](../../docs/decisions/ADR-049.md) puts that constructor
 in `calendar.ts` and `src/` is still the identity stub.

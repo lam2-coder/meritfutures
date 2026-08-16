@@ -21,7 +21,7 @@
 // `validate-plan.ts` could key its rules by `CV-nn` because M01 ships a CV
 // table. There is no equivalent table for the shape of a day sequence: the
 // constraints live in M01's invariant list, in M01's DO-1 preconditions, in the
-// rule taxonomy, in an approved edge case, in ADR-046 and in four named `CHECK`
+// rule taxonomy, in an approved edge case, in ADR-049 and in four named `CHECK`
 // constraints on `daily_marks`.
 //
 // So the rule id IS the primary source, spelled the way that source spells it,
@@ -49,8 +49,8 @@
 import type { CalendarDay, DailyMark, DaySequence } from './day-input.js';
 
 export type DsRuleId =
-  // ADR-046: the coverage interval the slice declares.
-  | 'ADR-046/inside-coverage'
+  // ADR-049: the coverage interval the slice declares.
+  | 'ADR-049/inside-coverage'
   // M01 R-02 and `CalendarDay.sequence`.
   | 'R-02/calendar-is-ordered'
   | 'R-02/sequence-is-dense'
@@ -75,7 +75,7 @@ export type DsRuleId =
 
 /** Every rule id, in order, so a caller can iterate the contract rather than retype it. */
 export const DS_RULE_IDS: readonly DsRuleId[] = [
-  'ADR-046/inside-coverage',
+  'ADR-049/inside-coverage',
   'R-02/calendar-is-ordered',
   'R-02/sequence-is-dense',
   'DO-1/day-is-a-session',
@@ -103,12 +103,12 @@ export const DS_RULE_IDS: readonly DsRuleId[] = [
  * fall behind the thing it cites is the defect ADR-034 exists to end.
  */
 export const DS_RULE_SOURCES: Record<DsRuleId, string> = {
-  'ADR-046/inside-coverage':
-    'ADR-046: the slice carries "a declared coverage interval"; a day outside it is ' +
+  'ADR-049/inside-coverage':
+    'ADR-049: the slice carries "a declared coverage interval"; a day outside it is ' +
     'UNKNOWN rather than not-a-trading-day (ADR-042 F-4, 0032). The golden loader ' +
     'enforces the same shape on the fixture calendar as L-08.',
   'R-02/calendar-is-ordered':
-    'ADR-046: "a frozen ORDERED array of CalendarDay". M01 section 2.1 makes ' +
+    'ADR-049: "a frozen ORDERED array of CalendarDay". M01 section 2.1 makes ' +
     '`sequence` a dense index into that order.',
   'R-02/sequence-is-dense':
     'M01 section 2.1: `sequence` is a "dense index into the calendar; gap counting ' +
@@ -219,12 +219,12 @@ function checkCalendar(
   for (let i = 0; i < days.length; i++) {
     const day = days[i]!;
 
-    // ADR-046/inside-coverage. A session the calendar declares and its own
+    // ADR-049/inside-coverage. A session the calendar declares and its own
     // coverage disowns makes the coverage interval meaningless: every lookup
     // for that day would be a refusal against a day the same file lists.
     if (day.tradingDay < from || day.tradingDay > to) {
       out.push({
-        id: 'ADR-046/inside-coverage',
+        id: 'ADR-049/inside-coverage',
         path: `calendar.days[${i}].tradingDay`,
         detail: `session ${day.tradingDay} is outside the declared coverage ${from}..${to}`,
       });
