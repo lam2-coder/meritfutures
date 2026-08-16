@@ -1,0 +1,42 @@
+# GS-013  Low exactly at the floor survives
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   floor breach  `low_balance_cents < floorOpenCents` (strict `<`, touching
+#   the floor is not a breach)                                M01 R-21
+#   floor at account open = size_cents - drawdown_cents       M01 R-12
+#   4,750,000 = 5,000,000 - 250,000                           M01 Appendix A.1 at 50K
+#   "`4,750,000 < 4,750,000` is false. This is the auto-liquidation setpoint
+#   ruling"                                                   GOLDEN_SCENARIOS GS-013 row
+#   "A clean liquidation lands exactly on the floor and survives; slippage
+#   below it breaches"                                        M01 R-20
+#
+# THE LOW IS THE FLOOR TO THE CENT, WHICH IS THE SCENARIO. R-20 pushes the
+# floor to the platform as the auto-liquidation setpoint, so this is not a
+# contrived boundary: it is the value the liquidation is aimed at, and the
+# strict `<` is what decides whether a trader who was liquidated cleanly still
+# has an account. GS-014 is this file with one cent of slippage.
+#
+# THE DAY IS A LOSING DAY THAT DOES NOT MOVE THE FLOOR. Its close of 4,990,000c
+# is below the high-water balance an account opens with, so R-13's `max` leaves
+# the floor where R-12 put it and the surviving floor is the same 4,750,000c
+# the breach was tested against.
+id: GS-013
+name: low exactly at the floor survives
+source: M01 R-12, R-21
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 4990000
+    high_balance_cents: 5005000
+    low_balance_cents: 4750000
+    realized_pnl_cents: -10000
+    fill_count: 2
+    traded_day: true
+settlements: []

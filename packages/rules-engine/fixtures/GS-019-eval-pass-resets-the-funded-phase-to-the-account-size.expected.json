@@ -1,0 +1,16 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 5000000,
+    "high_water_balance_cents": 5000000,
+    "floor_cents": 4750000,
+    "traded_days_count": 0,
+    "win_days_count": 0,
+    "consistency_best_day_cents": 0,
+    "consistency_period_profit_cents": 0,
+    "consistency_period_start_day": "2026-11-04"
+  },
+  "events": ["rule.floor_locked", "phase.passed", "day.closed"],
+  "pins": "the funded phase begins at the account size with every counter at zero, and 400,000c of eval profit is not carried into it",
+  "note": "EVERY FIELD R-31 NAMES IS STATED, because this is the scenario whose whole subject is the set of things the reset touches. The period start day is the next trading day after the pass day, read off the fixture calendar rather than computed by adding one to a date. `floor_locked` is not pinned for the reason GS-017 gives: the lock engages at DO-7 and the reset rewrites the floor at DO-8, and no document says what the flag does across that boundary. WORTH NAMING WHILE THE VALUES ARE FRESH: the pinned floor of 4,750,000 is LOWER than the floor this day held moments earlier, which reads against INV-06's `the floor never decreases, no exception, no phase qualifier`. R-12 sanctions it in its own words, `at account open, and again at the funded reset with the funded drawdown`, and the registry row states 4,750,000 outright, so the expectation follows both. The tension is between INV-06's phrasing and R-12's second clause, it is a defect in a frozen document if it is one, and it is recorded here rather than resolved here."
+}

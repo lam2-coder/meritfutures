@@ -1,0 +1,10 @@
+{
+  "end_state": {
+    "trading_day": "2026-11-04",
+    "traded_days_count": 1,
+    "win_days_count": 1
+  },
+  "events": ["day.closed", "day.closed"],
+  "pins": "a trading day with no fills still closes and still advances the state's trading day, and the traded-day count does not move with it",
+  "note": "THE PIN IS THE PAIR, not either field alone. `trading_day` reaching 2026-11-04 says the second day was evaluated; `traded_days_count` holding at 1 says R-08's strict `>` refused to count it. An engine that skipped the day entirely satisfies the second and fails the first. The win-day count is stated for the same reason and traced the same way: 30,000 >= 15,000 counts the first day under R-09 and 0 >= 15,000 does not count the second, so the count that stops at 1 is a second measurement of the same fact rather than a restatement of it. R-02's own arithmetic, `calendar.sequence` subtraction, reaches no field this format can carry; the fixture cites it because the registry row does and because the sequence-subtracted counters are what the row is about."
+}

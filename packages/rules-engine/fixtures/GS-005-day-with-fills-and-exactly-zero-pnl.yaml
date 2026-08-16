@@ -1,0 +1,38 @@
+# GS-005  Day with fills and exactly zero P&L
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   traded day  `fill_count > 0`, strict `>`                  M01 R-08
+#   win day     `realized_pnl_cents >= win_day_floor_cents`   M01 R-09
+#   win day floor 15,000c at 50K, 30bp                        M01 Appendix A.1
+#   "`traded_day = true`, `win_day = false`. The `>` on fill count and the `>=`
+#   on the win floor are different operators and both are asserted"
+#                                                             GOLDEN_SCENARIOS GS-005 row
+#
+# ZERO IS THE ONLY VALUE THAT SEPARATES THE TWO OPERATORS ON ONE DAY. Four
+# fills make `4 > 0` true and 0 P&L makes `0 >= 15,000` false, so an engine that
+# had copied either operator onto the other rule fails here: `4 >= 0` and
+# `0 > 0` each flip exactly one of the two counters.
+#
+# THE INTRADAY RANGE IS REAL AND THE DAY STILL NETS ZERO, which is what a day of
+# fills that close flat looks like. The low sits far above the floor at open of
+# 4,750,000c so R-21 cannot reach the outcome.
+id: GS-005
+name: day with fills and exactly zero P&L
+source: M01 R-08, R-09
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5000000
+    high_balance_cents: 5010000
+    low_balance_cents: 4990000
+    realized_pnl_cents: 0
+    fill_count: 4
+    traded_day: true
+settlements: []

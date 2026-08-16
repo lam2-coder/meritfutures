@@ -1,0 +1,13 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "floor_cents": 5010000,
+    "floor_locked": true,
+    "high_water_balance_cents": 5260000,
+    "balance_cents": 5400000,
+    "breached": false
+  },
+  "events": ["rule.floor_locked", "day.closed", "day.closed"],
+  "pins": "after the lock the high-water balance is frozen and the floor is immutable, so a later closing high raises the balance and nothing else",
+  "note": "THE FROZEN HIGH-WATER BALANCE IS THE FIELD THAT CATCHES A HALF-IMPLEMENTED LOCK. An engine that stopped moving the floor but kept updating `hwb` reports 5,400,000 here and still shows the right floor, and it would then move the floor the moment the lock condition was ever re-tested. The three events are day one's lock and close and day two's close: the lock fires once, which is what `permanently` means in R-15."
+}

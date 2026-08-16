@@ -1,0 +1,36 @@
+# GS-025  Withdrawable is balance minus size minus buffer, floored at zero
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   `withdrawable = max(0, balance_cents - size_cents - buffer_cents)`. The
+#   buffer is permanent and is never withdrawable                M01 R-35
+#   `withdrawable_cents >= 0` always                             M01 INV-05
+#   buffer  100,000c at 50K, 200bp                               M01 Appendix A.1
+#   "Balance below `size + buffer` yields exactly 0, never a negative"
+#                                                                GOLDEN_SCENARIOS GS-025 row
+#
+# THE BALANCE IS INSIDE THE BUFFER BY 10,000c AND THAT IS THE SCENARIO.
+# 5,090,000 - 5,000,000 - 100,000 is -10,000, so the account is profitable and
+# has nothing withdrawable, and the field that reports it must be 0 rather than
+# the negative the subtraction produces. A trader who has made 90,000c and can
+# withdraw none of it is the case the buffer exists to create, and R-35's `max`
+# is the only thing standing between that and a negative money field.
+id: GS-025
+name: withdrawable is balance minus size minus buffer, floored at zero
+source: M01 R-35
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5090000
+    high_balance_cents: 5095000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 90000
+    fill_count: 3
+    traded_day: true
+settlements: []

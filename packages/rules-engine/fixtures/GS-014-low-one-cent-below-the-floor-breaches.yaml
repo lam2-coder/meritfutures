@@ -1,0 +1,33 @@
+# GS-014  Low one cent below the floor breaches
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   floor breach  `low_balance_cents < floorOpenCents`, strict `<`  M01 R-21
+#   floor at account open = size_cents - drawdown_cents             M01 R-12
+#   4,750,000 = 5,000,000 - 250,000                                 M01 Appendix A.1 at 50K
+#   "`4,749,999 < 4,750,000` is true"                               GOLDEN_SCENARIOS GS-014 row
+#   "Breach is terminal and immediate. Phase to `closed`, no further state is
+#   ever written for the account"                                   M01 R-24
+#
+# ONE CENT IS THE ONLY DIFFERENCE FROM GS-013. Every other measurement is
+# identical, so the pair is the operator and nothing else. A reader diffing the
+# two files sees `low_balance_cents` and no other input change.
+id: GS-014
+name: low one cent below the floor breaches
+source: M01 R-21, R-24
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 4990000
+    high_balance_cents: 5005000
+    low_balance_cents: 4749999
+    realized_pnl_cents: -10000
+    fill_count: 2
+    traded_day: true
+settlements: []

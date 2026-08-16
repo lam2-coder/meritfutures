@@ -1,0 +1,32 @@
+# GS-007  Win day one cent below the floor does not count
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   win day  `realized_pnl_cents >= win_day_floor_cents`      M01 R-09
+#   win day floor 15,000c at 50K, 30bp                        M01 Appendix A.1
+#   "`14999 >= 15000` is false. The pair GS-006 and GS-007 is the published
+#   boundary"                                                 GOLDEN_SCENARIOS GS-007 row
+#
+# ONE CENT IS THE ONLY DIFFERENCE FROM GS-006, and the closing balance moves
+# with it because INV-19 makes closing the opening plus the realized P&L. The
+# fill count, the high, the low and the opening balance are deliberately
+# identical, so the pair isolates the operator and nothing else.
+id: GS-007
+name: win day one cent below the floor does not count
+source: M01 R-09
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5014999
+    high_balance_cents: 5020000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 14999
+    fill_count: 2
+    traded_day: true
+settlements: []
