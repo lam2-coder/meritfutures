@@ -956,8 +956,8 @@ const ci06h = {
     'migration filenames number 1..n with no duplicates, every number on disk is ' +
     'claimed by a row of the migration allocation table in DECISIONS.md, every ' +
     'hole matches a reservation, and the corpus workflow still carries the ' +
-    'ON_ERROR_STOP apply, the must-fail re-apply, the database-derived counts ' +
-    'and both database probes. ' +
+    'ON_ERROR_STOP apply, the must-fail re-apply, the database-derived counts, ' +
+    'the whole-schema NO-FLOATS assertion and all four database probes. ' +
     'TWO THINGS IT DOES NOT DO. The install itself needs a live PostgreSQL and ' +
     'runs in CI, so a green result here is NOT a claim that the set installs. And ' +
     'the cross-branch half, that a pull request may not claim a number already on ' +
@@ -1017,6 +1017,30 @@ const ci06h = {
       [
         'probe_plan_version_immutability.sql',
         "ADR-035's plan-version immutability probe is no longer run",
+      ],
+      // OI-07 CLOSES BY BEING PINNED HERE, NOT BY THE FILE EXISTING. A probe
+      // that ships beside a fix and never runs again is the same object as the
+      // golden test that was missing, and an unpinned step is one delete away
+      // from exactly that. probe_payout_hold.sql was wired into the workflow on
+      // 2026-08-16 and never added to this list, so it has been deletable
+      // without a gate noticing since the day it landed; it is pinned now for
+      // the same reason as the other two.
+      [
+        'probe_payout_hold.sql',
+        "ADR-040 and ADR-041's payout hold and restriction probe is no longer run",
+      ],
+      [
+        'probe_phone_identity.sql',
+        "ADR-039's phone identity and auth probe is no longer run (OI-07)",
+      ],
+      // OI-08. The NO-FLOATS assertion lived inside 0027 and could only ever
+      // see 0001-0027, so five migrations sat outside the guard the corpus
+      // believed protected every money column. It runs in the install job now,
+      // where it is positionally last by construction; unpinned, it could be
+      // moved back to a position that reads a prefix of the schema.
+      [
+        'assert_no_floats.sql',
+        'the NO-FLOATS assertion no longer runs over the whole applied schema (OI-08)',
       ],
     ];
     for (const [needle, why] of required) {
