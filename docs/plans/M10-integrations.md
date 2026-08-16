@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M12-transparency-platform.md, M15-discord-integration.md, M16-notification-center.md]
-last_updated: 2026-08-14
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M03-billing-checkout.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M12-transparency-platform.md, M15-discord-integration.md, M16-notification-center.md, M19-kyc-identity.md]
+last_updated: 2026-08-16
 ---
 
 # M10: Integrations
@@ -10,7 +10,9 @@ Constitution section M10 ("buy, wire, don't build"), Appendix B5 ten-section tem
 
 One sentence governs this module: **every integration is a copy of some part of Merit held by somebody else, and the design question is never what the vendor can do for us but what leaves the building to make it possible.**
 
-The constitution's instruction is to buy rather than build, and that instruction is correct. What it does not say, and what this plan exists to say, is that each purchase creates a **second custodian** of data whose first custodian is held to [SECURITY](../architecture/SECURITY.md)'s full control catalogue. Five vendors is five more places a breach can start and five more places Merit's own numbers can be quoted from.
+The constitution's instruction is to buy rather than build, and that instruction is correct. What it does not say, and what this plan exists to say, is that each purchase creates a **second custodian** of data whose first custodian is held to [SECURITY](../architecture/SECURITY.md)'s full control catalogue. Six vendors is six more places a breach can start and six more places Merit's own numbers can be quoted from.
+
+**Amended by [ADR-039](../decisions/ADR-039.md) (FOLD-01 session 5, 2026-08-16), and the amendment breaks this module's oldest assumption.** A sixth integration is added, the SMS sender (IN-M10-06), and it is **not like the other five**: phone verification is mandatory at registration, so for the first time a bought vendor sits on the critical path of something a trader is trying to do. INV-M10-01's list does not name registration, which is not an exemption but an omission of a flow that did not exist when the list was written. **Section 7.9 carries the sixth integration, the registration lookup's egress, and two findings that were surfaced rather than closed**, per this corpus's standing preference for a named gap over a quiet assumption.
 
 **Identifier conventions:** `INV-M10-nn` invariants, `SD-M10-nn` schema deltas, `IN-M10-nn` integrations, `FM-M10-nn` failure modes, `AS-M10-nn` adversarial scenarios, `OQ-M10-nn` open questions, `DEP-M10-nn` dependencies.
 
@@ -20,7 +22,7 @@ The constitution's instruction is to buy rather than build, and that instruction
 
 ### 1.1 What this module is
 
-The wiring layer between Merit's event stream and five bought services, plus the egress discipline that governs all of them.
+The wiring layer between Merit's event stream and six bought services, plus the egress discipline that governs all of them.
 
 | ID | Integration | Direction | What crosses the boundary |
 |---|---|---|---|
@@ -29,8 +31,9 @@ The wiring layer between Merit's event stream and five bought services, plus the
 | IN-M10-03 | **Loops or Customer.io**, lifecycle messaging | Outbound events | The nine [EVENTS section 11](../architecture/EVENTS.md) triggers, with suppression guards, and the minimum payload each needs |
 | IN-M10-04 | **Sentry, uptime monitoring, status page** | Outbound errors and probes | Stack traces, request context, and release metadata, after scrubbing (AS-M10-04) |
 | IN-M10-05 | **Discord internal alerting** | Outbound webhook | Liability, CUSUM, reconciliation, and MID health alerts. **Internal operations only**, distinct from [M15](M15-discord-integration.md)'s community integration |
+| IN-M10-06 | **SMS sender** ([ADR-039](../decisions/ADR-039.md)) | Outbound API, synchronous at registration | **A telephone number and a one-time code.** The only integration on the critical path of anything, and the only one that carries an identity-grade identifier in plaintext. Section 7.9 |
 
-**The shared spine, which is the actual deliverable.** Every one of the five is wired through a single **outbound integration bus**: one dispatcher reading the `events` table, one egress allowlist, one redaction pass, one retry and dead-letter discipline, one audit record of what was sent where. Five bespoke webhook callers scattered through the codebase would be five different answers to "what did we tell that vendor about this trader", and that question has to have one answer.
+**The shared spine, which is the actual deliverable.** Every one of the six is wired through a single **outbound integration bus**: one dispatcher reading the `events` table, one egress allowlist, one redaction pass, one retry and dead-letter discipline, one audit record of what was sent where. Five bespoke webhook callers scattered through the codebase would be five different answers to "what did we tell that vendor about this trader", and that question has to have one answer.
 
 ### 1.2 What this module is not
 
@@ -47,7 +50,8 @@ The wiring layer between Merit's event stream and five bought services, plus the
 
 | ID | Invariant | Enforcement |
 |---|---|---|
-| INV-M10-01 | **No vendor is ever on the critical path of a purchase, a provisioning, a rule evaluation, or a payout** | Every outbound dispatch is asynchronous, enqueued through pg-boss ([ADR-006](../decisions/ADR-006.md)) after the transaction that caused it commits. A vendor outage produces a delayed message and never a failed sale or a delayed payout (AS-M10-06) |
+| INV-M10-01 | **No vendor is ever on the critical path of a purchase, a provisioning, a rule evaluation, or a payout** | Every outbound dispatch is asynchronous, enqueued through pg-boss ([ADR-006](../decisions/ADR-006.md)) after the transaction that caused it commits. A vendor outage produces a delayed message and never a failed sale or a delayed payout (AS-M10-06). **The claim is unchanged and its four-item list is now load bearing rather than illustrative**: [ADR-039](../decisions/ADR-039.md) puts IN-M10-06 on the critical path of **registration**, which this list does not name and never did. Section 7.9 states that plainly rather than widening the list to cover it, because widening it would be asserting a protection that does not exist |
+| INV-M10-12 | A telephone number exists in plaintext **in a request body and never at rest**, on either side of the boundary | `identity_phones.phone_hash`, `contact_channels.value_hash` and `otp_challenges.destination_hash` are all one-way ([`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql), [`0019`](../../packages/db/migrations/0019_notifications_and_community.sql)), and `integration_dispatches.fields_sent` records **field names rather than values** (SD-M10-02), so the audit trail of a number's disclosure never becomes a second copy of the number. This is C-13's hashed-signal discipline extended to the one identifier that a vendor cannot do its job without receiving, and section 7.9 records what it costs |
 | INV-M10-02 | Every outbound payload passes one redaction pass, and the allowlist is per integration and per field | SD-M10-01's `integration_contracts`. Not a denylist. A field added to an event next year is **not** sent to any vendor until somebody adds it to that vendor's contract (AS-M10-04) |
 | INV-M10-03 | Every dispatch writes an audit row: which vendor, which event, which fields, when, and the response | SD-M10-02 `integration_dispatches`. "What did we tell that vendor about this trader" is a query, answerable during a privacy request or a vendor breach |
 | INV-M10-04 | No document, no biometric, no PAN, no full device fingerprint, and no raw IP leaves Merit through any integration | [SECURITY](../architecture/SECURITY.md) C-13 extended to egress. The contract allowlists make it structural rather than a review item |
@@ -138,7 +142,9 @@ stateDiagram-v2
     end note
 ```
 
-Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `passkeys`, `sessions`, `otp_challenges`, `idempotency_keys`, and the raw ingest tables. Excluded at column level: every name, email, and destination reference. What remains is enough for cohort funnels, LTV and CAC, and payout health, and is not enough to identify a person (INV-M10-06).
+Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `passkeys`, `sessions`, `otp_challenges`, `idempotency_keys`, **`identity_phones`, `phone_change_requests`, `contact_channels`**, and the raw ingest tables. Excluded at column level: every name, email, and destination reference. What remains is enough for cohort funnels, LTV and CAC, and payout health, and is not enough to identify a person (INV-M10-06).
+
+**The three tables [`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql) and [`0019`](../../packages/db/migrations/0019_notifications_and_community.sql) added to that list are excluded on the same reasoning as `identity_signals`, and one of them needs its reasoning said out loud.** `identity_phones` is the identity graph's newest and highest-weight node ([ADR-022](../decisions/ADR-022.md), [ADR-039](../decisions/ADR-039.md) (b)), and its carrier columns are the most re-identifying non-PII in the estate: carrier plus country plus line type plus a portability date is a small enough bucket that it identifies a person in a cohort of a few hundred without holding a single hashed value. **A hash is not an exclusion criterion and never was**, which is why this list names tables rather than trusting the column-level pass. **`otp_send_budget` is excluded at column level rather than entirely, and the column is `scope_key`.** The breaker's own behavior is exactly what the founder should be able to chart: spend, sends, the trip, the degraded window and `deferred_registrations` are all figures [ADR-039](../decisions/ADR-039.md) requires somebody to watch, and putting them behind the admin console only would make the reported figure the one nobody charts. But `scope_key` is polymorphic by `scope_kind`: `encode(phone_hash,'hex')` for `phone`, the alpha-2 for `country`, the literal `global`, **and the raw address for `ip`**. One column, four meanings, one of which is PII, so the column goes and the counts stay. **A column-level exclusion driven by a sibling column's value cannot be reasoned about at replication time**, which is why the whole column is dropped rather than the `ip` rows, and it is worth noticing that this shape appears the moment a table stores a key whose type is a value.
 
 ---
 
@@ -182,6 +188,8 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 | FM-M10-07 | Support agent views an identity they were not assigned | Unaudited read of the identity graph, and the social-engineering surface | `support_context_views`, plus a per-agent rate and breadth alert | Contact-reference resolution server side, role-scoped fields, and audit on every call. AS-M10-01 |
 | FM-M10-08 | Status page shares a failure domain with the outage | Silence at the moment silence reads as concealment | Third-party hosted, probed from outside | INV-M10-09, plus a named human and a pre-written template per incident class (constitution section 7) |
 | FM-M10-09 | A scheduled digest silently stops | Nobody notices, because a quiet week and a broken job look identical | Dead-man switch per job (INV-M10-10) | The dead-man switch is the recovery: it alarms on non-run rather than on failure |
+| FM-M10-10 | **The SMS sender is down and registration is mandatory-verified** | **Nobody can register.** Not a delayed message: a closed front door, and the first vendor outage in this module that costs revenue rather than patience | Send-failure rate and OTP delivery latency per country, and the registration funnel's first step | **Undecided, and it is `OQ-M10-05`.** C-28's degradation covers the **cost breaker** and says nothing about a vendor outage, and the mechanism it would reuse (`deferred_registrations`, the `pre_funded` gate) already exists. Section 7.9 |
+| FM-M10-11 | A prior contact must be notified and **no deliverable address exists** | The account-takeover countermeasure `INV-M16-03` and [SECURITY §4.8](../architecture/SECURITY.md) leg 2 both name does not fire, silently, on the one event it exists for | **None today.** A send with no address is a code path that has never had an address to fail on | **Undecided, and it is `OQ-M10-06`.** Section 7.9 |
 
 ---
 
@@ -263,6 +271,66 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 
 ---
 
+## 7.9 The two egresses ADR-039 adds, and the two findings they surfaced
+
+### 7.9.1 IN-M10-06, the SMS sender
+
+**M16 decides what to say and M10 delivers it**, which is section 1.2's boundary and it holds here unchanged. What is new is what crosses: **a telephone number in plaintext and a one-time code**, to a vendor, on a synchronous path, for an unauthenticated stranger.
+
+| Property | Requirement |
+|---|---|
+| **Contract** | Its own `integration_contracts` row (SD-M10-01). The number is an allowlisted field and adding it is a **disclosure decision**, audited as `integration.contract_changed` like every other |
+| **Audit** | `integration_dispatches` records `fields_sent` and never values (INV-M10-03, INV-M10-12), so the record of a number's disclosure does not become a copy of the number |
+| **Rate limiting** | **Not M10's.** The velocity scopes and the cost breaker are `otp_send_budget` under [M16](M16-notification-center.md) `INV-M16-12` and C-28. M10 delivers what M16 authorized and never decides that a send is too many, which is section 1.2's "M10 never decides that something is alarming" applied to cost |
+| **Deliverability** | Per-country delivery rate and latency are operational figures here and **cost** figures in [M03 §7.9.2](M03-billing-checkout.md). One vendor behaviour, two owners, and it is worth saying which is which because "SMS is expensive in country X" and "SMS does not arrive in country X" have different remedies |
+| **Credential** | Per integration, minimum scope, 90 day rotation (INV-M10-11). A sender credential is a **spend** credential, which no other credential in this module is |
+
+**Why the transport-only discipline is not negotiable for this one.** AS-M10-06 part 3 says content a trader must receive is Merit's, rendered from M16's templates. Every SMS vendor sells a contact book, a template engine and a verification API that does the whole ceremony for you, and taking any of the three moves an authentication factor's state into a vendor. **The verification API is the tempting one and it is the one that must be refused**: it would make a vendor the authority on whether a number is verified, which is a fact `identity_phones.verified_at` exists to hold and which C-27 then depends on.
+
+### 7.9.2 The registration lookup as governed egress
+
+Not a seventh integration: [ADR-023](../decisions/ADR-023.md)'s existing vendor at a second call site, resolved on evidence in [FOLD-01 §3.1](FOLD-01-phone-identity.md) and specified from the commerce side in [M03 §7.9.1](M03-billing-checkout.md). **What M10 owns is that it is an egress and therefore takes its own contract row rather than inheriting checkout's.**
+
+**The reason a shared row would have been wrong is the reason the allowlist is per call site and not per vendor.** Checkout's row allowlists email, device, IP and BIN. If the registration lookup rode on it, the phone number would have had to be added to a row a checkout call also reads, and INV-M10-02's guarantee — a field is not sent to anybody until somebody adds it to that vendor's contract — would have quietly become "the number is sent at checkout too". **Two moments, two rows, two answers to `GET /admin/identities/:identityId/disclosures`.**
+
+**And INV-M10-04 is not violated by this, which is worth stating because it looks like it might be.** The list is documents, biometrics, PAN, full device fingerprints and raw IPs. A telephone number is not on it and is not being quietly added to it: the number is the **subject** of the lookup rather than context attached to one, so a vendor that does not receive it cannot answer. That is the difference between this egress and AS-M10-04's Sentry payload, where every sensitive field was context nobody needed. **INV-M10-12 is what bounds it instead**: plaintext in the request, never at rest, on either side.
+
+### 7.9.3 Finding 1: a vendor is now on the critical path of registration, by design, on day one
+
+**AS-M10-06 is about a vendor that becomes load bearing by drift, over six months, with no moment anyone could have said no. IN-M10-06 is load bearing on the day it ships**, because [ADR-039](../decisions/ADR-039.md) makes phone verification mandatory at registration. If the SMS vendor is down, nobody registers. That is FM-M10-10 and it is the first vendor outage in this module that costs revenue rather than patience.
+
+**INV-M10-01's list does not name registration**, so nothing is being contradicted. But the list was written when every integration was post-commit and asynchronous, and reading it as "no vendor is ever load bearing" is now wrong. The invariant's claim is left exactly as it was and the omission is named here, because widening the list to include registration would be **asserting a protection that does not exist**.
+
+**What the ruling already settled, and what it did not.** C-28's degradation ruling is precise and it is about the **cost breaker**: on trip, registration continues with verification deferred to [ADR-021](../decisions/ADR-021.md)'s `pre_funded` gate, and the window alarms. **A vendor outage is a different trigger with an identical shape**: nothing has moved, nothing is owed, and the only thing a refusal protects is a vendor's availability. The mechanism to reuse already exists and is already built, `deferred_registrations` and the `pre_funded` gate, and `otp_send_budget.state` has a `degraded` value that a health check could set.
+
+**It is raised as `OQ-M10-05` and not decided here**, because "the same reasoning obviously applies" is exactly the move that produced this corpus's worst errors. Degrading on a **cost** trip is a founder ruling about Merit's own bill. Degrading on a **vendor** outage lets an attacker who can DoS a third party turn off Merit's phone verification, and that is a different bargain that the founder has not been asked about.
+
+### 7.9.4 Finding 2: the prior contact has no deliverable address, and neither does the current one
+
+**This is a proven gap in a shipped control, of exactly [`OI-06`](FOLD-01-phone-identity.md)'s shape: every document citing the control cites a control whose input does not exist.** It is recorded rather than fixed, for `OI-06`'s reason.
+
+**The claim, checked against the migrations rather than recalled.** There is **no plaintext telephone number in any of the twenty-nine migrations.** `identity_phones` holds `phone_hash bytea` plus a `phone_preview` that is "enough to recognise, not enough to reconstruct" ([`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql)); `phone_change_requests` holds `new_phone_hash bytea`; `otp_challenges` holds `destination_hash bytea`; `contact_channels` holds `value_hash bytea`. Every one is one-way and every one is one-way **on purpose**, and the reasoning in each comment is correct: a second plaintext copy of every number a trader ever used buys nothing and costs a breach.
+
+**What follows from it is not what those comments assume.** Both [`0019`](../../packages/db/migrations/0019_notifications_and_community.sql) and the [`contact_channels`](../architecture/data-model/contact_channels.md) design record say the value is hashed because **"the sending path holds the address"**. The sending path is this module. **This module holds nothing**, by INV-M10-02 and INV-M10-03 and by the deliberate absence in section 2 of any table that stores a contact value, and it may not delegate the holding to a vendor because AS-M10-06 part 3 forbids a vendor being the system of record for content a trader must receive.
+
+So the address is held by **the request**, and only a request that carries one has one:
+
+| Flow | Who supplies the number | Deliverable today |
+|---|---|---|
+| Registration OTP, login OTP | The trader types it | **Yes** |
+| A security-class SMS to the **verified** number: destination changed, passkey registered, breach | Nobody. Merit initiates | **No** |
+| `INV-M16-03`'s notification to the **prior** number after a phone change | Nobody, and it must not be the actor, since the actor may be the attacker | **No** |
+| [SECURITY §4.8](../architecture/SECURITY.md) leg 2, `prior_notified_at` | as above | **No** |
+| Dormancy escalation "including prior contacts" ([COUNSEL_PACKET](../legal/COUNSEL_PACKET.md) 3a) | Nobody | **No** on the SMS leg |
+
+**The email side has the same gap on prior addresses and not on current ones.** `users.email` is plaintext, so a live email is deliverable; it is one column on one row, so a change **overwrites** it and the prior address survives only as `contact_channels.value_hash`. `INV-M16-03` has therefore never had a deliverable prior address on either channel, and that predates [ADR-039](../decisions/ADR-039.md) entirely. **`SD-M16-06` widened `contact_channels.kind` to accept `sms` and made the countermeasure *representable*; it did not make it *sendable*, and the difference is this finding.**
+
+**The sharpest version, because it is the one that would survive a review.** `phone_change_requests_applied_is_complete` makes `prior_notified_at` a precondition of the write, so the database refuses a change that did not notify. **The database can only assert that a timestamp exists.** A handler with no address to send to and a column it must fill will fill it, the constraint will pass, the ceremony will look enforced, and the notification that is the entire anti-takeover control will never have left the building. **A control that is storage-enforceable and not send-enforceable reads as enforced in every document and in every test that inspects the row.**
+
+**Recommendation, offered without deciding it.** Store the address **reversibly rather than not at all**: a `value_ciphertext` beside the existing `value_hash`, envelope-encrypted under a key only the dispatcher can use, with the hash kept for matching and uniqueness. That preserves the stated goal, which is that a database dump does not yield a usable address, and gives the sending path the thing every citing document already assumes it has. It is a schema change in its own migration after its own session, and it touches `contact_channels`, `identity_phones` and `phone_change_requests`.
+
+**No `OI-nn` identifier is claimed for it and the reason is a defect, not an oversight.** [`DELTA_MANIFEST`](../../packages/db/DELTA_MANIFEST.md) already carries **two rows numbered `OI-06`**, found by the S-E3 session: the `OI` series is the one registry with no allocation table, which is the [ADR-034](../decisions/ADR-034.md) race the three allocation tables exist to end. Claiming a third number into a namespace with a known live collision would make the collision harder to resolve rather than easier. It is `OQ-M10-06` here, and it needs a manifest row once the numbering is settled.
+
 ## 8. Test plan
 
 ### 8.1 Suites
@@ -274,7 +342,7 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 | Suppression guards evaluated at send time | `M10-G-nn` | 8 | every commit | merge |
 | Support context scoping and audit | `M10-S-nn` | 7 | every commit | merge |
 | Replica exclusion (asserts named columns and tables are absent) | `M10-R-nn` | 5 | every commit | merge |
-| Vendor-down chaos across the four critical flows | `M10-X-nn` | 4 | every commit | merge |
+| Vendor-down chaos across the critical flows | `M10-X-nn` | **one per critical flow**: purchase, provisioning, payout request, payout settlement, **and registration** | every commit | merge |
 | Negative authz (D5) on support and internal endpoints | `M10-N-nn` | 5 | every commit | merge |
 | Sentry scrubber canary | `M10-K-01` | 1 | nightly, and continuously in production | page |
 | Dead-man switch coverage over the cron inventory | `M10-D-01` | 1 | nightly | nightly alarm |
@@ -290,6 +358,10 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 | GS-152 | Unhandled exception on the payout path | The captured payload contains route, release, error class, request id, and account id, and nothing else. The canary does not appear in the vendor. AS-M10-04 |
 | GS-153 | Alert dispatched to a mis-set Discord channel | Startup and per-send channel assertion fails closed and pages; no message is posted; no figure was in the body anyway. AS-M10-05 |
 | GS-154 | Every vendor returns 500 and then times out | Purchase, provisioning, payout request, and payout settlement all complete. Messages queue. AS-M10-06 |
+
+**The registration flow joins the chaos suite and its assertion is blocked, which is stated rather than papered over.** The other four assert that the flow **completes** with every vendor returning 500 and then timing out. Registration cannot assert that yet, because whether it completes under an SMS-sender outage is `OQ-M10-05` and is the founder's to rule. **The test is written now against the behaviour the founder chooses**, and until then it asserts the one thing that is already settled either way: **the failure is visible**, alarmed and counted, rather than a registration funnel that quietly reads as a bad traffic day. The count was a hand-maintained "4" and is replaced by the rule that produces it, per [ADR-034](../decisions/ADR-034.md).
+
+**IN-M10-06's contract needs no new suite** and that is 8.3 working as designed: the allowlist negative tests are generated from the contract rows, so a sixth integration produces its own tests by existing. A module that had to remember to add a test for its newest vendor would be the module FM-M10-03 describes.
 
 ### 8.3 Coverage rule
 
@@ -310,7 +382,9 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 | `integration.replica_lag_seconds` | FM-M10-06 |
 | Sentry event volume by path, and scrubbed-field count | A sudden rise in scrubbed fields on a money path means somebody added context to an error handler |
 | Delivery latency p95 for the payout family | The one message class where lateness is a brand event rather than an inconvenience |
-| Per-vendor cost, monthly | Constitution E3 and the C8 retro. Five vendors is five bills that grow without anyone choosing |
+| Per-vendor cost, monthly | Constitution E3 and the C8 retro. Six vendors is six bills that grow without anyone choosing, and **one of them is now a bill an adversary can move** ([M03 §7.9.2](M03-billing-checkout.md)) |
+| **SMS delivery rate and latency p95, by destination country** | FM-M10-10's leading indicator, and the operational half of a number [M03](M03-billing-checkout.md) also watches as cost. A country whose delivery rate falls is a country whose traders cannot register, and the registration funnel alone would read it as weak demand |
+| **Registration lookup timeout rate** | The fail-open path's frequency. Every timeout writes `line_type = 'unknown'` and `footprint_present = NULL`, so a rising rate silently degrades [M07](M07-risk-abuse.md)'s D-18 fleet signature rather than failing anything, which is the correct posture and the reason it has to be watched instead |
 
 ### 9.2 Alerts
 
@@ -325,6 +399,7 @@ Excluded from replication entirely: `identity_signals`, `kyc_verifications`, `pa
 | Replica lag | past budget warn, past 2x **page** and the dashboards banner |
 | Dead-man switch non-run | any scheduled job | **page** |
 | Metabase-versus-published divergence | any | warn, investigated same day |
+| SMS send failure rate, globally or for any one destination country | past the configured rate | **page**. FM-M10-10, and it is a page rather than a warn because the symptom on every other dashboard is "fewer signups today" |
 
 ### 9.3 Dashboard
 
@@ -342,6 +417,10 @@ M10 supplies a panel on [M6](M06-admin-ops-console.md)'s operations view rather 
 
 **OQ-M10-04. What is the retention on `integration_dispatches`?** It is the only long-retention table in the module and it exists to answer breach and privacy questions. Proposed: **7 years for the field-list metadata, no payload bodies stored at all.** Storing the metadata is cheap and answers the question; storing the payloads would recreate the disclosure inside Merit, which is the opposite of the point.
 
+**OQ-M10-05 (NEW, from [ADR-039](../decisions/ADR-039.md)). When the SMS sender is down, does registration degrade the way the cost breaker degrades, or does it stop?** Section 7.9.3. C-28 ruled the **cost** breaker degrades: registration continues, verification defers to `pre_funded`, the window alarms, and `deferred_registrations` counts the cohort. A vendor outage has the identical shape and a different trigger, and the mechanism to reuse is already built. **Proposed: degrade, on the same reasoning and with the same alarms**, because the asymmetry the founder ruled on is a property of *registration* rather than of *cost*: nothing has moved, nothing is owed, and a refusal protects only the vendor's uptime. **Flagged rather than assumed, and the reason is the one difference that matters:** degrading on cost is a decision about Merit's own bill, while degrading on a vendor outage means anyone who can take that vendor offline can turn off Merit's phone verification, and an SMS provider is a far easier target than Merit. If the answer is degrade, the fifth chaos test asserts completion; if it is stop, it asserts a clean, alarmed, counted refusal. **Either answer is testable and the absence of an answer is what is not.**
+
+**OQ-M10-06 (NEW, from [ADR-039](../decisions/ADR-039.md), and it is a proven gap rather than a design preference). Nothing in the schema holds an address the dispatcher can send to.** Section 7.9.4. No plaintext telephone number exists in any migration, `users.email` is overwritten on change, and `contact_channels.value_hash` is one-way, so `INV-M16-03`'s prior-contact notification, [SECURITY §4.8](../architecture/SECURITY.md) leg 2, and every security-class SMS Merit itself initiates have no deliverable destination. Two documents say the value is hashed because "the sending path holds the address"; **the sending path is this module and it holds nothing.** **Recommendation: a `value_ciphertext` beside the hash, envelope-encrypted under a dispatcher-only key**, in its own migration after its own session, which preserves the goal (a dump yields no usable address) and gives the citing documents the thing they already assume. **No `OI-nn` is claimed**: the `OI` series already carries two rows numbered `OI-06` and is the one registry with no allocation table.
+
 ---
 
 ### Dependencies on other modules
@@ -354,3 +433,5 @@ M10 supplies a panel on [M6](M06-admin-ops-console.md)'s operations view rather 
 | DEP-M10-04 | M7 exposes restriction state and open-flag severity readably at send time | M7 | The guards cannot evaluate late, which is the entire counter to AS-M10-03 |
 | DEP-M10-05 | M12 publishes a versioned metric definition the reconciliation can compute against | M12 | AS-M10-02's strong counter does not exist and the weak one is all that remains |
 | DEP-M10-06 | INFRA provides column-filtered logical replication and a `SELECT`-only replica role | INFRA | INV-M10-06 becomes a convention, and Metabase becomes a data-exfiltration console with a login page |
+| DEP-M10-07 | M16 authorizes every OTP send against `otp_send_budget` **before** it reaches the dispatcher | M16, C-28 | The velocity scopes and the cost breaker exist and nothing consults them, so the pumping attack in [M16](M16-notification-center.md) `AS-M16-07` runs against a spend limit that is a row nobody reads |
+| DEP-M10-08 | Something holds an address the dispatcher can send to | **Unowned. `OQ-M10-06`** | `INV-M16-03`, [SECURITY §4.8](../architecture/SECURITY.md) leg 2 and every Merit-initiated security SMS have no destination, and the phone-change ceremony's constraint passes on a timestamp for a message that never left. **This is the only row in this table with no owner**, which is the honest state of it |
