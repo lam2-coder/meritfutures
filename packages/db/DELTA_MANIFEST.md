@@ -20,7 +20,7 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->34<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->35<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -389,7 +389,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->34<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->35<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->102<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -639,7 +639,7 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->102<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**, across <!--gen:migration_files-->34<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->102<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**, across <!--gen:migration_files-->35<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
 
 ---
 
@@ -675,6 +675,11 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | `OI-07` | FOLD-01 session 3 | **allocated.** `0029` had no committed probe. Closed 2026-08-16 |
 | `OI-08` | FOLD-01 session 3 | **allocated.** The positional NO-FLOATS block. Closed 2026-08-16 |
 | **`OI-09`** | this session | **allocated.** `CI-06n` accepts a link in prose where its own title says a row. Open, and section 17 records how it was found |
+| `OI-10` | the review desk, 2026-08-16 | **allocated.** Keep-both merges duplicated four passages in STATE and no gate could see it. Deduplicated; the gate that would catch it is unwritten. **This row was missing from this table**, claimed in [STATE](../../docs/STATE.md) and never brought back here, which is the drift the table exists to end |
+| **`OI-11`** | `0035`'s session | **allocated, open.** **A duplicate row in an allocation table is invisible to every gate.** `allocated()` accumulates claims into a `Set`, so the two adjacent rows both claiming `0034` produced one member and twelve gates passed. The check is cheap and blocked on a cleanup: the ADR table claims `039` to `046` twice each and the migration table claims `0033` twice, so it fails on arrival. See [ALLOCATION](../../docs/decisions/ALLOCATION.md) |
+| **`OI-12`** | `0035`'s session | **allocated, open.** **A calendar `INSERT` moves no watermark.** `0033` guards every way a day can change; a day backfilled inside an existing coverage window changes the day sequence retroactively with no revision row, and every stamped `rule_states` row still claims a watermark that looks current. ADR-045 owns `trading_calendar`'s guards and ADR-047 does not rule it |
+| **`OI-13`** | `0035`'s session | **allocated, open.** **B.4 step 4's audited rewrite has no grant.** `0026` revoked `UPDATE` on `rule_states` from `merit_app` and `PUBLIC` and no `SECURITY DEFINER` function performs it. Pre-existing and identical for `engine_version`; `calendar_revision_id` makes a second caller for a path that has none |
+| **`OI-14`** | `0035`'s session | **allocated, open.** **The replay job must refuse an empty in-scope set.** If the engine never populates `calendar_revision_id`, every row reads as out of scope after the first correction, the audit compares nothing, and an audit that has stopped looking reports exactly like one that found nothing (FM-17). No per-row constraint can tell "not yet written" from "pristine calendar" without fabricating, so it belongs to the job |
 
 ### Section numbers
 
@@ -687,6 +692,8 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | 15 | `OI-07` and `OI-08`'s closure | **allocated** |
 | **16** | this session | **allocated.** This table |
 | **17** | this session | **allocated.** `0033` lands |
+| **18** | `0034`'s session | **allocated.** `0034` lands. **This row was written into the file as a heading and never into this table**, one section after the table was created to stop exactly that |
+| **19** | `0035`'s session | **allocated.** `0035` lands |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
 
@@ -712,7 +719,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->34<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->35<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
 
 | | Before `0033` | After `0033` |
 |---|---|---|
@@ -787,7 +794,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->34<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->35<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
 
 | | Before `0034` | After `0034` |
 |---|---|---|
@@ -911,3 +918,98 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 **It does not backfill.** Every row written before `0034` has a hash and no ciphertext, and sealing one requires the plaintext, which for a **prior** address Merit does not have. **The backfill is forward-only by construction** and the addresses already lost stay lost.
 
 **And there is no gate.** `CI-06h`'s job runs the probe, which proves this schema. Nothing asserts that the **next** table carrying an address hash arrives with a sendable sibling, or that a later migration has not granted `DELETE` to this role. Both are checkable and neither is claimed here, because a gate arrives with a `CI-06` letter and a seeded violation it has been watched failing on.
+
+---
+
+## 19. `0035` lands, and the ruling it carries is one a constraint cannot reach (2026-08-16)
+
+**[ADR-047](../../docs/decisions/ADR-047.md) accepted, `OQ-P2-02` closed, [`0035_rule_states_calendar_revision.sql`](migrations/0035_rule_states_calendar_revision.sql) written, applied, probed and pinned.** It is the other half of `0033`. `0033` made the prior image **mandatory** on the calendar side, so every correction leaves an unforgeable record of what the calendar said before it moved; nothing joined that record to a state row, so **replay held the evidence and could not scope by it.**
+
+`rule_states.calendar_revision_id` references `trading_calendar_revisions(id)` `ON DELETE RESTRICT`. A **reference rather than a copied value**, which ADR-047 rules explicitly: a stored revision number accepts any integer a writer types, and a second copy of a fact the database owns is the drift this corpus has spent five ADRs ending.
+
+### The stamp is a watermark, and the column name invites the other reading
+
+**`calendar_revision_id` is the highest revision id that existed when the FOLD ran. It is NOT the revision that corrected this row's `trading_day`.** A rule state is folded over the whole day sequence from day one, so what it depends on is the calendar **as a whole**. A per-day pointer would scope replay to the corrected day and **miss every downstream counter**, which is the entire failure ADR-047 exists to prevent.
+
+**The watermark is complete because of what `0032` and `0033` already installed**, and it is worth naming the chain: `0032` revoked `UPDATE` and `DELETE` on `trading_calendar_revisions` from `merit_app` and `PUBLIC`, `0033` requires a prior image on every `UPDATE` to `trading_calendar` and refuses `DELETE` and `TRUNCATE`, and the identity primary key is monotonic. So **the set of revisions with `id <= N` is a complete and immutable description of every correction the calendar had undergone at watermark N.** The column is decoration without all three.
+
+### The ruling is an EXCLUSION, and getting it backwards inverts the ADR
+
+**`calendar_revision_id` is excluded from `state_hash`.** `engine_version` is already excluded because "a build identifier is not state; including it makes every engine upgrade a universal divergence", and ADR-047's thesis is that the calendar revision is the engine's **second version-like input**. The identical argument applies with identical force: **in the hash, one calendar correction changes every row's hash at once and pages once per account**, which is the 5,000-page morning the ADR exists to prevent.
+
+**The nineteen hashed fields and their order are unchanged**, so no stored hash moves and no replay is invalidated. The **exclusion** list goes from three to four, and it is extended **in the column comment `0015` put it in** rather than only in a document, because that comment is the only machine-readable record of the input set ([ADR-026](../../docs/decisions/ADR-026.md) C-07). A migration that added a column and left the comment alone would make C-07's own warning come true in the commit that cites it.
+
+### Install verification, from empty
+
+| Check | Result |
+|---|---|
+| Forward-only apply, `0001` to `0035`, `ON_ERROR_STOP=1` | **applies clean** |
+| Re-apply of `0035` | **rejected** (`column "calendar_revision_id" of relation "rule_states" already exists`) |
+| Foreign key installed | `rule_states_calendar_revision_id_fkey` -> `trading_calendar_revisions(id)` `ON DELETE RESTRICT` |
+| `state_hash` comment | names `calendar_revision_id` among the exclusions |
+| Tables created / triggers created | **zero and zero**, so the database-derived counts are unchanged |
+| Corpus gates | **15 of 15** |
+
+**No backfill, and it needs none.** `rule_states` has zero rows: the engine is P2 and no seed or fixture inserts into it. The `ADD COLUMN` is metadata-only and **nothing in the file can be read as evidence that a populated table satisfies it**, which is `0032` and `0033`'s sentence and is why the probe exists.
+
+### The probe leads with SIX successes, because here the dangerous edit is a TIGHTENING
+
+[`probe_rule_states_calendar_revision.sql`](../../scripts/db/probe_rule_states_calendar_revision.sql), **10 / 10**, wired into [`corpus.yml`](../../.github/workflows/corpus.yml) and **pinned by `CI-06h` in the same commit**.
+
+**Section 13's lesson is usually "a guard that refuses everything passes an inventory of refusals". This migration is the mirror image and it is worth stating separately: a NULLABLE column's dangerous edit is a NOT NULL, and no rejection can see one.** `NOT NULL` on `calendar_revision_id` installs cleanly, satisfies all four rejections below, and **refuses every state row the engine writes until somebody has corrected the calendar at least once**. That is ADR-039's `SUCCESS 2` in a different costume: completing the pair looks like tightening a constraint while actually breaking the ordinary path to guard the rare one.
+
+| Assertion | What fails if it is deleted |
+|---|---|
+| **SUCCESS 1** | A `NOT NULL` on the column goes unnoticed. NULL means the fold read a calendar that had **never** been corrected, which is every row until the first correction lands |
+| **SUCCESS 2** | The ordinary post-correction write is unproven |
+| **SUCCESS 3** | Nothing asserts two states may **disagree**. B.4 step 1 compares only rows matching the current watermark, and a schema forcing every row to one value satisfies the key, reads as tidy, and leaves the scoping query nothing to scope. It asserts **both sides of the partition are non-empty** |
+| **SUCCESS 4** | The `= max(id)` guard gets added later by somebody who reads the rejections and concludes the column is under-constrained. **It would force a lie**: a correction committing between the fold and the write leaves a row that genuinely read the older calendar |
+| **SUCCESS 5** | The **non**-correspondence goes unasserted. It walks from a state for `2026-06-03` to the prior image of `2026-06-01` and **requires them to differ**, so a future "fix" that constrains the two days to agree fails here and nowhere else |
+| **SUCCESS 6** | The one ruling no constraint can reach. The hash is computed by an engine that does not exist yet, so the **contract** is asserted instead, in **both halves**: that the comment names the column, and that it names it as `excluded` |
+| **REJECTION 1** | A state may cite a revision that never existed, which is what a bare integer would allow and is why ADR-047 rules a reference |
+| **REJECTION 2** | `ON DELETE RESTRICT` is unproven and a stamp may point at a deleted row |
+| **REJECTION 3** | `0032`'s `REVOKE` is unproven, and **the watermark rests on it**: if the prior image at revision 7 can be rewritten, two folds carrying watermark 7 read different calendars |
+| **REJECTION 4** | A revision may be erased in the window between the correction landing and the first fold citing it |
+
+**Rejections 1 and 2 both raise `foreign_key_violation`**, so both are checked **by message**: a handler catching the class cannot tell "the revision does not exist" from "it may not be deleted while a state cites it", and either half could be deleted with both tests still passing.
+
+### Nine counterfactuals, each watched failing on its own finding
+
+| Seeded defect | Caught by |
+|---|---|
+| `NOT NULL` on `calendar_revision_id` | SUCCESS 1 |
+| The naive `= max(id)` guard on INSERT | SUCCESS 1 (it refuses NULL as well) |
+| **The refined guard that permits NULL and forces non-null stamps current** | **SUCCESS 4 alone**, with 1, 2 and 3 passing |
+| The watermark constrained to match the row's own `trading_day` | SUCCESS 5 |
+| The `state_hash` comment reverted to `0015`'s three exclusions | SUCCESS 6 |
+| **The INVERSION: the comment lists the column as hashed rather than excluded** | SUCCESS 6's second half |
+| The foreign key dropped (a bare integer) | REJECTION 1 |
+| `ON DELETE CASCADE` in place of `RESTRICT` | REJECTION 2 |
+| `0032`'s `REVOKE` undone | REJECTION 3 |
+| **A trigger refusing every `rule_states` write** | SUCCESS 1, which is the shape only a success case can see |
+
+**Both forms of the `max(id)` guard were seeded and they fail in different places**, which is why the probe header names both rather than claiming SUCCESS 4 catches "the" guard. The first draft of that header did claim it, and the seeded run said otherwise.
+
+### What `0035` does not do
+
+**It installs no trigger asserting the stamp is current, and refusing to is a decision.** The tempting guard would force a row that genuinely read the older calendar to claim one it never saw, and replay would then believe a stale row was current. **A control that can fabricate is not a control**, which is `0033`'s own header ("the database's answer to a correction with no reason is to REFUSE the correction, never to write a reason of its own") applied back to it. What **is** assertable, that the stamp names a revision that really existed, is the foreign key.
+
+**It adds no index.** B.4 step 1 scopes by this column on every nightly audit, which sounds like an index and is not: the audit re-derives every row for every account, so the scoping is a filter applied **during** a full pass rather than a lookup into one. **`engine_version` has carried the identical access pattern since `0015` with no index**, and adding one for the second while the first has none would assert a difference that does not exist.
+
+**It does not guard calendar `INSERT`, and that is a stated exposure.** `0033` covers every way a day can **change**; an `INSERT` writes no revision row and moves no watermark. For a **future** day that is correct, because extending coverage forward changes no already-computed state. For a day **backfilled inside an existing coverage window** it is not: the day sequence moves retroactively and every stamped row still claims a watermark that looks current. ADR-047 does not rule it and ADR-045 owns `trading_calendar`'s guards, so this session does not add a money-path trigger on its own authority. **`0032` header item 3's restraint, applied a second time.** `OI-12`.
+
+**It does not create the rewrite path B.4 step 4 needs.** `0026` revoked `UPDATE` on `rule_states` from `merit_app` and `PUBLIC` and no `SECURITY DEFINER` function performs the audited rewrite. **Pre-existing and identical for `engine_version`**, so it is not widened here, but this column makes a second caller for a path that has none. `OI-13`.
+
+**And it cannot make the engine populate the column.** This is the failure the column creates if it is never written: **every row stamped NULL after a correction reads as out of scope, the audit compares nothing, and an audit that has stopped looking reports exactly like an audit that found nothing** (FM-17). No per-row constraint can tell "not yet written" from "pristine calendar" without fabricating, so the assertion belongs to the replay job: **it must refuse a run whose in-scope set is empty while rows exist.** `OI-14`.
+
+### `0035` broke a probe written before it, and a hand-maintained list is why
+
+**`probe_calendar_revision_required.sql`'s `REJECTION 8` truncated `trading_calendar, trading_calendar_revisions` by name**, and its own comment explained the pair: naming both tables leaves the foreign key no objection, so **the only thing standing between an operator and an empty calendar is CALENDAR-C2**. That list named every table in the dependency graph **as of `0033`**.
+
+**`0035` added a third.** `rule_states.calendar_revision_id` references `trading_calendar_revisions`, so the statement began failing with `cannot truncate a table referenced in a foreign key constraint` **before CALENDAR-C2 could fire**. The guard was intact the whole time; the probe had gone blind to it.
+
+**Two things stopped that from being a silent pass, and both were already in the file.** The assertion checks the finding **by message** rather than by exception class, so a `wrong finding` is a failure rather than a green rejection; and section 18's rule was followed, **every probe was run against the new schema rather than only the new one**. This session ran seven probes and the NO-FLOATS assertion; one failed, and it failed loudly.
+
+**The repair removes the list rather than extending it.** `TRUNCATE trading_calendar CASCADE` makes PostgreSQL derive the referencing set, so the next migration to reference either table cannot break the assertion the way `0035` did. It is also the **stronger** test: `CASCADE` is the form an operator with a deadline reaches for, and it is the one that empties the audit trail **and the rule states** along with the calendar. **This is `OI-08`'s lesson in a new costume**: a hand-maintained list does not fail when it goes stale, it keeps passing against less. Here it did not even manage that, which is the better failure of the two. Watched failing dirty with `trading_calendar_no_truncate` dropped.
+
+**All seven probes and the NO-FLOATS assertion pass against the `0035` schema.**
