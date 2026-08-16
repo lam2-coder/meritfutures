@@ -17,7 +17,7 @@ Merit stores **status and references only**. Documents, images, and biometric te
 | `verified_at` | timestamptz | null | |
 | `expires_at` | timestamptz | null | drives re-verification |
 | `raw_result` | jsonb | not null default `'{}'` | provider decision metadata only, **never document data** |
-| `verification_purpose` | text | not null, check in (`initial`,`reverify_destination`,`reverify_flag`,`reverify_dormant`,`reverify_expiry`) | **`SD-M19-01`.** A re-verification is a new row, or the system cannot distinguish "we checked again today" from "we looked at what we already had" (INV-M19-06) |
+| `verification_purpose` | text | not null, check in (`initial`,`reverify_destination`,`reverify_flag`,`reverify_dormant`,`reverify_expiry`,**`reverify_phone_change`**) | **`SD-M19-01`.** A re-verification is a new row, or the system cannot distinguish "we checked again today" from "we looked at what we already had" (INV-M19-06). **`reverify_phone_change` is `SD-M19-07`**, [ADR-039](../../decisions/ADR-039.md) (c) |
 | `supersedes` | uuid | fk kyc_verifications, null, on delete restrict | **`SD-M19-01`** |
 | `liveness_passed` | boolean | null | **`SD-M19-01`** |
 | `liveness_method` | text | null | **`SD-M19-01`.** Recorded because liveness techniques and their defeat rates move quickly: an enforcement decided on a 2027 liveness check needs to know which technique produced it (AS-M19-06), and a boolean alone ages into an assertion nobody can re-evaluate |
@@ -25,5 +25,7 @@ Merit stores **status and references only**. Documents, images, and biometric te
 | ~~`dedupe_matched_identity_id`~~ | ~~uuid~~ | **never created, by [ADR-029](../../decisions/ADR-029.md)** | `dedupe_matches` (`SD-M19-04`) is authoritative. A dedupe hit is an **auto-enforcement input**: it bans an account without human review, and a system with two sources for that decision will eventually enforce on whichever is read first. Greenfield means the column is never created rather than created and dropped |
 
 Indexes: `kyc_verifications_identity_state_idx (identity_id, state)`; `kyc_verifications_dedupe_hit_idx (biometric_dedupe_hit)` where true; `kyc_verifications_supersedes_idx (supersedes)` where not null; `kyc_verifications_placement_idx (placement, created_at desc)`, which is the per-placement funnel telemetry [ADR-021](../../decisions/ADR-021.md) made a condition of its acceptance.
-Constraints: `kyc_verifications_supersession_matches_purpose` (an `initial` supersedes nothing and every other purpose supersedes something, so the chain has no holes); `kyc_verifications_no_self_supersede`.
+Constraints: `kyc_verifications_verification_purpose_allowed` (`0003` wrote the check inline and Postgres named it `kyc_verifications_verification_purpose_check`; `0029` drops it and re-adds it under an explicit name); `kyc_verifications_supersession_matches_purpose` (an `initial` supersedes nothing and every other purpose supersedes something, so the chain has no holes); `kyc_verifications_no_self_supersede`.
 Retention: forever (AML obligation), PII minimal by construction.
+
+**`SD-M19-07` needed no change to `kyc_verifications_supersession_matches_purpose`, and that is the point of writing a constraint against the shape rather than against a list.** `0003` requires that any non-`initial` purpose supersedes something. A phone-change re-verification that supersedes nothing is therefore refused by a constraint written before the value existed. Executed, not read: the refusal was watched.
