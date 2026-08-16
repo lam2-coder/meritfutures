@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../decisions/README.md, ../OVERVIEW.md]
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # DATA MODEL
@@ -23,6 +23,8 @@ Every table, every column, with type, constraints, indexes, retention, and the r
 > **Four rulings changed a column or a value rather than adding one**, and each is folded rather than merely recorded: [ADR-027](../../decisions/ADR-027.md) (two distinct per-identity ledger classes, seven in total), [ADR-028](../../decisions/ADR-028.md) (`payout_requests.status` and **both** of its index predicates), [ADR-029](../../decisions/ADR-029.md) (`dedupe_matched_identity_id` dropped), and [ADR-030](../../decisions/ADR-030.md) (`max_payouts`, `kyc.triggers`). The sentence read "three" against a list of four and is corrected here.
 
 > **Further amended, 2026-08-14, by two rulings on `published_statistics`.** [ADR-031](../../decisions/ADR-031.md): `value_numeric numeric` becomes **`value bigint`** with a mandatory **`value_unit`**, retiring its no-floats exemption and leaving **two** columns on that list, none of them money. [ADR-032](../../decisions/ADR-032.md): **`measure`** joins the table and the window unique key, `statistic_definitions` gains **`measures`**, and **STAT-C1** in `0027` makes "neither figure of a pair is published alone" a database constraint rather than prose. Both amend approved `SD-M12-02`; the second touches the immutability contract on a public surface. Sections amended: §13 (invariants) and §17 (the no-floats exemption list, and the verification record), plus this header.
+
+> **Further amended, 2026-08-16, by [ADR-040](../../decisions/ADR-040.md) and [ADR-041](../../decisions/ADR-041.md), landing as [`0030`](../../../packages/db/migrations/0030_payout_hold_enum.sql) and [`0031`](../../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql).** `payout_status` gains **`held_pending_review`**, a pre-approval review state with a hard 48 hour auto-release SLA, and **both** `SD-09` predicates are dropped and re-created under their existing names to carry it. `payout_requests` gains the hold trio and its completeness CHECK; `wallet_withdrawals` gains the settlement guard that makes its existing halt columns bind; **`identity_restriction_episodes`** is new. The zero-denial sentence is amended rather than reinterpreted: it was "no review state exists" and it is now **"a review state exists and it expires"**. Sections 3, 8, 13 and 17 move, and so does this header. **Two of the ten sites carrying the old sentence are inside merged migrations and can never be edited** (`0001:73`, `0010:77`); `0010:225` is a `COMMENT ON TABLE`, which is replaceable metadata, so `0031` re-states it.
 
 Split to a file per table on 2026-08-15 by [ADR-043](../../decisions/ADR-043.md).
 Each `### <table>` design record is its own file; the conventions, the plan-config
@@ -79,7 +81,9 @@ erDiagram
 
 ## 3. Identity, authentication and KYC
 
-Created by [`0002_identity`](../../../packages/db/migrations/0002_identity.sql) and [`0003_kyc`](../../../packages/db/migrations/0003_kyc.sql). Twelve tables. Both files are money path: identity is the row every cap and every aggregate liability figure keys off, and KYC is what stands between the payout rail and a fleet.
+Created by [`0002_identity`](../../../packages/db/migrations/0002_identity.sql), [`0003_kyc`](../../../packages/db/migrations/0003_kyc.sql) and [`0031_payout_hold_and_identity_restriction`](../../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql). Thirteen tables. All three files are money path: identity is the row every cap and every aggregate liability figure keys off, KYC is what stands between the payout rail and a fleet, and `0031` is where enforcement acquires a clock that binds on Merit.
+
+**The tables group by concern rather than by migration**, which is why `identity_restriction_episodes` is listed here and not with `0031`'s payout objects in section 8. A reader looking for what the corpus knows about a human looks in one place.
 
 | Table | |
 |---|---|
@@ -95,6 +99,7 @@ Created by [`0002_identity`](../../../packages/db/migrations/0002_identity.sql) 
 | [`sanctions_screenings`](sanctions_screenings.md) | |
 | [`kyc_funnel_events`](kyc_funnel_events.md) | |
 | [`dedupe_matches`](dedupe_matches.md) | |
+| [`identity_restriction_episodes`](identity_restriction_episodes.md) | **`U-09`**, [ADR-041](../../decisions/ADR-041.md). The identity-level restriction as a row rather than a column |
 
 ## 4. Catalog and configuration
 
@@ -158,6 +163,8 @@ Created by [`0013_ingest`](../../../packages/db/migrations/0013_ingest.sql), [`0
 Created by [`0009_ledger`](../../../packages/db/migrations/0009_ledger.sql), [`0010_payouts`](../../../packages/db/migrations/0010_payouts.sql), [`0011_wallet`](../../../packages/db/migrations/0011_wallet.sql) and [`0016_treasury_controls`](../../../packages/db/migrations/0016_treasury_controls.sql). Fifteen tables, all money path. `0010` is the file where money leaves.
 
 **Money movement is three objects, not one.** A [payout request](../../GLOSSARY.md) is a claim against an account evaluated by the engine. A wallet entry is what the trader is owed. A wallet withdrawal is the external rail moving it. Conflating any two of them makes the engine's gates and the rail's gates share a status column, and the first person to add a state breaks the other one.
+
+**Amended by [`0030`](../../../packages/db/migrations/0030_payout_hold_enum.sql) and [`0031`](../../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql), which add no table here.** `payout_requests` gains `held_pending_review`, the hold trio, the hold-expiry index and the two widened `SD-09` predicates; `wallet_withdrawals` gains `wallet_withdrawals_frozen_cannot_settle`. **That split is the same argument this paragraph makes**: on the internal leg the hold **replaces** approval and is therefore a status, and on the external leg the halt is **orthogonal** to the rail state and is therefore a CHECK. Full reasoning in [`payout_requests`](payout_requests.md) and [`wallet_withdrawals`](wallet_withdrawals.md).
 
 | Table | |
 |---|---|
@@ -338,6 +345,12 @@ Notes that matter: `payout_cap_schedule` is an **array from day one** even thoug
 | **`closing = opening + realized_pnl + adjustment`** (INV-18) | `daily_marks_balance_arithmetic`, checkable only because `SD-01` exists |
 | **No non-integer column exists outside the two ruled exemptions** | a `DO` block in `0027` reading `information_schema.columns`, asserted in both directions (§17) |
 | **Neither figure of a paired statistic is published alone** (ST-04 mean and median, ST-05 and ST-06 p50 and p95) | **STAT-C1**, a deferred constraint trigger ([ADR-032](../../decisions/ADR-032.md)): a publish run emitting one `measure` for a `stat_code` must emit every measure its definition declares. Probed against the database, both ways |
+| **A held payout carries a cited flag and a clock, and a released one keeps both** | `payout_requests_hold_is_complete` and `payout_requests_hold_expiry_after_held`, check constraints (`U-07`, [ADR-040](../../decisions/ADR-040.md)). A hold with a flag and no clock is the indefinite hold zero denial must not permit itself |
+| **A held request is outstanding, so a second one cannot be filed against the account** | `payout_requests_no_in_flight_uq`, predicate widened in `0031`. **The `C-02` defect from the other direction**: left at `('approved','frozen')` the index still exists, is still valid, and stops covering the state that most needs it |
+| **A withdrawal carrying a live freeze never settles** | `wallet_withdrawals_frozen_cannot_settle`, a check constraint (`U-08`). `0011` made the halt representable and nothing made it bind |
+| **At most one open restriction episode per identity** | `identity_restriction_episodes_open_uq`, a partial unique index (`U-09`, [ADR-041](../../decisions/ADR-041.md)). Two open episodes means two restore actions, and whichever runs second un-restricts a trader nobody cleared |
+
+**The first four rows are probed against a real database by [`probe_payout_hold.sql`](../../../scripts/db/probe_payout_hold.sql), 18 assertions, leading with the success cases**, and the two-file split is itself a CI step that watches the combined form fail. Both are wired into the `migrations` job, because a probe that ships beside a migration and never runs again is the same object as the golden test that was missing ([ADR-035](../../decisions/ADR-035.md)).
 
 ## 14. Migration policy
 
@@ -375,11 +388,13 @@ Walked line by line at the gate. All five confirmed as written; recorded in [DEC
 
 **Inside the SQL, every folded column, index, constraint and table carries an inline `-- SD-nn` or `-- U-nn` marker.** A reader looking at a column does not have to leave the file to learn why it exists.
 
-### The 27 files, and which of them are money path
+### The <!--gen:migration_files-->30<!--/gen--> files, and which of them are money path
 
-`0001` extensions and enums, `0002` identity, `0003` kyc, `0004` catalog, `0005` affiliate program, `0006` commerce, `0007` accounts, `0008` risk, `0009` ledger, `0010` payouts, `0011` wallet, `0012` disputes and affiliate settlement, `0013` ingest, `0014` marks, `0015` rule states, `0016` treasury controls, `0017` events and audit, `0018` integrations, `0019` notifications and community, `0020` public surface, `0021` transparency, `0022` analytics journal, `0023` loyalty and graduation, `0024` offers, `0025` reserved sequence, `0026` roles and grants, `0027` triggers and invariants.
+`0001` extensions and enums, `0002` identity, `0003` kyc, `0004` catalog, `0005` affiliate program, `0006` commerce, `0007` accounts, `0008` risk, `0009` ledger, `0010` payouts, `0011` wallet, `0012` disputes and affiliate settlement, `0013` ingest, `0014` marks, `0015` rule states, `0016` treasury controls, `0017` events and audit, `0018` integrations, `0019` notifications and community, `0020` public surface, `0021` transparency, `0022` analytics journal, `0023` loyalty and graduation, `0024` offers, `0025` reserved sequence, `0026` roles and grants, `0027` triggers and invariants, `0028` supersede plan version immutability, `0030` payout hold enum, `0031` payout hold and identity restriction.
 
-**Sixteen carry an `E2 READ: MONEY PATH` header** naming what in the file needs the founder's line-by-line read and why. Money-path files carry their reasoning in comments, not only in DDL, because the constitution E2 read is on the diff and a diff that requires four other documents to interpret is one that gets skimmed.
+**The count is a [CI-06g](../../testing/STRATEGY.md) span and the list beside it is not, which is a gap stated rather than hidden.** This heading read "The 27 files" against 28 on disk from the moment [`0028`](../../../packages/db/migrations/0028_supersede_plan_version_immutability.sql) merged, and the list below it omitted `0028` entirely: the ninth hand-maintained count found wrong, in the section that records the eighth. `0029` is **reserved and unwritten** ([ALLOCATION](../../decisions/ALLOCATION.md)), which is why the sequence skips it here and why `CI-06h` asserts gaplessness over allocated **plus reserved** rather than over the directory.
+
+**<!--gen:e2_files-->20<!--/gen--> carry an `E2 READ: MONEY PATH` header** naming what in the file needs the founder's line-by-line read and why. Money-path files carry their reasoning in comments, not only in DDL, because the constitution E2 read is on the diff and a diff that requires four other documents to interpret is one that gets skimmed. **This sentence read "Sixteen" against seventeen files when it was written**, which is why it is a span now.
 
 ### The three tables that are created and deliberately empty
 
@@ -424,3 +439,18 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 **The first row is why this section exists in this form.** The trigger read `NEW.config` and `OLD.config`, and `plan_versions` has no `config` column: the rule contract is `rules`. Every `UPDATE` against a published row therefore raised `record "new" has no field "config"`. The promise "a published plan version never changes" survived by accident, because the error rejects the write; **the permitted retirement transition was refused too, so a plan version could not be retired at all**. A draft row updates normally, which is why an install check and every existing probe missed it. **An invariant that was reviewed and not executed has not been checked**, which is the same lesson the `array_length` defect taught one file over, found the same way.
 
 **And the deeper one, which is now a gate.** Every probe in this corpus attempted a forbidden thing and asserted a rejection. A guard that rejects **everything** passes all of them. `probe_plan_version_immutability.sql` therefore leads with the **permitted** transition, and `0028` ships with it, per [ADR-035](../../decisions/ADR-035.md)'s own words: the missing test is the finding as much as the missing column is.
+
+### Verification performed on `0030` and `0031` (2026-08-16)
+
+**Executed against PostgreSQL 16, not read.** The full <!--gen:migration_files-->30<!--/gen-->-file set applies forward-only from empty under `ON_ERROR_STOP=1`.
+
+| Check | Method | Result |
+|---|---|---|
+| The set applies forward-only from empty | `psql -f` per file, `ON_ERROR_STOP=1` | **pass**, zero errors |
+| Object counts, from the catalogue rather than a grep | `pg_tables`, `pg_indexes`, `pg_constraint`, `pg_trigger` | **97 tables, 331 indexes, 353 check constraints, 6 triggers.** `+1` table, `+5` indexes (two of the five are replacements under existing names), `+6` checks, `+0` triggers |
+| **The counterfactual on the two-file split** | the combined file, wrapped in `BEGIN`/`COMMIT` as every migration here is, run against `0001`-`0028` | **fails**, `unsafe use of new value "held_pending_review" of enum type payout_status`, and the rollback restores the unique index the file had already dropped |
+| **The counterfactual's own counterfactual** | the same statements with the transaction block **removed**, under the install job's autocommit | **succeeds.** So the reason for two files is that `0031` must be **atomic**, not that psql cannot run the statements in sequence. Recorded in [DELTA_MANIFEST section 14](../../../packages/db/DELTA_MANIFEST.md) as a correction to the fold plan's finding 6 |
+| The hold, the widened predicate, the external-leg guard and the episode table | [`probe_payout_hold.sql`](../../../scripts/db/probe_payout_hold.sql), **18 assertions, leading with the success cases** | **18 / 18 pass** |
+| Every `CREATE TABLE` has a design record, both directions | [CI-06i](../../testing/STRATEGY.md) | **97 / 97** |
+
+**Both new checks are wired into the `migrations` job, not run once and described.** The probe and the counterfactual are steps in [`corpus.yml`](../../../.github/workflows/corpus.yml), and the counterfactual fails the build **if the combined form ever succeeds**, which is the case in which the split should be revisited rather than inherited.

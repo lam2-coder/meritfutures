@@ -197,3 +197,62 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_plan_version_immutability.sql
+
+      # ADR-040 and ADR-041, landing with 0030 and 0031. Same reason as rider 2
+      # one step up: a probe that ships beside a migration and never runs again
+      # is the same object as the golden test that was missing.
+      #
+      # It LEADS WITH THE SUCCESS CASES. A hold that cannot be written at all
+      # satisfies every rejection assertion in the file and pays nobody, which is
+      # the shape of pass ADR-035 was found hiding inside.
+      - name: Probe ADR-040's payout hold and ADR-041's restriction episode
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_payout_hold.sql
+
+      # THE COUNTERFACTUAL ON THE TWO-FILE SPLIT (FOLD-02 section 9 item 5).
+      # 0030 exists because an enum value cannot be USED in the transaction that
+      # added it, and the reason is asserted here rather than trusted to a
+      # comment. The combined form MUST fail; a run in which it succeeds means
+      # the constraint that forced the split has gone away and the split should
+      # be revisited rather than inherited.
+      - name: Counterfactual, the combined enum-and-predicate migration must fail
+        run: |
+          set -euo pipefail
+          createdb merit_counterfactual
+          # Everything BELOW 0030, so the probe runs against the schema as it
+          # stood before the enum value existed. Derived from the filename
+          # rather than globbed, because a glob narrow enough to mean "below
+          # 0030" stops meaning it the moment the set reaches 0100.
+          for f in packages/db/migrations/*.sql; do
+            n=$(basename "$f" | cut -c1-4)
+            if [ "$((10#$n))" -ge 30 ]; then break; fi
+            psql -d merit_counterfactual -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+          cat > /tmp/combined.sql <<'SQL'
+          BEGIN;
+          ALTER TYPE payout_status ADD VALUE 'held_pending_review';
+          DROP INDEX payout_requests_no_in_flight_uq;
+          CREATE UNIQUE INDEX payout_requests_no_in_flight_uq
+            ON payout_requests (account_id)
+            WHERE status IN ('approved', 'frozen', 'held_pending_review');
+          COMMIT;
+          SQL
+          if psql -d merit_counterfactual -v ON_ERROR_STOP=1 -q -f /tmp/combined.sql 2>/tmp/combined.err; then
+            echo "COUNTERFACTUAL FAILED: the combined form was ACCEPTED."
+            echo "0030 and 0031 are two files because it is not. Re-read FOLD-02 section 9 item 5."
+            exit 1
+          fi
+          grep -q 'unsafe use of new value' /tmp/combined.err || {
+            echo "The combined form failed for the WRONG REASON, so it proves nothing:"
+            cat /tmp/combined.err
+            exit 1
+          }
+          echo "Combined form rejected as required:"
+          cat /tmp/combined.err
+          # And the guarantee it dropped is still there, which is the property
+          # the transactional form buys and the reason 0031 keeps its BEGIN.
+          psql -d merit_counterfactual -At -c \
+            "select 1 from pg_indexes where indexname = 'payout_requests_no_in_flight_uq'" \
+            | grep -q 1 || { echo "the rollback did not restore the unique index"; exit 1; }
+          dropdb merit_counterfactual

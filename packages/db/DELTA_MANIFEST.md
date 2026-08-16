@@ -1,22 +1,26 @@
 ---
 status: review
 depends_on: [../../docs/architecture/data-model/README.md, ../../docs/decisions/README.md]
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # Delta manifest
 
 **The completeness gate reads this file.** [ADR-026](../../docs/decisions/ADR-026.md) requires that every `SD-nn` and `U-nn` appearing anywhere in `docs/` appears **exactly once** here with a disposition. A count nobody can drift is better than a count someone remembers to update.
 
-**94 schema changes in scope: 88 numbered, 6 unnumbered.** No delta was rejected. 91 land in the v1 core sequence and 3 in the marked reserved sequence.
+**97 schema changes in scope: 88 numbered, 9 unnumbered.** No delta was rejected. 94 land in the v1 core sequence and 3 in the marked reserved sequence.
 
 **The count moved from 93 to 94 by founder ruling (2026-08-14).** `U-06` is the sixth unnumbered change, found while folding. [ADR-026](../../docs/decisions/ADR-026.md)'s table of five did not carry it. See section 5.
+
+**It moved from 94 to 97 on 2026-08-16**, when [ADR-040](../../docs/decisions/ADR-040.md) and [ADR-041](../../docs/decisions/ADR-041.md) landed as `0030` and `0031`: `U-07`, `U-08` and `U-09`, all three unnumbered for the same reason the first six were, which is that a ruling arrived with no delta number attached. **This sentence and the one above it are the only place the total is written by hand**; the checked figure is the `manifest_changes` span in [STATE](../../docs/STATE.md) and [INDEX](../../docs/INDEX.md), which counts the rows rather than trusting the prose.
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
 ## 1. The migration sequence
 
-27 files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->30<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why; <!--gen:e2_files-->20<!--/gen--> of them do.
+
+**This heading read "27 files" while 28 were on disk, and the table below stopped at `0027`.** Both are corrected here rather than only counted: `0028` merged with [ADR-035](../../docs/decisions/ADR-035.md) and was never rowed. `0029` is **reserved and unwritten** ([ALLOCATION](../../docs/decisions/ALLOCATION.md)), which is why the sequence below skips it and why `CI-06h` asserts gaplessness over allocated **plus reserved** rather than over the directory.
 
 | # | File | Money path | Contents |
 |---|---|---|---|
@@ -47,6 +51,9 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 | 0025 | `reserved_sequence` | no | `identity_signal_weights`, `graduation_invitations`, `certificate_verifications` |
 | 0026 | `roles_and_grants` | yes | application role, append-only grants (VG-8), analytics role |
 | 0027 | `triggers_invariants` | yes | zero-sum, LEDGER-C1, LEDGER-C2, immutability triggers |
+| 0028 | `supersede_plan_version_immutability` | yes | [ADR-035](../../docs/decisions/ADR-035.md). Replaces the published-plan-version guard's body and re-adds seven `array_length` CHECKs as `cardinality`. Adds no object |
+| 0030 | `payout_hold_enum` | yes | [ADR-040](../../docs/decisions/ADR-040.md). `payout_status` gains `held_pending_review`. **One statement, no `BEGIN`/`COMMIT`** |
+| 0031 | `payout_hold_and_identity_restriction` | yes | [ADR-040](../../docs/decisions/ADR-040.md) and [ADR-041](../../docs/decisions/ADR-041.md). The hold trio and its CHECK, both `SD-09` predicates widened, the hold-expiry index, `wallet_withdrawals_frozen_cannot_settle`, `identity_restriction_episodes`, and the replacement `COMMENT ON TABLE payout_requests` |
 
 ### Two forward references, and why they are not an ALTER chain
 
@@ -70,7 +77,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-06 | `rule_states` | `engine_eligible`; `engine_gates` / `context_gates` split | 0015 | **landed** |
 | SD-07 | `rule_states` | add `consistency_period_start_day` | 0015 | **landed** |
 | SD-08 | `rule_states` | add `state_hash` | 0015 | **landed** |
-| SD-09 | `payout_requests` | partial unique `(account_id) where status in ('approved','frozen')` (predicate per ADR-028) | 0010 | **landed** |
+| SD-09 | `payout_requests` | partial unique `(account_id) where status in ('approved','frozen')` (predicate per ADR-028) | 0010 | **landed**, **amended by [ADR-040](../../docs/decisions/ADR-040.md)**: both predicates become `('approved','frozen','held_pending_review')`, dropped and re-created under their existing names in `0031`. A widening of an existing delta, not a new one (section 7's rule) |
 | SD-10 | `plan_version_sizes` | conditional not-null on the two `floor_lock_*` columns | 0004 | **landed** |
 
 ## 3. Batch 1: M02 to M08, 37 deltas
@@ -161,9 +168,11 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M20-03 | `wallet_withdrawals` | add `source_provenance_summary`, `earliest_credit_at` | 0011 | **landed** |
 | SD-M20-04 | new `wallet_dormancy` | the obligation is not discovered during an audit | 0011 | **landed** |
 
-## 5. The six unnumbered changes
+## 5. The nine unnumbered changes
 
-Rulings the schema did not yet express. **Five of the six were invisible because nobody was counting**, and the sixth was miscited to a delta that means something else. This is the reason a count matters.
+Rulings the schema did not yet express. **Five of the first six were invisible because nobody was counting**, and the sixth was miscited to a delta that means something else. This is the reason a count matters.
+
+**`U-07` to `U-09` are different in one respect worth stating: they were never invisible.** They are claimed here, in the same commit that writes `0030` and `0031`, because [FOLD-02](../../docs/plans/FOLD-02-enforcement-window-and-suspension.md) section 7 rules that a delta identifier is claimed **by its registry row existing** and not by a plan pre-naming it. The plan that authorized them named no number, deliberately.
 
 | # | Change | Source | Migration | Status |
 |---|---|---|---|---|
@@ -173,6 +182,9 @@ Rulings the schema did not yet express. **Five of the six were invisible because
 | U-04 | `identity_signals.kind` gains `footprint_enrichment` | ADR-023, M07 D-15 | 0002 | **landed** |
 | U-05 | `kyc_verifications.placement` check widened to the ruled trigger set | ADR-021 | 0003 | **landed** |
 | **U-06** | `provisioning_status` gains **`confirmed_inferred`**, plus the binding that `set_risk` may never reach it | M02 section 3.2, AS-M2-03 | 0001 (value), 0007 (binding CHECK) | **landed** |
+| **U-07** | `payout_status` gains **`held_pending_review`**, plus `payout_requests.held_at`, `hold_flag_id`, `hold_expires_at`, `payout_requests_hold_is_complete`, `payout_requests_hold_expiry_after_held` and `payout_requests_hold_expiry_idx` | [ADR-040](../../docs/decisions/ADR-040.md) | 0030 (value), 0031 (columns, CHECKs, index) | **landed** |
+| **U-08** | `wallet_withdrawals` gains **`wallet_withdrawals_frozen_cannot_settle`**: a withdrawal carrying a live freeze may not reach `settled`. `0011` gave the external leg its freeze columns and `wallet_withdrawal_status` has no frozen value, so **the halt was representable and unenforced** | [ADR-040](../../docs/decisions/ADR-040.md) | 0031 | **landed** |
+| **U-09** | new **`identity_restriction_episodes`**, with at most one open episode per identity and an all-or-none restore trio | [ADR-041](../../docs/decisions/ADR-041.md) | 0031 | **landed** |
 
 **`U-06` was found while folding and is the sixth unnumbered change.** The approved [DATA_MODEL section 6](../../docs/architecture/data-model/README.md) declares `provisioning_status` with five values; [M02 section 3.2](../../docs/plans/M02-rithmic-bridge.md) adds a sixth and makes it a distinct state rather than a synonym, and AS-M2-03 makes it **binding that a `set_risk` operation may never reach it**. That is a schema change to an approved document with no delta number, which is the definition of an unnumbered change.
 
@@ -199,6 +211,7 @@ Items found while folding that are **not schema deltas** and are **not closed**.
 | **OI-02** | **`published_statistics` cannot express three of the seven ruled statistics.** ST-04 publishes mean **and** median together and "neither is published alone"; ST-05 and ST-06 each publish **p50 and p95**. Two rows for one statistic, window and grain collide on `published_statistics_window_uq`, and no column distinguishes which figure a row carries. Proposed fix: a `measure` discriminator (`rate`, `total`, `mean`, `median`, `p50`, `p95`, `count`) on the table and in the index. **Applied** by [ADR-032](../../docs/decisions/ADR-032.md), together with **STAT-C1**, a deferred constraint trigger in `0027` asserting that a publish run emitting one measure emits every measure its definition declares. The column made the second figure writable; the trigger is what makes it required | **CLOSED** (2026-08-14) |
 | **OI-03** | **`0026`'s append-only revoke list is a list, and a list drifts.** Eighteen tables are named there against [DATA_MODEL section 1](../../docs/architecture/data-model/README.md)'s Mutability set. The CI check must assert the revoke list **against the document** rather than trusting either | **OPEN**, CI not yet built |
 | **OI-04** | **Two legitimate single-column updates on append-only tables** (`daily_marks.superseded_by`, `identity_links.suppressed`) are forbidden by the grants and require `SECURITY DEFINER` functions that **do not exist yet**. A naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug | **OPEN**, arrives with the owning module |
+| **OI-06** | **`evidence_packs` is account-scoped and a restriction is per human.** `evidence_packs.account_id` is `NOT NULL` (`0008:238`), while [ADR-041](../../docs/decisions/ADR-041.md)'s restriction halts every linked account at once and may precede any account at all. So `identity_restriction_episodes.evidence_pack_id` is nullable and cites a pack exported against **one** of the identity's accounts, which is a narrower artifact than the enforcement it evidences. **This is not fixed here**: widening `evidence_packs` is a change to a merged table on the evidence path and belongs to [M06](../../docs/plans/M06-admin-ops-console.md), which owns the export surface and the `investigating` to `enforced` workflow that requires the pack | **OPEN**, found while folding `0031`, arrives with M06 |
 | **OI-05** | **`0027`'s published-plan-version immutability trigger reads `NEW.config`, and `plan_versions` has no `config` column.** The rule contract is `rules`. PL/pgSQL resolves record fields at execution, so the migration installs cleanly and the function is wrong only when it fires. **Proven by execution, not by reading**: every `UPDATE` against a published row raises `record "new" has no field "config"`. The immutability promise survives by accident, because the error rejects the write; **the ruled `published -> retired` transition is refused too, so no plan version can be retired.** A draft row updates normally, which is why the install check and every probe in section 10 missed it. **`0027` is merged and is not edited**: the fix is a superseding migration, which takes the set from 27 files to 28 | **CLOSED** 2026-08-15. [ADR-035](../../docs/decisions/ADR-035.md) **accepted**; fixed by `0028`, which carries an `E2 READ` header and still needs the founder's read. **Two amendments at acceptance are larger than the ADR as proposed** (the whole row is pinned rather than a list of columns, and a retired row is now frozen absolutely per STATE_MACHINES section 9). The structural fix is **[CI-06j](../../docs/testing/STRATEGY.md)**, which found it from the tree with no database |
 
 ## 9. NO-FLOATS EXEMPTION LIST
@@ -334,3 +347,62 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 **The probe leads with the success case, and that is the transferable part.** Every probe in section 10 attempted a forbidden thing and asserted a rejection, so **every one of them passes against a guard that rejects everything**. Section 10 is an inventory of what somebody thought to test; this row is what the inventory could not see from inside itself.
 
+
+---
+
+## 14. `0030` and `0031` land, and the two-file split is proven by execution (2026-08-16)
+
+**[ADR-040](../../docs/decisions/ADR-040.md) and [ADR-041](../../docs/decisions/ADR-041.md) accepted; [FOLD-02](../../docs/plans/FOLD-02-enforcement-window-and-suspension.md) session 3.** Two files, and the reason they are two is asserted rather than cited.
+
+### The counterfactual, and the counterfactual's own counterfactual
+
+**FOLD-02 section 9 item 5 requires the combined form be watched failing**, on `0028`'s transferable lesson: a probe that only ever attempts forbidden things passes against a guard that rejects everything. It was written, run against the full `0001`-`0028` set on PostgreSQL 16, and it failed:
+
+```
+ERROR:  unsafe use of new value "held_pending_review" of enum type payout_status
+LINE 3:   WHERE status IN ('approved', 'frozen', 'held_pending_revie...
+HINT:  New enum values must be committed before they can be used.
+```
+
+**And then the probe that makes that one mean something was run too**, because a failure watched in one direction only is the same defect one level up. The **same statements with the `BEGIN`/`COMMIT` removed**, under the install job's autocommit, **succeed**.
+
+| Form | Result |
+|---|---|
+| `ALTER TYPE` and the predicate, one file, wrapped in `BEGIN`/`COMMIT` | **rejected**, `unsafe use of new value`. The rollback restores the unique index the file had already dropped |
+| The same statements, one file, **no transaction block**, autocommit | **accepted** |
+| `0030` then `0031`, as shipped | **accepted**, and `0031` keeps its transaction |
+
+**So FOLD-02 finding 6 is imprecise and the correction is recorded rather than smoothed over.** It reads "the enum value and the index predicates that reference it **cannot be one file**". They can, if that file gives up atomicity. What they cannot be is one **atomic** file, and **it is `0031` that needs the atomicity**: `0031` drops a uniqueness guarantee before re-creating it, and a non-atomic `0031` failing between the two leaves `payout_requests` with nothing enforcing `G-NO-IN-FLIGHT` and a runner reporting a partial apply. The nicer-sounding reason and the true one differ, and the true one is the one that generalizes to the next enum value somebody adds.
+
+**It is a CI step, not a paragraph.** `.github/workflows/corpus.yml` applies everything below `0030` to a scratch database, runs the combined form, and **fails the build if it succeeds** or if it fails for any reason other than `unsafe use of new value`. If PostgreSQL ever relaxes this, the split should be revisited rather than inherited, and the build is what will say so.
+
+### Verification performed
+
+| Check | Result |
+|---|---|
+| All <!--gen:migration_files-->30<!--/gen--> migrations apply forward-only from empty, `ON_ERROR_STOP=1` | **pass**, zero errors |
+| Object counts, from the catalogue rather than a grep | **97 tables, 331 indexes, 353 check constraints, 6 triggers** |
+| The delta against `0001`-`0028` | `+1` table, `+5` indexes, `+6` check constraints, `+0` triggers. **Two of the five indexes are replacements under existing names**, so the net new objects are the hold-expiry index and the episode table's four |
+| [`probe_payout_hold.sql`](../../scripts/db/probe_payout_hold.sql), **18 assertions, leading with the success cases** | **18 / 18 pass** |
+| [CI-06i](../../docs/testing/STRATEGY.md), every `CREATE TABLE` has a design record, both directions | **97 / 97** |
+| [CI-06h](../../docs/testing/STRATEGY.md), every number on disk claimed by [ALLOCATION](../../docs/decisions/ALLOCATION.md), gapless over allocated plus reserved | **pass.** `0029` is a reserved hole, which is the case the gate was written for |
+
+**The probe leads with four success cases before it attempts a single rejection**: a hold is writable at all, a second outstanding request is refused, the auto-release pays and the hold stays provable, and enforcement frees the ladder rung. A hold that cannot be written satisfies every rejection assertion in the file and pays nobody, which is the shape of pass [ADR-035](../../docs/decisions/ADR-035.md) was found hiding inside.
+
+### Two departures from the approved plan, recorded rather than absorbed
+
+**1. `wallet_withdrawals_open_idx` is NOT re-created.** [ADR-040](../../docs/decisions/ADR-040.md) and FOLD-02 section 4.5 both say "the open index re-created so a halted row stays visible". Its predicate is `status IN ('requested','cooling','approved','transferring')` (`0011:205`), and because the halt is **orthogonal to the rail state** by that same ADR's ruling, a halted withdrawal is still `approved` or `transferring` and **already matches**. The fold's own finding 3 says exactly this from the other side: "a halted withdrawal still matches `wallet_withdrawals_open_idx` and nothing refuses settlement", so what was missing was the refusal, which is `U-08`. Dropping and re-creating an index to a byte-identical definition on a money table is a null change that reads in a diff as a considered one. The halted set's own read path is already indexed too: `wallet_withdrawals_freeze_expiry_idx` is `(freeze_expires_at) WHERE freeze_expires_at IS NOT NULL`, and by `wallet_withdrawals_freeze_is_complete` that is exactly the halted set. **If the E2 read wants the re-creation anyway it belongs in a superseding migration**, because `0031` will be merged by then.
+
+**2. `payout_requests_hold_is_complete` does not have the freeze trio's shape, and the difference is retention.** `payout_requests_freeze_is_complete` (`0010:141`) couples its trio to the status in both directions, so a released freeze must **clear** its columns and the row keeps no evidence it was ever frozen. That is merged and is not edited. The new constraint is written the other way: an **open** hold must be complete, and a **released** hold keeps its trio, so "Merit held this payout and paid it at the SLA" is provable from the row. This is [ADR-041](../../docs/decisions/ADR-041.md)'s own argument for the restriction being an episode row rather than a column, applied one table over: **a record erased by the act of ending is unprovable at exactly the moment it is contested**, and a trader whose money was held for 48 hours is the person most likely to ask. The one combination that stays unrepresentable either way is a hold with a flag and no clock, or a clock and no flag. **The resulting asymmetry inside one file is real**: on `wallet_withdrawals` a released freeze still clears its trio, because that constraint is merged. Named in `0031`'s section 4 rather than left for a reader to notice.
+
+### One defect found in the gate runner, by executing rather than reading
+
+**`CI-06g` could not see the `e2_files` spans, and reported success.** `spansIn()` in [`gates.mjs`](../../scripts/corpus/gates.mjs) matched span names against `[a-z_]+`. Every key in `SPAN_QUERIES` parses under that **except one**: `e2_files` contains a digit. So the four `<!--gen:e2_files-->` spans in [STATE](../../docs/STATE.md) and [INDEX](../../docs/INDEX.md) matched nothing, the checker never compared them, the generator never rewrote them, and both reported success. **A span nobody can see is indistinguishable from a span that agrees with its query.**
+
+They read **18**, which was true when written and stopped being true the moment `0028` merged; `0030` and `0031` take the real figure to **20**. The number they carry is **the scope of the founder's E2 read**, which is the one count in this corpus whose staleness has a person attached to it.
+
+**How it surfaced is the transferable part.** The same span key was written into this file and into DATA_MODEL at `20` in the same commit, and `gates.mjs check` passed with **two documents saying 18 and two saying 20**. A gate cannot survive that contradiction, and noticing it took running the thing rather than reading it, which is [ADR-035](../../docs/decisions/ADR-035.md)'s lesson arriving in the gate runner instead of a trigger body. The character class now reads `[a-z0-9_]+`, `falsify.mjs` still watches `CI-06g` fail on a hand-edited span, and the three stale spans were regenerated.
+
+### What is NOT in this session, and is not implied by it
+
+`0030` and `0031` bind the **database**. They do not touch `G-ELIGIBLE`, the machines, the invariants, the surfaces, the ToS clauses, the events, the edge cases, the golden scenarios, `CI-06l`, or `CRON_INVENTORY`, all of which are FOLD-02 sessions 4 through 8. **`identities.status = 'restricted'` still does not block a payout request or a checkout**, because that binding is `G-ELIGIBLE`'s and lands with the machines. The schema is ready for it; nothing enforces it yet, and saying so is the difference between a migration set and a shipped ruling.

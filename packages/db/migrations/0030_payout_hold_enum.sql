@@ -1,0 +1,71 @@
+-- =============================================================================
+-- 0030_payout_hold_enum
+-- =============================================================================
+-- E2 READ: MONEY PATH. ONE STATEMENT. The whole of the founder's read here is
+-- the statement itself and the reason this file exists at all.
+--
+-- ADR-040, ACCEPTED 2026-08-15. payout_status gains 'held_pending_review', a
+-- PRE-APPROVAL state entered when an unresolved high-severity flag exists at
+-- request time, with a hard 48 hour auto-release SLA. The columns, the
+-- predicates and the index that make it bind are in 0031.
+--
+-- WHY THIS IS ITS OWN FILE, AND WHY IT HAS NO BEGIN/COMMIT
+--
+--   PostgreSQL refuses to USE a new enum value in the transaction that ADDED
+--   it. Every index predicate in 0031 is such a use. Every other migration in
+--   this set wraps itself in BEGIN/COMMIT, and 0031 must: it creates a table,
+--   three columns, two indexes and four constraints, and a set that half
+--   applies is a schema nobody can reason about. So the two cannot be one file,
+--   and this one carries no transaction block of its own.
+--
+--   The install job runs each file through `psql -f` in autocommit
+--   (.github/workflows/corpus.yml), so this statement commits on its own and
+--   0031 opens afterwards against a committed value.
+--
+--   PROVEN BY EXECUTION, NOT BY CITING THE MANUAL, per FOLD-02 section 9 item
+--   5 and 0028's transferable lesson. The combined form was written, run
+--   against PostgreSQL 16 on the full 0001-0028 set, and watched failing:
+--
+--     ERROR:  unsafe use of new value "held_pending_review" of enum type
+--             payout_status
+--     LINE 3:   WHERE status IN ('approved', 'frozen', 'held_pending_revie...
+--     HINT:  New enum values must be committed before they can be used.
+--
+--   AND THE PROBE THAT MAKES THAT ONE MEAN SOMETHING WAS RUN TOO, because a
+--   guard watched failing in only one direction is 0028's defect again. The
+--   SAME combined statements with the BEGIN/COMMIT REMOVED, under the install
+--   job's autocommit, SUCCEED. So "these cannot be one file" is imprecise and
+--   is not what this header claims: they cannot be one file THAT IS ATOMIC.
+--   FOLD-02 finding 6 states it the first way; the correction is recorded in
+--   DELTA_MANIFEST section 14 rather than left as a nicer-sounding reason.
+--
+--   The atomicity is the whole argument, and it is 0031 that needs it: 0031
+--   DROPS a uniqueness guarantee before re-creating it, and a non-atomic 0031
+--   that fails between the two leaves payout_requests with NOTHING ENFORCING
+--   G-NO-IN-FLIGHT and a migration runner reporting a partial apply. In the
+--   transactional form the ALTER's failure rolled the DROP back with it, which
+--   is exactly the property being preserved by putting the ALTER here.
+--
+-- WHAT THE ZERO-DENIAL POLICY NOW SAYS, because 0001:73 and 0010:77 both say
+-- the older thing and are MERGED, so they stay as written forever (E2). A
+-- reader arriving from either lands here:
+--
+--   The substance survives. NO PAYOUT IS DENIED. Every hold either pays inside
+--   48 hours or produces a documented enforcement action carrying a cited flag,
+--   a ToS clause and an evidence pack.
+--
+--   The mechanism changes. Zero denial was expressed as "no review state
+--   exists". It is now "a review state exists AND IT EXPIRES". There is still
+--   no 'denied' value and adding one still requires an ADR against the policy.
+--
+-- ORDERING. The value appends after 'frozen' rather than being placed with
+-- BEFORE/AFTER, because nothing in this schema sorts on payout_status and a
+-- placement chosen for reading order would imply an ordering that no query has.
+--
+-- Delta: U-07 (the value; the rest of U-07 is in 0031)
+-- Ruling: ADR-040
+--
+-- Migrations are sacred: once merged, never edited, only superseded.
+-- =============================================================================
+
+ALTER TYPE payout_status ADD VALUE 'held_pending_review';

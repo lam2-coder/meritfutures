@@ -758,9 +758,27 @@ const sqlMatchCount = (re) =>
 // STRATEGY's own CI-06g section shows `<!--gen:adr_count-->25<!--/gen-->` in a
 // fence as the worked example; regenerating it would rewrite the explanation of
 // the mechanism to match the mechanism.
+// THE NAME CLASS INCLUDES DIGITS, AND IT DID NOT UNTIL 2026-08-16.
+//
+// It was `[a-z_]+`. Every span key in SPAN_QUERIES parses under that except one:
+// `e2_files`. So the four `<!--gen:e2_files-->` spans in STATE and INDEX MATCHED
+// NOTHING. The checker never compared them and the generator never rewrote them,
+// and both reported success, because a span nobody can see is indistinguishable
+// from a span that agrees with its query.
+//
+// They read "18" and were right when written; `0028` made them 17 short of
+// nothing and `0030`/`0031` took the true figure to 20 with no gate moving. The
+// count they carry is the SCOPE OF THE FOUNDER'S E2 READ, which is the one
+// number in the corpus whose staleness has a person attached to it.
+//
+// Found by executing rather than by reading: the same span key was written into
+// DELTA_MANIFEST and DATA_MODEL at 20 in the same commit, `check` passed with
+// two documents saying 18 and two saying 20, and that contradiction is what a
+// passing gate could not survive. The exact shape of ADR-035, in the gate runner
+// rather than in a trigger body.
 function spansIn(body) {
   const masked = body.replace(/^```[\s\S]*?^```/gm, (block) => block.replace(/</g, '\0'));
-  return [...masked.matchAll(/<!--gen:([a-z_]+)-->(.*?)<!--\/gen-->/gs)];
+  return [...masked.matchAll(/<!--gen:([a-z0-9_]+)-->(.*?)<!--\/gen-->/gs)];
 }
 
 const ci06g = {
