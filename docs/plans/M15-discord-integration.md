@@ -1,18 +1,20 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/TOP10_FIRMS.md, M07-risk-abuse.md, M10-integrations.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M16-notification-center.md]
-last_updated: 2026-08-14
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../DELIVERY_PLAN.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, ../../research/ADVERSARY_DOSSIER.md, ../../research/TOP10_FIRMS.md, M07-risk-abuse.md, M10-integrations.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M16-notification-center.md]
+last_updated: 2026-08-16
 ---
 
 # M15: Discord Integration
 
-Constitution section §4-ADDENDUM ("role sync on funded and payout events, announcements bot"), section 10's open decision that **Discord community bot scope is post-launch**, and Appendix B5's ten-section template. Non-money path, and the module with the widest gap in the corpus between how small it looks and how much it discloses.
+Constitution section §4-ADDENDUM ("role sync on funded and payout events, announcements bot"), section 10's open decision that Discord community bot scope is post-launch, **amended by [ADR-041](../decisions/ADR-041.md) on 2026-08-15**, and Appendix B5's ten-section template. Non-money path, and the module with the widest gap in the corpus between how small it looks and how much it discloses.
 
 One sentence governs this module: **every Discord role is a public statement about a trader, and every bot message is Merit speaking in a room it does not control.**
 
 The market makes the case for being here. [TOP10_FIRMS](../../research/TOP10_FIRMS.md) records Tradeify running a 102,000 member Discord as its primary announcement channel, and the [dossier](../../research/ADVERSARY_DOSSIER.md) records that the same platform is where hedging syndicates, paid passing services, and copy-ring rentals coordinate. Both facts are about the same room. A firm's community server is simultaneously its best retention surface and a venue its adversaries already occupy, and this plan treats those as one problem rather than two.
 
-**Section 10's ruling is respected rather than reargued: this module is post-launch.** It is planned now because the events it consumes and the identity link it needs are decisions that must not be retrofitted, and because building it later against a design nobody wrote is how a bot ends up holding an authentication factor.
+**Section 10's post-launch scoping held until 2026-08-15 and is now partially amended.** [ADR-041](../decisions/ADR-041.md) moves **the identity link and the announcement templates into launch scope at P8, +3 to 5 days, and leaves role sync post-launch**, which is this plan's own `OQ-M15-01` recommendation with a phase and a number attached. The constitution is read-only and the ADR is the amendment, per [CLAUDE.md](../../CLAUDE.md). [DELIVERY_PLAN](../DELIVERY_PLAN.md) sections 1, 2, 4 and 5 carry it, and its headline is restated as **18 weeks plus 3 to 5 days** rather than leaving the delta implied.
+
+**The reason the module was planned before it was scheduled is unchanged, and the ruling is what that reasoning was for.** The events it consumes and the identity link it needs are decisions that must not be retrofitted, and building it later against a design nobody wrote is how a bot ends up holding an authentication factor. **The ruling's own ground is `INV-M15-06`**, not a roadmap preference: role removal must be silent, batched, and never coincident with an enforcement, and [ADR-041](../decisions/ADR-041.md)'s identity restriction creates an enforcement that halts every linked account at once.
 
 **Identifier conventions:** `INV-M15-nn` invariants, `SD-M15-nn` schema deltas, `RS-M15-nn` role surfaces, `FM-M15-nn` failure modes, `AS-M15-nn` adversarial scenarios, `OQ-M15-nn` open questions, `DEP-M15-nn` dependencies.
 
@@ -24,11 +26,26 @@ The market makes the case for being here. [TOP10_FIRMS](../../research/TOP10_FIR
 
 A community Discord presence with three capabilities, each scoped tightly by what it is allowed to reveal.
 
-| ID | Capability | Scope |
-|---|---|---|
-| RS-M15-01 | **Identity link** | A trader voluntarily links a Discord account to their Merit identity. One way, revocable, and never an authentication factor (AS-M15-02) |
-| RS-M15-02 | **Role sync** | Roles granted from Merit state, **opt in per role**, and deliberately coarse (AS-M15-01) |
-| RS-M15-03 | **Announcements** | Merit speaking: releases, rule-version publishes, status. Sourced from events, never hand-typed by the bot's credential (AS-M15-03) |
+| ID | Capability | Scope | Ships |
+|---|---|---|---|
+| RS-M15-01 | **Identity link** | A trader voluntarily links a Discord account to their Merit identity. One way, revocable, and never an authentication factor (AS-M15-02) | **P8** ([ADR-041](../decisions/ADR-041.md)) |
+| RS-M15-02 | **Role sync** | Roles granted from Merit state, **opt in per role**, and deliberately coarse (AS-M15-01) | **Post-launch** |
+| RS-M15-03 | **Announcements** | Merit speaking: releases, rule-version publishes, status. Sourced from events, never hand-typed by the bot's credential (AS-M15-03) | **P8** ([ADR-041](../decisions/ADR-041.md)) |
+
+**`PATCH /me/discord/roles` and `role_opt_ins` ship with role sync and not before.** A consent surface for roles that do not exist collects a preference nothing reads, and a stored opt-in that predates the thing it consents to is consent to a description rather than to a behavior.
+
+### 1.1a What the partial scope buys, and what it does not discharge
+
+**Stated here because the ruling's reason and the ruling's contents are about different halves of this module, and a reader who assumes they are the same half will draw the wrong conclusion about launch day.**
+
+`INV-M15-06` is the ground of the ruling and **role sync is the thing it constrains**, so at launch it constrains nothing: with no role sync there is no role to vanish at the moment of an enforcement. **The launch-day protection against AS-M15-05 is role sync's absence, not the pulled-forward scope**, and nothing in P8 enforces `INV-M15-06` because nothing in P8 can violate it.
+
+**What the ruling buys is the ordering.** Role sync now arrives into a corpus where identity restriction already exists, where the batching discipline was written against it, and where the removal path can be built against a real enforcement rather than an anticipated one. The alternative the ADR rejected is the reverse order, in which role sync ships first and the first restriction is the one that discovers the gap in public.
+
+**Two consequences follow, and the second is the one a reader is most likely to miss.**
+
+1. **Role sync does not ship without `M15-B-nn` green and `DEP-M15-04` met.** Those are already merge-blocking here; what changes is that they are now the gate on a post-launch deployment rather than on a launch-scope one, and a post-launch deployment has no launch checklist standing behind it.
+2. **The room is in launch scope even though most of the module is not.** A community server with an announcement bot and a link flow is a public venue Merit hosts from P8. **AS-M15-04 (Merit hosts the room where the rings recruit) and AS-M15-06 (support in public) are live from the day the server opens**, and neither depends on role sync. The scenarios that wait with role sync are AS-M15-01 and AS-M15-05. **The partial scope is not half the risk; it is a different half of the risk than the module's headline feature.**
 
 ### 1.2 What this module is not
 
@@ -254,16 +271,20 @@ stateDiagram-v2
 
 ### 8.1 Suites
 
-| Suite | Prefix | Count | Runs | Blocks |
-|---|---|---|---|---|
-| Link flow: direction, nonce single use, replay, revocation | `M15-L-nn` | 8 | every commit | merge |
-| Role consent: per-role opt in, coarseness assertion over the role catalogue | `M15-R-nn` | 7 | every commit | merge |
-| Removal batching and enforcement decoupling | `M15-B-nn` | 5 | every commit | merge |
-| Announcement templating (negative: no free-text path, no unknown template) | `M15-A-nn` | 6 | every commit | merge |
-| Negative authz and grant separation (auth, support, risk, evidence) | `M15-N-nn` | 6 | every commit | merge |
-| Credential separation from [M10](M10-integrations.md)'s alerting | `M15-S-nn` | 3 | every commit | merge |
-| Reconciliation sweep after a Discord outage | `M15-O-01` | 1 | nightly | nightly alarm |
-| Golden fixtures | `GS-nnn` | 6 owned (GS-186 to GS-191) | every commit | merge |
+| Suite | Prefix | Count | Runs | Blocks | Ships |
+|---|---|---|---|---|---|
+| Link flow: direction, nonce single use, replay, revocation | `M15-L-nn` | 8 | every commit | merge | **P8** |
+| Role consent: per-role opt in, coarseness assertion over the role catalogue | `M15-R-nn` | 7 | every commit | merge | post-launch |
+| Removal batching and enforcement decoupling | `M15-B-nn` | 5 | every commit | merge | post-launch |
+| Announcement templating (negative: no free-text path, no unknown template) | `M15-A-nn` | 6 | every commit | merge | **P8** |
+| Negative authz and grant separation (auth, support, risk, evidence) | `M15-N-nn` | 6 | every commit | merge | **P8** |
+| Credential separation from [M10](M10-integrations.md)'s alerting | `M15-S-nn` | 3 | every commit | merge | **P8** |
+| Reconciliation sweep after a Discord outage | `M15-O-01` | 1 | nightly | nightly alarm | post-launch |
+| Golden fixtures | `GS-nnn` | 6 owned (GS-186 to GS-191) | every commit | merge | **four at P8**, GS-186 and GS-190 with role sync |
+
+**The `Ships` column follows the capability it asserts and nothing else.** The four P8 suites are the ones [DELIVERY_PLAN](../DELIVERY_PLAN.md)'s P8 definition of done names, and the agreement between the two documents is deliberate rather than incidental: a phase whose definition of done names a different set of suites than the module does is a phase that can be declared complete by either list.
+
+**`M15-N-nn` is in the launch set and it is the one that would look deferrable.** It asserts that the link table is unreachable from the auth and support-verification services by grant, and the link is exactly what P8 ships. `INV-M15-03` binds from the first linked account, not from the first synced role.
 
 ### 8.2 Named scenarios owned by this module
 
@@ -275,6 +296,8 @@ stateDiagram-v2
 | GS-189 | Prohibited-arrangement solicitation observed in the community | Moderated as a server matter, producing **no flag, no evidence entry, and no account action**. AS-M15-04 |
 | GS-190 | Enforcement closes an account holding a synced role | Removal is deferred to a batch window containing mixed churn, and the trader was notified first. AS-M15-05 |
 | GS-191 | Account-specific question asked in a public channel | Automatic routing reply, no account state disclosed, and no human answer in channel. AS-M15-06 |
+
+**GS-186 and GS-190 pin role sync and ship with it. GS-187, GS-188, GS-189 and GS-191 pin surfaces that exist from P8**, and GS-189 and GS-191 are live at launch for the reason section 1.1a gives: they are about the room rather than about the roles, and the room opens with the announcement bot.
 
 ### 8.3 Coverage rule
 
@@ -315,7 +338,9 @@ M15 supplies a small panel: opt-in shares per role, unlink rate, sync drift, and
 
 ## 10. Open questions for the founder
 
-**OQ-M15-01. Confirming section 10's post-launch scoping.** The constitution leaves Discord bot scope as a post-launch decision and this plan assumes that stands. Two pieces are worth pulling forward regardless: the **event allowlist** and the **link direction**, because both are cheap now and expensive to retrofit, and a link built later without INV-M15-03 in mind is exactly how a chat account becomes a credential. Proposed: **build the link and the announcement templates in the launch quarter; ship role sync post-launch**, after the community exists and its norms are visible.
+**~~OQ-M15-01. Confirming section 10's post-launch scoping.~~ RULED 2026-08-15, [ADR-041](../decisions/ADR-041.md).** The recommendation was **build the link and the announcement templates in the launch quarter and ship role sync post-launch**, and it is adopted as written, with the two things the recommendation lacked supplied: **the phase, P8, and the cost, +3 to 5 days.** The question closed as `OQ-F2-03`.
+
+> **What is worth keeping from the closed question is why it was proposed at all.** The event allowlist and the link direction were named as cheap now and expensive to retrofit, and a link built later without `INV-M15-03` in mind is how a chat account becomes a credential. **The ruling was decided on a different ground** (`INV-M15-06` and the ordering against identity restriction, section 1.1a), **and the two grounds happen to select the same scope.** That is a coincidence worth noticing rather than evidence that the reasoning was shared: had they disagreed, this plan would have deferred to the ADR and said so here.
 
 **OQ-M15-02. Does a payout-visible role exist at all?** AS-M15-01 argues it is the most targetable signal Merit could publish and that its benefit is community texture a trader can already create for themselves with an [M11](M11-certificates-social-proof.md) certificate, consented per instance. Proposed: **it does not exist.** Traders who want to share a payout share a certificate, which is their choice each time rather than a standing broadcast.
 
@@ -335,3 +360,7 @@ M15 supplies a small panel: opt-in shares per role, unlink rate, sync drift, and
 | DEP-M15-04 | M16 notifies a trader before a role is removed | M16 | A trader learns their own status change from a Discord sidebar |
 | DEP-M15-05 | M12 owns every published aggregate | M12 | The announcements bot becomes a second publisher with no method page |
 | DEP-M15-06 | M11 certificates exist as the consented, per-instance alternative to a payout role | M11 | OQ-M15-02's recommendation loses its substitute, and the pressure for a standing broadcast returns |
+
+**Four of these six now bind at P8 rather than post-launch, and their owners' own scopes did not move.** `DEP-M15-01`, `DEP-M15-02`, `DEP-M15-03` and `DEP-M15-05` all attach to the link, the bot credential or the announcement path, every one of which ships in P8. `DEP-M15-04` and `DEP-M15-06` attach to role sync and to the payout-role substitute and travel with them.
+
+**`DEP-M15-05` is the one to watch, because M12 is launch scope and its numbers are not.** [DELIVERY_PLAN](../DELIVERY_PLAN.md) section 2 records that at a `min_sample` of 250 the transparency platform publishes "not yet meaningful" on launch day. An announcement bot in a young community is under exactly the pressure `AS-M15-03` describes, and the answer does not change: the bot links to [M12](M12-transparency-platform.md) or it says nothing, and "not yet meaningful" is what it links to. **A template that would render a statistic the platform is declining to publish is the same second publisher `INV-M15-05` forbids**, arriving through a gap in the calendar rather than through a gap in the design.

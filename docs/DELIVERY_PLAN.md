@@ -1,14 +1,16 @@
 ---
 status: approved
-depends_on: [../MERIT_BUILD_MASTER_PROMPT.md, decisions/README.md, STATE.md, INDEX.md, testing/STRATEGY.md, testing/SIMULATION_HARNESS.md, GUIDE_BRIEFING.md]
-last_updated: 2026-08-14
+depends_on: [../MERIT_BUILD_MASTER_PROMPT.md, decisions/README.md, STATE.md, INDEX.md, testing/STRATEGY.md, testing/SIMULATION_HARNESS.md, GUIDE_BRIEFING.md, plans/M15-discord-integration.md]
+last_updated: 2026-08-16
 ---
 
 # Delivery Plan
 
 **Constitution section 8's twelve-week plan, re-planned against what the corpus has since decided.** The constitution is read-only, so this document is the amendment, made through the process section 9 requires.
 
-**The headline, stated first because it is the thing the founder needs and everything below is the argument for it: the plan is now 18 weeks to a public-launch gate, not 12.** Six weeks were added by five decisions, every one of them deliberate and every one of them recorded with its cost at the time it was taken. **None of the six weeks is slippage.** What follows is where each went, what is launch-blocking and what is not, and what could be traded if the schedule tightens.
+**The headline, stated first because it is the thing the founder needs and everything below is the argument for it: the plan is now 18 weeks plus 3 to 5 days to a public-launch gate, not 12.** Six weeks and 3 to 5 days were added by six decisions, every one of them deliberate and every one of them recorded with its cost at the time it was taken. **None of it is slippage.** What follows is where each went, what is launch-blocking and what is not, and what could be traded if the schedule tightens.
+
+**The 3 to 5 days are [ADR-041](decisions/ADR-041.md)'s, they are the first addition since FREEZE, and they are stated in the headline rather than absorbed into a phase.** A three-day addition is exactly the size that gets rounded away, and a plan that rounds away every three-day addition has no way of noticing the fourth one. The rule this document applies to a 2 to 4 week decision applies to a 3 day one or it is not a rule.
 
 ---
 
@@ -22,6 +24,7 @@ last_updated: 2026-08-14
 | **[ADR-023](decisions/ADR-023.md), checkout enrichment** | **+2 to 3 days.** Bought rather than built, observe mode first, one adapter and one signal path | Yes, as a bought integration |
 | **M11 through M18**, ten modules the twelve weeks never mentioned | **Variable, and this is where the triage in section 2 does its work.** Not all of them are launch-blocking and treating them as though they were is how a 12 week plan becomes a 30 week one | No. Section 8 predates the §4-ADDENDUM's module expansion |
 | **[ADR-025](decisions/ADR-025.md), cap release rejected** | **Net zero, slightly negative.** Progressive cap release leaves scope; cross-account loyalty is smaller and is not launch-blocking in any case | Yes |
+| **[ADR-041](decisions/ADR-041.md), M15 partial into launch scope** | **+3 to 5 days.** The Discord link and the announcement templates enter **P8**; role sync stays post-launch. The smallest of the six additions and the first since FREEZE | **Yes**, as days rather than as a pull-forward with no number, on this document's own discipline. It is recorded so it can be traded, which is [ADR-020](decisions/ADR-020.md)'s reason for stating a duration at all |
 
 **The two-tier data plane is the trade that is actually available.** It is recorded as a duration precisely so that this sentence can be written: **cutting tier 2 recovers 2 to 4 weeks and costs Merit a live dashboard**, which is competitive-floor table stakes in this market. The recommendation is to keep it, and the founder should know it is the lever.
 
@@ -47,9 +50,11 @@ last_updated: 2026-08-14
 | **M17 offers engine**, minimal | **SHOULD** | Commercial. Reset pricing at launch is needed; experiments, bundles, and promotional credit are not |
 | **M13 analytics and journal** | **LATER** | Retention driver, not a launch requirement. It also carries the load-contention risk against the payout path ([EC-103](edge-cases/EC-103.md)), which is a reason to ship it when there is slack rather than during a launch |
 | **M14 loyalty and retention** | **LATER** | [ADR-025](decisions/ADR-025.md) shrank it and its trigger is a **completed ladder**, which by construction nobody has for at least 25 trading days after the first funded account |
-| **M15 Discord** | **LATER** | Constitution section 10 already says post-launch |
+| **M15 Discord**, the link and the announcement templates | **MUST**, partially | **[ADR-041](decisions/ADR-041.md), and this is the one row the three tests did not decide.** They would have left it LATER, where it sat until 2026-08-15. It moves on `INV-M15-06`: role removal must be silent, batched, and never coincident with an enforcement, and Ruling B creates an enforcement that halts every linked account at once. **Role sync stays post-launch**, so what ships at launch is the link and the template-only announcement path, per [M15](plans/M15-discord-integration.md)'s own `OQ-M15-01`. **+3 to 5 days, P8** |
 
 **The triage recovers roughly 4 weeks** against a plan that treated all ten as launch scope, and it is why 18 rather than 22.
+
+**M15 is the first thing the triage has given back, and it gave back days rather than weeks.** The row is kept in the table with its reasoning rather than deleted, because the useful record is not that M15 is launch scope; it is that a module the three tests placed at LATER was moved by an invariant in a different module, and the next module to move will most likely move the same way. **A triage test set that cannot see a cross-module invariant is a triage test set with a known blind spot**, and this is its first instance rather than an exception to it.
 
 ---
 
@@ -86,7 +91,9 @@ The founder marks the corpus FROZEN in [STATE](STATE.md). **Only after this does
 
 ## 4. The revised plan
 
-Eighteen weeks. Each phase carries a definition of done that includes its tests green, per section 8's own rule.
+Eighteen weeks plus 3 to 5 days. Each phase carries a definition of done that includes its tests green, per section 8's own rule.
+
+**The delta sits in P8 and moves P9's start with it.** It is written into the two phases it touches rather than into the total alone, so that a reader looking at a phase sees the same number as a reader looking at the headline.
 
 | Phase | Weeks | Contents | Definition of done |
 |---|---|---|---|
@@ -97,18 +104,21 @@ Eighteen weeks. Each phase carries a definition of done that includes its tests 
 | **P5 Payouts and wallet** | **9 to 10** | **M20 wallet and the two-leg payout**, the external rail in sandbox, the freeze path with its expiry sweep, the admin liability dashboard including wallet balances, the event feed | Two-leg atomicity green, wallet concurrency green, a freeze reaching expiry **releases**, reserve coverage computed with float excluded |
 | **P6 Live tier** | **11 to 12** | **[ADR-020](decisions/ADR-020.md)'s tier 2**: streaming ingest through the adapter, the live cache, WebSocket delivery, live portal surfaces, live Open Liability, degradation and labeling | GS-132 byte-identical with the cache poisoned, GS-133 relabeling in the same render as the fallback. **This is the tradeable phase** |
 | **P7 Risk and abuse** | **13 to 14** | Tier-1 detectors including D-12 to D-14, the flags queue, two-tier evidence packs, CUSUM and circuit breakers, [ADR-022](decisions/ADR-022.md)'s **v1 tier only**, Metabase, Chatwoot and Loops wiring | Detector canaries found on every run, evidence-pack redaction by audience green, the breaker reporting `insufficient_data` rather than firing on a small sample |
-| **P8 Hardening** | **15 to 16** | Idempotency chaos, load sanity, the security pass and the D0 battery, **the runbooks rehearsed rather than read**, the real Rithmic test environment, the CME TPAP prerequisites checklist | All ten D0 fixtures green, both load profiles inside target, **the restore drill run once for real with payouts mid-queue**, the break-glass existence check performed |
-| **P9 Private beta** | **17 to 18+** | 50 to 100 traders at a discount. **The shadow-run**, daily triage, polish | **Six clean weeks of shadow-run, restarting on any P0** ([STRATEGY](testing/STRATEGY.md) section 3.6). This gate is measured in clean weeks rather than in calendar weeks, which is why the plan ends at "18+" |
+| **P8 Hardening** | **15 to 16, plus 3 to 5 days** | Idempotency chaos, load sanity, the security pass and the D0 battery, **the runbooks rehearsed rather than read**, the real Rithmic test environment, the CME TPAP prerequisites checklist, and **[M15](plans/M15-discord-integration.md)'s partial scope: the identity link and the template-only announcement path, role sync excluded** ([ADR-041](decisions/ADR-041.md)) | All ten D0 fixtures green, both load profiles inside target, **the restore drill run once for real with payouts mid-queue**, the break-glass existence check performed. **For M15: the link suite, the announcement suite proving there is no free-text send path and no unknown-template post, the negative-authz suite proving the link table is unreachable from auth and support verification, and the credential-separation suite against [M10](plans/M10-integrations.md)'s alerting.** The role-consent and removal-batching suites ship with role sync and are not P8's |
+| **P9 Private beta** | **17 to 18+, shifted by P8's 3 to 5 days** | 50 to 100 traders at a discount. **The shadow-run**, daily triage, polish. **The community server exists from P8**, which is the point of moving M15: the surface is there when the beta community forms rather than arriving after it has settled somewhere else | **Six clean weeks of shadow-run, restarting on any P0** ([STRATEGY](testing/STRATEGY.md) section 3.6). This gate is measured in clean weeks rather than in calendar weeks, which is why the plan ends at "18+" |
 
 **P9 is honestly open-ended and the plan says so.** The public-launch gate is the constitution's section 5.6 requirement, it is measured in consecutive clean weeks, and a plan that quotes it as two weeks is a plan that has already decided to shorten it.
 
 ---
 
-## 5. What is not in the 18 weeks
+## 5. What is not in the plan
+
+**The heading previously read "what is not in the 18 weeks" and the total is no longer a whole number of weeks.** The list is what the plan excludes, not what a particular figure excludes, and phrasing it against a figure is how a section heading goes stale without anything catching it.
 
 | Item | When |
 |---|---|
-| M13 analytics and journal, M14 loyalty, M15 Discord | Post-launch, in that order |
+| M13 analytics and journal, M14 loyalty | Post-launch, in that order |
+| **M15's role sync**: the per-role consent surface, the removal batching, and the reconciliation sweep | Post-launch. **The link and the announcement templates ship in P8** ([ADR-041](decisions/ADR-041.md)). Role sync is the half that publishes something about a named trader, and it is the half that waits. **The server itself is not deferred with it**, and the channel policy and moderation posture are live from P8 because the room is |
 | M17's experiments, bundles, and promotional credit | Post-launch. Reset pricing ships in P4 |
 | M18's review-pool surface | Post-launch. **The terminal settlement ships in P5** because it is a correctness requirement |
 | M11's leaderboard and deferred per-trade certificate kind | Post-launch, and the per-trade kind may never ship ([EC-090](edge-cases/EC-090.md)) |
@@ -127,6 +137,6 @@ Eighteen weeks. Each phase carries a definition of done that includes its tests 
 | **The counsel sitting** | Calendar | Three items, one lawyer, one sitting. Item 2 (wallet characterization) is the only one that blocks launch, and it most likely resolves as yes-with-conditions |
 | **`mc_lifecycle.py` has not landed** | Founder task | Four calibrated figures are conservative rather than exact, and the direction of the error is the safe one. [SIMULATION_HARNESS](testing/SIMULATION_HARNESS.md) section 8 is the checklist |
 | **The capital decision** | Founder | 18 month combined-stress ruin is **6.28 percent at $150K and 0.36 percent at $350K**. It is not an engineering input and it decides whether the plan is worth executing |
-| **Tier 2 is 2 to 4 weeks of a 18 week plan** | Engineering | It is the recorded trade. Cutting it recovers the weeks and costs the live dashboard |
+| **Tier 2 is 2 to 4 weeks of the whole plan, and the largest single item in it** | Engineering | It is the recorded trade. Cutting it recovers the weeks and costs the live dashboard. **The denominator was written out as a number here and is now stated as a rule**, because a total that moves by 3 days makes every hand-copied instance of it wrong and nothing in CI can see a stale number inside a sentence |
 
 **Three of the six are calendar rather than engineering, and all three have been outstanding for the whole corpus phase.** That is the honest summary: **the schedule's largest risk is not the build.**
