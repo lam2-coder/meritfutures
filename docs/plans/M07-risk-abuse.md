@@ -168,6 +168,24 @@ The machine is [STATE_MACHINES section 7](../architecture/STATE_MACHINES.md), un
 | **Restriction** (`identities.status = 'restricted'`) | **one human**, every account they hold | none of its own. Reversed by a **documented restore**, and where a payout is pending its `sla_due_at` binds the restriction so it cannot outlast the hold's 48 hours | `identity_restriction_episodes.restored_at`, `restored_by` and `restore_evidence`, all-or-none |
 
 **Closure for cause is the fourth and it is terminal**, which is why it is not in that table: the three above all end with the trader still holding what they had.
+### 3.3a The three enforcement outcomes, which are not interchangeable
+
+**M07 originates evidence; it never originates money movement.** What an `enforced` flag can produce is now three distinct things, and the corpus has confused them at least once, so they are tabulated rather than described.
+
+| Outcome | Scope | Reversible | Clock | Record |
+|---|---|---|---|---|
+| **Closure for cause** | one **account** | **no, terminal** | none | `account_status_history`, plus an exported evidence pack |
+| **Freeze** | one **payment** | yes | proposed 10 business days ([M05](M05-payout-system.md) OQ-M5-02) | the freeze trio on the row |
+| **Hold** ([ADR-040](../decisions/ADR-040.md)) | one **payment, before approval** | yes, **and it releases itself** | **48 hours, hard** | the five hold columns, all together or none |
+| **Restriction** ([ADR-041](../decisions/ADR-041.md)) | one **human**, every linked account | yes, by a **documented restore** | 48 hours where a payout is pending | an [`identity_restriction_episodes`](../architecture/data-model/identity_restriction_episodes.md) row |
+
+**The hold is the one that constrains M07 rather than empowering it.** A high-severity flag standing at request time no longer means the payout waits on an investigator's attention; it means the payout waits **48 hours and then pays**, unless M07 has produced a cited flag, a ToS clause and an exported evidence pack inside that window. AS-M7-01 computed detection cadence against extraction speed and found the margin thin. **This narrows it deliberately**, and the trade is stated rather than discovered: an investigation that cannot be made in two days does not get to hold the money while it is made.
+
+**Restriction is the escalation that answers AS-M7-02 and AS-M7-06**, where the unit of abuse is a human operating several accounts and per-account enforcement plays whack-a-mole against a graph. It requires the same evidence as a closure and produces a reversible state rather than a terminal one, which is what makes it usable while a case is still being built.
+
+**Entry points, both of them v1** ([ADR-022](../decisions/ADR-022.md) tiers the graph explorer to v1.x, so the one-click-from-a-cluster affordance cannot be the only way in): the **flags queue** and the **identity drill-down**, both on the existing `investigating` to `enforced` path that already requires an exported evidence pack, a ToS clause and a written reason. Both inherit **GS-117**, the typed reason before the confirm control enables, and restoration is a reversal of a protective state, which is the category GS-117 names explicitly.
+
+**The 48 hour SLA binds the restriction, not the payout.** A restriction opened over a held payout does **not** extend that payout's `hold_expires_at`. Without that property, Ruling B is a route around Ruling A and the whole enforcement window is theatre: an investigator who wanted more than 48 hours would simply restrict the human.
 
 ### 3.4 The copy-trading clause, and what it does to D-01
 

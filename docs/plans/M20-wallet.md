@@ -60,11 +60,15 @@ The `trader_wallet` ledger position per identity ([M05](M05-payout-system.md) SD
 | INV-M20-04 | Every debit records its **cause and reference**, and every credit records its **provenance class** | SD-M20-01. A balance whose components are indistinguishable cannot be governed by any of the rules below |
 | INV-M20-05 | A refund is returned to the **payment method that funded the purchase**, always. A card purchase never refunds to the wallet | AS-M20-03. Crossing rails converts card money into withdrawable cash and bypasses the card network's own protections |
 | INV-M20-06 | **Every context gate that blocks the external leg blocks wallet spend too**, and the set is enumerated rather than described: `payouts_frozen` on the account or the identity, `recon_blocked`, KYC not `verified`, and **`identities.status = 'restricted'`** | AS-M20-02. **A freeze that stops the cash door and leaves the product door open is not a freeze**, and the same sentence is true of a restriction. **The restriction leg is [ADR-041](../decisions/ADR-041.md) and it is a widening, stated as one.** This invariant named `payouts_frozen` and nothing else; the restriction appeared only in AS-M20-02's counter prose, with **no invariant binding it and nothing asserting it**. That is the same finding one table over from `G-ELIGIBLE` not naming `identities.status`, and it is why ADR-041 reads as asking for a new state when the state already existed: **`restricted` did almost nothing, in almost every place it was cited as doing something** |
+| INV-M20-06 | A **payouts-frozen** identity cannot spend wallet value either, **and neither can a `restricted` one** | AS-M20-02. A freeze that stops the cash door and leaves the product door open is not a freeze. **[ADR-041](../decisions/ADR-041.md) adds the identity status to the same gate**: a restriction is per human and halts everything, so it binds spend and external withdrawal by the same clause, not by a second one |
 | INV-M20-07 | Wallet spend carries a per-identity velocity limit, with excess **delayed rather than refused** | [SECURITY](../architecture/SECURITY.md) C-23, [M05](M05-payout-system.md) OQ-M5-06 |
 | INV-M20-08 | Wallet balances are **segregated in reporting and in fact**, and the float is never treated as working capital | AS-M20-08. [ADR-019](../decisions/ADR-019.md) says liquidity improves and liability does not, and this is the invariant that keeps the second half true |
 | INV-M20-09 | A wallet balance is **payable on demand forever**, and dormancy never forfeits it | AS-M20-07. A forfeiture clause on money already earned is the single most brand-destroying term available to this firm |
 | INV-M20-10 | Every wallet position reconciles: sum of credits minus sum of debits equals the ledger position, per identity, nightly | Extends [M05](M05-payout-system.md) INV-M5-04's zero-sum discipline to a per-identity assertion, because the wallet is where a per-identity error would hide |
 | INV-M20-11 | The wallet is **not an account a third party can pay into**. There is no deposit, no top-up, and no funding from outside | AS-M20-04. The moment Merit accepts inbound money into a spendable, withdrawable balance, it is operating something quite different from what [ADR-019](../decisions/ADR-019.md) approved |
+| INV-M20-12 | **A withdrawal carrying a live halt cannot reach `settled`** | [ADR-040](../decisions/ADR-040.md), enforced by `wallet_withdrawals_live_freeze_blocks_settlement` in [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql). **`0011` gave this table `frozen_at`, `freeze_flag_id`, `freeze_expires_at` and a freeze-expiry index, and `wallet_withdrawal_status` has never had a frozen value**: the halt was representable and entirely unenforced for four migrations, so a halted withdrawal still matched the open index and nothing refused settlement. Nobody wrote that defect; it arrived by writing half a mechanism and reading the other half as done |
+| INV-M20-13 | **A halt is orthogonal to the rail state and is never collapsed into it** | The halt is `frozen_at` and its two companions on the row, exactly as `payouts_frozen` and `recon_blocked` ride alongside the account machine. A halted withdrawal is still `approved` or `transferring` as far as the rail is concerned, and putting an orthogonal hold in the rail's status column is `SD-M5-06`'s named mistake, where the engine's gates and the rail's gates sharing one column **is** the defect |
+| INV-M20-14 | **A halt expires, and release resumes the rail rather than re-paying** | Same 48 hours and the same hourly sweep as the payout hold. The money is already the trader's, so there is nothing to pay again. `wallet_withdrawals_open_idx` is re-created under the same name and the same predicate so **a halted row stays visible** to the operator and the sweep: a halt that removes the row from the only index anyone scans is a halt nobody can find |
 
 ---
 
@@ -105,6 +109,7 @@ flowchart LR
 ```mermaid
 stateDiagram-v2
     [*] --> requested: checkout with payment_method = wallet
+    requested --> refused: identity restricted (INV-M20-06, ADR-041)
     requested --> refused: identity payouts_frozen (INV-M20-06)
     requested --> refused: identity restricted (INV-M20-06, ADR-041)
     requested --> refused: recon_blocked or KYC not verified (INV-M20-06)
@@ -148,6 +153,21 @@ sequenceDiagram
 1. **The halt is not a status**, because it is orthogonal to the rail state. A halted withdrawal is still `approved` or `transferring` as far as Rise is concerned, and collapsing an orthogonal hold into the rail's status column is `SD-M5-06`'s named mistake, which this module inherits directly since `wallet_withdrawals` is that delta's table.
 2. **The row stays visible.** `wallet_withdrawals_open_idx` is re-created under its own name with the halted row still inside its predicate, because a halt that removes the row from the only index anyone scans is a halt nobody can find.
 3. **Release resumes the rail and does not re-pay.** The money is already the trader's: LT-06 debited the wallet at approval, so the halt is holding a **transfer**, not a claim, and there is nothing to credit back. This is the same 48 wall-clock hour clock on the same hourly sweep as the internal leg's hold, and **it is the whole of the difference between the two legs**: the internal one holds a decision that has posted nothing, and this one holds a payment whose ledger entry already exists.
+**The withdrawal's own machine is drawn in [STATE_MACHINES section 3.2](../architecture/STATE_MACHINES.md), which is where it belongs and where it did not exist until [ADR-040](../decisions/ADR-040.md).** The sequence above is what M20 does; the states are what `wallet_withdrawals` is.
+
+### 3.3a The halt, which is enforcement rather than a state
+
+**The asymmetry with the payout hold is deliberate and is stated here so it does not read as an oversight.** On `payout_requests` the hold **replaces** approval, so it is a status. Here the halt is **orthogonal** to the rail state, so it is three columns and a `CHECK` (INV-M20-12 through INV-M20-14).
+
+| | payout hold | wallet halt |
+|---|---|---|
+| Shape | a status value, `held_pending_review` | `frozen_at` + `freeze_flag_id` + `freeze_expires_at`, beside the status |
+| Ledger at entry | **nothing posted** | LT-06 already posted; **the money is already the trader's** |
+| Release means | approve and pay | **resume the rail.** Never re-pay |
+| Enforcement means | close the request, nothing to reverse | the money is gone; recovery is a dispute, not a reversal |
+| Clock | 48 hours | 48 hours, same sweep, same S1 dead-man switch |
+
+**Both clocks are watched by the same nightly assertion, and it fires on the query rather than on the job** ([M05](M05-payout-system.md) INV-M5-18). A sweep that reports success is not evidence that the work happened.
 
 ### 3.4 The provenance rule, which is this module's central control
 

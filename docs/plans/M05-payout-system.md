@@ -37,7 +37,7 @@ POST /accounts/:id/payout
        yes -> status: held_pending_review    [nothing posted, 48h clock starts]
        no  -> continue
   -> post LT-01 ledger transaction, crediting the identity's wallet position
-  -> status: settled_to_wallet              [instant, irrevocable, atomic]
+  -> status: settled                        [instant, irrevocable, atomic]
   -> call M1's applySettlement exactly once  (anchors advance, win days reset)
   -> notify
 ```
@@ -59,6 +59,10 @@ There is no approval step in either list because there is no approver. That abse
 
 **The single most important consequence, because it reorganizes this whole document.** Every control that used to live "after settlement" now lives after the *external* settlement, and the internal leg has effectively no after. The controls did not weaken; they moved to the leg where the money actually leaves Merit, which is where they were always aimed.
 
+> **Both listings above said `status: settled_to_wallet`, which is a value [ADR-028](../decisions/ADR-028.md) explicitly REJECTED** ("settlement to the wallet is the only settlement the internal leg has, and a status naming its destination invites a second one"). The rejection is recorded in `0001`'s own comment block. **ADR-028 believed it had corrected this file**: it names M05's freeze target as one of two sites it fixed, and it read past the phantom status twice on the way there. **The fifth site of that sweep, found by folding a state into the machine and checking every status word against the enum**, and it is not on [ADR-040](../decisions/ADR-040.md)'s list of four remaining sites either, because nobody had looked here. Corrected to `settled`.
+
+**One state joins this pipeline under [ADR-040](../decisions/ADR-040.md), and it sits before the first line rather than inside it.** When an unresolved high-severity flag stands against the identity at request time, the request is created as `held_pending_review`: `evaluatePayout`, `clampPayout` and the immutable snapshot all run and are stored, **and the LT-01 posting is the only step deferred**. There is still no approver and no approval step. There is a clock, it is 48 hours, and it is hard.
+
 ### 1.2 What this module is not
 
 | Not M5 | Whose job | Why the boundary is here |
@@ -74,6 +78,7 @@ There is no approval step in either list because there is no approver. That abse
 | ID | Invariant | Enforcement |
 |---|---|---|
 | INV-M5-01 | There is no code path that denies an eligible request | **Amended by [ADR-040](../decisions/ADR-040.md), in both halves.** **The substance survives:** `payout_requests.status` still has **no `denied` value** and no payout is denied. **The mechanism changes:** this invariant was enforced by "no review state exists" and is now enforced by **a review state that expires**. `held_pending_review` either pays inside 48 hours or produces a documented enforcement action carrying a cited flag, a ToS clause and an evidence pack, and INV-M5-17 is what makes the first branch mechanical. **The absence is no longer the control; the clock is**, and that is why the change is recorded as an amendment rather than absorbed as a clarification |
+| INV-M5-01 | There is no code path that denies an eligible request | `payout_requests.status` has no `denied` value, and it never will without an ADR against the zero-denial policy. **The review state is `held_pending_review` and the control is now the EXPIRY rather than the absence** ([ADR-040](../decisions/ADR-040.md)): every hold either pays inside 48 hours or produces a documented enforcement action carrying a cited flag, a ToS clause and an evidence pack. This row read "no `denied` and no `pending_review` value. The absence is the control", and **the substance of it is unchanged while its mechanism moved**, which is why the amendment is written out rather than absorbed |
 | INV-M5-02 | The number shown by `GET /eligibility` and the number sent by `POST /payout` come from the same function with the same inputs | Both call M1's `evaluatePayout`. A second evaluator would be a second rule |
 | INV-M5-03 | `trader_cents + firm_cents = approved_cents`, exactly, always | Check constraint plus M1's R-44 and RE-P-08. Rounding favors the trader by at most one cent, and the published copy says so |
 | INV-M5-04 | Every ledger transaction sums to zero, and the whole table sums to zero | Deferred constraint trigger at commit, plus a nightly global assertion. `ledger.invariant_violated` halts payouts (see AS-M5-05 for why that is dangerous as well as necessary) |
@@ -82,6 +87,10 @@ There is no approval step in either list because there is no approver. That abse
 | INV-M5-07 | `applySettlement` is called exactly once per settled payout, with both trading days recorded | M1's DEP D-M5-1. Idempotent on `payout_request_id`, plus a per-account advisory lock shared with the batch |
 | INV-M5-08 | At most one payout is in flight per account | Partial unique index (M1's SD-09), **not** only the engine gate, because the engine is not the only writer. M1's DEP D-M5-2, GS-052 |
 | INV-M5-09 | An account that breaches after approval and before settlement is still paid | Constitution M1's FM-18 and [M01 section 3.3](M01-rules-engine.md). The snapshot was true when taken and the money was already the trader's |
+| INV-M5-17 | **A held request that reaches auto-release pays, even if the account breached during the hold** | [ADR-040](../decisions/ADR-040.md). INV-M5-09's **first** clause governs (the snapshot was true when it was taken); its second does not apply, because nothing was posted and nothing was yet the trader's. The first clause wins because the alternative is that **Merit's own hold cost the trader money**, which is the exact shape zero denial exists to make impossible. Pinned by a golden scenario rather than left to reasoning |
+| INV-M5-18 | **No payout request sits past its hold or freeze expiry** | Asserted nightly **on the query**, evaluated independently of whether the hourly sweep reported success ([M02](M02-rithmic-bridge.md) FM-M2-11's idiom applied to the releaser: a job that reports success is not evidence that the work happened). It is the **fourth unsuppressible alarm**, amending [M06](M06-admin-ops-console.md) OQ-M6-01, because a releaser that is not running is an alarm and an alarm that can be muted is not a control |
+| INV-M5-19 | **A hold consumes no ladder rung** | `payout_requests_account_ordinal_uq` is partial on `status <> 'failed'`, unchanged by `0031` and deliberately so. A held request holds its ordinal while held; enforcement sends it to `failed`, which releases the rung (EC-037). A hold that burned a rung would silently shorten a finite ladder |
+| INV-M5-20 | **A restriction cannot hold a held payout past its own 48 hours** | [ADR-041](../decisions/ADR-041.md). `identity_restriction_episodes.sla_due_at` binds the **restriction**, and `hold_expires_at` is untouched by it. **This is the property that stops Ruling B from becoming a route around Ruling A**, and it is asserted rather than intended |
 | INV-M5-10 | A freeze requires at least one cited open flag and is bounded in time | Confirmed at the [Wave 2 gate](../decisions/README.md); the time bound is SD-M5-01 and AS-M5-04 |
 | INV-M5-11 | The reserve is reported against a **live** wallet balance, not a computed one | SD-M5-03. A reserve coverage ratio derived from our own ledger rather than the rail's balance is a number that agrees with itself |
 | INV-M5-12 | The circuit breaker pauses sales and can never pause payouts | Structural: the breaker's only effect is a flag read by [M3](M03-billing-checkout.md)'s checkout. There is no code path from any liability signal to a payout block |
@@ -148,7 +157,7 @@ The payout request machine ([STATE_MACHINES section 2](../architecture/STATE_MAC
 
 **Under [ADR-019](../decisions/ADR-019.md) there are two settlements and they are very different animals.** The internal one is a transaction; the external one is a conversation with a third party. The steps below are the **external** leg, preserved as written because a webhook from a rail is exactly as untrustworthy as it always was.
 
-**The internal leg, for contrast, has no step list worth the name**, and that is the point: approval, LT-01, the wallet credit, both anchor advances, the win-day reset, and `applySettlement` all commit in **one database transaction**. Idempotency is the transaction plus the request's idempotency key. There is no webhook to replay, no ordering to defend, no partial state to reconcile, and no window in which a second request can arrive. Every failure mode from FM-M5-02 through FM-M5-04 is inapplicable to it by construction rather than by control, which is the strongest form of not having a bug. `payout_requests.status` reaches `settled_to_wallet` and stops.
+**The internal leg, for contrast, has no step list worth the name**, and that is the point: approval, LT-01, the wallet credit, both anchor advances, the win-day reset, and `applySettlement` all commit in **one database transaction**. Idempotency is the transaction plus the request's idempotency key. There is no webhook to replay, no ordering to defend, no partial state to reconcile, and no window in which a second request can arrive. Every failure mode from FM-M5-02 through FM-M5-04 is inapplicable to it by construction rather than by control, which is the strongest form of not having a bug. `payout_requests.status` reaches `settled` and stops.
 
 Settlement on the external leg is still the most consequential transition involving an outside party, so its steps are ordered and each is idempotent.
 
@@ -176,7 +185,42 @@ Settlement on the external leg is still the most consequential transition involv
 - A settlement whose adjustment never appears is **visible**, because the field stays null and `balance_reflection_status` stays `pending` past its window (AS-M5-01).
 - The third consequence was that the cadence gap could not be gamed by settlement-timing games. **The wallet retires that concern rather than weakening it**: with the anchor on an instant internal credit there is no settlement timing left to game, because the trader cannot influence when a transaction that already committed committed.
 
-### 3.3 The freeze path, bounded
+### 3.3 The hold path, bounded harder
+
+**Entered at request time or not at all** ([ADR-040](../decisions/ADR-040.md)).
+
+```mermaid
+stateDiagram-v2
+    [*] --> held_pending_review: an unresolved high-severity flag stands at request time
+    held_pending_review --> approved: the flag resolves, OR the 48 hours elapse
+    held_pending_review --> failed: enforcement decided, with an exported evidence pack
+    note right of held_pending_review
+      Requires: a cited risk_flags row, a ToS
+      clause, a written reason, and a clock.
+      All five hold columns together or none
+      (payout_requests_hold_is_complete).
+      Nothing is posted. Nothing is owed.
+      Expiry PAYS. It does not extend.
+    end note
+```
+
+**It is not the freeze under a second name, and the discriminator is whether the ledger has moved.** A held request has posted nothing, so release means *approve and pay* and enforcement reverses nothing. A frozen request has posted LT-01 and the money is already the trader's, so release means *let settlement proceed* and enforcement means LT-03. That difference is why the two clocks differ (48 hours against a proposed 10 business days) and why only one of them is a pre-approval state.
+
+**The hold stores the full evaluated decision, and that choice has a blast radius the alternative did not.** The snapshot, `approved_cents`, the split, the ordinal and the pinned plan version are computed at request time and frozen. Release is then mechanical and re-evaluates nothing, which preserves INV-M5-02 (the number shown is the number sent) and, decisively, **keeps every existing `NOT NULL` and every existing `CHECK` on `payout_requests` intact**. A superseding migration that relaxes `NOT NULL` on the money table would have been the wider change by far.
+
+**The auto-release is the load-bearing control, so it is structural in three places and unsuppressible in one.** It is now the only thing standing between a hold and an indefinite one:
+
+1. **It joins the existing hourly freeze-expiry sweep** ([CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md)), which already carries an **S1 dead-man switch** whose stated reason is that a stalled sweep converts a bounded hold into an unbounded one. One job, one row, one switch. `payout_requests_hold_expiry_idx` is that sweep's source, added beside the freeze-expiry index rather than widening it: **two clocks, two sweeps, two indexes, and neither silently covering the other.**
+2. **The alarm fires on the query, not on the job.** INV-M5-18.
+3. **It is the fourth unsuppressible alarm.** [M06](M06-admin-ops-console.md) OQ-M6-01 names three; this amends it.
+
+**A hold does not consume a ladder rung** (INV-M5-19), **a restriction cannot extend it** (INV-M5-20), and **expiry pays even after a breach** (INV-M5-17).
+
+**The trader sees the fact, the ToS clause, and the date it resolves.** Not the evidence and not the detector. Section 3.4's rule governs both holds and freezes, and [M04](M04-trader-portal.md)'s copy rule binds: **it is never worded as a rejection**, because it is not one.
+
+### 3.4 The freeze path, bounded
+
+> **This section was 3.3 until [ADR-040](../decisions/ADR-040.md) put the hold ahead of it**, because the hold precedes approval and the freeze follows it, and every other machine in this corpus is written in lifecycle order. **Three inbound pointers were retargeted in the same commit rather than left to rot**: [M16](M16-notification-center.md) AS-M16-nn's freeze-notice attack, [M12](M12-transparency-platform.md)'s definitional-gap paragraph, and [FOLD-02](FOLD-02-enforcement-window-and-suspension.md) section 4.6. A renumber that retargets a pointer silently is the same defect class as a predicate that stops matching.
 
 ```mermaid
 stateDiagram-v2

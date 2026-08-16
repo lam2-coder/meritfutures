@@ -137,7 +137,7 @@ So `0031` gives the external leg its **enforcement** rather than a state: a CHEC
 
 ### 4.6 What the trader sees
 
-The fact, the ToS clause, and the date it resolves. Not the evidence and not the detector. [M05](M05-payout-system.md) section 3.3's existing rule governs: a review the trader cannot see the end of is indistinguishable from a refusal. [M04](M04-trader-portal.md)'s copy rule binds, so it is **never worded as a rejection**, and [M16](M16-notification-center.md) carries the notice in the security and money class, which [DELIVERY_PLAN](../DELIVERY_PLAN.md) section 2 already puts in launch scope.
+The fact, the ToS clause, and the date it resolves. Not the evidence and not the detector. [M05](M05-payout-system.md) section 3.4's existing rule governs: a review the trader cannot see the end of is indistinguishable from a refusal. [M04](M04-trader-portal.md)'s copy rule binds, so it is **never worded as a rejection**, and [M16](M16-notification-center.md) carries the notice in the security and money class, which [DELIVERY_PLAN](../DELIVERY_PLAN.md) section 2 already puts in launch scope.
 
 ---
 
