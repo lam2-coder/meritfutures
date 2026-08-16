@@ -40,7 +40,8 @@ export const RULE_ASSERTIONS = {
   'R-12': 'the initial floor is size_cents - drawdown_cents',
   'R-13': 'the trailing floor follows the CLOSING balance and never the intraday high',
   'R-14': 'the floor never retreats, and an attempt to lower it throws INV-06',
-  'R-15': 'the lock engages at closing - size >= at_profit_cents, and is permanent',
+  'R-15':
+    'the lock engages at closing - size >= at_profit_cents, is permanent, and never lowers the trailed floor',
   'R-16': 'a static drawdown holds floor = size_cents - drawdown_cents for life',
   'R-18': 'the breach comparator is the floor AT THE OPEN, trailed strictly afterwards',
   'R-21': 'a floor breach is low_balance_cents < floorOpen, strict: touching survives',
