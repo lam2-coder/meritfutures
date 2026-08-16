@@ -48,4 +48,6 @@ must be recoverable from its own file alone.
 | [2026-08-15 - Session 28](2026-08-15-session-28.md) | S-E planned, TradingCalendar as data and the wall-clock unit boundary |
 | [2026-08-15 - Session 29](2026-08-15-session-29.md) | the allocation registries made honest, and the four fold ADRs |
 | [2026-08-15 - Session 30](2026-08-15-session-30.md) | DECISIONS.md becomes a directory (ADR-043, stage 1 of 5) |
+| [2026-08-16 - Session 31](2026-08-16-session-31.md) | FOLD-01 session 3, migration `0029` and the phone-identity schema |
+| [2026-08-16 - Session 31](2026-08-16-session-31.md) | FOLD-02 session 3, migrations `0030` and `0031` |
 | [2026-08-16 - Session 31](2026-08-16-session-31.md) | `0032` carries ADR-042's F-1 to F-4 (S-E session 2, money path) |
