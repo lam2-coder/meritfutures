@@ -472,9 +472,13 @@ Append-only is a **grant**, not a convention. `0026_roles_and_grants` revokes `U
 
 **Rejections are checked by message text, not by exception class**, per `0028`: a handler catching "any error" scores a wrong-reason failure as the constraint working, which is how ADR-035's defect stayed invisible through a founder-grade review.
 
+**These forty-eight are [`scripts/db/probe_phone_identity.sql`](../../../scripts/db/probe_phone_identity.sql) as of 2026-08-16, run by CI-06h on every push** (`OI-07`, closed). In the file each rejection names the constraint it expects and the helper compares it against `GET STACKED DIAGNOSTICS`, so a write refused by the **wrong** constraint fails the probe rather than passing it.
+
 **Grants were verified rather than assumed.** `0026`'s `ALTER DEFAULT PRIVILEGES` covers the three new tables: `merit_app` holds `SELECT, INSERT, UPDATE, DELETE` on each and `merit_analytics` holds nothing, which is the ruled default. None of the three is append-only, for [`contact_channels`](contact_channels.md)' reason: supersession is written by `UPDATE` on the superseded row.
 
 **The no-floats set is unchanged and still exactly the two `correlation_groups` columns**, confirmed by querying `information_schema.columns` on the installed schema. It was confirmed by query rather than by the `DO` block, and the reason is `OI-08`: the block lives in `0027` and runs before `0028` and `0029` exist.
+
+**`OI-08` closed on 2026-08-16** and the hand query is no longer the only thing checking. [`scripts/db/assert_no_floats.sql`](../../../scripts/db/assert_no_floats.sql) runs in the install job after every migration applies, so it is positionally last **by construction**: a migration numbered `0099` is inside it on the day it is written. The blind spot had reached `0028` through `0032` by the time it was fixed, five migrations rather than the two this paragraph was written against, because **a positional assertion does not fail when it goes blind. It keeps passing, against less.** `0027`'s block stays where it is, per E2.
 ### Verification performed on `0030` and `0031` (2026-08-16)
 
 **The full 30-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, zero errors**, producing **97 tables, 331 indexes, 351 check constraints and 6 triggers**. The four new check constraints and the one new table are enumerated against the previous figures in [DELTA_MANIFEST section 14](../../../packages/db/DELTA_MANIFEST.md), which also carries the probe table.

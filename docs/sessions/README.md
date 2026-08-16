@@ -51,4 +51,7 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 31](2026-08-16-session-31.md) | FOLD-01 session 3, migration `0029` and the phone-identity schema |
 | [2026-08-16 - Session 31](2026-08-16-session-31.md) | FOLD-02 session 3, migrations `0030` and `0031` |
 | [2026-08-16 - Session 31](2026-08-16-session-31.md) | `0032` carries ADR-042's F-1 to F-4 (S-E session 2, money path) |
+| [2026-08-16 - Session 31](2026-08-16-session-31.md) | `OI-07` and `OI-08` close: the phone probe committed, NO-FLOATS made whole-schema |
+| [2026-08-16 - Session 32](2026-08-16-session-32.md) | FOLD-01 session 4, the invariants and the adversarial scenarios |
+| [2026-08-16 - Session 32](2026-08-16-session-32.md) | S-E session 3, the calendar source shape and the session generator |
 | [2026-08-16 - Session 32](2026-08-16-session-32.md) | The AI and LLM policy (ADR-044), written by the review desk |

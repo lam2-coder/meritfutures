@@ -11,9 +11,16 @@ name: corpus
 # THE OBJECT COUNTS ARE NOT REPEATED HERE, and that is deliberate. They read
 # "96 tables, 326 indexes, 347 check constraints and 6 triggers" until
 # 2026-08-16, when 0030 and 0031 made three of the four wrong in a comment
-# nobody reads while the job that emits them stayed correct. The job below
-# prints the live figures on every run; the current set is 30 files and
-# 97 / 331 / 351 / 6, recorded in DELTA_MANIFEST section 14 where it is dated.
+# nobody reads while the job that emits them stayed correct.
+#
+# AND THEN THE REPLACEMENT DRIFTED TOO, INSIDE THE COMMENT THAT DOCUMENTS THE
+# DRIFT. The fix restated "30 files and 97 / 331 / 351 / 6" one sentence after
+# declaring the counts would not be repeated here; 0032 landed the same day and
+# made every one of those figures wrong again. A count in a comment has now
+# been found wrong twice in one file on one day, which is CI-06g's whole thesis
+# arriving by demonstration. No figures are stated here at all. The job below
+# derives them from the database and prints them on every run, and
+# DELTA_MANIFEST records them dated, once, where a gate can reach them.
 #
 # Every check here exists because the thing it checks ALREADY DRIFTED once:
 #   CI-06a  59 links broke silently before a human found them
@@ -180,6 +187,32 @@ jobs:
           [ "$db_trigs" = "$sql_trigs" ] || { echo "::error::triggers: DDL says $sql_trigs, database says $db_trigs"; fail=1; }
           exit $fail
 
+      # OI-08. NO-FLOATS, ASSERTED WHERE IT CAN SEE THE WHOLE SCHEMA.
+      #
+      # The assertion was written as a DO block inside 0027, so it reads
+      # information_schema AS OF 0027. That was true the day it was written and
+      # false the day 0028 landed. By 0032 there were FIVE MIGRATIONS OUTSIDE
+      # THE GUARD THE CORPUS BELIEVED PROTECTED EVERY MONEY COLUMN, and a later
+      # migration adding a numeric money column would have sailed past it.
+      # Nothing failed; the guard was simply not looking, which is why this was
+      # found by hand rather than by CI.
+      #
+      # Here it runs after every migration has applied, so it is positionally
+      # last BY CONSTRUCTION rather than by whoever remembers to move it. A
+      # migration numbered 0099 is inside this guard on the day it is written.
+      #
+      # 0027's copy is deliberately NOT deleted: migrations are sacred, once
+      # merged never edited, only superseded (constitution E2). It still passes
+      # and it is now a historical assertion about the schema at 0027.
+      #
+      # THE FILE FALSIFIES ITSELF, one seeded violation per direction, because
+      # an assertion only ever run against a schema that satisfies it reports
+      # PASS in exactly the same way as one narrowed until it reads nothing.
+      - name: NO-FLOATS holds over the whole applied schema (OI-08)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/assert_no_floats.sql
+
       # 5. The ledger constraints that carry rulings, probed against the real
       #    database. Each is one perturbation. A constraint nobody has seen
       #    reject anything is a constraint nobody knows is wired up.
@@ -221,3 +254,31 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_payout_hold.sql
+
+      # 8. ADR-039, phone identity and passwordless auth. OI-07.
+      #
+      # FOLD-01 session 3 executed forty-eight assertions against 0029 and
+      # COMMITTED NONE OF THEM. They were watched passing once and then existed
+      # only as a table in DELTA_MANIFEST section 14, which is the exact object
+      # section 13 names: a probe that ships beside a fix and never runs again
+      # is the same thing as the golden test that was missing.
+      #
+      # IT LEADS WITH THE SUCCESS CASE, and on this migration that is not a
+      # stylistic preference. 0029's central ruling is something the database
+      # must NOT do: ADR-039 splits the hard link in two and leaves
+      # phone -> identity deliberately unconstrained, so a SECOND IDENTITY
+      # VERIFYING A LIVE NUMBER MUST COMPLETE and raise the flag. An absence is
+      # invisible in a diff, and "completing the pair" with a unique index on
+      # phone_hash looks like tightening a constraint while actually refusing
+      # the innocent owner of a recycled number at the door, before the
+      # portability check that exists to rescue them can run (amendment 3).
+      # SUCCESS 2 is what fails the day somebody does it.
+      #
+      # Rejections are checked by THE CONSTRAINT THAT FIRED, read out of GET
+      # STACKED DIAGNOSTICS, never by exception class: before 0028 a retirement
+      # raised undefined_column and a handler catching "any error" scored that
+      # as the constraint working.
+      - name: Probe ADR-039's phone identity and auth (OI-07)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_phone_identity.sql
