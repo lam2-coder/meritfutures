@@ -349,3 +349,35 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_reversible_contact_addresses.sql
+
+      # 11. ADR-047, the calendar revision on rule_states installed by 0035.
+      # OQ-P2-02, and the other half of 0033.
+      #
+      # SIX SUCCESSES BEFORE THE FIRST REJECTION, because on this migration the
+      # dangerous edit is a TIGHTENING and only a success case can see one.
+      # `calendar_revision_id` is nullable: NULL means the fold read a calendar
+      # that had never been corrected, which is every row the engine writes
+      # until the first correction lands. A NOT NULL looks like completing the
+      # pair, installs cleanly, satisfies all four rejections, and stops the
+      # engine dead. SUCCESS 1 is what fails the day somebody adds it, and
+      # SUCCESS 4 is what fails the day somebody forces the stamp to equal the
+      # current maximum, which would make a row claim a calendar it never read.
+      #
+      # SUCCESS 5 ASSERTS A NON-CORRESPONDENCE, which is unusual enough to say
+      # out loud: it walks from a rule state for one day to the prior image of a
+      # DIFFERENT day and requires them to differ. The column is a watermark
+      # over the whole calendar, not a pointer to this row's own correction, and
+      # a per-day reading would scope replay to the corrected day and miss every
+      # downstream counter. That reading is the one the column name invites.
+      #
+      # SUCCESS 6 REACHES THE ONE THING NO CONSTRAINT CAN. ADR-047's central
+      # ruling is that this column is EXCLUDED from state_hash, the hash is
+      # computed by an engine that does not exist yet, and the only
+      # machine-readable record of the input set is the column comment 0015 put
+      # it in (ADR-026 C-07). Both halves are asserted, because a comment that
+      # added the column to the HASHED list would satisfy a presence check while
+      # inverting the ruling.
+      - name: Probe ADR-047's calendar revision on rule_states (OQ-P2-02)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_rule_states_calendar_revision.sql

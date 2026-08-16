@@ -1066,7 +1066,10 @@ const ci06h = {
     'claimed by a row of the migration allocation table in DECISIONS.md, every ' +
     'hole matches a reservation, and the corpus workflow still carries the ' +
     'ON_ERROR_STOP apply, the must-fail re-apply, the database-derived counts, ' +
-    'the whole-schema NO-FLOATS assertion and all five database probes. ' +
+    'the whole-schema NO-FLOATS assertion and every probe pinned in the ' +
+    "required-needle list below. THAT LIST IS THE COUNT: this line read 'all " +
+    "five database probes' while the list held six, which is a hand-maintained " +
+    'number in the gate file that exists to end hand-maintained numbers. ' +
     'TWO THINGS IT DOES NOT DO. The install itself needs a live PostgreSQL and ' +
     'runs in CI, so a green result here is NOT a claim that the set installs. And ' +
     'the cross-branch half, that a pull request may not claim a number already on ' +
@@ -1170,6 +1173,26 @@ const ci06h = {
         'probe_reversible_contact_addresses.sql',
         "ADR-046's sealed addresses, plaintext floor and dispatcher grants are " +
           'no longer probed (OQ-M10-06)',
+      ],
+      // OQ-P2-02. Pinned in the commit that wires it, which is now the rule
+      // rather than the exception: probe_payout_hold.sql and
+      // probe_reversible_contact_addresses.sql were each wired and left
+      // unpinned, and DELTA_MANIFEST section 18 records that three occurrences
+      // is a pattern rather than three accidents.
+      //
+      // IT IS THE ONLY PROBE HERE WHOSE SUCCESS CASES OUTNUMBER ITS REJECTIONS,
+      // and that is a property of what 0035 installs rather than a style. The
+      // dangerous edit to a nullable column is a TIGHTENING, and a tightening
+      // is invisible to an inventory of refusals: NOT NULL on
+      // calendar_revision_id passes all four rejections below and refuses every
+      // state row the engine writes until the calendar has been corrected once.
+      // Deleting this step deletes the only assertion that ADR-047's column is
+      // still permissive in the two directions the ruling requires.
+      [
+        'probe_rule_states_calendar_revision.sql',
+        "ADR-047's calendar watermark on rule_states is no longer probed, so " +
+          'nothing asserts the column stays nullable, stays permissive of an ' +
+          'older watermark, or stays out of the state_hash contract (OQ-P2-02)',
       ],
       // OI-08. The NO-FLOATS assertion lived inside 0027 and could only ever
       // see 0001-0027, so five migrations sat outside the guard the corpus
