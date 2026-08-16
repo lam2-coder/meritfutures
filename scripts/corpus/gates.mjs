@@ -2205,6 +2205,31 @@ const ci06m = {
         findings.push(`${path}: has no \`sessions\` array`);
         continue;
       }
+      // THE VACUITY DIRECTION, AND IT WAS FOUND BY EXECUTION RATHER THAN BY
+      // READING. Every per-session assertion below is a loop, and every loop
+      // over an empty array succeeds. A fixture emptied to `"sessions": []`
+      // with `"session_count": 0` satisfied the declared-count check (0 equals
+      // 0), the coverage check (nothing to fall outside it) and the weekend
+      // check (nothing to land on a Saturday), and CI-06m REPORTED PASS. A
+      // derivation that reproduces nothing read exactly like one that
+      // reproduces correctly, which is what this gate exists to tell apart.
+      //
+      // It is the same defect the corpus has now found four times in four
+      // costumes: `array_length` on an empty array returning NULL and the CHECK
+      // passing (ADR-035, seven constraints), `{}` accepted as a
+      // `trading_calendar_revisions` prior image, an allowlist that decays by
+      // keeping a stale entry (CI-06l), and this. THE EMPTY CASE IS NEVER THE
+      // SAFE DEFAULT: it is the single value the assertion exists to reject,
+      // and it is the one value that skips the assertion entirely.
+      if (sessions.length === 0) {
+        findings.push(
+          `${path}: declares zero sessions. Every check below this one is a loop, so an empty ` +
+            'array satisfies all of them and the fixture asserts NOTHING while reading as ' +
+            'derived. A calendar with no sessions cannot resolve the day a golden fixture ' +
+            'names, and L-08 would refuse every lookup rather than one',
+        );
+        continue;
+      }
       if (typeof fx.session_count !== 'number') {
         findings.push(
           `${path}: declares no \`session_count\`. The declared count is the second independent ` +
@@ -2242,6 +2267,21 @@ const ci06m = {
         findings.push(
           `${path}: status "${fx.status}" is not "partial" and the file names no generator. ` +
             "Two hand-maintained calendars is the drift class this file's own note describes",
+        );
+      }
+      // THE CITATION MUST RESOLVE, which is `CI-06l/unknown-job`'s assertion one
+      // registry over: a coverage row naming a release job nobody scheduled is
+      // the original failure wearing the fix's clothing. A fixture naming a
+      // generator that has moved is the same shape and is worse, because
+      // `generated_by` is the ONE field that distinguishes a derived calendar
+      // from a typed one. Left unchecked, a file goes on claiming derivation
+      // from a script that no longer exists, and the claim is what a reader
+      // trusts instead of re-deriving.
+      if (typeof fx.generated_by === 'string' && !existsSync(join(ROOT, fx.generated_by))) {
+        findings.push(
+          `${path}: names generator "${fx.generated_by}", which does not exist. A file that ` +
+            'claims to be derived from a script nobody can run is hand-maintained with a ' +
+            'provenance line on top',
         );
       }
     }

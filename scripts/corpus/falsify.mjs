@@ -842,6 +842,117 @@ const SCOPE_CASES = [
     },
   },
   {
+    name: 'CI-06m/small-is-not-empty',
+    gate: 'CI-06m',
+    what: 'a fixture cut to a single session, which is small and legitimate and must NOT be a finding',
+    // THE CONTROL FOR THE TWO CASES BELOW, and it is the one that keeps the
+    // vacuity check honest. `sessions.length === 0` is rejected because an
+    // empty array skips every assertion after it; SMALL is not the same
+    // property and must stay legal, because `cme-2026.json` is deliberately
+    // five sessions and `status: partial` says so.
+    //
+    // Without this direction the gate could be "hardened" into requiring a full
+    // year, every seeded case above would still fire, and the harness would
+    // report success while the fixture that actually exists had become illegal.
+    // That is the failure mode falsify.mjs's own header names: a narrowing
+    // tested only from the noisy side.
+    //
+    // THE CONTROL IS THE SAME EDIT CUT ONE FURTHER, to zero. Without it this
+    // case is decoration: a gate that had simply stopped reading the fixture
+    // directory would report PASS here and the harness would score it as
+    // evidence. The two together say the boundary is at EMPTY and not at SMALL,
+    // which is the only reading that leaves `cme-2026.json` legal.
+    control: {
+      expect: 'declares zero sessions',
+      seed: (d) => {
+        const dir = join(d, 'packages/rules-engine/fixtures/calendars');
+        const file = readdirSync(dir)
+          .filter((f) => f.endsWith('.json'))
+          .sort()[0];
+        if (!file) throw new Error('seed anchor not found: no calendar fixture');
+        const p = join(dir, file);
+        const fx = JSON.parse(readFileSync(p, 'utf8'));
+        fx.sessions = [];
+        fx.session_count = 0;
+        writeFileSync(p, `${JSON.stringify(fx, null, 2)}\n`);
+      },
+    },
+    expect: 'PASS',
+    seed: (d) => {
+      const dir = join(d, 'packages/rules-engine/fixtures/calendars');
+      const file = readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .sort()[0];
+      if (!file) throw new Error('seed anchor not found: no calendar fixture');
+      const p = join(dir, file);
+      const fx = JSON.parse(readFileSync(p, 'utf8'));
+      if (!Array.isArray(fx.sessions) || fx.sessions.length === 0) {
+        throw new Error('seed anchor not found: the fixture declares no sessions to cut');
+      }
+      const first = fx.sessions[0];
+      fx.sessions = [first];
+      fx.session_count = 1;
+      // Coverage narrows with it, so this stays a COHERENT small calendar
+      // rather than one that trips the containment check for another reason.
+      fx.coverage = { from: first.trading_day, to: first.trading_day };
+      writeFileSync(p, `${JSON.stringify(fx, null, 2)}\n`);
+    },
+  },
+  {
+    name: 'CI-06m/vacuous-derivation',
+    gate: 'CI-06m',
+    what: 'a fixture emptied to zero sessions, which reproduces NOTHING and MUST be a finding',
+    // THE THIRD DIRECTION, and it is here because the gate did not have it and
+    // the hole was proven by execution rather than argued: the fixture was
+    // emptied to `"sessions": []` with `"session_count": 0` and CI-06m REPORTED
+    // PASS. Every check after the count is a loop, and every loop over an empty
+    // array succeeds, so a derivation that reproduces nothing read exactly like
+    // one that reproduces correctly.
+    //
+    // It is CI-06l/stale-entry's lesson in a different costume. That case
+    // covers the direction an ALLOWLIST decays in; this covers the direction a
+    // DERIVATION decays in. Both are the quiet direction, and both pass the
+    // gate's headline assertion while asserting nothing.
+    expect: 'declares zero sessions',
+    seed: (d) => {
+      const dir = join(d, 'packages/rules-engine/fixtures/calendars');
+      const file = readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .sort()[0];
+      if (!file) throw new Error('seed anchor not found: no calendar fixture');
+      const p = join(dir, file);
+      const fx = JSON.parse(readFileSync(p, 'utf8'));
+      // The count is emptied WITH the array, on purpose. Emptying only the array
+      // would trip the declared-count check instead, and this case exists to
+      // prove the gate catches the version where the file is internally
+      // consistent and says nothing.
+      fx.sessions = [];
+      fx.session_count = 0;
+      writeFileSync(p, `${JSON.stringify(fx, null, 2)}\n`);
+    },
+  },
+  {
+    name: 'CI-06m/phantom-generator',
+    gate: 'CI-06m',
+    what: 'a fixture claiming derivation from a generator that does not exist, which MUST be a finding',
+    // CI-06l/unknown-job's assertion, one registry over. `generated_by` is the
+    // one field separating a derived calendar from a typed one, so a citation
+    // that resolves to nothing lets a hand-maintained file keep a provenance
+    // line on top of it.
+    expect: 'which does not exist',
+    seed: (d) => {
+      const dir = join(d, 'packages/rules-engine/fixtures/calendars');
+      const file = readdirSync(dir)
+        .filter((f) => f.endsWith('.json'))
+        .sort()[0];
+      if (!file) throw new Error('seed anchor not found: no calendar fixture');
+      const p = join(dir, file);
+      const fx = JSON.parse(readFileSync(p, 'utf8'));
+      fx.generated_by = 'packages/db/src/seed/calendars/generate-that-moved.mjs';
+      writeFileSync(p, `${JSON.stringify(fx, null, 2)}\n`);
+    },
+  },
+  {
     name: 'CI-06h/reserved',
     gate: 'CI-06h',
     what: 'a hole a sibling branch has reserved, which must NOT be a finding',
