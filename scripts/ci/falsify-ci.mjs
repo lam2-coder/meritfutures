@@ -363,6 +363,75 @@ const CASES = [
   },
 
   // ---------------------------------------------------------------------------
+  // CI-02  THE ENGINE'S RULES, EACH WATCHED FAILING ON A MUTANT OF ITSELF
+  // ---------------------------------------------------------------------------
+  // The two cases above prove the STAGE goes red. These prove the RULES do, and
+  // the difference is the whole reason they exist.
+  //
+  // M01 section 8.4's coverage rule is "every rule has at least one unit test
+  // asserting its OPERATOR at the boundary on both sides", and ADR-048 then
+  // rests the golden stage's polarity on that series being real: a declared rule
+  // whose unit test does not actually bite would flip its fixtures to `direct`
+  // and prove nothing. A test that still passes when its operator is flipped is
+  // a test asserting nothing, and that is checkable from outside the test.
+  //
+  // EACH NEEDLE IS THE `RE-U-nn` TITLE, not merely a non-zero exit. A mutant
+  // that makes some other test fail is FAILED OFF-TARGET, which is the
+  // distinction this file was written to keep.
+  ...[
+    {
+      rule: 'R-21',
+      seeds: 'the floor breach comparator relaxed from `<` to `<=`, so touching the floor breaches',
+      file: 'packages/rules-engine/src/day/breach.ts',
+      from: 'mark.lowBalanceCents < input.floorOpenCents',
+      to: 'mark.lowBalanceCents <= input.floorOpenCents',
+    },
+    {
+      rule: 'R-22',
+      seeds: 'the hard daily-loss-limit comparator moved from `>` to `>=`, which is the spelling M01 section 3.6 pseudocode carries and R-22 rejects',
+      file: 'packages/rules-engine/src/day/breach.ts',
+      from: "dailyLossLimit.type === 'hard' && lossCents > dailyLossLimit.limitCents",
+      to: "dailyLossLimit.type === 'hard' && lossCents >= dailyLossLimit.limitCents",
+    },
+    {
+      rule: 'R-09',
+      seeds: 'the win-day comparator tightened from `>=` to `>`, so a day exactly at the floor stops counting',
+      file: 'packages/rules-engine/src/day/counters.ts',
+      from: 'mark.realizedPnlCents >= winDayFloorCents',
+      to: 'mark.realizedPnlCents > winDayFloorCents',
+    },
+    {
+      rule: 'R-13',
+      seeds: 'the trailing floor handed the intraday high instead of the close, which is GS-011 exactly',
+      file: 'packages/rules-engine/src/day/advance.ts',
+      // The first occurrence is DO-7's call into `advanceFloor`; the later ones
+      // are `balanceCents:` and the `day.closed` payload, and neither matches.
+      from: 'closingBalanceCents: mark.closingBalanceCents,',
+      to: 'closingBalanceCents: mark.highBalanceCents,',
+    },
+  ].map(({ rule, seeds, file, from, to }) => ({
+    id: `CI-02/engine-${rule}`,
+    stage: 'CI-02',
+    seeds,
+    needles: [`RE-U-0${rule.slice(2)}`, rule],
+    run: () =>
+      seededEdit(
+        file,
+        (before) => {
+          // A MUTATION THAT DID NOT APPLY IS NOT A CLEAN RUN, it is a case that
+          // tested nothing. The gate would pass and the runner would report DID
+          // NOT FAIL, which reads as "the test is weak" when the truth is "the
+          // seed missed". Throwing names which of the two happened.
+          if (!before.includes(from)) {
+            throw new Error(`the ${rule} mutant found no "${from}" in ${file}`);
+          }
+          return before.replace(from, to);
+        },
+        () => run('pnpm', ['exec', 'vitest', 'run', '--project', 'unit']),
+      ),
+  })),
+
+  // ---------------------------------------------------------------------------
   // CI-05  Security static
   // ---------------------------------------------------------------------------
   {
