@@ -1,6 +1,6 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M10-integrations.md, M16-notification-center.md, M19-kyc-identity.md]
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M07-risk-abuse.md, M10-integrations.md, M16-notification-center.md, M19-kyc-identity.md, M20-wallet.md, FOLD-02-enforcement-window-and-suspension.md]
 last_updated: 2026-08-16
 ---
 
@@ -11,6 +11,8 @@ Constitution section M3, Appendix B4 items 9 through 12 and 16, Appendix D2, App
 This module is the front door. It is the only place a stranger who has never been authenticated can cause Merit to spend money (a provisioned account costs real entitlement dollars from the moment it exists), and it is the surface a card-fraud ring meets first. Two properties dominate every decision in it: **a purchase is a contract pinned to a plan version forever**, and **every inbound payment fact is a third-party assertion that may arrive twice, out of order, or forged.**
 
 **Amended and approved at the Wave 3 batch 1 gate (2026-08-14).** One ruling changed this module: **[ADR-019](../decisions/ADR-019.md)'s Merit Wallet becomes a checkout payment method** (section 3.4, INV-M3-13, SD-M3-06). The PSP application timing question (OQ-M3-04) was answered as a calendar note rather than a design change.
+
+**Amended by [ADR-041](../decisions/ADR-041.md) ([FOLD-02](FOLD-02-enforcement-window-and-suspension.md) session 5, 2026-08-16).** **An identity-level restriction refuses purchases and resets, server side** (section 3.5, `INV-M3-15`), joining the existing hard-limit set rather than the flag machinery. It is one check and it closes a gap this module already had in a shape nobody had looked at: **the wallet leg of checkout has refused a restricted identity since [ADR-019](../decisions/ADR-019.md) and the card leg never has**, so today a restricted trader can buy with a card and cannot buy with their own wallet balance. Nothing about pricing, coupons, the saga, MID failover, plan publishing or the enrichment call moves.
 
 **Identifier conventions:** `INV-M3-nn` invariants, `SD-M3-nn` schema deltas, `FM-M3-nn` failure modes, `AS-M3-nn` adversarial scenarios, `OQ-M3-nn` open questions, `DEP-M3-nn` dependencies.
 
@@ -38,7 +40,7 @@ Every arrow above can fail, and each failure has a named compensation in section
 | Talking to Rithmic | [M2](M02-rithmic-bridge.md) | M3 emits `account.provision_requested` and stops. It has no idea what a CSV is |
 | Deciding whether an account is eligible for anything | [M1](M01-rules-engine.md) | M3 creates accounts. It never reads a rule |
 | Verifying identity | M19 | M3 **blocks** on KYC state when the placement config says to, and consumes the state as a boolean. It never runs a check |
-| Deciding whether a buyer is a fraudster | M7 | M3 enforces hard limits (account cap per entity, per-identity coupon limit, geo). Judgment calls are flags, not checkout errors |
+| Deciding whether a buyer is a fraudster | M7 | M3 enforces hard limits (account cap per entity, per-identity coupon limit, geo, **and since [ADR-041](../decisions/ADR-041.md) an identity-level restriction**). Judgment calls are flags, not checkout errors. **A restriction is on the hard-limit side of that line and the placement is the ruling rather than a preference**: it is a recorded enforcement decision a human already made with a cited flag, a ToS clause and an exported evidence pack, not a score M3 is being asked to interpret |
 | Paying anybody | M5 | Money out is M5. M3 only ever takes money in, plus refunds and reversals |
 | Choosing what the rules say | founder, M1 | M3 publishes plan versions. `validatePlan` (M1 CV-01 to CV-19) is what decides whether a publish is allowed |
 
@@ -60,6 +62,7 @@ Every arrow above can fail, and each failure has a named compensation in section
 | INV-M3-12 | A published plan version passes `validatePlan` before it is publishable, and publishing materializes `plan_version_sizes` in the same transaction | M1's CV-01 to CV-19; G-PUBLISH-APPROVED in [STATE_MACHINES section 10](../architecture/STATE_MACHINES.md). GS-076 to GS-078, GS-083 |
 | INV-M3-13 | A wallet-funded purchase debits the wallet **in the same transaction** that creates the purchase, and never creates a purchase it could not fund | Wallet balance is Merit's own ledger, so there is no third party and no asynchronous confirmation. The debit and the purchase commit together or neither does, which makes the entire PSP webhook machinery inapplicable to this path rather than merely unused |
 | INV-M3-14 | A wallet debit never takes an identity's balance below zero, and there is no credit facility anywhere in checkout | Check constraint plus the transaction in INV-M3-13. A negative wallet balance would be Merit lending money to a trader, which is a product nobody decided to build |
+| INV-M3-15 | **An identity whose `identities.status` is `restricted` completes no purchase and no reset, by any payment method** | [ADR-041](../decisions/ADR-041.md), section 3.5. Checked **server side**, at the same point in the checkout transaction as the per-identity cap (INV-M3-08), on the resolved [identity](../GLOSSARY.md#trader-identity) rather than on the user or the email. It is a **hard limit and never a flag**, so it is a named refusal with a stated reason and never a silent decline, on OQ-M3-03's own reasoning that a silent decline teaches a ring to try a different email while an explicit one does not. **The check covers all three `payment_method` values including `mixed`**, which is the one that would otherwise half-fail |
 
 ---
 
@@ -183,14 +186,46 @@ The [Merit Wallet](../decisions/ADR-019.md) is a checkout payment method alongsi
 
 **Chargeback risk falls, and the reason is worth stating because it changes this module's risk profile.** Wallet-funded purchases carry no chargeback exposure whatsoever, so as wallet adoption grows the denominator of `chargeback_rate_bp` shrinks while the numerator does not. **The MID health thresholds in SD-M3-03 are computed against card volume, not total volume**, or a healthy shift toward wallet funding would look like a deteriorating chargeback ratio and trip the failover in AS-M3-02's direction for no reason at all.
 
+### 3.5 The restriction refusal (ADR-041)
+
+[ADR-041](../decisions/ADR-041.md) gives `identities.status = 'restricted'` its enforcement surface, and checkout is one of the five legs. **The change is one server-side check and it is deliberately not more than that** (INV-M3-15).
+
+| | |
+|---|---|
+| **Where** | The resolved-identity step of the checkout transaction, beside the per-identity cap (INV-M3-08). Same join, same synchronous [M7](M07-risk-abuse.md) resolver (DEP-M3-04), same transaction |
+| **What it covers** | `POST /checkout` and `POST /accounts/:id/reset`, all three `payment_method` values |
+| **Refusal shape** | A **named, stated refusal**, never a silent decline, on OQ-M3-03's reasoning. `422`, in `geo_restricted`'s and `account_cap_reached`'s shape |
+| **What it is not** | Not a flag check, not a score, not a fail-open enrichment signal. **`restricted` is not evidence, it is a decision already taken** |
+| **New schema** | **None.** `identities.status` has carried the value since [`0001`](../../packages/db/migrations/0001_extensions_and_enums.sql) and the restriction episode is [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql)'s |
+
+**The error code is proposed and not claimed here: `identity_restricted`.** [API_CONTRACT](../architecture/API_CONTRACT.md)'s error table and the two endpoints' error lists are where the vocabulary becomes real, and that document is [FOLD-02](FOLD-02-enforcement-window-and-suspension.md) **session 6**. **The forward reference is stated in this document only**, which is one direction short of the discipline session 4 applied to `payout.held`, and the difference is that this session's fence does not include the file the other half would go in. A session 6 that folds API_CONTRACT and omits this leaves M03 refusing a purchase with a code the contract does not define.
+
+#### 3.5.1 The half of this that already worked, and the half that never did
+
+**This is the finding, and it is a proven asymmetry inside one endpoint rather than a missing feature.**
+
+`POST /checkout` accepts `psp`, `wallet` and `mixed` (SD-M3-06). The wallet leg debits the identity's wallet position, and [M20](M20-wallet.md) `INV-M20-06` has blocked **wallet spend** on `identities.status = 'restricted'` since [ADR-041](../decisions/ADR-041.md) folded it. The card leg touches no wallet gate at all.
+
+So the position before this fold, stated as the behaviour it produces:
+
+| Payment method | A restricted identity buying today | Why |
+|---|---|---|
+| `wallet` | **refused** | The wallet spend gate refuses it, correctly and for its own reasons |
+| `psp` | **completes** | Nothing in checkout reads `identities.status` |
+| `mixed` | **refused, on the wallet leg, after the card leg is underway** | Section 3.4 applies the wallet leg first and holds it pending the PSP result, so the failure lands mid-saga |
+
+**A restricted trader could buy with a card and could not buy with money Merit already owes them.** That is the wrong way round on every reading: the wallet balance is the one funding source that involves no card network, no chargeback exposure and no third party, and it was the only one the enforcement reached. It is also the shape [ADR-041](../decisions/ADR-041.md) found twice elsewhere in this fold, where **the control existed in the paragraph explaining why the attack fails and nowhere that binds**, arriving here as a control that binds in exactly one of the three places it was believed to.
+
+**`mixed` is the case that shows why this could not be left to the wallet gate.** Refusing at the wallet leg refuses **after** the checkout transaction has begun composing a PSP session, so the correct outcome is reached through a compensation path (section 3.1's released wallet debit) rather than through a refusal. A hard limit checked at the resolved-identity step refuses before anything exists, which is where every other hard limit in this module is checked and is why the check goes there rather than being inferred from the wallet's.
+
 ## 4. API endpoints touched
 
 Schemas are in [API_CONTRACT sections 5 and 8](../architecture/API_CONTRACT.md) and are not restated. What follows is what M3 adds to that contract.
 
 | Endpoint | M3's role | What this plan adds |
 |---|---|---|
-| `POST /checkout` | Owns | The full server-authoritative rule list: price from `plan_version_sizes`; discount recomputed; cap checked per identity (INV-M3-08); geo decision recorded (SD-M3-05); ToS acceptance written **before** the PSP session exists, so a buyer who abandons still has a recorded acceptance and a buyer who completes cannot have skipped it. **Accepts `payment_method` of `psp`, `wallet`, or `mixed`** (SD-M3-06, section 3.4); the wallet leg is server-computed from the identity's balance and is never supplied by the client, for the same reason no price is |
-| `POST /accounts/:id/reset` | Owns | Same pipeline, `kind = 'reset'`, `parent_account_id` set. **The reset resolves the plan version current at reset time**, not the parent's, which is how a breached account on v1 becomes a new account on v3. That is correct and it must be said in the reset UI, because a trader who assumes their old rules carried over has been surprised by a rule change they never agreed to |
+| `POST /checkout` | Owns | The full server-authoritative rule list: price from `plan_version_sizes`; discount recomputed; cap checked per identity (INV-M3-08); **restriction checked per identity (INV-M3-15, section 3.5)**; geo decision recorded (SD-M3-05); ToS acceptance written **before** the PSP session exists, so a buyer who abandons still has a recorded acceptance and a buyer who completes cannot have skipped it. **Accepts `payment_method` of `psp`, `wallet`, or `mixed`** (SD-M3-06, section 3.4); the wallet leg is server-computed from the identity's balance and is never supplied by the client, for the same reason no price is |
+| `POST /accounts/:id/reset` | Owns | Same pipeline, `kind = 'reset'`, `parent_account_id` set, **and the same restriction check**, which matters more here than on a new purchase: a reset is the highest-volume repeat purchase in the business and it is the door a restricted trader is most likely to be standing at, since a restriction is frequently opened over an account that just breached. **The reset resolves the plan version current at reset time**, not the parent's, which is how a breached account on v1 becomes a new account on v3. That is correct and it must be said in the reset UI, because a trader who assumes their old rules carried over has been surprised by a rule change they never agreed to |
 | `POST /webhooks/psp/:provider` | Owns | Verify, persist raw, dedupe, then dispatch. Returns 200 on duplicate (a provider that gets a 500 retries forever) and 401 on bad signature. Never does business work in the request; it enqueues |
 | `POST /admin/plans/:id/versions`, `POST /admin/plans/versions/:id/publish` | Owns | `validatePlan` gate, `plan_version_sizes` materialization in the same transaction, dual control on cap/split/gap diffs ([ADR-010](../decisions/ADR-010.md)), diff rendering including warnings |
 | `GET /purchases` | Owns | |
@@ -223,6 +258,7 @@ All in the approved [EVENTS.md section 4](../architecture/EVENTS.md) except the 
 | `fill` ingestion, first per account (M2) | Sets `first_trade_at`, closing the refund window |
 | `identity.merged` (M7) | Two identities merging can put the merged entity over its account cap. **Existing accounts are grandfathered and new purchases are blocked** (B4 #17, GS-046). M3 owns the block half |
 | `kyc.verified` / `kyc.rejected` (M19) | Gates checkout when placement is `pre_eval` or the plan is Direct |
+| `identity.restricted` (M6) | **NEW, [ADR-041](../decisions/ADR-041.md).** M3 does **not** act on the event: INV-M3-15 reads `identities.status` inside the checkout transaction, and a gate driven by an event is a gate with a replication lag on the money path. It is listed as consumed for one purpose, which is **cache invalidation** on any resolved-identity or eligibility material checkout holds outside that transaction. **The state is the authority and the event is the notification**, and writing that down is what stops a later implementation from reading a cached boolean |
 
 ---
 
@@ -376,6 +412,10 @@ A **SEON-class digital-footprint vendor** runs at checkout, supplying email and 
 
 **Every state transition in the saga has a test for its compensation, not only for its happy path.** A saga whose compensations are untested is a saga with no compensations, which is Appendix E's whole thesis about code that satisfies the happy path and skips the primitive.
 
+**And every hard limit is tested on all three payment methods**, which section 3.5.1 turned from a formality into the thing that would have caught the gap it found. A refusal asserted only against `psp` passes while the `wallet` leg refuses for its own unrelated reason, and a refusal asserted only against `wallet` passes while the card door stands open. **The restriction case is written across `psp`, `wallet` and `mixed`, and `mixed` asserts the refusal lands before any PSP session exists** rather than through the compensation path.
+
+**One golden scenario is owed and no `GS-nnn` is claimed here**, for `CI-06d`'s reason and session 4's precedent: [GOLDEN_SCENARIOS](../testing/golden-scenarios/README.md) is [FOLD-02](FOLD-02-enforcement-window-and-suspension.md) session 7. Named in words: **a restricted identity is refused at checkout and at reset on every payment method, with a stated reason, and the refusal survives the identity presenting a second email that resolves to the same identity** (which is GS-094's assertion with a different hard limit behind it).
+
 ---
 
 ## 9. Observability
@@ -420,7 +460,11 @@ One page: funnel by step for today and trailing 30 days, MID health for both pro
 
 **OQ-M3-02. Refund policy, stated precisely enough to publish.** Constitution M3 says "refund window pre-first-trade only". Two things are underspecified and both will be asked on day one: is there also a **time** bound (for example 7 days, even with no trades), and does a refund release the entity cap slot immediately or after a cooling period? Proposal: 14 days **and** pre-first-trade, whichever comes first; the cap slot releases immediately, because holding it punishes the honest case and AS-M3-01's velocity signal is the right control for the dishonest one.
 
-**OQ-M3-03. Do we sell to an identity with an open severity-4 flag?** Today checkout blocks on hard limits only (cap, geo, KYC) and flags are never a checkout error, per the detection-time enforcement doctrine. That is the right default. The edge case worth ruling on: an identity with an **enforced** closure in its history buying again. Proposal: block new purchases after an enforcement, cite the ToS clause, and make it an explicit, appealable decision rather than a silent decline, because a silent decline teaches a ring to try a different email while an explicit one does not.
+**OQ-M3-03. Do we sell to an identity with an open severity-4 flag?** Today checkout blocks on hard limits only (cap, geo, KYC, **and since [ADR-041](../decisions/ADR-041.md) a live restriction**) and flags are never a checkout error, per the detection-time enforcement doctrine. That is the right default. The edge case worth ruling on: an identity with an **enforced** closure in its history buying again. Proposal: block new purchases after an enforcement, cite the ToS clause, and make it an explicit, appealable decision rather than a silent decline, because a silent decline teaches a ring to try a different email while an explicit one does not.
+
+**The restriction refusal does not answer this question and the distinction is the useful part.** INV-M3-15 refuses on a **live** state, which is a reversible enforcement currently in force. OQ-M3-03 asks about **history**: a closure for cause that has already happened and is terminal, on an identity whose current status is `active`. **A restriction that has been restored leaves `identities.status = 'active'` and an `identity_restriction_episodes` row that will still be there in five years**, so this question is now sharper rather than answered: it is whether a closed episode, like a closed enforcement, is itself a reason to refuse. Recommendation unchanged, and the recommendation now has to name **which** past enforcements count, because after this fold there are two kinds of history on the record instead of one.
+
+**Severity 4 acquired a second meaning while this question sat open**, which the founder should have in front of them: under [ADR-040](../decisions/ADR-040.md) an unresolved severity-4 flag now **holds a payout request** (`G-HOLD-REQUIRED`). This question asks whether the same band should stop a purchase. Answering yes would make one severity value gate both the money coming in and the money going out, which is a much larger commitment than the question was originally asking about, and [M07](M07-risk-abuse.md) already records that moving a detector between 3 and 4 is a data change with a recorded effective date precisely because of what the band now decides.
 
 **OQ-M3-04 (RULED, 2026-08-14). PSP shortlist and application timing.** Constitution section 10 lists "PSP shortlist (apply to 2 immediately)" as an open decision, and constitution section 8 flags PSP approval lead time as a schedule risk to be front-loaded in W1. This is a **calendar** dependency, not a design one: the adapter interface is provider-agnostic and M3 can be built and tested against a fake, but no real revenue exists until two MIDs are approved.
 
@@ -438,3 +482,4 @@ One page: funnel by step for today and trailing 30 days, MID health for both pro
 | DEP-M3-04 | M7 supplies the resolved identity for cap enforcement at checkout time, synchronously | M7 | The cap falls back to per-user, which is per-email, which is the fleet attack in constitution Appendix A item 6 |
 | DEP-M3-05 | M19 supplies KYC state as a checkout gate when placement is `pre_eval` or the plan is Direct | M19 | Direct plans fund unverified humans, which is AS-M3-03 with no defense at all |
 | DEP-M3-06 | M5 posts the compensating reversal on chargeback | M5 | The ledger stops being honest, which breaks the zero-sum invariant and every liability number built on it |
+| DEP-M3-07 | [M6](M06-admin-ops-console.md) writes `identities.status = 'restricted'` and the episode row; [M19](M19-kyc-identity.md) and [M7](M07-risk-abuse.md) own the resolved identity the check joins through | M6, M7 | INV-M3-15 has nothing to read. **This is DEP-M3-04's dependency and not a new one**: if the resolver falls back to per-user, the restriction check falls back with the cap check, so a restricted human buys under a second email exactly as an over-cap one does. The two failures are one failure, which is worth stating because a restriction refusal that quietly degrades to per-email is indistinguishable from one that works |
