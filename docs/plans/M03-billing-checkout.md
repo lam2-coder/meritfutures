@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md]
-last_updated: 2026-08-14
+depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M10-integrations.md, M16-notification-center.md, M19-kyc-identity.md]
+last_updated: 2026-08-16
 ---
 
 # M3: Billing and Checkout
@@ -318,6 +318,36 @@ A **SEON-class digital-footprint vendor** runs at checkout, supplying email and 
 
 **The fail-open rule is the one to defend in review.** A checkout that cannot complete because an enrichment call timed out has converted a fraud control into an outage, and the trade is lopsided: the cost of letting a rare bad purchase through is one account's exposure, while the cost of a blocked checkout is every purchase during the incident. Enrichment is a signal, not a gate, and a signal that can stop revenue is misconfigured.
 
+### 7.9.1 The registration lookup: the same vendor, a second call site ([ADR-039](../decisions/ADR-039.md) (a))
+
+**One vendor, two moments. Not a second sub-processor.** [ADR-039](../decisions/ADR-039.md) (a) buys carrier and line-type lookup, portability history and digital-footprint presence on the phone number at **registration**, and [FOLD-01 §3.1](FOLD-01-phone-identity.md) resolved it onto ADR-023's existing vendor on evidence rather than on preference: three of (a)'s four signals already sit inside the purchased scope, and [OQ-M19-04](M19-kyc-identity.md)'s corpus-splitting argument cuts against buying a second vendor for the fourth.
+
+**The call site is new even though the vendor is not, and that distinction is the whole of what M03 owns here.**
+
+| Property | Checkout enrichment (7.9) | Registration lookup (7.9.1) |
+|---|---|---|
+| **When** | A trader is buying. The purchase exists | A stranger is registering. **Nothing exists and nothing is owed** |
+| **What crosses the boundary** | Email, device, IP, BIN | **The telephone number**, which never left Merit before |
+| **Governed by** | Its `integration_contracts` row | **Its own** `integration_contracts` row under [M10](M10-integrations.md)'s `SD-M10-01` field allowlist (`INV-M10-02`, `INV-M10-04`) |
+| **Failure behavior** | Non-blocking in observe mode; fail-open on timeout in enforcement | **Inherited verbatim**, and `identity_phones.line_type` defaults to `unknown` in [`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql) so the fail-open value is the stored one |
+| **The posture that is not inherited because it never applied** | Soft decline plus review queue | **VoIP is scored and never rejected.** There is no CHECK anywhere in `0029` that refuses a line type, and that absence is the ruling |
+| **Procurement** | Vendor-agnostic adapter, re-evaluated | **Portability history is a disqualifying selection criterion.** A vendor that cannot supply it cannot be selected, because amendment 3's recycling guard has no input without it |
+
+**The procurement condition is the load-bearing half and it belongs in this section because M03 owns the vendor relationship.** It is not a preference expressed during selection; it is a condition of acceptance. Amendment 3 binds a phone to an identity as a hard graph link, and the only thing that stops a carrier's reassignment of a banned trader's number from auto-linking its innocent new owner is portability history. **A vendor selected without it leaves a control in the corpus whose input does not exist**, which is the failure class [FOLD-01 §8](FOLD-01-phone-identity.md) named `OI-06` for and which this one condition is enough to prevent.
+
+### 7.9.2 What enters the Cost Stack, and why the shape of the cost changed rather than its size
+
+(e) puts SMS delivery and lookup cost into the [Cost Stack](../../research/calibration/README.md). **Two lines, and the second one is the one that matters:**
+
+| Line | Driver | Notes |
+|---|---|---|
+| **SMS OTP delivery** | Per message, per destination country | Priced per country and not per message. Termination rates vary by more than an order of magnitude across destinations, so a blended global rate flatters the countries that cost the most, which are also the ones an [SMS pumping](M16-notification-center.md) attack selects for |
+| **Registration phone lookup** | Per registration | Same vendor, second call site. The unit price is the smaller number and the volume is the larger one |
+
+**Every previous line in the Cost Stack is driven by a purchase. These two are driven by a signup.** Checkout enrichment costs money on revenue-bearing traffic, so its cost per acquired customer is bounded by definition: a purchase happened. Registration lookup and SMS OTP cost money on traffic that has bought nothing, so **their cost per acquired customer moves inversely with the signup-to-purchase ratio**, and that ratio is not something Merit controls. A marketing campaign that draws unqualified traffic raises it. **An attacker raises it deliberately, which is the entire premise of ADR-039 amendment 2**, and the cost circuit breaker (`otp_send_budget`, C-28) exists precisely because this is the first cost line in the estate an adversary can drive on purpose.
+
+**The consequence for the model, stated so whoever re-runs it does not have to derive it.** These two lines cannot be modelled as a constant per funded account. They belong against **signups** with the conversion ratio as an explicit input, and the breaker's budget is the ceiling that makes the worst case finite rather than unbounded. **The workbook's cost stack tab predates ADR-039 and carries neither line**, which is a divergence of exactly the kind [the calibration README](../../research/calibration/README.md) already tracks for the plans tab; it is recorded here rather than added there, because the workbook is corroborating evidence for the corpus and the corpus is where the ruling lives.
+
 ## 8. Test plan
 
 ### 8.1 Suites
@@ -363,6 +393,8 @@ A **SEON-class digital-footprint vendor** runs at checkout, supplying email and 
 | `refund.rate` and refunds per identity | AS-M3-01 |
 | `purchases.created` versus `psp.settlements` daily | AS-M3-06's reconciliation. The money-in mirror of M2's balance recon |
 | `plan_version.publishes` with validation warnings count | A publish that carried warnings is a thing to be able to find later |
+| **Vendor cost per signup and vendor cost per acquired customer**, tracked as two numbers | Section 7.9.2. The first is what an attacker can move and the second is what the business model depends on, and reporting only the blended figure hides the divergence between them until a campaign or an attack has already run |
+| **SMS OTP spend by destination country** | The pumping signature is a country mix that does not resemble the customer mix, and a blended rate cannot show it. Pairs with [M16](M16-notification-center.md)'s breaker telemetry, which is where the ceiling lives |
 
 ### 9.2 Alerts
 

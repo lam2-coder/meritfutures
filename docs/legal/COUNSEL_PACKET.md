@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [README.md, TOS_CLAUSES.md, PRIVACY_POLICY.md, AFFILIATE_TERMS.md, ../plans/M18-graduation-track.md, ../plans/M19-kyc-identity.md, ../plans/M20-wallet.md, ../decisions/README.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-16
 ---
 
 # The Counsel Packet
@@ -83,9 +83,9 @@ The external settlement rail takes 2 to 3 business days, which traders experienc
 
 ---
 
-## Item 3: Escheatment mapping, and the BIPA plus GDPR analysis
+## Item 3: Escheatment mapping, and the BIPA, GDPR and telecom-metadata analysis
 
-Two mappings, bundled because they are the same kind of work: jurisdiction-by-jurisdiction analysis that engineering cannot do and that decays if it is not on a calendar.
+Three mappings, bundled because they are the same kind of work: jurisdiction-by-jurisdiction analysis that engineering cannot do and that decays if it is not on a calendar.
 
 ### 3a. Escheatment and dormancy
 
@@ -111,9 +111,33 @@ Two mappings, bundled because they are the same kind of work: jurisdiction-by-ju
 
 **One retention carve-out needs the balancing test most.** **Banned-identity records persist past account closure**, because an identity defense that forgets a banned operator when they close their account is not a defense. What persists is the minimum that makes recognition possible: the decision, the linking signals, and the reason. Not documents, not images. Tradeify publishes a fraud-prevention retention basis for exactly this and is the precedent to compare against, and **where Merit's scope is narrower, counsel should say so rather than copying a broader claim**.
 
+### 3d. Telecom metadata lawful basis (added 2026-08-16 by [ADR-039](../decisions/ADR-039.md))
+
+**The question.** A telephone number is now collected for **authentication** and is mandatory at registration. Merit then runs a **carrier and line-type lookup** on it: carrier name and country, line type, **portability history**, and whether the number has a digital footprint. Four sub-questions, and the fourth is the one engineering cannot even guess at.
+
+1. What is the **lawful basis** for enriching, for fraud prevention, a number the person supplied in order to log in?
+2. Where the basis is legitimate interest, what does the **balancing test** say, given that the number was not optional?
+3. Does the **EU ePrivacy** regime change the answer, given that the subject matter is a communications identifier and its carrier?
+4. **Is portability history a heightened category anywhere?** It reveals **when a person changed carrier**, which is a fact about their communications rather than about their account, and Merit has no way to know whether any jurisdiction treats it specially.
+
+**The facts the answer turns on.** Each is a description of a system that is fully specified, so the answer can be given against a design.
+
+| Fact | Detail |
+|---|---|
+| **The number is not optional** | Phone verification is mandatory at registration. A basis that depends on the collection being voluntary is not available here, and counsel should say so plainly if that is the case rather than route around it |
+| **Two purposes, and Merit's position is that they are two** | **Authentication** is the collection purpose. **Fraud prevention** is what the enrichment serves. This is the same shape as the trading-behavior category in 3c: Merit's position is that the second purpose is disclosed as **its own purpose** rather than folded into "providing the service", and folding it is the gap that makes a later enforcement contestable |
+| **Merit does not store the number** | `identity_phones` holds a one-way hash and a non-reconstructable display fragment, plus the carrier metadata. The same minimization posture as 3b's biometrics, and it carries 3b's same consequence in reverse: the retained data is the **metadata**, which is the part this question is about |
+| **No vendor is added** | The lookup is [ADR-023](../decisions/ADR-023.md)'s existing enrichment sub-processor at a second call site, not a new one. **A sub-processor already disclosed, receiving a new category of data** |
+| **Nothing is refused automatically on the output** | **VoIP is scored and never rejected**, and there is no constraint anywhere in the schema that refuses a line type. The strongest automatic consequence is that a second identity verifying a live number completes verification and **raises a flag for human review**, changing no state ([ADR-039](../decisions/ADR-039.md)). Counsel should map this against whatever automated-decision rules apply; engineering's contribution is the fact that **no decision with an effect is taken by a machine on this data** |
+| **One use of it is protective, and it should count in the balance** | Portability history exists in the design to stop a **recycled number** auto-linking its innocent new owner to a banned identity. The enrichment that raises the question is also the only thing that answers it, and a design without it would be worse for the data subject rather than better |
+
+**Why this is asked before the code and not after.** If portability history turns out to be heightened somewhere Merit serves, the remedies are all cheap **today**: exclude the field for that jurisdiction, shorten its retention, or make it a review input rather than a stored one. Each becomes a migration and a re-disclosure once the column is populated. **This is the packet's whole thesis arriving in the newest place.**
+
 ### Blocked by the answer
 
 **The privacy policy leaving draft**, and the dormancy calendar.
+
+**One thing is deliberately not blocked, and the distinction matters for sequencing.** The registration lookup itself is a design decision Merit has taken and is not waiting on counsel. What waits is **the privacy policy's telephony row asserting a basis**: it cites 3d instead, so the policy is honest about what it does not yet know rather than publishing a basis engineering picked. **A lawful basis stated by an engineer is a representation, and it is the one kind of claim this packet exists to stop Merit making.**
 
 ---
 
