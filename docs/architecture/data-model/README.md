@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../decisions/README.md, ../OVERVIEW.md]
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # DATA MODEL
@@ -45,10 +45,11 @@ about a table.
 - Foreign keys are always declared with an explicit `on delete` action, and that action is `restrict` for every financial or evidentiary relationship. We do not cascade deletes anywhere in a money path.
 
 **Mutability**
-- **The append-only set is these eighteen tables**, and the list is exact rather than illustrative because [`0026_roles_and_grants`](../../../packages/db/migrations/0026_roles_and_grants.sql) revokes `UPDATE` and `DELETE` on exactly this set, from the application role **and from `PUBLIC`**: `ledger_entries`, `ledger_transactions`, `events`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `identity_merges`, `identity_links`, `tos_acceptances`, `account_status_history`, `wallet_entries`, `published_statistics`, `kyc_funnel_events`, `integration_dispatches`, `support_context_views`, `certificate_verifications`. The application role holds `INSERT` and `SELECT` only. Enforced by grants in the database, not by convention ([VG-8](../../../research/VIBE_FAILURE_POSTMORTEMS.md)).
+- **The append-only set is these twenty tables**, and the list is exact rather than illustrative because two migrations revoke `UPDATE` and `DELETE` on exactly this set, from the application role **and from `PUBLIC`**. [`0026_roles_and_grants`](../../../packages/db/migrations/0026_roles_and_grants.sql) revokes on eighteen: `ledger_entries`, `ledger_transactions`, `events`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `identity_merges`, `identity_links`, `tos_acceptances`, `account_status_history`, `wallet_entries`, `published_statistics`, `kyc_funnel_events`, `integration_dispatches`, `support_context_views`, `certificate_verifications`. [`0032`](../../../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql) revokes on the two it creates, `trading_calendar_revisions` and `trading_calendar_loads`, and **supersedes `0026`'s list rather than editing it**. The application role holds `INSERT` and `SELECT` only. Enforced by grants in the database, not by convention ([VG-8](../../../research/VIBE_FAILURE_POSTMORTEMS.md)).
+  - **A later migration that creates an append-only table must revoke, and `0026` is why.** Its closing `ALTER DEFAULT PRIVILEGES` grants the application role `SELECT, INSERT, UPDATE, DELETE` on every table a future migration creates, so a new table is fully mutable the instant it exists and the words "append-only" in its comment are false until somebody revokes. `0032` is the first migration to hit this, and the rule is stated here rather than left to be rediscovered.
   - The approved list read `events`, `ledger_entries`, `ledger_transactions`, `admin_actions`, `fills`, `raw_ingest_rows`, `daily_marks`, `rule_states`, `eligibility` snapshots, `identity_merges`. **`eligibility` snapshots is not a table** (the eligibility snapshot is a `jsonb` column on `payout_requests`, §8), and the other nine tables above were added by the fold. This paragraph is the document half of `OI-03`: the CI check asserts `0026`'s revoke list against **this list**, so the two cannot drift apart in either direction.
   - **Two single-column updates on append-only tables are legitimate and ruled** (`daily_marks.superseded_by`, `identity_links.suppressed`). They are performed by `SECURITY DEFINER` functions owned by the migrator role, each arriving with the module that owns the transition and with its negative-authz test. Those functions do not exist yet, so a naive first implementation of either transition fails at the grant, which is the correct failure and will look like a bug.
-- Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 96 tables carry `updated_at`**; the rest are either append-only or written once.
+- Mutable tables carry `updated_at` and emit an event on every meaningful transition, so the trail exists even where the row is overwritten. **Thirty of the 98 tables carry `updated_at`**; the rest are either append-only or written once. (The figure was thirty of 96 until `0032` added two append-only tables, which is why the numerator did not move.)
 - Nothing is ever soft-deleted with a boolean. Lifecycle is a status enum with an event trail. The one soft delete in the schema is `journal_entries.deleted_at`, and it is a **tombstone for a hard-delete job** rather than an end state (§10).
 
 **Naming**: `snake_case`, plural table names, `_cents` and `_bp` suffixes are mandatory on money and ratio columns, `_at` on timestamps, `_on` on dates. A column named `amount` without a unit suffix is a review reject.
@@ -98,7 +99,9 @@ Created by [`0002_identity`](../../../packages/db/migrations/0002_identity.sql) 
 
 ## 4. Catalog and configuration
 
-Created by [`0004_catalog`](../../../packages/db/migrations/0004_catalog.sql). Eight tables, money path. `plan_versions` **is** the rule contract: the single source of truth the engine executes and the site renders, and the artifact behind the most valuable promise Merit can make in a market whose live case study is a firm destroyed by a retroactive rule change.
+Created by [`0004_catalog`](../../../packages/db/migrations/0004_catalog.sql) and [`0032_trading_calendar_holidays_coverage_revisions`](../../../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql) (the two calendar tables, and the amendments to `trading_calendar` itself). Ten tables, money path. `plan_versions` **is** the rule contract: the single source of truth the engine executes and the site renders, and the artifact behind the most valuable promise Merit can make in a market whose live case study is a firm destroyed by a retroactive rule change.
+
+**The calendar is the second thing in this section that changes rule outcomes with no change to a line of engine code.** Every counter the engine keeps is counted in trading days (R-01, R-02, R-05, R-34, R-37, R-47), and the engine is a pure function of the calendar it is handed: `types: []`, `merit/engine-purity` and `RI-01` each guarantee it cannot go and check for itself. [ADR-042](../../decisions/ADR-042.md) is the ruling set, and `0032` carries F-1 through F-4.
 
 | Table | |
 |---|---|
@@ -110,6 +113,8 @@ Created by [`0004_catalog`](../../../packages/db/migrations/0004_catalog.sql). E
 | [`geo_restrictions`](geo_restrictions.md) | |
 | [`contract_specs`](contract_specs.md) | |
 | [`trading_calendar`](trading_calendar.md) | |
+| [`trading_calendar_revisions`](trading_calendar_revisions.md) | |
+| [`trading_calendar_loads`](trading_calendar_loads.md) | |
 
 ## 5. Commerce
 

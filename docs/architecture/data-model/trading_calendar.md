@@ -1,15 +1,23 @@
 ### trading_calendar
 The trading day is data, never arithmetic.
 
+**Amended by [`0032`](../../../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql) under [ADR-042](../../decisions/ADR-042.md) F-1 and F-3.** `0004` is merged and is not edited; `0032` supersedes what it installed.
+
 | Column | Type | Constraints | Why |
 |---|---|---|---|
-| `trading_day` | date | pk | |
-| `session_open_at`, `session_close_at` | timestamptz | not null | UTC instants derived from CT session definitions, so DST is a row rather than a calculation (B4 #1). No engine rule ever derives a trading day from a timestamp's UTC date |
-| `is_half_day` | boolean | not null default false | counts as a **full day** (B4 #3). A half day counting as half a day would make the minimum-trading-days gate a different promise in November |
-| `is_holiday` | boolean | not null default false | not a trading day at all |
+| `trading_day` | date | pk | **the exchange CT trading day**, never a UTC calendar date derived from a timestamp (B4 #1). Unit stated here because the type cannot state it |
+| `session_open_at`, `session_close_at` | timestamptz | **null exactly when `is_holiday`** (`0032`, was `not null`) | UTC instants derived from CT session definitions, so DST is a row rather than a calculation (B4 #1). No engine rule ever derives a trading day from a timestamp's UTC date. **`0004` made these `not null` under `check (close > open)`, so a holiday row had to carry a fabricated session interval** while the check beside it said a holiday has no session to contain fills in. R-01 is a containment lookup, so a fabricated interval is not inert: it is an interval a fill can fall inside |
+| `is_half_day` | boolean | not null default false | counts as a **full day** (B4 #3). A half day counting as half a day would make the minimum-trading-days gate a different promise in November. The only thing it changes is `session_close_at` |
+| `is_holiday` | boolean | not null default false | not a trading day at all. **A positive fact rather than an absence** since `0032`: a row with no session must be a holiday, and a holiday must have no session |
 | `halted` | boolean | not null default false | day counters advance, win days do not (B4 #2). A trader cannot earn a win day on a session the exchange halted, and cannot be penalised for one either |
-| `notes` | text | null | |
+| `notes` | text | null; **required and non-blank when `is_half_day`** (`0032`) | on an early-close day this carries the **per-group** close times, because `session_close_at` carries only one of them |
 | `created_at`, `updated_at` | timestamptz | not null default now() | |
 
-Constraints: `trading_calendar_session_ordered`; `trading_calendar_holiday_not_half_day` (a holiday has no session to contain fills in).
-Seeded years ahead, maintained as data, reviewed annually. Retention: forever.
+Constraints: `trading_calendar_session_ordered` (**rewritten by `0032`**, name preserved: both session columns null, or both non-null and ordered); `trading_calendar_holiday_not_half_day` (`0004`); `trading_calendar_holiday_has_no_session` (`0032`, `is_holiday = (session_open_at is null)`); `trading_calendar_half_day_records_group_closes` (`0032`).
+Seeded years ahead, maintained as data, reviewed annually. **Coverage is not stated here**: it is in [`trading_calendar_loads`](trading_calendar_loads.md), and a day outside coverage is unknown rather than a holiday. Retention: forever.
+
+**Why the ordering check was rewritten rather than left alone, which is the most dangerous line in `0032`.** Dropping `not null` from a column named inside an existing `check` does not make that check null-safe; it makes it **vacuous** on the rows that now carry null, because `session_close_at > session_open_at` evaluates to `null` when either side is null and **a `check` that evaluates to `null` passes**. That is the identical defect [ADR-035](../../decisions/ADR-035.md) found seven times in the `array_length` form. The rewritten constraint admits the two legitimate states and nothing else, and **it was proven empirically rather than reasoned about**: the weak reading, built in a scratch schema and given a holiday carrying a close time and no open, **commits**. `trading_calendar_holiday_has_no_session` names only `session_open_at`, so on its own it would leave exactly that row writable.
+
+**Why one `session_close_at` serves six symbols, [ADR-042](../../decisions/ADR-042.md) F-3.** [`contract_specs`](contract_specs.md) lists `ES`, `MES`, `NQ`, `MNQ`, `CL` and `GC`, spanning CME, NYMEX and COMEX, whose early closes differ by product group while their regular hours agree. On an early-close day `session_close_at` is the **latest** close across those groups. R-01 is a containment lookup, so the only thing at stake is whether a fill can fall outside every session, and the latest close guarantees it cannot; the next session opens at 17:00 CT regardless, so no overlap is created and no fill is orphaned. **The symbol dimension is rejected**: it turns R-01 into a per-symbol lookup, changes the engine's calendar contract, and makes the calendar's grain differ from the grain every counter is defined at.
+
+**The `notes` constraint asserts presence, never content.** It cannot tell per-group close times from the word "yes". It is there because the alternative is that F-3's per-group record lands as prose only, and `btrim` rather than `is not null` because the empty string satisfies `is not null` and is the same class of silent pass as the empty array.
