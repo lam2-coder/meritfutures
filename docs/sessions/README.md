@@ -51,3 +51,4 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 31](2026-08-16-session-31.md) | FOLD-01 session 3, migration `0029` and the phone-identity schema |
 | [2026-08-16 - Session 31](2026-08-16-session-31.md) | FOLD-02 session 3, migrations `0030` and `0031` |
 | [2026-08-16 - Session 31](2026-08-16-session-31.md) | `0032` carries ADR-042's F-1 to F-4 (S-E session 2, money path) |
+| [2026-08-16 - Session 31](2026-08-16-session-31.md) | `OI-07` and `OI-08` close: the phone probe committed, NO-FLOATS made whole-schema |
