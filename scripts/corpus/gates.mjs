@@ -957,7 +957,7 @@ const ci06h = {
     'claimed by a row of the migration allocation table in DECISIONS.md, every ' +
     'hole matches a reservation, and the corpus workflow still carries the ' +
     'ON_ERROR_STOP apply, the must-fail re-apply, the database-derived counts, ' +
-    'the whole-schema NO-FLOATS assertion and all four database probes. ' +
+    'the whole-schema NO-FLOATS assertion and all five database probes. ' +
     'TWO THINGS IT DOES NOT DO. The install itself needs a live PostgreSQL and ' +
     'runs in CI, so a green result here is NOT a claim that the set installs. And ' +
     'the cross-branch half, that a pull request may not claim a number already on ' +
@@ -1032,6 +1032,16 @@ const ci06h = {
       [
         'probe_phone_identity.sql',
         "ADR-039's phone identity and auth probe is no longer run (OI-07)",
+      ],
+      // OI-06. ADR-045's guards are the only thing that makes ADR-042 F-2's
+      // prior image obligatory, and they are DEFERRED constraint triggers, so
+      // the probe that proves they fire is the only place the deferred check is
+      // ever forced. Arriving pinned rather than being pinned later: the probe
+      // step above went unpinned from the day it landed, which is the failure
+      // this list exists to end and it was found one file over.
+      [
+        'probe_calendar_revision_required.sql',
+        "ADR-045's calendar prior-image guards are no longer probed (OI-06)",
       ],
       // OI-08. The NO-FLOATS assertion lived inside 0027 and could only ever
       // see 0001-0027, so five migrations sat outside the guard the corpus
