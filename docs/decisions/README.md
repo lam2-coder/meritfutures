@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-15
+last_updated: 2026-08-16
 ---
 
 # DECISIONS (ADR registry)
@@ -71,6 +71,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-042](ADR-042.md) | The trading calendar is transcribed from the exchange, and Merit computes nothing in business days  (2026-08-15, status: accepted) |
 | [ADR-043](ADR-043.md) | The append-only registries become directory-per-entry  (2026-08-15, status: accepted) |
 | [ADR-044](ADR-044.md) | The AI and LLM policy. A permission boundary that adds no scope, and a narration boundary on the trader surface  (2026-08-16, status: accepted) |
+| [ADR-045](ADR-045.md) | A `trading_calendar` correction that leaves no prior image is refused by the database  (2026-08-16, status: accepted) |
 
 ## Gate closures
 
