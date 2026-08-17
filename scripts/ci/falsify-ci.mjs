@@ -323,6 +323,190 @@ function seededEdit(rel, edit, gate) {
 /** @type {Case[]} */
 const CASES = [
   // ---------------------------------------------------------------------------
+  // CI-01  RE-D-03, and the case that proves it is not a duplicate
+  // ---------------------------------------------------------------------------
+  {
+    id: 'CI-01/RE-D-03',
+    stage: 'CI-01',
+    // THIS CASE ASSERTS TWO THINGS AND THE SECOND IS THE POINT. RI-07 must fail
+    // on the escape, AND the two mechanisms that already existed must stay
+    // GREEN on the same tree. A new gate that fires only where an old one
+    // already fires is a second opinion, not a control, and the only way to
+    // tell those apart is to watch the old ones say nothing.
+    //
+    // The seed is the exact shape M01 section 1.4's RE-D-03 exists for: a
+    // RELATIVE import, so `merit/engine-purity` returns early on it, reaching a
+    // file OUTSIDE `packages/rules-engine/src/**`, so that file is never linted
+    // either, which then imports a Node builtin.
+    seeds:
+      'a `node:crypto` import in a file outside packages/rules-engine/src, reached from src/index.ts by a RELATIVE specifier. Invisible to RI-01 (manifest only) and to merit/engine-purity (returns early on `.`, and is attached to src/** only)',
+    needles: [
+      'OUTSIDE',
+      `${MARK}-escape.ts`,
+      'node:crypto',
+      'ADDITIVITY: RI-01 green, engine-purity green',
+    ],
+    run: () =>
+      seededInTree(
+        {
+          // THE SEED IS A FILE AND NOT A DIRECTORY, which is a constraint of this
+          // harness rather than a stylistic choice. `sweep()` removes stale
+          // marked paths with a non-recursive `rmSync`, so a marked DIRECTORY
+          // makes the harness throw `EISDIR` before any case runs at all. Found
+          // by seeding one. The package root is already outside `src/**`, which
+          // is the only property this case needs.
+          [`packages/rules-engine/${MARK}-escape.ts`]:
+            "import { randomUUID } from 'node:crypto';\n" +
+            '// The builtin is the point: RI-07 walks the graph and must reach it.\n' +
+            'export const nonce = (): string => randomUUID();\n',
+        },
+        () =>
+          seededEdit(
+            'packages/rules-engine/src/index.ts',
+            (before) => `${before}\nexport { nonce } from '../${MARK}-escape.js';\n`,
+            () => {
+              const ri07 = run('node', ['packages/tooling/checks/repo-invariants.mjs', 'RI-07']);
+              const ri01 = run('node', ['packages/tooling/checks/repo-invariants.mjs', 'RI-01']);
+              const lint = run('pnpm', ['exec', 'eslint', 'packages/rules-engine/src/']);
+              const additivity =
+                `ADDITIVITY: RI-01 ${ri01.status === 0 ? 'green' : 'RED'}, ` +
+                `engine-purity ${lint.status === 0 ? 'green' : 'RED'}`;
+              return { status: ri07.status, output: `${ri07.output}\n${additivity}\n` };
+            },
+          ),
+      ),
+  },
+
+  // ---------------------------------------------------------------------------
+  // CI-02  RE-D-01 and RE-D-02
+  // ---------------------------------------------------------------------------
+  {
+    id: 'CI-02/RE-D-01-engine',
+    stage: 'CI-02',
+    // THE FINDING RE-D-01 EXISTS TO PRODUCE. INV-01 is "the ENGINE performs no
+    // I/O and reads no clock | RE-D-01, RE-D-03, ESLint", so a seed anywhere
+    // else never once demonstrates this gate catching an engine clock read.
+    //
+    // `merit/engine-purity` catches this too, and THE REDUNDANCY IS DELIBERATE:
+    // M01 names three mechanisms for INV-01 on purpose, and a gate is proven by
+    // its own finding rather than by a neighbouring gate's.
+    //
+    // It goes INSIDE `advanceDay` rather than at module scope, because a
+    // top-level read runs at import time, which is before the trap installs.
+    seeds: 'a `Date.now()` inside `advanceDay`, on the fold path the demo corpus actually executes',
+    needles: ['RE-D-01', 'Date.now()', 'reads no clock'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/day/advance.ts',
+        (before) =>
+          before.replace(
+            'export function advanceDay(input: DayInput): DayOutput {\n' +
+              '  const { plan, mark, settlements, engineVersion } = input;',
+            'export function advanceDay(input: DayInput): DayOutput {\n' +
+              `  const ${MARK}_clock = Date.now();\n` +
+              `  void ${MARK}_clock;\n` +
+              '  const { plan, mark, settlements, engineVersion } = input;',
+          ),
+        () =>
+          run('pnpm', [
+            'exec',
+            'vitest',
+            'run',
+            '--project',
+            'unit',
+            'packages/golden-loader/test/determinism.test.ts',
+            '-t',
+            'RE-D-01',
+          ]),
+      ),
+  },
+  {
+    id: 'CI-02/RE-D-01-outside-the-glob',
+    stage: 'CI-02',
+    // THE ADDITIVITY CASE, and it is why the pair is kept rather than collapsed
+    // to the one above. `scripts/demo/fold.ts` is on the corpus's fold path and
+    // is OUTSIDE `merit/engine-purity`'s glob, so this clock read is one that
+    // ONLY RE-D-01 can see. The case asserts CI-01 stays green on it.
+    seeds:
+      'a `new Date()` in scripts/demo/fold.ts, which is on the fold path and outside merit/engine-purity glob, so no lint rule can see it',
+    needles: ['RE-D-01', 'new Date()', 'ADDITIVITY: eslint green'],
+    run: () =>
+      seededEdit(
+        'scripts/demo/fold.ts',
+        (before) =>
+          before.replace(
+            'export function foldAccount(input: FoldInput): AccountRun {',
+            'export function foldAccount(input: FoldInput): AccountRun {\n' +
+              `  const ${MARK}_now = new Date();\n` +
+              `  void ${MARK}_now;`,
+          ),
+        () => {
+          const gate = run('pnpm', [
+            'exec',
+            'vitest',
+            'run',
+            '--project',
+            'unit',
+            'packages/golden-loader/test/determinism.test.ts',
+            '-t',
+            'RE-D-01',
+          ]);
+          const lint = run('pnpm', ['exec', 'eslint', 'scripts/demo/fold.ts']);
+          return {
+            status: gate.status,
+            output: `${gate.output}\nADDITIVITY: eslint ${lint.status === 0 ? 'green' : 'RED'}\n`,
+          };
+        },
+      ),
+  },
+  {
+    id: 'CI-02/RE-D-02',
+    stage: 'CI-02',
+    // A LOCALE READ, WHICH IS THE DEFECT RE-D-02 IS SHAPED AROUND. STRATEGY
+    // section 3.1 names it in as many words: randomizing `LC_ALL` "is how a
+    // `toLocaleDateString` gets caught". `render.ts`'s own header bans it and
+    // this seeds exactly what that ban is for.
+    //
+    // It can only be caught ACROSS PROCESSES: Node resolves the ICU default
+    // locale once at startup, so the same seed is invisible to any in-process
+    // locale comparison. That is why RE-D-02 spawns `engine-digest.mjs`.
+    // THE SEED MUST REACH THE OUTPUT, NOT MERELY READ THE LOCALE. The first
+    // version assigned `toLocaleDateString()` to a variable it then discarded,
+    // and the digest was byte-identical under every locale: the gate reported
+    // "did not fail" and it was RIGHT to. A mutant whose effect never leaves the
+    // function proves nothing about a gate that compares output.
+    //
+    // `bigint.toLocaleString()` is the version that bites, and it is the exact
+    // defect `render.ts`'s own header bans: the thousands separator is a comma
+    // under `en`, a period under `de`, and Arabic-Indic digits under `ar_EG`.
+    seeds:
+      'a `toLocaleString()` thousands separator in scripts/demo/render.ts, so every money figure in the digest changes with LC_ALL',
+    needles: ['digest differs under TZ=', 'LC_ALL='],
+    run: () =>
+      seededEdit(
+        'scripts/demo/render.ts',
+        (before) =>
+          before.replace(
+            'function grouped(value: bigint): string {\n  const digits = String(value);',
+            'function grouped(value: bigint): string {\n' +
+              `  if (String(value).length > 0) return value.toLocaleString(); // ${MARK}\n` +
+              '  const digits = String(value);',
+          ),
+        () =>
+          run('pnpm', [
+            'exec',
+            'vitest',
+            'run',
+            '--project',
+            'unit',
+            'packages/golden-loader/test/determinism.test.ts',
+            '-t',
+            'RE-D-02',
+          ]),
+      ),
+  },
+
+  // ---------------------------------------------------------------------------
   // CI-01  Lint and types
   // ---------------------------------------------------------------------------
   {
