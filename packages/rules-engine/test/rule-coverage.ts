@@ -32,19 +32,35 @@ import type { RuleId } from '../src/rules.js';
  * section 3.5's operator column uses.
  */
 export const RULE_ASSERTIONS = {
+  'R-01':
+    'a fill belongs to the session containing it, and no value the fold reads carries an instant',
+  'R-02':
+    'counters advance only on trading days and whether or not the trader traded, and a gap is `sequence` subtraction',
   'R-03': 'a half day is a full trading day for every counter, and reaches no comparison',
   'R-04': 'on a halted session the day counters advance and win days do not',
+  'R-05':
+    'session bounds are stored UTC instants, and a `CalendarDay` carries neither one nor a zone',
+  'R-06':
+    'the fold is strictly forward, so the day already closed is never re-evaluated and no later one is seen',
   'R-07': 'opening == prior.balance + adjustment, and a failure refuses the day (INV-18)',
   'R-08': 'a traded day is fill_count > 0, strict',
   'R-09': 'a win day is realized_pnl_cents >= win_day_floor_cents, so exactly at the floor counts',
+  'R-10':
+    'the adjustment is on INV-18’s OPENING side and absent from INV-19, so it is never inside a session',
+  'R-11':
+    'the engine reads only live marks, and it does so by having no way to name a superseded one',
   'R-12': 'the initial floor is size_cents - drawdown_cents',
   'R-13': 'the trailing floor follows the CLOSING balance and never the intraday high',
   'R-14': 'the floor never retreats, and an attempt to lower it throws INV-06',
   'R-15':
     'the lock engages at closing - size >= at_profit_cents, is permanent, and never lowers the trailed floor',
   'R-16': 'a static drawdown holds floor = size_cents - drawdown_cents for life',
+  'R-17':
+    'intraday trailing is unimplemented, and `DrawdownType` is the closed union that makes it unrepresentable',
   'R-18': 'the breach comparator is the floor AT THE OPEN, trailed strictly afterwards',
   'R-19': 'a settlement writes NONE of the floor, the high-water balance or the lock (ADR-014)',
+  'R-20':
+    'the setpoint equals the CURRENT floor, which `day.closed` carries on every day and the engine never pushes',
   'R-21': 'a floor breach is low_balance_cents < floorOpen, strict: touching survives',
   'R-22':
     'a hard daily loss limit breaches at -realized_pnl > limit, strict: exactly at it survives',
@@ -57,6 +73,8 @@ export const RULE_ASSERTIONS = {
   'R-29': 'consistency is best * 10000 <= max_bp * profit, cross multiplied, so a tie passes',
   'R-30': 'the denominator rule skips the gate unless period profit > 0, strict',
   'R-31': 'the eval pass resets the funded phase to size and carries no eval profit',
+  'R-32':
+    'a plan that sets `max_days` REFUSES the day, because the anchor and the authoritative column are unruled',
   'R-33': 'the funded minimum-days gate is >=, and a configured zero DISABLES it (skipped)',
   'R-34': 'the win-day gate is winDaysCount >= required_count, so exactly at it passes',
   'R-35':
@@ -78,8 +96,50 @@ export const RULE_ASSERTIONS = {
   'R-50': 'lifetime settled accumulates every approved amount, which INV-17 bounds',
 } as const satisfies Partial<Record<RuleId, string>>;
 
-/** The rules this suite claims. `implemented-rules.test.ts` compares it to the engine's. */
-export const COVERED_RULES = Object.keys(RULE_ASSERTIONS) as readonly RuleId[];
+/**
+ * The rules whose `RE-U-nn` asserts an ABSENCE OR A REFUSAL rather than an
+ * operator, and the reason each one is not in `IMPLEMENTED_RULES`.
+ *
+ * THE TWO SERIES ARE NOT THE SAME SET AND THEY NEVER WERE. M01 section 8.4's
+ * coverage rule is over ALL FIFTY rules ("every rule R-01 to R-50 has at least
+ * one unit test"), and ADR-048's declared set is over the rules THE ENGINE
+ * COMPUTES, which it defines against the opposite failure: "a rule is
+ * implemented when the engine computes it, not when a symbol exists". A rule the
+ * engine cannot compute still owes a test, and that test's job is to say WHY it
+ * cannot, in a form that fails when the reason stops being true.
+ *
+ * That is RE-U-019's idiom, which the corpus already accepts: "an absence is the
+ * one kind of rule a reader cannot check by finding the line". The difference
+ * here is that R-19's absence is discharged INSIDE the engine and these are
+ * discharged outside it, so they carry a title and no declaration.
+ *
+ * WHAT WOULD MAKE ONE OF THESE MOVE, stated per row rather than left to a reader
+ * to guess, because the previous version of this list had two rows filed against
+ * a blocker that would not have unblocked them.
+ */
+export const DISCHARGED_ELSEWHERE = {
+  'R-01':
+    'ingest. `DailyMark` carries `fillCount` and no fill, so there is no execution timestamp to contain and no cast to refuse. A transcribed calendar does not change that: it adds rows, not a column on `CalendarDay`',
+  'R-05':
+    '`trading_calendar.session_open_at` and `session_close_at`, and `0032`’s constraints over them. `CalendarDay` carries neither column, so the timezone conversion R-05 forbids is unwritable here rather than merely unwritten',
+  'R-11':
+    'the caller’s `superseded_by is null` predicate, and replay recomputing forward. `DailyMark` carries no supersession field, so there is no branch a superseded mark could take and no check the engine could add without a new column',
+  'R-17':
+    'CV-01 at publish, in `validatePlan`, which is P2-1’s and does not exist yet. What holds it today is stronger and is in this package: `DrawdownType` has two members, so an `intraday_trailing` plan is a compile error rather than a rejected config',
+  'R-32':
+    'nothing, and that is the finding rather than the blocker. The refusal is implemented and asserted; what is unruled is R-32’s ANCHOR (neither it nor `G-EXPIRED` names the day the trading days elapse from) and WHICH COLUMN BINDS (a count against `max_days`, or the stored `accounts.expires_on` date). Both are founder rulings',
+  'R-20':
+    'M02’s setpoint push (`DEP-M2-03`), and the engine performs no I/O. What it owes is the number, and `day.closed.floorCents` is the state’s own floor on every day, quiet ones included',
+} as const satisfies Partial<Record<RuleId, string>>;
+
+/**
+ * The rules this suite claims the ENGINE COMPUTES. `implemented-rules.test.ts`
+ * compares it to `IMPLEMENTED_RULES`, and compares `RULE_ASSERTIONS` against all
+ * fifty separately, because those are two different claims.
+ */
+export const COVERED_RULES = (Object.keys(RULE_ASSERTIONS) as readonly RuleId[]).filter(
+  (rule) => !(rule in DISCHARGED_ELSEWHERE),
+);
 
 /**
  * The title of a rule's unit test: `RE-U-013  R-13  the trailing floor ...`.

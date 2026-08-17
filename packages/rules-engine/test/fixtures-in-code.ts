@@ -290,6 +290,37 @@ export const CME_WINDOW: CalendarSlice = buildCalendarSlice({
   coverage: { from: day('2026-11-02'), to: day('2026-11-06') },
 });
 
+/**
+ * A slice with a HOLE in it, and it deliberately names no exchange.
+ *
+ * R-02's second half is "gap counting is `calendar.sequence` subtraction, never
+ * date arithmetic", and `CME_WINDOW` CANNOT TELL THE TWO APART: its five days
+ * are consecutive, so the difference of the sequences and the difference of the
+ * dates are both 4 and an engine written either way passes. This slice is the
+ * discriminator. Between `2026-11-02` and `2026-11-06` it holds one intervening
+ * session and none of the others, so **date arithmetic answers 4 and sequence
+ * subtraction answers 2**, and only one of them is R-02's.
+ *
+ * IT IS NOT A CLAIM ABOUT WHICH DAYS THE CME TRADES, and the name is chosen so
+ * it cannot be mistaken for one. `TR-01` forbids writing the exchange's calendar
+ * from recollection and this file would be the easiest place in the repository
+ * to do it by accident. What is asserted here is a property of the ENGINE's
+ * arithmetic over whatever slice the caller supplied: the days omitted below are
+ * omitted to make a subtraction and a date difference disagree, and for no other
+ * reason. `2026-11-03` and `2026-11-05` are inside `coverage` and absent from
+ * `days`, which is `lookupCalendarDay`'s `not_a_session` and is the other half
+ * of R-02 that `CME_WINDOW` cannot reach either, because every day it covers is
+ * a session.
+ */
+export const GAPPED_SLICE: CalendarSlice = buildCalendarSlice({
+  days: [
+    { tradingDay: day('2026-11-02'), isHalfDay: false, halted: false, sequence: 4021 },
+    { tradingDay: day('2026-11-04'), isHalfDay: false, halted: false, sequence: 4022 },
+    { tradingDay: day('2026-11-06'), isHalfDay: false, halted: false, sequence: 4023 },
+  ],
+  coverage: { from: day('2026-11-02'), to: day('2026-11-06') },
+});
+
 /** The same window with one day's flags changed, for R-03 and R-04. */
 export function windowWith(
   tradingDay: TradingDay,

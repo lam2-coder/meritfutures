@@ -1,9 +1,17 @@
 // =============================================================================
-// GROUP C: THE FLOOR. RE-U-012 to RE-U-018.
+// GROUP C: THE FLOOR. RE-U-012 to RE-U-020, and the group is complete.
 // =============================================================================
 // Every expectation here is arithmetic stated in a document, and the arithmetic
 // is written out beside it in integer cents so a reader checks the number
 // instead of trusting it (P2 section 2's second traceability tier).
+//
+// R-17 AND R-20 ARE THE TWO THAT ASSERT AN ABSENCE, and neither is declared in
+// `IMPLEMENTED_RULES`. R-17 is "config-supported and unimplemented", discharged
+// by `DrawdownType` being a closed two-member union and, when it exists, by
+// CV-01 in `validatePlan`. R-20's setpoint is pushed by M02 and the engine
+// performs no I/O; what it owes is the number, and `day.closed.floorCents`
+// carrying the state's own floor is the assertion. R-19 is in `settle.ts`'s
+// suite rather than here, because settlement is where its absence is discharged.
 // =============================================================================
 
 import { expect, test } from 'vitest';
@@ -11,7 +19,7 @@ import { expect, test } from 'vitest';
 import { advanceDay, initialState } from '../src/day/advance.js';
 import { advanceFloor, initialFloorCents } from '../src/day/floor.js';
 import { EngineInvariantError } from '../src/errors.js';
-import type { DayOutput, ResolvedPlan, RuleState } from '../src/types.js';
+import type { DayOutput, DrawdownType, ResolvedPlan, RuleState } from '../src/types.js';
 import {
   CME_WINDOW,
   CORE_50K,
@@ -297,4 +305,97 @@ test(reU('R-18'), () => {
   expect(survived.state.breached).toBe(false);
   expect(survived.state.floorOpenCents).toBe(4_750_000n);
   expect(survived.state.floorCents).toBe(5_500_000n);
+});
+
+// -----------------------------------------------------------------------------
+// R-17  intraday trailing is config-supported and unimplemented
+// -----------------------------------------------------------------------------
+test(reU('R-17'), () => {
+  // "CONFIG-SUPPORTED AND UNIMPLEMENTED. Rejected at publish by CV-01." Two
+  // layers hold that and only one of them is in this package. CV-01 is
+  // `validatePlan`'s and `validatePlan` does not exist yet, which is P2-1's; what
+  // exists today is the type, and the type is the stronger of the two because it
+  // makes the config unrepresentable rather than rejected.
+  //
+  // BOTH SIDES OF THE UNION, AND THE THIRD MEMBER THAT IS NOT ONE. `DrawdownType`
+  // is `'trailing_eod' | 'static'`, so an `intraday_trailing` plan cannot be
+  // constructed here at all: the line below is a COMPILE error, asserted by
+  // `@ts-expect-error`, which fails the typecheck if the union ever widens.
+  const trailing: DrawdownType = 'trailing_eod';
+  const staticType: DrawdownType = 'static';
+  // @ts-expect-error R-17: `intraday_trailing` is not a member of `DrawdownType`
+  const intraday: DrawdownType = 'intraday_trailing';
+  expect([trailing, staticType]).toEqual(['trailing_eod', 'static']);
+  expect(intraday).toBe('intraday_trailing');
+
+  // AND THE FLOOR IS COMPUTED FROM THE CLOSE ON EVERY BRANCH THAT EXISTS, which
+  // is the behavioural half: there is no code path that raises a floor from an
+  // INTRADAY number. R-13's own row says the same thing from the other side
+  // ("the intraday high never raises it") and RE-U-013 asserts it for
+  // `trailing_eod`; here it is asserted across the whole union, so a third
+  // member added without a rule would have no branch to arrive in.
+  const high = 5_900_000n;
+  for (const plan of [withoutFloorLock(CORE_50K), withStaticDrawdown(CORE_50K)]) {
+    const out = fold(plan, {
+      tradingDay: day('2026-11-03'),
+      openingBalanceCents: 5_000_000n,
+      realizedPnlCents: 100_000n,
+      highBalanceCents: high,
+    });
+    expect(out.state.highWaterBalanceCents).not.toBe(high);
+    expect(out.state.floorCents).toBeLessThan(high - CORE_50K.funded.drawdown.drawdownCents);
+  }
+});
+
+// -----------------------------------------------------------------------------
+// R-20  the setpoint equals the current floor, and the engine never pushes it
+// -----------------------------------------------------------------------------
+test(reU('R-20'), () => {
+  // "THE AUTO-LIQUIDATION SETPOINT PUSHED TO THE PLATFORM EQUALS THE CURRENT
+  // FLOOR. Re-pushed whenever the floor moves." The push is M02's (`DEP-M2-03`)
+  // and the engine performs no I/O, so what this package owes is the SOURCE: a
+  // number a pusher can read that is the floor as of the close, on every day.
+  //
+  // `day.closed.floorCents` IS THAT NUMBER AND IT IS THE STATE'S OWN, asserted as
+  // an equality rather than a value so it cannot drift into a second derivation.
+  const plan = withoutFloorLock(CORE_50K);
+  const climbed = fold(plan, {
+    tradingDay: day('2026-11-03'),
+    openingBalanceCents: 5_000_000n,
+    realizedPnlCents: 750_000n,
+  });
+  const closed = climbed.events.find((e) => e.type === 'day.closed');
+  expect(closed).toBeDefined();
+  expect(closed).toMatchObject({
+    floorCents: climbed.state.floorCents,
+    floorOpenCents: climbed.state.floorOpenCents,
+  });
+  // 5,750,000 - 250,000. The floor MOVED today, so this is a day the setpoint is
+  // re-pushed on, and the event carrying it is the trigger.
+  expect(climbed.state.floorCents).toBe(5_500_000n);
+  expect(climbed.state.floorOpenCents).toBe(4_750_000n);
+
+  // THE OTHER SIDE: A DAY THE FLOOR DID NOT MOVE STILL CARRIES IT. R-20's "re-
+  // pushed whenever the floor moves" is a statement about when a push is
+  // REQUIRED, not about when the number is available, and an event that omitted
+  // the floor on quiet days would make the consumer track the last one it saw.
+  const flat = fold(plan, {
+    tradingDay: day('2026-11-03'),
+    openingBalanceCents: 5_000_000n,
+    realizedPnlCents: -10_000n,
+  });
+  const flatClosed = flat.events.find((e) => e.type === 'day.closed');
+  expect(flatClosed).toMatchObject({ floorCents: 4_750_000n, floorOpenCents: 4_750_000n });
+  expect(flat.state.floorCents).toBe(flat.state.floorOpenCents);
+
+  // AND THE HAZARD IS NAMED HERE RATHER THAN RESOLVED HERE, because it is not
+  // this package's to resolve. `DEP-M2-03` justifies deriving the push from a
+  // floor-change EVENT on the ground that "since ADR-014 the floor only moves
+  // up, so drift is always permissive". `rule.floor_locked` carries a floor that
+  // is NOT the day's final floor on the one day the two differ, which RE-U-031
+  // pins from the progression side. A pusher reading the day's FINAL state, which
+  // is what `day.closed` carries and what this test asserts, is correct on every
+  // day including that one; a pusher reading a lock payload is not. R-20 says
+  // "equals the CURRENT floor", and the current floor is the state's.
+  expect(climbed.events.filter((e) => e.type === 'rule.floor_locked')).toEqual([]);
 });

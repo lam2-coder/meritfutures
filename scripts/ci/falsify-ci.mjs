@@ -247,6 +247,79 @@ const CASES = [
       ),
   },
   {
+    id: 'CI-01/engine-R-17',
+    stage: 'CI-01',
+    // R-17's MUTANT LIVES IN THE TYPECHECK STAGE AND NOT IN CI-02's, and the
+    // placement is the finding rather than an inconvenience. Every other engine
+    // rule is asserted by a comparison a unit test can run; R-17 is "config-
+    // supported and UNIMPLEMENTED", so what discharges it is that
+    // `intraday_trailing` cannot be written down. `RE-U-017` asserts that with
+    // `@ts-expect-error`, which vitest cannot evaluate at all -- it runs
+    // transpiled code and a type error is simply gone by then. Widening the
+    // union makes the directive UNUSED, which is a `tsc` error, so the gate that
+    // must be watched failing is CI-01.
+    seeds:
+      "`DrawdownType` widened to admit `intraday_trailing`, which R-17 says is unimplemented and CV-01 rejects at publish. RE-U-017's `@ts-expect-error` goes unused and tsc says so",
+    needles: ['error TS', 'rules-c-floor.test.ts'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/types.ts',
+        (before) =>
+          before.replace(
+            "export type DrawdownType = 'trailing_eod' | 'static';",
+            "export type DrawdownType = 'trailing_eod' | 'static' | 'intraday_trailing';",
+          ),
+        () => run('pnpm', ['--filter', '@merit/rules-engine', 'run', 'typecheck']),
+      ),
+  },
+  {
+    id: 'CI-01/engine-R-05',
+    stage: 'CI-01',
+    // THE MUTANT IS THE ONE CHANGE THAT WOULD MAKE R-05 AN ENGINE RULE. R-05 is
+    // discharged by `CalendarDay` not carrying `trading_calendar`'s two session
+    // instants, so the violation aimed at it is the column arriving. `RE-U-005`
+    // holds a `Record<keyof CalendarDay, true>`, which stops compiling the
+    // moment the interface grows a fifth key, and a transcribed calendar year
+    // adds ROWS rather than columns, so this cannot fire by accident.
+    seeds:
+      '`CalendarDay` widened with a `session_open_at` instant, which is the one change that would put a timezone inside the engine (R-05, B4 #1)',
+    needles: ['error TS', 'rules-a-calendar.test.ts'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/types.ts',
+        (before) =>
+          before.replace(
+            '  /** Dense index into the calendar. Gap counting is subtraction, never date math (R-02). */\n  readonly sequence: number;',
+            '  readonly sessionOpenAt: string;\n  /** Dense index into the calendar. Gap counting is subtraction, never date math (R-02). */\n  readonly sequence: number;',
+          ),
+        () => run('pnpm', ['--filter', '@merit/rules-engine', 'run', 'typecheck']),
+      ),
+  },
+  {
+    id: 'CI-01/engine-R-11',
+    stage: 'CI-01',
+    // R-01 AND R-11 SHARE THIS MUTANT'S TARGET AND ASSERT DIFFERENT THINGS ABOUT
+    // IT, so one edit is watched failing on two rules. `RE-U-001` holds a
+    // `Record<keyof DailyMark, true>` (adding a key is a missing property) and
+    // `RE-U-011` holds an `Extract<keyof DailyMark, 'supersededBy' | ...>[]`
+    // (which resolves from `never` to a real union the moment the field exists).
+    // The needle names both files so a mutant that tripped only one of them is
+    // reported off-target rather than accepted.
+    seeds:
+      '`DailyMark` widened with a `supersededBy` field, so the engine could branch on a mark the caller was supposed to have filtered out (R-11, R-01)',
+    needles: ['error TS', 'rules-a-calendar.test.ts', 'rules-b-marks.test.ts'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/types.ts',
+        (before) =>
+          before.replace(
+            '  readonly fillCount: number;\n  readonly sourceHash: string;',
+            '  readonly fillCount: number;\n  readonly supersededBy: string | null;\n  readonly sourceHash: string;',
+          ),
+        () => run('pnpm', ['--filter', '@merit/rules-engine', 'run', 'typecheck']),
+      ),
+  },
+  {
     id: 'CI-01/vg4',
     stage: 'CI-01',
     seeds: 'a raw PostgreSQL driver imported by an app, which is VG-4 exactly',
@@ -378,6 +451,73 @@ const CASES = [
   // that makes some other test fail is FAILED OFF-TARGET, which is the
   // distinction this file was written to keep.
   ...[
+    {
+      rule: 'R-02',
+      // THE MUTANT IS DATE ARITHMETIC, WHICH IS THE ONE R-02 NAMES BY NAME
+      // ("never date arithmetic"). It is seeded on `tradingDaysBetween` because
+      // that is where the substitution is tempting and where it is INVISIBLE on
+      // every consecutive window: `CME_WINDOW`'s five days answer 4 either way,
+      // and only `GAPPED_SLICE` tells them apart. A gap counted in calendar days
+      // is R-37's cadence gate reading 7 where the exchange traded 5, which is
+      // AS-06 arriving as a money gate rather than as a display bug.
+      seeds:
+        'the gap count reaching for a date difference instead of `sequence` subtraction, which agrees on every consecutive window and disagrees across a holiday (AS-06)',
+      file: 'packages/rules-engine/src/calendar.ts',
+      from: 'return { found: true, tradingDays: to.day.sequence - from.day.sequence };',
+      to: 'return { found: true, tradingDays: (Number(to.day.tradingDay.slice(8)) - Number(from.day.tradingDay.slice(8))) };',
+    },
+    {
+      rule: 'R-06',
+      seeds:
+        'DO-1’s strictly-forward guard relaxed from `<=` to `<`, so re-applying the day the state already carries folds it a second time instead of refusing (INV-14)',
+      file: 'packages/rules-engine/src/day/advance.ts',
+      from: 'if (input.prior !== null && mark.tradingDay <= input.prior.tradingDay) {',
+      to: 'if (input.prior !== null && mark.tradingDay < input.prior.tradingDay) {',
+    },
+    {
+      rule: 'R-32',
+      // R-32 IS NOT DECLARED AND ITS REFUSAL IS, so the mutant is aimed at the
+      // refusal: switching it off makes an eval day on a plan carrying
+      // `max_days` fold normally and expire nothing, which is the exact failure
+      // the refusal exists to prevent -- an account traded past its own expiry
+      // with a green state row and nothing anywhere saying so.
+      seeds:
+        'the eval-expiry refusal switched off, so a plan configuring `max_days` folds every day and expires nothing (R-32, G-EXPIRED)',
+      file: 'packages/rules-engine/src/day/progression.ts',
+      from: 'if (evalRules.maxDays !== null) {',
+      to: 'if (false && evalRules.maxDays !== null) {',
+    },
+    {
+      rule: 'R-20',
+      // R-20 IS NOT DECLARED AND IT STILL EARNS A MUTANT, because what it
+      // asserts is that `day.closed` carries the setpoint's SOURCE and a
+      // consumer reading it is right on every day. The mutant is the plausible
+      // confusion rather than an arbitrary flip: `floorOpenCents` and
+      // `floorCents` are both on the payload and they differ exactly on the days
+      // the floor MOVED, which are precisely the days R-20 requires a re-push.
+      // So a setpoint derived from the wrong one is stale on every day it
+      // matters and identical on every day it does not.
+      seeds:
+        'the closing event carrying the floor AT THE OPEN as the setpoint, so the push is stale on exactly the days the floor moved (D-M2-3)',
+      file: 'packages/rules-engine/src/day/advance.ts',
+      from: '    floorCents: state.floorCents,\n    tradedDaysCount: state.tradedDaysCount,',
+      to: '    floorCents: state.floorOpenCents,\n    tradedDaysCount: state.tradedDaysCount,',
+    },
+    {
+      rule: 'R-10',
+      // THE MUTANT IS THE ADJUSTMENT MOVED FROM THE OPENING IDENTITY TO THE
+      // CLOSING ONE, which is R-10's "never inside a session" written the wrong
+      // way round and is AS-10 exactly: with the term inside INV-19, a settled
+      // withdrawal is arithmetically indistinguishable from a day of trading
+      // losses. The day still folds, so nothing crashes; what changes is that
+      // the one identity that would have caught a misplaced movement now
+      // ACCEPTS it and the one that should not have a term for it now does.
+      seeds:
+        'the adjustment moved out of INV-18’s opening identity and into INV-19’s closing one, so a settled withdrawal reads as a session loss (AS-10, SD-01)',
+      file: 'packages/rules-engine/src/day/advance.ts',
+      from: 'const expectedClosing = mark.openingBalanceCents + mark.realizedPnlCents;',
+      to: 'const expectedClosing = mark.openingBalanceCents + mark.realizedPnlCents + mark.adjustmentCents;',
+    },
     {
       rule: 'R-21',
       seeds: 'the floor breach comparator relaxed from `<` to `<=`, so touching the floor breaches',
