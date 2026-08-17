@@ -90,7 +90,7 @@ describe('the seedbed itself', () => {
     const dir = seedbed();
     const fixture = loadFixture(yamlPath(dir), { fixtureDir: dir, registry: REGISTRY });
     expect(fixture.id).toBe('GS-011');
-    expect(fixture.input.dayMarks).toHaveLength(1);
+    expect(fixture.input.marks).toHaveLength(1);
     expect(fixture.expected.pins).toContain('never the intraday high');
   });
 });

@@ -166,10 +166,30 @@ function dailyLossLimit(value: unknown): DailyLossLimitRules {
   return { type, limitCents: cents(limit['limit_cents'], 'rules.daily_loss_limit.limit_cents') };
 }
 
-/** `"disabled"` or a basis-point figure. Appendix A writes both spellings. */
+/**
+ * THREE SPELLINGS IN THE RECORDS AND ALL THREE ARE READ.
+ *
+ *   `"disabled"`                  CORE-50K's eval block
+ *   `{ max_day_share_bp: 3000 }`  MERIT-RAPID-50K's eval block
+ *   `3000`                        every funded block, keyed `consistency_bp`
+ *
+ * ONE SHAPE PER BLOCK WOULD BE BETTER AND IT IS NOT THIS FILE'S TO IMPOSE. The
+ * records are fixture inputs, they are transcribed from Appendix A, and the
+ * fence on this session is that no fixture file is edited. So the reader accepts
+ * what the directory holds and refuses a fourth spelling rather than guessing at
+ * one: a consistency rule this file could not read would otherwise resolve to a
+ * disabled gate, which is a rule silently switched off on the money path.
+ */
 function consistency(value: unknown, what: string): ConsistencyRules {
   if (value === 'disabled') return { enabled: false };
-  return { enabled: true, maxDayShareBp: integer(value, what) as BasisPoints };
+  if (typeof value === 'number') {
+    return { enabled: true, maxDayShareBp: integer(value, what) as BasisPoints };
+  }
+  const block = record(value, what);
+  return {
+    enabled: true,
+    maxDayShareBp: integer(block['max_day_share_bp'], `${what}.max_day_share_bp`) as BasisPoints,
+  };
 }
 
 /**
