@@ -29,10 +29,23 @@ export {
 export type {
   FixtureExpectation,
   FixtureFailure,
+  FixtureInput,
   GoldenFixture,
   LoadOptions,
   LoadResult,
 } from './loader.js';
+
+// THE TWO STAND-INS FOR P2-1, EXPORTED SO THEY CAN BE TESTED AND SO THE ONE
+// THAT MUST BE DELETED IS VISIBLE FROM THE PACKAGE'S FRONT DOOR. `plan.ts`
+// stands in for `resolvePlan` and goes when it lands; `calendar.ts` assembles
+// rows for ADR-049's constructor and stays.
+export { PlanRecordError, resolvePlanRecord } from './plan.js';
+export {
+  CalendarRecordError,
+  SYNTHESIZED_SEQUENCE_BASE,
+  buildSliceFromRecord,
+} from './calendar.js';
+export type { CalendarRecord } from './calendar.js';
 
 export { describeDiff, diffEndState, diffEvents, snakeToCamel } from './compare.js';
 export type { Diff } from './compare.js';
@@ -49,7 +62,7 @@ export type { FixturePolarity, GroupPolarity, StageCoverage } from './coverage.j
 export { checkDeclarationAgainstFold, citedRuleIds, derivePolarity } from './polarity.js';
 export type { DeclarationCheck, Derivation, Polarity } from './polarity.js';
 
-export { engineIsIdentityStub, runFixture } from './run.js';
+export { GOLDEN_ENGINE_VERSION, engineIsIdentityStub, runFixture } from './run.js';
 export type { FixtureOutcome } from './run.js';
 
 export { YamlSubsetError, parseYamlSubset } from './yaml.js';
