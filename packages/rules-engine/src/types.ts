@@ -389,6 +389,293 @@ export interface ResolvedPlan {
 }
 
 // -----------------------------------------------------------------------------
+// The plan, as PUBLISHED: what `resolvePlan` and `validatePlan` read
+// -----------------------------------------------------------------------------
+// M01 section 1.3 gives both functions two arguments rather than one merged
+// object:
+//
+//   resolvePlan(rules: PlanRulesJson, size: PlanVersionSizeRow): ResolvedPlan
+//   validatePlan(rules: PlanRulesJson, sizes: PlanVersionSizeRow[]): ValidationResult
+//
+// and section 2.4 says why the split is the contract rather than a calling
+// convention: "The engine reads two things and never anything else:
+// `plan_versions.rules` for STRUCTURE and `plan_version_sizes` for EVERY CENTS
+// VALUE. No percentage is ever applied to a money value at runtime."
+//
+// SO THE KEYS BELOW ARE snake_case AND STAY THAT WAY. Every other type in this
+// file is the engine's own camelCase, because the engine owns the shape. These
+// two are the stored `jsonb` and the stored row, transcribed key for key from
+// DATA_MODEL section 11 and `0004_catalog.sql`. Renaming them at this boundary
+// would make every `CV-nn` path in `validate.ts` uncitable against the document
+// that states it, which is the one property a publish validator has to keep.
+//
+// `validatePlan` TAKES AN ARRAY OF SIZE ROWS AND THAT IS NOT A CONVENIENCE. A
+// publish publishes one `plan_versions` row with one `rules` jsonb and N
+// `plan_version_sizes` rows (v1: four sizes). CV-11 and CV-12 are inequalities
+// ACROSS the two, so a validator handed one size at a time could pass every
+// size individually while the version as a whole was unpublishable.
+
+/**
+ * `plan_versions.rules.*.drawdown.type`, which is WIDER by one member than
+ * `DrawdownType`.
+ *
+ * THE THIRD MEMBER IS R-17 AND IT IS WHY THIS TYPE EXISTS SEPARATELY. R-17:
+ * "Intraday trailing is config-supported and unimplemented", rejected at publish
+ * by CV-01. A published plan may therefore CARRY `intraday_trailing`; a resolved
+ * plan may not, and `DrawdownType` has two members so that it cannot.
+ *
+ * `validatePlan` is the narrowing, and CV-01 is the only thing standing between
+ * the two unions. Typing the published value as the closed union instead would
+ * make CV-01 unreachable and its test vacuous, which is the shape M01 section
+ * 8.4 and this repository's mutant discipline both exist to refuse.
+ */
+export type PublishedDrawdownType = 'trailing_eod' | 'static' | 'intraday_trailing';
+
+/** `plan_versions.rules.*.drawdown`. Ratio in bp; the cents live on the size row. */
+export interface PublishedDrawdown {
+  /** CV-01. */
+  readonly type: PublishedDrawdownType;
+  /** Materialized to `plan_version_sizes.drawdown_cents` at publish. CV-02. */
+  readonly amount_bp: number;
+  readonly lock: PublishedFloorLock;
+}
+
+/**
+ * `plan_versions.rules.*.drawdown.lock`.
+ *
+ * BOTH CENTS FIELDS ARE `null` ON ALL THREE V1 PLANS and that is not an
+ * omission: DATA_MODEL section 11's example carries `"lock": { "enabled": true,
+ * "at_profit_cents": null, "floor_at_cents": null }` on `phase_funded`, and the
+ * values live on `plan_version_sizes.floor_lock_at_profit_cents` and
+ * `floor_lock_floor_at_cents` because they scale with size. The fields are
+ * carried here because the jsonb carries them, and CV-11 and CV-12 read the
+ * SIZE ROW.
+ */
+export interface PublishedFloorLock {
+  readonly enabled: boolean;
+  readonly at_profit_cents: Cents | null;
+  readonly floor_at_cents: Cents | null;
+}
+
+/** CV-16's vocabulary. The amount is a ratio here and cents on the size row. */
+export interface PublishedDailyLossLimit {
+  readonly type: string;
+  readonly amount_bp: number | null;
+}
+
+/** CV-06. `mode` is explicit "so nobody has to remember which phase behaves how". */
+export interface PublishedConsistency {
+  readonly enabled: boolean;
+  readonly max_day_share_bp: number | null;
+  readonly mode: 'pass_time_dilutable' | 'payout_gated';
+}
+
+/** CV-09's structural half. An array from day one, per DATA_MODEL section 11. */
+export interface PublishedCapScheduleStep {
+  readonly from_ordinal: number;
+  readonly cap_bp: number;
+}
+
+/** `plan_versions.rules.phase_eval`. */
+export interface PublishedEvalPhase {
+  readonly enabled: boolean;
+  /** CV-03's precondition is `enabled`; the cents are on the size row. */
+  readonly profit_target_bp: number;
+  readonly drawdown: PublishedDrawdown;
+  readonly daily_loss_limit: PublishedDailyLossLimit;
+  /** CV-04. */
+  readonly min_trading_days: number;
+  /** R-28, pass-time and dilutable. */
+  readonly consistency: PublishedConsistency;
+  /** R-32. `null` means unlimited, which is every v1 plan. */
+  readonly max_days: number | null;
+}
+
+/** `plan_versions.rules.phase_funded.win_days`. CV-05. */
+export interface PublishedWinDays {
+  readonly required_count: number;
+  /** Materialized to `plan_version_sizes.win_day_floor_cents`. */
+  readonly floor_bp: number;
+  readonly reset_on_payout: boolean;
+}
+
+/** `plan_versions.rules.phase_funded`. */
+export interface PublishedFundedPhase {
+  readonly drawdown: PublishedDrawdown;
+  readonly daily_loss_limit: PublishedDailyLossLimit;
+  /** CV-19. Zero DISABLES the gate; it does not set it low. */
+  readonly min_trading_days: number;
+  readonly win_days: PublishedWinDays;
+  readonly consistency: PublishedConsistency;
+  /** Materialized to `plan_version_sizes.buffer_cents`. CV-07. */
+  readonly buffer_bp: number;
+  /** CV-08. */
+  readonly cadence_gap_trading_days: number;
+  /** CV-09, CV-10, CV-17. Materialized to `payout_cap_schedule_cents`. */
+  readonly payout_cap_schedule: readonly PublishedCapScheduleStep[];
+  /**
+   * CV-15, and THE ONE CENTS VALUE THAT LIVES IN `rules` RATHER THAN ON THE SIZE
+   * ROW. Appendix A's preamble: "`min_payout_cents` never does" scale by size,
+   * so there is nothing per size to materialize.
+   */
+  readonly min_payout_cents: Cents;
+  /** CV-13. */
+  readonly split_bp: number;
+  /** CV-14, under ADR-030's canonical name. */
+  readonly max_payouts: number;
+  /** CV-18. Retired but retained, per ADR-014. */
+  readonly post_payout_floor_rule: { readonly mode: string };
+}
+
+/**
+ * `plan_versions.rules`, transcribed from DATA_MODEL section 11.
+ *
+ * `limits` and `kyc` are in the stored jsonb and are NOT here. M01 section 1.2
+ * puts entitlement and KYC outside this module, and a type that carried them
+ * would invite a rule to read them. What `validatePlan` may not see, it may not
+ * validate, and neither key has a `CV-nn`.
+ */
+export interface PlanRulesJson {
+  readonly schema_version: 1;
+  readonly phase_eval: PublishedEvalPhase;
+  readonly phase_funded: PublishedFundedPhase;
+}
+
+/** One row of `plan_version_sizes.payout_cap_schedule_cents`. */
+export interface SizeCapScheduleStep {
+  readonly from_ordinal: number;
+  readonly cap_cents: Cents;
+}
+
+/**
+ * One row of `plan_version_sizes`, transcribed column for column from
+ * `0004_catalog.sql`.
+ *
+ * MONEY IS `Cents` HERE AND `number` IN `test/generators/plan-config.ts`, and
+ * the difference is deliberate on both sides. INV-02 is "all money is `bigint`
+ * integer cents AT EVERY BOUNDARY", and a publish validator is a boundary. The
+ * generator emits `number` for the same reason `day-input.ts` emits `tradedDay`
+ * and `winDay`: it models rows a database can hold, not values the engine reads.
+ *
+ * `price_cents` AND `reset_price_cents` ARE COLUMNS AND ARE NOT HERE. No `CV-nn`
+ * mentions either, no rule reads a price, and M01 section 1.2 puts commerce
+ * outside this module. A validator that could see the price could grow a rule
+ * about it.
+ */
+export interface PlanVersionSizeRow {
+  readonly size_cents: Cents;
+  /** CV-02, materialized. ONE COLUMN, and `rules` declares a drawdown PER PHASE. */
+  readonly drawdown_cents: Cents;
+  /** CV-03, materialized. `null` on Direct: no evaluation, so no target. */
+  readonly profit_target_cents: Cents | null;
+  /** CV-07, CV-11. */
+  readonly buffer_cents: Cents;
+  /** CV-05, materialized from `floor_bp`. */
+  readonly win_day_floor_cents: Cents;
+  /** CV-09, CV-10, CV-17. */
+  readonly payout_cap_schedule_cents: readonly SizeCapScheduleStep[];
+  /** CV-16, materialized. ONE COLUMN, and `rules` declares a limit PER PHASE. */
+  readonly daily_loss_limit_cents: Cents | null;
+  /** SD-10, materialized from `rules.phase_funded.drawdown.lock.enabled`. */
+  readonly floor_lock_enabled: boolean;
+  /** CV-12. Present exactly when `floor_lock_enabled` (SD-10's CHECK). */
+  readonly floor_lock_at_profit_cents: Cents | null;
+  /** CV-11, CV-12. Present exactly when `floor_lock_enabled`. */
+  readonly floor_lock_floor_at_cents: Cents | null;
+}
+
+// -----------------------------------------------------------------------------
+// What `validatePlan` returns
+// -----------------------------------------------------------------------------
+// THREE CHANNELS, BECAUSE M01 STATES THREE DIFFERENT KINDS OF FINDING and
+// collapsing them would destroy the distinction section 2.4 spends a paragraph
+// defending: "a diff whose every line says warning trains its reader to skim."
+
+/** The nineteen publish validations of M01 section 2.4. Every one BLOCKS. */
+export type CvId =
+  | 'CV-01'
+  | 'CV-02'
+  | 'CV-03'
+  | 'CV-04'
+  | 'CV-05'
+  | 'CV-06'
+  | 'CV-07'
+  | 'CV-08'
+  | 'CV-09'
+  | 'CV-10'
+  | 'CV-11'
+  | 'CV-12'
+  | 'CV-13'
+  | 'CV-14'
+  | 'CV-15'
+  | 'CV-16'
+  | 'CV-17'
+  | 'CV-18'
+  | 'CV-19';
+
+/** M01 section 2.4's publish-diff messages. None blocks. */
+export type PwId = 'PW-01' | 'PW-02a' | 'PW-02b' | 'PW-03' | 'PW-04';
+
+/**
+ * A materialization disagreement: `plan_version_sizes` does not say what
+ * `plan_versions.rules` says.
+ *
+ * THESE CARRY NO `CV-nn` AND M01's TABLE DOES NOT ENUMERATE THEM, which is
+ * exactly why they are reported on their own channel rather than filed under a
+ * neighbouring rule. `0004_catalog.sql` is the primary source that puts the
+ * check at publish: "The publish path writes both, and CV-publish validation
+ * asserts the materialized flag matches the parent's jsonb." That sentence is
+ * about SD-10's `floor_lock_enabled` and the same shape recurs twice more.
+ *
+ * They BLOCK, and the reason is FM-07: "Plan config published with impossible
+ * values ... Accounts permanently ineligible while looking healthy, or a gate
+ * that does nothing." A size row that disagrees with its rules is a plan whose
+ * published text and executed arithmetic are different plans.
+ */
+export type MaterializationId = 'MZ-lock-flag' | 'MZ-per-phase' | 'MZ-cap-ordinals';
+
+export interface CvViolation {
+  readonly id: CvId;
+  /** Where it was found, so the publish error names the field and not the rule alone. */
+  readonly path: string;
+  readonly detail: string;
+  /** `size_cents` of the row it was found on, or `null` for a rules-only finding. */
+  readonly sizeCents: Cents | null;
+}
+
+export interface MaterializationFinding {
+  readonly id: MaterializationId;
+  readonly path: string;
+  readonly detail: string;
+  readonly sizeCents: Cents | null;
+}
+
+/** M01 section 2.4: `info` is worth seeing, `warning` is a gate that cannot bind. */
+export type PublishDiffSeverity = 'info' | 'warning';
+
+export interface PublishDiff {
+  readonly id: PwId;
+  readonly severity: PublishDiffSeverity;
+  readonly message: string;
+  readonly sizeCents: Cents | null;
+}
+
+/**
+ * What `POST /admin/plans/versions/:id/publish` reads.
+ *
+ * `ok` IS DERIVED AND IS NOT A FOURTH FACT. It is `errors.length === 0 &&
+ * materialization.length === 0`, carried so a caller cannot publish by checking
+ * the wrong list. M01: "A config that reaches an account is a config that
+ * already passed all of these."
+ */
+export interface ValidationResult {
+  readonly ok: boolean;
+  readonly errors: readonly CvViolation[];
+  readonly materialization: readonly MaterializationFinding[];
+  readonly diffs: readonly PublishDiff[];
+}
+
+// -----------------------------------------------------------------------------
 // The day's inputs
 // -----------------------------------------------------------------------------
 
