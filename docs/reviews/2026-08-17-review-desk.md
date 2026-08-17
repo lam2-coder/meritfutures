@@ -95,34 +95,66 @@ the module as a file move on purpose; that judgment was right and it holds.
 
 ---
 
-## 4. RULING 3. A disabled consistency gate needs a third state, not `skipped: true`
+## 4. RULING 3. A disabled consistency gate reports `skipped: true`, and the third state I first ruled for does not exist
+
+**This ruling was issued wrong and corrected the same day. The wrong version and how it
+was caught are kept below, because the failure is more instructive than the fix.**
 
 [PR #59](../../scripts/demo/README.md) found that `consistencyOk` returns
 `{ ok: true, skipped: false }` when `cfg.enabled` is false
 ([`consistency.ts:97`](../../packages/rules-engine/src/day/consistency.ts)), so a plan
 whose eval consistency is disabled renders `consistency={satisfied=true skipped=false}`
-in `phase.passed`. CV-19's own words, quoted in that same file's header, are that a
-disabled gate "must be visibly disabled in the eligibility breakdown ... so no trader or
-support agent ever sees a gate that reads as satisfied when it was never evaluated."
+in `phase.passed`. **That defect is real.** A disabled gate reading as satisfied is
+exactly what the corpus forbids.
 
-**The obvious fix is wrong.** Setting `skipped: true` when disabled would collapse two
-distinct facts into one bit. The file's header reserves `skipped` for R-30's denominator
-rule ("`skipped` IS NOT `!enabled`") and that reservation is correct: "the gate passed
-because there was nothing to test" and "the gate was never configured" are different
-things a support agent needs told apart. CV-19's text happens to spell the disabled case
-`skipped: true` because it was written about R-33, which has no denominator rule to
-compete with. Consistency has both.
+**Ruled: `consistencyOk` returns `skipped: true` when `!cfg.enabled`. One line.** Five
+sources state the shape and four of them state it in the same words:
 
-**Ruled: `ConsistencyVerdict` distinguishes three states explicitly** — evaluated,
-skipped by R-30, disabled by config — and the eligibility breakdown renders disabled
-distinctly from both. `skipped` keeps its R-30 meaning, so no information is lost, and
-CV-19's requirement is met by the thing it actually asks for, which is visibility rather
-than a particular boolean.
+| Source | Wording |
+|---|---|
+| **`CV-19`** ([M01 line 286](../plans/M01-rules-engine.md)) | `pass: true, skipped: true` ... "**using the same `skipped` shape as the consistency denominator rule**" |
+| **[EC-050](../edge-cases/EC-050.md)** | "**the identical shape the consistency denominator rule already uses** for a skipped comparison" |
+| **[ADR-015](../decisions/ADR-015.md)** | "**the same shape the consistency denominator rule already uses**" |
+| **[GLOSSARY](../GLOSSARY.md), minimum trading days** | "reports `pass: true, skipped: true` and renders as disabled" |
+| **`GS-080`** | "**the same shape the consistency denominator rule uses**, and the eligibility response distinguishes it from a gate that was evaluated and passed" |
 
-**This renders nothing wrong today**, because the funded gate is enabled on all three v1
-plans. That is what makes it worth fixing now rather than later: it is a control that is
-valid, reachable, and enforcing nothing, and the eval half of R-28 is where it surfaces,
-in a payload M16 and M04 both read.
+**The corpus made `skipped` mean NOT EVALUATED, FOR ANY REASON**, and tied the disabled
+case to the denominator case deliberately, four separate times. The required distinction
+is two-way, evaluated versus not, and `GS-080` says so where it says what the response
+must distinguish.
+
+**No information is lost and no new field is needed.** `maxDayShareBp` is `null` when the
+gate is disabled and carries the configured limit when R-30's denominator rule fired, so
+the reason is already recoverable from the payload. That is asserted in a test rather than
+left as a property somebody noticed.
+
+**No ADR. No frozen document changes. `GS-080`'s stated shape is untouched**, which is the
+test that this is the right repair rather than a convenient one.
+
+### What the first ruling got wrong, and why it is worth the space
+
+**Ruled first, and wrongly: that `ConsistencyVerdict` needed three states** — evaluated,
+skipped by R-30, disabled by config — on the reasoning that collapsing disabled into
+`skipped` would lose a distinction a support agent needs.
+
+That reasoning came from
+[`consistency.ts`](../../packages/rules-engine/src/day/consistency.ts)'s own header, which
+asserts "**`skipped` IS NOT `!enabled`**". **That comment is a session's invention and it
+contradicts five frozen citations.** The review desk read the comment, found it
+persuasive, and did not open CV-19, EC-050, ADR-015, the GLOSSARY entry or GS-080 before
+ruling on the vocabulary they define.
+
+**This is [EC-157](../edge-cases/EC-157.md)'s failure repeated exactly**: reasoning from a
+local artifact instead of against the primary sources that disagree with it. EC-157's own
+sentence was "an executable statement of the wrong identity is still the wrong identity";
+a code comment stating the wrong vocabulary is the same thing one layer weaker, because a
+comment is not even executable.
+
+**It was caught by the build session, which read the five sources and asked.** That is the
+sixth wrong guide ruling caught this way and the mechanism is the same every time: contact
+with a primary source, not adversarial review of plausible reasoning. The remedy is not
+more care. It is that **a ruling about vocabulary quotes the documents that define it**,
+in the ruling, at the point it is issued. This section now does.
 
 ---
 
