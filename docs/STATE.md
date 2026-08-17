@@ -492,6 +492,57 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 **The monotone mutant was seeded in the wrong file.** Inside `advanceFloor` a decrease is caught by the tripwire **throwing** rather than by the property **asserting**, so the case would have proved the tripwire works and said nothing about `RE-P-01`. It moved one line out, past the tripwire's reach.
 
 **And the first lock-reachability check counted a literal and failed on every seed**: section 3.4's floor at the lock is `max(trailed, locked)`, so on a day that jumps past the 260,000c trigger the locked literal never appears. It reads `floorLocked` off the state now.
+## `P2-1` lands: the config contract, and `R-17` was never outside this package (2026-08-17)
+
+**[Session 49](sessions/2026-08-17-session-49.md) wrote `resolvePlan` and `validatePlan`, so all six of [M01](plans/M01-rules-engine.md) section 1.3's exported functions now exist.** `CV-01` to `CV-19` and `PW-01` to `PW-04` are transcribed from section 2.4 into [`plan/validate.ts`](../packages/rules-engine/src/plan/validate.ts); [`plan/resolve.ts`](../packages/rules-engine/src/plan/resolve.ts) materializes one plan at one size and applies no percentage anywhere. `pnpm run verify` green: **6 of 6 invariants, 566 tests with 29 skipped, 15 of 15 gates clean and dirty, 16 scope cases**, and a full `falsify-ci.mjs` reports **58 of 61** on a clean tree, the three that ERROR being `gitleaks`, `semgrep` and `syft`/`grype` absent from this container's PATH.
+
+**`R-17` is DECLARED. The count is forty-five of fifty declared and fifty of fifty titled.**
+
+### The five that remain, and only one of them is engineering work
+
+**This was established before any code was written rather than discovered at the end**, which is the repair to how the undeclared list has been read for three sessions running.
+
+| Not declared | Discharged by | Reachable by an engineering session? |
+|---|---|---|
+| `R-01` | Ingest. `DailyMark` carries `fillCount` and no instant | **No.** A transcribed calendar adds rows, not a column |
+| `R-05` | `trading_calendar`'s session instants, and [`0032`](../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql) | **No.** `CalendarDay` carries neither column |
+| `R-11` | The caller's `superseded_by is null`, **and replay recomputing forward** | **YES**, by writing `replay.ts`. It is the only one |
+| `R-20` | M02's setpoint push (`DEP-M2-03`) | **No.** The engine performs no I/O |
+| `R-32` | **Nothing.** The refusal is implemented; the anchor and the column are unruled | **No.** Two founder rulings |
+
+**AN UNDECLARED COUNT IS NOT A WORK QUEUE.** The brief said to start at the first titled-but-undeclared rule and work forward; that is `R-01`, and working forward from it produces no code for four consecutive rules. Six undeclared rules were **two units of available work and four statements about other layers**, and the two needed different unwritten files, which under [ADR-003](decisions/ADR-003.md) is two sessions.
+
+**`R-17` was filed under "discharged outside the engine entirely" and `validatePlan` is in this package.** Its row reads "rejected at publish by `CV-01`" and M01 section 1.3's layout puts `plan/validate.ts` in `packages/rules-engine`. **That is the third time the same inferential step has been taken**: [session 48](sessions/2026-08-17-session-48.md) found `R-02`, `R-06` and `R-10` filed the same way and [session 47](sessions/2026-08-16-session-47.md) named the pattern first. It is now written into [`src/rules.ts`](../packages/rules-engine/src/rules.ts) beside the reason rather than only into a log.
+
+### Four findings reported, none resolved, two of them ADR candidates
+
+| Finding | Why it is reported rather than folded |
+|---|---|
+| **`min_settlement_lag_trading_days` is required by M01 and absent from DATA_MODEL section 11** | M01 section 2.4: it "remains **a published configuration constant rather than a literal in engine code**". `PW-02a` and `PW-02b` are unwritable without it and the `plan_versions.rules` example carries no such key. The field is declared on `PlanRulesJson` on M01's authority; writing `0` into `publishDiff` would violate the sentence that made it config. **ADR candidate** |
+| **`plan_version_sizes` materializes ONE `drawdown_cents` and ONE `daily_loss_limit_cents`, and `rules` declares both PER PHASE** | Appendix A lists eval and funded drawdown as separate rows and `R-31` spells "`size_cents` minus **funded** drawdown". All three v1 plans set them equal, so nothing exercises a difference. If they ever differ, `resolvePlan` has one number and two phases and **whichever phase loses gets the other's drawdown silently**. The new `MZ-per-phase` finding refuses the publish instead of picking. **ADR candidate** |
+| **`CV-04` carries no `phase_eval.enabled` precondition and `CV-03` does, one row apart** | Transcribed literally, Direct must publish `phase_eval.min_trading_days >= 1` for a phase it never runs. **The independent oracle reads it identically**, so the asymmetry is on the page. Followed and reported on the `R-15` and `R-22` precedent, with the consequence asserted in `RE-C-04` |
+| **DATA_MODEL section 11 turns the eval floor lock off and nothing reads that field** | `plan_version_sizes.floor_lock_enabled` is one column sourced from `phase_funded.drawdown.lock.enabled` per [`0004`](../packages/db/migrations/0004_catalog.sql), so both resolved phases carry the funded lock. That the eval floor **does** lock is [ADR-050](decisions/ADR-050.md)'s own arithmetic: "every v1 eval pass is also a lock day" |
+
+**Three findings carry no `CV-nn` and block anyway.** `MZ-lock-flag`, `MZ-per-phase` and `MZ-cap-ordinals` are the three ways the size row can disagree with the jsonb it was computed from. M01's CV table enumerates none of them and `0004_catalog.sql` is the primary source that puts the check at publish. They block under `FM-07`, and they are reported on their own channel rather than borrowing a neighbouring id.
+
+### `RE-C-oracle`, and Appendix A.4 as a test
+
+**`RE-C-01` to `RE-C-19` each assert both sides of their operator, and each conditional rule also asserts its precondition FALSE** (the vacuity the plan generator caught in its own `CV-17` case on the first run). `RE-C-oracle` is constitution C10's writer/reviewer split as an executable check: `test/generators/validate-plan.ts` transcribed the same nineteen rules from the same table in **session 40**, before any engine code existed, and each of the nineteen seeded violations is now built in both stored shapes with both validators required to name the same id. **The two differ in three places, none a rule**, each documented at its site.
+
+**Appendix A.4 is reproduced row by row rather than read as a table**, including `PW-03` firing on Core EOD alone and `PW-02b` on Merit Rapid alone. Core EOD is validated at all four [ADR-024](decisions/ADR-024.md) sizes with the bp arithmetic asserted to reproduce the transcribed 50K and 150K columns. And **`resolvePlan` is asserted against `fixtures-in-code.ts`'s independently transcribed `ResolvedPlan` values**, so two readings of Appendix A check each other.
+
+### A killed `falsify-ci.mjs` run used to leave a money-path mutant in the tree
+
+**It happened twice in one session.** `seededEdit` restores in a `finally` and a `finally` does not run when the process is killed. A timed-out run left the `R-33` mutant in [`gates.ts`](../packages/rules-engine/src/payout/gates.ts): `tradedDaysSkipped` pinned to `false`, so `CV-19`'s disabled gate reports **satisfied** rather than skipped, which is `GS-080`'s exact failure, **one `git add -A` from a branch**. It was caught only because the next run's own "the mutant found no ..." error fired against the already-mutated line.
+
+**A signal handler is not the fix and was tried first**: the gate runs its child synchronously, so node is blocked inside the spawn for the whole of each case, and `SIGKILL` is uncatchable regardless. The restore is now a journal written to disk **before** each mutation and replayed by the next invocation, verified by `SIGKILL`ing a run mid-case. **And an interrupted run may not have stopped**: an orphaned process was still seeding mutants while `git status` was being read, which is what sent the first diagnosis to a phantom defect. `pkill -f falsify-ci` before trusting a status read after any interrupt.
+
+### What was NOT done
+
+**CI-03's polarity is untouched**, for the sixth session running, and the fixture-wiring session remains the largest unblocking left in P2. **No golden fixture and no `EC-nnn`**, per P2 section 2's alternation. **No ADR**, for the reason sessions 44, 45, 47 and 48 each gave. **`replay.ts`, `hash.ts` and `SD-08` are still absent**, and `R-11` is what they would declare.
+
+---
+
 ## The last nine rules: fifty of fifty titled, forty-four of fifty declared (2026-08-17)
 
 **[Session 48](sessions/2026-08-17-session-48.md) closed the `RE-U-nn` series.** M01 section 8.4's coverage rule -- "every rule R-01 to R-50 has at least one unit test asserting its operator at the boundary on both sides" -- is met for the first time, and it is met **without overstating what the engine computes**. `pnpm run verify` green: **6 of 6 invariants, 474 tests with 25 skipped, 15 of 15 gates clean and dirty, 16 scope cases**, and `falsify-ci.mjs` reports **37 of 37 watched failing** on a clean tree.
@@ -527,6 +578,8 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 **`CI-03`'s polarity is still untouched**, for the fifth session running, and `IMPLEMENTED_RULES` at 44 is what the fixture-wiring session will read when ADR-048's prerequisite lands.
 
+> **AMENDED by [session 49](sessions/2026-08-17-session-49.md). `IMPLEMENTED_RULES` is 45.** `R-17` left the table above when `validatePlan` was written: its row is "rejected at publish by `CV-01`" and M01 section 1.3 puts `plan/validate.ts` inside this package, so "discharged outside the engine entirely" was the same unchecked step this section is about, taken a fourth time. **The remaining five are `R-01`, `R-05`, `R-11`, `R-20` and `R-32`, and only `R-11` is reachable by an engineering session.**
+
 ---
 
 ## Groups F, G and H: forty-one of M01's fifty rules, and the nine that are left say why (2026-08-16)
@@ -546,7 +599,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 > **AMENDED by [session 48](sessions/2026-08-17-session-48.md). Three of those nine were not blocked on anything, and two of the remaining six would not have moved when the calendar landed either.** M01 section 3.1's ordering table cites `R-02` and `R-06` on DO-1's row and `R-10` on DO-3's, against checks [`advance.ts`](../packages/rules-engine/src/day/advance.ts) has carried since group B; all three are now **declared**. `R-01` and `R-05` are stated against `trading_calendar.session_open_at` and `session_close_at`, which **`CalendarDay` does not carry**, and a transcribed calendar year adds rows rather than columns, so they were filed against a blocker that would not have unblocked them. The count is now **forty-four of fifty declared and fifty of fifty titled**, and the sentence above about `R-32`'s schema delta was already withdrawn by [session 47](sessions/2026-08-16-session-47.md) and is corrected in the section below.
 
-**Four of M01's six exported functions now exist**: `initialState`, `advanceDay`, `applySettlement` and `evaluatePayout`. `resolvePlan` and `validatePlan` are `P2-1`.
+**Four of M01's six exported functions now exist**: `initialState`, `advanceDay`, `applySettlement` and `evaluatePayout`. `resolvePlan` and `validatePlan` are `P2-1`. **All six exist as of [session 49](sessions/2026-08-17-session-49.md), which wrote `P2-1`.**
 
 ### Three things the engine now does that M01's pseudocode does not
 
