@@ -462,6 +462,53 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## The nightly batch exists and `state_hash` is computed, and the replay COMPARISON is not wired (2026-08-17)
+
+**[Session 49](sessions/2026-08-17-session-49.md) built the left-hand side of `INV-04` and says so rather than letting a green suite imply the rest.** `INV-04` is "replaying every mark from day one reproduces stored state byte-identically". The fold, the row and the hash exist; **nothing yet re-derives a stored row and compares the two.** It waits until more rules exist, because an audit run against six of eight rule groups reports agreement about the two it can fold and silence about the rest, **which reads exactly like an audit that found nothing** (FM-17, `OI-14`).
+
+**Three files at [`apps/worker/src/batch/`](../apps/worker/src/batch/), and the engine package was not opened.** `@merit/rules-engine`'s `exports` map publishes `.` and nothing else, so **the module resolver enforces the published-interface rule** rather than a convention doing it, which is what let this land beside three sessions writing rules inside `packages/rules-engine/src/`. `pnpm run verify` green: **6 of 6 invariants, 571 tests over 45 files, 15 gates clean and dirty, 16 scope cases.**
+
+| | |
+|---|---|
+| [`state-hash.ts`](../apps/worker/src/batch/state-hash.ts) | SD-08. SHA-256 over [ADR-026](decisions/ADR-026.md) C-07's **nineteen columns in the declared order**, `bigint` base-10, `null` as an explicit sentinel, no whitespace. The five exclusions carry **their reasons**, not just their names |
+| [`ports.ts`](../apps/worker/src/batch/ports.ts) | The I/O boundary, declared before its client exists. `packages/db`'s own idiom: there is no Drizzle client, no `pg` in any manifest, and the scaffold does not invent them |
+| [`nightly.ts`](../apps/worker/src/batch/nightly.ts) | Read ingest, fold `advanceDay` over the trading day, write `rule_states`. `foldAccountDay` is **pure**, so `runNightlyBatch` is a loop and a writer with no rule in it |
+
+### The framing is a decision the sources do not make, and it needs the founder's eye
+
+**C-07 and M01 Appendix B.2 give three rendering rules and NO SEPARATOR.** Plain concatenation is **not injective and the collision is one column pair away**: `traded_days_count = 1, win_days_count = 23` and `12, 3` both render `123`, so two different states carry one hash and `INV-04` asserts nothing on exactly the counters `R-33` and `R-34` gate on.
+
+**Adopted: each field is length-prefixed `<utf8 byte length>:<utf8 bytes>`**, injective with no argument about the value domains, because a separator character is injective only while no field can contain it and that is a claim a future column can falsify quietly.
+
+**It is settled now because `rule_states` has zero rows** ([`0035`](../packages/db/migrations/0035_rule_states_calendar_revision.sql) says so in its own header), so choosing costs nothing today. **Changing it after the first row lands invalidates every stored hash and no migration repairs it, only a full audited rewrite under B.4.**
+
+### Four things the sources decide and the code now carries
+
+| | |
+|---|---|
+| **`engine_gates` cannot be `JSON.stringify`** | It **throws on a bigint** and four of the twenty-five leaves are `Cents`. Underneath that, M01 section 1.4 bans "iteration over an object's keys where the result affects output", so hashing insertion order would diverge the whole book the day someone reorders two fields. **And the hash is over the ENGINE's value, never Postgres's `jsonb`**, which sorts keys by length then bytewise |
+| **`account_id` is column 1 and is not on `RuleState`** | `DayInput` carries no account id by design, so the batch supplies it. **Asserted** as canonical lowercase UUID rather than normalized: a caller that switched to upper case would keep working while every hash it produced changed |
+| **The watermark is read BEFORE the slice** | A correction between the two leaves a row claiming an **older** calendar than it read: replay finds it out of scope and B.4 step 4 rewrites it. Reversed, the row claims a calendar it never saw and "replay would then believe a stale row was current". **This is the code half of the trigger [`0035`](../packages/db/migrations/0035_rule_states_calendar_revision.sql) refused to write**, and it is asserted on call order |
+| **`context_gates` comes from `evaluatePayout`** | The column is `NOT NULL` and DO-9 does not produce it, because SD-06 splits the gates so context never enters the replayed state. The batch asks the engine rather than putting a second `R-40` in a worker. **Two folds differing only in `ExternalGates` produce an identical hash**, which is `INV-23` asserted rather than assumed |
+
+### What `0033` and `0035` bought, which is why the computation is worth landing before the comparison
+
+**[`0033`](../packages/db/migrations/0033_trading_calendar_revision_required.sql) made the calendar's prior image mandatory** and **[`0035`](../packages/db/migrations/0035_rule_states_calendar_revision.sql) joined that record to a state row.** Together they are what makes a **calendar correction distinguishable from an engine regression** on the nightly run. Before them a holiday correction fell into Appendix B.3's "anything else: page", and since a calendar correction changes the day sequence for **every account at once**, the first one diverged the whole book: 5,000 pages on one morning. **The alarm does not fail by being wrong. It fails by being right five thousand times.**
+
+**The half those two could not install is the stamp itself**, because `0035` refuses a trigger asserting it is current: no per-row constraint can tell "not yet written" from "pristine calendar" without fabricating (`OI-14`). **Only the batch knows when the fold ran**, so only the batch can write the honest stamp. That is now two lines, in the order that makes them true.
+
+### Three exposures named and left open
+
+| | |
+|---|---|
+| **`OI-15` is new** | **M01 section 1.3 puts `hash.ts` in the engine and `merit/engine-purity` would refuse it there today.** The rule reports **every non-relative import** inside `packages/rules-engine/src/**`, so `import { createHash } from 'node:crypto'` is an error, while M01 section 1.4's banned-constructs table permits "`crypto` **beyond a pure hash**". **The prose allows the import the rule refuses.** Building in `apps/worker` sidesteps it and does not resolve it: a scoped lint exception or a hand-rolled SHA-256, and neither is a decision to make in passing |
+| **`0015` names four context gates and the engine publishes five** | The column comment says "freeze, recon_blocked, KYC, in-flight"; `ContextGateResults` carries those plus **`accountActive`**, which `R-40` states and API_CONTRACT renders. The engine's shape is stored so the column and the endpoint speak one vocabulary. **`0015` is merged and only an ADR moves it**, so this is flagged rather than reconciled |
+| **Events are returned and not persisted** | `advanceDay` emits M01 section 5's facts; writing them needs `0017`'s tables and EVENTS.md's vocabulary mapping. They are carried on each outcome **so the gap is visible in the type** rather than in nobody's memory |
+
+**And one process finding.** A typecheck failure was pushed because `pnpm run typecheck 2>&1 | tail -8 && git commit` **continues past a red compile**: a pipeline exits with its last command's status. Fixed one commit later. **A check whose failure cannot reach the shell is a check that passed**, which is the lesson `falsify-ci.mjs` already carries about runs it cannot bound.
+
+---
+
 ## `INV-06` is ruled and `RE-P-01` exists: the exception is pinned, not excused (2026-08-17)
 
 **[ADR-050](decisions/ADR-050.md) closes the ruling three sessions have been blocked on** ([session 45](sessions/2026-08-16-session-45.md), [session 47](sessions/2026-08-16-session-47.md), [session 48](sessions/2026-08-17-session-48.md)).
@@ -574,6 +621,8 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 **No golden fixture was written and no `EC-nnn` was claimed.** P2 section 2 alternates fixture sessions and engine sessions: "a session doing both has derived its expectations from its own output."
 
 **`hash.ts` and `SD-08` are still absent**, so `RuleState` carries no `stateHash` and `replay` does not exist. Both are the replay session's, and `OI-14` ([ADR-047](decisions/ADR-047.md)) is still P2's to discharge.
+
+> **AMENDED by [session 49](sessions/2026-08-17-session-49.md). `SD-08`'s computation now exists, and `hash.ts` still does not.** The canonical serialization is [`apps/worker/src/batch/state-hash.ts`](../apps/worker/src/batch/state-hash.ts) rather than M01 section 1.3's `packages/rules-engine/src/hash.ts`, for two reasons: three sessions owned the engine package, and **`merit/engine-purity` would refuse `node:crypto` there** while M01 section 1.4 permits "`crypto` beyond a pure hash" (`OI-15`). **The other two clauses stand unchanged**: `RuleState` carries no `stateHash`, because a state hashes a ROW rather than carrying its own digest, and `replay` does not exist. **`OI-14` is still open**, and the batch is what will discharge it.
 
 ---
 
