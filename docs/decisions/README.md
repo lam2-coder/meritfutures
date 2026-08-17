@@ -80,6 +80,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-051](ADR-051.md) | `R-32` anchors at `opened_on`, and `phase_eval.max_days` is the column that binds  (2026-08-17, status: accepted) |
 | [ADR-052](ADR-052.md) | The locked floor is an assignment, and the engine is wrong because a test was made stricter than the rule it was testing  (2026-08-17, status: accepted) |
 | [ADR-053](ADR-053.md) | The high-water bound holds only while the floor is unlocked, and what it stops asserting is the ruling  (2026-08-17, status: proposed) |
+| [ADR-055](ADR-055.md) | A holiday pauses the session belonging to the next trade date, and the exception carries that session's bounds  (2026-08-17, status: proposed) |
 
 ## Gate closures
 
