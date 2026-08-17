@@ -10,7 +10,7 @@ Per account **per trading day**, not a single current row. Roughly 250 rows per 
 | `floor_cents` | bigint | not null | the [floor](../../GLOSSARY.md#floor) that **survived** this day |
 | `floor_locked` | boolean | not null default false | |
 | `floor_open_cents` | bigint | not null | **`SD-04`.** The floor the day was **judged against**. On any day where the floor moved the two differ, and the evidence pack must be able to show which one produced a breach decision (EC-035). Without it, a breach explanation reads "your low was below the floor" while showing a floor the low was never compared to |
-| `high_water_balance_cents` | bigint | not null | drives trailing |
+| `high_water_balance_cents` | bigint | not null | drives trailing, and **frozen permanently once `floor_locked`** (`R-15`, `R-13`), so after the lock a new closing high leaves this column **below** `balance_cents` and the row is correct (`GS-016`). Reset **downward** to `size_cents` at the funded reset (`R-31`). [ADR-053](../../decisions/ADR-053.md) scopes the bound below to the unlocked state for exactly that reason |
 | `balance_cents` | bigint | not null | end-of-day balance |
 | `withdrawable_cents` | bigint | not null, check >= 0 | derived, stored for query speed. §13's invariant, as a CHECK |
 | `traded_days_count` | integer | not null, check >= 0 | |
@@ -31,7 +31,7 @@ Per account **per trading day**, not a single current row. Roughly 250 rows per 
 | `created_at` | timestamptz | not null default now() | |
 
 Indexes: unique `rule_states_account_day_uq (account_id, trading_day)`, total rather than partial because unlike `daily_marks` a rule state is never superseded (a correction to the inputs produces a **replay**, and the replay's divergence is the finding); `rule_states_account_day_desc_idx (account_id, trading_day desc)`; `rule_states_engine_eligible_idx (trading_day)` where `engine_eligible`, the eligible-next-7-days forecast source; `rule_states_day_hash_idx (trading_day, account_id) include (state_hash)`, the nightly replay audit's comparison read.
-Constraints: `rule_states_anchors_move_together`; `rule_states_cadence_anchor_not_before_payout_anchor`; `rule_states_settlements_imply_anchors`; `rule_states_consistency_period_started`; `rule_states_consistency_numerator_within_denominator`; `rule_states_high_water_bounds_balance`; `rule_states_win_days_within_traded_days`; `rule_states_hash_is_sha256`.
+Constraints: `rule_states_anchors_move_together`; `rule_states_cadence_anchor_not_before_payout_anchor`; `rule_states_settlements_imply_anchors`; `rule_states_consistency_period_started`; `rule_states_consistency_numerator_within_denominator`; `rule_states_high_water_bounds_balance_unlocked`; `rule_states_win_days_within_traded_days`; `rule_states_hash_is_sha256`.
 Append-only. Retention: forever.
 
 **The `state_hash` input list ([ADR-026](../../decisions/ADR-026.md) C-07), reproduced here because a hash whose input set is implicit is a hash that changes meaning when a column is added.** Nineteen fields in this exact declared order, bigint rendered base-10, null as an explicit sentinel, no whitespace:

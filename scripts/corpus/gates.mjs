@@ -2635,7 +2635,7 @@ const ci06p = {
     'table going vacuous once gaplessness can be satisfied by the gate itself; and the ' +
     'letters are gapless over implemented plus reserved, so a letter a sibling branch ' +
     'holds is a hole that passes. ' +
-    'THREE THINGS IT DOES NOT DO. It inherits CI-06f and CI-06h\'s cross-branch gap ' +
+    "THREE THINGS IT DOES NOT DO. It inherits CI-06f and CI-06h's cross-branch gap " +
     'verbatim: a pull request may not claim a letter already taken on main, and this run ' +
     'sees one ref. It does not require an implemented gate to HAVE a STRATEGY row, ' +
     'because ADR-026 is a check in this runner with no letter at all and the rule would ' +
@@ -2760,6 +2760,190 @@ function allocationReport() {
 }
 
 // -----------------------------------------------------------------------------
+// CI-06q  Cited authority exists
+// -----------------------------------------------------------------------------
+// ON 2026-08-17 A MERGE-BLOCKING STAGE CITED AN AUTHORITY THAT DID NOT EXIST.
+// Two lines in packages/golden-loader/src/coverage.ts attributed the deferral of
+// ADR-048's polarity enforcement to a dated ruling by the founder. No such
+// ruling existed, in `docs/` or anywhere else, and ADR-048 does not mention
+// enforcement being deferred.
+//
+// THE BEHAVIOUR WAS CORRECT AND NEEDED NO AUTHORITY AT ALL: a derived direction
+// cannot be enforced against a fold that reaches none of the rules a fixture
+// cites, which is a tautology rather than a decision. THE CITATION WAS THE WHOLE
+// DEFECT, and nothing in this repository could see it, because no gate had ever
+// asked whether a cited ruling exists.
+//
+// -----------------------------------------------------------------------------
+// WHAT "RESOLVES" MEANS, AND WHY THE OBVIOUS READING IS CIRCULAR
+// -----------------------------------------------------------------------------
+// The tempting definition is "some file under docs/ mentions that date near the
+// word ruling". THAT DEFINITION IS SATISFIED BY THE CITATIONS THEMSELVES. Two
+// session logs cite the 2026-08-17 ruling in exactly that shape, so the gate
+// would have read one citation as the authority for another and PASSED ON THE
+// DEFECT THAT COMMISSIONED IT. Measured, not reasoned about: 59 dated citations
+// exist in this tree and the ones under docs/ outnumber the declarations.
+//
+// So resolution is to a REGISTRY DECLARATION, which is structural rather than
+// prose, and there are exactly two shapes:
+//
+//   an ADR heading      `## ADR-nnn: <title>  (YYYY-MM-DD, status: ...)`
+//   a gates/ filename   docs/decisions/gates/<slug>-YYYY-MM-DD.md
+//
+// Both are places a ruling is DECLARED. Neither can be produced by writing a
+// sentence that cites one.
+//
+// -----------------------------------------------------------------------------
+// WHAT IT CANNOT SEE, STATED RATHER THAN IMPLIED
+// -----------------------------------------------------------------------------
+// THE SHARPEST LIMITATION FIRST, BECAUSE IT IS THE ONE A READER WOULD OTHERWISE
+// ASSUME AWAY: this gate would NOT have caught the defect that commissioned it.
+// 2026-08-17 carries three declared rulings (ADR-050, ADR-051, ADR-052), so a
+// citation naming that date resolves. What was wrong was not that the date had
+// no ruling; it was that the rulings it has DO NOT SAY WHAT THE CITATION
+// CLAIMED. This gate checks that a cited authority EXISTS. It cannot check that
+// the authority says what the citation says it says, because that is a reading
+// of two documents against each other and no regex performs it.
+//
+// THE ASSERTION THAT WOULD HAVE CAUGHT IT is one step stronger: a citation must
+// name the ruling (`ADR-nnn` or a `gates/` file) and not merely its date, so the
+// claim can be checked against the document it rests on. IT IS NOT WRITTEN HERE
+// AND THE REASON IS A MEASUREMENT: 28 of the 59 dated citations name no ruling,
+// and they sit in GLOSSARY, API_CONTRACT, INFRA, OVERVIEW, SECURITY, DATA_MODEL
+// and nine ADRs. Every one of those is frozen, so the cleanup is an ADR and a
+// session rather than a gate, and a gate that fails on arrival is a gate
+// somebody switches off. It is declared here in the idiom the letter table used
+// for its own duplicate-row check: named, measured, and blocked on a cleanup.
+//
+// A PARAPHRASE IS OUT OF REACH. "as the founder decided last Tuesday", "per the
+// gate call", or a citation with the date spelled in words matches nothing here.
+// The gate reads one written form and claims no more than that form.
+//
+// THE NEEDLE IS ASSEMBLED FROM FRAGMENTS so this file is not itself a finding
+// when the gate scans the repository it lives in. That is RI-02's idiom in
+// packages/tooling, which matched its own prose twice, and the alternative
+// considered and rejected there was a by-name exclusion for the file that
+// defines the check: a hole in exactly the place a hole is least visible.
+
+const ISO_DATE_SOURCE = '20\\d{2}-[01]\\d-[0-3]\\d';
+
+/** The cited form, assembled so the pattern cannot match its own definition. */
+const CITED_RULING_SOURCE =
+  ['found', 'er'].join('') + '[- ]' + ['rul', 'ing'].join('') + '[^.\\n]{0,40}?';
+
+/** Every date on which a ruling is DECLARED by a registry file. */
+function declaredRulingDates() {
+  const dates = new Set();
+  const iso = new RegExp(ISO_DATE_SOURCE, 'g');
+
+  const decisions = 'docs/decisions';
+  for (const file of readdirSync(join(ROOT, decisions)).filter((f) => /^ADR-\d+\.md$/.test(f))) {
+    // The heading's parenthetical, which is where every ADR in this corpus
+    // carries its date. A date in an ADR's BODY declares nothing: ADR-052's body
+    // cites 2026-08-16 while ruling on 2026-08-17.
+    for (const lineText of read(join(decisions, file)).split('\n')) {
+      if (!lineText.startsWith('## ADR-')) continue;
+      const paren = /\(([^)]*)\)\s*$/.exec(lineText.trim());
+      if (paren === null) continue;
+      for (const m of paren[1].matchAll(iso)) dates.add(m[0]);
+      break;
+    }
+  }
+
+  const gatesDir = join(decisions, 'gates');
+  if (existsSync(join(ROOT, gatesDir))) {
+    for (const file of readdirSync(join(ROOT, gatesDir))) {
+      for (const m of file.matchAll(iso)) dates.add(m[0]);
+    }
+  }
+
+  return dates;
+}
+
+const ci06q = {
+  id: 'CI-06q',
+  title: 'Every dated citation of a founder ruling resolves to a declared ruling',
+  covers:
+    'CITED AUTHORITY EXISTS. Every dated reference to a ruling by the founder, in ' +
+    'any .md, .ts or .mjs under docs/, scripts/ or packages/, names a date on which ' +
+    'a ruling is DECLARED by a registry file: an ADR whose heading parenthetical ' +
+    'carries that date, or a file under docs/decisions/gates/ whose filename does. ' +
+    'Resolution is deliberately NOT "some document mentions the date", because the ' +
+    'citations then satisfy each other and the gate passes on the defect it exists ' +
+    'for. ' +
+    'IT WOULD NOT HAVE CAUGHT THE DEFECT THAT COMMISSIONED IT, and that is the ' +
+    'limitation to read first: the miscited date HAS declared rulings, and what was ' +
+    'wrong is that they do not say what the citation claimed. This gate checks that ' +
+    'an authority EXISTS, never that it says what is attributed to it. The stronger ' +
+    'assertion (a citation must NAME its ruling, not just date it) is declared in ' +
+    'this file and not written, because 28 of 59 citations would fail it today and ' +
+    'they sit in frozen documents. ' +
+    'A PARAPHRASE IS OUT OF REACH: only one written form is read, so an undated ' +
+    'reference, a date spelled in words, or "as the founder decided last week" ' +
+    'matches nothing and is claimed as nothing.',
+  run() {
+    const findings = [];
+    const declared = declaredRulingDates();
+
+    // A check that resolved against an empty set would call every citation a
+    // finding, which reads as 59 defects rather than as a broken check.
+    if (declared.size === 0) {
+      throw new Error(
+        'no declared ruling dates were parsed from docs/decisions; CI-06q cannot run, ' +
+          'and resolving every citation against an empty set would report the whole ' +
+          'corpus as unresolved rather than reporting itself as broken',
+      );
+    }
+
+    const cited = new RegExp(CITED_RULING_SOURCE + '(' + ISO_DATE_SOURCE + ')', 'g');
+    let scanned = 0;
+    let citations = 0;
+
+    for (const rel of allFiles()) {
+      if (!/^(docs|scripts|packages)\//.test(rel)) continue;
+      if (!/\.(md|ts|mjs)$/.test(rel)) continue;
+      scanned++;
+      const lines = read(rel).split('\n');
+      lines.forEach((lineText, i) => {
+        for (const m of lineText.matchAll(cited)) {
+          citations++;
+          const date = m[1];
+          if (declared.has(date)) continue;
+          findings.push(
+            `${rel}:${i + 1}: cites a ruling dated ${date}, and no registry file ` +
+              'declares one on that date. A ruling is declared by an ADR heading ' +
+              'parenthetical or by a file under docs/decisions/gates/; a document merely ' +
+              'mentioning the date is another citation, not the authority. Either the ' +
+              'ruling is unrecorded and needs writing down, or the citation is ' +
+              'attributing a decision to an authority that does not exist',
+          );
+        }
+      });
+    }
+
+    // TWO WAYS THIS GATE COULD GO QUIET, BOTH REFUSED. A glob that stopped
+    // matching, and a needle that stopped matching, produce the same clean
+    // result as a corpus with no defect in it.
+    if (scanned < 100) {
+      throw new Error(
+        `CI-06q scanned ${scanned} file(s), which is far below this corpus's size; ` +
+          'the file filter has stopped matching and the gate is asserting about a ' +
+          'tree it did not read',
+      );
+    }
+    if (citations === 0) {
+      throw new Error(
+        'CI-06q found no dated citation anywhere in the corpus. This corpus is built ' +
+          'on recorded rulings and cites them constantly, so zero means the needle has ' +
+          'stopped matching rather than that the citations are gone',
+      );
+    }
+
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -2778,6 +2962,7 @@ const GATES = [
   ci06m,
   ci06n,
   ci06p,
+  ci06q,
   adr026,
 ];
 

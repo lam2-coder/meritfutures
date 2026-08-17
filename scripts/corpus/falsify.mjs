@@ -608,6 +608,34 @@ const SEEDS = {
       );
     },
   },
+  'CI-06q': {
+    what: 'a dated citation of a founder ruling on a date no registry file declares',
+    real:
+      'two lines in packages/golden-loader attributed the deferral of ADR-048s polarity ' +
+      'enforcement to a dated ruling by the founder, and no such ruling existed anywhere; ' +
+      'the behaviour needed no authority at all and the citation was the whole defect',
+    // A PRE-PROJECT DATE, AND THE CHOICE IS DELIBERATE. Every other derived seed
+    // in this harness derives from a sequence so it cannot collide as the corpus
+    // grows; a date is not a sequence, so the collision is avoided from the other
+    // end. Merit's first ADR is dated 2026, so no registry file can ever declare
+    // a ruling on a 2019 date, and the seed stays falsifiable forever without a
+    // pin somebody has to move.
+    expect: () => 'cites a ruling dated 2019-01-02',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\nThe cap was raised by a ` +
+          // Assembled, so this harness is not itself a finding when the gate
+          // scans the repository it lives in. RI-02's idiom, and the same reason
+          // gates.mjs assembles the pattern rather than spelling it.
+          ['found', 'er'].join('') +
+          ' ' +
+          ['rul', 'ing'].join('') +
+          ', 2019-01-02, which nothing records.\n',
+      ),
+  },
   'CI-06p': {
     what: 'a CI-06 letter claimed two past the last one, leaving the letters between it claimed by nobody',
     real:
@@ -1055,6 +1083,48 @@ const SCOPE_CASES = [
     },
   },
   {
+    name: 'CI-06q/undated-is-not-a-citation',
+    gate: 'CI-06q',
+    what: 'a reference to a founder ruling carrying NO date, which must NOT be a finding',
+    expect: 'PASS',
+    // THE BOUNDARY IS AT `dated`, NOT AT `mentions a ruling`, and this is the
+    // direction that says so. This corpus talks about rulings constantly --
+    // "this is a founder item rather than an engineering one", "it needs a
+    // ruling" -- and 158 such mentions exist against 59 dated citations. A gate
+    // that flagged all of them would be unusable and would be switched off in a
+    // week, so the undated form is OUT OF SCOPE BY DESIGN.
+    //
+    // It is also the blind spot, and the two facts are the same fact: an
+    // authority cited in words rather than by date cannot be resolved against a
+    // registry, so the gate claims nothing about it. `covers` says so, and this
+    // case is what stops that claim from being quietly widened later.
+    control: {
+      expect: 'cites a ruling dated 2019-01-03',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\nDecided by a ` +
+            ['found', 'er'].join('') +
+            ' ' +
+            ['rul', 'ing'].join('') +
+            ' on 2019-01-03, and nothing records it.\n',
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\nThe cap was raised by a ` +
+          ['found', 'er'].join('') +
+          ' ' +
+          ['rul', 'ing'].join('') +
+          ' last Tuesday, and nothing records it.\n',
+      ),
+  },
+  {
     name: 'CI-06m/small-is-not-empty',
     gate: 'CI-06m',
     what: 'a fixture cut to a single session, which is small and legitimate and must NOT be a finding',
@@ -1379,7 +1449,11 @@ const LOADER_CASES = [
     expect: 'must agree when a bigint result states the same cents as an integer expectation',
     seed: (d) =>
       edit(d, COMPARE, (b) =>
-        once(b, 'if (bigintAgrees(got, wanted)) continue;', 'if (Object.is(got, wanted)) continue;'),
+        once(
+          b,
+          'if (bigintAgrees(got, wanted)) continue;',
+          'if (Object.is(got, wanted)) continue;',
+        ),
       ),
   },
   {
@@ -1410,7 +1484,14 @@ const LOADER_CASES = [
     // this closes the half where it cites only a CV-nn or an INV-nn, which
     // P2 section 2 permits and which names no rule.
     expect: 'must never derive direct from a citation naming no rule at all',
-    seed: (d) => edit(d, POLARITY, (b) => once(b, "      polarity: 'inverted',\n      cited,\n      undeclared: [],", "      polarity: 'direct',\n      cited,\n      undeclared: [],")),
+    seed: (d) =>
+      edit(d, POLARITY, (b) =>
+        once(
+          b,
+          "      polarity: 'inverted',\n      cited,\n      undeclared: [],",
+          "      polarity: 'direct',\n      cited,\n      undeclared: [],",
+        ),
+      ),
   },
   {
     name: 'polarity/declaration-ignored',
@@ -1423,7 +1504,11 @@ const LOADER_CASES = [
     expect: 'must derive inverted when one cited rule is undeclared',
     seed: (d) =>
       edit(d, POLARITY, (b) =>
-        once(b, 'const undeclared = cited.filter((id) => !declared.has(id));', 'const undeclared = [];'),
+        once(
+          b,
+          'const undeclared = cited.filter((id) => !declared.has(id));',
+          'const undeclared = [];',
+        ),
       ),
   },
   {
@@ -1770,7 +1855,6 @@ function main() {
           `CI-03 boundary they name. Each one has now been watched doing both.`
       : `\n${bad} problem(s). A gate that cannot be made to fail is not checking anything, and ` +
           `a gate that fails on a file outside its scope is checking the wrong thing.`,
-
   );
   return bad ? 1 : 0;
 }

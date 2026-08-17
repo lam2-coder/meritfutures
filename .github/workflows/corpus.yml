@@ -400,3 +400,33 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_daily_marks_identities.sql
+
+      # ADR-053. FIVE SUCCESS CASES BEFORE THE FIRST REJECTION, and on this
+      # migration that is the whole point of the file.
+      #
+      # The defect it guards was a CONSTRAINT REFUSING A LEGITIMATE ROW:
+      # `rule_states_high_water_bounds_balance` asserted `hwb >= balance`
+      # unconditionally while R-15 freezes `hwb` permanently at the floor lock,
+      # so the state row of EVERY LOCKED ACCOUNT THAT THEN MADE A NEW CLOSING
+      # HIGH was unwritable, which is every account that passes an evaluation.
+      # SUCCESS 1 is GS-016's expected end state verbatim, and it is what fails
+      # the day somebody re-tightens the bound.
+      #
+      # SUCCESS 4 AND 5 ARE THE SAME ROW UNDER BOTH READINGS OF AN OPEN FOUNDER
+      # ITEM. Whether the R-31 funded reset clears the lock is unruled, and
+      # ADR-053 claims to be correct either way; those two cases are what make
+      # the claim testable. They are also what would fail if somebody replaced
+      # this constraint with a cross-row freeze trigger, because R-31 resets
+      # `hwb` DOWNWARD to `size_cents` and on Core EOD every eval pass is also a
+      # lock day.
+      #
+      # REJECTION 3 IS THE ASSERTION THAT LOOKS MISPLACED AND IS NOT. A CHECK
+      # THAT EVALUATES TO NULL PASSES. This predicate is two-valued only because
+      # floor_locked, high_water_balance_cents and balance_cents are all NOT
+      # NULL, and it names none of them; drop one later and the constraint
+      # admits everything with its text unchanged and every rejection here still
+      # passing. The NOT NULLs are asserted from the catalogue for that reason.
+      - name: Probe ADR-053's scoped high-water bound (0037)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_rule_states_high_water_bound.sql
