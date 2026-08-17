@@ -382,3 +382,42 @@ Four omissions, each a decision rather than a gap.
 **OQ-TS-02. Is Stryker's mutation score ever a gate, or only a trend?** Proposed **trend only**, reported nightly. A threshold on a young codebase produces tests written to kill mutants rather than to pin behavior, which is TR-01 inverted. Revisit once the engine is stable and the score has a baseline worth defending.
 
 **OQ-TS-03. Do the corpus-integrity checks (CI-06) survive FREEZE, or retire when code begins?** Proposed **survive**. The corpus does not stop being the specification when the code starts; it becomes the thing the code is checked against, and a broken link in a plan doc is worse after FREEZE than before it.
+
+---
+
+## 8. What P2-7 actually landed, and what it does not yet prove
+
+**Appended at P2-7 (2026-08-17) rather than folded into sections 3.1 and 4.1, because a sibling session holds those sections.** The founder resolves the merge. Nothing above this line was edited.
+
+### 8.1 The `RE-D-nn` suite exists now, and it did not before
+
+[M01 section 1.4](../plans/M01-rules-engine.md) names three determinism gates and calls all three merge blockers. **None of the three was in the tree**; the string `RE-D-01` appeared only in prose. They now exist:
+
+| ID | Where it lives | What it does |
+|---|---|---|
+| `RE-D-01` | `packages/golden-loader/test/determinism.test.ts` | Traps the clock surface, `Math.random` and `fetch`, then folds both corpora |
+| `RE-D-02` | the same file, over `scripts/ci/engine-digest.mjs` | Spawns the digest under three `(TZ, LC_ALL)` pairs and diffs |
+| `RE-D-03` | `RI-07` in `packages/tooling/checks/repo-invariants.mjs` | Walks the engine's transitive module graph |
+
+`RE-D-03` lands as a repo invariant rather than as a Vitest suite because it is one by construction, and because the manifest half of the same boundary (`RI-01`) already lives in that file. It closes a hole that is concrete rather than theoretical: **a relative import that escapes `packages/rules-engine/src` is invisible to every mechanism that existed before it.** `merit/engine-purity` returns early on any specifier starting with `.`, and is attached to `src/**` only, so the escaped file is never linted either. Seeded on this tree, `RI-07` fails while `RI-01` and ESLint both stay green, and the falsification case asserts exactly that.
+
+### 8.2 `PT-06`, in three halves, two of which are still vacuous
+
+The vacuity is **derived at run time and printed**, never recorded in prose that ages. [ADR-038](../decisions/ADR-038.md)'s mechanism, reused.
+
+| Half | Today | How the reader is told |
+|---|---|---|
+| Timezone invariance over `advanceDay` | **Real.** 45 of 50 rules, folded through `runDemo` | asserted |
+| Locale invariance | **Real across processes only** | `localeIsProcessScoped()` measures it; `RE-D-02` carries it |
+| Arrival-order permutation | **Unexpressible.** The engine exports no `replay` | `Object.keys(engine).includes('replay')` skips it by name |
+| The golden corpus, under either gate | **Vacuous.** The loader still folds `evaluate`, the identity stub | `engineIsIdentityStub()` gates it; the log prints `golden VACUOUS` |
+
+Each of these switches itself on when the fact underneath it changes. No edit and nobody to remember.
+
+**One measured fact worth recording, because it invalidates the obvious implementation.** Section 3.1 says `PT-06` "runs with `TZ` and `LC_ALL` randomized per case". **`TZ` can be randomized in-process and `LC_ALL` cannot**: Node resolves the ICU default locale once at startup, so assigning `process.env.LC_ALL` afterwards changes nothing `Intl` will ever read. A harness that assigned it and asserted invariance would pass on every seed forever. This is why `RE-D-02` spawns a process instead of wrapping a closure.
+
+### 8.3 The generators
+
+P2 section 5 names three and two existed. The third, the arbitrary settlement sequence, was deferred by `day-sequence.ts` on the ground that it "means generating payout eligibility, which means the engine". That reason has expired and it is built. Fifteen rules, each individually falsifiable.
+
+**One rule in that contract cannot be violated alone, and the counterfactual says so rather than relaxing.** `INV-17`'s lifetime bound is `R-42` and `R-49` conjoined over an account's life, so no single construction step can break it by itself. The exemption is a compile-checked list of one, and a test asserts the list has exactly one entry.
