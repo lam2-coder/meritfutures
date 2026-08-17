@@ -462,6 +462,43 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## The last nine rules: fifty of fifty titled, forty-four of fifty declared (2026-08-17)
+
+**[Session 48](sessions/2026-08-17-session-48.md) closed the `RE-U-nn` series.** M01 section 8.4's coverage rule -- "every rule R-01 to R-50 has at least one unit test asserting its operator at the boundary on both sides" -- is met for the first time, and it is met **without overstating what the engine computes**. `pnpm run verify` green: **6 of 6 invariants, 474 tests with 25 skipped, 15 of 15 gates clean and dirty, 16 scope cases**, and `falsify-ci.mjs` reports **37 of 37 watched failing** on a clean tree.
+
+**`RULE_ASSERTIONS` and `IMPLEMENTED_RULES` are no longer the same set, and that is the whole repair.** The coverage rule is over **fifty**; [ADR-048](decisions/ADR-048.md)'s declared set is over **what the engine computes**, defined against the opposite failure ("a rule is implemented when the engine computes it, not when a symbol exists"). Treating them as one set is what let the suite report a complete series while it was nine short of one. `DISCHARGED_ELSEWHERE` is the new export that separates them, and every row names where its rule is discharged rather than merely that it is absent.
+
+**Three of the nine were never blocked, and M01 section 3.1's ordering table says so in one line each.**
+
+| Rule | Where M01 maps it | Status |
+|---|---|---|
+| `R-02` | **DO-1**, "`mark.tradingDay` is a calendar trading day", plus the gap half in `tradingDaysBetween` | **Declared** |
+| `R-06` | **DO-1**, "`mark.tradingDay > prior.tradingDay`" | **Declared** |
+| `R-10` | **DO-3**, cited beside `R-07` against INV-18 and INV-19 | **Declared** |
+
+`advance.ts` has carried all three checks since group B landed, **citing them by name in its own comments**. `R-02` and `R-06` sat on the undeclared list under "blocked on the calendar transcription", which is true of the rest of group A and true of their **golden files**; `R-10` sat there under "discharged outside the engine", which is true of `R-11` beside it and not of `R-10`. Nobody read the DO table against the list. **This is [session 47](sessions/2026-08-16-session-47.md)'s own generalisation arriving a third time**: a correct observation followed by one unchecked inferential step.
+
+**`R-01` and `R-05` would not have moved when the calendar landed either, and that is the more expensive half.** Both are stated against [`trading_calendar`](architecture/data-model/trading_calendar.md)'s `session_open_at` and `session_close_at`. `CalendarDay` is `{tradingDay, isHalfDay, halted, sequence}` and carries **neither column**; `DailyMark` carries `fillCount` and **no fill and no instant**. A transcribed CME year adds **rows**. So a session arriving after the transcription to finish group A would have found two rules it could not write and no statement anywhere of why.
+
+**The six that remain undeclared, each with where it is discharged and the mutant watching it.**
+
+| Rule | Discharged by | Watched failing on |
+|---|---|---|
+| `R-01` | Ingest. No execution timestamp reaches the fold | `CI-01/engine-R-11` |
+| `R-05` | `trading_calendar`'s session instants, and [`0032`](../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql)'s constraints | `CI-01/engine-R-05` |
+| `R-11` | The caller's `superseded_by is null`, and replay recomputing forward | `CI-01/engine-R-11` |
+| `R-17` | `DrawdownType`'s closed union today; `CV-01` at publish once `validatePlan` exists | `CI-01/engine-R-17` |
+| `R-20` | M02's setpoint push (`DEP-M2-03`). The engine owes the number, not the push | `CI-02/engine-R-20` |
+| `R-32` | **Nothing.** The refusal is implemented; the **anchor** and **which column binds** are unruled | `CI-02/engine-R-32` |
+
+**Four of the eight new mutants are in the TYPECHECK stage, which is a shape `falsify-ci.mjs` did not previously have.** The three absence tests were written as `Object.keys` checks first and **that version was worth nothing**: `Object.keys` reads what the fixture constructed, so a `supersededBy` added to `DailyMark` and left unset by `mark()` passes it silently, which is precisely the change `R-11` exists to notice. All three are now compile-time, in `PlanConfigVersionIsClosed`'s idiom, **and that rewrite is what made a mutant possible for any of them**. `R-17` is the same story from the other direction: vitest runs transpiled code, so its `@ts-expect-error` is unevaluable there by construction.
+
+**`RE-U-032` is honestly short of section 8.4's sentence and says so in three places.** R-32's operator is `>` against elapsed trading days and nothing exercises it. What the test asserts is the **refusal** at its own boundary, at two configured values rather than one, because a reader who saw only the 30-day case could believe the rule was implemented and the account simply had not expired. **The two things blocking the operator are founder rulings**, unchanged from session 47: the **anchor** the days elapse from, which neither R-32 nor `G-EXPIRED` names while an account sits `provisioning_pending`, and **which column binds**, a count against `max_days` or the stored `accounts.expires_on` date.
+
+**`CI-03`'s polarity is still untouched**, for the fifth session running, and `IMPLEMENTED_RULES` at 44 is what the fixture-wiring session will read when ADR-048's prerequisite lands.
+
+---
+
 ## Groups F, G and H: forty-one of M01's fifty rules, and the nine that are left say why (2026-08-16)
 
 **[P2](plans/P2-rules-engine.md) section 7's `P2-6` and the group F and H sessions have landed** ([session 47](sessions/2026-08-16-session-47.md)), in one branch and five commits. **`pnpm run verify` is green: 460 tests, 15 corpus gates clean and dirty, 43 falsify cases with 40 watched failing on their own finding** (the three that error are scanners absent from this container's PATH, unchanged).
@@ -476,6 +513,8 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 | **Group H**, settlement | R-19, R-46, R-47, R-48, R-49, R-50 | [`payout/settle.ts`](../packages/rules-engine/src/payout/settle.ts), wired at DO-2 |
 
 **The nine that are not implemented, each with the thing it waits on.** `R-01`, `R-02`, `R-05` and `R-06` are group A and wait on the **calendar transcription**, which is a founder item ([P2](plans/P2-rules-engine.md) section 6). `R-10`, `R-11`, `R-17` and `R-20` are discharged outside the engine entirely: ingest, publish validation, and the platform setpoint. `R-32` **refuses** rather than being absent, because elapsed trading days is not derivable from `RuleState` and adding the field is a schema delta and an ADR.
+
+> **AMENDED by [session 48](sessions/2026-08-17-session-48.md). Three of those nine were not blocked on anything, and two of the remaining six would not have moved when the calendar landed either.** M01 section 3.1's ordering table cites `R-02` and `R-06` on DO-1's row and `R-10` on DO-3's, against checks [`advance.ts`](../packages/rules-engine/src/day/advance.ts) has carried since group B; all three are now **declared**. `R-01` and `R-05` are stated against `trading_calendar.session_open_at` and `session_close_at`, which **`CalendarDay` does not carry**, and a transcribed calendar year adds rows rather than columns, so they were filed against a blocker that would not have unblocked them. The count is now **forty-four of fifty declared and fifty of fifty titled**, and the sentence above about `R-32`'s schema delta was already withdrawn by [session 47](sessions/2026-08-16-session-47.md) and is corrected in the section below.
 
 **Four of M01's six exported functions now exist**: `initialState`, `advanceDay`, `applySettlement` and `evaluatePayout`. `resolvePlan` and `validatePlan` are `P2-1`.
 
