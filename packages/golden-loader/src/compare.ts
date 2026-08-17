@@ -86,10 +86,25 @@ function bigintAgrees(actual: bigint, expected: number): boolean {
   return Number.isSafeInteger(expected) && actual === BigInt(expected);
 }
 
-/** A one-line rendering of a diff, for a test failure message. */
+/**
+ * A one-line rendering of a diff, for a test failure message.
+ *
+ * A NOTED DIFF STILL SHOWS BOTH SIDES, AND IT DID NOT UNTIL THE FOLD WAS REAL.
+ * The event-count note read "expected 9 event(s), engine emitted 7 (expected
+ * a,b,c...)": the count of what the engine emitted, and then the EXPECTED list
+ * again. Which seven it emitted -- the one thing that says where the stream
+ * diverged -- was computed, carried on `diff.actual`, and never printed. Against
+ * the identity stub the answer was always "none" and the omission cost nothing;
+ * the first fixture folded through `advanceDay` made it the difference between a
+ * finding and a puzzle.
+ */
 export function describeDiff(diff: Diff): string {
-  if (diff.note !== undefined)
-    return `${diff.field}: ${diff.note} (expected ${show(diff.expected)})`;
+  if (diff.note !== undefined) {
+    return (
+      `${diff.field}: ${diff.note} (expected ${show(diff.expected)}, ` +
+      `engine produced ${show(diff.actual)})`
+    );
+  }
   return `${diff.field}: expected ${show(diff.expected)}, engine produced ${show(diff.actual)}`;
 }
 
