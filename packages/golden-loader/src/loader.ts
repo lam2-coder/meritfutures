@@ -299,6 +299,54 @@ export function m01Identifiers(path: string = M01_PATH): Set<string> {
   return ids;
 }
 
+const M01_GROUP_HEADING = /^#+\s*(Group [A-Z]:[^\n]*)$/gm;
+
+/**
+ * Each `R-nn` M01 defines, mapped to the rule GROUP whose heading it falls under.
+ *
+ * ADR-048 REQUIRES COVERAGE TO REPORT POLARITY PER RULE GROUP and rejected
+ * deriving polarity itself from the group, "because the group is not written on
+ * the fixture and would become a second hand-maintained mapping, which is
+ * ADR-034's class". THAT ARGUMENT APPLIES TO THIS FUNCTION TOO and is why it
+ * reads M01 rather than restating the eight ranges: `packages/rules-engine`'s
+ * `RuleId` carries the same eight boundaries in COMMENTS, which no machine can
+ * read, and copying them here would be the second expression of one concept
+ * that ADR-034 exists to end. M01 states the groups as headings above the rule
+ * tables, so the document that defines a rule is also the one that says which
+ * group it is in.
+ *
+ * A rule under no heading is omitted rather than bucketed into a default. The
+ * caller reports it as ungrouped, which is visible; a default group is not.
+ */
+export function m01RuleGroups(path: string = M01_PATH): Map<string, string> {
+  if (!existsSync(path)) {
+    throw new Error(`M01 is not where the loader expects it: ${path}`);
+  }
+  const body = readFileSync(path, 'utf8');
+
+  const headings = [...body.matchAll(M01_GROUP_HEADING)].map((m) => ({
+    at: m.index,
+    title: m[1] as string,
+  }));
+  if (headings.length === 0) {
+    throw new Error(`M01 states no "Group X:" headings: ${path}`);
+  }
+
+  const groups = new Map<string, string>();
+  for (const match of body.matchAll(/^\|\s*\*{0,2}(R-\d{2})\*{0,2}\s*\|/gm)) {
+    const at = match.index;
+    // The last heading at or before the row. A rule row above every heading
+    // belongs to no group and is left out, which the report then names.
+    let title: string | undefined;
+    for (const heading of headings) {
+      if (heading.at <= at) title = heading.title;
+      else break;
+    }
+    if (title !== undefined) groups.set(match[1] as string, title);
+  }
+  return groups;
+}
+
 /** Every identifier a `source:` line cites, in the order it cites them. */
 export function citedIdentifiers(source: string): string[] {
   // `\b` on both sides is what keeps `ADR-048` from reading as a citation of

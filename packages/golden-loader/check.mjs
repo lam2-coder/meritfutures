@@ -10,6 +10,9 @@
 //      so by name.
 //   2. The end-state comparison agrees and disagrees where it must, ACROSS THE
 //      TYPE BOUNDARY, against hand-built states.
+//   3. ADR-048's polarity derivation reads a citation and a declared rule set
+//      the way the ruling states, including the vacuity case it calls "the
+//      dangerous one".
 //
 // IT EXISTS SO BOTH CAN BE SEEDED AND WATCHED FROM OUTSIDE VITEST, which is
 // what scripts/corpus/falsify.mjs needs. That harness copies the tree, seeds
@@ -18,13 +21,15 @@
 // deliberately omits `node_modules`, so a checker that needs a workspace
 // resolution cannot run there at all.
 //
-// SO THIS FILE IMPORTS `./src/loader.ts` AND `./src/compare.ts` DIRECTLY AND
-// NEVER `./src/index.ts`, and the restraint is load bearing rather than
-// stylistic. The barrel re-exports `run.ts`, which imports `evaluate` from
-// `@merit/rules-engine` as a VALUE and is the one place this package needs the
-// workspace at all. Reaching it would make this script unrunnable in exactly
-// the tree the falsification harness builds. Everything below needs only
-// relative modules, which Node resolves and strips on its own.
+// SO THIS FILE IMPORTS `./src/loader.ts`, `./src/compare.ts` AND
+// `./src/polarity.ts` DIRECTLY AND NEVER `./src/index.ts`, and the restraint is
+// load bearing rather than stylistic. The barrel re-exports `run.ts` and
+// `coverage.ts`, which import the engine as a VALUE and are the only places
+// this package needs the workspace at all. Reaching either would make this
+// script unrunnable in exactly the tree the falsification harness builds.
+// Everything below needs only relative modules, which Node resolves and strips
+// on its own. `polarity.ts` takes the declared rule set as a PARAMETER for the
+// same reason, so the derivation can be checked without the engine.
 //
 // ../test/loader.test.ts and ../test/compare.test.ts assert the same two things
 // from inside vitest, and neither is redundant: those files assert the rule id
@@ -52,6 +57,7 @@ const { FIXTURE_DIR, loadFixtureDirectory } = await import(
   new URL('./src/loader.ts', import.meta.url).href
 );
 const { diffEndState } = await import(new URL('./src/compare.ts', import.meta.url).href);
+const { derivePolarity } = await import(new URL('./src/polarity.ts', import.meta.url).href);
 
 const findings = [];
 const report = (message) => findings.push(message);
@@ -142,13 +148,52 @@ expectDiffs(
 );
 
 // -----------------------------------------------------------------------------
+// 3. The polarity derivation (ADR-048)
+// -----------------------------------------------------------------------------
+// HAND-BUILT DECLARED SETS, so these hold against any engine. The ruling is
+// that a fixture citing only declared rules must MATCH and one citing anything
+// undeclared must FAIL, and the case ADR-048 calls "the dangerous one" is a
+// fixture citing no rule at all: "every rule this fixture cites is implemented"
+// is vacuously true of it, and reading that as `direct` would assert against a
+// fold that computes nothing.
+
+/** @type {(what: string, source: string, declared: string[], wanted: string) => void} */
+function expectPolarity(what, source, declared, wanted) {
+  const got = derivePolarity(source, new Set(declared)).polarity;
+  if (got !== wanted) {
+    report(`derivePolarity ${what}: expected ${wanted}, got ${got}`);
+  }
+}
+
+expectPolarity(
+  'must derive direct when the engine declares every rule the fixture cites',
+  'M01 R-13, R-18',
+  ['R-13', 'R-18'],
+  'direct',
+);
+expectPolarity(
+  'must derive inverted when one cited rule is undeclared',
+  'M01 R-13, R-32',
+  ['R-13'],
+  'inverted',
+);
+expectPolarity('must derive inverted when the declared set is empty', 'M01 R-13', [], 'inverted');
+expectPolarity(
+  'must never derive direct from a citation naming no rule at all (ADR-048 case 4)',
+  'M01 INV-06, CV-01',
+  ['R-13', 'R-18'],
+  'inverted',
+);
+
+// -----------------------------------------------------------------------------
 
 for (const finding of findings) process.stdout.write(`       ${finding}\n`);
 
 process.stdout.write(
   findings.length === 0
-    ? `${fixtures.length} fixture(s) loaded from ${dir}, 0 refused, and the comparison holds ` +
-        `on both sides of the bigint boundary.\n`
+    ? `${fixtures.length} fixture(s) loaded from ${dir}, 0 refused, the comparison holds on ` +
+        `both sides of the bigint boundary, and the polarity derivation reads both directions ` +
+        `and the vacuity case as ADR-048 states them.\n`
     : `${findings.length} finding(s) over ${fixtures.length} loaded fixture(s) in ${dir}.\n`,
 );
 

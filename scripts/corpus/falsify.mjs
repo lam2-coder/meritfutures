@@ -1134,6 +1134,9 @@ const GS_011 =
 /** The comparison, which every money assertion this stage will ever make goes through. */
 const COMPARE = 'packages/golden-loader/src/compare.ts';
 
+/** ADR-048's derivation, which decides which direction each fixture is asserted in. */
+const POLARITY = 'packages/golden-loader/src/polarity.ts';
+
 const LOADER_CASES = [
   {
     name: 'L-13/cites-nothing',
@@ -1213,6 +1216,45 @@ const LOADER_CASES = [
           'return true;',
         ),
       ),
+  },
+  {
+    name: 'polarity/vacuous-empty-citation',
+    what: "a citation naming no rule read as `direct`, which is ADR-048's case 4",
+    // THE ONE ADR-048 CALLS "THE DANGEROUS ONE". "Every rule this fixture cites
+    // is implemented" is vacuously true of a fixture citing none, so reading
+    // that as `direct` asserts a match against a fold that computes nothing,
+    // and the fixture then fails for a reason with nothing to do with its
+    // subject. L-13 closes the half where a fixture cites nothing M01 defines;
+    // this closes the half where it cites only a CV-nn or an INV-nn, which
+    // P2 section 2 permits and which names no rule.
+    expect: 'must never derive direct from a citation naming no rule at all',
+    seed: (d) => edit(d, POLARITY, (b) => once(b, "      polarity: 'inverted',\n      cited,\n      undeclared: [],", "      polarity: 'direct',\n      cited,\n      undeclared: [],")),
+  },
+  {
+    name: 'polarity/declaration-ignored',
+    what: 'the derivation reading an undeclared rule as implemented',
+    // ADR-048's failure mode 2 from the loader's side: a fixture whose rules
+    // the engine has NOT declared must stay `inverted`, because under inversion
+    // a match is the failure condition. A derivation that ignores the declared
+    // set flips every fixture at once, which is exactly the all-or-nothing
+    // behaviour the ruling exists to replace.
+    expect: 'must derive inverted when one cited rule is undeclared',
+    seed: (d) =>
+      edit(d, POLARITY, (b) =>
+        once(b, 'const undeclared = cited.filter((id) => !declared.has(id));', 'const undeclared = [];'),
+      ),
+  },
+  {
+    name: 'polarity/out-undeclared-rule-still-loads',
+    what: 'a fixture citing a rule the engine has not declared, which must LOAD and derive inverted',
+    // THE BOUNDARY BETWEEN L-13 AND THE DERIVATION, asserted from the side
+    // where nothing may be refused. `R-32` is defined in M01 and is not in the
+    // engine's declared set, so it is a resolvable citation of an unimplemented
+    // rule: L-13 must accept it and the derivation must read it as `inverted`.
+    // A loader that refused it would make "the fixture exists, and FAILS,
+    // before the function does" impossible to write down, which is TR-02.
+    expect: 'PASS',
+    seed: (d) => edit(d, GS_011, (b) => once(b, /^source: .*$/m, 'source: M01 R-13, R-32')),
   },
   {
     name: 'compare/safe-integer-guard',
