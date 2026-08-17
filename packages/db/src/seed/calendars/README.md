@@ -150,3 +150,23 @@ Both are needed and neither substitutes for the other. The first is provenance a
 **The per-asset-class spread is the other thing it makes concrete.** On the Monday: Equities and Interest Rates pause at 12:00, Energy and Metals at 13:30, Grains opens 19:00. F-3's rule is that `close_ct` takes the LATEST close across `ES`, `MES`, `NQ`, `MNQ`, `CL` and `GC`, and the per-group times go in `notes`.
 
 **Still needed: the holiday calendar itself**, the list of closures and early closes across the declared coverage. That is a different page of the same site (`/tools-information/holiday-calendar.html`), and until it is here the exception lists stay `null` and `generate.mjs` keeps refusing the file.
+
+## A second artifact, and it verifies the session rule against the exchange (2026-08-17)
+
+[`cme-trading-hours-2026-08-16-to-2026-08-18-all-products.retrieved-2026-08-17.xlsx`](cme-trading-hours-2026-08-16-to-2026-08-18-all-products.retrieved-2026-08-17.xlsx), SHA-256 `7120e6763e111661abb202c4c1cb1394a9e07cce90bdc4314af00d44950c801d`. The same Trading Hours tool at **per-product** granularity: 1,591 products, three days, `2026-08-16` to `2026-08-18`. **No holiday falls inside that window**, so it adds no exception row.
+
+**What it does is close a `TR-01` gap nobody had named.** `session_rule` in [`cme-2026-2028.source.json`](cme-2026-2028.source.json) carries `open_ct: 17:00`, `open_day_offset: -1`, `close_ct: 16:00`, and its `_note` cites [P1 S-E section 3.1](../../../../../docs/plans/P1-SE-trading-calendar.md) **verbatim**. That is a Merit document. `TR-01` is "every value transcribed from the named authority and never from an implementation", and until this file landed **the session rule was transcribed from our own plan rather than from CME.**
+
+All six products [ADR-042](../../../../../docs/decisions/ADR-042.md) F-3 names are in the export and **all six agree**:
+
+| | `2026-08-17`, verbatim |
+|---|---|
+| `ES`, `MES`, `NQ`, `MNQ` (CME) | `16:00 Trade Date: 2026-08-17 (CLOSED)`, `16:45 Trade Date: 2026-08-18 (PREOPEN)`, `17:00 Trade Date: 2026-08-18 (OPEN)` |
+| `CL` (NYMEX) | identical |
+| `GC` (COMEX) | identical |
+
+**Trade date `T` runs 17:00 CT on `T-1` to 16:00 CT on `T`**, which is the rule the file already stated, now stated by the exchange. The 16:00-to-16:45 gap is the maintenance break and sits outside the session on both sides, so the rule excludes it correctly rather than by luck.
+
+**F-3's latest-close rule is a no-op on an ordinary day and only bites on an early close.** All six close at 16:00 here; the spread appears on a holiday, as the Labor Day artifact above shows (Equities 12:00, Energy and Metals 13:30). Worth knowing before someone reads F-3 and expects a per-product `close_ct` on every row.
+
+**Still missing, and it is the same thing as before: the holiday LIST.** The Trading Hours tool exports a three-day window, so reaching every closure and early close in the declared coverage through it is roughly thirty separate exports. The holiday calendar is one document and it is a different page.
