@@ -85,3 +85,4 @@ must be recoverable from its own file alone.
 | [2026-08-17 - Session 49](2026-08-17-session-49.md) | the nightly batch and `state_hash`, with the replay comparison deliberately not wired |
 | [2026-08-17 - Session 49](2026-08-17-session-49.md) | the local demo: the simulator through the engine, and four things the first watched run surfaced |
 | [2026-08-17 - Session 49](2026-08-17-session-49.md) | `P2-1`: the config contract, CV-01 to CV-19, and R-17 declared (45 of 50) |
+| [2026-08-17 - Session 50](2026-08-17-session-50.md) | `P2-7`: the three merge blockers that were never written, and PT-06's three halves |
