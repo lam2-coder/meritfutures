@@ -90,7 +90,7 @@ describe('the seedbed itself', () => {
     const dir = seedbed();
     const fixture = loadFixture(yamlPath(dir), { fixtureDir: dir, registry: REGISTRY });
     expect(fixture.id).toBe('GS-011');
-    expect(fixture.input.dayMarks).toHaveLength(1);
+    expect(fixture.input.marks).toHaveLength(1);
     expect(fixture.expected.pins).toContain('never the intraday high');
   });
 });
@@ -219,16 +219,36 @@ describe('each loader rule, watched failing on its own seeded violation', () => 
     expect(refusal(dir).rule).toBe('L-10');
   });
 
-  test('L-11 a non-zero adjustment, which has nowhere to go', () => {
+  test('a non-zero adjustment now REACHES the fold, and INV-18 is what judges it', () => {
+    // L-11's refusal of this is RETIRED and its own comment predicted the day:
+    // "M01 folds settlements into the day stream and this refusal expires
+    // there". `DailyMark.adjustmentCents` is SD-01's non-trading movement and
+    // INV-18 is stated against it, so an adjustment a fixture states is now a
+    // number the engine checks rather than a number the loader refuses.
+    //
+    // THE SEEDED VIOLATION IS KEPT, POINTED AT THE RULE THAT NOW OWNS IT. The
+    // day's opening balance no longer equals `prior.balance + adjustment`, so
+    // DO-3 refuses the day. That is the engine's answer, arrived at through the
+    // loader, which is the property this suite exists to hold.
     const dir = seedbed();
     editYaml(dir, (b) => b.replace('adjustment_cents: 0', 'adjustment_cents: 5000'));
-    expect(refusal(dir).rule).toBe('L-11');
+    const fixture = loadFixture(yamlPath(dir), { fixtureDir: dir, registry: REGISTRY });
+    expect(fixture.input.marks[0]?.adjustmentCents).toBe(5_000n);
+
+    const { assertions } = runFixture(fixture);
+    expect(assertions.map((a) => a.kind)).toEqual(['opening_mismatch']);
   });
 
-  test('L-11 a settlement, which has nowhere to go either', () => {
+  test('L-11 a settlement, which the FORMAT cannot state', () => {
+    // The refusal survives and the reason moved. `DayInput.settlements` exists,
+    // so the engine is no longer what is missing; what is missing is any way for
+    // a fixture to state the five fields `SettlementFact` declares. Inventing
+    // them here would be the loader writing a fixture.
     const dir = seedbed();
     editYaml(dir, (b) => b.replace('settlements: []', 'settlements:\n  - ordinal: 1'));
-    expect(refusal(dir).rule).toBe('L-11');
+    const error = refusal(dir);
+    expect(error.rule).toBe('L-11');
+    expect(error.message).toContain('basis_trading_day');
   });
 
   test('L-13 a source citing nothing at all, which is ADR-048 case 4', () => {
@@ -272,23 +292,44 @@ describe('each loader rule, watched failing on its own seeded violation', () => 
 // -----------------------------------------------------------------------------
 
 describe('a fixture folded through the engine', () => {
-  test('reports a mismatch on every field the fixture pins and the stub does not produce', () => {
-    // This is the loader's own answer to "prove it FAILS when an expected end
-    // state does not match", taken through the real path rather than through
-    // the diff function alone: read the file, resolve the plan and the
-    // calendar, call the engine's public entry point, diff.
+  test('MATCHES, which it could not do while the fold was the identity stub', () => {
+    // This assertion used to read the other way and list five fields the stub
+    // did not produce, `floor_cents` among them, with the message "the engine
+    // result carries no floorCents". `runFixture` folded `evaluate`, which
+    // returns `{ newState: input.accountState, events: [] }`, so the thirty
+    // fixtures diffed an identity function and CI-03's end-to-end half was
+    // vacuous (ADR-038).
+    //
+    // GS-011 pins that the trailing floor does not trail on an intraday spike
+    // (R-13, R-15), and folding its one day through `advanceDay` now produces
+    // exactly the state the fixture states.
     const dir = seedbed();
+    const fixture = loadFixture(yamlPath(dir), { fixtureDir: dir, registry: REGISTRY });
+    const { diffs, assertions } = runFixture(fixture);
+
+    expect(assertions).toEqual([]);
+    expect(diffs.map(describeDiff)).toEqual([]);
+  });
+
+  test('and FAILS on a corrupted expectation, through the whole chain', () => {
+    // The half that has to survive the flip. A stage that matches is worth
+    // nothing without the paired proof that it would not have matched a wrong
+    // number, and taking it through the real path rather than through
+    // `diffEndState` alone is what makes it a statement about the loader:
+    // read the file, resolve the plan and the calendar, build the slice, fold
+    // the day stream, diff.
+    const dir = seedbed();
+    editExpectation(dir, (e) => ({
+      ...e,
+      // One cent, on the field the scenario exists to pin.
+      end_state: { ...(e['end_state'] as Record<string, unknown>), floor_cents: 4_770_001 },
+    }));
     const fixture = loadFixture(yamlPath(dir), { fixtureDir: dir, registry: REGISTRY });
     const { diffs } = runFixture(fixture);
 
-    expect(diffs.map((d) => d.field)).toEqual([
-      'phase',
-      'floor_cents',
-      'high_water_balance_cents',
-      'breached',
-      'events',
+    expect(diffs.map(describeDiff)).toEqual([
+      'floor_cents: expected 4770001, engine produced 4770000n',
     ]);
-    expect(describeDiff(diffs[1] as never)).toContain('the engine result carries no "floorCents"');
   });
 });
 

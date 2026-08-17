@@ -61,6 +61,7 @@ import {
   type Derivation,
   type Polarity,
 } from './polarity.js';
+import { describeDiff } from './compare.js';
 import { engineIsIdentityStub, runFixture } from './run.js';
 
 /**
@@ -81,6 +82,19 @@ export interface FixturePolarity {
   readonly derivation: Derivation;
   /** `true` when the stage's own outcome rule is satisfied for this fixture. */
   readonly holds: boolean;
+  /**
+   * WHY IT DID NOT HOLD, WHICH THE DERIVATION DOES NOT SAY.
+   *
+   * `derivation.because` answers "why is this fixture asserted in this
+   * direction" and the report printed it beside every failure, so a reader was
+   * told the engine declares every rule the fixture cites and nothing about the
+   * field that disagreed. While the fold was the identity that was the whole
+   * truth available; folding for real makes it a summary that names the wrong
+   * thing. Empty when the fixture holds.
+   */
+  readonly failure: readonly string[];
+  /** The day a refusal stopped the fold, or `null`. A refusal is not a field diff. */
+  readonly refusedOn: string | null;
 }
 
 /** One M01 rule group, and how far the flip has advanced through it. */
@@ -215,12 +229,27 @@ export function stageCoverage(): StageCoverage {
     declaredRules: DECLARED_RULES.size,
   });
 
-  const polarities = fixtures.map((fixture) => {
+  const polarities: FixturePolarity[] = fixtures.map((fixture) => {
     const derivation = derivePolarity(fixture.source, DECLARED_RULES);
+    const outcome = runFixture(fixture);
+    const holds =
+      derivation.polarity === 'direct' ? outcome.diffs.length === 0 : outcome.diffs.length > 0;
+
     return {
       id: fixture.id,
       derivation,
-      holds: stageAssertionHolds(fixture, derivation.polarity),
+      holds,
+      // A REFUSAL IS REPORTED AS A REFUSAL RATHER THAN AS EIGHT FIELD DIFFS. A
+      // day the fold declined to write leaves every later field at the value it
+      // had before, so the diff list reads as eight independent wrong numbers
+      // when there is one cause and it is upstream of all of them.
+      refusedOn: outcome.refusedOn,
+      failure: holds
+        ? []
+        : [
+            ...outcome.assertions.map((a) => `${a.tradingDay} ${a.kind}: ${a.detail}`),
+            ...outcome.diffs.map(describeDiff),
+          ],
     };
   });
 
@@ -366,14 +395,22 @@ export function renderStageCoverage(coverage: StageCoverage): string {
   const notHolding = polarities.filter((p) => !p.holds);
   if (notHolding.length > 0) {
     lines.push(
-      `**${notHolding.length} of ${fixtures} fixture(s) would FAIL if the derived direction were ` +
-        `enforced today**${enforced ? '' : ', which is what the ruling above defers'}:`,
-      '',
-      ...notHolding.map(
-        (p) => `- ${p.id}: derives ${p.derivation.polarity}, because ${p.derivation.because}`,
-      ),
+      enforced
+        ? `**${notHolding.length} of ${fixtures} fixture(s) FAIL, and this stage is red until ` +
+            'each is resolved.** A fixture is never edited to make it pass: a fixture edited to ' +
+            'match an engine proves only that the code agrees with itself (TR-01).'
+        : `**${notHolding.length} of ${fixtures} fixture(s) would FAIL if the derived direction ` +
+            'were enforced today**, which is what the ruling above defers:',
       '',
     );
+    for (const p of notHolding) {
+      lines.push(`- **${p.id}** derives ${p.derivation.polarity}, because ${p.derivation.because}`);
+      // THE REASON IT FAILED, NOT ONLY THE REASON IT WAS ASSERTED. Both are
+      // needed and only the second used to be printed, which told a reader the
+      // fixture's citation resolves and nothing about the number that moved.
+      for (const line of p.failure) lines.push(`  - ${line}`);
+    }
+    lines.push('');
   }
 
   lines.push(
