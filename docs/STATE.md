@@ -571,6 +571,8 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 **What approval costs, so whoever applies it can predict it.** `floor.ts` changes, its 25-line comment is the argument being overruled, the sub-step `neverRetreats('R-15', ...)` call is deleted rather than kept, and `CI-02/engine-R-15`'s seeded mutant **inverts**. **`GS-024` goes green: it is one of the six fixtures failing `CI-03`, so six becomes five**, and the count not moving is evidence the fix is incomplete.
 
+**The six-to-five prediction is checkable rather than estimated.** `GS-024` fails on **exactly one diff**, `floor_cents: expected 5010000, engine produced 5050001n`, which is the hand computation above confirmed by the engine; every other field and event in that fixture matches. The other five (`GS-020`, `GS-054`, `GS-055`, `GS-061`, `GS-064`) fail on the three causes [session 51](sessions/2026-08-17-session-51.md) named and are untouched by this ruling.
+
 **The divergence day and the 40,001.** 2026-11-03, the day `GS-024`'s close clears the 260,000c trigger by 40,001c instead of landing on it. **The odd cent is not a rounding remainder and there is no unwritten rounding decision**: it is `GS-023`'s moved cent, still in the balance on day two, and no division exists anywhere in the floor path. `CV-12` makes the two readings agree only where the balance lands on the trigger to the cent, which is `GS-015`'s and `GS-016`'s lock day and **not where any real account locks.**
 
 ### `0015`'s high-water constraint refuses to store the ordinary success case, and it is a separate ruling
