@@ -86,3 +86,4 @@ must be recoverable from its own file alone.
 | [2026-08-17 - Session 49](2026-08-17-session-49.md) | the local demo: the simulator through the engine, and four things the first watched run surfaced |
 | [2026-08-17 - Session 49](2026-08-17-session-49.md) | `P2-1`: the config contract, CV-01 to CV-19, and R-17 declared (45 of 50) |
 | [2026-08-17 - Session 50](2026-08-17-session-50.md) | the State column deleted on ADR-034's remedy, and `CI-06p` gives the letter registry its gate |
+| [2026-08-17 - Session 50](2026-08-17-session-50.md) | the fixture wiring: `L-13`, the `bigint` comparison, and the premise ADR-048 rests on |

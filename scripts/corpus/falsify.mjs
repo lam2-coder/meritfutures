@@ -1288,6 +1288,175 @@ const SCOPE_CASES = [
   },
 ];
 
+// =============================================================================
+// LOADER CASES: CI-03's engine-independent halves, watched failing
+// =============================================================================
+// Same shape as everything above -- seed the copy, run the checker in the copy
+// -- and it took one design decision in the checker to be possible at all.
+// `copyTree` omits `node_modules`, so nothing needing vitest or a workspace
+// resolution can run in a tree copy. `packages/golden-loader/check.mjs`
+// therefore imports `./src/loader.ts` and `./src/compare.ts` directly and never
+// the package barrel, which re-exports the one module importing the engine as a
+// value. It needs relative modules only, so it runs where vitest cannot.
+//
+// THAT IS WHAT LETS A CASE SEED THE RULE AS WELL AS THE DATA. A seeded fixture
+// proves the `L-nn` refusal fires. A seeded COMPARISON proves the stage would
+// notice if the comparison stopped working, which no fixture can demonstrate
+// while the polarity is inverted and every fixture is asserted to fail anyway.
+//
+// `expect` IS EITHER A SUBSTRING THE FINDING MUST CONTAIN OR THE LITERAL
+// 'PASS', exactly as in SCOPE_CASES, and no boundary appears here in one
+// direction only. A rule that refuses every fixture passes every violation case
+// below and is useless.
+
+/** The fixture the loader's own seeded-violation suite uses, for the same reason. */
+const GS_011 =
+  'packages/rules-engine/fixtures/GS-011-trailing-floor-ignores-the-intraday-high.yaml';
+
+/** The comparison, which every money assertion this stage will ever make goes through. */
+const COMPARE = 'packages/golden-loader/src/compare.ts';
+
+/** ADR-048's derivation, which decides which direction each fixture is asserted in. */
+const POLARITY = 'packages/golden-loader/src/polarity.ts';
+
+const LOADER_CASES = [
+  {
+    name: 'L-13/cites-nothing',
+    what: "a fixture whose `source:` cites no identifier at all, which is ADR-048's case 4",
+    // THE VACUITY CASE, and the reason this rule is ADR-048's stated
+    // prerequisite rather than its companion. "Every rule this fixture cites is
+    // implemented" is trivially true of a fixture citing none, so without this
+    // refusal such a fixture flips to `direct` against an engine that
+    // implements nothing and fails for a reason with nothing to do with its
+    // subject.
+    expect: 'L-13 GS-011-trailing-floor-ignores-the-intraday-high.yaml: "source" cites no',
+    seed: (d) => edit(d, GS_011, (b) => once(b, /^source: .*$/m, 'source: the floor')),
+  },
+  {
+    name: 'L-13/unresolvable',
+    what: 'a fixture citing a rule number M01 does not define',
+    expect: 'cites R-99, which M01 does not define',
+    seed: (d) => edit(d, GS_011, (b) => once(b, /^source: .*$/m, 'source: M01 R-99')),
+  },
+  {
+    name: 'L-13/out-neighbouring-identifiers',
+    what: 'a source naming ADR, RE-U and GS identifiers beside its rules, which must NOT be a finding',
+    // THE DIRECTION A NARROWED RULE GOES QUIET IN. `ADR-048` contains `R-04`
+    // and `RE-U-019` contains `R-01` as substrings, and neither is a citation.
+    // A rule matching them would resolve citations nobody made; a rule that
+    // then tightened to compensate would start refusing real fixtures. The
+    // boundary is the word break, and this asserts it from the permissive side.
+    expect: 'PASS',
+    seed: (d) =>
+      edit(d, GS_011, (b) =>
+        once(b, /^source: .*$/m, 'source: M01 R-13, R-18, per ADR-048 and RE-U-019, see GS-011'),
+      ),
+  },
+  {
+    name: 'L-13/out-invariant-only',
+    what: 'a source citing only an INV-nn, which P2 section 2 permits and must NOT be a finding',
+    // P2 section 2 rules the citation as "at least one `R-nn`, `CV-nn` or
+    // `INV-nn` that exists in M01", three prefixes rather than one. A rule
+    // narrowed to `R-nn` would be quieter, would pass both violation cases
+    // above, and would refuse a fixture the plan explicitly allows.
+    expect: 'PASS',
+    seed: (d) => edit(d, GS_011, (b) => once(b, /^source: .*$/m, 'source: M01 INV-06')),
+  },
+  {
+    name: 'compare/bigint-boundary',
+    what: 'the end-state comparison reverted to Object.is across the bigint boundary',
+    // THE MUTANT IS THE CODE THIS REPOSITORY SHIPPED UNTIL TODAY, which is what
+    // makes it worth seeding rather than a hypothetical. INV-02 makes every
+    // money field the engine returns a `bigint` and JSON has no literal for
+    // one, so `Object.is(4770000n, 4770000)` is false and EVERY money field of
+    // EVERY fixture reported a diff it should not have.
+    //
+    // IT IS INVISIBLE FROM THE FIXTURES AND STAYS INVISIBLE UNTIL THE POLARITY
+    // FLIPS, which is why this case seeds source rather than data: under
+    // inversion a fixture that must FAIL fails, so a comparison that cannot
+    // agree with anything is indistinguishable from one that works. No seeded
+    // fixture can tell those apart. A seeded comparison can.
+    expect: 'must agree when a bigint result states the same cents as an integer expectation',
+    seed: (d) =>
+      edit(d, COMPARE, (b) =>
+        once(b, 'if (bigintAgrees(got, wanted)) continue;', 'if (Object.is(got, wanted)) continue;'),
+      ),
+  },
+  {
+    name: 'compare/over-agreement',
+    what: 'a bigint comparison that agrees with everything, which is the direction the fix could go wrong in',
+    // THE CASE ABOVE ONLY PROVES THE COMPARISON CAN AGREE. A comparison that
+    // agrees with everything also passes it, and would be far worse than the
+    // defect being fixed: the old code could never assert a cent, and this one
+    // would assert every cent was right. Money moves in the second direction.
+    expect: 'must disagree on one cent below, across the type boundary',
+    seed: (d) =>
+      edit(d, COMPARE, (b) =>
+        once(
+          b,
+          'return Number.isSafeInteger(expected) && actual === BigInt(expected);',
+          'return true;',
+        ),
+      ),
+  },
+  {
+    name: 'polarity/vacuous-empty-citation',
+    what: "a citation naming no rule read as `direct`, which is ADR-048's case 4",
+    // THE ONE ADR-048 CALLS "THE DANGEROUS ONE". "Every rule this fixture cites
+    // is implemented" is vacuously true of a fixture citing none, so reading
+    // that as `direct` asserts a match against a fold that computes nothing,
+    // and the fixture then fails for a reason with nothing to do with its
+    // subject. L-13 closes the half where a fixture cites nothing M01 defines;
+    // this closes the half where it cites only a CV-nn or an INV-nn, which
+    // P2 section 2 permits and which names no rule.
+    expect: 'must never derive direct from a citation naming no rule at all',
+    seed: (d) => edit(d, POLARITY, (b) => once(b, "      polarity: 'inverted',\n      cited,\n      undeclared: [],", "      polarity: 'direct',\n      cited,\n      undeclared: [],")),
+  },
+  {
+    name: 'polarity/declaration-ignored',
+    what: 'the derivation reading an undeclared rule as implemented',
+    // ADR-048's failure mode 2 from the loader's side: a fixture whose rules
+    // the engine has NOT declared must stay `inverted`, because under inversion
+    // a match is the failure condition. A derivation that ignores the declared
+    // set flips every fixture at once, which is exactly the all-or-nothing
+    // behaviour the ruling exists to replace.
+    expect: 'must derive inverted when one cited rule is undeclared',
+    seed: (d) =>
+      edit(d, POLARITY, (b) =>
+        once(b, 'const undeclared = cited.filter((id) => !declared.has(id));', 'const undeclared = [];'),
+      ),
+  },
+  {
+    name: 'polarity/out-undeclared-rule-still-loads',
+    what: 'a fixture citing a rule the engine has not declared, which must LOAD and derive inverted',
+    // THE BOUNDARY BETWEEN L-13 AND THE DERIVATION, asserted from the side
+    // where nothing may be refused. `R-32` is defined in M01 and is not in the
+    // engine's declared set, so it is a resolvable citation of an unimplemented
+    // rule: L-13 must accept it and the derivation must read it as `inverted`.
+    // A loader that refused it would make "the fixture exists, and FAILS,
+    // before the function does" impossible to write down, which is TR-02.
+    expect: 'PASS',
+    seed: (d) => edit(d, GS_011, (b) => once(b, /^source: .*$/m, 'source: M01 R-13, R-32')),
+  },
+  {
+    name: 'compare/safe-integer-guard',
+    what: 'the guard removed, so a fractional expectation reaches BigInt() and throws',
+    // `BigInt(4770000.5)` THROWS A RangeError. Without the guard a fixture
+    // stating half a cent takes the whole stage down with an exception instead
+    // of producing a finding, and an exception is not a diff: nothing names the
+    // field, and CI-03 reports a crash where it should report a fixture defect.
+    expect: 'threw RangeError',
+    seed: (d) =>
+      edit(d, COMPARE, (b) =>
+        once(
+          b,
+          'return Number.isSafeInteger(expected) && actual === BigInt(expected);',
+          'return actual === BigInt(expected);',
+        ),
+      ),
+  },
+];
+
 // `expect` may be a string or a function of the seeded tree, because a seed that
 // derives its identifier cannot name its own finding in advance.
 const resolveExpect = (e, dir) => (typeof e === 'function' ? e(dir) : e);
@@ -1320,6 +1489,34 @@ function copyTree(dir) {
   for (const entry of readdirSync(ROOT)) {
     if (entry === '.git' || entry === 'node_modules') continue;
     cpSync(join(ROOT, entry), join(dir, entry), { recursive: true });
+  }
+}
+
+const indentAll = (text) =>
+  text
+    .split('\n')
+    .map((l) => `        ${l}`)
+    .join('\n');
+
+/**
+ * Run CI-03's engine-independent halves IN THE COPY, exactly as `runGate` runs
+ * a gate in the copy.
+ *
+ * `packages/golden-loader/check.mjs` imports `./src/loader.ts` and
+ * `./src/compare.ts` directly and never the package barrel, so it needs no
+ * workspace resolution and runs in a tree the copy step gave no `node_modules`.
+ * That is what lets a loader case seed the RULE as well as the DATA: a seeded
+ * fixture proves the rule fires, and a seeded comparison proves the comparison
+ * is the thing being relied on.
+ */
+function runLoaderCheck(dir) {
+  try {
+    const stdout = execFileSync('node', [join(dir, 'packages/golden-loader/check.mjs')], {
+      encoding: 'utf8',
+    });
+    return { pass: true, stdout };
+  } catch (err) {
+    return { pass: false, stdout: (err.stdout ?? '') + (err.stderr ?? '') };
   }
 }
 
@@ -1476,12 +1673,84 @@ function main() {
     }
   }
 
+  console.log("\nLOADER: CI-03's engine-independent halves, each seeded in the copy\n");
+
+  // THE POSITIVE CONTROL COMES FIRST AND IS ITS OWN CASE. Every violation case
+  // below is satisfied by a checker that refuses everything, so the unseeded
+  // copy must come back clean before any of them means anything.
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'merit-loader-'));
+    try {
+      copyTree(dir);
+      const { pass, stdout } = runLoaderCheck(dir);
+      if (pass) {
+        console.log('  control comes back clean  an untouched copy of the tree');
+      } else {
+        bad++;
+        console.log('  CONTROL DID NOT PASS      an untouched copy of the tree');
+        console.log(
+          '        Every violation case below is satisfied by a loader that refuses ' +
+            'everything, so they assert nothing until this loads:',
+        );
+        console.log(indentAll(stdout));
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  for (const c of LOADER_CASES) {
+    const dir = mkdtempSync(join(tmpdir(), 'merit-loader-'));
+    try {
+      copyTree(dir);
+      const stale = trySeed(c.seed, dir);
+      if (stale) {
+        bad++;
+        console.log(`  SEED IS STALE             ${c.name}  <- ${c.what}`);
+        console.log(`        ${stale}`);
+        console.log('        The harness no longer describes the loader. Fix the seed.');
+        continue;
+      }
+      const expect = resolveExpect(c.expect, dir);
+      const { pass, stdout } = runLoaderCheck(dir);
+      const findings = stdout
+        .split('\n')
+        .filter((l) => l.startsWith('       '))
+        .map((l) => l.trim());
+      if (expect === 'PASS') {
+        if (pass) {
+          console.log(`  out of scope, accepted    ${c.name}  <- ${c.what}`);
+        } else {
+          bad++;
+          console.log(`  REFUSED A VALID INPUT     ${c.name}  <- ${c.what}`);
+          for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
+        }
+      } else if (!pass && findings.some((f) => f.includes(expect))) {
+        console.log(`  found as required         ${c.name}  <- ${c.what}`);
+        console.log(`        ${findings.find((f) => f.includes(expect)).slice(0, 150)}`);
+      } else {
+        bad++;
+        console.log(
+          `  ${pass ? 'DID NOT FAIL             ' : 'FAILED OFF-TARGET        '} ${c.name}  <- ${c.what}`,
+        );
+        console.log(
+          `        Expected a finding containing "${expect}". Got ${findings.length} finding(s):`,
+        );
+        for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   console.log(
     bad === 0
-      ? `\nAll ${ids.length} gates pass clean and fail dirty, and ${SCOPE_CASES.length} scope ` +
-          `case(s) hold. Each one has now been watched doing both.`
+      ? `\nAll ${ids.length} gates pass clean and fail dirty, ${SCOPE_CASES.length} scope ` +
+          `case(s) hold, and ${LOADER_CASES.length} loader case(s) land on the side of the ` +
+          `CI-03 boundary they name. Each one has now been watched doing both.`
       : `\n${bad} problem(s). A gate that cannot be made to fail is not checking anything, and ` +
           `a gate that fails on a file outside its scope is checking the wrong thing.`,
+
   );
   return bad ? 1 : 0;
 }

@@ -406,6 +406,30 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## The fixture wiring lands, and `IMPLEMENTED_RULES` is true of the package and false of the fold (2026-08-17)
+
+**All three items the fixture-wiring session has owed since session 45 are in, in the order [ADR-048](decisions/ADR-048.md) makes a prerequisite** ([session 50](sessions/2026-08-17-session-50.md)). **`packages/rules-engine/src/` was not opened**, no fixture was authored and none regenerated.
+
+| Item | What landed |
+|---|---|
+| **`L-13`** | `source:` is a **resolvable citation**: at least one `R-nn`, `CV-nn` or `INV-nn` that M01 **defines**. The definition query is the leading table cell, not a mention anywhere in the file, because M01 discusses far more identifiers than it defines. It returns exactly `R-01` to `R-50`, `CV-01` to `CV-19`, `INV-01` to `INV-24` |
+| **The `bigint` comparison** | `diffEndState` compares a `bigint` result against an integer JSON expectation. This was **every money assertion CI-03 will ever make**, not an edge case, and `show` now renders a `bigint` with its `n` so a type mismatch stops printing two identical numbers |
+| **ADR-048's derivation** | Polarity per fixture from the rules it cites against the declared set, reported **per rule group**, with the groups read from M01's own headings rather than restated from `RuleId`'s comments |
+
+**The derivation surfaced the premise underneath it, and that is the session's real product.** `IMPLEMENTED_RULES` declares **45** rules, every one implemented with a passing `RE-U-nn`, so ADR-048's ruled cross-check is satisfied. **They are implemented in `advanceDay`, `applySettlement` and `evaluatePayout`, and CI-03 folds `evaluate`** — the scaffold placeholder that is not one of [M01 section 1.3](plans/M01-rules-engine.md)'s six functions and returns its input by reference. **A rule can therefore be implemented, unit-tested, declared, cross-checked and unreachable from the stage that derives polarity from the declaration.** ADR-048 names four ways the derivation can be wrong; this is a fifth, and it is the one this repository is in.
+
+**All 30 fixtures derive `direct` and all 30 would fail.** That is not a fixture defect and none was edited: every batch was written to cite resolvable rules, and [session 48](sessions/2026-08-17-session-48.md) recorded in its own words that its fixtures "all four derive to `direct`".
+
+> **RULED (2026-08-17, founder, mid-session). The derivation is REPORTED and not ENFORCED while that premise does not hold.** Enforcing now is CI-03 red on 31 assertions, and [STRATEGY section 1](testing/STRATEGY.md) says a permanently red required stage is worse than a smaller one nobody clicks through. What runs instead is the standing TR-02 assertion: every fixture must FAIL against a fold that computes nothing. **The two blocks are mutually exclusive and nothing is edited to move between them** — `declaration.holds` going true starts the derived assertion and stops the standing one. That is **one computed condition** over the whole directory, printed in bold in the stage's own output on every run, and no fixture can reach it, which is what separates it from the `pending` flag TR-03 forbids.
+
+**The vacuity class survives `L-13` by one prefix.** ADR-048 case 4 is closed "by a prerequisite rather than by care", and the prerequisite accepts three prefixes while polarity is derived from rules only: a fixture citing only `INV-06` satisfies `L-13`, cites no rule, and is vacuously `direct` exactly as before. Closed structurally in `derivePolarity`, where an empty cited-rule set derives `inverted`. **This is the sixth costume of the defect the ADR already lists in five, and it arrived inside the repair for the fifth.**
+
+**`falsify.mjs` can now seed CI-03, and the fix was in the checker rather than the harness.** `copyTree` omits `node_modules`, so nothing needing vitest runs in a tree copy; [`check.mjs`](../packages/golden-loader/check.mjs) imports `loader.ts`, `compare.ts` and `polarity.ts` **directly and never the barrel**, which re-exports the two modules importing the engine as a value. **That is what lets a case seed the RULE and not only the DATA**, which is why the `bigint` and polarity seeds exist at all: no seeded fixture can catch either while every fixture is asserted to fail anyway. **Ten loader cases**, each watched failing on its own finding and passing out of scope.
+
+**Next, and it is now the only thing between this stage and its own assertion:** rewire `runFixture` from `evaluate` to `resolvePlan` -> `initialState` -> `advanceDay`, at which point 30 assertions switch on with nothing edited. It needs `PLAN_CONFIG_SOURCE` widened past `plan_version_id` and `EngineInput` retired from the loader, it changes how every fixture is loaded, and **`INV-07` versus the funded reset and the floor-lock jump disagreement would both surface on the day it lands**. **STRATEGY's CI-03 row is still owed** an amendment saying what a green CI-03 means during P2, deferred rather than forgotten: the stage is about to change again.
+
+---
+
 ## P2 is unblocked: its four rulings are closed and two records are repaired (2026-08-16)
 
 **[P2](plans/P2-rules-engine.md) section 8 listed four items, each blocking `P2-1`, none an engineering call. All four are closed** ([session 40](sessions/2026-08-16-session-40.md)), and the three ADRs landed **in one commit** rather than three sessions, because three sessions each appending to `docs/decisions/` is three collisions in the registry [ADR-043](decisions/ADR-043.md) split to end.

@@ -44,29 +44,30 @@ export function runFixture(fixture: GoldenFixture): FixtureOutcome {
 }
 
 // -----------------------------------------------------------------------------
-// The polarity of the golden assertions is DERIVED, not declared
+// THE GLOBAL PROBE IS SUPERSEDED AND SURVIVES AS ONE INPUT TO A CROSS-CHECK
 // -----------------------------------------------------------------------------
-// TR-02: "Tests first on any money path. The fixture exists, and FAILS, before
-// the function does." packages/rules-engine ships the identity evaluation, so
-// every fixture here is in that window and every one of them must currently
-// fail. STRATEGY section 1 is equally clear that a permanently red required
-// stage is worse than a smaller one nobody clicks through.
+// ADR-048 retired this as the source of polarity. It was global and
+// all-or-nothing, so the moment the first rule landed the whole directory
+// flipped to `direct` at once, including fixtures for rules not yet written,
+// and M01 is fifty rules across eight groups that cannot land in one commit
+// under ADR-003. Polarity is now derived PER FIXTURE in ./polarity.ts, from the
+// rules each fixture cites against the set the engine declares.
 //
-// SO CI-03 ASSERTS THE FAILURE INSTEAD OF SUFFERING IT, and the direction is
-// read off the engine rather than set by a flag in a fixture. A per-fixture
-// `pending: true` would be the weakening TR-03 forbids: the escape hatch a
-// future session reaches for at 11pm when one scenario will not go green.
+// WHAT THE PROBE STILL DOES IS THE THING ITS OLD HEADER WARNED ABOUT. That
+// header named a case it could not cover: "an engine that returns its input
+// state by reference AND emits no event for a day that moves the floor would be
+// read as the stub". ADR-048 says the warning is "still worth a comment where
+// the new derivation lives", and it turned out to be worth more than a comment.
+// Paired with the engine's declared rule count it is a CONTRADICTION DETECTOR:
+// a fold that behaves as the identity while the engine declares rules it
+// implements means the declaration is true of the package and false of the
+// function this stage folds. `checkDeclarationAgainstFold` is where that is
+// read, and it consults no fixture, exactly as ADR-048 says a declaration check
+// should.
 //
-// Under the stub, a fixture that MATCHES is the failure, because a fixture
-// matching an engine that computes nothing is a fixture that pins nothing. When
-// M01 lands, this probe stops holding, the polarity flips, and every fixture
-// becomes a live assertion WITH NO FIXTURE EDITED AND NO FLAG REMOVED.
-//
-// WHAT THE PROBE DOES NOT COVER, stated rather than implied: an engine that
-// returns its input state by reference AND emits no event for a day that moves
-// the floor would be read as the stub. That engine is broken in a way GS-009
-// and GS-011 both fail on the moment the polarity flips, so the failure mode is
-// a loud one rather than a silent pass.
+// A PER-FIXTURE `pending: true` REMAINS THE WEAKENING TR-03 FORBIDS: the escape
+// hatch a future session reaches for at 11pm when one scenario will not go
+// green. Nothing here or in ./polarity.ts is written in a fixture at all.
 
 const PROBE_PLAN = { planVersionId: 'probe' } as unknown as PlanConfigVersion;
 const PROBE_STATE = {
@@ -76,11 +77,15 @@ const PROBE_STATE = {
 } as unknown as AccountState;
 
 /**
- * `true` while `evaluate` is still the scaffold's identity function.
+ * `true` while the folded function returns its input by reference and emits
+ * nothing, which is what `evaluate` still does.
  *
  * The probe supplies one day that closes above the opening balance, which any
  * implemented engine must react to: the trailing floor moves by R-13 and the
  * day closes by the day-outcome sequence in M01 section 3.4.
+ *
+ * NO LONGER THE POLARITY. It is one input to the declaration cross-check in
+ * ./polarity.ts and has no other caller.
  */
 export function engineIsIdentityStub(): boolean {
   const probe = evaluate({
