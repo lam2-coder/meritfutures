@@ -2,28 +2,39 @@
 // =============================================================================
 // packages/golden-loader/check.mjs
 // =============================================================================
-// THE LOADER'S LOAD HALF, AS A COMMAND, OVER ANY FIXTURE DIRECTORY.
+// CI-03's TWO ENGINE-INDEPENDENT HALVES, AS A COMMAND.
 //
 //   node packages/golden-loader/check.mjs [fixtureDir]
 //
-// IT EXISTS SO THE `L-nn` RULES CAN BE SEEDED AND WATCHED FROM OUTSIDE VITEST,
-// which is what scripts/corpus/falsify.mjs needs and could not have. That
-// harness works by copying the tree and running a checker inside the copy, and
-// the copy deliberately omits `node_modules`, so nothing that needs vitest can
-// run there at all. Pointing a checker in THIS tree at a seeded fixture
-// directory is the same experiment with the dependency the other way round: the
-// rule under test is this tree's, the data under test is the seeded copy's,
-// which is the pairing a falsification harness actually wants.
+//   1. Every fixture in the directory loads, or the `L-nn` that refused it says
+//      so by name.
+//   2. The end-state comparison agrees and disagrees where it must, ACROSS THE
+//      TYPE BOUNDARY, against hand-built states.
 //
-// ../test/loader.test.ts asserts the same rules from inside vitest and neither
-// is redundant: that file asserts the rule ID a refusal carries, and this one
-// asserts that a directory of fixtures loads clean, which is the thing CI-03
-// depends on before it compares anything.
+// IT EXISTS SO BOTH CAN BE SEEDED AND WATCHED FROM OUTSIDE VITEST, which is
+// what scripts/corpus/falsify.mjs needs. That harness copies the tree, seeds
+// one violation into the copy, and runs the checker IN THE COPY, so the thing
+// under test is the seeded code rather than this branch's. The copy
+// deliberately omits `node_modules`, so a checker that needs a workspace
+// resolution cannot run there at all.
+//
+// SO THIS FILE IMPORTS `./src/loader.ts` AND `./src/compare.ts` DIRECTLY AND
+// NEVER `./src/index.ts`, and the restraint is load bearing rather than
+// stylistic. The barrel re-exports `run.ts`, which imports `evaluate` from
+// `@merit/rules-engine` as a VALUE and is the one place this package needs the
+// workspace at all. Reaching it would make this script unrunnable in exactly
+// the tree the falsification harness builds. Everything below needs only
+// relative modules, which Node resolves and strips on its own.
+//
+// ../test/loader.test.ts and ../test/compare.test.ts assert the same two things
+// from inside vitest, and neither is redundant: those files assert the rule id
+// a refusal carries and the exact text of a rendered diff, and this one asserts
+// the properties that survive being run against a mutated copy of themselves.
 //
 // THE OUTPUT FORMAT IS SEVEN LEADING SPACES PER FINDING, matching what
 // scripts/corpus/gates.mjs prints and what falsify.mjs parses. A harness that
 // scores "it exited non-zero" as success is the defect that whole file exists
-// to refuse, so every finding here says WHICH rule refused WHICH file.
+// to refuse, so every finding here says what was expected and what happened.
 // =============================================================================
 
 import { register } from 'node:module';
@@ -38,31 +49,107 @@ import { register } from 'node:module';
 register(new URL('../../scripts/demo/ts-resolve.mjs', import.meta.url));
 
 const { FIXTURE_DIR, loadFixtureDirectory } = await import(
-  new URL('./src/index.ts', import.meta.url).href
+  new URL('./src/loader.ts', import.meta.url).href
 );
+const { diffEndState } = await import(new URL('./src/compare.ts', import.meta.url).href);
+
+const findings = [];
+const report = (message) => findings.push(message);
+
+// -----------------------------------------------------------------------------
+// 1. The directory loads
+// -----------------------------------------------------------------------------
 
 const dir = process.argv[2] ?? FIXTURE_DIR;
-
 const { fixtures, failures } = loadFixtureDirectory({ fixtureDir: dir });
 
-for (const failure of failures) {
-  process.stdout.write(`       ${failure.error.message}\n`);
-}
+for (const failure of failures) report(failure.error.message);
 
 // A DIRECTORY THAT HELD NOTHING IS A FINDING, NOT A CLEAN RUN. It is the vacuity
 // class ADR-048 names, one level up from the one L-13 closes: every assertion
-// below is satisfied by an empty directory, and "0 fixtures, 0 failures" reads
+// above is satisfied by an empty directory, and "0 fixtures, 0 failures" reads
 // as green in every summary line that will ever quote it.
 if (fixtures.length === 0 && failures.length === 0) {
-  process.stdout.write(`       no fixture loaded from ${dir}, so nothing was checked\n`);
+  report(`no fixture loaded from ${dir}, so nothing was checked`);
 }
 
-const bad = failures.length + (fixtures.length === 0 ? 1 : 0);
+// -----------------------------------------------------------------------------
+// 2. The comparison, across the type boundary money actually crosses
+// -----------------------------------------------------------------------------
+// INV-02 makes every money field the engine returns a `bigint`; JSON has no
+// literal for one, so every money field a fixture pins is a `number`. This is
+// therefore not an edge case, it is every money assertion the stage will ever
+// make, and while the polarity is inverted a defect here is INVISIBLE: a
+// fixture that must fail fails, for a reason nobody planted.
+//
+// HAND-BUILT ON BOTH SIDES, so these hold whatever the engine does today. That
+// is the same argument ../test/compare.test.ts makes for living where it does.
 
-process.stdout.write(
-  bad === 0
-    ? `${fixtures.length} fixture(s) loaded from ${dir}, 0 refused.\n`
-    : `${bad} finding(s) over ${fixtures.length} loaded fixture(s) in ${dir}.\n`,
+/** @type {(what: string, actual: object, expected: object, wanted: number) => void} */
+function expectDiffs(what, actual, expected, wanted) {
+  // A THROW IS A FINDING, NOT A CRASH. `BigInt(4770000.5)` raises a RangeError,
+  // so a comparison that lost its safe-integer guard would take the stage down
+  // with an exception rather than report a fixture defect, and an exception
+  // names no field. Catching it here turns "CI-03 crashed" into a sentence
+  // saying which comparison threw and on what.
+  let got;
+  try {
+    got = diffEndState(actual, expected).length;
+  } catch (err) {
+    report(`diffEndState ${what}: threw ${err instanceof Error ? err.name : 'a non-Error'}`);
+    return;
+  }
+  if (got !== wanted) {
+    report(`diffEndState ${what}: expected ${wanted} diff(s), got ${got}`);
+  }
+}
+
+expectDiffs(
+  'must agree when a bigint result states the same cents as an integer expectation',
+  { floorCents: 4_770_000n },
+  { floor_cents: 4_770_000 },
+  0,
+);
+expectDiffs(
+  'must disagree on one cent below, across the type boundary',
+  { floorCents: 4_770_000n },
+  { floor_cents: 4_769_999 },
+  1,
+);
+expectDiffs(
+  'must disagree on one cent above, across the type boundary',
+  { floorCents: 4_770_000n },
+  { floor_cents: 4_770_001 },
+  1,
+);
+expectDiffs(
+  'must disagree on a sign flip, which a magnitude comparison would accept',
+  { floorCents: 4_770_000n },
+  { floor_cents: -4_770_000 },
+  1,
+);
+expectDiffs(
+  'must disagree on a fractional expectation rather than throwing on BigInt()',
+  { floorCents: 4_770_000n },
+  { floor_cents: 4_770_000.5 },
+  1,
+);
+expectDiffs(
+  'must still disagree when the engine result carries no such field',
+  {},
+  { floor_cents: 4_770_000 },
+  1,
 );
 
-process.exitCode = bad ? 1 : 0;
+// -----------------------------------------------------------------------------
+
+for (const finding of findings) process.stdout.write(`       ${finding}\n`);
+
+process.stdout.write(
+  findings.length === 0
+    ? `${fixtures.length} fixture(s) loaded from ${dir}, 0 refused, and the comparison holds ` +
+        `on both sides of the bigint boundary.\n`
+    : `${findings.length} finding(s) over ${fixtures.length} loaded fixture(s) in ${dir}.\n`,
+);
+
+process.exitCode = findings.length ? 1 : 0;
