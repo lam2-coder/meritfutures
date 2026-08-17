@@ -44,6 +44,7 @@ export const RULE_ASSERTIONS = {
     'the lock engages at closing - size >= at_profit_cents, is permanent, and never lowers the trailed floor',
   'R-16': 'a static drawdown holds floor = size_cents - drawdown_cents for life',
   'R-18': 'the breach comparator is the floor AT THE OPEN, trailed strictly afterwards',
+  'R-19': 'a settlement writes NONE of the floor, the high-water balance or the lock (ADR-014)',
   'R-21': 'a floor breach is low_balance_cents < floorOpen, strict: touching survives',
   'R-22':
     'a hard daily loss limit breaches at -realized_pnl > limit, strict: exactly at it survives',
@@ -56,6 +57,25 @@ export const RULE_ASSERTIONS = {
   'R-29': 'consistency is best * 10000 <= max_bp * profit, cross multiplied, so a tie passes',
   'R-30': 'the denominator rule skips the gate unless period profit > 0, strict',
   'R-31': 'the eval pass resets the funded phase to size and carries no eval profit',
+  'R-33': 'the funded minimum-days gate is >=, and a configured zero DISABLES it (skipped)',
+  'R-34': 'the win-day gate is winDaysCount >= required_count, so exactly at it passes',
+  'R-35':
+    'withdrawable is max(0, balance - size - buffer), floored at zero, and the buffer is never in it',
+  'R-36': 'funded consistency delays eligibility and shares R-29 with the eval variant',
+  'R-37': 'the cadence gap is >= by sequence subtraction, and an unanswerable anchor refuses',
+  'R-38': 'one payout in flight, on the EXTERNAL leg only, and it binds through context',
+  'R-39': 'the minimum payout is min(withdrawable, cap) >= 10000, so exactly 100.00 is eligible',
+  'R-41': 'engineEligible is the conjunction of every engine gate, with no shortcut path',
+  'R-40': 'the context gates are account active and funded, KYC verified, not frozen, recon clear',
+  'R-42': 'the cap is the LAST schedule entry whose from_ordinal <= ordinal',
+  'R-43': 'approved is min(effective_request, cap, withdrawable), and a tie names no term',
+  'R-44': 'the split ceilings to the trader and the legs sum to approved exactly',
+  'R-45': 'the ordinal is payoutsSettledCount + 1, so a failed attempt consumes none',
+  'R-46': 'settlement advances BOTH anchors, the basis day and the wallet-credit day',
+  'R-47': 'win days and the consistency period reset to the day STRICTLY AFTER the basis day',
+  'R-48': 'the floor is untouched by settlement, which is R-19 from the settlement side',
+  'R-49': 'the ladder graduates at payoutsSettledCount >= max_payouts, >=, and emits no invitation',
+  'R-50': 'lifetime settled accumulates every approved amount, which INV-17 bounds',
 } as const satisfies Partial<Record<RuleId, string>>;
 
 /** The rules this suite claims. `implemented-rules.test.ts` compares it to the engine's. */

@@ -94,7 +94,7 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules `advanceDay` computes today. TWENTY-TWO OF FIFTY.
+ * The rules the engine computes today. FORTY-ONE OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
@@ -121,6 +121,33 @@ export type RuleId =
  *   R-29  day/consistency.ts, the cross multiplication
  *   R-30  day/consistency.ts, the denominator rule, before any arithmetic
  *   R-31  day/progression.ts, the funded reset, in the same step as the pass
+ *   R-33  payout/gates.ts, the funded minimum-days gate, skipped at zero
+ *   R-34  payout/gates.ts, the win-day gate over the anchored counter
+ *   R-35  payout/gates.ts withdrawableCents, and DO-9, which is where the two
+ *         terms it reads are final
+ *   R-36  payout/gates.ts, funded consistency, sharing R-29's function
+ *   R-37  payout/gates.ts and calendar.ts, the cadence gap by sequence
+ *         subtraction. An anchor the slice cannot answer for REFUSES the day
+ *   R-39  payout/gates.ts, min(withdrawable, cap) against the minimum payout
+ *   R-41  payout/gates.ts allGatesPass, the conjunction, listed not reduced
+ *   R-42  payout/clamp.ts capForOrdinal, the last rung at or below the ordinal
+ *   R-43  payout/clamp.ts clampPayout, the three-way min and the four reasons
+ *   R-44  payout/clamp.ts clampPayout, the ceiling to the trader
+ *   R-45  payout/clamp.ts ordinalForNextPayout, derived from settlements
+ *   R-19  payout/settle.ts, and it is discharged by an ABSENCE: the floor, the
+ *         high-water balance and the lock are the three fields settlement does
+ *         not write. RE-U-019 asserts the absence, because an absence is the one
+ *         kind of rule a reader cannot check by finding the line
+ *   R-46  payout/settle.ts, both anchors, and they are different dates
+ *   R-47  payout/settle.ts, the win-day and consistency reset at the basis day
+ *   R-48  payout/settle.ts. R-19 from the settlement's side
+ *   R-49  payout/settle.ts, the ladder, evaluated immediately after
+ *   R-50  payout/settle.ts, lifetime accounting, which INV-17 bounds
+ *   R-38  payout/evaluate.ts, the external leg's one-in-flight control. It
+ *         binds through `contextEligible` and is reported on its own field,
+ *         because API_CONTRACT's `gates` object has no in-flight entry
+ *   R-40  payout/evaluate.ts, the four context gates, read at request time and
+ *         never stored (INV-23)
  *
  * NOT DECLARED AND WORTH NAMING, because their absence is the count being
  * honest rather than the list being short.
@@ -136,11 +163,11 @@ export type RuleId =
  *         account past its own expiry with a green state row
  *   R-02  needs `sequence` subtraction over a real calendar (group A, blocked
  *         on the calendar data)
- *   R-10, R-11, R-17, R-19, R-20
- *         discharged outside the day fold: ingest, publish validation,
- *         settlement, the platform setpoint
- *   R-33 to R-50
- *         groups F, G and H
+ *   R-10, R-11, R-17, R-20
+ *         discharged outside the engine entirely: ingest, publish validation,
+ *         and the platform setpoint. R-19 LEFT THIS LIST when group H landed,
+ *         because settlement is where it is discharged and settlement is now
+ *         code
  */
 export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-03',
@@ -154,6 +181,7 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-15',
   'R-16',
   'R-18',
+  'R-19',
   'R-21',
   'R-22',
   'R-23',
@@ -165,4 +193,22 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-29',
   'R-30',
   'R-31',
+  'R-33',
+  'R-34',
+  'R-35',
+  'R-36',
+  'R-37',
+  'R-38',
+  'R-39',
+  'R-40',
+  'R-41',
+  'R-42',
+  'R-43',
+  'R-44',
+  'R-45',
+  'R-46',
+  'R-47',
+  'R-48',
+  'R-49',
+  'R-50',
 ];

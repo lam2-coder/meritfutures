@@ -182,13 +182,26 @@ export interface EngineResult {
 // WHAT IS DELIBERATELY ABSENT FROM `RuleState` BELOW, because a field the
 // engine cannot fill is worse than a field it does not declare:
 //
-//   withdrawableCents            R-35, group F, DO-9
-//   engineEligible, engineGates  R-33..R-41, group F, DO-9
 //   stateHash                    SD-08, and `hash.ts`, which replay needs and
 //                                the day fold does not
 //
-// Each lands with the rules that compute it, and widening a record nothing
+// It lands with the rules that compute it, and widening a record nothing
 // outside this package reads yet is a diff rather than a migration.
+//
+// `withdrawableCents`, `engineGates` AND `engineEligible` WERE ON THAT LIST AND
+// HAVE LANDED. R-35 arrived first and alone, ahead of the rest of group F,
+// because M01 section 3.6's `clampPayout` reads it off the state and P2 section
+// 2 sequences group G before group F. The two eligibility fields waited for
+// EVERY term of R-41's conjunction, because INV-15 is "`engine_eligible ==
+// AND(every engine gate)` with no shortcut path" and a conjunction over a subset
+// is not a weaker answer, it is a wrong one that reads as an answer.
+//
+// THE CONTEXT GATES ARE STILL ABSENT AND ALWAYS WILL BE. SD-06 splits
+// `gate_results` into `engine_gates` and `context_gates` precisely so freeze,
+// recon, KYC and in-flight never enter the replayed state: "they were true on
+// the day and may not be true now. Mixing them into the replayed state
+// guarantees nightly false divergences" (INV-23). They are combined at read time
+// by `evaluatePayout` and they are never a field here.
 
 // -----------------------------------------------------------------------------
 // The calendar, as a VALUE (ADR-049)
@@ -443,6 +456,178 @@ export type Phase = 'eval' | 'funded' | 'closed' | 'graduated';
 
 export type BreachKind = 'trailing_eod_floor' | 'static_floor' | 'hard_daily_loss_limit';
 
+// -----------------------------------------------------------------------------
+// The engine gates (R-33 to R-39), gate by gate
+// -----------------------------------------------------------------------------
+// M01 section 4: "The gate-breakdown response is A PRODUCT FEATURE, NOT DEBUG
+// OUTPUT. Competitors show a progress bar; Merit shows the whole rule, including
+// the exact amount of additional profit that would fix a consistency shortfall."
+// So every gate below carries the two numbers that made its verdict and not just
+// the verdict, and the field names are API_CONTRACT's
+// `GET /accounts/:id/eligibility` shape in this package's camel case.
+//
+// `skipped` IS NOT `!pass` AND IT IS NOT `!enabled`. CV-19 fixed the vocabulary:
+// a gate that was NOT EVALUATED reports `pass: true, skipped: true` and "must be
+// visibly disabled in the eligibility breakdown ... so no trader or support
+// agent ever sees a gate that reads as satisfied when it was never evaluated".
+
+/** R-33. `tradedDaysCount >= min_trading_days`, and 0 DISABLES the gate (CV-19). */
+export interface TradedDaysGate {
+  readonly pass: boolean;
+  /** CV-19, ADR-015: `true` on all three v1 plans, where the minimum is 0. */
+  readonly skipped: boolean;
+  readonly have: number;
+  readonly need: number;
+}
+
+/** R-34. `winDaysCount >= required_count`, counted strictly after `payoutAnchorDay`. */
+export interface WinDaysGate {
+  readonly pass: boolean;
+  readonly have: number;
+  readonly need: number;
+  /** R-09's threshold, carried so the breakdown says what counts as a win day. */
+  readonly floorCents: Cents;
+}
+
+/** R-35 in its gate form: has the balance cleared the permanent buffer. */
+export interface BufferGate {
+  readonly pass: boolean;
+  /** `balance - size`: the profit standing above the account size. */
+  readonly haveCents: Cents;
+  /** `buffer_cents`, which is permanent and never withdrawable. */
+  readonly needCents: Cents;
+}
+
+/** R-36 over the R-47 period, using R-29's arithmetic and R-30's denominator rule. */
+export interface ConsistencyGate {
+  readonly pass: boolean;
+  /** R-30. The period profit was not positive, so nothing was evaluated. */
+  readonly skipped: boolean;
+  readonly bestDayShareBp: number | null;
+  readonly maxDayShareBp: number | null;
+  /** AS-13, OQ-9: displayed AT ALL TIMES, not only when the gate fails. */
+  readonly profitNeededToDiluteCents: Cents;
+}
+
+/** R-37. Trading days strictly after `cadenceAnchorDay`, by `sequence` subtraction. */
+export interface CadenceGapGate {
+  readonly pass: boolean;
+  /** `true` when there is no anchor: the first payout has no gap to clear. */
+  readonly skipped: boolean;
+  /** `null` when skipped. Never a date difference (AS-06). */
+  readonly tradingDaysSinceLastPayout: number | null;
+  readonly need: number;
+  /**
+   * AS-06's resolved date, so the trader never does trading-day arithmetic.
+   *
+   * `null` when the gate is not waiting on anything, and `null` when the day
+   * falls outside the slice the caller loaded. A REPORTED date, never compared.
+   */
+  readonly nextEligibleTradingDay: TradingDay | null;
+}
+
+/** R-39. `min(withdrawable, cap) >= min_payout_cents`, `>=` (GS-042). */
+export interface MinimumAmountGate {
+  readonly pass: boolean;
+  readonly withdrawableCents: Cents;
+  /** R-42's rung for the ordinal this state would request at. */
+  readonly capCents: Cents;
+  /** CV-15. 10,000c, fixed, and never scaled by size. */
+  readonly minPayoutCents: Cents;
+}
+
+// -----------------------------------------------------------------------------
+// The context gates (R-38, R-40), which are NEVER part of the replayed state
+// -----------------------------------------------------------------------------
+// INV-23: "Context gates (frozen, recon, KYC, in flight) NEVER ENTER THE
+// REPLAYED STATE OR ITS HASH", and SD-06 splits `gate_results` in two for the
+// same reason: "they were true on the day and may not be true now. Mixing them
+// into the replayed state guarantees NIGHTLY FALSE DIVERGENCES."
+//
+// So nothing below appears on `RuleState`. It is computed at read time by
+// `evaluatePayout` from an `ExternalGates` the caller supplies, and it is
+// combined with the engine gates only in the returned evaluation.
+
+/** M01 section 2.1's `accounts.status` vocabulary. */
+export type AccountStatus =
+  'active' | 'breached' | 'expired' | 'closed_admin' | 'closed_chargeback' | 'graduated';
+
+/** M01 section 2.1's KYC vocabulary. D-M19-1 supplies it at read time. */
+export type KycState = 'kyc_required' | 'pending' | 'verified' | 'rejected' | 'expired';
+
+/**
+ * Context, never replayed (INV-23). Every field is resolved by the CALLER.
+ *
+ * M01 section 2.1 verbatim, and two fields carry a note that is part of the
+ * contract rather than commentary: `payoutsFrozen` is "account level OR identity
+ * level, RESOLVED BY THE CALLER", and `hasPayoutInFlight` is an outstanding
+ * external-leg withdrawal for this identity.
+ */
+export interface ExternalGates {
+  readonly accountStatus: AccountStatus;
+  readonly kycState: KycState;
+  /** Account level OR identity level, already resolved. */
+  readonly payoutsFrozen: boolean;
+  readonly reconBlocked: boolean;
+  /** R-38. An outstanding external-leg withdrawal exists for this identity. */
+  readonly hasPayoutInFlight: boolean;
+}
+
+/** R-40. Account `active` AND phase `funded`. */
+export interface AccountActiveGate {
+  readonly pass: boolean;
+  readonly status: AccountStatus;
+  /** The engine half of R-40's first clause, reported so a failure is legible. */
+  readonly phase: Phase;
+}
+
+/** R-40. D-M19-1: "KYC state is supplied as a context gate at read time." */
+export interface KycVerifiedGate {
+  readonly pass: boolean;
+  readonly state: KycState;
+}
+
+/** R-40. The engine cannot say WHICH level froze the payout, and says so. */
+export interface NotFrozenGate {
+  readonly pass: boolean;
+  readonly reason: string | null;
+}
+
+/** R-40. FM-04's `recon_blocked` excludes an account from eligibility. */
+export interface ReconClearGate {
+  readonly pass: boolean;
+}
+
+/**
+ * R-40's four gates, in API_CONTRACT's `GET /accounts/:id/eligibility` order.
+ *
+ * R-38 IS NOT ONE OF THEM AND THAT IS API_CONTRACT's SHAPE RATHER THAN AN
+ * OMISSION. See `PayoutEvaluation.noPayoutInFlight`.
+ */
+export interface ContextGateResults {
+  readonly accountActive: AccountActiveGate;
+  readonly kycVerified: KycVerifiedGate;
+  readonly notFrozen: NotFrozenGate;
+  readonly reconClear: ReconClearGate;
+}
+
+/**
+ * SD-06's `engine_gates`. Every gate R-41 conjoins, and nothing that is context.
+ *
+ * THE ORDER OF THE FIELDS IS THE ORDER `engineEligible` READS THEM, which
+ * matters because SD-08's canonical serialization hashes fields in a fixed
+ * declared order and the determinism contract bans "iteration over an object's
+ * keys where the result affects output".
+ */
+export interface EngineGateResults {
+  readonly tradedDays: TradedDaysGate;
+  readonly winDays: WinDaysGate;
+  readonly buffer: BufferGate;
+  readonly consistency: ConsistencyGate;
+  readonly cadenceGap: CadenceGapGate;
+  readonly minimumAmount: MinimumAmountGate;
+}
+
 /**
  * One row of `rule_states`: the whole fold accumulator, minus the three field
  * groups named at the top of this section.
@@ -457,6 +642,13 @@ export interface RuleState {
   readonly floorCents: Cents;
   readonly floorLocked: boolean;
   readonly highWaterBalanceCents: Cents;
+  /**
+   * R-35. `max(0, balance - size - buffer)`, and `0n` outside the funded phase.
+   *
+   * INV-05 is that this is NEVER negative, and the formula is where that is
+   * enforced rather than a check downstream of it.
+   */
+  readonly withdrawableCents: Cents;
   /** Phase scoped (R-33). */
   readonly tradedDaysCount: number;
   /** Anchor scoped (R-34, R-47). */
@@ -471,10 +663,82 @@ export interface RuleState {
   /** SD-02. Wallet-credit day of the last settled payout (R-46, ADR-019). */
   readonly cadenceAnchorDay: TradingDay | null;
   readonly lifetimeSettledCents: Cents;
+  /** SD-06. Engine gates only: context is combined at read time (INV-23). */
+  readonly engineGates: EngineGateResults;
+  /** R-41, INV-15. The conjunction of every gate above, with no shortcut path. */
+  readonly engineEligible: boolean;
   readonly breached: boolean;
   readonly breachKind: BreachKind | null;
   readonly engineVersion: string;
 }
+
+/**
+ * The engine gates plus the context gates, in API_CONTRACT's
+ * `GET /accounts/:id/eligibility` shape (M01 section 2.2).
+ *
+ * R-38 IS ABSENT AND THAT IS THE PUBLISHED SHAPE. API_CONTRACT's `gates` object
+ * carries no in-flight entry; the condition surfaces as `POST`'s `conflict`
+ * error and as the SD-09 partial unique index. `PayoutEvaluation` reports R-38's
+ * verdict on its own field so the rule still binds without widening a contract
+ * other modules render.
+ */
+export interface FullGateResults extends ContextGateResults, EngineGateResults {}
+
+/** R-43's four values, and `none` is an EXACT TIE rather than an absence. */
+export type ClampReason = 'none' | 'cap' | 'withdrawable' | 'requested';
+
+/**
+ * What `evaluatePayout` returns to both payout endpoints (M01 section 2.2).
+ *
+ * NOTHING HERE IS EVER STORED IN `rule_states`. INV-23 keeps the context half
+ * out of the replayed state, and SD-06 is the column split that enforces it. A
+ * settled payout's `eligibility_snapshot` is a serialization of this value, and
+ * INV-22 makes that snapshot append-only: "the snapshot is what was true when
+ * the money moved, and an upgrade cannot retroactively make a payment wrong."
+ */
+export interface PayoutEvaluation {
+  /** R-06. The last closed day, and never anything more recent. */
+  readonly asOfTradingDay: TradingDay;
+  readonly engineEligible: boolean;
+  readonly contextEligible: boolean;
+  /** R-41. `engineEligible && contextEligible`, with no shortcut path. */
+  readonly eligible: boolean;
+  readonly gates: FullGateResults;
+  /** R-38. Reported separately because API_CONTRACT's `gates` has no slot. */
+  readonly noPayoutInFlight: { readonly pass: boolean };
+  /** `min(withdrawable, cap)`, and `0n` when not eligible. */
+  readonly maxPayoutCents: Cents;
+  readonly capCents: Cents;
+  /** R-45. `payoutsSettledCount + 1`. */
+  readonly ordinal: number;
+  /** CV-15. Carried so a caller never re-reads config to render the floor. */
+  readonly minPayoutCents: Cents;
+  /** R-43 and R-44. The amount and its split, computed whatever the verdict. */
+  readonly clamp: {
+    readonly effectiveRequestCents: Cents;
+    readonly approvedCents: Cents;
+    readonly reason: ClampReason;
+    readonly traderCents: Cents;
+    readonly firmCents: Cents;
+    readonly splitBp: BasisPoints;
+  };
+}
+
+/**
+ * A `RuleState` with the two fields group F computes removed.
+ *
+ * NOTHING THAT COMPUTES A GATE MAY READ ONE. INV-15 is "`engine_eligible ==
+ * AND(every engine gate)` with NO SHORTCUT PATH", and the cheapest shortcut
+ * there is would be an evaluator that carried a prior row's answer forward on
+ * some branch. Taking the fields out of the parameter type makes that a compile
+ * error rather than a review note, which is the same idiom
+ * `PlanConfigVersionIsClosed` and `CalendarSliceIsData` use one file over.
+ *
+ * It is also what lets `initialState` build a state in one pass: the gates are
+ * computed from the record that does not yet carry them, so there is no
+ * placeholder gate set for a later edit to leave behind.
+ */
+export type GateInputState = Omit<RuleState, 'engineGates' | 'engineEligible'>;
 
 /**
  * Why the engine refused to compute a day.
@@ -505,8 +769,6 @@ export type AssertionKind =
   | 'day_not_a_session'
   /** ADR-049. The day is outside the slice's coverage, so the answer is UNKNOWN. */
   | 'calendar_coverage_miss'
-  /** DO-2. `applySettlement` is group H and is not written. */
-  | 'settlement_unimplemented'
   /** DO-8, R-32. `phase_eval.max_days` is set and eval expiry is not computable. */
   | 'eval_expiry_unimplemented'
   /** DO-8. The state claims the eval phase on a plan that has no eval phase. */
@@ -551,6 +813,20 @@ export interface DayClosedEvent extends EngineEvent {
   readonly winDaysCount: number;
   /** SD-07. */
   readonly consistencyPeriodStartDay: TradingDay | null;
+  /** R-35, so a consumer never recomputes a payable amount (FM-16). */
+  readonly withdrawableCents: Cents;
+  /**
+   * M01 section 5.2: `day.closed` "carries the full mark payload PLUS
+   * `gate_results`".
+   *
+   * ENGINE GATES ONLY, which is SD-06 rather than an omission: the context gates
+   * "were true on the day and may not be true now", so an event carrying them
+   * would hand every consumer a freeze state with no expiry. `engine.gate_
+   * failure_distribution` (section 9.1), which M01 calls "the most useful product
+   * metric in the system", is read off exactly this payload.
+   */
+  readonly engineGates: EngineGateResults;
+  readonly engineEligible: boolean;
 }
 
 /** DO-5. */
@@ -615,6 +891,40 @@ export interface PhasePassedEvent extends EngineEvent {
     readonly satisfied: boolean;
     readonly skipped: boolean;
   };
+}
+
+/**
+ * R-47. The win-day counter reset at settlement, anchored to the BASIS day.
+ *
+ * M01 section 5.2: the payload "carries `previous_count`, `reset_to`, and now
+ * also `anchor_trading_day`, because 'reset to zero' WITHOUT THE ANCHOR IS NOT
+ * ENOUGH TO EXPLAIN THE NEXT CYCLE".
+ */
+export interface WinDaysResetEvent extends EngineEvent {
+  readonly type: 'payout.win_days_reset';
+  readonly previousCount: number;
+  readonly resetTo: number;
+  /** The settled payout's basis day, which is what the next cycle counts from. */
+  readonly anchorTradingDay: TradingDay;
+  /** SD-07. The trading day STRICTLY after the anchor (AS-12). */
+  readonly consistencyPeriodStartDay: TradingDay;
+}
+
+/**
+ * R-49. The ladder is finished and the account closes.
+ *
+ * NO LIVE INVITATION TRAVELS WITH IT ([ADR-024](../../../docs/decisions/ADR-024.md)).
+ * R-49: "the `graduation_eligible` flag set. NO LIVE INVITATION IS EMITTED:
+ * eligibility is a review-pool flag, and invitation is a discretionary operator
+ * action taken from that pool, OUTSIDE THE ENGINE."
+ */
+export interface AccountGraduatedEvent extends EngineEvent {
+  readonly type: 'account.graduated';
+  readonly payoutsSettledCount: number;
+  /** CV-14 under ADR-030's canonical name. The rung count that was reached. */
+  readonly maxPayouts: number;
+  /** R-50. INV-17 bounds it at `ladder * max cap in the schedule`. */
+  readonly lifetimeSettledCents: Cents;
 }
 
 /**

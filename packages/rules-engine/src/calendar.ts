@@ -16,23 +16,28 @@
 //
 // WHAT IS HERE AND WHAT IS NOT
 //
-//   here    the constructor, the lookup DO-1 needs, and `nextTradingDayAfter`
-//   not     sequence-gap counting (R-37, R-02)
+//   here    the constructor, the lookup DO-1 needs, `nextTradingDayAfter`, and
+//           R-37's gap count by `sequence` subtraction
+//   not     R-02's counter advance, which is not a calendar query at all
 //
-// THE GAP COUNT BELONGS TO GROUPS A AND F, which P2 section 2 puts AFTER the
-// real calendar data lands ("There is not one calendar row in the repository").
-// Writing it now would mean writing it against no data, which is the
-// transcription-from-recollection TR-01 forbids.
+// THE GAP COUNT MOVED ACROSS THAT LINE WHEN GROUP F ARRIVED, and this header
+// used to say it belonged with the missing calendar data. That was one claim too
+// wide, and `nextTradingDayAfter` had already been moved on the narrower
+// reading: what TR-01 forbids is writing down WHICH DAYS THE EXCHANGE TRADES
+// from recollection, and neither function does that. `tradingDaysBetween`
+// subtracts two `sequence` values the caller's own slice supplied. M01 section
+// 2.1 defines `sequence` as "a DENSE index into the calendar", so the
+// difference is the count of exchange trading days in the interval whether or
+// not the slice holds every day between them, which is the entire reason the
+// field exists ("gap counting is subtraction, never date math"). A subtraction
+// is correct or incorrect against the slice's own numbering, which
+// `buildCalendarSlice` already establishes.
 //
-// `nextTradingDayAfter` MOVED ACROSS THAT LINE WHEN GROUP E ARRIVED, and the
-// distinction is worth stating because this header previously grouped it with
-// the gap count. R-02 and R-37 count trading days ACROSS A RANGE, so they need
-// a calendar that spans the range and there is no such data. This function
-// takes ONE STEP along the slice the caller already supplied, which R-31 needs
-// today ("`consistencyPeriodStartDay` = the day after the pass day") and R-47
-// will need identically. A step is correct or incorrect against the slice's own
-// ordering, which `buildCalendarSlice` already establishes, so nothing here is
-// written from recollection about which days the CME trades.
+// WHAT IS STILL BLOCKED ON THE DATA IS THE FIXTURE, NOT THE FUNCTION. P2
+// section 2 puts groups A, F and H after the calendar lands because their
+// GOLDEN FILES need "a full slice, real data"; the unit suite folds against the
+// five-session window in `test/fixtures-in-code.ts`, whose sequences start at
+// 4021 precisely so a test cannot confuse a window offset for a calendar index.
 // =============================================================================
 
 import type { CalendarDay, CalendarSlice, TradingDay } from './types.js';
@@ -169,4 +174,77 @@ export function nextTradingDayAfter(slice: CalendarSlice, tradingDay: TradingDay
   const next = slice.days[position + 1];
   if (next === undefined) return { found: false, reason: 'outside_coverage' };
   return { found: true, day: next };
+}
+
+/** A gap count, or the reason the slice could not supply one. */
+export type GapCount =
+  | { readonly found: true; readonly tradingDays: number }
+  | { readonly found: false; readonly reason: 'not_a_session' | 'outside_coverage' };
+
+/**
+ * R-37's count: trading days `d` with `afterDay < d <= throughDay`.
+ *
+ * `count = sequence(throughDay) - sequence(afterDay)`, WHICH IS THE WHOLE
+ * MECHANISM. M01 R-02: "gap counting is `calendar.sequence` subtraction, never
+ * date arithmetic", and R-37: "computed by `calendar.sequence` subtraction".
+ * AS-06 is why: five trading days is 7 calendar days in June and 9 to 10 across
+ * the year-end cluster, so any implementation that reached for a date difference
+ * would publish a rule its own traders cannot evaluate.
+ *
+ * THE SLICE NEED NOT HOLD THE DAYS BETWEEN THEM. `sequence` is a dense index
+ * into the exchange's calendar rather than a position in this window, so the
+ * difference is the true count even across a window that skipped days. That is
+ * the property `buildCalendarSlice` protects by refusing a non-monotone sequence
+ * and the one `test/fixtures-in-code.ts` protects by starting its window at 4021.
+ *
+ * BOTH ENDPOINTS MUST BE IN THE SLICE, AND A MISS IS A TYPED REFUSAL. P2
+ * section 1 rules exactly this case, because "replay will ask for the sequence
+ * of an anchor older than the slice": returning null "silently weakens R-37, a
+ * money gate", and throwing would make "the fold's behavior depend on how much
+ * calendar the caller loaded, which is a caller decision leaking into engine
+ * output". So the miss travels to `DayOutput.assertions`, no state is written
+ * for the day, and the caller is told to load more calendar.
+ *
+ * The count is NEGATIVE when `throughDay` precedes `afterDay`, and that is
+ * arithmetic rather than an error: the caller compares it against a
+ * non-negative configured gap (CV-08), so a backwards interval fails the gate
+ * instead of passing it by accident.
+ */
+export function tradingDaysBetween(
+  slice: CalendarSlice,
+  afterDay: TradingDay,
+  throughDay: TradingDay,
+): GapCount {
+  const from = lookupCalendarDay(slice, afterDay);
+  if (!from.found) return from;
+
+  const to = lookupCalendarDay(slice, throughDay);
+  if (!to.found) return to;
+
+  return { found: true, tradingDays: to.day.sequence - from.day.sequence };
+}
+
+/**
+ * The trading day carrying a given `sequence`, or `null`.
+ *
+ * IT RETURNS A NULL WHERE EVERYTHING ELSE IN THIS FILE RETURNS A TYPED MISS, and
+ * the difference is which side of ADR-049's ruling the caller sits on. That
+ * ruling governs a lookup a GATE DECISION depends on. This function serves
+ * `next_eligible_trading_day`, which API_CONTRACT already types `string | null`
+ * and which is REPORTED rather than compared: AS-06 requires the trader to be
+ * shown a resolved date instead of doing trading-day arithmetic, and a slice
+ * that stops short of that date makes the date unknown without making the gate
+ * unknown. Reporting null there is honest; letting a gate pass on a null is what
+ * P2 section 1 rejected.
+ *
+ * A LINEAR SCAN AND NOT INDEX ARITHMETIC. `slice.index` maps a DAY to a
+ * position, and a position is not a sequence: a window that skipped days would
+ * make `days[position + n]` the wrong day, silently, exactly on the holiday
+ * clusters AS-06 is about.
+ */
+export function tradingDayAtSequence(slice: CalendarSlice, sequence: number): CalendarDay | null {
+  for (const day of slice.days) {
+    if (day.sequence === sequence) return day;
+  }
+  return null;
 }

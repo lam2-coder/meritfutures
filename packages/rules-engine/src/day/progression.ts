@@ -15,11 +15,11 @@
 // R-32 REFUSES, AND THE COUNT IS THE POINT. See the block above the refusal.
 //
 // DO-8's FUNDED HALF IS NOT HERE AND IS NOT MISSING. Section 3.1: "Funded: test
-// the ladder, which can also fire here if a settlement graduated the account."
-// R-49 fires only after a settlement, `applySettlement` is group H, and DO-2
-// already refuses any day a settlement is effective on. So there is no funded
-// day this file could have anything to say about, and a funded branch here
-// would be a branch no input reaches.
+// the ladder, WHICH CAN ALSO FIRE HERE IF A SETTLEMENT GRADUATED THE ACCOUNT."
+// R-49 fires only after a settlement, so `payout/settle.ts` evaluates it inside
+// `applySettlement` at DO-2 and a graduated account returns from there. So there
+// is still no funded day this file could have anything to say about, and a
+// funded branch here would be a branch no input reaches.
 //
 // -----------------------------------------------------------------------------
 // THE PASS TEST IS STATELESS AND IS RE-EVALUATED FROM SCRATCH EVERY DAY

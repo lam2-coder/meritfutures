@@ -28,12 +28,31 @@ test('the declared set is a set, and is ordered as M01 orders the rules', () => 
   expect([...IMPLEMENTED_RULES]).toEqual([...IMPLEMENTED_RULES].sort());
 });
 
-test('the count is reported rather than implied: twenty-two of M01’s fifty rules', () => {
+test('the count is reported rather than implied: forty-one of M01’s fifty rules', () => {
   // THIS ASSERTION IS THE HONEST COUNT IN EXECUTABLE FORM. It fails when a rule
   // is added, which is the point: the session that adds one updates the number
   // here and in `src/rules.ts`'s header, and a session that added a rule without
   // noticing it had is a session that cannot land.
-  expect(IMPLEMENTED_RULES.length).toBe(22);
+  expect(IMPLEMENTED_RULES.length).toBe(41);
+});
+
+test('the nine undeclared rules are undeclared for three stated reasons', () => {
+  // THE ABSENCE IS THE COUNT BEING HONEST. Nine rules are not declared, and none
+  // of them is merely unwritten: each is blocked on data, on a document, or on a
+  // module that is not the engine. `src/rules.ts` names the reason for each.
+  const undeclared = [
+    'R-01', // group A: session containment, blocked on the calendar data
+    'R-02',
+    'R-05',
+    'R-06',
+    'R-10', // discharged outside the engine: ingest, publish validation, M2
+    'R-11',
+    'R-17',
+    'R-20',
+    'R-32', // REFUSES: elapsed trading days needs a column, so an ADR
+  ];
+  for (const rule of undeclared) expect(IMPLEMENTED_RULES).not.toContain(rule);
+  expect(IMPLEMENTED_RULES.length + undeclared.length).toBe(50);
 });
 
 test('R-32 is NOT declared, and the refusal is what makes that safe', () => {

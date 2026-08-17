@@ -77,3 +77,4 @@ must be recoverable from its own file alone.
 | [2026-08-16 - Session 46](2026-08-16-session-46.md) | the simulator's streaming mode, ADR-020's tier 2 |
 | [2026-08-16 - Session 47](2026-08-16-session-47.md) | `INV-06`'s scope tested and refuted, and two findings whose premises did not survive |
 | [2026-08-16 - Session 47](2026-08-16-session-47.md) | golden fixtures batch 3: twenty-one to twenty-five of 284, and the format's ceiling |
+| [2026-08-16 - Session 47](2026-08-16-session-47.md) | rules engine groups F, G and H: 41 of M01's 50 rules |

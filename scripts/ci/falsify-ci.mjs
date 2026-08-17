@@ -268,8 +268,7 @@ const CASES = [
     run: () =>
       seededInTree(
         {
-          [`packages/rules-engine/src/${MARK}-purity.ts`]:
-            'export const stamp = Date.now();\n',
+          [`packages/rules-engine/src/${MARK}-purity.ts`]: 'export const stamp = Date.now();\n',
         },
         () => run('pnpm', ['exec', 'eslint', `packages/rules-engine/src/${MARK}-purity.ts`]),
       ),
@@ -388,21 +387,24 @@ const CASES = [
     },
     {
       rule: 'R-22',
-      seeds: 'the hard daily-loss-limit comparator moved from `>` to `>=`, which is the spelling M01 section 3.6 pseudocode carries and R-22 rejects',
+      seeds:
+        'the hard daily-loss-limit comparator moved from `>` to `>=`, which is the spelling M01 section 3.6 pseudocode carries and R-22 rejects',
       file: 'packages/rules-engine/src/day/breach.ts',
       from: "dailyLossLimit.type === 'hard' && lossCents > dailyLossLimit.limitCents",
       to: "dailyLossLimit.type === 'hard' && lossCents >= dailyLossLimit.limitCents",
     },
     {
       rule: 'R-09',
-      seeds: 'the win-day comparator tightened from `>=` to `>`, so a day exactly at the floor stops counting',
+      seeds:
+        'the win-day comparator tightened from `>=` to `>`, so a day exactly at the floor stops counting',
       file: 'packages/rules-engine/src/day/counters.ts',
       from: 'mark.realizedPnlCents >= winDayFloorCents',
       to: 'mark.realizedPnlCents > winDayFloorCents',
     },
     {
       rule: 'R-13',
-      seeds: 'the trailing floor handed the intraday high instead of the close, which is GS-011 exactly',
+      seeds:
+        'the trailing floor handed the intraday high instead of the close, which is GS-011 exactly',
       file: 'packages/rules-engine/src/day/advance.ts',
       // The first occurrence is DO-7's call into `advanceFloor`; the later ones
       // are `balanceCents:` and the `day.closed` payload, and neither matches.
@@ -421,7 +423,8 @@ const CASES = [
       // expectation goes red, and R-14's tripwire throws INV-06 before it gets
       // there. A mutant that only one of the two catches would not have proved
       // the tripwire was strengthened.
-      seeds: "the floor lock assigning `floor_lock_floor_at_cents` instead of taking section 3.4's `max`, which lowers the floor on a day that jumps past the trigger",
+      seeds:
+        "the floor lock assigning `floor_lock_floor_at_cents` instead of taking section 3.4's `max`, which lowers the floor on a day that jumps past the trigger",
       file: 'packages/rules-engine/src/day/floor.ts',
       from:
         'floorCents =\n' +
@@ -432,45 +435,261 @@ const CASES = [
     },
     {
       rule: 'R-26',
-      seeds: 'the eval profit target tightened from `>=` to `>`, so an account exactly at its target stops passing (GS-017)',
+      seeds:
+        'the eval profit target tightened from `>=` to `>`, so an account exactly at its target stops passing (GS-017)',
       file: 'packages/rules-engine/src/day/progression.ts',
       from: 'const targetMet = profitCents >= evalRules.profitTargetCents;',
       to: 'const targetMet = profitCents > evalRules.profitTargetCents;',
     },
     {
       rule: 'R-27',
-      seeds: 'the eval minimum-trading-days gate tightened from `>=` to `>`, so an account exactly at the minimum stops passing',
+      seeds:
+        'the eval minimum-trading-days gate tightened from `>=` to `>`, so an account exactly at the minimum stops passing',
       file: 'packages/rules-engine/src/day/progression.ts',
       from: 'const daysMet = state.tradedDaysCount >= evalRules.minTradingDays;',
       to: 'const daysMet = state.tradedDaysCount > evalRules.minTradingDays;',
     },
     {
       rule: 'R-28',
-      seeds: 'the consistency deferral turned into a pass, which is the half of R-28 that gets lost: it delays, it never fails, and it must not silently allow either',
+      seeds:
+        'the consistency deferral turned into a pass, which is the half of R-28 that gets lost: it delays, it never fails, and it must not silently allow either',
       file: 'packages/rules-engine/src/day/progression.ts',
       from: 'if (!verdict.ok) {',
       to: 'if (false && !verdict.ok) {',
     },
     {
       rule: 'R-29',
-      seeds: 'the consistency comparison tightened from `<=` to `<`, so a best day exactly at the threshold stops passing (GS-023)',
+      seeds:
+        'the consistency comparison tightened from `<=` to `<`, so a best day exactly at the threshold stops passing (GS-023)',
       file: 'packages/rules-engine/src/day/consistency.ts',
       from: 'const ok = bestDayCents * 10_000n <= limitBp * periodProfitCents;',
       to: 'const ok = bestDayCents * 10_000n < limitBp * periodProfitCents;',
     },
     {
       rule: 'R-30',
-      seeds: "the denominator rule relaxed from `<= 0n` to `< 0n`, so a zero-profit period is EVALUATED instead of skipped, which is GS-021 and the near miss of FM-15's divide by zero",
+      seeds:
+        "the denominator rule relaxed from `<= 0n` to `< 0n`, so a zero-profit period is EVALUATED instead of skipped, which is GS-021 and the near miss of FM-15's divide by zero",
       file: 'packages/rules-engine/src/day/consistency.ts',
       from: 'if (periodProfitCents <= 0n) {',
       to: 'if (periodProfitCents < 0n) {',
     },
     {
       rule: 'R-31',
-      seeds: "the funded reset carrying the eval profit instead of resetting to `size_cents`, which is AS-14 written into the engine rather than arriving from the platform",
+      seeds:
+        'the funded reset carrying the eval profit instead of resetting to `size_cents`, which is AS-14 written into the engine rather than arriving from the platform',
       file: 'packages/rules-engine/src/day/progression.ts',
       from: 'balanceCents: plan.sizeCents,',
       to: 'balanceCents: mark.closingBalanceCents,',
+    },
+    {
+      rule: 'R-35',
+      // THE `max` IS THE RULE AND NOT DEFENSIVE CODE. Dropping it turns a
+      // profitable account sitting inside its buffer into a NEGATIVE
+      // withdrawable, which is INV-05 ("`withdrawable_cents >= 0` always")
+      // violated by the one expression M01 says enforces it: "Formula floors at
+      // zero (R-35)". GS-025 is exactly this input, at -10,000c.
+      seeds:
+        'the withdrawable formula stripped of its floor, so a balance inside the buffer reports a negative amount (GS-025, INV-05)',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'return surplus > 0n ? surplus : 0n;',
+      to: 'return surplus;',
+    },
+    {
+      rule: 'R-33',
+      // CV-19's zero DISABLES the gate. Reading the zero as an ordinary
+      // threshold makes it pass for the wrong reason and, worse, report
+      // `skipped: false`, so GS-080's disabled gate renders as a satisfied one
+      // on every eligibility screen in the lineup.
+      seeds:
+        'the funded minimum-days gate treating a configured zero as a threshold rather than as disabled (CV-19, GS-080)',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'const tradedDaysSkipped = funded.minTradingDays === 0;',
+      to: 'const tradedDaysSkipped = false;',
+    },
+    {
+      rule: 'R-34',
+      seeds:
+        'the win-day gate tightened from `>=` to `>`, so an account exactly at its required count stops being eligible',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'pass: state.winDaysCount >= funded.winDaysRequiredCount,',
+      to: 'pass: state.winDaysCount > funded.winDaysRequiredCount,',
+    },
+    {
+      rule: 'R-36',
+      // The funded gate reading the EVAL consistency block. On Core EOD that is
+      // `enabled: false`, so the gate would pass unconditionally and the 3000bp
+      // funded limit would stop existing, silently, on the plan that carries it.
+      seeds:
+        'funded consistency reading the EVAL consistency block, which is disabled on Core EOD and would delete the gate',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: '    funded.consistency,\n  );',
+      to: '    plan.eval?.consistency ?? funded.consistency,\n  );',
+    },
+    {
+      rule: 'R-37',
+      seeds:
+        'the cadence gap relaxed from `>=` to `>` against a count that is already a difference, so a cleared gap reads as one day short',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'const pass = counted.tradingDays >= needTradingDays;',
+      to: 'const pass = counted.tradingDays > needTradingDays;',
+    },
+    {
+      rule: 'R-38',
+      // AS-01, live. Dropping the in-flight term lets a trader fire a second and
+      // third request against a state whose reset has not happened yet: "on
+      // CORE-50K that converts one qualifying stretch into 3 x 150,000c of
+      // approved payouts, against a withdrawable that only ever supported one."
+      seeds:
+        'the one-in-flight control dropped from the context conjunction, which is AS-01 with the engine’s first line of defence removed',
+      file: 'packages/rules-engine/src/payout/evaluate.ts',
+      from: '    reconClear.pass &&\n    noPayoutInFlight.pass;',
+      to: '    reconClear.pass;',
+    },
+    {
+      rule: 'R-40',
+      // R-40 requires the account to be `active` AND the phase to be `funded`.
+      // Dropping the phase term makes an eval or graduated account context
+      // eligible, which is the half a status check alone cannot see.
+      seeds: 'the context gate losing R-40’s phase term, so a graduated account reads as payable',
+      file: 'packages/rules-engine/src/payout/evaluate.ts',
+      from: "pass: external.accountStatus === 'active' && state.phase === 'funded',",
+      to: "pass: external.accountStatus === 'active',",
+    },
+    {
+      rule: 'R-39',
+      seeds:
+        'the minimum-payout gate tightened from `>=` to `>`, so exactly 100.00 stops being eligible (GS-042, CV-15)',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: 'pass: payable >= funded.minPayoutCents,',
+      to: 'pass: payable > funded.minPayoutCents,',
+    },
+    {
+      rule: 'R-41',
+      // INV-15 is "with NO SHORTCUT PATH". Dropping one term from the
+      // conjunction is that shortcut, and the win-day gate is the term a v1
+      // plan can actually fail while every other one holds.
+      seeds:
+        'the eligibility conjunction losing its win-day term, which is INV-15’s shortcut path in one line',
+      file: 'packages/rules-engine/src/payout/gates.ts',
+      from: '    gates.winDays.pass &&\n',
+      to: '',
+    },
+    {
+      rule: 'R-42',
+      // The scan keeps the LAST matching rung. Taking the FIRST is the reading a
+      // single-rung lineup cannot distinguish: all three v1 plans carry one
+      // entry, so this mutant is invisible on every published config and changes
+      // the cap on the first plan that ladders one.
+      seeds:
+        'cap resolution taking the FIRST rung at or below the ordinal instead of the LAST, which no v1 plan can tell apart',
+      file: 'packages/rules-engine/src/payout/clamp.ts',
+      from: 'if (step.fromOrdinal <= ordinal) capCents = step.capCents;',
+      to: 'if (step.fromOrdinal <= ordinal && capCents === null) capCents = step.capCents;',
+    },
+    {
+      rule: 'R-43',
+      // INV-10 is `approved = min(effective_request, cap, withdrawable)`. Drop
+      // the cap term and a supplied amount is clamped only by the withdrawable,
+      // which is a per-request liability limit removed on the money path.
+      seeds:
+        'the clamp losing its cap term, so a supplied amount is bounded only by the withdrawable (INV-10, GS-026)',
+      file: 'packages/rules-engine/src/payout/clamp.ts',
+      from: 'const approvedCents = min(min(effectiveRequestCents, capCents), withdrawable);',
+      to: 'const approvedCents = min(effectiveRequestCents, withdrawable);',
+    },
+    {
+      rule: 'R-44',
+      // The ceiling is what makes the rounding favor the trader. Truncating
+      // moves at most one cent per payout to the firm, which is the direction
+      // R-44 forbids and the published copy denies.
+      seeds:
+        'the split truncating instead of ceiling, so the remainder cent goes to the firm (GS-029, RE-P-08)',
+      file: 'packages/rules-engine/src/payout/clamp.ts',
+      from: 'const traderCents = (approvedCents * BigInt(splitBp) + 9_999n) / 10_000n;',
+      to: 'const traderCents = (approvedCents * BigInt(splitBp)) / 10_000n;',
+    },
+    {
+      rule: 'R-45',
+      // AS-11 written into the engine: an ordinal counted from ATTEMPTS rather
+      // than settlements advances the cap schedule and the graduation counter
+      // for money that never arrived.
+      seeds:
+        'the payout ordinal counted from attempts rather than settlements, which is AS-11 and costs a ladder rung per failed transfer',
+      file: 'packages/rules-engine/src/payout/clamp.ts',
+      from: 'return state.payoutsSettledCount + 1;',
+      to: 'return state.payoutsSettledCount + 2;',
+    },
+    {
+      rule: 'R-19',
+      // ADR-014's whole ruling in one line, reinstated. A settlement that
+      // recomputes the floor under the dropped balance hands back the loss room
+      // the founder deliberately removed, and it moves the floor DOWN, which is
+      // INV-06 with no exception and no settlement carve-out.
+      seeds:
+        'a post-payout floor recompute reinstated, which ADR-014 removed and CV-18 pins to `none`',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: '    balanceCents: state.balanceCents - fact.approvedCents,',
+      to:
+        '    balanceCents: state.balanceCents - fact.approvedCents,\n' +
+        '    floorCents: state.balanceCents - fact.approvedCents - plan.funded.drawdown.drawdownCents,',
+    },
+    {
+      rule: 'R-46',
+      // SD-02: "the two anchors are genuinely different dates and conflating
+      // them is a silent liability change of 40 percent (EC-039)". On the v1
+      // lineup the two dates coincide, so this mutant is invisible on every
+      // published scenario and bites the first time settlement stops being
+      // instant.
+      seeds:
+        'the cadence anchor set from the BASIS day instead of the wallet-credit day, conflating SD-02’s two anchors (EC-039)',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: 'cadenceAnchorDay: fact.effectiveTradingDay,',
+      to: 'cadenceAnchorDay: fact.basisTradingDay,',
+    },
+    {
+      rule: 'R-47',
+      // AS-12 exactly: "if the basis day is included in the new consistency
+      // period, the very day that funded a payout counts against the next
+      // cycle ... and it looks like the consistency rule working rather than a
+      // bug."
+      seeds:
+        'the consistency period starting ON the basis day rather than strictly after it, which is AS-12’s off-by-one',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: 'consistencyPeriodStartDay: periodStart.day.tradingDay,\n\n    payoutsSettledCount:',
+      to: 'consistencyPeriodStartDay: fact.basisTradingDay,\n\n    payoutsSettledCount:',
+    },
+    {
+      rule: 'R-48',
+      // R-19's other two fields. The floor is the obvious one; the HIGH-WATER
+      // BALANCE is the one a recompute would reach for next, and dropping it to
+      // the post-payout balance would let R-13 re-trail from a lower high on
+      // every subsequent day, which lowers the floor by a route the floor's own
+      // tripwire never sees.
+      seeds:
+        'the high-water balance dropped to the post-payout balance, so R-13 re-trails from a lower high forever after',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: '    payoutsSettledCount: state.payoutsSettledCount + 1,',
+      to:
+        '    highWaterBalanceCents: state.balanceCents - fact.approvedCents,\n' +
+        '    payoutsSettledCount: state.payoutsSettledCount + 1,',
+    },
+    {
+      rule: 'R-49',
+      seeds:
+        'the ladder tightened from `>=` to `>`, so an account settles one payout past its own graduation rung',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: 'const graduated = settled.payoutsSettledCount >= plan.funded.maxPayouts;',
+      to: 'const graduated = settled.payoutsSettledCount > plan.funded.maxPayouts;',
+    },
+    {
+      rule: 'R-50',
+      // INV-17's bound is `ladder * max cap`, and a lifetime counter that does
+      // not accumulate makes RE-P-17 assert nothing at all.
+      seeds:
+        'lifetime settled failing to accumulate, which is the counter INV-17’s liability bound is asserted against',
+      file: 'packages/rules-engine/src/payout/settle.ts',
+      from: 'lifetimeSettledCents: state.lifetimeSettledCents + fact.approvedCents,',
+      to: 'lifetimeSettledCents: fact.approvedCents,',
     },
   ].map(({ rule, seeds, file, from, to }) => ({
     id: `CI-02/engine-${rule}`,
@@ -642,9 +861,14 @@ const CASES = [
           2,
         )}\n`,
       );
-      const resolved = run('pnpm', ['install', '--lockfile-only', '--ignore-scripts'], { cwd: dir });
+      const resolved = run('pnpm', ['install', '--lockfile-only', '--ignore-scripts'], {
+        cwd: dir,
+      });
       if (resolved.status !== 0) {
-        return { status: resolved.status, output: `pnpm could not resolve the seed\n${resolved.output}` };
+        return {
+          status: resolved.status,
+          output: `pnpm could not resolve the seed\n${resolved.output}`,
+        };
       }
       return run('pnpm', ['audit', '--audit-level=moderate'], { cwd: dir });
     },
