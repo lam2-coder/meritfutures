@@ -76,6 +76,7 @@ import type {
   TradingDay,
 } from '../src/index.js';
 import {
+  ACCOUNT_OPENED_ON,
   CORE_50K,
   ENGINE_VERSION,
   MERIT_RAPID_50K,
@@ -315,6 +316,7 @@ function fold(plan: ResolvedPlan, seq: DaySequence, withSettlements: boolean): F
       mark,
       calendar,
       settlements: settlement === null ? [] : [settlement],
+      openedOn: ACCOUNT_OPENED_ON,
     });
 
     if (out.assertions.length > 0) {

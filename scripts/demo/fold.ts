@@ -64,7 +64,7 @@ import type {
   SimSession,
 } from '../../packages/rithmic/src/index.js';
 import { simulate } from '../../packages/rithmic/src/index.js';
-import { toCalendarSlice, toDailyMark } from './bridge.js';
+import { asTradingDay, toCalendarSlice, toDailyMark } from './bridge.js';
 import type { Cohort } from './config.js';
 
 /**
@@ -152,6 +152,17 @@ export function foldAccount(input: FoldInput): AccountRun {
   const { seed, plan, sessions, specs, sequenceBase, cohort, account } = input;
   const calendar = toCalendarSlice(sessions, sequenceBase);
 
+  // R-32's anchor (ADR-051), which for the demo is the first session it folds.
+  // The demo's accounts start trading on day one of the run, and ADR-051 defines
+  // `opened_on` as the first TRADEABLE day, so the two coincide here by
+  // construction rather than by assumption. Nothing in the demo lineup sets
+  // `phase_eval.max_days`, so R-32 never reads it; it is supplied because the
+  // field is required, and it is required so that it cannot be forgotten
+  // somewhere it WOULD be read.
+  const firstSession = sessions[0];
+  if (firstSession === undefined) throw new Error('the demo fold needs at least one session');
+  const openedOn = asTradingDay(firstSession.tradingDay);
+
   const rows: DayRow[] = [];
   let prior: RuleState | null = null;
   let firstEligibleDay: string | null = null;
@@ -186,6 +197,7 @@ export function foldAccount(input: FoldInput): AccountRun {
         mark,
         calendar,
         settlements: [],
+        openedOn,
       });
 
       const refused = output.assertions.length > 0;

@@ -134,6 +134,10 @@ const accountDay = (accountId: string, overrides: Partial<AccountDay> = {}): Acc
   mark: DAY_ONE,
   settlements: [],
   external: CLEAR,
+  // R-32's anchor (ADR-051). No plan in this file sets `phase_eval.max_days`,
+  // so the rule never reads it; it is required so it cannot go missing where it
+  // WOULD be read.
+  openedOn: DAY_ONE.tradingDay,
   ...overrides,
 });
 

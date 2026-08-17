@@ -603,7 +603,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 | `R-05` | `trading_calendar`'s session instants, and [`0032`](../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql) | **No.** `CalendarDay` carries neither column |
 | `R-11` | The caller's `superseded_by is null`, **and replay recomputing forward** | **YES**, by writing `replay.ts`. It is the only one |
 | `R-20` | M02's setpoint push (`DEP-M2-03`) | **No.** The engine performs no I/O |
-| `R-32` | **Nothing.** The refusal is implemented; the anchor and the column are unruled | **No.** Two founder rulings |
+| ~~`R-32`~~ | ~~**Nothing.** The refusal is implemented; the anchor and the column are unruled~~ | **DECLARED by [session 51](sessions/2026-08-17-session-51.md)**, on `ADR-051` |
 
 **AN UNDECLARED COUNT IS NOT A WORK QUEUE.** The brief said to start at the first titled-but-undeclared rule and work forward; that is `R-01`, and working forward from it produces no code for four consecutive rules. Six undeclared rules were **two units of available work and four statements about other layers**, and the two needed different unwritten files, which under [ADR-003](decisions/ADR-003.md) is two sessions.
 
@@ -683,7 +683,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 | `R-11` | The caller's `superseded_by is null`, and replay recomputing forward | `CI-01/engine-R-11` |
 | `R-17` | `DrawdownType`'s closed union today; `CV-01` at publish once `validatePlan` exists | `CI-01/engine-R-17` |
 | `R-20` | M02's setpoint push (`DEP-M2-03`). The engine owes the number, not the push | `CI-02/engine-R-20` |
-| `R-32` | **Nothing.** The refusal is implemented; the **anchor** and **which column binds** are unruled | `CI-02/engine-R-32` |
+| ~~`R-32`~~ | **DECLARED by [session 51](sessions/2026-08-17-session-51.md).** `ADR-051` ruled the anchor and the column; the mutant now aims at the **fencepost** rather than at the refusal | `CI-02/engine-R-32` |
 
 **Four of the eight new mutants are in the TYPECHECK stage, which is a shape `falsify-ci.mjs` did not previously have.** The three absence tests were written as `Object.keys` checks first and **that version was worth nothing**: `Object.keys` reads what the fixture constructed, so a `supersededBy` added to `DailyMark` and left unset by `mark()` passes it silently, which is precisely the change `R-11` exists to notice. All three are now compile-time, in `PlanConfigVersionIsClosed`'s idiom, **and that rewrite is what made a mutant possible for any of them**. `R-17` is the same story from the other direction: vitest runs transpiled code, so its `@ts-expect-error` is unevaluable there by construction.
 
@@ -692,6 +692,10 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 **`CI-03`'s polarity is still untouched**, for the fifth session running, and `IMPLEMENTED_RULES` at 44 is what the fixture-wiring session will read when ADR-048's prerequisite lands.
 
 > **AMENDED by [session 49](sessions/2026-08-17-session-49.md). `IMPLEMENTED_RULES` is 45.** `R-17` left the table above when `validatePlan` was written: its row is "rejected at publish by `CV-01`" and M01 section 1.3 puts `plan/validate.ts` inside this package, so "discharged outside the engine entirely" was the same unchecked step this section is about, taken a fourth time. **The remaining five are `R-01`, `R-05`, `R-11`, `R-20` and `R-32`, and only `R-11` is reachable by an engineering session.**
+
+> **AMENDED AGAIN by [session 51](sessions/2026-08-17-session-51.md). `IMPLEMENTED_RULES` is 46, and `RE-U-032` is no longer short of section 8.4's sentence.** `ADR-051` ruled both blockers: the anchor is `accounts.opened_on`, meaning the first **tradeable** day, and `phase_eval.max_days` binds while `accounts.expires_on` is derived and is never an input. `R-32` computes, and the paragraph above about the test asserting only a **refusal** is withdrawn: it now folds the operator on both sides of the boundary.
+>
+> **The fencepost was left unruled on purpose and this session settled it: the opening day is elapsed day 1**, so `max_days` is the number of trading days the account may trade. That is pinned by `RE-U-032`'s boundary pair and by a `falsify-ci.mjs` seed watched failing on it, not by prose. **The remaining four are `R-01`, `R-05`, `R-11` and `R-20`, none of them blocked on a founder ruling**, and `R-11` is still the only one an engineering session can reach.
 
 ---
 
@@ -757,12 +761,14 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 | **DO-4, DO-5** breach | Implemented: R-21 strict `<`, R-22 strict `>`, R-23's fact, R-24, R-25 |
 | **DO-6** counters | Implemented: R-08, R-09 with R-04's halted clause, the consistency accumulators |
 | **DO-7** floor | Implemented: R-13 or R-16, then R-15, then R-14's `INV-06` tripwire |
-| **DO-8** progression | **Implemented for the eval half**: R-26, R-27, R-28's deferral, R-29, R-30, R-31's funded reset. **R-32 REFUSES.** The funded half is R-49's ladder, which fires only after a settlement, so DO-2's refusal already covers every day that could reach it |
+| **DO-8** progression | **Implemented for the eval half**: R-26, R-27, R-28's deferral, R-29, R-30, R-31's funded reset, and ~~**R-32 REFUSES**~~ **R-32 as of [session 51](sessions/2026-08-17-session-51.md)**, computed on `ADR-051`. The funded half is R-49's ladder, which fires only after a settlement, so DO-2's refusal already covers every day that could reach it |
 | **DO-9** gates | ~~**The engine gates are NOT evaluated**~~ **IMPLEMENTED** as of session 47: R-33 to R-37, R-39 and R-41's conjunction, and `day.closed` now carries `gate_results`. `stateHash` (`SD-08`) is still absent and belongs to `hash.ts` |
 
 **A refusal is not a skip, and that distinction is the fold's main structural claim.** Each unimplemented step returns a typed `AssertionFailure` naming the group behind it, which means no state is written for the day and the caller raises reconciliation. A fold that quietly omitted a settlement would return a balance 150,000c too high and pay a second time against it; refusing is `FM-05`'s idiom applied to an unfinished engine rather than to a bad vendor row.
 
 **R-32 is the clearest case of it, and it is the one worth reading.** "Elapsed trading days `>` `phase_eval.max_days` expires the account", and **elapsed trading days is not derivable from `RuleState`**: M01 section 2.2's record carries no account-open day, and `tradedDaysCount` counts days *with fills*, which R-08 makes a different quantity. Giving the record that field is a column on `rule_states`, so it is a **schema delta and an ADR rather than a diff**, and `SD-01` to `SD-10` do not contain it. `max_days` is `null` on all three v1 plans, so nothing in the lineup reaches it; a plan that set it now **refuses the day** rather than folding it and expiring nothing, which would trade an account past its own expiry with a green state row.
+
+> **CLOSED by [session 51](sessions/2026-08-17-session-51.md).** The refusal is deleted and R-32 computes. The "schema delta" half of the paragraph above was already withdrawn by [session 47](sessions/2026-08-16-session-47.md); what remained were the anchor and the binding column, and `ADR-051` ruled both. The field landed on **`DayInput`**, as session 47 predicted, and **no migration was written: `0037` is still free.**
 
 **The declared set is `IMPLEMENTED_RULES`, exported, and it is ADR-048's engine half arriving without ADR-048's flip.** CI-03's polarity is **unchanged**: `engineIsIdentityStub()` still governs, every fixture is still asserted to fail, and the derivation waits on the resolvable-citation `L-nn` rule ADR-048 names as its prerequisite. **Eleven of the twenty-two were watched failing on a mutant of themselves** (R-09, R-13, R-15, R-21, R-22, R-26 to R-31), and **session 47 took that to twenty-eight of forty-one**: every rule it declared arrived with its own seeded mutant in [`falsify-ci.mjs`](../scripts/ci/falsify-ci.mjs), because a test that still passes when its operator is flipped is a test asserting nothing, and ADR-048's polarity rests on that series being real.
 
@@ -833,6 +839,10 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 **So what R-32 needs is one field on `DayInput`, which is an amendment to M01 section 2.1 and not a migration.** Still an ADR, because `DayInput` is specified in a frozen document, and still the founder's. **But no `rule_states` column, no `SD-nn`, and deliberately no migration number reserved**: a number reserved against a migration that should not be written is worse than no number, because a migration is sacred once merged and can only be superseded (constitution E2). **`0037` remains free.**
 
 **Two things are genuinely unruled and the refusal now stands on them rather than on the schema.** First the **anchor**: R-32 and `G-EXPIRED` both say "elapsed trading days" and **neither names the day they elapse from**, and an account sits in `provisioning_pending` before it is `active`, so a clock anchored at `opened_on` can burn days the trader could not trade. Second **which column binds**: R-32 and `G-EXPIRED` describe a **count** against `max_days`, `accounts.expires_on` is a stored **date** for the same fact, and the corpus does not say which is authoritative.
+
+> **BOTH RULED by `ADR-051`, and implemented in [session 51](sessions/2026-08-17-session-51.md).** The **anchor** is `accounts.opened_on`, and the burned-days objection was answered by fixing what the column MEANS rather than by adding one: it is the first **tradeable** day, set at `G-PROVISIONED` and never at `purchase.paid`, so provisioning latency is never charged to the trader. **`phase_eval.max_days` binds** and `accounts.expires_on` is a derived materialisation that is never an input, on four facts on the tree: it has no writer anywhere in the repository, it is mutable where `max_days` is immutable on a published version, `INV-04`'s byte-identical replay cannot reproduce an edited date, and the engine already has `max_days` through `ResolvedPlan`.
+>
+> **The prediction above held exactly**: the field landed on `DayInput`, **no `rule_states` column, no `SD-nn`, no migration, and `0037` is still free.** What `ADR-051` deliberately did **not** rule was the fencepost, and session 51 settled it with an executable pin rather than a sentence: **the opening day is elapsed day 1**, so `max_days` is the number of trading days the account may trade.
 
 ---
 

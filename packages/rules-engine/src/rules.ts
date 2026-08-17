@@ -141,6 +141,14 @@ export type RuleId =
  *   R-29  day/consistency.ts, the cross multiplication
  *   R-30  day/consistency.ts, the denominator rule, before any arithmetic
  *   R-31  day/progression.ts, the funded reset, in the same step as the pass
+ *   R-32  day/progression.ts, eval expiry. DECLARED SINCE ADR-051, which ruled
+ *         the anchor (`accounts.opened_on`, the first TRADEABLE day) and the
+ *         column that binds (`phase_eval.max_days`; `accounts.expires_on` is
+ *         derived and is never an input). It counts by `sequence` subtraction
+ *         from `DayInput.openedOn`, the M01 section 2.1 amendment. THE
+ *         FENCEPOST WAS THIS SESSION'S AND IS PINNED BY `RE-U-032` RATHER THAN
+ *         BY PROSE: the opening day is elapsed day 1, so `max_days` is the
+ *         number of trading days the account may trade
  *   R-33  payout/gates.ts, the funded minimum-days gate, skipped at zero
  *   R-34  payout/gates.ts, the win-day gate over the anchored counter
  *   R-35  payout/gates.ts withdrawableCents, and DO-9, which is where the two
@@ -172,22 +180,6 @@ export type RuleId =
  * NOT DECLARED AND WORTH NAMING, because their absence is the count being
  * honest rather than the list being short.
  *
- *   R-32  REFUSES rather than being absent, and it is the one worth reading.
- *         "Elapsed trading days `>` the limit expires the account", and elapsed
- *         trading days is NOT DERIVABLE from `RuleState`: M01 section 2.2's
- *         record carries no account-open day, and `tradedDaysCount` counts days
- *         with fills, which R-08 makes a different quantity. WHAT IS BLOCKED IS
- *         NOT THE SCHEMA. The datum is stored twice already, on
- *         `accounts.opened_on` and `accounts.expires_on`, and M01 section 1.3
- *         hands the open day to `initialState` and then drops it, so R-32 needs
- *         one field on `DayInput` and an M01 section 2.1 amendment rather than a
- *         `rule_states` column. Two things are genuinely unruled and both are
- *         the founder's: the ANCHOR the days elapse from, which neither R-32 nor
- *         `G-EXPIRED` names while an account sits `provisioning_pending`, and
- *         WHICH COLUMN BINDS, a count against `max_days` or the stored
- *         `expires_on` date. `max_days` is null on all three v1 plans; a plan
- *         that set it makes the day refuse, because folding it would trade an
- *         account past its own expiry with a green state row
  *   R-01, R-05
  *         discharged by `trading_calendar` and the ingest path, and NEITHER IS
  *         WAITING ON THE CALENDAR TRANSCRIPTION, which is where this list filed
@@ -240,6 +232,7 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-29',
   'R-30',
   'R-31',
+  'R-32',
   'R-33',
   'R-34',
   'R-35',

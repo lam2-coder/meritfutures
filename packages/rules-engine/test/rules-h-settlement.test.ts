@@ -16,6 +16,7 @@ import { advanceDay } from '../src/day/advance.js';
 import { applySettlement } from '../src/payout/settle.js';
 import type { Cents, DayOutput, RuleState, SettlementFact, TradingDay } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -337,6 +338,7 @@ function fold(prior: RuleState, settlements: readonly SettlementFact[]): DayOutp
     }),
     calendar: CME_WINDOW,
     settlements,
+    openedOn: ACCOUNT_OPENED_ON,
   });
 }
 

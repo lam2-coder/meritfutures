@@ -266,6 +266,23 @@ export function withoutFloorLock(plan: ResolvedPlan): ResolvedPlan {
 }
 
 /**
+ * `accounts.opened_on` for every fold in this suite: `CME_WINDOW`'s first day.
+ *
+ * R-32'S ANCHOR (ADR-051), AND IT IS INERT IN ALMOST EVERY TEST THAT PASSES IT.
+ * The rule reads this only when `phase_eval.max_days` is not null, and no v1
+ * plan configures one, so on every other fold the value is carried and never
+ * looked up. It is stated once here rather than defaulted inside `advanceDay`,
+ * because a default anchor living in the engine is an engine that invents the
+ * day an account opened when a caller forgets to say.
+ *
+ * IT IS THE FIRST DAY OF THE WINDOW ON PURPOSE. `RE-U-032` counts forward from
+ * it, so an anchor in the middle would leave the boundary pair fewer days than
+ * the slice actually holds and make the fixture's arithmetic depend on where the
+ * constant happened to sit.
+ */
+export const ACCOUNT_OPENED_ON: TradingDay = day('2026-11-02');
+
+/**
  * The fixture calendar's five sessions, in code.
  *
  * `fixtures/calendars/cme-2026.json` is `status: partial` and holds exactly

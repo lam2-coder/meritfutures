@@ -29,6 +29,7 @@ import { advanceDay } from '../src/day/advance.js';
 import { isTradedDay, isWinDay } from '../src/day/counters.js';
 import type { CalendarDay, DailyMark, DayOutput } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -74,6 +75,7 @@ function foldRaw(fields: {
     },
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
 }
 
@@ -185,6 +187,7 @@ test(reU('R-08'), () => {
     }),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
   expect(out.state.tradedDaysCount).toBe(4);
   expect(out.state.winDaysCount).toBe(2);
@@ -248,6 +251,7 @@ test(reU('R-10'), () => {
     }),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
   expect(atTheOpen.assertions).toEqual([]);
   expect(atTheOpen.state.balanceCents).toBe(4_870_000n);
@@ -345,6 +349,7 @@ test(reU('R-11'), () => {
     }),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
   expect(correction.assertions.map((a) => a.kind)).toEqual(['not_forward']);
   expect(correction.state.balanceCents).toBe(5_020_000n);

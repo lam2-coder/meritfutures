@@ -17,6 +17,7 @@ import { buildCalendarSlice } from '../src/calendar.js';
 import { advanceDay, initialState } from '../src/day/advance.js';
 import type { DayClosedEvent, SettlementFact } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -39,6 +40,7 @@ function fold(overrides: Partial<Parameters<typeof advanceDay>[0]> = {}) {
     mark: mark(A_DAY),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
     ...overrides,
   });
 }

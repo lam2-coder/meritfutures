@@ -74,7 +74,7 @@ export const RULE_ASSERTIONS = {
   'R-30': 'the denominator rule skips the gate unless period profit > 0, strict',
   'R-31': 'the eval pass resets the funded phase to size and carries no eval profit',
   'R-32':
-    'a plan that sets `max_days` REFUSES the day, because the anchor and the authoritative column are unruled',
+    'elapsed trading days `>` max_days expires the account, counted from `opened_on` by sequence subtraction, and the opening day is elapsed day 1 (ADR-051)',
   'R-33': 'the funded minimum-days gate is >=, and a configured zero DISABLES it (skipped)',
   'R-34': 'the win-day gate is winDaysCount >= required_count, so exactly at it passes',
   'R-35':
@@ -124,8 +124,6 @@ export const DISCHARGED_ELSEWHERE = {
     '`trading_calendar.session_open_at` and `session_close_at`, and `0032`’s constraints over them. `CalendarDay` carries neither column, so the timezone conversion R-05 forbids is unwritable here rather than merely unwritten',
   'R-11':
     'the caller’s `superseded_by is null` predicate, and replay recomputing forward. `DailyMark` carries no supersession field, so there is no branch a superseded mark could take and no check the engine could add without a new column',
-  'R-32':
-    'nothing, and that is the finding rather than the blocker. The refusal is implemented and asserted; what is unruled is R-32’s ANCHOR (neither it nor `G-EXPIRED` names the day the trading days elapse from) and WHICH COLUMN BINDS (a count against `max_days`, or the stored `accounts.expires_on` date). Both are founder rulings',
   'R-20':
     'M02’s setpoint push (`DEP-M2-03`), and the engine performs no I/O. What it owes is the number, and `day.closed.floorCents` is the state’s own floor on every day, quiet ones included',
 } as const satisfies Partial<Record<RuleId, string>>;

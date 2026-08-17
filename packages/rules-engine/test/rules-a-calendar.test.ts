@@ -37,6 +37,7 @@ import { tradingDaysBetween } from '../src/calendar.js';
 import { advanceDay } from '../src/day/advance.js';
 import type { CalendarDay, DailyMark, DayOutput, RuleState } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -65,6 +66,7 @@ function foldOn(calendar: typeof CME_WINDOW, prior: RuleState = fundedPrior(CORE
     mark: mark(WIN_DAY),
     calendar,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
 }
 
@@ -146,6 +148,7 @@ test(reU('R-02'), () => {
     mark: mark({ ...WIN_DAY, tradingDay: day('2026-11-04') }),
     calendar: GAPPED_SLICE,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
   expect(onASession.assertions).toEqual([]);
   expect(onASession.state.tradedDaysCount).toBe(2);
@@ -157,6 +160,7 @@ test(reU('R-02'), () => {
     mark: mark({ ...WIN_DAY, tradingDay: day('2026-11-03') }),
     calendar: GAPPED_SLICE,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
   expect(onANonSession.assertions.map((a) => a.kind)).toEqual(['day_not_a_session']);
   // NO COUNTER MOVED, which is the half of "counters advance only on trading
@@ -197,6 +201,7 @@ test(reU('R-02'), () => {
     }),
     calendar: GAPPED_SLICE,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
   expect(idle.assertions).toEqual([]);
   // The day closed and the state row exists: the trading day elapsed.
@@ -308,6 +313,7 @@ test(reU('R-06'), () => {
       mark: mark({ ...WIN_DAY, tradingDay: day(tradingDay) }),
       calendar: CME_WINDOW,
       settlements: [],
+      openedOn: ACCOUNT_OPENED_ON,
     });
 
   const forward = fold('2026-11-04');

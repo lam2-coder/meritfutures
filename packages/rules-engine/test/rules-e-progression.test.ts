@@ -36,11 +36,14 @@ import type {
   PhasePassedEvent,
   ResolvedPlan,
   RuleState,
+  TradingDay,
 } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
+  GAPPED_SLICE,
   MERIT_RAPID_50K,
   bp,
   day,
@@ -64,6 +67,7 @@ function fold(
     mark: mark(fields),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
 }
 
@@ -521,42 +525,183 @@ test(reU('R-31'), () => {
 // `src/rules.ts` states the count and these are what make it checkable rather
 // than merely asserted.
 
+/** One eval day folded against a nominated calendar and anchor. R-32's shape. */
+function foldFrom(
+  plan: ResolvedPlan,
+  openedOn: TradingDay,
+  fields: Parameters<typeof mark>[0],
+  calendar = CME_WINDOW,
+): DayOutput {
+  return advanceDay({
+    engineVersion: ENGINE_VERSION,
+    plan,
+    prior: evalPrior(plan, { tradingDay: openedOn }),
+    mark: mark(fields),
+    calendar,
+    settlements: [],
+    openedOn,
+  });
+}
+
 test(reU('R-32'), () => {
-  // THE BOUNDARY IS `max_days` ITSELF, AND BOTH SIDES ARE HERE. The same account,
-  // the same mark and the same calendar; the only thing that varies is whether
-  // the plan configures an expiry at all.
+  // =========================================================================
+  // THE FENCEPOST, AND THIS TEST IS THE RULING RATHER THAN A CHECK OF ONE
+  // =========================================================================
+  // ADR-051 closed R-32's anchor (`accounts.opened_on`) and its authoritative
+  // column (`phase_eval.max_days`) and DELIBERATELY LEFT THE OFF-BY-ONE OPEN:
+  // "whether the opening day is elapsed day 0 or day 1 is an off-by-one on a
+  // money path, and this corpus has ruled repeatedly that the way to settle one
+  // is an executable pin ... the fixture is the answer."
+  //
+  // THE READING TAKEN IS THAT THE OPENING DAY IS ELAPSED DAY 1, so `max_days` is
+  // THE NUMBER OF TRADING DAYS THE ACCOUNT MAY TRADE. The alternative grants an
+  // account N+1 days on a limit of N, which no plan author can predict from the
+  // number they typed. The pair below is what makes that binding: a session that
+  // changes the engine's `+ 1` fails HERE, by name, rather than somewhere a
+  // reader has to reconstruct the intent.
+  //
+  // The window is `CME_WINDOW`: 2026-11-02..06, sequences 4021..4025, five
+  // consecutive sessions. The anchor is its first day.
   const fields = {
-    tradingDay: day('2026-11-03'),
     openingBalanceCents: 5_000_000n,
     realizedPnlCents: 20_000n,
   } as const;
 
-  // SIDE ONE: `null`, which is every v1 plan (Appendix A). The day folds.
-  expect(CORE_50K.eval?.maxDays).toBeNull();
-  const unconfigured = fold(CORE_50K, fields);
-  expect(unconfigured.assertions).toEqual([]);
-  expect(unconfigured.state.tradingDay).toBe('2026-11-03');
-
-  // SIDE TWO: any value at all. The day REFUSES, and it refuses on the presence
-  // of the config rather than on a comparison against it, which is the honest
-  // shape while the count itself is unruled. A plan that set it would otherwise
-  // fold every day and expire nothing, trading an account past its own expiry
-  // with a green state row.
+  // -------------------------------------------------------------------------
+  // SIDE ONE: EXACTLY REACHED. `max_days = 3`, the THIRD trading day, folds.
+  // -------------------------------------------------------------------------
+  //   opened_on   2026-11-02  sequence 4021  elapsed 1
+  //               2026-11-03  sequence 4022  elapsed 2
+  //   the mark    2026-11-04  sequence 4023  elapsed 3
   //
-  // 30 and 1 are both configs `validatePlan` would accept, and BOTH REFUSE,
-  // which is what distinguishes "the rule is unimplemented" from "the rule is
-  // implemented and this account has not expired yet". A reader who saw only the
-  // 30 case could believe the latter.
-  for (const maxDays of [30, 1]) {
-    const out = fold(withEvalMaxDays(CORE_50K, maxDays), fields);
-    expect(out.assertions.map((a) => a.kind)).toEqual(['eval_expiry_unimplemented']);
-    expect(out.assertions[0]?.detail).toContain('R-32');
-    expect(out.events).toEqual([]);
-    // NO STATE IS WRITTEN. The carried state is the one the fold arrived with,
-    // so nothing about the refused day reaches a row.
-    expect(out.state.phase).toBe('eval');
-    expect(out.state.tradingDay).not.toBe('2026-11-03');
-  }
+  // 4023 - 4021 = 2, plus the opening day = 3. `3 > 3` is false, so the account
+  // is alive and the day is an ordinary day.
+  const reached = foldFrom(withEvalMaxDays(CORE_50K, 3), day('2026-11-02'), {
+    ...fields,
+    tradingDay: day('2026-11-04'),
+  });
+  expect(reached.assertions).toEqual([]);
+  expect(reached.events.map((e) => e.type)).not.toContain('account.expired');
+  expect(reached.state.phase).toBe('eval');
+  expect(reached.state.tradingDay).toBe('2026-11-04');
+
+  // -------------------------------------------------------------------------
+  // SIDE TWO: EXACTLY EXCEEDED. The very next session expires the account.
+  // -------------------------------------------------------------------------
+  //   the mark    2026-11-05  sequence 4024  elapsed 4, and `4 > 3`.
+  const exceeded = foldFrom(withEvalMaxDays(CORE_50K, 3), day('2026-11-02'), {
+    ...fields,
+    tradingDay: day('2026-11-05'),
+  });
+  expect(exceeded.assertions).toEqual([]);
+  expect(exceeded.state.phase).toBe('closed');
+
+  // EXPIRED IS NOT BREACHED, and the payload says which limit ran out. A
+  // consumer reading `breachKind` to explain the closure would otherwise be
+  // handed a drawdown type that never happened.
+  expect(exceeded.state.breached).toBe(false);
+  expect(exceeded.state.breachKind).toBeNull();
+  expect(exceeded.events.find((e) => e.type === 'account.expired')).toEqual({
+    type: 'account.expired',
+    tradingDay: '2026-11-05',
+    expiryRule: 'R-32',
+    elapsedTradingDays: 4,
+    maxDays: 3,
+  });
+
+  // THE DAY STILL CLOSES. An expiry is a fact about the day, not a reason to
+  // withhold the day's own record, and `day.closed` is what every downstream
+  // consumer reads.
+  expect(exceeded.events.map((e) => e.type)).toContain('day.closed');
+
+  // -------------------------------------------------------------------------
+  // AND `null` STILL FOLDS, which is every v1 plan (Appendix A).
+  // -------------------------------------------------------------------------
+  // Without this the two sides above would be satisfied by an engine that
+  // expired every account on its fourth day regardless of configuration.
+  expect(CORE_50K.eval?.maxDays).toBeNull();
+  const unconfigured = foldFrom(CORE_50K, day('2026-11-02'), {
+    ...fields,
+    tradingDay: day('2026-11-05'),
+  });
+  expect(unconfigured.assertions).toEqual([]);
+  expect(unconfigured.state.phase).toBe('eval');
+  expect(unconfigured.events.map((e) => e.type)).not.toContain('account.expired');
+});
+
+test('RE-U-032  R-32  the count is `sequence` SUBTRACTION and never date arithmetic', () => {
+  // THIS IS THE ASSERTION THAT FAILS IF ANYONE REACHES FOR A `Date`, and it is
+  // the reason `GAPPED_SLICE` exists. R-02: "gap counting is `calendar.sequence`
+  // subtraction, never date arithmetic." AS-06 is why it matters: five trading
+  // days is 7 calendar days in June and 9 to 10 across the year-end cluster, so
+  // a date difference expires accounts on the wrong day near every holiday and
+  // agrees perfectly on the consecutive windows a test is most likely to use.
+  //
+  // `CME_WINDOW` CANNOT TELL THE TWO APART because its five days are
+  // consecutive. `GAPPED_SLICE` holds 2026-11-02, -04 and -06 at sequences 4021,
+  // 4022 and 4023, so between the first and last:
+  //
+  //   sequence subtraction   4023 - 4021 = 2, plus the opening day = 3
+  //   date arithmetic        6 - 2       = 4, plus the opening day = 5
+  //
+  // With `max_days = 4`: the correct count of 3 leaves the account ALIVE, and a
+  // date-based count of 5 would expire it. So this fold passing is the engine
+  // doing subtraction, and it is a different fact from the boundary pair above.
+  const alive = foldFrom(
+    withEvalMaxDays(CORE_50K, 4),
+    day('2026-11-02'),
+    { openingBalanceCents: 5_000_000n, realizedPnlCents: 20_000n, tradingDay: day('2026-11-06') },
+    GAPPED_SLICE,
+  );
+  expect(alive.assertions).toEqual([]);
+  expect(alive.state.phase).toBe('eval');
+  expect(alive.events.map((e) => e.type)).not.toContain('account.expired');
+
+  // And the same slice with the limit set to the true count expires on the next
+  // step rather than never: `3 > 3` is false, `3 > 2` is true. Without this the
+  // assertion above could be satisfied by a count that never expires anything.
+  const expired = foldFrom(
+    withEvalMaxDays(CORE_50K, 2),
+    day('2026-11-02'),
+    { openingBalanceCents: 5_000_000n, realizedPnlCents: 20_000n, tradingDay: day('2026-11-06') },
+    GAPPED_SLICE,
+  );
+  expect(expired.state.phase).toBe('closed');
+  expect(expired.events.find((e) => e.type === 'account.expired')).toMatchObject({
+    elapsedTradingDays: 3,
+    maxDays: 2,
+  });
+});
+
+test('RE-U-032  R-32  an anchor the slice cannot answer for REFUSES the day', () => {
+  // P2 section 1 and ADR-049 rule this case by name: "replay will ask for the
+  // sequence of an anchor older than the slice." Returning a default would
+  // silently weaken a rule that CLOSES ACCOUNTS, and throwing would make the
+  // fold's output depend on how much calendar the caller loaded. So it is a
+  // typed refusal that writes no state, exactly as R-37's cadence anchor is.
+  //
+  // It reuses `calendar_coverage_miss` rather than minting a second kind: it is
+  // the same miss, from the same lookup, for the same reason.
+  const out = advanceDay({
+    engineVersion: ENGINE_VERSION,
+    plan: withEvalMaxDays(CORE_50K, 3),
+    prior: evalPrior(CORE_50K, { tradingDay: day('2026-11-03') }),
+    mark: mark({
+      tradingDay: day('2026-11-04'),
+      openingBalanceCents: 5_000_000n,
+      realizedPnlCents: 20_000n,
+    }),
+    calendar: CME_WINDOW,
+    settlements: [],
+    // Before the window opens, which is where a real replay's anchor sits.
+    openedOn: day('2026-10-01'),
+  });
+
+  expect(out.assertions.map((a) => a.kind)).toEqual(['calendar_coverage_miss']);
+  expect(out.assertions[0]?.detail).toContain('R-32');
+  expect(out.events).toEqual([]);
+  // NO STATE IS WRITTEN. The carried state is the one the fold arrived with.
+  expect(out.state.tradingDay).toBe('2026-11-03');
 });
 
 test('R-31  a pass on the last day the slice covers refuses, per ADR-049', () => {
@@ -595,6 +740,7 @@ test('DO-8  a state claiming the eval phase on a plan with no eval phase refuses
     }),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
   expect(out.assertions.map((a) => a.kind)).toEqual(['eval_phase_without_eval_rules']);
   expect(out.events).toEqual([]);

@@ -91,3 +91,4 @@ must be recoverable from its own file alone.
 | [2026-08-17 - Session 50](2026-08-17-session-50.md) | `P2-7`: the three merge blockers that were never written, and PT-06's three halves |
 | [2026-08-17 - Session 51](2026-08-17-session-51.md) | golden fixtures batch 6: none written, and the polarity question answered by measurement |
 | [2026-08-17 - Session 51](2026-08-17-session-51.md) | CI-03 folds `advanceDay`: 24 of 30 fixtures pass, and the six that do not have three causes |
+| [2026-08-17 - Session 51](2026-08-17-session-51.md) | `R-32` computed on ADR-051, and the fencepost pinned by the boundary pair |

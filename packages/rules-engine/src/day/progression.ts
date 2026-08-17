@@ -12,7 +12,9 @@
 //   R-30  the denominator rule, in `consistency.ts`
 //   R-31  the funded reset, applied in the same step as the pass
 //
-// R-32 REFUSES, AND THE COUNT IS THE POINT. See the block above the refusal.
+//   R-32  eval expiry, COMPUTED SINCE ADR-051. See the block above it for the
+//         anchor, the column that binds, and the fencepost the boundary pair in
+//         `RE-U-032` pins rather than a sentence here
 //
 // DO-8's FUNDED HALF IS NOT HERE AND IS NOT MISSING. Section 3.1: "Funded: test
 // the ladder, WHICH CAN ALSO FIRE HERE IF A SETTLEMENT GRADUATED THE ACCOUNT."
@@ -36,8 +38,9 @@
 // staler answer to a question the arithmetic already answers on every day.
 // =============================================================================
 
-import { nextTradingDayAfter } from '../calendar.js';
+import { nextTradingDayAfter, tradingDaysBetween } from '../calendar.js';
 import type {
+  AccountExpiredEvent,
   AssertionFailure,
   CalendarSlice,
   DailyMark,
@@ -46,18 +49,25 @@ import type {
   PhasePassedEvent,
   ResolvedPlan,
   RuleState,
+  TradingDay,
 } from '../types.js';
 import { consistencyOk } from './consistency.js';
 import { initialFloorCents } from './floor.js';
 
 /**
- * What DO-8 did with an eval-phase day. Four outcomes and they are genuinely
- * four: nothing happened, the pass deferred, the pass fired, or the day refused.
+ * What DO-8 did with an eval-phase day. Five outcomes and they are genuinely
+ * five: nothing happened, the pass deferred, the pass fired, the evaluation ran
+ * out of days, or the day refused.
+ *
+ * `expired` CARRIES A STATE AND `refused` DOES NOT, which is the distinction the
+ * whole file turns on. An expiry is a fact the fold computed and wrote; a
+ * refusal is the fold declining to write anything at all.
  */
 export type ProgressionOutcome =
   | { readonly kind: 'unchanged' }
   | { readonly kind: 'deferred'; readonly event: PassDeferredConsistencyEvent }
   | { readonly kind: 'passed'; readonly state: RuleState; readonly event: PhasePassedEvent }
+  | { readonly kind: 'expired'; readonly state: RuleState; readonly event: AccountExpiredEvent }
   | { readonly kind: 'refused'; readonly assertion: AssertionFailure };
 
 export interface ProgressionInput {
@@ -67,75 +77,103 @@ export interface ProgressionInput {
   readonly evalRules: EvalPhaseRules;
   readonly mark: DailyMark;
   readonly calendar: CalendarSlice;
+  /** `accounts.opened_on`, R-32's anchor. ADR-051, and it is the first TRADEABLE day. */
+  readonly openedOn: TradingDay;
 }
 
 /** DO-8 on an eval-phase day. */
 export function advanceEvalProgression(input: ProgressionInput): ProgressionOutcome {
-  const { state, plan, evalRules, mark, calendar } = input;
+  const { state, plan, evalRules, mark, calendar, openedOn } = input;
 
   // ---------------------------------------------------------------------------
-  // R-32  EVAL EXPIRY, AND THIS REFUSES RATHER THAN COMPUTING
+  // R-32  EVAL EXPIRY. COMPUTED, AND IT RUNS BEFORE THE PASS TEST
   // ---------------------------------------------------------------------------
-  // R-32 is "elapsed trading days `>` `phase_eval.max_days` expires the
-  // account", and ELAPSED TRADING DAYS IS NOT DERIVABLE FROM `RuleState`. The
-  // record M01 section 2.2 specifies carries no account-open day and no
-  // eval-start day: `tradingDay` is the day just folded, `tradedDaysCount`
-  // counts days WITH FILLS and is a different quantity by R-08, and no anchor
-  // points at the open. Counting elapsed trading days needs the open day and a
-  // calendar spanning it, which is R-02's `sequence` subtraction.
+  // "Elapsed trading days `>` `phase_eval.max_days` expires the account."
+  // ADR-051 closed the two questions this stood refusing on since session 47.
   //
-  // SESSION 45 CONCLUDED "SO IT IS A COLUMN ON `rule_states`, A SCHEMA DELTA
-  // AND AN ADR", AND SESSION 47 CHECKED THAT AGAINST THE SCHEMA AND WITHDREW IT.
-  // The datum is already stored, twice, and neither copy is on this record:
+  // WHICH COLUMN BINDS: `phase_eval.max_days`, and `accounts.expires_on` is a
+  // DERIVED materialisation that is never an input here. ADR-051's reasons are
+  // on the tree rather than aesthetic: `expires_on` has no writer anywhere in
+  // the repository, so a rule reading it would expire nobody; `max_days` is
+  // immutable on a published plan version (`0027`, `0028`) while `expires_on` is
+  // an ordinary mutable column, and an expiry an `UPDATE` can move per account is
+  // an override rather than a rule; and INV-04's byte-identical replay cannot
+  // reproduce a date somebody edited last March.
   //
-  //   * `accounts.opened_on date NOT NULL` (`0007_accounts.sql:76`), declared
-  //     `**Unit: trading day**` in `data-model/accounts.md:16`. It is not null,
-  //     it never moves, and it is exactly R-02's `sequence` anchor.
-  //   * `accounts.expires_on date NULL` (`0007_accounts.sql:90`), "eval expiry
-  //     when configured", which is `max_days` already materialised as a date.
+  // THE ANCHOR: `accounts.opened_on`, WHICH MEANS THE FIRST TRADEABLE DAY. The
+  // objection that an eval clock can burn days a trader could not trade is real,
+  // and ADR-051 answered it by fixing what `opened_on` MEANS rather than by
+  // adding a column: it is set at `G-PROVISIONED`, not at `purchase.paid`, so
+  // provisioning latency is never charged to the trader. It arrives on
+  // `DayInput` (the M01 section 2.1 amendment) and never from this file.
   //
-  // AND M01'S OWN PUBLIC SURFACE ALREADY TREATS THE OPEN DAY AS AN ENGINE INPUT:
-  // section 1.3 is `initialState(plan: ResolvedPlan, openedOn: TradingDay)`. The
-  // engine is HANDED the open day at construction and drops it; `initialState`
-  // writes it to `tradingDay`, which the next fold overwrites. So the gap is not
-  // a fact the engine lacks. It is a field `DayInput` does not carry, and the
-  // golden fixture format has carried `account.opened_on` all along, on the
-  // loader's "reaches no engine input" list that STATE.md item 3 says M01 empties.
+  // THE COUNT IS `sequence` SUBTRACTION AND NEVER DATE ARITHMETIC. R-02: "gap
+  // counting is `calendar.sequence` subtraction, never date arithmetic", and
+  // AS-06 is why: five trading days is 7 calendar days in June and 9 to 10
+  // across the year-end cluster, so a date difference would expire accounts on
+  // the wrong day near every holiday and agree everywhere a test is convenient.
+  // `RE-U-032` folds `GAPPED_SLICE` for exactly this: subtraction answers 3
+  // where a date difference answers 5.
   //
-  // WHAT R-32 ACTUALLY NEEDS IS ONE FIELD ON `DayInput`, WHICH IS AN AMENDMENT
-  // TO M01 SECTION 2.1 AND NOT A MIGRATION. That is still an ADR, because
-  // `DayInput` is specified in a frozen document, and it is still the founder's.
-  // But no `rule_states` column is required, no `SD-nn` is required, and no
-  // migration number should be reserved for it: a number reserved against a
-  // migration that should not be written is worse than no number, because a
-  // migration is sacred once merged and can only be superseded (E2).
+  // THE FENCEPOST IS `+ 1`, AND IT IS THE ONE THING ADR-051 LEFT UNRULED. The
+  // opening day is elapsed day 1, so `max_days` is THE NUMBER OF TRADING DAYS
+  // THE ACCOUNT MAY TRADE: with `max_days = 3` the third day folds and the
+  // fourth expires. `tradingDaysBetween` is exclusive of its anchor and answers
+  // 0 on the opening day, so without this term a limit of N would grant N+1
+  // days. ADR-051 requires the boundary to be settled by an executable pin
+  // rather than by this paragraph, and `RE-U-032` asserts both sides of it.
   //
-  // TWO THINGS ARE GENUINELY UNRULED AND THE REFUSAL STANDS ON THEM RATHER THAN
-  // ON THE SCHEMA. First, the ANCHOR: R-32 and `G-EXPIRED` both say "elapsed
-  // trading days" and neither names the day they elapse from, and an account
-  // sits in `provisioning_pending` before it is `active`, so an eval clock
-  // anchored at `opened_on` can burn days the trader could not trade. Second,
-  // WHICH COLUMN IS AUTHORITATIVE: R-32 and `G-EXPIRED` describe a COUNT against
-  // `max_days`, and `accounts.expires_on` is a stored DATE for the same fact.
-  // Two artifacts, two shapes, and the corpus does not say which one binds.
+  // AN UNANSWERABLE ANCHOR REFUSES, WHICH IS R-37's RULING APPLIED AGAIN. P2
+  // section 1 and ADR-049 govern exactly this: "replay will ask for the sequence
+  // of an anchor older than the slice", and returning a default there would
+  // silently weaken a rule that closes accounts. So the miss travels to
+  // `DayOutput.assertions`, no state is written, and the caller is told to load
+  // more calendar. It reuses `calendar_coverage_miss` rather than minting a
+  // second kind that means the same thing.
   //
-  // WHY REFUSE RATHER THAN IGNORE. `max_days` is `null` on all three v1 plans
-  // (R-32: "so unreachable"), so nothing in the lineup reaches this line. But a
-  // plan that DID set it would otherwise fold every day and expire nothing,
-  // which is an account trading past its own expiry with a green state row: a
-  // wrong number returned confidently on a money path, which is the exact shape
-  // FM-05 and AS-14 refuse. A refusal writes no state and raises reconciliation.
+  // WHY BEFORE THE PASS TEST. A day past the limit is a day the account no
+  // longer has, so it cannot be the day the account passes. The day that exactly
+  // REACHES the limit is still a live trading day and still passes, which is the
+  // fencepost doing visible work rather than an ordering accident.
   if (evalRules.maxDays !== null) {
-    return {
-      kind: 'refused',
-      assertion: {
-        kind: 'eval_expiry_unimplemented',
-        tradingDay: mark.tradingDay,
-        detail:
-          `phase_eval.max_days is ${String(evalRules.maxDays)} and R-32's elapsed-trading-day ` +
-          `count is not derivable from RuleState, which carries no account-open day`,
-      },
-    };
+    const counted = tradingDaysBetween(calendar, openedOn, mark.tradingDay);
+    if (!counted.found) {
+      return {
+        kind: 'refused',
+        assertion: {
+          kind: 'calendar_coverage_miss',
+          tradingDay: mark.tradingDay,
+          detail:
+            `R-32 counts elapsed trading days from ${openedOn} to ${mark.tradingDay} by sequence ` +
+            `subtraction, and ${counted.reason === 'outside_coverage' ? 'one of them is outside' : 'one of them is not a session inside'} ` +
+            `the slice's coverage ${calendar.coverage.from}..${calendar.coverage.to}`,
+        },
+      };
+    }
+
+    // Inclusive of the opening day: see the fencepost note above.
+    const elapsedTradingDays = counted.tradingDays + 1;
+    if (elapsedTradingDays > evalRules.maxDays) {
+      return {
+        kind: 'expired',
+        state: {
+          ...state,
+          phase: 'closed',
+          // NOT `breached`. An expired account ran out of days; it did not cross
+          // a floor, and a consumer reading `breachKind` to explain the closure
+          // would otherwise be told a drawdown type that never happened.
+          breached: false,
+          breachKind: null,
+        },
+        event: {
+          type: 'account.expired',
+          tradingDay: mark.tradingDay,
+          expiryRule: 'R-32',
+          elapsedTradingDays,
+          maxDays: evalRules.maxDays,
+        },
+      };
+    }
   }
 
   // ---------------------------------------------------------------------------

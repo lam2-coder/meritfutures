@@ -13,6 +13,7 @@ import { advanceDay } from '../src/day/advance.js';
 import { evaluatePayout } from '../src/payout/evaluate.js';
 import type { ExternalGates, RuleState } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -60,6 +61,7 @@ function eligibleState(): RuleState {
     }),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
   expect(out.assertions).toEqual([]);
   expect(out.state.engineEligible).toBe(true);
