@@ -128,3 +128,25 @@ Both are needed and neither substitutes for the other. The first is provenance a
 **B4 #1 forbids the *engine* deriving a trading day from a timestamp at runtime.** It does not forbid a build step whose output is committed, digest-pinned and thereafter read as data. Nothing in `generate.mjs` runs in a request, the engine never imports it, and what the engine eventually reads is the committed JSON and the rows loaded from it. [ADR-042](../../../../../docs/decisions/ADR-042.md) states the distinction for exactly this reason: a careful future reader will otherwise read the generator as the thing the rule exists to prevent.
 
 **Every UTC instant is converted through `Intl` with `timeZone: 'America/Chicago'` and then rendered back and required to match.** No CT wall time in this repository is converted by hand. The generated file states **both** the CT wall time and the UTC instant so that the loader **verifies rather than computes** (S-E4), and the DST transitions inside coverage are discovered from IANA and checked against the published United States rule, which is the only form of DST check that can fail.
+
+---
+
+## The first artifact landed, and it covers one holiday (2026-08-17)
+
+[`cme-trading-hours-2026-09-06-to-2026-09-08.retrieved-2026-08-17.xlsx`](cme-trading-hours-2026-09-06-to-2026-09-08.retrieved-2026-08-17.xlsx), SHA-256 `70c3a6370cae35c8c3189c7a580d974261be43914d85a6c65d981e5bfb2793b2`, retrieved by the founder from CME Group's **Trading Hours** tool on 2026-08-17 from an environment that can reach `cmegroup.com`.
+
+**It is NOT wired into `provenance.artifact` and `status` stays `awaiting-transcription`, deliberately.** It is a three-day window, not the holiday calendar. Naming a one-holiday export as *the* artifact would let a later session read `provenance.artifact` as a complete source and transcribe against it, and that reader would find eight or nine holidays a year missing with nothing in this directory telling them so. **`null` is still not the empty list**, one layer further out.
+
+**What it does settle, and it settles the hard one.** It is Labor Day 2026, in the per-asset-class form [ADR-042](../../../../../docs/decisions/ADR-042.md) F-3 needs, and it is a worked example of the judgement call [The one transcription hazard the ruled model does not settle](#the-one-transcription-hazard-the-ruled-model-does-not-settle) names:
+
+| Column | Equities |
+|---|---|
+| **Sun 2026-09-06** | `17:00 Trade Date: 2026-09-08 (OPEN)` |
+| **Mon 2026-09-07** | `12:00 Trade Date: 2026-09-08 (PREOPEN)`, `17:00 Trade Date: 2026-09-08 (OPEN)` |
+| **Tue 2026-09-08** | `16:00 Trade Date: 2026-09-08 (CLOSED)` |
+
+**Sunday's open carries trade date 2026-09-08, not 2026-09-07.** So Labor Day Monday is **a holiday and not an early close**: it is never a trade date at all, and what happens at 12:00 CT on Monday is a pause inside the 2026-09-08 session, which runs Sunday 17:00 CT to Tuesday 16:00 CT. A reader seeing "12:00" and reaching for `early_closes` would put a session on a day the exchange assigns no trade date to, and `generate.mjs` would accept it, because `holiday-on-a-weekend` and `early-close-on-a-holiday` do not fire on a well-formed row that is simply about the wrong day.
+
+**The per-asset-class spread is the other thing it makes concrete.** On the Monday: Equities and Interest Rates pause at 12:00, Energy and Metals at 13:30, Grains opens 19:00. F-3's rule is that `close_ct` takes the LATEST close across `ES`, `MES`, `NQ`, `MNQ`, `CL` and `GC`, and the per-group times go in `notes`.
+
+**Still needed: the holiday calendar itself**, the list of closures and early closes across the declared coverage. That is a different page of the same site (`/tools-information/holiday-calendar.html`), and until it is here the exception lists stay `null` and `generate.mjs` keeps refusing the file.
