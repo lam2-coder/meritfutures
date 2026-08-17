@@ -4,7 +4,8 @@
   "type": "module",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "pnpm -r run typecheck && tsc -p scripts/demo",
+    "//typecheck": "`pnpm -r` walks the WORKSPACE, and scripts/demo is deliberately not a package in it. So the demo's project is named here: a TypeScript directory no `tsc` invocation reaches is a directory that rots, and the alternative (making a demo a workspace package) spends a VG-12 admission on a script that prints a table.",
     "lint": "eslint .",
     "format": "prettier --write \"*.{js,mjs,ts,json}\" \".prettierrc\" \"{apps,packages}/**/*.{ts,mts,js,mjs,json}\"",
     "format:check": "prettier --check \"*.{js,mjs,ts,json}\" \".prettierrc\" \"{apps,packages}/**/*.{ts,mts,js,mjs,json}\"",
