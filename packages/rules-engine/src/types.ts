@@ -579,6 +579,14 @@ export interface SizeCapScheduleStep {
  * about it.
  */
 export interface PlanVersionSizeRow {
+  /**
+   * `plan_version_sizes.plan_version_id`, and it is here because
+   * `ResolvedPlan.planVersionId` has to come from somewhere. INV-16: "An
+   * account's `plan_version_id` is an input and is NEVER CHOSEN BY THE ENGINE."
+   * Reading it off the size row is that invariant in the signature: `resolvePlan`
+   * carries the identity forward and has no way to invent one.
+   */
+  readonly plan_version_id: PlanVersionId;
   readonly size_cents: Cents;
   /** CV-02, materialized. ONE COLUMN, and `rules` declares a drawdown PER PHASE. */
   readonly drawdown_cents: Cents;

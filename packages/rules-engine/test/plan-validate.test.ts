@@ -30,6 +30,7 @@ import type {
   Cents,
   CvId,
   PlanRulesJson,
+  PlanVersionId,
   PlanVersionSizeRow,
   PublishedEvalPhase,
   PublishedFundedPhase,
@@ -113,6 +114,9 @@ const CORE_FUNDED: PublishedFundedPhase = {
 };
 
 const CORE_50K: PlanVersionSizeRow = {
+  // `fixtures/plans/CORE-50K.json`, whose own note says it is transcribed from
+  // Appendix A.1 and from nowhere else.
+  plan_version_id: '0199c7a1-0000-7000-8000-000000000001' as PlanVersionId,
   size_cents: c(5_000_000), //                    A preamble: 50K is 5,000,000c
   drawdown_cents: c(250_000), //                  A.1, 500bp of 5,000,000
   profit_target_cents: c(300_000), //             A.1, 600bp
