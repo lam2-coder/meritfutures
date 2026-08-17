@@ -66,6 +66,68 @@ describe('diffEndState', () => {
     expect(diffEndState({ ...state, winDaysCount: 3 }, { floor_cents: 4_770_000 })).toEqual([]);
   });
 
+  // ---------------------------------------------------------------------------
+  // MONEY: `bigint` FROM THE ENGINE AGAINST A JSON NUMBER FROM THE FIXTURE
+  // ---------------------------------------------------------------------------
+  // INV-02 makes every money field a `bigint` and JSON has no literal for one,
+  // so this is not an edge: it is EVERY money field of EVERY fixture. The cases
+  // below are the ones that decide whether this stage can ever assert a cent,
+  // and the second is the one that keeps the first from being a coercion.
+
+  test('agrees when a bigint result states the same cents as an integer expectation', () => {
+    expect(diffEndState({ floorCents: 4_770_000n }, { floor_cents: 4_770_000 })).toEqual([]);
+  });
+
+  test('FAILS on one cent across the type boundary, in both directions', () => {
+    expect(diffEndState({ floorCents: 4_770_000n }, { floor_cents: 4_770_001 })).toHaveLength(1);
+    expect(diffEndState({ floorCents: 4_770_001n }, { floor_cents: 4_770_000 })).toHaveLength(1);
+  });
+
+  test('FAILS on a negative expectation a magnitude comparison would accept', () => {
+    expect(diffEndState({ floorCents: 4_770_000n }, { floor_cents: -4_770_000 })).toHaveLength(1);
+  });
+
+  test('FAILS on a fractional expectation rather than truncating it to cents', () => {
+    // `BigInt(4770000.5)` THROWS, and a comparison that reached it would take
+    // the stage down with a RangeError instead of reporting a finding. A
+    // fixture stating half a cent has stated something money is not, and the
+    // note says which of the two sides is wrong.
+    const diffs = diffEndState({ floorCents: 4_770_000n }, { floor_cents: 4_770_000.5 });
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0]?.note).toContain('no whole number of cents');
+  });
+
+  test('FAILS on an expectation beyond the range JSON round-trips', () => {
+    // 2^53 and 2^53 + 1 are the same `number`. An expectation out there cannot
+    // be compared faithfully whatever the engine returns, so it is a finding
+    // rather than an agreement that happens to hold.
+    const diffs = diffEndState(
+      { lifetimeSettledCents: BigInt(Number.MAX_SAFE_INTEGER) + 2n },
+      { lifetime_settled_cents: Number.MAX_SAFE_INTEGER + 2 },
+    );
+    expect(diffs).toHaveLength(1);
+    expect(diffs[0]?.note).toContain('no whole number of cents');
+  });
+
+  test('renders the two types so a reader can tell them apart', () => {
+    // Before the `n`, a type mismatch printed "expected 4770000, engine
+    // produced 4770000": a diff whose two sides read identically, which sends
+    // the reader looking for a defect in the differ.
+    const diffs = diffEndState({ floorCents: 4_770_000n }, { floor_cents: 4_770_001 });
+    expect(describeDiff(diffs[0] as never)).toBe(
+      'floor_cents: expected 4770001, engine produced 4770000n',
+    );
+  });
+
+  test('does not coerce a plain number on the ENGINE side of a money field', () => {
+    // The direction deliberately not handled. A `number` where INV-02 requires
+    // a `bigint` is a broken engine, and a comparison that accepted it would
+    // hide exactly the defect the invariant exists to catch. The expectation is
+    // never a `bigint`: it came through `JSON.parse`.
+    expect(diffEndState({ floorCents: 4_770_000 }, { floor_cents: 4_770_000 })).toEqual([]);
+    expect(diffEndState({ floorCents: 4_770_000n }, { floor_cents: '4770000' })).toHaveLength(1);
+  });
+
   test('reads snake_case as the engine spells it', () => {
     expect(snakeToCamel('high_water_balance_cents')).toBe('highWaterBalanceCents');
     expect(snakeToCamel('phase')).toBe('phase');
