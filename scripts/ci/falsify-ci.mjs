@@ -402,6 +402,22 @@ const CASES = [
       to: 'if (input.prior !== null && mark.tradingDay < input.prior.tradingDay) {',
     },
     {
+      rule: 'R-20',
+      // R-20 IS NOT DECLARED AND IT STILL EARNS A MUTANT, because what it
+      // asserts is that `day.closed` carries the setpoint's SOURCE and a
+      // consumer reading it is right on every day. The mutant is the plausible
+      // confusion rather than an arbitrary flip: `floorOpenCents` and
+      // `floorCents` are both on the payload and they differ exactly on the days
+      // the floor MOVED, which are precisely the days R-20 requires a re-push.
+      // So a setpoint derived from the wrong one is stale on every day it
+      // matters and identical on every day it does not.
+      seeds:
+        'the closing event carrying the floor AT THE OPEN as the setpoint, so the push is stale on exactly the days the floor moved (D-M2-3)',
+      file: 'packages/rules-engine/src/day/advance.ts',
+      from: '    floorCents: state.floorCents,\n    tradedDaysCount: state.tradedDaysCount,',
+      to: '    floorCents: state.floorOpenCents,\n    tradedDaysCount: state.tradedDaysCount,',
+    },
+    {
       rule: 'R-10',
       // THE MUTANT IS THE ADJUSTMENT MOVED FROM THE OPENING IDENTITY TO THE
       // CLOSING ONE, which is R-10's "never inside a session" written the wrong

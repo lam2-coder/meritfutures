@@ -23,7 +23,29 @@ test('every rule the engine declares has a named unit test, and the reverse', ()
   expect([...IMPLEMENTED_RULES].sort()).toEqual([...COVERED_RULES].sort());
 });
 
-test('a rule is titled or declared, and the two lists partition the titled set', () => {
+test('M01 section 8.4’s coverage rule, executable: all fifty rules carry a unit test', () => {
+  // "EVERY RULE R-01 TO R-50 HAS AT LEAST ONE UNIT TEST asserting its operator at
+  // the boundary on both sides." That sentence is over FIFTY and ADR-048's
+  // declared set is over the rules the engine COMPUTES, and treating the two as
+  // one set is what let this suite report a complete `RE-U-nn` series while it
+  // was nine short of one. The two claims are asserted separately for that
+  // reason, and this is the first commit at which this one is true.
+  //
+  // WHAT IT DOES NOT PROVE is unchanged and is this file's header: that a test
+  // asserts what its title says. Nothing inside a test file can. The seeded
+  // mutants are what make a title worth reading.
+  //
+  // AND ONE TITLE IS HONESTLY SHORT OF THE SENTENCE ABOVE. `RE-U-032` asserts a
+  // REFUSAL at its boundary rather than R-32's `>` against elapsed trading days,
+  // because the anchor and the authoritative column are unruled. That is stated
+  // in the test, in `DISCHARGED_ELSEWHERE` and in `src/rules.ts`, so the gap is
+  // recorded in three places rather than closed by a green count.
+  const titled = Object.keys(RULE_ASSERTIONS).sort();
+  const everyRule = Array.from({ length: 50 }, (_, i) => `R-${String(i + 1).padStart(2, '0')}`);
+  expect(titled).toEqual(everyRule);
+});
+
+test('a rule is titled or declared, and the two lists partition the fifty', () => {
   // `DISCHARGED_ELSEWHERE` is the only way a rule can carry a title without being
   // declared, so a session that adds a title for a rule it did not implement has
   // to say WHERE the rule is discharged instead. An empty reason is not available:

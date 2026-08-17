@@ -1,12 +1,27 @@
 // =============================================================================
-// GROUP E: THE EVALUATION PHASE. RE-U-026 to RE-U-031.
+// GROUP E: THE EVALUATION PHASE. RE-U-026 to RE-U-032, and the group is
+// complete.
 // =============================================================================
 // Every expectation here is arithmetic stated in a document, and the arithmetic
 // is written out beside it in integer cents so a reader checks the number
 // instead of trusting it (P2 section 2's second traceability tier).
 //
-// R-32 IS NOT IN THIS FILE'S `RE-U` RANGE AND ITS ABSENCE IS ASSERTED, at the
-// bottom, against the refusal that stands in for it. See `src/rules.ts`.
+// R-32 IS NOW IN THE `RE-U` SERIES AND IS STILL NOT DECLARED, and holding both
+// of those at once is the point rather than a compromise. M01 section 8.4 wants
+// a unit test for every rule R-01 to R-50 and R-32's own row names `RE-U-032` as
+// what pins it; ADR-048 wants the declared set to be the rules the engine
+// COMPUTES, and the engine computes no expiry. What `RE-U-032` asserts is the
+// REFUSAL, at its boundary on both sides, which is a real behaviour with a real
+// operator: `max_days` null folds, `max_days` set refuses.
+//
+// IT IS NOT THE OPERATOR ASSERTION M01 SECTION 8.4 ASKS FOR, AND SAYING SO IS
+// PART OF THE TEST. R-32's operator is `>` against elapsed trading days, and
+// nothing here exercises it, because the two things blocking it are founder
+// rulings rather than code: the ANCHOR the days elapse from, which neither R-32
+// nor `G-EXPIRED` names while an account sits `provisioning_pending`, and WHICH
+// COLUMN BINDS, a count against `max_days` or the stored `accounts.expires_on`
+// date. The session that receives those rulings replaces this test with the
+// boundary pair and deletes the refusal with it.
 // =============================================================================
 
 import { expect, test } from 'vitest';
@@ -449,23 +464,47 @@ test(reU('R-31'), () => {
 // =============================================================================
 // R-32, AND THE TWO REFUSALS GROUP E ADDS
 // =============================================================================
-// Not `RE-U` tests and not claimed as rules. They assert the SHAPE of DO-8: what
-// refuses, and that a refusal writes nothing. `src/rules.ts` states the count
-// and these are what make it checkable rather than merely asserted.
+// The two below `RE-U-032` are not `RE-U` tests and not claimed as rules. They
+// assert the SHAPE of DO-8: what refuses, and that a refusal writes nothing.
+// `src/rules.ts` states the count and these are what make it checkable rather
+// than merely asserted.
 
-test('R-32  a plan that sets `max_days` refuses the day rather than expiring nothing', () => {
-  // `max_days` is null on all three v1 plans, so nothing in the lineup reaches
-  // this. A plan that set it would otherwise fold every day and expire nothing,
-  // trading an account past its own expiry with a green state row.
-  const out = fold(withEvalMaxDays(CORE_50K, 30), {
+test(reU('R-32'), () => {
+  // THE BOUNDARY IS `max_days` ITSELF, AND BOTH SIDES ARE HERE. The same account,
+  // the same mark and the same calendar; the only thing that varies is whether
+  // the plan configures an expiry at all.
+  const fields = {
     tradingDay: day('2026-11-03'),
     openingBalanceCents: 5_000_000n,
     realizedPnlCents: 20_000n,
-  });
-  expect(out.assertions.map((a) => a.kind)).toEqual(['eval_expiry_unimplemented']);
-  expect(out.assertions[0]?.detail).toContain('R-32');
-  expect(out.events).toEqual([]);
-  expect(out.state.phase).toBe('eval');
+  } as const;
+
+  // SIDE ONE: `null`, which is every v1 plan (Appendix A). The day folds.
+  expect(CORE_50K.eval?.maxDays).toBeNull();
+  const unconfigured = fold(CORE_50K, fields);
+  expect(unconfigured.assertions).toEqual([]);
+  expect(unconfigured.state.tradingDay).toBe('2026-11-03');
+
+  // SIDE TWO: any value at all. The day REFUSES, and it refuses on the presence
+  // of the config rather than on a comparison against it, which is the honest
+  // shape while the count itself is unruled. A plan that set it would otherwise
+  // fold every day and expire nothing, trading an account past its own expiry
+  // with a green state row.
+  //
+  // 30 and 1 are both configs `validatePlan` would accept, and BOTH REFUSE,
+  // which is what distinguishes "the rule is unimplemented" from "the rule is
+  // implemented and this account has not expired yet". A reader who saw only the
+  // 30 case could believe the latter.
+  for (const maxDays of [30, 1]) {
+    const out = fold(withEvalMaxDays(CORE_50K, maxDays), fields);
+    expect(out.assertions.map((a) => a.kind)).toEqual(['eval_expiry_unimplemented']);
+    expect(out.assertions[0]?.detail).toContain('R-32');
+    expect(out.events).toEqual([]);
+    // NO STATE IS WRITTEN. The carried state is the one the fold arrived with,
+    // so nothing about the refused day reaches a row.
+    expect(out.state.phase).toBe('eval');
+    expect(out.state.tradingDay).not.toBe('2026-11-03');
+  }
 });
 
 test('R-31  a pass on the last day the slice covers refuses, per ADR-049', () => {
