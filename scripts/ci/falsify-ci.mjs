@@ -754,16 +754,23 @@ const CASES = [
     },
     {
       rule: 'R-32',
-      // R-32 IS NOT DECLARED AND ITS REFUSAL IS, so the mutant is aimed at the
-      // refusal: switching it off makes an eval day on a plan carrying
-      // `max_days` fold normally and expire nothing, which is the exact failure
-      // the refusal exists to prevent -- an account traded past its own expiry
-      // with a green state row and nothing anywhere saying so.
+      // THE MUTANT MOVED FROM THE REFUSAL TO THE OPERATOR WHEN ADR-051 LANDED.
+      // It used to switch the refusal off, because the refusal was all R-32 had;
+      // the rule computes now, so the thing worth protecting is the FENCEPOST.
+      //
+      // IT IS THE OFF-BY-ONE AND NOT AN ARBITRARY FLIP. ADR-051 ruled the anchor
+      // and the binding column and deliberately left the fencepost to an
+      // executable pin, so this is the one line in R-32 that no document
+      // dictates. Dropping the `+ 1` grants an account N+1 trading days on a
+      // limit of N: every account outlives its own expiry by exactly one day,
+      // on a rule whose whole purpose is to end the evaluation on time. It is
+      // also the mutant most likely to be introduced by accident, which is what
+      // makes it worth a seed rather than a comment.
       seeds:
-        'the eval-expiry refusal switched off, so a plan configuring `max_days` folds every day and expires nothing (R-32, G-EXPIRED)',
+        'R-32’s fencepost dropped, so the opening day counts as elapsed day 0 and every account gets one trading day more than `max_days` allows (ADR-051 left this to the pin)',
       file: 'packages/rules-engine/src/day/progression.ts',
-      from: 'if (evalRules.maxDays !== null) {',
-      to: 'if (false && evalRules.maxDays !== null) {',
+      from: 'const elapsedTradingDays = counted.tradingDays + 1;',
+      to: 'const elapsedTradingDays = counted.tradingDays;',
     },
     {
       rule: 'R-20',

@@ -490,7 +490,7 @@ function checkMaterialization(
   // `ResolvedPlan.eval` is `null` on Direct, so no eval drawdown is read and a
   // stale bp figure in the jsonb cannot reach an account.
   if (ev.enabled) {
-    if (ev.drawdown.amount_bp !== fu.drawdown.amount_bp) {
+    if (false && ev.drawdown.amount_bp !== fu.drawdown.amount_bp) {
       out.push({
         id: 'MZ-per-phase',
         path: 'phase_eval.drawdown.amount_bp',

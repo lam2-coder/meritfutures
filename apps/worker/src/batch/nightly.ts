@@ -140,6 +140,7 @@ export function foldAccountDay(
     mark: day.mark,
     calendar,
     settlements: day.settlements,
+    openedOn: day.openedOn,
   });
 
   // DO-3, and ADR-049 for the calendar miss. "A failure does not throw: it

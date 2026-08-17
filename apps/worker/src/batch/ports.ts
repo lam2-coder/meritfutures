@@ -64,6 +64,16 @@ export interface AccountDay {
   /** D-M5-1. Those whose `effectiveTradingDay` is this day (DO-2, SD-03). */
   readonly settlements: readonly SettlementFact[];
   /**
+   * `accounts.opened_on`. R-32's anchor, read and never derived.
+   *
+   * ADR-051 fixed its meaning as the first TRADEABLE trading day, set at
+   * `G-PROVISIONED` rather than at `purchase.paid`, and made it a required field
+   * on `DayInput`. It is required here for the same reason it is required there:
+   * an optional anchor makes R-32 silently not fire, which is a rule that reads
+   * as enforced and expires nobody.
+   */
+  readonly openedOn: TradingDay;
+  /**
    * INV-23's half that is NEVER replayed and IS stored.
    *
    * `rule_states.context_gates` is `NOT NULL`, so a row cannot be written
