@@ -462,6 +462,53 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## The nightly batch exists and `state_hash` is computed, and the replay COMPARISON is not wired (2026-08-17)
+
+**[Session 49](sessions/2026-08-17-session-49.md) built the left-hand side of `INV-04` and says so rather than letting a green suite imply the rest.** `INV-04` is "replaying every mark from day one reproduces stored state byte-identically". The fold, the row and the hash exist; **nothing yet re-derives a stored row and compares the two.** It waits until more rules exist, because an audit run against six of eight rule groups reports agreement about the two it can fold and silence about the rest, **which reads exactly like an audit that found nothing** (FM-17, `OI-14`).
+
+**Three files at [`apps/worker/src/batch/`](../apps/worker/src/batch/), and the engine package was not opened.** `@merit/rules-engine`'s `exports` map publishes `.` and nothing else, so **the module resolver enforces the published-interface rule** rather than a convention doing it, which is what let this land beside three sessions writing rules inside `packages/rules-engine/src/`. `pnpm run verify` green: **6 of 6 invariants, 571 tests over 45 files, 15 gates clean and dirty, 16 scope cases.**
+
+| | |
+|---|---|
+| [`state-hash.ts`](../apps/worker/src/batch/state-hash.ts) | SD-08. SHA-256 over [ADR-026](decisions/ADR-026.md) C-07's **nineteen columns in the declared order**, `bigint` base-10, `null` as an explicit sentinel, no whitespace. The five exclusions carry **their reasons**, not just their names |
+| [`ports.ts`](../apps/worker/src/batch/ports.ts) | The I/O boundary, declared before its client exists. `packages/db`'s own idiom: there is no Drizzle client, no `pg` in any manifest, and the scaffold does not invent them |
+| [`nightly.ts`](../apps/worker/src/batch/nightly.ts) | Read ingest, fold `advanceDay` over the trading day, write `rule_states`. `foldAccountDay` is **pure**, so `runNightlyBatch` is a loop and a writer with no rule in it |
+
+### The framing is a decision the sources do not make, and it needs the founder's eye
+
+**C-07 and M01 Appendix B.2 give three rendering rules and NO SEPARATOR.** Plain concatenation is **not injective and the collision is one column pair away**: `traded_days_count = 1, win_days_count = 23` and `12, 3` both render `123`, so two different states carry one hash and `INV-04` asserts nothing on exactly the counters `R-33` and `R-34` gate on.
+
+**Adopted: each field is length-prefixed `<utf8 byte length>:<utf8 bytes>`**, injective with no argument about the value domains, because a separator character is injective only while no field can contain it and that is a claim a future column can falsify quietly.
+
+**It is settled now because `rule_states` has zero rows** ([`0035`](../packages/db/migrations/0035_rule_states_calendar_revision.sql) says so in its own header), so choosing costs nothing today. **Changing it after the first row lands invalidates every stored hash and no migration repairs it, only a full audited rewrite under B.4.**
+
+### Four things the sources decide and the code now carries
+
+| | |
+|---|---|
+| **`engine_gates` cannot be `JSON.stringify`** | It **throws on a bigint** and four of the twenty-five leaves are `Cents`. Underneath that, M01 section 1.4 bans "iteration over an object's keys where the result affects output", so hashing insertion order would diverge the whole book the day someone reorders two fields. **And the hash is over the ENGINE's value, never Postgres's `jsonb`**, which sorts keys by length then bytewise |
+| **`account_id` is column 1 and is not on `RuleState`** | `DayInput` carries no account id by design, so the batch supplies it. **Asserted** as canonical lowercase UUID rather than normalized: a caller that switched to upper case would keep working while every hash it produced changed |
+| **The watermark is read BEFORE the slice** | A correction between the two leaves a row claiming an **older** calendar than it read: replay finds it out of scope and B.4 step 4 rewrites it. Reversed, the row claims a calendar it never saw and "replay would then believe a stale row was current". **This is the code half of the trigger [`0035`](../packages/db/migrations/0035_rule_states_calendar_revision.sql) refused to write**, and it is asserted on call order |
+| **`context_gates` comes from `evaluatePayout`** | The column is `NOT NULL` and DO-9 does not produce it, because SD-06 splits the gates so context never enters the replayed state. The batch asks the engine rather than putting a second `R-40` in a worker. **Two folds differing only in `ExternalGates` produce an identical hash**, which is `INV-23` asserted rather than assumed |
+
+### What `0033` and `0035` bought, which is why the computation is worth landing before the comparison
+
+**[`0033`](../packages/db/migrations/0033_trading_calendar_revision_required.sql) made the calendar's prior image mandatory** and **[`0035`](../packages/db/migrations/0035_rule_states_calendar_revision.sql) joined that record to a state row.** Together they are what makes a **calendar correction distinguishable from an engine regression** on the nightly run. Before them a holiday correction fell into Appendix B.3's "anything else: page", and since a calendar correction changes the day sequence for **every account at once**, the first one diverged the whole book: 5,000 pages on one morning. **The alarm does not fail by being wrong. It fails by being right five thousand times.**
+
+**The half those two could not install is the stamp itself**, because `0035` refuses a trigger asserting it is current: no per-row constraint can tell "not yet written" from "pristine calendar" without fabricating (`OI-14`). **Only the batch knows when the fold ran**, so only the batch can write the honest stamp. That is now two lines, in the order that makes them true.
+
+### Three exposures named and left open
+
+| | |
+|---|---|
+| **`OI-15` is new** | **M01 section 1.3 puts `hash.ts` in the engine and `merit/engine-purity` would refuse it there today.** The rule reports **every non-relative import** inside `packages/rules-engine/src/**`, so `import { createHash } from 'node:crypto'` is an error, while M01 section 1.4's banned-constructs table permits "`crypto` **beyond a pure hash**". **The prose allows the import the rule refuses.** Building in `apps/worker` sidesteps it and does not resolve it: a scoped lint exception or a hand-rolled SHA-256, and neither is a decision to make in passing |
+| **`0015` names four context gates and the engine publishes five** | The column comment says "freeze, recon_blocked, KYC, in-flight"; `ContextGateResults` carries those plus **`accountActive`**, which `R-40` states and API_CONTRACT renders. The engine's shape is stored so the column and the endpoint speak one vocabulary. **`0015` is merged and only an ADR moves it**, so this is flagged rather than reconciled |
+| **Events are returned and not persisted** | `advanceDay` emits M01 section 5's facts; writing them needs `0017`'s tables and EVENTS.md's vocabulary mapping. They are carried on each outcome **so the gap is visible in the type** rather than in nobody's memory |
+
+**And one process finding.** A typecheck failure was pushed because `pnpm run typecheck 2>&1 | tail -8 && git commit` **continues past a red compile**: a pipeline exits with its last command's status. Fixed one commit later. **A check whose failure cannot reach the shell is a check that passed**, which is the lesson `falsify-ci.mjs` already carries about runs it cannot bound.
+
+---
+
 ## `INV-06` is ruled and `RE-P-01` exists: the exception is pinned, not excused (2026-08-17)
 
 **[ADR-050](decisions/ADR-050.md) closes the ruling three sessions have been blocked on** ([session 45](sessions/2026-08-16-session-45.md), [session 47](sessions/2026-08-16-session-47.md), [session 48](sessions/2026-08-17-session-48.md)).
@@ -574,6 +621,8 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 **No golden fixture was written and no `EC-nnn` was claimed.** P2 section 2 alternates fixture sessions and engine sessions: "a session doing both has derived its expectations from its own output."
 
 **`hash.ts` and `SD-08` are still absent**, so `RuleState` carries no `stateHash` and `replay` does not exist. Both are the replay session's, and `OI-14` ([ADR-047](decisions/ADR-047.md)) is still P2's to discharge.
+
+> **AMENDED by [session 49](sessions/2026-08-17-session-49.md). `SD-08`'s computation now exists, and `hash.ts` still does not.** The canonical serialization is [`apps/worker/src/batch/state-hash.ts`](../apps/worker/src/batch/state-hash.ts) rather than M01 section 1.3's `packages/rules-engine/src/hash.ts`, for two reasons: three sessions owned the engine package, and **`merit/engine-purity` would refuse `node:crypto` there** while M01 section 1.4 permits "`crypto` beyond a pure hash" (`OI-15`). **The other two clauses stand unchanged**: `RuleState` carries no `stateHash`, because a state hashes a ROW rather than carrying its own digest, and `replay` does not exist. **`OI-14` is still open**, and the batch is what will discharge it.
 
 ---
 
@@ -700,9 +749,37 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 **[ADR-050](decisions/ADR-050.md) lifted that constraint on 2026-08-17 and batch 4 is what it unblocked.** Two of batch 4's four fixtures cross the eval pass; the three earlier files are confirmed rather than edited. **The constraint did not disappear, it moved**: `INV-07` is unruled on the same step, so a fixture that crosses the pass still pins no `floor_cents`, no `floor_locked` and no `high_water_balance_cents` on any day after it.
 
-**The format's ceiling is now the binding constraint rather than the engine**, and every remaining M1 row is blocked by one of five named things in [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md): a session **kind** or a fill stream; a **settlement** input, which `L-11` refuses; the **`skipped: true`** shape, which lives in nested `engine_gates` while `diffEndState` compares flat fields with `Object.is`; **payout arithmetic**, which is not a day fold; and **five sessions**, which bounds GS-064 and the long streams. The two unlocks that reach the most rows are the **calendar transcription** (a founder item) and a **settlement on `EngineInput`**.
+**The format's ceiling is now the binding constraint rather than the engine**, and every remaining M1 row is blocked by one of five named things in [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md): a session **kind** or a fill stream; a **settlement** input, which `L-11` refuses; the **`skipped: true`** shape, which lives in nested `engine_gates` while `diffEndState` compares flat fields with `Object.is`; **payout arithmetic**, which is not a day fold; and **five sessions**, which bounds the long streams. The unlock that reaches the most rows is a **settlement on `EngineInput`**.
+
+> **Two clauses of that paragraph are corrected by batch 5 (2026-08-17, [session 49](sessions/2026-08-17-session-49.md)) and are left standing so the correction reads against them.** "Five sessions, which bounds **GS-064**" was Core EOD's win-day count read as the directory's: Merit Rapid requires three, and GS-064 is written. And **the calendar transcription is no longer named as one of the two largest unlocks**, because `EngineInput` carries no calendar at all, so the session-kind rows need the input type to widen and a transcribed year alone moves none of them.
 
 **A third M01 seam, smaller than the two floors and worth ruling beside them.** `R-38` is a funded gate in group F and `DO-9` evaluates "R-33 to R-39", but its input `hasPayoutInFlight` is declared on `ExternalGates`, which `INV-23` says is context and never replayed, and `R-40`'s context list does not name `R-38`. **So `engine_eligible`'s value depends on where `R-38`'s input is read from, and M01 does not say.** GS-055 pins the four gate inputs individually rather than the conjunction.
+
+---
+
+
+## Golden fixtures, batches 4 and 5: thirty of 284, and a batch that mostly checked reasons (2026-08-17)
+
+**Batch 4 landed four** ([session 48](sessions/2026-08-17-session-48.md)): **GS-044, GS-054, GS-061, GS-242**, on a third plan record [`plans/CORE-150K.json`](../packages/rules-engine/fixtures/plans/CORE-150K.json) transcribed from [Appendix A.1](plans/M01-rules-engine.md)'s 150K column. It is the first batch whose subject is the **funded phase reached through the eval pass**, which [ADR-050](decisions/ADR-050.md) is what made writable. It also checked mechanically that **every one of M1's 73 owned scenarios is either a fixture or a named held-back row**, which was not true before it: the table had listed reasons for the scenarios somebody had tried to write and was silent about the rest.
+
+**Batch 5 landed one** ([session 49](sessions/2026-08-17-session-49.md)): **GS-064**. Batch 4's check was correct, so there was nothing left to transcribe, and the session **checked the held-back reasons against their primary sources instead**. One was wrong and three were incomplete.
+
+| Row | Recorded reason | What the source says |
+|---|---|---|
+| **GS-064** | Not inside five sessions: eligibility is six trading days after the win-day gate | Arithmetic on `win_days.required_count = 5`, which is **Appendix A.1's**. Appendix A.2 carries **3**, so the cheapest eligible close is day three and the breach lands on day four. **Written**, on the plan record batch 2 added |
+| **GS-001, GS-003, GS-004, GS-030 to GS-032** | The fixture calendar declares five full sessions and no fill stream | True, and not the blocker. **`EngineInput` carries no calendar at all**, so `is_half_day` and `halted` reach nothing whatever it declares, and `DailyMark` has no fill instant. A transcribed CME year moves none of the six |
+| **GS-070** | Five sessions, and no shape for `assertions` | **`funded_start_not_size` is unreachable independently of `opening_mismatch`**: DO-3 tests `INV-18` first, `L-11` fixes `adjustment_cents` at 0, and the post-reset prior balance **is** `size_cents` |
+| **GS-080** | The nested `engine_gates` object | **And** a second blocker: no fixture may pin `engine_eligible: true` while `R-38` sits in group F with its input on `ExternalGates`, which is the seam recorded above |
+
+**The wrong reason is this corpus's own recurring shape arriving a fourth time**: a correct observation about one plan carried one unchecked step to the directory. Sessions 47 and 48 each found it once, batch 3 found it in the `R-30` denominator row, and **the plan record that dissolved this one was added by the batch that recorded the reason's neighbours**. The lesson batch 3 already wrote down holds: a reason nobody re-derives becomes a fact.
+
+**GS-064 pins `engine_eligible` and it is the only fixture that does.** Three win days on Merit Rapid make every engine gate pass at the close of 2026-11-04; day four is a **traded win day closing at a new high** whose low is one cent under the trailed floor, so DO-6, DO-7 and DO-9 would each have made the account look *more* eligible and DO-4 returns before any of them run. **Six fields carried at day three's values beside a balance carried at day four's** are the assertion, because `engine_eligible: false` alone is satisfied by an engine that never computed it. The direction is safe where GS-055's `true` was not: `R-25` says "no eligibility" in its own words and section 3.6's breach block writes the field outright, so **`R-38`'s contested membership cannot change the answer**.
+
+**A longer synthetic calendar was worked out and then not added.** It would have been legitimate on `calendar.ts`'s own `GAPPED_SLICE` precedent; it was dropped because **it unblocks nothing** once the plan record is read correctly. The reasoning is recorded in the fixture README so the next session that reaches for one starts from where this stopped.
+
+**`sessions[].kind` is carried and ignored**, with no `L-nn` rule refusing it and no `AWAITING_M01_INPUT` entry naming it, which makes it the one place this format can silently drop a stated condition. Recorded for the fixture-wiring session, which owns every rule in that table.
+
+**And 284 is the wrong denominator for what is left in that directory.** It can only ever hold **M1's partition of 73**; the other 211 are other modules' fixtures, and writing one there would double-count against that module's coverage. The honest pair is **30 of 284** for the registry and **30 of 73** for the directory, and both are now carried in its README.
 
 ---
 
