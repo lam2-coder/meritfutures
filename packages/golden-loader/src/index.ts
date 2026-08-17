@@ -43,9 +43,9 @@ export { PlanRecordError, resolvePlanRecord } from './plan.js';
 export {
   CalendarRecordError,
   SYNTHESIZED_SEQUENCE_BASE,
-  buildSliceFromRecord,
+  calendarRowsFromRecord,
 } from './calendar.js';
-export type { CalendarRecord } from './calendar.js';
+export type { CalendarRecord, CalendarRows } from './calendar.js';
 
 export { describeDiff, diffEndState, diffEvents, snakeToCamel } from './compare.js';
 export type { Diff } from './compare.js';

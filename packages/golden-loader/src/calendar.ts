@@ -49,8 +49,28 @@
 // here would be this file deciding a session was halted.
 // =============================================================================
 
-import { buildCalendarSlice } from '@merit/rules-engine';
-import type { CalendarDay, CalendarSlice, TradingDay } from '@merit/rules-engine';
+// -----------------------------------------------------------------------------
+// THIS MODULE IMPORTS THE ENGINE FOR TYPES ONLY, AND THAT IS LOAD BEARING
+// -----------------------------------------------------------------------------
+// `packages/golden-loader/check.mjs` imports `./src/loader.ts` directly and
+// never the barrel, because the falsification harness copies the tree WITHOUT
+// `node_modules` and runs the checker in the copy: a module needing a workspace
+// resolution cannot run there at all. `loader.ts` imports this file, so this
+// file inherits that constraint.
+//
+// SO THE ROWS ARE ASSEMBLED HERE AND THE SLICE IS CONSTRUCTED IN `run.ts`, which
+// already imports the engine as a value and is already outside what `check.mjs`
+// reaches. ADR-049's `buildCalendarSlice` is still the only thing that makes a
+// slice; what moved is which module calls it.
+//
+// THE FIRST VERSION OF THIS FILE CALLED IT HERE AND PASSED EVERY LOCAL RUN.
+// `copyTree` skips `.git` and `node_modules` at the ROOT ONLY, so pnpm's nested
+// `packages/golden-loader/node_modules` was copied along with everything else
+// and the bare specifier resolved through it. On a CI runner that had not
+// installed, it did not. A harness invariant that holds by accident of the local
+// tree is one that fails on the machine that matters, and the comment in
+// `check.mjs` had stated it correctly all along.
+import type { CalendarDay, TradingDay } from '@merit/rules-engine';
 
 /**
  * The base the synthesized `sequence` counts from.
@@ -97,7 +117,20 @@ function isHalfDay(kind: string | undefined, tradingDay: string): boolean {
 }
 
 /**
- * Build the slice the fold is handed.
+ * What `buildCalendarSlice` is called with: rows and a coverage interval.
+ *
+ * IT IS `CalendarSource` IN EVERYTHING BUT NAME, and it is restated rather than
+ * imported because `CalendarSource` is declared beside the constructor and this
+ * module may not reach the engine for a value. The compile assertion below is
+ * what keeps the restatement honest.
+ */
+export interface CalendarRows {
+  readonly days: readonly CalendarDay[];
+  readonly coverage: { readonly from: TradingDay; readonly to: TradingDay };
+}
+
+/**
+ * The record, as the rows ADR-049's constructor takes.
  *
  * COVERAGE IS THE RECORD'S OWN, NOT THE SPAN OF THE SESSIONS. The record
  * declares an interval and `loadCalendar` already enforces that every session
@@ -105,24 +138,29 @@ function isHalfDay(kind: string | undefined, tradingDay: string): boolean {
  * misses are `outside_coverage` and which are `not_a_session`, and ADR-049 makes
  * those two different answers: one says the calendar cannot speak for the day,
  * the other says the day is not a session.
+ *
+ * THE ROWS ARE NOT VALIDATED HERE and `buildCalendarSlice` is where they are.
+ * Days strictly ascending, `sequence` strictly ascending with them, and coverage
+ * containing every day are the constructor's checks, and duplicating them would
+ * be a second expression of ADR-049's own contract. `loadCalendar` refuses a day
+ * outside coverage and a day out of order before this is ever reached, so the
+ * constructor cannot throw for a reason the fixture rule did not already name.
  */
-export function buildSliceFromRecord(record: CalendarRecord): CalendarSlice {
+export function calendarRowsFromRecord(record: CalendarRecord): CalendarRows {
   if (record.sessions.length === 0) {
     throw new CalendarRecordError('a calendar with no session can grade no fixture');
   }
 
-  const days: CalendarDay[] = record.sessions.map((session, index) => ({
-    tradingDay: session.trading_day as TradingDay,
-    isHalfDay: isHalfDay(session.kind, session.trading_day),
-    halted: false,
-    sequence: SYNTHESIZED_SEQUENCE_BASE + index,
-  }));
-
-  return buildCalendarSlice({
-    days,
+  return {
+    days: record.sessions.map((session, index) => ({
+      tradingDay: session.trading_day as TradingDay,
+      isHalfDay: isHalfDay(session.kind, session.trading_day),
+      halted: false,
+      sequence: SYNTHESIZED_SEQUENCE_BASE + index,
+    })),
     coverage: {
       from: record.coverage.from as TradingDay,
       to: record.coverage.to as TradingDay,
     },
-  });
+  };
 }

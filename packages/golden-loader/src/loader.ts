@@ -26,14 +26,13 @@ import { fileURLToPath } from 'node:url';
 
 import type {
   AccountId,
-  CalendarSlice,
   DailyMark,
   ResolvedPlan,
   SettlementFact,
   TradingDay,
 } from '@merit/rules-engine';
 
-import { buildSliceFromRecord, CalendarRecordError } from './calendar.js';
+import { calendarRowsFromRecord, CalendarRecordError, type CalendarRows } from './calendar.js';
 import { snakeToCamel } from './compare.js';
 import { PlanRecordError, resolvePlanRecord } from './plan.js';
 import { parseYamlSubset, type YamlValue } from './yaml.js';
@@ -445,7 +444,15 @@ export interface FixtureExpectation {
  */
 export interface FixtureInput {
   readonly plan: ResolvedPlan;
-  readonly calendar: CalendarSlice;
+  /**
+   * The rows ADR-049's constructor takes, NOT the slice itself.
+   *
+   * `buildCalendarSlice` is a value import of the engine and this module may not
+   * carry one: `check.mjs` loads this file in a tree copy with no
+   * `node_modules`. `run.ts` builds the slice, which is one module further out
+   * and already holds the engine.
+   */
+  readonly calendar: CalendarRows;
   /** `accounts.opened_on`. The day `initialState` opens the account on. */
   readonly openedOn: TradingDay;
   /**
@@ -512,7 +519,7 @@ function loadCalendar(
   dir: string,
   name: string,
   file: string,
-): { days: Set<string>; slice: CalendarSlice } {
+): { days: Set<string>; rows: CalendarRows } {
   const path = join(dir, 'calendars', `${name}.json`);
   const record = readJson(path, 'L-08', file);
 
@@ -528,6 +535,7 @@ function loadCalendar(
 
   const days = new Set<string>();
   const rows: { trading_day: string; kind?: string }[] = [];
+  let previous = '';
   for (const session of sessions) {
     const row = session as { trading_day?: unknown; kind?: unknown };
     const day = row.trading_day;
@@ -541,6 +549,16 @@ function loadCalendar(
         `calendar ${name} holds ${day} outside its own coverage`,
       );
     }
+    // STRICTLY ASCENDING, CHECKED HERE BECAUSE THE CONSTRUCTOR CHECKS IT LATER.
+    // `buildCalendarSlice` refuses a non-monotone slice and it is now called at
+    // FOLD time, so without this a record's own defect would surface as a throw
+    // inside `runFixture` rather than as the `L-08` that owns the record. The
+    // synthesized `sequence` is the row's index, so days ascending is exactly
+    // what makes the sequence ascending with them.
+    if (day <= previous) {
+      throw new FixtureError('L-08', file, `calendar ${name} holds ${day} after ${previous}`);
+    }
+    previous = day;
     days.add(day);
     rows.push(
       typeof row.kind === 'string' ? { trading_day: day, kind: row.kind } : { trading_day: day },
@@ -550,19 +568,18 @@ function loadCalendar(
   try {
     return {
       days,
-      slice: buildSliceFromRecord({ coverage: { from: span.from, to: span.to }, sessions: rows }),
+      rows: calendarRowsFromRecord({ coverage: { from: span.from, to: span.to }, sessions: rows }),
     };
   } catch (cause) {
-    // `buildCalendarSlice` throws `CalendarSliceError` on a malformed slice, and
-    // ADR-049 calls that "a caller defect, not a day the engine refuses". The
-    // caller here is this loader, so it arrives as the calendar rule that owns
-    // the record rather than as an unclassified crash.
+    // A `kind` the mapping cannot read is a stated condition the engine would
+    // never see, and it arrives as the calendar rule that owns the record rather
+    // than as an unclassified crash.
     throw new FixtureError(
       'L-08',
       file,
-      cause instanceof CalendarRecordError || cause instanceof Error
+      cause instanceof CalendarRecordError
         ? `calendar ${name}: ${cause.message}`
-        : `calendar ${name} could not be built into a slice`,
+        : `calendar ${name} could not be read: ${String(cause)}`,
     );
   }
 }
@@ -737,7 +754,7 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
   if (typeof calendarName !== 'string' || calendarName.trim() === '') {
     throw new FixtureError('L-08', yamlFile, '"calendar" is required');
   }
-  const { days: sessions, slice: calendar } = loadCalendar(dir, calendarName, yamlFile);
+  const { days: sessions, rows: calendar } = loadCalendar(dir, calendarName, yamlFile);
 
   // L-09  The account block.
   const account = document['account'];

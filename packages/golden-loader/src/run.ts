@@ -95,7 +95,15 @@ function openingState(fixture: GoldenFixture): RuleState {
 
 /** Fold one fixture's day stream through the engine and diff the end state. */
 export function runFixture(fixture: GoldenFixture): FixtureOutcome {
-  const { plan, calendar, marks, settlements, startingPhase } = fixture.input;
+  const { plan, marks, settlements, startingPhase } = fixture.input;
+
+  // THE SLICE IS CONSTRUCTED HERE AND NOT IN THE LOADER, and the boundary is the
+  // falsification harness's rather than a preference. `check.mjs` imports
+  // `./src/loader.ts` in a tree copy that has no `node_modules`, so nothing
+  // reachable from the loader may import the engine as a VALUE.
+  // `buildCalendarSlice` is one, this module already holds several, and ADR-049
+  // still requires the slice to come from its own pure constructor.
+  const calendar = buildCalendarSlice(fixture.input.calendar);
 
   const opening = openingState(fixture);
   let state: RuleState = opening;
