@@ -483,6 +483,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 | **Settlements are covered without the generator that does not exist** | `INV-18` compares against the **pre-settlement** balance plus `adjustment_cents`, and `SD-01` puts the settled withdrawal in that column, so a mark the generator already draws with a negative adjustment **is** a settlement day. No payout eligibility is invented |
 | **The fold ends the day after a pass, and that is `DO-3` working** | The generator chains balances through a reset it knows nothing about, so `INV-18` refuses the next mark. Each sequence contributes **at most one pass**, and the pass day itself folds in full. Asserted, so a future widening is a red test |
 | **Both mutants watched failing** | `CI-02/engine-RE-P-01-exception` seeds a reset **one cent low**, which **no other check in the repository catches**: `DO-7`'s tripwire never spans the reset. `CI-02/engine-RE-P-01-monotone` seeds `R-12`'s expression where `DO-7`'s outcome belongs, in `advance.ts` where the tripwire cannot see it either |
+| **The clean run is 34 of 34** | An earlier run reported 33 and printed "THE HARNESS CHANGED THE TREE", because documents were being edited in the same working tree while it ran. `falsify-ci.mjs` compares `git status` before and after and its diagnosis was right: **a falsification run measured on a tree someone else is writing to is not a measurement** |
 
 ### Two defects the falsification run found and the green property could not
 
