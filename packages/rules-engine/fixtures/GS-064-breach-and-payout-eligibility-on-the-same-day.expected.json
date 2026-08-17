@@ -1,0 +1,21 @@
+{
+  "end_state": {
+    "phase": "closed",
+    "breached": true,
+    "breach_kind": "trailing_eod_floor",
+    "engine_eligible": false,
+    "balance_cents": 5140000,
+    "floor_open_cents": 4870000,
+    "floor_cents": 4870000,
+    "floor_locked": false,
+    "high_water_balance_cents": 5120000,
+    "withdrawable_cents": 20000,
+    "traded_days_count": 3,
+    "win_days_count": 3,
+    "consistency_best_day_cents": 40000,
+    "consistency_period_profit_cents": 120000
+  },
+  "events": ["day.closed", "day.closed", "day.closed", "breach.detected"],
+  "pins": "every input the eligibility decision reads is still standing at the value that made the account eligible at the previous close, and the answer is false anyway, because DO-4 returns before DO-6 can advance a counter and before DO-9 can evaluate a gate",
+  "note": "THE SIX CARRIED FIELDS ARE THE ASSERTION AND `engine_eligible` ALONE WOULD NOT BE. An engine that never computed eligibility at all also reports false, so a fixture pinning only that would pass against nothing. What separates the two is that `win_days_count`, `traded_days_count`, `withdrawable_cents`, `high_water_balance_cents` and both consistency accumulators are pinned at DAY THREE's values while `balance_cents` is pinned at DAY FOUR's. The breach block writes the trading day, the phase, the breach fields, the floor at open, the closing balance and `engineEligible`, and nothing else, so every other field is the previous close's by construction. An engine that ran DO-6 before its breach check reports `win_days_count: 4` and `traded_days_count: 4`, because day four has fills and clears the 15,000c win floor. One that ran DO-9 reports `withdrawable_cents: 40000`. One that ran DO-7 reports `high_water_balance_cents: 5140000` and a floor of 4,890,000. ALL FOUR OF THOSE ENGINES ARE ELIGIBLE-LOOKING AND ALL FOUR ARE WRONG, and each fails on a different field here. `high_water_balance_cents: 5120000` BESIDE `balance_cents: 5140000` IS THE ORDERING LAW MADE INTO TWO NUMBERS. Day four closes 20,000c above day three and the high-water balance does not follow it, because R-13 lives at DO-7 and DO-4 returned first. The balance moves because the breach block writes it explicitly; the high-water balance does not because the breach block does not. `floor_cents` EQUALS `floor_open_cents` FOR THE SAME REASON, at 4,870,000c, which is 5,120,000 less the 250,000c funded drawdown and is the floor three days of trailing produced. GS-063 pins the same equality one day into an account's life, where the floor at open is still R-12's; this pins it against a TRAILED floor, so a breach comparator that read `size_cents - drawdown_cents` rather than `prior.floorCents` would find 4,869,999 comfortably above 4,750,000 and let the account live. THE ELIGIBILITY AT DAY THREE IS AN ANTECEDENT THIS FORMAT CANNOT PIN DIRECTLY, and that is stated rather than glossed. The six gate verdicts live in `engine_gates`, which is nested and which compare.ts diffs with Object.is on flat fields, so no expectation reaches them; and `engine_eligible: true` could not be pinned at day three even if the end state carried it, for the reason GS-055's sibling gives, which is that M01 lists R-38 as a funded gate in group F while its input is declared on `ExternalGates` and R-40's context list does not name it. NONE OF THAT WEAKENS THE `false` HERE. R-25's row says 'no eligibility' in its own words and DO-4's block writes `engineEligible: false` outright, so the value is the same under either reading of R-38's membership. THIS IS THE ONLY FIXTURE IN THE DIRECTORY THAT PINS `engine_eligible`, and it pins the one direction M01 states without ambiguity. THE COUNTERFACTUAL, WHICH IS WHERE THE ONE CENT LIVES. Raise day four's low by a single cent to 4,870,000 and R-21's strict `<` is false: the day survives, DO-6 through DO-9 all run, and eight of the fourteen fields above move at once, to phase `funded`, `breached: false`, win days 4, traded days 4, balance 5,140,000, withdrawable 40,000, high-water 5,140,000 and floor 4,890,000. The account is then MORE eligible than it was at day three rather than closed. That is the size of the decision R-21's operator makes and it is why the operator is the contract."
+}
