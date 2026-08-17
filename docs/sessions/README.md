@@ -89,3 +89,4 @@ must be recoverable from its own file alone.
 | [2026-08-17 - Session 50](2026-08-17-session-50.md) | the fixture wiring: `L-13`, the `bigint` comparison, and the premise ADR-048 rests on |
 | [2026-08-17 - Session 50](2026-08-17-session-50.md) | a disabled consistency gate reports `skipped`, and the `EngineEvent` union |
 | [2026-08-17 - Session 50](2026-08-17-session-50.md) | `P2-7`: the three merge blockers that were never written, and PT-06's three halves |
+| [2026-08-17 - Session 51](2026-08-17-session-51.md) | `R-32` computed on ADR-051, and the fencepost pinned by the boundary pair |
