@@ -64,18 +64,25 @@ test('the declared set is a set, and is ordered as M01 orders the rules', () => 
   expect([...IMPLEMENTED_RULES]).toEqual([...IMPLEMENTED_RULES].sort());
 });
 
-test('the count is reported rather than implied: forty-five of M01’s fifty rules', () => {
+test('the count is reported rather than implied: forty-six of M01’s fifty rules', () => {
   // THIS ASSERTION IS THE HONEST COUNT IN EXECUTABLE FORM. It fails when a rule
   // is added, which is the point: the session that adds one updates the number
   // here and in `src/rules.ts`'s header, and a session that added a rule without
   // noticing it had is a session that cannot land.
-  expect(IMPLEMENTED_RULES.length).toBe(45);
+  expect(IMPLEMENTED_RULES.length).toBe(46);
 });
 
-test('the five undeclared rules are undeclared for stated reasons', () => {
-  // THE ABSENCE IS THE COUNT BEING HONEST. Five rules are not declared, and none
-  // of them is merely unwritten: each is discharged by another layer or refuses
-  // pending a founder ruling. `src/rules.ts` names the reason for each.
+test('the four undeclared rules are undeclared for stated reasons', () => {
+  // THE ABSENCE IS THE COUNT BEING HONEST. Four rules are not declared, and none
+  // of them is merely unwritten: each is discharged by another layer.
+  // `src/rules.ts` names the reason for each.
+  //
+  // AND IT WAS FIVE UNTIL ADR-051. R-32 sat here refusing on two questions the
+  // corpus had not answered: the ANCHOR the trading days elapse from, and
+  // WHICH COLUMN BINDS. ADR-051 ruled both, so R-32 moved to the declared set
+  // with `RE-U-032` pinning the fencepost the ruling deliberately left open.
+  // NONE OF THE FOUR THAT REMAIN IS BLOCKED ON A FOUNDER RULING: every one is
+  // discharged by a layer that is not this engine.
   //
   // THIS LIST WAS NINE AND THREE OF THE NINE WERE WRONGLY ON IT, ALL THREE FOR
   // THE SAME REASON: M01 SECTION 3.1's ORDERING TABLE WAS NEVER CONSULTED. R-02
@@ -93,17 +100,20 @@ test('the five undeclared rules are undeclared for stated reasons', () => {
     'R-05',
     'R-11', // discharged outside the engine: the caller's predicate and replay
     'R-20',
-    'R-32', // REFUSES: the anchor and the authoritative column are unruled
   ];
   for (const rule of undeclared) expect(IMPLEMENTED_RULES).not.toContain(rule);
   expect(IMPLEMENTED_RULES.length + undeclared.length).toBe(50);
 });
 
-test('R-32 is NOT declared, and the refusal is what makes that safe', () => {
-  // R-32's elapsed-trading-day count is not derivable from `RuleState`, so the
-  // engine refuses any eval day on a plan that sets `max_days` rather than
-  // folding it and expiring nothing. A session that implements R-32 deletes this
-  // test along with the refusal; a session that declares it without implementing
-  // it fails here, which is the point of asserting an absence.
-  expect(IMPLEMENTED_RULES).not.toContain('R-32');
+test('R-32 IS declared, and the boundary pair is what makes that safe', () => {
+  // The inverse of the assertion that stood here. It asserted R-32's ABSENCE so
+  // that a later session could not declare the rule without implementing it;
+  // that session has run, so what needs protecting now is the opposite claim.
+  //
+  // A DECLARATION IS NOT SELF-CERTIFYING (ADR-048), and the thing that certifies
+  // this one is `RE-U-032`: it folds both sides of the boundary, and flipping
+  // the engine's fencepost fails it by name. `RULE_ASSERTIONS` carries the
+  // operator sentence, so the cross-check in the first test of this file ties
+  // the declaration to a passing assertion rather than to this line.
+  expect(IMPLEMENTED_RULES).toContain('R-32');
 });
