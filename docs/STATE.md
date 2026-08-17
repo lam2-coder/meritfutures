@@ -421,7 +421,31 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## `P2-7`: the three merge blockers that were never written, and PT-06's three halves (2026-08-17)
+
+**[M01 section 1.4](plans/M01-rules-engine.md) names `RE-D-01`, `RE-D-02` and `RE-D-03` and calls all three merge blockers. None of the three was in the tree** ([session 50](sessions/2026-08-17-session-50.md)): the identifiers appeared only in prose, in M01 and in P2. All three now exist and all three have been **watched failing on a seeded violation aimed at them**, `CI-01` at 10 of 10 and `CI-02` at 50 of 50.
+
+| Gate | Landed as | Bites today? |
+|---|---|---|
+| `RE-D-01` | `packages/golden-loader/test/determinism.test.ts` | **Yes**, over the demo corpus. Vacuous over the golden corpus, **derived** |
+| `RE-D-02` | the same file, spawning [`engine-digest.mjs`](../scripts/ci/engine-digest.mjs) | **Yes.** Three `(TZ, LC_ALL)` pairs, and the spawn is watched moving the locale |
+| `RE-D-03` | **`RI-07`** in [`repo-invariants.mjs`](../packages/tooling/checks/repo-invariants.mjs) | **Yes**, on a hole no other mechanism can see |
+
+**`RI-07` closes a path rather than a line, which is why four mechanisms missed it.** `RI-01` reads the manifest and says so. `merit/engine-purity` reads one file at a time and **returns early on every relative specifier**; `eslint.config.js` attaches it to `packages/rules-engine/src/**` and nothing else; `tsconfig`'s `types: []` removes ambient declarations, not an explicit `node:` import. So a file outside `src/` importing `node:crypto`, reached from `src/index.ts` by a **relative** specifier, is invisible to all four at once. Seeded on this tree, **`RI-07` fails while `RI-01` and ESLint stay green**, and the falsification case demands that additivity in its own needles.
+
+**`PT-06` has three halves and the vacuity of two is DERIVED, never narrated.** [ADR-038](decisions/ADR-038.md)'s mechanism reused: the timezone half is real over `runDemo`; the arrival-order half is skipped by reading `Object.keys(engine)` for a `replay` export; the golden corpus is gated on `engineIsIdentityStub()` and the run prints `golden VACUOUS`. Each switches itself on when the fact underneath it changes, with no edit and nobody to remember.
+
+> **One measured fact that invalidates the obvious implementation of [STRATEGY section 3.1](testing/STRATEGY.md).** That section asks `PT-06` to randomize "`TZ` and `LC_ALL` per case". **`TZ` can be randomized in-process and `LC_ALL` cannot**: Node resolves the ICU default locale **once at startup**, so assigning `process.env.LC_ALL` afterwards changes nothing `Intl` will read, and a harness that did it would pass on every seed forever. The locale half is carried **across processes** instead, and `localeIsProcessScoped()` measures the fact so a future runtime flips it on by itself. Recorded in STRATEGY section 8.2 as well, because the next reader of 3.1 will otherwise write it literally.
+
+**The third generator is built.** P2 section 5 names three; the settlement-sequence generator was deferred on the ground that it needs payout eligibility and therefore the engine, and **that reason expired** when `evaluatePayout`, `applySettlement` and the clamp landed. Fifteen rules, each individually falsifiable, **except `INV-17`, which is `R-42` and `R-49` conjoined over a life and cannot be broken alone**; that exemption is a compile-checked list of one with a test asserting its length.
+
+**`pnpm run verify` exits 0**: 714 passed and 32 skipped across 51 files, **7 of 7 invariants**, **15 of 15 corpus gates**. Nothing under `packages/rules-engine/src/**` and nothing in `scripts/corpus/gates.mjs` was changed; [STRATEGY](testing/STRATEGY.md) was **appended to** as section 8, not restructured, because a sibling session holds sections 3.1 and 4.1.
+
+---
+
 ## Two of P2's three generators exist, and the second one found a money-path contradiction (2026-08-16)
+
+> **AMENDED by [session 50](sessions/2026-08-17-session-50.md). The settlement-sequence generator now exists.** The deferral below was correct when written and its stated reason has since expired: generating a coherent settlement stream "means the engine", and the engine arrived. `P2`'s three generators are complete.
 
 **P2 section 5's `fast-check` generators are "the expensive half" and the one thing genuinely buildable before the engine.** The plan generator landed with `CV-01` to `CV-19` executable ([session 40](sessions/2026-08-16-session-40.md)); the **arbitrary day-sequence generator** lands now that `ADR-046` has settled `DayInput`'s shape ([session 42](sessions/2026-08-16-session-42.md)), which is why it was deferred rather than built twice. **The settlement-sequence generator remains unbuilt on purpose**: a `SettlementFact` carries an ordinal that is `payouts_settled_count + 1` at request time and two distinct trading days, so generating one coherently means generating payout eligibility, which means the engine.
 
