@@ -72,13 +72,12 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-043](ADR-043.md) | The append-only registries become directory-per-entry  (2026-08-15, status: accepted) |
 | [ADR-044](ADR-044.md) | The AI and LLM policy. A permission boundary that adds no scope, and a narration boundary on the trader surface  (2026-08-16, status: accepted) |
 | [ADR-045](ADR-045.md) | A `trading_calendar` correction that leaves no prior image is refused by the database  (2026-08-16, status: accepted) |
-
 | [ADR-047](ADR-047.md) | `rule_states` carries the calendar revision, and Appendix B.4's protocol governs a calendar correction  (2026-08-16, status: accepted) |
 | [ADR-048](ADR-048.md) | CI-03's polarity is derived per fixture from the rules it cites  (2026-08-16, status: accepted) |
 | [ADR-049](ADR-049.md) | `CalendarSlice` is a value, and a lookup miss is a typed refusal  (2026-08-16, status: accepted) |
 | [ADR-050](ADR-050.md) | `INV-06` gains a stated `R-31` exception, and it is exactly one rule  (2026-08-17, status: accepted) |
 | [ADR-046](ADR-046.md) | A contact address is held reversibly, and the notification obligation is discharged by evidence  (2026-08-16, status: accepted) |
-| [ADR-050](ADR-050.md) | INV-06 gains a stated R-31 exception, and the funded-reset floor is citable  (2026-08-17, status: accepted) |
+| [ADR-051](ADR-051.md) | `R-32` anchors at `opened_on`, and `phase_eval.max_days` is the column that binds  (2026-08-17, status: accepted) |
 
 ## Gate closures
 
