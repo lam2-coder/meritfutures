@@ -430,6 +430,25 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## The short calendar is repaired, and the repair was two halves rather than one (2026-08-17)
+
+**CI-03 is 2 red of 30, down from 6** ([session 52](sessions/2026-08-17-session-52.md)). [`cme-2026.json`](../packages/rules-engine/fixtures/calendars/cme-2026.json) now holds **seven** contiguous sessions, `2026-10-30` to `2026-11-09`, and the four funded fixtures that refused on their own open day anchor at the session before their first mark. **No expected value was edited** and nothing outside [`packages/rules-engine/fixtures/`](../packages/rules-engine/fixtures/README.md) was touched.
+
+| Fixture | Cause | Now |
+|---|---|---|
+| `GS-020` | `R-31`'s consistency period starts on the trading day after `2026-11-06`, which the slice did not cover | **passes** |
+| `GS-054`, `GS-055`, `GS-061` | first mark on `opened_on`, refused `not_forward` (`INV-14`, `R-06`) | **pass** |
+| `GS-064` | the same refusal, hiding a second cause | 13 diffs to **1**, and the 1 is new |
+| `GS-024` | the section 3.4 versus 3.6 floor-lock disagreement | **unchanged, identically** |
+
+**The diagnosis session 51 recorded was right about the cause and half right about the repair.** Extending the calendar fixed **one** of the five. The session after `2026-11-06` is what `GS-020` needed. The session before `2026-11-02` is **necessary and not sufficient** for the other four, because `opened_on` is a fixture input and `advanceDay` compares `mark.tradingDay` against `prior.tradingDay` regardless of what surrounds either. **Moving the anchor is not an expectation edit and the distinction is checkable**: `opened_on` reaches `R-32` and nothing else ([ADR-051](decisions/ADR-051.md)), and `R-32` runs only in the eval phase, so a funded fold cannot compute a different number from a different anchor. The three fixtures that went green match every field M01 derived independently, which an edit-to-fit could not produce.
+
+> **A NEW FOUNDER ITEM, AND IT IS A THREE-WAY DISAGREEMENT.** `GS-064`'s surviving diff is `withdrawable_cents`: the fixture pins **20,000**, the engine produces **0**, and `R-35` on the pinned closing balance would give **40,000**. The engine states its reading in [`advance.ts`](../packages/rules-engine/src/day/advance.ts) ("R-35 on a closed account is `0n`"); the fixture derives its own from the pre-breach balance. **What `R-35` measures on the row that CLOSES an account is undecided in the corpus**, and picking a side by editing either file is the TR-01 failure the stage exists to catch. It joins the floor-lock ruling `GS-024` is waiting on.
+
+**One stale sentence is named rather than fixed.** [`golden-loader/src/calendar.ts`](../packages/golden-loader/src/calendar.ts) says the fixture calendar "holds five consecutive sessions". The paragraph's substance survives, because seven contiguous sessions still make array position equal the dense calendar index, but the number is stale and the file was outside the session fence.
+
+---
+
 ## P2 is unblocked: its four rulings are closed and two records are repaired (2026-08-16)
 
 **[P2](plans/P2-rules-engine.md) section 8 listed four items, each blocking `P2-1`, none an engineering call. All four are closed** ([session 40](sessions/2026-08-16-session-40.md)), and the three ADRs landed **in one commit** rather than three sessions, because three sessions each appending to `docs/decisions/` is three collisions in the registry [ADR-043](decisions/ADR-043.md) split to end.
