@@ -1,0 +1,114 @@
+# GS-061  Peak-picking: requesting on a local maximum  (AS-08)
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "A volatile account requests on its best close. Asserts the firm
+#   systematically pays at trader-chosen local maxima and hands the premium to
+#   the simulation harness to price"                  GOLDEN_SCENARIOS GS-061 row
+#   "Every request is evaluated against the last closed day, and the trader
+#   chooses which day to request on ... The premium is the expected value of
+#   `max` over the window a trader is willing to wait, minus the mean ... It is
+#   not exploitable beyond the cap, but it is a systematic bias in the
+#   liability model and it applies to every honest trader too"     M01 AS-08
+#   "None at the rule level, and none is wanted: waiting for a good day is not
+#   abuse"                                                          M01 AS-08
+#   `withdrawable = max(0, balance_cents - size_cents - buffer_cents)` M01 R-35
+#   buffer 100,000c at 50K, payout cap 150,000c at 50K   M01 Appendix A.1
+#   funded drawdown 250,000c, floor lock at 260,000c     M01 Appendix A.1
+#   win day floor 15,000c at 50K                         M01 Appendix A.1
+#   5,005,000 = 5,255,000 - 250,000                      M01 R-13
+#
+# THE FIXTURE IS THE STREAM AS MUCH AS THE END STATE, AND THAT IS UNUSUAL HERE.
+# AS-08 is not about one number being wrong; it is about which of five correct
+# numbers the firm actually pays. So the day stream is a real volatile path with
+# two losing days inside it, and R-35 is applied at each close:
+#
+#   day 1   close 5,120,000   withdrawable    20,000
+#   day 2   close 5,050,000   withdrawable         0   (floored, INV-05)
+#   day 3   close 5,210,000   withdrawable   110,000
+#   day 4   close 5,120,000   withdrawable    20,000
+#   day 5   close 5,255,000   withdrawable   155,000   <- the trader's choice
+#
+# **The mean of the five is 61,000c and the peak is 155,000c**, so the premium
+# on this window is 94,000c, and it is paid to a trader who did nothing but wait
+# four days. That is AS-08's arithmetic on a concrete path, and it is the number
+# the Monte Carlo port has to model as a strategy rather than as a random draw,
+# or the CVaR99 estimate that drives the reserve is biased low.
+#
+# AND IT IS BOUNDED, WHICH IS THE OTHER HALF AND IS WHY THE PEAK OVERSHOOTS. The
+# cap is 150,000c and day five's withdrawable is 155,000c, so R-43 clamps and
+# the last 5,000c of the peak is worth nothing. Waiting from day three to day
+# five buys 40,000c, not 45,000c, and waiting for a still better day buys zero.
+# AS-08's "not exploitable beyond the cap" is a fact about the clamp rather than
+# a hope, and the overshoot is what makes this fixture say it. GS-055 owns the
+# case where the withdrawable lands EXACTLY on the cap and this one deliberately
+# does not restate it.
+#
+# R-06 IS THE RULE THIS SCENARIO IS ABOUT AND IT IS DELIBERATELY NOT CITED.
+# "Every evaluation is against the last closed day and nothing more recent" is
+# what makes the trader's choice a choice at all. It is not in the engine's
+# declared `IMPLEMENTED_RULES` set, and citing it would hold this fixture
+# INVERTED under ADR-048 for a rule its expected end state does not depend on:
+# the end state is the fold's output, and R-06 governs when a request reads it.
+# Naming it here rather than in `source:` is the honest placement.
+#
+# ADR-048 POLARITY: DIRECT. Every rule cited (R-08, R-09, R-13, R-15, R-21,
+# R-35) is in the declared set. The derivation is not wired yet; the citation is
+# written to be resolvable now.
+id: GS-061
+name: peak-picking, requesting on a local maximum
+source: M01 R-08, R-09, R-13, R-15, R-21, R-35
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5160000
+    low_balance_cents: 4960000
+    realized_pnl_cents: 120000
+    fill_count: 14
+    traded_day: true
+  # A losing day. The floor does not follow the balance down (R-14), so day
+  # three's breach comparator is still day one's floor.
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5050000
+    high_balance_cents: 5140000
+    low_balance_cents: 5010000
+    realized_pnl_cents: -70000
+    fill_count: 11
+    traded_day: true
+  # The first local maximum. A trader who requested here would have been paid
+  # 110,000c, correctly, and 40,000c less than the trader who waited.
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5050000
+    closing_balance_cents: 5210000
+    high_balance_cents: 5225000
+    low_balance_cents: 5030000
+    realized_pnl_cents: 160000
+    fill_count: 16
+    traded_day: true
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5210000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5215000
+    low_balance_cents: 5095000
+    realized_pnl_cents: -90000
+    fill_count: 12
+    traded_day: true
+  # The chosen day. 255,000c of closing profit, which is 5,000c short of the
+  # 260,000c lock trigger, so the peak of this window does not lock the floor.
+  - trading_day: 2026-11-06
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5255000
+    high_balance_cents: 5265000
+    low_balance_cents: 5105000
+    realized_pnl_cents: 135000
+    fill_count: 15
+    traded_day: true
+settlements: []
