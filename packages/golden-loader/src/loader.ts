@@ -26,15 +26,16 @@ import { fileURLToPath } from 'node:url';
 
 import type {
   AccountId,
-  AccountState,
-  DayMark,
-  EngineInput,
-  PlanConfigVersion,
-  PlanVersionId,
+  CalendarSlice,
+  DailyMark,
+  ResolvedPlan,
+  SettlementFact,
   TradingDay,
 } from '@merit/rules-engine';
 
+import { buildSliceFromRecord, CalendarRecordError } from './calendar.js';
 import { snakeToCamel } from './compare.js';
+import { PlanRecordError, resolvePlanRecord } from './plan.js';
 import { parseYamlSubset, type YamlValue } from './yaml.js';
 
 // -----------------------------------------------------------------------------
@@ -58,13 +59,19 @@ type Equals<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 // parameter no fixture author chose, which is the defaulting DATA_MODEL
 // section 12 forbids arriving through the test harness.
 
-/** `PlanConfigVersion` field -> the key it is read from in a plan record. */
-const PLAN_CONFIG_SOURCE = {
-  planVersionId: 'plan_version_id',
-} as const;
-type _PlanKeysAreTotal = Assert<Equals<keyof typeof PLAN_CONFIG_SOURCE, keyof PlanConfigVersion>>;
-
-/** `DayMark` field -> the key it is read from in a `days:` row. */
+/**
+ * `DailyMark` field -> the key it is read from in a `days:` row.
+ *
+ * THIS MAP NOW POINTS AT `DailyMark` AND NOT AT `DayMark`, which is the whole
+ * of what changed on the input side. `DayMark` is the scaffold's record and
+ * `evaluate`'s argument; `DailyMark` is "exactly the live row from
+ * `daily_marks`" (M01 section 2.1) and is what `advanceDay` folds. The two
+ * differ in three places and each one is a statement: `DailyMark` carries
+ * `adjustmentCents` and `sourceHash`, and it carries NO `tradedDay`, because
+ * R-08 derives that from `fillCount` and "an engine that read them would be an
+ * engine whose breach and win-day arithmetic depended on the ingester agreeing
+ * with it".
+ */
 const DAY_MARK_SOURCE = {
   tradingDay: 'trading_day',
   openingBalanceCents: 'opening_balance_cents',
@@ -72,57 +79,77 @@ const DAY_MARK_SOURCE = {
   highBalanceCents: 'high_balance_cents',
   lowBalanceCents: 'low_balance_cents',
   realizedPnlCents: 'realized_pnl_cents',
+  adjustmentCents: 'adjustment_cents',
   fillCount: 'fill_count',
-  tradedDay: 'traded_day',
+  sourceHash: 'source_hash',
 } as const;
-type _DayKeysAreTotal = Assert<Equals<keyof typeof DAY_MARK_SOURCE, keyof DayMark>>;
+type _DayKeysAreTotal = Assert<Equals<keyof typeof DAY_MARK_SOURCE, keyof DailyMark>>;
 
-/** `AccountState` field -> the key it is read from in the `account:` block. */
+/** The `account:` keys that reach the fold. */
 const ACCOUNT_SOURCE = {
   sizeCents: 'size_cents',
+  phase: 'phase',
+  openedOn: 'opened_on',
 } as const;
 
 /**
- * `AccountState` fields the loader supplies rather than reads.
+ * Fields the loader supplies rather than reads, with the reason each is not a
+ * fixture's to state.
  *
- * Both are identifiers rather than rule inputs: `accountId` is derived from the
- * scenario id so a fixture run is reproducible and nameable, and
- * `planVersionId` comes from the resolved plan record, because an evaluation
- * that could be run against a version the account is not pinned to is the
+ * `accountId` is derived from the scenario id so a fixture run is reproducible
+ * and nameable. `planVersionId` comes from the resolved plan record, because an
+ * evaluation run against a version the account is not pinned to is the
  * retroactive-change hole `0027`'s trigger exists to close.
+ *
+ * `sourceHash` JOINS THEM, AND IT IS THE ONE ADDITION HERE. In the pipeline it
+ * is the ingested artifact's digest and it is replay's input for telling a
+ * superseded mark from a backdated one (M01 Appendix B.3). `advanceDay` never
+ * reads it, no fixture states one, and a loader that invented something
+ * digest-shaped would be manufacturing evidence; it carries the scenario and
+ * the day instead, which is true and is obviously not a hash.
  */
-const ACCOUNT_SYNTHESIZED = ['accountId', 'planVersionId'] as const;
-
-type _AccountKeysAreTotal = Assert<
-  Equals<keyof typeof ACCOUNT_SOURCE | (typeof ACCOUNT_SYNTHESIZED)[number], keyof AccountState>
->;
+const ACCOUNT_SYNTHESIZED = ['accountId', 'planVersionId', 'sourceHash'] as const;
 
 // -----------------------------------------------------------------------------
-// The fields the corpus's fixture format states and the scaffold's engine types
-// have no home for
+// THE LIST IS EMPTY, AND EMPTYING IT IS WHAT THIS SESSION DID
 // -----------------------------------------------------------------------------
-// GOLDEN_SCENARIOS section 2's printed example carries `account.phase`,
-// `account.opened_on`, `days[].adjustment_cents` and `settlements`. The engine
-// types written at the scaffold do not declare any of them, and
-// packages/rules-engine/src/types.ts says why in its own words: "THE FIELD SETS
-// BELOW ARE THE SCAFFOLD'S, NOT M01's".
+// It held four entries: `account.phase`, `account.opened_on`,
+// `days[].adjustment_cents` and `settlements`. All four were true of the
+// SCAFFOLD's engine types, which is what its old header said: `EngineInput` is
+// `{ planConfigVersion, accountState, dayMarks }` and has a home for none of
+// them. STATE item 3 said M01 empties the list and this is that.
 //
-// THE CHOICE HERE IS BETWEEN DROPPING THEM SILENTLY AND NAMING THEM. A dropped
-// input on a money path is the worst available outcome: the fixture states a
-// condition, the engine never sees it, and the scenario passes while pinning
-// something else. So the loader refuses any fixture field it can neither map
-// nor find on this list, the list is one visible place, and adding to it is a
-// diff a reviewer reads.
+//   account.phase              `RuleState.phase`, through the prior state
+//   account.opened_on          `initialState(plan, openedOn, engineVersion)`
+//   days[].adjustment_cents    `DailyMark.adjustmentCents` (SD-01, R-10)
+//   settlements                `DayInput.settlements` (empty only, see L-11)
 //
-// IT CANNOT ROT INTO A PERMANENT EXCUSE EITHER. L-14 asserts every entry is
-// actually used by some fixture, so an entry whose field stops appearing has to
-// be deleted rather than inherited.
-const AWAITING_M01_INPUT = [
-  'account.phase',
-  'account.opened_on',
-  'days[].adjustment_cents',
-  'settlements',
-] as const;
+// THE LIST STAYS, EMPTY, AND IS NOT DELETED. It is the mechanism rather than the
+// contents: the loader refuses any fixture field it can neither map nor find
+// here, so a format that grows a field the engine cannot take has one visible
+// place to declare it and a reviewer reads the diff. An empty list is the
+// strongest state it can be in, and L-14 keeps it from silently refilling with
+// entries nothing uses.
+const AWAITING_M01_INPUT: readonly string[] = [];
+
+/**
+ * Fields a fixture states that the ENGINE DERIVES, which is a different thing
+ * from a field it has no home for.
+ *
+ * `traded_day` is `fill_count > 0` by R-08. `DailyMark` carries no such field
+ * and `types.ts` is explicit that this is deliberate: the batch writes what it
+ * observed, the engine derives it, "and an engine that read them would be an
+ * engine whose breach and win-day arithmetic depended on the ingester agreeing
+ * with it".
+ *
+ * SO THE FIXTURE MAY STATE IT AND THE FOLD MAY NOT READ IT, and that is not the
+ * silent drop `AWAITING_M01_INPUT` exists to prevent: the value is not lost,
+ * it is RECOMPUTED, from `fill_count`, which the fixture also states. A fixture
+ * whose `traded_day` disagrees with its own `fill_count` is stating a
+ * contradiction, and `L-10` refuses it below rather than letting the fold quietly
+ * pick the one it happens to read.
+ */
+const DERIVED_BY_THE_ENGINE = ['days[].traded_day'] as const;
 
 /** The fixture keys this loader knows about at the top level. */
 const FIXTURE_KEYS = new Set([
@@ -408,6 +435,32 @@ export interface FixtureExpectation {
   readonly pins: string;
 }
 
+/**
+ * Exactly what the fold is called with, and nothing else.
+ *
+ * THIS IS `DayInput` MINUS THE TWO FIELDS THAT MOVE PER DAY. `advanceDay` takes
+ * `{ engineVersion, plan, prior, mark, calendar, settlements }`; `prior` is the
+ * fold's own carry and `mark` is one row of `marks`, so what a fixture supplies
+ * is everything else, once, for the whole stream.
+ */
+export interface FixtureInput {
+  readonly plan: ResolvedPlan;
+  readonly calendar: CalendarSlice;
+  /** `accounts.opened_on`. The day `initialState` opens the account on. */
+  readonly openedOn: TradingDay;
+  /**
+   * The phase the account is in before the first mark.
+   *
+   * `closed` and `graduated` are not startable and L-09 refuses them: both are
+   * terminal (R-24, R-49), so a fixture stating one is describing an account no
+   * day can be folded against, which `advanceDay` answers with `account_closed`
+   * rather than with the scenario's subject.
+   */
+  readonly startingPhase: 'eval' | 'funded';
+  readonly marks: readonly DailyMark[];
+  readonly settlements: readonly SettlementFact[];
+}
+
 export interface GoldenFixture {
   readonly id: string;
   readonly file: string;
@@ -415,8 +468,8 @@ export interface GoldenFixture {
   readonly source: string;
   readonly planName: string;
   readonly calendarName: string;
-  /** Exactly what the engine is called with, and nothing else. */
-  readonly input: EngineInput;
+  readonly accountId: AccountId;
+  readonly input: FixtureInput;
   readonly expected: FixtureExpectation;
 }
 
@@ -446,7 +499,20 @@ export function expectationPath(yamlFile: string): string {
   return yamlFile.replace(/\.yaml$/, '.expected.json');
 }
 
-function loadCalendar(dir: string, name: string, file: string): Set<string> {
+/**
+ * The calendar, as both the day set L-08 checks against and the slice the fold
+ * is handed.
+ *
+ * THE TWO COME FROM ONE READ ON PURPOSE. A loader that validated against a set
+ * built here and folded against a slice built somewhere else would have two
+ * answers to "is this day a session", and the fixture would be checked against
+ * the one that is not the engine's.
+ */
+function loadCalendar(
+  dir: string,
+  name: string,
+  file: string,
+): { days: Set<string>; slice: CalendarSlice } {
   const path = join(dir, 'calendars', `${name}.json`);
   const record = readJson(path, 'L-08', file);
 
@@ -461,8 +527,10 @@ function loadCalendar(dir: string, name: string, file: string): Set<string> {
   }
 
   const days = new Set<string>();
+  const rows: { trading_day: string; kind?: string }[] = [];
   for (const session of sessions) {
-    const day = (session as { trading_day?: unknown }).trading_day;
+    const row = session as { trading_day?: unknown; kind?: unknown };
+    const day = row.trading_day;
     if (typeof day !== 'string' || !TRADING_DAY_PATTERN.test(day)) {
       throw new FixtureError('L-08', file, `calendar ${name} holds a malformed session`);
     }
@@ -474,8 +542,29 @@ function loadCalendar(dir: string, name: string, file: string): Set<string> {
       );
     }
     days.add(day);
+    rows.push(
+      typeof row.kind === 'string' ? { trading_day: day, kind: row.kind } : { trading_day: day },
+    );
   }
-  return days;
+
+  try {
+    return {
+      days,
+      slice: buildSliceFromRecord({ coverage: { from: span.from, to: span.to }, sessions: rows }),
+    };
+  } catch (cause) {
+    // `buildCalendarSlice` throws `CalendarSliceError` on a malformed slice, and
+    // ADR-049 calls that "a caller defect, not a day the engine refuses". The
+    // caller here is this loader, so it arrives as the calendar rule that owns
+    // the record rather than as an unclassified crash.
+    throw new FixtureError(
+      'L-08',
+      file,
+      cause instanceof CalendarRecordError || cause instanceof Error
+        ? `calendar ${name}: ${cause.message}`
+        : `calendar ${name} could not be built into a slice`,
+    );
+  }
 }
 
 /**
@@ -625,14 +714,21 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
   if (typeof planName !== 'string' || planName.trim() === '') {
     throw new FixtureError('L-07', yamlFile, '"plan" is required');
   }
-  const plan = readJson(join(dir, 'plans', `${planName}.json`), 'L-07', yamlFile);
-  const planConfig: Record<string, unknown> = {};
-  for (const [field, key] of Object.entries(PLAN_CONFIG_SOURCE)) {
-    const value = plan[key];
-    if (value === undefined) {
-      throw new FixtureError('L-07', yamlFile, `plan ${planName} carries no "${key}"`);
-    }
-    planConfig[field] = value;
+  const planRecord = readJson(join(dir, 'plans', `${planName}.json`), 'L-07', yamlFile);
+  let plan: ResolvedPlan;
+  try {
+    plan = resolvePlanRecord(planRecord);
+  } catch (cause) {
+    // `resolvePlanRecord` already carries `L-07`; this is where it becomes the
+    // `FixtureError` the rest of the loader throws, naming the fixture that
+    // asked for the record rather than the record alone.
+    throw new FixtureError(
+      'L-07',
+      yamlFile,
+      cause instanceof PlanRecordError
+        ? `plan ${planName}: ${cause.detail}`
+        : `plan ${planName} could not be resolved: ${String(cause)}`,
+    );
   }
 
   // L-08  The calendar resolves, and every day in the stream is a session it
@@ -641,7 +737,7 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
   if (typeof calendarName !== 'string' || calendarName.trim() === '') {
     throw new FixtureError('L-08', yamlFile, '"calendar" is required');
   }
-  const sessions = loadCalendar(dir, calendarName, yamlFile);
+  const { days: sessions, slice: calendar } = loadCalendar(dir, calendarName, yamlFile);
 
   // L-09  The account block.
   const account = document['account'];
@@ -660,12 +756,56 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
       );
     }
     const mapped = Object.values(ACCOUNT_SOURCE).includes(key as never);
-    const awaiting = (AWAITING_M01_INPUT as readonly string[]).includes(`account.${key}`);
+    const awaiting = AWAITING_M01_INPUT.includes(`account.${key}`);
     if (!mapped && !awaiting) {
       throw new FixtureError('L-09', yamlFile, `account field "${key}" reaches no engine input`);
     }
   }
   const sizeCents = requireInteger(account['size_cents'], 'L-09', yamlFile, 'account.size_cents');
+
+  // L-09  THE SIZE IS STATED TWICE AND BOTH STATEMENTS REACH THE FOLD. The
+  //       fixture states `account.size_cents` and the plan record states
+  //       `size.size_cents`, and `advanceDay` reads only the plan's: R-26
+  //       measures profit against `plan.sizeCents`, R-35 subtracts it, INV-20
+  //       compares against it. A fixture whose account size disagreed with its
+  //       plan would be graded entirely against the plan's number while a reader
+  //       checked the arithmetic against the fixture's.
+  if (BigInt(sizeCents) !== plan.sizeCents) {
+    throw new FixtureError(
+      'L-09',
+      yamlFile,
+      `account.size_cents is ${String(sizeCents)} and plan ${planName} is sized ` +
+        `${plan.sizeCents}; the fold reads the plan's and a reader would read this one`,
+    );
+  }
+
+  // L-09  The phase the account starts in, which `AWAITING_M01_INPUT` used to
+  //       hold because `EngineInput` had nowhere to put it. `RuleState.phase` is
+  //       where it goes now.
+  const phase = account['phase'];
+  if (phase !== 'eval' && phase !== 'funded') {
+    throw new FixtureError(
+      'L-09',
+      yamlFile,
+      `account.phase must be "eval" or "funded", found ${JSON.stringify(phase)}. ` +
+        '`closed` and `graduated` are terminal (R-24, R-49) and no day folds against either',
+    );
+  }
+  if (phase === 'eval' && plan.eval === null) {
+    // `initialState` puts an account in `funded` exactly when the plan has no
+    // evaluation phase (Direct, Appendix A.3), so an eval fixture on such a plan
+    // states a phase the engine cannot construct.
+    throw new FixtureError(
+      'L-09',
+      yamlFile,
+      `account.phase is "eval" and plan ${planName} has no evaluation phase`,
+    );
+  }
+
+  const openedOn = account['opened_on'];
+  if (typeof openedOn !== 'string' || !TRADING_DAY_PATTERN.test(openedOn)) {
+    throw new FixtureError('L-09', yamlFile, 'account.opened_on must be YYYY-MM-DD');
+  }
 
   // L-10  The day stream. Every field DayMark declares is supplied by the
   //       fixture; nothing is derived here.
@@ -677,7 +817,7 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
   const days = document['days'];
   if (!Array.isArray(days)) throw new FixtureError('L-10', yamlFile, '"days" must be a list');
 
-  const dayMarks: DayMark[] = [];
+  const dayMarks: DailyMark[] = [];
   let previousDay = '';
   for (const [index, row] of days.entries()) {
     const where = `days[${index}]`;
@@ -685,8 +825,9 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
 
     for (const key of Object.keys(row)) {
       const mapped = Object.values(DAY_MARK_SOURCE).includes(key as never);
-      const awaiting = (AWAITING_M01_INPUT as readonly string[]).includes(`days[].${key}`);
-      if (!mapped && !awaiting) {
+      const awaiting = AWAITING_M01_INPUT.includes(`days[].${key}`);
+      const derived = (DERIVED_BY_THE_ENGINE as readonly string[]).includes(`days[].${key}`);
+      if (!mapped && !awaiting && !derived) {
         throw new FixtureError('L-10', yamlFile, `${where} field "${key}" reaches no engine input`);
       }
     }
@@ -710,20 +851,42 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
     }
     previousDay = tradingDay;
 
+    const fillCount = requireInteger(row['fill_count'], 'L-10', yamlFile, `${where}.fill_count`);
+
+    // L-10  `traded_day` IS DERIVED AND IS STILL CHECKED. R-08 is
+    //       `fill_count > 0` and `DailyMark` carries no `tradedDay`, so the
+    //       fixture's statement reaches no engine input. It is not dropped: it
+    //       is compared against the value the engine will derive from the same
+    //       row, because a fixture asserting `traded_day: false` beside
+    //       `fill_count: 3` is stating a contradiction, and the fold would
+    //       silently resolve it in favour of the field the fixture author was
+    //       not looking at.
     const tradedDay = row['traded_day'];
     if (typeof tradedDay !== 'boolean') {
       throw new FixtureError('L-10', yamlFile, `${where}.traded_day must be true or false`);
     }
-
-    const adjustment = row['adjustment_cents'];
-    if (adjustment !== undefined && adjustment !== 0) {
-      // Carried-and-ignored is not an option on a money field.
+    if (tradedDay !== fillCount > 0) {
       throw new FixtureError(
-        'L-11',
+        'L-10',
         yamlFile,
-        `${where}.adjustment_cents is ${JSON.stringify(adjustment)} and the engine has nowhere to put it`,
+        `${where}.traded_day is ${String(tradedDay)} and fill_count is ${String(fillCount)}; ` +
+          'R-08 derives the first from the second and the engine will read only the second',
       );
     }
+
+    // `adjustment_cents` NOW HAS A HOME AND L-11's REFUSAL OF IT IS RETIRED.
+    // Its own comment said so: "M01 folds settlements into the day stream and
+    // this refusal expires there". `DailyMark.adjustmentCents` is SD-01's
+    // non-trading movement, applied at the open of its effective day (R-10), and
+    // INV-18 is stated against it. An absent key is zero, which is what a day
+    // with no movement has, and is the only default in this file that states a
+    // fact rather than choosing a parameter.
+    const adjustmentCents =
+      row['adjustment_cents'] === undefined
+        ? 0n
+        : BigInt(
+            requireInteger(row['adjustment_cents'], 'L-10', yamlFile, `${where}.adjustment_cents`),
+          );
 
     // MONEY CROSSES INTO THE ENGINE AS `bigint`, AND JSON HAS NO LITERAL FOR
     // ONE. `Cents` is `bigint` (M01 section 2.1, INV-02: "all money is `bigint`
@@ -760,28 +923,35 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
       realizedPnlCents: BigInt(
         requireInteger(row['realized_pnl_cents'], 'L-10', yamlFile, `${where}.realized_pnl_cents`),
       ),
-      fillCount: requireInteger(row['fill_count'], 'L-10', yamlFile, `${where}.fill_count`),
-      tradedDay,
+      adjustmentCents,
+      fillCount,
+      // Synthesized, and deliberately not digest-shaped. See ACCOUNT_SYNTHESIZED.
+      sourceHash: `fixture:${id}:${tradingDay}`,
     });
   }
 
-  // L-11  Settlements have no home on `EngineInput` yet, so a fixture may state
-  //       the empty list and may not state anything else. M01 folds settlements
-  //       into the day stream (M01 section 3.1) and this refusal expires there.
+  // L-11  SETTLEMENTS ARE AN ENGINE INPUT NOW AND THE REFUSAL SURVIVES FOR A
+  //       DIFFERENT REASON. `DayInput.settlements` is a `SettlementFact[]` and
+  //       DO-2 applies them in ordinal order, so the shape exists. What does not
+  //       exist is a fixture that states one: `SettlementFact` needs
+  //       `payoutRequestId`, `ordinal`, `approvedCents`, `basisTradingDay` and
+  //       `effectiveTradingDay`, the format has no block for them, and every
+  //       fixture in the directory states `settlements: []`.
+  //
+  //       INVENTING THE FIVE FIELDS HERE WOULD BE THE LOADER WRITING A FIXTURE.
+  //       So the empty list passes through to the fold and a non-empty one is
+  //       refused, naming what it would take to accept one rather than naming an
+  //       engine limitation that is no longer true.
   const settlements = document['settlements'];
   if (settlements !== undefined && (!Array.isArray(settlements) || settlements.length > 0)) {
     throw new FixtureError(
       'L-11',
       yamlFile,
-      'settlements are not yet an engine input; only an empty list may be stated',
+      'the fixture format states no settlement fields, so only an empty list may be stated. ' +
+        'DayInput.settlements takes SettlementFact, which needs payout_request_id, ordinal, ' +
+        'approved_cents, basis_trading_day and effective_trading_day',
     );
   }
-
-  const accountState: AccountState = {
-    accountId: id as AccountId,
-    planVersionId: planConfig['planVersionId'] as PlanVersionId,
-    sizeCents: BigInt(sizeCents),
-  };
 
   return {
     id,
@@ -790,10 +960,14 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
     source,
     planName,
     calendarName,
+    accountId: id as AccountId,
     input: {
-      planConfigVersion: planConfig as unknown as PlanConfigVersion,
-      accountState,
-      dayMarks,
+      plan,
+      calendar,
+      openedOn: openedOn as TradingDay,
+      startingPhase: phase,
+      marks: dayMarks,
+      settlements: [] as readonly SettlementFact[],
     },
     expected: {
       end_state: endState as Record<string, unknown>,
