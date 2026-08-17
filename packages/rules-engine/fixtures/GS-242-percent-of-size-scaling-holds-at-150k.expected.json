@@ -1,0 +1,22 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 15320000,
+    "withdrawable_cents": 20000,
+    "traded_days_count": 3,
+    "win_days_count": 2,
+    "consistency_best_day_cents": 230001,
+    "consistency_period_profit_cents": 320000,
+    "consistency_period_start_day": "2026-11-03"
+  },
+  "events": [
+    "rule.floor_locked",
+    "phase.passed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed"
+  ],
+  "pins": "the four bp-expressed parameters derive independently at 15,000,000c and each one breaks a different field if it does not, while min_payout_cents stays at 10,000 and the withdrawable is placed where a scaled minimum would change the answer",
+  "note": "`win_days_count: 2` IS THE FIELD THAT CANNOT BE SATISFIED BY ACCIDENT. Three days are traded and their P&L is 45,000c, 44,999c and 230,001c. A win floor derived at 45,000c counts two of them. A floor left at the 50K figure of 15,000c counts three. A floor scaled by the wrong factor, or read off the 25K column at 7,500c, also counts three. A floor derived as a percentage of the wrong base counts one or none. ONLY 45,000 GIVES 2, and `traded_days_count: 3` is stated beside it so an engine that conflated R-08 with R-09 fails on the pair rather than on neither. THE DRAWDOWN IS PINNED THROUGH THE BREACH CHECK RATHER THAN THROUGH A STATE FIELD, and that is a deliberate second-best. Day two's low is exactly 14,250,000c, which is 15,000,000 less the 750,000c the 500bp figure derives to, and R-21's strict `<` means the day survives at exactly the floor and breaches one cent below it. A drawdown that derived to anything SMALLER puts the floor above 14,250,000 and this stream breaches on day two, which is loud: the phase would be `closed`, the balance would stop at 15,045,000, and five of the eight pinned fields would move at once. `floor_cents` ITSELF IS NOT PINNED AND ADR-050 IS WHY. This stream crosses an eval pass, the pass day engages the lock at 760,000c against a 900,000c target, and whether `floorLocked` carries across the funded reset is the INV-07 question ADR-050 explicitly declines to rule. Under 'cleared' the floor trails to 14,295,000 and then 14,339,999; under 'carried' it stays frozen at 14,250,000. `high_water_balance_cents` and `floor_locked` are unpinned for the same reason. EVERY LOW AFTER DAY TWO SITS ABOVE BOTH CANDIDATES, so the breach outcome and the event list are identical under either reading, and day two's own comparison is against the reset floor, which both readings agree DO-8 wrote. THE MINIMUM PAYOUT IS THE ONE PARAMETER PINNED BY PLACEMENT RATHER THAN BY VALUE. `withdrawable_cents: 20000` sits above the 10,000c minimum Appendix A fixes at every size and below the 30,000c that scaling it three times would produce, so `min(withdrawable, cap) >= min_payout_cents` is true here and false under a scaled minimum. R-39's gate result is in `engine_gates`, which is nested and which compare.ts cannot reach with Object.is, so the input is pinned and the counterfactual is recorded here rather than asserted. THIS ACCOUNT IS NOT ELIGIBLE AND THE FIXTURE DOES NOT CLAIM IT IS. Win days are 2 against a required 5, and funded consistency is 230,001 on 320,000, which is 7188bp against a 3000bp limit. The scenario is about parameter derivation at a second size; eligibility at 150K would be a different stream and a different row. THE CAP AT 450,000c IS DERIVED IN THE PLAN RECORD AND REACHED BY NOTHING HERE, because R-43's clamp lives in `evaluatePayout` rather than in the day fold. L-07 checks the record loads and the record states the 300bp derivation; the fixture does not pretend to fold it."
+}
