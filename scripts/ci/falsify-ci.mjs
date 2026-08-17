@@ -178,6 +178,98 @@ function report(path) {
 // `needles` are what the finding must SAY. A case whose needle is merely the
 // name of the tool would be satisfied by a crash.
 
+// -----------------------------------------------------------------------------
+// A KILLED RUN MUST NOT LEAVE A MUTANT IN THE TREE
+// -----------------------------------------------------------------------------
+// `seededEdit` and `seededInTree` restore in a `finally`, and A `finally` DOES
+// NOT RUN WHEN THE PROCESS IS KILLED. This suite takes minutes, so it is
+// routinely killed: a CI timeout, an impatient laptop, a session harness with a
+// two-minute budget. The mutation then survives as an uncommitted working-tree
+// edit, and the next thing to touch the tree is a `git add -A`.
+//
+// THIS IS NOT HYPOTHETICAL AND IT HAPPENED TWICE IN ONE SESSION. A timed-out run
+// left the `R-33` mutant in `gates.ts` (`tradedDaysSkipped` pinned to `false`,
+// so CV-19's disabled gate reads as SATISFIED rather than skipped, which is
+// GS-080's exact failure), and the retry that proved the fix left `R-37`'s. The
+// first was caught only because the next run's own "the mutant found no ..."
+// error fired against the already-mutated line. That is the harness noticing by
+// luck, and it is one `git add -A` away from a seeded money-path defect landing
+// on a branch.
+//
+// A SIGNAL HANDLER IS NOT THE FIX AND WAS TRIED FIRST. The gate runs its child
+// SYNCHRONOUSLY, so node is blocked inside the spawn for the whole of each case
+// and a queued handler cannot run until it returns. `SIGKILL` is uncatchable in
+// any case. So the restore has to survive the process dying at an arbitrary
+// instant, which means it has to be ON DISK BEFORE THE MUTATION IS.
+//
+// The journal is written before each seed and truncated after it, and the next
+// run restores from it and says so. Recovery is therefore automatic and LOUD:
+// silent recovery would hide a harness that crashes every run.
+const JOURNAL = join(ROOT, '.falsify-pending.json');
+
+/** @type {Map<string, string | null>} path -> original contents, `null` when it did not exist */
+const PENDING = new Map();
+
+function writeJournal() {
+  if (PENDING.size === 0) {
+    rmSync(JOURNAL, { force: true });
+    return;
+  }
+  writeFileSync(JOURNAL, JSON.stringify(Object.fromEntries(PENDING), null, 2));
+}
+
+/** Record a file's pre-seed state, ON DISK, before it is touched. */
+function beginSeed(paths) {
+  for (const path of paths) {
+    PENDING.set(path, existsSync(path) ? readFileSync(path, 'utf8') : null);
+  }
+  writeJournal();
+}
+
+/** Put the files back and drop them from the journal. */
+function endSeed(paths) {
+  for (const path of paths) {
+    const before = PENDING.get(path);
+    if (before === null) rmSync(path, { force: true });
+    else if (before !== undefined) writeFileSync(path, before);
+    PENDING.delete(path);
+  }
+  writeJournal();
+}
+
+/**
+ * Undo whatever a previous run was killed in the middle of.
+ *
+ * RUN BEFORE ANY CASE, because a case seeded on top of a surviving mutation
+ * tests neither one.
+ */
+function recoverFromKilledRun() {
+  if (!existsSync(JOURNAL)) return;
+  /** @type {Record<string, string | null>} */
+  const pending = JSON.parse(readFileSync(JOURNAL, 'utf8'));
+  const paths = Object.keys(pending);
+  for (const path of paths) {
+    const before = pending[path];
+    if (before === null) rmSync(path, { force: true });
+    else writeFileSync(path, before);
+  }
+  rmSync(JOURNAL, { force: true });
+  process.stderr.write(
+    `RECOVERED ${paths.length} seeded file(s) left behind by a killed run:\n` +
+      paths.map((p) => `  ${p}\n`).join('') +
+      'A previous invocation was killed mid-case. The tree is restored; nothing else was changed.\n\n',
+  );
+}
+
+// Still worth having for the window between cases, where node is not blocked in
+// a child and an interactive interrupt can be honoured immediately.
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.on(signal, () => {
+    for (const path of [...PENDING.keys()]) endSeed([path]);
+    process.exit(signal === 'SIGINT' ? 130 : 143);
+  });
+}
+
 /**
  * @typedef {object} Case
  * @property {string} id
@@ -196,12 +288,13 @@ function report(path) {
  * @returns {Ran}
  */
 function seededInTree(files, gate) {
-  const planted = Object.keys(files);
+  const paths = Object.keys(files).map((rel) => join(ROOT, rel));
+  beginSeed(paths);
   try {
     for (const [rel, body] of Object.entries(files)) write(ROOT, rel, body);
     return gate();
   } finally {
-    for (const rel of planted) rmSync(join(ROOT, rel), { force: true });
+    endSeed(paths);
   }
 }
 
@@ -218,11 +311,12 @@ function seededInTree(files, gate) {
 function seededEdit(rel, edit, gate) {
   const path = join(ROOT, rel);
   const before = readFileSync(path, 'utf8');
+  beginSeed([path]);
   try {
     writeFileSync(path, edit(before));
     return gate();
   } finally {
-    writeFileSync(path, before);
+    endSeed([path]);
   }
 }
 
@@ -854,6 +948,124 @@ const CASES = [
   })),
 
   // ---------------------------------------------------------------------------
+  // CI-02  THE PUBLISH PATH: CV-01 TO CV-19, THE MZ FINDINGS, AND resolvePlan
+  // ---------------------------------------------------------------------------
+  // The `RE-C-nn` series is the config half of M01 section 8.1 and its operators
+  // need the same treatment the `RE-U-nn` series got: a test that does not go
+  // red when its comparison is flipped is asserting nothing.
+  //
+  // SIX OF THE NINETEEN ARE SEEDED RATHER THAN ALL NINETEEN, and the choice is
+  // stated so it is a judgement rather than an omission. The four operator
+  // mutants below are the ones where a plausible edit CHANGES WHAT PUBLISHES:
+  // CV-11 and CV-17 are the two halves of INV-21, CV-12 is what stops the floor
+  // jumping at the lock, and CV-01 is R-17. CV-09 and CV-15 are seeded because
+  // each is an equality or an identity that reads correctly when written the
+  // wrong way. The remaining thirteen are `>=` against a constant with no second
+  // reading, and their `RE-C` cases already assert both sides.
+  //
+  // THE LAST TWO ARE NOT CV RULES. `MZ-per-phase` is this session's own finding
+  // and a finding nobody watched fail is a finding nobody has tested; the
+  // `resolvePlan` mutant is the percentage M01 section 2.4 exists to keep out of
+  // the runtime, and it is the one edit in this package that would look like a
+  // simplification in a diff.
+  ...[
+    {
+      id: 'CV-01',
+      seeds:
+        '`intraday_trailing` admitted by CV-01, which is R-17 computing something plausible instead of failing loudly (GS-078)',
+      file: 'packages/rules-engine/src/plan/validate.ts',
+      from: "if (d.type !== 'trailing_eod' && d.type !== 'static') {",
+      to: "if (d.type !== 'trailing_eod' && d.type !== 'static' && d.type !== 'intraday_trailing') {",
+      needles: ['RE-C-01', 'CV-01'],
+    },
+    {
+      id: 'CV-09',
+      seeds:
+        'the first-rung check loosened from `!== 1` to `< 1`, so a schedule starting at ordinal 2 publishes and ordinal 1 has no cap',
+      file: 'packages/rules-engine/src/plan/validate.ts',
+      from: 'if (first.from_ordinal !== 1) {',
+      to: 'if (first.from_ordinal < 1) {',
+      needles: ['RE-C-09', 'CV-09'],
+    },
+    {
+      id: 'CV-11',
+      seeds:
+        'CV-11 relaxed from `>` to `>=`, so a buffer EQUAL to the locked-floor offset publishes and a post-payout balance lands exactly on the floor (INV-21)',
+      file: 'packages/rules-engine/src/plan/validate.ts',
+      from: 'if (!(size.buffer_cents > offset)) {',
+      to: 'if (!(size.buffer_cents >= offset)) {',
+      needles: ['RE-C-11', 'CV-11'],
+    },
+    {
+      id: 'CV-12',
+      seeds:
+        'CV-12 weakened from an equality to a one-sided bound, so a lock trigger ABOVE the trailing floor publishes and the floor jumps when it engages (R-15)',
+      file: 'packages/rules-engine/src/plan/validate.ts',
+      from: 'if (atProfit !== expected) {',
+      to: 'if (atProfit < expected) {',
+      needles: ['RE-C-12', 'CV-12'],
+    },
+    {
+      id: 'CV-15',
+      seeds:
+        'CV-15 loosened from an equality to a floor, so a config edit can raise the minimum payout above the 10,000c GLOSSARY fixes and never scales',
+      file: 'packages/rules-engine/src/plan/validate.ts',
+      from: 'if (fu.min_payout_cents !== MIN_PAYOUT_CENTS) {',
+      to: 'if (fu.min_payout_cents < MIN_PAYOUT_CENTS) {',
+      needles: ['RE-C-15', 'CV-15'],
+    },
+    {
+      id: 'CV-17',
+      seeds:
+        'CV-17 relaxed from `<` to `<=`, which is the other half of INV-21: a cap EQUAL to the drawdown means the payout breaches the account that earned it (GS-083)',
+      file: 'packages/rules-engine/src/plan/validate.ts',
+      from: 'if (!(sched[i]!.cap_cents < size.drawdown_cents)) {',
+      to: 'if (!(sched[i]!.cap_cents <= size.drawdown_cents)) {',
+      needles: ['RE-C-17', 'CV-17'],
+    },
+    {
+      id: 'MZ-per-phase',
+      seeds:
+        'the per-phase materialization check gated off, so a plan declaring two different drawdowns publishes and one phase silently gets the other’s number',
+      file: 'packages/rules-engine/src/plan/validate.ts',
+      from: '    if (ev.drawdown.amount_bp !== fu.drawdown.amount_bp) {',
+      to: '    if (false && ev.drawdown.amount_bp !== fu.drawdown.amount_bp) {',
+      needles: ['MZ-per-phase'],
+    },
+    {
+      id: 'resolve-percentage',
+      // M01 section 2.4: "No percentage is ever applied to a money value at
+      // runtime. That single rule is what makes the marketing page and the
+      // engine agree to the cent." The mutant is the edit that looks like a
+      // tidy-up: deriving the drawdown from the bp instead of reading the
+      // materialized column. On every v1 plan it produces the SAME NUMBER, which
+      // is exactly why it needs a test that does not.
+      seeds:
+        'the drawdown recomputed from `amount_bp` at resolution instead of read from `plan_version_sizes`, which is the one-cent drift the table exists to prevent',
+      file: 'packages/rules-engine/src/plan/resolve.ts',
+      from: '    drawdownCents: size.drawdown_cents,',
+      to: '    drawdownCents: (size.size_cents * BigInt(published.amount_bp)) / 10_000n,',
+      needles: ['no percentage is applied'],
+    },
+  ].map(({ id, seeds, file, from, to, needles }) => ({
+    id: `CI-02/engine-${id}`,
+    stage: 'CI-02',
+    seeds,
+    needles,
+    run: () =>
+      seededEdit(
+        file,
+        (before) => {
+          if (!before.includes(from)) {
+            throw new Error(`the ${id} mutant found no "${from}" in ${file}`);
+          }
+          return before.replace(from, to);
+        },
+        () => run('pnpm', ['exec', 'vitest', 'run', '--project', 'unit']),
+      ),
+  })),
+
+  // ---------------------------------------------------------------------------
   // CI-02  RE-P-01, WATCHED FAILING IN BOTH OF ITS DIRECTIONS
   // ---------------------------------------------------------------------------
   // The `RE-U-nn` series above proves the unit suite's operators bite. RE-P-01
@@ -1146,6 +1358,11 @@ function sweep() {
 
 function main() {
   const [arg] = process.argv.slice(2);
+
+  // BEFORE ANYTHING ELSE, INCLUDING `list`. A surviving mutation is a defect in
+  // the working tree whether or not this invocation intends to run a case, and
+  // the cheapest moment to remove it is any moment this script starts.
+  recoverFromKilledRun();
 
   if (arg === 'list') {
     for (const c of CASES) {

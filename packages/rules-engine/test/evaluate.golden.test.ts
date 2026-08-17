@@ -60,6 +60,8 @@ test('the engine entry point is the whole public surface, and it is this exact l
     'initialState',
     'lookupCalendarDay',
     'nextTradingDayAfter',
+    'resolvePlan',
+    'validatePlan',
   ]);
   expect(typeof engine.evaluate).toBe('function');
   expect(typeof engine.advanceDay).toBe('function');

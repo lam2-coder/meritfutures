@@ -17,3 +17,9 @@ build/
 coverage/
 
 .DS_Store
+
+# `scripts/ci/falsify-ci.mjs`'s crash journal. It holds the pre-seed contents of
+# whatever file a mutant is currently sitting on, so a killed run can be undone
+# by the next one. It exists only while a case is in flight and must never be
+# committed: it is a copy of tracked source, and a stale copy at that.
+.falsify-pending.json

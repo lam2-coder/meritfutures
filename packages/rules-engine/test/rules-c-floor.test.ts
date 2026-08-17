@@ -5,18 +5,20 @@
 // is written out beside it in integer cents so a reader checks the number
 // instead of trusting it (P2 section 2's second traceability tier).
 //
-// R-17 AND R-20 ARE THE TWO THAT ASSERT AN ABSENCE, and neither is declared in
-// `IMPLEMENTED_RULES`. R-17 is "config-supported and unimplemented", discharged
-// by `DrawdownType` being a closed two-member union and, when it exists, by
-// CV-01 in `validatePlan`. R-20's setpoint is pushed by M02 and the engine
-// performs no I/O; what it owes is the number, and `day.closed.floorCents`
-// carrying the state's own floor is the assertion. R-19 is in `settle.ts`'s
-// suite rather than here, because settlement is where its absence is discharged.
+// R-20 ASSERTS AN ABSENCE AND IS NOT DECLARED: its setpoint is pushed by M02 and
+// the engine performs no I/O, so what it owes is the number, and
+// `day.closed.floorCents` carrying the state's own floor is the assertion.
+// R-17 WAS BESIDE IT UNTIL `validatePlan` LANDED and is now declared: CV-01 is
+// inside this package by M01 section 1.3's layout, so "rejected at publish"
+// was never somebody else's job. R-19 is in `settle.ts`'s suite rather than
+// here, because settlement is where its absence is discharged.
 // =============================================================================
 
 import { expect, test } from 'vitest';
 
 import { advanceDay, initialState } from '../src/day/advance.js';
+import { resolvePlan } from '../src/plan/resolve.js';
+import { validatePlan } from '../src/plan/validate.js';
 import { advanceFloor, initialFloorCents } from '../src/day/floor.js';
 import { EngineInvariantError } from '../src/errors.js';
 import type { DayOutput, DrawdownType, ResolvedPlan, RuleState } from '../src/types.js';
@@ -30,6 +32,7 @@ import {
   withStaticDrawdown,
   withoutFloorLock,
 } from './fixtures-in-code.js';
+import { CORE_50K_SIZE, CORE_FUNDED, coreRules } from './published-plans-in-code.js';
 import { reU } from './rule-coverage.js';
 
 /** One funded day, folded. Every test in this file is one of these. */
@@ -311,11 +314,13 @@ test(reU('R-18'), () => {
 // R-17  intraday trailing is config-supported and unimplemented
 // -----------------------------------------------------------------------------
 test(reU('R-17'), () => {
-  // "CONFIG-SUPPORTED AND UNIMPLEMENTED. Rejected at publish by CV-01." Two
-  // layers hold that and only one of them is in this package. CV-01 is
-  // `validatePlan`'s and `validatePlan` does not exist yet, which is P2-1's; what
-  // exists today is the type, and the type is the stronger of the two because it
-  // makes the config unrepresentable rather than rejected.
+  // "CONFIG-SUPPORTED AND UNIMPLEMENTED. Rejected at publish by CV-01." THREE
+  // layers hold that and all three are in this package. CV-01 rejects the
+  // publish, `resolvePlan` refuses rather than narrowing, and `DrawdownType`
+  // makes the resolved config unrepresentable. The third is the strongest and
+  // the first is the one R-17's own row names, which is why the rule is declared
+  // only now: `RE-C-01` and `plan-resolve.test.ts` carry the two runtime halves
+  // and the compile-time half stays here.
   //
   // BOTH SIDES OF THE UNION, AND THE THIRD MEMBER THAT IS NOT ONE. `DrawdownType`
   // is `'trailing_eod' | 'static'`, so an `intraday_trailing` plan cannot be
@@ -327,6 +332,20 @@ test(reU('R-17'), () => {
   const intraday: DrawdownType = 'intraday_trailing';
   expect([trailing, staticType]).toEqual(['trailing_eod', 'static']);
   expect(intraday).toBe('intraday_trailing');
+
+  // AND THE TWO RUNTIME HALVES, because a compile-time assertion cannot see a
+  // plan arriving from the database. CV-01 refuses the publish and `resolvePlan`
+  // refuses the config, and both sides of the membership test are asserted: the
+  // two admitted members pass and the third does not.
+  const admitted = coreRules();
+  expect(validatePlan(admitted, [CORE_50K_SIZE]).errors).toEqual([]);
+  expect(() => resolvePlan(admitted, CORE_50K_SIZE)).not.toThrow();
+
+  const refused = coreRules({
+    funded: { drawdown: { ...CORE_FUNDED.drawdown, type: 'intraday_trailing' } },
+  });
+  expect(validatePlan(refused, [CORE_50K_SIZE]).errors.map((e) => e.id)).toContain('CV-01');
+  expect(() => resolvePlan(refused, CORE_50K_SIZE)).toThrow(/CV-01/);
 
   // AND THE FLOOR IS COMPUTED FROM THE CLOSE ON EVERY BRANCH THAT EXISTS, which
   // is the behavioural half: there is no code path that raises a floor from an

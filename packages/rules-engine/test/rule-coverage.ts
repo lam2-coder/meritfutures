@@ -56,7 +56,7 @@ export const RULE_ASSERTIONS = {
     'the lock engages at closing - size >= at_profit_cents, is permanent, and never lowers the trailed floor',
   'R-16': 'a static drawdown holds floor = size_cents - drawdown_cents for life',
   'R-17':
-    'intraday trailing is unimplemented, and `DrawdownType` is the closed union that makes it unrepresentable',
+    'intraday trailing is unimplemented: CV-01 rejects it at publish, `resolvePlan` refuses it, and `DrawdownType` is the closed union it cannot reach',
   'R-18': 'the breach comparator is the floor AT THE OPEN, trailed strictly afterwards',
   'R-19': 'a settlement writes NONE of the floor, the high-water balance or the lock (ADR-014)',
   'R-20':
@@ -124,8 +124,6 @@ export const DISCHARGED_ELSEWHERE = {
     '`trading_calendar.session_open_at` and `session_close_at`, and `0032`’s constraints over them. `CalendarDay` carries neither column, so the timezone conversion R-05 forbids is unwritable here rather than merely unwritten',
   'R-11':
     'the caller’s `superseded_by is null` predicate, and replay recomputing forward. `DailyMark` carries no supersession field, so there is no branch a superseded mark could take and no check the engine could add without a new column',
-  'R-17':
-    'CV-01 at publish, in `validatePlan`, which is P2-1’s and does not exist yet. What holds it today is stronger and is in this package: `DrawdownType` has two members, so an `intraday_trailing` plan is a compile error rather than a rejected config',
   'R-32':
     'nothing, and that is the finding rather than the blocker. The refusal is implemented and asserted; what is unruled is R-32’s ANCHOR (neither it nor `G-EXPIRED` names the day the trading days elapse from) and WHICH COLUMN BINDS (a count against `max_days`, or the stored `accounts.expires_on` date). Both are founder rulings',
   'R-20':
