@@ -129,6 +129,44 @@ Each is asserted from both sides in [`test/loader.test.ts`](../../golden-loader/
 
 **What batch 5 deliberately did not do: add a calendar.** A longer synthetic slice was the obvious repair and it was worked out before it was found to be unnecessary, so the reasoning is recorded rather than discarded. It would have been legitimate on [`calendar.ts`](../src/calendar.ts)'s own `GAPPED_SLICE` precedent, where session 47 ruled that "what TR-01 forbids is writing down which days the exchange trades" and a slice supplied to make two answers disagree is not that. **It was dropped because it unblocks nothing.** GS-064 fits in four sessions on Merit Rapid, GS-070's blocker turned out not to be the calendar, and every other held-back row is blocked on a settlement, a clamp, a nested gate, a second account, or an input `EngineInput` does not have. **A convention introduced for a fixture that did not need it is a convention the next session inherits and cannot audit.**
 
+### Batch 6 wrote no fixture, and the count stays at thirty
+
+**Batch 6 was commissioned to write the thirty-first and it wrote none.** That is the finding rather than a shortfall, and the alternative was worse: every one of the forty-eight held-back rows below was re-derived against its primary source this batch, **all forty-eight still bind**, and writing a fixture for any of them would have meant inventing an input, which is what TR-01 forbids. Batch 5 could write one because it found a reason that was **wrong**. This batch looked for the same thing and found none that unblocks a scenario.
+
+**The reconciliation is mechanical rather than read by eye**, because that is the check batch 4 introduced and the only kind that stays true:
+
+| | |
+|---|---|
+| M1 partition | **73** |
+| Written | **30** |
+| Named on a held-back row | **43**, and the rows also carry five *cross-references* to written fixtures (GS-021, GS-022, GS-054, GS-055, GS-064) which are explanations inside other rows rather than claims that those files are missing |
+| **Unaccounted** | **none** |
+
+**One held-back reason has expired at its head while still binding at its tail, which is the shape session 49 named and this is its inverse.** `GS-141`'s row opens "`validatePlan` is P2-1" — **`validatePlan` landed in P2-1** and that clause is now false. The row still holds on its other two clauses: the scenario is a publish diff **across three plans** rather than one account's day stream, and `PW-02a` against `PW-02b` is a message-classification claim no end state carries. **An expired clause standing in front of a binding one is as misleading as a true one standing in front of a binding one**, and it will send a reader to unblock something that is already unblocked. The row is corrected below.
+
+### What these thirty fixtures currently prove, and what they will prove
+
+**Stated plainly here because the stage's own block states it per run, and a reader of this directory is not looking at a CI log.**
+
+`packages/golden-loader/src/run.ts` still folds **`evaluate`**, the scaffold's identity evaluation, which returns the state it was given and emits nothing. So today these thirty prove:
+
+- that they **load and parse** in the YAML subset, with zero load failures;
+- that every id is one of the 284 the registry defines;
+- that every one states a **pin** and a **citation that resolves in M01** (`L-13`);
+- and that every one **fails** against a fold that computes nothing, which is TR-02's window asserted rather than suffered.
+
+They do **not** prove that any expected end state is the number the corpus states. The stage measures that and says so: **a corrupted expected end state still passes for 30 of 30**, because any expectation at all produces diffs against an engine computing nothing. **That is not a defect in these files.** It is what the inverted window means, and it ends for a fixture the moment the folded function runs the rules the fixture cites, with nothing here edited.
+
+### The polarity every one of the thirty derives, measured
+
+[ADR-048](../../../docs/decisions/ADR-048.md)'s per-fixture derivation and `L-13` have both landed. The result, read off the stage rather than reasoned about:
+
+**All thirty derive `direct`. None derives `inverted`.** Every fixture in this directory cites at least one `R-nn`, and the engine declares 45 of 50, so every citation resolves. **The empty-citation case that derives `inverted` catches nothing here** — it is a guard against a fixture that has not been written yet, not a reclassification of any that has.
+
+**No fixture's polarity changed meaning, and the reason is one level up from any fixture.** The derivation is **reported and not enforced**, because its premise does not hold: the function this stage folds returns its input by reference, so **no declared rule is reachable from the fold at all**, and a polarity derived from the declaration would flip all thirty to `direct` against a fold computing none of them. What runs instead is the standing TR-02 assertion. **Thirty of thirty would fail if the derived direction were enforced today**, which is exactly why it is not.
+
+> **A ruling that changes what a merge-blocking stage asserts is recorded in one source comment and in no document.** `coverage.ts` attributes the deferral to a **founder ruling of 2026-08-17** and cites it twice; it appears nowhere in `docs/`, and [ADR-048](../../../docs/decisions/ADR-048.md) does not mention enforcement being deferred. **Not fixed here**: it is a ruling rather than an edit, and it is outside this directory. Recorded because a claim that lives in exactly one place is the class [ADR-034](../../../docs/decisions/ADR-034.md) exists to end, and this one governs whether CI-03 asserts its own name.
+
 **What the format cannot yet reach, named rather than left as an absence:**
 
 | Held back | Why |
@@ -144,7 +182,7 @@ Each is asserted from both sides in [`test/loader.test.ts`](../../golden-loader/
 | GS-034, GS-035, GS-047 | **Added by batch 4.** None of the three is one ordered day stream. GS-034 needs a **superseding mark** and a replay forward; GS-035 needs a **clock**, which INV-01 forbids the engine from reading; GS-047 needs the **same day applied twice**, and `L-10` refuses a repeated day. **In GS-047 the loader rule that blocks the fixture is the same claim the scenario exists to assert** (INV-14, idempotence), which is worth stating rather than filing as a gap |
 | GS-057, GS-058, GS-059, GS-241 | **Added by batch 4.** GS-057 and GS-058 are the correction window in both directions and need a **settlement plus an absorbed delta**, which is `L-11` and a sibling shape at once. GS-059 counts a cadence gap **across a holiday cluster**, which needs a calendar spanning one. GS-241 is INV-17's lifetime bound over **five settlements** |
 | GS-062, and GS-054's account B | **Not a format gap and not fixable by one.** A golden fixture is one account's fold, because the engine is per account by design: "cross-account state inside a pure fold would destroy replay" (AS-09). GS-062's assertion is the identity-level **forecast**, which M6 owns and no per-account fold can produce. GS-054 is written from account A's side alone and its sibling says why that is the assertion rather than the limitation |
-| GS-141 | Publish-time validation. `validatePlan` is P2-1, the scenario is about a **publish diff** across three plans rather than an account's day stream, and PW-02a against PW-02b is a message-classification claim no end state carries |
+| GS-141 | Publish-time validation. **Corrected by batch 6.** This row opened "`validatePlan` is P2-1", which **has since landed**, so the clause a reader meets first is now false and points at a blocker that is gone. **The row still binds on its other two clauses**, both structural: the scenario is a publish diff **across three plans** rather than one account's day stream, and `PW-02a` against `PW-02b` is a message-classification claim **no end state carries**. Neither moves when an engine function lands |
 
 **R-32 has no row above because it has no golden scenario, and that is the corpus's choice rather than an omission here.** `ADR-051` unblocked eval expiry and asked the implementing session to settle the fencepost with an executable pin at the boundary. The pin landed in [`RE-U-032`](../test/rules-e-progression.test.ts) and **not** as a fixture, for three reasons checked before the decision rather than after it:
 

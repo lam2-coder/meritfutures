@@ -271,16 +271,17 @@ describe('coverage this stage does not have', () => {
     expect(fixtures.filter((f) => !registry.has(f.id))).toEqual([]);
   });
 
-  test('four fixture fields still reach no engine input, and they are named', () => {
-    // GOLDEN_SCENARIOS section 2's format states them and the scaffold's engine
-    // types declare none of them. The loader refuses any fixture field that is
-    // neither mapped nor on this list, so nothing is dropped in silence; M01
-    // empties it.
-    expect([...AWAITING_ENGINE_INPUT]).toEqual([
-      'account.phase',
-      'account.opened_on',
-      'days[].adjustment_cents',
-      'settlements',
-    ]);
+  test('no fixture field reaches no engine input, which is what M01 landing means', () => {
+    // IT HELD FOUR ENTRIES AND HOLDS NONE. `account.phase`, `account.opened_on`,
+    // `days[].adjustment_cents` and `settlements` were all true of the
+    // SCAFFOLD's `EngineInput`; `DayInput` has a home for every one. STATE
+    // item 3 said M01 empties this list, and folding through `advanceDay` is
+    // what emptied it.
+    //
+    // THE ASSERTION IS KEPT RATHER THAN DELETED, in the direction that now
+    // matters: it fails if an entry ever returns. A field the fold cannot take
+    // is still declarable in one visible place, and a reviewer still reads the
+    // diff; what may not happen again is the list quietly refilling.
+    expect([...AWAITING_ENGINE_INPUT]).toEqual([]);
   });
 });

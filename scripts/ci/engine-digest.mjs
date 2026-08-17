@@ -133,7 +133,13 @@ lines.push(`golden count=${fixtures.length}`);
 for (const fixture of [...fixtures].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
   const outcome = runFixture(fixture);
   lines.push(
-    `golden ${fixture.id} ${sha(canonical({ state: outcome.result.newState, events: outcome.result.events, diffs: outcome.diffs }))}`,
+    // `outcome.result` WAS AN `EngineResult` AND IS NOW THE FOLD'S OWN OUTPUT.
+    // `runFixture` called `evaluate`, which returns `{ newState, events }`; it
+    // folds `advanceDay`, which carries a `RuleState` and accumulates events
+    // across the stream. The digest covers `assertions` too, because a day the
+    // fold REFUSED is part of what a run produced and two runs that refused
+    // different days have not agreed.
+    `golden ${fixture.id} ${sha(canonical({ state: outcome.state, events: outcome.events, assertions: outcome.assertions, diffs: outcome.diffs }))}`,
   );
 }
 

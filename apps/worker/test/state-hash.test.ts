@@ -361,6 +361,166 @@ describe('every one of the twenty-five engine_gates leaves moves the digest', ()
 });
 
 // -----------------------------------------------------------------------------
+// The leaf list is EVERY leaf, and a widening of `EngineGateResults` is LOUD
+// -----------------------------------------------------------------------------
+// THE CONTROL ABOVE STAYS VALID AND ENFORCES NOTHING AGAINST THE LIKELIEST
+// FUTURE CHANGE. `ENGINE_GATE_LEAVES` is an explicit ordered list of twenty-five
+// dotted paths, and the mutation cases above are transcribed from that same
+// list. Add a twenty-sixth field to `EngineGateResults` and every assertion in
+// this file still passes: the list did not change, so the transcription still
+// matches it, so the new field is simply not hashed. A gate result that is not
+// hashed is a gate result INV-04's nightly replay cannot see move, which is the
+// exact failure `state_hash` exists to prevent, arriving silently.
+//
+// A `keyof` mapped type does not close this. The leaves are NESTED paths, one
+// level down inside six gate interfaces, and `keyof EngineGateResults` is the
+// six gate names. The type system knows the shape; only a walk over a VALUE
+// yields the dotted paths the list is written in.
+//
+// SO THE VALUE IS WALKED AND THE TWO SETS ARE COMPARED. The completeness of the
+// walk comes from the type: `REPRESENTATIVE` is annotated `EngineGateResults`,
+// so a new REQUIRED field makes the literal below a compile error, the literal
+// gains the field, and the walk then reports it as unhashed by name. The two
+// halves are what make it loud rather than either alone.
+//
+// ITS ONE BLIND SPOT, STATED RATHER THAN LEFT TO BE DISCOVERED: an OPTIONAL
+// field omitted from the literal is invisible to a value walk. No field on the
+// six gate interfaces is optional today. Keep it that way, or this control
+// weakens exactly as quietly as the one it was written to replace.
+//
+// AND IT COMPARES SETS, NOT ORDER, DELIBERATELY. Key order is what M01 section
+// 1.4 bans depending on, "because key order is insertion order and CAN DRIFT
+// WITH A REFACTOR". The ordered list remains the specification for the hash;
+// order is pinned above against a hand transcription. This asserts membership,
+// which is the property a walk can honestly measure.
+
+/**
+ * A value is walked only if it is a plain object. A `Date`, a `Buffer`, a `Map`
+ * or any class instance is reported as ONE leaf at its own path rather than
+ * being taken apart, so such a field arrives here as an unhashed path to rule
+ * on rather than as a silently expanded set of internals.
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/** Every dotted leaf path in a value. `null` is a leaf; an empty object is a leaf. */
+function dottedLeafPaths(value: unknown, prefix = ''): readonly string[] {
+  if (!isPlainObject(value)) return [prefix];
+  const keys = Object.keys(value);
+  if (keys.length === 0) return [prefix];
+  return keys.flatMap((key) =>
+    dottedLeafPaths(value[key], prefix === '' ? key : `${prefix}.${key}`),
+  );
+}
+
+/**
+ * Every nullable leaf POPULATED, which `GATES` deliberately leaves null.
+ *
+ * Both values are walked below. A null renders as a leaf at its own path, so a
+ * future nullable whose value happens to be null in one fixture cannot hide its
+ * structure from both.
+ */
+const REPRESENTATIVE: EngineGateResults = {
+  tradedDays: { pass: true, skipped: false, have: 12, need: 10 },
+  winDays: { pass: true, have: 5, need: 5, floorCents: 15_000n },
+  buffer: { pass: true, haveCents: 300_000n, needCents: 100_000n },
+  consistency: {
+    pass: true,
+    skipped: false,
+    bestDayShareBp: 2500,
+    maxDayShareBp: 3000,
+    profitNeededToDiluteCents: 0n,
+  },
+  cadenceGap: {
+    pass: true,
+    skipped: false,
+    tradingDaysSinceLastPayout: 7,
+    need: 5,
+    nextEligibleTradingDay: td('2026-08-21'),
+  },
+  minimumAmount: {
+    pass: true,
+    withdrawableCents: 200_000n,
+    capCents: 250_000n,
+    minPayoutCents: 10_000n,
+  },
+};
+
+describe('every leaf of EngineGateResults is declared in ENGINE_GATE_LEAVES', () => {
+  const declared = ENGINE_GATE_LEAVES.map((l) => l.path);
+
+  const fixtures: readonly (readonly [string, EngineGateResults])[] = [
+    ['every nullable populated', REPRESENTATIVE],
+    ['the nullables null', GATES],
+  ];
+
+  for (const [label, gates] of fixtures) {
+    it(`declares every path present in the value: ${label}`, () => {
+      const walked = dottedLeafPaths(gates);
+
+      const unhashed = walked.filter((path) => !declared.includes(path));
+      expect(
+        unhashed,
+        `these EngineGateResults leaves are NOT in ENGINE_GATE_LEAVES, so they are not in the ` +
+          `SD-08 state hash and INV-04 replay cannot see them move: ${unhashed.join(', ')}. ` +
+          `Adding a leaf changes the serialization of every row and is an Appendix B.4 ` +
+          `engine-upgrade event, not a test fix.`,
+      ).toEqual([]);
+    });
+
+    it(`declares no path absent from the value: ${label}`, () => {
+      const walked = dottedLeafPaths(gates);
+
+      const stale = declared.filter((path) => !walked.includes(path));
+      expect(
+        stale,
+        `ENGINE_GATE_LEAVES declares paths that no longer exist on EngineGateResults: ` +
+          `${stale.join(', ')}. Removing a leaf is also an Appendix B.4 event.`,
+      ).toEqual([]);
+    });
+  }
+
+  it('walks to exactly the twenty-five the list carries, with no duplicates', () => {
+    const walked = dottedLeafPaths(REPRESENTATIVE);
+    expect(walked).toHaveLength(25);
+    expect(new Set(walked).size).toBe(25);
+    expect([...walked].sort()).toEqual([...declared].sort());
+  });
+
+  it('the walk itself finds an added leaf, which is what makes the assertion a control', () => {
+    // The walker is the load-bearing half. If it silently skipped an unknown
+    // field, the assertion above would pass on a widened type and this whole
+    // section would read as enforcement while enforcing nothing, which is the
+    // defect it was written to end. So the walker is exercised on a value that
+    // HAS a twenty-sixth leaf, without touching the engine's type.
+    const widened = {
+      ...REPRESENTATIVE,
+      winDays: { ...REPRESENTATIVE.winDays, streakDays: 3 },
+    };
+
+    const walked = dottedLeafPaths(widened);
+    expect(walked).toContain('winDays.streakDays');
+    expect(walked.filter((path) => !declared.includes(path))).toEqual(['winDays.streakDays']);
+  });
+
+  it('reports a nested object added as a gate by its leaves, not as one opaque field', () => {
+    const widened = {
+      ...REPRESENTATIVE,
+      drawdownPace: { pass: true, usedBp: 4000, limitBp: 8000 },
+    };
+
+    expect(dottedLeafPaths(widened).filter((path) => !declared.includes(path))).toEqual([
+      'drawdownPace.pass',
+      'drawdownPace.usedBp',
+      'drawdownPace.limitBp',
+    ]);
+  });
+});
+
+// -----------------------------------------------------------------------------
 // The exclusions, asserted where they are assertable
 // -----------------------------------------------------------------------------
 // `context_gates` and `calendar_revision_id` cannot be asserted here and the

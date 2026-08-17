@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->50<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->51<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -886,6 +886,20 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+
+## Golden fixtures, batch 6: none written, and the polarity question answered by measurement (2026-08-17)
+
+**Batch 6 was commissioned to write the thirty-first fixture and wrote none** ([session 51](sessions/2026-08-17-session-51.md)). All forty-three held-back rows were re-derived against their primary sources and **every one still binds**; the reconciliation is mechanical rather than read by eye — **73 partition, 30 written, 43 on a row, zero unaccounted**. Every remaining scenario needs an input `EngineInput` does not carry, and `EngineInput` is unchanged at `{planConfigVersion, accountState, dayMarks}`. Writing one anyway would mean inventing that input, which is TR-01.
+
+**The polarity question was answered by measurement and the expected answer was wrong.** [ADR-048](decisions/ADR-048.md)'s per-fixture derivation and `L-13` have both landed, and the batch was briefed to find fixtures that had flipped to `inverted` for citing no rule. **None derives `inverted` and none changed meaning**: every fixture in the directory cites at least one `R-nn` and the engine declares 45 of 50, so the empty-citation case **catches nothing that exists**. It guards a fixture nobody has written yet. **CI-03's own emitted block was already printing this on every run**, in the form ADR-038 requires.
+
+**No fixture's polarity changed because the cause sits one level above any fixture.** The derivation is **reported and not enforced**: the function the stage folds returns its input by reference, so no declared rule is reachable from the fold, and **thirty of thirty would fail if the derived direction were enforced today**.
+
+> **A ruling that changes what a merge-blocking stage asserts is recorded in one source comment and in no document, and this is an open item rather than a note.** `coverage.ts` twice attributes the enforcement deferral to a **founder ruling of 2026-08-17**. It appears in no file under `docs/`, and **[ADR-048](decisions/ADR-048.md), the ADR the derivation implements, does not mention enforcement being deferred at all.** The constitution's rule is that changing a frozen document takes an ADR; [ADR-034](decisions/ADR-034.md)'s is that a claim living in exactly one place drifts. **Not fixed by that session**: a ruling is not an edit, and it was outside its fence.
+
+**One held-back reason was corrected.** `GS-141`'s row opened "`validatePlan` is P2-1", and **`validatePlan` has landed**, so the clause a reader met first was false and pointed at a blocker that no longer exists. Its other two clauses are structural and hold. [Session 49](sessions/2026-08-17-session-49.md) found the mirror image, a **true** reason standing in front of a binding one; **a held-back reason is a claim with a shelf life** is the generalisation both instances now support.
+
+---
 
 ## Golden fixtures, batches 4 and 5: thirty of 284, and a batch that mostly checked reasons (2026-08-17)
 

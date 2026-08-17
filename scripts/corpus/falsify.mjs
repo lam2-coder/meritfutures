@@ -44,7 +44,7 @@ import {
   readdirSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join, dirname, resolve } from 'node:path';
+import { basename, join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
@@ -1485,10 +1485,30 @@ function gateIds() {
 // out on the first run, and CI-06a and CI-06c then "failed" on links into a
 // directory the harness had not copied. A harness that tests a tree the gates
 // never see is testing the harness.
+//
+// `node_modules` IS SKIPPED AT EVERY DEPTH AND NOT ONLY AT THE ROOT, and the
+// difference was a false green. This loop skipped the two names among ROOT's own
+// entries, so pnpm's NESTED `packages/*/node_modules` were copied with their
+// packages; a module reachable from `packages/golden-loader/src/loader.ts` could
+// then resolve `@merit/rules-engine` through one, and the loader cases passed
+// locally. On a CI runner that had not installed, the same cases failed with
+// ERR_MODULE_NOT_FOUND.
+//
+// `check.mjs` states the invariant those cases rest on -- it "imports
+// ./src/loader.ts ... directly and never ./src/index.ts", so the tree copy can
+// have no workspace resolution at all -- and the copy step was quietly making
+// the invariant untestable on the machine where it is written. A harness that is
+// green locally and red in CI teaches its reader to distrust CI, which is the
+// more expensive of the two failures.
+const skipCopy = (entry) => entry === '.git' || entry === 'node_modules';
+
 function copyTree(dir) {
   for (const entry of readdirSync(ROOT)) {
-    if (entry === '.git' || entry === 'node_modules') continue;
-    cpSync(join(ROOT, entry), join(dir, entry), { recursive: true });
+    if (skipCopy(entry)) continue;
+    cpSync(join(ROOT, entry), join(dir, entry), {
+      recursive: true,
+      filter: (src) => !skipCopy(basename(src)),
+    });
   }
 }
 

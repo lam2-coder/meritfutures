@@ -1478,6 +1478,18 @@ const CASES = [
             name: 'merit-falsify-seed',
             version: '0.0.0',
             private: true,
+            // THE PIN IS CARRIED INTO THE SEED, AND IT IS NOT COSMETIC. Without
+            // it this manifest has no `packageManager` and sits outside the
+            // repository, so corepack finds no project spec, falls back to
+            // `fetchLatestStableVersion` and asks the registry what the latest
+            // pnpm is. That query is rate limited, it answered HTTP 429 on
+            // 2026-08-17, and the case then failed OFF-TARGET: the harness
+            // reported `exited 1 without saying: lodash` and refused to count
+            // it, which is the discipline working. Four of the five CI-05 cases
+            // are local; this was the only one reaching the network for a
+            // reason unrelated to the thing it tests.
+            packageManager: JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+              .packageManager,
             dependencies: { [VULNERABLE.name]: VULNERABLE.version },
           },
           null,
