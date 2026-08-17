@@ -511,6 +511,22 @@ export interface PublishedFundedPhase {
   readonly buffer_bp: number;
   /** CV-08. */
   readonly cadence_gap_trading_days: number;
+  /**
+   * PW-02a and PW-02b's settlement term, at ADR-019's v1 value of `0`.
+   *
+   * DATA_MODEL SECTION 11's EXAMPLE DOES NOT CARRY THIS KEY AND M01 SECTION 2.4
+   * REQUIRES IT TO EXIST, which is a disagreement between two approved documents
+   * rather than a shape decision this file is making. M01: "It remains A
+   * PUBLISHED CONFIGURATION CONSTANT RATHER THAN A LITERAL IN ENGINE CODE, for
+   * the same reason it always was: a future change to the settlement model
+   * re-runs this comparison instead of quietly invalidating it."
+   *
+   * So writing `0` inside `publishDiff` would violate the sentence that made the
+   * field config in the first place, and the field is declared here on M01's
+   * authority. The gap is reported rather than folded: a frozen document moves
+   * by ADR and not by a commit that needed a key.
+   */
+  readonly min_settlement_lag_trading_days: number;
   /** CV-09, CV-10, CV-17. Materialized to `payout_cap_schedule_cents`. */
   readonly payout_cap_schedule: readonly PublishedCapScheduleStep[];
   /**
