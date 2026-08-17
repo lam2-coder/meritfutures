@@ -1,0 +1,109 @@
+# GS-242  Percent-of-size scaling holds at 150K  (ADR-024)
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "Every bp-expressed parameter derives correctly at 15,000,000c, and
+#   `min_payout_cents` does NOT scale. Pins that adding a size is a row rather
+#   than a redesign"                                  GOLDEN_SCENARIOS GS-242 row
+#   "150K is 15,000,000c. Percentage-expressed rules scale by size;
+#   `min_payout_cents` never does"                    M01 Appendix A preamble
+#   "The bp figure is the source and the cents columns are derived, which is
+#   what makes adding a size a row rather than a redesign"  M01 Appendix A, ADR-024
+#   "`min_payout_cents` is 10,000 at every size"       M01 Appendix A, GLOSSARY, CV-15
+#   eval profit target 900,000c at 150K, 600bp         M01 Appendix A.1
+#   eval and funded drawdown 750,000c at 150K, 500bp   M01 Appendix A.1
+#   14,250,000 = 15,000,000 - 750,000                  M01 R-12, R-31, ADR-050
+#   floor lock at 760,000c = 750,000 + 10,000          M01 Appendix A.1, CV-12
+#   win day floor 45,000c at 150K, 30bp                M01 Appendix A.1
+#   buffer 300,000c at 150K, 200bp                     M01 Appendix A.1
+#   payout cap 450,000c at 150K, 300bp                 M01 Appendix A.1
+#   20,000 = 15,320,000 - 15,000,000 - 300,000         M01 R-35
+#
+# FOUR DERIVED PARAMETERS ARE PINNED AND EACH ONE BREAKS A DIFFERENT FIELD IF
+# THE DERIVATION IS WRONG. That is what "every bp-expressed parameter derives
+# correctly" has to mean in a fixture: not one number checked four ways, but
+# four numbers each checked once, on a stream where only the correct value
+# produces the stated outcome.
+#
+#   600bp target -> 900,000c   Day one closes on EXACTLY 900,000c of profit.
+#                              R-26 is `>=`, so the pass fires at the boundary
+#                              and does not fire at a target of 899,999c or of
+#                              900,001c. GS-017 owns this boundary at 50K.
+#   500bp drawdown -> 750,000c Day two's LOW is exactly 14,250,000c, which is
+#                              the funded reset floor. R-21 is a strict `<`, so
+#                              the day survives, and it survives only because
+#                              the floor is not one cent higher. GS-013 owns
+#                              this boundary at 50K.
+#   30bp win floor -> 45,000c  Days two and three are 45,000c and 44,999c. One
+#                              counts and one does not, so `win_days_count` is
+#                              2 rather than 3 or 1. GS-006 and GS-007 own this
+#                              boundary at 50K.
+#   200bp buffer -> 300,000c   `withdrawable_cents` is 20,000c, which is the
+#                              balance less the size less the buffer and no
+#                              other arithmetic reaches it.
+#
+# AND `min_payout_cents` DOES NOT SCALE, WHICH IS THE ONE NEGATIVE. The
+# withdrawable lands at 20,000c on purpose: it is above the 10,000c minimum
+# Appendix A fixes at every size, and BELOW the 30,000c a minimum that scaled
+# with size would produce. So an engine or a config that scaled it turns
+# `min(withdrawable, cap) >= min_payout_cents` from true to false on this exact
+# stream. The gate's own result lives in `engine_gates` and no flat expectation
+# can reach it, so the input is what this fixture pins and the note says so.
+#
+# THE PASS DAY IS ALSO A LOCK DAY AT 150K FOR THE SAME REASON IT IS AT 50K. The
+# trigger is 760,000c of closing profit against a 900,000c target, and CV-12
+# keeps the two in that order at every size, so `rule.floor_locked` precedes
+# `phase.passed` here exactly as it does in GS-019 and GS-044.
+#
+# ADR-048 POLARITY: DIRECT. Every rule cited (R-08, R-09, R-12, R-21, R-26,
+# R-27, R-31, R-35, R-39) is in the engine's declared `IMPLEMENTED_RULES` set.
+# The derivation is not wired yet; the citation is written to be resolvable now.
+id: GS-242
+name: percent-of-size scaling holds at 150K
+source: M01 R-08, R-09, R-12, R-21, R-26, R-27, R-31, R-35, R-39
+plan: CORE-150K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 15000000
+days:
+  # 600bp of 15,000,000 is 900,000, and this day closes on exactly that.
+  - trading_day: 2026-11-02
+    opening_balance_cents: 15000000
+    closing_balance_cents: 15900000
+    high_balance_cents: 15910000
+    low_balance_cents: 14960000
+    realized_pnl_cents: 900000
+    fill_count: 12
+    traded_day: true
+  # The first funded day. It opens at exactly `size_cents` (INV-20), its low is
+  # exactly the funded reset floor, and its P&L is exactly the win floor.
+  - trading_day: 2026-11-03
+    opening_balance_cents: 15000000
+    closing_balance_cents: 15045000
+    high_balance_cents: 15050000
+    low_balance_cents: 14250000
+    realized_pnl_cents: 45000
+    fill_count: 3
+    traded_day: true
+  # One cent below the win floor. Traded, not won.
+  - trading_day: 2026-11-04
+    opening_balance_cents: 15045000
+    closing_balance_cents: 15089999
+    high_balance_cents: 15095000
+    low_balance_cents: 15040000
+    realized_pnl_cents: 44999
+    fill_count: 3
+    traded_day: true
+  # The day that carries the balance past the buffer, and no further than
+  # 20,000c past it.
+  - trading_day: 2026-11-05
+    opening_balance_cents: 15089999
+    closing_balance_cents: 15320000
+    high_balance_cents: 15325000
+    low_balance_cents: 15085000
+    realized_pnl_cents: 230001
+    fill_count: 6
+    traded_day: true
+settlements: []

@@ -1,0 +1,23 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 5335000,
+    "withdrawable_cents": 235000,
+    "traded_days_count": 5,
+    "win_days_count": 5,
+    "consistency_best_day_cents": 100000,
+    "consistency_period_profit_cents": 335000,
+    "high_water_balance_cents": 5290000,
+    "floor_locked": true
+  },
+  "events": [
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "rule.floor_locked",
+    "day.closed",
+    "day.closed"
+  ],
+  "pins": "the consistency denominator is manufacturable and the engine is correct to pass it: a best day that failed R-29 by 133,334c clears on three controlled days that add nothing to the numerator, and every other funded gate passes on the same stream",
+  "note": "THE TWO ACCUMULATORS ARE THE FIXTURE AND THEY MUST BE READ TOGETHER. `consistency_best_day_cents: 100000` is unmoved across the last three days, which is the whole attack: the manufactured days are chosen below the existing best day so they enter the denominator only. `consistency_period_profit_cents: 335000` is the first value at which R-29 turns over, and it turns over by 5,000,000 in cross-multiplied units, which is 1,666c of profit. AN ENGINE THAT DIVIDED RATHER THAN CROSS MULTIPLIED LANDS HERE TOO, and that is why the pair is stated rather than a computed share: 100,000 / 335,000 is 29.85 percent under any rounding, so this fixture does not separate R-29's arithmetic from a floating-point one. GS-023 and GS-024 own that boundary at one cent and this fixture deliberately does not restate it. What this one adds is that the inputs to the ratio are BOTH manufacturable and the engine has no way to see it. WIN DAYS IS 5 AGAINST A REQUIRED 5, WHICH IS THE SHARPEST FIELD HERE. The three manufactured days are 45,000c each, comfortably past the 15,000c win floor, so the pattern that dilutes consistency also satisfies R-34 on the same days. The ring pays for one gate and gets two. `traded_days_count: 5` is stated beside it because R-08 counts a different quantity and a fixture that pinned only one of them would not notice an engine that conflated them. `withdrawable_cents: 235000` IS PINNED AND THE CAP IS NOT. R-35 puts 235,000c past the buffer, which is 85,000c more than the 150,000c cap, so AS-02's 'unlock a 150,000c cap' is reached with room to spare. The clamp itself is R-43's and lives in `evaluatePayout` rather than in the day fold, so the expectation states the input to the clamp and stops there. `floor_locked: true` IS SAFE HERE AND WOULD NOT BE ON A STREAM THAT CROSSED AN EVAL PASS. This account is funded from open, so ADR-050's open INV-07 question never arises. `floor_cents` IS STILL NOT PINNED, for the OTHER reason: day four closes 290,000c up, which is 30,000c past the 260,000c lock trigger, so M01 section 3.4's `max` returns 5,040,000 where section 3.6's assignment returns 5,010,000. That disagreement is unruled. Every low on days four and five sits above both candidates, so the breach outcome is the same under either reading and the silence costs nothing. `high_water_balance_cents: 5290000` IS DETERMINATE UNDER BOTH READINGS and is pinned because of it: DO-7 trails before it locks, so day four's close raises the high-water balance and then freezes it, and day five's higher close of 5,335,000 does not move it. An engine that locked before trailing reports 5,245,000 here. `profit_needed_to_dilute_cents` IS WHAT AS-02'S DETECTOR ACTUALLY CONSUMES and no flat expectation can reach it: it lives in `engine_gates`, which is a nested object, and compare.ts diffs flat fields with Object.is. The two accumulators it is computed from are pinned instead, which is the weaker claim honestly stated."
+}

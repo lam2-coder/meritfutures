@@ -854,6 +854,86 @@ const CASES = [
   })),
 
   // ---------------------------------------------------------------------------
+  // CI-02  RE-P-01, WATCHED FAILING IN BOTH OF ITS DIRECTIONS
+  // ---------------------------------------------------------------------------
+  // The `RE-U-nn` series above proves the unit suite's operators bite. RE-P-01
+  // is a PROPERTY and it makes two claims that fail differently, so it is
+  // watched twice: no boundary is asserted in one direction only.
+  //
+  // Both cases run `--project property` and both demand the string `RE-P-01` in
+  // the output, which is the failing test's own name. A mutant that made some
+  // other property go red would be FAILED OFF-TARGET, which is the distinction
+  // this file exists to keep.
+  {
+    id: 'CI-02/engine-RE-P-01-monotone',
+    stage: 'CI-02',
+    // R-12's INITIAL floor expression written where DO-7's OUTCOME belongs, so
+    // a floor that has trailed up falls back to the account-open floor on the
+    // next day. It is the confusion R-12 and R-13 invite by both being floor
+    // rules, and it decreases the floor on an ordinary day that emits no
+    // `phase.passed`, so ADR-050's one exception cannot cover it.
+    //
+    // IT IS SEEDED IN `advance.ts` AND NOT IN `floor.ts`, AND THAT IS THE WHOLE
+    // POINT OF THIS CASE. R-14's tripwire lives INSIDE `advanceFloor` and
+    // compares within one day's trail-then-lock, so a floor lowered after that
+    // function returns is invisible to it. A mutant inside `floor.ts` would be
+    // caught by the tripwire throwing rather than by the property asserting, and
+    // this pair is meant to show that RE-P-01 itself bites.
+    seeds:
+      "the day's floor written from R-12's account-open expression rather than from DO-7's outcome, so a trailed floor falls back on the next day",
+    needles: ['RE-P-01'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/day/advance.ts',
+        (before) => {
+          const from = 'floorCents: floor.floorCents,';
+          if (!before.includes(from)) {
+            throw new Error(`the RE-P-01 monotone mutant found no "${from}" in advance.ts`);
+          }
+          return before.replace(
+            from,
+            'floorCents: initialFloorCents(plan.sizeCents, rules.drawdown.drawdownCents),',
+          );
+        },
+        () => run('pnpm', ['exec', 'vitest', 'run', '--project', 'property']),
+      ),
+  },
+  {
+    id: 'CI-02/engine-RE-P-01-exception',
+    stage: 'CI-02',
+    // THE MUTANT NO TRIPWIRE CAN SEE, and the reason this case exists at all.
+    // DO-7's `neverRetreats` compares within one day's trail-then-lock and never
+    // spans the R-31 reset, deliberately (ADR-050), so a reset that lands one
+    // cent BELOW `size_cents - funded drawdown_cents` passes every check the
+    // engine makes about itself.
+    //
+    // It is an exception WIDER than the one ADR-050 states, which is exactly the
+    // unstated exception INV-06's "no exception, no phase qualifier" clause
+    // forbids. Only RE-P-01's `===` at the pass day catches it, which is what
+    // makes "the exception is pinned rather than excused" a fact about the
+    // repository instead of a sentence in an ADR.
+    seeds:
+      "the R-31 funded reset landing one cent below the floor R-12 and R-31 state and GS-019 pins, which is an exception wider than ADR-050's",
+    needles: ['RE-P-01'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/day/progression.ts',
+        (before) => {
+          const from =
+            'const resetFloorCents = initialFloorCents(plan.sizeCents, plan.funded.drawdown.drawdownCents);';
+          if (!before.includes(from)) {
+            throw new Error(`the RE-P-01 exception mutant found no "${from}" in progression.ts`);
+          }
+          return before.replace(
+            from,
+            'const resetFloorCents = initialFloorCents(plan.sizeCents, plan.funded.drawdown.drawdownCents + 1n);',
+          );
+        },
+        () => run('pnpm', ['exec', 'vitest', 'run', '--project', 'property']),
+      ),
+  },
+
+  // ---------------------------------------------------------------------------
   // CI-05  Security static
   // ---------------------------------------------------------------------------
   {
