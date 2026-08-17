@@ -147,13 +147,19 @@ export interface AccountState {
 // -----------------------------------------------------------------------------
 
 /**
- * Something the evaluation decided, emitted rather than written.
+ * The two fields every emitted event carries, and the base the concrete events
+ * extend.
  *
  * The engine performs no I/O, so it does not persist an event; it returns one
- * and the caller writes it. M01 defines the event set, and `type` is a string
- * here rather than a union for exactly as long as that set is unwritten.
+ * and the caller writes it.
+ *
+ * THIS IS THE BASE, NOT THE PUBLIC TYPE OF `events`. That is `EngineEvent`
+ * below, which is the discriminated union of the concrete events. This
+ * interface's own doc comment used to say `type` was "a string here rather than
+ * a union for exactly as long as that set is unwritten"; the set is written, so
+ * the union exists.
  */
-export interface EngineEvent {
+export interface EngineEventBase {
   readonly type: string;
   readonly tradingDay: TradingDay;
 }
@@ -1112,7 +1118,7 @@ export interface DayOutput {
 // whose they are.
 
 /** DO-9, once per account per trading day. */
-export interface DayClosedEvent extends EngineEvent {
+export interface DayClosedEvent extends EngineEventBase {
   readonly type: 'day.closed';
   readonly closingBalanceCents: Cents;
   /** SD-01, carried because a settled payout is not a trading loss (AS-10). */
@@ -1141,7 +1147,7 @@ export interface DayClosedEvent extends EngineEvent {
 }
 
 /** DO-5. */
-export interface BreachDetectedEvent extends EngineEvent {
+export interface BreachDetectedEvent extends EngineEventBase {
   readonly type: 'breach.detected';
   readonly breachKind: BreachKind;
   readonly lowBalanceCents: Cents;
@@ -1152,14 +1158,14 @@ export interface BreachDetectedEvent extends EngineEvent {
 }
 
 /** R-15. The lock is permanent and changes the trader's risk profile for good. */
-export interface FloorLockedEvent extends EngineEvent {
+export interface FloorLockedEvent extends EngineEventBase {
   readonly type: 'rule.floor_locked';
   readonly atProfitCents: Cents;
   readonly lockedFloorCents: Cents;
 }
 
 /** R-23. A fact, never a breach. Enforcement, if any, is the platform's. */
-export interface SoftDailyLossLimitEvent extends EngineEvent {
+export interface SoftDailyLossLimitEvent extends EngineEventBase {
   readonly type: 'rule.soft_dll_exceeded';
   readonly realizedPnlCents: Cents;
   readonly limitCents: Cents;
@@ -1183,7 +1189,7 @@ export interface SoftDailyLossLimitEvent extends EngineEvent {
  * largest trader-facing fact in this document", and an event that carried only
  * one of them could not say what was lost.
  */
-export interface PhasePassedEvent extends EngineEvent {
+export interface PhasePassedEvent extends EngineEventBase {
   readonly type: 'phase.passed';
   readonly fromPhase: 'eval';
   readonly toPhase: 'funded';
@@ -1211,7 +1217,7 @@ export interface PhasePassedEvent extends EngineEvent {
  * also `anchor_trading_day`, because 'reset to zero' WITHOUT THE ANCHOR IS NOT
  * ENOUGH TO EXPLAIN THE NEXT CYCLE".
  */
-export interface WinDaysResetEvent extends EngineEvent {
+export interface WinDaysResetEvent extends EngineEventBase {
   readonly type: 'payout.win_days_reset';
   readonly previousCount: number;
   readonly resetTo: number;
@@ -1229,7 +1235,7 @@ export interface WinDaysResetEvent extends EngineEvent {
  * eligibility is a review-pool flag, and invitation is a discretionary operator
  * action taken from that pool, OUTSIDE THE ENGINE."
  */
-export interface AccountGraduatedEvent extends EngineEvent {
+export interface AccountGraduatedEvent extends EngineEventBase {
   readonly type: 'account.graduated';
   readonly payoutsSettledCount: number;
   /** CV-14 under ADR-030's canonical name. The rung count that was reached. */
@@ -1253,10 +1259,68 @@ export interface AccountGraduatedEvent extends EngineEvent {
  * honestly"), so the field is spelled as the catalogue spells it and the
  * engine-side name is recorded here rather than in a translation layer.
  */
-export interface PassDeferredConsistencyEvent extends EngineEvent {
+export interface PassDeferredConsistencyEvent extends EngineEventBase {
   readonly type: 'phase.pass_deferred_consistency';
   readonly bestDayShareBp: number;
   readonly maxDayShareBp: number;
   /** Additional period profit that would dilute the best day under the limit. */
   readonly shortfallCents: Cents;
 }
+
+// -----------------------------------------------------------------------------
+// THE EVENT UNION, WHICH IS WHAT `DayOutput.events` ACTUALLY CONTAINS
+// -----------------------------------------------------------------------------
+// `DayOutput.events` and `SettlementOutput.events` are typed `readonly
+// EngineEvent[]`, and until this alias existed `EngineEvent` was the BASE
+// (`{ type: string; tradingDay }`). Every concrete event extended it and none of
+// them was reachable from the array's type, so a consumer that wanted to read
+// `closingBalanceCents` off a `day.closed` had to CAST, once per event type,
+// with nothing checking that the cast matched the `type` string it was guarded
+// by. `scripts/demo/render.ts` recorded that in its own words and walked
+// `Object.entries` to avoid it.
+//
+// M01 SECTION 1.3's EXPORT LIMIT DOES NOT REACH THIS, and the distinction is the
+// reason the limit exists. "The public surface is SIX FUNCTIONS. Nothing else is
+// exported, because every additional export is A WAY FOR A CALLER TO REIMPLEMENT
+// A RULE slightly differently." A union of the record shapes the engine already
+// returns is not a rule a caller can reimplement: it computes nothing, decides
+// nothing, and has no second implementation to drift from. What it removes is a
+// cast, and an unchecked cast on a money-path payload is the thing the limit is
+// protecting against, not an instance of it. The engine already exports all
+// eight members individually; withholding only their union buys no safety and
+// costs every consumer a cast.
+//
+// THERE ARE EIGHT MEMBERS, NOT NINE. M01 section 5.2's table lists eleven names
+// and three of them have no producer in the day fold: `payout.floor_recomputed`
+// is "RETIRED AT THE M1 GATE" with no producer after ADR-014,
+// `account.live_invitation_issued` is not emitted at all because ADR-024 makes
+// invitation "a discretionary operator action ... OUTSIDE THE ENGINE", and
+// `replay.divergence_detected` belongs to Appendix B's replay harness rather
+// than to `advanceDay` or `applySettlement`. The eight below are exactly the
+// eight `type` literals constructed in `day/advance.ts`, `day/progression.ts`
+// and `payout/settle.ts`.
+//
+// `EXHAUSTIVE_EVENT_TYPES` IS NOT DECLARED HERE ON PURPOSE. A second list of the
+// same eight names is a second thing to forget to update, and the union already
+// fails a `switch` with a `never` default when a member is added. The engine's
+// own guard is `rules-engine-events.test.ts`, which asserts that every `type`
+// literal the union admits is one the sources actually construct.
+
+/**
+ * Everything the day fold and settlement can emit, discriminated on `type`.
+ *
+ * The members are listed in M01 section 5.2's order rather than alphabetically,
+ * so the union reads as the event catalogue it is.
+ */
+export type EngineEvent =
+  | DayClosedEvent
+  | BreachDetectedEvent
+  | PhasePassedEvent
+  | PassDeferredConsistencyEvent
+  | AccountGraduatedEvent
+  | WinDaysResetEvent
+  | FloorLockedEvent
+  | SoftDailyLossLimitEvent;
+
+/** Every `type` literal `EngineEvent` admits. Derived, never listed by hand. */
+export type EngineEventType = EngineEvent['type'];

@@ -49,23 +49,72 @@ import type { Cents, ConsistencyRules } from '../types.js';
 /**
  * What the consistency gate decided, and the two numbers a reader is owed.
  *
- * `skipped` IS NOT `!enabled`. CV-19 fixed the vocabulary when it disabled the
- * funded minimum-days gate: a gate that was not evaluated reports `pass: true,
- * skipped: true` and "must be visibly disabled in the eligibility breakdown ...
- * so no trader or support agent ever sees a gate that reads as satisfied when it
- * was never evaluated". R-30's denominator rule is the same shape: the gate
- * passed because there was nothing to test, not because the ratio was good.
+ * `skipped` MEANS NOT EVALUATED, FOR ANY REASON, AND THAT INCLUDES `!enabled`.
+ * This comment previously read "`skipped` IS NOT `!enabled`" and the disabled
+ * branch below returned `skipped: false` to match it. That was this package's
+ * invention and it contradicted five frozen citations, four of which tie the two
+ * cases together in the same words:
+ *
+ *   CV-19 (M01 section 2.4)  a disabled gate reports `pass: true, skipped: true`
+ *                            "using the SAME `skipped` SHAPE as the consistency
+ *                            denominator rule"
+ *   EC-050                   "the IDENTICAL SHAPE the consistency denominator
+ *                            rule already uses for a skipped comparison"
+ *   ADR-015                  "the SAME SHAPE the consistency denominator rule
+ *                            already uses"
+ *   GLOSSARY                 a disabled gate "reports `pass: true, skipped:
+ *                            true` and renders as disabled"
+ *   GS-080                   "the SAME SHAPE the consistency denominator rule
+ *                            uses"
+ *
+ * The corpus tied the disabled case to the denominator case deliberately, four
+ * separate times, and CV-19's reason is the one that binds here: "no trader or
+ * support agent ever sees a gate that reads as satisfied when it was never
+ * evaluated". A disabled gate returning `skipped: false` rendered as SATISFIED
+ * in every consumer that reads the flag, which is `render.ts`'s `SKIP` glyph and
+ * M04's INV-M4-05 alike.
+ *
+ * M01 SECTION 3.6's REFERENCE ALGORITHM WRITES `{ ok: true, skipped: false }` ON
+ * THIS BRANCH AND IT IS THE ONE SOURCE THAT DOES. It is a five-line sketch of
+ * this function inside a section about arithmetic; CV-19 is a validation rule
+ * about the vocabulary, stated in section 2.4 and repeated in four documents
+ * outside M01. The specific and repeated statement governs the incidental one,
+ * so no frozen document moves and GS-080's stated shape is untouched.
+ *
+ * THE TWO NOT-EVALUATED CASES REMAIN DISTINGUISHABLE AND NO FIELD WAS ADDED FOR
+ * IT: `maxDayShareBp` carries the discriminator. See its own comment below.
  */
 export interface ConsistencyVerdict {
   /** R-28 and R-36 both read this and nothing else to decide. */
   readonly ok: boolean;
-  /** R-30. True exactly when the denominator rule skipped the arithmetic. */
+  /**
+   * Not evaluated, for either reason: the gate is disabled, or R-30's
+   * denominator rule skipped the arithmetic. CV-19, EC-050, ADR-015, GLOSSARY
+   * and GS-080 all spell both cases this way.
+   */
   readonly skipped: boolean;
   /** M01 section 3.6's `profit_needed_to_dilute`. `0n` whenever `ok`. */
   readonly profitNeededToDiluteCents: Cents;
   /** Reported, never compared. `null` when the gate is disabled or skipped. */
   readonly bestDayShareBp: number | null;
-  /** The configured limit, carried so an event payload does not re-read config. */
+  /**
+   * The configured limit, carried so an event payload does not re-read config.
+   *
+   * IT IS ALSO WHAT TELLS THE TWO `skipped` CASES APART, and the type is what
+   * guarantees it rather than a convention this file maintains. `ConsistencyRules`
+   * is a discriminated union whose `{ enabled: false }` arm HAS NO
+   * `maxDayShareBp` FIELD AT ALL (types.ts), so the disabled branch has no limit
+   * available to report and `null` is the only value it can carry. R-30's branch
+   * is reached only with `enabled: true`, where CV-06 pins `0 <
+   * max_day_share_bp <= 10000`, so it always carries a positive number and can
+   * never present a falsy `0` that reads like an absence.
+   *
+   *   `skipped && maxDayShareBp === null`  the gate is DISABLED
+   *   `skipped && maxDayShareBp !== null`  R-30's denominator rule fired
+   *
+   * Support needs those told apart, which is why the property is asserted in
+   * `rules-e-progression.test.ts` rather than left as a readable coincidence.
+   */
   readonly maxDayShareBp: number | null;
 }
 
@@ -94,10 +143,14 @@ export function consistencyOk(
   periodProfitCents: Cents,
   cfg: ConsistencyRules,
 ): ConsistencyVerdict {
+  // A DISABLED GATE IS NOT EVALUATED, SO IT REPORTS `skipped: true` (CV-19,
+  // EC-050, ADR-015, GLOSSARY, GS-080). `maxDayShareBp` is `null` here because
+  // the `{ enabled: false }` arm of `ConsistencyRules` carries no limit to
+  // report, and that null is what separates this case from R-30's below.
   if (!cfg.enabled) {
     return {
       ok: true,
-      skipped: false,
+      skipped: true,
       profitNeededToDiluteCents: 0n,
       bestDayShareBp: null,
       maxDayShareBp: null,
@@ -108,6 +161,12 @@ export function consistencyOk(
 
   // R-30, STRICT. Zero and negative period profit both land here, which is
   // GS-021 and GS-022, and nothing below this line can then divide by zero.
+  //
+  // `skipped: true` IS THE SAME FLAG THE DISABLED BRANCH ABOVE SETS, which is
+  // the shape CV-19 and EC-050 chose on purpose. The two are told apart by
+  // `maxDayShareBp`, which is non-null on this branch and null on that one: this
+  // gate WAS configured, at a limit worth showing, and simply had nothing to
+  // measure it against.
   if (periodProfitCents <= 0n) {
     return {
       ok: true,
