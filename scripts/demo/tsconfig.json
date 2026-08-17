@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+
+  "//": "The demo is not a workspace package and must still be typechecked. `pnpm -r run typecheck` walks the workspace and would never reach this directory, so the root `typecheck` script names this project explicitly. `include` reaches into both packages because the demo consumes them from source through relative paths: there is no node_modules link to `@merit/rules-engine` from outside the workspace, and nothing in this repository is built by tsc, so a relative import of the published entry point is what a consumer outside `packages/*` has.",
+
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

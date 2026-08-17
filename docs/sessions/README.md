@@ -83,3 +83,4 @@ must be recoverable from its own file alone.
 | [2026-08-17 - Session 48](2026-08-17-session-48.md) | the last nine rules: 50 of 50 titled, 44 of 50 declared, and three that were never blocked |
 | [2026-08-17 - Session 49](2026-08-17-session-49.md) | golden fixtures batch 5: thirty of 284, and four held-back reasons checked against their sources |
 | [2026-08-17 - Session 49](2026-08-17-session-49.md) | the nightly batch and `state_hash`, with the replay comparison deliberately not wired |
+| [2026-08-17 - Session 49](2026-08-17-session-49.md) | the local demo: the simulator through the engine, and four things the first watched run surfaced |
