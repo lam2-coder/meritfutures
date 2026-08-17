@@ -64,16 +64,16 @@ test('the declared set is a set, and is ordered as M01 orders the rules', () => 
   expect([...IMPLEMENTED_RULES]).toEqual([...IMPLEMENTED_RULES].sort());
 });
 
-test('the count is reported rather than implied: forty-four of M01’s fifty rules', () => {
+test('the count is reported rather than implied: forty-five of M01’s fifty rules', () => {
   // THIS ASSERTION IS THE HONEST COUNT IN EXECUTABLE FORM. It fails when a rule
   // is added, which is the point: the session that adds one updates the number
   // here and in `src/rules.ts`'s header, and a session that added a rule without
   // noticing it had is a session that cannot land.
-  expect(IMPLEMENTED_RULES.length).toBe(44);
+  expect(IMPLEMENTED_RULES.length).toBe(45);
 });
 
-test('the six undeclared rules are undeclared for stated reasons', () => {
-  // THE ABSENCE IS THE COUNT BEING HONEST. Six rules are not declared, and none
+test('the five undeclared rules are undeclared for stated reasons', () => {
+  // THE ABSENCE IS THE COUNT BEING HONEST. Five rules are not declared, and none
   // of them is merely unwritten: each is discharged by another layer or refuses
   // pending a founder ruling. `src/rules.ts` names the reason for each.
   //
@@ -83,11 +83,15 @@ test('the six undeclared rules are undeclared for stated reasons', () => {
   // `advance.ts` has carried since group B. R-02 and R-06 were filed under
   // "blocked on the calendar transcription" because the rest of group A is, and
   // what the transcription blocks is their GOLDEN files.
+  //
+  // AND IT WAS SIX UNTIL `validatePlan` LANDED. R-17 sat here under "discharged
+  // outside the engine", which is the same unchecked step the three above took:
+  // "rejected at publish by CV-01" reads as somebody else's job, and M01 section
+  // 1.3 puts `plan/validate.ts` inside this package.
   const undeclared = [
     'R-01', // ingest and `trading_calendar`; a transcription adds rows, not columns
     'R-05',
-    'R-11', // discharged outside the engine: the caller's predicate, CV-01, M2
-    'R-17',
+    'R-11', // discharged outside the engine: the caller's predicate and replay
     'R-20',
     'R-32', // REFUSES: the anchor and the authoritative column are unruled
   ];

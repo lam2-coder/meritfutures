@@ -28,9 +28,9 @@ export type {
 // -----------------------------------------------------------------------------
 // M01 section 1.3 names six exported functions and says "nothing else is
 // exported, because every additional export is a way for a caller to reimplement
-// a rule slightly differently". Four of the six are here: `initialState`,
-// `advanceDay`, `applySettlement` and `evaluatePayout`. `resolvePlan` and
-// `validatePlan` are P2-1.
+// a rule slightly differently". ALL SIX ARE NOW HERE: `resolvePlan`,
+// `validatePlan`, `initialState`, `advanceDay`, `applySettlement` and
+// `evaluatePayout`.
 //
 // `clampPayout` IS DELIBERATELY NOT HERE AND M01 DISAGREES WITH ITSELF ABOUT IT.
 // Section 3.6's reference algorithm writes `export function clampPayout`, and
@@ -70,6 +70,8 @@ export type {
   ClampReason,
   ConsistencyGate,
   ContextGateResults,
+  CvId,
+  CvViolation,
   DrawdownRules,
   DrawdownType,
   EngineGateResults,
@@ -90,11 +92,29 @@ export type {
   PhaseDayRules,
   ReconClearGate,
   PhasePassedEvent,
+  MaterializationFinding,
+  MaterializationId,
+  PlanRulesJson,
+  PlanVersionSizeRow,
+  PublishDiff,
+  PublishDiffSeverity,
+  PublishedCapScheduleStep,
+  PublishedConsistency,
+  PublishedDailyLossLimit,
+  PublishedDrawdown,
+  PublishedDrawdownType,
+  PublishedEvalPhase,
+  PublishedFloorLock,
+  PublishedFundedPhase,
+  PublishedWinDays,
+  PwId,
   ResolvedPlan,
   RuleState,
   SettlementFact,
+  SizeCapScheduleStep,
   SoftDailyLossLimitEvent,
   TradedDaysGate,
+  ValidationResult,
   WinDaysGate,
   WinDaysResetEvent,
 } from './types.js';
@@ -111,6 +131,9 @@ export { EngineInvariantError } from './errors.js';
 
 export { IMPLEMENTED_RULES } from './rules.js';
 export type { RuleId } from './rules.js';
+
+export { resolvePlan } from './plan/resolve.js';
+export { validatePlan } from './plan/validate.js';
 
 export { advanceDay, initialState } from './day/advance.js';
 export { applySettlement } from './payout/settle.js';

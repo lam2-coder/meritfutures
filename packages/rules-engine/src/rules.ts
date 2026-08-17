@@ -94,7 +94,7 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules the engine computes today. FORTY-FOUR OF FIFTY.
+ * The rules the engine computes today. FORTY-FIVE OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
@@ -122,6 +122,13 @@ export type RuleId =
  *   R-14  day/floor.ts advanceFloor, the INV-06 tripwire
  *   R-15  day/floor.ts advanceFloor, the lock block
  *   R-16  day/floor.ts advanceFloor, static: the floor never moves
+ *   R-17  plan/validate.ts CV-01, and plan/resolve.ts, which REFUSES rather than
+ *         narrowing. R-17's own row is "rejected at publish by CV-01", and
+ *         CV-01 lives in `validatePlan`, which is inside this package by M01
+ *         section 1.3's layout. The type-level half did not go away and is now
+ *         the second of two: `PublishedDrawdownType` has three members so CV-01
+ *         has something to reject, `DrawdownType` has two so a resolved plan
+ *         cannot hold the third, and the rule is the narrowing between them
  *   R-18  day/advance.ts, floorOpenCents captured before DO-7 trails
  *   R-21  day/breach.ts checkBreach, strict `<`
  *   R-22  day/breach.ts checkBreach, strict `>`
@@ -190,13 +197,20 @@ export type RuleId =
  *         execution timestamp and `DailyMark` carries `fillCount` and no
  *         instant. Transcribing the CME year adds rows, not columns, so it
  *         unblocks their GOLDEN files and not the rules
- *   R-11, R-17, R-20
+ *   R-11, R-20
  *         discharged outside the engine entirely: the caller's live-mark
- *         predicate, publish validation, and the platform setpoint. R-19 LEFT
- *         THIS LIST when group H landed, because settlement is where it is
- *         discharged and settlement is now code, and R-10 LEFT IT when group B
- *         was completed, because DO-3's pair of identities is a check that
- *         fires rather than a rule the engine merely mentions
+ *         predicate and the platform setpoint. R-19 LEFT THIS LIST when group H
+ *         landed, because settlement is where it is discharged and settlement is
+ *         now code; R-10 LEFT IT when group B was completed, because DO-3's pair
+ *         of identities is a check that fires rather than a rule the engine
+ *         merely mentions; and R-17 LEFT IT when `validatePlan` was written,
+ *         because "publish validation" was never outside this package. M01
+ *         section 1.3 puts `plan/validate.ts` in `packages/rules-engine`, so the
+ *         line that filed R-17 beside R-11 and R-20 was reading "publish" as
+ *         "somebody else". IT IS THE THIRD TIME THIS EXACT STEP HAS BEEN TAKEN:
+ *         R-02, R-06 and R-10 were filed the same way in session 48, and the
+ *         generalisation was correct about its neighbours and never checked
+ *         against the rule in hand
  */
 export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-02',
@@ -212,6 +226,7 @@ export const IMPLEMENTED_RULES: readonly RuleId[] = [
   'R-14',
   'R-15',
   'R-16',
+  'R-17',
   'R-18',
   'R-19',
   'R-21',
