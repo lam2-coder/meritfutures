@@ -1,0 +1,97 @@
+# GS-054  Manufactured dilution days from a hedged pair  (AS-02)
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "A has a best day of 100,000c against period profit of 200,000c, a 5000bp
+#   share against a 3000bp limit, and needs 133,334c more profit to dilute.
+#   Three manufactured days of roughly 45,000c each get there ... to unlock a
+#   150,000c cap"                                                 M01 AS-02
+#   "Consistency alone cannot stop a funded ring. It bounds the shape of
+#   extraction, not its existence"                                M01 AS-02
+#   `best_day_cents * 10000 <= max_day_share_bp * period_profit_cents`, integer
+#   cross multiplication, no division anywhere                    M01 R-29
+#   funded consistency 3000bp                                     M01 Appendix A.1
+#   win days required 5, win day floor 15,000c at 50K             M01 Appendix A.1
+#   buffer 100,000c at 50K, payout cap 150,000c at 50K            M01 Appendix A.1
+#   funded drawdown 250,000c at 50K, floor lock at 260,000c       M01 Appendix A.1
+#   235,000 = 5,335,000 - 5,000,000 - 100,000                     M01 R-35
+#
+# THE THREE NUMBERS AS-02 STATES ARE ALL REACHED IN ORDER, WHICH IS WHY THE
+# STREAM IS FIVE DAYS RATHER THAN THREE. Days one and two put the account
+# exactly on AS-02's stated position: best day 100,000c on period profit
+# 200,000c, a 5000bp share against the 3000bp limit, failing by 133,334c. Days
+# three to five are AS-02's "three manufactured days of roughly 45,000c each",
+# and 335,000c is the first period profit at which R-29's cross multiplication
+# turns over: 100,000 * 10,000 = 1,000,000,000 against 3000 * 335,000 =
+# 1,005,000,000. **AT DAY FOUR IT STILL FAILS** (3000 * 290,000 = 870,000,000),
+# so the fifth day is load bearing and dropping it breaks the fixture on the
+# field the scenario is about rather than on an aggregate.
+#
+# THE OTHER ACCOUNT IS NOT IN THIS FILE AND CANNOT BE. AS-02's ring is a pair:
+# account B carries the matching loss so the pair is net flat before fees. A
+# golden fixture is one account's day stream, and that is exactly the assertion
+# rather than a limitation of the format. **Account B is invisible to account
+# A's fold**, the engine is per account by design ("cross-account state inside a
+# pure fold would destroy replay", AS-09), and so every gate below passes on a
+# stream the engine has no way to recognise as manufactured. AS-02's own
+# conclusion is the pin: consistency bounds the shape of extraction, not its
+# existence. The detector is M7's and the fixture does not pretend to reach it.
+#
+# ADR-048 POLARITY: DIRECT. Every rule cited (R-08, R-09, R-13, R-15, R-21,
+# R-29, R-35, R-36) is in the engine's declared `IMPLEMENTED_RULES` set. The
+# derivation is not wired yet; the citation is written to be resolvable now.
+id: GS-054
+name: manufactured dilution days from a hedged pair
+source: M01 R-08, R-09, R-13, R-15, R-21, R-29, R-35, R-36
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  # The two real days. Best day 100,000c, period profit 200,000c, a 5000bp
+  # share: AS-02's stated starting position, failing R-29 by 133,334c.
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5100000
+    high_balance_cents: 5110000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 100000
+    fill_count: 9
+    traded_day: true
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5090000
+    realized_pnl_cents: 100000
+    fill_count: 8
+    traded_day: true
+  # The three manufactured days. Each is a controlled 45,000c, which is a win
+  # day by R-09 and dilutes the denominator without touching the numerator.
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5200000
+    closing_balance_cents: 5245000
+    high_balance_cents: 5250000
+    low_balance_cents: 5195000
+    realized_pnl_cents: 45000
+    fill_count: 2
+    traded_day: true
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5245000
+    closing_balance_cents: 5290000
+    high_balance_cents: 5295000
+    low_balance_cents: 5240000
+    realized_pnl_cents: 45000
+    fill_count: 2
+    traded_day: true
+  - trading_day: 2026-11-06
+    opening_balance_cents: 5290000
+    closing_balance_cents: 5335000
+    high_balance_cents: 5340000
+    low_balance_cents: 5285000
+    realized_pnl_cents: 45000
+    fill_count: 2
+    traded_day: true
+settlements: []
