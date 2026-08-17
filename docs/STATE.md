@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->49<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->50<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -462,6 +462,39 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## `INV-06` is ruled and `RE-P-01` exists: the exception is pinned, not excused (2026-08-17)
+
+**[ADR-050](decisions/ADR-050.md) closes the ruling three sessions have been blocked on** ([session 45](sessions/2026-08-16-session-45.md), [session 47](sessions/2026-08-16-session-47.md), [session 48](sessions/2026-08-17-session-48.md)).
+
+> **`INV-06`: the floor never decreases, EXCEPT at the `R-31` funded reset, where it is initialised to `size_cents` minus the funded drawdown** (`R-12`, `R-31`, `GS-019`).
+
+**"No exception, no phase qualifier" exists to prevent UNSTATED exceptions**, and a single named, cited, testable one is the opposite of what that language guards against. **Scoping to `(account, phase)` was rejected because it makes the invariant true by redefining its domain**: the floor still falls on the pass day, by **at least** the 260,000c that separates the locked floor from the funded one and by 400,000c on `GS-019`'s own day, and hiding that costs every future reader the reconstruction. **[ADR-014](decisions/ADR-014.md) does not conflict.** Its permanent lock is about **settlement** never resetting the floor; `R-31` is a **phase transition**, and the balance falls to `size_cents` in the same step, so no loss room narrows.
+
+**Amended in place, each citing the ADR:** [M01](plans/M01-rules-engine.md) section 1.5's `INV-06` row and section 8's `RE-P-01` row, [STRATEGY](testing/STRATEGY.md)'s `PT-01` row, and the reporting block in [`progression.ts`](../packages/rules-engine/src/day/progression.ts). **`GS-019`, `GS-020` and `GS-023` are ratified and were not edited.**
+
+### The property, and why it asserts MORE at the exception rather than less
+
+**[`floor-monotonicity.property.test.ts`](../packages/rules-engine/test/floor-monotonicity.property.test.ts) is `RE-P-01` and `PT-01`.** A property that merely **skipped** the pass day would accept any floor at all there, which is exactly the unstated exception the clause forbids. So at the one step the exception covers, `>=` becomes `===` against `size_cents - funded drawdown_cents`.
+
+| | |
+|---|---|
+| **The generator is told nothing about phases** | `daySequenceArbitrary` draws marks, gaps, halted sessions and adjustments. The exception is recognised from the **engine's own `phase.passed` event**, so a generator cannot decide where it lands |
+| **The support is measured, not assumed** | The pass is reached, **a pass is watched LOWERING the floor**, the floor is watched rising, the lock engages, settlements apply, and a terminal state is reached. Without the second of those, `if (step.passed) continue` would be excusing nothing |
+| **Settlements are covered without the generator that does not exist** | `INV-18` compares against the **pre-settlement** balance plus `adjustment_cents`, and `SD-01` puts the settled withdrawal in that column, so a mark the generator already draws with a negative adjustment **is** a settlement day. No payout eligibility is invented |
+| **The fold ends the day after a pass, and that is `DO-3` working** | The generator chains balances through a reset it knows nothing about, so `INV-18` refuses the next mark. Each sequence contributes **at most one pass**, and the pass day itself folds in full. Asserted, so a future widening is a red test |
+| **Both mutants watched failing** | `CI-02/engine-RE-P-01-exception` seeds a reset **one cent low**, which **no other check in the repository catches**: `DO-7`'s tripwire never spans the reset. `CI-02/engine-RE-P-01-monotone` seeds `R-12`'s expression where `DO-7`'s outcome belongs, in `advance.ts` where the tripwire cannot see it either |
+| **The clean run is 34 of 34** | An earlier run reported 33 and printed "THE HARNESS CHANGED THE TREE", because documents were being edited in the same working tree while it ran. `falsify-ci.mjs` compares `git status` before and after and its diagnosis was right: **a falsification run measured on a tree someone else is writing to is not a measurement** |
+
+### Two defects the falsification run found and the green property could not
+
+**A module-level sampling pass scored the first mutant `FAILED OFF-TARGET`.** The reachability block was written at module level, copying `day-sequence.property.test.ts`, which is right to do it there because its generator calls no engine code. **This one folds**, so `R-14`'s tripwire can throw inside it, and at module level that throw lands during **collection**: vitest reported `0 test` for the file and every test carrying `RE-P-01` in its name never ran. Moved into `beforeAll`. **The property was green throughout, and only `falsify-ci.mjs` could see it.**
+
+**The monotone mutant was seeded in the wrong file.** Inside `advanceFloor` a decrease is caught by the tripwire **throwing** rather than by the property **asserting**, so the case would have proved the tripwire works and said nothing about `RE-P-01`. It moved one line out, past the tripwire's reach.
+
+**And the first lock-reachability check counted a literal and failed on every seed**: section 3.4's floor at the lock is `max(trailed, locked)`, so on a day that jumps past the 260,000c trigger the locked literal never appears. It reads `floorLocked` off the state now.
+
+---
+
 ## Groups F, G and H: forty-one of M01's fifty rules, and the nine that are left say why (2026-08-16)
 
 **[P2](plans/P2-rules-engine.md) section 7's `P2-6` and the group F and H sessions have landed** ([session 47](sessions/2026-08-16-session-47.md)), in one branch and five commits. **`pnpm run verify` is green: 460 tests, 15 corpus gates clean and dirty, 43 falsify cases with 40 watched failing on their own finding** (the three that error are scanners absent from this container's PATH, unchanged).
@@ -500,7 +533,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 **CI-03's polarity is untouched**, for the fourth session running. `engineIsIdentityStub()` still governs, every golden fixture is still asserted to fail, and [ADR-048](decisions/ADR-048.md)'s stated prerequisite, the resolvable-citation `L-nn` rule, is still unwritten. **The fixture-wiring session is now the single largest unblocking left in P2**: the `L-nn` rule, the loader's `bigint` comparison, then the per-fixture derivation, in that order.
 
-**`RE-P-01` and the floor-monotonicity property were not written**, because `INV-06`'s scope is unruled and that ruling decides whether the generator may cross an eval pass. Unchanged from [session 45](sessions/2026-08-16-session-45.md).
+**`RE-P-01` and the floor-monotonicity property were not written**, because `INV-06`'s scope is unruled and that ruling decides whether the generator may cross an eval pass. Unchanged from [session 45](sessions/2026-08-16-session-45.md). **CLOSED 2026-08-17 by [ADR-050](decisions/ADR-050.md): both are written, and the generator crosses the pass without being told what a phase is.** See the section at the top of this file.
 
 **No golden fixture was written and no `EC-nnn` was claimed.** P2 section 2 alternates fixture sessions and engine sessions: "a session doing both has derived its expectations from its own output."
 
@@ -543,7 +576,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 | Open | Where |
 |---|---|
-| **`INV-06`'s scope is unruled, and R-31 needs it. The per-account reading was TESTED AND REFUTED (session 47)** | The funded reset lowers the floor from 5,050,000c to 4,750,000c on the pass day. **R-12, R-31 and GS-019 all state that number**, so the engine follows them, and the balance falls to `size_cents` in the same step so no loss room narrows. **The hypothesis that `D-M2-1`'s "or provisioning a new one" makes the funded account a NEW ACCOUNT does not survive the sources**, so per-account scoping cannot rescue R-31: see the section below. **Two readings survive and both are the founder's**: per `(account, phase)`, which "no phase qualifier" argues against in its own words, or `INV-06` gaining a stated R-31 exception. **The property session still cannot be written until one is ruled** |
+| ~~**`INV-06`'s scope is unruled, and R-31 needs it. The per-account reading was TESTED AND REFUTED (session 47)**~~ **RULED 2026-08-17, [ADR-050](decisions/ADR-050.md): a stated `R-31` exception** | The funded reset lowers the floor from 5,050,000c to 4,750,000c on the pass day. **R-12, R-31 and GS-019 all state that number**, so the engine follows them, and the balance falls to `size_cents` in the same step so no loss room narrows. **The hypothesis that `D-M2-1`'s "or provisioning a new one" makes the funded account a NEW ACCOUNT does not survive the sources**, so per-account scoping cannot rescue R-31: see the section below. **Two readings survive and both are the founder's**: per `(account, phase)`, which "no phase qualifier" argues against in its own words, or `INV-06` gaining a stated R-31 exception. **The property session still cannot be written until one is ruled** |
 | **M01 disagrees with itself on R-22's operator, and this is a defect in a frozen document** | Section 3.6's pseudocode writes the hard daily-loss-limit comparison as `>=`; **R-22's operator column, `OQ-6`'s ruling and section 10.1 all write `>`** ("exactly at the limit survives"). Section 3.5 makes the operator column the contract, so the engine implements `>` and `RE-U-022` pins it. **Moving the pseudocode is an ADR, not a commit**, and no ADR is attempted on a session's own authority. **No v1 plan configures a daily loss limit**, so nothing exercises it until one does, which is exactly why it is recorded now |
 | **M01 disagrees with itself on R-15's lock effect** | Section 3.4's `max` against section 3.6's assignment, above. Recorded here for the same reason and left for the same authority |
 | **`rule.floor_locked` fires on a day the account then leaves, and the payload is worth more than the timeline noise (session 47)** | Every v1 eval pass locks the floor at DO-7 and is reset out of the lock at DO-8, in that order, because DO-7 precedes DO-8 and neither step may be reordered. The event is true of the eval account and is noise on a timeline the trader reads as funded. **`RE-U-031` now pins the sequence** `rule.floor_locked, phase.passed, day.closed`. **The half session 45 did not record is that `locked_floor_cents` is 5,050,000c while the account leaves the day on 4,750,000c**, and `DEP-M2-03` has M2 turning this event into a `set_risk` push. See the section below |
@@ -571,6 +604,8 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 **So per account is already what the corpus means, and that is exactly why it does not help.** Read per account, `INV-06` is the reading R-31 violates. **The mechanism the hypothesis needed is the one `platform_account_refs` provides**: `account_id` is a plain column with `assigned_at` and `retired_at`, so **one Merit account holds successive platform refs over time**, which is how "provisioning a new one" happens without a second Merit account.
 
 **What survives, and both are the founder's**: `INV-06` scoped per `(account, phase)`, which "no phase qualifier" argues against in its own words, or `INV-06` gaining a **stated R-31 exception**. `RE-P-01`'s generator cannot be written until one lands. **No scope sentence was added and `RE-P-01` was not touched**, per the instruction that a refuted hypothesis stops rather than being repaired into a ruling.
+
+**RULED 2026-08-17: the second reading, in [ADR-050](decisions/ADR-050.md).** The refutation above is what made the choice a real one rather than a preference, and it is cited in the ADR rather than repeated in it.
 
 ### 2. `rule.floor_locked` on the pass day is an M2 hazard, not only timeline noise
 
@@ -622,7 +657,7 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 **A held-back reason was wrong and had survived a batch.** After batch 2 the fixture README recorded that a non-positive consistency denominator "requires the period to have been reset by a settlement (`R-47`)", so GS-021 and GS-022 were held. **It does not**: `R-31`'s funded reset zeroes the same accumulators, and a funded account whose period was never reset reaches a negative denominator on its first losing stretch. `R-30` is unreachable in **eval** for a different reason worth keeping: with no adjustment, eval period profit **is** the closing balance minus the size, so a day meeting a 300,000c target has a denominator of at least 300,000c. **A held-back row records a reason, and a reason nobody re-derives becomes a fact.**
 
-**Batch 3 wrote nothing that depends on `INV-06`'s open scope**, which is the standing constraint on this work. **Three files already do**: GS-019 from batch 1 and GS-020 and GS-023 from batch 2 each pin `floor_cents: 4750000` after an eval pass. None was edited, because changing the value ratifies the ruling as surely as stating it.
+**Batch 3 wrote nothing that depends on `INV-06`'s open scope**, which is the standing constraint on this work. **Three files already do**: GS-019 from batch 1 and GS-020 and GS-023 from batch 2 each pin `floor_cents: 4750000` after an eval pass. None was edited, because changing the value ratifies the ruling as surely as stating it. **[ADR-050](decisions/ADR-050.md) ruled it on 2026-08-17 and 4,750,000 is the ruled value, so all three are ratified and none needed editing after all.** The exposure was three files and the cost of it was nothing, which is the argument for naming a file rather than fixing it.
 
 **The format's ceiling is now the binding constraint rather than the engine**, and every remaining M1 row is blocked by one of five named things in [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md): a session **kind** or a fill stream; a **settlement** input, which `L-11` refuses; the **`skipped: true`** shape, which lives in nested `engine_gates` while `diffEndState` compares flat fields with `Object.is`; **payout arithmetic**, which is not a day fold; and **five sessions**, which bounds GS-064 and the long streams. The two unlocks that reach the most rows are the **calendar transcription** (a founder item) and a **settlement on `EngineInput`**.
 

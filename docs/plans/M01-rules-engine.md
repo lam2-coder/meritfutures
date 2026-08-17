@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-17
 ---
 
 # M1: Rules Engine
@@ -114,7 +114,7 @@ Each is enforced somewhere real. "Enforced by review" is not an entry in this ta
 | INV-03 | All ratios are integer basis points, compared by cross-multiplication, never division | RE-U-029, code review against R-29 |
 | INV-04 | Replaying every mark from day one reproduces stored state byte-identically | Nightly self-audit job, GS-071, Appendix B |
 | INV-05 | `withdrawable_cents >= 0` always | Formula floors at zero (R-35), check constraint, property RE-P-05 |
-| INV-06 | The floor never decreases. No exception, no phase qualifier, no settlement carve-out ([ADR-014](../decisions/ADR-014.md)) | Property RE-P-01, GS-010, GS-081 |
+| INV-06 | The floor never decreases, **except at the R-31 funded reset**, where it is initialised to `size_cents` minus the **funded** drawdown (R-12, R-31, GS-019). No other exception, no phase qualifier, no settlement carve-out ([ADR-014](../decisions/ADR-014.md), amended by [ADR-050](../decisions/ADR-050.md)) | Property RE-P-01, GS-010, GS-081 |
 | INV-07 | A locked floor never changes again for the life of the account | Property RE-P-02, GS-016 |
 | INV-08 | The win-day count never decreases except when the payout anchor advances | Property RE-P-03 |
 | INV-09 | The traded-day count never decreases | Property RE-P-04 |
@@ -957,7 +957,7 @@ Written against generated day sequences. Each states the property in the form th
 
 | ID | Property |
 |---|---|
-| RE-P-01 | `floor(d+1) >= floor(d)` for **every** generated day sequence, for both drawdown types, **including sequences containing settlements**. Since [ADR-014](../decisions/ADR-014.md) the "no settlement" qualifier is gone, which strengthens the property and shrinks the generator's exclusion list to nothing |
+| RE-P-01 | `floor(d+1) >= floor(d)` for **every** generated day sequence, for both drawdown types, **including sequences containing settlements**. Since [ADR-014](../decisions/ADR-014.md) the "no settlement" qualifier is gone, which strengthens the property and shrinks the generator's exclusion list to nothing. **The one exception is the day that emits `phase.passed`** ([ADR-050](../decisions/ADR-050.md)): there the floor is asserted to equal `size_cents - funded drawdown_cents` **exactly**, so the R-31 reset is pinned rather than excused. The generator is told nothing about phases; the exception is recognised from the engine's own event stream |
 | RE-P-02 | Once `floorLocked`, `floor` is constant for every subsequent day, including across settlements |
 | RE-P-03 | `winDaysCount` is non-decreasing between settlements, and after a settlement equals the count of win days strictly after `payoutAnchorDay` |
 | RE-P-04 | `tradedDaysCount` is non-decreasing within a phase |
