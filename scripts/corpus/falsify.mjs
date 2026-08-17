@@ -1106,6 +1106,83 @@ const SCOPE_CASES = [
   },
 ];
 
+// =============================================================================
+// LOADER CASES: CI-03's `L-nn` rules, seeded in fixture DATA
+// =============================================================================
+// Same discipline as everything above and a different pairing, forced by the
+// one structural fact about this harness: `copyTree` omits `node_modules`, so
+// nothing needing vitest or a workspace resolution can run inside a tree copy.
+// The golden loader is TypeScript in a pnpm workspace and cannot run there at
+// all.
+//
+// SO THE COPY HOLDS THE DATA AND THIS TREE HOLDS THE RULE. Each case copies
+// `packages/rules-engine/fixtures` to a throwaway directory, seeds one
+// violation into it, and runs `packages/golden-loader/check.mjs` FROM ROOT
+// pointed at that directory. The rule under test is the one on this branch,
+// which is what a falsification harness is for; the data under test is a copy,
+// so a killed run cannot leave a seeded fixture in the tree. That last property
+// is why this is not `seededInTree` from scripts/ci/falsify-ci.mjs: that file
+// spends sixty lines on a journal precisely because it mutates the real tree,
+// and a case that does not have to mutate it should not.
+//
+// `expect` IS EITHER A SUBSTRING THE FINDING MUST CONTAIN OR THE LITERAL
+// 'PASS', exactly as in SCOPE_CASES, and no boundary appears here in one
+// direction only. A rule that refuses every fixture passes both violation cases
+// below and is useless.
+/** The fixture the loader's own seeded-violation suite uses, for the same reason. */
+const GS_011_YAML = 'GS-011-trailing-floor-ignores-the-intraday-high.yaml';
+
+/** Edit one file inside a copied FIXTURE directory. */
+const editFixture = (dir, file, fn) => {
+  const p = join(dir, file);
+  writeFileSync(p, fn(readFileSync(p, 'utf8')));
+};
+
+const LOADER_CASES = [
+  {
+    name: 'L-13/cites-nothing',
+    what: "a fixture whose `source:` cites no identifier at all, which is ADR-048's case 4",
+    // THE VACUITY CASE, and the reason this rule is ADR-048's stated
+    // prerequisite rather than its companion. "Every rule this fixture cites is
+    // implemented" is trivially true of a fixture citing none, so without this
+    // refusal such a fixture flips to `direct` against an engine that
+    // implements nothing and fails for a reason with nothing to do with its
+    // subject.
+    expect: 'L-13 GS-011-trailing-floor-ignores-the-intraday-high.yaml: "source" cites no',
+    seed: (d) => editFixture(d, GS_011_YAML, (b) => once(b, /^source: .*$/m, 'source: the floor')),
+  },
+  {
+    name: 'L-13/unresolvable',
+    what: 'a fixture citing a rule number M01 does not define',
+    expect: 'cites R-99, which M01 does not define',
+    seed: (d) => editFixture(d, GS_011_YAML, (b) => once(b, /^source: .*$/m, 'source: M01 R-99')),
+  },
+  {
+    name: 'L-13/out-neighbouring-identifiers',
+    what: 'a source naming ADR, RE-U and GS identifiers beside its rules, which must NOT be a finding',
+    // THE DIRECTION A NARROWED RULE GOES QUIET IN. `ADR-048` contains `R-04`
+    // and `RE-U-019` contains `R-01` as substrings, and neither is a citation.
+    // A rule matching them would resolve citations nobody made; a rule that
+    // then tightened to compensate would start refusing real fixtures. The
+    // boundary is the word break, and this asserts it from the permissive side.
+    expect: 'PASS',
+    seed: (d) =>
+      editFixture(d, GS_011_YAML, (b) =>
+        once(b, /^source: .*$/m, 'source: M01 R-13, R-18, per ADR-048 and RE-U-019, see GS-011'),
+      ),
+  },
+  {
+    name: 'L-13/out-invariant-only',
+    what: 'a source citing only an INV-nn, which P2 section 2 permits and must NOT be a finding',
+    // P2 section 2 rules the citation as "at least one `R-nn`, `CV-nn` or
+    // `INV-nn` that exists in M01", three prefixes rather than one. A rule
+    // narrowed to `R-nn` would be quieter, would pass both violation cases
+    // above, and would refuse a fixture the plan explicitly allows.
+    expect: 'PASS',
+    seed: (d) => editFixture(d, GS_011_YAML, (b) => once(b, /^source: .*$/m, 'source: M01 INV-06')),
+  },
+];
+
 // `expect` may be a string or a function of the seeded tree, because a seed that
 // derives its identifier cannot name its own finding in advance.
 const resolveExpect = (e, dir) => (typeof e === 'function' ? e(dir) : e);
@@ -1138,6 +1215,38 @@ function copyTree(dir) {
   for (const entry of readdirSync(ROOT)) {
     if (entry === '.git' || entry === 'node_modules') continue;
     cpSync(join(ROOT, entry), join(dir, entry), { recursive: true });
+  }
+}
+
+const indentAll = (text) =>
+  text
+    .split('\n')
+    .map((l) => `        ${l}`)
+    .join('\n');
+
+/**
+ * The fixture directory, copied. Small enough to copy per case, and copying it
+ * per case is what keeps one seed from being visible to the next.
+ */
+function copyFixtures(dir) {
+  cpSync(join(ROOT, 'packages/rules-engine/fixtures'), dir, { recursive: true });
+}
+
+/**
+ * Run the loader over a fixture directory, FROM THIS TREE.
+ *
+ * The rule is this branch's and the data is the copy's, which is the pairing a
+ * falsification harness wants: a seeded rule proves nothing about a rule
+ * nobody changed.
+ */
+function runLoader(dir) {
+  try {
+    const stdout = execFileSync('node', [join(ROOT, 'packages/golden-loader/check.mjs'), dir], {
+      encoding: 'utf8',
+    });
+    return { pass: true, stdout };
+  } catch (err) {
+    return { pass: false, stdout: (err.stdout ?? '') + (err.stderr ?? '') };
   }
 }
 
@@ -1294,12 +1403,84 @@ function main() {
     }
   }
 
+  console.log("\nLOADER: CI-03's L-nn rules, each seeded in fixture data\n");
+
+  // THE POSITIVE CONTROL COMES FIRST AND IS ITS OWN CASE. Every violation case
+  // below is satisfied by a loader that refuses everything, so the unseeded copy
+  // must load clean before any of them means anything.
+  {
+    const dir = mkdtempSync(join(tmpdir(), 'merit-loader-'));
+    try {
+      copyFixtures(dir);
+      const { pass, stdout } = runLoader(dir);
+      if (pass) {
+        console.log('  control loads clean     an untouched copy of the fixture directory');
+      } else {
+        bad++;
+        console.log('  CONTROL DID NOT LOAD    an untouched copy of the fixture directory');
+        console.log(
+          '        Every violation case below is satisfied by a loader that refuses ' +
+            'everything, so they assert nothing until this loads:',
+        );
+        console.log(indentAll(stdout));
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  for (const c of LOADER_CASES) {
+    const dir = mkdtempSync(join(tmpdir(), 'merit-loader-'));
+    try {
+      copyFixtures(dir);
+      const stale = trySeed(c.seed, dir);
+      if (stale) {
+        bad++;
+        console.log(`  SEED IS STALE           ${c.name}  <- ${c.what}`);
+        console.log(`        ${stale}`);
+        console.log('        The harness no longer describes the fixtures. Fix the seed.');
+        continue;
+      }
+      const expect = resolveExpect(c.expect, dir);
+      const { pass, stdout } = runLoader(dir);
+      const findings = stdout
+        .split('\n')
+        .filter((l) => l.startsWith('       '))
+        .map((l) => l.trim());
+      if (expect === 'PASS') {
+        if (pass) {
+          console.log(`  out of scope, loaded    ${c.name}  <- ${c.what}`);
+        } else {
+          bad++;
+          console.log(`  REFUSED A VALID FIXTURE ${c.name}  <- ${c.what}`);
+          for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
+        }
+      } else if (!pass && findings.some((f) => f.includes(expect))) {
+        console.log(`  refused as required     ${c.name}  <- ${c.what}`);
+        console.log(`        ${findings.find((f) => f.includes(expect)).slice(0, 150)}`);
+      } else {
+        bad++;
+        console.log(
+          `  ${pass ? 'DID NOT REFUSE         ' : 'REFUSED OFF-TARGET     '} ${c.name}  <- ${c.what}`,
+        );
+        console.log(
+          `        Expected a finding containing "${expect}". Got ${findings.length} finding(s):`,
+        );
+        for (const f of findings.slice(0, 3)) console.log(`          ${f.slice(0, 140)}`);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   console.log(
     bad === 0
-      ? `\nAll ${ids.length} gates pass clean and fail dirty, and ${SCOPE_CASES.length} scope ` +
-          `case(s) hold. Each one has now been watched doing both.`
+      ? `\nAll ${ids.length} gates pass clean and fail dirty, ${SCOPE_CASES.length} scope ` +
+          `case(s) hold, and ${LOADER_CASES.length} loader case(s) land on the side of the ` +
+          `L-nn boundary they name. Each one has now been watched doing both.`
       : `\n${bad} problem(s). A gate that cannot be made to fail is not checking anything, and ` +
           `a gate that fails on a file outside its scope is checking the wrong thing.`,
+
   );
   return bad ? 1 : 0;
 }

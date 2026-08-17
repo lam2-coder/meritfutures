@@ -7,9 +7,11 @@ import { afterAll, describe, expect, test } from 'vitest';
 import {
   FIXTURE_DIR,
   FixtureError,
+  citedIdentifiers,
   describeDiff,
   loadFixture,
   loadFixtureDirectory,
+  m01Identifiers,
   registryIds,
   runFixture,
   unusedAwaitingEntries,
@@ -229,6 +231,33 @@ describe('each loader rule, watched failing on its own seeded violation', () => 
     expect(refusal(dir).rule).toBe('L-11');
   });
 
+  test('L-13 a source citing nothing at all, which is ADR-048 case 4', () => {
+    // THE VACUITY CASE, AND IT IS THE REASON THIS RULE IS ADR-048'S STATED
+    // PREREQUISITE. "Every rule this fixture cites is implemented" is trivially
+    // true of a fixture that cites none, so without this refusal such a fixture
+    // flips to `direct` against an engine that implements nothing.
+    const dir = seedbed();
+    editYaml(dir, (b) => b.replace(/^source: .*$/m, 'source: the floor rule'));
+    expect(refusal(dir).rule).toBe('L-13');
+  });
+
+  test('L-13 a source citing an identifier M01 does not define', () => {
+    const dir = seedbed();
+    editYaml(dir, (b) => b.replace(/^source: .*$/m, 'source: M01 R-99'));
+    const error = refusal(dir);
+    expect(error.rule).toBe('L-13');
+    expect(error.message).toContain('R-99');
+  });
+
+  test('L-13 resolves against what M01 DEFINES, not what it mentions', () => {
+    // The half a mention-anywhere query would lose. `RE-U-019` and `ADR-048`
+    // both contain two digits after a letter and a dash, and neither is a
+    // citation; a fixture whose source named only those cites no rule.
+    expect(citedIdentifiers('RE-U-019, ADR-048, GS-011')).toEqual([]);
+    expect(citedIdentifiers('M01 R-13, R-18')).toEqual(['R-13', 'R-18']);
+    expect(citedIdentifiers('M01 CV-01 and INV-06')).toEqual(['CV-01', 'INV-06']);
+  });
+
   test('L-12 a file outside the YAML subset', () => {
     const dir = seedbed();
     editYaml(dir, (b) => `${b}\tphase: funded\n`);
@@ -291,6 +320,33 @@ describe('loadFixtureDirectory', () => {
 // -----------------------------------------------------------------------------
 // The registry
 // -----------------------------------------------------------------------------
+
+describe("M01's identifier space, which is what L-13 resolves against", () => {
+  test('every rule, config validation and invariant runs 1..n with no holes', () => {
+    // NOT A COUNT, for the same reason the registry contiguity case is not one.
+    // Contiguity is the structural property, and it is what makes the leading
+    // table cell a trustworthy definition query: a series with a hole in it is
+    // a series the query stopped reading, not a document with a missing rule.
+    const m01 = m01Identifiers();
+    for (const prefix of ['R', 'CV', 'INV']) {
+      const numbers = [...m01]
+        .filter((id) => id.startsWith(`${prefix}-`))
+        .map((id) => Number(id.slice(prefix.length + 1)))
+        .sort((a, b) => a - b);
+      expect(numbers.length).toBeGreaterThan(0);
+      expect(numbers).toEqual(numbers.map((_, i) => i + 1));
+    }
+  });
+
+  test('every fixture on the tree already cites a resolvable identifier', () => {
+    // The positive control for L-13. A rule that refuses everything passes every
+    // seeded case above and is useless; this is the other direction, over the
+    // real directory rather than over the seedbed's one fixture.
+    const { fixtures, failures } = loadFixtureDirectory();
+    expect(failures.map((f) => f.error.message)).toEqual([]);
+    expect(fixtures.filter((f) => citedIdentifiers(f.source).length === 0)).toEqual([]);
+  });
+});
 
 describe('the golden scenario registry', () => {
   test('is contiguous from GS-001 with no holes', () => {

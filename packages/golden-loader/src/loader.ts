@@ -189,6 +189,18 @@ export const REPO_ROOT = ((): string => {
 export const FIXTURE_DIR = join(REPO_ROOT, 'packages/rules-engine/fixtures');
 
 /**
+ * M01, which is where `source:` has to land for a citation to be resolvable.
+ *
+ * A PATH CONSTANT RATHER THAN A GLOB, because M01 is one document and the rule
+ * is that a fixture cites the rules engine's specification. `REGISTRY_PATH`
+ * above records what happens when a corpus document moves and a reader of it by
+ * path is missed; this one is asserted rather than assumed for the same reason,
+ * in `m01Identifiers`, which throws when the file is gone instead of returning
+ * an empty set that would make every citation unresolvable at once.
+ */
+export const M01_PATH = join(REPO_ROOT, 'docs/plans/M01-rules-engine.md');
+
+/**
  * ADR-043 split the registry into one file per SECTION, so this is a DIRECTORY.
  *
  * It was `docs/testing/GOLDEN_SCENARIOS.md` until 2026-08-15. The split moved the
@@ -239,6 +251,61 @@ export function registryIds(registryPath: string = REGISTRY_PATH): Set<string> {
     body = readFileSync(registryPath, 'utf8');
   }
   return new Set([...body.matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1] as string));
+}
+
+// -----------------------------------------------------------------------------
+// M01's identifier space, which is what makes `source:` resolvable
+// -----------------------------------------------------------------------------
+// P2 section 2's mechanical traceability tier: `source:` "becomes a resolvable
+// citation: at least one `R-nn`, `CV-nn` or `INV-nn` that exists in M01".
+//
+// THE DEFINITION QUERY IS THE LEADING TABLE CELL, NOT A MENTION ANYWHERE IN THE
+// FILE, and the difference is the whole value of the rule. M01 mentions `R-31`
+// inside INV-06's prose, inside a state-diagram label and inside half a dozen
+// other rows; a mention-anywhere query would resolve a citation of a rule the
+// document only ever refers to, and the first fixture citing an identifier M01
+// discusses but does not define would load clean. A rule, a config validation
+// and an invariant are each DEFINED by a row of their own table, so the row is
+// the definition and the leading cell is its name.
+//
+// VERIFIED TOTAL RATHER THAN ASSERTED COUNT: at the time of writing this query
+// returns exactly the 93 identifiers a mention-anywhere query returns, which is
+// R-01 to R-50, CV-01 to CV-19 and INV-01 to INV-24 with nothing on either side
+// that the other lacks. The number is not written down here, for STRATEGY
+// section 4.4's reason: a quantity a script can derive does not get stated by
+// hand. What IS asserted is that the parse found something at all.
+
+const M01_DEFINITION = /^\|\s*\*{0,2}((?:R|CV|INV)-\d{2})\*{0,2}\s*\|/gm;
+
+/**
+ * Every `R-nn`, `CV-nn` and `INV-nn` M01 DEFINES.
+ *
+ * @throws when M01 is not where this expects it, or when the parse finds no
+ * identifier at all. Both are the empty-set case ADR-048 calls the vacuity
+ * class: an empty definition set makes every citation unresolvable and would
+ * turn `L-13` from a traceability rule into a rule that refuses every fixture
+ * in the directory, which reads as a corpus problem and is a reader problem.
+ */
+export function m01Identifiers(path: string = M01_PATH): Set<string> {
+  if (!existsSync(path)) {
+    throw new Error(`M01 is not where the loader expects it: ${path}`);
+  }
+  const ids = new Set(
+    [...readFileSync(path, 'utf8').matchAll(M01_DEFINITION)].map((m) => m[1] as string),
+  );
+  if (ids.size === 0) {
+    throw new Error(`M01 defines no R-nn, CV-nn or INV-nn rows: ${path}`);
+  }
+  return ids;
+}
+
+/** Every identifier a `source:` line cites, in the order it cites them. */
+export function citedIdentifiers(source: string): string[] {
+  // `\b` on both sides is what keeps `ADR-048` from reading as a citation of
+  // `R-04` and `RE-U-019` from reading as one of `R-01`: neither has a word
+  // boundary before its `R`. A three-digit `R-123` matches nothing either,
+  // which is a fixture citing no rule rather than a fixture citing R-12.
+  return [...new Set([...source.matchAll(/\b(?:R|CV|INV)-\d{2}\b/g)].map((m) => m[0]))];
 }
 
 // -----------------------------------------------------------------------------
@@ -434,6 +501,43 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
       'L-02',
       yamlFile,
       '"source" must cite the rule the scenario derives from',
+    );
+  }
+
+  // L-13  The citation RESOLVES, and there is at least one of them.
+  //
+  //       P2 section 2's mechanical traceability tier, and ADR-048's STATED
+  //       PREREQUISITE rather than its companion: "a fixture citing nothing
+  //       makes the polarity test VACUOUSLY TRUE". Polarity is derived from the
+  //       rules a fixture cites, so "every rule this fixture cites is
+  //       implemented" is trivially satisfied by a fixture that cites none, and
+  //       such a fixture would flip to `direct` against an engine implementing
+  //       nothing and then fail for a reason with nothing to do with its
+  //       subject. ADR-048 lists that as case 4, "the dangerous one", and says
+  //       it is "closed by a prerequisite rather than by care". This is the
+  //       prerequisite, and it lands before the derivation reads a citation.
+  //
+  //       BOTH HALVES ARE THE SAME RULE ON PURPOSE. A citation of `R-99` and a
+  //       citation of nothing are one defect wearing two costumes: in each case
+  //       the fixture names no rule this repository can resolve, and in each
+  //       case the traceability the tier exists to provide is absent. Splitting
+  //       them into two rule numbers would let the second be relaxed without
+  //       the first being discussed.
+  const cited = citedIdentifiers(source);
+  if (cited.length === 0) {
+    throw new FixtureError(
+      'L-13',
+      yamlFile,
+      `"source" cites no R-nn, CV-nn or INV-nn that M01 defines: ${JSON.stringify(source)}`,
+    );
+  }
+  const m01 = options.m01Ids ?? m01Identifiers(options.m01Path);
+  const unresolved = cited.filter((id) => !m01.has(id));
+  if (unresolved.length > 0) {
+    throw new FixtureError(
+      'L-13',
+      yamlFile,
+      `"source" cites ${unresolved.join(', ')}, which M01 does not define`,
     );
   }
 
@@ -657,6 +761,10 @@ export interface LoadOptions {
   readonly registryPath?: string;
   /** Supplied directly by the falsification suite, which builds its own. */
   readonly registry?: Set<string>;
+  /** Defaults to `docs/plans/M01-rules-engine.md`. */
+  readonly m01Path?: string;
+  /** L-13's resolution set, read once per directory rather than per fixture. */
+  readonly m01Ids?: Set<string>;
 }
 
 /**
@@ -673,6 +781,7 @@ export function loadFixtureDirectory(options: LoadOptions = {}): LoadResult {
   }
 
   const registry = options.registry ?? registryIds(options.registryPath);
+  const m01Ids = options.m01Ids ?? m01Identifiers(options.m01Path);
   const fixtures: GoldenFixture[] = [];
   const failures: FixtureFailure[] = [];
 
@@ -683,7 +792,7 @@ export function loadFixtureDirectory(options: LoadOptions = {}): LoadResult {
 
   for (const file of files) {
     try {
-      fixtures.push(loadFixture(file, { ...options, fixtureDir: dir, registry }));
+      fixtures.push(loadFixture(file, { ...options, fixtureDir: dir, registry, m01Ids }));
     } catch (cause) {
       const error =
         cause instanceof FixtureError
