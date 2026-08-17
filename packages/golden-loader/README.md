@@ -28,11 +28,27 @@ The arrow also points the right way: `RI-01` asserts `packages/rules-engine` dec
 
 [STRATEGY section 3.2](../../docs/testing/STRATEGY.md): that is what stops a fixture from quietly acquiring a bespoke assertion that weakens it. `test/fixtures.golden.test.ts` is written once and applied to whatever the directory holds.
 
+## The stage folds `advanceDay`, and 24 of 30 fixtures pass
+
+**Until 2026-08-17 this stage folded `evaluate`**, the scaffold's identity stub, whose whole body is `return { newState: input.accountState, events: [] }`. Thirty fixtures diffed the output of that, [ADR-038](../../docs/decisions/ADR-038.md) recorded it, and `describe.runIf(!declaration.holds)` was written to survive it. `runFixture` now folds `advanceDay` over the day stream, which is what M01 section 3.1 specifies and where the declared rules live.
+
+**24 of 30 pass. The six that do not are listed by the stage itself, on every run, with the field that moved.** None of the six is an engine defect and none is fixed here, because a fixture edited to match an engine proves only that the code agrees with itself (TR-01).
+
+| Fixtures | Cause |
+|---|---|
+| `GS-054`, `GS-055`, `GS-061`, `GS-064` | **The fixture calendar has no day to anchor a funded prior on.** Each states `phase: funded` with `opened_on: 2026-11-02` and then consumes all five of `cme-2026.json`'s sessions, so its first mark falls on its own open day and `advanceDay` refuses `not_forward` (INV-14, R-06). The eight funded fixtures that start on `2026-11-03` all pass |
+| `GS-020` | **The eval passes on the last day the calendar covers.** R-31's consistency period starts on the next trading day, `nextTradingDayAfter` has nothing to answer with, and the day is refused with the typed `calendar_coverage_miss` [ADR-049](../../docs/decisions/ADR-049.md) rules for exactly this |
+| `GS-024` | **The floor-lock jump disagreement, which is a founder ruling and not a defect.** M01 section 3.4's floor machine is `max(trailed, locked)` and section 3.6 states the locked value; the engine follows 3.4 and produces `5,050,001`, the fixture follows 3.6 and pins `5,010,000` |
+
+**Five of the six want two more sessions on `fixtures/calendars/cme-2026.json`**, one before `2026-11-02` and one after `2026-11-06`. That is a fixture-directory edit and it is not this package's to make.
+
 ## The polarity of the golden assertions is derived, not declared
 
-**TR-02 puts the fixture before the function on a money path: "the fixture exists, and FAILS, before the function does."** `packages/rules-engine` ships the scaffold's identity evaluation, so every fixture is in that window. **STRATEGY section 1** is equally clear that a permanently red required stage is worse than a smaller suite whose failures are trusted, because the first one trains its own reader to click through red.
+**TR-02 puts the fixture before the function on a money path: "the fixture exists, and FAILS, before the function does."** **STRATEGY section 1** is equally clear that a permanently red required stage is worse than a smaller suite whose failures are trusted, because the first one trains its own reader to click through red.
 
-**So the stage asserts the failure instead of suffering it, and reads the direction off the engine.** `engineIsIdentityStub()` probes `evaluate` with one day that closes above its open, which any implemented engine must react to. While that probe holds, **a fixture that MATCHES is the finding**, since a fixture satisfied by an engine that computes nothing is a fixture pinning nothing.
+**The direction is read off the engine, per rule.** `engineIsIdentityStub()` probes the function this stage actually folds with one day that closes above its open, which any implemented engine must react to. It no longer holds, so the derived per-fixture direction is **enforced**: a fixture citing only implemented rules must MATCH, and one citing an unimplemented rule must FAIL, where a match is the finding.
+
+**The probe had to move with the fold and that is the lesson worth keeping.** While it probed `evaluate` and the stage folded `evaluate`, the two agreed. The moment the fold moved, a probe left behind would have reported the fold as the identity forever, `declaration.holds` would have stayed false, and the stage would have sat in its own escape hatch with nothing left to escape.
 
 **A per-fixture `pending: true` was the alternative and it is the weakening TR-03 forbids**: the escape hatch a future session reaches for at 11pm when one scenario will not go green. There is no flag to remove and no fixture to edit; when M01 lands the probe stops holding and the same fixtures become live assertions.
 
@@ -40,15 +56,17 @@ The arrow also points the right way: `RI-01` asserts `packages/rules-engine` dec
 
 ## The stage says what it currently proves, and the claims are measured
 
-[ADR-038](../../docs/decisions/ADR-038.md). While the polarity is inverted, `CI-03 golden files: pass` means three things its name contradicts:
+[ADR-038](../../docs/decisions/ADR-038.md). While the polarity was inverted, `CI-03 golden files: pass` meant three things its name contradicts:
 
 | | |
 |---|---|
 | The assertion is `diffs.length > 0` | A fixture that MATCHES is the finding |
 | **A corrupted expected end state still passes** | Any expectation at all produces diffs against an engine that computes nothing, so the stage is blind to whether the expected end states are the ones the corpus states |
-| The end-to-end assertion is not running | It is behind `describe.runIf(!stubbed)` and shows up as a skip count |
+| The end-to-end assertion is not running | It is behind `describe.runIf(!declaration.holds)` and shows up as a skip count |
 
-All three were correct, and all three were stated **only in a pull request body**, which is authored once and read during one review. So [`src/coverage.ts`](src/coverage.ts) emits them into the job log and `$GITHUB_STEP_SUMMARY` on every run, and it **measures** rather than repeats: the corrupted-expectation claim is proved by corrupting every loaded fixture and re-running the stage's own assertion over it, and the fixture-to-registry fraction is derived from the tree and the registry. **When M01 lands the block changes on its own**, exactly as the polarity does.
+**All three stopped being true when the fold became real, and the block says so on its own** because it measures rather than repeats: the corruption probe is now re-run against the enforced direction and caught on every fixture. That is the property ADR-038 was written for, arriving without anybody editing the block.
+
+All three were correct when written, and all three were stated **only in a pull request body**, which is authored once and read during one review. So [`src/coverage.ts`](src/coverage.ts) emits them into the job log and `$GITHUB_STEP_SUMMARY` on every run, and it **measures** rather than repeats: the corrupted-expectation claim is proved by corrupting every loaded fixture and re-running the stage's own assertion over it, and the fixture-to-registry fraction is derived from the tree and the registry. **When M01 lands the block changes on its own**, exactly as the polarity does.
 
 `--reporter=verbose` is part of the stage's command for this reason and not for taste: Vitest's default reporter swallows test stdout on a passing run.
 
