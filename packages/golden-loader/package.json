@@ -14,8 +14,10 @@
   "dependencies": {
     "@merit/rules-engine": "workspace:*"
   },
+  "//fast-check": "PT-06's harness randomizes `TZ` per case, which needs `process`, which the engine package does not have (`types: []`, deliberately). So the harness and the properties that use it live here, and the generator library comes with them. It is a devDependency, it is already in the catalog and already installed for @merit/rules-engine, so it adds no package to the tree that VG-12 has not already admitted.",
   "devDependencies": {
     "@types/node": "catalog:",
+    "fast-check": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

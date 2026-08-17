@@ -17,10 +17,12 @@
     "falsify:ci": "node scripts/ci/falsify-ci.mjs",
     "verify": "pnpm run check:invariants && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run gates && pnpm run falsify"
   },
+  "//fast-check": "AT THE ROOT FOR scripts/demo's SAKE, and for the same reason `vitest` is here: the demo is deliberately not a workspace package (see its tsconfig), so it has no node_modules of its own and resolves its test-time imports from the root. PT-06 lives in scripts/demo/test because `runDemo` is the only multi-account fold through the real engine in this tree. No package is added that VG-12 has not already admitted: fast-check is in the catalog and is already installed for @merit/rules-engine. NOTE FOR THE NEXT SESSION: this comment sits at the TOP LEVEL and not inside `devDependencies`, where pnpm read a `//`-prefixed key as a real package name and installed it.",
   "devDependencies": {
     "@merit/tooling": "workspace:*",
     "@types/node": "catalog:",
     "eslint": "catalog:",
+    "fast-check": "catalog:",
     "eslint-plugin-merit": "workspace:*",
     "prettier": "catalog:",
     "typescript": "catalog:",

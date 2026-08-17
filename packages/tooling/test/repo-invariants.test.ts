@@ -52,6 +52,16 @@ function cleanTree(): string {
   for (const pkg of ['rules-engine', 'db']) {
     write(root, `packages/${pkg}/package.json`, JSON.stringify({ name: `@merit/${pkg}` }));
   }
+  // RI-07's input: a module GRAPH, not a file. Two modules rather than one,
+  // because the check throws when it walks fewer than two -- a graph walk that
+  // reached only the entry point means the specifier scan stopped matching, and
+  // a fixture with one file could not tell those apart.
+  write(root, 'packages/rules-engine/src/index.ts', "export { floorAt } from './floor.js';\n");
+  write(
+    root,
+    'packages/rules-engine/src/floor.ts',
+    'export const floorAt = (n: number): number => (n < 0 ? 0 : n);\n',
+  );
   for (const app of ['site', 'portal', 'admin', 'worker']) {
     write(root, `apps/${app}/package.json`, JSON.stringify({ name: `@merit/${app}` }));
   }
@@ -223,6 +233,83 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     write(root, 'package.json', JSON.stringify({ name: 'merit', engines: { node: '>=20' } }));
     expect(findings('RI-05', root).join('\n')).toContain('engines.node is ">=20"');
   });
+
+  // ---------------------------------------------------------------------------
+  // RI-07, AND THE FIRST CASE IS THE ONE THAT JUSTIFIES THE CHECK EXISTING
+  // ---------------------------------------------------------------------------
+  // The others are defence in depth. The escape-hatch case is the one no other
+  // mechanism in this repository can produce a finding for: the specifier is
+  // RELATIVE, so `merit/engine-purity` returns early on it, and the file it
+  // reaches is outside that rule's glob, so nothing lints the file either.
+  test('RI-07 catches a relative import that escapes packages/rules-engine/src', () => {
+    const root = cleanTree();
+    write(root, 'packages/rules-engine/impure/io.ts', 'export const x = 1;\n');
+    write(
+      root,
+      'packages/rules-engine/src/index.ts',
+      "export { floorAt } from './floor.js';\nexport { x } from '../impure/io.js';\n",
+    );
+    const out = findings('RI-07', root).join('\n');
+    expect(out).toContain('OUTSIDE');
+    expect(out).toContain('packages/rules-engine/impure/io.ts');
+  });
+
+  test('RI-07 catches a Node builtin reached TRANSITIVELY, and names the trail', () => {
+    // Two hops from the entry point, which is the whole difference between this
+    // check and a per-file lint rule. The trail is asserted because a finding
+    // that says "somewhere in the engine" is a finding somebody has to
+    // reproduce before they can act on it.
+    const root = cleanTree();
+    write(
+      root,
+      'packages/rules-engine/src/floor.ts',
+      "import { readFileSync } from 'node:fs';\nexport const floorAt = (): string => readFileSync('x', 'utf8');\n",
+    );
+    const out = findings('RI-07', root).join('\n');
+    expect(out).toContain('node:fs');
+    expect(out).toContain('Reached by: packages/rules-engine/src/index.ts');
+  });
+
+  test('RI-07 catches a bare specifier that is not a builtin', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'packages/rules-engine/src/floor.ts',
+      "import Decimal from 'decimal.js';\nexport const floorAt = (n: number): number => new Decimal(n).toNumber();\n",
+    );
+    const out = findings('RI-07', root).join('\n');
+    expect(out).toContain('decimal.js');
+    expect(out).toContain('neither relative nor a Node builtin');
+  });
+
+  test('RI-07 reports a relative import that resolves to nothing rather than skipping it', () => {
+    // The direction matters. A walk that silently skipped what it could not
+    // resolve would report PASS for a subgraph it never read, which is rule 1
+    // of this runner: never weaken a check to pass it.
+    const root = cleanTree();
+    write(
+      root,
+      'packages/rules-engine/src/index.ts',
+      "export { floorAt } from './floor.js';\nexport { gone } from './not-here.js';\n",
+    );
+    expect(findings('RI-07', root).join('\n')).toContain('resolves to no file on disk');
+  });
+
+  test('RI-07 does not report a specifier that appears only inside a comment', () => {
+    // These files carry more prose than code and their headers quote real
+    // import lines while explaining them. A check that read those as imports
+    // would fail on the tree it is meant to protect, so the clean direction
+    // needs this stated as its own case rather than left to the whole-repo run.
+    const root = cleanTree();
+    write(
+      root,
+      'packages/rules-engine/src/floor.ts',
+      "// This module must never `import { readFileSync } from 'node:fs'`.\n" +
+        "/* Nor `import Decimal from 'decimal.js'`, for INV-02's reason. */\n" +
+        'export const floorAt = (n: number): number => n;\n',
+    );
+    expect(findings('RI-07', root)).toEqual([]);
+  });
 });
 
 // -----------------------------------------------------------------------------
@@ -233,6 +320,7 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     ['RI-01', 'packages/rules-engine/package.json'],
     ['RI-03', 'vitest.config.ts'],
     ['RI-05', '.nvmrc'],
+    ['RI-07', 'packages/rules-engine/src/index.ts'],
   ])('%s throws when %s is gone', (id, input) => {
     const root = cleanTree();
     renameSync(join(root, input), join(root, `${input}.moved`));
@@ -243,6 +331,17 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     const root = cleanTree();
     write(root, 'pnpm-workspace.yaml', 'packages:\n');
     expect(() => findings('RI-01', root)).toThrow(/claims no packages/);
+  });
+
+  test('RI-07 throws when the graph walk reaches only the entry point', () => {
+    // THE FAILURE MODE THIS GUARDS IS THE CHECK ITSELF BREAKING SILENTLY. If the
+    // specifier scan stopped matching -- a regex edit, a syntax this file does
+    // not parse -- RI-07 would walk one file, find no imports, and report PASS
+    // about a thirteen-module package it never read. Reaching one file is
+    // therefore an ERROR and not a clean result.
+    const root = cleanTree();
+    write(root, 'packages/rules-engine/src/index.ts', 'export const nothing = 1;\n');
+    expect(() => findings('RI-07', root)).toThrow(/walked 1 file/);
   });
 });
 
