@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../decisions/README.md, ../edge-cases/README.md, golden-scenarios/README.md, SIMULATION_HARNESS.md, ../architecture/INFRA.md, ../architecture/SECURITY.md, ../architecture/API_CONTRACT.md, ../architecture/data-model/README.md, ../plans/M01-rules-engine.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../../research/SECURITY_LANDSCAPE.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-17
 ---
 
 # Testing Strategy
@@ -60,7 +60,7 @@ The engine is a pure function over a day stream ([M01](../plans/M01-rules-engine
 
 | ID | Property | Note |
 |---|---|---|
-| PT-01 | **Floor monotonicity per drawdown type.** `floor(d+1) >= floor(d)`, with no exceptions | Strengthened by [ADR-014](../decisions/ADR-014.md): with no post-payout recompute, INV-06 lost its carve-out and the property lost its `unless` clause. GS-081 is the settlement case |
+| PT-01 | **Floor monotonicity per drawdown type.** `floor(d+1) >= floor(d)`, **except across the R-31 funded reset**, where the floor is asserted to equal `size_cents - funded drawdown_cents` exactly | [ADR-014](../decisions/ADR-014.md) removed the settlement carve-out and [ADR-050](../decisions/ADR-050.md) states the one exception that remains. `PT-01` and M01's `RE-P-01` are one property under two registries and may not disagree. GS-081 is the settlement case; GS-019 is the transition |
 | PT-02 | **Win days never decrease except at a payout reset**, and at a reset they go to exactly zero | The exception is the whole property. A generator that never settles proves nothing about R-47 |
 | PT-03 | **Ledger zero-sum**, per transaction and in aggregate | Per-transaction is a deferred constraint in the database ([ADR-016](../decisions/ADR-016.md)), so this property tests the aggregate the constraint cannot see. Pairs with GS-231's per-identity assertion |
 | PT-04 | **`withdrawable_cents >= 0` always**, at every point in every generated life | R-35's floor at zero. The generator is allowed to drive balance below `size + buffer`, which is the case a naive implementation returns a negative for |

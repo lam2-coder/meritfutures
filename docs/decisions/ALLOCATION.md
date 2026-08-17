@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [README.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-17
 ---
 
 # Number allocation
@@ -42,6 +42,7 @@ row. A table split into a file per row is not a table, which is the same reason
 | **048** | `claude/trading-calendar-holidays-0032-w8lq6m`, [P2](../plans/P2-rules-engine.md) section 8 | **written on the branch, unmerged.** `OQ-P2-03`: CI-03's polarity is derived per fixture from the rules it cites |
 | **049** | `claude/ec157-repair-a-and-adr046`, [ADR-049](ADR-049.md) | **allocated.** `CalendarSlice` is a value and a lookup miss is a typed refusal (`OQ-P2-01`). **This ruling was written as `046` and moved here**, because `docs/decisions/ADR-046.md` carried two `## ADR-046` headings for two unrelated rulings. See below |
 | **045** | merged to `main` (PR #29) | **allocated.** [ADR-045](ADR-045.md), the `trading_calendar` prior image becomes a trigger. [ADR-042](ADR-042.md) was silent and the founder has ruled it. **Claimed as `044` first and moved**, see below. **This row and `0033`'s read `written on the branch, unmerged` until 2026-08-16**, after PR #29 merged both, which is the tenth and eleventh instance |
+| **050** | `claude/corpus-workflow-founder-rulings-py70hi`, the `INV-06` scope ruling | **written on the branch, unmerged.** `INV-06` gains a **stated `R-31` exception**: the floor never decreases except at the funded reset, where `R-12` initialises it to `size_cents` minus the **funded** drawdown. It amends a frozen invariant in [M01 section 1.5](../plans/M01-rules-engine.md), which is why it is an ADR and not a commit, and it is what unblocks `RE-P-01`. **Every remote ref was read before this number was taken** and all fourteen max at `049`, which is the manual step the `044` collision below exists to teach |
 | **046** | `claude/builder-reviewer-loop-rykvhs`, this session | **reserved, unwritten.** [`OQ-M10-06`](../plans/M10-integrations.md)'s ruling: a contact address is held **reversibly** rather than not at all, a `value_ciphertext` beside the existing `value_hash` under a key only the dispatcher can use, so `INV-M16-03`'s prior-contact notification and [SECURITY §4.8](../architecture/SECURITY.md) leg 2 have a destination. **Every remote ref was read before this number was taken**, which is the manual step the `044` collision below exists to teach |
 | **050** | `claude/builder-reviewer-loop-rykvhs`, golden fixtures batch 4 | **written on the branch, unmerged.** [ADR-050](ADR-050.md), the founder ruling that `INV-06` gains a stated `R-31` exception, which makes the funded-reset floor citable and unblocks a fixture that crosses the eval pass. **The number was read off this table and off `git ls-remote` before it was taken**, per the `044` lesson below. **`INV-07` is deliberately NOT covered by it** and is a separate open founder item |
 

@@ -237,57 +237,51 @@ export function advanceEvalProgression(input: ProgressionInput): ProgressionOutc
   // records what was, not what is.
   //
   // -----------------------------------------------------------------------------
-  // THE FLOOR MOVES DOWN HERE, WHICH IS WHAT INV-06 SAYS NEVER HAPPENS
+  // THE FLOOR MOVES DOWN HERE, AND ADR-050 IS THE EXCEPTION THAT SAYS IT MAY
   // -----------------------------------------------------------------------------
-  // Reported rather than resolved, because resolving it is an ADR. INV-06 is
-  // "the floor never decreases. NO EXCEPTION, no phase qualifier, no settlement
-  // carve-out", and RE-P-01 asserts `floor(d+1) >= floor(d)` for every generated
-  // sequence. On a Core EOD pass day the eval floor is the locked 5,010,000c and
-  // the funded floor is 4,750,000c, so it falls by 260,000c.
+  // INV-06 read "the floor never decreases. NO EXCEPTION, no phase qualifier, no
+  // settlement carve-out", and this step lowers it on every Core EOD pass. The
+  // funded floor is 4,750,000c and the eval floor is AT LEAST the locked
+  // 5,010,000c, because the lock triggers at 260,000c of profit and the eval
+  // target is 300,000c, so every v1 eval pass is also a lock day. The fall is at
+  // least 260,000c and is usually larger, because section 3.4's `max` leaves the
+  // floor at the TRAILED value on a day that jumps past the trigger: GS-019
+  // closes at 5,400,000c, reaches a floor of 5,150,000c, and falls 400,000c.
   //
-  // THE SPECIFIC RULES ARE UNAMBIGUOUS AND THIS FILE FOLLOWS THEM: R-12 states
-  // the funded-reset floor, R-31 states it again, and GS-019 pins the number.
-  // The balance falls to `size_cents` in the same step, so nothing about the
-  // trader's loss room narrows; ADR-014's concern was a floor falling UNDER A
-  // BALANCE THAT DID NOT.
+  // THIS FILE ALWAYS FOLLOWED THE SPECIFIC RULES AND THEY HAVE NOT MOVED: R-12
+  // states the funded-reset floor, R-31 states it again, and GS-019 pins the
+  // number. What moved is the invariant. ADR-050 amends INV-06 to
   //
-  // What is genuinely unsettled is INV-06's SCOPE, and SESSION 47 CLOSED OFF ONE
-  // OF THE TWO READINGS RATHER THAN LEAVING BOTH OPEN.
+  //   the floor never decreases, EXCEPT at the R-31 funded reset, where it is
+  //   initialised to `size_cents` minus the funded drawdown
   //
-  // THE PER-ACCOUNT READING DOES NOT RESCUE R-31, AND D-M2-1 IS NOT ABOUT THIS
-  // ACCOUNT. The hypothesis was that "provisioning a new one" makes the funded
-  // account a NEW account, so nothing decreases within one account and "no phase
-  // qualifier" is satisfied exactly. Five primary sources refuse it:
+  // and the ruling's reasoning is worth the four lines it costs, because a
+  // reader who does not have it will try to restore the absolute form. "No
+  // exception, no phase qualifier" exists to prevent UNSTATED exceptions, and a
+  // single named, cited, testable exception is the opposite of what that clause
+  // guards against. Scoping INV-06 per (account, phase) instead would make it
+  // technically true by redefining its domain, which hides this same fall and
+  // makes every future reader reconstruct why. And ADR-014's permanent lock is
+  // about SETTLEMENT never resetting the floor; R-31 is a phase transition, and
+  // the balance falls to `size_cents` in the same step, so no loss room narrows.
   //
-  //   * M02's DEP-M2-01 is the same dependency from the owning side and it names
-  //     the subject outright: "on `phase.passed`, THE PLATFORM ACCOUNT is reset
-  //     to `size_cents` (or a new account provisioned at `size_cents`)". The
-  //     "new one" is a vendor account. `INV-M2-07` says the same in M2's terms,
-  //     "a funded account's first MARK opens at exactly `size_cents`", and
-  //     `FM-M2-07`'s remedy is "refuse, page, RE-PROVISION".
-  //   * STATE_MACHINES section 1 draws `eval_phase --> funded_phase: G-EVAL-PASS`
-  //     as a substate transition INSIDE one account's `active` state. Universal
-  //     rule 3 reserves "a new one is created instead" for TERMINAL states, and
-  //     the eval pass is not one; universal rule 2 says a transition not drawn
-  //     does not exist.
-  //   * `accounts.phase` is one column on one row over the enum
-  //     ('eval','funded','closed','graduated'), and `funded_on date NULL` is set
-  //     on that same row under `accounts_funded_has_date`. `account_status_history`
-  //     logs `from_phase`/`to_phase` per `account_id`, which is a record of a
-  //     phase moving WITHIN an account.
-  //   * `accounts.purchase_id` is `NOT NULL UNIQUE`: one account per purchase.
-  //     An eval pass is not a purchase, so no second account row can exist for it.
-  //   * `rule_states` is unique on `(account_id, trading_day)` and carries
-  //     `phase` "as of the END of this day". One account's row sequence spans
-  //     both phases; under a new-account reading that column would be constant.
+  // SESSION 47 CLOSED OFF THE READING THAT WOULD HAVE AVOIDED THE AMENDMENT.
+  // The hypothesis was that "or provisioning a new one" makes the funded account
+  // a NEW account, so nothing decreases within one. Five primary sources refuse
+  // it: M02's DEP-M2-01 names the subject as THE PLATFORM ACCOUNT, STATE_MACHINES
+  // draws `eval_phase --> funded_phase` inside one account's `active` state,
+  // `accounts.phase` is one column on one row with `purchase_id NOT NULL UNIQUE`,
+  // `rule_states` is unique on `(account_id, trading_day)` and carries `phase`
+  // per day, and `platform_account_refs` is how one Merit account holds
+  // successive PLATFORM refs. So per account is already the corpus's meaning,
+  // which is exactly why it could not rescue R-31.
   //
-  // SO PER-ACCOUNT IS ALREADY WHAT THE CORPUS MEANS, AND THAT IS PRECISELY WHY IT
-  // DOES NOT HELP: read per account, INV-06 is the reading R-31 violates. The
-  // surviving readings are per (account, phase), which "no phase qualifier"
-  // argues against in its own words, or INV-06 gaining a stated R-31 exception.
-  // Both are the founder's. Session 44 handled M01's R-22 disagreement the same
-  // way: follow the rule table, report the defect, leave the ADR to the founder.
-  // RE-P-01's generator still cannot be written until one of them is ruled.
+  // RE-P-01 NOW PINS THIS STEP RATHER THAN SKIPPING IT. `floor-monotonicity.
+  // property.test.ts` asserts `floor(d+1) >= floor(d)` on every step that emits
+  // no `phase.passed`, and on the step that does it asserts the floor EQUALS
+  // `size_cents - funded drawdown_cents` exactly. An exception that merely
+  // excused a decrease here would let any decrease through on a pass day, which
+  // is the unstated exception INV-06 forbids.
   //
   // DO-7's INV-06 TRIPWIRE IS NOT WEAKENED AND MUST NOT BE. It compares within
   // one day's trail-then-lock and never sees this step, which is correct: the
