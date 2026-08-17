@@ -170,3 +170,53 @@ All six products [ADR-042](../../../../../docs/decisions/ADR-042.md) F-3 names a
 **F-3's latest-close rule is a no-op on an ordinary day and only bites on an early close.** All six close at 16:00 here; the spread appears on a holiday, as the Labor Day artifact above shows (Equities 12:00, Energy and Metals 13:30). Worth knowing before someone reads F-3 and expects a per-product `close_ct` on every row.
 
 **Still missing, and it is the same thing as before: the holiday LIST.** The Trading Hours tool exports a three-day window, so reaching every closure and early close in the declared coverage through it is roughly thirty separate exports. The holiday calendar is one document and it is a different page.
+
+---
+
+## Three more holiday artifacts, and the one that changes the file's SHAPE (2026-08-17)
+
+| Artifact | Covers | SHA-256 (first 20) |
+|---|---|---|
+| `...-2026-11-25-to-2026-11-27-thanksgiving...xlsx` | Thanksgiving | `9b8dc1ef2fdf0787b63b` |
+| `...-2026-12-24-to-2026-12-26-christmas...xlsx` | Christmas | `7f87613410493bdaf535` |
+| `...-2026-12-31-to-2027-01-02-new-year...xlsx` | New Year | `30fb1ed033349713b07c` |
+
+A fourth upload was Labor Day again, SHA-256 `70c3a637...`, byte-identical to the one already here and not committed twice.
+
+**The founder reports these are the only holidays the date picker offers, and the reason is legible: they are the only ones still ahead of `2026-08-17`.** The other seven 2026 holidays have already happened and the tool does not look back. Nothing on the page publishes a 2027 schedule beyond `1 January`.
+
+### What the four artifacts say, read and not inferred
+
+| Holiday | Closure, no trade date | Early close, latest across the six (F-3) |
+|---|---|---|
+| Labor Day | `2026-09-07` | none, `09-08` closes 16:00 |
+| Thanksgiving | `2026-11-26` | **`2026-11-27` at 13:45** (Equities 12:15, Energy and Metals 13:45) |
+| Christmas | `2026-12-25` | **`2026-12-24` at 12:45** (Equities 12:15, Energy and Metals 12:45) |
+| New Year | `2027-01-01` | none, `2026-12-31` closes 16:00 |
+
+**These are NOT transcribed into [`cme-2026-2028.source.json`](cme-2026-2028.source.json) here.** Two blind readers do that, and a table in the README they both read is the first reader's answer handed to the second.
+
+### FINDING 3: `session_rule` IS INSUFFICIENT, and `R-01` fails on the open side about three times a year
+
+**This is the important one and it is arithmetic rather than interpretation.**
+
+`session_rule` says a trade date runs **17:00 CT on the prior calendar day to 16:00 CT on the trading day**, and the all-products export confirms it exactly on an ordinary day. **On the day after a holiday it is wrong at the OPEN end, and the artifacts say so in their own cells:**
+
+| Trade date | What CME shows | What `session_rule` computes |
+|---|---|---|
+| `2026-09-08` | opens **Sun `09-06` 17:00**, pauses Mon 12:00 to 17:00, closes Tue 16:00 | opens Mon `09-07` 17:00 |
+| `2026-11-27` | opens **Wed `11-25` 17:00**, pauses Thu 12:00 to 17:00, closes Fri 12:15 | opens Thu `11-26` 17:00 |
+
+**A holiday does not remove a session. It PAUSES the session belonging to the next trade date**, and that session opened before the holiday began.
+
+So Merit's computed session for `2026-09-08` is a strict subset of the real one, and **a fill on Sunday evening or Monday morning of Labor Day weekend lands inside no Merit session at all.** `R-01` is fill containment; a fill in no session is the condition it exists to detect, arriving on ordinary trading rather than on an error. On roughly three holidays a year, at the exact moment volume returns.
+
+**`early_closes` covers the close end and nothing covers the open end.** The file has `holidays` and `early_closes` and no third list, so this is a gap in the file's SHAPE rather than in a value, which is why it is recorded here rather than fixed in passing.
+
+**Recommendation, not a ruling:** the exception entry for a holiday carries the **explicit bounds of the session that absorbs it** rather than a second list of early opens, because the artifacts state those bounds directly and a derived open would be a second rule to get wrong. Deciding it amends [ADR-042](../../../../../docs/decisions/ADR-042.md)'s F-series and belongs to a plan session with the four artifacts open.
+
+### FINDING 4: two dates on the page are holidays for OTHER venues and are NOT Globex holidays
+
+`Columbus Day` (`2026-10-12`) and `Veterans Day` (`2026-11-11`) appear on the holiday page under **BrokerTec repo, Settlement Notices and Clearing Notices**, and appear **nowhere in the 2026 CME Globex Trading Schedule**. Globex futures trade both days.
+
+A transcriber scanning the page for the word "holiday" adds two closures that do not exist, each perfectly well formed, and `generate.mjs` accepts both: neither falls on a weekend and neither carries a session to contradict. **Both blind readers get this warning identically**, alongside the `INCLUDES THE FOLLOWING DATES` trap.
