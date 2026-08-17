@@ -379,6 +379,44 @@ const CASES = [
   // distinction this file was written to keep.
   ...[
     {
+      rule: 'R-02',
+      // THE MUTANT IS DATE ARITHMETIC, WHICH IS THE ONE R-02 NAMES BY NAME
+      // ("never date arithmetic"). It is seeded on `tradingDaysBetween` because
+      // that is where the substitution is tempting and where it is INVISIBLE on
+      // every consecutive window: `CME_WINDOW`'s five days answer 4 either way,
+      // and only `GAPPED_SLICE` tells them apart. A gap counted in calendar days
+      // is R-37's cadence gate reading 7 where the exchange traded 5, which is
+      // AS-06 arriving as a money gate rather than as a display bug.
+      seeds:
+        'the gap count reaching for a date difference instead of `sequence` subtraction, which agrees on every consecutive window and disagrees across a holiday (AS-06)',
+      file: 'packages/rules-engine/src/calendar.ts',
+      from: 'return { found: true, tradingDays: to.day.sequence - from.day.sequence };',
+      to: 'return { found: true, tradingDays: (Number(to.day.tradingDay.slice(8)) - Number(from.day.tradingDay.slice(8))) };',
+    },
+    {
+      rule: 'R-06',
+      seeds:
+        'DO-1’s strictly-forward guard relaxed from `<=` to `<`, so re-applying the day the state already carries folds it a second time instead of refusing (INV-14)',
+      file: 'packages/rules-engine/src/day/advance.ts',
+      from: 'if (input.prior !== null && mark.tradingDay <= input.prior.tradingDay) {',
+      to: 'if (input.prior !== null && mark.tradingDay < input.prior.tradingDay) {',
+    },
+    {
+      rule: 'R-10',
+      // THE MUTANT IS THE ADJUSTMENT MOVED FROM THE OPENING IDENTITY TO THE
+      // CLOSING ONE, which is R-10's "never inside a session" written the wrong
+      // way round and is AS-10 exactly: with the term inside INV-19, a settled
+      // withdrawal is arithmetically indistinguishable from a day of trading
+      // losses. The day still folds, so nothing crashes; what changes is that
+      // the one identity that would have caught a misplaced movement now
+      // ACCEPTS it and the one that should not have a term for it now does.
+      seeds:
+        'the adjustment moved out of INV-18’s opening identity and into INV-19’s closing one, so a settled withdrawal reads as a session loss (AS-10, SD-01)',
+      file: 'packages/rules-engine/src/day/advance.ts',
+      from: 'const expectedClosing = mark.openingBalanceCents + mark.realizedPnlCents;',
+      to: 'const expectedClosing = mark.openingBalanceCents + mark.realizedPnlCents + mark.adjustmentCents;',
+    },
+    {
       rule: 'R-21',
       seeds: 'the floor breach comparator relaxed from `<` to `<=`, so touching the floor breaches',
       file: 'packages/rules-engine/src/day/breach.ts',

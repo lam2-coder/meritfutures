@@ -94,16 +94,29 @@ export type RuleId =
   | 'R-50';
 
 /**
- * The rules the engine computes today. FORTY-ONE OF FIFTY.
+ * The rules the engine computes today. FORTY-FOUR OF FIFTY.
  *
  * Each entry names where it is applied, because the point of the list is that a
  * reader can check it rather than trust it.
  *
+ *   R-02  day/advance.ts DO-1, the calendar lookup, and calendar.ts
+ *         `tradingDaysBetween`. M01 section 3.1's DO-1 row cites R-02 for
+ *         "`mark.tradingDay` is a calendar trading day" and the gap half is
+ *         `sequence` subtraction, which this file's own header already had to
+ *         separate from the blocked FIXTURES once
+ *   R-06  day/advance.ts DO-1, `mark.tradingDay > prior.tradingDay`, the same
+ *         row's last clause. The structural half is that `DailyMark` describes
+ *         a closed day and can describe no other kind
  *   R-03  isHalfDay reaches no comparison, asserted rather than assumed
  *   R-04  day/counters.ts, the `!halted` half of the win-day expression
  *   R-07  day/advance.ts markIdentityFailures, INV-18
  *   R-08  day/counters.ts isTradedDay
  *   R-09  day/counters.ts isWinDay
+ *   R-10  day/advance.ts markIdentityFailures, and it is discharged by WHERE the
+ *         adjustment appears rather than by a comparison: INV-18 puts it on the
+ *         opening side and INV-19 has no term for it, so a movement placed
+ *         inside the session refuses the day. M01 section 3.1's DO-3 row cites
+ *         R-07 and R-10 together for exactly that pair
  *   R-12  day/floor.ts initialFloorCents, and initialState
  *   R-13  day/floor.ts advanceFloor, the trailing block
  *   R-14  day/floor.ts advanceFloor, the INV-06 tripwire
@@ -156,25 +169,44 @@ export type RuleId =
  *         "Elapsed trading days `>` the limit expires the account", and elapsed
  *         trading days is NOT DERIVABLE from `RuleState`: M01 section 2.2's
  *         record carries no account-open day, and `tradedDaysCount` counts days
- *         with fills, which R-08 makes a different quantity. Adding the field
- *         is a column on `rule_states`, so it is a schema delta and an ADR
- *         rather than a diff. `max_days` is null on all three v1 plans; a plan
+ *         with fills, which R-08 makes a different quantity. WHAT IS BLOCKED IS
+ *         NOT THE SCHEMA. The datum is stored twice already, on
+ *         `accounts.opened_on` and `accounts.expires_on`, and M01 section 1.3
+ *         hands the open day to `initialState` and then drops it, so R-32 needs
+ *         one field on `DayInput` and an M01 section 2.1 amendment rather than a
+ *         `rule_states` column. Two things are genuinely unruled and both are
+ *         the founder's: the ANCHOR the days elapse from, which neither R-32 nor
+ *         `G-EXPIRED` names while an account sits `provisioning_pending`, and
+ *         WHICH COLUMN BINDS, a count against `max_days` or the stored
+ *         `expires_on` date. `max_days` is null on all three v1 plans; a plan
  *         that set it makes the day refuse, because folding it would trade an
  *         account past its own expiry with a green state row
- *   R-02  needs `sequence` subtraction over a real calendar (group A, blocked
- *         on the calendar data)
- *   R-10, R-11, R-17, R-20
- *         discharged outside the engine entirely: ingest, publish validation,
- *         and the platform setpoint. R-19 LEFT THIS LIST when group H landed,
- *         because settlement is where it is discharged and settlement is now
- *         code
+ *   R-01, R-05
+ *         discharged by `trading_calendar` and the ingest path, and NEITHER IS
+ *         WAITING ON THE CALENDAR TRANSCRIPTION, which is where this list filed
+ *         them until group A was written. `CalendarDay` is `{tradingDay,
+ *         isHalfDay, halted, sequence}` and R-05's session bounds are two
+ *         columns it does not carry; R-01 is a containment lookup over a fill's
+ *         execution timestamp and `DailyMark` carries `fillCount` and no
+ *         instant. Transcribing the CME year adds rows, not columns, so it
+ *         unblocks their GOLDEN files and not the rules
+ *   R-11, R-17, R-20
+ *         discharged outside the engine entirely: the caller's live-mark
+ *         predicate, publish validation, and the platform setpoint. R-19 LEFT
+ *         THIS LIST when group H landed, because settlement is where it is
+ *         discharged and settlement is now code, and R-10 LEFT IT when group B
+ *         was completed, because DO-3's pair of identities is a check that
+ *         fires rather than a rule the engine merely mentions
  */
 export const IMPLEMENTED_RULES: readonly RuleId[] = [
+  'R-02',
   'R-03',
   'R-04',
+  'R-06',
   'R-07',
   'R-08',
   'R-09',
+  'R-10',
   'R-12',
   'R-13',
   'R-14',
