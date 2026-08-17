@@ -1,0 +1,139 @@
+# GS-055  Minimum-variance path to a full-cap extraction
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "First cycle needs `buffer + cap = 100,000c + 150,000c = 250,000c` of
+#   profit, at least 5 win days of at least 15,000c each, at least 5 traded
+#   days, and a best day of at most 30 percent of period profit. Five days at
+#   exactly 50,000c satisfies all of it: best-day share is 2000bp, comfortably
+#   inside 3000bp. Five trading days to a full-cap first payout"     M01 AS-03
+#   traded day  `fill_count > 0`, strict `>`                          M01 R-08
+#   win day     `realized_pnl_cents >= win_day_floor_cents`, `>=`     M01 R-09
+#   trailing floor  `hwb' = max(hwb, closing)`, `floor' = hwb' - drawdown`,
+#                   the intraday high never raises it                 M01 R-13
+#   floor lock trigger  `closing - size >= floor_lock_at_profit_cents`, `>=`
+#                                                                     M01 R-15
+#   withdrawable  `max(0, balance - size - buffer)`                   M01 R-35
+#   buffer 100,000c, payout cap 150,000c, win days required 5,
+#   win day floor 15,000c, funded consistency 3000bp, funded drawdown
+#   250,000c, lock at profit 260,000c, split 9000bp
+#                                                       M01 Appendix A.1 at 50K
+#   "Five days at 50,000c each, best-day share 2000bp, clears every gate: the
+#   floor on days-to-first-payout is 5 trading days"
+#                                              GOLDEN_SCENARIOS GS-055 row
+#
+# THE STREAM IS AS-03'S SOLUTION TRANSCRIBED, NOT A STREAM THAT HAPPENS TO
+# SATISFY IT. AS-03 computes the cheapest sequence that clears every gate and
+# names it: five days at exactly 50,000c. Every number below follows from that
+# one sentence and from Appendix A.1's 50K column.
+#
+#   profit needed   buffer 100,000 + cap 150,000            =   250,000c
+#   five days at                                                 50,000c
+#   win days        each 50,000 >= the 15,000 floor          =   5, gate needs 5
+#   traded days     each day has fills                       =   5
+#   best-day share  50,000 * 10000 = 500,000,000
+#                   3000  * 250,000 = 750,000,000            `<=` holds, 2000bp
+#   withdrawable    5,250,000 - 5,000,000 - 100,000          =   150,000c
+#   the cap                                                  =   150,000c
+#
+# THE WITHDRAWABLE LANDS EXACTLY ON THE CAP AND THAT IS WHAT MAKES IT A FULL-CAP
+# EXTRACTION. One cent less of profit and `min(withdrawable, cap)` is bounded by
+# the withdrawable instead, which is a different clamp reason and a different
+# scenario (GS-027). The path is minimum-variance in the sense AS-03 means: it
+# is the shortest sequence, at the smallest per-day figure, that reaches the cap
+# rather than merely reaching eligibility.
+#
+# THE LOCK NEVER ENGAGES, AND IT MISSES BY 10,000c. The lock trigger is 260,000c
+# of profit (Appendix A.1) and this path tops out at 250,000c, so a trader who
+# executes the cheapest full-cap cycle arrives at their first payout with the
+# floor still trailing and `floor_locked` still false. That is not decoration:
+# it is why this fixture can pin `floor_cents` at all, where GS-069 cannot.
+#
+# WHAT THE TRADER RECEIVES, AND WHY THE ROW STATES A PER-DAY FIGURE.
+#   trader = (150,000 * 9000 + 9999) / 10000 in integer division  = 135,000c
+#   firm   = 150,000 - 135,000                                    =  15,000c
+#   135,000c over 5 trading days                                  =  27,000c/day
+# That 27,000c is the live figure, under ADR-019's wallet-credit cadence anchor.
+#
+# THE SUPERSEDED COUNTERFACTUAL, CARRIED HERE RATHER THAN ONLY IN THE ADR because
+# GOLDEN_SCENARIOS GS-055 requires the suite to keep the liability cost of the
+# wallet visible. Under ADR-013's settlement-anchored cadence the same 135,000c
+# took 2 to 3 settlement days plus a 5 day gap, so 7 to 8 trading days, giving
+# 16,875c to 19,286c per trading day (M01 AS-03, the first row of its table).
+# ADR-019 moved the anchor to the wallet-credit day and the binding row is now
+# the second one. THE EXPECTED-TO-FAIL DIRECTION HAS THEREFORE INVERTED: what
+# must fail loudly is any future change that RE-INTRODUCES a settlement term
+# into the cadence anchor, because that would silently reduce modeled extraction
+# and hide a product regression rather than reveal one. Nothing in this file's
+# expectation depends on either figure, because the cadence anchor is a payout
+# input and this fixture is a day fold; the arithmetic is recorded here so a
+# session that changes the anchor has to read it.
+#
+# THE ACCOUNT IS FUNDED FROM DAY ONE, on GS-025's terms. `account.phase` is on
+# the loader's `AWAITING_M01_INPUT` list (L-09) and reaches no engine input yet,
+# so a fold that begins in `eval` fails on the pinned phase rather than passing
+# quietly on counters that would look the same in either phase. AS-03's cycle is
+# a FUNDED cycle: the buffer and the cap only mean anything after R-31 has run.
+#
+# THE GATES WHOSE INPUTS ARE PINNED AND WHOSE RESULTS ARE NOT: R-34 reads
+# `win_days_count`, R-36 reads the two consistency accumulators, R-39 reads the
+# withdrawable against the cap, and R-33 is configured 0 and disabled. All four
+# inputs are pinned in the sibling. The gate RESULTS live in `engine_gates`,
+# which no expectation can currently reach, and `engine_eligible` is not pinned
+# for a second reason the sibling gives.
+id: GS-055
+name: minimum-variance path to a full-cap extraction
+source: M01 R-08, R-09, R-13, R-15, R-35
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5050000
+    high_balance_cents: 5055000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5050000
+    closing_balance_cents: 5100000
+    high_balance_cents: 5105000
+    low_balance_cents: 5045000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5150000
+    high_balance_cents: 5155000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5150000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5145000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-06
+    opening_balance_cents: 5200000
+    closing_balance_cents: 5250000
+    high_balance_cents: 5255000
+    low_balance_cents: 5195000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+settlements: []

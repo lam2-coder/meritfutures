@@ -49,6 +49,30 @@ import type { DsRuleId } from './validate-day-sequence.js';
 // from an assumption into a measurement.
 const RUNS = 500;
 
+// THE REACHABILITY PASS DRAWS MORE THAN THE TWO DIRECTIONAL PASSES, AND THE
+// NUMBER WAS MEASURED RATHER THAN CHOSEN.
+//
+// `RUNS` above is sized for "a branch reached by ONE boolean, visited in both
+// directions many times over". The rarest thing this block tracks is not one
+// boolean: `coverageExact` needs `coverageBefore` AND `coverageAfter` to draw
+// zero together, and each is an `fc.integer({ min: 0, max: 10 })`. Sampled over
+// 20,000 draws that conjunction lands at **p ~= 0.0105**, so at 500 runs it is
+// expected about five times and is ABSENT ENTIRELY ON ROUGHLY ONE RUN IN TWO
+// HUNDRED. CI-02 caught it doing exactly that, on a branch that had not touched
+// this file.
+//
+// That is the failure this file already names one screen down: a check that
+// "passes on a lucky seed and fails on an unlucky one, which is how a real check
+// gets reclassified as flaky and deleted". It is also FM-17's shape, and the
+// remedy the corpus prefers is never to weaken the assertion.
+//
+// SO THE SAMPLE GREW AND NOTHING ELSE MOVED. The assertion still demands the
+// case be reached, the generator's distribution is untouched (reweighting it
+// would change the population direction 1 and direction 2 measure), and at
+// 5,000 runs the same event is expected about fifty times, which puts a false
+// red at `(1 - 0.0105)^5000`, around one in 10^23. The cost is one extra second.
+const REACHABILITY_RUNS = 5000;
+
 describe('direction 1: every emitted sequence satisfies the whole contract', () => {
   test('no violation of any rule, judged by the independent oracle', () => {
     fc.assert(
@@ -169,7 +193,7 @@ describe('the support reaches the cases the engine rules are about', () => {
         seen.coverageWider++;
       } else seen.coverageExact++;
     }),
-    { numRuns: RUNS },
+    { numRuns: REACHABILITY_RUNS },
   );
 
   test('R-03: half days and full days are both emitted', () => {
