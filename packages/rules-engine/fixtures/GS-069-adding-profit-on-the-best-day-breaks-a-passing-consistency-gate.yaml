@@ -1,0 +1,112 @@
+# GS-069  Adding profit on the best day breaks a passing consistency gate
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "A trader one day from eligibility has a very good day and becomes LESS
+#   eligible, because the new best day breaks consistency. Best day 30,000c on
+#   period profit 100,000c is exactly 3000bp and passes. One more 20,000c day on
+#   that same best day makes it 50,000c on 120,000c, which is 4166bp, and
+#   eligibility is lost. The trader made 20,000c and moved further from being
+#   paid"                                                          M01 AS-13
+#   "The constitution's phrasing that eligibility is monotone in its inputs is
+#   imprecise and the property suite asserts the accurate version instead"
+#                                                       M01 AS-13, EC-036, RE-P-06
+#   consistency arithmetic  `best_day_cents * 10000 <= max_day_share_bp *
+#                           period_profit_cents`                    M01 R-29
+#   eval consistency is tested only on days where R-26 and R-27 already hold,
+#   failing DEFERS the pass and NEVER fails an account              M01 R-28
+#   profit target  `closing - size >= profit_target_cents`          M01 R-26
+#   eval minimum trading days  `tradedDaysCount >= min_trading_days` M01 R-27
+#   floor lock trigger  `closing - size >= floor_lock_at_profit_cents` M01 R-15
+#   eval consistency 3000bp, target 300,000c, min trading days 2,
+#   lock at profit 260,000c                             M01 Appendix A.2 at 50K
+#   "The monotonicity counterexample. Eligibility is not monotone in profit,
+#   contrary to constitution section 5.1's phrasing, and the fixture is the
+#   proof"                                     GOLDEN_SCENARIOS GS-069 row
+#
+# THIS IS GS-023 WITH ONE P&L CHANGED, AND THE PAIR IS THE PROOF. Day one carries
+# 250,000c instead of 150,000c, and the balance chain carries that 100,000c
+# forward on every later day because INV-18 and INV-19 leave it no choice: the
+# opening balance is the prior close and the closing balance is the opening plus
+# the day's P&L. The three later P&L figures, all four fill counts, and every
+# high and low offset are identical between the two files. So there is exactly
+# one INDEPENDENT difference, and it is the one the scenario is about. GS-023
+# passes the eval; this file never does, and the trader who wrote it made
+# 100,000c MORE.
+#
+#   GS-023  best 150,000 of period profit 500,000  = 3000bp exactly    PASSES
+#   GS-069  best 250,000 of period profit 600,000  = 4166bp            DEFERS
+#
+#   the day-four comparison  250,000 * 10000 = 2,500,000,000
+#                            3000    * 600,000 = 1,800,000,000     `<=` FAILS
+#
+# AS-13'S NUMBERS ARE CARRIED AT A SCALE OF FIVE, WHICH IS NOT A COINCIDENCE AND
+# IS NOT AN INVENTION EITHER. AS-13 illustrates with 30,000c on 100,000c moving
+# to 50,000c on 120,000c. Its period profit of 100,000c does not meet the
+# 300,000c eval target on any 50K plan, so the ratio cannot be reproduced at
+# AS-13's own magnitudes inside a fixture. Multiplying every one of its four
+# numbers by five gives 150,000 on 500,000 moving to 250,000 on 600,000, which
+# is exactly GS-023's stream moving to this one, meets the target, and preserves
+# both ratios to the basis point: 3000bp exactly, and 2,500,000,000 / 600,000 =
+# 4166bp. The scale is applied to the whole quadruple or to none of it.
+#
+# THE ADDED PROFIT LANDS ON THE BEST DAY AND NOWHERE ELSE, which is the only
+# arrangement that proves the point. Adding 100,000c to day four would raise the
+# denominator without raising the numerator and the gate would pass more easily,
+# which is dilution and is GS-020's subject. AS-13 is the opposite motion: the
+# numerator moves and the denominator moves by the same amount, and because the
+# numerator is multiplied by 10000 while the denominator is multiplied by 3000,
+# a shared increase makes the ratio WORSE. That asymmetry is the counterexample.
+#
+# THE FLOOR IS DELIBERATELY NOT PINNED AND THE LOWS ARE CHOSEN SO IT DOES NOT
+# MATTER. The lock engages on day two at a close of 5,400,000c, which is
+# 140,000c PAST the 260,000c trigger rather than exactly on it, and M01 gives two
+# readings of what the floor is at the end of that day: section 3.6's pseudocode
+# assigns `floor = floorLockFloorAtCents` (5,010,000c) and section 3.4's binding
+# expression takes `max(hwb - drawdown, locked floor)` (5,150,000c). GS-015 is
+# the case where the close lands exactly on the trigger and the two agree by
+# CV-12. Here they do not, so every low on days three and four is set above BOTH
+# candidates and this fixture states neither. See the sibling's note.
+id: GS-069
+name: adding profit on the best day breaks a passing consistency gate
+source: M01 R-15, R-26, R-27, R-28, R-29
+plan: MERIT-RAPID-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5250000
+    high_balance_cents: 5255000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 250000
+    fill_count: 5
+    traded_day: true
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5250000
+    closing_balance_cents: 5400000
+    high_balance_cents: 5405000
+    low_balance_cents: 5245000
+    realized_pnl_cents: 150000
+    fill_count: 4
+    traded_day: true
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5400000
+    closing_balance_cents: 5550000
+    high_balance_cents: 5555000
+    low_balance_cents: 5395000
+    realized_pnl_cents: 150000
+    fill_count: 6
+    traded_day: true
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5550000
+    closing_balance_cents: 5600000
+    high_balance_cents: 5605000
+    low_balance_cents: 5545000
+    realized_pnl_cents: 50000
+    fill_count: 3
+    traded_day: true
+settlements: []

@@ -1,0 +1,76 @@
+# GS-021  Consistency skipped when period profit is zero
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   consistency denominator rule  "Skipped entirely unless
+#   `period_profit_cents > 0` (strict `>`). A skipped gate reports
+#   `pass: true, skipped: true`"                                   M01 R-30
+#   consistency arithmetic  `best_day_cents * 10000 <= max_day_share_bp *
+#                           period_profit_cents`, integer cross-multiplication
+#                           in bigint, no division anywhere        M01 R-29
+#   "R-30 skips before any arithmetic, and there is no division in the engine
+#   at all"                                              M01 FM-15, structurally impossible
+#   funded consistency  3000bp                          M01 Appendix A.1 at 50K
+#   win day floor  15,000c                              M01 Appendix A.1 at 50K
+#   "Denominator rule: gate passes by definition, no division is ever attempted"
+#                                                       GOLDEN_SCENARIOS GS-021 row
+#
+# THE DENOMINATOR IS ZERO AND THE NUMERATOR IS NOT, WHICH IS THE ENTIRE FIXTURE.
+# R-29's comparison is FALSE on this state and R-30 must make the gate pass
+# anyway, so the two rules give opposite answers and only one of them is the
+# ruled one:
+#
+#   R-29 alone  40,000 * 10000 = 400,000,000  <=  3000 * 0 = 0     FALSE, gate fails
+#   R-30 first  period profit 0 is not `> 0`                        SKIPPED, gate passes
+#
+# An engine that reached R-29 with this state would either divide by zero
+# (FM-15's crash), produce a `NaN` that compares false and silently blocks
+# eligibility (FM-15's worse case), or cross-multiply and fail a gate that is
+# ruled to pass. All three are separated from the ruled behavior by this file,
+# because a fixture whose best day were also zero would satisfy `0 <= 0` and
+# pass for a reason that has nothing to do with R-30.
+#
+# WHY THIS IS A FUNDED SCENARIO AND NOT AN EVAL ONE. Eval consistency (R-28) is
+# tested only on days where the profit target already holds (R-26), and with no
+# adjustment the period profit IS the closing balance minus the size. So a day
+# that meets a 300,000c target has a period profit of at least 300,000c, and a
+# non-positive denominator is UNREACHABLE at the moment the eval gate is tested.
+# The funded gate (R-36) is evaluated at DO-9 on every single day regardless of
+# any target, which is the only place R-30 has anything to do.
+#
+# THE ACCOUNT IS FUNDED FROM DAY ONE, on GS-025's terms. `account.phase` is on
+# the loader's `AWAITING_M01_INPUT` list (L-09) and reaches no engine input yet,
+# so a fold that begins in `eval` fails on the pinned phase rather than passing
+# quietly on the zero. The reset that R-31 would otherwise have to perform first
+# is deliberately not in this stream: it would drag R-26, R-27 and R-31 into the
+# cited set, and under ADR-048 a fixture flips to `direct` on the rules it cites.
+# This one cites the two it is about.
+id: GS-021
+name: consistency skipped when period profit is zero
+source: M01 R-29, R-30
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5040000
+    high_balance_cents: 5045000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 40000
+    fill_count: 4
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5040000
+    closing_balance_cents: 5000000
+    high_balance_cents: 5045000
+    low_balance_cents: 4995000
+    realized_pnl_cents: -40000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+settlements: []

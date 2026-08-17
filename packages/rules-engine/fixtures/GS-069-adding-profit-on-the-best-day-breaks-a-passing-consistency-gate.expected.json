@@ -1,0 +1,21 @@
+{
+  "end_state": {
+    "phase": "eval",
+    "balance_cents": 5600000,
+    "traded_days_count": 4,
+    "consistency_best_day_cents": 250000,
+    "consistency_period_profit_cents": 600000
+  },
+  "events": [
+    "day.closed",
+    "rule.floor_locked",
+    "phase.pass_deferred_consistency",
+    "day.closed",
+    "phase.pass_deferred_consistency",
+    "day.closed",
+    "phase.pass_deferred_consistency",
+    "day.closed"
+  ],
+  "pins": "a trader who adds profit to their best day moves further from passing, because R-29 multiplies the numerator by 10000 and the denominator by only max_day_share_bp, so a shared increase makes the ratio worse and eligibility is not monotone in profit",
+  "note": "THE DIFF AGAINST GS-023 IS ONE INDEPENDENT INPUT AND ONE EVENT, AND THAT IS THE WHOLE PROOF. GS-023's seventh event is `phase.passed` and this file's is `phase.pass_deferred_consistency`. The only input chosen differently is day one's realized P&L; the later balances differ only because INV-18 and INV-19 force the chain to carry that 100,000c forward, and the three later P&L figures, all four fill counts and every high and low offset are identical. A reader who wants to know whether eligibility is monotone in profit can diff the two files and see one number go UP while the outcome goes backwards. `phase: eval` and `balance_cents: 5600000` are the same statement from the state side: the account is 600,000c in profit, twice the 300,000c target, and it is still in the evaluation phase with its eval profit intact because R-31's reset never ran. AN ENGINE THAT PASSED THIS ACCOUNT REPORTS `funded` AND 5,000,000, which is a difference of 600,000c on the field a trader reads first. THE TWO ACCUMULATORS ARE PINNED BECAUSE THE RATIO IS MADE OF THEM and neither alone says anything: 250,000 is the numerator R-29 multiplies by 10000, 600,000 is the denominator it multiplies by 3000, and 2,500,000,000 against 1,800,000,000 is the comparison. `traded_days_count: 4` is pinned to close the alternative explanation: R-27 needs 2 and the account has 4, so the pass was not blocked by the day gate, and an engine that deferred for the wrong reason cannot hide behind this field. THREE DEFERRALS AND NO BREACH is R-28 doing the thing it exists to do. The target is met on day two and the gate is re-tested on every day after it, and none of those days closes the account, because an eval consistency violation delays a pass and never fails an account. `floor_cents` IS NOT PINNED AND THAT IS DELIBERATE. The lock engages on day two at a close 140,000c PAST its 260,000c trigger rather than exactly on it, and M01 gives two answers for the floor at the end of that day: section 3.6's pseudocode assigns the locked floor of 5,010,000 while section 3.4's binding expression takes `max(hwb - drawdown, locked floor)` and yields 5,150,000. GS-015 is the case where the close lands exactly on the trigger, where CV-12 makes the two agree and there is no jump. Nothing in M01 rules the overshoot case, so pinning either value would be choosing a reading, which is TR-01 inverted. Every low on days three and four sits above both candidates, so the breach outcome of this fixture does not depend on the resolution. `floor_locked` is not pinned for the reason GS-017's and GS-023's siblings record."
+}

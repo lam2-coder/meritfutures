@@ -1,0 +1,17 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 5250000,
+    "withdrawable_cents": 150000,
+    "traded_days_count": 5,
+    "win_days_count": 5,
+    "consistency_best_day_cents": 50000,
+    "consistency_period_profit_cents": 250000,
+    "floor_cents": 5000000,
+    "high_water_balance_cents": 5250000,
+    "floor_locked": false
+  },
+  "events": ["day.closed", "day.closed", "day.closed", "day.closed", "day.closed"],
+  "pins": "the cheapest sequence of days that reaches a full-cap first payout is five, and every gate's input is stated so that shortening the path by one day breaks a named gate rather than an aggregate",
+  "note": "TEN FIELDS BECAUSE AS-03 MAKES TEN CLAIMS, and a shorter expectation would let the fixture pass while the path was wrong. `win_days_count: 5` against a required 5 is the gate that sets the length; `traded_days_count: 5` is R-08 counted separately, because a day with fills and no win would move one and not the other; the two consistency accumulators are the 2000bp share, which is what makes the path legal rather than merely long; and `withdrawable_cents: 150000` is R-35's arithmetic landing exactly on the 150,000c cap, which is the difference between a full-cap extraction and an ordinary one. DROP ANY DAY AND A NAMED FIELD MOVES. Four days at 50,000c gives 4 win days against a required 5 and a withdrawable of 100,000c against a 150,000c cap, so both the win-day gate and the full-cap claim fail, and they fail on different fields. That is the property AS-03 asserts when it calls five 'the floor on days-to-first-payout'. `floor_locked: false` IS A PINNED NEGATIVE AND IT IS THE SHARPEST FIELD HERE. The lock trigger is 260,000c of profit and this path tops out at 250,000c, so the cheapest full-cap cycle finishes 10,000c short of locking. An engine whose lock used `>` where the trailing floor sits, or whose trigger read the intraday high rather than the close, engages here and reports true. It also means `floor_cents: 5000000` is unambiguous: with no lock there is only one reading of the floor, which is 5,250,000 less the 250,000c funded drawdown, and `high_water_balance_cents: 5250000` states that the closing balance and not the 5,255,000 intraday high is what raised it (R-13). FIVE `day.closed` EVENTS AND NOTHING ELSE. No `rule.floor_locked`, no `breach.detected`, no `phase.passed`. Every low sits above that day's floor at open, which walks 4,750,000 to 4,950,000 across the stream. `engine_eligible` IS NOT PINNED AND THE REASON IS NOT THE NESTED-OBJECT ONE. Gate RESULTS live in `engine_gates` which no flat expectation can reach, but `engine_eligible` is a plain boolean and could be. It is left out because R-38 is listed as a funded gate in M01 group F while its input, `hasPayoutInFlight`, is declared on `ExternalGates` and R-40's context list does not name it. So the conjunction's value depends on where R-38's input is read from, and M01 does not say. Pinning true would be choosing that reading. The four gate inputs this scenario is actually about are pinned individually instead, which is the weaker claim honestly stated rather than the stronger one guessed."
+}

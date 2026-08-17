@@ -1,0 +1,11 @@
+{
+  "end_state": {
+    "phase": "funded",
+    "balance_cents": 4950000,
+    "consistency_best_day_cents": 40000,
+    "consistency_period_profit_cents": -50000
+  },
+  "events": ["day.closed", "day.closed"],
+  "pins": "a consistency period whose profit is negative skips the gate on the same rule the zero case uses, so a losing period never blocks eligibility through an arithmetic comparison that is false for every possible best day",
+  "note": "THE NEGATIVE NUMBER IS THE FIXTURE. `consistency_period_profit_cents: -50000` is the one field that separates this file from GS-021, and it is a signed money field arriving at a gate, which is the shape R-30 exists to intercept. An engine that clamped the accumulator at zero would satisfy GS-021's expectation and fail this one, and it would also have quietly turned a losing period into a zero period everywhere else the accumulator is read. THE BEST DAY IS STILL 40,000 for the reason GS-021's sibling records: M01 section 3.6 takes the maximum rather than the last value, and -90,000 is not greater than 40,000. So the numerator is positive while the denominator is negative, and R-29's `<=` is false by a margin of 550,000,000 rather than narrowly. `balance_cents: 4950000` states that the account is 50,000c BELOW its size and still open, which is the whole point of a gate that delays rather than denies: R-36 is a payout gate, not a breach, and a funded account underwater is a normal state. TWO `day.closed` EVENTS with no `breach.detected` is the second half of that: the low of 4,945,000 sits above the floor at open of 4,790,000, so R-21's strict `<` is false and the fold reaches the gate rather than returning at DO-5. WHAT THIS FIXTURE CANNOT YET PIN is what GS-021's sibling names: R-30's `skipped: true` lives in `engine_gates`, a nested object, and `diffEndState` compares flat fields with `Object.is`."
+}

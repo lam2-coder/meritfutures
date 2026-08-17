@@ -1,0 +1,77 @@
+# GS-022  Consistency skipped when period profit is negative
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   consistency denominator rule  "Skipped entirely unless
+#   `period_profit_cents > 0` (strict `>`). A skipped gate reports
+#   `pass: true, skipped: true`"                                   M01 R-30
+#   `if (periodProfitCents <= 0n) return { ok: true, skipped: true }`
+#                                              M01 section 3.6, consistencyOk
+#   consistency arithmetic  `best_day_cents * 10000 <= max_day_share_bp *
+#                           period_profit_cents`                    M01 R-29
+#   funded consistency  3000bp                          M01 Appendix A.1 at 50K
+#   win day floor  15,000c                              M01 Appendix A.1 at 50K
+#   "Same rule, negative denominator"       GOLDEN_SCENARIOS GS-022 row
+#
+# THIS IS GS-021 WITH ONE NUMBER CHANGED, and the pair is the assertion. The
+# losing day carries -90,000c instead of -40,000c; every other measurement in
+# both files is identical. GS-021 lands the denominator on zero and this one
+# lands it 50,000c below zero, so the two files separate the two halves of
+# R-30's `> 0`:
+#
+#   GS-021  period profit  0        not `> 0` because it is EQUAL       skipped
+#   GS-022  period profit -50,000   not `> 0` because it is LESS        skipped
+#
+# AN ENGINE THAT WROTE `>=` INSTEAD OF `>` SATISFIES GS-022 AND FAILS GS-021,
+# which is why the zero case cannot be dropped as a special case of this one.
+# The registry rows are two rows for that reason.
+#
+# THE CROSS-MULTIPLICATION IS NOT MERELY WRONG HERE, IT IS BACKWARDS. On a
+# negative denominator R-29's right-hand side is negative and its left-hand
+# side is positive, so the comparison is false for every possible best day:
+#
+#   40,000 * 10000  =  400,000,000   <=   3000 * -50,000 = -150,000,000   FALSE
+#
+# A funded account that had a losing period would therefore be held ineligible
+# by a consistency gate for as long as it stayed down, which is the silent
+# eligibility block FM-15 names and R-36's "delays, never denies retroactively"
+# forbids. R-30 returning before the arithmetic is what stops it.
+#
+# THE ACCOUNT IS FUNDED FROM DAY ONE, on GS-025's and GS-021's terms:
+# `account.phase` is on the loader's `AWAITING_M01_INPUT` list (L-09), so a fold
+# that begins in `eval` fails on the pinned phase rather than passing quietly.
+#
+# THE LOSING DAY DOES NOT BREACH AND THAT IS CHECKED, NOT ASSUMED. The floor at
+# open on day two is 4,790,000 (5,040,000 high water less the 250,000c funded
+# drawdown, M01 R-13 and Appendix A.1 at 50K) and the low is 4,945,000, so R-21's
+# strict `<` is false and the fold reaches DO-9 where the gate lives. A stream
+# that breached would never evaluate a consistency gate at all.
+id: GS-022
+name: consistency skipped when period profit is negative
+source: M01 R-29, R-30
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5040000
+    high_balance_cents: 5045000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 40000
+    fill_count: 4
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5040000
+    closing_balance_cents: 4950000
+    high_balance_cents: 5045000
+    low_balance_cents: 4945000
+    realized_pnl_cents: -90000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+settlements: []
