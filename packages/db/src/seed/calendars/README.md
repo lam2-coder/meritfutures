@@ -209,11 +209,30 @@ A fourth upload was Labor Day again, SHA-256 `70c3a637...`, byte-identical to th
 
 **A holiday does not remove a session. It PAUSES the session belonging to the next trade date**, and that session opened before the holiday began.
 
+**RULED by [ADR-055](../../../../../docs/decisions/ADR-055.md) (status `proposed`), which also NARROWED this finding. The two rows above are not the whole rule**, and the other two committed artifacts show the opposite behaviour as a positive fact:
+
+| Holiday | Day | Evening open on the preceding trading day? |
+|---|---|---|
+| Labor Day `2026-09-07` | Mon | **yes.** Sun `09-06 17:00` opens trade date `09-08`, in all nine futures classes |
+| Thanksgiving `2026-11-26` | Thu | **yes.** Wed `11-25 17:00` opens trade date `11-27`, in all nine |
+| Christmas `2026-12-25` | Fri | **no.** `12-24` carries `12:15 (CLOSED)` and **nothing after it**, in all nine |
+| New Year `2027-01-01` | Fri | **no.** `12-31` carries `16:00 (CLOSED)` and **nothing after it**, in all nine |
+
+`Cryptocurrencies` is the lone exception in both Friday cases and trades its own `16:01`/`16:02` schedule; no `contract_specs` product is in that class.
+
+**The empty evening is EVIDENCE, not missing coverage.** The export lists evening opens in the prior calendar day's column and does exactly that for the other two holidays, in files of the identical format.
+
+**So a mid-week holiday is absorbed and a Friday holiday is not**, and that is why [ADR-055](../../../../../docs/decisions/ADR-055.md) rules the bounds TRANSCRIBED rather than derived: the obvious derivation computes a Thursday `12-24 17:00` open for trade date `12-28`, and the Christmas artifact positively contradicts it.
+
+**TRANSCRIBER'S INSTRUCTION, and both blind readers get it identically:** for every holiday, read the **evening of the preceding trading day** and state whether a session opened there. `absorbs_into: null` is the positive statement that none did; a missing key is refused as untranscribed.
+
 So Merit's computed session for `2026-09-08` is a strict subset of the real one, and **a fill on Sunday evening or Monday morning of Labor Day weekend lands inside no Merit session at all.** `R-01` is fill containment; a fill in no session is the condition it exists to detect, arriving on ordinary trading rather than on an error. On roughly three holidays a year, at the exact moment volume returns.
 
 **`early_closes` covers the close end and nothing covers the open end.** The file has `holidays` and `early_closes` and no third list, so this is a gap in the file's SHAPE rather than in a value, which is why it is recorded here rather than fixed in passing.
 
 **Recommendation, not a ruling:** the exception entry for a holiday carries the **explicit bounds of the session that absorbs it** rather than a second list of early opens, because the artifacts state those bounds directly and a derived open would be a second rule to get wrong. Deciding it amends [ADR-042](../../../../../docs/decisions/ADR-042.md)'s F-series and belongs to a plan session with the four artifacts open.
+
+**That session happened and [ADR-055](../../../../../docs/decisions/ADR-055.md) adopted the recommendation**, with one addition the artifacts forced: the close is carried alongside the open even though it is derivable, so the generator can derive what it expects and **refuse a disagreement**. The derivation is kept as a cross-check rather than discarded as a source. The shape is `absorbs_into`, and the six rejections it makes possible are enumerated in the ruling. **Nothing here is transcribed and no shape edit has been made to the source file**: the schema and its validator land together in the session that writes both.
 
 ### FINDING 4: two dates on the page are holidays for OTHER venues and are NOT Globex holidays
 
