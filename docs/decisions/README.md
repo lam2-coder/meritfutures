@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-16
+last_updated: 2026-08-17
 ---
 
 # DECISIONS (ADR registry)
@@ -77,6 +77,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-048](ADR-048.md) | CI-03's polarity is derived per fixture from the rules it cites  (2026-08-16, status: accepted) |
 | [ADR-049](ADR-049.md) | `CalendarSlice` is a value, and a lookup miss is a typed refusal  (2026-08-16, status: accepted) |
 | [ADR-046](ADR-046.md) | A contact address is held reversibly, and the notification obligation is discharged by evidence  (2026-08-16, status: accepted) |
+| [ADR-050](ADR-050.md) | INV-06 gains a stated R-31 exception, and the funded-reset floor is citable  (2026-08-17, status: accepted) |
 
 ## Gate closures
 

@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-16
+last_updated: 2026-08-17
 ---
 
 # STATE
@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->49<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->50<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off | Ruling |
 |---|---|
@@ -543,7 +543,8 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 | Open | Where |
 |---|---|
-| **`INV-06`'s scope is unruled, and R-31 needs it. The per-account reading was TESTED AND REFUTED (session 47)** | The funded reset lowers the floor from 5,050,000c to 4,750,000c on the pass day. **R-12, R-31 and GS-019 all state that number**, so the engine follows them, and the balance falls to `size_cents` in the same step so no loss room narrows. **The hypothesis that `D-M2-1`'s "or provisioning a new one" makes the funded account a NEW ACCOUNT does not survive the sources**, so per-account scoping cannot rescue R-31: see the section below. **Two readings survive and both are the founder's**: per `(account, phase)`, which "no phase qualifier" argues against in its own words, or `INV-06` gaining a stated R-31 exception. **The property session still cannot be written until one is ruled** |
+| ~~**`INV-06`'s scope is unruled, and R-31 needs it**~~ **CLOSED by [ADR-050](decisions/ADR-050.md) (2026-08-17)** | The founder ruled: **`INV-06` gains a stated `R-31` exception**, and the per-`(account, phase)` scoping was declined rather than merely not chosen. **4,750,000c at 50K is correct and citable**, `GS-019`, `GS-020` and `GS-023` are confirmed rather than edited, and a fixture may now cross the eval pass. **`RE-P-01` is unblocked** and states the exception in the property rather than in a comment. The per-account reading was tested and refuted in [session 47](sessions/2026-08-16-session-47.md) and that section below stands as the record of why |
+| **`INV-07` IS IN EXACTLY THE POSITION `INV-06` WAS IN, AND [ADR-050](decisions/ADR-050.md) DOES NOT TOUCH IT (2026-08-17)** | `INV-07` reads "a locked floor never changes again for the **life of the account**", enforced by `RE-P-02` and `GS-016`. **The same funded reset clears the lock**: [`progression.ts`](../packages/rules-engine/src/day/progression.ts) writes `floorLocked: false` at DO-8, correctly derived from section 3.4's floor machine starting at `trailing` and from R-12 naming the funded reset as one of its two entry points, because an account arriving funded and still locked would have `hwb` frozen at `size_cents` and R-13 guarded off for life. **The derivation is sound and is not the point.** `R-31` does not name `floorLocked` at all, and `INV-07` says "life of the account" in the same words `INV-06` said "no phase qualifier". **`RE-P-02` fails on `GS-019` the way `RE-P-01` did.** Founder item. **No batch-4 fixture pins `floor_locked` across an eval pass** |
 | **M01 disagrees with itself on R-22's operator, and this is a defect in a frozen document** | Section 3.6's pseudocode writes the hard daily-loss-limit comparison as `>=`; **R-22's operator column, `OQ-6`'s ruling and section 10.1 all write `>`** ("exactly at the limit survives"). Section 3.5 makes the operator column the contract, so the engine implements `>` and `RE-U-022` pins it. **Moving the pseudocode is an ADR, not a commit**, and no ADR is attempted on a session's own authority. **No v1 plan configures a daily loss limit**, so nothing exercises it until one does, which is exactly why it is recorded now |
 | **M01 disagrees with itself on R-15's lock effect** | Section 3.4's `max` against section 3.6's assignment, above. Recorded here for the same reason and left for the same authority |
 | **`rule.floor_locked` fires on a day the account then leaves, and the payload is worth more than the timeline noise (session 47)** | Every v1 eval pass locks the floor at DO-7 and is reset out of the lock at DO-8, in that order, because DO-7 precedes DO-8 and neither step may be reordered. The event is true of the eval account and is noise on a timeline the trader reads as funded. **`RE-U-031` now pins the sequence** `rule.floor_locked, phase.passed, day.closed`. **The half session 45 did not record is that `locked_floor_cents` is 5,050,000c while the account leaves the day on 4,750,000c**, and `DEP-M2-03` has M2 turning this event into a `set_risk` push. See the section below |
