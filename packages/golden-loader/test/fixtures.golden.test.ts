@@ -169,8 +169,12 @@ const named = (f: GoldenFixture): string => `${f.id} ${f.name}`;
 
 describe('the declaration the derivation rests on', () => {
   test('the coverage block says so, on every run, when it does not hold', () => {
-    // THE DERIVATION IS REPORTED AND NOT YET ENFORCED (founder ruling,
-    // 2026-08-17), so this is the assertion that keeps the reporting honest.
+    // THE DERIVATION IS REPORTED AND NOT YET ENFORCED WHENEVER THE DECLARATION
+    // DOES NOT HOLD, so this is the assertion that keeps the reporting honest.
+    // An earlier version of this comment attributed that to a "founder ruling,
+    // 2026-08-17". No such ruling exists and none is needed: a derived direction
+    // cannot be enforced against a fold that reaches none of the rules a fixture
+    // cites, which is a fact about the tree rather than a decision.
     // A finding that exists only in a variable is the quiet direction; this
     // fails if the block ever stops printing the premise it is running on.
     if (declaration.holds) {
