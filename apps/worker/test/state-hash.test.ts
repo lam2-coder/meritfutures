@@ -1,0 +1,443 @@
+// =============================================================================
+// apps/worker/test/state-hash.test.ts
+// =============================================================================
+// THE EXPECTATION IS TRANSCRIBED FROM ADR-026 C-07, NOT READ OFF THE MODULE.
+// TR-01's whole point: "a fixture derived from the implementation proves only
+// that the code agrees with itself". So this file writes its own framing
+// function, lists the nineteen values in C-07's numbered order by hand, and
+// hashes the result with `node:crypto` directly. If the module drops a column,
+// reorders two, or renders a bigint differently, the digests part.
+//
+// The second half of the file is the one that would catch the likelier defect.
+// A hand-written expectation pins ONE state; a column silently dropped from the
+// renderer is invisible the moment that column's value is the same in the
+// fixture and in the expectation. So every one of the nineteen columns and
+// every one of the twenty-five gate leaves is MUTATED IN TURN and the hash is
+// asserted to move. That is what proves each field is actually reached.
+
+import { createHash } from 'node:crypto';
+
+import { describe, expect, it } from 'vitest';
+
+import type { EngineGateResults, RuleState, TradingDay } from '@merit/rules-engine';
+
+import {
+  canonicalStateSerialization,
+  ENGINE_GATE_LEAVES,
+  EXCLUDED_COLUMNS,
+  HASHED_COLUMNS,
+  StateHashError,
+  stateHash,
+  type StateHashSubject,
+} from '../src/batch/state-hash.js';
+
+const td = (s: string): TradingDay => s as TradingDay;
+
+const ACCOUNT_ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
+
+/**
+ * A funded day mid-consistency-period with no settlement yet, so all three
+ * nullable columns are null and the sentinel is exercised on every one of them.
+ */
+const GATES: EngineGateResults = {
+  tradedDays: { pass: true, skipped: true, have: 12, need: 0 },
+  winDays: { pass: false, have: 3, need: 5, floorCents: 15_000n },
+  buffer: { pass: false, haveCents: 30_000n, needCents: 100_000n },
+  consistency: {
+    pass: true,
+    skipped: false,
+    bestDayShareBp: 6667,
+    maxDayShareBp: 3000,
+    profitNeededToDiluteCents: 36_667n,
+  },
+  cadenceGap: {
+    pass: true,
+    skipped: true,
+    tradingDaysSinceLastPayout: null,
+    need: 5,
+    nextEligibleTradingDay: null,
+  },
+  minimumAmount: {
+    pass: false,
+    withdrawableCents: 0n,
+    capCents: 250_000n,
+    minPayoutCents: 10_000n,
+  },
+};
+
+const STATE: RuleState = {
+  tradingDay: td('2026-08-17'),
+  phase: 'funded',
+  balanceCents: 5_030_000n,
+  floorOpenCents: 4_750_000n,
+  floorCents: 4_780_000n,
+  floorLocked: false,
+  highWaterBalanceCents: 5_030_000n,
+  withdrawableCents: 0n,
+  tradedDaysCount: 12,
+  winDaysCount: 3,
+  consistencyBestDayCents: 20_000n,
+  consistencyPeriodProfitCents: 30_000n,
+  consistencyPeriodStartDay: null,
+  payoutsSettledCount: 0,
+  payoutAnchorDay: null,
+  cadenceAnchorDay: null,
+  lifetimeSettledCents: 0n,
+  engineGates: GATES,
+  engineEligible: false,
+  breached: false,
+  breachKind: null,
+  engineVersion: 'test-engine',
+};
+
+const SUBJECT: StateHashSubject = { accountId: ACCOUNT_ID, state: STATE };
+
+// -----------------------------------------------------------------------------
+// The independent serializer
+// -----------------------------------------------------------------------------
+
+/** Written here rather than imported. `<utf8 byte length>:<utf8 bytes>`. */
+function f(value: string): string {
+  return `${String(Buffer.byteLength(value, 'utf8'))}:${value}`;
+}
+
+/**
+ * The twenty-five gate leaves, transcribed from `EngineGateResults` and each
+ * gate interface's own field order, which `types.ts` states is "the order
+ * `engineEligible` READS THEM ... because SD-08's canonical serialization
+ * hashes fields in a fixed declared order".
+ */
+const EXPECTED_GATES: string =
+  // tradedDays: pass, skipped, have, need
+  f('true') +
+  f('true') +
+  f('12') +
+  f('0') +
+  // winDays: pass, have, need, floorCents
+  f('false') +
+  f('3') +
+  f('5') +
+  f('15000') +
+  // buffer: pass, haveCents, needCents
+  f('false') +
+  f('30000') +
+  f('100000') +
+  // consistency: pass, skipped, bestDayShareBp, maxDayShareBp, profitNeededToDiluteCents
+  f('true') +
+  f('false') +
+  f('6667') +
+  f('3000') +
+  f('36667') +
+  // cadenceGap: pass, skipped, tradingDaysSinceLastPayout, need, nextEligibleTradingDay
+  f('true') +
+  f('true') +
+  f('~null') +
+  f('5') +
+  f('~null') +
+  // minimumAmount: pass, withdrawableCents, capCents, minPayoutCents
+  f('false') +
+  f('0') +
+  f('250000') +
+  f('10000');
+
+/** ADR-026 C-07's numbered list, 1 to 19, transcribed in its order. */
+const EXPECTED_SERIALIZATION: string =
+  f(ACCOUNT_ID) + //                   1.  account_id
+  f('2026-08-17') + //                 2.  trading_day
+  f('funded') + //                     3.  phase
+  f('4780000') + //                    4.  floor_cents
+  f('false') + //                      5.  floor_locked
+  f('4750000') + //                    6.  floor_open_cents                SD-04
+  f('5030000') + //                    7.  high_water_balance_cents
+  f('5030000') + //                    8.  balance_cents
+  f('0') + //                          9.  withdrawable_cents
+  f('12') + //                        10.  traded_days_count
+  f('3') + //                         11.  win_days_count
+  f('20000') + //                     12.  consistency_best_day_cents
+  f('30000') + //                     13.  consistency_period_profit_cents
+  f('~null') + //                     14.  consistency_period_start_day    SD-07
+  f('0') + //                         15.  payouts_settled_count
+  f('~null') + //                     16.  payout_anchor_day               SD-02
+  f('~null') + //                     17.  cadence_anchor_day              SD-02
+  f('false') + //                     18.  engine_eligible                 SD-06
+  f(EXPECTED_GATES); //               19.  engine_gates                    SD-06
+
+describe('SD-08 state_hash: the serialization ADR-026 C-07 declares', () => {
+  it('serializes the nineteen columns in C-07 order, framed, with no whitespace', () => {
+    expect(canonicalStateSerialization(SUBJECT)).toBe(EXPECTED_SERIALIZATION);
+  });
+
+  it('hashes exactly that serialization with SHA-256', () => {
+    const independent = createHash('sha256').update(EXPECTED_SERIALIZATION, 'utf8').digest();
+    expect(stateHash(SUBJECT).equals(independent)).toBe(true);
+  });
+
+  it('produces the 32 bytes rule_states_hash_is_sha256 checks', () => {
+    expect(stateHash(SUBJECT)).toHaveLength(32);
+  });
+
+  it('is deterministic: the same subject twice is the same digest (INV-04)', () => {
+    expect(stateHash(SUBJECT).equals(stateHash(SUBJECT))).toBe(true);
+  });
+
+  it('carries no whitespace, which C-07 states as a rendering rule', () => {
+    expect(canonicalStateSerialization(SUBJECT)).not.toMatch(/\s/);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The list itself, against ADR-026 C-07
+// -----------------------------------------------------------------------------
+// C-07 is prose in an ADR and `0015`'s column comment is prose in SQL. This is
+// the only executable copy, so the names and the ordinals are asserted against
+// the ADR rather than against the module that uses them.
+
+const C07_COLUMNS = [
+  'account_id',
+  'trading_day',
+  'phase',
+  'floor_cents',
+  'floor_locked',
+  'floor_open_cents',
+  'high_water_balance_cents',
+  'balance_cents',
+  'withdrawable_cents',
+  'traded_days_count',
+  'win_days_count',
+  'consistency_best_day_cents',
+  'consistency_period_profit_cents',
+  'consistency_period_start_day',
+  'payouts_settled_count',
+  'payout_anchor_day',
+  'cadence_anchor_day',
+  'engine_eligible',
+  'engine_gates',
+] as const;
+
+describe('the hashed column list is ADR-026 C-07 exactly', () => {
+  it('is nineteen columns, in C-07 declared order, under C-07 names', () => {
+    expect(HASHED_COLUMNS.map((c) => c.column)).toEqual([...C07_COLUMNS]);
+  });
+
+  it('numbers them 1 to 19 as C-07 numbers them', () => {
+    expect(HASHED_COLUMNS.map((c) => c.ordinal)).toEqual(
+      Array.from({ length: 19 }, (_, i) => i + 1),
+    );
+  });
+
+  it('names every exclusion C-07 and ADR-047 state, so the list carries five entries', () => {
+    expect(EXCLUDED_COLUMNS.map((c) => c.column)).toEqual([
+      'context_gates',
+      'engine_version',
+      'computed_at',
+      'calendar_revision_id',
+      'id, state_hash',
+    ]);
+  });
+
+  it('gives every exclusion a reason rather than only a name', () => {
+    for (const excluded of EXCLUDED_COLUMNS) {
+      expect(excluded.reason.length).toBeGreaterThan(20);
+      expect(excluded.source).not.toBe('');
+    }
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Every column and every leaf is REACHED
+// -----------------------------------------------------------------------------
+// A dropped column is invisible to a single hand-written expectation whenever
+// the dropped column's value happens to match. Mutating each field in turn and
+// asserting the digest moves is what makes "nineteen columns are hashed" a
+// measurement rather than a claim.
+
+const BASE = stateHash(SUBJECT);
+
+const withState = (patch: Partial<RuleState>): StateHashSubject => ({
+  accountId: ACCOUNT_ID,
+  state: { ...STATE, ...patch },
+});
+
+const withGates = (patch: Partial<EngineGateResults>): StateHashSubject =>
+  withState({ engineGates: { ...GATES, ...patch } });
+
+describe('every hashed column moves the digest', () => {
+  const cases: readonly (readonly [string, StateHashSubject])[] = [
+    ['account_id', { accountId: 'ffffffff-d9cb-469f-a165-70867728950e', state: STATE }],
+    ['trading_day', withState({ tradingDay: td('2026-08-18') })],
+    ['phase', withState({ phase: 'eval' })],
+    ['floor_cents', withState({ floorCents: 4_780_001n })],
+    ['floor_locked', withState({ floorLocked: true })],
+    ['floor_open_cents', withState({ floorOpenCents: 4_750_001n })],
+    ['high_water_balance_cents', withState({ highWaterBalanceCents: 5_030_001n })],
+    ['balance_cents', withState({ balanceCents: 5_030_001n })],
+    ['withdrawable_cents', withState({ withdrawableCents: 1n })],
+    ['traded_days_count', withState({ tradedDaysCount: 13 })],
+    ['win_days_count', withState({ winDaysCount: 4 })],
+    ['consistency_best_day_cents', withState({ consistencyBestDayCents: 20_001n })],
+    ['consistency_period_profit_cents', withState({ consistencyPeriodProfitCents: 30_001n })],
+    ['consistency_period_start_day', withState({ consistencyPeriodStartDay: td('2026-08-10') })],
+    ['payouts_settled_count', withState({ payoutsSettledCount: 1 })],
+    ['payout_anchor_day', withState({ payoutAnchorDay: td('2026-08-03') })],
+    ['cadence_anchor_day', withState({ cadenceAnchorDay: td('2026-08-04') })],
+    ['engine_eligible', withState({ engineEligible: true })],
+    ['engine_gates', withGates({ buffer: { pass: true, haveCents: 30_000n, needCents: 0n } })],
+  ];
+
+  it('covers all nineteen', () => {
+    expect(cases.map(([column]) => column)).toEqual([...C07_COLUMNS]);
+  });
+
+  for (const [column, mutated] of cases) {
+    it(`${column} changes the hash`, () => {
+      expect(stateHash(mutated).equals(BASE)).toBe(false);
+    });
+  }
+});
+
+describe('every one of the twenty-five engine_gates leaves moves the digest', () => {
+  const cases: readonly (readonly [string, EngineGateResults])[] = [
+    ['tradedDays.pass', { ...GATES, tradedDays: { ...GATES.tradedDays, pass: false } }],
+    ['tradedDays.skipped', { ...GATES, tradedDays: { ...GATES.tradedDays, skipped: false } }],
+    ['tradedDays.have', { ...GATES, tradedDays: { ...GATES.tradedDays, have: 13 } }],
+    ['tradedDays.need', { ...GATES, tradedDays: { ...GATES.tradedDays, need: 1 } }],
+    ['winDays.pass', { ...GATES, winDays: { ...GATES.winDays, pass: true } }],
+    ['winDays.have', { ...GATES, winDays: { ...GATES.winDays, have: 4 } }],
+    ['winDays.need', { ...GATES, winDays: { ...GATES.winDays, need: 6 } }],
+    ['winDays.floorCents', { ...GATES, winDays: { ...GATES.winDays, floorCents: 15_001n } }],
+    ['buffer.pass', { ...GATES, buffer: { ...GATES.buffer, pass: true } }],
+    ['buffer.haveCents', { ...GATES, buffer: { ...GATES.buffer, haveCents: 30_001n } }],
+    ['buffer.needCents', { ...GATES, buffer: { ...GATES.buffer, needCents: 100_001n } }],
+    ['consistency.pass', { ...GATES, consistency: { ...GATES.consistency, pass: false } }],
+    ['consistency.skipped', { ...GATES, consistency: { ...GATES.consistency, skipped: true } }],
+    [
+      'consistency.bestDayShareBp',
+      { ...GATES, consistency: { ...GATES.consistency, bestDayShareBp: 6668 } },
+    ],
+    [
+      'consistency.maxDayShareBp',
+      { ...GATES, consistency: { ...GATES.consistency, maxDayShareBp: 3001 } },
+    ],
+    [
+      'consistency.profitNeededToDiluteCents',
+      { ...GATES, consistency: { ...GATES.consistency, profitNeededToDiluteCents: 36_668n } },
+    ],
+    ['cadenceGap.pass', { ...GATES, cadenceGap: { ...GATES.cadenceGap, pass: false } }],
+    ['cadenceGap.skipped', { ...GATES, cadenceGap: { ...GATES.cadenceGap, skipped: false } }],
+    [
+      'cadenceGap.tradingDaysSinceLastPayout',
+      { ...GATES, cadenceGap: { ...GATES.cadenceGap, tradingDaysSinceLastPayout: 7 } },
+    ],
+    ['cadenceGap.need', { ...GATES, cadenceGap: { ...GATES.cadenceGap, need: 6 } }],
+    [
+      'cadenceGap.nextEligibleTradingDay',
+      { ...GATES, cadenceGap: { ...GATES.cadenceGap, nextEligibleTradingDay: td('2026-08-21') } },
+    ],
+    ['minimumAmount.pass', { ...GATES, minimumAmount: { ...GATES.minimumAmount, pass: true } }],
+    [
+      'minimumAmount.withdrawableCents',
+      { ...GATES, minimumAmount: { ...GATES.minimumAmount, withdrawableCents: 1n } },
+    ],
+    [
+      'minimumAmount.capCents',
+      { ...GATES, minimumAmount: { ...GATES.minimumAmount, capCents: 250_001n } },
+    ],
+    [
+      'minimumAmount.minPayoutCents',
+      { ...GATES, minimumAmount: { ...GATES.minimumAmount, minPayoutCents: 10_001n } },
+    ],
+  ];
+
+  it('covers every declared leaf, and the leaf list is twenty-five long', () => {
+    expect(ENGINE_GATE_LEAVES).toHaveLength(25);
+    expect(cases.map(([path]) => path)).toEqual(ENGINE_GATE_LEAVES.map((l) => l.path));
+  });
+
+  for (const [path, gates] of cases) {
+    it(`${path} changes the hash`, () => {
+      expect(stateHash(withState({ engineGates: gates })).equals(BASE)).toBe(false);
+    });
+  }
+});
+
+// -----------------------------------------------------------------------------
+// The exclusions, asserted where they are assertable
+// -----------------------------------------------------------------------------
+// `context_gates` and `calendar_revision_id` cannot be asserted here and the
+// reason is stronger than a test: neither reaches this function at all.
+// `RuleState` carries no context gate (INV-23 is structural in the type: "so
+// nothing below appears on `RuleState`") and the calendar watermark is the
+// batch's stamp, never the engine's output. `computed_at` and `id` are the
+// writer's. `engine_version` is the one exclusion that IS on `RuleState`, so it
+// is the one that could be hashed by accident, and it is asserted.
+
+describe('the exclusions', () => {
+  it('engine_version is on RuleState and is NOT hashed (ADR-026 C-07)', () => {
+    expect(
+      stateHash(withState({ engineVersion: 'a-completely-different-build' })).equals(BASE),
+    ).toBe(true);
+  });
+
+  it('the RuleState fields that are not rule_states columns are not hashed either', () => {
+    // `lifetimeSettledCents`, `breached` and `breachKind` are engine state with
+    // no column in `0015`. Hashing a field the table does not hold would make
+    // replay compare a value the stored row never carried.
+    expect(stateHash(withState({ lifetimeSettledCents: 999_999n })).equals(BASE)).toBe(true);
+    expect(stateHash(withState({ breached: true })).equals(BASE)).toBe(true);
+    expect(stateHash(withState({ breachKind: 'static_floor' })).equals(BASE)).toBe(true);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The framing, and the collision it exists to prevent
+// -----------------------------------------------------------------------------
+
+describe('the framing is injective', () => {
+  it('separates two adjacent counts that plain concatenation would merge', () => {
+    // Unframed, `traded_days_count = 1, win_days_count = 23` and `12, 3` both
+    // render "123", and replay would read two different states as one.
+    const a = stateHash(withState({ tradedDaysCount: 1, winDaysCount: 23 }));
+    const b = stateHash(withState({ tradedDaysCount: 12, winDaysCount: 3 }));
+    expect(a.equals(b)).toBe(false);
+  });
+
+  it('keeps the two anchors distinguishable when their values are swapped (C-09)', () => {
+    const anchored = withState({
+      payoutsSettledCount: 1,
+      payoutAnchorDay: td('2026-08-03'),
+      cadenceAnchorDay: td('2026-08-05'),
+    });
+    const swapped = withState({
+      payoutsSettledCount: 1,
+      payoutAnchorDay: td('2026-08-05'),
+      cadenceAnchorDay: td('2026-08-03'),
+    });
+    expect(stateHash(anchored).equals(stateHash(swapped))).toBe(false);
+  });
+
+  it('distinguishes a null anchor from a date, through the sentinel', () => {
+    expect(stateHash(withState({ payoutAnchorDay: td('2026-08-03') })).equals(BASE)).toBe(false);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// Refusals
+// -----------------------------------------------------------------------------
+// A malformed value is a bug in the caller and it is loud, because the quiet
+// alternative is a row whose hash nothing can reproduce.
+
+describe('it refuses rather than hashing something plausible', () => {
+  it('refuses an account id that is not a canonical lowercase UUID', () => {
+    expect(() =>
+      canonicalStateSerialization({ accountId: ACCOUNT_ID.toUpperCase(), state: STATE }),
+    ).toThrow(StateHashError);
+  });
+
+  it('refuses a trading day that is not YYYY-MM-DD', () => {
+    expect(() => stateHash(withState({ tradingDay: td('17/08/2026') }))).toThrow(StateHashError);
+  });
+
+  it('refuses a count that is not an integer', () => {
+    expect(() => stateHash(withState({ tradedDaysCount: 12.5 }))).toThrow(StateHashError);
+  });
+});
