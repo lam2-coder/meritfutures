@@ -10,6 +10,7 @@ import { expect, test } from 'vitest';
 import { advanceDay } from '../src/day/advance.js';
 import type { BreachDetectedEvent, DayOutput, ResolvedPlan, RuleState } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -33,6 +34,7 @@ function fold(
     mark: mark(fields),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
 }
 

@@ -41,6 +41,7 @@ import type {
   RuleState,
 } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -63,6 +64,7 @@ function fold(
     mark: mark(fields),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
 }
 
@@ -81,21 +83,30 @@ const EVERY_EVENT_TYPE: Record<EngineEventType, true> = {
   'phase.passed': true,
   'phase.pass_deferred_consistency': true,
   'account.graduated': true,
+  'account.expired': true,
   'payout.win_days_reset': true,
   'rule.floor_locked': true,
   'rule.soft_dll_exceeded': true,
 };
 
-test('the EngineEvent union has exactly the eight events the engine emits', () => {
+test('the EngineEvent union has exactly the nine events the engine emits', () => {
   const names = Object.keys(EVERY_EVENT_TYPE).sort();
 
-  // EIGHT, NOT NINE. M01 section 5.2's table lists eleven names and three have
-  // no producer in the day fold: `payout.floor_recomputed` is "retired at the M1
-  // gate" with no producer after ADR-014, `account.live_invitation_issued` is
-  // never emitted because ADR-024 puts invitation "outside the engine", and
+  // NINE. M01 section 5.2's table lists eleven names and three have no producer
+  // in the day fold: `payout.floor_recomputed` is "retired at the M1 gate" with
+  // no producer after ADR-014, `account.live_invitation_issued` is never emitted
+  // because ADR-024 puts invitation "outside the engine", and
   // `replay.divergence_detected` belongs to Appendix B's replay harness rather
-  // than to `advanceDay` or `applySettlement`.
-  expect(names).toHaveLength(8);
+  // than to `advanceDay` or `applySettlement`. That leaves eight from the table.
+  //
+  // THE NINTH IS `account.expired` AND SECTION 5.2's TABLE DOES NOT LIST IT,
+  // which is a gap in that table rather than an invented name. R-32 emits it,
+  // section 5.2 defers to the catalogue ("all exist in the approved EVENTS.md
+  // catalogue except the two marked NEW"), and the catalogue has carried
+  // `account.expired` with a stated payload the whole time R-32 refused. The
+  // count below moved from 8 to 9 when ADR-051 unblocked the rule.
+  expect(names).toHaveLength(9);
+  expect(names).toContain('account.expired');
 
   // The three with no producer must NOT be union members. A retired event that
   // crept back into the union would have every consumer writing a dead branch.
@@ -173,6 +184,8 @@ function describeEvent(event: EngineEvent): string {
       return `deferred, short ${String(event.shortfallCents)}`;
     case 'account.graduated':
       return `graduated after ${String(event.payoutsSettledCount)}`;
+    case 'account.expired':
+      return `expired on day ${String(event.elapsedTradingDays)} of ${String(event.maxDays)}`;
     case 'payout.win_days_reset':
       return `win days ${String(event.previousCount)} -> ${String(event.resetTo)}`;
     case 'rule.floor_locked':

@@ -449,6 +449,7 @@ export function advanceDay(input: DayInput): DayOutput {
       evalRules: plan.eval,
       mark,
       calendar: input.calendar,
+      openedOn: input.openedOn,
     });
 
     switch (progression.kind) {
@@ -460,6 +461,18 @@ export function advanceDay(input: DayInput): DayOutput {
         events.push(progression.event);
         break;
       case 'passed':
+        state = progression.state;
+        events.push(progression.event);
+        break;
+      case 'expired':
+        // R-32. The account is `closed` and the day still CLOSES: DO-9 runs and
+        // `day.closed` is emitted, exactly as it is for a pass. The expiry is a
+        // fact about the day, not a reason to withhold the day's own record.
+        //
+        // R-25 STILL HOLDS AND COSTS NOTHING TO KEEP. A day that breached never
+        // reaches this branch, because DO-4 returned long before it, so "breach
+        // beats everything on the same day" is a property of the ordering rather
+        // than a check anyone has to remember here.
         state = progression.state;
         events.push(progression.event);
         break;

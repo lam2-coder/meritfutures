@@ -763,6 +763,21 @@ export interface DayInput {
   readonly calendar: CalendarSlice;
   /** Those whose `effectiveTradingDay` equals `mark.tradingDay`. */
   readonly settlements: readonly SettlementFact[];
+  /**
+   * `accounts.opened_on`, R-32's anchor. THE M01 SECTION 2.1 AMENDMENT, and the
+   * whole of what ADR-051 added to this interface.
+   *
+   * IT IS THE FIRST TRADEABLE DAY, NOT THE PURCHASE DAY, and the distinction is
+   * the ruling rather than a detail. An account sits `provisioning_pending` from
+   * `purchase.paid`, so a clock anchored at the purchase would charge the trader
+   * for Merit's own provisioning latency. ADR-051: `opened_on` "is set when the
+   * account reaches `active`, not when the purchase is paid".
+   *
+   * REQUIRED, NEVER OPTIONAL. An optional anchor makes R-32 silently not fire on
+   * the day a caller forgets it, which is a rule that reads as enforced and
+   * expires nobody: the exact shape `accounts.expires_on` was rejected for.
+   */
+  readonly openedOn: TradingDay;
 }
 
 // -----------------------------------------------------------------------------
@@ -1086,9 +1101,17 @@ export type AssertionKind =
   | 'day_not_a_session'
   /** ADR-049. The day is outside the slice's coverage, so the answer is UNKNOWN. */
   | 'calendar_coverage_miss'
-  /** DO-8, R-32. `phase_eval.max_days` is set and eval expiry is not computable. */
-  | 'eval_expiry_unimplemented'
-  /** DO-8. The state claims the eval phase on a plan that has no eval phase. */
+  /**
+   * DO-8. The state claims the eval phase on a plan that has no eval phase.
+   *
+   * `eval_expiry_unimplemented` STOOD HERE AND IS RETIRED BY ADR-051, which is a
+   * deletion rather than a rename. It meant "`max_days` is set and R-32 is not
+   * computable", and R-32 is computable now. The case that replaced it is an
+   * anchor the slice cannot answer for, which is `calendar_coverage_miss`
+   * already: the same refusal R-37 raises, for the same reason, rather than a
+   * second kind meaning the same thing. A retired kind kept "just in case" is a
+   * branch every consumer writes and nothing ever takes.
+   */
   | 'eval_phase_without_eval_rules';
 
 export interface AssertionFailure {
@@ -1245,6 +1268,36 @@ export interface AccountGraduatedEvent extends EngineEventBase {
 }
 
 /**
+ * R-32, DO-8. The evaluation ran out of trading days and the account closes.
+ *
+ * THE NAME AND PAYLOAD ARE `EVENTS.md`'s, NOT INVENTED HERE. The approved
+ * catalogue carries `account.expired` with `{ account_id, trading_day,
+ * expiry_rule }`. The account id is dropped for the reason stated above the
+ * event section: `DayInput` carries none, because the fold is per account by
+ * construction and the caller that supplied the marks is the one that knows
+ * whose they are.
+ *
+ * IT IS ABSENT FROM M01 SECTION 5.2's TABLE, WHICH IS A GAP IN THAT TABLE AND
+ * NOT A LICENCE TO INVENT ONE. Section 5.2 says "all exist in the approved
+ * EVENTS.md catalogue except the two marked NEW", so the catalogue is the wider
+ * set and M01's table simply never listed R-32's event while R-32 refused. The
+ * catalogue entry is used verbatim rather than a ninth name being coined.
+ */
+export interface AccountExpiredEvent extends EngineEventBase {
+  readonly type: 'account.expired';
+  /**
+   * `expiry_rule` from the catalogue. The rule that expired the account, so a
+   * consumer reading the timeline is told WHICH limit ran out rather than being
+   * left to infer it from the plan config as it stood at read time.
+   */
+  readonly expiryRule: 'R-32';
+  /** Elapsed trading days as R-32 counted them, inclusive of the opening day. */
+  readonly elapsedTradingDays: number;
+  /** `phase_eval.max_days`, the limit that was exceeded. ADR-051: it binds. */
+  readonly maxDays: number;
+}
+
+/**
  * DO-8, R-28. The target and the day count are met and consistency is not, so
  * the pass DEFERS.
  *
@@ -1290,15 +1343,25 @@ export interface PassDeferredConsistencyEvent extends EngineEventBase {
 // eight members individually; withholding only their union buys no safety and
 // costs every consumer a cast.
 //
-// THERE ARE EIGHT MEMBERS, NOT NINE. M01 section 5.2's table lists eleven names
-// and three of them have no producer in the day fold: `payout.floor_recomputed`
-// is "RETIRED AT THE M1 GATE" with no producer after ADR-014,
+// THERE ARE NINE MEMBERS. M01 section 5.2's table lists eleven names and three
+// of them have no producer in the day fold: `payout.floor_recomputed` is
+// "RETIRED AT THE M1 GATE" with no producer after ADR-014,
 // `account.live_invitation_issued` is not emitted at all because ADR-024 makes
 // invitation "a discretionary operator action ... OUTSIDE THE ENGINE", and
 // `replay.divergence_detected` belongs to Appendix B's replay harness rather
-// than to `advanceDay` or `applySettlement`. The eight below are exactly the
-// eight `type` literals constructed in `day/advance.ts`, `day/progression.ts`
-// and `payout/settle.ts`.
+// than to `advanceDay` or `applySettlement`. The nine below are exactly the nine
+// `type` literals constructed in `day/advance.ts`, `day/progression.ts` and
+// `payout/settle.ts`.
+//
+// THE NINTH IS `account.expired` AND IT CAME FROM THE CATALOGUE RATHER THAN
+// FROM M01's TABLE, which is worth stating because the arithmetic above stops
+// working otherwise. Section 5.2's eleven names do not include it, and R-32 is
+// the rule that emits it. That is a gap in section 5.2 rather than a new event:
+// section 5.2 declares "all exist in the approved EVENTS.md catalogue except the
+// two marked NEW", so the catalogue is the wider set, and `account.expired` has
+// sat in it with a stated payload the whole time R-32 refused. It is used as
+// found. Eight of the nine appear in section 5.2's table; the ninth appears in
+// the catalogue section 5.2 defers to.
 //
 // `EXHAUSTIVE_EVENT_TYPES` IS NOT DECLARED HERE ON PURPOSE. A second list of the
 // same eight names is a second thing to forget to update, and the union already
@@ -1318,6 +1381,7 @@ export type EngineEvent =
   | PhasePassedEvent
   | PassDeferredConsistencyEvent
   | AccountGraduatedEvent
+  | AccountExpiredEvent
   | WinDaysResetEvent
   | FloorLockedEvent
   | SoftDailyLossLimitEvent;

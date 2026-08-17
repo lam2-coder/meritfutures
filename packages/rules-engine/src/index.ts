@@ -60,6 +60,7 @@ export type {
 
 export type {
   AccountActiveGate,
+  AccountExpiredEvent,
   AccountGraduatedEvent,
   AccountStatus,
   AssertionFailure,

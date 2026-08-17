@@ -17,6 +17,7 @@ import { advanceDay, initialState } from '../src/day/advance.js';
 import { withdrawableCents } from '../src/payout/gates.js';
 import type { DayOutput, ResolvedPlan, RuleState } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -42,6 +43,7 @@ function fold(
     mark: mark(fields),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
 }
 

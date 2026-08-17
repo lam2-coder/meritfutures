@@ -23,6 +23,7 @@ import { advanceFloor, initialFloorCents } from '../src/day/floor.js';
 import { EngineInvariantError } from '../src/errors.js';
 import type { DayOutput, DrawdownType, ResolvedPlan, RuleState } from '../src/types.js';
 import {
+  ACCOUNT_OPENED_ON,
   CME_WINDOW,
   CORE_50K,
   ENGINE_VERSION,
@@ -48,6 +49,7 @@ function fold(
     mark: mark(fields),
     calendar: CME_WINDOW,
     settlements: [],
+    openedOn: ACCOUNT_OPENED_ON,
   });
 }
 
