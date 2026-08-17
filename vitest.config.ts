@@ -43,7 +43,15 @@ import { defineConfig } from 'vitest/config';
 // adds a threshold by default, so its absence is ASSERTED by
 // `repo-invariants.mjs` rather than left to a reader noticing.
 
-const SOURCES = ['apps/*', 'packages/*'];
+// `scripts/demo` IS A SOURCE ROOT AND NOT A FOURTH PROJECT, which is the whole
+// of this line's argument. The projects map to CI STAGES rather than to
+// directories, so a `demo` project would be claiming a stage the ruled pipeline
+// does not have. What `scripts/demo/test` holds is a unit suite by every
+// ordinary meaning of the word -- it asserts that a pure function returns the
+// same bytes twice -- so it belongs in CI-02 beside the others, and adding the
+// root here is what puts it there. A test matched by no project does not run,
+// and a determinism claim nothing runs is a claim, not a control.
+const SOURCES = ['apps/*', 'packages/*', 'scripts/demo'];
 
 /** Test files that belong to no stage-specific suffix. CI-02, with `property`. */
 const UNIT = SOURCES.map((s) => `${s}/test/**/*.test.ts`);
