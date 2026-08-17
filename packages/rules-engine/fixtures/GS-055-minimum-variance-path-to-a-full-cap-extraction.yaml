@@ -88,7 +88,18 @@ plan: CORE-50K
 calendar: cme-2026
 account:
   phase: funded
-  opened_on: 2026-11-02
+  # THE OPEN DAY PRECEDES THE FIRST MARK AND IT HAS TO. A funded fixture is
+  # handed an explicit prior anchored here, because `initialState` cannot open
+  # an account in `funded` on a plan that has an evaluation phase, and
+  # `advanceDay` then refuses a mark that is not strictly after that prior
+  # (INV-14, R-06). This said 2026-11-02, the day the stream's first mark lands
+  # on, so the fold refused `not_forward` on mark one and wrote no state at all:
+  # every counter below read zero against an engine that had not run. 2026-10-30
+  # is the preceding session, which the fixture calendar now covers. It is the
+  # convention the eight funded fixtures that were already green follow, and it
+  # changes no computed field: `opened_on` reaches R-32's elapsed count and
+  # nothing else, and R-32 runs only in the eval phase.
+  opened_on: 2026-10-30
   size_cents: 5000000
 days:
   - trading_day: 2026-11-02
