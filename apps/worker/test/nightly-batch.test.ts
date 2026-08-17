@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 
 import { buildCalendarSlice } from '@merit/rules-engine';
 import type {
+  BasisPoints,
   CalendarDay,
   CalendarSlice,
   DailyMark,
@@ -37,6 +38,8 @@ import type {
 } from '../src/batch/ports.js';
 
 const td = (s: string): TradingDay => s as TradingDay;
+/** INV-03. Ratios are integer basis points, and the brand is what says so. */
+const bp = (n: number): BasisPoints => n as BasisPoints;
 
 const ACCOUNT_A = '0f8fad5b-d9cb-469f-a165-70867728950e';
 const ACCOUNT_B = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
@@ -75,12 +78,12 @@ const PLAN: ResolvedPlan = {
     winDayFloorCents: 15_000n,
     minTradingDays: 0,
     winDaysRequiredCount: 5,
-    consistency: { enabled: true, maxDayShareBp: 3000 },
+    consistency: { enabled: true, maxDayShareBp: bp(3000) },
     bufferCents: 100_000n,
     cadenceGapTradingDays: 5,
     payoutCapSchedule: [{ fromOrdinal: 1, capCents: 150_000n }],
     minPayoutCents: 10_000n,
-    splitBp: 9000,
+    splitBp: bp(9000),
     maxPayouts: 5,
   },
 };
