@@ -95,3 +95,4 @@ must be recoverable from its own file alone.
 | [2026-08-17 - Session 52](2026-08-17-session-52.md) | the short calendar repaired, and the repair was two halves rather than one |
 | [2026-08-17 - Session 52](2026-08-17-session-52.md) | The GS-024 floor divergence, ruled against the engine on a derivation nobody had checked |
 | [2026-08-17 - Session 53](2026-08-17-session-53.md) | `CI-06q`, cited authority exists, and the limitation that it would not have caught its own cause |
+| [2026-08-17 - Session 54](2026-08-17-session-54.md) | `ADR-055`, the open end of a trade date's session, and a finding narrower than it was recorded |
