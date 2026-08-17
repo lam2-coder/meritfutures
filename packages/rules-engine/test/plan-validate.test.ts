@@ -73,79 +73,18 @@ const CV_ASSERTIONS: Record<CvId, string> = {
 /** `RE-C-01  CV-01  drawdown.type is ...`, the two series navigable without a table. */
 const reC = (cv: CvId): string => `RE-C-${cv.slice(3)}  ${cv}  ${CV_ASSERTIONS[cv]}`;
 
-// -----------------------------------------------------------------------------
-// Appendix A.1: Core EOD at 50K
-// -----------------------------------------------------------------------------
-
-const c = (n: number): Cents => BigInt(n);
-
-const CORE_EVAL: PublishedEvalPhase = {
-  enabled: true,
-  profit_target_bp: 600, //                       A.1 eval profit target
-  drawdown: {
-    type: 'trailing_eod', //                      A.1 eval drawdown, trailing EOD
-    amount_bp: 500,
-    lock: { enabled: false, at_profit_cents: null, floor_at_cents: null },
-  },
-  daily_loss_limit: { type: 'none', amount_bp: null }, // A.1 daily loss limit: none
-  min_trading_days: 1, //                         A.1 eval minimum trading days
-  consistency: { enabled: false, max_day_share_bp: null, mode: 'pass_time_dilutable' },
-  max_days: null, //                              R-32, null in all v1 plans
-};
-
-const CORE_FUNDED: PublishedFundedPhase = {
-  drawdown: {
-    type: 'trailing_eod', //                      A.1 funded drawdown, trailing EOD
-    amount_bp: 500,
-    lock: { enabled: true, at_profit_cents: null, floor_at_cents: null }, // A.1 floor lock enabled
-  },
-  daily_loss_limit: { type: 'none', amount_bp: null },
-  min_trading_days: 0, //                         A.1, ADR-015, gate disabled
-  win_days: { required_count: 5, floor_bp: 30, reset_on_payout: true }, // A.1 win days required
-  consistency: { enabled: true, max_day_share_bp: 3000, mode: 'payout_gated' }, // A.1 funded consistency
-  buffer_bp: 200, //                              A.1 buffer
-  cadence_gap_trading_days: 5, //                 A.1 cadence gap, trading days
-  min_settlement_lag_trading_days: 0, //          ADR-019, the wallet's instant internal leg
-  payout_cap_schedule: [{ from_ordinal: 1, cap_bp: 300 }], // A.1 payout cap, ordinal 1 and up
-  min_payout_cents: c(10_000), //                 A preamble, GLOSSARY, CV-15
-  split_bp: 9000, //                              A.1 split to trader
-  max_payouts: 5, //                              A.1 ladder, ADR-024
-  post_payout_floor_rule: { mode: 'none' }, //    A preamble, ADR-014, CV-18
-};
-
-const CORE_50K: PlanVersionSizeRow = {
-  // `fixtures/plans/CORE-50K.json`, whose own note says it is transcribed from
-  // Appendix A.1 and from nowhere else.
-  plan_version_id: '0199c7a1-0000-7000-8000-000000000001' as PlanVersionId,
-  size_cents: c(5_000_000), //                    A preamble: 50K is 5,000,000c
-  drawdown_cents: c(250_000), //                  A.1, 500bp of 5,000,000
-  profit_target_cents: c(300_000), //             A.1, 600bp
-  buffer_cents: c(100_000), //                    A.1, 200bp
-  win_day_floor_cents: c(15_000), //              A.1, 30bp
-  payout_cap_schedule_cents: [{ from_ordinal: 1, cap_cents: c(150_000) }], // A.1, 300bp
-  daily_loss_limit_cents: null, //                A.1 daily loss limit: none
-  floor_lock_enabled: true,
-  floor_lock_at_profit_cents: c(260_000), //      A.1, = drawdown + 10,000 by CV-12
-  floor_lock_floor_at_cents: c(5_010_000), //     A.1 locked floor, size + 10,000
-};
-
-function coreRules(
-  over: {
-    evalPhase?: Partial<PublishedEvalPhase>;
-    funded?: Partial<PublishedFundedPhase>;
-  } = {},
-): PlanRulesJson {
-  return {
-    schema_version: 1,
-    phase_eval: { ...CORE_EVAL, ...over.evalPhase },
-    phase_funded: { ...CORE_FUNDED, ...over.funded },
-  };
-}
-
-const coreSize = (over: Partial<PlanVersionSizeRow> = {}): PlanVersionSizeRow => ({
-  ...CORE_50K,
-  ...over,
-});
+import {
+  CORE_50K_SIZE,
+  CORE_EVAL,
+  CORE_FUNDED,
+  DIRECT_50K_SIZE,
+  DIRECT_RULES,
+  RAPID_50K_SIZE,
+  RAPID_RULES,
+  c,
+  coreRules,
+  coreSize,
+} from './published-plans-in-code.js';
 
 /** The whole lineup's shape: one rules jsonb, N size rows. */
 const check = (
@@ -156,73 +95,15 @@ const check = (
 const idsOf = (r: ValidationResult): readonly CvId[] => r.errors.map((e) => e.id);
 const diffIds = (r: ValidationResult): readonly PwId[] => r.diffs.map((d) => d.id);
 
-// -----------------------------------------------------------------------------
-// Appendix A.2: Merit Rapid at 50K, and A.3: Direct at 50K
-// -----------------------------------------------------------------------------
-// TWO MORE PLANS BECAUSE A.4 CHECKS THREE, and because each carries a case the
-// Core row cannot: Merit Rapid is the only plan with an ENABLED EVAL
-// CONSISTENCY (CV-06 on the eval phase) and the only PW-02b; Direct is the only
-// plan with a DISABLED EVAL PHASE (CV-03's precondition false) and a drawdown
-// that is not 500bp.
-
-const RAPID_RULES: PlanRulesJson = {
-  schema_version: 1,
-  phase_eval: {
-    ...CORE_EVAL,
-    min_trading_days: 2, //                       A.2 eval minimum trading days
-    consistency: { enabled: true, max_day_share_bp: 3000, mode: 'pass_time_dilutable' }, // A.2
-  },
-  phase_funded: {
-    ...CORE_FUNDED,
-    win_days: { required_count: 3, floor_bp: 30, reset_on_payout: true }, // A.2, ADR-018 w=3
-    consistency: { enabled: true, max_day_share_bp: 4000, mode: 'payout_gated' }, // A.2
-    cadence_gap_trading_days: 1, //               A.2, dominated by the win-day gate
-    payout_cap_schedule: [{ from_ordinal: 1, cap_bp: 200 }], // A.2 payout cap
-  },
-};
-
-const RAPID_50K: PlanVersionSizeRow = {
-  ...CORE_50K,
-  payout_cap_schedule_cents: [{ from_ordinal: 1, cap_cents: c(100_000) }], // A.2, 200bp
-};
-
-const DIRECT_RULES: PlanRulesJson = {
-  schema_version: 1,
-  phase_eval: {
-    ...CORE_EVAL,
-    enabled: false, //                            A.3 eval phase: disabled
-    drawdown: { ...CORE_EVAL.drawdown, amount_bp: 400 }, // matched to funded, see MZ-per-phase
-  },
-  phase_funded: {
-    ...CORE_FUNDED,
-    drawdown: {
-      type: 'trailing_eod',
-      amount_bp: 400, //                          A.3 funded drawdown
-      lock: { enabled: true, at_profit_cents: null, floor_at_cents: null },
-    },
-    consistency: { enabled: true, max_day_share_bp: 2500, mode: 'payout_gated' }, // A.3
-    buffer_bp: 300, //                            A.3 buffer
-    max_payouts: 4, //                            A.3 ladder, set to 4 at the FREEZE gate
-  },
-};
-
-const DIRECT_50K: PlanVersionSizeRow = {
-  ...CORE_50K,
-  drawdown_cents: c(200_000), //                  A.3, 400bp
-  profit_target_cents: null, //                   A.3: no evaluation, so no target
-  buffer_cents: c(150_000), //                    A.3, 300bp
-  floor_lock_at_profit_cents: c(210_000), //      A.3, = 200,000 + 10,000 by CV-12
-};
-
 // =============================================================================
 // Appendix A.4, the validation walk of the approved lineup
 // =============================================================================
 
 describe('Appendix A.4  the approved lineup publishes', () => {
   it.each([
-    ['Core EOD 50K', coreRules(), CORE_50K],
-    ['Merit Rapid 50K', RAPID_RULES, RAPID_50K],
-    ['Direct 50K', DIRECT_RULES, DIRECT_50K],
+    ['Core EOD 50K', coreRules(), CORE_50K_SIZE],
+    ['Merit Rapid 50K', RAPID_RULES, RAPID_50K_SIZE],
+    ['Direct 50K', DIRECT_RULES, DIRECT_50K_SIZE],
   ])('%s passes every CV rule and every materialization check', (_name, rules, size) => {
     const result = validatePlan(rules, [size]);
     expect(result.errors).toEqual([]);
@@ -239,9 +120,9 @@ describe('Appendix A.4  the approved lineup publishes', () => {
   //                   Merit Rapid: not fired (100,000 = 100,000)
   //                   Direct: not fired (150,000 = 150,000)
   it.each([
-    ['Core EOD 50K', coreRules(), CORE_50K, ['PW-01', 'PW-02a', 'PW-03']],
-    ['Merit Rapid 50K', RAPID_RULES, RAPID_50K, ['PW-01', 'PW-02b']],
-    ['Direct 50K', DIRECT_RULES, DIRECT_50K, ['PW-01', 'PW-02a']],
+    ['Core EOD 50K', coreRules(), CORE_50K_SIZE, ['PW-01', 'PW-02a', 'PW-03']],
+    ['Merit Rapid 50K', RAPID_RULES, RAPID_50K_SIZE, ['PW-01', 'PW-02b']],
+    ['Direct 50K', DIRECT_RULES, DIRECT_50K_SIZE, ['PW-01', 'PW-02a']],
   ])('%s emits exactly A.4 publish diff', (_name, rules, size, expected) => {
     expect([...diffIds(validatePlan(rules, [size]))].sort()).toEqual([...expected].sort());
   });
@@ -250,13 +131,13 @@ describe('Appendix A.4  the approved lineup publishes', () => {
     // "The `cap > buffer` warning firing on Core EOD alone is the plain statement
     // that a Core trader's first extraction takes more out than the cushion the
     // plan leaves behind." A strict `>`: Rapid and Direct tie and do not fire.
-    expect(diffIds(validatePlan(coreRules(), [CORE_50K]))).toContain('PW-03');
-    expect(diffIds(validatePlan(RAPID_RULES, [RAPID_50K]))).not.toContain('PW-03');
-    expect(diffIds(validatePlan(DIRECT_RULES, [DIRECT_50K]))).not.toContain('PW-03');
+    expect(diffIds(validatePlan(coreRules(), [CORE_50K_SIZE]))).toContain('PW-03');
+    expect(diffIds(validatePlan(RAPID_RULES, [RAPID_50K_SIZE]))).not.toContain('PW-03');
+    expect(diffIds(validatePlan(DIRECT_RULES, [DIRECT_50K_SIZE]))).not.toContain('PW-03');
   });
 
   it('a publish diff never blocks, which is what separates it from a CV rule', () => {
-    const result = validatePlan(coreRules(), [CORE_50K]);
+    const result = validatePlan(coreRules(), [CORE_50K_SIZE]);
     expect(result.diffs.length).toBeGreaterThan(0);
     expect(result.ok).toBe(true);
   });
@@ -693,7 +574,7 @@ describe('the version, not one size', () => {
       floor_lock_at_profit_cents: c(260_000), //  A.1 says 760,000 at this size
       floor_lock_floor_at_cents: c(15_010_000),
     });
-    const result = check(coreRules(), [CORE_50K, bad150k]);
+    const result = check(coreRules(), [CORE_50K_SIZE, bad150k]);
     expect(result.ok).toBe(false);
 
     const cv12 = result.errors.filter((e) => e.id === 'CV-12');
@@ -702,7 +583,7 @@ describe('the version, not one size', () => {
   });
 
   it('a rules-level violation is reported once, not once per size', () => {
-    const result = check(coreRules({ funded: { split_bp: 0 } }), [CORE_50K, coreSize()]);
+    const result = check(coreRules({ funded: { split_bp: 0 } }), [CORE_50K_SIZE, coreSize()]);
     expect(result.errors.filter((e) => e.id === 'CV-13')).toHaveLength(1);
     expect(result.errors.filter((e) => e.id === 'CV-13')[0]!.sizeCents).toBeNull();
   });
@@ -727,7 +608,7 @@ describe('the version, not one size', () => {
 
     // The transcribed 50K and 150K rows must equal what the bp figures produce,
     // or Appendix A's own arithmetic is wrong somewhere.
-    expect(at(5_000_000)).toEqual(CORE_50K);
+    expect(at(5_000_000)).toEqual(CORE_50K_SIZE);
     expect(at(15_000_000).floor_lock_at_profit_cents).toBe(c(760_000)); // A.1's 150K column
 
     const result = validatePlan(coreRules(), sizes);
@@ -868,9 +749,9 @@ const SEEDS: Record<CvId, { rules: PlanRulesJson; size: PlanVersionSizeRow }> = 
 
 describe('RE-C-oracle  the engine and the independent transcription agree', () => {
   it('the lineup is clean under the oracle too', () => {
-    expect(oracleValidatePlan(toMaterialized(coreRules(), CORE_50K))).toEqual([]);
-    expect(oracleValidatePlan(toMaterialized(RAPID_RULES, RAPID_50K))).toEqual([]);
-    expect(oracleValidatePlan(toMaterialized(DIRECT_RULES, DIRECT_50K))).toEqual([]);
+    expect(oracleValidatePlan(toMaterialized(coreRules(), CORE_50K_SIZE))).toEqual([]);
+    expect(oracleValidatePlan(toMaterialized(RAPID_RULES, RAPID_50K_SIZE))).toEqual([]);
+    expect(oracleValidatePlan(toMaterialized(DIRECT_RULES, DIRECT_50K_SIZE))).toEqual([]);
   });
 
   it.each(Object.keys(SEEDS) as CvId[])('%s fires in both validators', (id) => {

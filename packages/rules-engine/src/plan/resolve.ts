@@ -76,6 +76,17 @@ function resolveDrawdownType(published: PublishedDrawdown['type'], phase: string
  * from one place and its two values from another is how the two copies drift
  * apart without anybody noticing; `validatePlan`'s `MZ-lock-flag` is what holds
  * them together before either reaches this function.
+ *
+ * SO BOTH RESOLVED PHASES CARRY THE SAME LOCK, AND THE EVAL PHASE LOCKING IS
+ * RULED RATHER THAN INFERRED. There is one `floor_lock_enabled` column and
+ * `0004_catalog.sql` names its source as `phase_funded.drawdown.lock.enabled`,
+ * so the eval phase's own `lock` block in the jsonb is never read. That the eval
+ * floor nonetheless locks is ADR-050's arithmetic: "the lock triggers at
+ * 260,000c of profit and the eval target is 300,000c, so EVERY v1 eval pass is
+ * also a lock day", and GS-019's eval floor of 5,150,000c on the pass day is
+ * computed from exactly that. DATA_MODEL section 11's example carries
+ * `phase_eval ... lock.enabled: false`, which is a field nothing materializes
+ * and nothing reads; the disagreement is reported rather than folded.
  */
 function resolveLock(size: PlanVersionSizeRow): FloorLockRules {
   if (!size.floor_lock_enabled) return { enabled: false };
