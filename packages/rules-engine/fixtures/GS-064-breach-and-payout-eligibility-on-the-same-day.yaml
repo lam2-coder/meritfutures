@@ -1,0 +1,147 @@
+# GS-064  Breach and payout eligibility on the same day
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "Breach wins. An eligibility that existed at the previous close does not
+#   survive the breach check"                       GOLDEN_SCENARIOS GS-064 row
+#   "Breach beats everything on the same day. Ordering law DO-4 before DO-8.
+#   No `phase.passed`, NO ELIGIBILITY, no graduation"                 M01 R-25
+#   "Breach is terminal and immediate. Phase to `closed`, no further state is
+#   ever written for the account"                            M01 R-24, INV-12
+#   floor breach  `low_balance_cents < floorOpenCents`, STRICT `<`     M01 R-21
+#   "The breach comparator is the floor AT THE OPEN. `floorOpenCents =
+#   prior.floorCents`. Trailing happens at DO-7, strictly after the breach
+#   check at DO-4"                                                    M01 R-18
+#   initial floor  `size_cents - drawdown_cents` at account open      M01 R-12
+#   trailing floor  `hwb' = max(hwb, closing)`, `floor' = hwb' - drawdown`
+#                                                                     M01 R-13
+#   traded day  `fill_count > 0`, strict `>`                          M01 R-08
+#   win day     `realized_pnl_cents >= win_day_floor_cents`, `>=`     M01 R-09
+#   withdrawable  `max(0, balance - size - buffer)`                   M01 R-35
+#   win days required 3, cadence gap 1 trading day, funded consistency
+#   4000bp, funded min trading days 0, win day floor 15,000c, buffer
+#   100,000c, payout cap 100,000c, min payout 10,000c, funded drawdown
+#   250,000c, lock at profit 260,000c        M01 Appendix A.2 at 50K
+#
+# THE PLAN IS MERIT RAPID AND THAT IS THE WHOLE REASON THIS FIXTURE FITS. This
+# directory's held-back table recorded GS-064 as "reachable in principle and not
+# inside five sessions", because eligibility "is six trading days after the
+# win-day gate is satisfied". THAT IS TRUE OF CORE EOD AND ONLY OF CORE EOD.
+# Appendix A.1 requires 5 win days, so the cheapest eligible close is day five
+# and the breach lands on day six, one session past what `cme-2026.json`
+# declares. Appendix A.2 requires THREE. The cheapest eligible close is day
+# three and the breach lands on day four, and the calendar has had room for it
+# since `MERIT-RAPID-50K.json` was transcribed in batch 2.
+#
+# THE THREE DAYS ARE THE CHEAPEST ELIGIBLE PATH ON THIS PLAN, and each gate's
+# binding number is stated so that removing a day breaks a NAMED gate:
+#
+#   win days        each 40,000 >= the 15,000c floor       =  3, gate needs 3
+#   traded days     each day has fills                     =  3, gate needs 0
+#   buffer          5,120,000 - 5,000,000 = 120,000        >= 100,000c
+#   consistency     40,000 * 10000  =   400,000,000
+#                   4000   * 120,000 =  480,000,000        `<=` holds, 3333bp
+#   withdrawable    5,120,000 - 5,000,000 - 100,000        =  20,000c
+#   minimum payout  min(20,000, cap 100,000) = 20,000      >= 10,000c
+#   cadence gap     no anchor exists, so it is skipped     R-37, passes trivially
+#
+# So at the close of 2026-11-04 EVERY ENGINE GATE PASSES. That is the
+# antecedent the scenario's row states, and the fourth day is what happens to it.
+#
+# DAY FOUR IS BUILT SO THAT NOTHING EXCEPT THE BREACH COULD HAVE ENDED THE
+# ELIGIBILITY. Its close is 5,140,000, higher than day three's. Its realized
+# P&L is 20,000c, which is above the 15,000c win floor, so it is a win day. It
+# has fills, so it is a traded day. Had DO-6 through DO-9 run, win days would be
+# 4, traded days 4, the withdrawable 40,000c and the consistency share 400,000,000
+# against 560,000,000: every gate would pass MORE comfortably than the day
+# before. The only thing wrong with the day is that its LOW is one cent under
+# the floor the day opened against.
+#
+#   floor at the open of day four   5,120,000 - 250,000  =  4,870,000c   R-13, R-18
+#   day four's low                                          4,869,999c
+#   R-21 is a strict `<`                    4,869,999 < 4,870,000 is TRUE
+#
+# GS-013 AND GS-014 OWN THAT ONE CENT AT THE INITIAL FLOOR AND THIS FIXTURE
+# CARRIES IT TO A TRAILED FLOOR. The pair is not restated here; what is new is
+# that the floor being compared against was produced by three days of trailing
+# rather than by R-12, so a breach comparator reading `size - drawdown` instead
+# of `prior.floorCents` misses this breach entirely and the account survives.
+#
+# THE LOCK NEVER ENGAGES AND THE ACCOUNT NEVER PASSES AN EVAL, WHICH IS WHY THIS
+# FIXTURE MAY PIN A FLOOR AT ALL. Profit tops out at 120,000c against a 260,000c
+# lock trigger, so section 3.4's `max` and section 3.6's assignment agree
+# vacuously and there is one reading of the floor. No eval pass means INV-07 is
+# not touched either. GS-055 is the only other fixture in this directory that can
+# say both.
+#
+# THE ACCOUNT IS FUNDED FROM DAY ONE, on GS-025's and GS-055's terms.
+# `account.phase` is on the loader's `AWAITING_M01_INPUT` list (L-09) and reaches
+# no engine input yet, so a fold that begins in `eval` fails this fixture on the
+# pinned phase rather than passing quietly. Eligibility is a FUNDED concept: the
+# buffer, the cap and the win-day gate only mean anything after R-31 has run.
+#
+# ADR-048 POLARITY: DIRECT. Every rule cited (R-08, R-09, R-12, R-13, R-18,
+# R-21, R-24, R-25, R-35) is in the engine's declared `IMPLEMENTED_RULES` set.
+# The derivation is not wired yet; the citation is written to be resolvable now.
+#
+# R-33, R-34, R-36, R-37, R-39 AND R-41 ARE DELIBERATELY NOT CITED. They are the
+# gates that make day three eligible, and a citation is an assertion about what
+# the EXPECTATION depends on rather than a bibliography (GS-061's rule). The
+# expectation is day four's state, and `engine_eligible: false` there is written
+# by DO-4's breach block under R-24 and R-25, not by any gate's verdict. What the
+# gates contribute is pinned through their INPUTS, which R-08, R-09 and R-35 own.
+id: GS-064
+name: breach and payout eligibility on the same day
+source: M01 R-08, R-09, R-12, R-13, R-18, R-21, R-24, R-25, R-35
+plan: MERIT-RAPID-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-02
+  size_cents: 5000000
+days:
+  # Win day one. Floor at the open is R-12's 4,750,000c; the low clears it.
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5040000
+    high_balance_cents: 5045000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 40000
+    fill_count: 4
+    traded_day: true
+    adjustment_cents: 0
+  # Win day two. The floor has trailed to 4,790,000c and the low clears it by
+  # 10,000c, which is deliberate: this stream breaches on day four and nowhere
+  # else.
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5040000
+    closing_balance_cents: 5080000
+    high_balance_cents: 5085000
+    low_balance_cents: 4800000
+    realized_pnl_cents: 40000
+    fill_count: 4
+    traded_day: true
+    adjustment_cents: 0
+  # Win day three. THE ACCOUNT IS ELIGIBLE AT THIS CLOSE. Every gate's binding
+  # number is in the header block above.
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5080000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5125000
+    low_balance_cents: 5075000
+    realized_pnl_cents: 40000
+    fill_count: 4
+    traded_day: true
+    adjustment_cents: 0
+  # The breach. A traded win day that closes at a new high, whose low is one
+  # cent below the 4,870,000c floor it opened against.
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5140000
+    high_balance_cents: 5145000
+    low_balance_cents: 4869999
+    realized_pnl_cents: 20000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+settlements: []
