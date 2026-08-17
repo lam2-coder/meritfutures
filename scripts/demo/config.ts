@@ -182,8 +182,12 @@ const STEADY: Cohort = {
     // count advances slowly for a reason that is not about the rules.
     tradeRateBasisPoints: { min: 10_000, max: 10_000 },
     tradesPerDayMax: { min: 2, max: 3 },
-    quantityMax: { min: 2, max: 3 },
-    driftTicks: { min: 2, max: 4 },
+    quantityMax: { min: 3, max: 5 },
+    // The drift is what makes the run long enough to be interesting and short
+    // enough to watch. A Core EOD account clears a 300,000c target and then five
+    // win days at a 15,000c floor, so a cohort drifting a tick a day would need
+    // a window nobody reads.
+    driftTicks: { min: 4, max: 6 },
     volatilityTicks: { min: 2, max: 4 },
     liquidationSlippageTicks: { min: 0, max: 0 },
   },
@@ -209,7 +213,39 @@ const RISK_SEEKING: Cohort = {
   },
 };
 
-export const COHORTS: readonly Cohort[] = Object.freeze([STEADY, RISK_SEEKING]);
+/**
+ * Climbs, then gives it back. THIS COHORT EXISTS FOR ONE OUTPUT LINE.
+ *
+ * Merit's floor TRAILS with the high-water balance (R-13) and the setpoint the
+ * platform enforces was pushed once, at open, at `size - drawdown`. So the two
+ * diverge the moment an account is profitable, and an account that climbs and
+ * then falls back can break Merit's floor at a balance the platform is still
+ * perfectly happy with: a breach with NO auto-liquidation record behind it.
+ *
+ * `steady` never falls far enough to show that and `risk-seeking` never climbs
+ * far enough, so without this cohort the demo would print the liquidated breach
+ * only and a reader would come away believing a breach always has vendor
+ * evidence. AS-M2-03 is the case where it does not, and it is a question for M02
+ * (how often is the setpoint re-pushed?) rather than a defect in either package.
+ */
+const SWING: Cohort = {
+  label: 'swing',
+  intent:
+    'climbs, then gives it back. Expected to breach a TRAILED floor the platform setpoint is nowhere near',
+  accountRefPrefix: 'DEMOSWNG',
+  userRefPrefix: 'DEMOUSR',
+  firstRefOrdinal: 250_001,
+  behaviour: {
+    tradeRateBasisPoints: { min: 10_000, max: 10_000 },
+    tradesPerDayMax: { min: 2, max: 4 },
+    quantityMax: { min: 6, max: 9 },
+    driftTicks: { min: 0, max: 1 },
+    volatilityTicks: { min: 9, max: 14 },
+    liquidationSlippageTicks: { min: 0, max: 1 },
+  },
+};
+
+export const COHORTS: readonly Cohort[] = Object.freeze([STEADY, SWING, RISK_SEEKING]);
 
 /**
  * The population spec for one cohort, at one seed, for one account count.
