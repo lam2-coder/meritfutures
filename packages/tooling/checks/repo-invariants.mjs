@@ -38,6 +38,7 @@
 // =============================================================================
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { builtinModules } from 'node:module';
 import { join, dirname, resolve, extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -521,7 +522,224 @@ const ri06 = {
   },
 };
 
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06];
+// -----------------------------------------------------------------------------
+// RI-07  The engine's TRANSITIVE module graph reaches no Node builtin
+// -----------------------------------------------------------------------------
+// M01 SECTION 1.4's `RE-D-03`, WHICH IS A NAMED MERGE BLOCKER AND WAS NOT IN THE
+// TREE: "`RE-D-03` is a dependency-graph assertion that the package's TRANSITIVE
+// imports contain no Node builtins. All three are merge blockers."
+//
+// IT LANDS BESIDE RI-01 BECAUSE IT IS A REPO INVARIANT BY CONSTRUCTION and the
+// manifest half of the same boundary already lives here.
+//
+// -----------------------------------------------------------------------------
+// WHAT THE THREE EXISTING MECHANISMS CANNOT SEE, WHICH IS WHY THIS IS NOT A
+// FOURTH SPELLING OF THEM
+// -----------------------------------------------------------------------------
+// The hole is concrete rather than theoretical, and it was verified on this tree
+// before the check was written:
+//
+//   RI-01                 reads the MANIFEST. Its own `covers` says "It does NOT
+//                         read the source"
+//   merit/engine-purity   reads ONE FILE AT A TIME, and returns early on every
+//                         relative specifier: `if (source.startsWith('.')) return`
+//   eslint.config.js      attaches that rule to `packages/rules-engine/src/**/*.ts`
+//                         and to nothing else
+//   tsconfig `types: []`  removes the ambient DECLARATIONS, so `process` and
+//                         `Buffer` do not exist. It does not stop an explicit
+//                         `import { readFileSync } from 'node:fs'`
+//
+// So a file at `packages/rules-engine/impure/x.ts` that imports `node:crypto`,
+// imported from `src/index.ts` as `../impure/x.js`, is INVISIBLE TO ALL FOUR AT
+// ONCE: the specifier is relative so the lint rule returns early, the file is
+// outside the glob so it is never linted itself, and no manifest entry appears
+// so RI-01 stays green. That file is the seeded violation this check ships with
+// in `scripts/ci/falsify-ci.mjs`, and that case asserts CI-01's other gates stay
+// GREEN on it, which is what proves this check is additive.
+//
+// Walking the graph is the only way to see it, because the defect is a PATH and
+// not a line.
+
+/** Node's own list, so a builtin added by a future release is covered without an edit. */
+const NODE_BUILTINS = new Set(
+  builtinModules.flatMap((m) => [m, `node:${m}`]).concat(builtinModules.map((m) => `node:${m}`)),
+);
+
+/**
+ * Source with comments removed, so a specifier quoted inside a header block is
+ * not read as an import.
+ *
+ * These files carry more prose than code and several headers quote real import
+ * lines while explaining them, so scanning the raw text would report findings
+ * against sentences. The `[^:]` guard keeps `https://` out of the line-comment
+ * pattern.
+ */
+/**
+ * @param {string} source
+ * @returns {string}
+ */
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
+
+/**
+ * Every statically written module specifier in one file, in source order.
+ *
+ * @param {string} source
+ * @returns {string[]}
+ */
+function specifiersIn(source) {
+  const code = stripComments(source);
+  /** @type {string[]} */
+  const out = [];
+  for (const re of [
+    // `import ... from 'x'` and `export ... from 'x'`.
+    /\bfrom\s*['"]([^'"]+)['"]/g,
+    // `import 'x'`, the side-effect form.
+    /\bimport\s+['"]([^'"]+)['"]/g,
+    // `import('x')` with a literal argument. A specifier BUILT AT RUNTIME is
+    // invisible here and the `covers` line says so.
+    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  ]) {
+    let m;
+    while ((m = re.exec(code)) !== null) {
+      if (m[1] !== undefined) out.push(m[1]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Resolve a relative specifier the way this workspace publishes source.
+ *
+ * Every package here sets `"exports": { ".": "./src/index.ts" }` and nothing is
+ * built by `tsc`, so TypeScript's `./x.js` convention names a file that is
+ * actually `x.ts` on disk. `scripts/demo/ts-resolve.mjs` solves the same problem
+ * for Node at runtime; this is the static half of it.
+ *
+ * @param {string} fromFile
+ * @param {string} specifier
+ * @returns {string | null}
+ */
+function resolveRelative(fromFile, specifier) {
+  const base = resolve(dirname(fromFile), specifier);
+  const candidates = [];
+  if (/\.(js|mjs|cjs)$/.test(base)) {
+    candidates.push(base.replace(/\.(js|mjs|cjs)$/, '.ts'), base.replace(/\.js$/, '.mts'), base);
+  } else if (/\.(ts|mts)$/.test(base)) {
+    candidates.push(base);
+  } else {
+    candidates.push(`${base}.ts`, `${base}.mts`, `${base}.js`, join(base, 'index.ts'));
+  }
+  return candidates.find((c) => existsSync(c) && statSync(c).isFile()) ?? null;
+}
+
+/** @type {Invariant} */
+const ri07 = {
+  id: 'RI-07',
+  title: "packages/rules-engine's transitive module graph reaches no Node builtin",
+  covers:
+    "M01 section 1.4's RE-D-03: it walks the module graph from " +
+    'packages/rules-engine/src/index.ts, follows every relative import to the ' +
+    'file it names, and reports three things: a reached file OUTSIDE ' +
+    'packages/rules-engine/src (which no other mechanism can see, because ' +
+    'merit/engine-purity returns early on a relative specifier and is attached ' +
+    'only to that glob), a Node builtin anywhere in the closure, and a bare ' +
+    'specifier that is neither. It reads STATIC specifiers and literal ' +
+    "`import('...')` only, from source with comments stripped: a specifier BUILT " +
+    "AT RUNTIME is invisible to it and is the property suites' and the replay " +
+    "self-audit's to catch, which is the same division merit/engine-purity's own " +
+    'header draws. It does not read the manifest; that is RI-01.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const entry = join(root, 'packages/rules-engine/src/index.ts');
+    if (!existsSync(entry)) {
+      throw new Error(`packages/rules-engine/src/index.ts does not exist; RI-07 cannot run`);
+    }
+
+    const srcRoot = join(root, 'packages/rules-engine/src');
+    const seen = new Set();
+    /** @type {Array<{file: string, via: string[]}>} */
+    const queue = [{ file: entry, via: [] }];
+    let walked = 0;
+
+    while (queue.length > 0) {
+      const next = queue.shift();
+      if (next === undefined) break;
+      const { file, via } = next;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      walked++;
+
+      const rel = file.startsWith(root) ? file.slice(root.length + 1) : file;
+      const trail = via.length === 0 ? 'the entry point' : `${via.join(' -> ')} -> ${rel}`;
+
+      for (const spec of specifiersIn(readFileSync(file, 'utf8'))) {
+        if (NODE_BUILTINS.has(spec)) {
+          findings.push(
+            `${rel} imports the Node builtin \`${spec}\`. M01 INV-01: "The engine ` +
+              'performs no I/O and reads no clock", enforced by RE-D-01, RE-D-03 and ' +
+              `ESLint. Reached by: ${trail}`,
+          );
+          continue;
+        }
+
+        if (!spec.startsWith('.')) {
+          findings.push(
+            `${rel} imports \`${spec}\`, which is neither relative nor a Node builtin. ` +
+              'An external package reached from engine source resolves anyway under a ' +
+              'hoisted layout, with no manifest entry for RI-01 to find. ' +
+              `Reached by: ${trail}`,
+          );
+          continue;
+        }
+
+        const target = resolveRelative(file, spec);
+        if (target === null) {
+          findings.push(
+            `${rel} imports \`${spec}\`, which resolves to no file on disk. RI-07 ` +
+              'cannot walk what it cannot find, and a check that silently stopped ' +
+              `walking would report PASS for a subgraph it never read. Reached by: ${trail}`,
+          );
+          continue;
+        }
+
+        // THE FINDING NO OTHER MECHANISM PRODUCES. A relative import that leaves
+        // `src/` leaves the region `merit/engine-purity` is attached to, so
+        // everything the escaped file imports is unlinted.
+        if (!target.startsWith(srcRoot + '/')) {
+          const targetRel = target.startsWith(root) ? target.slice(root.length + 1) : target;
+          findings.push(
+            `${rel} imports \`${spec}\`, which resolves to ${targetRel}, OUTSIDE ` +
+              'packages/rules-engine/src. `merit/engine-purity` is attached to ' +
+              '`packages/rules-engine/src/**/*.ts` and returns early on a relative ' +
+              'specifier, so neither this import nor anything the escaped file ' +
+              `imports is linted at all. Reached by: ${trail}`,
+          );
+        }
+
+        queue.push({ file: target, via: [...via, rel] });
+      }
+    }
+
+    // A CHECK THAT WALKED ONE FILE IS NOT A CHECK THAT PASSED. The engine is a
+    // multi-file package (M01 section 1.3 lists thirteen modules), so a graph
+    // walk that reached only the entry point means the specifier scan stopped
+    // matching, not that the engine became a single file.
+    if (walked < 2) {
+      throw new Error(
+        `RI-07 walked ${walked} file(s) from src/index.ts. The engine is a multi-file ` +
+          'package, so this means the specifier scan matched nothing and the check is ' +
+          'asserting about a graph it did not read',
+      );
+    }
+
+    return findings;
+  },
+};
+
+export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07];
 
 function main() {
   const [arg] = process.argv.slice(2);
