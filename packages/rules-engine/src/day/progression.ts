@@ -152,7 +152,7 @@ export function advanceEvalProgression(input: ProgressionInput): ProgressionOutc
     }
 
     // Inclusive of the opening day: see the fencepost note above.
-    const elapsedTradingDays = counted.tradingDays;
+    const elapsedTradingDays = counted.tradingDays + 1;
     if (elapsedTradingDays > evalRules.maxDays) {
       return {
         kind: 'expired',
