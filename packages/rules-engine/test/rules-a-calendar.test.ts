@@ -82,19 +82,30 @@ test(reU('R-01'), () => {
   // boundary is unreachable from here, and the reason it is unreachable is the
   // assertion: no value the fold reads carries an instant for a cast to be
   // applied to.
-  const fields: readonly (keyof DailyMark)[] = [
-    'tradingDay',
-    'openingBalanceCents',
-    'closingBalanceCents',
-    'highBalanceCents',
-    'lowBalanceCents',
-    'realizedPnlCents',
-    'adjustmentCents',
-    'fillCount',
-    'sourceHash',
-  ];
+  // THE ASSERTION IS COMPILE-TIME FIRST AND RUNTIME SECOND, and the order
+  // matters. `Object.keys` sees what the FIXTURE constructed, so a field added
+  // to `DailyMark` and left unset by `mark()` would slip straight past it; the
+  // record below is over `keyof DailyMark`, so adding one is a missing-property
+  // error and removing one is an excess-property error. That is
+  // `PlanConfigVersionIsClosed`'s idiom, one directory over, and it is what makes
+  // this rule's mutant a real gate rather than a fixture edit.
+  const DAILY_MARK_FIELDS: Record<keyof DailyMark, true> = {
+    tradingDay: true,
+    openingBalanceCents: true,
+    closingBalanceCents: true,
+    highBalanceCents: true,
+    lowBalanceCents: true,
+    realizedPnlCents: true,
+    adjustmentCents: true,
+    fillCount: true,
+    sourceHash: true,
+  };
   const sample = mark(WIN_DAY);
-  expect(Object.keys(sample).sort()).toEqual([...fields].sort());
+  expect(Object.keys(sample).sort()).toEqual(Object.keys(DAILY_MARK_FIELDS).sort());
+
+  // NONE OF THE NINE IS AN INSTANT, which is the sentence the record above makes
+  // checkable. Eight are the day's arithmetic and the ninth is a source hash.
+  expect(Object.keys(DAILY_MARK_FIELDS)).toHaveLength(9);
 
   // THE MARK CARRIES A COUNT OF FILLS AND NOT ONE FILL. R-08 is `fill_count > 0`
   // and that is the whole of what the engine knows about them, so the assignment
@@ -249,10 +260,19 @@ test(reU('R-05'), () => {
   // calculation". `CalendarDay` is the engine's view of that table and it holds
   // NEITHER COLUMN, which is what makes the conversion unwritable here rather
   // than merely unwritten.
-  const fields: readonly (keyof CalendarDay)[] = ['tradingDay', 'isHalfDay', 'halted', 'sequence'];
+  // COMPILE-TIME FIRST, for RE-U-001's reason: a `session_open_at` added to
+  // `CalendarDay` is the exact change that would make R-05 an engine rule, and a
+  // runtime key check over a fixture would not see it arrive.
+  const CALENDAR_DAY_FIELDS: Record<keyof CalendarDay, true> = {
+    tradingDay: true,
+    isHalfDay: true,
+    halted: true,
+    sequence: true,
+  };
   const sample = CME_WINDOW.days[0];
   expect(sample).toBeDefined();
-  expect(Object.keys(sample ?? {}).sort()).toEqual([...fields].sort());
+  expect(Object.keys(sample ?? {}).sort()).toEqual(Object.keys(CALENDAR_DAY_FIELDS).sort());
+  expect(Object.keys(CALENDAR_DAY_FIELDS)).toHaveLength(4);
 
   // THE BOUNDARY R-05 IS ABOUT IS THE DST TRANSITION, where the CT wall clock
   // holds still and the UTC instant moves by an hour. Both sides of it are

@@ -27,7 +27,7 @@ import { expect, test } from 'vitest';
 
 import { advanceDay } from '../src/day/advance.js';
 import { isTradedDay, isWinDay } from '../src/day/counters.js';
-import type { CalendarDay, DayOutput } from '../src/types.js';
+import type { CalendarDay, DailyMark, DayOutput } from '../src/types.js';
 import {
   CME_WINDOW,
   CORE_50K,
@@ -228,12 +228,26 @@ test(reU('R-10'), () => {
 
   // SIDE ONE: at the open. The opening balance is 150,000c below the prior
   // balance, the identity holds, and the day folds.
-  const atTheOpen = foldRaw({
-    priorBalanceCents: 5_000_000n,
-    adjustmentCents: withdrawal,
-    openingBalanceCents: 4_850_000n,
-    realizedPnlCents: 20_000n,
-    closingBalanceCents: 4_870_000n,
+  //
+  // THE MARK IS BUILT BY `mark()` RATHER THAN BY `foldRaw`, and the reason is
+  // this test's own subject. `foldRaw` pins `lowBalanceCents` at a constant
+  // 4,900,000c, which sits ABOVE an opening of 4,850,000c: a day whose low is
+  // above its open is a day that cannot occur, and asserting "the extraction is
+  // already behind the low" against one would be asserting it against a fixture
+  // rather than against the rule. `mark()` derives the low from the open and the
+  // close, so the day below is one an exchange could have produced.
+  const atTheOpen = advanceDay({
+    engineVersion: ENGINE_VERSION,
+    plan: CORE_50K,
+    prior: fundedPrior(CORE_50K, { balanceCents: 5_000_000n }),
+    mark: mark({
+      tradingDay: day('2026-11-03'),
+      openingBalanceCents: 4_850_000n,
+      realizedPnlCents: 20_000n,
+      adjustmentCents: withdrawal,
+    }),
+    calendar: CME_WINDOW,
+    settlements: [],
   });
   expect(atTheOpen.assertions).toEqual([]);
   expect(atTheOpen.state.balanceCents).toBe(4_870_000n);
@@ -243,7 +257,8 @@ test(reU('R-10'), () => {
   // opens where the prior balance was and closes 150,000c lower than its own
   // realized P&L accounts for, and DO-3 refuses on both identities: the opening
   // is short of `prior + adjustment` and the closing is short of `opening +
-  // realized_pnl`.
+  // realized_pnl`. This one is stated field by field on purpose, because a mark
+  // whose identities hold cannot express it.
   const insideTheSession = foldRaw({
     priorBalanceCents: 5_000_000n,
     adjustmentCents: withdrawal,
@@ -262,13 +277,14 @@ test(reU('R-10'), () => {
 
   // AND THIS IS AS-10's COUNTER, WHICH IS WHY THE PLACEMENT IS A MONEY RULE AND
   // NOT A BOOKKEEPING PREFERENCE. `lowBalanceCents` is the breach comparison
-  // input (R-21) and `foldRaw` sets it to 4,900,000c on both folds above. On the
-  // day-of side, a 150,000c extraction that read as an intraday move would drag
-  // the low toward a floor sitting at 4,750,000c; because the movement is at the
-  // open, the low describes the SESSION and the extraction is already behind it.
-  // The account that earned the payout is not breached by taking it (INV-21).
+  // input (R-21). Because the movement lands at the OPEN, the low describes the
+  // session and the extraction is already behind it: 4,850,000c against a floor
+  // of 4,750,000c, so the account that earned the payout is not breached by
+  // taking it (INV-21). Had the same 150,000c been an intraday move, the low
+  // would have been 4,700,000c and the day would have breached.
   expect(atTheOpen.state.breached).toBe(false);
   expect(atTheOpen.state.floorOpenCents).toBe(4_750_000n);
+  expect(4_850_000n - 150_000n).toBeLessThan(atTheOpen.state.floorOpenCents);
 });
 
 // -----------------------------------------------------------------------------
@@ -280,13 +296,21 @@ test(reU('R-11'), () => {
   // the fold and the assertion available here is that the decision cannot be
   // re-made or overridden inside it: `DailyMark` has no field naming a
   // supersession, so there is no branch for a superseded mark to take.
+  // THE ASSERTION IS COMPILE-TIME, for the reason RE-U-001 states: a runtime
+  // `Object.keys` check reads the FIXTURE, so a `supersededBy` added to
+  // `DailyMark` and left unset by `mark()` would not show up in it. `Extract`
+  // over `keyof DailyMark` resolves to `never` while no such field exists and to
+  // the field's own name the moment one does, and `never` is the only thing
+  // assignable to `never`.
+  const noSupersessionField: Extract<keyof DailyMark, 'supersededBy' | 'superseded_by'>[] = [];
+  expect(noSupersessionField).toEqual([]);
+
   const sample = mark({
     tradingDay: day('2026-11-03'),
     openingBalanceCents: 5_000_000n,
     realizedPnlCents: 20_000n,
   });
   expect(Object.keys(sample)).not.toContain('supersededBy');
-  expect(Object.keys(sample)).not.toContain('superseded_by');
 
   // WHAT THE MARK CARRIES INSTEAD IS `sourceHash`, AND THAT IS THE OTHER HALF OF
   // R-11 RATHER THAN A CONSOLATION. "A correction supersedes and REPLAY

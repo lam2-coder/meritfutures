@@ -247,6 +247,79 @@ const CASES = [
       ),
   },
   {
+    id: 'CI-01/engine-R-17',
+    stage: 'CI-01',
+    // R-17's MUTANT LIVES IN THE TYPECHECK STAGE AND NOT IN CI-02's, and the
+    // placement is the finding rather than an inconvenience. Every other engine
+    // rule is asserted by a comparison a unit test can run; R-17 is "config-
+    // supported and UNIMPLEMENTED", so what discharges it is that
+    // `intraday_trailing` cannot be written down. `RE-U-017` asserts that with
+    // `@ts-expect-error`, which vitest cannot evaluate at all -- it runs
+    // transpiled code and a type error is simply gone by then. Widening the
+    // union makes the directive UNUSED, which is a `tsc` error, so the gate that
+    // must be watched failing is CI-01.
+    seeds:
+      "`DrawdownType` widened to admit `intraday_trailing`, which R-17 says is unimplemented and CV-01 rejects at publish. RE-U-017's `@ts-expect-error` goes unused and tsc says so",
+    needles: ['error TS', 'rules-c-floor.test.ts'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/types.ts',
+        (before) =>
+          before.replace(
+            "export type DrawdownType = 'trailing_eod' | 'static';",
+            "export type DrawdownType = 'trailing_eod' | 'static' | 'intraday_trailing';",
+          ),
+        () => run('pnpm', ['--filter', '@merit/rules-engine', 'run', 'typecheck']),
+      ),
+  },
+  {
+    id: 'CI-01/engine-R-05',
+    stage: 'CI-01',
+    // THE MUTANT IS THE ONE CHANGE THAT WOULD MAKE R-05 AN ENGINE RULE. R-05 is
+    // discharged by `CalendarDay` not carrying `trading_calendar`'s two session
+    // instants, so the violation aimed at it is the column arriving. `RE-U-005`
+    // holds a `Record<keyof CalendarDay, true>`, which stops compiling the
+    // moment the interface grows a fifth key, and a transcribed calendar year
+    // adds ROWS rather than columns, so this cannot fire by accident.
+    seeds:
+      '`CalendarDay` widened with a `session_open_at` instant, which is the one change that would put a timezone inside the engine (R-05, B4 #1)',
+    needles: ['error TS', 'rules-a-calendar.test.ts'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/types.ts',
+        (before) =>
+          before.replace(
+            '  /** Dense index into the calendar. Gap counting is subtraction, never date math (R-02). */\n  readonly sequence: number;',
+            '  readonly sessionOpenAt: string;\n  /** Dense index into the calendar. Gap counting is subtraction, never date math (R-02). */\n  readonly sequence: number;',
+          ),
+        () => run('pnpm', ['--filter', '@merit/rules-engine', 'run', 'typecheck']),
+      ),
+  },
+  {
+    id: 'CI-01/engine-R-11',
+    stage: 'CI-01',
+    // R-01 AND R-11 SHARE THIS MUTANT'S TARGET AND ASSERT DIFFERENT THINGS ABOUT
+    // IT, so one edit is watched failing on two rules. `RE-U-001` holds a
+    // `Record<keyof DailyMark, true>` (adding a key is a missing property) and
+    // `RE-U-011` holds an `Extract<keyof DailyMark, 'supersededBy' | ...>[]`
+    // (which resolves from `never` to a real union the moment the field exists).
+    // The needle names both files so a mutant that tripped only one of them is
+    // reported off-target rather than accepted.
+    seeds:
+      '`DailyMark` widened with a `supersededBy` field, so the engine could branch on a mark the caller was supposed to have filtered out (R-11, R-01)',
+    needles: ['error TS', 'rules-a-calendar.test.ts', 'rules-b-marks.test.ts'],
+    run: () =>
+      seededEdit(
+        'packages/rules-engine/src/types.ts',
+        (before) =>
+          before.replace(
+            '  readonly fillCount: number;\n  readonly sourceHash: string;',
+            '  readonly fillCount: number;\n  readonly supersededBy: string | null;\n  readonly sourceHash: string;',
+          ),
+        () => run('pnpm', ['--filter', '@merit/rules-engine', 'run', 'typecheck']),
+      ),
+  },
+  {
     id: 'CI-01/vg4',
     stage: 'CI-01',
     seeds: 'a raw PostgreSQL driver imported by an app, which is VG-4 exactly',
@@ -400,6 +473,19 @@ const CASES = [
       file: 'packages/rules-engine/src/day/advance.ts',
       from: 'if (input.prior !== null && mark.tradingDay <= input.prior.tradingDay) {',
       to: 'if (input.prior !== null && mark.tradingDay < input.prior.tradingDay) {',
+    },
+    {
+      rule: 'R-32',
+      // R-32 IS NOT DECLARED AND ITS REFUSAL IS, so the mutant is aimed at the
+      // refusal: switching it off makes an eval day on a plan carrying
+      // `max_days` fold normally and expire nothing, which is the exact failure
+      // the refusal exists to prevent -- an account traded past its own expiry
+      // with a green state row and nothing anywhere saying so.
+      seeds:
+        'the eval-expiry refusal switched off, so a plan configuring `max_days` folds every day and expires nothing (R-32, G-EXPIRED)',
+      file: 'packages/rules-engine/src/day/progression.ts',
+      from: 'if (evalRules.maxDays !== null) {',
+      to: 'if (false && evalRules.maxDays !== null) {',
     },
     {
       rule: 'R-20',
