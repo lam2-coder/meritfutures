@@ -67,6 +67,10 @@ only 2026 is the worst available outcome**: `trading_calendar_loads` would asser
 knowledge of 2027 and 2028 that nobody has, which is precisely what `F-4` exists to make
 impossible.
 
+**RESOLVED by [ADR-055](../../../../../../docs/decisions/ADR-055.md) section 5, and resolved WITHOUT deciding the premise.** The ruling declines to say how far CME publishes, for exactly the reason stated below, and changes the mechanism instead: **`coverage.to` may not exceed the last date whose exceptions are transcribed from a committed artifact.** That is true whatever CME publishes, so the premise stops mattering, and it is what `F-4` already implies. `OQ-SE-02` is amended on its mechanism, not on its number. **What can honestly be declared today is nothing**, because the holiday list itself has still not been retrieved.
+
+**The original flag is kept below, because the reasoning it records is the reason the ruling went the way it did.**
+
 **This is FLAGGED, NOT RULED.** It is read off a paste, the page carries a date picker and
 a `View: Holidays / Full Calendar` toggle that a paste cannot exercise, and a ruling that
 amends a frozen ADR on the strength of a rendering is the mistake this desk has already
