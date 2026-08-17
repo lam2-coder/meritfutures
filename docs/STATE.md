@@ -936,6 +936,20 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 ---
 
 
+## `CI-06q` is written: a merge-blocking stage cited an authority that did not exist (2026-08-17)
+
+**Two lines in `packages/golden-loader/src/coverage.ts` attributed the deferral of [ADR-048](decisions/ADR-048.md)'s polarity enforcement to a dated ruling by the founder. No such ruling existed** ([session 53](sessions/2026-08-17-session-53.md)). **The behaviour was correct and needed no authority at all**: a derived direction cannot be enforced against a fold that reaches none of the rules a fixture cites, which is a tautology rather than a decision. **The citation was the whole defect**, and nothing in this repository could see it because no gate had ever asked whether a cited ruling exists. `CI-06q` now does, watched failing on its own finding and passing out of scope.
+
+> **THE GATE WOULD NOT HAVE CAUGHT THE DEFECT THAT COMMISSIONED IT, and that is recorded first because it is the part a reader assumes away.** `2026-08-17` carries three declared rulings (ADR-050, ADR-051, ADR-052), so the miscitation resolves. What was wrong was never that the date had no ruling; it was that **the rulings it has do not say what the citation claimed**. `CI-06q` checks that an authority **exists**, never that it says what is attributed to it. It catches a **fabricated** authority, which is a real and cheap error, and nothing more.
+
+**The obvious definition of "resolves" is circular and would have passed on this very defect.** "Some file under `docs/` mentions that date near the word ruling" is satisfied by the citations themselves, two of which sit in session logs. So resolution is to a **registry declaration**: an ADR heading parenthetical carrying the date, or a `gates/` filename carrying it. Neither can be produced by writing a sentence.
+
+**The assertion that would have caught it is declared and blocked, on a measurement.** A citation should NAME its ruling and not merely date it. **28 of the 59 dated citations name none**, in GLOSSARY, API_CONTRACT, INFRA, OVERVIEW, SECURITY, DATA_MODEL and nine ADRs, all frozen. That cleanup is an ADR and a session; a gate that fails on arrival is a gate somebody switches off.
+
+**`INV-06` occupied two rows of [M01 section 1.5](plans/M01-rules-engine.md) and is deduplicated to the strict union**, which decides nothing: both rows were ADR-050's amendment written twice by two branches, each missing something the other had. **This is the third instance of the shape today**, after `ADR-046`'s duplicate heading and a duplicate `ADR-050` row in the decisions README. A uniqueness gate over that registry is **`CI-06f`'s shape on another registry, is a separate gate, and claims no letter yet**; it needs a **section-bounded** parser, because a sweep for `^| INV-nn ` also matches a worked-example row further down whose cell merely begins with an invariant id.
+
+---
+
 ## Golden fixtures, batch 6: none written, and the polarity question answered by measurement (2026-08-17)
 
 **Batch 6 was commissioned to write the thirty-first fixture and wrote none** ([session 51](sessions/2026-08-17-session-51.md)). All forty-three held-back rows were re-derived against their primary sources and **every one still binds**; the reconciliation is mechanical rather than read by eye — **73 partition, 30 written, 43 on a row, zero unaccounted**. Every remaining scenario needs an input `EngineInput` does not carry, and `EngineInput` is unchanged at `{planConfigVersion, accountState, dayMarks}`. Writing one anyway would mean inventing that input, which is TR-01.
