@@ -497,12 +497,55 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 | Open | Where |
 |---|---|
-| **`INV-06`'s scope is unruled, and R-31 needs it** | The funded reset lowers the floor from 5,050,000c to 4,750,000c on the pass day. **R-12, R-31 and GS-019 all state that number**, so the engine follows them, and the balance falls to `size_cents` in the same step so no loss room narrows. But `INV-06` says the floor never decreases "**no exception, no phase qualifier**" and `RE-P-01` asserts it over generated sequences. Whether `INV-06` is scoped **per account or per phase** decides whether `RE-P-01`'s generator may cross an eval pass, and `D-M2-1` ("by resetting the account **or provisioning a new one**") is why the question is real. **The property session cannot be written until it is ruled** |
+| **`INV-06`'s scope is unruled, and R-31 needs it. The per-account reading was TESTED AND REFUTED (session 47)** | The funded reset lowers the floor from 5,050,000c to 4,750,000c on the pass day. **R-12, R-31 and GS-019 all state that number**, so the engine follows them, and the balance falls to `size_cents` in the same step so no loss room narrows. **The hypothesis that `D-M2-1`'s "or provisioning a new one" makes the funded account a NEW ACCOUNT does not survive the sources**, so per-account scoping cannot rescue R-31: see the section below. **Two readings survive and both are the founder's**: per `(account, phase)`, which "no phase qualifier" argues against in its own words, or `INV-06` gaining a stated R-31 exception. **The property session still cannot be written until one is ruled** |
 | **M01 disagrees with itself on R-22's operator, and this is a defect in a frozen document** | Section 3.6's pseudocode writes the hard daily-loss-limit comparison as `>=`; **R-22's operator column, `OQ-6`'s ruling and section 10.1 all write `>`** ("exactly at the limit survives"). Section 3.5 makes the operator column the contract, so the engine implements `>` and `RE-U-022` pins it. **Moving the pseudocode is an ADR, not a commit**, and no ADR is attempted on a session's own authority. **No v1 plan configures a daily loss limit**, so nothing exercises it until one does, which is exactly why it is recorded now |
 | **M01 disagrees with itself on R-15's lock effect** | Section 3.4's `max` against section 3.6's assignment, above. Recorded here for the same reason and left for the same authority |
-| **`rule.floor_locked` fires on a day the account then leaves** | Every v1 eval pass locks the floor at DO-7 and is reset out of the lock at DO-8, in that order, because DO-7 precedes DO-8 and neither step may be reordered. The event is true of the eval account and is **noise on a timeline the trader reads as funded**. The engine is faithful to the ordering law; whether M10 suppresses the event is not the engine's call |
+| **`rule.floor_locked` fires on a day the account then leaves, and the payload is worth more than the timeline noise (session 47)** | Every v1 eval pass locks the floor at DO-7 and is reset out of the lock at DO-8, in that order, because DO-7 precedes DO-8 and neither step may be reordered. The event is true of the eval account and is noise on a timeline the trader reads as funded. **`RE-U-031` now pins the sequence** `rule.floor_locked, phase.passed, day.closed`. **The half session 45 did not record is that `locked_floor_cents` is 5,050,000c while the account leaves the day on 4,750,000c**, and `DEP-M2-03` has M2 turning this event into a `set_risk` push. See the section below |
 | **The golden loader cannot fold `advanceDay` yet, and the reason is a comparison rather than a wiring** | `diffEndState` compares with `Object.is`, the expectations are JSON numbers, and the engine's state fields are `bigint`. `Object.is(4750000, 4750000n)` is **false**. The fixture-wiring session owns that conversion, and it is the same session that lands the `L-nn` citation rule and ADR-048's polarity derivation |
 | **`RuleState` is a subset of M01 section 2.2** | `withdrawableCents`, `engineEligible`, `engineGates` and `stateHash` are absent, each named in `types.ts` with the rule or the appendix that fills it. `hash.ts` and `SD-08` are replay's, not the day fold's |
+
+---
+
+## Three findings tested against their sources, and two of the three premises did not survive (2026-08-16)
+
+**[Session 47](sessions/2026-08-16-session-47.md) verified rather than ruled.** No rule, no invariant, no schema and no ADR moved. What changed is that two framings the corpus was carrying are now known to be wrong, and they are corrected where the next session reads them rather than left to be re-derived.
+
+### 1. `INV-06` scoped PER ACCOUNT does not rescue R-31, and `D-M2-1` is not about the Merit account
+
+**The hypothesis was worth testing and it fails.** If `D-M2-1`'s "by resetting the account **or provisioning a new one**" meant the funded account is a **new account**, then nothing would decrease within one account and "no phase qualifier" would be satisfied exactly. **Five primary sources refuse it, and they are independent of each other:**
+
+| Source | What it says |
+|---|---|
+| **[M02](plans/M02-rithmic-bridge.md)'s `DEP-M2-01`** | The **same dependency from the owning side**, and it names the subject outright: "on `phase.passed`, **the platform account** is reset to `size_cents` (or a new account provisioned at `size_cents`)". The "new one" is a **vendor** account. `INV-M2-07` says it in M2's own terms ("a funded account's first **mark** opens at exactly `size_cents`") and `FM-M2-07`'s remedy is "refuse, page, **re-provision**" |
+| **[STATE_MACHINES](architecture/STATE_MACHINES.md) section 1** | Draws `eval_phase --> funded_phase: G-EVAL-PASS` as a **substate transition inside one account's `active` state**. Universal rule 3 reserves "a new one is created instead" for **terminal** states, and an eval pass is not one; universal rule 2 says a transition not drawn does not exist |
+| **[`0007_accounts.sql`](../packages/db/migrations/0007_accounts.sql)** | `phase` is **one column on one row** over `('eval','funded','closed','graduated')`, and `funded_on date NULL` is set on that same row under `accounts_funded_has_date`. `account_status_history` logs `from_phase`/`to_phase` per `account_id`, which is a record of a phase moving **within** an account |
+| **[`0007_accounts.sql`](../packages/db/migrations/0007_accounts.sql)** | `purchase_id uuid NOT NULL UNIQUE`: **one account per purchase.** An eval pass is not a purchase, so no second account row can exist for one |
+| **[`0015_rule_states.sql`](../packages/db/migrations/0015_rule_states.sql)** | Unique on `(account_id, trading_day)`, carrying `phase` "as of the **end** of this day". One account's row sequence **spans both phases**; under a new-account reading that column would be constant per account |
+
+**So per account is already what the corpus means, and that is exactly why it does not help.** Read per account, `INV-06` is the reading R-31 violates. **The mechanism the hypothesis needed is the one `platform_account_refs` provides**: `account_id` is a plain column with `assigned_at` and `retired_at`, so **one Merit account holds successive platform refs over time**, which is how "provisioning a new one" happens without a second Merit account.
+
+**What survives, and both are the founder's**: `INV-06` scoped per `(account, phase)`, which "no phase qualifier" argues against in its own words, or `INV-06` gaining a **stated R-31 exception**. `RE-P-01`'s generator cannot be written until one lands. **No scope sentence was added and `RE-P-01` was not touched**, per the instruction that a refuted hypothesis stops rather than being repaired into a ruling.
+
+### 2. `rule.floor_locked` on the pass day is an M2 hazard, not only timeline noise
+
+**`RE-U-031` now pins the sequence** `rule.floor_locked, phase.passed, day.closed`, and the payload alongside it. On a Core EOD pass the event carries `locked_floor_cents` of **5,050,000c** while the account leaves the day carrying **4,750,000c**.
+
+**`DEP-M2-03` is "M1 emits a floor change (via `day.closed`, `rule.floor_locked`) that M2 turns into a `set_risk` push", and its safety argument has exactly one v1 counterexample, which is this day.** The argument is "since [ADR-014](decisions/ADR-014.md) the floor only moves up, so **drift is always permissive**, which is safe for the trader". **On the pass day the floor moves down**, so the drift is **restrictive**, and `D-M2-3`'s other branch is the live one: "the platform liquidates before the floor (**traders lose accounts early**)". **The payload sits above the funded account's opening balance of `size_cents`**, so a setpoint pushed from it liquidates the account on its **first funded mark**.
+
+**The engine is faithful and nothing here is a defect in it.** Whether M10 or M16 suppresses the event on the trader's timeline, and whether M2 reads its setpoint from this payload or from the day's final state, are those modules' calls. The assertion exists so a change to either **fails a test rather than a funded account**.
+
+### 3. R-32's missing field is NOT a schema delta, and no migration number was claimed
+
+**[Session 45](sessions/2026-08-16-session-45.md) concluded "the field is a column on `rule_states`, so it is a schema delta and an ADR". That is withdrawn.** The datum is already stored twice, and neither copy is on `RuleState`:
+
+- **`accounts.opened_on date NOT NULL`** ([`0007`](../packages/db/migrations/0007_accounts.sql)), declared `**Unit: trading day**` in [`data-model/accounts.md`](architecture/data-model/accounts.md). Not null, never moves, and exactly R-02's `sequence` anchor.
+- **`accounts.expires_on date NULL`**, "eval expiry when configured", which is **`max_days` already materialised as a date**.
+
+**And [M01](plans/M01-rules-engine.md)'s own public surface already treats the open day as an engine input**: section 1.3 is `initialState(plan: ResolvedPlan, openedOn: TradingDay)`. **The engine is handed the open day at construction and drops it** (`initialState` writes it to `tradingDay`, which the next fold overwrites). The golden fixture format has carried `account.opened_on` all along, on the loader's "reaches no engine input" list that **item 3 above says M01 empties**.
+
+**So what R-32 needs is one field on `DayInput`, which is an amendment to M01 section 2.1 and not a migration.** Still an ADR, because `DayInput` is specified in a frozen document, and still the founder's. **But no `rule_states` column, no `SD-nn`, and deliberately no migration number reserved**: a number reserved against a migration that should not be written is worse than no number, because a migration is sacred once merged and can only be superseded (constitution E2). **`0037` remains free.**
+
+**Two things are genuinely unruled and the refusal now stands on them rather than on the schema.** First the **anchor**: R-32 and `G-EXPIRED` both say "elapsed trading days" and **neither names the day they elapse from**, and an account sits in `provisioning_pending` before it is `active`, so a clock anchored at `opened_on` can burn days the trader could not trade. Second **which column binds**: R-32 and `G-EXPIRED` describe a **count** against `max_days`, `accounts.expires_on` is a stored **date** for the same fact, and the corpus does not say which is authoritative.
 
 ---
 

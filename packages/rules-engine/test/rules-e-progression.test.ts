@@ -16,6 +16,7 @@ import { consistencyOk } from '../src/day/consistency.js';
 import { advanceFloor } from '../src/day/floor.js';
 import type {
   DayOutput,
+  FloorLockedEvent,
   PassDeferredConsistencyEvent,
   PhasePassedEvent,
   ResolvedPlan,
@@ -373,9 +374,20 @@ test(reU('R-31'), () => {
   //
   // R-12, R-31 and GS-019 all state that number, so the engine follows them.
   // INV-06 says the floor never decreases "no exception, no phase qualifier",
-  // and RE-P-01 asserts it over generated sequences. WHETHER INV-06 IS SCOPED
-  // PER ACCOUNT OR PER PHASE IS THE FOUNDER'S TO RULE, and RE-P-01's generator
-  // cannot be written until it is.
+  // and RE-P-01 asserts it over generated sequences.
+  //
+  // SESSION 47 REFUTED THE PER-ACCOUNT READING rather than leaving it open. The
+  // hypothesis was that D-M2-1's "or provisioning a new one" makes the funded
+  // account a new ACCOUNT, so nothing decreases within one. It does not:
+  // DEP-M2-01 is the same dependency from M02's side and says "THE PLATFORM
+  // ACCOUNT is reset", STATE_MACHINES draws eval_phase -> funded_phase inside
+  // one account's `active` state, `accounts.phase` is one column on one row,
+  // `accounts.purchase_id` is NOT NULL UNIQUE so a pass cannot mint a second
+  // row, and `rule_states` is unique on (account_id, trading_day) with `phase`
+  // per day. Per account is already the corpus's meaning, so it is the reading
+  // R-31 violates. See `progression.ts` for the full chain. What survives is
+  // per (account, phase), or a stated R-31 exception on INV-06, and BOTH ARE
+  // THE FOUNDER'S. RE-P-01's generator still cannot be written until one lands.
   const atDo7 = advanceFloor({
     priorFloorCents: 4_750_000n,
     priorHighWaterBalanceCents: 5_000_000n,
@@ -393,6 +405,45 @@ test(reU('R-31'), () => {
   // `trailing`. A funded account arriving locked would have `hwb` frozen at
   // `size_cents` and R-13 guarded off for life, so its floor could never trail.
   expect(out.state.floorLocked).toBe(false);
+
+  // -----------------------------------------------------------------------------
+  // `rule.floor_locked` FIRES ON A DAY THE ACCOUNT THEN LEAVES, AND IT CARRIES A
+  // FLOOR NO ACCOUNT EVER HELD AT REST
+  // -----------------------------------------------------------------------------
+  // ASSERTED HERE BECAUSE THE ORDERING IS THE FINDING. DO-7 locks and DO-8 resets
+  // out of the lock, in that order, and neither step may be reordered. Every v1
+  // eval pass reaches it: Core EOD locks at 260,000c of profit and its target is
+  // 300,000c, so an account cannot pass without locking first.
+  expect(out.events.map((e) => e.type)).toEqual([
+    'rule.floor_locked',
+    'phase.passed',
+    'day.closed',
+  ]);
+
+  // AND THE PAYLOAD IS THE PART THAT MATTERS TO M2 RATHER THAN TO THE TIMELINE.
+  // M01 section 7 gives the event `locked_floor_cents`, which is 5,050,000 here,
+  // while the floor the account actually carries out of the day is 4,750,000.
+  const locked = out.events[0] as FloorLockedEvent;
+  expect(locked.lockedFloorCents).toBe(5_050_000n);
+  expect(locked.atProfitCents).toBe(300_000n);
+  expect(out.state.floorCents).toBe(4_750_000n);
+
+  // DEP-M2-03 IS "M1 EMITS A FLOOR CHANGE (VIA `day.closed`, `rule.floor_locked`)
+  // THAT M2 TURNS INTO A `set_risk` PUSH", AND ITS SAFETY ARGUMENT HAS EXACTLY
+  // ONE COUNTEREXAMPLE IN V1, WHICH IS THIS DAY. That argument is "since ADR-014
+  // the floor only moves up, so drift is always permissive, which is safe for the
+  // trader". On the pass day the floor moves DOWN, so the drift is RESTRICTIVE and
+  // D-M2-3's other branch is the live one: "the platform liquidates before the
+  // floor (traders lose accounts early)". A setpoint pushed from this payload
+  // sits ABOVE the funded account's opening balance of `size_cents`, so it would
+  // liquidate the account on its first funded mark.
+  expect(locked.lockedFloorCents).toBeGreaterThan(CORE_50K.sizeCents);
+
+  // THE ENGINE IS FAITHFUL AND NOTHING HERE IS A DEFECT IN IT. Whether M10 or M16
+  // suppresses the event on the trader's timeline, and whether M2 reads a setpoint
+  // from this payload or from the day's final state, are those modules' calls.
+  // This assertion exists so that a change to either one fails a test rather than
+  // a funded account.
 });
 
 // =============================================================================
