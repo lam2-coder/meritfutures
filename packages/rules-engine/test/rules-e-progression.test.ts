@@ -294,17 +294,69 @@ test(reU('R-29'), () => {
   expect(consistencyOk(100_000n, 333_334n, at3000bp).ok).toBe(true);
   expect(consistencyOk(100_000n, 333_333n, at3000bp).ok).toBe(false);
 
-  // A DISABLED GATE PASSES AND IS NOT `skipped`. CV-19's vocabulary: `skipped`
-  // means "evaluated nothing", and a gate the plan does not configure was never
-  // a gate. CORE-50K's eval consistency is this case.
+  // A DISABLED GATE PASSES AND IS `skipped`. CV-19's vocabulary, in its own
+  // words: a disabled gate reports `pass: true, skipped: true` "using the same
+  // `skipped` shape as the consistency denominator rule". EC-050, ADR-015,
+  // GLOSSARY and GS-080 all say it the same way. `skipped` means NOT EVALUATED,
+  // for any reason, and a gate the plan does not configure was never evaluated.
+  //
+  // THIS ASSERTION READ `skipped: false` UNTIL THE FIVE CITATIONS WERE CHECKED
+  // AGAINST IT. The disabled gate rendered as SATISFIED in every consumer that
+  // reads the flag, which is exactly what CV-19 exists to forbid. CORE-50K's
+  // eval consistency is this case and is the only v1-reachable one.
   const off = consistencyOk(100_000n, 200_000n, { enabled: false });
   expect(off).toEqual({
     ok: true,
-    skipped: false,
+    skipped: true,
     profitNeededToDiluteCents: 0n,
     bestDayShareBp: null,
     maxDayShareBp: null,
   });
+});
+
+// -----------------------------------------------------------------------------
+// `maxDayShareBp` TELLS THE TWO `skipped` CASES APART
+// -----------------------------------------------------------------------------
+// Folding the disabled case into `skipped` is only safe because the distinction
+// support needs survives it. "Passed because there was nothing to test" and
+// "never configured" are different facts, and a support agent reading a skipped
+// consistency gate has to know which one they are looking at: the first is a
+// trader who has not made money yet, the second is a plan that never had the
+// gate.
+//
+// THE DISCRIMINATOR IS `maxDayShareBp` AND THE TYPE IS WHAT GUARANTEES IT.
+// `ConsistencyRules` is a discriminated union whose `{ enabled: false }` arm has
+// no `maxDayShareBp` field at all, so the disabled branch has no limit available
+// to report; R-30's branch is reached only under `enabled: true`, where CV-06
+// pins `0 < max_day_share_bp <= 10000` and the value is therefore always a
+// positive number rather than a falsy `0` that would read like an absence.
+//
+// It is asserted here rather than left as a readable coincidence, because it is
+// now load bearing: it is the whole reason no third state was added.
+test('a skipped consistency gate says WHICH kind of skipped it is', () => {
+  const at3000bp = { enabled: true, maxDayShareBp: bp(3000) } as const;
+
+  const disabled = consistencyOk(100_000n, 200_000n, { enabled: false });
+  const denominator = consistencyOk(100_000n, 0n, at3000bp);
+
+  // Both are skipped, and neither reads as satisfied.
+  expect(disabled.skipped).toBe(true);
+  expect(denominator.skipped).toBe(true);
+
+  // And they are still distinguishable, in the one field that carries it.
+  expect(disabled.maxDayShareBp).toBe(null);
+  expect(denominator.maxDayShareBp).toBe(3000);
+
+  // The negative denominator is the same case as the zero one (GS-022), so it
+  // must land on the same side of the discriminator.
+  expect(consistencyOk(100_000n, -1n, at3000bp).maxDayShareBp).toBe(3000);
+
+  // AN EVALUATED GATE ALSO CARRIES THE LIMIT, which is what makes `skipped` the
+  // necessary first term: `maxDayShareBp !== null` alone does not mean skipped,
+  // it means configured. The pair is the answer, not either field alone.
+  const evaluated = consistencyOk(100_000n, 500_000n, at3000bp);
+  expect(evaluated.skipped).toBe(false);
+  expect(evaluated.maxDayShareBp).toBe(3000);
 });
 
 // -----------------------------------------------------------------------------

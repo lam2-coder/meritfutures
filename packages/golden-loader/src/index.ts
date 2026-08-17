@@ -14,11 +14,15 @@ export {
   AWAITING_ENGINE_INPUT,
   FIXTURE_DIR,
   FixtureError,
+  M01_PATH,
   REGISTRY_PATH,
   REPO_ROOT,
+  citedIdentifiers,
   expectationPath,
   loadFixture,
   loadFixtureDirectory,
+  m01Identifiers,
+  m01RuleGroups,
   registryIds,
   unusedAwaitingEntries,
 } from './loader.js';
@@ -33,8 +37,17 @@ export type {
 export { describeDiff, diffEndState, diffEvents, snakeToCamel } from './compare.js';
 export type { Diff } from './compare.js';
 
-export { mismatchProofExists, renderStageCoverage, stageCoverage } from './coverage.js';
-export type { StageCoverage } from './coverage.js';
+export {
+  DECLARED_RULES,
+  mismatchProofExists,
+  renderStageCoverage,
+  stageAssertionHolds,
+  stageCoverage,
+} from './coverage.js';
+export type { FixturePolarity, GroupPolarity, StageCoverage } from './coverage.js';
+
+export { checkDeclarationAgainstFold, citedRuleIds, derivePolarity } from './polarity.js';
+export type { DeclarationCheck, Derivation, Polarity } from './polarity.js';
 
 export { engineIsIdentityStub, runFixture } from './run.js';
 export type { FixtureOutcome } from './run.js';

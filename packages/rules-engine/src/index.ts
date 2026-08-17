@@ -16,6 +16,8 @@ export type {
   Cents,
   DayMark,
   EngineEvent,
+  EngineEventBase,
+  EngineEventType,
   EngineInput,
   EngineResult,
   PlanConfigVersion,
@@ -47,6 +49,14 @@ export type {
 // `buildCalendarSlice` is a seventh name and is not a seventh rule: ADR-049
 // requires the slice to be "built by a pure exported constructor", and a
 // constructor a caller cannot reach is a value a caller cannot make.
+//
+// THE LIMIT IS ABOUT FUNCTIONS, AND `EngineEvent` IS A TYPE UNION. Section 1.3's
+// reason is that "every additional export is A WAY FOR A CALLER TO REIMPLEMENT A
+// RULE slightly differently"; a union of the record shapes `advanceDay` already
+// returns computes nothing and has no second implementation to drift from. Every
+// one of its eight members was already exported individually, so withholding the
+// union bought no safety and cost every consumer an unchecked cast per event
+// type on a money-path payload. See the note above the alias in `types.ts`.
 
 export type {
   AccountActiveGate,

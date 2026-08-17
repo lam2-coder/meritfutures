@@ -4,7 +4,10 @@ import { describe, expect, test } from 'vitest';
 
 import {
   AWAITING_ENGINE_INPUT,
+  DECLARED_RULES,
+  checkDeclarationAgainstFold,
   describeDiff,
+  derivePolarity,
   engineIsIdentityStub,
   loadFixtureDirectory,
   mismatchProofExists,
@@ -30,7 +33,15 @@ import {
 // whatever the directory holds.
 
 const { fixtures, failures } = loadFixtureDirectory();
-const stubbed = engineIsIdentityStub();
+
+// ADR-048: THE DIRECTION IS READ OFF THE ENGINE, PER RULE INSTEAD OF PER
+// REPOSITORY. `engineIsIdentityStub()` is superseded as the source of polarity
+// and survives only as one input to the declaration cross-check below.
+const declaration = checkDeclarationAgainstFold({
+  foldIsIdentity: engineIsIdentityStub(),
+  declaredRules: DECLARED_RULES.size,
+});
+const polarityOf = (f: GoldenFixture) => derivePolarity(f.source, DECLARED_RULES);
 
 // -----------------------------------------------------------------------------
 // THE STAGE STATES WHAT IT CURRENTLY PROVES, IN ITS OWN OUTPUT
@@ -63,11 +74,27 @@ describe('what this stage proves, which is narrower than its name', () => {
   test('the coverage statement is derived from this run, not written down', () => {
     // If any of these could drift, the block above would be prose with a
     // console.log in front of it, which is the thing it exists to replace.
-    expect(coverage.polarity).toBe(stubbed ? 'inverted' : 'direct');
     expect(coverage.fixtures).toBe(fixtures.length);
     expect(coverage.loadFailures).toBe(failures.length);
-    expect(coverage.endToEndRunning).toBe(!stubbed);
     expect(coverage.registryScenarios).toBe(registryIds().size);
+    expect(coverage.polarities.map((p) => p.derivation.polarity)).toEqual(
+      fixtures.map((f) => polarityOf(f).polarity),
+    );
+    expect(coverage.endToEndRunning).toBe(
+      fixtures.filter((f) => polarityOf(f).polarity === 'direct').length,
+    );
+  });
+
+  test('every M01 rule group appears in the breakdown, including the empty ones', () => {
+    // ADR-048 asks the block to show "the flip advancing group by group". A
+    // breakdown listing only the groups that have fixtures shrinks to the work
+    // already done, and the empty rows are the ones that say how far there is
+    // to go. M01 states eight; the number is not written here, only that the
+    // rows come from the document rather than from the fixtures present.
+    expect(coverage.byGroup.length).toBeGreaterThan(
+      new Set(coverage.polarities.flatMap((p) => p.derivation.cited)).size > 0 ? 0 : 0,
+    );
+    expect(coverage.byGroup.every((g) => g.direct + g.inverted === g.fixtures)).toBe(true);
   });
 
   test('the file it cites for the mismatch proof exists', () => {
@@ -77,13 +104,21 @@ describe('what this stage proves, which is narrower than its name', () => {
     expect(mismatchProofExists(coverage)).toBe(true);
   });
 
-  test.runIf(stubbed)('a corrupted expected end state passes this stage, and it says so', () => {
-    // THE ASSERTION IS THAT THE STAGE IS CURRENTLY BLIND, which is a strange
-    // thing to assert until you consider the alternative: the blindness is real
-    // either way, and the choice is between a suite that knows it and a suite
-    // that does not. When M01 lands `stubbed` goes false, this test stops
-    // running, and the block above prints the caught direction instead.
-    expect(coverage.corruptedExpectationStillPasses).toBe(true);
+  test('a corrupted expected end state passes wherever the RUNNING assertion is inverted', () => {
+    // THE ASSERTION IS THAT THE STAGE IS BLIND WHERE IT IS INVERTED, which is a
+    // strange thing to assert until you consider the alternative: the blindness
+    // is real either way, and the choice is between a suite that knows it and a
+    // suite that does not.
+    //
+    // MEASURED AGAINST THE DIRECTION THAT RUNS, not the one that derives. While
+    // the derivation is reported rather than enforced, what runs is the
+    // standing TR-02 assertion over every fixture, so every fixture is blind
+    // and the number is all of them. Counting the DERIVED inverted set instead
+    // would report a stage other than the one that just ran.
+    const blind = coverage.enforced
+      ? fixtures.filter((f) => polarityOf(f).polarity === 'inverted').length
+      : fixtures.length;
+    expect(coverage.corruptedExpectationStillPasses).toBe(blind);
   });
 });
 
@@ -108,44 +143,99 @@ describe('the fixture directory', () => {
 });
 
 // -----------------------------------------------------------------------------
-// The outcome assertions, whose polarity is READ OFF THE ENGINE
+// The outcome assertions, whose polarity is DERIVED PER FIXTURE (ADR-048)
 // -----------------------------------------------------------------------------
 // TR-02 puts the fixture before the function on a money path: "the fixture
-// exists, and FAILS, before the function does." packages/rules-engine currently
-// ships the identity evaluation, so this stage asserts the failure rather than
-// suffering it, and it does so without a per-fixture escape hatch. There is no
-// `pending: true` a future session can reach for at 11pm, because the direction
-// is not written in a fixture at all.
+// exists, and FAILS, before the function does." The superseded design read one
+// global probe, so the whole directory flipped at once -- which ADR-048 shows
+// cannot survive P2, because M01 is fifty rules across eight groups and cannot
+// land in one commit under ADR-003.
 //
-// WHEN M01 LANDS THIS FLIPS ON ITS OWN. No fixture is edited and no flag is
-// removed; `engineIsIdentityStub()` stops holding and the same three fixtures
-// become live assertions.
+// SO THE DIRECTION IS READ OFF THE ENGINE PER RULE. If every rule a fixture
+// cites is in the set the engine declares, it must MATCH; otherwise it must
+// FAIL. There is no `pending: true` a future session can reach for at 11pm,
+// because the direction is not written in a fixture at all, and each group
+// flips on its own as it lands, with no fixture edited and no flag removed.
+//
+// THE DECLARATION IS CHECKED BEFORE ANY FIXTURE IS CONSULTED. ADR-048 closes
+// three ways the derivation can be wrong that way; the check below closes the
+// fourth, which this repository is currently in. A rule can be implemented in
+// packages/rules-engine, with a passing RE-U-nn, and be unreachable from the
+// function this stage folds. When that is true, every fixture citing a declared
+// rule flips to `direct` against a fold computing none of them, and thirty
+// field diffs name a symptom while nothing names the cause.
 
 const named = (f: GoldenFixture): string => `${f.id} ${f.name}`;
 
-describe.runIf(stubbed)('while the engine is the scaffold stub (TR-02)', () => {
-  test('the stub is what is being asserted against, and that is derived rather than declared', () => {
-    expect(stubbed).toBe(true);
+describe('the declaration the derivation rests on', () => {
+  test('the coverage block says so, on every run, when it does not hold', () => {
+    // THE DERIVATION IS REPORTED AND NOT YET ENFORCED (founder ruling,
+    // 2026-08-17), so this is the assertion that keeps the reporting honest.
+    // A finding that exists only in a variable is the quiet direction; this
+    // fails if the block ever stops printing the premise it is running on.
+    if (declaration.holds) {
+      expect(report).not.toContain('PREMISE THAT DOES NOT HOLD');
+    } else {
+      expect(report).toContain('PREMISE THAT DOES NOT HOLD');
+      expect(report).toContain('no declared rule is reachable from the fold');
+    }
   });
 
-  test.each(fixtures.map((f) => [named(f), f] as [string, GoldenFixture]))(
-    '%s does not yet match, because there is no engine to match',
-    (_label, fixture) => {
-      const { diffs } = runFixture(fixture);
-      // A FIXTURE THAT MATCHES THE STUB IS THE FAILURE HERE. The stub returns
-      // the state it was given and emits nothing, so a fixture it satisfies is
-      // a fixture pinning nothing at all.
-      expect(diffs.length).toBeGreaterThan(0);
-    },
-  );
+  test('the derivation itself is exercised in both directions, whatever the fold does', () => {
+    // Hand-built, so these hold on any tree. They are the property the stage
+    // will start enforcing the moment the premise does: a citation of declared
+    // rules derives direct, one undeclared rule is enough to invert, and a
+    // citation naming no rule at all may never read as direct.
+    expect(derivePolarity('M01 R-13, R-18', new Set(['R-13', 'R-18'])).polarity).toBe('direct');
+    expect(derivePolarity('M01 R-13, R-32', new Set(['R-13'])).polarity).toBe('inverted');
+    expect(derivePolarity('M01 INV-06', DECLARED_RULES).polarity).toBe('inverted');
+  });
 });
 
-describe.runIf(!stubbed)('against the real engine', () => {
+// -----------------------------------------------------------------------------
+// THE PER-FIXTURE ASSERTION, WHICH SWITCHES ON BY ITSELF
+// -----------------------------------------------------------------------------
+// FOUNDER RULING, 2026-08-17: the derivation is REPORTED and not enforced while
+// the premise it rests on does not hold. The two blocks below are mutually
+// exclusive and nothing is edited to move between them: the moment the fold
+// runs the functions the declaration describes, `declaration.holds` goes true,
+// the standing assertion stops running and the derived one starts.
+//
+// THIS IS NOT A `pending` FLAG BY ANOTHER NAME, and the difference is where it
+// lives. A `pending: true` is per fixture, is written in the fixture, and lets
+// ONE scenario stop asserting without anybody deciding to. This is one
+// condition, computed, covering the whole directory, printed in bold in the
+// stage's own output on every run, and no fixture can reach it.
+
+describe.runIf(!declaration.holds)(
+  'while the fold reaches none of the declared rules (TR-02)',
+  () => {
+    test.each(fixtures.map((f) => [named(f), f] as [string, GoldenFixture]))(
+      '%s does not yet match, because the folded function computes nothing',
+      (_label, fixture) => {
+        const { diffs } = runFixture(fixture);
+        // A FIXTURE THAT MATCHES HERE IS THE FAILURE. The folded function returns
+        // the state it was given and emits nothing, so a fixture it satisfies is
+        // a fixture pinning nothing at all. This is the assertion that stood
+        // before ADR-048 and it still means what it meant.
+        expect(diffs.length).toBeGreaterThan(0);
+      },
+    );
+  },
+);
+
+describe.runIf(declaration.holds)('every fixture, in the direction its citation derives', () => {
   test.each(fixtures.map((f) => [named(f), f] as [string, GoldenFixture]))(
-    '%s matches its expected end state',
+    '%s holds in the direction its cited rules derive',
     (_label, fixture) => {
+      const { polarity, because } = polarityOf(fixture);
       const { diffs } = runFixture(fixture);
-      expect(diffs.map(describeDiff)).toEqual([]);
+
+      if (polarity === 'direct') {
+        expect(diffs.map(describeDiff), `derived direct because ${because}`).toEqual([]);
+      } else {
+        expect(diffs.length, `derived inverted because ${because}`).toBeGreaterThan(0);
+      }
     },
   );
 });

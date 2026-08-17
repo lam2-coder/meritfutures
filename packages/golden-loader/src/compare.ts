@@ -42,7 +42,48 @@ export function snakeToCamel(field: string): string {
 }
 
 function show(value: unknown): string {
+  // A `bigint` RENDERS WITH ITS `n`, and that is the whole reason this branch
+  // exists. `String(4770000n)` and `String(4770000)` are the same four-and-a-bit
+  // characters, so before this the report for a type mismatch read "expected
+  // 4770000, engine produced 4770000" -- a diff whose two sides are printed
+  // identically, which reads as a bug in the differ rather than as the finding
+  // it is. Whatever this file decides about comparing the two, it may not
+  // describe them in a way a reader cannot tell apart.
+  if (typeof value === 'bigint') return `${value}n`;
   return typeof value === 'string' ? JSON.stringify(value) : String(value);
+}
+
+// -----------------------------------------------------------------------------
+// `bigint` ON ONE SIDE AND A JSON NUMBER ON THE OTHER
+// -----------------------------------------------------------------------------
+// INV-02: "all money is `bigint` integer cents at every boundary", so every
+// money field the engine returns is a `bigint`. A fixture is a text file and
+// JSON HAS NO LITERAL FOR ONE, so every money field an expectation pins is a
+// `number`. `Object.is(4770000n, 4770000)` is FALSE, and the loader's own
+// header already names this boundary on the input side: `requireInteger` checks
+// and `BigInt` widens, "and there is no other" crossing. There was one, on the
+// way back out, and it had no check at all.
+//
+// WHAT THAT COST IS EVERY MONEY ASSERTION THIS STAGE WILL EVER MAKE. Under the
+// inverted polarity it is invisible: a fixture that must FAIL fails, and it
+// fails for a reason nobody planted. The moment a fixture's polarity flips to
+// `direct` it becomes a fixture that can never match, whatever the engine
+// computes, because the one field class every money scenario pins is compared
+// across two types that are never `Object.is`-equal.
+//
+// THE COERCION GOES ONE WAY AND ONLY ONE. A `bigint` from the engine is
+// compared against an integer `number` from the expectation. The reverse is not
+// handled and must not be: an expectation cannot hold a `bigint` (it came
+// through `JSON.parse`), and a `number` on the ENGINE's side of a money field
+// would be INV-02 broken, which is a finding rather than something to smooth
+// over. `Number.isSafeInteger` is the guard that keeps this from widening into
+// a coercion: an expected value that is fractional, or beyond the range JSON
+// round-trips faithfully, is reported as the mismatch it is rather than
+// silently truncated by `BigInt()`.
+
+/** `true` when a `bigint` result and a JSON expectation state the same cents. */
+function bigintAgrees(actual: bigint, expected: number): boolean {
+  return Number.isSafeInteger(expected) && actual === BigInt(expected);
 }
 
 /** A one-line rendering of a diff, for a test failure message. */
@@ -79,6 +120,27 @@ export function diffEndState(
     }
 
     const got = actual[key];
+
+    if (typeof got === 'bigint' && typeof wanted === 'number') {
+      if (bigintAgrees(got, wanted)) continue;
+      diffs.push({
+        field,
+        expected: wanted,
+        actual: got,
+        // A fractional or out-of-range expectation is a different finding from
+        // a wrong one, and reporting them the same way sends a reader looking
+        // for an engine defect. Money is integer cents (INV-02) and a fixture
+        // stating anything else has stated a value this comparison cannot
+        // faithfully make, which is the fixture's defect and says so.
+        ...(Number.isSafeInteger(wanted)
+          ? {}
+          : {
+              note: 'the expectation is not a safe integer, so it states no whole number of cents',
+            }),
+      });
+      continue;
+    }
+
     if (!Object.is(got, wanted)) diffs.push({ field, expected: wanted, actual: got });
   }
 
