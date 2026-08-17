@@ -115,6 +115,7 @@ Each is enforced somewhere real. "Enforced by review" is not an entry in this ta
 | INV-04 | Replaying every mark from day one reproduces stored state byte-identically | Nightly self-audit job, GS-071, Appendix B |
 | INV-05 | `withdrawable_cents >= 0` always | Formula floors at zero (R-35), check constraint, property RE-P-05 |
 | INV-06 | The floor never decreases, **except at the R-31 funded reset**, where it is initialised to `size_cents` minus the **funded** drawdown (R-12, R-31, GS-019). No other exception, no phase qualifier, no settlement carve-out ([ADR-014](../decisions/ADR-014.md), amended by [ADR-050](../decisions/ADR-050.md)) | Property RE-P-01, GS-010, GS-081 |
+| INV-06 | The floor never decreases, **except at the funded reset**, where R-31 sets it to `size_cents - funded drawdown_cents` ([ADR-050](../decisions/ADR-050.md)). No other exception, no phase qualifier, no settlement carve-out ([ADR-014](../decisions/ADR-014.md)) | Property RE-P-01, GS-010, GS-019, GS-081 |
 | INV-07 | A locked floor never changes again for the life of the account | Property RE-P-02, GS-016 |
 | INV-08 | The win-day count never decreases except when the payout anchor advances | Property RE-P-03 |
 | INV-09 | The traded-day count never decreases | Property RE-P-04 |

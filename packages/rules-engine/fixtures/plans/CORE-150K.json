@@ -1,0 +1,44 @@
+{
+  "id": "CORE-150K",
+  "source": "docs/plans/M01-rules-engine.md Appendix A.1, the 150K column",
+  "note": "TRANSCRIBED FROM APPENDIX A AND FROM NOWHERE ELSE, on the same rule CORE-50K.json states. It is the SECOND SIZE of one plan rather than a second plan, which is the whole content of ADR-024's percent-of-size confirmation: the bp figure is the source and the cents columns are derived, so adding a size is a row rather than a redesign. EVERY CENTS FIGURE BELOW IS THE 50K FIGURE TIMES THREE, WITH EXACTLY ONE EXCEPTION, and the exception is the point: `min_payout_cents` is 10,000 at every size (Appendix A's preamble, GLOSSARY minimum-payout, CV-15). The bp columns are byte-identical to CORE-50K.json because they are the same plan; if a reader finds a bp value here that differs from that file, one of the two is a transcription error rather than a size difference. The floor-lock trigger is the one derived number Appendix A states directly rather than by bp: 760,000 = 750,000 + 10,000, which is CV-12 and is why the floor never jumps when it locks.",
+  "plan_code": "core_eod",
+  "size_label": "150K",
+  "plan_version_id": "0199c7a1-0000-7000-8000-000000000003",
+  "rules": {
+    "drawdown": { "type": "trailing_eod", "amount_bp": 500 },
+    "eval": {
+      "profit_target_bp": 600,
+      "min_trading_days": 1,
+      "consistency": "disabled"
+    },
+    "funded": { "consistency_bp": 3000, "min_trading_days": 0 },
+    "win_days": { "required_count": 5, "floor_bp": 30 },
+    "buffer_bp": 200,
+    "cadence_gap_trading_days": 5,
+    "payout": {
+      "cap_bp": 300,
+      "min_payout_cents": 10000,
+      "split_bp": 9000,
+      "max_payouts": 5
+    },
+    "floor_lock": {
+      "enabled": true,
+      "at_profit_cents": 760000,
+      "locked_floor_offset_cents": 10000
+    },
+    "post_payout_floor_rule": { "mode": "none" },
+    "daily_loss_limit": null,
+    "max_accounts_per_entity": 10
+  },
+  "size": {
+    "size_cents": 15000000,
+    "eval_drawdown_cents": 750000,
+    "eval_profit_target_cents": 900000,
+    "funded_drawdown_cents": 750000,
+    "win_day_floor_cents": 45000,
+    "buffer_cents": 300000,
+    "payout_cap_cents": 450000,
+    "min_payout_cents": 10000
+  }
+}
