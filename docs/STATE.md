@@ -123,7 +123,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## Blocked
 
-Nothing.
+**One thing, and it is a founder item rather than an engineering one: the CME calendar artifact.** `www.cmegroup.com`, `iana.org` and `nyse.com` are all refused by the network egress proxy, re-attempted 2026-08-17. `holidays` is `null`, the calendar cannot be seeded, and [P2 section 6](plans/P2-rules-engine.md) is explicit that **groups A, F and H cannot proceed without it**. [CI-06m](testing/STRATEGY.md)'s fixture-regeneration half is wired and cannot assert the days, because there is nothing to derive from. Nothing else on the founder list gates current work.
 
 **The ADR-031 collision is resolved.** Two open pull requests both claimed the number: PR #4 carried ADR-031 and ADR-032, PR #5 a different proposed ADR-031, and both branched from a `main` whose registry ended at 030. The founder assigned at merge, PR #5's became **ADR-033**, and **[ADR-034](decisions/ADR-034.md) ruled that a number is claimed in an allocation table before the ADR is written**. [CI-06f](testing/STRATEGY.md) now **fails the second pull request to claim a number** rather than failing the corpus after both have merged, which is what this incident asked for in its own words.
 
@@ -227,7 +227,7 @@ Nothing.
 
 **FOLD-01 session 6 is DONE (2026-08-16, [session 37](sessions/2026-08-16-session-37.md)), and the citation debt is settled.** The registries and the gates landed: `GS-258` to `GS-272` as [golden-scenario section 34](testing/golden-scenarios/34-gs-258-to-gs-272-phone-identity-and-the-authority-boundary.md), `EC-142` to `EC-149`, `CI-06k`, and the `API_CONTRACT`, `EVENTS` and `STATE_MACHINES` surfaces. **All five owed citations are live**: session 4's `AS-M19-09` and `AS-M16-07`, and session 5's three named in words in [M04 §8.2](plans/M04-trader-portal.md), which now carries them as a table. **The endpoints M04 consumed and never had are written**, including the session-list endpoint owed since `AS-M4-05` was approved.
 
-**The corpus now carries <!--gen:gate_count-->15<!--/gen--> gates.** `CI-06k` is declared authority: every row of [API_CONTRACT §12](architecture/API_CONTRACT.md)'s matrix carries a required-factor cell, every sensitive action C-27 names declares a **non-single** factor, and no `notification_kinds` class outside the post-identity `security` and `money` classes is `rate_limit_exempt`. **It was watched failing on the seeded finding for all three assertions**, one seed plus two scope cases, because `SEEDS` holds one violation per gate and a three-assertion gate is otherwise watched failing on a third of itself.
+**The corpus now carries <!--gen:gate_count-->16<!--/gen--> gates.** `CI-06k` is declared authority: every row of [API_CONTRACT §12](architecture/API_CONTRACT.md)'s matrix carries a required-factor cell, every sensitive action C-27 names declares a **non-single** factor, and no `notification_kinds` class outside the post-identity `security` and `money` classes is `rate_limit_exempt`. **It was watched failing on the seeded finding for all three assertions**, one seed plus two scope cases, because `SEEDS` holds one violation per gate and a three-assertion gate is otherwise watched failing on a third of itself.
 
 **The remaining FOLD-01 work is the founder's E2 read on `0029`**, unchanged by that session. **`gates.mjs` and `falsify.mjs` were both edited**, so FOLD-02 session 7 and S-E session 5 must not start from a tree that predates it.
 
@@ -327,7 +327,7 @@ Nothing.
 
 **Session 7 ran sessions 6 and 7 together, because session 6 had not run.** The brief said to check rather than assume, and the check was a grep: **no ToS clause, no GUIDE_BRIEFING line, no `API_CONTRACT` type and no `EVENTS` row carried `held_pending_review`**. What had merged as "session 6" was **FOLD-01's** session 6, one fold over. Non-money throughout: no migration, no `DELTA_MANIFEST` row, no ADR.
 
-**The corpus now carries <!--gen:gate_count-->15<!--/gen--> gates.** **`CI-06l`, every expiry has a sweep**: every `*_expires_at` column the migrations declare is dispositioned exactly once in [CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md), either against a release job that is itself a row of that document's scheduled table, or on a written exemption list with a reason. **Four assertions, and the two that earn it are the stale-entry checks**, which run in the direction nobody looks: an entry naming a column no migration declares means the list still looks complete while the real column, under its new spelling, is covered by nothing. One seed plus three scope cases.
+**The corpus now carries <!--gen:gate_count-->16<!--/gen--> gates.** **`CI-06l`, every expiry has a sweep**: every `*_expires_at` column the migrations declare is dispositioned exactly once in [CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md), either against a release job that is itself a row of that document's scheduled table, or on a written exemption list with a reason. **Four assertions, and the two that earn it are the stale-entry checks**, which run in the direction nobody looks: an entry naming a column no migration declares means the list still looks complete while the real column, under its new spelling, is covered by nothing. One seed plus three scope cases.
 
 **The registries.** [Golden-scenario section 35, GS-273 to GS-284](testing/golden-scenarios/35-gs-273-to-gs-284-the-enforcement-window-and-identity-restriction.md), the range derived from the registry maximum; `EC-150` to `EC-156`; and **the five citations owed in words by sessions 5 and 6 are now live**, three from [M06 §8.3](plans/M06-admin-ops-console.md), one from M03 and one from M08. **`GS-114`'s registry row now names four unsuppressible alarms**, closing the divergence M06 §8.2 recorded rather than left to be discovered.
 
@@ -907,6 +907,18 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## The State column is deleted and the letter table gets its gate, `CI-06p` (2026-08-17)
+
+**The State column of all three allocation tables is gone**, on [ADR-034](decisions/ADR-034.md)'s own two-branch remedy: generate the value, or delete it and point at the source. It claimed `allocated` or `reserved, unmerged` and **was wrong eleven times in nine days**, each instance repaired by hand and recorded in the row it falsified: `035` after PR #9, `036` after PR #13, `037` and `038` after PR #15, `039` to `043` after PR #17 and PR #18, `045` and `0033` after PR #29.
+
+**The finding is not the eleven instances, it is what they happened despite.** [ADR-036](decisions/ADR-036.md) had already ruled the column prose no gate can check, and [STRATEGY](testing/STRATEGY.md) had already declared it as a coverage gap, **in writing, before eight of the eleven**. A declared gap is a description of a defect and not a fix for one, and hand-repair was never one of ADR-034's two branches. The cell split cleanly: **is the artifact in this tree** is derived at check time and printed by `node scripts/corpus/gates.mjs allocation`; **has the claiming branch merged** is deleted, because it is the two-ref problem and no single ref can answer it. **Claimed by stays**, and the distinction is the whole ruling: a claimant is a historical fact that merging cannot falsify, while `reserved, unmerged` is false the instant a pull request merges and nothing in the tree tells the row to change.
+
+**`CI-06p` closes the third registry**, which had a table and no gate for a week. **Not by oversight**: `allocated()` parses a three-digit or four-digit first cell and a letter does not parse, so the registry with the strongest written case for a gate was also the one where reusing the shared reader cost the most. Its third assertion is the one worth carrying, and it is `CI-06h`'s: **every letter the runner implements must be claimed by a row**, because gaplessness alone can never force a row when a new gate fills its own hole. `CI-06f` still lacks that counterpart on the ADR table, and it is blocked on `OI-11` rather than unnoticed: the table carries duplicate rows today and the assertion would fail on arrival.
+
+**Watched failing on all three assertions plus its rule-2 guard**, and the full harness was then run although this session's brief scoped that out: **16 of 16 gates pass clean and fail dirty, and 18 scope cases hold.**
+
+---
+
 ## `0035` closes `OQ-P2-02`, and a duplicate row in an allocation table is invisible to every gate (2026-08-16)
 
 **[`0035_rule_states_calendar_revision.sql`](../packages/db/migrations/0035_rule_states_calendar_revision.sql) exists, applies, is probed and is pinned, and the founder's E2 read is still to come.** [ADR-047](decisions/ADR-047.md) closes `OQ-P2-02`, and **it is the other half of `0033`.** `0033` made the prior image mandatory on the calendar side, so every correction leaves an unforgeable record of what the calendar said before it moved. **Nothing joined that record to a state row**, so `INV-04` was undefined against a calendar that can move underneath it: replay held the evidence and could not scope by it. It edits nothing; `0015` is untouched on disk.
@@ -1070,7 +1082,7 @@ is [ADR-042](decisions/ADR-042.md)'s argument for its SQL shape check.
 
 | P1 item | State | What is actually left |
 |---|---|---|
-| **CI-06, corpus integrity** | **DONE and exceeded** | **Twelve** checks, all passing clean and failing dirty. The row's own definition of done is met **for CI-06 only**. This row stood three times in this table and read "Eleven" against the twelve `gates.mjs` reports; both are `OI-10` |
+| **CI-06, corpus integrity** | **DONE and exceeded** | <!--gen:gate_count-->16<!--/gen--> checks, all passing clean and failing dirty. **That figure was the bare word "Twelve" until 2026-08-17**, which is a hand-maintained count in the row that reports the gate against hand-maintained counts; it is a span now, on ADR-034's remedy, and the query is `GATES.length`. The row's own definition of done is met **for CI-06 only**. This row stood three times in this table and read "Eleven" against the twelve `gates.mjs` reports; both are `OI-10` |
 | **The reconciled schema and migrations** | **DONE**, pending the E2 read | <!--gen:migration_files-->36<!--/gen--> files, <!--gen:sql_tables-->102<!--/gen--> tables, <!--gen:sql_triggers-->10<!--/gen--> triggers, verified on a clean PostgreSQL 16 install; **index and check-constraint totals are emitted by the install job**, for the reason line 99 gives. Nothing to build. **The founder's read is the remaining work and it is not engineering** |
 | **CI-06h, migration install** | **RUNS IN ACTIONS, green** | Corrected 2026-08-15 (S-B). This row read "WIRED, never executed by GitHub. **It has not run in Actions once**" and that was already false when it was written: run `31860712550`, job `94953489824`, commit `3082b61e`, **2026-08-15T03:01:16Z, success**, applying all <!--gen:migration_files-->36<!--/gen--> migrations against PostgreSQL 16 on a runner. It has since run on every push to this branch, and now carries ADR-035's probe as well (run `31862563569`) |
 | **The reconciled schema and migrations** | **DONE**, pending the E2 read | <!--gen:migration_files-->36<!--/gen--> files, **98 tables, 332 indexes, 359 check constraints, 6 triggers**, verified on a clean PostgreSQL 16 install (`0001` to `0028` then `0032`; `0029` to `0031` are reserved and unwritten). The figures read 96 / 326 / 347 / 6 before `0032`. Nothing to build. **The founder's read is the remaining work and it is not engineering** |
@@ -1192,3 +1204,32 @@ is [ADR-042](decisions/ADR-042.md)'s argument for its SQL shape check.
 **One defect was found in the falsification harness while verifying, and it is the same class as ADR-037's.** `falsify.mjs`'s CI-06g seed hardcoded `<!--gen:ec_count-->140`, so adding EC-141 broke the harness built to catch hand-maintained counts. It now reads the span and adds one, which is a violation by construction whatever the query returns. **Sixth site of that class, and the first one inside the tooling.**
 
 **What is NOT enforced, stated rather than implied.** CI-06g's parameter half is a rule a reviewer applies, not a query a runner runs. Closing it needs a check that can tell a shorthand from a scenario's own arithmetic, since GS-026's "withdrawable 214,250, cap 150,000" is a computed boundary a fixture exists to pin and must survive any sweep. That query is not ruled, and a gate that fails on correct prose is a gate that gets switched off.
+
+---
+
+## The build is running ahead of P2's sequence, and P2-7 is what it skipped (2026-08-17)
+
+**Four pull requests merged: [#57](../packages/rules-engine/fixtures/) golden fixtures batch 5, [#58](../apps/worker/src/batch/state-hash.ts) the nightly batch and `state_hash`, [#59](../scripts/demo/README.md) the demo CLI, [#60](../packages/rules-engine/src/plan/validate.ts) P2-1's config contract.** On `main` after the merge: **48 test files, 656 passed, 30 skipped, 15 of 15 gates clean and dirty, 16 scope cases.** The demo was **run rather than read**, and `IMPLEMENTED_RULES.length === 45` is asserted mechanically rather than counted by hand.
+
+**Position: 45 of 50 rules declared, 30 of 284 golden fixtures, four of M01's six exported functions.**
+
+**[P2 section 7](plans/P2-rules-engine.md) sequences `P2-7` (the generators, PT-06's harness, `RE-D-01` to `RE-D-03`) before the calendar gate, and it has not run.** Sessions executed P2-8's content instead: the simulator, the nightly batch, groups F, G and H. So the engine reached 45 rules and 30 fixtures **with its determinism contract asserted by nothing that runs.**
+
+| | What [M01 section 1.4](plans/M01-rules-engine.md) specifies as a merge blocker | What is in the tree |
+|---|---|---|
+| `RE-D-01` | Stub `globalThis.fetch`, `Date` and `Math.random` to throw, run the entire golden suite | Nothing |
+| `RE-D-02` | Run the suite under `TZ=Asia/Kolkata` with a non-English locale, diff against the default run | Nothing. No workflow sets `TZ` or `LC_ALL` |
+| `RE-D-03` | A dependency-graph assertion that the package's **transitive** imports contain no Node builtins | Nothing. `RI-01` reads the **manifest** and its own `covers` prose says so; `merit/engine-purity` reads **direct** imports under `packages/rules-engine/src/**`. Neither walks the graph |
+
+The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**. That is the point: it is vacuous until it is not, and nothing would notice the day it stops being. **P2 already scheduled the cure and the ruling is only that it runs next.** `RE-D-03` lands as `RI-07` in [`repo-invariants.mjs`](../packages/tooling/checks/repo-invariants.mjs), beside `RI-01`, and each of the three ships with a seeded violation it has been watched failing on.
+
+**Four rulings from the [review desk](reviews/2026-08-17-review-desk.md), which carries the reasoning and the citations:**
+
+| # | Ruling |
+|---|---|
+| **1** | **`P2-7` runs next.** Overdue rather than missing |
+| **2** | **`hash.ts` hand-rolls SHA-256 and waits for `RE-D-03`.** [M01 1.4](plans/M01-rules-engine.md) contradicts itself inside one section: the banned-constructs table permits "`crypto` beyond a pure hash" and `RE-D-03` two paragraphs later bans **every** Node builtin. Exempting `RE-D-03` is weakening a gate to pass it, which section 9 forbids. `state-hash.ts` stays in `apps/worker` until the assertion that decides its home exists |
+| **3** | **A disabled consistency gate reports `skipped: true`.** `consistencyOk` returns `{ ok: true, skipped: false }` when `cfg.enabled` is false, so a disabled gate reads as satisfied. **`CV-19`, [EC-050](edge-cases/EC-050.md), [ADR-015](decisions/ADR-015.md), the [GLOSSARY](GLOSSARY.md) and `GS-080` all state the shape, and four of them state it in the same words: the same `skipped` shape the consistency denominator rule already uses.** The distinction the corpus requires is two-way, evaluated versus not. `maxDayShareBp` already carries the reason (`null` when disabled), so nothing is lost. One line, no ADR, `GS-080` untouched. **This ruling was issued wrong first**, prescribing a three-state vocabulary on the strength of a code comment that contradicts all five sources, and was caught by the build session reading them. Sixth of its kind, same mechanism every time: [the review record](reviews/2026-08-17-review-desk.md) carries the anatomy |
+| **4** | **Export the `EngineEvent` discriminated union.** A consumer that must cast is a consumer that can cast wrong |
+
+**One finding is recorded and not scheduled.** `DEP-M2-03`'s setpoint source now has a number attached: the demo's `DEMOSWNG250002` locked its floor 296,250c above a platform setpoint pushed once at provisioning, breached, and carries **no auto-liquidation record** while [DATA_CAPABILITIES](../research/DATA_CAPABILITIES.md) section 1 names that record as Merit's breach evidence. Every rule involved is working as written. How often M2 re-pushes the setpoint is an [M02](plans/M02-rithmic-bridge.md) question, M02 holds at `review` pending the vendor call, and nothing being built depends on the answer.

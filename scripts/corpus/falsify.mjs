@@ -173,6 +173,111 @@ const lastAdrId = (dir) => {
 };
 
 // =============================================================================
+// The letter registry, which is CI-06p's input
+// =============================================================================
+// Same rider as the numeric registries above: nothing here names a letter. The
+// table grows by one row whenever a gate is written, so a seed pinned to `q`
+// would go silent the first week somebody claims it, which is exactly how the
+// two migration seeds went stale on 0029.
+const LETTER_HEADING = '## CI gate identifier allocation';
+
+// BOUNDED ON ANY HEADING rather than on `\n## `, and this differs from
+// `addMigrationRow` one helper up on purpose. The letter table is the LAST `##`
+// section in ALLOCATION.md, so a `\n## ` bound runs to end of file and the "last
+// row" a seed anchors to would be a row of the prose sections below it. It is
+// the same bound `allocatedLetters()` uses in gates.mjs, for the same reason.
+function letterSection(body) {
+  const start = body.indexOf(LETTER_HEADING);
+  if (start === -1) throw new Error(`seed anchor not found: the "${LETTER_HEADING}" table`);
+  const after = body.slice(start + LETTER_HEADING.length);
+  const end = after.search(/\n#{1,6} /);
+  return { at: start + LETTER_HEADING.length, section: end === -1 ? after : after.slice(0, end) };
+}
+
+const LETTER_CELL = /^\s*\*{0,2}`?([a-z])`?\*{0,2}(?:\s+to\s+\*{0,2}`?([a-z])`?\*{0,2})?\s*$/;
+
+function claimedLetters(dir) {
+  const { section } = letterSection(
+    readFileSync(join(dir, 'docs/decisions/ALLOCATION.md'), 'utf8'),
+  );
+  const claimed = new Set();
+  let rows = 0;
+  for (const line of section.split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const m = LETTER_CELL.exec(line.split('|')[1] ?? '');
+    if (!m) continue;
+    rows++;
+    const to = (m[2] ?? m[1]).charCodeAt(0);
+    for (let c = m[1].charCodeAt(0); c <= to; c++) claimed.add(String.fromCharCode(c));
+  }
+  // Rule 2 of gates.mjs applied to the harness, as `nextFree` does one registry
+  // over: a parser that reads nothing would seed against a table nobody parsed.
+  if (rows === 0) throw new Error(`seed anchor found no rows in the "${LETTER_HEADING}" table`);
+  return claimed;
+}
+
+// The first letter the table does not claim, which is also the gate's first
+// hole: CI-06p asserts that every implemented letter is claimed by a row, so on
+// any tree where that assertion holds the table's claims are a superset of the
+// runner's.
+function nextFreeLetter(dir) {
+  const claimed = claimedLetters(dir);
+  for (let c = 'a'.charCodeAt(0); c <= 'x'.charCodeAt(0); c++) {
+    const letter = String.fromCharCode(c);
+    if (!claimed.has(letter)) return letter;
+  }
+  // Stops at `x` rather than `z` because every seed below needs two letters of
+  // headroom above the one it names. A harness that silently wrapped past `z`
+  // would plant nothing and report a tidy `did not fire`.
+  throw new Error(`seed anchor exhausted: the "${LETTER_HEADING}" table claims a through x`);
+}
+
+// The CI-06 letters the runner implements, read from the tree COPY's gates.mjs
+// rather than from ROOT's, on the same reasoning as `nextFree`: the copy is what
+// the gate will read.
+function implementedLettersIn(dir) {
+  const body = readFileSync(join(dir, 'scripts/corpus/gates.mjs'), 'utf8');
+  const out = [...body.matchAll(/id:\s*'CI-06([a-z])'/g)].map((m) => m[1]).sort();
+  if (out.length === 0) {
+    throw new Error('seed anchor not found: no CI-06<letter> gate ids in gates.mjs');
+  }
+  return out;
+}
+
+const STRATEGY_DOC_F = 'docs/testing/STRATEGY.md';
+const GATE_INVENTORY_F = '### 4.4 Corpus integrity';
+
+// The first row of STRATEGY's gate inventory whose first cell IS a `CI-06<letter>`,
+// found by shape and BOUNDED TO SECTION 4.4, so a row of some later table is never
+// the thing a seed duplicates. `####` subheadings inside 4.4 do not end it, which
+// is what keeps the bound at the section rather than at the first prose block.
+function strategyInventory(dir) {
+  const body = readFileSync(join(dir, STRATEGY_DOC_F), 'utf8');
+  const start = body.indexOf(GATE_INVENTORY_F);
+  if (start === -1) throw new Error(`seed anchor not found: the "${GATE_INVENTORY_F}" section`);
+  const lines = body.split('\n');
+  const first = body.slice(0, start).split('\n').length - 1;
+  for (let i = first + 1; i < lines.length; i++) {
+    if (/^### /.test(lines[i])) break;
+    if (!lines[i].startsWith('|')) continue;
+    const m = /^\s*\*{0,2}`?CI-06([a-z])`?\*{0,2}\s*$/.exec(lines[i].split('|')[1] ?? '');
+    if (m) return { lines, i, line: lines[i], letter: m[1] };
+  }
+  throw new Error('seed anchor not found: no CI-06 row in the STRATEGY gate inventory');
+}
+
+// Claim a letter, anchored to the LAST row of the letter table rather than to a
+// literal, which is `addMigrationRow`'s rule with a different alphabet.
+function addLetterRow(body, letter, note) {
+  const { at, section } = letterSection(body);
+  const rows = [...section.matchAll(/^\|.*\|$/gm)];
+  if (rows.length < 3) throw new Error('seed anchor found no rows in the letter table');
+  const last = rows[rows.length - 1];
+  const end = at + last.index + last[0].length;
+  return `${body.slice(0, end)}\n| **\`${letter}\`** | falsify probe | ${note} |${body.slice(end)}`;
+}
+
+// =============================================================================
 // CI-06k's seeds, and why every one of them is DERIVED
 // =============================================================================
 // Same rider as the migration seeds above, applied to a different registry. The
@@ -500,6 +605,24 @@ const SEEDS = {
       writeFileSync(
         join(d, `docs/decisions/ADR-${n}.md`),
         `## ADR-${n}: an entry nothing indexes  (2026-08-15, status: proposed)\n`,
+      );
+    },
+  },
+  'CI-06p': {
+    what: 'a CI-06 letter claimed two past the last one, leaving the letters between it claimed by nobody',
+    real:
+      'three plan documents each stated which letters the other two were taking, which is ' +
+      'one sequence hand-maintained in three places, and ADR-038 collided on the registry ' +
+      'that already had a table',
+    // The hole is at the FIRST free letter and the seed claims two past it, so
+    // the reservation the seed writes is never the letter the finding names.
+    // `expect` is resolved against the SEEDED tree, and a row claiming `free + 2`
+    // does not move `free`, which is the CI-06l lesson applied before it bit.
+    expect: (d) => `CI-06${nextFreeLetter(d)} is neither implemented nor reserved (a hole)`,
+    seed: (d) => {
+      const beyond = String.fromCharCode(nextFreeLetter(d).charCodeAt(0) + 2);
+      edit(d, 'docs/decisions/ALLOCATION.md', (b) =>
+        addLetterRow(b, beyond, 'a letter claimed two past the last one, which opens the hole'),
       );
     },
   },
@@ -1103,6 +1226,65 @@ const SCOPE_CASES = [
         join(d, `packages/db/migrations/${nextFreeMigration(d)}_probe_unallocated.sql`),
         '-- A migration whose number came from `ls` rather than from the table.\n',
       ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06p. THE GATE HAS THREE ASSERTIONS AND THE SEED CARRIES ONE.
+  //
+  // CI-06k's precedent, two gates over: a gate asserting three things and
+  // watched failing on one of them is taken on trust for the other two, and
+  // "taken on trust" is the condition this harness exists to end. The seeded
+  // violation covers assertion 3, the hole. These two cover assertions 1 and 2.
+  //
+  // THE QUIET DIRECTION IS THE CLEAN TREE RUN at the top of this harness, and it
+  // is not decoration here: `o` is claimed by ADR-044 and no gate implements it,
+  // so every clean run asserts that a letter a sibling branch reserved is a hole
+  // that PASSES. That is `CI-06h/reserved`'s case, already planted in the corpus
+  // rather than in a temporary directory, and duplicating it here would test the
+  // same tree twice.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06p/duplicate-row',
+    gate: 'CI-06p',
+    what: "one letter heading two rows of STRATEGY's gate inventory, which MUST be a finding",
+    // Assertion 1, and the letter is whichever one the inventory rows first.
+    expect: (d) => `CI-06${strategyInventory(d).letter} heads more than one row`,
+    seed: (d) => {
+      const { lines, i, line } = strategyInventory(d);
+      lines.splice(i + 1, 0, line);
+      writeFileSync(join(d, STRATEGY_DOC_F), lines.join('\n'));
+    },
+  },
+  {
+    name: 'CI-06p/unclaimed-letter',
+    gate: 'CI-06p',
+    what: 'a gate in the runner whose letter no row of the table claims, which MUST be a finding',
+    // Assertion 2, and it is the one that keeps the table from going vacuous:
+    // gaplessness alone can never force a row, because a gate that exists in the
+    // runner fills its own hole. Without this assertion the letters stay gapless
+    // while the registry quietly stops being maintained.
+    //
+    // The target is the HIGHEST implemented letter, derived from the copy's own
+    // gates.mjs, because that is the row a session most recently wrote and the
+    // one a session is most likely to forget.
+    expect: (d) => {
+      const letters = implementedLettersIn(d);
+      return `CI-06${letters[letters.length - 1]} is implemented in this runner and no row`;
+    },
+    seed: (d) => {
+      const letters = implementedLettersIn(d);
+      const letter = letters[letters.length - 1];
+      const p = join(d, 'docs/decisions/ALLOCATION.md');
+      const body = readFileSync(p, 'utf8');
+      const kept = body.split('\n').filter((line) => {
+        if (!line.startsWith('|')) return true;
+        const m = LETTER_CELL.exec(line.split('|')[1] ?? '');
+        return !(m && m[1] === letter && m[2] === undefined);
+      });
+      if (kept.length === body.split('\n').length) {
+        throw new Error(`seed anchor not found: no row claiming \`${letter}\` on its own`);
+      }
+      writeFileSync(p, kept.join('\n'));
+    },
   },
 ];
 
