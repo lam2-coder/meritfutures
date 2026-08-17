@@ -123,7 +123,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## Blocked
 
-Nothing.
+**One thing, and it is a founder item rather than an engineering one: the CME calendar artifact.** `www.cmegroup.com`, `iana.org` and `nyse.com` are all refused by the network egress proxy, re-attempted 2026-08-17. `holidays` is `null`, the calendar cannot be seeded, and [P2 section 6](plans/P2-rules-engine.md) is explicit that **groups A, F and H cannot proceed without it**. [CI-06m](testing/STRATEGY.md)'s fixture-regeneration half is wired and cannot assert the days, because there is nothing to derive from. Nothing else on the founder list gates current work.
 
 **The ADR-031 collision is resolved.** Two open pull requests both claimed the number: PR #4 carried ADR-031 and ADR-032, PR #5 a different proposed ADR-031, and both branched from a `main` whose registry ended at 030. The founder assigned at merge, PR #5's became **ADR-033**, and **[ADR-034](decisions/ADR-034.md) ruled that a number is claimed in an allocation table before the ADR is written**. [CI-06f](testing/STRATEGY.md) now **fails the second pull request to claim a number** rather than failing the corpus after both have merged, which is what this incident asked for in its own words.
 
@@ -1168,3 +1168,32 @@ is [ADR-042](decisions/ADR-042.md)'s argument for its SQL shape check.
 **One defect was found in the falsification harness while verifying, and it is the same class as ADR-037's.** `falsify.mjs`'s CI-06g seed hardcoded `<!--gen:ec_count-->140`, so adding EC-141 broke the harness built to catch hand-maintained counts. It now reads the span and adds one, which is a violation by construction whatever the query returns. **Sixth site of that class, and the first one inside the tooling.**
 
 **What is NOT enforced, stated rather than implied.** CI-06g's parameter half is a rule a reviewer applies, not a query a runner runs. Closing it needs a check that can tell a shorthand from a scenario's own arithmetic, since GS-026's "withdrawable 214,250, cap 150,000" is a computed boundary a fixture exists to pin and must survive any sweep. That query is not ruled, and a gate that fails on correct prose is a gate that gets switched off.
+
+---
+
+## The build is running ahead of P2's sequence, and P2-7 is what it skipped (2026-08-17)
+
+**Four pull requests merged: [#57](../packages/rules-engine/fixtures/) golden fixtures batch 5, [#58](../apps/worker/src/batch/state-hash.ts) the nightly batch and `state_hash`, [#59](../scripts/demo/README.md) the demo CLI, [#60](../packages/rules-engine/src/plan/validate.ts) P2-1's config contract.** On `main` after the merge: **48 test files, 656 passed, 30 skipped, 15 of 15 gates clean and dirty, 16 scope cases.** The demo was **run rather than read**, and `IMPLEMENTED_RULES.length === 45` is asserted mechanically rather than counted by hand.
+
+**Position: 45 of 50 rules declared, 30 of 284 golden fixtures, four of M01's six exported functions.**
+
+**[P2 section 7](plans/P2-rules-engine.md) sequences `P2-7` (the generators, PT-06's harness, `RE-D-01` to `RE-D-03`) before the calendar gate, and it has not run.** Sessions executed P2-8's content instead: the simulator, the nightly batch, groups F, G and H. So the engine reached 45 rules and 30 fixtures **with its determinism contract asserted by nothing that runs.**
+
+| | What [M01 section 1.4](plans/M01-rules-engine.md) specifies as a merge blocker | What is in the tree |
+|---|---|---|
+| `RE-D-01` | Stub `globalThis.fetch`, `Date` and `Math.random` to throw, run the entire golden suite | Nothing |
+| `RE-D-02` | Run the suite under `TZ=Asia/Kolkata` with a non-English locale, diff against the default run | Nothing. No workflow sets `TZ` or `LC_ALL` |
+| `RE-D-03` | A dependency-graph assertion that the package's **transitive** imports contain no Node builtins | Nothing. `RI-01` reads the **manifest** and its own `covers` prose says so; `merit/engine-purity` reads **direct** imports under `packages/rules-engine/src/**`. Neither walks the graph |
+
+The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**. That is the point: it is vacuous until it is not, and nothing would notice the day it stops being. **P2 already scheduled the cure and the ruling is only that it runs next.** `RE-D-03` lands as `RI-07` in [`repo-invariants.mjs`](../packages/tooling/checks/repo-invariants.mjs), beside `RI-01`, and each of the three ships with a seeded violation it has been watched failing on.
+
+**Four rulings from the [review desk](reviews/2026-08-17-review-desk.md), which carries the reasoning and the citations:**
+
+| # | Ruling |
+|---|---|
+| **1** | **`P2-7` runs next.** Overdue rather than missing |
+| **2** | **`hash.ts` hand-rolls SHA-256 and waits for `RE-D-03`.** [M01 1.4](plans/M01-rules-engine.md) contradicts itself inside one section: the banned-constructs table permits "`crypto` beyond a pure hash" and `RE-D-03` two paragraphs later bans **every** Node builtin. Exempting `RE-D-03` is weakening a gate to pass it, which section 9 forbids. `state-hash.ts` stays in `apps/worker` until the assertion that decides its home exists |
+| **3** | **A disabled consistency gate needs a third state, not `skipped: true`.** `consistencyOk` returns `{ ok: true, skipped: false }` when `cfg.enabled` is false, so a disabled gate reads as satisfied, which is exactly what `CV-19` forbids. But `skipped` is reserved for `R-30`'s denominator rule and that reservation is right, so the verdict distinguishes **evaluated, skipped, disabled** and the breakdown renders disabled distinctly. **Nothing renders wrong today** because the funded gate is enabled on all three v1 plans, which is what makes it the house defect rather than a bug |
+| **4** | **Export the `EngineEvent` discriminated union.** A consumer that must cast is a consumer that can cast wrong |
+
+**One finding is recorded and not scheduled.** `DEP-M2-03`'s setpoint source now has a number attached: the demo's `DEMOSWNG250002` locked its floor 296,250c above a platform setpoint pushed once at provisioning, breached, and carries **no auto-liquidation record** while [DATA_CAPABILITIES](../research/DATA_CAPABILITIES.md) section 1 names that record as Merit's breach evidence. Every rule involved is working as written. How often M2 re-pushes the setpoint is an [M02](plans/M02-rithmic-bridge.md) question, M02 holds at `review` pending the vendor call, and nothing being built depends on the answer.
