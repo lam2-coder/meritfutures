@@ -749,9 +749,37 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 **[ADR-050](decisions/ADR-050.md) lifted that constraint on 2026-08-17 and batch 4 is what it unblocked.** Two of batch 4's four fixtures cross the eval pass; the three earlier files are confirmed rather than edited. **The constraint did not disappear, it moved**: `INV-07` is unruled on the same step, so a fixture that crosses the pass still pins no `floor_cents`, no `floor_locked` and no `high_water_balance_cents` on any day after it.
 
-**The format's ceiling is now the binding constraint rather than the engine**, and every remaining M1 row is blocked by one of five named things in [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md): a session **kind** or a fill stream; a **settlement** input, which `L-11` refuses; the **`skipped: true`** shape, which lives in nested `engine_gates` while `diffEndState` compares flat fields with `Object.is`; **payout arithmetic**, which is not a day fold; and **five sessions**, which bounds GS-064 and the long streams. The two unlocks that reach the most rows are the **calendar transcription** (a founder item) and a **settlement on `EngineInput`**.
+**The format's ceiling is now the binding constraint rather than the engine**, and every remaining M1 row is blocked by one of five named things in [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md): a session **kind** or a fill stream; a **settlement** input, which `L-11` refuses; the **`skipped: true`** shape, which lives in nested `engine_gates` while `diffEndState` compares flat fields with `Object.is`; **payout arithmetic**, which is not a day fold; and **five sessions**, which bounds the long streams. The unlock that reaches the most rows is a **settlement on `EngineInput`**.
+
+> **Two clauses of that paragraph are corrected by batch 5 (2026-08-17, [session 49](sessions/2026-08-17-session-49.md)) and are left standing so the correction reads against them.** "Five sessions, which bounds **GS-064**" was Core EOD's win-day count read as the directory's: Merit Rapid requires three, and GS-064 is written. And **the calendar transcription is no longer named as one of the two largest unlocks**, because `EngineInput` carries no calendar at all, so the session-kind rows need the input type to widen and a transcribed year alone moves none of them.
 
 **A third M01 seam, smaller than the two floors and worth ruling beside them.** `R-38` is a funded gate in group F and `DO-9` evaluates "R-33 to R-39", but its input `hasPayoutInFlight` is declared on `ExternalGates`, which `INV-23` says is context and never replayed, and `R-40`'s context list does not name `R-38`. **So `engine_eligible`'s value depends on where `R-38`'s input is read from, and M01 does not say.** GS-055 pins the four gate inputs individually rather than the conjunction.
+
+---
+
+
+## Golden fixtures, batches 4 and 5: thirty of 284, and a batch that mostly checked reasons (2026-08-17)
+
+**Batch 4 landed four** ([session 48](sessions/2026-08-17-session-48.md)): **GS-044, GS-054, GS-061, GS-242**, on a third plan record [`plans/CORE-150K.json`](../packages/rules-engine/fixtures/plans/CORE-150K.json) transcribed from [Appendix A.1](plans/M01-rules-engine.md)'s 150K column. It is the first batch whose subject is the **funded phase reached through the eval pass**, which [ADR-050](decisions/ADR-050.md) is what made writable. It also checked mechanically that **every one of M1's 73 owned scenarios is either a fixture or a named held-back row**, which was not true before it: the table had listed reasons for the scenarios somebody had tried to write and was silent about the rest.
+
+**Batch 5 landed one** ([session 49](sessions/2026-08-17-session-49.md)): **GS-064**. Batch 4's check was correct, so there was nothing left to transcribe, and the session **checked the held-back reasons against their primary sources instead**. One was wrong and three were incomplete.
+
+| Row | Recorded reason | What the source says |
+|---|---|---|
+| **GS-064** | Not inside five sessions: eligibility is six trading days after the win-day gate | Arithmetic on `win_days.required_count = 5`, which is **Appendix A.1's**. Appendix A.2 carries **3**, so the cheapest eligible close is day three and the breach lands on day four. **Written**, on the plan record batch 2 added |
+| **GS-001, GS-003, GS-004, GS-030 to GS-032** | The fixture calendar declares five full sessions and no fill stream | True, and not the blocker. **`EngineInput` carries no calendar at all**, so `is_half_day` and `halted` reach nothing whatever it declares, and `DailyMark` has no fill instant. A transcribed CME year moves none of the six |
+| **GS-070** | Five sessions, and no shape for `assertions` | **`funded_start_not_size` is unreachable independently of `opening_mismatch`**: DO-3 tests `INV-18` first, `L-11` fixes `adjustment_cents` at 0, and the post-reset prior balance **is** `size_cents` |
+| **GS-080** | The nested `engine_gates` object | **And** a second blocker: no fixture may pin `engine_eligible: true` while `R-38` sits in group F with its input on `ExternalGates`, which is the seam recorded above |
+
+**The wrong reason is this corpus's own recurring shape arriving a fourth time**: a correct observation about one plan carried one unchecked step to the directory. Sessions 47 and 48 each found it once, batch 3 found it in the `R-30` denominator row, and **the plan record that dissolved this one was added by the batch that recorded the reason's neighbours**. The lesson batch 3 already wrote down holds: a reason nobody re-derives becomes a fact.
+
+**GS-064 pins `engine_eligible` and it is the only fixture that does.** Three win days on Merit Rapid make every engine gate pass at the close of 2026-11-04; day four is a **traded win day closing at a new high** whose low is one cent under the trailed floor, so DO-6, DO-7 and DO-9 would each have made the account look *more* eligible and DO-4 returns before any of them run. **Six fields carried at day three's values beside a balance carried at day four's** are the assertion, because `engine_eligible: false` alone is satisfied by an engine that never computed it. The direction is safe where GS-055's `true` was not: `R-25` says "no eligibility" in its own words and section 3.6's breach block writes the field outright, so **`R-38`'s contested membership cannot change the answer**.
+
+**A longer synthetic calendar was worked out and then not added.** It would have been legitimate on `calendar.ts`'s own `GAPPED_SLICE` precedent; it was dropped because **it unblocks nothing** once the plan record is read correctly. The reasoning is recorded in the fixture README so the next session that reaches for one starts from where this stopped.
+
+**`sessions[].kind` is carried and ignored**, with no `L-nn` rule refusing it and no `AWAITING_M01_INPUT` entry naming it, which makes it the one place this format can silently drop a stated condition. Recorded for the fixture-wiring session, which owns every rule in that table.
+
+**And 284 is the wrong denominator for what is left in that directory.** It can only ever hold **M1's partition of 73**; the other 211 are other modules' fixtures, and writing one there would double-count against that module's coverage. The honest pair is **30 of 284** for the registry and **30 of 73** for the directory, and both are now carried in its README.
 
 ---
 
