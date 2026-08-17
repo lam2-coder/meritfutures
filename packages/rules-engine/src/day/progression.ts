@@ -84,10 +84,40 @@ export function advanceEvalProgression(input: ProgressionInput): ProgressionOutc
   // points at the open. Counting elapsed trading days needs the open day and a
   // calendar spanning it, which is R-02's `sequence` subtraction.
   //
-  // GIVING `RuleState` THAT FIELD IS A COLUMN ON `rule_states`, WHICH IS A
-  // SCHEMA DELTA AND NOT A DIFF. M01's SD-01 to SD-10 do not contain it and the
-  // corpus is frozen, so proposing one is an ADR and the founder's, not this
-  // session's. It is reported in the session log rather than decided here.
+  // SESSION 45 CONCLUDED "SO IT IS A COLUMN ON `rule_states`, A SCHEMA DELTA
+  // AND AN ADR", AND SESSION 47 CHECKED THAT AGAINST THE SCHEMA AND WITHDREW IT.
+  // The datum is already stored, twice, and neither copy is on this record:
+  //
+  //   * `accounts.opened_on date NOT NULL` (`0007_accounts.sql:76`), declared
+  //     `**Unit: trading day**` in `data-model/accounts.md:16`. It is not null,
+  //     it never moves, and it is exactly R-02's `sequence` anchor.
+  //   * `accounts.expires_on date NULL` (`0007_accounts.sql:90`), "eval expiry
+  //     when configured", which is `max_days` already materialised as a date.
+  //
+  // AND M01'S OWN PUBLIC SURFACE ALREADY TREATS THE OPEN DAY AS AN ENGINE INPUT:
+  // section 1.3 is `initialState(plan: ResolvedPlan, openedOn: TradingDay)`. The
+  // engine is HANDED the open day at construction and drops it; `initialState`
+  // writes it to `tradingDay`, which the next fold overwrites. So the gap is not
+  // a fact the engine lacks. It is a field `DayInput` does not carry, and the
+  // golden fixture format has carried `account.opened_on` all along, on the
+  // loader's "reaches no engine input" list that STATE.md item 3 says M01 empties.
+  //
+  // WHAT R-32 ACTUALLY NEEDS IS ONE FIELD ON `DayInput`, WHICH IS AN AMENDMENT
+  // TO M01 SECTION 2.1 AND NOT A MIGRATION. That is still an ADR, because
+  // `DayInput` is specified in a frozen document, and it is still the founder's.
+  // But no `rule_states` column is required, no `SD-nn` is required, and no
+  // migration number should be reserved for it: a number reserved against a
+  // migration that should not be written is worse than no number, because a
+  // migration is sacred once merged and can only be superseded (E2).
+  //
+  // TWO THINGS ARE GENUINELY UNRULED AND THE REFUSAL STANDS ON THEM RATHER THAN
+  // ON THE SCHEMA. First, the ANCHOR: R-32 and `G-EXPIRED` both say "elapsed
+  // trading days" and neither names the day they elapse from, and an account
+  // sits in `provisioning_pending` before it is `active`, so an eval clock
+  // anchored at `opened_on` can burn days the trader could not trade. Second,
+  // WHICH COLUMN IS AUTHORITATIVE: R-32 and `G-EXPIRED` describe a COUNT against
+  // `max_days`, and `accounts.expires_on` is a stored DATE for the same fact.
+  // Two artifacts, two shapes, and the corpus does not say which one binds.
   //
   // WHY REFUSE RATHER THAN IGNORE. `max_days` is `null` on all three v1 plans
   // (R-32: "so unreachable"), so nothing in the lineup reaches this line. But a
@@ -221,12 +251,43 @@ export function advanceEvalProgression(input: ProgressionInput): ProgressionOutc
   // trader's loss room narrows; ADR-014's concern was a floor falling UNDER A
   // BALANCE THAT DID NOT.
   //
-  // What is genuinely unsettled is INV-06's SCOPE: whether it is per account or
-  // per phase, and D-M2-1 ("by resetting the account OR PROVISIONING A NEW ONE")
-  // is the reason the question is real rather than pedantic. That scope decides
-  // whether RE-P-01's generator may cross an eval pass, so the property session
-  // needs it ruled. Session 44 handled M01's R-22 disagreement the same way:
-  // follow the rule table, report the defect, and leave the ADR to the founder.
+  // What is genuinely unsettled is INV-06's SCOPE, and SESSION 47 CLOSED OFF ONE
+  // OF THE TWO READINGS RATHER THAN LEAVING BOTH OPEN.
+  //
+  // THE PER-ACCOUNT READING DOES NOT RESCUE R-31, AND D-M2-1 IS NOT ABOUT THIS
+  // ACCOUNT. The hypothesis was that "provisioning a new one" makes the funded
+  // account a NEW account, so nothing decreases within one account and "no phase
+  // qualifier" is satisfied exactly. Five primary sources refuse it:
+  //
+  //   * M02's DEP-M2-01 is the same dependency from the owning side and it names
+  //     the subject outright: "on `phase.passed`, THE PLATFORM ACCOUNT is reset
+  //     to `size_cents` (or a new account provisioned at `size_cents`)". The
+  //     "new one" is a vendor account. `INV-M2-07` says the same in M2's terms,
+  //     "a funded account's first MARK opens at exactly `size_cents`", and
+  //     `FM-M2-07`'s remedy is "refuse, page, RE-PROVISION".
+  //   * STATE_MACHINES section 1 draws `eval_phase --> funded_phase: G-EVAL-PASS`
+  //     as a substate transition INSIDE one account's `active` state. Universal
+  //     rule 3 reserves "a new one is created instead" for TERMINAL states, and
+  //     the eval pass is not one; universal rule 2 says a transition not drawn
+  //     does not exist.
+  //   * `accounts.phase` is one column on one row over the enum
+  //     ('eval','funded','closed','graduated'), and `funded_on date NULL` is set
+  //     on that same row under `accounts_funded_has_date`. `account_status_history`
+  //     logs `from_phase`/`to_phase` per `account_id`, which is a record of a
+  //     phase moving WITHIN an account.
+  //   * `accounts.purchase_id` is `NOT NULL UNIQUE`: one account per purchase.
+  //     An eval pass is not a purchase, so no second account row can exist for it.
+  //   * `rule_states` is unique on `(account_id, trading_day)` and carries
+  //     `phase` "as of the END of this day". One account's row sequence spans
+  //     both phases; under a new-account reading that column would be constant.
+  //
+  // SO PER-ACCOUNT IS ALREADY WHAT THE CORPUS MEANS, AND THAT IS PRECISELY WHY IT
+  // DOES NOT HELP: read per account, INV-06 is the reading R-31 violates. The
+  // surviving readings are per (account, phase), which "no phase qualifier"
+  // argues against in its own words, or INV-06 gaining a stated R-31 exception.
+  // Both are the founder's. Session 44 handled M01's R-22 disagreement the same
+  // way: follow the rule table, report the defect, leave the ADR to the founder.
+  // RE-P-01's generator still cannot be written until one of them is ruled.
   //
   // DO-7's INV-06 TRIPWIRE IS NOT WEAKENED AND MUST NOT BE. It compares within
   // one day's trail-then-lock and never sees this step, which is correct: the
