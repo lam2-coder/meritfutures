@@ -1091,7 +1091,10 @@ const ci06h = {
     'runs in CI, so a green result here is NOT a claim that the set installs. And ' +
     'the cross-branch half, that a pull request may not claim a number already on ' +
     'main, needs a job that can see both refs; this run sees one, exactly as ' +
-    "CI-06f's does. The table's State column is prose and is not parsed.",
+    "CI-06f's does. The table has no State column to parse: it claimed a merge " +
+    "state no single ref can see, it was wrong eleven times, and ADR-034's " +
+    'remedy deleted it. The half that IS derivable is derived, here and by the ' +
+    '`allocation` subcommand.',
   run() {
     const findings = [];
     const files = sqlFiles().map((p) => p.replace('packages/db/migrations/', ''));
@@ -2524,6 +2527,239 @@ function calendarGenerator() {
 }
 
 // -----------------------------------------------------------------------------
+// CI-06p  THE LETTER REGISTRY, READ THE WAY THE TWO NUMERIC ONES ARE READ
+// -----------------------------------------------------------------------------
+// The third allocation table in ALLOCATION.md claims `CI-06` LETTERS, and for a
+// week nothing read it. That is not an oversight, it is a parser fact: the
+// shared `allocated()` above matches a three-digit or four-digit first cell and
+// A LETTER DOES NOT PARSE. So the table that was written to end three plan
+// documents hand-maintaining one sequence was itself the one registry with no
+// gate over it, and it said so in its own words.
+//
+// THE ASSERTION SET IS NAMED BY THE TABLE, not invented here: "uniqueness of the
+// letters in the STRATEGY rows, and gaplessness over allocated plus reserved,
+// which is CI-06f's assertion with a different alphabet." Three checks:
+//
+//   1. UNIQUENESS IN THE STRATEGY INVENTORY. Each `CI-06<letter>` heads at most
+//      one row of section 4.4. Two rows for one letter is ADR-038's collision in
+//      the document that describes the gates rather than in the runner.
+//   2. EVERY IMPLEMENTED LETTER IS CLAIMED BY A ROW. This is CI-06h's second
+//      assertion and it is the one that keeps the table from going vacuous:
+//      gaplessness alone can never force a row, because a gate that exists in
+//      the runner fills its own hole. Without this the sequence stays gapless
+//      while the registry quietly stops being maintained, which is the state
+//      this table was created to end.
+//   3. GAPLESS OVER IMPLEMENTED PLUS RESERVED. `o` is reserved by ADR-044 and
+//      unwritten, so a hole a sibling branch holds must pass, exactly as it does
+//      on the two tables above. The maximum is taken over the STRATEGY letters
+//      too, so a letter rowed in STRATEGY and claimed nowhere is a hole rather
+//      than a row above the horizon that nothing looks at.
+//
+// SAME TWO-REF GAP, INHERITED VERBATIM. A branch cannot see a letter its sibling
+// took, which is why gaplessness runs over reserved at all.
+const LETTER_ALLOCATION = '## CI gate identifier allocation';
+const STRATEGY_DOC = 'docs/testing/STRATEGY.md';
+const GATE_INVENTORY = '### 4.4 Corpus integrity';
+
+// The letters a table section claims, from the FIRST CELL OF TABLE ROWS ONLY,
+// which is `allocated()`'s rule with a different alphabet. `| `a` to `j` |` is a
+// range and `| **`k`** |` is one letter; the header row and the `|---|`
+// separator match neither, which is how they are skipped.
+//
+// BOUNDED ON ANY HEADING RATHER THAN ON `\n## `, and the difference is not
+// style. This is the LAST `##` section in the file, so a `\n## ` bound runs to
+// end of file and every table row in the prose sections below it would claim a
+// letter. The two numeric tables each have a `##` sibling beneath them and never
+// had this problem, which is exactly why copying their bound would have been
+// wrong in a way nothing would have reported.
+function allocatedLetters(body) {
+  const start = body.indexOf(LETTER_ALLOCATION);
+  if (start === -1) throw new Error(`allocation table not found: "${LETTER_ALLOCATION}"`);
+  const rest = body.slice(start + LETTER_ALLOCATION.length);
+  const next = rest.search(/\n#{1,6} /);
+  const claimed = new Set();
+  let rows = 0;
+  for (const line of (next === -1 ? rest : rest.slice(0, next)).split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const m = /^\s*\*{0,2}`?([a-z])`?\*{0,2}(?:\s+to\s+\*{0,2}`?([a-z])`?\*{0,2})?\s*$/.exec(
+      line.split('|')[1] ?? '',
+    );
+    if (!m) continue;
+    rows++;
+    const to = (m[2] ?? m[1]).charCodeAt(0);
+    for (let c = m[1].charCodeAt(0); c <= to; c++) claimed.add(String.fromCharCode(c));
+  }
+  // Rule 2. A table that parses to nothing is a gate with an empty reservation
+  // set: it reports every hole and no false pass, and it is still a runner that
+  // has lost its input.
+  if (rows === 0) throw new Error(`allocation table claims no letters: "${LETTER_ALLOCATION}"`);
+  return claimed;
+}
+
+// The letters the runner actually implements, read from GATES rather than from
+// STRATEGY's table, because the runner is the artifact and the table is the
+// description of it. Same reasoning as `gate_count`'s query.
+const implementedLetters = () =>
+  new Set(
+    GATES.map((g) => /^CI-06([a-z])$/.exec(g.id))
+      .filter(Boolean)
+      .map((m) => m[1]),
+  );
+
+// The letters STRATEGY section 4.4 rows, in order, so a duplicate is visible.
+// Bounded to its own `###` section for the same reason `negativeAuthzRows` and
+// `cronRows` are: unbounded, this runs into 4.5 and reads a table answering a
+// different question.
+function strategyGateLetters() {
+  const body = read(STRATEGY_DOC);
+  const start = body.indexOf(GATE_INVENTORY);
+  if (start === -1) throw new Error(`${STRATEGY_DOC}: section not found: "${GATE_INVENTORY}"`);
+  const after = body.slice(start + GATE_INVENTORY.length);
+  const end = after.search(/\n### /);
+  const out = [];
+  for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const m = /^\s*\*{0,2}`?CI-06([a-z])`?\*{0,2}\s*$/.exec(line.split('|')[1] ?? '');
+    if (m) out.push(m[1]);
+  }
+  return out;
+}
+
+const ci06p = {
+  id: 'CI-06p',
+  title: 'CI gate letters are unique in STRATEGY and gapless over implemented plus reserved',
+  covers:
+    "CI-06f's assertion with a different alphabet, over the third allocation table. " +
+    'Each CI-06<letter> heads at most one row of STRATEGY section 4.4; every letter the ' +
+    'runner implements is claimed by a row of the letter table, which is what stops the ' +
+    'table going vacuous once gaplessness can be satisfied by the gate itself; and the ' +
+    'letters are gapless over implemented plus reserved, so a letter a sibling branch ' +
+    'holds is a hole that passes. ' +
+    'THREE THINGS IT DOES NOT DO. It inherits CI-06f and CI-06h\'s cross-branch gap ' +
+    'verbatim: a pull request may not claim a letter already taken on main, and this run ' +
+    'sees one ref. It does not require an implemented gate to HAVE a STRATEGY row, ' +
+    'because ADR-026 is a check in this runner with no letter at all and the rule would ' +
+    'be a shape nobody has ruled. And it says nothing about whether a gate does what its ' +
+    'row claims, which is falsify.mjs and not a parse.',
+  run() {
+    const findings = [];
+    const implemented = implementedLetters();
+    // Rule 2 on a derived input. A regex that stopped matching the gate ids
+    // would make every claimed letter unimplemented and every row a finding,
+    // which is loud; an EMPTY implemented set with an empty table would be
+    // silent, and that is the direction this guard is for.
+    if (implemented.size === 0) {
+      throw new Error('no CI-06<letter> gates found in this runner; the gate cannot run');
+    }
+    const reserved = allocatedLetters(read(ALLOCATION_DOC));
+
+    // Assertion 1.
+    const rowed = strategyGateLetters();
+    if (rowed.length === 0) {
+      throw new Error(
+        `${STRATEGY_DOC}: the ${GATE_INVENTORY} inventory parsed to zero CI-06 rows; ` +
+          'CI-06p is asserting nothing about it',
+      );
+    }
+    const seen = new Set();
+    for (const letter of rowed) {
+      if (seen.has(letter)) {
+        findings.push(
+          `${STRATEGY_DOC}: CI-06${letter} heads more than one row of the ${GATE_INVENTORY} ` +
+            'inventory. One letter is one gate, and two rows for it is the collision this ' +
+            'registry exists to end, in the document that describes the gates',
+        );
+      }
+      seen.add(letter);
+    }
+
+    // Assertion 2, which is CI-06h's and not CI-06f's.
+    for (const letter of [...implemented].sort()) {
+      if (!reserved.has(letter)) {
+        findings.push(
+          `CI-06${letter} is implemented in this runner and no row of the letter table in ` +
+            `${ALLOCATION_DOC} claims it. Claim the letter there before writing the gate ` +
+            '(ADR-034, ADR-036), or the table stops being what a sibling branch reads',
+        );
+      }
+    }
+
+    // Assertion 3. The STRATEGY letters are in the maximum so a letter rowed
+    // there and claimed nowhere is a hole rather than a row nothing reaches.
+    const all = [...implemented, ...reserved, ...rowed].map((c) => c.charCodeAt(0));
+    const max = Math.max(...all);
+    for (let c = 'a'.charCodeAt(0); c <= max; c++) {
+      const letter = String.fromCharCode(c);
+      if (!implemented.has(letter) && !reserved.has(letter)) {
+        findings.push(
+          `CI-06${letter} is neither implemented nor reserved (a hole). A letter is claimed ` +
+            `in ${ALLOCATION_DOC} before the gate is written, and a hole a sibling branch ` +
+            'has reserved passes',
+        );
+      }
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// `allocation`: the derivation the allocation tables point at
+// -----------------------------------------------------------------------------
+// THE STATE COLUMN WAS DELETED AND THIS IS THE HALF THAT REPLACED IT. It read
+// `allocated` or `reserved, unmerged` and was wrong eleven times in nine days,
+// because a runner reading one ref cannot tell a reservation from an allocation
+// and neither can a reader. ADR-034's remedy is to generate the value or delete
+// it and point at the source; the half a single ref CAN answer is "is the
+// artifact in this tree", and this prints it per claimed row.
+//
+// IT IS NOT A GATE AND IT ASSERTS NOTHING. `absent` here means absent from THIS
+// REF, which is the whole of what the deleted column got wrong. A sibling branch
+// may hold the file, and `git ls-remote` is still the manual step.
+function allocationReport() {
+  const body = read(ALLOCATION_DOC);
+  const line = (id, present, note) =>
+    console.log(`  ${id.padEnd(10)}${present ? 'present  ' : 'absent   '}${note}`);
+
+  const adrOnDisk = new Set(
+    adrEntries()
+      .map((e) => e.id)
+      .filter((id) => id && !/^D/.test(id))
+      .map(Number),
+  );
+  console.log(`ADR numbers        ${ALLOCATION_DOC}, "${ADR_ALLOCATION}"`);
+  for (const n of [...allocated(body, ADR_ALLOCATION)].sort((a, b) => a - b)) {
+    const id = String(n).padStart(3, '0');
+    line(`ADR-${id}`, adrOnDisk.has(n), `docs/decisions/ADR-${id}.md`);
+  }
+
+  const migrationsOnDisk = new Map(
+    sqlFiles()
+      .map((p) => [/(\d{4})_/.exec(p), p.replace('packages/db/migrations/', '')])
+      .filter(([m]) => m)
+      .map(([m, f]) => [Number(m[1]), f]),
+  );
+  console.log(`\nMigration numbers  ${ALLOCATION_DOC}, "${MIGRATION_ALLOCATION}"`);
+  for (const n of [...allocated(body, MIGRATION_ALLOCATION)].sort((a, b) => a - b)) {
+    const id = String(n).padStart(4, '0');
+    line(id, migrationsOnDisk.has(n), migrationsOnDisk.get(n) ?? 'no file on this ref');
+  }
+
+  const implemented = implementedLetters();
+  console.log(`\nCI gate letters    ${ALLOCATION_DOC}, "${LETTER_ALLOCATION}"`);
+  for (const letter of [...allocatedLetters(body)].sort()) {
+    const has = implemented.has(letter);
+    line(`CI-06${letter}`, has, has ? 'a gate in this runner' : 'no gate in this runner');
+  }
+
+  console.log(
+    '\n`absent` means absent from THIS REF and nothing more. A sibling branch may hold it,\n' +
+      'which is the two-ref gap CI-06f, CI-06h and CI-06p each declare, and it is why the\n' +
+      'State column that used to claim otherwise was deleted rather than repaired again.',
+  );
+  return 0;
+}
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -2541,6 +2777,7 @@ const GATES = [
   ci06l,
   ci06m,
   ci06n,
+  ci06p,
   adr026,
 ];
 
@@ -2552,6 +2789,7 @@ function main() {
     return 0;
   }
   if (cmd === 'generate') return generate();
+  if (cmd === 'allocation') return allocationReport();
 
   // Dev affordance ported from PR #7: CI-06a tells you a link is dead, this
   // tells you what to point it at instead.
@@ -2568,7 +2806,8 @@ function main() {
 
   if (cmd !== 'check') {
     console.error(
-      'usage: node scripts/corpus/gates.mjs check [GATE-ID] | generate | list | anchors <file.md>',
+      'usage: node scripts/corpus/gates.mjs check [GATE-ID] | generate | allocation | list | ' +
+        'anchors <file.md>',
     );
     return 2;
   }
