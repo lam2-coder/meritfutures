@@ -118,8 +118,17 @@ export interface StageCoverage {
    */
   readonly declaration: DeclarationCheck;
   /**
-   * `false` while the derivation is REPORTED rather than enforced (founder
-   * ruling, 2026-08-17), which is exactly while `declaration` does not hold.
+   * `false` while the derivation is REPORTED rather than enforced, which is
+   * exactly while `declaration` does not hold.
+   *
+   * NO RULING SITS BEHIND THIS AND EARLIER COMMENTS SAID ONE DID. Two lines in
+   * this file attributed the deferral to a "founder ruling, 2026-08-17"; no such
+   * ruling exists, in `docs/` or anywhere else, and ADR-048 does not mention
+   * enforcement being deferred. NOTHING WAS WRONG WITH THE BEHAVIOUR: it needs no
+   * ruling, because it is a tautology rather than a decision. A derived direction
+   * cannot be enforced against a fold that reaches none of the rules a fixture
+   * cites. The citation was the defect, and a merge-blocking stage citing an
+   * authority that does not exist is worse than one citing none.
    *
    * IT IS DERIVED, NOT SET. There is no switch a session can flip: the stage
    * starts enforcing the derived direction the moment the folded function runs
@@ -334,7 +343,8 @@ export function renderStageCoverage(coverage: StageCoverage): string {
     enforced
       ? '**The derived direction is ENFORCED.** Each fixture is asserted in the direction its ' +
           'citation derives.'
-      : '**The derived direction is REPORTED AND NOT ENFORCED** (founder ruling, 2026-08-17), ' +
+      : '**The derived direction is REPORTED AND NOT ENFORCED**, ' +
+          'because the fold reaches none of the rules these fixtures cite. ' +
           'because the premise above does not hold. What runs instead is the standing TR-02 ' +
           'assertion: every fixture must FAIL against a fold that computes nothing, and a fixture ' +
           'that matches is the finding. **Nothing is edited to move between the two.** The derived ' +

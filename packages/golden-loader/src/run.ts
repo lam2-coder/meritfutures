@@ -95,7 +95,13 @@ function openingState(fixture: GoldenFixture): RuleState {
 
 /** Fold one fixture's day stream through the engine and diff the end state. */
 export function runFixture(fixture: GoldenFixture): FixtureOutcome {
-  const { plan, marks, settlements, startingPhase } = fixture.input;
+  // `openedOn` IS DESTRUCTURED HERE BECAUSE `DayInput` NOW REQUIRES IT. ADR-051
+  // anchors R-32's elapsed-trading-day count at `accounts.opened_on` and made the
+  // field required rather than optional, on the reasoning that an optional anchor
+  // means R-32 silently does not fire when it is absent. The fixture format has
+  // carried `account.opened_on` all along; `AWAITING_M01_INPUT` is now empty and
+  // this is the last of its four entries to reach an engine input.
+  const { plan, marks, settlements, startingPhase, openedOn } = fixture.input;
 
   // THE SLICE IS CONSTRUCTED HERE AND NOT IN THE LOADER, and the boundary is the
   // falsification harness's rather than a preference. `check.mjs` imports
@@ -130,6 +136,7 @@ export function runFixture(fixture: GoldenFixture): FixtureOutcome {
       mark,
       calendar,
       settlements,
+      openedOn,
     });
 
     events.push(...output.events);
@@ -229,6 +236,9 @@ export function engineIsIdentityStub(): boolean {
     engineVersion: 'probe',
     plan: PROBE_PLAN,
     prior,
+    // The probe opens on the day `initialState` above opens it on, so R-32's
+    // elapsed count is 1 and cannot expire a plan whose `max_days` is null.
+    openedOn: '2026-11-02' as TradingDay,
     mark: {
       tradingDay: PROBE_DAY,
       openingBalanceCents: 1_000_000n,
