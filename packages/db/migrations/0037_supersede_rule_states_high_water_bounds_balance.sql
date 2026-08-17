@@ -84,13 +84,31 @@
 -- floorLocked: false at DO-8, and ADR-050 deliberately did not cover it.
 --
 -- A post-lock bound against the floor (`hwb > floor_cents`) was also refused.
--- It is derivable from CV-12 and CV-02 but no row of M01 states it, one of its
--- inputs is ADR-052 which is unsigned, and it would not catch the failure mode
--- above: a half-implemented lock makes hwb too HIGH and that bounds it below.
+-- It is derivable from CV-12 and CV-02 but no row of M01 states it, and it
+-- would not catch the failure mode above: a half-implemented lock makes hwb too
+-- HIGH and that bounds it below.
 -- THIS SESSION EXISTS BECAUSE SOMEBODY WROTE A CHECK STRONGER THAN THE RULE IT
 -- WAS CHECKING. Writing a second one while repairing the first is not a fix.
 --
 -- What holds the post-lock behaviour is the fixture layer, GS-016 and RE-P-02.
+--
+-- -----------------------------------------------------------------------------
+-- THIS FILE REMOVES A SUPPORT FROM AN ALREADY-SIGNED RULING
+-- -----------------------------------------------------------------------------
+-- ADR-052 (accepted 2026-08-17) rejects the alternative of freezing hwb at the
+-- lock trigger partly BECAUSE OF THE CONSTRAINT THIS FILE SCOPES: a hwb of
+-- 5,260,000 against that day's balance of 5,300,001 is a row "the constraint
+-- rejects". After this migration that row is a LOCKED row and the constraint no
+-- longer rejects it, so that argument stops working.
+--
+-- The alternative stays rejected on ADR-052's second and independent reason,
+-- in the same sentence: freezing early "would also make
+-- high_water_balance_cents stop being the account's high-water balance". That
+-- is about what the column means and nothing here touches it. NOTHING IN THIS
+-- FILE REOPENS A SIGNED RULING; it removes a support that ruling no longer
+-- needs, and ADR-053 section 5 records the removal so a later reader
+-- re-deriving ADR-052 from its own text does not find an argument that has
+-- quietly stopped holding.
 -- =============================================================================
 
 BEGIN;
