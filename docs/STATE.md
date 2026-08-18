@@ -1554,3 +1554,24 @@ The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**.
 | **Next-action 6 is NARROWED, not closed** | Its stated grounds are dead for a **required** field: both walked fixtures are type-annotated, so it is a compile error first and the walk names the path second. What remains is an **optional (`?`) field omitted from both literals**, which the test file declares as its own blind spot; `GateLeaf.path` still being `string`; and an object-or-null field `null` in both fixtures reporting as one path. **Not edited here** -- `## Next 3 actions` belongs to R1 |
 
 **Four obligations are named in the module header and none is wired**, each outside this fence: B.1's payout halt, the event's destination (`0017`'s tables), a scheduler, and `replay.audit_completed`, which [`CRON_INVENTORY.md`](ops/runbooks/CRON_INVENTORY.md) requires and the `EVENTS.md` catalogue does not define. **A green audit today also covers less than it appears to**, because the engine does not implement every rule group yet, which is what the report's counts exist to make visible.
+
+---
+
+## `CI-06t` closed the span-parser blind spot, and found four live sites doing it (2026-08-18, session 69)
+
+**Nineteen gates now.** [`CI-06t`](testing/STRATEGY.md): in every markdown file, each generated-span opener is followed by its closer **before any other opener appears**, and a closer with no opener before it is a finding. **This section names the tokens rather than spelling them, and so does the gate**, because a document describing this gate is a document carrying the defect unless it is careful.
+
+**A total count of openers against closers is not this check, and that distinction is the whole gate.** `CI-06g` matches an opener only when a closer follows it somewhere, so an opener with nothing after it **matches nothing and is skipped in silence**. It stays invisible for exactly as long as it is the last such token in the file; the first section appended below it supplies the closer it has been waiting for, and the stale opener then swallows everything between, including the new span's own opener. That is what failed on 2026-08-18 with a cause two days old.
+
+**FOUR REAL SITES IN THREE DOCUMENTS, FOUND BY RUNNING THE CHECK ACROSS THE TREE BEFORE ANYTHING WAS SEEDED.** All four are the identical shape as the STATE line the gate comes from, prose describing a span by spelling its opener out, and all four are repaired by naming the span instead. [Session 30](sessions/2026-08-15-session-30.md) is the sharpest: it opens twice on one line with neither closed while a third sits unclosed above it, which is the arrangement no balance count can locate. One of the three, the [unsigned-ADR audit](decisions/gates/unsigned-adr-audit-2026-08-18.md), sits **outside this session's fence** and was repaired anyway on the brief's explicit instruction, and is named here rather than slipped in.
+
+**The gate's own first draft was the fifth instance of the class it exists for**, and the record is kept rather than tidied away. It sorted span tokens by **line** with an opener-first tiebreak and reported fifty findings against a clean tree, because [INDEX](INDEX.md) carries three spans on one line and [STRATEGY](testing/STRATEGY.md) carries two. Sorted by character offset it is clean, and a scope case now pins that arrangement.
+
+**Its document set is `markdownFiles()`, which is `CI-06g`'s own, and deliberately not `isCorpusDocument`.** That helper is `CI-06b` and `CI-06c`'s shared reader under `OQ-P1-04` and answers a different question. This gate protects **one parser**, so it guards exactly the population that parser reads; the audit file above sits in a directory `isCorpusDocument` excludes.
+
+| Verification | Result |
+|---|---|
+| `node scripts/corpus/gates.mjs check` | **19 of 19 pass** |
+| `node scripts/corpus/falsify.mjs` | green; both `CI-06t` seeds watched firing, **23** scope cases hold |
+| `pnpm vitest run` | **60 files, 908 passed**, 40 skipped |
+| Tree scan | 494 markdown files, 10 carry span tokens, 158 tokens, **0 unbalanced** |
