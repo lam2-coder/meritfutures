@@ -1559,9 +1559,9 @@ The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**.
 
 ## `CI-06s` closes `OI-07`, and its fourth occurrence was live on `main` when the gate arrived (2026-08-18)
 
-**Every `scripts/db/probe_*.sql` on disk is now asserted to be both RUN and PINNED.** A step in [`corpus.yml`](../../.github/workflows/corpus.yml) makes a probe run; a needle in `CI-06h`'s required list makes deleting that step a gate failure. **Wiring a probe and pinning it are two edits in two files, and the second is the one that gets forgotten, because the first is the one that makes CI green.**
+**Every `scripts/db/probe_*.sql` on disk is now asserted to be both RUN and PINNED.** A step in [`corpus.yml`](../.github/workflows/corpus.yml) makes a probe run; a needle in `CI-06h`'s required list makes deleting that step a gate failure. **Wiring a probe and pinning it are two edits in two files, and the second is the one that gets forgotten, because the first is the one that makes CI green.**
 
-**This record named the gate three times without claiming it** and its own words were "Three occurrences is a pattern: the fix is a gate asserting that every `scripts/db/probe_*.sql` on disk is both run and pinned". **There were four.** `probe_rule_states_high_water_bound.sql` was on disk, was wired, and the string `high_water_bound` appeared nowhere in [`gates.mjs`](../../scripts/corpus/gates.mjs). It was repaired in its own commit, and the omission was made by the session that wrote the probe.
+**This record named the gate three times without claiming it** and its own words were "Three occurrences is a pattern: the fix is a gate asserting that every `scripts/db/probe_*.sql` on disk is both run and pinned". **There were four.** `probe_rule_states_high_water_bound.sql` was on disk, was wired, and the string `high_water_bound` appeared nowhere in [`gates.mjs`](../scripts/corpus/gates.mjs). It was repaired in its own commit, and the omission was made by the session that wrote the probe.
 
 | | |
 |---|---|
