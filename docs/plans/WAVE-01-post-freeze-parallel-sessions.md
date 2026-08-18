@@ -4,10 +4,10 @@ depends_on: [../STATE.md, ../decisions/ALLOCATION.md, P2-rules-engine.md, ../tes
 last_updated: 2026-08-18
 ---
 
-# WAVE-01: nine sessions, six of them concurrent
+# WAVE-01: ten sessions, six of them concurrent
 
 **A wave plan, not a module plan.** It carries no ruling and no design. It is the allocation
-table and the prompt set for the nine sessions that are unblocked on 2026-08-18, written so
+table and the prompt set for the ten sessions that are unblocked on 2026-08-18, written so
 the founder pastes a prompt into a fresh session and reads a pull request rather than
 composing anything.
 
@@ -26,8 +26,8 @@ claim precedes the artifact.
 
 | Registry | Spent by this wave | Where the claim lives |
 |---|---|---|
-| **`CI-06` letters** | **`r`** (G1), **`s`** (G3). `o` was already reserved and unwritten and G2 spends it | [ALLOCATION](../decisions/ALLOCATION.md), letter table. **Committed 2026-08-18, before this document existed** |
-| **Session-log numbers** | **61 to 69**, one per session, in the table below | **This table.** That registry has no allocation table and has now raced twice: [STATE](../STATE.md) records four entries numbered 31 and two numbered 32, and [sessions/README](../sessions/README.md) currently carries **two rows numbered 58 and two numbered 59**. Until it gets a table of its own, this document is one for this wave |
+| **`CI-06` letters** | **`r`** (G1), **`s`** (G3), **`t`** (G4). `o` was already reserved and unwritten and G2 spends it | [ALLOCATION](../decisions/ALLOCATION.md), letter table. **`r` and `s` were committed before this document existed**; `t` was claimed mid-session when the defect that needs it was found |
+| **Session-log numbers** | **61 to 70**, one per session, in the table below | **This table.** That registry has no allocation table and has now raced twice: [STATE](../STATE.md) records four entries numbered 31 and two numbered 32, and [sessions/README](../sessions/README.md) currently carries **two rows numbered 58 and two numbered 59**. Until it gets a table of its own, this document is one for this wave |
 | **ADR numbers** | **none reserved** | No session below is expected to need one. **A session that discovers it does stops, claims the number in [ALLOCATION](../decisions/ALLOCATION.md) in its own commit, and proceeds** — it does not write the ADR first. `059` is the next free number and no row claims it |
 | **Migration numbers** | **none.** No session below touches `packages/db/migrations` | `0038` is the next free number and no row claims it |
 
@@ -48,11 +48,12 @@ directory they are fenced to files that do not exist yet.
 | **1** | **F1** | Golden fixtures batch 10, and one retraction that left a copy standing | 66 | `claude/wave01-f1-fixtures-batch-10` | `packages/rules-engine/fixtures/`, `packages/golden-loader/` | non-money |
 | **2** | **G2** | `CI-06o`: the money-path model ban | 67 | `claude/wave01-g2-ci06o-model-ban` | `scripts/corpus/`, `docs/testing/STRATEGY.md` | non-money |
 | **2** | **G3** | `CI-06s`: every probe is run **and** pinned | 68 | `claude/wave01-g3-ci06s-probe-pinning` | `scripts/corpus/`, `docs/testing/STRATEGY.md` | non-money |
-| **3** | **R1** | `OI-11`: the duplicated registry rows | 69 | `claude/wave01-r1-oi11-dedup` | `docs/decisions/ALLOCATION.md`, `docs/STATE.md` | non-money |
+| **3** | **G4** | `CI-06t`: every generated span is closed | 69 | `claude/wave01-g4-ci06t-span-balance` | `scripts/corpus/`, `docs/testing/STRATEGY.md` | non-money |
+| **4** | **R1** | `OI-11`: the duplicated registry rows | 70 | `claude/wave01-r1-oi11-dedup` | `docs/decisions/ALLOCATION.md`, `docs/STATE.md` | non-money |
 
 **Why the ranks exist, stated rather than left to be inferred.**
 
-- **The gates lane is serial and cannot be widened.** `G1`, `G2` and `G3` all write
+- **The gates lane is serial and cannot be widened.** `G1`, `G2`, `G3` and `G4` all write
   `scripts/corpus/gates.mjs` and `scripts/corpus/falsify.mjs`. The
   [PR #7 / PR #8 reconciliation](../STATE.md) is what two branches independently writing that
   one file costs, and it cost a session.
@@ -68,7 +69,7 @@ directory they are fenced to files that do not exist yet.
 ## 3. The rules every prompt below carries, written once here
 
 Each prompt restates these, because a prompt that points at a document is a prompt whose
-rules do not arrive with it. They are collected here so a tenth session can be written
+rules do not arrive with it. They are collected here so an eleventh session can be written
 without re-deriving them.
 
 1. **The session-log stub is the first commit.** Write
@@ -590,6 +591,7 @@ DEFINITION OF DONE
   - if the gate finds a REAL unpinned or unrun probe on arrival, FIX IT in this
     session and say so. A gate that fails on arrival is a gate somebody
     switches off.
+STOP THERE. CI-06t is session 69's and its letter is reserved for it.
 
 Then: append ONE `##` section at the END of docs/STATE.md. Edit no existing
 line. Open the pull request yourself and do not merge it.
@@ -597,7 +599,72 @@ line. Open the pull request yourself and do not merge it.
 
 ---
 
-### R1 — `OI-11`, the duplicated registry rows (session 69, LAST and ALONE)
+### G4 — `CI-06t`, every generated span is closed (session 69, after G3 merges)
+
+```
+Branch: claude/wave01-g4-ci06t-span-balance   (create from origin/main AFTER
+        session 68's pull request has merged — same gates.mjs collision)
+Fence:  scripts/corpus/, docs/testing/STRATEGY.md, docs/STATE.md (append only),
+        docs/sessions/.
+Regime: non-money. Log number 69.
+
+OBJECTIVE
+Write CI-06t.
+
+The letter `t` IS ALREADY RESERVED for you in docs/decisions/ALLOCATION.md.
+
+WHAT IT ASSERTS: in every tracked document, each `gen:` opener is followed by
+its closer BEFORE ANY OTHER OPENER APPEARS. An unbalanced document is a
+finding, and so is a closer with no opener. NOTE THAT THIS PARAGRAPH NAMES THE
+TOKENS RATHER THAN SPELLING THEM, and so must your gate's `covers` line and
+your STRATEGY row: a document describing this gate is a document carrying the
+defect unless it is careful, which is how the reservation row for this very
+letter became the fifth instance of the class.
+
+THE DEFECT IT COMES FROM, AND WHY CI-06g CANNOT SEE IT. On 2026-08-18 the
+planning session appended a section to docs/STATE.md and CI-06g failed
+reporting that the `ec_count` span "reads" ten thousand characters of
+unrelated prose. The cause was two days old and had been passing: STATE line
+1404 described a falsify.mjs seed by WRITING THE OPENER OUT IN FULL, and never
+closed it. AN OPENER WITH NO CLOSER AFTER IT ANYWHERE IN THE FILE SIMPLY DOES
+NOT MATCH, so CI-06g skipped it in silence. It was invisible for exactly as
+long as it was the last such token in the file, and the first append below it
+supplied the closer it had been waiting for. The line was rewritten to name
+the span rather than spell it, and the repair is on main; your gate is what
+stops the next one.
+
+THIS IS THE FOURTH INSTANCE OF THE SPAN-PARSER CLASS and you should say so in
+the gate's `covers` line: CI-06n's parser matched a prose mention rather than
+a table row (OI-09), CI-06g's own falsify seed hardcoded the value it was
+checking, and `registryIds()` re-implemented the gs_count query. Each was a
+reader looser or narrower than the property it claimed.
+
+THE SEED MUST BE THE REAL SHAPE, NOT A CONVENIENT ONE. Seed a document with an
+opener that has NO closer after it and confirm your gate fires. Then seed the
+harder case and confirm it fires too: an unclosed opener EARLY in a file with
+a legitimate closed span LATER, which is the arrangement that produced the
+defect and the one a naive balance count of openers against closers passes.
+A gate that only counts totals is not this gate.
+
+WATCH IT PASS OUT OF SCOPE: a document with no spans at all, and a document
+whose spans are all correctly closed, must not be findings.
+
+ALSO: add the CI-06t row to docs/testing/STRATEGY.md section 4.4.
+
+DEFINITION OF DONE
+  - node scripts/corpus/gates.mjs check -> 21 of 21 (state the number you see)
+  - node scripts/corpus/falsify.mjs     -> green, both seeded cases watched
+    firing on their own findings and both scope cases passing, all quoted
+  - pnpm vitest run                     -> green
+  - if the gate finds a REAL unbalanced document on arrival, fix it and say so.
+
+Then: append ONE `##` section at the END of docs/STATE.md. Edit no existing
+line. Open the pull request yourself and do not merge it.
+```
+
+---
+
+### R1 — `OI-11`, the duplicated registry rows (session 70, LAST and ALONE)
 
 ```
 Branch: claude/wave01-r1-oi11-dedup   (create from origin/main AFTER EVERY
@@ -607,7 +674,7 @@ Branch: claude/wave01-r1-oi11-dedup   (create from origin/main AFTER EVERY
         which is the defect it exists to clear.)
 Fence:  docs/decisions/ALLOCATION.md, docs/STATE.md, docs/sessions/.
         NO CODE. NO GATE. If the cleanup implies a gate, name it and STOP.
-Regime: non-money, but it edits two registries. One objective. Log number 69.
+Regime: non-money, but it edits two registries. One objective. Log number 70.
 
 OBJECTIVE
 Deduplicate the allocation tables and STATE's duplicated passages, deciding
