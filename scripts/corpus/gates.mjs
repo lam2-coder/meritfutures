@@ -2529,6 +2529,261 @@ function calendarGenerator() {
 // -----------------------------------------------------------------------------
 // CI-06p  THE LETTER REGISTRY, READ THE WAY THE TWO NUMERIC ONES ARE READ
 // -----------------------------------------------------------------------------
+// CI-06o  No model on the money path, and a money path outside the scope list
+// -----------------------------------------------------------------------------
+// ADR-044 SECTION 8, WHICH SPECIFIES THIS GATE AND THEN SAYS IT DOES NOT EXIST:
+//
+//   "No module that resolves, directly or transitively, from
+//   `packages/rules-engine` or from the payout, ledger or auth paths may import
+//   a model SDK or reach a model endpoint. The banned-identifier list is
+//   declared in one place, and A PATH ADDED TO THE MONEY-PATH SET WITHOUT BEING
+//   ADDED TO THE GATE'S SCOPE IS ITSELF A FINDING."
+//
+// "A rule that says no model on the money path and is enforced by people
+// remembering it is a control that exists, stays valid, and enforces nothing."
+// Until this runs and has been WATCHED FAILING, prohibition 1 is prose.
+//
+// -----------------------------------------------------------------------------
+// THE FIRST ASSERTION IS NEARLY VACUOUS TODAY AND THE SECOND IS WHY IT SHIPS NOW
+// -----------------------------------------------------------------------------
+// There is no ledger, payout or auth package: `packages/` holds db,
+// eslint-plugin-merit, golden-loader, rithmic, rules-engine and tooling. So
+// assertion 1 scans one package and finds nothing, which is ADR-042's argument
+// for its SQL shape check rather than a reason to defer: a gate written while
+// its subject is empty is a gate nobody has to argue with later, and the day
+// `packages/payout` arrives is the day somebody would otherwise have had to
+// remember this ADR.
+//
+// ASSERTION 2 IS THE ONE WITH TEETH, and it is what stops assertion 1 going
+// quietly vacuous. A scope list is a claim about coverage, and a coverage claim
+// that nothing checks decays the first time a directory is added. So the gate
+// DISCOVERS money paths independently of its own scope list and reports any it
+// finds that the list does not name.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS IS NOT A FOURTH SPELLING OF RI-07, WHICH WAS CHECKED BEFORE IT WAS
+// WRITTEN
+// -----------------------------------------------------------------------------
+// `RI-07` walks the engine's transitive module graph and reports "a bare
+// specifier that is neither" a Node builtin nor a relative path, so an
+// `import ... from '@anthropic-ai/sdk'` inside `packages/rules-engine/src`
+// ALREADY fails there. Three things here are outside it:
+//
+//   scope      RI-07 starts at `packages/rules-engine/src/index.ts` and follows
+//              relative imports. It says nothing about the payout, ledger or
+//              auth paths, and it reaches no file the engine does not import
+//   endpoints  RI-07 reads SPECIFIERS. A model reached by URL is a string
+//              literal in a file that imports nothing unusual
+//   the list   RI-07 has no ban list; it allows relative-or-builtin and refuses
+//              the rest. ADR-044 requires the banned identifiers in ONE place,
+//              which is what `MODEL_SDK_SPECIFIERS` and `MODEL_ENDPOINT_HOSTS`
+//              below are, and what a reader adding an SDK looks for
+//
+// `merit/engine-purity` is also not this: it reads one file at a time, returns
+// early on relative specifiers, and is attached to `rules-engine/src/**` only.
+// Neither mechanism has assertion 2 at all.
+
+/**
+ * THE BANNED IDENTIFIER LIST, DECLARED IN ONE PLACE (ADR-044 section 8).
+ *
+ * Matched against IMPORT SPECIFIERS, exactly or as a package prefix, and never
+ * as a loose substring. That is not fastidiousness: scanning for `cohere` over
+ * this repository matches "co**here**nt" in five files of the engine's own test
+ * generators, which was measured before this list was written rather than
+ * discovered by a false red.
+ */
+const MODEL_SDK_SPECIFIERS = [
+  '@anthropic-ai/sdk',
+  'openai',
+  '@google/generative-ai',
+  '@google/genai',
+  'cohere-ai',
+  '@mistralai/mistralai',
+  'replicate',
+  'langchain',
+  '@langchain/core',
+  'ollama',
+  '@aws-sdk/client-bedrock-runtime',
+  'together-ai',
+  'groq-sdk',
+  '@huggingface/inference',
+];
+
+/** Matched against string literals. Dotted hosts, so they need no word guard. */
+const MODEL_ENDPOINT_HOSTS = [
+  'api.anthropic.com',
+  'api.openai.com',
+  'generativelanguage.googleapis.com',
+  'api.cohere.ai',
+  'api.mistral.ai',
+  'api.replicate.com',
+  'api.together.xyz',
+  'api.groq.com',
+  'bedrock-runtime.',
+  'api-inference.huggingface.co',
+];
+
+/**
+ * The paths assertion 1 scans. ADR-044 names four money paths and one of them
+ * exists; the other three are listed as the names assertion 2 watches for.
+ */
+const CI06O_SCOPE = ['packages/rules-engine'];
+
+/**
+ * How assertion 2 RECOGNISES a money path without being told.
+ *
+ * ADR-044's four are the rules engine, payout, ledger and auth, and CLAUDE.md's
+ * session-length regime names the same four. A package or app whose directory
+ * name carries one of these words is a money path, and if the scope list does
+ * not name it the gate says so.
+ */
+const MONEY_PATH_WORDS = ['rules-engine', 'payout', 'ledger', 'auth'];
+
+/**
+ * Comments removed while string literals are respected, because a URL contains
+ * `//` and a naive stripper eats the rest of the line that holds it. Walks the
+ * source once tracking which of five states it is in.
+ */
+function stripJsComments(src) {
+  let out = '';
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    const d = src[i + 1];
+    if (c === '/' && d === '/') {
+      while (i < src.length && src[i] !== '\n') i++;
+      continue;
+    }
+    if (c === '/' && d === '*') {
+      i += 2;
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      const quote = c;
+      out += c;
+      i++;
+      while (i < src.length) {
+        if (src[i] === '\\') {
+          out += src[i] + (src[i + 1] ?? '');
+          i += 2;
+          continue;
+        }
+        out += src[i];
+        if (src[i] === quote) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+/** Every specifier a static import, re-export, dynamic import or require names. */
+function importSpecifiers(src) {
+  const out = [];
+  const patterns = [
+    /(?:^|[^\w$])(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]/g,
+    /(?:^|[^\w$])import\s*['"]([^'"]+)['"]/g,
+    /(?:^|[^\w$])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /(?:^|[^\w$])require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(src)) !== null) out.push(m[1]);
+  }
+  return out;
+}
+
+/** `openai` matches `openai` and `openai/shims`, and never `openai-ish`. */
+const isBannedSpecifier = (spec) =>
+  MODEL_SDK_SPECIFIERS.find((b) => spec === b || spec.startsWith(`${b}/`));
+
+const CI06O_SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
+
+const ci06o = {
+  id: 'CI-06o',
+  title: 'No model SDK or model endpoint on the money path, and no money path outside the scope list',
+  covers:
+    "ADR-044 section 8's prohibition 1, in two assertions. ONE: no file under a " +
+    'money-path scope entry imports a model SDK or names a model endpoint host, ' +
+    'read from STATIC import, re-export, dynamic-import and require specifiers ' +
+    'and from string literals, with comments stripped. TWO: every money path the ' +
+    'gate can DISCOVER, meaning a child of packages/ or apps/ whose directory ' +
+    "name carries one of ADR-044's four money-path words, is named in the scope " +
+    'list, so a path added to the money-path set without being added here is ' +
+    'itself a finding. IT IS NOT RI-07: that walks the engine module graph only, ' +
+    'reads specifiers and not endpoints, and has no ban list and no assertion 2. ' +
+    'WHAT IT CANNOT DO, stated because a gate implying coverage it lacks is worse ' +
+    'than its absence: a host BUILT AT RUNTIME from concatenation or an env var ' +
+    'is invisible to it, as is a model call made by a dependency inside its own ' +
+    'package (node_modules is never walked), and discovery is BY NAME, so a money ' +
+    'path whose directory name does not say so -- apps/worker runs the nightly ' +
+    'batch today -- is not found by assertion 2 and must be added by hand.',
+  run() {
+    const findings = [];
+    let scanned = 0;
+
+    // Assertion 1.
+    for (const dir of CI06O_SCOPE) {
+      if (!existsSync(join(ROOT, dir))) {
+        findings.push(`${dir}: scope entry does not exist, so nothing under it is checked`);
+        continue;
+      }
+      for (const file of walk(dir)) {
+        if (!CI06O_SOURCE.has(extname(file))) continue;
+        scanned++;
+        const src = stripJsComments(read(file));
+        for (const spec of importSpecifiers(src)) {
+          const banned = isBannedSpecifier(spec);
+          if (banned) findings.push(`${file}: imports the model SDK "${banned}"`);
+        }
+        for (const host of MODEL_ENDPOINT_HOSTS) {
+          if (src.includes(host)) findings.push(`${file}: names the model endpoint "${host}"`);
+        }
+      }
+    }
+
+    // Rule 2 on a directory-shaped input. A scope that matches no file is a gate
+    // asserting nothing, and it must say so rather than pass quietly.
+    if (scanned === 0) {
+      findings.push('the scope list matched no source file, so assertion 1 asserted nothing');
+    }
+
+    // Assertion 2, and it is the half that keeps assertion 1 honest.
+    let discovered = 0;
+    for (const root of ['packages', 'apps']) {
+      if (!existsSync(join(ROOT, root))) continue;
+      for (const entry of readdirSync(join(ROOT, root))) {
+        if (entry === 'node_modules') continue;
+        const rel = `${root}/${entry}`;
+        if (!statSync(join(ROOT, rel)).isDirectory()) continue;
+        const word = MONEY_PATH_WORDS.find((w) => entry.includes(w));
+        if (!word) continue;
+        discovered++;
+        if (!CI06O_SCOPE.includes(rel)) {
+          findings.push(
+            `${rel}: money path (its name carries "${word}") is not in CI-06o's scope list, ` +
+              'so ADR-044 prohibition 1 is not enforced over it',
+          );
+        }
+      }
+    }
+    if (discovered === 0) {
+      findings.push('discovery matched no money path, so assertion 2 asserted nothing');
+    }
+
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // The third allocation table in ALLOCATION.md claims `CI-06` LETTERS, and for a
 // week nothing read it. That is not an oversight, it is a parser fact: the
 // shared `allocated()` above matches a three-digit or four-digit first cell and
@@ -3112,6 +3367,7 @@ const GATES = [
   ci06l,
   ci06m,
   ci06n,
+  ci06o,
   ci06p,
   ci06q,
   ci06r,
