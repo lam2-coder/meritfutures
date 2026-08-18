@@ -107,3 +107,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 57](2026-08-18-session-57.md) | `GS-083` written in the `RE-C-nn` suite: publishing fails and `CV-17` is the code named |
 | [2026-08-18 - Session 57](2026-08-18-session-57.md) | ADR-057: one refuted sentence in four documents, and the ninth breach-row field |
 | [2026-08-18 - Session 58](2026-08-18-session-58.md) | the CME source publishes forward-only, and ADR-042's coverage reason is falsified |
+| [2026-08-18 - Session 58](2026-08-18-session-58.md) | the fixture calendar gains the four transcribed holiday weeks: a holiday, an early close and an absorbed session |
