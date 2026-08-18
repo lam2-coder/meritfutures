@@ -38,6 +38,8 @@ export type {
   BatchReadPort,
   BatchWritePort,
   ReconciliationFinding,
+  ReplayDivergence,
+  ReplayDivergenceFinding,
   RuleStateRow,
   StoredContextGates,
 } from './batch/ports.js';
@@ -53,7 +55,35 @@ export {
   EXCLUDED_COLUMNS,
   HASHED_COLUMNS,
 } from './batch/state-hash.js';
-export type { ExcludedColumn, HashedColumn, StateHashSubject } from './batch/state-hash.js';
+export { ENGINE_GATE_LEAVES } from './batch/state-hash.js';
+export type {
+  ExcludedColumn,
+  HashedColumn,
+  HashedState,
+  StateHashSubject,
+} from './batch/state-hash.js';
+
+// INV-04's comparison. `ENGINE_GATE_LEAVES` is exported above beside it because
+// a divergence names a gate by its dotted path, which is what the list carries
+// them for, and a consumer that cannot read the list cannot interpret the name.
+//
+// STILL NOT SCHEDULED. Nothing calls `runReplayAudit`: there is no cron, and
+// `CRON_INVENTORY.md`'s `replay.audit_completed` signal has no producer and no
+// entry in the EVENTS.md catalogue. The audit is built and unrun, which is the
+// same shape as the batch above it.
+export {
+  auditAccount,
+  diffStoredAgainstRecomputed,
+  runReplayAudit,
+  ReplayAuditRefusal,
+} from './batch/replay.js';
+export type {
+  AccountDayInput,
+  ReplayAccountReport,
+  ReplayAuditConfig,
+  ReplayAuditReport,
+  ReplayMode,
+} from './batch/replay.js';
 
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;
