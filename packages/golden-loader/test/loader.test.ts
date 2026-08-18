@@ -239,16 +239,68 @@ describe('each loader rule, watched failing on its own seeded violation', () => 
     expect(assertions.map((a) => a.kind)).toEqual(['opening_mismatch']);
   });
 
-  test('L-11 a settlement, which the FORMAT cannot state', () => {
-    // The refusal survives and the reason moved. `DayInput.settlements` exists,
-    // so the engine is no longer what is missing; what is missing is any way for
-    // a fixture to state the five fields `SettlementFact` declares. Inventing
-    // them here would be the loader writing a fixture.
+  test('L-11 a settlement missing the fields SettlementFact declares', () => {
+    // THE REFUSAL NARROWED RATHER THAN LIFTING. It read "the FORMAT cannot state
+    // a settlement" and the format states one now, so what survives is the
+    // malformed case: `SettlementFact` declares all five fields non-optional,
+    // and a defaulted `basis_trading_day` would be the loader choosing the
+    // parameter R-47 anchors the whole consistency period on.
     const dir = seedbed();
     editYaml(dir, (b) => b.replace('settlements: []', 'settlements:\n  - ordinal: 1'));
     const error = refusal(dir);
     expect(error.rule).toBe('L-11');
-    expect(error.message).toContain('basis_trading_day');
+    expect(error.message).toContain('payout_request_id');
+  });
+
+  test('L-11 two settlements sharing one ordinal, which SD-05 forbids', () => {
+    // DO-2's sort is `(a, b) => a.ordinal - b.ordinal` and is total ONLY because
+    // ordinals are unique. Repeat one and the application order falls back to
+    // `Array.prototype.sort`'s stability, which the determinism contract bans by
+    // name -- and R-42 resolves a cap per ordinal, so the order decides money.
+    const dir = seedbed();
+    editYaml(dir, (b) =>
+      b.replace(
+        'settlements: []',
+        'settlements:\n' +
+          '  - payout_request_id: pr-1\n' +
+          '    ordinal: 1\n' +
+          '    approved_cents: 150000\n' +
+          '    basis_trading_day: 2026-11-02\n' +
+          '    effective_trading_day: 2026-11-03\n' +
+          '  - payout_request_id: pr-2\n' +
+          '    ordinal: 1\n' +
+          '    approved_cents: 150000\n' +
+          '    basis_trading_day: 2026-11-02\n' +
+          '    effective_trading_day: 2026-11-03\n',
+      ),
+    );
+    const error = refusal(dir);
+    expect(error.rule).toBe('L-11');
+    expect(error.message).toContain('SD-05');
+  });
+
+  test('L-15 a settlement effective on a day the stream does not contain', () => {
+    // THE INERT CASE, AND IT IS THE ONE THIS DIRECTORY CANNOT SEE WITHOUT A
+    // RULE. `run.ts` hands each day the settlements effective on it, so a fact
+    // naming a day outside the stream is never applied -- the fixture passes,
+    // pinning an end state no settlement reached while reading like a scenario
+    // about one. A green fixture that asserts nothing is the failure mode `L-06`
+    // exists to refuse one level up.
+    const dir = seedbed();
+    editYaml(dir, (b) =>
+      b.replace(
+        'settlements: []',
+        'settlements:\n' +
+          '  - payout_request_id: pr-1\n' +
+          '    ordinal: 1\n' +
+          '    approved_cents: 150000\n' +
+          '    basis_trading_day: 2026-11-02\n' +
+          '    effective_trading_day: 2026-12-24\n',
+      ),
+    );
+    const error = refusal(dir);
+    expect(error.rule).toBe('L-15');
+    expect(error.message).toContain('never apply it');
   });
 
   test('L-13 a source citing nothing at all, which is ADR-048 case 4', () => {

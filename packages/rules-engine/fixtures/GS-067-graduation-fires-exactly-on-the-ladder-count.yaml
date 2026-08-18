@@ -1,0 +1,249 @@
+# GS-067  Graduation fires exactly on the ladder count
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "The `max_payouts`th settlement graduates; the one before it does not. `>=`
+#   asserted at both boundaries. THE COUNT IS THE PLAN'S, READ FROM CONFIG, and
+#   stating it here would be a fourteenth copy of the value ADR-037 deleted the
+#   other thirteen of"                                  GOLDEN_SCENARIOS GS-067
+#   R-49  `payoutsSettledCount >= payouts_to_graduate` (`>=`), evaluated
+#         IMMEDIATELY AFTER A SETTLEMENT. Phase to `graduated`, account closed,
+#         and the `graduation_eligible` flag set. NO LIVE INVITATION IS EMITTED
+#                                          M01 R-49, ADR-024
+#   R-45  `ordinal = payoutsSettledCount + 1`                          M01 R-45
+#   R-46  `payoutAnchorDay = basisTradingDay`;
+#         `cadenceAnchorDay = effectiveTradingDay`                     M01 R-46
+#   R-47  the win-day counter and the consistency period reset on settlement,
+#         anchored to the basis day                                    M01 R-47
+#   R-50  `lifetimeSettledCents += approvedCents`, bounded by INV-17   M01 R-50
+#   R-48  the floor, the high-water balance and the lock are untouched M01 R-48
+#   size 5,000,000c, funded drawdown 250,000c, buffer 100,000c, win day floor
+#   15,000c, win days required 3, payout cap 100,000c, funded consistency
+#   4000bp, floor lock at 260,000c of profit
+#                                                       M01 Appendix A.2 at 50K
+#
+# THE LADDER COUNT IS NOWHERE IN THIS FILE AND THAT IS THE REGISTRY ROW'S OWN
+# INSTRUCTION. GS-067 says the count "is the plan's, read from config, and
+# stating it here would be a fourteenth copy of the value ADR-037 deleted the
+# other thirteen of". So this fixture states FIVE SETTLEMENTS and pins the
+# EVENT SEQUENCE; it never writes the number 5 as an expectation. Change
+# `max_payouts` in `MERIT-RAPID-50K.json` and this fixture fails, which is the
+# behaviour a copy of the constant would have destroyed.
+#
+# BOTH SIDES OF `>=` ARE PINNED BY ONE STREAM, AND THE EVENT LIST IS WHERE.
+# `account.graduated` appears EXACTLY ONCE and it is the LAST event, after the
+# fifth `payout.win_days_reset` and not the fourth. Two engines fail it:
+#   - one writing `>` graduates at no settlement at all (5 > 5 is false), so the
+#     event is absent and the phase is still `funded`;
+#   - one graduating a rung early emits it after the fourth reset, which is
+#     position 17 of 21 rather than 21 of 21.
+# A fixture that pinned only the end state would catch the first and miss the
+# second, because both end in `graduated`.
+#
+# FIVE CYCLES, EACH ONE THE CHEAPEST THE GATES ACTUALLY PERMIT. A settlement a
+# fixture states is a fact M5 has already approved, so a fixture may state one
+# the gates would have REFUSED and still fold. This stream does not. On every
+# basis day the account carries exactly three win days against a required three,
+# a best-day share inside the 4000bp limit, and a withdrawable of exactly
+# 100,000c against a 100,000c cap, so all five extractions are ones R-43 would
+# have approved to the cent.
+#
+#   each basis day     balance 5,200,000  hwb 5,200,000  floor 4,950,000
+#   withdrawable       5,200,000 - 5,000,000 - 100,000        =   100,000c
+#   cap at every ordinal (cap_bp 200 of 5,000,000)            =   100,000c
+#   five settlements   5 x 100,000                            =   500,000c
+#
+# 500,000c IS INV-17's BOUND MET EXACTLY, WHICH IS GS-241's SUBJECT AND NOT
+# THIS FILE'S CLAIM. `lifetime_settled_cents: 500000` is pinned here because
+# R-50 computes it on the path this stream walks, and GS-241 is the row that
+# asserts no sequence can EXCEED it. The two are different claims about the same
+# number and this note says which one is being made.
+#
+# THE LOCK NEVER ENGAGES. The trigger is 260,000c of profit and the account tops
+# out at 200,000c, so `floor_locked` is false throughout and `floor_cents` has
+# one reading under both the superseded `max` and ADR-052's ruled assignment.
+#
+# SETTLEMENT 3 CROSSES A WEEKEND AND R-47's ANSWER IS THE MONDAY. The basis day
+# is Friday 2026-09-25 and the new period starts on 2026-09-28, not 2026-09-26.
+# GS-068 makes the same point across a transcribed holiday; this one gets it for
+# free out of the stream's own shape and is not written for it.
+id: GS-067
+name: graduation fires exactly on the ladder count
+source: M01 R-08, R-09, R-10, R-13, R-14, R-18, R-21, R-35, R-45, R-46, R-47, R-48, R-49, R-50
+plan: MERIT-RAPID-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-09-14
+  size_cents: 5000000
+days:
+  - trading_day: 2026-09-15
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5070000
+    high_balance_cents: 5075000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 70000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-16
+    opening_balance_cents: 5070000
+    closing_balance_cents: 5140000
+    high_balance_cents: 5145000
+    low_balance_cents: 5065000
+    realized_pnl_cents: 70000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-17
+    opening_balance_cents: 5140000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5135000
+    realized_pnl_cents: 60000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-18
+    adjustment_cents: -100000
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5135000
+    high_balance_cents: 5140000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 35000
+    fill_count: 2
+    traded_day: true
+  - trading_day: 2026-09-21
+    opening_balance_cents: 5135000
+    closing_balance_cents: 5170000
+    high_balance_cents: 5175000
+    low_balance_cents: 5130000
+    realized_pnl_cents: 35000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-22
+    opening_balance_cents: 5170000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5165000
+    realized_pnl_cents: 30000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-23
+    adjustment_cents: -100000
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5135000
+    high_balance_cents: 5140000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 35000
+    fill_count: 2
+    traded_day: true
+  - trading_day: 2026-09-24
+    opening_balance_cents: 5135000
+    closing_balance_cents: 5170000
+    high_balance_cents: 5175000
+    low_balance_cents: 5130000
+    realized_pnl_cents: 35000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-25
+    opening_balance_cents: 5170000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5165000
+    realized_pnl_cents: 30000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-28
+    adjustment_cents: -100000
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5135000
+    high_balance_cents: 5140000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 35000
+    fill_count: 2
+    traded_day: true
+  - trading_day: 2026-09-29
+    opening_balance_cents: 5135000
+    closing_balance_cents: 5170000
+    high_balance_cents: 5175000
+    low_balance_cents: 5130000
+    realized_pnl_cents: 35000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-30
+    opening_balance_cents: 5170000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5165000
+    realized_pnl_cents: 30000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-10-01
+    adjustment_cents: -100000
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5135000
+    high_balance_cents: 5140000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 35000
+    fill_count: 2
+    traded_day: true
+  - trading_day: 2026-10-02
+    opening_balance_cents: 5135000
+    closing_balance_cents: 5170000
+    high_balance_cents: 5175000
+    low_balance_cents: 5130000
+    realized_pnl_cents: 35000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-10-05
+    opening_balance_cents: 5170000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5165000
+    realized_pnl_cents: 30000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-10-06
+    adjustment_cents: -100000
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5100000
+    high_balance_cents: 5100000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+settlements:
+  - payout_request_id: GS-067-pr-1
+    ordinal: 1
+    approved_cents: 100000
+    basis_trading_day: 2026-09-17
+    effective_trading_day: 2026-09-18
+  - payout_request_id: GS-067-pr-2
+    ordinal: 2
+    approved_cents: 100000
+    basis_trading_day: 2026-09-22
+    effective_trading_day: 2026-09-23
+  - payout_request_id: GS-067-pr-3
+    ordinal: 3
+    approved_cents: 100000
+    basis_trading_day: 2026-09-25
+    effective_trading_day: 2026-09-28
+  - payout_request_id: GS-067-pr-4
+    ordinal: 4
+    approved_cents: 100000
+    basis_trading_day: 2026-09-30
+    effective_trading_day: 2026-10-01
+  - payout_request_id: GS-067-pr-5
+    ordinal: 5
+    approved_cents: 100000
+    basis_trading_day: 2026-10-05
+    effective_trading_day: 2026-10-06
