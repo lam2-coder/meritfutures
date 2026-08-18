@@ -1433,3 +1433,21 @@ The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**.
 | **4** | **Export the `EngineEvent` discriminated union.** A consumer that must cast is a consumer that can cast wrong |
 
 **One finding is recorded and not scheduled.** `DEP-M2-03`'s setpoint source now has a number attached: the demo's `DEMOSWNG250002` locked its floor 296,250c above a platform setpoint pushed once at provisioning, breached, and carries **no auto-liquidation record** while [DATA_CAPABILITIES](../research/DATA_CAPABILITIES.md) section 1 names that record as Merit's breach evidence. Every rule involved is working as written. How often M2 re-pushes the setpoint is an [M02](plans/M02-rithmic-bridge.md) question, M02 holds at `review` pending the vendor call, and nothing being built depends on the answer.
+
+---
+
+## `CI-06r` closed the ADR-status contradiction, and refused half of its own brief (2026-08-18, session 61)
+
+**Eighteen gates now, and the eighteenth reads an ADR entry against itself.** [`CI-06r`](testing/STRATEGY.md): an entry whose body records a founder verdict of `ACCEPTED`, `GRANTED`, `ADOPTED` or `APPROVED` may not head itself `status: proposed`. It found exactly three, which are the three the [unsigned-ADR audit](decisions/gates/unsigned-adr-audit-2026-08-18.md) named, and they are repaired: [ADR-006](decisions/ADR-006.md), [ADR-007](decisions/ADR-007.md) and [ADR-008](decisions/ADR-008.md) now head themselves `accepted`, each citing the [M1 gate closure](decisions/gates/m1-gate-closure-2026-08-13.md) that records the founder accepting all three on 2026-08-13. **The status word was the only stale thing and it stayed stale for five days**, because `CI-06f` reads numbers and never status and `CI-06b` validates frontmatter while an ADR carries its status in a **heading**.
+
+**THE SYMMETRIC HALF OF THE BRIEF IS REFUTED BY THE TREE AND IS NOT WRITTEN.** "An entry heading itself `accepted` must carry an approval line" reads well and is false of this corpus: **34 entries head `accepted` and carry none** (`ADR-005`, `ADR-018` to `ADR-032`, `ADR-034`, `ADR-037` to `ADR-049`, `ADR-051`, `ADR-D1`), and every one is legitimate, because their approvals are recorded in the [gate-closure files](decisions/gates/) where this corpus has put batch sign-offs from the beginning. Writing it would have gone red on arrival on thirty-four files whose only available repair is to invent thirty-four founder signatures. **An entry with no approval line claims nothing and cannot contradict itself**, so the asymmetry is a fact about how approval is recorded rather than an omission, and it is stated in the gate's own `covers` line rather than left for a reader to infer.
+
+**What the gate cannot do, stated because a gate implying coverage it does not have is worse than the absence.** It compares a file with **itself** and can check neither half against the gate record. An entry heading itself `accepted` that no founder ever signed passes, and always will. That is [`CI-06q`](testing/STRATEGY.md)'s boundary one row up, and the five genuinely unsigned entries (`ADR-001`, `ADR-033`, `ADR-036`, `ADR-056`, `ADR-058`) pass for the right reason rather than by exemption.
+
+**Two files outside this session's fence were touched and both are named rather than slipped in.** The `r` row in [ALLOCATION](decisions/ALLOCATION.md) is a **deliberate duplicate** of PR #96's, which reserved the letter on a branch open against this exact base and unmerged, so this ref cannot see it and `CI-06p` fails the moment `CI-06r` exists. The row is #96's verbatim but for one link, and **whoever merges second keeps one row and it should be #96's**. The seven `gate_count` spans were rewritten by `gates.mjs generate`, which is [ADR-034](decisions/ADR-034.md)'s own remedy run by the tool that owns it rather than a hand edit.
+
+| Verification | Result |
+|---|---|
+| `node scripts/corpus/gates.mjs check` | **18 of 18 pass** |
+| `node scripts/corpus/falsify.mjs` | green; `CI-06r` watched failing on its own finding, **20** scope cases hold |
+| `pnpm vitest run` | **54 files, 789 passed**, 38 skipped |
