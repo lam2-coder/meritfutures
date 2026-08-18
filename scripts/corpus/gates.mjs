@@ -1240,6 +1240,23 @@ const ci06h = {
         'assert_no_floats.sql',
         'the NO-FLOATS assertion no longer runs over the whole applied schema (OI-08)',
       ],
+      // OI-07's FOURTH OCCURRENCE, and it was live on main until CI-06s found
+      // it. The probe was written and wired in the same session and this line
+      // was not, which is the identical omission probe_payout_hold.sql made and
+      // probe_reversible_contact_addresses.sql repeated: wiring a probe and
+      // pinning it are two edits in two files, and the second is the one that
+      // gets forgotten because the first one makes the tests pass.
+      //
+      // ADDED BY THE SESSION THAT WROTE CI-06s, which is why the gate could be
+      // watched failing on a real violation before its own seeds existed. A
+      // gate that fails on arrival is a gate somebody switches off.
+      [
+        'probe_rule_states_high_water_bound.sql',
+        "ADR-053's scoped high-water bound is no longer probed, so nothing " +
+          'asserts that a locked account may make a new closing high, that the ' +
+          'unlocked half still refuses, or that the three NOT NULLs the ' +
+          'predicate depends on and does not name are still there (OI-07)',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
