@@ -1,0 +1,82 @@
+# GS-032  Half day the trader sat out (Appendix B4 item 3)
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01,
+# GOLDEN_SCENARIOS section 1). Every number below traces to a document:
+#
+#   "A half day is a full trading day for every counter", operator column
+#   "No effect on any comparison"                             M01 R-03
+#   "Counters advance only on trading days, and advance whether or not the
+#   trader traded"                                            M01 R-02
+#   traded day is `fill_count > 0`, strict `>`                M01 R-08
+#   win day is `realized_pnl_cents >= win_day_floor_cents`    M01 R-09
+#   the trailing floor never retreats                         M01 R-14
+#   "Counts as a full trading day, identical to GS-003 with the real calendar"
+#                                                             GOLDEN_SCENARIOS GS-032 row
+#   50K size            5,000,000c                            M01 Appendix A, sizes line
+#   Core EOD win day floor 15,000c at 50K, 30bp               M01 Appendix A.1
+#   Core EOD eval drawdown 250,000c at 50K, 500bp             M01 Appendix A.1
+#
+# THIS IS GS-003 WITH ONE INPUT CHANGED, AND THE CHANGE IS THE FILL COUNT.
+# GS-003's half day is traded and wins; this one's is sat out. Together they say
+# R-03 in both directions: a shortened session contributes exactly what a full
+# session would when it is traded, and exactly what a full session would when it
+# is not. A single fixture can only ever show one of those, and an engine that
+# discounted a half day would be caught by whichever one it was not written
+# against.
+#
+# THE B4 QUESTION THIS ANSWERS IS THE ADVERSARIAL ONE. Appendix B4 item 3 is a
+# probe rather than a rule statement: a shortened session that the trader did not
+# use is the shape most likely to be quietly dropped, because on the day itself
+# nothing happened and no counter had to move. R-02 says the trading day advances
+# anyway, and R-08's strict `>` on the fill count is the only reason the traded
+# count stays where it is. The half day is therefore doing two jobs at once, and
+# the end state distinguishes them: `trading_day` reaching 2026-11-27 says the
+# session was evaluated, and `traded_days_count` holding at 1 says R-08 refused
+# to count it. An engine that skipped the half day satisfies the second and fails
+# the first.
+#
+# BOTH DAYS ARE TRANSCRIBED AND NEITHER IS SYNTHETIC. `calendars/cme-2026.json`
+# is `status: "partial"` and 78 of its 83 sessions are days that file invented;
+# these two are not. `2026-11-25` is a FULL session closing 16:00 CT and
+# `2026-11-27` is an EARLY CLOSE at 13:45 CT, both read out of
+# `packages/db/src/seed/calendars/cme-trading-hours-2026-11-25-to-2026-11-27-thanksgiving.retrieved-2026-08-17.xlsx`,
+# and `2026-11-26` is a transcribed ABSENCE rather than a session. The account
+# opens on `2026-11-25`, its first tradeable day (ADR-051). Nothing in this
+# fixture rests on a session the calendar synthesized, which is what lets the
+# registry row's "with the real calendar" be taken at its word rather than
+# approximated.
+#
+# THE SECOND DAY IS FLAT BECAUSE IT HAS NO FILLS. No fills means no realized P&L,
+# so open, close, high and low are one number: an untraded day with an intraday
+# range would be a day with fills. INV-18 holds across the boundary because the
+# opening balance is the prior close and the adjustment is zero, and INV-19 holds
+# because the close is the open plus a P&L of zero.
+id: GS-032
+name: half day the trader sat out
+source: M01 R-03, R-02, R-08, R-09, R-14
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-25
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-25
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5030000
+    high_balance_cents: 5035000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-27
+    opening_balance_cents: 5030000
+    closing_balance_cents: 5030000
+    high_balance_cents: 5030000
+    low_balance_cents: 5030000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+settlements: []

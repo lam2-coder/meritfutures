@@ -1,0 +1,84 @@
+# GS-003  Half day counts as a full trading day
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01,
+# GOLDEN_SCENARIOS section 1). Every number below traces to a document:
+#
+#   "A half day is a full trading day for every counter", operator column
+#   "No effect on any comparison"                             M01 R-03
+#   "Counters advance only on trading days, and advance whether or not the
+#   trader traded"                                            M01 R-02
+#   traded day is `fill_count > 0`, strict `>`                M01 R-08
+#   win day is `realized_pnl_cents >= win_day_floor_cents`    M01 R-09
+#   the trailing floor is the high-water balance less the drawdown
+#                                                             M01 R-13
+#   "Thanksgiving Friday advances min-day and gap counters identically to a
+#   full session"                                             GOLDEN_SCENARIOS GS-003 row
+#   50K size            5,000,000c                            M01 Appendix A, sizes line
+#   Core EOD win day floor 15,000c at 50K, 30bp               M01 Appendix A.1
+#   Core EOD eval drawdown 250,000c at 50K, 500bp             M01 Appendix A.1
+#
+# BOTH DAYS ARE TRANSCRIBED AND NEITHER IS SYNTHETIC, WHICH IS WHAT LETS THIS
+# FIXTURE SAY "THANKSGIVING" RATHER THAN "A DAY THIS FILE DECLARED HALF".
+# `calendars/cme-2026.json` is `status: "partial"` and 78 of its 83 sessions are
+# synthetic; these two are not. `2026-11-25` is a FULL session closing 16:00 CT
+# and `2026-11-27` is an EARLY CLOSE at 13:45 CT, both read out of
+# `packages/db/src/seed/calendars/cme-trading-hours-2026-11-25-to-2026-11-27-thanksgiving.retrieved-2026-08-17.xlsx`,
+# and `2026-11-26` is a transcribed ABSENCE rather than a session. The account
+# opens on `2026-11-25`, which is its first tradeable day (ADR-051), so no day in
+# this fixture rests on a session this calendar invented.
+#
+# THE TWO DAYS CARRY THE SAME P&L AND THE SAME FILL COUNT, AND THAT IS THE
+# ASSERTION. R-03's operator column is "No effect on any comparison", which is a
+# claim about a NON-difference, and a non-difference needs two measurements that
+# would differ if the claim were false. Day one is a full session and day two is
+# the half day; both realize 30,000c on 3 fills. The counters therefore read 2
+# and 2, so the half day contributed exactly 1 and exactly 1. An engine that
+# skipped the shortened session, or scored it as a fraction of a day, reads 1 and
+# 1 on the same stream.
+#
+# THE BALANCES WALK BECAUSE THEY MUST AND THE COUNTED QUANTITIES DO NOT. INV-18
+# puts the opening balance at the prior close, so two days cannot carry identical
+# balances unless both are flat, and a flat day has no win to count. What is held
+# identical is what the counters actually read: `realized_pnl_cents` and
+# `fill_count`.
+#
+# NOTHING HERE PASSES, LOCKS OR BREACHES, ON PURPOSE. Profit reaches 60,000c
+# against a 300,000c eval target (R-26) and a 260,000c lock trigger, and the low
+# on each day sits far above the floor that day opened with (R-21). A half day
+# that also passed an eval would pin R-26 and R-31 as well, and this file's
+# subject is the counter and nothing else.
+#
+# GS-032 IS THIS FILE WITH ONE INPUT CHANGED. Its half day carries no fills, so
+# the pair states R-03 in both directions: the shortened session contributes
+# exactly what a full session would when it is traded, and exactly what a full
+# session would when it is not. See that file's sibling for what the registry
+# says about the relationship between the two rows.
+id: GS-003
+name: half day counts as a full trading day
+source: M01 R-03, R-02, R-08, R-09
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: eval
+  opened_on: 2026-11-25
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-25
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5030000
+    high_balance_cents: 5035000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-27
+    opening_balance_cents: 5030000
+    closing_balance_cents: 5060000
+    high_balance_cents: 5065000
+    low_balance_cents: 5025000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+settlements: []
