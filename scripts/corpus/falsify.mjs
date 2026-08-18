@@ -1238,7 +1238,7 @@ const SCOPE_CASES = [
     seed: (d) => {
       edit(d, 'scripts/corpus/gates.mjs', (b) =>
         b.replace(
-          /(\n      \[\n        'assert_no_floats\.sql',)/,
+          /(\n {6}\[\n {8}'assert_no_floats\.sql',)/,
           "\n      ['probe_deleted_last_spring.sql', 'a probe nobody provides is no longer run'],$1",
         ),
       );
