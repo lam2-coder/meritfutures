@@ -54,17 +54,41 @@ const RULE = {
 };
 
 /**
+ * ADR-055's absorbed session, on the synthetic holiday.
+ *
+ * The holiday is Thursday and the next trade date is Friday, whose session
+ * opened Wednesday evening, before the closure. That is the shape the ruling
+ * exists for, and the close is 12:15 rather than 16:00 because the Friday is
+ * also the early close: the hardest of the four combinations to get right, and
+ * the one where a check that reached for `session_rule.close_ct` instead of the
+ * `early_closes` entry would pass on everything else and be wrong here.
+ */
+const ABSORBED = {
+  trading_day: '2026-11-27',
+  session_open_day: '2026-11-25',
+  session_open_ct: '17:00',
+  session_close_day: '2026-11-27',
+  session_close_ct: '12:15',
+};
+
+/**
  * Monday 2026-11-23 to Monday 2026-11-30, holding one holiday (Thursday), one
  * early close (Friday), and a weekend the generator must skip.
+ *
+ * `coverage.evidence_to` and the holiday's `absorbs_into` are ADR-055's, and
+ * they are in the BASE fixture rather than in an override because the ruling
+ * made them required: a base that omitted them would make every case below
+ * fail on the missing key rather than on its own seeded violation, which is the
+ * failure mode this file exists to prevent one level up.
  */
 function source(over: Record<string, unknown> = {}): string {
   return JSON.stringify({
     id: 'synthetic',
     status: 'transcribed',
     provenance: PROVENANCE,
-    coverage: { from: '2026-11-23', to: '2026-11-30' },
+    coverage: { from: '2026-11-23', to: '2026-11-30', evidence_to: '2026-11-30' },
     session_rule: RULE,
-    holidays: [{ day: '2026-11-26', name: 'Synthetic Closure' }],
+    holidays: [{ day: '2026-11-26', name: 'Synthetic Closure', absorbs_into: ABSORBED }],
     early_closes: [
       {
         day: '2026-11-27',
@@ -74,6 +98,15 @@ function source(over: Record<string, unknown> = {}): string {
     ],
     ...over,
   });
+}
+
+/** The base fixture's holiday with one field of its `absorbs_into` changed. */
+function absorbing(over: Record<string, unknown>): Record<string, unknown> {
+  return {
+    holidays: [
+      { day: '2026-11-26', name: 'Synthetic Closure', absorbs_into: { ...ABSORBED, ...over } },
+    ],
+  };
 }
 
 /** The finding, not the message. */
@@ -140,6 +173,49 @@ describe('the positive control', () => {
     });
   });
 
+  it('opens the absorbed trade date where the exchange did, not where the rule computes (ADR-055)', () => {
+    // THE MONEY-PATH LINE. The holiday is Thursday, so `open_day_offset: -1`
+    // computes a Thursday 17:00 open for Friday's session. The exchange opened
+    // it WEDNESDAY evening, before the closure. The computed row is a strict
+    // SUBSET of the real session, and a fill in the gap falls inside no session
+    // in the file at all, which is the condition R-01 exists to detect.
+    const absorbed = generated.rows.find((r) => r.trading_day === '2026-11-27');
+    expect(absorbed).toMatchObject({
+      session_open_ct: '2026-11-25T17:00:00',
+      session_open_at: '2026-11-25T23:00:00Z',
+    });
+    expect(absorbed?.session_open_ct).not.toBe('2026-11-26T17:00:00');
+  });
+
+  it('leaves every unabsorbed session on the rule, so the exception stays an exception', () => {
+    // The three ordinary rows are unchanged by ADR-055. A change that widened
+    // the absorbed open into a general rewrite would still pass the case above
+    // and fail here.
+    expect(
+      generated.rows
+        .filter((r) => !r.is_holiday && r.trading_day !== '2026-11-27')
+        .map((r) => [r.trading_day, r.session_open_ct]),
+    ).toEqual([
+      ['2026-11-23', '2026-11-22T17:00:00'],
+      ['2026-11-24', '2026-11-23T17:00:00'],
+      ['2026-11-25', '2026-11-24T17:00:00'],
+      ['2026-11-30', '2026-11-29T17:00:00'],
+    ]);
+  });
+
+  it('keeps the absorbed session from overlapping the one before it, which R-01 needs', () => {
+    // Wednesday closes 16:00 CT and Friday's absorbed session opens 17:00 CT
+    // the same day, one hour later. `checkRows` asserts this for every
+    // consecutive pair and `build` has already run it; the case is here because
+    // an absorbed open reaching BACK past a close is the way this rule breaks,
+    // and it is the failure a reader would not think to look for.
+    const wed = generated.rows.find((r) => r.trading_day === '2026-11-25');
+    const fri = generated.rows.find((r) => r.trading_day === '2026-11-27');
+    expect(wed?.session_close_at).toBe('2026-11-25T22:00:00Z');
+    expect(fri?.session_open_at).toBe('2026-11-25T23:00:00Z');
+    expect(Date.parse(fri!.session_open_at!)).toBeGreaterThan(Date.parse(wed!.session_close_at!));
+  });
+
   it('counts what it generated, and states the digest of the source that produced it', () => {
     expect(generated.counts).toEqual({
       holiday_count: 1,
@@ -166,7 +242,7 @@ describe('CT to UTC', () => {
     );
     const summer = build(
       source({
-        coverage: { from: '2026-06-15', to: '2026-06-15' },
+        coverage: { from: '2026-06-15', to: '2026-06-15', evidence_to: '2026-06-15' },
         holidays: [],
         early_closes: [],
       }),
@@ -259,27 +335,27 @@ describe('the source file is refused when', () => {
     [
       'a holiday falls on a weekend, where it would silently generate nothing',
       'holiday-on-a-weekend',
-      { holidays: [{ day: '2026-11-28', name: 'Synthetic Closure' }] },
+      { holidays: [{ day: '2026-11-28', name: 'Synthetic Closure', absorbs_into: null }] },
     ],
     [
       'a holiday is listed twice',
       'holiday-duplicated',
       {
         holidays: [
-          { day: '2026-11-26', name: 'Synthetic Closure' },
-          { day: '2026-11-26', name: 'Synthetic Closure' },
+          { day: '2026-11-26', name: 'Synthetic Closure', absorbs_into: ABSORBED },
+          { day: '2026-11-26', name: 'Synthetic Closure', absorbs_into: ABSORBED },
         ],
       },
     ],
     [
       'a holiday has no name for the second reader to diff against',
       'holiday-unnamed',
-      { holidays: [{ day: '2026-11-26', name: '  ' }] },
+      { holidays: [{ day: '2026-11-26', name: '  ', absorbs_into: ABSORBED }] },
     ],
     [
       'an exception falls outside coverage, where it is a transcribed value that does nothing',
       'exception-outside-coverage',
-      { holidays: [{ day: '2026-12-25', name: 'Synthetic Closure' }] },
+      { holidays: [{ day: '2026-12-25', name: 'Synthetic Closure', absorbs_into: null }] },
     ],
     [
       'a day is both a holiday and an early close, so the two lists disagree about whether it trades',
@@ -299,7 +375,7 @@ describe('the source file is refused when', () => {
     [
       'a date matches the pattern and is not a calendar date',
       'day-not-a-date',
-      { holidays: [{ day: '2026-02-30', name: 'Synthetic Closure' }] },
+      { holidays: [{ day: '2026-02-30', name: 'Synthetic Closure', absorbs_into: null }] },
     ],
     ['a CT time is malformed', 'ct-time-malformed', { session_rule: { ...RULE, close_ct: '4pm' } }],
     [
@@ -320,7 +396,63 @@ describe('the source file is refused when', () => {
     [
       'coverage runs backwards',
       'coverage-inverted',
-      { coverage: { from: '2026-11-30', to: '2026-11-23' } },
+      { coverage: { from: '2026-11-30', to: '2026-11-23', evidence_to: '2026-11-30' } },
+    ],
+
+    // -------------------------------------------------------------------------
+    // ADR-055. The six rejections the ruling enumerates, plus the evidence
+    // bound section 5 rules and the type check that keeps a malformed
+    // `absorbs_into` from failing on the wrong finding.
+    // -------------------------------------------------------------------------
+    [
+      'a holiday does not say whether it absorbed a session, which is the state ADR-055 made required',
+      'absorbs-into-not-transcribed',
+      { holidays: [{ day: '2026-11-26', name: 'Synthetic Closure' }] },
+    ],
+    [
+      'absorbs_into is neither null nor an object, so it would otherwise fail on a sub-key',
+      'absorbs-into-not-an-object',
+      { holidays: [{ day: '2026-11-26', name: 'Synthetic Closure', absorbs_into: '2026-11-27' }] },
+    ],
+    [
+      'the absorbed session opens ON the holiday, which is what session_rule already computes',
+      'absorbed-open-not-before-holiday',
+      absorbing({ session_open_day: '2026-11-26' }),
+    ],
+    [
+      'the absorbed session opens AFTER the holiday, which is the unchanged rule wearing an exception',
+      'absorbed-open-not-before-holiday',
+      absorbing({ session_open_day: '2026-11-27' }),
+    ],
+    [
+      'the holiday claims a trade date that is not the next one',
+      'absorbed-trading-day-not-next',
+      absorbing({ trading_day: '2026-11-30', session_close_day: '2026-11-30' }),
+    ],
+    [
+      'the stated close disagrees with the early_closes entry for the day it absorbed',
+      'absorbed-close-disagrees',
+      absorbing({ session_close_ct: '16:00' }),
+    ],
+    [
+      'the stated close lands on a day other than the trade date it belongs to',
+      'absorbed-close-disagrees',
+      absorbing({ session_close_day: '2026-11-30' }),
+    ],
+    [
+      'a mid-week holiday claims to absorb nothing while the next calendar day trades',
+      'absorbed-null-but-next-day-trades',
+      { holidays: [{ day: '2026-11-26', name: 'Synthetic Closure', absorbs_into: null }] },
+    ],
+    [
+      'nobody has established how far the committed evidence reaches',
+      'coverage-evidence-not-transcribed',
+      { coverage: { from: '2026-11-23', to: '2026-11-30', evidence_to: null } },
+    ],
+    [
+      'coverage runs past the last date a committed artifact supports',
+      'coverage-exceeds-evidence',
+      { coverage: { from: '2026-11-23', to: '2026-11-30', evidence_to: '2026-11-27' } },
     ],
   ];
 
@@ -329,6 +461,88 @@ describe('the source file is refused when', () => {
       expect(findingOf(() => build(source(over), { sourceFile: 'synthetic.json' }))).toBe(finding);
     });
   }
+});
+
+// -----------------------------------------------------------------------------
+// ADR-055's sixth rejection, which is currently unreachable
+// -----------------------------------------------------------------------------
+
+describe('`absorbed-session-not-claimed` is a backstop the two checks above it shadow', () => {
+  // THIS SUITE'S OWN RULE IS THAT EVERY REJECTION SHIPS WITH A SEEDED VIOLATION
+  // WATCHED FAILING ON ITS OWN FINDING, and this one has none, because no
+  // source file can reach it. That is stated here rather than papered over with
+  // a seed that fails on a different finding and looks like coverage.
+  //
+  // THE PROOF IS SHORT. Let `D` trade and let `D - 1` be a holiday. The holiday
+  // states `absorbs_into` as either `null` or an object.
+  //
+  //   null   `absorbed-null-but-next-day-trades` fires, because `D` is the next
+  //          calendar day and it trades
+  //   object `absorbed-trading-day-not-next` requires it to name
+  //          `nextTradingDay(D - 1)`. That walk starts at `D`, and `D` trades,
+  //          so it returns `D`. The object therefore names `D` and `D` is claimed
+  //
+  // Both branches are closed before the reverse pass runs, so it cannot fire.
+  // The two cases below are the two branches, each asserted on the finding that
+  // actually catches it. If a future change to either check makes this suite go
+  // red, the backstop has become reachable and owes a seed of its own.
+
+  it('catches the null branch on the more specific finding', () => {
+    expect(
+      findingOf(() =>
+        build(
+          source({
+            holidays: [{ day: '2026-11-26', name: 'Synthetic Closure', absorbs_into: null }],
+          }),
+          { sourceFile: 'synthetic.json' },
+        ),
+      ),
+    ).toBe('absorbed-null-but-next-day-trades');
+  });
+
+  it('catches the object branch on the more specific finding', () => {
+    expect(
+      findingOf(() =>
+        build(source(absorbing({ trading_day: '2026-11-30', session_close_day: '2026-11-30' })), {
+          sourceFile: 'synthetic.json',
+        }),
+      ),
+    ).toBe('absorbed-trading-day-not-next');
+  });
+
+  it('accepts a run of holidays, where both entries legitimately claim the same trade date', () => {
+    // Wednesday and Thursday both shut and Friday trades. `nextTradingDay`
+    // skips a holiday, so BOTH entries name 2026-11-27 and both are right: the
+    // session opened Tuesday evening, before the run, and both closures sit
+    // inside it. Recorded as a passing case rather than left to be discovered,
+    // because it is the shape a reader assumes must be a duplicate claim.
+    //
+    // WHAT IS NOT CHECKED, AND IT IS STATED HERE RATHER THAN IMPLIED: two
+    // claimants on one trade date are not required to AGREE about its bounds.
+    // `generate` keys them by trade date and the last one wins. It is outside
+    // ADR-055's six and is not invented here; it is carried to the session log
+    // as a finding.
+    const run = {
+      trading_day: '2026-11-27',
+      session_open_day: '2026-11-24',
+      session_open_ct: '17:00',
+      session_close_day: '2026-11-27',
+      session_close_ct: '12:15',
+    };
+    const generated = build(
+      source({
+        holidays: [
+          { day: '2026-11-25', name: 'First Synthetic Closure', absorbs_into: run },
+          { day: '2026-11-26', name: 'Second Synthetic Closure', absorbs_into: run },
+        ],
+      }),
+      { sourceFile: 'synthetic.json' },
+    );
+    expect(generated.rows.find((r) => r.trading_day === '2026-11-27')).toMatchObject({
+      session_open_ct: '2026-11-24T17:00:00',
+      session_close_ct: '2026-11-27T12:15:00',
+    });
+  });
 });
 
 // -----------------------------------------------------------------------------
@@ -344,6 +558,44 @@ describe('the committed CME source file', () => {
   it('refuses to generate until it has been transcribed from the publication', () => {
     const text = readFileSync(SOURCE_FILE, 'utf8');
     expect(findingOf(() => readSource(text, SOURCE_FILE))).toBe('source-not-transcribed');
+  });
+
+  it('carries four independent refusals, so satisfying one does not make it loadable', () => {
+    // FOUR, AND THE COUNT WAS CHECKED RATHER THAN ASSUMED: this case was
+    // written expecting three and the run said `provenance-field-missing`,
+    // which is the fourth and sits between the other two in `readSource`'s
+    // order. They are not spares. `status` says nobody has transcribed, the
+    // null exception lists say nobody has read the exceptions, `provenance`
+    // says nobody has named the publication, and `evidence_to` says nobody has
+    // established how far the committed evidence reaches. A transcriber peels
+    // them off one at a time and the last one is ADR-055's, which is the one a
+    // reader is least likely to expect.
+    const raw = JSON.parse(readFileSync(SOURCE_FILE, 'utf8'));
+    const peel = (over: Record<string, unknown>) =>
+      findingOf(() => readSource(JSON.stringify({ ...raw, ...over })));
+
+    const transcribed = { status: 'transcribed' };
+    expect(peel(transcribed)).toBe('exception-list-not-transcribed');
+
+    const listed = { ...transcribed, holidays: [], early_closes: [] };
+    expect(peel(listed)).toBe('provenance-field-missing');
+
+    const sourced = { ...listed, provenance: PROVENANCE };
+    expect(peel(sourced)).toBe('coverage-evidence-not-transcribed');
+  });
+
+  it('states the absorbs_into contract where the transcriber will read it', () => {
+    // ADR-055 is a document and this file is what the transcriber has open.
+    // The contract has to be legible HERE, and the three states are the half
+    // that a reader who skims will get wrong.
+    const raw = JSON.parse(readFileSync(SOURCE_FILE, 'utf8'));
+    const note = String(raw._holidays_note);
+    expect(note).toContain('absorbs_into');
+    for (const state of ['ABSENT', 'null', 'object']) expect(note).toContain(state);
+    // The key is `day`, and ADR-055 section 3's snippet writes `date`. The
+    // discrepancy is named in the note so a transcriber following the ADR
+    // verbatim finds out here rather than from a rejection.
+    expect(note).toContain('`day` AND NOT `date`');
   });
 });
 
@@ -377,7 +629,9 @@ describe('the second, blind transcription', () => {
   it('surfaces a disagreement about which holiday a closure is, not only about whether one exists', () => {
     const first = readSource(source());
     const second = readSource(
-      source({ holidays: [{ day: '2026-11-26', name: 'A Different Closure' }] }),
+      source({
+        holidays: [{ day: '2026-11-26', name: 'A Different Closure', absorbs_into: ABSORBED }],
+      }),
     );
     expect(diffTranscriptions(first, second)).toEqual([
       'holiday 2026-11-26: first says Synthetic Closure, second says A Different Closure',
