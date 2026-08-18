@@ -111,3 +111,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | ADR-056 rewritten: the refuted mechanism deleted, the surviving argument promoted, three narrowings folded in |
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | GS-003 and GS-032 written: the two group A rows the transcribed half day unblocked, and the four rules it did not |
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | the six unsigned ADRs audited against the tree, and three of them were signed at the M1 gate |
+| [2026-08-18 - Session 63](2026-08-18-session-63.md) | PT-02 and PT-08 asserted, and PT-02's row names one exception where the engine has two |
