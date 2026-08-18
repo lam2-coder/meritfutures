@@ -3095,6 +3095,179 @@ const ci06r = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06t  EVERY GENERATED SPAN IS CLOSED BEFORE THE NEXT ONE OPENS
+// -----------------------------------------------------------------------------
+// THIS COMMENT NAMES THE TOKENS AND NEVER SPELLS THEM, and that is not fussiness:
+// a document describing this gate is a document carrying the defect unless it is
+// careful. The reservation row for this very letter spelled an opener out while
+// reserving a gate against spelling openers out, and CI-06g caught it within the
+// minute. So: an OPENER is the `gen:` comment naming a span, and a CLOSER is its
+// partner. Neither appears literally anywhere in this file; the seed in
+// falsify.mjs assembles them, which is the one place a literal is unavoidable.
+//
+// THE DEFECT. On 2026-08-18 a planning session appended a section to STATE.md and
+// CI-06g failed, reporting that the `ec_count` span "reads" ten thousand
+// characters of unrelated prose. THE CAUSE WAS TWO DAYS OLD AND HAD BEEN PASSING.
+// A line described a falsify.mjs seed by spelling an opener out and never closing
+// it. `spansIn` matches an opener only when a closer follows it, so an opener
+// with nothing after it MATCHES NOTHING AND IS SKIPPED IN SILENCE. It was
+// invisible for exactly as long as it was the last such token in the file, and
+// the first append below it supplied the closer it had been waiting for. The
+// stale opener then paired with the NEW span's closer and swallowed everything
+// between, including that span's own opener.
+//
+// SO A TOTAL COUNT OF OPENERS AGAINST CLOSERS IS NOT THIS CHECK, and the
+// distinction is the whole gate. A file can hold equal numbers of each and still
+// be wrong: `docs/sessions/2026-08-15-session-30.md` opened twice on one line
+// with neither closed while a third sat unclosed above it, and any balance-count
+// reading would have to see three closers appear later to call it a finding.
+// What matters is ORDER: each opener is followed by its closer BEFORE ANY OTHER
+// OPENER APPEARS, which is what makes the non-greedy pair in `spansIn` mean what
+// it looks like it means.
+//
+// FOURTH INSTANCE OF THE SPAN-PARSER CLASS, and this gate is a reader too, which
+// is the honest thing to say about it. CI-06n's parser matched a prose mention
+// rather than a table row (`OI-09`); CI-06g's own falsify seed hardcoded the
+// value it was checking; and `registryIds()` re-implemented the `gs_count` query
+// instead of calling it. Each was a reader looser or narrower than the property
+// it claimed. This one is narrower than "the spans are correct" on purpose: it
+// says nothing about a span's NAME or its CONTENT, which is CI-06g's half.
+//
+// THE DOCUMENT SET IS `markdownFiles()`, WHICH IS CI-06g's, AND NOT
+// `isCorpusDocument`. That is a deliberate choice against the obvious reuse.
+// `isCorpusDocument` is `CI-06b` and `CI-06c`'s shared reader under `OQ-P1-04`,
+// and it answers "is this a thing with a gateable status and an INDEX row" --
+// a different question. This gate exists to protect ONE parser, `spansIn`, and
+// the population at risk is exactly the population that parser reads, which is
+// every markdown file. Guarding a narrower set than the reader you are
+// protecting is how a gate ends up green over the file that breaks. Two of the
+// four real sites found on arrival sit in `docs/sessions/`, which both readers
+// cover; the third sat under `docs/decisions/gates/`, which `isCorpusDocument`
+// excludes as a registry entry and `markdownFiles()` does not.
+
+/**
+ * Span tokens in one document, in the order they appear, with the code fences
+ * masked exactly as `spansIn` masks them.
+ *
+ * THE MASKING IS NOT OPTIONAL AND IS NOT DEFENSIVE. STRATEGY's own CI-06g
+ * section carries a worked example of a span inside a fence, and a scan that
+ * did not mask would report the document explaining the gate as a violation of
+ * it. Sharing the mask with `spansIn` is what makes "quoted" mean one thing.
+ */
+function spanTokens(body) {
+  const masked = body.replace(/^```[\s\S]*?^```/gm, (block) => block.replace(/</g, '\0'));
+  // Assembled rather than spelled, for the reason the block comment above gives.
+  const OPENER = new RegExp(`<!--${'gen'}:([a-z0-9_]+)-->`, 'g');
+  const CLOSER = new RegExp(`<!--/${'gen'}-->`, 'g');
+  const at = (i) => masked.slice(0, i).split('\n').length;
+  const tokens = [];
+  for (const m of masked.matchAll(OPENER))
+    tokens.push({ kind: 'opener', at: m.index, line: at(m.index), name: m[1] });
+  for (const m of masked.matchAll(CLOSER))
+    tokens.push({ kind: 'closer', at: m.index, line: at(m.index) });
+  // Two sweeps and one sort rather than one alternating pattern, because a
+  // single regex would have to name both forms and the sort is the cheap half.
+  //
+  // SORTED BY CHARACTER OFFSET AND NOT BY LINE, and the first draft of this
+  // function sorted by line and reported fifty findings against a clean tree.
+  // INDEX.md carries three spans on ONE line and STRATEGY carries two; a
+  // line-keyed sort with an opener-first tiebreak reads those as three openers
+  // followed by three closers, which is the exact shape this gate calls a
+  // finding. A reader looser or narrower than the property it claims is the
+  // class this gate is the fourth instance of, and it was the fifth for about a
+  // minute.
+  return tokens.sort((a, b) => a.at - b.at);
+}
+
+const ci06t = {
+  id: 'CI-06t',
+  title: 'Every generated span is closed before the next one opens',
+  covers:
+    'SPAN BALANCE, READ AS ORDER RATHER THAN AS A COUNT. In every markdown file, ' +
+    'each generated-span opener is followed by its closer BEFORE ANY OTHER OPENER ' +
+    'APPEARS, and a closer with no opener before it is a finding. ' +
+    'A TOTAL COUNT OF OPENERS AGAINST CLOSERS IS NOT THIS CHECK and would have ' +
+    'passed on the defect that commissioned it. CI-06g reads a span by matching ' +
+    'an opener to the next closer anywhere after it, so an opener with no closer ' +
+    'after it matches NOTHING and is skipped in silence, and the moment a later ' +
+    'span supplies a closer the stale opener swallows everything between them, ' +
+    'including that later span own opener. That is a defect which passes for as ' +
+    'long as it is the last such token in the file and fails on the next append. ' +
+    'IT SAYS NOTHING ABOUT A SPAN NAME OR ITS CONTENT, which is CI-06g half. A ' +
+    'perfectly balanced file whose every span holds a stale number passes here ' +
+    'and is CI-06g finding, and the two gates are deliberately not merged so ' +
+    'that neither is taken on trust for the other. ' +
+    'IT READS markdownFiles(), WHICH IS CI-06g OWN SET, and deliberately not ' +
+    'isCorpusDocument: the population at risk is exactly the population the ' +
+    'parser being protected reads, and one of the four real sites found on ' +
+    'arrival sat in a directory isCorpusDocument excludes. ' +
+    'IT IS A READER TOO, which is the fourth instance of that class here and is ' +
+    'stated rather than left to be discovered. Code fences are masked with the ' +
+    'same expression CI-06g uses, so a worked example of a span inside a fence ' +
+    'is quoted rather than counted; a token constructed at runtime, or split ' +
+    'across a line, is out of reach and is claimed as nothing.',
+  run() {
+    const findings = [];
+    let documents = 0;
+    let tokens = 0;
+
+    for (const file of markdownFiles()) {
+      const found = spanTokens(read(file));
+      if (found.length === 0) continue;
+      documents++;
+      tokens += found.length;
+
+      let open = null;
+      for (const token of found) {
+        if (token.kind === 'opener') {
+          if (open) {
+            findings.push(
+              `${file}:${token.line}: span "${token.name}" opens while "${open.name}" ` +
+                `(line ${open.line}) is still unclosed. CI-06g will pair the earlier opener ` +
+                `with a LATER closer and read everything between them as its content. Name ` +
+                `the span rather than spelling its opener, which is the repair STATE.md took`,
+            );
+          }
+          open = token;
+        } else {
+          if (!open) {
+            findings.push(
+              `${file}:${token.line}: a span closer with no opener before it. Either the ` +
+                `opener was deleted and its closer left behind, or a document is quoting a ` +
+                `closer outside a code fence`,
+            );
+          }
+          open = null;
+        }
+      }
+      if (open) {
+        findings.push(
+          `${file}:${open.line}: span "${open.name}" opens and is never closed. IT IS ` +
+            `INVISIBLE TO CI-06g FOR EXACTLY AS LONG AS NOTHING IS APPENDED BELOW IT, ` +
+            `and the first section added after it supplies the closer it has been waiting ` +
+            `for. Name the span rather than spelling its opener`,
+        );
+      }
+    }
+
+    // The sentinel, and it fails differently from a finding on purpose. This
+    // gate reports nothing on a corpus with no spans in it and on a corpus
+    // whose token pattern has stopped matching, and those two are not the same
+    // fact. `CI-06g` carries the identical guard for the identical reason.
+    if (documents === 0 || tokens === 0) {
+      throw new Error(
+        'CI-06t found no generated-span token in any markdown file. This corpus ' +
+          'carries them in INDEX, STATE, STRATEGY and several session logs, so zero ' +
+          'means the token pattern has stopped matching and every unbalanced document ' +
+          'in the tree would pass for the wrong reason',
+      );
+    }
+
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -3116,6 +3289,7 @@ const GATES = [
   ci06q,
   ci06r,
   adr026,
+  ci06t,
 ];
 
 function main() {
