@@ -1,0 +1,189 @@
+# GS-081  Settlement leaves the floor, the high-water balance, and the lock untouched
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   R-19  "There is no post-payout floor recompute. A settled payout reduces
+#         `balanceCents` and changes nothing else about the floor: `floorCents`,
+#         `highWaterBalanceCents`, and `floorLocked` all carry through
+#         untouched"                                                  M01 R-19
+#   R-48  "The floor is untouched by settlement ... The balance falls at the
+#         open of `effectiveTradingDay`; `floorCents`, `highWaterBalanceCents`,
+#         and `floorLocked` are carried through unchanged"            M01 R-48
+#   R-15  trigger `closing - size >= floor_lock_at_profit_cents` (`>=`); effect
+#         `floor = floor_lock_floor_at_cents`, `floorLocked = true`, `hwb`
+#         frozen, all permanently                                     M01 R-15
+#   R-10  non-trading movements carried in `adjustment_cents`, applied at the
+#         OPEN of the effective day                              M01 R-10, SD-01
+#   INV-18  `opening == prior.balance + adjustment`, asserted at DO-3  M01 INV-18
+#   INV-06  the floor never decreases, one exception (R-31), no settlement
+#           carve-out                              M01 INV-06, ADR-014, ADR-050
+#   R-21  breach is `low_balance_cents < floorOpenCents`, strict `<`   M01 R-21
+#   R-35  `withdrawable = max(0, balance - size - buffer)`            M01 R-35
+#   `payout.floor_recomputed` is RETIRED WITH NO PRODUCER after ADR-014
+#                                              M01 section 4 events, EVENTS.md
+#   size 5,000,000c, funded drawdown 250,000c, buffer 100,000c, cap 150,000c,
+#   win day floor 15,000c, win days required 5, funded consistency 3000bp,
+#   lock at profit 260,000c, locked floor offset 10,000c
+#                                                       M01 Appendix A.1 at 50K
+#
+# ---------------------------------------------------------------------------
+# WHAT THE REGISTRY ROW ASKS FOR, AND WHICH HALF OF IT THIS FILE PINS
+# ---------------------------------------------------------------------------
+# The row reads: "A capped payout settles on a locked account and on an
+# unlocked one. In both cases `floor_cents`, `high_water_balance_cents`, and
+# `floor_locked` are byte-identical across the settlement while `balance_cents`
+# falls by exactly `approved_cents`. No `payout.floor_recomputed` event is
+# emitted."
+#
+# THIS FILE IS THE LOCKED HALF. GS-065 IS THE UNLOCKED HALF, on the same plan,
+# and it is already in this directory: its floor holds at 5,000,000c and its
+# `floor_locked: false` across a 150,000c extraction. Splitting the row across
+# two files is forced by two facts and neither is a preference.
+#
+#   THE FORMAT PINS ONE END STATE. `expected.end_state` is a single `RuleState`
+#   diffed after the last mark. A fold carrying an unlocked settlement and then
+#   a locked one can only pin the second; the first would be exercised and
+#   unstated, which is a fixture claiming coverage it does not have.
+#
+#   THE CALENDAR CANNOT CARRY TWO GATE-LEGAL PAYOUTS. `cme-2026` holds seven
+#   sessions. On CORE-50K R-34 requires five win days and R-47 restarts that
+#   count at the basis day, so a second payout needs five more win days after
+#   the first: eleven sessions minimum. On MERIT-RAPID-50K, whose cadence gap is
+#   1 rather than 5, it is three, and the sum is still nine. Two settlements in
+#   one stream would therefore have to be a payout the plan's own gates refuse,
+#   and GS-065 set the standard this file follows: model an extraction the gates
+#   actually permit rather than assert a movement out of nowhere.
+#
+# WHAT IS THEREFORE NOT CLAIMED. `payouts_settled_count`, `payout_anchor_day`,
+# `cadence_anchor_day` and `lifetime_settled_cents` are what `applySettlement`
+# computes from a `SettlementFact`. This fixture states the mark's adjustment
+# rather than the fact, because `L-11` still refuses a fixture that states one,
+# and NONE OF THE FOUR IS ON GS-081's REGISTRY ROW. Every claim on that row is
+# about the floor, the high-water balance, the lock flag, the balance, and an
+# event that is not emitted, and not one of those five is computed by
+# `applySettlement`: the balance falls at DO-3 through R-10's adjustment.
+#
+# ---------------------------------------------------------------------------
+# THE STREAM, AND WHY EVERY NUMBER IN IT IS THE NUMBER IT IS
+# ---------------------------------------------------------------------------
+# FIVE DAYS OF EXACTLY 52,000c, WHICH IS THE CHEAPEST PATH TO A LOCKED ACCOUNT
+# THAT IS ALSO PAYOUT-ELIGIBLE. Five win days against a required five (52,000c
+# clears the 15,000c win-day floor); best-day share 52,000 / 260,000 = 2000bp
+# inside 3000bp; funded `min_trading_days` 0; first payout, so R-37's cadence
+# anchor is null and the gate passes trivially.
+#
+#   close of day 5  5,260,000     profit 260,000 = the lock trigger EXACTLY
+#   locked floor    5,000,000 + 10,000                       = 5,010,000c
+#   trailing floor  5,260,000 - 250,000                      = 5,010,000c
+#
+# THE TWO ARE EQUAL AND THAT IS DELIBERATE. ADR-052 settled that R-15 is an
+# ASSIGNMENT rather than `max(trail, lock)`, and the engine on main still
+# carries the `max`. A lock day where the two readings disagree would make this
+# fixture a second measurement of that open question instead of a measurement of
+# R-19. Here they agree to the cent, so this file is silent on ADR-052 and says
+# only what its own row says. It is also why the floor series is monotone
+# non-decreasing throughout -- 4,802,000 to 4,854,000 to 4,906,000 to 4,958,000
+# to 5,010,000 -- with INV-06 untouched on every step.
+#
+# THE SIXTH DAY IS THE SETTLEMENT AND NOTHING ELSE. `fill_count: 0` and
+# `realized_pnl_cents: 0`, so the ONLY movement in the day is the withdrawal.
+# That is what makes "balance falls by exactly `approved_cents`" a reading and
+# not an inference: 5,260,000 - 5,110,000 = 150,000c, with no trading P&L
+# anywhere in the subtraction to be confused for part of it.
+#
+#   withdrawable    5,260,000 - 5,000,000 - 100,000          =   160,000c
+#   capped at       payout cap                               =   150,000c
+#   opening day 6   5,260,000 - 150,000                      = 5,110,000c
+#   floor at open   locked, unmoved                          = 5,010,000c
+#   loss room       5,110,000 - 5,010,000                    =   100,000c
+#
+# THE LOSS ROOM IS 100,000c AND NOT 90,000c, AND THE DIFFERENCE IS THE CAP
+# BINDING. R-19 states the room after an extraction as "the buffer, or the
+# buffer minus the lock offset once locked". The second figure is the room when
+# the WHOLE withdrawable leaves: balance - (balance - size - buffer) - (size +
+# offset) = buffer - offset = 90,000c, which is GS-056's pin. Here the cap stops
+# 10,000c of the withdrawable from leaving, so 10,000c more stays in the
+# account. On CORE-50K a locked account's withdrawable is always at least
+# 160,000c against a 150,000c cap, so the cap ALWAYS binds at the moment of the
+# lock and 90,000c is not reachable on this stream. This file does not pin a
+# loss room; the arithmetic is here so the two figures are not read as a
+# contradiction.
+#
+# INV-21 HOLDS AND THE FIXTURE SHOWS WHY RATHER THAN ASSERTING IT. The account
+# is paid on its own closing high and opens the next session 100,000c above its
+# floor, so `low < floorOpen` is false by a wide margin and `breached` is
+# pinned false. CV-11 is what guarantees that in general (the lock is enabled on
+# every v1 plan); GS-083 is the fixture for CV-17's lock-disabled half and it is
+# not expressible here, for the reason recorded in this batch's session log.
+id: GS-081
+name: settlement leaves the floor, the high-water balance, and the lock untouched
+source: M01 R-08, R-10, R-13, R-14, R-15, R-18, R-19, R-21, R-35, R-48, INV-06, INV-18, INV-21
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-10-30
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5052000
+    high_balance_cents: 5057000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 52000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5052000
+    closing_balance_cents: 5104000
+    high_balance_cents: 5109000
+    low_balance_cents: 5047000
+    realized_pnl_cents: 52000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5104000
+    closing_balance_cents: 5156000
+    high_balance_cents: 5161000
+    low_balance_cents: 5099000
+    realized_pnl_cents: 52000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5156000
+    closing_balance_cents: 5208000
+    high_balance_cents: 5213000
+    low_balance_cents: 5151000
+    realized_pnl_cents: 52000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  # THE LOCK DAY. `closing - size` is 260,000c and the trigger is 260,000c, so
+  # R-15's `>=` fires on equality. The floor is assigned 5,010,000c, which is
+  # also where the trail already sits, and the high-water balance freezes at
+  # 5,260,000c for the rest of the account's life.
+  - trading_day: 2026-11-06
+    opening_balance_cents: 5208000
+    closing_balance_cents: 5260000
+    high_balance_cents: 5265000
+    low_balance_cents: 5203000
+    realized_pnl_cents: 52000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  # THE DAY THE MONEY LEAVES A LOCKED ACCOUNT. The capped 150,000c withdrawal
+  # is the adjustment and it lands at the open (R-10). No fills, no realized
+  # P&L: the balance movement across this day is the payout and only the payout.
+  - trading_day: 2026-11-09
+    adjustment_cents: -150000
+    opening_balance_cents: 5110000
+    closing_balance_cents: 5110000
+    high_balance_cents: 5110000
+    low_balance_cents: 5110000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+settlements: []
