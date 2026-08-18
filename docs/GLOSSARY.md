@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-18
 ---
 
 # GLOSSARY
@@ -103,7 +103,7 @@ Floor = (maximum end-of-day balance ever achieved) minus (drawdown amount). The 
 Config: `drawdown.type = "trailing_eod"`.
 
 ## floor lock
-The rule that stops a trailing floor from trailing once the account reaches a configured profit threshold, fixing the floor at [account size](#account-size) plus a configured amount (typically the point at which the trader's capital is protected). Locking is permanent for the account: the high-water balance stops updating at the same moment, which is what makes the floor immutable rather than merely capped. **Enabled on all three v1 plans at account size plus 10,000 cents ($100)**, engaging at exactly `drawdown + 10,000c` of closing profit so that the trailing floor is already sitting at the lock value when it engages and the floor never jumps ([ADR-014](decisions/ADR-014.md)).
+The rule that stops a trailing floor from trailing once the account reaches a configured profit threshold, fixing the floor at [account size](#account-size) plus a configured amount (typically the point at which the trader's capital is protected). Locking is permanent for the account: the high-water balance stops updating at the same moment, which is what makes the floor immutable rather than merely capped. **Enabled on all three v1 plans at account size plus 10,000 cents ($100)**, engaging at `drawdown + 10,000c` of closing profit so that the locked value sits at or above the trailing floor of the day before, and the lock day therefore never lowers the floor ([ADR-014](decisions/ADR-014.md), corrected by [ADR-052](decisions/ADR-052.md) and carried here by [ADR-057](decisions/ADR-057.md)). The two are **not** equal on the lock day itself: a close that overshoots the trigger locks strictly below the floor the trail alone would have produced.
 Config: `drawdown.lock.enabled`, `drawdown.lock.at_profit_cents`, `drawdown.lock.floor_at_cents`.
 
 ## static drawdown
