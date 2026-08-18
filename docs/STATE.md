@@ -1433,3 +1433,21 @@ The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**.
 | **4** | **Export the `EngineEvent` discriminated union.** A consumer that must cast is a consumer that can cast wrong |
 
 **One finding is recorded and not scheduled.** `DEP-M2-03`'s setpoint source now has a number attached: the demo's `DEMOSWNG250002` locked its floor 296,250c above a platform setpoint pushed once at provisioning, breached, and carries **no auto-liquidation record** while [DATA_CAPABILITIES](../research/DATA_CAPABILITIES.md) section 1 names that record as Merit's breach evidence. Every rule involved is working as written. How often M2 re-pushes the setpoint is an [M02](plans/M02-rithmic-bridge.md) question, M02 holds at `review` pending the vendor call, and nothing being built depends on the answer.
+
+---
+
+## INV-04's comparison is wired, and an audit that stopped looking now refuses (2026-08-18)
+
+**[`apps/worker/src/batch/replay.ts`](../apps/worker/src/batch/replay.ts) exists.** `nightly.ts` computed `state_hash` on every row it wrote and nothing read it back; the file said so in its own header. **Replay now re-derives a stored row and compares the two**, which is INV-04's right-hand side and the first time the evidence this batch produces is read by anything.
+
+**The order is B.2's:** `state_hash` first by `Buffer.equals`, then a field-by-field diff **only on mismatch**, naming the `rule_states` SQL column or `engine_gates.<dotted.path>` for a gate leaf. **The stored row is never re-hashed** and the module header carries `ports.ts`'s reason verbatim, because "just hash both sides, it's symmetric" is the obvious future simplification and it would diverge the whole book on its first run.
+
+**Scope is B.4 step 1 read twice**, for `engine_version` and for `calendar_revision_id` ([ADR-047](decisions/ADR-047.md)), applied as an explicit partition with the mode on the report so that B.4 step 2's dry run does not require a second comparator. **No schema change: `0038` stays unclaimed**, and findings go through a `raiseDivergence` port that persists nothing, on `nightly.ts`'s own precedent for events.
+
+| | |
+|---|---|
+| **`OI-14` is SATISFIED, and its row is NOT closed** | The refusal on an empty in-scope set is built and tested: an audit that has stopped looking reports exactly like one that found nothing (FM-17), so it throws rather than returning a clean report. **`OI-14` lives in [`DELTA_MANIFEST`](../packages/db/DELTA_MANIFEST.md), outside this session's fence, so closing the row is a documentation edit somebody else makes.** A session that reported closing a registry row it cannot edit would leave the next reader believing a registry moved when it did not |
+| **The defect found before the module was written** | `foldAccountDay` dropped `out.state`, and a `RuleStateRow` cannot rebuild a `RuleState`. The only recomputation expressible was one folding from `AccountDay.prior`, **the stored value being audited**. Watched failing on the four-day chain: `expected 1 to be 3` |
+| **Next-action 6 is NARROWED, not closed** | Its stated grounds are dead for a **required** field: both walked fixtures are type-annotated, so it is a compile error first and the walk names the path second. What remains is an **optional (`?`) field omitted from both literals**, which the test file declares as its own blind spot; `GateLeaf.path` still being `string`; and an object-or-null field `null` in both fixtures reporting as one path. **Not edited here** -- `## Next 3 actions` belongs to R1 |
+
+**Four obligations are named in the module header and none is wired**, each outside this fence: B.1's payout halt, the event's destination (`0017`'s tables), a scheduler, and `replay.audit_completed`, which [`CRON_INVENTORY.md`](ops/runbooks/CRON_INVENTORY.md) requires and the `EVENTS.md` catalogue does not define. **A green audit today also covers less than it appears to**, because the engine does not implement every rule group yet, which is what the report's counts exist to make visible.
