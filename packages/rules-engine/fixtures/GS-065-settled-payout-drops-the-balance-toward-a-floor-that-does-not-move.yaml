@@ -1,0 +1,148 @@
+# GS-065  Settled payout drops the balance toward a floor that does not move
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "Not an attacker, a bug, and the most expensive kind: a 150,000c withdrawal
+#   reduces the platform balance. If the engine reads that reduction as trading
+#   loss, an account can be breached by being paid."                 M01 AS-10
+#   non-trading movements  carried in `adjustment_cents` and applied at the open
+#                          of the effective day, never inside a session
+#                                                            M01 R-10, SD-01
+#   R-19  "There is no post-payout floor recompute. A settled payout reduces
+#         `balanceCents` and changes nothing else about the floor: `floorCents`,
+#         `highWaterBalanceCents`, and `floorLocked` all carry through
+#         untouched. The trader's loss room after an extraction is therefore the
+#         buffer, or the buffer minus the lock offset once locked"    M01 R-19
+#   INV-18  `opening == prior.balance + adjustment`, asserted at DO-3
+#                                                          M01 INV-18, R-07
+#   INV-21  "a settled payout can never breach the account that earned it"
+#                                                                 M01 INV-21
+#   floor breach  `low_balance_cents < floorOpenCents`, strict `<`     M01 R-21
+#   breach comparator is the floor AT THE OPEN                        M01 R-18
+#   trailing floor  `hwb' = max(hwb, closing)`, `floor' = hwb' - drawdown`
+#                                                              M01 R-13, R-14
+#   withdrawable  `max(0, balance - size - buffer)`                   M01 R-35
+#   size 5,000,000c, funded drawdown 250,000c, buffer 100,000c,
+#   payout cap 150,000c, win day floor 15,000c, win days required 5
+#                                                       M01 Appendix A.1 at 50K
+#
+# WHY THIS FIXTURE COULD NOT BE WRITTEN UNTIL NOW, AND WHAT CHANGED.
+# The held-back row filed GS-065 under "they turn on a SETTLEMENT, and `L-11`
+# refuses a fixture that states one because `EngineInput` has no home for it".
+# THE SECOND HALF OF THAT SENTENCE HAS EXPIRED and the first half was always
+# narrower than it read.
+#
+# A SETTLEMENT REACHES A MARK AS `adjustment_cents` AND M01 SAYS SO IN R-10's
+# OWN ROW, which cites GS-065 by name. What `applySettlement` additionally
+# computes is R-46's two anchors, R-47's win-day and consistency reset, R-49's
+# ladder and R-50's lifetime total. THIS SCENARIO PINS NONE OF THEM: every claim
+# on its registry row is about the balance, the floor and the breach comparison.
+# So the fixture states the movement the way the pipeline states it, on the mark,
+# and states no `SettlementFact`, which `L-11` still refuses for a reason that is
+# now the FORMAT's rather than the engine's.
+#
+# WHAT IS THEREFORE NOT CLAIMED, STATED HERE RATHER THAN LEFT TO A READER.
+# `payouts_settled_count`, `payout_anchor_day`, `cadence_anchor_day` and
+# `lifetime_settled_cents` do not move in this fold and are NOT PINNED. A
+# fixture pinning `payouts_settled_count: 0` beside a note describing a
+# settlement would be stating the counter as an expectation when it is really an
+# absence. GS-081 is the row that owns those four fields, it is still held back,
+# and it needs the settlement block this format does not have.
+#
+# THE FIRST FIVE DAYS ARE GS-055's STREAM, UNCHANGED, AND THAT IS THE POINT.
+# AS-03's minimum-variance path is the cheapest sequence that earns a full-cap
+# payout: five days at exactly 50,000c, five win days against a required five,
+# best-day share 2000bp inside 3000bp, ending with a withdrawable of exactly
+# 150,000c against a 150,000c cap. THIS FILE IS THAT PATH PLUS THE DAY THE MONEY
+# LEAVES, so the extraction it models is one the gates actually permit rather
+# than a movement asserted out of nowhere.
+#
+#   after day 5     balance 5,250,000  hwb 5,250,000  floor 5,000,000
+#   withdrawable    5,250,000 - 5,000,000 - 100,000       =   150,000c = the cap
+#   the payout      adjustment                            =  -150,000c
+#   opening day 6   5,250,000 - 150,000                   = 5,100,000c
+#   loss room       5,100,000 - 5,000,000                 =   100,000c = buffer
+#
+# THE LOCK NEVER ENGAGES AND THAT IS WHAT MAKES THIS THE FIRST HALF OF R-19's
+# SENTENCE. The trigger is 260,000c of profit and this path tops out at
+# 250,000c, so the floor is still trailing and `floor_locked` is still false when
+# the money leaves. R-19's loss room is therefore "the buffer" exactly, with no
+# lock offset subtracted, and there is only one reading of the floor: section
+# 3.4's `max` and section 3.6's assignment cannot disagree where no lock exists.
+# GS-056 is the locked half of the same sentence, on the same plan, and pins
+# 90,000c.
+#
+# DAY 6 CONSUMES THE WHOLE LOSS ROOM AND SURVIVES BY R-21's OPERATOR. The low is
+# 5,000,000c and the floor at open is 5,000,000c, so `low < floor` is false and
+# the account that was just paid is still standing at the close. One cent lower
+# and it breaches, which is GS-014's boundary arriving on the day of a payout
+# rather than on an ordinary day.
+id: GS-065
+name: settled payout drops the balance toward a floor that does not move
+source: M01 R-08, R-09, R-10, R-13, R-14, R-18, R-19, R-21, R-35
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-10-30
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5050000
+    high_balance_cents: 5055000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5050000
+    closing_balance_cents: 5100000
+    high_balance_cents: 5105000
+    low_balance_cents: 5045000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-04
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5150000
+    high_balance_cents: 5155000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5150000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5145000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-06
+    opening_balance_cents: 5200000
+    closing_balance_cents: 5250000
+    high_balance_cents: 5255000
+    low_balance_cents: 5195000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  # THE DAY THE MONEY LEAVES. The withdrawal is the adjustment and it lands at
+  # the open (R-10), so the opening balance is the prior close less 150,000c and
+  # INV-18 holds with the adjustment in it. The day then loses exactly the buffer
+  # and touches the floor without crossing it.
+  - trading_day: 2026-11-09
+    adjustment_cents: -150000
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5000000
+    high_balance_cents: 5100000
+    low_balance_cents: 5000000
+    realized_pnl_cents: -100000
+    fill_count: 4
+    traded_day: true
+settlements: []
