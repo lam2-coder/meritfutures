@@ -257,12 +257,60 @@ function renderEngineGates(gates: EngineGateResults): string {
 // executable copy, so it carries the ordinal and the column's SQL name and a
 // test asserts both against the ADR rather than against this file.
 
+// -----------------------------------------------------------------------------
+// THE SUBJECT IS THE PROJECTION THE HASH READS, NOT `RuleState`, AND THE REPLAY
+// AUDIT IS WHY
+// -----------------------------------------------------------------------------
+// `HASHED_COLUMNS` below declares NINETEEN SQL columns. Exactly ONE of them
+// (`account_id`) reads `subject.accountId`; the other EIGHTEEN read
+// `subject.state.*`. Nineteen and eighteen are both right, about different sets,
+// and they are stated together here because a lone numeral near this array is
+// how a hand-maintained count goes wrong.
+//
+// `state` is typed as those eighteen rather than as `RuleState` so that a STORED
+// row can be a subject. `RuleState` carries three fields that no `rule_states`
+// column holds -- `lifetimeSettledCents`, `breached`, `breachKind` -- so a
+// `RuleStateRow` read back out of storage can never BE a `RuleState`, and the
+// replay comparison would have to fabricate them to hash the stored side.
+//
+// IT IS A WIDENING AND NOTHING SERIALIZED MOVES. `Pick` is erased at compile
+// time; every existing caller passes a `RuleState`, which remains assignable;
+// the renderers are untouched. The proof is that `state-hash.test.ts` passes
+// unchanged, including its independently transcribed serialization.
+//
+// The alternative, `storedRow as unknown as RuleState`, fabricates three fields
+// that are invisible today and go live the moment a twentieth hashed column is
+// added -- at which point the stored side renders a value no row ever held.
+
+/** The eighteen `RuleState` fields the hash reads. Everything else is excluded. */
+export type HashedState = Pick<
+  RuleState,
+  | 'tradingDay'
+  | 'phase'
+  | 'floorCents'
+  | 'floorLocked'
+  | 'floorOpenCents'
+  | 'highWaterBalanceCents'
+  | 'balanceCents'
+  | 'withdrawableCents'
+  | 'tradedDaysCount'
+  | 'winDaysCount'
+  | 'consistencyBestDayCents'
+  | 'consistencyPeriodProfitCents'
+  | 'consistencyPeriodStartDay'
+  | 'payoutsSettledCount'
+  | 'payoutAnchorDay'
+  | 'cadenceAnchorDay'
+  | 'engineEligible'
+  | 'engineGates'
+>;
+
 /** The account the row belongs to, which `RuleState` does not carry. */
 export interface StateHashSubject {
   /** `rule_states.account_id`. Canonical lowercase UUID. */
   readonly accountId: string;
   /** Everything else the hash covers, as the engine returned it. */
-  readonly state: RuleState;
+  readonly state: HashedState;
 }
 
 export interface HashedColumn {
