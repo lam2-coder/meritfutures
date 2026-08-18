@@ -1433,3 +1433,20 @@ The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**.
 | **4** | **Export the `EngineEvent` discriminated union.** A consumer that must cast is a consumer that can cast wrong |
 
 **One finding is recorded and not scheduled.** `DEP-M2-03`'s setpoint source now has a number attached: the demo's `DEMOSWNG250002` locked its floor 296,250c above a platform setpoint pushed once at provisioning, breached, and carries **no auto-liquidation record** while [DATA_CAPABILITIES](../research/DATA_CAPABILITIES.md) section 1 names that record as Merit's breach evidence. Every rule involved is working as written. How often M2 re-pushes the setpoint is an [M02](plans/M02-rithmic-bridge.md) question, M02 holds at `review` pending the vendor call, and nothing being built depends on the answer.
+
+---
+
+## `PT-04` and `PT-07` are asserted, and each found a ruling it did not expect (2026-08-18)
+
+**Two of P2's seven properties move from registered to asserted** ([session 62](sessions/2026-08-18-session-62.md)). `PT-01` was the only one asserted before this; `PT-02`, `PT-05` and `PT-08` remain unasserted and are sessions 63 and 64's. **799 passing across 56 files, 17 of 17 gates**, and both mutants watched failing with the tree reverted clean.
+
+| | |
+|---|---|
+| **`PT-04` / `RE-P-05`** | `withdrawableCents >= 0` at every point, **and equal to `R-35` re-derived from its own wording**, so the property detects drift between the document and the code rather than a formula agreeing with itself |
+| **`PT-07` / `RE-P-13`** | Applying the same day twice is a no-op **and returns a refusal**, because "the state did not change" is satisfied by an engine that re-ran the day and landed on the same numbers |
+
+**The vacuity risk for `PT-04` was the phase, and it is the whole design.** `withdrawableCents` returns `0n` unless the phase is `funded` (`gates.ts` line 79), and a generated sequence crosses the eval pass **at most once** because `R-31` resets the balance and `DO-3`'s `INV-18` check refuses the next mark. So the fold starts from `fundedPrior` and every generated day is funded. Three reachability counts are asserted non-zero, including the one STRATEGY's own note calls for: **balance driven below `size + buffer`**, which is the case a missing floor returns a negative for.
+
+> **Each property found a ruling by failing on it, which is the argument for re-deriving a formula rather than calling the engine's own.** `PT-04` failed first with `R-35 over balance 4958745: expected 1n to be 0n` — that is [ADR-054](decisions/ADR-054.md) working, since `R-35` does not run on the row that closes an account and `withdrawableCents` carries. `PT-07` failed first with `expected ['account_closed'] to deeply equal ['not_forward']` — `advance.ts` line 188's terminal guard sits **ahead** of the same-day guard at line 198, so a day that closed the account is refused for being terminal before it is ever refused for being a repeat. **Both exceptions are PINNED rather than skipped**, on `PT-01`'s rule for `ADR-050`'s exception: a test that skips a case accepts any value in it.
+
+**One duplication is created deliberately and has an owner rather than a mention.** `property-harness.ts` holds four helpers that already exist as private copies in `floor-monotonicity.property.test.ts` (lines 143, 252, 264 and `fold` at 299). They cannot be imported from a test file without re-registering its suite, and extracting them is an edit to a file session 62's fence forbids. **The follow-up is a named one-objective session**: `PT-01` imports from the harness and the four private copies go.
