@@ -103,3 +103,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 56](2026-08-18-session-56.md) | `INV-07` and the funded reset: ADR-056 proposed |
 | [2026-08-18 - Session 56](2026-08-18-session-56.md) | `GS-081` written and `GS-083` routed out: `INV-21`'s missing fixtures, and a counterexample filed under the wrong half |
 | [2026-08-18 - Session 56](2026-08-18-session-56.md) | `absorbs_into`, the shape ADR-055 shipped without its validator |
+| [2026-08-18 - Session 57](2026-08-18-session-57.md) | `GS-083` written in the `RE-C-nn` suite: publishing fails and `CV-17` is the code named |
