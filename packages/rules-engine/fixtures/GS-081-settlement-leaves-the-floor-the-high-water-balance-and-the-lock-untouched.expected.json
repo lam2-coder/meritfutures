@@ -1,0 +1,28 @@
+{
+  "end_state": {
+    "trading_day": "2026-11-09",
+    "phase": "funded",
+    "balance_cents": 5110000,
+    "floor_open_cents": 5010000,
+    "floor_cents": 5010000,
+    "floor_locked": true,
+    "high_water_balance_cents": 5260000,
+    "withdrawable_cents": 10000,
+    "traded_days_count": 5,
+    "win_days_count": 5,
+    "consistency_best_day_cents": 52000,
+    "consistency_period_profit_cents": 260000,
+    "breached": false
+  },
+  "events": [
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "rule.floor_locked",
+    "day.closed",
+    "day.closed"
+  ],
+  "pins": "a capped payout settling on a LOCKED account moves the balance down by exactly approved_cents and leaves floor_cents, high_water_balance_cents and floor_locked byte-identical across the settlement, with no payout.floor_recomputed emitted",
+  "note": "THE SIXTH `day.closed` IS WHAT MAKES THIS A SETTLEMENT FIXTURE RATHER THAN A LOCK FIXTURE, and it is GS-065's assertion arriving on a LOCKED account. M01 section 3.6's own sketch compares INV-18's opening against the POST-settlement balance, which on a 150,000c payout expects an opening 150,000c below the real one, raises `opening_mismatch`, and writes no state for the day. Under that reading this fold stops at 2026-11-06 and `trading_day`, `balance_cents` (5,260,000 rather than 5,110,000) and `withdrawable_cents` (160,000 rather than 10,000) all move together. INV-18's own row is `opening == PRIOR.balance + adjustment` and this fixture is written against the row. `floor_cents: 5010000`, `high_water_balance_cents: 5260000` AND `floor_locked: true` ARE R-19's THREE UNTOUCHED FIELDS MEASURED ACROSS A SETTLEMENT ON A LOCKED ACCOUNT. All three are the values 2026-11-06 produced. The payout day neither raised the high-water balance (frozen by R-15, and its close is 150,000c below it in any case) nor moved the floor nor cleared the lock. A post-payout recompute in the superseded `reset_to_balance_minus_dd` direction puts the floor at 4,860,000 and unlocks nothing that was locked; a compensating recompute in the other direction puts it above 5,010,000. ADR-014 removed both, and R-48 says the removal applies to `floorLocked` as well as to the two numbers, which is the half of the sentence a reader is most likely to skip. This file is where that is measured. `balance_cents: 5110000` IS `approved_cents` AND NOTHING ELSE. 5,260,000 - 5,110,000 = 150,000, the capped payout exactly. The day carries `fill_count: 0` and `realized_pnl_cents: 0` precisely so that subtraction has no second term in it: on a day that also traded, 'falls by exactly `approved_cents`' would be an inference from two movements rather than a reading of one. `consistency_period_profit_cents: 260000` IS THE ADJUSTMENT NOT LEAKING INTO THE ACCUMULATORS. The period profit is the five 52,000c days and the 150,000c withdrawal appears nowhere in it. An engine that derived the day's P&L from the balance movement instead of reading `realized_pnl_cents` computes 260,000 - 150,000 = 110,000 here and fails on this field. `traded_days_count: 5` against six marks is R-08 on the sixth: a settlement day with no fills is not a traded day, and the counters that advance on it are the calendar's rather than the trader's (GS-002). `win_days_count: 5` is unreset because this fold states no `SettlementFact`, so R-47 has no basis day to anchor to; see the fixture header. `withdrawable_cents: 10000` IS THE CAP HAVING BOUND. R-35 gives 5,110,000 - 5,000,000 - 100,000 = 10,000, which is what the 150,000c cap left behind out of a 160,000c withdrawable. It is also exactly `min_payout_cents`, which is a coincidence of the plan's parameters and is not asserted as anything. `breached: false` IS INV-21, AND THE MARGIN IS THE POINT. The account was paid on its own closing high and opened the next session at 5,110,000c against a floor at open of 5,010,000c, so R-21's strict `<` is false with 100,000c to spare. CV-11 is what guarantees this in general and GS-083 is CV-17's half. THE EVENT LIST CARRIES NO `payout.floor_recomputed` AND THAT IS A PINNED ABSENCE. `diffEvents` compares the accumulated sequence against this list, so an engine that emitted one would fail here. The event has been retired with no producer since ADR-014 (M01 section 4, EVENTS.md); `engine-events.test.ts` asserts the catalogue does not contain it, and this fixture asserts the FOLD does not emit it, which is the other half of the same claim. `rule.floor_locked` SITS FIFTH AND BEFORE THAT DAY'S `day.closed`, which is the order GS-015 pins on the same plan and the same trigger. FOUR FIELDS ARE DELIBERATELY NOT PINNED: `payouts_settled_count`, `payout_anchor_day`, `cadence_anchor_day` and `lifetime_settled_cents` are what `applySettlement` computes from a `SettlementFact`, this fixture states the mark's adjustment instead because L-11 refuses a stated fact, and none of the four is on GS-081's registry row. Pinning them at their untouched values would dress an absence up as an expectation."
+}
