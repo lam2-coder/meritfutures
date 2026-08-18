@@ -275,7 +275,7 @@ The engine reads two things and never anything else: `plan_versions.rules` for s
 | CV-09 | `payout_cap_schedule` is non-empty, starts at `from_ordinal: 1`, ordinals strictly increase, every `cap_cents > 0` | A gap in the schedule leaves an ordinal with no cap |
 | CV-10 | every `cap_cents >= min_payout_cents` | Otherwise no payout at that rung can ever satisfy the minimum, and the account is permanently ineligible while looking healthy (GS-076) |
 | CV-11 | when `drawdown.lock.enabled`, `buffer_cents > (floor_lock_floor_at_cents - size_cents)` | Half of INV-21. Since the floor never exceeds `floor_lock_floor_at_cents` while the lock is enabled (pre-lock it is strictly below by CV-12, post-lock it equals it), and a post-payout balance is always at least `size + buffer`, this inequality is what stops a payout from breaching the account that earned it. Load bearing since [ADR-014](../decisions/ADR-014.md) removed the post-payout reset |
-| CV-12 | when `drawdown.lock.enabled`, `floor_lock_at_profit_cents == drawdown_cents + (floor_lock_floor_at_cents - size_cents)` | Forces the lock to engage exactly where the trailing floor already sits, so the floor never jumps. See R-15 |
+| CV-12 | when `drawdown.lock.enabled`, `floor_lock_at_profit_cents == drawdown_cents + (floor_lock_floor_at_cents - size_cents)` | Forces the locked value to sit **at or above** the trailing floor of the day before the lock, so the lock day never lowers the floor. It does **not** make the two equal on the lock day itself, which is what [ADR-052](../decisions/ADR-052.md) corrected. See R-15 |
 | CV-13 | `0 < split_bp <= 10000` | |
 | CV-14 | `ladder.payouts_to_graduate >= 1` | |
 | CV-15 | `min_payout_cents == 10000` | Fixed by GLOSSARY and never scaled by size. Stated as validation so a well-meaning config edit cannot quietly move it |
@@ -404,11 +404,11 @@ For a `static` drawdown the machine has one state: `floor = size - drawdown`, fo
 **The whole floor, in one expression** ([ADR-014](../decisions/ADR-014.md)). Every rule in group C is a consequence of this and of the fact that `hwb` stops updating at the lock:
 
 ```
-floor(d) = max( hwb(d) - drawdown_cents ,
-                floorLocked ? floor_lock_floor_at_cents : size_cents - drawdown_cents )
+floor(d) = floorLocked ? floor_lock_floor_at_cents
+                       : max( hwb(d) - drawdown_cents , size_cents - drawdown_cents )
 ```
 
-The `max` is redundant given the update order (trailing only raises, and the lock freezes `hwb` exactly where the trailing floor already equals the locked value, by CV-12). It is written this way because it is the founder's binding formulation, because it makes INV-06 self-evident rather than derived, and because a reader who is trying to break the engine should be able to see in one line that **no term in the floor can ever go down.** A settlement appears nowhere in it, which is the entire content of the OQ-5 ruling.
+**The lock is a branch rather than a term, as amended by [ADR-052](../decisions/ADR-052.md) (accepted 2026-08-17).** This expression previously took a `max` over both, and called that `max` redundant on the reasoning that the lock freezes `hwb` exactly where the trailing floor already equals the locked value, by CV-12. **The `max` is not redundant. It is wrong on any day that overshoots the trigger**, and R-15's `>=` allows exactly that: a day can clear the trigger by any amount, and every eval pass on the v1 lineup does, so the `max` selects the trailed floor and the lock never binds again. That falsifies CV-11's premise that post-lock the floor **equals** `floor_lock_floor_at_cents`, and with it CV-11's derivation of INV-21, which no publish-time check can rescue because the overshoot is a runtime quantity. INV-06 is now derived rather than self-evident, and it is derived at the granularity INV-06 is stated at: pre-lock the trailing floor is strictly below the locked value by CV-12, so the lock day **raises** the stored floor. A settlement appears nowhere in it, which is the entire content of the OQ-5 ruling.
 
 ### 3.5 The complete rule taxonomy
 

@@ -217,15 +217,19 @@ test(reU('R-15'), () => {
   // A DAY THAT JUMPS PAST THE TRIGGER, WHICH IS THE CASE THIS TEST DID NOT HAVE
   // -----------------------------------------------------------------------------
   // The two cases above land ON the trigger and one cent below it, which is
-  // where CV-12's "the floor never jumps" is true and where M01 calls section
-  // 3.4's `max` redundant. R-15's operator is `>=`, so a single day can clear
-  // the trigger by any amount, AND EVERY V1 EVAL PASS DOES: the lock triggers at
+  // where CV-12 makes the assignment and the `max` agree to the cent. A BOUNDARY
+  // PAIR IS NOT COVERAGE OF AN OPERATOR WHEN BOTH SIDES SIT INSIDE THE SAME
+  // DEGENERATE CASE. R-15's operator is `>=`, so a single day can clear the
+  // trigger by any amount, AND EVERY V1 EVAL PASS DOES: the lock triggers at
   // 260,000c of profit and the eval target is 300,000c.
   //
   // Here the account closes 300,000c up. The trail has already put the floor at
-  // 5,300,000 - 250,000 = 5,050,000, which is 40,000c ABOVE the locked value of
-  // 5,010,000. Section 3.4's `max` keeps 5,050,000; assigning the locked value
-  // would move the floor DOWN on the account's best day, which is INV-06.
+  // 5,300,000 - 250,000 = 5,050,000, which is 40,000c above the locked value.
+  // THE LOCK ASSIGNS 5,010,000 (ADR-052, accepted 2026-08-17). The floor moving
+  // down within the day is not INV-06: INV-06 is a property of the stored
+  // day-over-day series, and this day's stored floor rises from the prior day's
+  // 4,750,000. What the `max` cost instead was CV-11's derivation of INV-21,
+  // whose premise is that the post-lock floor EQUALS floor_lock_floor_at_cents.
   const overshoot = fold(
     CORE_50K,
     {
@@ -236,12 +240,14 @@ test(reU('R-15'), () => {
     fundedPrior(CORE_50K),
   );
   expect(overshoot.state.floorLocked).toBe(true);
-  expect(overshoot.state.floorCents).toBe(5_050_000n);
+  expect(overshoot.state.floorCents).toBe(5_010_000n);
   expect(overshoot.state.highWaterBalanceCents).toBe(5_300_000n);
 
-  // AND THE LOCK IS STILL PERMANENT AT THE HIGHER NUMBER. `hwb` is frozen, so
-  // the expression returns 5,050,000 every subsequent day and INV-07 holds: the
-  // lock is a floor under the floor, not a cap on it.
+  // AND THE LOCK IS PERMANENT AT THE LOCKED VALUE. `hwb` is frozen at the
+  // lock-day close, which is what 0015's high-water bound requires and what
+  // makes the overshoot real rather than an artefact; the R-13 guard then keeps
+  // the lock branch from being re-entered, so the floor returns 5,010,000 every
+  // subsequent day and INV-07 holds.
   const later = fold(
     CORE_50K,
     {
@@ -251,7 +257,7 @@ test(reU('R-15'), () => {
     },
     overshoot.state,
   );
-  expect(later.state.floorCents).toBe(5_050_000n);
+  expect(later.state.floorCents).toBe(5_010_000n);
   expect(later.state.highWaterBalanceCents).toBe(5_300_000n);
 });
 
