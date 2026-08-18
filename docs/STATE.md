@@ -1554,3 +1554,20 @@ The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**.
 | **Next-action 6 is NARROWED, not closed** | Its stated grounds are dead for a **required** field: both walked fixtures are type-annotated, so it is a compile error first and the walk names the path second. What remains is an **optional (`?`) field omitted from both literals**, which the test file declares as its own blind spot; `GateLeaf.path` still being `string`; and an object-or-null field `null` in both fixtures reporting as one path. **Not edited here** -- `## Next 3 actions` belongs to R1 |
 
 **Four obligations are named in the module header and none is wired**, each outside this fence: B.1's payout halt, the event's destination (`0017`'s tables), a scheduler, and `replay.audit_completed`, which [`CRON_INVENTORY.md`](ops/runbooks/CRON_INVENTORY.md) requires and the `EVENTS.md` catalogue does not define. **A green audit today also covers less than it appears to**, because the engine does not implement every rule group yet, which is what the report's counts exist to make visible.
+
+---
+
+## `CI-06s` closes `OI-07`, and its fourth occurrence was live on `main` when the gate arrived (2026-08-18)
+
+**Every `scripts/db/probe_*.sql` on disk is now asserted to be both RUN and PINNED.** A step in [`corpus.yml`](../../.github/workflows/corpus.yml) makes a probe run; a needle in `CI-06h`'s required list makes deleting that step a gate failure. **Wiring a probe and pinning it are two edits in two files, and the second is the one that gets forgotten, because the first is the one that makes CI green.**
+
+**This record named the gate three times without claiming it** and its own words were "Three occurrences is a pattern: the fix is a gate asserting that every `scripts/db/probe_*.sql` on disk is both run and pinned". **There were four.** `probe_rule_states_high_water_bound.sql` was on disk, was wired, and the string `high_water_bound` appeared nowhere in [`gates.mjs`](../../scripts/corpus/gates.mjs). It was repaired in its own commit, and the omission was made by the session that wrote the probe.
+
+| | |
+|---|---|
+| **Three directions, and the stale one earns it** | A probe on disk nothing runs; a probe run that nothing pins; **and a needle naming a probe no file provides**. `CI-06l`'s record already says the stale-entry checks are the ones that earn a gate, because they run in the direction nobody looks: **a list naming something that no longer exists still looks complete** |
+| **It matches the step, not the mention** | The needle is the `-f scripts/db/<file>` argument of a psql invocation. `corpus.yml` names `rule_states_high_water_bounds_balance` in a comment three lines above the step running `probe_rule_states_high_water_bound.sql`, and those are different strings. A parser reading any mention takes that comment for coverage, which is the span-parser class `CI-06g` and `CI-06n` have each met |
+| **The gate reads its own file, bounded** | `CI-06h`'s list is a local `const` inside its `run()`, so the pinned side is read as text from `ci06h`'s block alone. Unbounded, `CI-06s`'s own prose names probe filenames and it would report every probe pinned on the day it was written. **The bound cannot name the next gate**: the declarations are not alphabetical, `ci06i` precedes `ci06h`, and the first attempt hit exactly that and was caught by the gate's own sentinel |
+| **Repair first, then seed** | The unpinned direction is the one this session repaired, so seeding it on the repaired probe would make the seed and the fix prove each other. The scope case invents its own probe, wires it, and leaves it unpinned |
+
+**Nine probes on disk, nine wired, eight pinned before the repair** -- checked in both directions by hand before the gate was written, because the desk's finding is a claim like any other. **Adding a gate moves `gate_count` from 18 to 19**, which `generate` rewrote across eight spans in four files, two of them outside this session's fence. That is unavoidable for any session that adds a gate and it is stated rather than hidden.
