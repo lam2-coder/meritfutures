@@ -676,6 +676,30 @@ const SEEDS = {
       );
     },
   },
+  'CI-06s': {
+    what: 'a probe added to scripts/db that no workflow step runs',
+    real:
+      'probe_rule_states_high_water_bound.sql was on disk, WAS wired at corpus.yml:432, and ' +
+      'the string `high_water_bound` appeared nowhere in gates.mjs. That is OI-07 a fourth ' +
+      'time, live on main the day this gate was written, after probe_payout_hold.sql was ' +
+      'wired and never pinned and probe_reversible_contact_addresses.sql repeated the ' +
+      'identical omission and was caught before merge only by a human reading the diff',
+    // THE UNRUN DIRECTION IS THE SEED AND THE OTHER TWO ARE SCOPE CASES, because
+    // the unpinned direction is the one this session REPAIRED. Seeding the
+    // repair's own shape here would make the seed and the fix prove each other,
+    // so that direction is seeded below on a different probe entirely.
+    //
+    // The file is written and NOT wired, which is the cheaper half of the two
+    // edits and therefore the one a session actually makes: a probe lands beside
+    // a fix, the fix merges, and nothing ever runs the probe again.
+    expect: 'scripts/db/probe_seeded_never_run.sql exists and no step in',
+    seed: (d) => {
+      writeFileSync(
+        join(d, 'scripts/db/probe_seeded_never_run.sql'),
+        '-- A probe that ships beside a fix and is never run again.\n',
+      );
+    },
+  },
   'CI-06p': {
     what: 'a CI-06 letter claimed two past the last one, leaving the letters between it claimed by nobody',
     real:
@@ -1174,6 +1198,51 @@ const SCOPE_CASES = [
       seed: (d) => seedProposedAdr(d, true),
     },
     seed: (d) => seedProposedAdr(d, false),
+  },
+  {
+    name: 'CI-06s/wired-but-unpinned',
+    gate: 'CI-06s',
+    what: 'a probe the workflow RUNS that CI-06h does not pin, which is OI-07 exactly',
+    // SEEDED AFTER THE REPAIR AND ON A DIFFERENT PROBE, deliberately. This
+    // session repaired the real fourth occurrence
+    // (probe_rule_states_high_water_bound.sql) before writing this case. Seeding
+    // the repaired probe would make the seed and the repair prove each other and
+    // neither would prove the gate, so the case invents its own probe, wires it,
+    // and leaves it unpinned -- which is the state the three real occurrences
+    // were in.
+    expect: 'is not pinned by CI-06h',
+    seed: (d) => {
+      writeFileSync(
+        join(d, 'scripts/db/probe_seeded_unpinned.sql'),
+        '-- Wired below, pinned nowhere. One delete from never running again.\n',
+      );
+      edit(d, '.github/workflows/corpus.yml', (b) =>
+        b.replace(
+          /(\n\s+psql -v ON_ERROR_STOP=1 -q -f scripts\/db\/probe_ledger_constraints\.sql)/,
+          '$1\n          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_seeded_unpinned.sql',
+        ),
+      );
+    },
+  },
+  {
+    name: 'CI-06s/stale-needle-names-a-probe-nobody-provides',
+    gate: 'CI-06s',
+    what: "a needle in CI-06h's list naming a probe that no file provides",
+    // THE DIRECTION NOBODY LOOKS, and CI-06l's record says the stale-entry
+    // checks are the ones that earn a gate for exactly this reason: A LIST
+    // NAMING SOMETHING THAT NO LONGER EXISTS STILL LOOKS COMPLETE. Rename a
+    // probe, update the workflow, and CI-06h goes on pinning a filename that
+    // cannot be deleted because it is already gone. Every gate stays green and
+    // the needle asserts nothing.
+    expect: 'and no file provides it',
+    seed: (d) => {
+      edit(d, 'scripts/corpus/gates.mjs', (b) =>
+        b.replace(
+          /(\n      \[\n        'assert_no_floats\.sql',)/,
+          "\n      ['probe_deleted_last_spring.sql', 'a probe nobody provides is no longer run'],$1",
+        ),
+      );
+    },
   },
   {
     name: 'CI-06q/undated-is-not-a-citation',
