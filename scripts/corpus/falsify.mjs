@@ -608,6 +608,23 @@ const SEEDS = {
       );
     },
   },
+  'CI-06o': {
+    what: 'a model SDK imported by a file on the money path',
+    real:
+      'ADR-044 section 8 specified this prohibition and then said it was prose: a rule '
+      + 'that says no model on the money path and is enforced by people remembering it is '
+      + 'a control that exists, stays valid, and enforces nothing',
+    // THE SEEDED FILE IS NEW RATHER THAN AN EDIT TO AN EXISTING ONE, so the seed
+    // cannot go stale when the file it would have edited is renamed, and so the
+    // violation is the whole of what the file contains.
+    expect: () => 'packages/rules-engine/src/narrate.ts: imports the model SDK "@anthropic-ai/sdk"',
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'packages/rules-engine/src/narrate.ts'),
+        'import Anthropic from \'@anthropic-ai/sdk\';\n'
+          + 'export const explain = async (why: string) => new Anthropic().messages.create({ why });\n',
+      ),
+  },
   'CI-06q': {
     what: 'a dated citation of a founder ruling on a date no registry file declares',
     real:
@@ -1447,6 +1464,43 @@ const SCOPE_CASES = [
         throw new Error(`seed anchor not found: no row claiming \`${letter}\` on its own`);
       }
       writeFileSync(p, kept.join('\n'));
+    },
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06o. TWO ASSERTIONS, AND `SEEDS` CARRIES ONE.
+  //
+  // The seeded violation covers assertion 1, which is nearly vacuous today: there
+  // is no ledger, payout or auth package, so it scans one package and finds
+  // nothing. ASSERTION 2 IS THE ONE WITH TEETH and it would otherwise be taken on
+  // trust, which is CI-06k's arithmetic one gate over.
+  //
+  // A money path added without being added to the gate's scope is itself a
+  // finding, and this is the case that watches it fire. It seeds the exact
+  // scenario ADR-044 was written against: `packages/payout` arrives, nobody
+  // remembers the ADR, and the gate says so rather than scanning a set that no
+  // longer covers the money path.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06o/unscoped-money-path',
+    gate: 'CI-06o',
+    what: "a new money-path package that the gate's own scope list does not name",
+    expect:
+      'packages/payout: money path (its name carries "payout") is not in CI-06o\'s scope list',
+    seed: (d) => {
+      mkdirSync(join(d, 'packages/payout/src'), { recursive: true });
+      writeFileSync(
+        join(d, 'packages/payout/package.json'),
+        JSON.stringify({ name: '@merit/payout', private: true }, null, 2) + '\n',
+      );
+      // THE SEEDED PACKAGE IS CLEAN, which is the point of this case rather than
+      // an oversight. It imports no model SDK, so assertion 1 has nothing to say
+      // about it and would report NOTHING. The finding is the scope gap itself:
+      // an unscoped money path is a hole whether or not anybody has walked
+      // through it yet.
+      writeFileSync(
+        join(d, 'packages/payout/src/index.ts'),
+        'export const settle = (cents: bigint): bigint => cents;\n',
+      );
     },
   },
 ];
