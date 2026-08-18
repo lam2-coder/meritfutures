@@ -49,8 +49,10 @@
 # CV-12 puts the trailing floor at exactly the locked value there
 # (5,260,000 - 250,000 = 5,010,000 = 5,000,000 + 10,000), so section 3.4's `max`
 # and section 3.6's assignment agree and this file pins a floor that has only one
-# reading. A close that overshot the trigger would put the two 40,000c apart and
-# this fixture would be ratifying a ruling nobody has made.
+# reading. THAT DISAGREEMENT IS NOW RULED (ADR-052, accepted 2026-08-17, for the
+# assignment) and the exact-trigger close is kept anyway: the engine still takes
+# the `max`, this file was written while the ruling was `proposed`, and a fixture
+# that is correct under both readings needs no revisit when the engine catches up.
 #
 # THE ACCOUNT SITS AT `size + 250,000c` WHEN THE MONEY LEAVES, WHICH IS AS-04's
 # OWN POSITION. Day two gives back 10,000c of the day-one close, which is what
