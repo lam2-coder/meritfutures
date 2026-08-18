@@ -1,0 +1,154 @@
+# GS-068  Consistency period boundary at the settlement day
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "The basis day itself is excluded from the new period and the day after is
+#   included. Asserts a one-day off-by-one cannot silently move eligibility"
+#                                                    GOLDEN_SCENARIOS GS-068
+#   AS-12  "If the basis day is included in the new consistency period, THE VERY
+#          DAY THAT FUNDED A PAYOUT COUNTS AGAINST THE NEXT CYCLE. On a plan
+#          where the payout day is usually the best day, this blocks the
+#          following cycle by exactly one large day, AND IT LOOKS LIKE THE
+#          CONSISTENCY RULE WORKING rather than a bug"          M01 section 7
+#   R-47   `winDaysCount = count of win days d > payoutAnchorDay`;
+#          `consistencyPeriodStartDay = the next trading day after
+#          payoutAnchorDay`. Progress earned during the transfer window is KEPT
+#                                                                     M01 R-47
+#   R-46   `payoutAnchorDay = fact.basisTradingDay`;
+#          `cadenceAnchorDay = fact.effectiveTradingDay`               M01 R-46
+#   R-50   `lifetimeSettledCents += approvedCents`                     M01 R-50
+#   R-49   `payoutsSettledCount >= payouts_to_graduate`, evaluated immediately
+#          after a settlement. 1 of 5 here, so it does not fire        M01 R-49
+#   R-48   the floor, the high-water balance and the lock are untouched by a
+#          settlement                                                  M01 R-48
+#   R-10   the withdrawal reaches the mark as `adjustment_cents`, applied at the
+#          open of the effective day                              M01 R-10, SD-01
+#   INV-18 `opening == PRIOR.balance + adjustment`, asserted at DO-3   M01 INV-18
+#   R-35   withdrawable `max(0, balance - size - buffer)`              M01 R-35
+#   size 5,000,000c, funded drawdown 250,000c, buffer 100,000c, win day floor
+#   15,000c, win days required 5, payout cap 150,000c, min payout 10,000c,
+#   ladder 5, floor lock at 260,000c of profit
+#                                                       M01 Appendix A.1 at 50K
+#
+# THIS IS THE FIRST FIXTURE IN THE DIRECTORY THAT STATES A `SettlementFact`, AND
+# GS-081's SIBLING NAMED THE FOUR FIELDS IT WOULD TAKE TO WRITE ONE. That file
+# says, of `payouts_settled_count`, `payout_anchor_day`, `cadence_anchor_day` and
+# `lifetime_settled_cents`: "this fixture states the mark's adjustment instead
+# because L-11 refuses a stated fact, and none of the four is on GS-081's
+# registry row. Pinning them at their untouched values would dress an absence up
+# as an expectation." ALL FOUR ARE ON GS-068's ROW AND ALL FOUR ARE PINNED HERE.
+#
+# THE HOLIDAY IS LOAD BEARING AND IT IS TRANSCRIBED RATHER THAN INVENTED.
+# R-47 starts the new period on "the next TRADING day after" the basis day. The
+# basis day is 2026-11-25 and the next CALENDAR day is 2026-11-26, which is
+# Thanksgiving and is not a session: `cme-2026.json` carries that absence from a
+# committed CME artifact, not from recollection. So `consistency_period_start_day`
+# is 2026-11-27, and an engine that added one calendar day writes 2026-11-26 --
+# a day the fold could not then find in the slice. R-02's distinction between
+# sequence subtraction and date arithmetic, arriving on the settlement path.
+#
+# THE FIRST FIVE DAYS ARE AS-03's MINIMUM-VARIANCE PATH, THE SAME SHAPE GS-055
+# AND GS-065 USE, AND THE REUSE IS THE ARGUMENT RATHER THAN AN ECONOMY. A
+# settlement a fixture states is a fact the payout pipeline has already approved,
+# so a fixture may state one the gates would have REFUSED and still fold. This
+# stream does not: five days at exactly 50,000c give five win days against a
+# required five, a best-day share of 2000bp inside the 3000bp limit, and a
+# withdrawable of exactly 150,000c against a 150,000c cap, so the extraction
+# modelled here is one R-43 would have approved to the cent.
+#
+#   after 2026-11-25   balance 5,250,000  hwb 5,250,000  floor 5,000,000
+#   withdrawable       5,250,000 - 5,000,000 - 100,000        =   150,000c
+#   ordinal 1 cap                                             =   150,000c
+#   approved           min(withdrawable, cap)                 =   150,000c
+#   opening 2026-11-27 5,250,000 - 150,000                    = 5,100,000c
+#
+# WHAT MAKES THE OFF-BY-ONE VISIBLE IN TWO FIELDS AT ONCE. The basis day carries
+# 50,000c and the day after carries 40,000c, and they are DIFFERENT numbers on
+# purpose. If the basis day leaked into the new period, `consistency_best_day_cents`
+# reads 50,000 rather than 40,000 and `consistency_period_profit_cents` reads
+# 90,000 rather than 40,000. A fixture where both days carried the same P&L would
+# move only the second field, and AS-12's claim is about the first.
+#
+# THE LOCK NEVER ENGAGES, WHICH KEEPS THIS FIXTURE OFF ADR-052's GROUND. The
+# trigger is 260,000c of profit and this path tops out at 250,000c, so
+# `floor_locked` is false throughout and `floor_cents` has one reading under both
+# the superseded `max` and the ruled assignment. GS-024 is the file that owns
+# that boundary and this one does not touch it.
+id: GS-068
+name: consistency period boundary at the settlement day
+source: M01 R-08, R-09, R-10, R-13, R-14, R-18, R-21, R-35, R-46, R-47, R-49, R-50
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-18
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-19
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5050000
+    high_balance_cents: 5055000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-20
+    opening_balance_cents: 5050000
+    closing_balance_cents: 5100000
+    high_balance_cents: 5105000
+    low_balance_cents: 5045000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-23
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5150000
+    high_balance_cents: 5155000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-24
+    opening_balance_cents: 5150000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5145000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  # THE BASIS DAY. The fifth win day, the day the payout was computed against,
+  # and the day R-47 excludes from the period that starts after it.
+  - trading_day: 2026-11-25
+    opening_balance_cents: 5200000
+    closing_balance_cents: 5250000
+    high_balance_cents: 5255000
+    low_balance_cents: 5195000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  # 2026-11-26 IS THANKSGIVING AND IS NOT A SESSION. The next trading day after
+  # the basis day is this one, two calendar days later.
+  #
+  # THE EFFECTIVE DAY. The withdrawal lands at the open (R-10), so the opening
+  # balance is the prior close less 150,000c and INV-18 holds with the adjustment
+  # in it. The day then trades 40,000c, which is the first day of the NEW period.
+  - trading_day: 2026-11-27
+    adjustment_cents: -150000
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5140000
+    high_balance_cents: 5145000
+    low_balance_cents: 5090000
+    realized_pnl_cents: 40000
+    fill_count: 2
+    traded_day: true
+settlements:
+  - payout_request_id: GS-068-pr-1
+    ordinal: 1
+    approved_cents: 150000
+    basis_trading_day: 2026-11-25
+    effective_trading_day: 2026-11-27
