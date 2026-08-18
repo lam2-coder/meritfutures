@@ -1,0 +1,33 @@
+{
+  "end_state": {
+    "trading_day": "2026-11-27",
+    "phase": "funded",
+    "balance_cents": 5140000,
+    "floor_open_cents": 5000000,
+    "floor_cents": 5000000,
+    "floor_locked": false,
+    "high_water_balance_cents": 5250000,
+    "withdrawable_cents": 40000,
+    "traded_days_count": 6,
+    "win_days_count": 1,
+    "consistency_best_day_cents": 40000,
+    "consistency_period_profit_cents": 40000,
+    "consistency_period_start_day": "2026-11-27",
+    "payouts_settled_count": 1,
+    "payout_anchor_day": "2026-11-25",
+    "cadence_anchor_day": "2026-11-27",
+    "lifetime_settled_cents": 150000,
+    "breached": false
+  },
+  "events": [
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "payout.win_days_reset",
+    "day.closed"
+  ],
+  "pins": "R-47 starts the new consistency period on the trading day AFTER the basis day, so the basis day's own 50,000c is excluded from both accumulators and the 40,000c earned on the effective day is the whole of the new period, while R-46's two anchors, R-50's lifetime total and R-49's unfired ladder are pinned beside them",
+  "note": "`consistency_period_start_day: 2026-11-27` IS THE FIXTURE. The basis day is 2026-11-25 and R-47 starts the period on \"the next TRADING day after\" it. The next CALENDAR day is 2026-11-26, which is Thanksgiving and carries no session in `cme-2026.json` -- an absence transcribed from a committed CME artifact rather than from recollection. An engine that added one calendar day writes 2026-11-26 and fails on this field; one that added one INDEX writes 2026-11-27 and passes. This is R-02's sequence-versus-date distinction arriving on the settlement path, and no earlier fixture reaches it there. `consistency_best_day_cents: 40000` AND `consistency_period_profit_cents: 40000` ARE AS-12 MEASURED IN TWO FIELDS AT ONCE. The basis day carried 50,000c and the effective day carried 40,000c, deliberately different numbers: an engine that included the basis day in the new period writes 50,000 for the best day and 90,000 for the period profit, so a one-day off-by-one moves both fields and neither can absorb it. AS-12's warning is that this failure \"LOOKS LIKE THE CONSISTENCY RULE WORKING\", which is why it needs a pinned number rather than a gate verdict. `win_days_count: 1` IS THE SAME BOUNDARY ON THE OTHER COUNTER. Five win days were earned before the settlement and R-47 resets to \"win days d > payoutAnchorDay\", so the count is not 6 and not 5 but the one day after the anchor. R-47's fairness clause -- \"progress earned during the transfer window is KEPT\" -- is what makes 1 correct rather than 0: the effective day's win is counted even though it fell on the day the money left. `payout_anchor_day: 2026-11-25` AND `cadence_anchor_day: 2026-11-27` ARE R-46's TWO DATES, AND THEY DIFFER HERE. M01 R-46 notes that on the v1 lineup the two are usually the same date; this fixture is a case where they are not, because the transfer window spans a holiday. A single-anchor engine passes GS-082's shape and fails this one. `payouts_settled_count: 1` AND `lifetime_settled_cents: 150000` ARE R-45 AND R-50, and 150,000 is `approved_cents` exactly, with no split applied: R-44's trader and firm legs live on `PayoutEvaluation` and never reach `RuleState`, so a fixture cannot pin them and this one does not claim to. `phase: funded` IS R-49 NOT FIRING. The ladder is `payoutsSettledCount >= payouts_to_graduate` with `>=`, and 1 of the plan's 5 does not reach it, so the phase is unchanged and no `account.graduated` event appears in the list. GS-067 is the file that owns the boundary where it does fire. `floor_cents: 5000000`, `high_water_balance_cents: 5250000` AND `floor_locked: false` ARE R-48's THREE UNTOUCHED FIELDS, carried here as the trailing-floor half of what GS-081 measured on a locked account. The lock never engages: the trigger is 260,000c of profit and this path tops out at 250,000c, so `floor_cents` has one reading under both the superseded `max` and ADR-052's ruled assignment, and this fixture stands clear of that boundary. `traded_days_count: 6` AGAINST SIX MARKS is R-08 on every day including the settlement day, which carries `fill_count: 2` and therefore trades. R-47 resets the win-day and consistency counters and does NOT reset this one; an engine that zeroed it with its neighbours writes 1 here. `withdrawable_cents: 40000` IS R-35 AFTER THE MONEY LEFT: 5,140,000 - 5,000,000 - 100,000. The 150,000c that was withdrawable before the settlement is gone and the 40,000c the new period earned is what is left, which is the arithmetic a trader sees on the day a payout lands. THE EVENT ORDER IS DO-2 BEFORE DO-9 AND THE LIST PINS IT. `payout.win_days_reset` sits sixth, before the effective day's own `day.closed`, because settlements are applied at DO-2 and the day closes at DO-9. An engine that applied the settlement after the day's counters advanced would emit them in the other order AND would count the effective day's win against the old period, so the sequence and the two accumulator fields fail together rather than independently."
+}

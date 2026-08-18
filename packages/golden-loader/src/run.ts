@@ -135,7 +135,19 @@ export function runFixture(fixture: GoldenFixture): FixtureOutcome {
       prior,
       mark,
       calendar,
-      settlements,
+      // THE FILTER IS THE CALLER'S AND THIS LINE IS WHERE IT WAS MISSING.
+      // `DayInput.settlements` is documented as "those whose
+      // `effectiveTradingDay` equals `mark.tradingDay`", and `advanceDay` takes
+      // that at its word: DO-2 sorts by ordinal and applies EVERY fact it is
+      // handed, with no day comparison anywhere in the loop. Passing the whole
+      // array to every day would settle each payout once per trading day.
+      //
+      // IT WAS INERT UNTIL THIS BATCH AND THAT IS WHY IT SURVIVED. `L-11`
+      // refused any non-empty list, so `settlements` was `[]` on every fixture
+      // in the directory and the missing filter could not be observed. The
+      // format now states settlements, so the defect became reachable in the
+      // same change that made it visible.
+      settlements: settlements.filter((s) => s.effectiveTradingDay === mark.tradingDay),
       openedOn,
     });
 

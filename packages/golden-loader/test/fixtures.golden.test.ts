@@ -199,11 +199,21 @@ describe('the declaration the derivation rests on', () => {
 // -----------------------------------------------------------------------------
 // THE PER-FIXTURE ASSERTION, WHICH SWITCHES ON BY ITSELF
 // -----------------------------------------------------------------------------
-// FOUNDER RULING, 2026-08-17: the derivation is REPORTED and not enforced while
-// the premise it rests on does not hold. The two blocks below are mutually
-// exclusive and nothing is edited to move between them: the moment the fold
-// runs the functions the declaration describes, `declaration.holds` goes true,
-// the standing assertion stops running and the derived one starts.
+// The derivation is REPORTED and not enforced while the premise it rests on does
+// not hold. The two blocks below are mutually exclusive and nothing is edited to
+// move between them: the moment the fold runs the functions the declaration
+// describes, `declaration.holds` goes true, the standing assertion stops running
+// and the derived one starts.
+//
+// NO RULING SITS BEHIND THIS. This comment opened "FOUNDER RULING, 2026-08-17"
+// until the attribution was retracted in `coverage.ts` and twenty-eight lines
+// above; this was the third copy and it outlived the retraction. No such ruling
+// exists and none is needed, because the deferral is a tautology rather than a
+// decision: a derived direction cannot be enforced against a fold that reaches
+// none of the rules a fixture cites. `CI-06q` passes over the stale copy because
+// 2026-08-17 does carry three declared rulings, so the DATE resolves while the
+// CLAIM is false; the gate checks that an authority exists and never that it
+// says what is attributed to it.
 //
 // THIS IS NOT A `pending` FLAG BY ANOTHER NAME, and the difference is where it
 // lives. A `pending: true` is per fixture, is written in the fixture, and lets
