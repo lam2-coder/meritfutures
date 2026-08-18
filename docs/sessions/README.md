@@ -114,3 +114,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | the six unsigned ADRs audited against the tree, and three of them were signed at the M1 gate |
 | [2026-08-18 - Session 61](2026-08-18-session-61.md) | `CI-06r`, and the half of its own brief the tree refuted |
 | [2026-08-18 - Session 64](2026-08-18-session-64.md) | `PT-05` asserted, and a property that could not see its own mutant |
+| [2026-08-18 - Session 62](2026-08-18-session-62.md) | `PT-04` and `PT-07` asserted, and each found a ruling by failing on it |
