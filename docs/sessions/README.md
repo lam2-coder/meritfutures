@@ -99,4 +99,5 @@ must be recoverable from its own file alone.
 | [2026-08-17 - Session 54](2026-08-17-session-54.md) | `ADR-055`, the open end of a trade date's session, and a finding narrower than it was recorded |
 | [2026-08-17 - Session 55](2026-08-17-session-55.md) | ADR-052 applied: the locked floor becomes an assignment |
 | [2026-08-17 - Session 55](2026-08-17-session-55.md) | golden fixtures batch 7: the forty-three re-derived, and three unblocked by one field |
+| [2026-08-18 - Session 56](2026-08-18-session-56.md) | `ADR-054` implemented: the `DO-5` call site removed, and `RE-U-025` asserts the carried-field set |
 | [2026-08-18 - Session 56](2026-08-18-session-56.md) | `GS-081` written and `GS-083` routed out: `INV-21`'s missing fixtures, and a counterexample filed under the wrong half |

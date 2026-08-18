@@ -322,20 +322,39 @@ export function advanceDay(input: DayInput): DayOutput {
       breachKind: breach.kind,
       engineVersion,
     };
-    // R-35 on a closed account is `0n`, and it is recomputed rather than carried
-    // from `prior`: a breached account that was withdrawable-positive yesterday
-    // must not present a positive withdrawable on the row that closed it.
+    // `withdrawableCents` IS CARRIED, NOT RECOMPUTED, AND ADR-054 IS WHY.
+    // This block used to call `withdrawableCents(closedState, plan)` here, on the
+    // stated reason that "a breached account that was withdrawable-positive
+    // yesterday must not present a positive withdrawable on the row that closed
+    // it". That argument is overruled: it is a PRESENTATION rule, and the
+    // ordering law decides the field instead.
+    //
+    // `R-35` is one of `R-33` to `R-41`, which is DO-9's row. DO-5's row reads
+    // "Nothing after this runs" and `R-24` reads "no further state is ever
+    // written", so `R-35` DOES NOT RUN ON THIS ROW AT ALL. M01 section 3.6's
+    // breach block sets exactly EIGHT fields -- `tradingDay`, `phase`,
+    // `breached`, `breachKind`, `floorOpenCents`, `balanceCents`,
+    // `engineEligible`, `engineVersion` -- and `withdrawableCents` is among the
+    // CARRIED remainder. So it arrives through the `...settledState` spread in
+    // `closedState`, exactly as the other twelve carried fields already do.
+    //
+    // The call site was the defect and not the function: `withdrawableCents`'s
+    // own phase guard is M01's `withdrawable()` verbatim and is untouched. It
+    // stays live through `R-32` expiry, which does fall through to DO-9.
+    // `RE-U-025` now asserts the carried-field set directly, so a recompute
+    // reintroduced anywhere in this branch fails a unit test rather than a
+    // fixture.
     //
     // The gates are STATED rather than evaluated, which is M01 section 3.6's own
     // breach branch (`engineEligible: false`, nothing computed) plus the record
     // the type requires. `gatesAfterBreach` says why it is not a call into
     // `evaluateEngineGates`: R-37 can refuse a day, and a breach must be
-    // recorded whatever the caller's calendar window happens to cover.
-    const withdrawable = withdrawableCents(closedState, plan);
+    // recorded whatever the caller's calendar window happens to cover. It now
+    // reads the CARRIED withdrawable, so `minimumAmount.withdrawableCents` on a
+    // breach row reports that value rather than zero.
     const state: RuleState = {
       ...closedState,
-      withdrawableCents: withdrawable,
-      engineGates: gatesAfterBreach({ ...closedState, withdrawableCents: withdrawable }, plan),
+      engineGates: gatesAfterBreach(closedState, plan),
       engineEligible: false,
     };
     const detected: BreachDetectedEvent = {
