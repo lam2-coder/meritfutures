@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md]
-last_updated: 2026-08-17
+last_updated: 2026-08-18
 ---
 
 # M1: Rules Engine
@@ -442,7 +442,7 @@ Fifty rules. Every one carries its config field, its exact arithmetic in integer
 | R-12 | Initial floor | `drawdown.amount_bp` to `drawdown_cents` | `floor = size_cents - drawdown_cents` at account open, and again at the funded reset with the funded drawdown | GS-008 |
 | R-13 | Trailing-EOD floor | `drawdown.type = "trailing_eod"` | `hwb' = max(hwb, closing_balance_cents)`; `floor' = hwb' - drawdown_cents`. Uses the **closing** balance only; the intraday high never raises it. `hwb` stops updating once `floorLocked` | GS-009, GS-011 |
 | R-14 | The floor never retreats | n/a | Follows from `max`. Asserted separately because it is the property a future change is most likely to break, and since [ADR-014](../decisions/ADR-014.md) it has **no exceptions at all** | GS-010, GS-081 |
-| R-15 | Floor lock | `drawdown.lock.*` to `floor_lock_at_profit_cents`, `floor_lock_floor_at_cents` | Trigger: `closing_balance_cents - size_cents >= floor_lock_at_profit_cents` (`>=`). Effect: `floor = floor_lock_floor_at_cents`, `floorLocked = true`, `hwb` frozen, all permanently. CV-12 forces the trigger to sit exactly where the trailing floor already is, so **the floor never jumps**. Enabled on all three v1 plans at `floor_lock_floor_at_cents = size_cents + 10,000c` ([ADR-014](../decisions/ADR-014.md)) | GS-015, GS-016 |
+| R-15 | Floor lock | `drawdown.lock.*` to `floor_lock_at_profit_cents`, `floor_lock_floor_at_cents` | Trigger: `closing_balance_cents - size_cents >= floor_lock_at_profit_cents` (`>=`). Effect: `floor = floor_lock_floor_at_cents`, `floorLocked = true`, `hwb` frozen, all permanently. CV-12 puts the locked value **at or above** the trailing floor of the day before the lock, so the lock day never lowers the stored floor. It does **not** make the two equal on the lock day itself: a close that overshoots the trigger locks strictly below the floor the trail alone would have produced, which is what [ADR-052](../decisions/ADR-052.md) corrected and [ADR-057](../decisions/ADR-057.md) carried to this row. See CV-12. Enabled on all three v1 plans at `floor_lock_floor_at_cents = size_cents + 10,000c` ([ADR-014](../decisions/ADR-014.md)) | GS-015, GS-016, GS-024 |
 | R-16 | Static drawdown | `drawdown.type = "static"` | `floor = size_cents - drawdown_cents` for the life of the account | RE-U-016 |
 | R-17 | Intraday trailing is config-supported and unimplemented | `drawdown.type = "intraday_trailing"` | Rejected at publish by CV-01 | GS-078 |
 | R-18 | The breach comparator is the floor **at the open** | n/a | `floorOpenCents = prior.floorCents`. Trailing happens at DO-7, strictly after the breach check at DO-4 | GS-012 |
@@ -551,8 +551,18 @@ export function advanceDay(input: DayInput): DayOutput {
   if (floorBreach || dllBreach) {
     const kind = floorBreach ? (rules.drawdown.type === 'static' ? 'static_floor' : 'trailing_eod_floor')
                              : 'hard_daily_loss_limit';
+    // NINE FIELDS, and the ninth is `engineGates`. `RuleState` (section 2.2)
+    // requires the gate record, and RE-P-15 states `engineEligible` equals the
+    // conjunction of `engineGates` for EVERY state, so a breach row that
+    // carried the prior day's verdicts would show a passing conjunction beside
+    // `engineEligible: false` (GS-064 is exactly that day). The gates are
+    // STATED and never evaluated here: R-37 can refuse a day whose slice does
+    // not cover the cadence anchor, and a breach the fold declined to record on
+    // a caller's window choice is R-24 broken. Every `pass` is false, including
+    // the two that can be `skipped`. ADR-057.
     s = { ...s, tradingDay: mark.tradingDay, phase: 'closed', breached: true, breachKind: kind,
           floorOpenCents: floorOpen, balanceCents: mark.closingBalanceCents,
+          engineGates: gatesAfterBreach(s, plan),
           engineEligible: false, engineVersion };
     events.push(breachDetected(s, mark, floorOpen, kind));
     return { state: withHash(s), events, assertions };            // R-24, terminal
@@ -1080,7 +1090,7 @@ The consequence you need to rule on: **Rapid Daily cannot be daily under that an
 
 **OQ-3 (RULED: confirmed from the lifecycle simulation; funded min days 0). Rapid Daily's funded gates are not specified anywhere.** The constitution gives Rapid Daily its consistency thresholds, cap, gap, split, ladder, and account maximum, but not its drawdown, eval profit target, win-day count, win-day floor, buffer, or funded minimum days. Six numbers, all of which change the plan's economics and all of which must be published. Appendix A marks each as `RULING NEEDED` with a proposed default carried over from Core EOD.
 
-**OQ-4 (RULED: approved, X = 10,000c, all three plans). Floor lock values.** The constitution says the trailing floor "locks at initial balance plus $X once buffer or profit threshold reached" without fixing X. This document proposes X = 10,000 cents with the lock engaging at `drawdown_cents + 10,000c` of profit, which is chosen so the trailing floor is already sitting exactly at the lock value when it engages and therefore never jumps (CV-12, R-15). Confirm the value, and confirm the lock is enabled on Core EOD and Direct.
+**OQ-4 (RULED: approved, X = 10,000c, all three plans). Floor lock values.** The constitution says the trailing floor "locks at initial balance plus $X once buffer or profit threshold reached" without fixing X. This document proposes X = 10,000 cents with the lock engaging at `drawdown_cents + 10,000c` of profit, ~~which is chosen so the trailing floor is already sitting exactly at the lock value when it engages and therefore never jumps (CV-12, R-15)~~ **which is chosen so the locked value sits at or above the trailing floor of the day before the lock, and the lock day therefore never lowers the stored floor (CV-12, R-15)**. **The struck clause is kept rather than deleted, because the value was ruled on a reason that did not hold and that is worth being able to find.** [ADR-052](../decisions/ADR-052.md) refuted it: the two are equal only on a close that lands on the trigger to the cent, and R-15's `>=` admits any overshoot. **The approved X = 10,000c is unaffected and so is this ruling**, because what CV-12 buys is the at-or-above relation rather than the equality, and that is what makes INV-06 hold across the lock ([ADR-057](../decisions/ADR-057.md)). Confirm the value, and confirm the lock is enabled on Core EOD and Direct.
 
 **OQ-5 (RULED: OVERRULED, no post-payout reset at all, revisit post-beta). Post-payout floor rule per plan.** `reset_to_balance_minus_dd` or `lock_at_size_plus`. AS-04 argues for `reset_to_balance_minus_dd` on every v1 plan, because the locked variant hands the trader a free option exactly when they have proven they can make money. Recommendation: reset mode everywhere in v1.
 
