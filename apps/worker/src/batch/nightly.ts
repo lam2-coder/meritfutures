@@ -52,6 +52,7 @@ import {
   type CalendarSlice,
   type DayOutput,
   type EngineEvent,
+  type RuleState,
   type TradingDay,
 } from '@merit/rules-engine';
 
@@ -116,7 +117,27 @@ export interface NightlyBatchReport {
 // -----------------------------------------------------------------------------
 
 export type AccountDayFold =
-  | { readonly kind: 'row'; readonly row: RuleStateRow; readonly events: readonly EngineEvent[] }
+  | {
+      readonly kind: 'row';
+      readonly row: RuleStateRow;
+      readonly events: readonly EngineEvent[];
+      // THE STATE IS RETURNED SO A REPLAY CAN CHAIN ITS OWN PRIOR, and without
+      // it INV-04 is not expressible. `RuleStateRow` cannot rebuild a
+      // `RuleState`: `lifetimeSettledCents`, `breached` and `breachKind` are on
+      // the state and have no column. So a replay that could only see the row
+      // would have to take day N+1's `prior` from storage -- which is the value
+      // it is auditing. An error on day 40 would be folded into day 41's stored
+      // prior, day 41 would recompute from that poisoned prior, and days 41 to
+      // 250 would all agree. INV-04 says "from day one" for this reason.
+      //
+      // Nothing enumerates this union's keys: it is named in exactly three
+      // places (this declaration, `foldAccountDay`'s return type, and a type
+      // re-export from `index.ts`), and every consumer reads named fields. No
+      // `Object.keys`, `Object.entries`, `for...in` or serializer reaches it, so
+      // adding a field changes no output. M01 section 1.4 is why that had to be
+      // checked rather than assumed.
+      readonly state: RuleState;
+    }
   | { readonly kind: 'refused'; readonly assertions: readonly AssertionFailure[] };
 
 /**
@@ -224,7 +245,7 @@ export function foldAccountDay(
     calendarRevisionId,
   };
 
-  return { kind: 'row', row, events: out.events };
+  return { kind: 'row', row, events: out.events, state };
 }
 
 // -----------------------------------------------------------------------------

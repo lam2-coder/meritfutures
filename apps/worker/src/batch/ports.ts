@@ -177,6 +177,50 @@ export interface ReconciliationFinding {
 }
 
 // -----------------------------------------------------------------------------
+// Replay divergence
+// -----------------------------------------------------------------------------
+// A DELIBERATE SIBLING OF RECONCILIATION AND NOT THE SAME CHANNEL. Reconciliation
+// is "the fold REFUSED TO RUN" (DO-3, an `AssertionFailure`). A divergence is
+// "the fold RAN AND DISAGREED WITH STORAGE". B.3 treats them as different
+// causes with different responses, and collapsing them would make a replay
+// divergence indistinguishable from a vendor arithmetic failure on the page.
+
+/** One field that moved. `field` is singular because the event is (EVENTS.md:190). */
+export interface ReplayDivergence {
+  /**
+   * The `rule_states` SQL column name, so the page names something that exists
+   * in the database, or `engine_gates.<dotted.path>` for a gate leaf, which is
+   * what `ENGINE_GATE_LEAVES` carries dotted paths for.
+   */
+  readonly field: string;
+  /** RENDERED, never raw. A `bigint` in an event payload throws at emission. */
+  readonly stored: string;
+  readonly recomputed: string;
+}
+
+/**
+ * One account-day that diverged, with every field that moved.
+ *
+ * GROUPED, AND THE ADAPTER EXPANDS IT. `EVENTS.md:190` gives
+ * `replay.divergence_detected` a SINGULAR `field`, so the adapter emits one
+ * event per entry in `divergences`. It is grouped here because B.1 says a
+ * divergence "halts payout eligibility for that account and pages", and a halt
+ * plus its evidence belong in one transaction rather than in N racing ones.
+ *
+ * WHAT THIS PORT DOES NOT DO, stated so the module does not read as a control
+ * it is not: THE HALT IS NOT WIRED. B.1's "halts payout eligibility" is a write
+ * to another table, outside this session's fence, and no adapter implements
+ * this port yet. The obligation is a type here rather than a memory.
+ */
+export interface ReplayDivergenceFinding {
+  readonly accountId: string;
+  readonly tradingDay: TradingDay;
+  /** The version the RUNNING build folded under. `EVENTS.md:190`'s payload field. */
+  readonly engineVersion: string;
+  readonly divergences: readonly ReplayDivergence[];
+}
+
+// -----------------------------------------------------------------------------
 // The ports
 // -----------------------------------------------------------------------------
 
@@ -218,6 +262,37 @@ export interface BatchReadPort {
 
   /** One account's inputs for one day, or `null` if it has no live mark. */
   loadAccountDay(accountId: string, tradingDay: TradingDay): Promise<AccountDay | null>;
+
+  /**
+   * Every account that has ever held a rule state, for the replay audit.
+   *
+   * B.1 is "for EVERY account that has ever existed", which is a wider set than
+   * `accountsWithLiveMark`: an account that stopped trading still has stored
+   * rows, and an audit that skipped it would stop looking at exactly the
+   * accounts nobody is watching.
+   */
+  accountsWithStoredState(): Promise<readonly string[]>;
+
+  /**
+   * One account's stored `rule_states` rows, oldest first.
+   *
+   * The right-hand side of INV-04. Served by `rule_states_account_day_desc_idx`
+   * (`0015`), read in `(account_id, trading_day)` order per B.5.
+   *
+   * `stateHash` MUST be the bytes storage returned, never a value the adapter
+   * recomputed. See `raiseDivergence` and `replay.ts`'s header.
+   */
+  storedRuleStates(accountId: string): Promise<readonly RuleStateRow[]>;
+
+  /**
+   * One account's inputs from day one, oldest first.
+   *
+   * INV-04 is "replaying every mark FROM DAY ONE", so the audit needs the whole
+   * input history, not one day of it. `prior` on each of these is IGNORED by
+   * the replay, which carries its own: folding from a stored prior would audit
+   * the value being audited.
+   */
+  accountDaysFrom(accountId: string): Promise<readonly AccountDay[]>;
 }
 
 export interface BatchWritePort {
@@ -234,6 +309,16 @@ export interface BatchWritePort {
 
   /** DO-3. No state was written for this account-day, and someone must look. */
   raiseReconciliation(finding: ReconciliationFinding): Promise<void>;
+
+  /**
+   * INV-04. A stored row and its replay disagree.
+   *
+   * `EVENTS.md:194`: "`ingest.correction_received` and
+   * `replay.divergence_detected` are the two events that must never be quiet."
+   * The adapter expands one finding into one event per diverging field and
+   * halts payout eligibility for the account (B.1). Neither is wired yet.
+   */
+  raiseDivergence(finding: ReplayDivergenceFinding): Promise<void>;
 }
 
 export interface BatchPorts {
