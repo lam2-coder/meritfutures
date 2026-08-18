@@ -95,3 +95,4 @@ grouped these rulings live in [gates/](gates/).
 | [Parameter status: launch candidates versus structural rulings (founder ruling, 2026-08-14)](gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md) | 0 | 0 |
 | [Consolidated founder addendum and batch 2 gate closure (2026-08-14)](gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md) | 2 | 5 |
 | [FREEZE gate closure (2026-08-14)](gates/freeze-gate-closure-2026-08-14.md) | 4 | 17 |
+| [Unsigned ADR audit (2026-08-18)](gates/unsigned-adr-audit-2026-08-18.md) | 0 | 0 |
