@@ -171,6 +171,20 @@ const FIXTURE_KEYS = new Set([
  */
 const EXPECTATION_KEYS = new Set(['end_state', 'events', 'pins', 'note']);
 
+/**
+ * `SettlementFact`'s five fields in snake case, and the list is the type's
+ * rather than this file's: `payoutRequestId`, `ordinal`, `approvedCents`,
+ * `basisTradingDay`, `effectiveTradingDay`. L-11 refuses anything else, so a
+ * fixture cannot state a settlement field the engine has no home for.
+ */
+const SETTLEMENT_KEYS = new Set([
+  'payout_request_id',
+  'ordinal',
+  'approved_cents',
+  'basis_trading_day',
+  'effective_trading_day',
+]);
+
 const ID_PATTERN = /^GS-\d{3}$/;
 const TRADING_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -947,27 +961,127 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
     });
   }
 
-  // L-11  SETTLEMENTS ARE AN ENGINE INPUT NOW AND THE REFUSAL SURVIVES FOR A
-  //       DIFFERENT REASON. `DayInput.settlements` is a `SettlementFact[]` and
-  //       DO-2 applies them in ordinal order, so the shape exists. What does not
-  //       exist is a fixture that states one: `SettlementFact` needs
-  //       `payoutRequestId`, `ordinal`, `approvedCents`, `basisTradingDay` and
-  //       `effectiveTradingDay`, the format has no block for them, and every
-  //       fixture in the directory states `settlements: []`.
+  // L-11  THE SETTLEMENT BLOCK, AND THE REFUSAL IT REPLACES NAMED ITS OWN
+  //       REMEDY. This rule read "the fixture format states no settlement
+  //       fields, so only an empty list may be stated", and its comment said
+  //       what it would take to lift it: a block for `payoutRequestId`,
+  //       `ordinal`, `approvedCents`, `basisTradingDay` and
+  //       `effectiveTradingDay`. That block is below and the five names are
+  //       transcribed from `SettlementFact` rather than chosen here, so this is
+  //       the loader READING a fixture rather than writing one -- the thing the
+  //       old comment ruled out was inventing the fields, not stating them.
   //
-  //       INVENTING THE FIVE FIELDS HERE WOULD BE THE LOADER WRITING A FIXTURE.
-  //       So the empty list passes through to the fold and a non-empty one is
-  //       refused, naming what it would take to accept one rather than naming an
-  //       engine limitation that is no longer true.
-  const settlements = document['settlements'];
-  if (settlements !== undefined && (!Array.isArray(settlements) || settlements.length > 0)) {
-    throw new FixtureError(
-      'L-11',
-      yamlFile,
-      'the fixture format states no settlement fields, so only an empty list may be stated. ' +
-        'DayInput.settlements takes SettlementFact, which needs payout_request_id, ordinal, ' +
-        'approved_cents, basis_trading_day and effective_trading_day',
-    );
+  //       WHAT IS STILL REFUSED IS A MALFORMED ONE. Every field is required,
+  //       because `SettlementFact` declares all five non-optional and a
+  //       defaulted `ordinal` or `basisTradingDay` would be the loader choosing
+  //       a parameter that R-42, R-47 and R-49 each branch on.
+  const settlementsRaw = document['settlements'];
+  const settlements: SettlementFact[] = [];
+  if (settlementsRaw !== undefined) {
+    if (!Array.isArray(settlementsRaw)) {
+      throw new FixtureError('L-11', yamlFile, '"settlements" must be a list');
+    }
+    const seenOrdinals = new Set<number>();
+    for (const [index, raw] of settlementsRaw.entries()) {
+      const where = `settlements[${String(index)}]`;
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+        throw new FixtureError('L-11', yamlFile, `${where} must be a mapping`);
+      }
+      const row = raw as Record<string, YamlValue | undefined>;
+      for (const key of Object.keys(row)) {
+        if (!SETTLEMENT_KEYS.has(key)) {
+          throw new FixtureError('L-11', yamlFile, `unknown settlement key "${where}.${key}"`);
+        }
+      }
+
+      const payoutRequestId = row['payout_request_id'];
+      if (typeof payoutRequestId !== 'string' || payoutRequestId.trim() === '') {
+        throw new FixtureError('L-11', yamlFile, `${where}.payout_request_id is required`);
+      }
+
+      // SD-05: ordinals are unique per account, and DO-2's sort is total only
+      // because they are. A fixture repeating one would make the application
+      // order depend on `Array.prototype.sort`'s stability, which the
+      // determinism contract bans by name.
+      const ordinal = requireInteger(row['ordinal'], 'L-11', yamlFile, `${where}.ordinal`);
+      if (ordinal < 1) {
+        throw new FixtureError(
+          'L-11',
+          yamlFile,
+          `${where}.ordinal is ${String(ordinal)}; R-45 assigns payoutsSettledCount + 1, so the first is 1`,
+        );
+      }
+      if (seenOrdinals.has(ordinal)) {
+        throw new FixtureError(
+          'L-11',
+          yamlFile,
+          `${where}.ordinal ${String(ordinal)} is stated twice; SD-05 makes ordinals unique per account`,
+        );
+      }
+      seenOrdinals.add(ordinal);
+
+      const approvedCents = requireInteger(
+        row['approved_cents'],
+        'L-11',
+        yamlFile,
+        `${where}.approved_cents`,
+      );
+      if (approvedCents <= 0) {
+        throw new FixtureError(
+          'L-11',
+          yamlFile,
+          `${where}.approved_cents is ${String(approvedCents)}; a settlement moves money out and R-43 approves only at or above min_payout_cents`,
+        );
+      }
+
+      const basisTradingDay = row['basis_trading_day'];
+      const effectiveTradingDay = row['effective_trading_day'];
+      for (const [label, value] of [
+        ['basis_trading_day', basisTradingDay],
+        ['effective_trading_day', effectiveTradingDay],
+      ] as const) {
+        if (typeof value !== 'string' || !TRADING_DAY_PATTERN.test(value)) {
+          throw new FixtureError('L-11', yamlFile, `${where}.${label} must be YYYY-MM-DD`);
+        }
+        if (!sessions.has(value)) {
+          throw new FixtureError(
+            'L-08',
+            yamlFile,
+            `${where}.${label} ${value} is not a session in calendar ${calendarName}`,
+          );
+        }
+      }
+
+      settlements.push({
+        payoutRequestId,
+        ordinal,
+        approvedCents: BigInt(approvedCents),
+        basisTradingDay: basisTradingDay as TradingDay,
+        effectiveTradingDay: effectiveTradingDay as TradingDay,
+      });
+    }
+
+    // L-15  A SETTLEMENT WHOSE EFFECTIVE DAY IS NOT IN THIS FIXTURE'S STREAM IS
+    //       INERT, AND INERT IS THE ONE OUTCOME THIS DIRECTORY CANNOT SEE.
+    //       `DayInput.settlements` is documented as "those whose
+    //       `effectiveTradingDay` equals `mark.tradingDay`", so `run.ts` hands
+    //       each day the settlements effective on it. A fact naming a day the
+    //       stream does not contain is therefore never applied, and the fixture
+    //       still passes: it pins an end state that no settlement reached, while
+    //       reading like a scenario about one. That is the quiet direction, and
+    //       it is exactly the shape `L-06` exists to refuse one level up.
+    const streamDays = new Set(dayMarks.map((m) => m.tradingDay as string));
+    for (const fact of settlements) {
+      if (!streamDays.has(fact.effectiveTradingDay)) {
+        throw new FixtureError(
+          'L-15',
+          yamlFile,
+          `settlement ${fact.payoutRequestId} is effective on ${fact.effectiveTradingDay}, ` +
+            "which is not a day in this fixture's stream, so DO-2 would never apply it " +
+            'and the expectation would pin a fold no settlement reached',
+        );
+      }
+    }
   }
 
   return {
@@ -984,7 +1098,7 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
       openedOn: openedOn as TradingDay,
       startingPhase: phase,
       marks: dayMarks,
-      settlements: [] as readonly SettlementFact[],
+      settlements: settlements as readonly SettlementFact[],
     },
     expected: {
       end_state: endState as Record<string, unknown>,
