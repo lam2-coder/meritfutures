@@ -213,3 +213,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 66](2026-08-18-session-66.md) | golden fixtures batch 10: `L-11` lifted, the settlement block, GS-067 and GS-068, and six rejections with a reason each |
 | [2026-08-18 - Session 63](2026-08-18-session-63.md) | PT-02 and PT-08 asserted, and PT-02's row names one exception where the engine has two |
 | [2026-08-18 - Session 65](2026-08-18-session-65.md) | the replay self-audit's comparison is wired: hash first, field diff on mismatch, and an empty scope refuses |
+| [2026-08-18 - Session 73](2026-08-18-session-73.md) | `ADR-060` proposed: what `engine_eligible` contains, and the missing enumeration that was the real blocker |
