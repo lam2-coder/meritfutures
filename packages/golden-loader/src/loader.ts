@@ -121,7 +121,7 @@ const ACCOUNT_SYNTHESIZED = ['accountId', 'planVersionId', 'sourceHash'] as cons
 //   account.phase              `RuleState.phase`, through the prior state
 //   account.opened_on          `initialState(plan, openedOn, engineVersion)`
 //   days[].adjustment_cents    `DailyMark.adjustmentCents` (SD-01, R-10)
-//   settlements                `DayInput.settlements` (empty only, see L-11)
+//   settlements                `DayInput.settlements` (a stated block, see L-11)
 //
 // THE LIST STAYS, EMPTY, AND IS NOT DELETED. It is the mechanism rather than the
 // contents: the loader refuses any fixture field it can neither map nor find
