@@ -211,3 +211,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | GS-003 and GS-032 written: the two group A rows the transcribed half day unblocked, and the four rules it did not       |
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | the six unsigned ADRs audited against the tree, and three of them were signed at the M1 gate                            |
 | [2026-08-18 - Session 66](2026-08-18-session-66.md) | golden fixtures batch 10: `L-11` lifted, the settlement block, GS-067 and GS-068, and six rejections with a reason each |
+| [2026-08-18 - Session 63](2026-08-18-session-63.md) | PT-02 and PT-08 asserted, and PT-02's row names one exception where the engine has two |
