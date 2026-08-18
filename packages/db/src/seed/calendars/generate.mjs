@@ -307,6 +307,11 @@ export function readSource(text, where = 'source') {
     `${where}.early_closes`,
   );
 
+  // ADR-055. Runs here rather than inside `readHolidays` because four of its
+  // five checks need to know which days trade and one needs the early-close
+  // time, so it cannot run until both lists exist.
+  checkAbsorbedSessions(holidays, earlyCloses, coverage, rule, `${where}.holidays`);
+
   return {
     id: src.id,
     provenance,
@@ -370,6 +375,33 @@ function readProvenance(p, where) {
 }
 
 /** Inclusive bounds, in the same date domain as `trading_calendar.trading_day`. */
+/**
+ * The coverage bounds, and the evidence bound that caps them.
+ *
+ * ADR-055 SECTION 5 AMENDED `OQ-SE-02` ON ITS MECHANISM RATHER THAN ITS NUMBER.
+ * The old reason for `to` was a fact about the publisher, "the current year plus
+ * two is about as far as CME publishes, so it is the honest maximum rather than
+ * a chosen one". `FINDING 2` put that premise in question and the ADR
+ * deliberately declines to decide it, because it is legible only from a paste
+ * and ruling from a rendering is the mistake this desk made once already.
+ *
+ * So the rule became one that is true whatever CME publishes:
+ *
+ *   `coverage.to` MAY NOT EXCEED the last date whose exceptions are transcribed
+ *   from a committed artifact.
+ *
+ * `evidence_to` is that date, stated by the transcriber. It is `F-4` one layer
+ * earlier: `trading_calendar_loads` records coverage as a FACT, and declaring
+ * coverage through 2028 while filling only 2026 makes it assert knowledge
+ * nobody has. A horizon formula and an evidence bound cannot disagree if the
+ * evidence bound is the one that binds.
+ *
+ * NULL IS NOT A FAR HORIZON, which is the same distinction `holidays: null`
+ * draws one field over. Null says nobody has established how far the evidence
+ * reaches; it is refused, and it is refused SEPARATELY from `coverage-exceeds-evidence`
+ * because "nobody looked" and "the bound is exceeded" are different facts and
+ * conflating them is the error this whole file exists to avoid.
+ */
 function readCoverage(c, where) {
   if (c === null || typeof c !== 'object') reject('coverage-missing', `${where} is absent`);
   const from = parseDay(c.from, `${where}.from`);
@@ -377,7 +409,30 @@ function readCoverage(c, where) {
   if (Date.UTC(to.y, to.mo - 1, to.d) < Date.UTC(from.y, from.mo - 1, from.d)) {
     reject('coverage-inverted', `${where} runs ${toDayString(from)} to ${toDayString(to)}`);
   }
-  return { from, to };
+
+  if (c.evidence_to === null || c.evidence_to === undefined) {
+    reject(
+      'coverage-evidence-not-transcribed',
+      `${where}.evidence_to is ${String(c.evidence_to)}. ADR-055 section 5: coverage may not ` +
+        `exceed the last date whose exceptions come from a committed artifact, and null says ` +
+        `nobody has established what that date is. NULL IS NOT A FAR HORIZON. Declaring coverage ` +
+        `to ${toDayString(to)} without it makes trading_calendar_loads assert knowledge nobody ` +
+        `has, which is the state ADR-042 F-4 exists to make impossible`,
+    );
+  }
+  const evidenceTo = parseDay(c.evidence_to, `${where}.evidence_to`);
+  if (Date.UTC(to.y, to.mo - 1, to.d) > Date.UTC(evidenceTo.y, evidenceTo.mo - 1, evidenceTo.d)) {
+    reject(
+      'coverage-exceeds-evidence',
+      `${where} declares coverage to ${toDayString(to)} and the evidence reaches only ` +
+        `${toDayString(evidenceTo)}. ADR-055 section 5: the tail between them is coverage the ` +
+        `file claims and no committed artifact supports. It is also what would stop the horizon ` +
+        `alarm ever firing, because coverage would run to ${toDayString(to)} while the exception ` +
+        `lists ended at ${toDayString(evidenceTo)}`,
+    );
+  }
+
+  return { from, to, evidenceTo };
 }
 
 /**
@@ -436,9 +491,89 @@ function readHolidays(list, coverage, where) {
           `drop. Neither is loadable`,
       );
     }
-    byDay.set(key, { day, name: h.name, notes: typeof h.notes === 'string' ? h.notes : null });
+    byDay.set(key, {
+      day,
+      name: h.name,
+      notes: typeof h.notes === 'string' ? h.notes : null,
+      absorbsInto: readAbsorbsInto(h, at),
+    });
   });
   return byDay;
+}
+
+/**
+ * `absorbs_into`, ADR-055's ruling, with the three states that are the design.
+ *
+ * A HOLIDAY DOES NOT REMOVE A SESSION. It pauses the session belonging to the
+ * next trade date, and that session opened before the holiday began. CME opens
+ * trade date `2026-09-08` on Sunday `09-06`; `session_rule` computes Monday
+ * `09-07` and is wrong by twenty-four hours. Merit's computed session is a
+ * strict SUBSET of the real one, so a fill on the Sunday evening of Labor Day
+ * weekend falls inside no Merit session at all, which is the condition `R-01`
+ * exists to detect. That is the money-path reason this is a required key.
+ *
+ *   ABSENT  `absorbs-into-not-transcribed`. Nobody has read the artifact
+ *   `null`  the POSITIVE STATEMENT that this holiday absorbs no session
+ *   object  the bounds, read off the artifact under `TR-01`, never computed
+ *
+ * THE ABSENT/`null` DISTINCTION IS `F-1`'s LESSON ONE LAYER DEEPER, and it is
+ * the same distinction the file already draws between `holidays: null` and
+ * `holidays: []`. A Friday holiday is genuinely the `null` shape: `12-24`
+ * carries `12:15 (CLOSED)` and nothing after it in all nine futures classes,
+ * and that empty evening is EVIDENCE rather than missing coverage, in files of
+ * the identical format that DO list an evening open for Labor Day and
+ * Thanksgiving.
+ *
+ * A MALFORMED DATE OR TIME INSIDE THE OBJECT REUSES THE EXISTING FINDINGS
+ * (`day-not-iso`, `day-not-a-date`, `ct-time-malformed`) rather than gaining
+ * new ones, because they are the same defects one level down and each already
+ * ships with a seeded violation. A missing sub-key reaches `parseDay(undefined)`
+ * and lands on `day-not-iso`, which names the field.
+ */
+function readAbsorbsInto(h, at) {
+  if (!Object.prototype.hasOwnProperty.call(h, 'absorbs_into')) {
+    reject(
+      'absorbs-into-not-transcribed',
+      `${at} has no \`absorbs_into\`. ADR-055 makes it REQUIRED on every holiday: a holiday ` +
+        `pauses the session belonging to the next trade date, and whether it did is a fact only ` +
+        `the publication carries. An absent key says nobody has read the artifact for this ` +
+        `holiday. WRITE null TO SAY IT ABSORBS NOTHING, which is a positive statement and is ` +
+        `what a Friday holiday looks like`,
+    );
+  }
+  const raw = h.absorbs_into;
+  if (raw === null) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    reject(
+      'absorbs-into-not-an-object',
+      `${at}.absorbs_into is ${Array.isArray(raw) ? 'an array' : JSON.stringify(raw)}. It is ` +
+        `either null or an object carrying trading_day, session_open_day, session_open_ct, ` +
+        `session_close_day and session_close_ct`,
+    );
+  }
+  const where = `${at}.absorbs_into`;
+  const tradingDay = parseDay(raw.trading_day, `${where}.trading_day`);
+  const openDay = parseDay(raw.session_open_day, `${where}.session_open_day`);
+  const closeDay = parseDay(raw.session_close_day, `${where}.session_close_day`);
+  if (!CT_TIME.test(raw.session_open_ct ?? ''))
+    reject(
+      'ct-time-malformed',
+      `${where}.session_open_ct is ${JSON.stringify(raw.session_open_ct)}`,
+    );
+  if (!CT_TIME.test(raw.session_close_ct ?? '')) {
+    reject(
+      'ct-time-malformed',
+      `${where}.session_close_ct is ${JSON.stringify(raw.session_close_ct)}`,
+    );
+  }
+  return {
+    tradingDay,
+    openDay,
+    openCt: raw.session_open_ct,
+    closeDay,
+    closeCt: raw.session_close_ct,
+    where,
+  };
 }
 
 /**
@@ -501,6 +636,159 @@ function readEarlyCloses(list, coverage, holidays, rule, where) {
     byDay.set(key, { day, close_ct: e.close_ct, notes: e.notes });
   });
   return byDay;
+}
+
+/**
+ * ADR-055's five cross-checks over the absorbed sessions, run once both
+ * exception lists are read because four of the five need to know which days
+ * trade and one needs the early-close time.
+ *
+ * THE DERIVATION IS A CROSS-CHECK HERE AND NEVER A SOURCE, which is the one
+ * role it can safely hold. ADR-055 section 2 rules out a derived open on
+ * artifact evidence: the natural walk-back, "open at 17:00 on the day before
+ * the run of non-trading days", computes a Thursday `12-24 17:00` open for
+ * trade date `12-28`, and the Christmas export positively contradicts it. A
+ * correct derivation would have to distinguish a holiday adjacent to a weekend
+ * from one inside the week, which is at least three interacting cases. So the
+ * transcriber states the bounds and this function checks them.
+ *
+ * The close is checked the same way and for the same stated reason: two
+ * independent statements of one fact is this file's `declared` pattern, and
+ * NEITHER IS AUTHORITATIVE ALONE. The agreement is the check.
+ */
+function checkAbsorbedSessions(holidays, earlyCloses, coverage, rule, where) {
+  const claimed = new Map();
+
+  for (const [key, holiday] of holidays) {
+    const absorbed = holiday.absorbsInto;
+
+    if (absorbed === null) {
+      // ADR-055: `null` while the next CALENDAR day is a trade date is "the
+      // Labor Day shape claiming to be the Christmas one". A Friday holiday is
+      // followed by a Saturday, so it passes; a mid-week holiday is followed by
+      // a trading day, and a session it did not absorb is a session opening
+      // twenty-four hours late.
+      //
+      // A NEXT DAY OUTSIDE COVERAGE IS NOT A TRADE DATE HERE, deliberately.
+      // F-4 makes an uncovered day UNKNOWN rather than false, and this
+      // rejection fires only where the file positively states the next day
+      // trades.
+      const next = addDays(holiday.day, 1);
+      if (isTradingDay(next, holidays, coverage)) {
+        reject(
+          'absorbed-null-but-next-day-trades',
+          `${where} ${key} (${holiday.name}) states \`absorbs_into: null\` and ` +
+            `${toDayString(next)} is the next calendar day and does trade. null is the POSITIVE ` +
+            `statement that no session was absorbed, and it is what a Friday holiday looks like ` +
+            `because a Saturday follows it. A holiday with a trading day the very next morning ` +
+            `absorbed that day's session, which opened before the holiday began`,
+        );
+      }
+      continue;
+    }
+
+    // 1. The absorbed session opened BEFORE the holiday. That is the whole
+    //    finding: the session exists on the far side of the closure.
+    if (!isBefore(absorbed.openDay, holiday.day)) {
+      reject(
+        'absorbed-open-not-before-holiday',
+        `${absorbed.where}.session_open_day is ${toDayString(absorbed.openDay)} and the holiday ` +
+          `is ${key}. An absorbed session OPENED BEFORE THE HOLIDAY BEGAN, which is the fact ` +
+          `that makes it absorbed rather than merely adjacent. An open on or after the holiday ` +
+          `is what session_rule already computes and needs no exception`,
+      );
+    }
+
+    // 2. It absorbed the NEXT trade date, derived and compared.
+    const expected = nextTradingDay(holiday.day, holidays, coverage);
+    if (expected === null) {
+      reject(
+        'absorbed-trading-day-not-next',
+        `${absorbed.where}.trading_day is ${toDayString(absorbed.tradingDay)} and ${key} has no ` +
+          `next trading day inside coverage at all, so there is no session for it to absorb`,
+      );
+    }
+    if (toDayString(expected) !== toDayString(absorbed.tradingDay)) {
+      reject(
+        'absorbed-trading-day-not-next',
+        `${absorbed.where}.trading_day is ${toDayString(absorbed.tradingDay)} and the next ` +
+          `weekday after ${key} that is not itself a holiday is ${toDayString(expected)}. A ` +
+          `holiday absorbs the session belonging to the NEXT trade date and no other`,
+      );
+    }
+
+    // 3. The stated close against the one session_rule and early_closes give.
+    //    Derived, compared, and a disagreement is the finding.
+    const tradingKey = toDayString(absorbed.tradingDay);
+    const early = earlyCloses.get(tradingKey);
+    const expectedCloseCt = early ? early.close_ct : rule.close_ct;
+    if (toDayString(absorbed.closeDay) !== tradingKey || absorbed.closeCt !== expectedCloseCt) {
+      reject(
+        'absorbed-close-disagrees',
+        `${absorbed.where} states the session closing ${toDayString(absorbed.closeDay)} ` +
+          `${absorbed.closeCt} CT, and ${tradingKey} closes ${tradingKey} ${expectedCloseCt} CT ` +
+          `by ${early ? 'its early_closes entry' : 'session_rule'}. The close is carried although ` +
+          `it is derivable, on this file's declared pattern: NEITHER STATEMENT IS AUTHORITATIVE ` +
+          `ALONE and the agreement is the check`,
+      );
+    }
+
+    claimed.set(tradingKey, key);
+  }
+
+  // 4. The reverse direction, which is the one a reader cannot see by looking
+  //    at the file: a trade date whose session opened before a holiday, with
+  //    no holiday saying so. It catches a holiday naming the WRONG day (the
+  //    real next trade date is then unclaimed) and the run-of-holidays case
+  //    that the per-entry checks above cannot reach.
+  for (let day = coverage.from; !isAfter(day, coverage.to); day = addDays(day, 1)) {
+    if (!isTradingDay(day, holidays, coverage)) continue;
+    const prior = addDays(day, -1);
+    const priorKey = toDayString(prior);
+    if (!holidays.has(priorKey)) continue;
+    const key = toDayString(day);
+    if (!claimed.has(key)) {
+      reject(
+        'absorbed-session-not-claimed',
+        `${key} trades and the calendar day before it, ${priorKey}, is a holiday ` +
+          `(${holidays.get(priorKey).name}), and no holiday names ${key} in absorbs_into. Its ` +
+          `session opened on the far side of that closure and nothing in the file says when`,
+      );
+    }
+  }
+}
+
+/** Weekday, inside coverage, and not a holiday. */
+function isTradingDay(day, holidays, coverage) {
+  const dow = dayOfWeek(day);
+  if (dow === 0 || dow === 6) return false;
+  if (!inCoverage(day, coverage)) return false;
+  return !holidays.has(toDayString(day));
+}
+
+/**
+ * The next weekday after `day` that is not itself a holiday, or `null` when
+ * coverage ends first. The walk is bounded by coverage rather than by a step
+ * count, because an unbounded walk over a malformed file is a hang.
+ */
+function nextTradingDay(day, holidays, coverage) {
+  for (let d = addDays(day, 1); !isAfter(d, coverage.to); d = addDays(d, 1)) {
+    if (isTradingDay(d, holidays, coverage)) return d;
+  }
+  return null;
+}
+
+function dayMs(day) {
+  return Date.UTC(day.y, day.mo - 1, day.d);
+}
+function isBefore(a, b) {
+  return dayMs(a) < dayMs(b);
+}
+function isAfter(a, b) {
+  return dayMs(a) > dayMs(b);
+}
+function inCoverage(day, coverage) {
+  return !isBefore(day, coverage.from) && !isAfter(day, coverage.to);
 }
 
 function requireInCoverage(day, coverage, where) {
@@ -681,6 +969,16 @@ export function generate(source) {
   const seenHolidays = new Set();
   const seenEarlyCloses = new Set();
 
+  // ADR-055's absorbed sessions, keyed by the trade date they belong to.
+  // `checkAbsorbedSessions` has already proved each one names the next trade
+  // date, so at most one holiday claims any key.
+  const absorbedByTradingDay = new Map();
+  for (const holiday of holidays.values()) {
+    if (holiday.absorbsInto) {
+      absorbedByTradingDay.set(toDayString(holiday.absorbsInto.tradingDay), holiday.absorbsInto);
+    }
+  }
+
   const hi = Date.UTC(coverage.to.y, coverage.to.mo - 1, coverage.to.d);
   for (let day = coverage.from; Date.UTC(day.y, day.mo - 1, day.d) <= hi; day = addDays(day, 1)) {
     const key = toDayString(day);
@@ -714,15 +1012,29 @@ export function generate(source) {
     const early = earlyCloses.get(key);
     if (early) seenEarlyCloses.add(key);
     const closeCt = early ? early.close_ct : rule.close_ct;
-    const openDay = addDays(day, rule.open_day_offset);
+
+    // ADR-055, AND THIS IS THE LINE THAT CLOSES R-01's CONTAINMENT GAP. A trade
+    // date whose session was absorbed by a holiday opens where the exchange
+    // says it opened, which is BEFORE the holiday, and not where
+    // `open_day_offset: -1` computes. Without this the row is a strict subset
+    // of the real session and a fill on the Sunday evening of Labor Day weekend
+    // falls inside no session in the file.
+    //
+    // The transcribed value is used and the rule is not consulted, because
+    // `checkAbsorbedSessions` has already required the two to agree everywhere
+    // they can be compared. That is what "the derivation is demoted to a
+    // cross-check" means in one line of code.
+    const absorbed = absorbedByTradingDay.get(key);
+    const openDay = absorbed ? absorbed.openDay : addDays(day, rule.open_day_offset);
+    const openCt = absorbed ? absorbed.openCt : rule.open_ct;
 
     rows.push({
       trading_day: key,
       is_holiday: false,
       is_half_day: Boolean(early),
       halted: false,
-      session_open_ct: ctWallString(openDay, rule.open_ct),
-      session_open_at: utcString(ctWallToInstant(openDay, rule.open_ct, `${key} open`)),
+      session_open_ct: ctWallString(openDay, openCt),
+      session_open_at: utcString(ctWallToInstant(openDay, openCt, `${key} open`)),
       session_close_ct: ctWallString(day, closeCt),
       session_close_at: utcString(ctWallToInstant(day, closeCt, `${key} close`)),
       notes: early ? early.notes : null,
@@ -906,6 +1218,12 @@ export function diffTranscriptions(a, b) {
   // readers agreeing that the exchange is shut on a day while disagreeing about
   // which holiday it is means at least one of them read a different row.
   diffMaps(differences, 'holiday', a.holidays, b.holidays, (h) => h.name);
+  // ADR-055's `absorbs_into`, compared because it is a TRANSCRIBED value and a
+  // transcribed value no second reader is compared on has no second reader.
+  // Rendered rather than deep-compared so a disagreement names the half that
+  // differs, and `null` renders as the word so the state that says "this
+  // holiday absorbed nothing" is legible in the diff instead of blank.
+  diffShared(differences, 'absorbed session', a.holidays, b.holidays, renderAbsorbed);
   // Early closes are compared on day AND close time. `notes` is deliberately
   // NOT compared: it is per-group prose, F-3 requires its presence rather than
   // its wording, and requiring two readers to phrase it identically would push
@@ -914,6 +1232,32 @@ export function diffTranscriptions(a, b) {
   diffMaps(differences, 'early close', a.earlyCloses, b.earlyCloses, (e) => e.close_ct);
 
   return differences;
+}
+
+/**
+ * Like `diffMaps` but over the keys BOTH readers have.
+ *
+ * A holiday one reader missed is already one difference, reported by the
+ * `holiday` pass above. Reporting it a second time as a missing absorbed
+ * session would make one disagreement read as two and would put the count in
+ * the diff out of step with the number of things to go and check.
+ */
+function diffShared(out, label, a, b, valueOf) {
+  for (const [key, va] of a) {
+    if (!b.has(key)) continue;
+    if (valueOf(va) !== valueOf(b.get(key))) {
+      out.push(`${label} ${key}: first says ${valueOf(va)}, second says ${valueOf(b.get(key))}`);
+    }
+  }
+}
+
+function renderAbsorbed(h) {
+  const x = h.absorbsInto;
+  if (x === null) return 'null (absorbs no session)';
+  return (
+    `${toDayString(x.tradingDay)} opens ${toDayString(x.openDay)} ${x.openCt} CT, ` +
+    `closes ${toDayString(x.closeDay)} ${x.closeCt} CT`
+  );
 }
 
 function diffMaps(out, label, a, b, valueOf) {
