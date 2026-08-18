@@ -636,6 +636,46 @@ const SEEDS = {
           ', 2019-01-02, which nothing records.\n',
       ),
   },
+  'CI-06r': {
+    what: 'an ADR heading itself `status: proposed` while its own body records the founder accepting it',
+    real:
+      'ADR-006, ADR-007 and ADR-008 each headed themselves proposed while carrying, at their own ' +
+      'line 6, a dated founder approval reading ACCEPTED, and the M1 gate closure recorded the ' +
+      'founder accepting all three on that date; seventeen of seventeen gates passed over it ' +
+      'because CI-06f reads numbers and never status and CI-06b validates frontmatter while an ' +
+      'ADR carries its status in a heading',
+    // A NEW ENTRY AT THE NEXT FREE NUMBER RATHER THAN AN EDIT TO AN EXISTING ONE.
+    // The three real instances are repaired in the same commit range that wrote
+    // this gate, so a seed that edited one of them would be a seed whose target
+    // the next session can legitimately delete. `nextFreeAdr` is the same
+    // derivation the CI-06n seed uses, and it keeps this falsifiable as the
+    // registry grows.
+    expect: (d) => `ADR-${nextFreeAdr(d)} heads itself \`status: proposed\``,
+    seed: (d) => {
+      const n = nextFreeAdr(d);
+      writeFileSync(
+        join(d, `docs/decisions/ADR-${n}.md`),
+        `## ADR-${n}: an entry that contradicts itself  (2026-08-18, status: proposed)\n` +
+          '- **' +
+          // Assembled for RI-02's reason, the same one CI-06q's seed states: this
+          // harness lives in the repository the gate scans, and a spelled-out
+          // approval line here would make the harness its own finding.
+          ['Found', 'er'].join('') +
+          ' approval (2026-08-18): ' +
+          ['ACCEP', 'TED'].join('') +
+          '.** The signature is here and the heading still says proposed.\n',
+      );
+      // The entry needs its README row or CI-06n reports the seed instead, which
+      // is a seed failing on a neighbour's finding and is the defect this
+      // harness exists to refuse.
+      edit(d, 'docs/decisions/README.md', (b) =>
+        b.replace(
+          /\n\n## Gate closures/,
+          `\n| [ADR-${n}](ADR-${n}.md) | an entry that contradicts itself  (2026-08-18, status: proposed) |\n\n## Gate closures`,
+        ),
+      );
+    },
+  },
   'CI-06p': {
     what: 'a CI-06 letter claimed two past the last one, leaving the letters between it claimed by nobody',
     real:
@@ -765,6 +805,36 @@ const SEEDS = {
 // completeness check over it. A scope case exists where a boundary has actually
 // been argued about. Inventing one per gate would fill this file with cases
 // nobody chose, which is the opposite of the point.
+/**
+ * One ADR entry heading itself `proposed`, with or without an accepting verdict.
+ *
+ * Shared by the CI-06r scope case and its control so the two files differ in
+ * EXACTLY the approval line and nothing else. Writing them separately is how a
+ * control ends up firing on an unrelated difference, which is a control that
+ * proves the seed rather than the boundary.
+ */
+function seedProposedAdr(d, withApproval) {
+  const n = nextFreeAdr(d);
+  const approval =
+    '- **' +
+    ['Found', 'er'].join('') +
+    ' approval (2026-08-18): ' +
+    ['ACCEP', 'TED'].join('') +
+    '.**\n';
+  writeFileSync(
+    join(d, `docs/decisions/ADR-${n}.md`),
+    `## ADR-${n}: an entry awaiting a signature  (2026-08-18, status: proposed)\n` +
+      '- Context: nobody has ruled on this yet, which is what `proposed` says.\n' +
+      (withApproval ? approval : ''),
+  );
+  edit(d, 'docs/decisions/README.md', (b) =>
+    b.replace(
+      /\n\n## Gate closures/,
+      `\n| [ADR-${n}](ADR-${n}.md) | an entry awaiting a signature  (2026-08-18, status: proposed) |\n\n## Gate closures`,
+    ),
+  );
+}
+
 const SCOPE_CASES = [
   {
     name: 'CI-06b/out',
@@ -1081,6 +1151,29 @@ const SCOPE_CASES = [
       lines[last] = `|${cells.join('|')}|`;
       writeFileSync(p, lines.join('\n'));
     },
+  },
+  {
+    name: 'CI-06r/proposed-with-no-approval-line-is-not-a-finding',
+    gate: 'CI-06r',
+    what: 'an ADR legitimately awaiting signature: heading `proposed`, and NO approval line at all',
+    expect: 'PASS',
+    // THE BOUNDARY IS AT `contradicts itself`, NOT AT `is unsigned`, and this is
+    // the direction that says so. Five entries head themselves proposed today
+    // with no accepting verdict in the body -- ADR-001, ADR-033, ADR-036,
+    // ADR-056 and ADR-058 -- and every one is an honest record of a ruling
+    // nobody has made. The unsigned-ADR audit recommends a SPLIT rather than a
+    // batch signature, which is the founder's to make and not a gate's.
+    //
+    // A gate that flagged them would be demanding signatures rather than
+    // reporting contradictions, and it would go red on arrival on five files
+    // whose only repair is a decision. The control fires on the same file with
+    // the approval line added, which is the one edit that turns an honest
+    // `proposed` into a contradiction.
+    control: {
+      expect: (d) => `ADR-${nextFreeAdr(d)} heads itself \`status: proposed\``,
+      seed: (d) => seedProposedAdr(d, true),
+    },
+    seed: (d) => seedProposedAdr(d, false),
   },
   {
     name: 'CI-06q/undated-is-not-a-citation',
