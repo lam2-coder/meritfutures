@@ -1,0 +1,88 @@
+# GS-070  Funded start balance does not equal size
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "A provisioning miss, or a deliberate one. If the platform does not reset
+#   the funded account to `size_cents`, the trader carries eval profit into the
+#   funded phase, clears the buffer on day one, and can extract before a single
+#   funded gate has had time to work. On CORE-50K an eval passed at
+#   `size + 300,000c` would arrive funded with 200,000c already withdrawable."
+#                                                                   M01 AS-14
+#   "INV-20 is asserted at DO-3 on the transition boundary. The engine refuses
+#   the day rather than computing on it, and reconciliation pages."   M01 AS-14
+#   mark identity, opening  `opening == prior.balance + adjustment` (INV-18),
+#                           "failure raises reconciliation, never a computed
+#                           guess"                                   M01 R-07
+#   non-trading movements   carried in `adjustment_cents`, applied at the open
+#                           of the effective day, never inside a session
+#                                                             M01 R-10, SD-01
+#   INV-20  "the first funded mark opens at exactly `size_cents`", asserted at
+#           DO-3 on the phase-transition boundary                    M01 INV-20
+#   initial floor  `floor = size_cents - drawdown_cents` at account open
+#                                                                    M01 R-12
+#   funded drawdown 250,000c, buffer 100,000c, size 5,000,000c
+#                                                       M01 Appendix A.1 at 50K
+#
+# WHY THIS FIXTURE COULD NOT BE WRITTEN UNTIL NOW, AND WHAT CHANGED.
+# The held-back row read: "`funded_start_not_size` cannot be reached
+# independently of `opening_mismatch`: DO-3 tests `opening == prior.balance +
+# adjustment` first, `L-11` fixes `adjustment_cents` at 0, and the prior balance
+# after R-31's reset IS `size_cents`, so any opening that trips AS-14's check
+# trips INV-18 in the same pass."
+#
+# THE MIDDLE CLAUSE HAS EXPIRED. `L-11` no longer fixes `adjustment_cents` at
+# zero: `DailyMark.adjustmentCents` is a mapped engine input and the loader
+# reads whatever the row states. So the two identities come apart. With a
+# +300,000c non-trading credit at the open, INV-18 HOLDS (5,000,000 + 300,000 ==
+# 5,300,000) and INV-20 FAILS on the same mark, and `funded_start_not_size` is
+# the only assertion the day can raise. AS-14 is a claim about the second
+# identity and this is the shape that isolates it.
+#
+# THE SHAPE THIS FIXTURE DECLINED, RECORDED RATHER THAN DISCARDED. Stating
+# `adjustment_cents: 0` beside an opening of 5,300,000 is the literal reading of
+# "the platform failed to reset", and it raises BOTH failures at once:
+# `markIdentityFailures` collects them rather than returning on the first. The
+# day is refused either way and the end state is identical, so that fixture
+# would pass just as well against an engine that had no INV-20 check at all.
+# It asserts "something refused" where AS-14 asserts "INV-20 refused", and the
+# whole reason INV-20 exists is that it is not implied by INV-18.
+#
+# +300,000c IS AS-14's OWN NUMBER, not one chosen to make the arithmetic land.
+# AS-14 works its attack on "an eval passed at `size + 300,000c`", which is also
+# CORE-50K's eval profit target exactly (Appendix A.1, 600bp of 5,000,000c). The
+# credit is the eval profit the reset should have taken back.
+#
+# WHAT THE EXPECTATION PINS IS THAT NOTHING WAS COMPUTED. A refusal writes no
+# state for the day (FM-05), the fold stops there, and the end state is the one
+# the account opened with: `trading_day` is still the OPEN day and not the mark's
+# day, every counter is still zero, and `withdrawable_cents` is 0 where AS-14's
+# uncaught account "would arrive funded with 200,000c already withdrawable"
+# (5,300,000 - 5,000,000 - 100,000). An engine that folded the day instead moves
+# four pinned fields and emits a `day.closed` this file forbids.
+id: GS-070
+name: funded start balance does not equal size
+source: M01 R-07, R-10, R-12, INV-18, INV-20
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  # The open day precedes the first mark, which is the convention every funded
+  # fixture here follows: `initialState` cannot open an account in `funded` on a
+  # plan that has an evaluation phase, so the loader hands the fold an explicit
+  # prior anchored here and `advanceDay` refuses a mark that is not strictly
+  # after it (INV-14, R-06).
+  opened_on: 2026-10-30
+  size_cents: 5000000
+days:
+  # THE ONLY MARK, AND IT IS REFUSED. INV-18 holds by construction and INV-20
+  # does not, so `funded_start_not_size` is the single assertion available.
+  - trading_day: 2026-11-02
+    adjustment_cents: 300000
+    opening_balance_cents: 5300000
+    closing_balance_cents: 5340000
+    high_balance_cents: 5345000
+    low_balance_cents: 5295000
+    realized_pnl_cents: 40000
+    fill_count: 3
+    traded_day: true
+settlements: []

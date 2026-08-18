@@ -1,0 +1,139 @@
+# GS-056  Locked floor converts the account into a free option
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "Once R-15's lock engages, the account's downside is fixed at
+#   `size + 10,000c` while its upside is unbounded ... On a locked CORE-50K
+#   account sitting at `size + 250,000c`, a maximum-variance day risks 240,000c
+#   of paper progress for a chance at another 150,000c cap."         M01 AS-04
+#   "The only thing at risk post-lock is progress above `size + 10,000c`, which
+#   is the buffer, which was never withdrawable."                    M01 AS-04
+#   "No reset means the floor never falls, so after every extraction the
+#   trader's loss room is the buffer rather than the full drawdown."  M01 AS-04
+#   R-19  "The trader's loss room after an extraction is therefore the buffer,
+#         or the buffer minus the lock offset once locked, and that is what the
+#         rules page must say"                                        M01 R-19
+#   floor lock  trigger `closing - size >= floor_lock_at_profit_cents` (`>=`);
+#               effect `floor = floor_lock_floor_at_cents`, `floorLocked = true`,
+#               `hwb` frozen, all permanently                         M01 R-15
+#   floor breach  `low_balance_cents < floorOpenCents`, strict `<`    M01 R-21
+#   breach comparator is the floor AT THE OPEN                        M01 R-18
+#   non-trading movements carried in `adjustment_cents`, applied at the open
+#                                                              M01 R-10, SD-01
+#   withdrawable  `max(0, balance - size - buffer)`                   M01 R-35
+#   "INV-21 worst case: post-payout balance versus floor:
+#    size+100,000 vs at most size+10,000"          M01 Appendix A.4, the 50K row
+#   size 5,000,000c, funded drawdown 250,000c, buffer 100,000c,
+#   payout cap 150,000c, lock at profit 260,000c, locked floor offset 10,000c
+#                                                       M01 Appendix A.1 at 50K
+#
+# WHY THIS FIXTURE COULD NOT BE WRITTEN UNTIL NOW, AND WHAT CHANGED.
+# The held-back row read "GS-056's second half is a post-payout balance, so it
+# needs a settlement". A POST-PAYOUT BALANCE IS AN ADJUSTMENT, which R-10 states
+# and which `DailyMark.adjustmentCents` now carries: the loader stopped fixing
+# it at zero when `AWAITING_M01_INPUT` emptied. What still has no home is a
+# `SettlementFact` (L-11), and nothing on this row needs one: every claim here
+# is about the floor, the loss room and the withdrawable.
+#
+# THIS IS THE LOCKED HALF OF R-19's SENTENCE AND GS-065 IS THE UNLOCKED HALF.
+# The two files are the same plan, the same buffer and the same 150,000c
+# extraction, and they differ in one fact: whether the lock had engaged before
+# the money left.
+#
+#   GS-065  unlocked, floor trails to 5,000,000, loss room = buffer  = 100,000c
+#   GS-056  locked,   floor pinned at 5,010,000, loss room
+#                     = buffer minus the lock offset                 =  90,000c
+#
+# THE LOCK ENGAGES EXACTLY ON ITS TRIGGER AND THAT IS LOAD BEARING. Day one
+# closes at 5,260,000c, which is 260,000c of profit and the trigger to the cent.
+# CV-12 puts the trailing floor at exactly the locked value there
+# (5,260,000 - 250,000 = 5,010,000 = 5,000,000 + 10,000), so section 3.4's `max`
+# and section 3.6's assignment agree and this file pins a floor that has only one
+# reading. THAT DISAGREEMENT IS NOW RULED (ADR-052, accepted 2026-08-17, for the
+# assignment) and the exact-trigger close is kept anyway: the engine still takes
+# the `max`, this file was written while the ruling was `proposed`, and a fixture
+# that is correct under both readings needs no revisit when the engine catches up.
+#
+# THE ACCOUNT SITS AT `size + 250,000c` WHEN THE MONEY LEAVES, WHICH IS AS-04's
+# OWN POSITION. Day two gives back 10,000c of the day-one close, which is what
+# takes a locked account from its high-water balance to the balance AS-04 works
+# its attack from, and it is the only way to reach a post-payout balance of
+# `size + 100,000c`: the cap is 150,000c, so 5,250,000 - 150,000 = 5,100,000
+# while 5,260,000 - 150,000 would leave 5,110,000 and a loss room of 100,000c
+# rather than the 90,000c the registry row states.
+#
+#   day 1 close   5,000,000 + 260,000                    = 5,260,000  LOCK
+#   locked floor  5,000,000 + 10,000                     = 5,010,000
+#   day 2 close   5,260,000 - 10,000                     = 5,250,000
+#   withdrawable  5,250,000 - 5,000,000 - 100,000        =   150,000  = the cap
+#   day 3 opening 5,250,000 - 150,000                    = 5,100,000  = size+buffer
+#   loss room     5,100,000 - 5,010,000                  =    90,000
+#   day 4 close   5,100,000 -  90,000                    = 5,010,000  = the floor
+#
+# DAY FOUR IS THE MAXIMUM-VARIANCE DAY AND IT LOSES EVERY CENT IT IS ALLOWED TO.
+# Its low is 5,010,000c and the floor at open is 5,010,000c, so `low < floor` is
+# false by R-21's strict operator and the account survives with nothing above the
+# locked floor. That is the free option priced exactly: the trader risked 90,000c
+# of buffer, none of it withdrawable, and the account is still alive to try
+# again. One cent further and it breaches, which is why this is a bound rather
+# than an observation.
+#
+# WHAT IS NOT CLAIMED. `payouts_settled_count` and the two anchors do not move in
+# this fold and are not pinned: the fixture states the mark's adjustment and not
+# the settlement fact behind it, exactly as GS-065 does, and for the same reason.
+id: GS-056
+name: locked floor converts the account into a free option
+source: M01 R-10, R-13, R-15, R-18, R-19, R-21, R-35
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-10-30
+  size_cents: 5000000
+days:
+  # THE LOCK DAY. Profit is 260,000c, which is the trigger to the cent, so the
+  # trailing floor and the locked floor are the same number and `rule.floor_locked`
+  # fires with no discontinuity (CV-12, GS-015).
+  - trading_day: 2026-11-02
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5260000
+    high_balance_cents: 5265000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 260000
+    fill_count: 4
+    traded_day: true
+    adjustment_cents: 0
+  # Back to AS-04's position of `size + 250,000c`. The high-water balance is
+  # frozen at the lock (R-13), so this day moves neither it nor the floor.
+  - trading_day: 2026-11-03
+    opening_balance_cents: 5260000
+    closing_balance_cents: 5250000
+    high_balance_cents: 5262000
+    low_balance_cents: 5245000
+    realized_pnl_cents: -10000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  # THE EXTRACTION, at the full 150,000c cap. The balance lands on `size + buffer`
+  # and the withdrawable goes to zero: everything left is buffer.
+  - trading_day: 2026-11-04
+    adjustment_cents: -150000
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5100000
+    high_balance_cents: 5105000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 0
+    fill_count: 2
+    traded_day: true
+  # THE MAXIMUM-VARIANCE DAY. It loses the whole 90,000c of loss room and closes
+  # on the locked floor, which R-21's strict `<` lets survive.
+  - trading_day: 2026-11-05
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5010000
+    high_balance_cents: 5100000
+    low_balance_cents: 5010000
+    realized_pnl_cents: -90000
+    fill_count: 8
+    traded_day: true
+    adjustment_cents: 0
+settlements: []

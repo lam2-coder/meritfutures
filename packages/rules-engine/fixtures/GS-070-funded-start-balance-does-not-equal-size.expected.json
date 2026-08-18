@@ -1,0 +1,17 @@
+{
+  "end_state": {
+    "trading_day": "2026-10-30",
+    "phase": "funded",
+    "balance_cents": 5000000,
+    "floor_cents": 4750000,
+    "floor_open_cents": 4750000,
+    "floor_locked": false,
+    "high_water_balance_cents": 5000000,
+    "withdrawable_cents": 0,
+    "traded_days_count": 0,
+    "win_days_count": 0
+  },
+  "events": [],
+  "pins": "INV-20 is not implied by INV-18: a first funded mark whose opening identity holds and whose opening balance is not size_cents is refused, and the refusal writes no state for the day",
+  "note": "`trading_day: 2026-10-30` IS THE FIELD THIS FILE IS ABOUT AND EVERY OTHER PINNED FIELD IS THERE TO SAY WHAT DID NOT MOVE WITH IT. It is the day the account OPENED, not the day the mark states. A refusal means no state is written for the day (FM-05) and the fold stops, so the end state is still the account-open state: an engine that folded 2026-11-02 anyway advances this field, the balance to 5,340,000, the high-water balance and floor with it, and the traded-day count to 1. Five fields move at once, which is what makes the refusal assertable through a field-by-field diff even though the expectation sibling has no shape for an `AssertionFailure`. `withdrawable_cents: 0` IS AS-14's OWN ARITHMETIC INVERTED. AS-14 computes that an uncaught funded start at `size + 300,000c` arrives 'with 200,000c already withdrawable' (5,300,000 - 5,000,000 - 100,000 by R-35), which is the extraction the miss buys the trader. This file pins zero, because the day was never folded and the account is still standing at its size. `floor_cents: 4750000` IS R-12 AT THE FUNDED DRAWDOWN and it is pinned for a second reason: it is the value the fold ARRIVED with, so pinning it asserts the refusal left the floor alone rather than writing a partial state. THE ONE THING THIS FILE CANNOT STATE IS THE ASSERTION KIND. `AssertionFailure` carries `kind: funded_start_not_size` and the sibling has no key for it, so the fixture reaches that claim by CONSTRUCTION rather than by naming it: the stated adjustment makes INV-18 hold, and INV-20 is then the only identity on the mark that can fail. `events: []` IS A PINNED NEGATIVE. A refused day emits nothing at all, not even `day.closed`, so an engine that recorded the day and flagged it afterwards fails here rather than passing quietly with a reconciliation nobody reads."
+}
