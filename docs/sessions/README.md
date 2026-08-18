@@ -97,3 +97,4 @@ must be recoverable from its own file alone.
 | [2026-08-17 - Session 53](2026-08-17-session-53.md) | `CI-06q`, cited authority exists, and the limitation that it would not have caught its own cause |
 | [2026-08-17 - Session 54](2026-08-17-session-54.md) | `GS-064`'s `withdrawable_cents`, ruled on the ordering law rather than on the arithmetic |
 | [2026-08-17 - Session 54](2026-08-17-session-54.md) | `ADR-055`, the open end of a trade date's session, and a finding narrower than it was recorded |
+| [2026-08-17 - Session 55](2026-08-17-session-55.md) | golden fixtures batch 7: the forty-three re-derived, and three unblocked by one field |
