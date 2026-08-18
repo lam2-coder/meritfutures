@@ -1,0 +1,13 @@
+{
+  "end_state": {
+    "trading_day": "2026-11-27",
+    "traded_days_count": 2,
+    "win_days_count": 2,
+    "balance_cents": 5060000,
+    "high_water_balance_cents": 5060000,
+    "floor_cents": 4810000
+  },
+  "events": ["day.closed", "day.closed"],
+  "pins": "an early-close session advances every counter exactly as the full session before it does, because R-03's operator column is `No effect on any comparison`",
+  "note": "THE PIN IS THE PAIR OF COUNTS AGAINST THE PAIR OF DAYS, not either count alone. Both days realize 30,000c on 3 fills, so 2 and 2 says the half day contributed 1 and 1; an engine that dropped the shortened session, or that scored it as a partial day, reads 1 and 1 against the same stream. THE FLOOR AND THE HIGH-WATER BALANCE ARE A SECOND, INDEPENDENT MEASUREMENT OF THE SAME FACT and are stated for that reason rather than for their own sake: R-13 trails the floor off the closing high, so 5,060,000 and 4,810,000 say the half day's close was processed at DO-7 rather than merely counted at DO-6. 4,810,000 is 5,060,000 less the 250,000c eval drawdown, which is Appendix A.1's figure at 50K and not arithmetic this file invented. `is_half_day` IS THE ONLY INPUT THAT DIFFERS BETWEEN THE TWO DAYS and it reaches `CalendarDay.isHalfDay` through the loader's `kind` mapping, so the fixture states a condition the engine actually sees; before the calendar carried a transcribed `half` day, this row was held back precisely because it did not. WHAT THIS FILE DOES NOT REACH is the other half of its own registry row: `gap counters` is R-02's `calendar.sequence` subtraction, which reaches no field this format can carry, exactly as GS-002's sibling records. The holiday absence of 2026-11-26 is visible to the calendar and to nothing in `RuleState`. The fixture cites R-02 because the registry row does and because the sequence-subtracted counters are what the row is about, and it does not pretend to pin them."
+}
