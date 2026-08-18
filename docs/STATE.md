@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-17
+last_updated: 2026-08-18
 ---
 
 # STATE
@@ -959,6 +959,24 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 **`OQ-SE-02` is amended on its mechanism, not its number, by refusing to answer the question it rests on.** Its premise is a claim about how far CME publishes, legible only from a **paste**, and ruling from a rendering is the mistake this desk made once this week. Instead: **`coverage.to` may not exceed the last date whose exceptions are transcribed from a committed artifact.** True whatever CME publishes, and what `F-4` already implies. **What can honestly be declared today is nothing** — the holiday list is still not retrieved, and `coverage`, `holidays` and `early_closes` stay `null`. The horizon alarm gains its purpose from this: against an evidence bound it fires when a retrieval is due, where against a declared-but-empty two-year tail it could never fire at all.
 
 **No transcription, no `generate.mjs` change, no shape edit to the source file.** The schema and its validator land together, because shipping one without the other is the failure the ruling's own section 4 rejects.
+
+---
+
+## `OQ-SE-02`'s premise is falsified by the artifacts, and the horizon alarm can never be cleared ([ADR-058](decisions/ADR-058.md), proposed 2026-08-18)
+
+**[ADR-055](decisions/ADR-055.md) declined to rule the premise because the only thing available to test it was a paste, and set the condition for reopening it: settle it against the artifacts when the artifacts land. They have.** Read out of the `.xlsx` date columns rather than off filenames: **every holiday window in [`packages/db/src/seed/calendars/`](../packages/db/src/seed/calendars/README.md) begins strictly AFTER its `2026-08-17` retrieval date**, at plus 20, 100, 129 and 136 days, and the furthest date any committed artifact reaches is `2027-01-02`. Four of the five carry a `docProps` export stamp on that date.
+
+**So the retrievable horizon is a sawtooth, not a constant.** The far end is a fixed date and the near end is today, so the reach decays daily and resets when the next schedule appears. **A full forward year never exists to transcribe**, and the holidays already passed are not merely untranscribed but unreachable, because the tool served none of them. `OQ-SE-02` asks for three years from a source that will not serve one.
+
+**The alarm is the money-adjacent half.** Six months is 181 to 184 days against a best reach of 138, so **the six-month horizon alarm fires on the best state attainable on the day it was measured** and every state after it is worse. Nothing clears it, which is `FM-17` by name and is how an alarm gets muted along with what it was going to say on the day it mattered. **ADR-055's sentence that the alarm "gains its purpose" from the evidence bound is right about the direction and wrong about the number**: the bound moved the alarm from never-fires to never-stops, and the six was carried across unexamined.
+
+**Lowering the number does not fix the class**, because the reach troughs at the year boundary and no constant is attainable in December. **One alarm was answering two questions**, and the ruling splits them: `calendar.retrieval_due`, always clearable by a retrieval, and `calendar.coverage_runway`, clearable only if the exchange has published further. **An alarm no action can clear is a countdown to `F-4`'s ruled refusal**: it names `coverage_end_day` as a date, escalates to an owner rather than repeating, and **a suppression on it may not expire later than that date**, which is `alarm_suppressions`' mandatory-expiry idea bounded by the thing it is counting down to.
+
+**The second finding is the more serious one and it is not about coverage.** The work-list paste records that CME finalises hours **roughly two weeks before each holiday**, subject to NYSE and SIFMA input, while the Thanksgiving export was taken **100 days ahead** and carries exact times (`12:15` Equities, `13:45` Energy). **Merit transcribes hours, not dates**, so the binding horizon is two weeks and everything beyond it is provisional. The exposure is one-directional: a close moving **later**, a holiday **removed**, or an `absorbs_into` that should have been an object, each leaves the recorded session a strict subset and a fill in the uncovered part lands inside no Merit session, which is `R-01`'s condition. **So the cadence is two obligations**: periodic **discovery**, and a **per-holiday confirmation** inside the finalisation window, scheduled off the calendar's own rows. A periodic sweep alone cannot discharge the second.
+
+**The production seed is reclassified.** It cannot be complete and correct at any single moment before launch, so it is a **launch dependency with a standing retrieval obligation and is not on the build's critical path**. The obligation lands in [CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md), which **has never carried a calendar row in either of its two tables**, so `OQ-SE-02`'s promise that the review would join it was never kept.
+
+**Approval is PENDING and unsigned.** It amends a frozen ADR's ruling and changes what an operational control means. **Two claims could not be sourced to an artifact**, the eleven-row 2026 schedule and the two-week finalisation window, both read off a file whose first line says it is not an artifact. Both are marked where they are used and **no ruling above fails if either is wrong**; the first confirmation retrieval, Labor Day at seven trading days out, is what tests the second.
 
 ---
 
