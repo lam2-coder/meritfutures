@@ -439,9 +439,11 @@ test(reU('R-31'), () => {
   // -----------------------------------------------------------------------------
   // Asserted rather than only commented, because a tension that lives in a
   // comment is a tension the next session re-derives. DO-7 left the floor at
-  // 5,050,000c on this very day: the trail put it at 5,300,000 - 250,000 and the
-  // lock engaged at 300,000c of profit without lowering it. R-31 then resets it
-  // to 4,750,000c, a fall of 300,000c, on the same day.
+  // 5,010,000c on this very day: the trail put it at 5,300,000 - 250,000 =
+  // 5,050,000 and the lock then ASSIGNED the locked value (ADR-052, accepted
+  // 2026-08-17). R-31 resets it to 4,750,000c, a fall of 260,000c, on the same
+  // day, and THAT fall is the one this test exists for: it is a day-over-day
+  // move in the stored series, which is the granularity INV-06 is stated at.
   //
   // R-12, R-31 and GS-019 all state that number, so the engine follows them.
   // INV-06 says the floor never decreases "no exception, no phase qualifier",
@@ -467,7 +469,7 @@ test(reU('R-31'), () => {
     sizeCents: CORE_50K.sizeCents,
     drawdown: CORE_50K.eval!.drawdown,
   });
-  expect(atDo7.floorCents).toBe(5_050_000n);
+  expect(atDo7.floorCents).toBe(5_010_000n);
   expect(atDo7.floorLocked).toBe(true);
   expect(out.state.floorCents).toBeLessThan(atDo7.floorCents);
 
@@ -492,10 +494,10 @@ test(reU('R-31'), () => {
   ]);
 
   // AND THE PAYLOAD IS THE PART THAT MATTERS TO M2 RATHER THAN TO THE TIMELINE.
-  // M01 section 7 gives the event `locked_floor_cents`, which is 5,050,000 here,
+  // M01 section 7 gives the event `locked_floor_cents`, which is 5,010,000 here,
   // while the floor the account actually carries out of the day is 4,750,000.
   const locked = out.events[0] as FloorLockedEvent;
-  expect(locked.lockedFloorCents).toBe(5_050_000n);
+  expect(locked.lockedFloorCents).toBe(5_010_000n);
   expect(locked.atProfitCents).toBe(300_000n);
   expect(out.state.floorCents).toBe(4_750_000n);
 
