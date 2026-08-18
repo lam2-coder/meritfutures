@@ -92,3 +92,4 @@ grouped these rulings live in [gates/](gates/).
 | [Parameter status: launch candidates versus structural rulings (founder ruling, 2026-08-14)](gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md) | 0 | 0 |
 | [Consolidated founder addendum and batch 2 gate closure (2026-08-14)](gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md) | 2 | 5 |
 | [FREEZE gate closure (2026-08-14)](gates/freeze-gate-closure-2026-08-14.md) | 4 | 17 |
+| [ADR-056](ADR-056.md) | `INV-07` gains a stated `R-31` exception, and the lock is cleared rather than carried  (2026-08-18, status: proposed) |
