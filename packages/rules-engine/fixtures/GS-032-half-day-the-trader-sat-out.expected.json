@@ -1,0 +1,13 @@
+{
+  "end_state": {
+    "trading_day": "2026-11-27",
+    "traded_days_count": 1,
+    "win_days_count": 1,
+    "balance_cents": 5030000,
+    "high_water_balance_cents": 5030000,
+    "floor_cents": 4780000
+  },
+  "events": ["day.closed", "day.closed"],
+  "pins": "an early-close session the trader sat out still closes and still advances the state's trading day, and the counters move exactly as they would on a full session with no fills",
+  "note": "THE PIN IS THE PAIR, not either field alone. `trading_day` reaching 2026-11-27 says the shortened session was evaluated; `traded_days_count` holding at 1 says R-08's strict `>` refused to count a day with no fills, and `win_days_count` holding at 1 says R-09's `>=` refused a P&L of 0 against a 15,000c floor. An engine that dropped the half day satisfies both counts and fails the trading day. THE FLOOR IS THE THIRD MEASUREMENT AND IT IS THE ONE THAT ONLY MOVES ON A MISTAKE: R-14 is that the trailing floor never retreats, so 4,780,000 after a flat day is 5,030,000 less the 250,000c eval drawdown carried forward unchanged from the full session. Appendix A.1 owns the 250,000; this file computes nothing. THE RELATIONSHIP TO GS-003 IS THE ONE THING THIS SIBLING WILL NOT LEAVE IMPLICIT. The registry states GS-032 as `identical to GS-003 with the real calendar`, and this fixture directory holds exactly one calendar, so a file that took `identical` literally would be GS-003 written twice under a second id, which is the mirror of GS-049's objection rather than an answer to it. What differs here is the fill count on the half day, and that is a deliberate reading of the row rather than a transcription of it: R-03 is a claim about a NON-difference, GS-003 states it where the half day is traded, and this file states it where the half day is not, which is Appendix B4's own adversarial framing for item 3. Both files sit on the same two transcribed days and cite the same rule, and neither is the whole of R-03 alone. WHAT NEITHER FILE REACHES is the gap half of GS-003's registry row: R-02's `calendar.sequence` subtraction reaches no field this format can carry, and the transcribed absence of 2026-11-26 is visible to the calendar and to nothing in `RuleState`."
+}
