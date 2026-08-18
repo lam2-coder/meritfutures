@@ -16,17 +16,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { buildCalendarSlice } from '@merit/rules-engine';
-import type {
-  BasisPoints,
-  CalendarDay,
-  CalendarSlice,
-  DailyMark,
-  ExternalGates,
-  PlanVersionId,
-  ResolvedPlan,
-  TradingDay,
-} from '@merit/rules-engine';
+import type { ExternalGates } from '@merit/rules-engine';
 
 import { foldAccountDay, runNightlyBatch } from '../src/batch/nightly.js';
 import type { NightlyBatchConfig } from '../src/batch/nightly.js';
@@ -34,112 +24,20 @@ import type {
   AccountDay,
   BatchPorts,
   ReconciliationFinding,
+  ReplayDivergenceFinding,
   RuleStateRow,
 } from '../src/batch/ports.js';
 
-const td = (s: string): TradingDay => s as TradingDay;
-/** INV-03. Ratios are integer basis points, and the brand is what says so. */
-const bp = (n: number): BasisPoints => n as BasisPoints;
-
-const ACCOUNT_A = '0f8fad5b-d9cb-469f-a165-70867728950e';
-const ACCOUNT_B = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
-const ENGINE_VERSION = 'engine-test';
-
-// -----------------------------------------------------------------------------
-// Core EOD at 50K, transcribed from M01 Appendix A.1's 50K column
-// -----------------------------------------------------------------------------
-// Every number here has a row in that table. `resolvePlan` is P2-1 and does not
-// exist, so the resolved shape is built by hand; when it lands, this becomes a
-// call rather than a literal.
-
-const PLAN: ResolvedPlan = {
-  planVersionId: 'core-eod-v1' as PlanVersionId,
-  sizeCents: 5_000_000n,
-  eval: {
-    drawdown: {
-      type: 'trailing_eod',
-      drawdownCents: 250_000n,
-      lock: { enabled: true, atProfitCents: 260_000n, floorAtCents: 5_010_000n },
-    },
-    dailyLossLimit: { type: 'none' },
-    winDayFloorCents: 15_000n,
-    profitTargetCents: 300_000n,
-    minTradingDays: 1,
-    consistency: { enabled: false },
-    maxDays: null,
-  },
-  funded: {
-    drawdown: {
-      type: 'trailing_eod',
-      drawdownCents: 250_000n,
-      lock: { enabled: true, atProfitCents: 260_000n, floorAtCents: 5_010_000n },
-    },
-    dailyLossLimit: { type: 'none' },
-    winDayFloorCents: 15_000n,
-    minTradingDays: 0,
-    winDaysRequiredCount: 5,
-    consistency: { enabled: true, maxDayShareBp: bp(3000) },
-    bufferCents: 100_000n,
-    cadenceGapTradingDays: 5,
-    payoutCapSchedule: [{ fromOrdinal: 1, capCents: 150_000n }],
-    minPayoutCents: 10_000n,
-    splitBp: bp(9000),
-    maxPayouts: 5,
-  },
-};
-
-const WINDOW: readonly CalendarDay[] = [
-  { tradingDay: td('2026-08-10'), isHalfDay: false, halted: false, sequence: 9001 },
-  { tradingDay: td('2026-08-11'), isHalfDay: false, halted: false, sequence: 9002 },
-  { tradingDay: td('2026-08-12'), isHalfDay: false, halted: false, sequence: 9003 },
-  { tradingDay: td('2026-08-13'), isHalfDay: false, halted: false, sequence: 9004 },
-  { tradingDay: td('2026-08-14'), isHalfDay: false, halted: false, sequence: 9005 },
-];
-
-const CALENDAR: CalendarSlice = buildCalendarSlice({
-  days: WINDOW,
-  coverage: { from: td('2026-08-10'), to: td('2026-08-14') },
-});
-
-/** Nothing in context blocks the account. Varied where a test is about context. */
-const CLEAR: ExternalGates = {
-  accountStatus: 'active',
-  kycState: 'verified',
-  payoutsFrozen: false,
-  reconBlocked: false,
-  hasPayoutInFlight: false,
-};
-
-/**
- * The account's first day: `prior` is null, so the fold opens the account
- * itself. INV-18 then reads against `initialState`'s balance, which is why the
- * opening is `size_cents` exactly and the adjustment is zero.
- */
-const DAY_ONE: DailyMark = {
-  tradingDay: td('2026-08-10'),
-  openingBalanceCents: 5_000_000n,
-  closingBalanceCents: 5_030_000n,
-  highBalanceCents: 5_035_000n,
-  lowBalanceCents: 4_990_000n,
-  realizedPnlCents: 30_000n,
-  adjustmentCents: 0n,
-  fillCount: 3,
-  sourceHash: 'day-one',
-};
-
-const accountDay = (accountId: string, overrides: Partial<AccountDay> = {}): AccountDay => ({
-  accountId,
-  plan: PLAN,
-  prior: null,
-  mark: DAY_ONE,
-  settlements: [],
-  external: CLEAR,
-  // R-32's anchor (ADR-051). No plan in this file sets `phase_eval.max_days`,
-  // so the rule never reads it; it is required so it cannot go missing where it
-  // WOULD be read.
-  openedOn: DAY_ONE.tradingDay,
-  ...overrides,
-});
+import {
+  ACCOUNT_A,
+  ACCOUNT_B,
+  CALENDAR,
+  CLEAR,
+  DAY_ONE,
+  ENGINE_VERSION,
+  accountDay,
+  td,
+} from './fixtures.js';
 
 // -----------------------------------------------------------------------------
 // A recording port pair
@@ -149,6 +47,7 @@ interface Recording {
   readonly ports: BatchPorts;
   readonly writes: RuleStateRow[];
   readonly reconciliations: ReconciliationFinding[];
+  readonly divergences: ReplayDivergenceFinding[];
   /** Every port call, in the order it was made. */
   readonly calls: string[];
   /** The high-water number of `loadAccountDay` calls in flight at once. */
@@ -158,6 +57,9 @@ interface Recording {
 interface RecordingOptions {
   readonly watermark?: number | null;
   readonly days?: Readonly<Record<string, AccountDay | null>>;
+  /** The replay audit's inputs: stored rows and the input history, per account. */
+  readonly stored?: Readonly<Record<string, readonly RuleStateRow[]>>;
+  readonly history?: Readonly<Record<string, readonly AccountDay[]>>;
   /** Milliseconds each account's load takes, so completion order can be shuffled. */
   readonly loadDelayMs?: Readonly<Record<string, number>>;
 }
@@ -165,6 +67,7 @@ interface RecordingOptions {
 function recordingPorts(accountIds: readonly string[], options: RecordingOptions = {}): Recording {
   const writes: RuleStateRow[] = [];
   const reconciliations: ReconciliationFinding[] = [];
+  const divergences: ReplayDivergenceFinding[] = [];
   const calls: string[] = [];
   let inFlight = 0;
   let peak = 0;
@@ -195,6 +98,18 @@ function recordingPorts(accountIds: readonly string[], options: RecordingOptions
         inFlight -= 1;
         return accountId in days ? (days[accountId] ?? null) : accountDay(accountId);
       },
+      accountsWithStoredState: async () => {
+        calls.push('accountsWithStoredState');
+        return Object.keys(options.stored ?? {});
+      },
+      storedRuleStates: async (accountId) => {
+        calls.push(`storedRuleStates:${accountId}`);
+        return options.stored?.[accountId] ?? [];
+      },
+      accountDaysFrom: async (accountId) => {
+        calls.push(`accountDaysFrom:${accountId}`);
+        return options.history?.[accountId] ?? [];
+      },
     },
     write: {
       writeRuleState: async (row) => {
@@ -205,10 +120,14 @@ function recordingPorts(accountIds: readonly string[], options: RecordingOptions
         calls.push(`raiseReconciliation:${finding.accountId}`);
         reconciliations.push(finding);
       },
+      raiseDivergence: async (finding) => {
+        calls.push(`raiseDivergence:${finding.accountId}:${finding.tradingDay}`);
+        divergences.push(finding);
+      },
     },
   };
 
-  return { ports, writes, reconciliations, calls, peakInFlight: () => peak };
+  return { ports, writes, reconciliations, divergences, calls, peakInFlight: () => peak };
 }
 
 const CONFIG: NightlyBatchConfig = {
