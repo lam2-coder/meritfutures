@@ -82,6 +82,8 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-053](ADR-053.md) | The high-water bound holds only while the floor is unlocked, and what it stops asserting is the ruling  (2026-08-17, status: accepted) |
 | [ADR-054](ADR-054.md) | `R-35` does not run on the row that closes an account, and `GS-064`'s `20,000` is right  (2026-08-17, status: accepted) |
 | [ADR-055](ADR-055.md) | A holiday pauses the session belonging to the next trade date, and the exception carries that session's bounds  (2026-08-17, status: accepted) |
+| [ADR-056](ADR-056.md) | `INV-07` gains a stated `R-31` exception, and the lock is cleared rather than carried  (2026-08-18, status: proposed) |
+| [ADR-057](ADR-057.md) | one refuted sentence in four documents, and the ninth field on a breach row  (2026-08-18, status: accepted) |
 | [ADR-058](ADR-058.md) | The calendar source publishes forward-only, so a full forward year never exists and the six-month horizon alarm can never be cleared  (2026-08-18, status: proposed) |
 
 ## Gate closures
@@ -93,5 +95,4 @@ grouped these rulings live in [gates/](gates/).
 | [Parameter status: launch candidates versus structural rulings (founder ruling, 2026-08-14)](gates/parameter-status-launch-candidates-versus-structural-rulings-founder-ruling-2026-08-14.md) | 0 | 0 |
 | [Consolidated founder addendum and batch 2 gate closure (2026-08-14)](gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md) | 2 | 5 |
 | [FREEZE gate closure (2026-08-14)](gates/freeze-gate-closure-2026-08-14.md) | 4 | 17 |
-| [ADR-056](ADR-056.md) | `INV-07` gains a stated `R-31` exception, and the lock is cleared rather than carried  (2026-08-18, status: proposed) |
-| [ADR-057](ADR-057.md) | one refuted sentence in four documents, and the ninth field on a breach row  (2026-08-18, status: accepted) |
+| [Unsigned ADR audit (2026-08-18)](gates/unsigned-adr-audit-2026-08-18.md) | 0 | 0 |

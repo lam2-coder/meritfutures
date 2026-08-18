@@ -966,6 +966,28 @@ Two branches independently folded FOLD-02 session 4 and both merged. The result 
 
 ---
 
+## Three of the six "unsigned" ADRs were signed on day one, and no gate can read a status word ([unsigned ADR audit](decisions/gates/unsigned-adr-audit-2026-08-18.md), 2026-08-18)
+
+**Eight ADRs sit at `status: proposed`. Six were proposed in the corpus phase and are being built against. The audit was commissioned on the premise that the build rests on unsigned decisions, and that premise is FALSE for half of them.** [ADR-006](decisions/ADR-006.md), [ADR-007](decisions/ADR-007.md) and [ADR-008](decisions/ADR-008.md) were **ACCEPTED on 2026-08-13**. The [M1 gate closure](decisions/gates/m1-gate-closure-2026-08-13.md) says so in the founder's own words at line 20, and each of the three carries its own dated `Founder approval ... ACCEPTED` line at its own line 6. **The signature exists. The status word in the heading is what is stale.**
+
+**Four other documents restate the acceptance, and two of them contradict themselves in the same direction.** [OVERVIEW:79](architecture/OVERVIEW.md) says "proposed as ADR-006" and [OVERVIEW:303](architecture/OVERVIEW.md) says "Queue: pg-boss, accepted"; [INFRA:21](architecture/INFRA.md) says "Proposed as ADR-007" and [INFRA:214](architecture/INFRA.md) says "both ACCEPTED". **The pre-gate sentence was never revisited when the gate closed and only the post-gate summary was**, which is how the wrong half survived into the ADR headings and then into everything generated from them.
+
+**Nobody raised it because nothing can see it.** 17 of 17 gates pass on a tree where three ADR headings contradict their own bodies. `CI-06f` reads ADR numbers, names and gaplessness and never the status; `grep "status: proposed" scripts/corpus/gates.mjs` returns nothing; `CI-06b` validates frontmatter and ADR entries carry their status in a **heading**. **This is the twelfth instance of the prose-carried-fact-in-a-registry class that [ADR-034](decisions/ADR-034.md) and [ADR-036](decisions/ADR-036.md) exist to end, inside the registry those two were written to protect.** The remedy is the one already ruled for the State column: generate the fact or delete it and point at the source. The audit recommends a gate over care, and **deliberately does not claim a `CI-06` letter**, because ADR-034 and ADR-036 both rule that the claim precedes the artifact and this record is not the artifact. The next free letter is `r`.
+
+**The other three, read against the tree.**
+
+| ADR | Position |
+|---|---|
+| **[036](decisions/ADR-036.md)** | **Accurate and fully built. The strongest of the six.** Both gates share one `allocated()` parser ([gates.mjs:368](../scripts/corpus/gates.mjs), called at `:765` and `:1118`), both falsify scope cases exist and are watched (`CI-06h/reserved` must pass, `CI-06h/unallocated` must fail), and the table is 37 migrations deep and **has already caught a real double-claim** ([ALLOCATION:118](decisions/ALLOCATION.md)). **Three numbers in its own Consequences line are stale** and all three were repaired elsewhere rather than in it |
+| **[001](decisions/ADR-001.md)** | **Decision holds, Consequences line is false.** "All constitution paths map 1:1" fails for five paths, all moved by [ADR-043](decisions/ADR-043.md), which does not cite ADR-001 and left it unamended. **Cited by no file in the tree** |
+| **[033](decisions/ADR-033.md)** | **Part 1 built, part 2 correctly not built, one convention silently replaced, one sentence false about itself.** `docs/reviews/` holds one dated review-desk record and **zero `*-verdict.md` files exist anywhere**, against an ADR that rules verdicts are artifacts. And [ADR-033:59](decisions/ADR-033.md) still reads "**This entry is 031**" and "both branches append to the end of this file", in the ADR whose subject is that an uncitable claim is the finding |
+
+**The recommendation is a SPLIT rather than a batch signature.** Four of the five items are records catching up with a reality that already holds. The fifth, ADR-033's blocking `Stop` hook, is a decision nobody has made: `C10` requires a `Stop` gate that blocks, [CLAUDE.md:22](../CLAUDE.md) records that the committed hooks deliberately never block, and the ADR asks what happens when the check itself cannot run. **Signing ADR-033 whole would read as answering that.**
+
+**What the audit did not find, stated because it is the useful negative.** Nothing has superseded 006, 007 or 008 in practice. `pg-boss` and `drizzle` appear **zero times** in `pnpm-lock.yaml` and in no `package.json`, and no deploy configuration of any kind exists for ADR-007's three vendors. **The three foundational decisions are described in twenty-seven distinct files between them and exercised by almost nothing**, which is the opposite of the risk the audit was sent to look for and is worth knowing before the first one is reversed.
+
+---
+
 ## `OQ-SE-02`'s premise is falsified by the artifacts, and the horizon alarm can never be cleared ([ADR-058](decisions/ADR-058.md), proposed 2026-08-18)
 
 **[ADR-055](decisions/ADR-055.md) declined to rule the premise because the only thing available to test it was a paste, and set the condition for reopening it: settle it against the artifacts when the artifacts land. They have.** Read out of the `.xlsx` date columns rather than off filenames: **every holiday window in [`packages/db/src/seed/calendars/`](../packages/db/src/seed/calendars/README.md) begins strictly AFTER its `2026-08-17` retrieval date**, at plus 20, 100, 129 and 136 days, and the furthest date any committed artifact reaches is `2027-01-02`. Four of the five carry a `docProps` export stamp on that date.
