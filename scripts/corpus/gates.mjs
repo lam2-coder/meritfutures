@@ -2944,6 +2944,157 @@ const ci06q = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06r  AN ADR'S HEADING STATUS AGREES WITH ITS OWN BODY
+// -----------------------------------------------------------------------------
+// The twelfth instance of one class: A FACT CARRIED IN PROSE INSIDE A REGISTRY,
+// and this time inside the registry ADR-034 and ADR-036 were written to protect.
+//
+// ADR-006, ADR-007 and ADR-008 each head themselves `status: proposed` while
+// carrying, at their own line 6, `Founder approval (2026-08-13): ACCEPTED`, and
+// the M1 gate closure records the founder accepting all three on that date.
+// SEVENTEEN OF SEVENTEEN GATES PASSED OVER IT, and neither of the two that look
+// at ADRs was ever going to catch it: `CI-06f` reads numbers and gaplessness and
+// never status, and `CI-06b` validates FRONTMATTER while an ADR entry carries
+// its status in a HEADING. A registry entry that contradicts itself in the one
+// field a reader scans for is exactly what a registry gate is for.
+//
+// ONLY ONE DIRECTION OF THE OBVIOUS PAIR IS ASSERTED, AND THE OTHER IS REFUTED
+// BY THE TREE RATHER THAN DEFERRED. The symmetric rule reads well and is false:
+// "an entry heading itself `accepted` must carry an approval line" fails on
+// THIRTY-FOUR entries today (ADR-005, ADR-018 to ADR-032, ADR-034, ADR-037 to
+// ADR-049, ADR-051, ADR-D1), and every one of them is legitimate. Those
+// approvals live in the gate-closure records under docs/decisions/gates/, which
+// is where this corpus has recorded a batch sign-off from the beginning. So the
+// asymmetry is a fact about how approval is recorded rather than an omission:
+// AN ENTRY WITH NO APPROVAL LINE CLAIMS NOTHING, and an entry claiming an
+// acceptance while heading itself unapproved contradicts itself. Writing the
+// symmetric half would have gone red on arrival on thirty-four files whose only
+// available repair is to invent thirty-four founder signatures, and STATE's own
+// sentence is that a gate which fails on arrival is a gate somebody switches off.
+//
+// AN APPROVAL LINE IS A NEEDLE PLUS A VERDICT, and both halves are load bearing.
+// `docs/decisions/ADR-047.md:26` reads "**Founder approval as an `admin_actions`
+// row carrying the report digest**", which is a step in a protocol the ADR
+// specifies rather than a verdict on the ADR itself, and four other entries
+// carry a bare `**Founder ruling.**` as a section header. A needle-only match
+// reads all five as approvals. Requiring a token from the CLOSED vocabulary
+// below is what separates a recorded verdict from prose about verdicts, and a
+// line carrying the needle and no token is deliberately claimed as nothing.
+const ADR_STATUS_HEADING =
+  /^## (ADR-(?:\d{3}|D\d+)):[^\n]*?\(\s*[^()]*?status:\s*([a-z]+)\s*\)\s*$/gm;
+const APPROVAL_NEEDLE = /founder\s+(?:approval|ruling)/i;
+
+// UPPERCASE ONLY, WHICH IS THE CORPUS'S OWN FORM AND IS THE TIGHTER READING.
+// Every recorded verdict in docs/decisions is written in capitals; lowercase
+// "approved" appears inside ordinary prose (ADR-018's "`w=3` approved") and
+// matching it would read a sentence as a signature.
+const ACCEPTING_VERDICTS = ['ACCEPTED', 'GRANTED', 'ADOPTED', 'APPROVED'];
+const OPEN_VERDICTS = ['PENDING', 'DECLINED', 'REJECTED', 'WITHDRAWN', 'SUPERSEDED'];
+
+/**
+ * Every approval line in one entry body, with the verdict it records.
+ *
+ * A LINE MAY CARRY BOTH, AND THE ACCEPTANCE WINS. ADR-052, ADR-054 and ADR-055
+ * each carry a `GRANTED` line and, below it, the `PENDING` line as it stood when
+ * the ruling was proposed, kept deliberately so the record reads against itself.
+ * A file holding both is approved with its history intact, so an entry is read
+ * as accepted when ANY of its lines accepts.
+ */
+function approvalLines(body) {
+  const out = [];
+  body.split('\n').forEach((line, i) => {
+    if (!APPROVAL_NEEDLE.test(line)) return;
+    const accepting = ACCEPTING_VERDICTS.filter((v) => line.includes(v));
+    const open = OPEN_VERDICTS.filter((v) => line.includes(v));
+    if (accepting.length === 0 && open.length === 0) return;
+    out.push({ line: i + 1, accepting, open, text: line.trim() });
+  });
+  return out;
+}
+
+const ci06r = {
+  id: 'CI-06r',
+  title: "An ADR's heading status agrees with the verdict recorded in its own body",
+  covers:
+    'AN ADR ENTRY IS READ AGAINST ITSELF. An entry whose body records a founder ' +
+    'verdict of ACCEPTED, GRANTED, ADOPTED or APPROVED may not head itself ' +
+    '`status: proposed`. That is the state ADR-006, ADR-007 and ADR-008 were in ' +
+    'while seventeen gates passed, because CI-06f reads ADR numbers and never ' +
+    'status and CI-06b validates frontmatter while an ADR carries its status in a ' +
+    'heading. ' +
+    'IT COMPARES A FILE WITH ITSELF AND CAN CHECK NEITHER HALF AGAINST THE GATE ' +
+    'RECORD, which is the boundary to read first and is the same one CI-06q ' +
+    'states one row above it. An entry that heads itself `accepted` while no ' +
+    'founder ever signed it passes here and always will, and so does an entry ' +
+    'whose approval line names a date on which nothing was ruled. What this gate ' +
+    'proves is that a reader scanning the heading and a reader reading the body ' +
+    'reach the same answer; whether that answer is TRUE is a question about the ' +
+    'gate-closure records under docs/decisions/gates/ that no file-local check ' +
+    'can reach. ' +
+    'THE SYMMETRIC HALF IS DELIBERATELY NOT ASSERTED AND IS REFUTED RATHER THAN ' +
+    'DEFERRED. "An entry heading itself accepted must carry an approval line" is ' +
+    'false of this corpus: 34 entries head accepted and carry none, legitimately, ' +
+    'because their approvals are recorded in the gate-closure files where batch ' +
+    'sign-offs have always lived. An entry with no approval line claims nothing ' +
+    'and cannot contradict itself. ' +
+    'A VERDICT IS A CLOSED UPPERCASE VOCABULARY and a founder-approval needle ' +
+    'carrying no token from it is claimed as nothing, so a protocol step that ' +
+    'uses the words (ADR-047 line 26) and a bare "Founder ruling." section header ' +
+    'are both out of reach, on purpose.',
+  run() {
+    const findings = [];
+    let entries = 0;
+    let approvals = 0;
+
+    for (const file of adrFiles()) {
+      const body = read(file);
+      const lines = approvalLines(body);
+      approvals += lines.length;
+
+      for (const m of [...body.matchAll(ADR_STATUS_HEADING)]) {
+        entries++;
+        const [, id, status] = m;
+        if (status !== 'proposed') continue;
+
+        const accepted = lines.filter((l) => l.accepting.length > 0);
+        if (accepted.length === 0) continue;
+
+        const at = accepted[0];
+        findings.push(
+          `${file}: ${id} heads itself \`status: proposed\` and its own line ${at.line} ` +
+            `records the founder's verdict as ${at.accepting.join(' and ')}. The signature ` +
+            `exists and the status word is what is stale: correct the heading to ` +
+            `\`accepted\`, citing the record that carries the verdict. ` +
+            `The line reads: ${JSON.stringify(at.text.slice(0, 160))}`,
+        );
+      }
+    }
+
+    // Two sentinels, and they fail differently on purpose. A parser that stopped
+    // matching headings would report nothing and look like a clean corpus, which
+    // is CI-06f's `adrEntries` defect one gate over: the assertion was there for
+    // thirty entries and the parser could not reach it.
+    if (entries === 0) {
+      throw new Error(
+        'CI-06r parsed no ADR heading carrying a status. Every entry in ' +
+          'docs/decisions carries one today, so zero means the heading form has ' +
+          'moved and this gate is asserting about a tree it did not read',
+      );
+    }
+    if (approvals === 0) {
+      throw new Error(
+        'CI-06r found no founder-approval line anywhere in docs/decisions. This ' +
+          'registry records verdicts constantly, so zero means the needle or the ' +
+          'verdict vocabulary has stopped matching and every proposed entry would ' +
+          'pass for the wrong reason',
+      );
+    }
+
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -2963,6 +3114,7 @@ const GATES = [
   ci06n,
   ci06p,
   ci06q,
+  ci06r,
   adr026,
 ];
 
