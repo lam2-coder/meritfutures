@@ -130,6 +130,51 @@ describe('each loader rule, watched failing on its own seeded violation', () => 
     expect(refusal(dir).rule).toBe('L-04');
   });
 
+  test('L-04 a NESTED end-state object that pins no field', () => {
+    // The root guard could not see this, and until `compare.ts` learned to
+    // recurse nothing could reach it either: a nested expectation could never
+    // match by any value, so the vacuous shape was unfalsifiable. `engine_gates:
+    // {}` walks, finds no leaf, and reports agreement against ANY engine.
+    const dir = seedbed();
+    editExpectation(dir, (e) => ({
+      ...e,
+      end_state: { ...(e['end_state'] as Record<string, unknown>), engine_gates: {} },
+    }));
+    const r = refusal(dir);
+    expect(r.rule).toBe('L-04');
+    // The refusal NAMES THE PATH, so the author is sent to the branch rather
+    // than to the file.
+    expect(r.message).toContain('end_state.engine_gates');
+  });
+
+  test('L-04 an empty object DEEPER than one level is refused too', () => {
+    const dir = seedbed();
+    editExpectation(dir, (e) => ({
+      ...e,
+      end_state: {
+        ...(e['end_state'] as Record<string, unknown>),
+        engine_gates: { win_days: {} },
+      },
+    }));
+    expect(refusal(dir).message).toContain('end_state.engine_gates.win_days');
+  });
+
+  test('a nested expectation that DOES pin a leaf still loads', () => {
+    // The guard above must refuse vacuity without refusing the shape this batch
+    // exists to enable, which is the half a rejection-only test cannot show.
+    const dir = seedbed();
+    editExpectation(dir, (e) => ({
+      ...e,
+      end_state: {
+        ...(e['end_state'] as Record<string, unknown>),
+        engine_gates: { traded_days: { skipped: true } },
+      },
+    }));
+    expect(() =>
+      loadFixture(yamlPath(dir, GS_011), { fixtureDir: dir, registry: REGISTRY }),
+    ).not.toThrow();
+  });
+
   test('L-04 an unknown key in the sibling', () => {
     const dir = seedbed();
     editExpectation(dir, (e) => ({ ...e, expect_end_state: {} }));

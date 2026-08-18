@@ -152,3 +152,129 @@ describe('diffEvents', () => {
     expect(diffs.map((d) => d.field)).toEqual(['events[0]', 'events[1]']);
   });
 });
+
+// -----------------------------------------------------------------------------
+// NESTED EXPECTATIONS
+// -----------------------------------------------------------------------------
+// THE SUCCESS CASE COMES FIRST AND THAT ORDER IS THE POINT. `probe_payout_hold`
+// records the lesson in DELTA_MANIFEST section 13: a guard that rejects
+// everything passes every rejection test written against it. Before this change
+// `engine_gates` could never match by any value, so a suite that opened with
+// divergence tests would have been green against a comparator that still could
+// not agree with a correct engine. The first assertion below is therefore that a
+// LEGITIMATE MATCH PASSES, and every divergence test after it means something
+// only because that one does.
+describe('diffEndState over nested objects', () => {
+  const GATES = {
+    tradedDays: { pass: true, skipped: true, have: 4, need: 0 },
+    winDays: { pass: false, have: 1, need: 3, floorCents: 15_000n },
+    minimumAmount: { pass: false, withdrawableCents: 0n, capCents: 100_000n },
+  };
+
+  test('a legitimate nested match produces NO diffs', () => {
+    expect(
+      diffEndState(
+        { engineGates: GATES, balanceCents: 5_000_000n },
+        {
+          engine_gates: {
+            traded_days: { pass: true, skipped: true },
+            win_days: { pass: false, need: 3 },
+          },
+          balance_cents: 5_000_000,
+        },
+      ),
+    ).toEqual([]);
+  });
+
+  test('the expectation drives the walk, so unpinned sibling leaves are not asserted', () => {
+    // A fixture pins the gate it has a claim about and stays silent about the
+    // other twenty-four. Asserting the whole object would make every fixture
+    // restate fields it never meant to pin.
+    expect(
+      diffEndState({ engineGates: GATES }, { engine_gates: { win_days: { need: 3 } } }),
+    ).toEqual([]);
+  });
+
+  test('a mismatch NAMES THE LEAF PATH, not the object', () => {
+    const diffs = diffEndState(
+      { engineGates: GATES },
+      { engine_gates: { traded_days: { skipped: false } } },
+    );
+    expect(diffs).toHaveLength(1);
+    // The whole deliverable: `engine_gates` alone would hand a reader two
+    // twenty-five-field objects and ask them to find the disagreement.
+    expect(diffs[0]?.field).toBe('engine_gates.traded_days.skipped');
+    expect(describeDiff(diffs[0]!)).toBe(
+      'engine_gates.traded_days.skipped: expected false, engine produced true',
+    );
+  });
+
+  test('the path is in the FIXTURE’s spelling, so it can be found by search in the YAML', () => {
+    const diffs = diffEndState(
+      { engineGates: GATES },
+      { engine_gates: { minimum_amount: { pass: true } } },
+    );
+    expect(diffs[0]?.field).toBe('engine_gates.minimum_amount.pass');
+  });
+
+  test('the bigint coercion still holds AT DEPTH', () => {
+    // compare.ts lines 62 and 72: `Object.is(4770000n, 4770000)` is FALSE, and
+    // every money field an expectation pins is a JSON number. Losing that on the
+    // way into a nested object would make every nested money assertion
+    // unmatchable, which is the defect this change exists to remove.
+    expect(
+      diffEndState({ engineGates: GATES }, { engine_gates: { win_days: { floor_cents: 15_000 } } }),
+    ).toEqual([]);
+
+    const wrong = diffEndState(
+      { engineGates: GATES },
+      { engine_gates: { minimum_amount: { cap_cents: 99_999 } } },
+    );
+    expect(wrong).toHaveLength(1);
+    expect(wrong[0]?.field).toBe('engine_gates.minimum_amount.cap_cents');
+  });
+
+  test('a fractional nested money expectation is reported as the fixture defect it is', () => {
+    const diffs = diffEndState(
+      { engineGates: GATES },
+      { engine_gates: { win_days: { floor_cents: 15_000.5 } } },
+    );
+    expect(diffs[0]?.note).toBe(
+      'the expectation is not a safe integer, so it states no whole number of cents',
+    );
+  });
+
+  test('a missing nested key names the full path and the engine spelling', () => {
+    const diffs = diffEndState(
+      { engineGates: GATES },
+      { engine_gates: { win_days: { not_a_field: 1 } } },
+    );
+    expect(diffs[0]?.field).toBe('engine_gates.win_days.not_a_field');
+    expect(diffs[0]?.note).toBe('the engine result carries no "notAField"');
+  });
+
+  test('shape disagreements are reported as shape disagreements, in both directions', () => {
+    const expectedObject = diffEndState(
+      { engineGates: 7 },
+      { engine_gates: { win_days: { need: 3 } } },
+    );
+    expect(expectedObject[0]?.note).toBe(
+      'the expectation states a nested object and the engine result does not carry one here',
+    );
+
+    const expectedValue = diffEndState({ engineGates: GATES }, { engine_gates: 7 });
+    expect(expectedValue[0]?.note).toBe(
+      'the engine result carries a nested object where the expectation states a value',
+    );
+  });
+
+  test('null and arrays do NOT recurse', () => {
+    // Both are `typeof 'object'`. Descending into an array would put a second,
+    // weaker copy of `diffEvents`' ordering rule in this file; descending into
+    // null would throw.
+    expect(diffEndState({ payoutAnchorDay: null }, { payout_anchor_day: null })).toEqual([]);
+    const arr = diffEndState({ steps: [1, 2] }, { steps: [1, 2] });
+    expect(arr).toHaveLength(1);
+    expect(arr[0]?.field).toBe('steps');
+  });
+});
