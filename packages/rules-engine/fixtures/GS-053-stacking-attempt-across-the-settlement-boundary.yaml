@@ -1,0 +1,126 @@
+# GS-053  Stacking attempt across the settlement boundary
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "Request 2 lands the instant request 1 credits the wallet: WIN DAYS HAVE
+#   RESET TO THE BASIS-DAY ANCHOR, SO IT FAILS THE WIN-DAY GATE rather than
+#   paying. Under ADR-019 that boundary is the same trading day rather than days
+#   later, which makes this the ONLY remaining line of defence on the internal
+#   leg"                                              GOLDEN_SCENARIOS GS-053
+#   AS-01  three requests against a withdrawable that only ever supported one
+#                                                                M01 section 7
+#   R-47   `winDaysCount = count of win days d > payoutAnchorDay`      M01 R-47
+#   R-46   `payoutAnchorDay = fact.basisTradingDay`                    M01 R-46
+#   R-34   `winDaysCount >= required_count`, counted strictly after the anchor
+#                                                                     M01 R-34
+#   R-10   the withdrawal reaches the mark as `adjustment_cents`, applied at the
+#          OPEN of the effective day                            M01 R-10, SD-01
+#   R-48   a settlement leaves the floor, the high-water balance and the lock
+#          untouched                                                  M01 R-48
+#   size 5,000,000c, funded drawdown 250,000c, buffer 100,000c, win day floor
+#   15,000c, win days required 5, payout cap 150,000c, min payout 10,000c,
+#   cadence gap 5 trading days, consistency 3000bp
+#                                                       M01 Appendix A.1 at 50K
+#
+# THE STREAM IS AS-03's MINIMUM-VARIANCE PATH AND THE REUSE IS DELIBERATE. Five
+# days at exactly 50,000c give five win days against a required five and a
+# withdrawable of exactly 150,000c against a 150,000c cap, so request 1 is one
+# R-43 would have approved to the cent. GS-055, GS-065 and GS-068 walk the same
+# five days, and GS-068's own sibling states why that is the argument rather than
+# an economy: a settlement a fixture states is a fact the payout pipeline has
+# already approved, so a stream that would have been REFUSED proves nothing about
+# what happens after it settles.
+#
+# WHERE THIS FIXTURE PARTS FROM GS-068, AND IT IS ONE MARK. GS-068's effective
+# day earns 40,000c and pins R-47's PERIOD BOUNDARY. This one earns 1,000c, which
+# is deliberately below the 15,000c win floor, so `win_days_count` is 0 rather
+# than 1 and the win-day gate reads `have: 0` against `need: 5`. That is the
+# starkest form of the row's claim: the counter the trader spent five days
+# building is gone the moment the first payout settles, and request 2 meets a
+# gate at zero.
+#
+# WHY THIS ROW WAITED FOR A NESTED COMPARISON. Its state half -- the counter
+# reset to the basis-day anchor -- is what GS-068 now pins. What is GS-053's own
+# is the GATE VERDICT, `win_days.pass: false`, which lives inside `engine_gates`.
+# That is a nested object and `compare.ts` diffed flat fields with `Object.is`
+# until this batch, so no value could ever match. Writing this row on its state
+# half alone would have been a half-row wearing a whole row's id, which is
+# GS-049's objection and is why batch 10 declined it.
+#
+# THE ROW NAMES THE WIN-DAY GATE AND THREE OTHERS ALSO REFUSE ON THIS DAY, WHICH
+# IS STATED RATHER THAN GLOSSED. See the sibling. This fixture does NOT claim the
+# win-day gate is the uniquely binding one; that claim has a different shape and
+# belongs to GS-082, which is not writable in this format.
+id: GS-053
+name: stacking attempt across the settlement boundary
+source: M01 R-08, R-09, R-10, R-13, R-14, R-18, R-21, R-33, R-34, R-35, R-36, R-37, R-39, R-41, R-46, R-47, R-48, R-49, R-50
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-11-18
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-19
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5050000
+    high_balance_cents: 5055000
+    low_balance_cents: 4995000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-20
+    opening_balance_cents: 5050000
+    closing_balance_cents: 5100000
+    high_balance_cents: 5105000
+    low_balance_cents: 5045000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-23
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5150000
+    high_balance_cents: 5155000
+    low_balance_cents: 5095000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-24
+    opening_balance_cents: 5150000
+    closing_balance_cents: 5200000
+    high_balance_cents: 5205000
+    low_balance_cents: 5145000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-25
+    opening_balance_cents: 5200000
+    closing_balance_cents: 5250000
+    high_balance_cents: 5255000
+    low_balance_cents: 5195000
+    realized_pnl_cents: 50000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  # THE EFFECTIVE DAY. R-10 and SD-01 put the withdrawal at the OPEN, so
+  # `opening = 5,250,000 - 150,000` and INV-18 closes at DO-3. The day earns
+  # 1,000c, which is a traded day under R-08 and is NOT a win day under R-09.
+  - trading_day: 2026-11-27
+    opening_balance_cents: 5100000
+    closing_balance_cents: 5101000
+    high_balance_cents: 5101000
+    low_balance_cents: 5100000
+    realized_pnl_cents: 1000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: -150000
+settlements:
+  - payout_request_id: GS-053-pr-1
+    ordinal: 1
+    approved_cents: 150000
+    basis_trading_day: 2026-11-25
+    effective_trading_day: 2026-11-27
