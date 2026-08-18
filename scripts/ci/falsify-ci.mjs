@@ -838,25 +838,34 @@ const CASES = [
     },
     {
       rule: 'R-15',
-      // THIS MUTANT IS A DEFECT THE ENGINE SHIPPED WITH, seeded back. R-15
-      // assigned the locked value where section 3.4's binding expression takes
-      // a `max`, so a day that jumped past the trigger dropped the floor below
-      // where R-13 had just trailed it. It survived because `RE-U-015` only
-      // landed ON the trigger, where the two numbers agree by CV-12.
+      // THIS MUTANT INVERTED WHEN ADR-052 WAS APPLIED, and the inversion is the
+      // ruling rather than a refactor. It used to seed the ASSIGNMENT back as
+      // the defect; the assignment is now the rule, and the `max` is the defect.
       //
-      // It now fails TWICE OVER, which is the point of keeping it: the
-      // expectation goes red, and R-14's tripwire throws INV-06 before it gets
-      // there. A mutant that only one of the two catches would not have proved
-      // the tripwire was strengthened.
+      // What the `max` costs is not visible on the lock day's floor alone. It
+      // keeps the trailed floor whenever the close JUMPS PAST the trigger, which
+      // every v1 eval pass does, so the lock never binds again and CV-11's
+      // premise -- that post-lock the floor EQUALS floor_lock_floor_at_cents --
+      // is false. CV-11 is a publish-time check and the overshoot is a runtime
+      // quantity, so nothing at publish time can bound it (ADR-052 section 2).
+      //
+      // IT IS CAUGHT BY `RE-U-015`'s EXPECTATION ALONE, and that is a real
+      // reduction in coverage worth stating rather than leaving a stale claim
+      // here. This comment used to say the mutant "fails TWICE OVER" because
+      // R-14's sub-step tripwire threw INV-06 before the expectation was
+      // reached. THAT TRIPWIRE IS GONE: it asserted monotonicity between
+      // sub-steps, which no document states, and it is what forced the `max` in
+      // the first place. ADR-052 deleted it and ruled no replacement into
+      // existence, so one assertion is what stands behind this mutant now.
       seeds:
-        "the floor lock assigning `floor_lock_floor_at_cents` instead of taking section 3.4's `max`, which lowers the floor on a day that jumps past the trigger",
+        'the floor lock taking a `max` against the trailed floor instead of assigning `floor_lock_floor_at_cents`, so a day that jumps past the trigger keeps the trailed floor and the lock never binds (ADR-052)',
       file: 'packages/rules-engine/src/day/floor.ts',
-      from:
+      from: 'floorCents = drawdown.lock.floorAtCents;',
+      to:
         'floorCents =\n' +
-        '      trailedFloorCents > drawdown.lock.floorAtCents\n' +
-        '        ? trailedFloorCents\n' +
+        '      floorCents > drawdown.lock.floorAtCents\n' +
+        '        ? floorCents\n' +
         '        : drawdown.lock.floorAtCents;',
-      to: 'floorCents = drawdown.lock.floorAtCents;',
     },
     {
       rule: 'R-26',
