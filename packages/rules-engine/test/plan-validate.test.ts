@@ -25,19 +25,34 @@
 
 import { describe, expect, it } from 'vitest';
 
+import { advanceDay } from '../src/day/advance.js';
+import { resolvePlan } from '../src/plan/resolve.js';
 import { validatePlan } from '../src/plan/validate.js';
 import type {
+  BreachDetectedEvent,
   Cents,
   CvId,
+  DayOutput,
   PlanRulesJson,
   PlanVersionSizeRow,
   PublishedFundedPhase,
   PwId,
+  ResolvedPlan,
+  RuleState,
+  SettlementFact,
   ValidationResult,
 } from '../src/types.js';
 
 import { validatePlan as oracleValidatePlan } from './generators/validate-plan.js';
 import type { MaterializedPlan } from './generators/plan-config.js';
+import {
+  ACCOUNT_OPENED_ON,
+  CME_WINDOW,
+  ENGINE_VERSION,
+  day,
+  fundedPrior,
+  mark,
+} from './fixtures-in-code.js';
 
 // -----------------------------------------------------------------------------
 // The registry, exhaustive by construction
@@ -758,5 +773,359 @@ describe('RE-C-oracle  the engine and the independent transcription agree', () =
     expect(oracleValidatePlan(toMaterialized(seed.rules, seed.size)).map((v) => v.id)).toContain(
       id,
     );
+  });
+});
+
+// =============================================================================
+// GS-083, the golden scenario that is not a golden fixture
+// =============================================================================
+// THE REGISTRY ROW: "Plan config rejected at publish: trailing drawdown, lock
+// disabled, cap at or above the drawdown. Publishing fails with CV-17 named.
+// The fixture also carries the arithmetic of what would have happened: an
+// account paid on a new closing high would open the next session below its own
+// floor and breach on the day it was paid. This is the file that keeps INV-21
+// true now that no post-payout recompute exists to rescue it."
+//
+// IT LIVES HERE BECAUSE IT CANNOT LIVE IN `fixtures/`. A publish validation
+// returns a `ValidationResult` against `(rules, sizes[])`; the golden format's
+// `EXPECTATION_KEYS` is `{end_state, events, pins, note}`, the loader folds one
+// account's day stream and diffs a `RuleState`, and `validatePlan` is never
+// called anywhere in that fold. There is no shape in that directory that can
+// state "publishing fails with CV-17 named", which is why the fixture README's
+// held-back table routes this row to the `RE-C-nn` suite and why the row above
+// now names this file.
+//
+// BOTH HALVES ARE ASSERTED AND THE SECOND IS WHY. "Publishing failed" alone
+// would pass if some other rule rejected the config, which is the vacuous shape
+// this repository keeps finding; so the block below pins CV-17 as the SOLE
+// error and an empty materialization set beside it. The config is otherwise
+// Appendix A.1 to the cent, and CV-17 is the only thing standing between it and
+// an account.
+//
+// THE ARITHMETIC IS EXECUTED RATHER THAN RECITED. `resolvePlan` takes the same
+// `(rules, size)` pair `validatePlan` rejected and the day fold runs on it, so
+// the breach below is the engine's own R-13, R-48 and R-21 rather than a
+// subtraction typed into a comment. One transcription, both halves.
+//
+// AND THE ARITHMETIC IS CV-17's OWN, NOT CV-11's. ADR-052 section 2 carries a
+// complete worked INV-21 counterexample and it belongs to the OTHER half:
+// MERIT-RAPID-50K with the lock ENABLED, landing one cent under a LOCKED floor
+// at 5,100,001. CV-17 is the lock DISABLED, landing under a TRAILING floor
+// because `cap >= drawdown`. The numbers below are derived from CV-17's own
+// M01 row and share none of ADR-052's; transcribing that counterexample into
+// this block would file one of INV-21's two halves under the other.
+// =============================================================================
+
+/**
+ * The rejected config: Appendix A.1's Core EOD at 50K with exactly two changes,
+ * and both are the registry row read literally.
+ *
+ *   the lock DISABLED    on the jsonb and on the size row together, or
+ *                        `MZ-lock-flag` fires and the block below would be
+ *                        measuring a materialization finding
+ *   the cap AT OR ABOVE  300,000c against A.1's 250,000c drawdown. `cap_bp`
+ *   THE DRAWDOWN         moves with it, 300bp to 600bp, because 600bp of
+ *                        5,000,000c IS 300,000c. Nothing cross-checks the two
+ *                        (`MZ-cap-ordinals` compares ordinals), so leaving the
+ *                        bp behind would publish a rules block and a size row
+ *                        that disagree about the cap while this file claimed
+ *                        the config was otherwise clean
+ *
+ * 300,000c IS 50,000c ABOVE THE DRAWDOWN AND THAT DIFFERENCE IS THE SHORTFALL.
+ * A cap one cent over would breach by one cent and read as a rounding artifact;
+ * the excess is stated at a size where the breach is unmistakably the payout's.
+ */
+const GS083_RULES: PlanRulesJson = coreRules({
+  funded: {
+    drawdown: {
+      type: 'trailing_eod', //                    A.1 funded drawdown, unchanged
+      amount_bp: 500,
+      lock: { enabled: false, at_profit_cents: null, floor_at_cents: null },
+    },
+    payout_cap_schedule: [{ from_ordinal: 1, cap_bp: 600 }], // 600bp of 50K = 300,000c
+  },
+});
+
+const GS083_SIZE: PlanVersionSizeRow = coreSize({
+  floor_lock_enabled: false,
+  floor_lock_at_profit_cents: null,
+  floor_lock_floor_at_cents: null,
+  payout_cap_schedule_cents: [{ from_ordinal: 1, cap_cents: c(300_000) }],
+});
+
+/** One day for one account, on the config `validatePlan` refused to publish. */
+function foldDay(
+  plan: ResolvedPlan,
+  prior: RuleState,
+  fields: Parameters<typeof mark>[0],
+  settlements: readonly SettlementFact[] = [],
+): DayOutput {
+  return advanceDay({
+    engineVersion: ENGINE_VERSION,
+    plan,
+    prior,
+    mark: mark(fields),
+    calendar: CME_WINDOW,
+    settlements,
+    openedOn: ACCOUNT_OPENED_ON,
+  });
+}
+
+describe('GS-083  trailing drawdown, lock disabled, cap at or above the drawdown', () => {
+  it('publishing FAILS, and CV-17 is the code named, alone', () => {
+    const result = validatePlan(GS083_RULES, [GS083_SIZE]);
+
+    // HALF ONE. M01: `validatePlan` "runs in `POST
+    // /admin/plans/versions/:id/publish` and BLOCKS THE PUBLISH. A config that
+    // reaches an account is a config that already passed all of these."
+    expect(result.ok).toBe(false);
+
+    // HALF TWO, AND IT IS AN EQUALITY RATHER THAN A `toContain`. A `toContain`
+    // here would pass on a config that CV-09 or CV-10 also rejected, and then
+    // the file would be asserting that SOMETHING blocked rather than that
+    // CV-17 did. Nothing else fires and nothing else may: this config is
+    // Appendix A.1 apart from the lock flag and the cap.
+    expect(idsOf(result)).toEqual(['CV-17']);
+    expect(result.materialization).toEqual([]);
+
+    // The finding names the rung it was found on and the size it was found at,
+    // because a publish diff that says "CV-17" without either is a founder
+    // reading nineteen rules to find one number.
+    expect(result.errors[0]!.path).toBe('payout_cap_schedule_cents[0].cap_cents');
+    expect(result.errors[0]!.sizeCents).toBe(c(5_000_000));
+
+    // AND THE INDEPENDENT TRANSCRIPTION AGREES, which is the same writer/reviewer
+    // split `RE-C-oracle` runs on the nineteen seeds. `test/generators/validate-plan.ts`
+    // transcribed CV-17 from M01 in session 40, before `validate.ts` existed.
+    expect(oracleValidatePlan(toMaterialized(GS083_RULES, GS083_SIZE)).map((v) => v.id)).toEqual([
+      'CV-17',
+    ]);
+  });
+
+  it('the arithmetic of what would have happened: paid on a new closing high, breached on the day it was paid', () => {
+    // The SAME pair `validatePlan` just rejected, resolved by the engine's own
+    // resolver. `resolvePlan` applies no CV rule -- CV-01 is the only one it can
+    // refuse -- so a config that must never reach an account can still be folded
+    // here, which is exactly what a counterfactual needs.
+    const plan = resolvePlan(GS083_RULES, GS083_SIZE);
+    expect(plan.funded.drawdown.lock.enabled).toBe(false);
+    expect(plan.funded.payoutCapSchedule).toEqual([{ fromOrdinal: 1, capCents: 300_000n }]);
+
+    // -------------------------------------------------------------------------
+    // The new closing high. CV-17: "a payout taken on a new closing high moves
+    // the balance down by `cap` against a floor sitting `drawdown` below the
+    // same high."
+    // -------------------------------------------------------------------------
+    //   5,000,000 + 400,000 = 5,400,000 closing, a new high with no prior one
+    //   5,400,000 -  250,000 = 5,150,000 floor, R-13's trail on the CLOSE
+    //   5,400,000 - 5,000,000 - 100,000 = 300,000 withdrawable, R-35
+    const high = foldDay(plan, fundedPrior(plan), {
+      tradingDay: day('2026-11-03'),
+      openingBalanceCents: 5_000_000n,
+      realizedPnlCents: 400_000n,
+    });
+    expect(high.assertions).toEqual([]);
+    expect(high.state.breached).toBe(false);
+    expect(high.state.balanceCents).toBe(5_400_000n);
+    expect(high.state.highWaterBalanceCents).toBe(5_400_000n);
+    expect(high.state.floorCents).toBe(5_150_000n);
+
+    // THE LOCK IS OFF AND STAYED OFF, which is CV-17's precondition holding at
+    // runtime rather than at publish. A.1's trigger is 260,000c of profit and
+    // this day closed 400,000c up, so on the LINEUP's config R-15 would have
+    // fired here and the floor would be 5,010,000c instead.
+    expect(high.state.floorLocked).toBe(false);
+
+    // The payout below is not an invented amount. It is the whole withdrawable
+    // and the whole cap at ordinal 1, which is the largest single payment this
+    // config can make and therefore the one CV-17 is stated about.
+    expect(high.state.withdrawableCents).toBe(300_000n);
+
+    // -------------------------------------------------------------------------
+    // The settlement, and the breach it causes
+    // -------------------------------------------------------------------------
+    // R-48: "the floor, the high-water balance and the lock are UNTOUCHED", so
+    // the floor at the open of the payout day is still 5,150,000c. R-10 puts the
+    // withdrawal in `adjustment_cents` at the OPEN of the effective day, so
+    // INV-18 reads 5,400,000 - 300,000 = 5,100,000.
+    const settlement: SettlementFact = {
+      payoutRequestId: 'gs-083',
+      ordinal: 1,
+      approvedCents: 300_000n,
+      basisTradingDay: day('2026-11-03'),
+      effectiveTradingDay: day('2026-11-04'),
+    };
+    const paid = foldDay(
+      plan,
+      high.state,
+      {
+        tradingDay: day('2026-11-04'),
+        openingBalanceCents: 5_100_000n,
+        realizedPnlCents: 0n,
+        adjustmentCents: -300_000n,
+        // NO FILLS AND NO REALIZED P&L, which is what makes this a reading
+        // rather than an inference: the account did not trade on the day it
+        // lost, so the only thing that moved the balance was the payout.
+        fillCount: 0,
+      },
+      [settlement],
+    );
+
+    expect(paid.assertions).toEqual([]);
+    expect(paid.state.breached).toBe(true);
+    expect(paid.state.breachKind).toBe('trailing_eod_floor');
+    expect(paid.state.phase).toBe('closed');
+
+    // THE SETTLEMENT WAS APPLIED AND THEN KILLED THE ACCOUNT, in that order.
+    // R-47's reset fires at DO-2 and the breach at DO-4, so both events are on
+    // the row, and no `day.closed` follows: R-24 is terminal.
+    expect(paid.events.map((e) => e.type)).toEqual(['payout.win_days_reset', 'breach.detected']);
+
+    // R-48 measured across the settlement: the floor the day was judged against
+    // is the one the closing high produced, not one a recompute rescued.
+    expect(paid.state.floorOpenCents).toBe(5_150_000n);
+
+    // THE SHORTFALL IS `cap - drawdown` AND NOTHING ELSE, which is the whole of
+    // CV-17's inequality expressed as money:
+    //   5,150,000 floor at open - 5,100,000 balance = 50,000
+    //     300,000 cap          -   250,000 drawdown = 50,000
+    const detected = paid.events[1] as BreachDetectedEvent;
+    expect(detected.floorCents).toBe(5_150_000n);
+    expect(detected.lowBalanceCents).toBe(5_100_000n);
+    expect(detected.shortfallCents).toBe(50_000n);
+    expect(detected.shortfallCents).toBe(
+      GS083_SIZE.payout_cap_schedule_cents[0]!.cap_cents - GS083_SIZE.drawdown_cents,
+    );
+
+    // INV-21 IS "a settled payout can never breach the account that earned it",
+    // and this is the config on which it is false. It is false at runtime, on
+    // the money path, with no losing day anywhere in the stream, and the only
+    // thing that ever stops it reaching an account is the rejection above.
+  });
+
+  it('a cap EXACTLY at the drawdown is rejected too, and the counterfactual says why', () => {
+    // "at or above" is the registry row's phrase and CV-17's operator is a
+    // strict `<`, so equality is a rejection. This is the half that decides
+    // between `cap < drawdown` and `cap <= drawdown`, and the counterfactual is
+    // the argument: at equality the payout lands EXACTLY ON the floor, which
+    // R-21's strict `<` survives, and one cent of drift the next session does
+    // not. CV-11 carries the identical shape on the locked side.
+    const equalRules = coreRules({
+      funded: {
+        drawdown: {
+          type: 'trailing_eod',
+          amount_bp: 500,
+          lock: { enabled: false, at_profit_cents: null, floor_at_cents: null },
+        },
+        payout_cap_schedule: [{ from_ordinal: 1, cap_bp: 500 }], // 500bp of 50K = 250,000c
+      },
+    });
+    const equalSize = coreSize({
+      floor_lock_enabled: false,
+      floor_lock_at_profit_cents: null,
+      floor_lock_floor_at_cents: null,
+      payout_cap_schedule_cents: [{ from_ordinal: 1, cap_cents: c(250_000) }], // == drawdown
+    });
+
+    const result = validatePlan(equalRules, [equalSize]);
+    expect(result.ok).toBe(false);
+    expect(idsOf(result)).toEqual(['CV-17']);
+
+    // And the day fold on the same pair. 5,350,000 is the closing high that
+    // makes one full 250,000c cap withdrawable:
+    //   5,350,000 - 5,000,000 - 100,000 = 250,000
+    //   5,350,000 -   250,000           = 5,100,000 floor
+    //   5,350,000 -   250,000 paid      = 5,100,000 balance, the floor exactly
+    const plan = resolvePlan(equalRules, equalSize);
+    const high = foldDay(plan, fundedPrior(plan), {
+      tradingDay: day('2026-11-03'),
+      openingBalanceCents: 5_000_000n,
+      realizedPnlCents: 350_000n,
+    });
+    expect(high.state.floorCents).toBe(5_100_000n);
+    expect(high.state.withdrawableCents).toBe(250_000n);
+
+    const settlement: SettlementFact = {
+      payoutRequestId: 'gs-083-equal',
+      ordinal: 1,
+      approvedCents: 250_000n,
+      basisTradingDay: day('2026-11-03'),
+      effectiveTradingDay: day('2026-11-04'),
+    };
+    const onTheFloor = foldDay(
+      plan,
+      high.state,
+      {
+        tradingDay: day('2026-11-04'),
+        openingBalanceCents: 5_100_000n,
+        realizedPnlCents: 0n,
+        adjustmentCents: -250_000n,
+        fillCount: 0,
+      },
+      [settlement],
+    );
+    expect(onTheFloor.state.breached).toBe(false);
+    expect(onTheFloor.state.balanceCents).toBe(5_100_000n);
+    expect(onTheFloor.state.floorOpenCents).toBe(5_100_000n);
+
+    // ONE CENT OF DRIFT ON THE SAME DAY BREACHES. The account was paid onto its
+    // own floor with zero room, and a config that publishes an account into that
+    // position is what `cap <= drawdown` would have admitted. That is why CV-17
+    // rejects equality rather than only the strict excess.
+    const drifted = foldDay(
+      plan,
+      high.state,
+      {
+        tradingDay: day('2026-11-04'),
+        openingBalanceCents: 5_100_000n,
+        realizedPnlCents: 0n,
+        lowBalanceCents: 5_099_999n,
+        adjustmentCents: -250_000n,
+      },
+      [settlement],
+    );
+    expect(drifted.state.breached).toBe(true);
+    expect(drifted.state.breachKind).toBe('trailing_eod_floor');
+  });
+
+  it('no v1 plan can reach CV-17, which is why it is validated rather than remembered', () => {
+    // M01's own justification, and the clause that makes GS-083 exist: "No v1
+    // plan can reach this (all three enable the lock, and CV-11 covers that
+    // case), which is exactly why it has to be validated rather than
+    // remembered." The precondition is `size.floor_lock_enabled`, so the claim
+    // is checkable on the three published rows directly.
+    for (const size of [CORE_50K_SIZE, RAPID_50K_SIZE, DIRECT_50K_SIZE]) {
+      expect(size.floor_lock_enabled).toBe(true);
+    }
+
+    // AND THE LINEUP CLEARS THE INEQUALITY TOO, WHICH IS A SECOND MARGIN AND NOT
+    // THE ONE M01 CITES. Core 150,000 < 250,000, Rapid 100,000 < 250,000, Direct
+    // 150,000 < 200,000 (A.3's 400bp drawdown). So turning the lock off on a v1
+    // plan does NOT trip CV-17, and it does not need to: the caps already
+    // satisfy it. CV-17 evaluated and passed is the rule doing its job on a
+    // config nobody publishes, which is a different thing from the rule being
+    // unreachable, and the difference is what a `not.toContain` on an unrelated
+    // plan would hide.
+    const unlockedCore = validatePlan(
+      coreRules({
+        funded: {
+          drawdown: {
+            type: 'trailing_eod',
+            amount_bp: 500,
+            lock: { enabled: false, at_profit_cents: null, floor_at_cents: null },
+          },
+        },
+      }),
+      [
+        coreSize({
+          floor_lock_enabled: false,
+          floor_lock_at_profit_cents: null,
+          floor_lock_floor_at_cents: null,
+        }),
+      ],
+    );
+    expect(unlockedCore.errors).toEqual([]);
+    expect(unlockedCore.materialization).toEqual([]);
+    expect(unlockedCore.ok).toBe(true);
   });
 });
