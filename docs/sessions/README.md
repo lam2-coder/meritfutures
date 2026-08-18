@@ -110,4 +110,5 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 58](2026-08-18-session-58.md) | the fixture calendar gains the four transcribed holiday weeks: a holiday, an early close and an absorbed session |
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | ADR-056 rewritten: the refuted mechanism deleted, the surviving argument promoted, three narrowings folded in |
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | GS-003 and GS-032 written: the two group A rows the transcribed half day unblocked, and the four rules it did not |
+| [2026-08-18 - Session 60](2026-08-18-session-60.md) | the wave plan, and the numbers reserved before the sessions that spend them |
 | [2026-08-18 - Session 59](2026-08-18-session-59.md) | the six unsigned ADRs audited against the tree, and three of them were signed at the M1 gate |
