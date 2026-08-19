@@ -106,7 +106,20 @@ import { materializedFrom } from './generator-bridge.js';
 import { foldSequence } from './property-harness.js';
 
 const RUNS = 200;
-const REACHABILITY = 500;
+const REACHABILITY = 1500;
+
+/**
+ * THE REACHABILITY SAMPLE IS SEEDED AND THE PROPERTIES ABOVE ARE NOT.
+ *
+ * Section 3 asserts COUNTS -- that a verdict is reached, that a term is isolated
+ * as a sole failure -- and the rarest of them lands about four times in five
+ * hundred draws. An unseeded sample makes that a coin flip, so the suite would
+ * go red on a tree nobody touched, which is the one failure mode that teaches a
+ * reader to re-run instead of to read. The seed is arbitrary and fixed; the
+ * PROPERTIES still draw fresh cases on every run, because they assert a law
+ * rather than a census.
+ */
+const REACHABILITY_SEED = 20_260_819;
 
 /** One day before the generator's earliest session, so the fold's prior is behind it. */
 const BEFORE_EVERY_DRAWN_SESSION = day('2026-01-01');
@@ -273,7 +286,7 @@ describe('the gate record is closed at the six INV-15 enumerates', () => {
 // fixed sample and asserted, so a generator change that quietly stops reaching a
 // verdict fails here rather than hollowing out section 1 in silence.
 describe('the generated folds reach the states RE-P-15 is about', () => {
-  const cases = fc.sample(caseArbitrary(), REACHABILITY);
+  const cases = fc.sample(caseArbitrary(), { numRuns: REACHABILITY, seed: REACHABILITY_SEED });
   const states = cases.flatMap((kase) => statesOf(kase).map((state) => ({ ...kase, state })));
 
   test('states are produced at all', () => {
