@@ -1240,6 +1240,23 @@ const ci06h = {
         'assert_no_floats.sql',
         'the NO-FLOATS assertion no longer runs over the whole applied schema (OI-08)',
       ],
+      // OI-07's FOURTH OCCURRENCE, and it was live on main until CI-06s found
+      // it. The probe was written and wired in the same session and this line
+      // was not, which is the identical omission probe_payout_hold.sql made and
+      // probe_reversible_contact_addresses.sql repeated: wiring a probe and
+      // pinning it are two edits in two files, and the second is the one that
+      // gets forgotten because the first one makes the tests pass.
+      //
+      // ADDED BY THE SESSION THAT WROTE CI-06s, which is why the gate could be
+      // watched failing on a real violation before its own seeds existed. A
+      // gate that fails on arrival is a gate somebody switches off.
+      [
+        'probe_rule_states_high_water_bound.sql',
+        "ADR-053's scoped high-water bound is no longer probed, so nothing " +
+          'asserts that a locked account may make a new closing high, that the ' +
+          'unlocked half still refuses, or that the three NOT NULLs the ' +
+          'predicate depends on and does not name are still there (OI-07)',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
@@ -3267,6 +3284,175 @@ function approvalLines(body) {
   return out;
 }
 
+// CI-06s  Every probe is run and pinned
+// -----------------------------------------------------------------------------
+// OI-07 HAS NOW HAPPENED FOUR TIMES AND THE FOURTH WAS LIVE ON MAIN WHEN THIS
+// GATE WAS WRITTEN. `probe_rule_states_high_water_bound.sql` was on disk, was
+// wired at corpus.yml, and the string `high_water_bound` appeared NOWHERE in
+// this file. STATE records the first three: `probe_payout_hold.sql` was wired
+// and never pinned, so it had been one delete away from being OI-07 again since
+// the day it landed, and `probe_reversible_contact_addresses.sql` then made the
+// identical omission and was caught before merge only by a human reading the
+// diff. STATE's own words: "Three occurrences is a pattern: the fix is a gate
+// asserting that every scripts/db/probe_*.sql on disk is both run and pinned."
+//
+// WIRING A PROBE AND PINNING IT ARE TWO EDITS IN TWO FILES, and that is the
+// whole mechanism. The workflow step makes it run; CI-06h's needle makes
+// deleting the step a gate failure. A probe with the first and not the second
+// runs until somebody tidies the workflow, and then stops running silently.
+//
+// -----------------------------------------------------------------------------
+// THE STALE DIRECTION IS THE HALF THAT EARNS THE GATE
+// -----------------------------------------------------------------------------
+// A needle naming a probe no file provides is a finding too. CI-06l's record
+// says why in the words this gate is built on: the stale-entry checks are the
+// ones that earn it, because they run in the direction nobody looks. A LIST
+// NAMING SOMETHING THAT NO LONGER EXISTS STILL LOOKS COMPLETE. Renaming a probe
+// and updating only the workflow leaves CI-06h pinning a filename that cannot
+// be deleted because it is already gone, and every gate stays green.
+//
+// -----------------------------------------------------------------------------
+// IT MATCHES THE STEP, NOT THE MENTION, AND THE NEAR-MISS IS REAL
+// -----------------------------------------------------------------------------
+// The probes are invoked as `psql ... -f scripts/db/probe_*.sql`. A parser that
+// matched any mention of a filename in the workflow would also match its
+// COMMENTS, and corpus.yml carries `rule_states_high_water_bounds_balance` in a
+// comment three lines above the step that runs
+// `probe_rule_states_high_water_bound.sql`. Those are different strings --
+// `bounds_balance` against `bound` -- and a loose parser reading either one
+// would have reported the probe as wired for the wrong reason. This is the
+// span-parser class CI-06g and CI-06n have each met.
+//
+// AND THE PINNED SIDE IS READ FROM CI-06h's BLOCK ALONE, not from this file as
+// a whole, because this file mentions probe filenames in the prose above. A
+// gate that counted its own comment as a pin would report every probe pinned
+// the moment it was written, which is the same defect one level up.
+const ci06s = {
+  id: 'CI-06s',
+  title: 'Every probe on disk is run by the workflow and pinned by CI-06h',
+  covers:
+    'A PROBE IS RUN AND PINNED, IN BOTH DIRECTIONS. Every scripts/db/probe_*.sql ' +
+    'on disk appears as a psql STEP in .github/workflows/corpus.yml and as a ' +
+    "needle in CI-06h's required list, and every probe filename that list names " +
+    'exists on disk. ' +
+    'IT MATCHES THE STEP AND NOT THE MENTION: the needle is the `-f ' +
+    'scripts/db/<file>` argument of a psql invocation, so a filename appearing ' +
+    'only in a workflow comment is claimed as nothing. corpus.yml names ' +
+    '`rule_states_high_water_bounds_balance` in a comment three lines above the ' +
+    'step running `probe_rule_states_high_water_bound.sql`, which is the ' +
+    'near-miss a loose parser reads as coverage. ' +
+    "THE PINNED SIDE IS READ FROM CI-06h's BLOCK ALONE, because this file names " +
+    'probe filenames in its own prose and a gate counting its own comment as a ' +
+    'pin would report every probe pinned on the day it was written. ' +
+    'WHAT IT CANNOT SEE: whether the probe asserts anything. A file that is run ' +
+    'and pinned and contains one comment passes here. Coverage of what a probe ' +
+    "proves is DELTA_MANIFEST section 13's success-case discipline and no parse " +
+    'reaches it. No database.',
+  run() {
+    const findings = [];
+    const probeDir = 'scripts/db';
+    const workflow = '.github/workflows/corpus.yml';
+
+    const onDisk = existsSync(join(ROOT, probeDir))
+      ? readdirSync(join(ROOT, probeDir))
+          .filter((f) => /^probe_[a-z0-9_]+\.sql$/.test(f))
+          .sort()
+      : [];
+
+    // The STEP. `-f` is what makes it an invocation rather than a sentence.
+    const wired = new Set();
+    if (existsSync(join(ROOT, workflow))) {
+      const wf = read(workflow);
+      for (const m of wf.matchAll(/psql\b[^\n]*?-f\s+scripts\/db\/(probe_[a-z0-9_]+\.sql)/g)) {
+        wired.add(m[1]);
+      }
+    } else {
+      findings.push(`${workflow} is missing, so no probe is run at all`);
+      return findings;
+    }
+
+    // CI-06h's block, bounded. `const ci06h = {` to the next top-level `const`
+    // gate declaration, so this gate's own prose is outside the window.
+    const self = read('scripts/corpus/gates.mjs');
+    const from = self.indexOf('\nconst ci06h = {');
+    // The NEXT top-level gate declaration, whichever letter it is. Naming one
+    // would be wrong the day a session inserts a gate between them, and the
+    // declarations are not in alphabetical order: ci06i precedes ci06h today.
+    const after = from === -1 ? -1 : self.slice(from + 1).search(/\nconst ci06[a-z] = \{/);
+    const to = after === -1 ? self.length : from + 1 + after;
+    const pinned = new Set();
+    if (from !== -1) {
+      for (const m of self.slice(from, to).matchAll(/'(probe_[a-z0-9_]+\.sql)'/g)) {
+        pinned.add(m[1]);
+      }
+    }
+
+    for (const probe of onDisk) {
+      if (!wired.has(probe)) {
+        findings.push(
+          `${probeDir}/${probe} exists and no step in ${workflow} runs it. A probe ` +
+            `that ships beside a fix and never runs again is the same object as the ` +
+            `golden test that was missing (OI-07). Add a psql step for it`,
+        );
+      }
+      if (!pinned.has(probe)) {
+        findings.push(
+          `${probeDir}/${probe} is not pinned by CI-06h's required-needle list, so ` +
+            `deleting its workflow step would be a silent change rather than a gate ` +
+            `failure. THIS IS OI-07's SHAPE and it has occurred four times. Add the ` +
+            `filename to the list in ci06h's run()`,
+        );
+      }
+    }
+
+    // The stale direction: a list naming something that no longer exists still
+    // looks complete.
+    for (const probe of [...pinned].sort()) {
+      if (!onDisk.includes(probe)) {
+        findings.push(
+          `CI-06h pins ${probe} and no file provides it. The needle asserts a step ` +
+            `nobody can delete because the probe is already gone, so CI-06h passes ` +
+            `while proving nothing about it. Remove the needle or restore the probe`,
+        );
+      }
+    }
+    for (const probe of [...wired].sort()) {
+      if (!onDisk.includes(probe)) {
+        findings.push(
+          `${workflow} runs ${probeDir}/${probe} and no such file exists, so the ` +
+            `migrations job fails at that step rather than proving anything`,
+        );
+      }
+    }
+
+    // Sentinels. Each zero means a parser stopped matching, and every probe
+    // would then pass for the wrong reason.
+    if (onDisk.length === 0) {
+      throw new Error(
+        `CI-06s found no probe under ${probeDir}. This repository has carried ` +
+          'probes since 0028, so zero means the directory or the naming has moved ' +
+          'and this gate is asserting about a tree it did not read',
+      );
+    }
+    if (wired.size === 0) {
+      throw new Error(
+        `CI-06s matched no psql probe step in ${workflow}. Zero means the step ` +
+          'form has moved, at which point every probe reads as unwired and the ' +
+          'findings above are noise rather than evidence',
+      );
+    }
+    if (pinned.size === 0) {
+      throw new Error(
+        "CI-06s read no probe filename out of CI-06h's block. Zero means the " +
+          'block bounds or the needle form have moved, and every probe would then ' +
+          'report as unpinned',
+      );
+    }
+
+    return findings;
+  },
+};
+
 const ci06r = {
   id: 'CI-06r',
   title: "An ADR's heading status agrees with the verdict recorded in its own body",
@@ -3544,6 +3730,7 @@ const GATES = [
   ci06p,
   ci06q,
   ci06r,
+  ci06s,
   adr026,
   ci06t,
 ];
