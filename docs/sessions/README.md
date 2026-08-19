@@ -214,3 +214,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 63](2026-08-18-session-63.md) | PT-02 and PT-08 asserted, and PT-02's row names one exception where the engine has two |
 | [2026-08-18 - Session 65](2026-08-18-session-65.md) | the replay self-audit's comparison is wired: hash first, field diff on mismatch, and an empty scope refuses |
 | [2026-08-18 - Session 69](2026-08-18-session-69.md) | `CI-06t`, and the four live sites the tree scan found before anything was seeded |
+| [2026-08-18 - Session 67](2026-08-18-session-67.md) | `CI-06o`, the money-path model ban: ADR-044's prohibition 1 stops being prose, and both assertions watched failing |
