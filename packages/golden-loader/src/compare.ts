@@ -114,15 +114,62 @@ export function describeDiff(diff: Diff): string {
  * The expectation is keyed as the fixture writes it and the result is keyed as
  * the engine declares it, so this is also the one place the two spellings meet.
  */
+// -----------------------------------------------------------------------------
+// NESTED EXPECTATIONS, AND WHY A LEAF PATH IS THE DELIVERABLE
+// -----------------------------------------------------------------------------
+// `engine_gates` is a nested object and this function compared flat fields with
+// `Object.is`, so a fixture pinning a per-gate verdict COULD NEVER MATCH by any
+// value: two object literals are never `Object.is`-equal. That is not a bug in
+// any one fixture, it is a comparison path that had no reachable success case,
+// and `GS-021` and `GS-022` say so in their own siblings -- they reach R-30's
+// denominator STATE and record that they cannot reach its FLAG.
+//
+// A DIFFERENCE MUST NAME THE LEAF, NOT THE OBJECT. Reporting
+// `engine_gates: expected {...}, engine produced {...}` hands a reader two
+// twenty-five-field objects and asks them to find the disagreement, which is a
+// divergence report that costs more than it saves. `apps/worker`'s
+// `ENGINE_GATE_LEAVES` carries dotted paths for exactly this reason and this
+// walk follows that idiom rather than inventing a second one.
+//
+// THE PATH IS IN THE FIXTURE'S SPELLING, NOT THE ENGINE'S. `field` is already
+// reported as the expectation writes it while `key` is the engine's camel case,
+// and a reader chasing a diff is looking at their own YAML. So a nested path
+// reads `engine_gates.traded_days.skipped` and can be found by search in the
+// file that stated it.
+//
+// ONLY PLAIN OBJECTS RECURSE. An array, a `null`, a `bigint` and a `Date` are
+// all `typeof 'object'` or otherwise deceptive, and descending into any of them
+// would turn a value comparison into a structural one. Arrays in particular:
+// `events` is compared by `diffEvents` with its own ordering rule, and a silent
+// element-wise walk here would be a second, weaker copy of it.
+
+/** `true` for a `{...}` literal, and false for null, arrays and every wrapper. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export function diffEndState(
   actual: Readonly<Record<string, unknown>>,
   expected: Readonly<Record<string, unknown>>,
 ): Diff[] {
+  return diffNested(actual, expected, '');
+}
+
+/**
+ * One level of the walk. `prefix` is the dotted path already travelled, in the
+ * fixture's spelling, and is empty at the root.
+ */
+function diffNested(
+  actual: Readonly<Record<string, unknown>>,
+  expected: Readonly<Record<string, unknown>>,
+  prefix: string,
+): Diff[] {
   const diffs: Diff[] = [];
 
-  for (const field of Object.keys(expected)) {
-    const wanted = expected[field];
-    const key = snakeToCamel(field);
+  for (const name of Object.keys(expected)) {
+    const field = prefix === '' ? name : `${prefix}.${name}`;
+    const wanted = expected[name];
+    const key = snakeToCamel(name);
 
     if (!Object.prototype.hasOwnProperty.call(actual, key)) {
       diffs.push({
@@ -135,6 +182,38 @@ export function diffEndState(
     }
 
     const got = actual[key];
+
+    // A NESTED EXPECTATION DESCENDS. The expectation drives the walk, so a
+    // fixture pins the leaves it cares about and stays silent about the other
+    // twenty-four; asserting the whole object would make every fixture restate
+    // fields it has no claim about.
+    if (isPlainObject(wanted)) {
+      if (!isPlainObject(got)) {
+        // The shapes disagree, which is a different finding from a wrong value:
+        // the fixture expects a record and the engine has something else there.
+        diffs.push({
+          field,
+          expected: wanted,
+          actual: got,
+          note: 'the expectation states a nested object and the engine result does not carry one here',
+        });
+        continue;
+      }
+      diffs.push(...diffNested(got, wanted, field));
+      continue;
+    }
+
+    // AND THE REVERSE SHAPE MISMATCH, which would otherwise reach `Object.is`
+    // and report "expected 3, engine produced [object Object]".
+    if (isPlainObject(got)) {
+      diffs.push({
+        field,
+        expected: wanted,
+        actual: got,
+        note: 'the engine result carries a nested object where the expectation states a value',
+      });
+      continue;
+    }
 
     if (typeof got === 'bigint' && typeof wanted === 'number') {
       if (bigintAgrees(got, wanted)) continue;

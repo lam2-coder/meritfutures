@@ -1,0 +1,49 @@
+{
+  "end_state": {
+    "trading_day": "2026-11-27",
+    "phase": "funded",
+    "balance_cents": 5101000,
+    "floor_open_cents": 5000000,
+    "floor_cents": 5000000,
+    "floor_locked": false,
+    "high_water_balance_cents": 5250000,
+    "withdrawable_cents": 1000,
+    "traded_days_count": 6,
+    "win_days_count": 0,
+    "payouts_settled_count": 1,
+    "payout_anchor_day": "2026-11-25",
+    "cadence_anchor_day": "2026-11-27",
+    "lifetime_settled_cents": 150000,
+    "consistency_period_start_day": "2026-11-27",
+    "breached": false,
+    "engine_eligible": false,
+    "engine_gates": {
+      "win_days": { "pass": false, "have": 0, "need": 5, "floor_cents": 15000 },
+      "traded_days": { "pass": true, "skipped": true, "have": 6, "need": 0 },
+      "buffer": { "pass": true, "have_cents": 101000, "need_cents": 100000 },
+      "cadence_gap": {
+        "pass": false,
+        "skipped": false,
+        "trading_days_since_last_payout": 0,
+        "need": 5
+      },
+      "minimum_amount": {
+        "pass": false,
+        "withdrawable_cents": 1000,
+        "cap_cents": 150000,
+        "min_payout_cents": 10000
+      }
+    }
+  },
+  "events": [
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "payout.win_days_reset",
+    "day.closed"
+  ],
+  "pins": "the five win days that funded request 1 are gone the instant it settles: R-47 recounts win days strictly after the basis-day anchor, so `win_days_count` is 0 and R-34's gate reads `have: 0` against `need: 5`, which is what refuses request 2 on the internal leg",
+  "note": "`win_days.pass: false` BESIDE `have: 0` IS THE FIXTURE, AND THE GATE VERDICT IS WHAT THIS ROW OWNS. Its state half, the counter reset to the basis-day anchor, is what GS-068 pins; the verdict lives inside `engine_gates`, which is a nested object that `compare.ts` could not diff until this batch, so no value could ever match. Writing the row on the counter alone would be a half-row wearing a whole row's id, which is GS-049's objection. THREE OTHER GATES ALSO REFUSE ON THIS DAY AND SAYING SO IS THE HONEST FORM OF THIS FIXTURE. `cadence_gap` counts 0 trading days strictly after the 2026-11-27 wallet-credit anchor against a required 5, so it refuses; `minimum_amount` compares `min(1,000, 150,000)` against 10,000c, so it refuses; and consistency is EVALUATED AND FAILS, because R-47 starts the new period on 2026-11-27 and a one-day period has its best day equal to its whole profit, which is 10,000bp against a 3,000bp limit. That last one is not a defect and not this row's claim: it is what a period containing exactly one day arithmetically is, and GS-068 shares it. THIS FIXTURE THEREFORE DOES NOT CLAIM THE WIN-DAY GATE IS THE UNIQUELY BINDING ONE. The registry row names it as the mechanism the reset produces, and that is what is pinned. \"Which gate binds, and which is merely dominated\" is a different claim with a different shape -- it needs the gate verdicts on SEVERAL days rather than one -- and it belongs to GS-082, which this format cannot express because a sibling pins ONE `end_state`. CONSISTENCY IS DELIBERATELY UNPINNED for the same reason it is discussed: pinning a failing consistency gate here would read as the fixture asserting that the stacking attempt defeated it, when the attempt never reached it. THE FLOOR, THE HIGH-WATER BALANCE AND THE LOCK ARE PINNED AT THEIR UNTOUCHED VALUES BECAUSE R-48 IS A CLAIM ABOUT A SETTLEMENT. The high-water balance stays at 2026-11-25's 5,250,000c although the balance fell to 5,101,000c, and the floor stays at 5,000,000c: a settlement is not a trading loss (AS-10), and an engine that trailed the floor down to the post-withdrawal balance would be handing back the drawdown the trader has already survived. `floor_locked` is false because 250,000c of high-water profit is 10,000c short of the 260,000c trigger, which is the same boundary GS-068 sits below. `engine_eligible: false` IS PINNED AND `true` IS NOT: GS-064 established the `false` direction, and no fixture may pin `true` while M01 lists R-38 under Group F and declares its input on `ExternalGates`."
+}
