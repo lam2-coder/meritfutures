@@ -47,12 +47,10 @@ import type {
   AccountStatus,
   CalendarSlice,
   Cents,
-  DailyMark,
   KycState,
   PayoutContext,
   ResolvedPlan,
   RuleState,
-  TradingDay,
 } from '../src/index.js';
 import {
   ACCOUNT_OPENED_ON,
@@ -64,8 +62,8 @@ import {
   mark,
 } from './fixtures-in-code.js';
 import { daySequenceArbitrary } from './generators/day-sequence.js';
-import type { DaySequence, DailyMark as GeneratedMark } from './generators/day-input.js';
-import type { MaterializedPlan } from './generators/plan-config.js';
+import type { DaySequence } from './generators/day-input.js';
+import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.js';
 
 // -----------------------------------------------------------------------------
 // R-42, RE-DERIVED FROM PLAN DATA RATHER THAN FROM `capForOrdinal`
@@ -145,110 +143,6 @@ function assertPt05(state: RuleState, plan: ResolvedPlan, ctx: PayoutContext): O
   }
 
   return { eligible: evaluation.eligible, approvedCents: approved };
-}
-
-// -----------------------------------------------------------------------------
-// The fold, in `floor-monotonicity.property.test.ts`'s shape
-// -----------------------------------------------------------------------------
-// THESE THREE HELPERS ARE COPIED RATHER THAN SHARED, AND THE FENCE IS WHY. This
-// session may create new files under `test/` and may not edit existing ones,
-// because sessions 62 and 63 are folding concurrently in this directory. Lifting
-// `materializedFrom`, `toEngineMark` and `sliceOf` into a shared module would
-// mean editing `floor-monotonicity.property.test.ts` to import it. Recorded so
-// the duplication reads as a fence cost rather than as an oversight.
-
-const toEngineMark = (m: GeneratedMark): DailyMark => ({
-  tradingDay: m.tradingDay as TradingDay,
-  openingBalanceCents: BigInt(m.openingBalanceCents),
-  closingBalanceCents: BigInt(m.closingBalanceCents),
-  highBalanceCents: BigInt(m.highBalanceCents),
-  lowBalanceCents: BigInt(m.lowBalanceCents),
-  realizedPnlCents: BigInt(m.realizedPnlCents),
-  adjustmentCents: BigInt(m.adjustmentCents),
-  fillCount: m.fillCount,
-  sourceHash: m.sourceHash,
-});
-
-const sliceOf = (seq: DaySequence): CalendarSlice =>
-  buildCalendarSlice({
-    days: seq.calendar.days.map((d) => ({ ...d, tradingDay: d.tradingDay as TradingDay })),
-    coverage: {
-      from: seq.calendar.coverage.from as TradingDay,
-      to: seq.calendar.coverage.to as TradingDay,
-    },
-  });
-
-function materializedFrom(plan: ResolvedPlan): MaterializedPlan {
-  const evalRules = plan.eval;
-  if (evalRules === null) throw new Error('this property folds plans with an evaluation phase');
-
-  const drawdown = (
-    rules: ResolvedPlan['funded']['drawdown'],
-  ): MaterializedPlan['phase_funded']['drawdown'] => ({
-    type: rules.type,
-    drawdown_cents: Number(rules.drawdownCents),
-    lock: rules.lock.enabled
-      ? {
-          enabled: true,
-          at_profit_cents: Number(rules.lock.atProfitCents),
-          floor_at_cents: Number(rules.lock.floorAtCents),
-        }
-      : { enabled: false, at_profit_cents: null, floor_at_cents: null },
-  });
-
-  const limit = (
-    rules: ResolvedPlan['funded']['dailyLossLimit'],
-  ): MaterializedPlan['phase_funded']['daily_loss_limit'] =>
-    rules.type === 'none'
-      ? { type: 'none', amount_cents: null }
-      : { type: rules.type, amount_cents: Number(rules.limitCents) };
-
-  return {
-    schema_version: 1,
-    size_cents: Number(plan.sizeCents),
-    phase_eval: {
-      enabled: true,
-      profit_target_cents: Number(evalRules.profitTargetCents),
-      drawdown: drawdown(evalRules.drawdown),
-      daily_loss_limit: limit(evalRules.dailyLossLimit),
-      min_trading_days: evalRules.minTradingDays,
-      consistency: evalRules.consistency.enabled
-        ? {
-            enabled: true,
-            max_day_share_bp: Number(evalRules.consistency.maxDayShareBp),
-            mode: 'pass_time_dilutable',
-          }
-        : { enabled: false, max_day_share_bp: null, mode: 'pass_time_dilutable' },
-      max_days: evalRules.maxDays,
-    },
-    phase_funded: {
-      drawdown: drawdown(plan.funded.drawdown),
-      daily_loss_limit: limit(plan.funded.dailyLossLimit),
-      min_trading_days: plan.funded.minTradingDays,
-      win_days: {
-        required_count: plan.funded.winDaysRequiredCount,
-        win_day_floor_cents: Number(plan.funded.winDayFloorCents),
-        reset_on_payout: true,
-      },
-      consistency: plan.funded.consistency.enabled
-        ? {
-            enabled: true,
-            max_day_share_bp: Number(plan.funded.consistency.maxDayShareBp),
-            mode: 'payout_gated',
-          }
-        : { enabled: false, max_day_share_bp: null, mode: 'payout_gated' },
-      buffer_cents: Number(plan.funded.bufferCents),
-      cadence_gap_trading_days: plan.funded.cadenceGapTradingDays,
-      payout_cap_schedule: plan.funded.payoutCapSchedule.map((step) => ({
-        from_ordinal: step.fromOrdinal,
-        cap_cents: Number(step.capCents),
-      })),
-      min_payout_cents: Number(plan.funded.minPayoutCents),
-      split_bp: Number(plan.funded.splitBp),
-      max_payouts: plan.funded.maxPayouts,
-      post_payout_floor_rule: { mode: 'none' },
-    },
-  };
 }
 
 /** Every state the engine wrote while folding a sequence. */

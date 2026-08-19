@@ -99,7 +99,8 @@ import { beforeAll, describe, expect, test } from 'vitest';
 
 import { applySettlement, type ResolvedPlan } from '../src/index.js';
 import { CORE_50K, MERIT_RAPID_50K } from './fixtures-in-code.js';
-import { foldSettlements, materializedFrom, settlementFoldArbitrary } from './settlement-fold.js';
+import { materializedFrom } from './generator-bridge.js';
+import { foldSettlements, settlementFoldArbitrary } from './settlement-fold.js';
 
 // Enough runs that a settlement, a reset over a POSITIVE count and an eval pass
 // are each visited many times over. `REACHABILITY` below is what turns that from
