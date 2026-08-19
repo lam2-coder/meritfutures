@@ -216,3 +216,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 69](2026-08-18-session-69.md) | `CI-06t`, and the four live sites the tree scan found before anything was seeded |
 | [2026-08-18 - Session 67](2026-08-18-session-67.md) | `CI-06o`, the money-path model ban: ADR-044's prohibition 1 stops being prose, and both assertions watched failing |
 | [2026-08-18 - Session 68](2026-08-18-session-68.md) | CI-06s: every probe is run and pinned, and OI-07's fourth occurrence repaired |
+| [2026-08-18 - Session 73](2026-08-18-session-73.md) | `ADR-060` proposed: what `engine_eligible` contains, and the missing enumeration that was the real blocker |
