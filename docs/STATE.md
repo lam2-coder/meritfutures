@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->58<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->60<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1600,6 +1600,72 @@ The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**.
 | **Repair first, then seed** | The unpinned direction is the one this session repaired, so seeding it on the repaired probe would make the seed and the fix prove each other. The scope case invents its own probe, wires it, and leaves it unpinned |
 
 **Nine probes on disk, nine wired, eight pinned before the repair** -- checked in both directions by hand before the gate was written, because the desk's finding is a claim like any other. **Adding a gate moves `gate_count` from 18 to 19**, which `generate` rewrote across eight spans in four files, two of them outside this session's fence. That is unavoidable for any session that adds a gate and it is stated rather than hidden.
+## `ADR-060` is proposed: `engine_eligible`'s membership, and the blocker that was a missing enumeration (2026-08-18)
+
+**[`ADR-060`](decisions/ADR-060.md) is `proposed` and UNSIGNED.** It resolves a frozen money-path
+document against itself and folds into a second frozen plan, so the signature is the founder's.
+
+**The recorded blocker did not survive re-derivation, and the correction changes the fold list rather
+than the verdict.** The [fixtures README](../packages/rules-engine/fixtures/README.md) has held four
+rows behind the sentence "the engine has CHOSEN a reading; `M01` has NOT", offering as one premise
+that `R-41` "says nothing about which gates are in the left operand". **`R-41`'s ROW says nothing;
+[M01:478](plans/M01-rules-engine.md), three lines above it and under the same heading, says it
+outright.** `M01` states the exclusion five times: `INV-23`, the `ExternalGates` sketch, the
+`RuleState` sketch, `SD-06`, and that preamble.
+
+**What `M01` has never done is ENUMERATE the engine gates.** `INV-15` reads `engine_eligible ==
+AND(every engine gate)` and no document says which those are; the only closed list is
+[`types.ts:954`](../packages/rules-engine/src/types.ts). **That is what made the true direction
+unpinnable, and `R-38` is one instance of it.** A ruling on `R-38` alone would have left `INV-15`
+without a referent and `GS-080` unwritable the day after signature, which is why the ADR's fold list
+runs to nine sites across six documents rather than one.
+
+**The recommendation is Reading A, derived from `M01` and not read off the engine.** Group F minus
+`R-38` (input declared on `ExternalGates`), minus `R-40` (which IS the context-gate rule), minus
+`R-41` (the conjunction, not a term in it) leaves six: `R-33` to `R-37` and `R-39`. They are the six
+the engine conjoins. **Agreement reached independently is what makes a fixture safe; the ADR names
+transcription from `types.ts` as the trap and rejects it explicitly.**
+
+**Two findings a reader should not have to open the ADR for.**
+
+- **`RE-P-15` DOES NOT EXIST.** `INV-15`'s named enforcement is a property ([M01:984](plans/M01-rules-engine.md))
+  and a grep across `packages/` and `scripts/` returns nothing. The invariant is enforced by no test.
+- **`M05:88` calls `R-38` "the engine gate"** in a frozen plan, in a cell citing `SD-06`. It changes
+  no behaviour and it means the fold crosses a plan boundary.
+
+**Nothing is folded and nothing may be until the ADR is signed.** On signature, item 1 of its fold
+list (`INV-15` gains the closed list) is the load-bearing edit; `GS-055` becomes pinnable at once,
+and `GS-080` and `GS-060` lose one of their two blockers and still need `compare.ts`'s nested diff.
+
+**`ADR-059` is reserved in [ALLOCATION](decisions/ALLOCATION.md) by a branch that does not hold it**,
+naming session 72 as claimant and declining to state a subject it could not read. `CI-06f` reports
+`059` as a hole the instant `060` is claimed, and the alternative was the incident that file records
+at line 68.
+
+## Session 72: ADR-059 frames the three group A input questions, and two of them were already answered where the specification cannot see them
+
+**[ADR-059](decisions/ADR-059.md) is `proposed` with an unsigned founder-approval line, and it implements nothing.** Group A has been stuck since batch 9 and the reason has been re-derived four times without ever being put as a decision. This entry states the gap as **three separate questions**, derives each blast radius by `git grep` rather than by estimate, and asks of each whether the VALUE it needs exists.
+
+| Question | Type change | Migration | Does the value exist? | Already decided? |
+|---|---|---|---|---|
+| An INSTANT on `DailyMark` (`R-01`) | 1 field, **20 construction sites**, 43 files reference the type | none | **Yes**, at ingest: [`0013_ingest.sql:152`](../packages/db/migrations/0013_ingest.sql) `executed_at timestamptz NOT NULL` | **Yes**, in `DISCHARGED_ELSEWHERE`. Never in M01 |
+| A real `halted` VALUE (`R-04`) | **none. The field already exists** | none | **NO.** No key in the source schema and no publisher anywhere | **No. This one is genuinely open** |
+| SESSION BOUNDS on `CalendarDay` (`R-05`) | 2 fields, 36 files reference the type | **none. [`0004_catalog.sql:318-319`](../packages/db/migrations/0004_catalog.sql) already carries both columns** | **NO.** Source is `awaiting-transcription`; 78 of 83 fixture sessions synthetic | **Yes**, in `DISCHARGED_ELSEWHERE`. Never in M01 |
+
+**`R-06` is excluded and named rather than silently dropped.** `GS-035` is "payout at 23:59:59 versus batch at 00:05", it needs a **clock**, and `INV-01` forbids the engine to read one. A proposal widening to include it would be proposing to break an invariant.
+
+**Two of the three are decided and the decision is in test code.** [`rule-coverage.ts:120`](../packages/rules-engine/test/rule-coverage.ts)'s `DISCHARGED_ELSEWHERE` holds `R-01` and `R-05` with stated reasons, [`implemented-rules.test.ts:57`](../packages/rules-engine/test/implemented-rules.test.ts) asserts the count, and [`rules-a-calendar.test.ts:22`](../packages/rules-engine/test/rules-a-calendar.test.ts) states it outright: *"R-01 AND R-05 ARE NOT WAITING FOR THE DATA, THEY ARE WAITING FOR NOTHING."* **[M01](plans/M01-rules-engine.md) lines 421 and 425 still list both in the same rule table as the forty-six the engine computes**, with the `Config` and `Arithmetic and operator` columns filled in exactly as if it performed them. A reader of the frozen specification cannot tell which rules the engine owns.
+
+**Two corrections to the brief this entry was written from, both of which change what kind of problem the thing is.**
+
+- **The `halted` constant has TWO writers, not one.** [`golden-loader/src/calendar.ts:158`](../packages/golden-loader/src/calendar.ts) was the briefed one; [`generate.mjs`](../packages/db/src/seed/calendars/generate.mjs) writes the same constant at lines 1002 and 1035 **in the production seed path**. So it is not that no fixture can set the flag: **no calendar Merit is able to build can set it**, and [`0004_catalog.sql:331`](../packages/db/migrations/0004_catalog.sql) has carried the column with `DEFAULT false` since the catalog migration.
+- **A halt is not a schedule fact, which is why the source schema has no room for one.** [`GLOSSARY.md:32`](GLOSSARY.md) defines it as a day the market is *"halted or limit locked such that a trader cannot transact"*. A limit lock is decided intraday, after that day's calendar was loaded. [`cme-2026-2028.source.json`](../packages/db/src/seed/calendars/cme-2026-2028.source.json) has ten top-level keys and none of them is a halts list; the one occurrence of the string is [ADR-055](decisions/ADR-055.md) section 4 declining to record the intraday pause.
+
+**What has never been framed is not the three questions. It is the five rows.** `GS-001`, `GS-004`, `GS-030`, `GS-031` and `GS-035` are, under the answers above, permanently outside the golden fixture suite, and the registry has no way to say that about a row. They sit in a denominator that reads as owed work, and [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md) line 267 records how close the polarity derivation came to classifying one of them as an expected failure and going green on it. **[ADR-048](decisions/ADR-048.md) has a vocabulary for a rule the engine has not implemented YET and none for one it never will.** The four recommendations are about that; the argument AGAINST the second of them is written at full strength in the entry's section 6, because an excluded row is a permanently muted one and `FM-17` is the corpus's own name for what that becomes.
+
+**One purity finding worth carrying forward.** A `session_open_at` on `CalendarDay` would be invisible to `RI-07` (a string comparison reaches no Node builtin), to `merit/engine-purity` (no import), and to `types: []` (no ambient typing). **The only mechanism in the tree that sees it arrive is a hand-written key count**, [`rules-a-calendar.test.ts:280`](../packages/rules-engine/test/rules-a-calendar.test.ts)'s `toHaveLength(4)`, written for exactly that purpose.
+
+**No `SD-nn`, no migration number, no `CI-06` letter.** `0038` stays free and the letter after `r` stays free; the gate that would fit, asserting every M01 rule appears in exactly one of `IMPLEMENTED_RULES` or `DISCHARGED_ELSEWHERE`, is named in the entry for whichever session writes it. **Nothing under `packages/` was edited. 18 of 18 gates; `pnpm vitest run` 908 pass, 40 skipped, 60 files.**
 ## `compare.ts` diffs `engine_gates`, and the handoff's count was wrong by one (2026-08-18)
 
 **[Session 71](sessions/2026-08-18-session-71.md) taught [`compare.ts`](../packages/golden-loader/src/compare.ts) to walk nested objects and wrote the two fixture rows that unblocks.** The comparison diffed flat fields with `Object.is`, and `engine_gates` is a nested object, so two object literals were never equal and **a per-gate verdict could not match by any value** -- which `GS-021` and `GS-022` had recorded about `R-30`'s flag in their own siblings. **Golden stage 38 to 40 fixtures, 40 direct, 0 inverted, 0 load failures. 922 passing from 908. 18 of 18 gates.**

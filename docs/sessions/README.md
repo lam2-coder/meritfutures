@@ -216,4 +216,6 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 69](2026-08-18-session-69.md) | `CI-06t`, and the four live sites the tree scan found before anything was seeded |
 | [2026-08-18 - Session 67](2026-08-18-session-67.md) | `CI-06o`, the money-path model ban: ADR-044's prohibition 1 stops being prose, and both assertions watched failing |
 | [2026-08-18 - Session 68](2026-08-18-session-68.md) | CI-06s: every probe is run and pinned, and OI-07's fourth occurrence repaired |
+| [2026-08-18 - Session 73](2026-08-18-session-73.md) | `ADR-060` proposed: what `engine_eligible` contains, and the missing enumeration that was the real blocker |
+| [2026-08-18 - Session 72](2026-08-18-session-72.md) | ADR-059 proposed: the three group A input questions, two already answered in test code and one with no source anywhere |
 | [2026-08-18 - Session 71](2026-08-18-session-71.md) | `compare.ts` diffs `engine_gates`, and the handoff's count was wrong by one |
