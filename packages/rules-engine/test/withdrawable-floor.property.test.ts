@@ -63,7 +63,8 @@ import {
 } from './fixtures-in-code.js';
 import { daySequenceArbitrary } from './generators/day-sequence.js';
 import type { DaySequence } from './generators/day-input.js';
-import { foldSequence, materializedFrom } from './property-harness.js';
+import { materializedFrom } from './generator-bridge.js';
+import { foldSequence } from './property-harness.js';
 import type { FoldStep } from './property-harness.js';
 
 const RUNS = 300;

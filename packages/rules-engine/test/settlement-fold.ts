@@ -9,30 +9,24 @@
 // agree with each other rather than with the engine.
 //
 // -----------------------------------------------------------------------------
-// THIS IS THE THIRD COPY OF THREE HELPERS AND THE COLLAPSE IS A LATER SESSION'S
+// THE THREE ADAPTERS IT ONCE CARRIED NOW LIVE IN `generator-bridge.ts`
 // -----------------------------------------------------------------------------
-// `materializedFrom`, `toEngineMark` and `sliceOf` below are duplicates. Named
-// in full, because a note that does not name the other copies is a note the
-// collapse session cannot act on:
+// `materializedFrom`, `toEngineMark` and `sliceOf` were the third of four copies
+// written in WAVE-01, and session 74 collapsed all four into
+// `generator-bridge.ts`. The `RESOLVED -> MATERIALIZED and never the reverse`
+// argument this file used to carry moved with them, into that module's header
+// where it now stands once.
 //
-//   ORIGINALS, private to PT-01's file
-//     `materializedFrom`  test/floor-monotonicity.property.test.ts:143
-//     `toEngineMark`      test/floor-monotonicity.property.test.ts:252
-//     `sliceOf`           test/floor-monotonicity.property.test.ts:264
-//   SECOND COPY  test/property-harness.ts, session 62's, carrying all three for
-//                PT-04 and PT-07
-//   THIRD COPY   this file, session 63's, for PT-02 and PT-08
+// THIS FILE'S COPY WAS THE ONE THE COLLAPSE HAD TO RULE ON. It wrote
+// `BigInt(x) as Cents` on `toEngineMark`'s six money fields where the other
+// three wrote `BigInt(x)`, and the uncast form is what survived: `Cents` is a
+// plain alias (`src/types.ts` line 38), so the uncast form CHECKS the assignment
+// where the cast ASSERTS it, and a cast is weaker than a check. `PT-02` and
+// `PT-08` are watched failing on their own seeded mutants after the change.
 //
-// THE END STATE IS ONE MODULE IMPORTED BY ALL THREE, and it is a follow-up
-// session rather than this one because every one of those files is inside
-// somebody's fence right now: PT-01's file is frozen to both concurrent
-// sessions, `property-harness.ts` is session 62's to write, and this file is
-// session 63's. A session that reached across would be resolving a conflict by
-// overwriting rather than by merging.
-//
-// TWO FILES INSIDE ONE SESSION SHARING A HELPER IS NOT SPECULATIVE ABSTRACTION,
-// which is the reason this file exists at all rather than the helpers being
-// inlined twice into the two suites that need them.
+// `foldSettlements` below was NOT collapsed. It carries a settlement stream that
+// neither peer harness folds, and merging folds is a different argument than
+// merging adapters.
 //
 // -----------------------------------------------------------------------------
 // THE FOLD STARTS FUNDED, AND THAT IS A STATEMENT ABOUT R-31 RATHER THAN A
@@ -55,147 +49,23 @@ import fc from 'fast-check';
 
 import {
   advanceDay,
-  buildCalendarSlice,
   initialState,
   type CalendarSlice,
   type Cents,
-  type DailyMark,
   type ResolvedPlan,
   type RuleState,
   type SettlementFact,
   type TradingDay,
 } from '../src/index.js';
 import { ENGINE_VERSION, fundedPrior } from './fixtures-in-code.js';
-import type { DaySequence, DailyMark as GeneratedMark } from './generators/day-input.js';
 import { daySequenceArbitrary } from './generators/day-sequence.js';
-import type { MaterializedPlan } from './generators/plan-config.js';
 import { settlementSequenceArbitrary } from './generators/settlement-sequence.js';
 import type {
   SettlementFact as GeneratedSettlement,
   SettlementSequence,
   SsRuleId,
 } from './generators/validate-settlement-sequence.js';
-
-// -----------------------------------------------------------------------------
-// RESOLVED -> MATERIALIZED
-// -----------------------------------------------------------------------------
-// `daySequenceArbitrary` and `settlementSequenceArbitrary` take a
-// `MaterializedPlan`, which is the shape a published plan has at publish time,
-// and the fold takes a `ResolvedPlan`. This direction is the safe one: its
-// output feeds a GENERATOR and never a rule. The other direction is
-// `resolvePlan`, it is P2-1's, and a second copy of it in test code would be a
-// rule derived twice.
-//
-// `chainMarks` reads exactly two fields off the plan -- `size_cents` for
-// INV-20's first-day opening balance and `phase_funded.win_days.
-// win_day_floor_cents` for R-09's `win_day` column -- and both properties assert
-// that those two agree with the fold's own plan, so a drift fails by name rather
-// than as an unexplained refusal in the middle of a fold.
-
-export function materializedFrom(plan: ResolvedPlan): MaterializedPlan {
-  const evalRules = plan.eval;
-  if (evalRules === null) {
-    // Direct is the plan with no evaluation phase (M01 Appendix A.3). Neither
-    // property folds it, and a projection that silently invented an eval block
-    // would hide that rather than report it.
-    throw new Error('this harness folds plans with an evaluation phase');
-  }
-
-  const drawdown = (
-    rules: ResolvedPlan['funded']['drawdown'],
-  ): MaterializedPlan['phase_funded']['drawdown'] => ({
-    type: rules.type,
-    drawdown_cents: Number(rules.drawdownCents),
-    lock: rules.lock.enabled
-      ? {
-          enabled: true,
-          at_profit_cents: Number(rules.lock.atProfitCents),
-          floor_at_cents: Number(rules.lock.floorAtCents),
-        }
-      : { enabled: false, at_profit_cents: null, floor_at_cents: null },
-  });
-
-  const limit = (
-    rules: ResolvedPlan['funded']['dailyLossLimit'],
-  ): MaterializedPlan['phase_funded']['daily_loss_limit'] =>
-    rules.type === 'none'
-      ? { type: 'none', amount_cents: null }
-      : { type: rules.type, amount_cents: Number(rules.limitCents) };
-
-  return {
-    schema_version: 1,
-    size_cents: Number(plan.sizeCents),
-    phase_eval: {
-      enabled: true,
-      profit_target_cents: Number(evalRules.profitTargetCents),
-      drawdown: drawdown(evalRules.drawdown),
-      daily_loss_limit: limit(evalRules.dailyLossLimit),
-      min_trading_days: evalRules.minTradingDays,
-      consistency: evalRules.consistency.enabled
-        ? {
-            enabled: true,
-            max_day_share_bp: Number(evalRules.consistency.maxDayShareBp),
-            // R-28: eval consistency is tested at pass time and is dilutable.
-            mode: 'pass_time_dilutable',
-          }
-        : { enabled: false, max_day_share_bp: null, mode: 'pass_time_dilutable' },
-      max_days: evalRules.maxDays,
-    },
-    phase_funded: {
-      drawdown: drawdown(plan.funded.drawdown),
-      daily_loss_limit: limit(plan.funded.dailyLossLimit),
-      min_trading_days: plan.funded.minTradingDays,
-      win_days: {
-        required_count: plan.funded.winDaysRequiredCount,
-        win_day_floor_cents: Number(plan.funded.winDayFloorCents),
-        // R-47: the counter goes to zero on every settlement, unconditionally.
-        // `ResolvedPlan` carries no switch for it because the rule has none.
-        reset_on_payout: true,
-      },
-      consistency: plan.funded.consistency.enabled
-        ? {
-            enabled: true,
-            max_day_share_bp: Number(plan.funded.consistency.maxDayShareBp),
-            // R-36: funded consistency is a payout gate.
-            mode: 'payout_gated',
-          }
-        : { enabled: false, max_day_share_bp: null, mode: 'payout_gated' },
-      buffer_cents: Number(plan.funded.bufferCents),
-      cadence_gap_trading_days: plan.funded.cadenceGapTradingDays,
-      payout_cap_schedule: plan.funded.payoutCapSchedule.map((step) => ({
-        from_ordinal: step.fromOrdinal,
-        cap_cents: Number(step.capCents),
-      })),
-      min_payout_cents: Number(plan.funded.minPayoutCents),
-      split_bp: Number(plan.funded.splitBp),
-      max_payouts: plan.funded.maxPayouts,
-      // CV-18, retired but retained: `none` is the single valid v1 value
-      // (ADR-014).
-      post_payout_floor_rule: { mode: 'none' },
-    },
-  };
-}
-
-export const toEngineMark = (m: GeneratedMark): DailyMark => ({
-  tradingDay: m.tradingDay as TradingDay,
-  openingBalanceCents: BigInt(m.openingBalanceCents) as Cents,
-  closingBalanceCents: BigInt(m.closingBalanceCents) as Cents,
-  highBalanceCents: BigInt(m.highBalanceCents) as Cents,
-  lowBalanceCents: BigInt(m.lowBalanceCents) as Cents,
-  realizedPnlCents: BigInt(m.realizedPnlCents) as Cents,
-  adjustmentCents: BigInt(m.adjustmentCents) as Cents,
-  fillCount: m.fillCount,
-  sourceHash: m.sourceHash,
-});
-
-export const sliceOf = (seq: DaySequence): CalendarSlice =>
-  buildCalendarSlice({
-    days: seq.calendar.days.map((d) => ({ ...d, tradingDay: d.tradingDay as TradingDay })),
-    coverage: {
-      from: seq.calendar.coverage.from as TradingDay,
-      to: seq.calendar.coverage.to as TradingDay,
-    },
-  });
+import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.js';
 
 /**
  * The oracle's settlement, projected onto the five fields `src/types.ts`'s

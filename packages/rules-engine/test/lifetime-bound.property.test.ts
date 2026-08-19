@@ -62,7 +62,8 @@ import { beforeAll, describe, expect, test } from 'vitest';
 
 import { applySettlement, type Cents, type ResolvedPlan } from '../src/index.js';
 import { CORE_50K, MERIT_RAPID_50K } from './fixtures-in-code.js';
-import { foldSettlements, materializedFrom, settlementFoldArbitrary } from './settlement-fold.js';
+import { materializedFrom } from './generator-bridge.js';
+import { foldSettlements, settlementFoldArbitrary } from './settlement-fold.js';
 import type { SsRuleId } from './generators/validate-settlement-sequence.js';
 
 const RUNS = 300;
