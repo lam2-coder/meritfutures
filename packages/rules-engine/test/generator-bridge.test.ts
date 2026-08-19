@@ -117,7 +117,13 @@ describe('generator-bridge: the collapsed adapters still generate', () => {
     for (const slice of sequences.map(sliceOf)) {
       expect(Object.keys(slice.index)).toHaveLength(slice.days.length);
       for (const d of slice.days) {
-        expect(slice.days[slice.index[d.tradingDay]]?.tradingDay).toBe(d.tradingDay);
+        // `index` is a plain `Record<string, number>`, so a lookup is
+        // `number | undefined` under `noUncheckedIndexedAccess`. The absence is
+        // asserted rather than coalesced away: a slice carrying a day its index
+        // does not know about is the defect this test is about.
+        const at = slice.index[d.tradingDay];
+        expect(at).toBeTypeOf('number');
+        expect(slice.days[at ?? -1]?.tradingDay).toBe(d.tradingDay);
       }
     }
   });
