@@ -86,7 +86,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-057](ADR-057.md) | one refuted sentence in four documents, and the ninth field on a breach row  (2026-08-18, status: accepted) |
 | [ADR-058](ADR-058.md) | The calendar source publishes forward-only, so a full forward year never exists and the six-month horizon alarm can never be cleared  (2026-08-18, status: proposed) |
 | [ADR-060](ADR-060.md) | `engine_eligible` contains the six funded gates and not R-38, and the reason it was unrulable is that no document ever enumerated them  (2026-08-18, status: proposed) |
-| [ADR-059](ADR-059.md) | The three engine inputs group A is blocked on, framed as three questions, and the disposition of the five registry rows that no answer to them can free  (2026-08-18, status: proposed) |
+| [ADR-059](ADR-059.md) | The three engine inputs group A is blocked on, framed as three questions, and the disposition of the five registry rows that no answer to them can free  (2026-08-18, status: accepted) |
 
 ## Gate closures
 
