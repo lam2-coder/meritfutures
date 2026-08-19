@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->59<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->60<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1600,6 +1600,48 @@ The engine has zero non-relative imports today, so `RE-D-03` is vacuous **now**.
 | **Repair first, then seed** | The unpinned direction is the one this session repaired, so seeding it on the repaired probe would make the seed and the fix prove each other. The scope case invents its own probe, wires it, and leaves it unpinned |
 
 **Nine probes on disk, nine wired, eight pinned before the repair** -- checked in both directions by hand before the gate was written, because the desk's finding is a claim like any other. **Adding a gate moves `gate_count` from 18 to 19**, which `generate` rewrote across eight spans in four files, two of them outside this session's fence. That is unavoidable for any session that adds a gate and it is stated rather than hidden.
+## `ADR-060` is proposed: `engine_eligible`'s membership, and the blocker that was a missing enumeration (2026-08-18)
+
+**[`ADR-060`](decisions/ADR-060.md) is `proposed` and UNSIGNED.** It resolves a frozen money-path
+document against itself and folds into a second frozen plan, so the signature is the founder's.
+
+**The recorded blocker did not survive re-derivation, and the correction changes the fold list rather
+than the verdict.** The [fixtures README](../packages/rules-engine/fixtures/README.md) has held four
+rows behind the sentence "the engine has CHOSEN a reading; `M01` has NOT", offering as one premise
+that `R-41` "says nothing about which gates are in the left operand". **`R-41`'s ROW says nothing;
+[M01:478](plans/M01-rules-engine.md), three lines above it and under the same heading, says it
+outright.** `M01` states the exclusion five times: `INV-23`, the `ExternalGates` sketch, the
+`RuleState` sketch, `SD-06`, and that preamble.
+
+**What `M01` has never done is ENUMERATE the engine gates.** `INV-15` reads `engine_eligible ==
+AND(every engine gate)` and no document says which those are; the only closed list is
+[`types.ts:954`](../packages/rules-engine/src/types.ts). **That is what made the true direction
+unpinnable, and `R-38` is one instance of it.** A ruling on `R-38` alone would have left `INV-15`
+without a referent and `GS-080` unwritable the day after signature, which is why the ADR's fold list
+runs to nine sites across six documents rather than one.
+
+**The recommendation is Reading A, derived from `M01` and not read off the engine.** Group F minus
+`R-38` (input declared on `ExternalGates`), minus `R-40` (which IS the context-gate rule), minus
+`R-41` (the conjunction, not a term in it) leaves six: `R-33` to `R-37` and `R-39`. They are the six
+the engine conjoins. **Agreement reached independently is what makes a fixture safe; the ADR names
+transcription from `types.ts` as the trap and rejects it explicitly.**
+
+**Two findings a reader should not have to open the ADR for.**
+
+- **`RE-P-15` DOES NOT EXIST.** `INV-15`'s named enforcement is a property ([M01:984](plans/M01-rules-engine.md))
+  and a grep across `packages/` and `scripts/` returns nothing. The invariant is enforced by no test.
+- **`M05:88` calls `R-38` "the engine gate"** in a frozen plan, in a cell citing `SD-06`. It changes
+  no behaviour and it means the fold crosses a plan boundary.
+
+**Nothing is folded and nothing may be until the ADR is signed.** On signature, item 1 of its fold
+list (`INV-15` gains the closed list) is the load-bearing edit; `GS-055` becomes pinnable at once,
+and `GS-080` and `GS-060` lose one of their two blockers and still need `compare.ts`'s nested diff.
+
+**`ADR-059` is reserved in [ALLOCATION](decisions/ALLOCATION.md) by a branch that does not hold it**,
+naming session 72 as claimant and declining to state a subject it could not read. `CI-06f` reports
+`059` as a hole the instant `060` is claimed, and the alternative was the incident that file records
+at line 68.
+
 ## Session 72: ADR-059 frames the three group A input questions, and two of them were already answered where the specification cannot see them
 
 **[ADR-059](decisions/ADR-059.md) is `proposed` with an unsigned founder-approval line, and it implements nothing.** Group A has been stuck since batch 9 and the reason has been re-derived four times without ever being put as a decision. This entry states the gap as **three separate questions**, derives each blast radius by `git grep` rather than by estimate, and asks of each whether the VALUE it needs exists.
