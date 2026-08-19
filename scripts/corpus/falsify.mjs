@@ -457,6 +457,19 @@ function firstCoverageColumnLoose(dir) {
 // tree copy rather than on the seeded violation. A gate failing for a reason
 // you did not plant tells you nothing about whether it can catch the thing you
 // did plant. Every seed therefore names a substring its finding must contain.
+/**
+ * A generated-span opener and closer, ASSEMBLED RATHER THAN WRITTEN.
+ *
+ * `falsify.mjs` lives inside the tree `CI-06t` scans, so a literal opener here
+ * would make this harness a finding of the gate it is proving. That is not a
+ * hypothetical: the ALLOCATION row reserving this very letter spelled an opener
+ * out while reserving a gate against spelling openers out, and `CI-06g` caught
+ * it within the minute. Same reason `CI-06q`'s seed assembles its approval
+ * phrase, and `RI-02`'s idiom generally.
+ */
+const opener = (name) => `<!--${'gen'}:${name}-->`;
+const closer = () => `<!--/${'gen'}-->`;
+
 const SEEDS = {
   'CI-06a': {
     what: 'a link to a heading that does not exist',
@@ -799,6 +812,26 @@ const SEEDS = {
     real: 'the delta tally was wrong on the day it was written, and U-06 was uncounted',
     expect: 'SD-M9-99',
     seed: (d) => edit(d, 'docs/STATE.md', (b) => b + '\nSD-M9-99 is folded.\n'),
+  },
+  'CI-06t': {
+    what: 'a generated-span opener written into prose and never closed',
+    real:
+      'a session log described a falsify.mjs seed by spelling an opener out and never ' +
+      'closing it. CI-06g matches an opener only when a closer follows it, so it was ' +
+      'skipped in silence for two days, and the first section appended below it supplied ' +
+      'the closer it had been waiting for. The stale opener then swallowed ten thousand ' +
+      'characters of unrelated prose including the new span own opener',
+    // THE ONLY PLACE IN THIS REPOSITORY WHERE A LITERAL TOKEN IS UNAVOIDABLE, and
+    // it is assembled rather than written so that this file is not itself the
+    // defect. RI-02's idiom, and the same reason CI-06q's seed assembles its
+    // approval phrase: the harness lives inside the tree the gate scans.
+    expect: 'opens and is never closed',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) => `${b}\n<!-- seeded -->\nThe count sits in a ${opener('ec_count')} span.\n`,
+      ),
   },
 };
 
@@ -1433,6 +1466,94 @@ const SCOPE_CASES = [
       lines.splice(i + 1, 0, line);
       writeFileSync(join(d, STRATEGY_DOC_F), lines.join('\n'));
     },
+  },
+  {
+    name: 'CI-06t/unclosed-before-a-good-span-later',
+    gate: 'CI-06t',
+    what: 'an unclosed opener EARLY with a legitimate closed span LATER, which MUST be a finding',
+    // THIS IS THE CASE A BALANCE COUNT PASSES, and it is the arrangement that
+    // produced the defect. One opener with no closer, then a complete span
+    // below it: two openers, one closer, and any reading that compares totals
+    // sees an imbalance it cannot locate, while a reading that pairs each
+    // opener with the NEXT closer anywhere after it sees one tidy span whose
+    // content happens to be everything in between.
+    //
+    // It is in scope and must FAIL. If a future edit turns CI-06t into a
+    // counter, the seed above still fires and this one stops, which is the
+    // whole reason both exist.
+    expect: 'is still unclosed',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\nThe stale one is a ${opener('ec_count')} written into prose.\n\n` +
+          `A real span follows it: ${opener('gs_count')}284${closer()}\n`,
+      ),
+  },
+  {
+    name: 'CI-06t/a-document-with-no-spans-is-not-a-finding',
+    gate: 'CI-06t',
+    what: 'a document carrying no span token at all, which must NOT be a finding',
+    expect: 'PASS',
+    // The boundary is at `unbalanced`, not at `mentions a span`. Most of the
+    // 494 markdown files in this tree carry no token and ten carry all 158 of
+    // them; a gate that reported on the other 484 would be unusable. The
+    // control fires on the same file with one unclosed opener added, which is
+    // the single edit that turns a silent document into a finding.
+    control: {
+      expect: 'opens and is never closed',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) => `${b}\n<!-- control -->\nA ${opener('adr_count')} left open.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\nThis paragraph discusses the ec_count span and carries no token.\n`,
+      ),
+  },
+  {
+    name: 'CI-06t/correctly-closed-spans-are-not-a-finding',
+    gate: 'CI-06t',
+    what: 'a document whose spans all open and close in order, which must NOT be a finding',
+    expect: 'PASS',
+    // TWO SPANS AND A SECOND ON THE SAME LINE, because the first draft of this
+    // gate sorted tokens by LINE and read three spans on one line as three
+    // openers followed by three closers. INDEX.md carries exactly that shape and
+    // the draft reported fifty findings against a clean tree. This case is what
+    // stops that regression returning quietly.
+    control: {
+      // The stale opener trails the good span, so the gate reaches end of file
+      // with one open and reports THAT form rather than the interleaving one.
+      // The first draft asserted the interleaving message here and the harness
+      // said CONTROL DID NOT FIRE, which is the harness doing its job: a
+      // control whose expectation is wrong proves nothing and the PASS beneath
+      // it would have asserted nothing.
+      expect: 'opens and is never closed',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\nOne ${opener('adr_count')}58${closer()} and a stale ` +
+            `${opener('ec_count')} beside it.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\nOne ${opener('adr_count')}58${closer()} then ` +
+          `${opener('ec_count')}157${closer()} on the same line.\n\n` +
+          `And another on its own: ${opener('gs_count')}284${closer()}\n`,
+      ),
   },
   {
     name: 'CI-06p/unclaimed-letter',
