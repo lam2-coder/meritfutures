@@ -1,0 +1,109 @@
+# GS-060  Zero-risk day farming for min-trading-days
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "One micro round trip per day advances traded days at commission cost. The
+#   funded min-days gate is now configured 0 and reports `skipped`, so the
+#   fixture asserts TWO THINGS: that the farming pattern buys nothing against
+#   the real gates (win days, buffer, consistency), and that a disabled gate
+#   renders as disabled rather than as satisfied"      GOLDEN_SCENARIOS GS-060
+#   AS-07  a traded day needs one fill, so a minimum-days gate is "a fee, not a
+#          constraint"                                            M01 section 7
+#   CV-19  `phase_funded.min_trading_days >= 0`, and 0 MEANS THE GATE IS
+#          DISABLED and reports `pass: true, skipped: true`  M01 section 2.4
+#   R-33   `tradedDaysCount >= min_trading_days`, 0 disables the gate   M01 R-33
+#   R-34   `winDaysCount >= required_count`                            M01 R-34
+#   R-35   withdrawable `max(0, balance - size - buffer)`              M01 R-35
+#   R-08   a traded day is a day with at least one fill                M01 R-08
+#   R-09   a win day is `realized_pnl >= win_day_floor_cents`          M01 R-09
+#   R-13   the floor trails the closing high                           M01 R-13
+#   R-39   `min(withdrawable, cap) >= min_payout_cents`                M01 R-39
+#   R-41   `engine_eligible` is the conjunction of every engine gate    M01 R-41
+#   size 5,000,000c, funded drawdown 250,000c, buffer 100,000c, win day floor
+#   15,000c, win days required 5, funded min trading days 0, payout cap
+#   150,000c, min payout 10,000c, consistency 3000bp
+#                                                       M01 Appendix A.1 at 50K
+#
+# THE FARMING PATTERN, IN THE ROW'S OWN TERMS. Four consecutive sessions, each a
+# "micro round trip": two fills and 1,000c of realized P&L. Every one is a TRADED
+# day under R-08 (a fill is the whole test) and NONE is a win day under R-09
+# (1,000c is far below the 15,000c floor). That is AS-07's attack executed: the
+# trader has bought four traded days at four commissions.
+#
+# WHAT IT BUYS, WHICH IS THE FIRST HALF OF THE ROW. Nothing. After four farmed
+# days the balance is 5,004,000c, so `withdrawable = max(0, 5,004,000 - 5,000,000
+# - 100,000)` is 0c: the 4,000c of profit is 96,000c short of the buffer, the
+# win-day gate needs 5 and has 0, and the minimum-payout gate compares
+# `min(0, 150,000)` against 10,000c. THREE GATES REFUSE and the conjunction is
+# false. The farming moved the one counter it was aimed at and moved no gate.
+#
+# AND THE SECOND HALF, WHICH IS WHY THIS ROW WAITED FOR A NESTED COMPARISON.
+# `min_trading_days` is 0 on all three v1 plans (ADR-015), so R-33's gate is
+# DISABLED and CV-19 fixes how it must read: `pass: true, skipped: true`, "so no
+# trader or support agent ever sees a gate that reads as satisfied when it was
+# never evaluated". `skipped` lives inside `engine_gates`, which is a nested
+# object, and `compare.ts` compared flat fields with `Object.is` until this
+# batch, so THE SECOND HALF WAS UNREACHABLE BY ANY VALUE. GS-021 and GS-022 say
+# so in their own siblings about R-30's flag.
+#
+# BOTH HALVES OR NEITHER, WHICH IS GS-049'S OBJECTION APPLIED TO THIS ROW. Batch
+# 10 declined to write the first half alone, because a half-row wearing a whole
+# row's id is worse than no row: a later reader sees GS-060 present and concludes
+# the disabled-gate claim is covered. With the nested comparison both halves are
+# assertable and both are asserted here.
+#
+# `engine_eligible: false` IS PINNED AND `true` IS NOT, DELIBERATELY. GS-064
+# established the `false` direction, and the `true` direction is still unpinnable
+# while M01 lists R-38 under Group F and declares `hasPayoutInFlight` on
+# `ExternalGates` -- the engine has chosen a reading and M01 has not. That is
+# GS-080's second blocker and it is why GS-080 is NOT in this batch.
+id: GS-060
+name: zero-risk day farming buys nothing against the real gates
+source: M01 R-08, R-09, R-13, R-14, R-18, R-21, R-33, R-34, R-35, R-36, R-37, R-39, R-41
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  # The open day precedes the first mark, which is the convention every funded
+  # fixture in this directory follows: `initialState` cannot open an account in
+  # `funded` on a plan that has an evaluation phase, and `advanceDay` refuses a
+  # mark that is not strictly after the prior it is handed (INV-14, R-06).
+  opened_on: 2026-11-18
+  size_cents: 5000000
+days:
+  - trading_day: 2026-11-19
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5001000
+    high_balance_cents: 5001000
+    low_balance_cents: 5000000
+    realized_pnl_cents: 1000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-20
+    opening_balance_cents: 5001000
+    closing_balance_cents: 5002000
+    high_balance_cents: 5002000
+    low_balance_cents: 5001000
+    realized_pnl_cents: 1000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-23
+    opening_balance_cents: 5002000
+    closing_balance_cents: 5003000
+    high_balance_cents: 5003000
+    low_balance_cents: 5002000
+    realized_pnl_cents: 1000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-24
+    opening_balance_cents: 5003000
+    closing_balance_cents: 5004000
+    high_balance_cents: 5004000
+    low_balance_cents: 5003000
+    realized_pnl_cents: 1000
+    fill_count: 2
+    traded_day: true
+    adjustment_cents: 0

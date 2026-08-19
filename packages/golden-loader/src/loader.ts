@@ -169,6 +169,24 @@ const FIXTURE_KEYS = new Set([
  * why the expectation pins what it pins, beside the values rather than in a
  * commit message nobody reads next to the file.
  */
+/**
+ * The dotted path of the first empty object nested anywhere inside an
+ * expectation, or `null` when every object on every branch pins at least one
+ * field. Arrays and `null` are values rather than records and are not walked,
+ * which is `compare.ts`'s rule and is stated the same way in both files.
+ */
+function firstEmptyObjectPath(value: Record<string, unknown>, path: string): string | null {
+  for (const [name, child] of Object.entries(value)) {
+    if (typeof child !== 'object' || child === null || Array.isArray(child)) continue;
+    const here = `${path}.${name}`;
+    const record = child as Record<string, unknown>;
+    if (Object.keys(record).length === 0) return here;
+    const deeper = firstEmptyObjectPath(record, here);
+    if (deeper !== null) return deeper;
+  }
+  return null;
+}
+
 const EXPECTATION_KEYS = new Set(['end_state', 'events', 'pins', 'note']);
 
 /**
@@ -734,6 +752,19 @@ export function loadFixture(yamlFile: string, options: LoadOptions = {}): Golden
     // An empty expectation is the one shape that passes against any engine at
     // all, which makes it the shape a failing fixture decays into.
     throw new FixtureError('L-04', yamlFile, '"end_state" pins no field');
+  }
+  // AND THE SAME GUARD ONE LEVEL DOWN, WHICH THIS CHECK DID NOT HAVE UNTIL
+  // `compare.ts` LEARNED TO RECURSE. The reasoning above is about a shape that
+  // passes against any engine, and `engine_gates: {}` is exactly that shape: the
+  // walk descends, finds no leaf to compare, and reports agreement. The root
+  // check could not see it and NOTHING COULD REACH IT EITHER, because a nested
+  // expectation could never match by any value before this batch -- the same
+  // shape as `run.ts` passing every settlement to every day while `L-11` forced
+  // `settlements: []`, where a rule that made a path unreachable also made its
+  // bug unfalsifiable. A vacuous nested pin is refused by name.
+  const emptyAt = firstEmptyObjectPath(endState as Record<string, unknown>, 'end_state');
+  if (emptyAt !== null) {
+    throw new FixtureError('L-04', yamlFile, `"${emptyAt}" pins no field`);
   }
   if (!Array.isArray(events) || events.some((e) => typeof e !== 'string')) {
     throw new FixtureError('L-04', yamlFile, '"events" must be a list of event types');

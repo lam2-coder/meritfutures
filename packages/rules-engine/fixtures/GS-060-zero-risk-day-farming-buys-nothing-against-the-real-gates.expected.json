@@ -1,0 +1,27 @@
+{
+  "end_state": {
+    "trading_day": "2026-11-24",
+    "phase": "funded",
+    "balance_cents": 5004000,
+    "floor_open_cents": 4753000,
+    "floor_cents": 4754000,
+    "floor_locked": false,
+    "high_water_balance_cents": 5004000,
+    "withdrawable_cents": 0,
+    "traded_days_count": 4,
+    "win_days_count": 0,
+    "consistency_best_day_cents": 1000,
+    "consistency_period_profit_cents": 4000,
+    "breached": false,
+    "engine_eligible": false,
+    "engine_gates": {
+      "traded_days": { "pass": true, "skipped": true, "have": 4, "need": 0 },
+      "win_days": { "pass": false, "have": 0, "need": 5, "floor_cents": 15000 },
+      "buffer": { "pass": false, "have_cents": 4000, "need_cents": 100000 },
+      "minimum_amount": { "pass": false, "withdrawable_cents": 0, "min_payout_cents": 10000 }
+    }
+  },
+  "events": ["day.closed", "day.closed", "day.closed", "day.closed"],
+  "pins": "four farmed traded days move `traded_days_count` to 4 and move no gate: the win-day gate has 0 of 5, the buffer gate is 96,000c short, the minimum-payout gate compares 0c against 10,000c, and `engine_eligible` is false, while R-33's gate is DISABLED at `min_trading_days: 0` and reports `pass: true, skipped: true` rather than reading as satisfied",
+  "note": "THE `skipped: true` ON `traded_days` IS THE HALF THIS ROW WAITED FOR AND IT IS THE FIRST FIXTURE IN THE DIRECTORY TO PIN ONE. `engine_gates` is a nested object and `compare.ts` diffed flat fields with `Object.is` until this batch, so two object literals were never equal and NO VALUE COULD EVER MATCH. GS-021 and GS-022 record the same limit about R-30's flag in their own siblings. `pass: true` BESIDE `skipped: true` IS THE WHOLE OF CV-19 AND EITHER ALONE WOULD BE THE DEFECT: a disabled gate that reported `pass: false` would block every payout on all three v1 plans, and one that reported `skipped: false` would render as SATISFIED, which is the sentence CV-19 exists to forbid -- \"no trader or support agent ever sees a gate that reads as satisfied when it was never evaluated\". THE FOUR GATE ENTRIES ARE THE FOUR THE ROW NAMES AND THE OTHER TWO ARE DELIBERATELY UNPINNED. The row names traded days, win days, buffer and consistency; `minimum_amount` is pinned because it is R-39's verdict on the farmed state and is the gate that would pay. `consistency` is NOT pinned and that is worth stating rather than leaving as an absence: on four equal 1,000c days the best day is 1,000c against 4,000c of period profit, so `1,000 * 10,000 <= 3,000 * 4,000` HOLDS and the gate PASSES. Pinning a passing consistency gate here would suggest the farming defeated it, when what actually happened is that four identical days cannot concentrate a best day at all -- the attack does not reach that gate, and GS-054 is the fixture that does. `cadence_gap` is also unpinned: with no settlement there is no anchor, so it skips, which is R-37's trivial case and not this row's claim. `engine_eligible: false` IS PINNED AND `true` IS NOT: GS-064 established the `false` direction, and no fixture may pin `true` while M01 lists R-38 under Group F and declares its input on `ExternalGates`, which is GS-080's second blocker and the reason GS-080 is not in this batch. THE FLOOR NUMBERS ARE R-13's AND ARE PINNED BECAUSE A FARMING STREAM THAT MOVED THE FLOOR WOULD BE A DIFFERENT SCENARIO: the closing high rises 1,000c a day, so the floor trails to `5,004,000 - 250,000 = 4,754,000` and the floor at open on the last day is the previous day's `4,753,000`. The lock is untouched at 4,000c of profit against a 260,000c trigger."
+}
