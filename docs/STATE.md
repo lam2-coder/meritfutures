@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->59<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->60<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->284<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1642,3 +1642,27 @@ naming session 72 as claimant and declining to state a subject it could not read
 `059` as a hole the instant `060` is claimed, and the alternative was the incident that file records
 at line 68.
 
+## Session 72: ADR-059 frames the three group A input questions, and two of them were already answered where the specification cannot see them
+
+**[ADR-059](decisions/ADR-059.md) is `proposed` with an unsigned founder-approval line, and it implements nothing.** Group A has been stuck since batch 9 and the reason has been re-derived four times without ever being put as a decision. This entry states the gap as **three separate questions**, derives each blast radius by `git grep` rather than by estimate, and asks of each whether the VALUE it needs exists.
+
+| Question | Type change | Migration | Does the value exist? | Already decided? |
+|---|---|---|---|---|
+| An INSTANT on `DailyMark` (`R-01`) | 1 field, **20 construction sites**, 43 files reference the type | none | **Yes**, at ingest: [`0013_ingest.sql:152`](../packages/db/migrations/0013_ingest.sql) `executed_at timestamptz NOT NULL` | **Yes**, in `DISCHARGED_ELSEWHERE`. Never in M01 |
+| A real `halted` VALUE (`R-04`) | **none. The field already exists** | none | **NO.** No key in the source schema and no publisher anywhere | **No. This one is genuinely open** |
+| SESSION BOUNDS on `CalendarDay` (`R-05`) | 2 fields, 36 files reference the type | **none. [`0004_catalog.sql:318-319`](../packages/db/migrations/0004_catalog.sql) already carries both columns** | **NO.** Source is `awaiting-transcription`; 78 of 83 fixture sessions synthetic | **Yes**, in `DISCHARGED_ELSEWHERE`. Never in M01 |
+
+**`R-06` is excluded and named rather than silently dropped.** `GS-035` is "payout at 23:59:59 versus batch at 00:05", it needs a **clock**, and `INV-01` forbids the engine to read one. A proposal widening to include it would be proposing to break an invariant.
+
+**Two of the three are decided and the decision is in test code.** [`rule-coverage.ts:120`](../packages/rules-engine/test/rule-coverage.ts)'s `DISCHARGED_ELSEWHERE` holds `R-01` and `R-05` with stated reasons, [`implemented-rules.test.ts:57`](../packages/rules-engine/test/implemented-rules.test.ts) asserts the count, and [`rules-a-calendar.test.ts:22`](../packages/rules-engine/test/rules-a-calendar.test.ts) states it outright: *"R-01 AND R-05 ARE NOT WAITING FOR THE DATA, THEY ARE WAITING FOR NOTHING."* **[M01](plans/M01-rules-engine.md) lines 421 and 425 still list both in the same rule table as the forty-six the engine computes**, with the `Config` and `Arithmetic and operator` columns filled in exactly as if it performed them. A reader of the frozen specification cannot tell which rules the engine owns.
+
+**Two corrections to the brief this entry was written from, both of which change what kind of problem the thing is.**
+
+- **The `halted` constant has TWO writers, not one.** [`golden-loader/src/calendar.ts:158`](../packages/golden-loader/src/calendar.ts) was the briefed one; [`generate.mjs`](../packages/db/src/seed/calendars/generate.mjs) writes the same constant at lines 1002 and 1035 **in the production seed path**. So it is not that no fixture can set the flag: **no calendar Merit is able to build can set it**, and [`0004_catalog.sql:331`](../packages/db/migrations/0004_catalog.sql) has carried the column with `DEFAULT false` since the catalog migration.
+- **A halt is not a schedule fact, which is why the source schema has no room for one.** [`GLOSSARY.md:32`](GLOSSARY.md) defines it as a day the market is *"halted or limit locked such that a trader cannot transact"*. A limit lock is decided intraday, after that day's calendar was loaded. [`cme-2026-2028.source.json`](../packages/db/src/seed/calendars/cme-2026-2028.source.json) has ten top-level keys and none of them is a halts list; the one occurrence of the string is [ADR-055](decisions/ADR-055.md) section 4 declining to record the intraday pause.
+
+**What has never been framed is not the three questions. It is the five rows.** `GS-001`, `GS-004`, `GS-030`, `GS-031` and `GS-035` are, under the answers above, permanently outside the golden fixture suite, and the registry has no way to say that about a row. They sit in a denominator that reads as owed work, and [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md) line 267 records how close the polarity derivation came to classifying one of them as an expected failure and going green on it. **[ADR-048](decisions/ADR-048.md) has a vocabulary for a rule the engine has not implemented YET and none for one it never will.** The four recommendations are about that; the argument AGAINST the second of them is written at full strength in the entry's section 6, because an excluded row is a permanently muted one and `FM-17` is the corpus's own name for what that becomes.
+
+**One purity finding worth carrying forward.** A `session_open_at` on `CalendarDay` would be invisible to `RI-07` (a string comparison reaches no Node builtin), to `merit/engine-purity` (no import), and to `types: []` (no ambient typing). **The only mechanism in the tree that sees it arrive is a hand-written key count**, [`rules-a-calendar.test.ts:280`](../packages/rules-engine/test/rules-a-calendar.test.ts)'s `toHaveLength(4)`, written for exactly that purpose.
+
+**No `SD-nn`, no migration number, no `CI-06` letter.** `0038` stays free and the letter after `r` stays free; the gate that would fit, asserting every M01 rule appears in exactly one of `IMPLEMENTED_RULES` or `DISCHARGED_ELSEWHERE`, is named in the entry for whichever session writes it. **Nothing under `packages/` was edited. 18 of 18 gates; `pnpm vitest run` 908 pass, 40 skipped, 60 files.**
