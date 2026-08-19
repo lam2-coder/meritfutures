@@ -857,6 +857,32 @@ const SEEDS = {
         (b) => `${b}\n<!-- seeded -->\nThe count sits in a ${opener('ec_count')} span.\n`,
       ),
   },
+
+  'CI-06u': {
+    what: 'one table carrying two rows under the same first-cell key',
+    real:
+      "the review desk's merge script resolves conflicts keep-both and then dedupes only " +
+      'lines over 60 characters that are byte-identical after comment stripping. Two ' +
+      'sessions appending to one markdown table therefore re-append every row the table ' +
+      'already had, and any copy differing by a link, a count or a wording is under the ' +
+      "dedupe's reach. It has happened three times on main-bound branches: ADR-050 twice " +
+      'in the decisions README with DIFFERENT titles, fourteen CI-06 rows in STRATEGY, ' +
+      'and duplicated passages in STATE recorded as OI-10',
+    // THE SEED CARRIES TWO DIFFERENT SECOND CELLS ON PURPOSE. A byte-identical
+    // pair is the case the merge script's own dedupe already removes, so seeding
+    // one would prove the gate fires on the population that never reaches main.
+    // The rows that survive the dedupe are exactly the rows that disagree.
+    expect: 'the first cell "seeded-term" already heads the row at line',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| Term | Meaning |\n|---|---|\n` +
+          `| seeded-term | what one session wrote |\n` +
+          `| seeded-term | what the other session wrote, which is not the same claim |\n`,
+      ),
+  },
 };
 
 // =============================================================================
@@ -1692,6 +1718,149 @@ const SCOPE_CASES = [
         'export const settle = (cents: bigint): bigint => cents;\n',
       );
     },
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06u. THE SEED PROVES IT FIRES. EVERY BOUNDARY BELOW IS ONE ITS SURVEY
+  // ARGUED ABOUT, and none of the four appears in one direction only.
+  //
+  // This gate is the one in this file most at risk of being quietly relaxed,
+  // because the cheapest way to make a false finding go away is to widen the
+  // exemption until it stops matching. Each case pins one edge of the scope so
+  // that widening it fails here rather than passing silently.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06u/a-dimension-column-repeats-and-is-not-a-finding',
+    gate: 'CI-06u',
+    what: 'a transition table whose From column repeats, which must NOT be a finding',
+    expect: 'PASS',
+    // THE POPULATION THIS PROTECTS IS REAL AND LARGE. The survey found 211
+    // repeated first cells and 32 of them are this shape: `active` has four
+    // outgoing edges in STATE_MACHINES, and S/T/R/I/D/E heads many rows each in
+    // SECURITY by construction. A gate reporting those is a gate switched off
+    // inside a week, which is the outcome the exemption exists to avoid.
+    //
+    // The control is the SAME TABLE with one word changed in the header row.
+    // Header `From` and header `Term` differ in nothing else, so a control that
+    // fires proves the exemption turns on the header and not on the content.
+    control: {
+      expect: 'the first cell "provisioning_pending" already heads the row at line',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\n\n| Term | To | Guard |\n|---|---|---|\n` +
+            `| provisioning_pending | active | G-PROVISIONED |\n` +
+            `| provisioning_pending | closed_admin | G-PROVISION-ABANDONED |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| From | To | Guard |\n|---|---|---|\n` +
+          `| provisioning_pending | active | G-PROVISIONED |\n` +
+          `| provisioning_pending | closed_admin | G-PROVISION-ABANDONED |\n`,
+      ),
+  },
+  {
+    name: 'CI-06u/a-repaired-register-entry-is-itself-a-finding',
+    gate: 'CI-06u',
+    what: 'a registered duplicate that has been REPAIRED, which must be a finding',
+    // THE DIRECTION AN ALLOWLIST DECAYS IN, and the reason the register is a
+    // register rather than an exemption list. The gate ships green over 105
+    // known duplicates it cannot repair inside its fence; without this
+    // assertion those 105 lines survive every repair and the gate ends up
+    // asserting nothing about eight of the files it reads.
+    //
+    // It seeds the REPAIR, not the damage: `M20-wallet.md` carries two
+    // `INV-M20-06` rows saying different things, one of them goes, and the gate
+    // must now object to its own register rather than say nothing.
+    expect: 'the register claims "inv-m20-06" is a known duplicate and it is not one on this ref',
+    seed: (d) => {
+      const p = join(d, 'docs/plans/M20-wallet.md');
+      const lines = readFileSync(p, 'utf8').split('\n');
+      const at = lines.findIndex((l) => /^\|\s*INV-M20-06\s*\|/.test(l));
+      if (at === -1) throw new Error('seed anchor not found: no `| INV-M20-06 |` row in M20');
+      lines.splice(at, 1);
+      writeFileSync(p, lines.join('\n'));
+    },
+  },
+  {
+    name: 'CI-06u/two-separate-tables-may-share-a-key',
+    gate: 'CI-06u',
+    what: 'one key appearing once in each of two DIFFERENT tables, which must NOT be a finding',
+    expect: 'PASS',
+    // THE UNIT IS ONE TABLE AND NOT ONE FILE. A document that defines `R-35` in
+    // a rules table and cites it in a coverage table further down is the normal
+    // shape of this corpus, and a file-wide uniqueness rule would report
+    // hundreds of them.
+    //
+    // The control is the SAME TWO TABLES with the blank line between them
+    // removed, which is the whole difference between two tables and one. That
+    // edit is not hypothetical: `docs/sessions/README.md` carries the entire
+    // session index twice under a re-inserted header row with no blank line
+    // between the copies, and a parser that split on the second delimiter row
+    // would read it as two tidy tables and report nothing. 58 of the survey's
+    // 105 findings live on the far side of this one boundary.
+    control: {
+      expect: 'the first cell "shared-key" already heads the row at line',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\n\n| Term | Meaning |\n|---|---|\n` +
+            `| shared-key | defined here |\n` +
+            `| Term | Meaning |\n|---|---|\n` +
+            `| shared-key | cited there |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| Term | Meaning |\n|---|---|\n` +
+          `| shared-key | defined here |\n\n` +
+          `| Term | Meaning |\n|---|---|\n` +
+          `| shared-key | cited there |\n`,
+      ),
+  },
+  {
+    name: 'CI-06u/an-empty-first-cell-claims-nothing',
+    gate: 'CI-06u',
+    what: 'a table whose first cells are empty on every row, which must NOT be a finding',
+    expect: 'PASS',
+    // THE CORPUS'S TWO-COLUMN LAYOUT TABLE OPENS `| | |` AND CARRIES CONTINUATION
+    // ROWS WITH NOTHING IN THE FIRST CELL. 37 tables under docs/ have an empty
+    // first-column header alone. An empty cell claims no key, so reading empties
+    // as one repeated key would report a large and entirely healthy population
+    // and would bury the eight files that are actually damaged.
+    //
+    // The control gives the same three rows one identical non-empty first cell,
+    // which is the single edit that turns a layout table into a registry with a
+    // collision in it.
+    control: {
+      expect: 'the first cell "same" already heads the row at line',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\n\n| | |\n|---|---|\n` +
+            `| same | first |\n| same | second |\n| same | third |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| | |\n|---|---|\n` +
+          `| | first |\n| | second |\n| | third |\n`,
+      ),
   },
 ];
 
