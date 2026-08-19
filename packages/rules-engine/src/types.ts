@@ -879,6 +879,13 @@ export interface MinimumAmountGate {
 // So nothing below appears on `RuleState`. It is computed at read time by
 // `evaluatePayout` from an `ExternalGates` the caller supplies, and it is
 // combined with the engine gates only in the returned evaluation.
+//
+// R-38's membership is RULED and no longer asserted here on this file's own
+// authority. ADR-060 rules Reading A: `engineEligible` is the closed six
+// R-33, R-34, R-35, R-36, R-37 and R-39, enumerated under INV-15 in M01
+// section 1.5, and R-38 binds through `contextEligible`. M01's Group F is
+// topical and contains both kinds, which is why the range "R-33 to R-41"
+// never was the enumeration.
 
 /** M01 section 2.1's `accounts.status` vocabulary. */
 export type AccountStatus =
