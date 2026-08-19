@@ -1706,3 +1706,29 @@ at line 68.
 **Two weaker degradations PASSED and are recorded rather than dropped.** Forcing the funded drawdown `type`, and forcing both `type` and `drawdown_cents`, both left the lineup distinct, because its three plans differ in several fields at once. The assertion catches an adapter that has stopped reading its input, which is the failure mode it is written for, and not every single-field drift. Reported because a control's blind spot found while proving it bites is worth more than the proof.
 
 **The position:** `pnpm vitest run` reports **61 files, 915 passed, 40 skipped**, from 60 / 908 / 40. The seven new tests are the non-vacuity assertions and no property was added: `--project property` alone is **12 files, 194 passed, 1 skipped**, unchanged. **18 of 18 gates pass. 7 of 7 invariants hold.** A repo-wide grep finds **exactly one definition site for each of the three names**.
+
+---
+
+## Session 75: `CI-06u`, and the 105 duplicate table keys already on `main` (2026-08-19)
+
+**`CI-06p` asserted uniqueness over ONE table because that is the table it was written for. The defect is not table-specific.** The review desk's merge script resolves conflicts keep-both and then dedupes only lines over 60 characters that are byte-identical after comment stripping, so two sessions appending to one markdown table do not produce two appended rows: **they produce a copy of every row the table already had**, and every copy differing by a link, a count or a wording is under the dedupe's reach and survives. `ADR-050` twice with different titles, fourteen `CI-06` rows in [STRATEGY](testing/STRATEGY.md), and this file's own duplicated passages recorded as `OI-10` are three occurrences of one mechanism. **A merge script runs on one machine under one operator; a gate runs on every pull request.** [`CI-06u`](testing/STRATEGY.md) is `CI-06p`'s first assertion generalised to every markdown table in `docs/`.
+
+**The survey ran before the assertion was written**, which is why the gate has the shape it has: 861 tables, 6,693 body rows, 211 repeated first cells in 12 files, splitting into two populations that a single rule would have served badly in both directions.
+
+| | |
+|---|---|
+| **32 rows are legitimate and out of scope by SHAPE** | Six first-column headers name a **dimension** rather than an identity: `From` on a transition table keyed by `(From, To, Guard)`, `Threat` on a STRIDE table, plus `Rank`, `Group`, `Source`, `Digest`. One argued entry each, and **an exemption matching no table is itself a finding** |
+| **105 keys in 8 files are corruption and are REGISTERED, not exempted** | Pinned as exact `(file, key)` pairs. A **new** duplicate is a finding, and **a register entry that no longer names a real duplicate is also a finding**, so the register shrinks as repairs land instead of becoming furniture |
+| **Why registered rather than repaired** | `falsify.mjs` runs every gate against the tree as it stands and a gate that cannot pass there is an ERROR, so a gate red on 105 findings cannot land. Seven of the eight files sat outside the session fence, and **three of the pairs contradict each other**, which is a ruling rather than a merge |
+
+**The three contradictions, which are the reason this is a `STATE` entry and not only a gate.**
+
+| Where | The two rows |
+|---|---|
+| [STATE_MACHINES](architecture/STATE_MACHINES.md), the guard table, **money path** | `G-ELIGIBLE` reads `identities.status <> 'restricted'` at line 405 and `identities.status = 'active'` at line 408, **both citing [ADR-041](decisions/ADR-041.md)**. Ten guards in that table are defined twice |
+| [M05](plans/M05-payout-system.md) | `INV-M5-17`, `INV-M5-18` and `INV-M5-19` **each state two entirely different invariants**. An invariant id that means two things cannot be cited |
+| [INDEX](INDEX.md) | `M05` carries two purposes, "bounded freeze, reset" and "the 48 hour enforcement window", in the registry that decides whether a thing exists |
+
+**And the largest single finding is this repository's own session index.** [`docs/sessions/README.md`](sessions/README.md) carries **the entire index twice**: a second copy opens at line 120 under a re-inserted header row and re-lists sessions 1 to 74, while the first copy stops at session 62. 58 of the 105 are that one duplication, and **nothing had recorded it** until the survey.
+
+**The position:** `node scripts/corpus/gates.mjs check` reports <!--gen:gate_count-->22<!--/gen--> of <!--gen:gate_count-->22<!--/gen--> gates pass. `node scripts/corpus/falsify.mjs` reports every gate passing clean and failing dirty and **30 scope cases holding**, four of them `CI-06u`'s, none asserted in one direction only. **The eight repairs are the next session's work and every one of them shrinks the register by hand**, which is exactly the friction the shrink-only assertion exists to create.
