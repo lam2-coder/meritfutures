@@ -2546,6 +2546,261 @@ function calendarGenerator() {
 // -----------------------------------------------------------------------------
 // CI-06p  THE LETTER REGISTRY, READ THE WAY THE TWO NUMERIC ONES ARE READ
 // -----------------------------------------------------------------------------
+// CI-06o  No model on the money path, and a money path outside the scope list
+// -----------------------------------------------------------------------------
+// ADR-044 SECTION 8, WHICH SPECIFIES THIS GATE AND THEN SAYS IT DOES NOT EXIST:
+//
+//   "No module that resolves, directly or transitively, from
+//   `packages/rules-engine` or from the payout, ledger or auth paths may import
+//   a model SDK or reach a model endpoint. The banned-identifier list is
+//   declared in one place, and A PATH ADDED TO THE MONEY-PATH SET WITHOUT BEING
+//   ADDED TO THE GATE'S SCOPE IS ITSELF A FINDING."
+//
+// "A rule that says no model on the money path and is enforced by people
+// remembering it is a control that exists, stays valid, and enforces nothing."
+// Until this runs and has been WATCHED FAILING, prohibition 1 is prose.
+//
+// -----------------------------------------------------------------------------
+// THE FIRST ASSERTION IS NEARLY VACUOUS TODAY AND THE SECOND IS WHY IT SHIPS NOW
+// -----------------------------------------------------------------------------
+// There is no ledger, payout or auth package: `packages/` holds db,
+// eslint-plugin-merit, golden-loader, rithmic, rules-engine and tooling. So
+// assertion 1 scans one package and finds nothing, which is ADR-042's argument
+// for its SQL shape check rather than a reason to defer: a gate written while
+// its subject is empty is a gate nobody has to argue with later, and the day
+// `packages/payout` arrives is the day somebody would otherwise have had to
+// remember this ADR.
+//
+// ASSERTION 2 IS THE ONE WITH TEETH, and it is what stops assertion 1 going
+// quietly vacuous. A scope list is a claim about coverage, and a coverage claim
+// that nothing checks decays the first time a directory is added. So the gate
+// DISCOVERS money paths independently of its own scope list and reports any it
+// finds that the list does not name.
+//
+// -----------------------------------------------------------------------------
+// WHY THIS IS NOT A FOURTH SPELLING OF RI-07, WHICH WAS CHECKED BEFORE IT WAS
+// WRITTEN
+// -----------------------------------------------------------------------------
+// `RI-07` walks the engine's transitive module graph and reports "a bare
+// specifier that is neither" a Node builtin nor a relative path, so an
+// `import ... from '@anthropic-ai/sdk'` inside `packages/rules-engine/src`
+// ALREADY fails there. Three things here are outside it:
+//
+//   scope      RI-07 starts at `packages/rules-engine/src/index.ts` and follows
+//              relative imports. It says nothing about the payout, ledger or
+//              auth paths, and it reaches no file the engine does not import
+//   endpoints  RI-07 reads SPECIFIERS. A model reached by URL is a string
+//              literal in a file that imports nothing unusual
+//   the list   RI-07 has no ban list; it allows relative-or-builtin and refuses
+//              the rest. ADR-044 requires the banned identifiers in ONE place,
+//              which is what `MODEL_SDK_SPECIFIERS` and `MODEL_ENDPOINT_HOSTS`
+//              below are, and what a reader adding an SDK looks for
+//
+// `merit/engine-purity` is also not this: it reads one file at a time, returns
+// early on relative specifiers, and is attached to `rules-engine/src/**` only.
+// Neither mechanism has assertion 2 at all.
+
+/**
+ * THE BANNED IDENTIFIER LIST, DECLARED IN ONE PLACE (ADR-044 section 8).
+ *
+ * Matched against IMPORT SPECIFIERS, exactly or as a package prefix, and never
+ * as a loose substring. That is not fastidiousness: scanning for `cohere` over
+ * this repository matches "co**here**nt" in five files of the engine's own test
+ * generators, which was measured before this list was written rather than
+ * discovered by a false red.
+ */
+const MODEL_SDK_SPECIFIERS = [
+  '@anthropic-ai/sdk',
+  'openai',
+  '@google/generative-ai',
+  '@google/genai',
+  'cohere-ai',
+  '@mistralai/mistralai',
+  'replicate',
+  'langchain',
+  '@langchain/core',
+  'ollama',
+  '@aws-sdk/client-bedrock-runtime',
+  'together-ai',
+  'groq-sdk',
+  '@huggingface/inference',
+];
+
+/** Matched against string literals. Dotted hosts, so they need no word guard. */
+const MODEL_ENDPOINT_HOSTS = [
+  'api.anthropic.com',
+  'api.openai.com',
+  'generativelanguage.googleapis.com',
+  'api.cohere.ai',
+  'api.mistral.ai',
+  'api.replicate.com',
+  'api.together.xyz',
+  'api.groq.com',
+  'bedrock-runtime.',
+  'api-inference.huggingface.co',
+];
+
+/**
+ * The paths assertion 1 scans. ADR-044 names four money paths and one of them
+ * exists; the other three are listed as the names assertion 2 watches for.
+ */
+const CI06O_SCOPE = ['packages/rules-engine'];
+
+/**
+ * How assertion 2 RECOGNISES a money path without being told.
+ *
+ * ADR-044's four are the rules engine, payout, ledger and auth, and CLAUDE.md's
+ * session-length regime names the same four. A package or app whose directory
+ * name carries one of these words is a money path, and if the scope list does
+ * not name it the gate says so.
+ */
+const MONEY_PATH_WORDS = ['rules-engine', 'payout', 'ledger', 'auth'];
+
+/**
+ * Comments removed while string literals are respected, because a URL contains
+ * `//` and a naive stripper eats the rest of the line that holds it. Walks the
+ * source once tracking which of five states it is in.
+ */
+function stripJsComments(src) {
+  let out = '';
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    const d = src[i + 1];
+    if (c === '/' && d === '/') {
+      while (i < src.length && src[i] !== '\n') i++;
+      continue;
+    }
+    if (c === '/' && d === '*') {
+      i += 2;
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++;
+      i += 2;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') {
+      const quote = c;
+      out += c;
+      i++;
+      while (i < src.length) {
+        if (src[i] === '\\') {
+          out += src[i] + (src[i + 1] ?? '');
+          i += 2;
+          continue;
+        }
+        out += src[i];
+        if (src[i] === quote) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+/** Every specifier a static import, re-export, dynamic import or require names. */
+function importSpecifiers(src) {
+  const out = [];
+  const patterns = [
+    /(?:^|[^\w$])(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]/g,
+    /(?:^|[^\w$])import\s*['"]([^'"]+)['"]/g,
+    /(?:^|[^\w$])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    /(?:^|[^\w$])require\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+  ];
+  for (const re of patterns) {
+    let m;
+    while ((m = re.exec(src)) !== null) out.push(m[1]);
+  }
+  return out;
+}
+
+/** `openai` matches `openai` and `openai/shims`, and never `openai-ish`. */
+const isBannedSpecifier = (spec) =>
+  MODEL_SDK_SPECIFIERS.find((b) => spec === b || spec.startsWith(`${b}/`));
+
+const CI06O_SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
+
+const ci06o = {
+  id: 'CI-06o',
+  title: 'No model SDK or model endpoint on the money path, and no money path outside the scope list',
+  covers:
+    "ADR-044 section 8's prohibition 1, in two assertions. ONE: no file under a " +
+    'money-path scope entry imports a model SDK or names a model endpoint host, ' +
+    'read from STATIC import, re-export, dynamic-import and require specifiers ' +
+    'and from string literals, with comments stripped. TWO: every money path the ' +
+    'gate can DISCOVER, meaning a child of packages/ or apps/ whose directory ' +
+    "name carries one of ADR-044's four money-path words, is named in the scope " +
+    'list, so a path added to the money-path set without being added here is ' +
+    'itself a finding. IT IS NOT RI-07: that walks the engine module graph only, ' +
+    'reads specifiers and not endpoints, and has no ban list and no assertion 2. ' +
+    'WHAT IT CANNOT DO, stated because a gate implying coverage it lacks is worse ' +
+    'than its absence: a host BUILT AT RUNTIME from concatenation or an env var ' +
+    'is invisible to it, as is a model call made by a dependency inside its own ' +
+    'package (node_modules is never walked), and discovery is BY NAME, so a money ' +
+    'path whose directory name does not say so -- apps/worker runs the nightly ' +
+    'batch today -- is not found by assertion 2 and must be added by hand.',
+  run() {
+    const findings = [];
+    let scanned = 0;
+
+    // Assertion 1.
+    for (const dir of CI06O_SCOPE) {
+      if (!existsSync(join(ROOT, dir))) {
+        findings.push(`${dir}: scope entry does not exist, so nothing under it is checked`);
+        continue;
+      }
+      for (const file of walk(dir)) {
+        if (!CI06O_SOURCE.has(extname(file))) continue;
+        scanned++;
+        const src = stripJsComments(read(file));
+        for (const spec of importSpecifiers(src)) {
+          const banned = isBannedSpecifier(spec);
+          if (banned) findings.push(`${file}: imports the model SDK "${banned}"`);
+        }
+        for (const host of MODEL_ENDPOINT_HOSTS) {
+          if (src.includes(host)) findings.push(`${file}: names the model endpoint "${host}"`);
+        }
+      }
+    }
+
+    // Rule 2 on a directory-shaped input. A scope that matches no file is a gate
+    // asserting nothing, and it must say so rather than pass quietly.
+    if (scanned === 0) {
+      findings.push('the scope list matched no source file, so assertion 1 asserted nothing');
+    }
+
+    // Assertion 2, and it is the half that keeps assertion 1 honest.
+    let discovered = 0;
+    for (const root of ['packages', 'apps']) {
+      if (!existsSync(join(ROOT, root))) continue;
+      for (const entry of readdirSync(join(ROOT, root))) {
+        if (entry === 'node_modules') continue;
+        const rel = `${root}/${entry}`;
+        if (!statSync(join(ROOT, rel)).isDirectory()) continue;
+        const word = MONEY_PATH_WORDS.find((w) => entry.includes(w));
+        if (!word) continue;
+        discovered++;
+        if (!CI06O_SCOPE.includes(rel)) {
+          findings.push(
+            `${rel}: money path (its name carries "${word}") is not in CI-06o's scope list, ` +
+              'so ADR-044 prohibition 1 is not enforced over it',
+          );
+        }
+      }
+    }
+    if (discovered === 0) {
+      findings.push('discovery matched no money path, so assertion 2 asserted nothing');
+    }
+
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // The third allocation table in ALLOCATION.md claims `CI-06` LETTERS, and for a
 // week nothing read it. That is not an oversight, it is a parser fact: the
 // shared `allocated()` above matches a three-digit or four-digit first cell and
@@ -3281,6 +3536,179 @@ const ci06r = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06t  EVERY GENERATED SPAN IS CLOSED BEFORE THE NEXT ONE OPENS
+// -----------------------------------------------------------------------------
+// THIS COMMENT NAMES THE TOKENS AND NEVER SPELLS THEM, and that is not fussiness:
+// a document describing this gate is a document carrying the defect unless it is
+// careful. The reservation row for this very letter spelled an opener out while
+// reserving a gate against spelling openers out, and CI-06g caught it within the
+// minute. So: an OPENER is the `gen:` comment naming a span, and a CLOSER is its
+// partner. Neither appears literally anywhere in this file; the seed in
+// falsify.mjs assembles them, which is the one place a literal is unavoidable.
+//
+// THE DEFECT. On 2026-08-18 a planning session appended a section to STATE.md and
+// CI-06g failed, reporting that the `ec_count` span "reads" ten thousand
+// characters of unrelated prose. THE CAUSE WAS TWO DAYS OLD AND HAD BEEN PASSING.
+// A line described a falsify.mjs seed by spelling an opener out and never closing
+// it. `spansIn` matches an opener only when a closer follows it, so an opener
+// with nothing after it MATCHES NOTHING AND IS SKIPPED IN SILENCE. It was
+// invisible for exactly as long as it was the last such token in the file, and
+// the first append below it supplied the closer it had been waiting for. The
+// stale opener then paired with the NEW span's closer and swallowed everything
+// between, including that span's own opener.
+//
+// SO A TOTAL COUNT OF OPENERS AGAINST CLOSERS IS NOT THIS CHECK, and the
+// distinction is the whole gate. A file can hold equal numbers of each and still
+// be wrong: `docs/sessions/2026-08-15-session-30.md` opened twice on one line
+// with neither closed while a third sat unclosed above it, and any balance-count
+// reading would have to see three closers appear later to call it a finding.
+// What matters is ORDER: each opener is followed by its closer BEFORE ANY OTHER
+// OPENER APPEARS, which is what makes the non-greedy pair in `spansIn` mean what
+// it looks like it means.
+//
+// FOURTH INSTANCE OF THE SPAN-PARSER CLASS, and this gate is a reader too, which
+// is the honest thing to say about it. CI-06n's parser matched a prose mention
+// rather than a table row (`OI-09`); CI-06g's own falsify seed hardcoded the
+// value it was checking; and `registryIds()` re-implemented the `gs_count` query
+// instead of calling it. Each was a reader looser or narrower than the property
+// it claimed. This one is narrower than "the spans are correct" on purpose: it
+// says nothing about a span's NAME or its CONTENT, which is CI-06g's half.
+//
+// THE DOCUMENT SET IS `markdownFiles()`, WHICH IS CI-06g's, AND NOT
+// `isCorpusDocument`. That is a deliberate choice against the obvious reuse.
+// `isCorpusDocument` is `CI-06b` and `CI-06c`'s shared reader under `OQ-P1-04`,
+// and it answers "is this a thing with a gateable status and an INDEX row" --
+// a different question. This gate exists to protect ONE parser, `spansIn`, and
+// the population at risk is exactly the population that parser reads, which is
+// every markdown file. Guarding a narrower set than the reader you are
+// protecting is how a gate ends up green over the file that breaks. Two of the
+// four real sites found on arrival sit in `docs/sessions/`, which both readers
+// cover; the third sat under `docs/decisions/gates/`, which `isCorpusDocument`
+// excludes as a registry entry and `markdownFiles()` does not.
+
+/**
+ * Span tokens in one document, in the order they appear, with the code fences
+ * masked exactly as `spansIn` masks them.
+ *
+ * THE MASKING IS NOT OPTIONAL AND IS NOT DEFENSIVE. STRATEGY's own CI-06g
+ * section carries a worked example of a span inside a fence, and a scan that
+ * did not mask would report the document explaining the gate as a violation of
+ * it. Sharing the mask with `spansIn` is what makes "quoted" mean one thing.
+ */
+function spanTokens(body) {
+  const masked = body.replace(/^```[\s\S]*?^```/gm, (block) => block.replace(/</g, '\0'));
+  // Assembled rather than spelled, for the reason the block comment above gives.
+  const OPENER = new RegExp(`<!--${'gen'}:([a-z0-9_]+)-->`, 'g');
+  const CLOSER = new RegExp(`<!--/${'gen'}-->`, 'g');
+  const at = (i) => masked.slice(0, i).split('\n').length;
+  const tokens = [];
+  for (const m of masked.matchAll(OPENER))
+    tokens.push({ kind: 'opener', at: m.index, line: at(m.index), name: m[1] });
+  for (const m of masked.matchAll(CLOSER))
+    tokens.push({ kind: 'closer', at: m.index, line: at(m.index) });
+  // Two sweeps and one sort rather than one alternating pattern, because a
+  // single regex would have to name both forms and the sort is the cheap half.
+  //
+  // SORTED BY CHARACTER OFFSET AND NOT BY LINE, and the first draft of this
+  // function sorted by line and reported fifty findings against a clean tree.
+  // INDEX.md carries three spans on ONE line and STRATEGY carries two; a
+  // line-keyed sort with an opener-first tiebreak reads those as three openers
+  // followed by three closers, which is the exact shape this gate calls a
+  // finding. A reader looser or narrower than the property it claims is the
+  // class this gate is the fourth instance of, and it was the fifth for about a
+  // minute.
+  return tokens.sort((a, b) => a.at - b.at);
+}
+
+const ci06t = {
+  id: 'CI-06t',
+  title: 'Every generated span is closed before the next one opens',
+  covers:
+    'SPAN BALANCE, READ AS ORDER RATHER THAN AS A COUNT. In every markdown file, ' +
+    'each generated-span opener is followed by its closer BEFORE ANY OTHER OPENER ' +
+    'APPEARS, and a closer with no opener before it is a finding. ' +
+    'A TOTAL COUNT OF OPENERS AGAINST CLOSERS IS NOT THIS CHECK and would have ' +
+    'passed on the defect that commissioned it. CI-06g reads a span by matching ' +
+    'an opener to the next closer anywhere after it, so an opener with no closer ' +
+    'after it matches NOTHING and is skipped in silence, and the moment a later ' +
+    'span supplies a closer the stale opener swallows everything between them, ' +
+    'including that later span own opener. That is a defect which passes for as ' +
+    'long as it is the last such token in the file and fails on the next append. ' +
+    'IT SAYS NOTHING ABOUT A SPAN NAME OR ITS CONTENT, which is CI-06g half. A ' +
+    'perfectly balanced file whose every span holds a stale number passes here ' +
+    'and is CI-06g finding, and the two gates are deliberately not merged so ' +
+    'that neither is taken on trust for the other. ' +
+    'IT READS markdownFiles(), WHICH IS CI-06g OWN SET, and deliberately not ' +
+    'isCorpusDocument: the population at risk is exactly the population the ' +
+    'parser being protected reads, and one of the four real sites found on ' +
+    'arrival sat in a directory isCorpusDocument excludes. ' +
+    'IT IS A READER TOO, which is the fourth instance of that class here and is ' +
+    'stated rather than left to be discovered. Code fences are masked with the ' +
+    'same expression CI-06g uses, so a worked example of a span inside a fence ' +
+    'is quoted rather than counted; a token constructed at runtime, or split ' +
+    'across a line, is out of reach and is claimed as nothing.',
+  run() {
+    const findings = [];
+    let documents = 0;
+    let tokens = 0;
+
+    for (const file of markdownFiles()) {
+      const found = spanTokens(read(file));
+      if (found.length === 0) continue;
+      documents++;
+      tokens += found.length;
+
+      let open = null;
+      for (const token of found) {
+        if (token.kind === 'opener') {
+          if (open) {
+            findings.push(
+              `${file}:${token.line}: span "${token.name}" opens while "${open.name}" ` +
+                `(line ${open.line}) is still unclosed. CI-06g will pair the earlier opener ` +
+                `with a LATER closer and read everything between them as its content. Name ` +
+                `the span rather than spelling its opener, which is the repair STATE.md took`,
+            );
+          }
+          open = token;
+        } else {
+          if (!open) {
+            findings.push(
+              `${file}:${token.line}: a span closer with no opener before it. Either the ` +
+                `opener was deleted and its closer left behind, or a document is quoting a ` +
+                `closer outside a code fence`,
+            );
+          }
+          open = null;
+        }
+      }
+      if (open) {
+        findings.push(
+          `${file}:${open.line}: span "${open.name}" opens and is never closed. IT IS ` +
+            `INVISIBLE TO CI-06g FOR EXACTLY AS LONG AS NOTHING IS APPENDED BELOW IT, ` +
+            `and the first section added after it supplies the closer it has been waiting ` +
+            `for. Name the span rather than spelling its opener`,
+        );
+      }
+    }
+
+    // The sentinel, and it fails differently from a finding on purpose. This
+    // gate reports nothing on a corpus with no spans in it and on a corpus
+    // whose token pattern has stopped matching, and those two are not the same
+    // fact. `CI-06g` carries the identical guard for the identical reason.
+    if (documents === 0 || tokens === 0) {
+      throw new Error(
+        'CI-06t found no generated-span token in any markdown file. This corpus ' +
+          'carries them in INDEX, STATE, STRATEGY and several session logs, so zero ' +
+          'means the token pattern has stopped matching and every unbalanced document ' +
+          'in the tree would pass for the wrong reason',
+      );
+    }
+
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -3298,11 +3726,13 @@ const GATES = [
   ci06l,
   ci06m,
   ci06n,
+  ci06o,
   ci06p,
   ci06q,
   ci06r,
   ci06s,
   adr026,
+  ci06t,
 ];
 
 function main() {

@@ -457,6 +457,19 @@ function firstCoverageColumnLoose(dir) {
 // tree copy rather than on the seeded violation. A gate failing for a reason
 // you did not plant tells you nothing about whether it can catch the thing you
 // did plant. Every seed therefore names a substring its finding must contain.
+/**
+ * A generated-span opener and closer, ASSEMBLED RATHER THAN WRITTEN.
+ *
+ * `falsify.mjs` lives inside the tree `CI-06t` scans, so a literal opener here
+ * would make this harness a finding of the gate it is proving. That is not a
+ * hypothetical: the ALLOCATION row reserving this very letter spelled an opener
+ * out while reserving a gate against spelling openers out, and `CI-06g` caught
+ * it within the minute. Same reason `CI-06q`'s seed assembles its approval
+ * phrase, and `RI-02`'s idiom generally.
+ */
+const opener = (name) => `<!--${'gen'}:${name}-->`;
+const closer = () => `<!--/${'gen'}-->`;
+
 const SEEDS = {
   'CI-06a': {
     what: 'a link to a heading that does not exist',
@@ -607,6 +620,23 @@ const SEEDS = {
         `## ADR-${n}: an entry nothing indexes  (2026-08-15, status: proposed)\n`,
       );
     },
+  },
+  'CI-06o': {
+    what: 'a model SDK imported by a file on the money path',
+    real:
+      'ADR-044 section 8 specified this prohibition and then said it was prose: a rule '
+      + 'that says no model on the money path and is enforced by people remembering it is '
+      + 'a control that exists, stays valid, and enforces nothing',
+    // THE SEEDED FILE IS NEW RATHER THAN AN EDIT TO AN EXISTING ONE, so the seed
+    // cannot go stale when the file it would have edited is renamed, and so the
+    // violation is the whole of what the file contains.
+    expect: () => 'packages/rules-engine/src/narrate.ts: imports the model SDK "@anthropic-ai/sdk"',
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'packages/rules-engine/src/narrate.ts'),
+        'import Anthropic from \'@anthropic-ai/sdk\';\n'
+          + 'export const explain = async (why: string) => new Anthropic().messages.create({ why });\n',
+      ),
   },
   'CI-06q': {
     what: 'a dated citation of a founder ruling on a date no registry file declares',
@@ -806,6 +836,26 @@ const SEEDS = {
     real: 'the delta tally was wrong on the day it was written, and U-06 was uncounted',
     expect: 'SD-M9-99',
     seed: (d) => edit(d, 'docs/STATE.md', (b) => b + '\nSD-M9-99 is folded.\n'),
+  },
+  'CI-06t': {
+    what: 'a generated-span opener written into prose and never closed',
+    real:
+      'a session log described a falsify.mjs seed by spelling an opener out and never ' +
+      'closing it. CI-06g matches an opener only when a closer follows it, so it was ' +
+      'skipped in silence for two days, and the first section appended below it supplied ' +
+      'the closer it had been waiting for. The stale opener then swallowed ten thousand ' +
+      'characters of unrelated prose including the new span own opener',
+    // THE ONLY PLACE IN THIS REPOSITORY WHERE A LITERAL TOKEN IS UNAVOIDABLE, and
+    // it is assembled rather than written so that this file is not itself the
+    // defect. RI-02's idiom, and the same reason CI-06q's seed assembles its
+    // approval phrase: the harness lives inside the tree the gate scans.
+    expect: 'opens and is never closed',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) => `${b}\n<!-- seeded -->\nThe count sits in a ${opener('ec_count')} span.\n`,
+      ),
   },
 };
 
@@ -1487,6 +1537,94 @@ const SCOPE_CASES = [
     },
   },
   {
+    name: 'CI-06t/unclosed-before-a-good-span-later',
+    gate: 'CI-06t',
+    what: 'an unclosed opener EARLY with a legitimate closed span LATER, which MUST be a finding',
+    // THIS IS THE CASE A BALANCE COUNT PASSES, and it is the arrangement that
+    // produced the defect. One opener with no closer, then a complete span
+    // below it: two openers, one closer, and any reading that compares totals
+    // sees an imbalance it cannot locate, while a reading that pairs each
+    // opener with the NEXT closer anywhere after it sees one tidy span whose
+    // content happens to be everything in between.
+    //
+    // It is in scope and must FAIL. If a future edit turns CI-06t into a
+    // counter, the seed above still fires and this one stops, which is the
+    // whole reason both exist.
+    expect: 'is still unclosed',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\nThe stale one is a ${opener('ec_count')} written into prose.\n\n` +
+          `A real span follows it: ${opener('gs_count')}284${closer()}\n`,
+      ),
+  },
+  {
+    name: 'CI-06t/a-document-with-no-spans-is-not-a-finding',
+    gate: 'CI-06t',
+    what: 'a document carrying no span token at all, which must NOT be a finding',
+    expect: 'PASS',
+    // The boundary is at `unbalanced`, not at `mentions a span`. Most of the
+    // 494 markdown files in this tree carry no token and ten carry all 158 of
+    // them; a gate that reported on the other 484 would be unusable. The
+    // control fires on the same file with one unclosed opener added, which is
+    // the single edit that turns a silent document into a finding.
+    control: {
+      expect: 'opens and is never closed',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) => `${b}\n<!-- control -->\nA ${opener('adr_count')} left open.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\nThis paragraph discusses the ec_count span and carries no token.\n`,
+      ),
+  },
+  {
+    name: 'CI-06t/correctly-closed-spans-are-not-a-finding',
+    gate: 'CI-06t',
+    what: 'a document whose spans all open and close in order, which must NOT be a finding',
+    expect: 'PASS',
+    // TWO SPANS AND A SECOND ON THE SAME LINE, because the first draft of this
+    // gate sorted tokens by LINE and read three spans on one line as three
+    // openers followed by three closers. INDEX.md carries exactly that shape and
+    // the draft reported fifty findings against a clean tree. This case is what
+    // stops that regression returning quietly.
+    control: {
+      // The stale opener trails the good span, so the gate reaches end of file
+      // with one open and reports THAT form rather than the interleaving one.
+      // The first draft asserted the interleaving message here and the harness
+      // said CONTROL DID NOT FIRE, which is the harness doing its job: a
+      // control whose expectation is wrong proves nothing and the PASS beneath
+      // it would have asserted nothing.
+      expect: 'opens and is never closed',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\nOne ${opener('adr_count')}58${closer()} and a stale ` +
+            `${opener('ec_count')} beside it.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\nOne ${opener('adr_count')}58${closer()} then ` +
+          `${opener('ec_count')}157${closer()} on the same line.\n\n` +
+          `And another on its own: ${opener('gs_count')}284${closer()}\n`,
+      ),
+  },
+  {
     name: 'CI-06p/unclaimed-letter',
     gate: 'CI-06p',
     what: 'a gate in the runner whose letter no row of the table claims, which MUST be a finding',
@@ -1516,6 +1654,43 @@ const SCOPE_CASES = [
         throw new Error(`seed anchor not found: no row claiming \`${letter}\` on its own`);
       }
       writeFileSync(p, kept.join('\n'));
+    },
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06o. TWO ASSERTIONS, AND `SEEDS` CARRIES ONE.
+  //
+  // The seeded violation covers assertion 1, which is nearly vacuous today: there
+  // is no ledger, payout or auth package, so it scans one package and finds
+  // nothing. ASSERTION 2 IS THE ONE WITH TEETH and it would otherwise be taken on
+  // trust, which is CI-06k's arithmetic one gate over.
+  //
+  // A money path added without being added to the gate's scope is itself a
+  // finding, and this is the case that watches it fire. It seeds the exact
+  // scenario ADR-044 was written against: `packages/payout` arrives, nobody
+  // remembers the ADR, and the gate says so rather than scanning a set that no
+  // longer covers the money path.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06o/unscoped-money-path',
+    gate: 'CI-06o',
+    what: "a new money-path package that the gate's own scope list does not name",
+    expect:
+      'packages/payout: money path (its name carries "payout") is not in CI-06o\'s scope list',
+    seed: (d) => {
+      mkdirSync(join(d, 'packages/payout/src'), { recursive: true });
+      writeFileSync(
+        join(d, 'packages/payout/package.json'),
+        JSON.stringify({ name: '@merit/payout', private: true }, null, 2) + '\n',
+      );
+      // THE SEEDED PACKAGE IS CLEAN, which is the point of this case rather than
+      // an oversight. It imports no model SDK, so assertion 1 has nothing to say
+      // about it and would report NOTHING. The finding is the scope gap itself:
+      // an unscoped money path is a hole whether or not anybody has walked
+      // through it yet.
+      writeFileSync(
+        join(d, 'packages/payout/src/index.ts'),
+        'export const settle = (cents: bigint): bigint => cents;\n',
+      );
     },
   },
 ];
