@@ -260,7 +260,7 @@ somewhere else in the corpus.** [`ADR-036.md:29`](../ADR-036.md) states:
 | The stale claim | The tree today | Where the repair is already recorded |
 |---|---|---|
 | "The next free migration number is `0029`" | 37 migrations exist; `0037` is the last row | [`ALLOCATION.md`](../ALLOCATION.md), "The next free number is the one after the last row of this table, and **this file no longer says which it is**." The number was **deleted** under ADR-034's remedy |
-| "The runner still holds eleven checks" | 17. `gates.mjs check` reports "17 of 17 gates pass" | [INDEX:117](../../INDEX.md), where the count is a `<!--gen:gate_count-->` span **because that cell stated it by hand and was wrong** |
+| "The runner still holds eleven checks" | 17. `gates.mjs check` reports "17 of 17 gates pass" | [INDEX:117](../../INDEX.md), where the count is a `gate_count` generated span **because that cell stated it by hand and was wrong** |
 | The alternatives list rejects a gate named `CI-06k` | `CI-06k` exists and is [ADR-039](../ADR-039.md)'s declared-authority gate | [`ALLOCATION.md`](../ALLOCATION.md): "One letter in this file is already spoken for by something that is not a gate, and it is named here so a reader does not mistake it for a reservation" |
 
 **None of these is a superseding-without-an-ADR case. Each is the corpus catching its own drift and
