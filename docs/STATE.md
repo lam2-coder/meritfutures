@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-18
+last_updated: 2026-08-19
 ---
 
 # STATE
@@ -1744,3 +1744,5 @@ at line 68.
 **Second, that gate is now cheap and its shape is worth naming.** With the column in place the check is one comparison in [`gates.mjs`](../scripts/corpus/gates.mjs) with no database: parse M01 section 3.5's eight tables, take the first cell and the `Computed by` cell of each of the fifty rows, and assert that a row reading `Engine` appears in `IMPLEMENTED_RULES` and a row reading anything else appears in `DISCHARGED_ELSEWHERE`, both directions. **It is a gate that reads a plan document against a test file**, which the corpus has no instance of yet, and that is the reason to be careful with its parser rather than a reason to defer it: `CI-06n`, `CI-06g`, `registryIds()` and `CI-06t`'s own first draft are four recorded cases of a reader looser than the property it claimed.
 
 **Third, no receiving suite for `GS-001` and `GS-030` was found.** The refusal's condition is that a row may leave group A once the suite that will verify it is named, and this session looked: **ingest has no fixture suite.** [`0013_ingest.sql`](../packages/db/migrations/0013_ingest.sql) declares the storage and [M02](plans/M02-rithmic-bridge.md) holds at `review` under [ADR-005](decisions/ADR-005.md) pending the vendor call, so the layer that owes `R-01` has no test directory to receive a scenario. **The condition is unmet and no row moved.** It is reported as a finding rather than acted on, exactly as the ruling instructs.
+
+**Position, each figure produced by a command rather than quoted:** **21 of 21 gates pass**, `npx vitest run` reports **61 files, 929 passed, 42 skipped** (unchanged: no test file and no `src/` file was touched), the calendar generator's own suite is **50 of 50**, and the layer column agrees with both exports in both directions -- 46 `Engine` rows against 46 in `IMPLEMENTED_RULES`, 4 non-engine rows against the 4 in `DISCHARGED_ELSEWHERE`, with nothing in either difference. **`0038` stays free and `CI-06u` is claimed and unwritten.**
