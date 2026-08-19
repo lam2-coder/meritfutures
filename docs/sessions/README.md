@@ -220,3 +220,4 @@ must be recoverable from its own file alone.
 | [2026-08-18 - Session 72](2026-08-18-session-72.md) | ADR-059 proposed: the three group A input questions, two already answered in test code and one with no source anywhere |
 | [2026-08-18 - Session 71](2026-08-18-session-71.md) | `compare.ts` diffs `engine_gates`, and the handoff's count was wrong by one |
 | [2026-08-19 - Session 74](2026-08-19-session-74.md) | the four adapter copies collapsed to one module, and the proof that it changed nothing |
+| [2026-08-19 - Session 75](2026-08-19-session-75.md) | ADR-059 signed as a split: the layer column on M01's fifty rules, the halt open question named, and the seed comment |
