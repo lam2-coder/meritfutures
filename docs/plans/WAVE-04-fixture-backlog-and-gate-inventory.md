@@ -126,6 +126,72 @@ stands.** What is certain today is that 16 is an upper bound and that
 **It also verified `GS-241`'s two figures by hand under TR-01 and they match the
 registry exactly**, so the row is right and only its reachability was wrong.
 
+### The harm was not wasted work, and `W2` is the session that named it
+
+**`W2` returned 1 of 6 independently and reached the same wall from the other
+side.** Its statement of the consequence is sharper than the one above and is the
+reason this repair is not a bookkeeping note:
+
+> `R-43` and `R-44` are in `IMPLEMENTED_RULES`, so a fixture citing them derives
+> **direct** and must match. It never could. Writing them would have produced a
+> **permanent false red on a money path**, indistinguishable from the engine
+> defect a golden failure is supposed to mean.
+
+**That is worse than an unwritable fixture and it is why half-rows were correctly
+declined twice.** [ADR-048](../decisions/ADR-048.md)'s polarity derivation is what
+makes a fixture safe to write before its rule lands; it offers **no protection at
+all** against a fixture whose assertion the pipeline cannot reach, because
+polarity is derived from the CITATION and never from the assertion. A direct
+fixture that can never match does not read as "not implemented yet". It reads as
+a broken engine, on the payout path, permanently.
+
+### THE JUSTIFICATION IN 2.2 CONTRADICTS SECTION 2, AND NO SOURCE READING WAS NEEDED TO SEE IT
+
+**`W2` also found the error without leaving this document.** Section 2 states, in
+bold, that *"the engine has not implemented the rule yet is NOT a blocker, and
+that is the design working."* Section 2.2 then justifies putting all six payout
+scenarios in Tier 1 because **"`R-43` and `R-44` are declared."**
+
+**If declaration is not what blocks, declaration cannot be what unblocks.** The
+two paragraphs are incompatible and they sit four hundred words apart in one
+file. **The justification answers condition W1 while the binding constraint was
+always condition W2, the format.** Reading `run.ts` would have caught it; so
+would reading this plan's own two paragraphs together, and that is the cheaper
+check that was also skipped.
+
+**And [`fixtures/README.md`](../../packages/rules-engine/fixtures/README.md)'s
+held-back table already said it**, in the file `W2`'s own prompt instructed it to
+read in full before writing anything. **The answer was written down, in the file
+the plan pointed at, and the plan contradicted it anyway.**
+
+### What `W2` and `W3` actually landed, and one ruling they raise
+
+| | |
+|---|---|
+| **`W3`** | **0 of 6.** `GS-035`, `GS-057`, `GS-058`, `GS-066`, `GS-082`, `GS-241` all blocked, each with the field and the file cited. `GS-241`'s two figures verified by hand under TR-01 and **matching the registry exactly** |
+| **`W2`** | **1 of 6.** `GS-080` written, derives direct, matched `advanceDay` on the first run with **fifteen hand-computed values and nothing edited**. `GS-026` to `GS-029` and `GS-042` blocked by ONE fact rather than five |
+| **Coverage moved less than the count suggests** | `GS-080` is a **Group F** fixture, not Group G. **The payout arithmetic these two sessions were sent to cover is still one fixture deep, at `GS-025`** |
+
+**`GS-042` IS ONE THIRD REACHABLE AND NEEDS A RULING THIS PLAN CANNOT TAKE.** Its
+`>=` boundary is a `RuleState` field; the exact tie and the one-cent request are
+both `clamp` results. `W2` declined it on `GS-060`'s stated standard, **"BOTH
+HALVES OR NEITHER"**, which batch 10 applied to exactly this trade. **But
+`GS-060`'s blocker was temporary and `GS-042`'s is structural**, so waiting costs
+more here than it did there. `W2`'s recommendation is to **split the registry row
+rather than relax the standard**, and it correctly declined to take that decision
+itself.
+
+### Two stale blockers in `fixtures/README.md`, found and deliberately not fixed
+
+Both are outside `W2`'s fence, which was shared with two concurrent sessions.
+
+- **`compare.ts` diffs nested expectations by leaf path now**, and the README's
+  held-back table still lists that as a blocker.
+- **Polarity is wired and enforced at 41 direct and 0 inverted.** The README
+  still says every fixture is inverted.
+
+---
+
 **The gate this wants is not written and is not `W8`'s.** Nothing in the tree
 asserts that a scenario queued as writable has an assertion the fixture pipeline
 can actually reach. That is checkable, and preferring a gate to more care is what
