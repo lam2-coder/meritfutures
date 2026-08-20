@@ -48,18 +48,7 @@
 // resolved by a build session picking one. The note travels on the output.
 // =============================================================================
 
-import type { OutputUnit, ProposedRegistryId, RegistryId } from './types.js';
-
-/** The stable key an output is addressed by. Never renamed once a run has stored one. */
-export type OutputKey =
-  | 'evaluation_pass_rate'
-  | 'funded_to_payout_rate'
-  | 'payouts_per_payer'
-  | 'liability_per_funded_account'
-  | 'contribution_per_buyer'
-  | 'margin_at_price'
-  | 'per_day_extraction_ceiling'
-  | 'lifetime_extraction_maximum';
+import type { OutputKey, OutputUnit, ProposedRegistryId, RegistryId } from './types.js';
 
 /** What an output IS, independent of any run. Data, so it can be listed and audited. */
 export interface OutputDefinition {

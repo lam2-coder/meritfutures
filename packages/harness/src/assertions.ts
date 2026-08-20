@@ -155,7 +155,7 @@ export function checkBands(
       return {
         bandId: band.id,
         label: band.label,
-        outputKey: '',
+        outputKey: null,
         realized: null,
         minimum: band.minimum,
         maximum: band.maximum,

@@ -363,6 +363,15 @@ export interface HarnessRunInput {
   readonly specs: readonly ContractSpec[];
   /** Where the run's sessions sit in the caller's calendar. `R-37` counts on it. */
   readonly sequenceBase: number;
+  /**
+   * `V-M2-09`. Accounts per platform USER, which Rithmic bills per login-month.
+   *
+   * OPTIONAL BECAUSE NO OUTPUT IN THIS PACKAGE READS IT. It changes the user ref
+   * a population is grouped onto and nothing else here, so a run that omits it
+   * is not a run missing a parameter. `SD-M2-05`'s invoice reconciliation is
+   * where it matters, and that is not this harness.
+   */
+  readonly accountsPerUser?: number;
   /** `R-03`. Days the caller declares half days, by `tradingDay`. */
   readonly halfDays?: ReadonlySet<string>;
   /** `R-04`. Days the caller declares halted, by `tradingDay`. */
@@ -372,6 +381,21 @@ export interface HarnessRunInput {
   readonly context: ExternalGates;
   readonly calibration: CalibrationSource;
 }
+
+/**
+ * The stable key an output is addressed by. Never renamed once a run has stored
+ * one: `SD-M21-01` puts a run's outputs in a `jsonb` column, and a rename makes
+ * every stored run unreadable rather than out of date.
+ */
+export type OutputKey =
+  | 'evaluation_pass_rate'
+  | 'funded_to_payout_rate'
+  | 'payouts_per_payer'
+  | 'liability_per_funded_account'
+  | 'contribution_per_buyer'
+  | 'margin_at_price'
+  | 'per_day_extraction_ceiling'
+  | 'lifetime_extraction_maximum';
 
 /** The units an output is stated in. Integers throughout. */
 export type OutputUnit =
@@ -399,7 +423,7 @@ export type ProposedRegistryId = 'HO-09' | 'HO-10' | 'HO-11';
  * `INV-M21-04`'s requirement and `AS-M21-02`'s early warning.
  */
 export interface OutputRecord {
-  readonly key: string;
+  readonly key: OutputKey;
   readonly label: string;
   readonly registryId: RegistryId | null;
   readonly proposedRegistryId: ProposedRegistryId | null;
@@ -417,7 +441,8 @@ export interface OutputRecord {
 export interface BandResult {
   readonly bandId: string;
   readonly label: string;
-  readonly outputKey: string;
+  /** `null` when no output in the run carries the band's identifier. */
+  readonly outputKey: OutputKey | null;
   /** `null` when the output had no sample, which is neither a pass nor a fail. */
   readonly realized: bigint | null;
   readonly minimum: bigint | null;

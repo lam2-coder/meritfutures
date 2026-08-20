@@ -44,12 +44,18 @@
 
 import type { Cents, ResolvedPlan } from '@merit/rules-engine';
 import type { Provenance } from './provenance.js';
-import type { OutputKey } from './outputs.js';
 import { outputDefinition } from './outputs.js';
 import type { Ratio } from './ratio.js';
 import { compare, fromInteger, multiply, ratio, subtract } from './ratio.js';
 import { checkLifetimeBound } from './assertions.js';
-import type { Aggregate, CommercialInputs, FunnelCounts, OutputRecord, Trial } from './types.js';
+import type {
+  Aggregate,
+  CommercialInputs,
+  FunnelCounts,
+  OutputKey,
+  OutputRecord,
+  Trial,
+} from './types.js';
 
 /** Thrown when an aggregate cannot be computed as specified. */
 export class AggregateError extends Error {
