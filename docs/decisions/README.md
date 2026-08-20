@@ -90,6 +90,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-061](ADR-061.md) | A duplicated table key is a repair when a session can state that both rows say the same thing, and an amendment when it cannot  (2026-08-20, status: proposed) |
 | [ADR-066](ADR-066.md) | Five vendor-parity surfaces admitted, two excluded, and the largest of the five is not new scope but an outstanding commitment nobody had noticed was unsatisfied  (2026-08-20, status: proposed) |
 | [ADR-062](ADR-062.md) | The payout gate reads `identities.status = 'active'`, and three more of section 10's ten duplicated guards were contradictions rather than copies  (2026-08-20, status: proposed) |
+| [ADR-063](ADR-063.md) | `SET A` keeps `INV-M5-17`, `18` and `19`, and one of the six rows is not a collision but a duplicate  (2026-08-20, status: proposed) |
 
 ## Gate closures
 
