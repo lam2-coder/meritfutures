@@ -356,7 +356,7 @@ GS-117.
 | `M6-N-05` | `POST /phone/change` ([API_CONTRACT:196](../architecture/API_CONTRACT.md)), `POST /me/contact-channels` ([M16:255](M16-notification-center.md)) | `C-27`, inherited |
 | `M6-N-06` | `POST /checkout` ([API_CONTRACT:267](../architecture/API_CONTRACT.md)) | **explicit** |
 | `M6-N-07` | `POST /kyc/session` ([API_CONTRACT:484](../architecture/API_CONTRACT.md)), `POST /kyc/reverify` ([M19:223](M19-kyc-identity.md)) | **explicit** |
-| `M6-N-08` | an impersonation token replayed against a trader route | `IMPERSONATION-C1`, a database constraint under `0042`. `GS-303` |
+| `M6-N-08` | an impersonation token replayed against a trader route | `IMPERSONATION-C1`, a database constraint under [`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql). `GS-303` |
 
 **`M6-N-04` is a tripwire and it must say so in the test body, not only here.** `grep destination` over [API_CONTRACT](../architecture/API_CONTRACT.md) returns three hits and **none of them is a route**: two are the OTP challenge's `destination` field and the third is [API_CONTRACT:691](../architecture/API_CONTRACT.md), a `D5` matrix row naming the capability under `C-27`. **So the capability is enumerated and the route is not written.** A negative-authz test that exercises nothing is the "control that exists and enforces nothing" class this corpus has now found roughly twenty times, and it fails the wrong way: it reads as coverage. `M6-N-04` therefore asserts the **conditional**, that IF a payout-destination route is ever added THEN an impersonation session cannot reach it, and **whoever writes that route owns converting it into a live test**. That sentence is the deliverable, and it belongs beside the assertion where that author will read it.
 
