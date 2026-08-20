@@ -4220,6 +4220,172 @@ const ci06v = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06w  Every allocation claim is read as a MULTISET, not a set
+// -----------------------------------------------------------------------------
+// THE REGISTRY THAT EXISTS TO MAKE A DOUBLE CLAIM VISIBLE COULD NOT SEE ONE.
+// `allocated()` and `allocatedLetters()` folded claims into a `Set`, so two
+// rows claiming `0034` produced ONE MEMBER. Every assertion built on them still
+// held: the sequence was gapless, every number on disk was claimed, and no gate
+// in this runner had any way to notice that two different artifacts had been
+// promised the same number. This is `OI-11`.
+//
+// IT IS NOT HYPOTHETICAL AND BOTH OCCURRENCES ARE ON RECORD.
+//   * `0034` was claimed by `ADR-047` for the `rule_states` calendar revision
+//     and by `ADR-046` for the reversible contact addresses, in ADJACENT ROWS
+//     of one table, on one ref, and FIFTEEN GATES PASSED OVER IT. `ADR-046`
+//     wrote the file and merged, so the other subject landed as `0035`.
+//     Recovery was free only because the second file was still unwritten; a
+//     merged migration is sacred (constitution E2) and cannot be renumbered.
+//   * The letter `u` was claimed by TWO DIFFERENT GATES and twenty-two gates
+//     passed over that, recorded in ADR-065 section 4.
+//
+// WHY THIS IS NOT ALREADY `CI-06u`'s JOB. The two are not the same assertion
+// and the distinction is worth stating plainly, because two gates whose scopes
+// are not separable is how a gate gets deleted later.
+//
+//   `CI-06u` reads TABLES. It would report a duplicate row in this file, and on
+//   today's tree it does read all three of these tables. It did NOT catch `u`,
+//   for a reason that is itself a finding: the row sat in an ORPHAN FRAGMENT.
+//   Four blank lines split the letter table into five runs and only the first
+//   carried a delimiter, so nine rows were invisible to every table gate in the
+//   runner. `CI-06v` now closes that hole and `S6` repaired the blanks.
+//
+//   `CI-06w` reads CLAIMS. It asserts at the SEMANTIC level, over the very maps
+//   `CI-06f`, `CI-06h` and `CI-06p` resolve their own answers through, so the
+//   properties it protects survive things `CI-06u` cannot see:
+//
+//     1. A RANGE OVERLAP IS NOT A DUPLICATE ROW. `| 001 to 032 |` and a later
+//        `| 032 |` are two textually distinct first cells and `CI-06u` is
+//        right to pass them. They claim `032` twice, and this gate says so.
+//     2. `CI-06u` IS DEFEATED BY PRESENTATION. Its key is the first cell after
+//        emphasis and links are stripped; `| 0034 |` against `| **0034** |`
+//        folds to one key today, but a row rewritten as `| 0034 to 0034 |`
+//        does not, and neither does one that reaches a claim through a range.
+//        This gate reads the number, never the spelling of the cell.
+//     3. IT CANNOT GO VACUOUS BY REFACTOR. `CI-06u`'s reach over this file is
+//        an accident of the tables being tables. If somebody folds
+//        `allocatedClaims` back into a `Set` -- the exact edit that created
+//        `OI-11` -- `CI-06u` goes on passing and this gate stops compiling a
+//        finding it should have. That is why it asserts over the shared parser
+//        instead of parsing the file a third time.
+//
+//   The overlap is real and is not a reason to keep one: on the population that
+//   actually occurs, two verbatim rows, they agree. `CI-06u` REGISTERS its
+//   duplicates and can be silenced per (file, key); this gate registers
+//   nothing, has no exemption list, and no way to accept a claim twice.
+//
+// THE FOURTH ASSERTION IS THE SAME `Set` ONE LEVEL IN, AND IT IS AN ADDITION TO
+// THE THREE THIS GATE WAS COMMISSIONED FOR. `implementedLetters()` builds the
+// runner's own letter set with `new Set(GATES.map(...))`, so TWO GATE OBJECTS
+// CARRYING ONE ID COLLAPSE TO ONE MEMBER and `CI-06p` reports a letter that is
+// implemented twice as implemented once. That is not a thought experiment: PR
+// #112 and PR #114 each define `id: 'CI-06u'` independently, #114 is open, and
+// a keep-both merge of it lands exactly here with nothing in the tree able to
+// see it. Registry and runner are one defect with one mechanism, and splitting
+// them across two gates would put the cheaper half in a gate nobody wrote.
+const ci06w = {
+  id: 'CI-06w',
+  title: 'Every allocation claim is read as a multiset: one key, at most one row',
+  covers:
+    'Each ADR number, each migration number and each CI-06 letter is claimed by AT MOST ONE ' +
+    "ROW of its own table in ALLOCATION, and each gate id appears at most once in the runner's " +
+    'GATES list. This is OI-11. allocated(), allocatedLetters() and implementedLetters() each ' +
+    'accumulated claims into a Set, so a second claim produced no second member: gaplessness ' +
+    'held, every-artifact-on-disk-is-claimed held, and the registry whose entire purpose is to ' +
+    'make a double claim visible could not see one. 0034 was double-claimed by two migrations ' +
+    'in adjacent rows and fifteen gates passed; the letter u was double-claimed by two gates ' +
+    'and twenty-two passed. ' +
+    'IT IS NOT CI-06u AND THE SCOPES ARE SEPARABLE. CI-06u reads TABLES and does read these ' +
+    'three; it missed u because the row sat in an orphan fragment, which CI-06v now closes. ' +
+    'CI-06w reads CLAIMS, over the same maps CI-06f, CI-06h and CI-06p answer through, and so ' +
+    'it sees three things a table parse cannot: a RANGE OVERLAP (001 to 032 against a later ' +
+    '032 is two distinct first cells and one number claimed twice), a claim reached through ' +
+    'any spelling of the cell rather than the cell text itself, and -- the reason it is ' +
+    'written this way -- a future refactor folding the claims back into a Set, which would ' +
+    'leave CI-06u passing and every double claim invisible again. CI-06u can also be silenced ' +
+    'per (file, key) by its register; this gate has no register and no exemption list. ' +
+    'THREE THINGS IT DOES NOT DO. It inherits the one-ref gap CI-06f, CI-06h, CI-06p and ' +
+    'CI-06u each declare: two BRANCHES claiming one number is the commonest form of this ' +
+    'defect and this run sees one ref, so it catches that at the merge and never at the pull ' +
+    'request. It says nothing about WHICH of two rows is right, which is ADR-065 section 1 and ' +
+    'a founder ruling rather than a parse. And it reads only the three tables ALLOCATION ' +
+    'carries: a registry with no allocation table at all, which docs/sessions is, is out of ' +
+    'reach until it has one.',
+  run() {
+    const findings = [];
+    const body = read(ALLOCATION_DOC);
+
+    // Each table's claims, keyed and formatted for the identifier it allocates.
+    // `allocatedClaims` and `allocatedLetterClaims` each throw when their table
+    // parses to zero rows, which is rule 2 on all three inputs.
+    const registries = [
+      {
+        heading: ADR_ALLOCATION,
+        what: 'ADR number',
+        claims: allocatedClaims(body, ADR_ALLOCATION),
+        label: (n) => `ADR-${String(n).padStart(3, '0')}`,
+      },
+      {
+        heading: MIGRATION_ALLOCATION,
+        what: 'migration number',
+        claims: allocatedClaims(body, MIGRATION_ALLOCATION),
+        label: (n) => String(n).padStart(4, '0'),
+      },
+      {
+        heading: LETTER_ALLOCATION,
+        what: 'CI gate letter',
+        claims: allocatedLetterClaims(body),
+        label: (l) => `CI-06${l}`,
+      },
+    ];
+
+    const note = [];
+    for (const { heading, what, claims, label } of registries) {
+      let rows = 0;
+      for (const lines of claims.values()) rows += lines.length;
+      note.push(`${claims.size} ${what}(s) over ${rows} claim(s)`);
+      // Sorted so the report is stable across runs: a gate whose finding order
+      // moves with Map insertion is a gate whose diff nobody can read.
+      for (const key of [...claims.keys()].sort()) {
+        const lines = claims.get(key);
+        if (lines.length < 2) continue;
+        findings.push(
+          `${ALLOCATION_DOC}: ${label(key)} is claimed by ${lines.length} rows of the ` +
+            `"${heading}" table, at line(s) ${lines.join(', ')}. The claims fold into a Set ` +
+            'downstream, so the second claim adds no member: the sequence stays gapless and ' +
+            'the registry can no longer say which artifact holds the number. Keep ONE row ' +
+            '(ADR-065 section 1: the merge row is the durable fact, and it carries the ' +
+            "branch row's reasoning where that says something the merge row does not)",
+        );
+      }
+    }
+
+    // The runner's own registry. Rule 2: an empty GATES would make this
+    // assertion silent rather than loud, and silence is the direction that
+    // matters on a duplicate check.
+    if (GATES.length === 0) {
+      throw new Error('GATES is empty; CI-06w is asserting nothing about the runner');
+    }
+    const byId = new Map();
+    for (const g of GATES) byId.set(g.id, (byId.get(g.id) ?? 0) + 1);
+    note.push(`${byId.size} gate id(s) over ${GATES.length} registration(s)`);
+    for (const id of [...byId.keys()].sort()) {
+      if (byId.get(id) < 2) continue;
+      findings.push(
+        `scripts/corpus/gates.mjs: the gate id ${id} is registered ${byId.get(id)} times in ` +
+          'GATES. implementedLetters() folds those ids into a Set, so CI-06p reports a letter ' +
+          'implemented twice as implemented once, and both gates run under one name. This is ' +
+          'what a keep-both merge of two branches that each wrote the same CI-06<letter> ' +
+          'produces. Rename one (ADR-065 section 5 rules the successor identifier is a slug)',
+      );
+    }
+
+    console.log(`       CI-06w note: ${note.join('; ')}`);
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -4246,6 +4412,7 @@ const GATES = [
   ci06t,
   ci06u,
   ci06v,
+  ci06w,
 ];
 
 function main() {
