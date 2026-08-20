@@ -38,10 +38,18 @@
 //                                          makes the caller's job, and never the
 //                                          verdict
 //
-// What the loop does decide is BEHAVIOUR: whether the trader asks at all
-// (`PP-09`), and what the account trades after its first payout (`PP-05`). Both
-// are population parameters with `PP-nn` identifiers, both are the caller's
-// numbers, and neither is a rule.
+// What the loop does decide is BEHAVIOUR: WHEN the trader asks (`PP-09` and
+// `AS-08`), and what the account trades after its first payout (`PP-05`). Both
+// are population parameters the corpus names, both are the caller's numbers, and
+// neither is a rule.
+//
+// AND ONE OF THEM IS A REQUIREMENT RATHER THAN A KNOB. M01 `AS-08` (peak
+// picking): "the simulation harness must model REQUEST TIMING AS A STRATEGY, not
+// as a random draw, or the CVaR99 estimate that drives the reserve is biased
+// low. This is a direct requirement on the Monte Carlo port." `decideRequest`
+// below is that requirement, and the random policy survives beside it because
+// M01 section 8.3 wants the estimate "reported under both policies so the bias
+// is measured rather than assumed".
 //
 // -----------------------------------------------------------------------------
 // WHY THE DAY MODEL IS DRIVEN ONE SESSION AT A TIME
@@ -102,7 +110,14 @@ import { advanceDay, evaluatePayout } from '@merit/rules-engine';
 import type { BalanceAdjustment, SimAccount } from '@merit/rithmic';
 import { drawKey, draws, simulate } from '@merit/rithmic';
 import { asTradingDay, sequenceOf, toDailyMark, tradingDaysAfter } from './bridge.js';
-import type { SettledPayout, Trial, TrialBehaviour, TrialInput, TrialOutcome } from './types.js';
+import type {
+  RequestPolicy,
+  SettledPayout,
+  Trial,
+  TrialBehaviour,
+  TrialInput,
+  TrialOutcome,
+} from './types.js';
 
 /** Thrown when a trial cannot be run as specified, or when the harness contradicts itself. */
 export class TrialError extends Error {
@@ -119,8 +134,20 @@ export function checkBehaviour(behaviour: TrialBehaviour): void {
       throw new TrialError(`${label} ${String(value)} is not a basis-point share in 0..10000`);
     }
   };
-  bp('payoutRequestChanceBp', behaviour.payoutRequestChanceBp);
   bp('riskUpShareBp', behaviour.riskUpShareBp);
+  const policy = behaviour.requestPolicy;
+  if (policy.kind === 'random') bp('requestPolicy.chanceBp', policy.chanceBp);
+  if (policy.kind === 'peak_picking' && !Number.isSafeInteger(policy.patienceTradingDays)) {
+    throw new TrialError(
+      `patienceTradingDays ${String(policy.patienceTradingDays)} is not an integer`,
+    );
+  }
+  if (policy.kind === 'peak_picking' && policy.patienceTradingDays < 1) {
+    throw new TrialError(
+      `patienceTradingDays ${String(policy.patienceTradingDays)} is not at least 1. A patience ` +
+        'of zero is a trader who never asks, which is not a request policy',
+    );
+  }
   if (
     !Number.isSafeInteger(behaviour.settlementLagTradingDays) ||
     behaviour.settlementLagTradingDays < 1
@@ -148,6 +175,58 @@ export function checkBehaviour(behaviour: TrialBehaviour): void {
 function riskUpQuantityMax(quantityMax: number, riskUpQuantityBp: number): number {
   const scaled = Math.floor((quantityMax * riskUpQuantityBp) / 10_000);
   return scaled < 1 ? 1 : scaled;
+}
+
+/**
+ * `AS-08`. Whether the trader asks TODAY, given that the engine has already said
+ * yes.
+ *
+ * IT READS ONLY WHAT THE PORTAL ALREADY SHOWS THE TRADER: today's payable
+ * amount, today's cap, and what the trader saw on earlier eligible days. There
+ * is no lookahead, because a policy that peeked at tomorrow's close would model
+ * a clairvoyant trader and overstate the premium `AS-08` is about, which is a
+ * different error from the one it warns of.
+ *
+ * IT DECIDES NOTHING THE ENGINE DECIDES. The amount and the eligibility are
+ * `evaluation`'s; this answers only "does the trader submit the request".
+ */
+function decideRequest(args: {
+  readonly policy: RequestPolicy;
+  readonly seed: string;
+  readonly platformAccountRef: string;
+  readonly tradingDay: string;
+  readonly payableCents: Cents;
+  readonly capCents: Cents;
+  /** The best payable seen on EARLIER eligible days in this window. */
+  readonly bestPayableCents: Cents | null;
+  /** Eligible days in this window, today included. */
+  readonly eligibleDaysObserved: number;
+}): boolean {
+  const { policy } = args;
+  switch (policy.kind) {
+    case 'immediate':
+      return true;
+    case 'random':
+      // Keyed on the day so the draw is stable under any change to the
+      // population or to the window, which is what `rng.ts` keys for.
+      return draws(
+        drawKey('harness-request', args.seed, args.platformAccountRef, args.tradingDay),
+      ).chanceInBasisPoints(policy.chanceBp);
+    case 'peak_picking': {
+      // `AS-08`: the premium "is not exploitable beyond the cap". A clamped
+      // figure cannot rise, so waiting past it only exposes the account to a
+      // breach it has nothing left to gain from.
+      if (args.payableCents >= args.capCents) return true;
+      // Patience spent. The trader asks on whatever today is, which is the
+      // honest cost of the strategy and is why the premium is not free.
+      if (args.eligibleDaysObserved >= policy.patienceTradingDays) return true;
+      // The first eligible day sets the reference and never fires. From then on
+      // the trader asks on the first day that beats everything seen so far,
+      // which is a local maximum computed out of the past alone.
+      if (args.bestPayableCents === null) return false;
+      return args.payableCents > args.bestPayableCents;
+    }
+  }
 }
 
 /**
@@ -217,6 +296,10 @@ export function runTrial(input: TrialInput): Trial {
   let breachedOn: string | null = null;
   let breachKind: BreachKind | null = null;
   let graduatedOn: string | null = null;
+  // `AS-08`'s observation window. Both reset whenever eligibility lapses and
+  // whenever a request is submitted, because a strategy is about ONE decision.
+  let eligibleDaysObserved = 0;
+  let bestPayableCents: Cents | null = null;
 
   // A plan with no evaluation phase opens funded (Appendix A.3, Direct), so its
   // first extraction cycle opens on the window's first session. On a plan with
@@ -370,13 +453,31 @@ export function runTrial(input: TrialInput): Trial {
       requestedCents: null,
     });
 
-    if (!evaluation.eligible) continue;
+    if (!evaluation.eligible) {
+      // The eligibility window closed, so the strategy's observation window
+      // closes with it. A trader who lost the buffer and regained it a month
+      // later is not still waiting on the peak they saw in the first stretch.
+      eligibleDaysObserved = 0;
+      bestPayableCents = null;
+      continue;
+    }
 
-    // `PP-09`. Whether the trader ASKS. Keyed on the day so the draw is stable
-    // under any change to the population or to the window.
-    const asks = draws(
-      drawKey('harness-request', seed, account.platformAccountRef, tradingDay),
-    ).chanceInBasisPoints(behaviour.payoutRequestChanceBp);
+    eligibleDaysObserved += 1;
+    const payableCents = evaluation.maxPayoutCents;
+    const asks = decideRequest({
+      policy: behaviour.requestPolicy,
+      seed,
+      platformAccountRef: account.platformAccountRef,
+      tradingDay,
+      payableCents,
+      capCents: evaluation.capCents,
+      bestPayableCents,
+      eligibleDaysObserved,
+    });
+    bestPayableCents =
+      bestPayableCents === null || payableCents > bestPayableCents
+        ? payableCents
+        : bestPayableCents;
     if (!asks) continue;
 
     if (inFlight !== null) {
@@ -455,8 +556,15 @@ export function runTrial(input: TrialInput): Trial {
               clampReason: evaluation.clamp.reason,
               cycleTradingDays,
               cycleFirstTradingDay,
+              eligibleDaysWaited: eligibleDaysObserved,
             },
           };
+
+    // The decision has been taken, so the observation window closes. The next
+    // one opens when the account is eligible again, which after a settlement is
+    // a cycle away.
+    eligibleDaysObserved = 0;
+    bestPayableCents = null;
   }
 
   const lifetimeSettledCents = payouts.reduce((total, payout) => total + payout.approvedCents, 0n);

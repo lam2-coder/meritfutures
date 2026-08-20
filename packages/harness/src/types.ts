@@ -52,28 +52,74 @@ import type { CalibrationSource, Provenance } from './provenance.js';
 // simulator has no notion of a payout. That is this record.
 
 /**
+ * WHEN A TRADER ASKS, WHICH `AS-08` MAKES A STRATEGY RATHER THAN A DRAW.
+ *
+ * M01 `AS-08` (peak picking) is a direct requirement on this package and it is
+ * worth quoting rather than summarising: "the trader chooses which day to
+ * request on. A volatile account will systematically request on a local maximum.
+ * The firm therefore never pays the average of a trader's equity curve; IT PAYS
+ * THE TRADER'S CHOSEN PEAK, every time, across every account." Its counter is
+ * not a rule and none is wanted, because waiting for a good day is not abuse:
+ * "the counter is that the simulation harness must model REQUEST TIMING AS A
+ * STRATEGY, not as a random draw, or the CVaR99 estimate that drives the reserve
+ * is BIASED LOW. This is a direct requirement on the Monte Carlo port."
+ *
+ * So there are three policies and the random one is kept rather than deleted:
+ * M01 section 8.3 requires the estimate to be "reported under both policies SO
+ * THE BIAS IS MEASURED rather than assumed", which needs both to be runnable.
+ * `run.ts`'s sweep is how a caller runs the pair.
+ *
+ * NONE OF THE THREE DECIDES AN AMOUNT. Each decides only whether the trader asks
+ * on a day the ENGINE has already ruled eligible, and the engine's own published
+ * figures are what the strategy reads, exactly as the portal renders them to the
+ * trader.
+ */
+export type RequestPolicy =
+  /**
+   * Ask on the first eligible day. `PP-09`'s funding baseline, "100 percent,
+   * immediately" (SIMULATION_HARNESS section 2.3), which is the PESSIMISTIC
+   * cash-flow case and therefore the one the wallet is funded against.
+   */
+  | { readonly kind: 'immediate' }
+  /**
+   * Ask with a fixed probability on each eligible day.
+   *
+   * THIS IS THE POLICY `AS-08` NAMES AS BIASED LOW, and it is here so the bias
+   * can be measured against `peak_picking` rather than assumed. A run that uses
+   * only this one is the run `AS-08` warns about.
+   */
+  | { readonly kind: 'random'; readonly chanceBp: number }
+  /**
+   * Wait for a local maximum, USING ONLY WHAT HAS ALREADY HAPPENED.
+   *
+   * The trader observes the payable amount on each eligible day and asks on the
+   * first day that sets a new high over the days observed since becoming
+   * eligible, giving up and asking anyway after `patienceTradingDays` eligible
+   * days. NO LOOKAHEAD: a policy that peeked at tomorrow's close would model a
+   * clairvoyant trader and overstate the premium, which is a different error
+   * from the one `AS-08` is about.
+   *
+   * At the cap the strategy asks immediately, on `AS-08`'s own reasoning that
+   * the premium "is not exploitable beyond the cap": more waiting cannot raise a
+   * clamped figure and can only lose the account to a breach.
+   *
+   * `patienceTradingDays: 1` reduces to `immediate`, which is the property that
+   * makes the two comparable.
+   */
+  | { readonly kind: 'peak_picking'; readonly patienceTradingDays: number };
+
+/**
  * The behaviour a trial applies on top of the day model. All caller-supplied.
  *
- * NONE OF THESE DECIDES A RULE. `payoutRequestChanceBp` decides whether the
- * trader ASKS, and the engine decides whether the answer is yes and for how
- * much; `settlementLagTradingDays` is when the money moves, which is `M05`'s
- * fact and never the engine's; the risk-up pair changes what the account TRADES,
- * which is the simulator's input and not a rule.
+ * NONE OF THESE DECIDES A RULE. `requestPolicy` decides whether the trader ASKS,
+ * and the engine decides whether the answer is yes and for how much;
+ * `settlementLagTradingDays` is when the money moves, which is `M05`'s fact and
+ * never the engine's; the risk-up pair changes what the account TRADES, which is
+ * the simulator's input and not a rule.
  */
 export interface TrialBehaviour {
-  /**
-   * `PP-09`. Probability in basis points that an eligible account requests a
-   * payout on a day it is eligible.
-   *
-   * SIMULATION_HARNESS section 2.3 sets the funding baseline at "100 percent,
-   * immediately", which is `10_000` here, and says why it is the baseline rather
-   * than the estimate: at launch there is no data for withdrawal behaviour, so
-   * the pessimistic case funds the wallet and "any float the wallet actually
-   * produces is REALIZED UPSIDE rather than a planning assumption". It is a knob
-   * so `HO-06`'s sweep can move it; it is not defaulted so nobody moves it by
-   * accident.
-   */
-  readonly payoutRequestChanceBp: number;
+  /** `PP-09` and `AS-08`. When the trader asks, given that the engine says yes. */
+  readonly requestPolicy: RequestPolicy;
   /**
    * Trading days between the basis day and the day the withdrawal lands on the
    * platform balance. At least 1.
@@ -206,6 +252,17 @@ export interface SettledPayout {
    */
   readonly cycleTradingDays: number;
   readonly cycleFirstTradingDay: string;
+  /**
+   * Eligible days that passed before the trader asked, this one included.
+   *
+   * `AS-08`'s PREMIUM IS THE MEASURABLE HALF OF THE POLICY. "The premium is the
+   * expected value of `max` over the window a trader is willing to wait, minus
+   * the mean", so a run under `immediate` reports `1` on every payout and a run
+   * under `peak_picking` reports the wait that produced the figure beside it.
+   * Without this the two policies produce two liability numbers and nothing that
+   * says why they differ.
+   */
+  readonly eligibleDaysWaited: number;
 }
 
 /** One account's whole life, and what the engine said at every step of it. */
