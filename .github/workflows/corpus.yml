@@ -430,3 +430,32 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_rule_states_high_water_bound.sql
+
+      # ADR-068's IMPERSONATION-C1, C2 and C3 (0042). AUTH, MONEY PATH.
+      #
+      # FIVE SUCCESS CASES BEFORE THE FIRST REJECTION, and on this file the
+      # success half is doing more work than usual. IMPERSONATION-C1 is a
+      # CROSS-TABLE EXISTS in a trigger body, and the two ways to get it wrong
+      # are both invisible to an inventory of refusals: a body that raises
+      # unconditionally, and a mirror pointed at the wrong column. Either would
+      # pass every rejection below AND TAKE THE TRADER AUTH PATH DOWN WITH IT,
+      # which is why S5 opens an ordinary trader session and asserts it worked.
+      # 0034 is the precedent: it had no success case on identity_phones, so a
+      # CHECK reading `phone_ciphertext IS NULL` passed thirty-two assertions
+      # and reported nothing.
+      #
+      # REJECTION 2 IS THE ONE THE FILE EXISTS FOR. A guard only on
+      # impersonation_sessions is satisfied by writing the sessions row SECOND,
+      # and REJECTION 1 still passes while that hole is open. Watched failing:
+      # with the mirror dropped, R1 passes and R2 fails, which is the seeded
+      # violation recorded in DELTA_MANIFEST section 21.
+      #
+      # REJECTION 5 PINS `LEAST(expires_at, COALESCE(ended_at, expires_at))`
+      # against the naive `expires_at`. A bound written the naive way passes
+      # REJECTION 4 and admits a page view recorded after an explicit exit,
+      # which is a view of a trader's account after the session ended, recorded
+      # as though the session were live. Also watched failing.
+      - name: Probe ADR-068's impersonation session boundary (0042)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_impersonation_session_type.sql
