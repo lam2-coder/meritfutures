@@ -3835,12 +3835,6 @@ const CI06U_REGISTER = new Map([
   // and it is the one register entry here that may legitimately grow before it
   // shrinks.
 
-  // REPAIRED by session 80 and the entry is gone rather than emptied. Three plan
-  // documents were rowed twice by the INDEX merge and M05's two rows gave it two
-  // different purposes, "bounded freeze, reset" against "the 48 hour enforcement
-  // window". The repair was per row rather than per block, because the richer row
-  // was the FIRST for M03 and M04 and the SECOND for M05: a block delete in either
-  // direction would have lost content. The register shrinks by one file.
   // The P1-item table, recorded as OI-10. Its two `CI-06, corpus integrity`
   // rows say `21` checks and `Eleven` checks.
   [
@@ -3857,24 +3851,15 @@ const CI06U_REGISTER = new Map([
       'vg-1 to vg-12',
     ],
   ],
-  // THE MONEY-PATH ONE. The guard table defines ten guards twice, and
-  // `G-ELIGIBLE`'s two definitions disagree about the identity clause while
-  // both cite ADR-041. Which one is the ruling is not a parse's question.
-  [
-    'docs/architecture/STATE_MACHINES.md',
-    [
-      'g-clamp',
-      'g-eligible',
-      'g-enforcement-restrict',
-      'g-freeze-cleared / g-freeze-enforced',
-      'g-freeze-during-flight',
-      'g-hold-enforced',
-      'g-hold-released',
-      'g-hold-required',
-      'g-no-in-flight',
-      'g-restriction-lifted',
-    ],
-  ],
+  // THE MONEY-PATH TEN ARE REPAIRED AND THIS ENTRY IS GONE, WHICH IS THE
+  // DIRECTION THIS REGISTER DECAYS IN. Session 78 read all ten pairs against
+  // primary sources: FOUR were contradictions and SIX were copies. The four are
+  // ruled in ADR-062 (`G-ELIGIBLE` reads `identities.status = 'active'`,
+  // `G-FREEZE-CLEARED` keeps its expiry disjunct, `G-HOLD-REQUIRED` keeps the
+  // severity 4+ band, `G-ENFORCEMENT-RESTRICT` requires the investigating-to-
+  // enforced path); the six landed as ADR-061 repairs, each keeping one half
+  // verbatim. The register loses the file ENTIRELY in the same commit as the
+  // repair, so the assertion below now speaks for seven files and not eight.
   // All three allocation tables, the ADR numbers, the migration numbers and the
   // letters. `r` is NOT here: the file argues that duplicate deliberately and
   // the two rows are byte-identical but for one link, so the dedupe reached it.
@@ -3903,15 +3888,6 @@ const CI06U_REGISTER = new Map([
       'm',
     ],
   ],
-  // `INV-M5-17`, `INV-M5-18` and `INV-M5-19` each state TWO ENTIRELY DIFFERENT
-  // invariants. An invariant id that means two things cannot be cited.
-  ['docs/plans/M05-payout-system.md', ['inv-m5-01', 'inv-m5-17', 'inv-m5-18', 'inv-m5-19']],
-  // REPAIRED by session 80 and the entry is gone rather than emptied. `S-14` and
-  // `S-15` each headed two rows of the founder sign-off table, one RULED and one
-  // UNSIGNED in each pair. The ruled rows kept their identifiers, because a row
-  // with a signature against it cannot move, and the unsigned pair took `S-17`
-  // and `S-18`. Nothing outside M12 cited either number, so no citation moved.
-  ['docs/plans/M20-wallet.md', ['inv-m20-06']],
   // THE WHOLE SESSION INDEX, TWICE. Lines 120 onward re-list sessions 1 to 74
   // under a second header row, and the first copy stops at session 62. Written
   // out rather than expressed as a range: a range is a rule, and a rule that
