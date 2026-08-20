@@ -205,6 +205,8 @@ mobile native apps; leaderboards/contests; n-tier sub-IB trees; no-code program 
 
 **The largest of the five admitted surfaces is not new scope at all.** `D-04`'s news-window clustering has been **unimplementable for the whole life of the corpus** and no gate noticed, because a declared dependency with no satisfying object is invisible to every check this repository runs. **The parity check found a hole in the corpus rather than a hole against a competitor**, and that is the honest summary of what the exercise was worth.
 
+**Section 3 of this document has carried the same MUST since Wave 1 and nobody joined the two up.** Its v1 MUST list names *"risk tier-1 detectors (copy-cluster, inverse-P&L, news-window, velocity) with evidence packs"*. **The news-window detector was already table stakes on our own record**, so the calendar dataset's MUST verdict below is not a new sizing; it is the first time the thing that detector reads was sized at all. A capability can sit on a MUST list for the life of a corpus while the data it needs is nowhere, and no check in this repository can see it.
+
 **The case for the two MUSTs is internal and does not rest on the vendor.** The calendar closes a commitment made when M07 was written and unsatisfied since; the bounce alert closes a path where a trader is locked out of OTP login with no signal anywhere. **Both would be MUST if no competitor existed.** What the parity check did was cause somebody to look.
 
 ---
