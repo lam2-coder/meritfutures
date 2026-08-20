@@ -108,12 +108,14 @@ payout request (`POST /accounts/:id/payout`), wallet spend and external withdraw
 
 | Rank | # | Session | Fence | Regime |
 |---|---|---|---|---|
-| **1** | **I1** | **The parity audit.** Build the matrix, list the gaps, change nothing | `docs/plans/M06-admin-ops-console.md` | non-money |
-| **2** | **I2** | **`ADR-068`** and `0042` | `docs/decisions/ADR-068.md`, `docs/plans/M06-admin-ops-console.md`, `packages/db/migrations/0042_*` | **MONEY PATH, plan mode** |
-| **2** | **I3** | The touchpoints: M04 banner, M05 / M19 / M20 rejection surfaces, SECURITY's D5 entries | `docs/plans/M04-*`, `M05-*`, `M19-*`, `M20-*`, `docs/architecture/SECURITY.md` | non-money |
-| **3** | **I4** | **`ADR-069`** and the gap closure | `docs/decisions/ADR-069.md`, `docs/plans/M06-admin-ops-console.md`, `packages/db/migrations/0043_*` | non-money |
+| **1** | **I1** | **The parity audit.** Build the matrix, list the gaps, change nothing. Log **88** | `docs/reviews/` only | non-money |
+| **2** | **I2** | **`ADR-068`** and `0042`. Log **95** | `docs/decisions/ADR-068.md`, `docs/plans/M06-admin-ops-console.md`, `packages/db/migrations/0042_*` | **MONEY PATH, plan mode** |
+| **2** | **I3** | Log **96**. The touchpoints: M04 banner, M05 / M19 / M20 rejection surfaces, SECURITY's D5 entries | `docs/plans/M04-*`, `M05-*`, `M19-*`, `M20-*`, `docs/architecture/SECURITY.md` | non-money |
+| **3** | **I4** | **`ADR-069`** and the gap closure. Log **97** | `docs/decisions/ADR-069.md`, `docs/plans/M06-admin-ops-console.md`, `packages/db/migrations/0043_*` | non-money |
 
-**`I1` runs first and alone, and it is the unusual one: it is an audit that writes a table and changes no behaviour.** `ADR-069` cannot be drafted before it, and `ADR-068`'s non-disclosure ruling is weaker without it, because the read-only constraint is only defensible if the admin surface can do the work instead.
+**`I1` writes its matrix to `docs/reviews/`, NOT into [M06](M06-admin-ops-console.md), and that is the difference between a session that can start today and one that cannot.** M06 is frozen, so a matrix written into it is an amendment needing `ADR-069`, and `ADR-069`'s content **is** the gap list the audit produces. **The audit would be blocked on its own output.** Writing the verdict to `docs/reviews/` is what [ADR-033](../decisions/ADR-033.md) made that directory for, `ADR-069` then cites it, and `I4` folds the matrix into M06 under that ruling.
+
+**So `I1` runs first, and it runs concurrently with everything, because it writes one new file in a directory nobody else holds.** `ADR-069` cannot be drafted before it, and `ADR-068`'s non-disclosure ruling is weaker without it, because the read-only constraint is only defensible if the admin surface can do the work instead.
 
 **`I2` and `I3` are concurrent.** `I2` holds M06 and the migration; `I3` holds the four other module plans and SECURITY. **`I3` writes no rejection logic**, only the surfaces that must show it.
 

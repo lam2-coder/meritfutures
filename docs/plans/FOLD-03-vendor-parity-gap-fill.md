@@ -222,13 +222,13 @@ Each block below is what the folding session writes. **Identifiers are allocated
 
 | Rank | # | Session | Fence | Regime |
 |---|---|---|---|---|
-| **1** | **F0** | `ADR-066` | `docs/decisions/ADR-066.md`, `docs/decisions/README.md` | non-money |
-| **2** | **F1** | The calendar: `0039`, M6 dataset, M4 panel | `docs/plans/M04-trader-portal.md`, the M06 dataset delta, `packages/db/migrations/0039_*` | non-money |
-| **2** | **F4** | Communications completeness | `docs/plans/M16-notification-center.md`, `packages/db/migrations/0041_*` | non-money |
-| **2** | **F5** | Parity assessment and sizing | `research/PROP_TECH_LANDSCAPE.md`, `docs/DELIVERY_PLAN.md` | non-money |
-| **3** | **F2** | Scheduled digests: `0040` | `docs/plans/M06-admin-ops-console.md`, `packages/db/migrations/0040_*` | non-money |
-| **3** | **F3** | Duplicate-signal views | `docs/plans/M06-admin-ops-console.md`, `docs/plans/M07-risk-abuse.md` | non-money |
-| **4** | **F6** | **`ADR-067` and `0038`** | `docs/decisions/ADR-067.md`, `docs/plans/M06-admin-ops-console.md`, `packages/db/migrations/0038_*` | **MONEY PATH** |
+| **1** | **F0** | `ADR-066`. Log **87** | `docs/decisions/ADR-066.md`, `docs/decisions/README.md` | non-money |
+| **2** | **F1** | The calendar: `0039`, M6 dataset, M4 panel. Log **89** | `docs/plans/M04-trader-portal.md`, the M06 dataset delta, `packages/db/migrations/0039_*` | non-money |
+| **2** | **F4** | Communications completeness. Log **92** | `docs/plans/M16-notification-center.md`, `packages/db/migrations/0041_*` | non-money |
+| **2** | **F5** | Parity assessment and sizing. Log **93** | `research/PROP_TECH_LANDSCAPE.md`, `docs/DELIVERY_PLAN.md` | non-money |
+| **3** | **F2** | Scheduled digests: `0040`. Log **90** | `docs/plans/M06-admin-ops-console.md`, `packages/db/migrations/0040_*` | non-money |
+| **3** | **F3** | Duplicate-signal views. Log **91** | `docs/plans/M06-admin-ops-console.md`, `docs/plans/M07-risk-abuse.md` | non-money |
+| **4** | **F6** | **`ADR-067` and `0038`**. Log **94** | `docs/decisions/ADR-067.md`, `docs/plans/M06-admin-ops-console.md`, `packages/db/migrations/0038_*` | **MONEY PATH** |
 
 **`F1`, `F4` and `F5` are concurrent.** Three files, three directories, no intersection.
 
