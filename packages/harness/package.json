@@ -1,0 +1,23 @@
+{
+  "name": "@merit/harness",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DEP-M21-01. The Monte Carlo harness: a trial loop and an aggregator over packages/rithmic's day model, folded through the real rules engine, producing the RE-S-nn outputs against a candidate configuration. Every result carries its calibration identity and sample size.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT DEPENDS ON THE ENGINE AND ON THE SIMULATOR AND NEITHER DEPENDS ON IT. RI-01 asserts packages/rules-engine declares no workspace dependency, so the arrow can only point this way; packages/rithmic is the vendor side and a vendor adapter that imported the rulebook would be a vendor adapter deciding a rule. Both resolve through their `exports` maps, which publish `.` and nothing else, so no file inside either package is reachable from here. SIMULATION_HARNESS section 4 is the reason that matters: the harness generates balances and reads outcomes, and a harness that could reach `rules-engine/src/day/breach.js` could decide one.",
+  "dependencies": {
+    "@merit/rithmic": "workspace:*",
+    "@merit/rules-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
