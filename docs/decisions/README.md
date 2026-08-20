@@ -82,8 +82,10 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-053](ADR-053.md) | The high-water bound holds only while the floor is unlocked, and what it stops asserting is the ruling  (2026-08-17, status: accepted) |
 | [ADR-054](ADR-054.md) | `R-35` does not run on the row that closes an account, and `GS-064`'s `20,000` is right  (2026-08-17, status: accepted) |
 | [ADR-055](ADR-055.md) | A holiday pauses the session belonging to the next trade date, and the exception carries that session's bounds  (2026-08-17, status: accepted) |
-| [ADR-056](ADR-056.md) | `INV-07` gains a stated `R-31` exception, and the lock is cleared rather than carried  (2026-08-18, status: proposed) |
+| [ADR-056](ADR-056.md) | `INV-07` gains a stated `R-31` exception, and the lock is cleared rather than carried  (2026-08-18, status: accepted) |
 | [ADR-057](ADR-057.md) | one refuted sentence in four documents, and the ninth field on a breach row  (2026-08-18, status: accepted) |
+| [ADR-058](ADR-058.md) | The calendar source publishes forward-only, so a full forward year never exists and the six-month horizon alarm can never be cleared  (2026-08-18, status: accepted) |
+| [ADR-060](ADR-060.md) | `engine_eligible` contains the six funded gates and not R-38, and the reason it was unrulable is that no document ever enumerated them  (2026-08-18, status: accepted) |
 | [ADR-058](ADR-058.md) | The calendar source publishes forward-only, so a full forward year never exists and the six-month horizon alarm can never be cleared  (2026-08-18, status: proposed) |
 | [ADR-060](ADR-060.md) | `engine_eligible` contains the six funded gates and not R-38, and the reason it was unrulable is that no document ever enumerated them  (2026-08-18, status: proposed) |
 | [ADR-059](ADR-059.md) | The three engine inputs group A is blocked on, framed as three questions, and the disposition of the five registry rows that no answer to them can free  (2026-08-18, status: accepted) |
