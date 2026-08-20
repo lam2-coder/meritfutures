@@ -57,6 +57,13 @@ needs an allocation table:
 | `I-26` | 18 | `NFA I-26-12`, an external regulatory citation in the affiliate, portal and counsel documents |
 | `PRE-ADR` | 1 | `PRE-ADR-014` in [session 55](../sessions/2026-08-17-session-55.md), a prose construction meaning "before ADR-014", not an identifier |
 
+**This file is inside its own scope, and the table in section 3 proves it.** That table
+carries a row whose first cell is `I-26`, so the census run against the committed survey
+reports a series `I` that did not exist before the survey described it. It is left
+standing rather than disguised: **a check written over a text pattern is a check the
+text can answer back**, which is why [`CI-06q`](../testing/STRATEGY.md) assembles its own
+search string from fragments so that it is not its own finding.
+
 **And it under-generates in one place that matters.** The `{2,3}` digit floor is why
 `D0` reports a single member. `D0-1` and `D0-2` are in the tree and the pattern cannot
 see them; only `D0-10` clears two digits. **A series whose members are single-digit is
@@ -372,33 +379,52 @@ inside that register.
 
 ## 4. Six readings the table cannot make for itself
 
-### 4.1 `OI` has two partial registers, in two repositories of meaning, and neither covers it
+### 4.1 `OI` HAS an allocation table, and the brief's strongest claim is the one to correct
 
-**`OI` is the series that commissioned this survey and it is the worst case in it.** 25
-members, 249 occurrences, and **no allocation table**. What it has instead is two
-de-facto registers that disagree about their own scope:
+**The prompt that commissioned this survey states that `OI` "has NO REGISTRY TABLE AT
+ALL". It has one.** It is
+[`DELTA_MANIFEST`](../../packages/db/DELTA_MANIFEST.md) **section 16**, and it is not
+improvised: the heading reads *"Allocation: `OI-nn` identifiers and section numbers"*,
+and the section opens by naming what it is for -- *"This file is the fourth numbered
+registry in the repository and it was the last one with no table. It collided twice in
+one day."* It applies [ADR-034](../decisions/ADR-034.md), it carries the two collisions
+it was written to end, and it was **deliberately** placed there rather than in
+[ALLOCATION](../decisions/ALLOCATION.md), on a stated argument: *"`OI-nn` and the section
+numbers are this document's own namespace."*
 
-| Register | Covers | What it is |
+**Correcting this is the difference between two rulings.** "`OI` has no table" leads to
+*write one*. "`OI` has a table whose declared scope no longer matches its series" leads
+to *decide whose namespace `OI` is*, which is a harder question and the real one.
+
+**So the tree carries three places an `OI` row appears, and only the first is a
+register:**
+
+| Site | Covers | What it is |
 |---|---|---|
-| [`DELTA_MANIFEST`](../../packages/db/DELTA_MANIFEST.md) section 8, *"Open items carried out of the fold"* | `OI-01` to `OI-15` | A dispositioned table, and the closest thing `OI` has to a registry. It lives under `packages/db/` and its subject is the schema fold |
-| [STATE](../STATE.md), six rows across six chronological sections | 6 members, overlapping the above | Not a register. They are finding rows inside narrative sections, keyed by identifier because the finding needed a name |
+| [`DELTA_MANIFEST`](../../packages/db/DELTA_MANIFEST.md) section 16 | `OI-01` to `OI-15` | **The allocation table.** Two columns, claimed-by and disposition, under ADR-034 |
+| `DELTA_MANIFEST` section 8, *"Open items carried out of the fold"* | the same range | The findings themselves, keyed by identifier. Not an allocation |
+| [STATE](../STATE.md), six rows across six chronological sections | 6 members | Not a register. Finding rows inside narrative sections, keyed by identifier because the finding needed a name |
 
-**Ten members have a row in neither**: `OI-16` through `OI-23`, and `OI-25` and `OI-26`,
-which [WAVE-04 section 6](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md)
-allocates in a plan document and says so about itself. **Eight more have a row in both.**
+**Ten members appear in none of the three**: `OI-16` through `OI-23`, and `OI-25` and
+`OI-26`, which [WAVE-04 section 6](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md)
+allocates in a plan document and says so about itself.
 
-**And `OI-06` is allocated twice, which the manifest records against itself**: *"CLAIMED
-TWICE, 2026-08-16, and left that way"*, one open and one closed, from two sessions that
-each read the register and each took the next number. **That is the duplicate-key class
-[WAVE-03](../plans/WAVE-03-duplicate-registry-keys.md) spent nine sessions on, standing
-unrepaired in the series with no registry**, and it is the second time this wave has met
-it: the brief that produced WAVE-04 proposed `OI-19` and `OI-20` for its two open items
-and both were already taken.
+**And the ten are not a lapse. They are the stated scope working as stated.** `OI-16`
+onward were opened by sessions about engine purity, gate coverage, lint scope and
+fixture inventory. **None of that is the manifest's own namespace**, so the argument that
+put the table in `packages/db/` is the same argument that keeps those ten out of it.
+**A register whose declared subject excludes 40 percent of its series is not that
+series' register**, and filing those ten into a schema-delta manifest to satisfy a gate
+would be filing a finding by where the check can see it.
 
-**The manifest cannot be the answer for the current range and the reason is subject, not
-location.** `OI-16` onward are findings about engine purity, gate coverage and lint
-scope. A schema-delta manifest is the wrong document to carry them, and moving them
-there to satisfy a gate would be filing a finding by where the check can see it.
+**`OI-06` is allocated twice, and the manifest records it against itself**: *"CLAIMED
+TWICE, 2026-08-16, and left that way"*, one open and one closed, from two sessions
+editing the same document on the same day. That collision is what commissioned section
+16 in the first place. **It is the duplicate-key class
+[WAVE-03](../plans/WAVE-03-duplicate-registry-keys.md) spent nine sessions on**, and it
+is the second time this wave has met it: the brief behind WAVE-04 proposed `OI-19` and
+`OI-20` for its two open items and both were already taken. **The table exists and the
+collisions kept happening**, which is the argument for a gate rather than against one.
 
 ### 4.2 `GS`'s 44 double rows are the ownership index, and they are correct
 
@@ -529,9 +555,12 @@ to run against a question a person chose to ask.
 4. **215 series is not the scope of anything.** Three rows are not identifiers, 22 are
    one-off names in a single table cell, and five series are already gated harder
    elsewhere.
-5. **`OI` is the live defect**: no table, ten members registered nowhere, one number
-   allocated twice with the collision recorded and unrepaired, and two more numbers
-   allocated in a plan file this wave.
+5. **`OI`'s defect is a register whose declared scope has expired, not a missing one.**
+   The table is `DELTA_MANIFEST` section 16, argued into that file because `OI-nn` was
+   *"this document's own namespace"*. Ten members are outside that namespace and outside
+   the table, one number is allocated twice with the collision recorded and unrepaired,
+   and two more were allocated in a plan file this wave. **The ruling `ADR-074` owes is
+   whose namespace `OI` is now**, and only then where the table lives.
 6. **Neither candidate rule passes the tree.** 120 of 215 series are clean under the
    narrow rule and 128 under the broad one. **A gate scoped to all series arrives as an
    ERROR under [`falsify.mjs`](../../scripts/corpus/falsify.mjs)**, so the ruling owes
