@@ -3826,95 +3826,54 @@ const DIMENSION_HEADERS = new Map([
 // day a file is repaired is the day its entry has to go.
 const CI06U_REGISTER = new Map([
   // THE SESSIONS INDEX IS NOT A MERGE ARTIFACT AND IS REGISTERED FOR A DIFFERENT
-  // REASON. Since session 45 the convention has been that parallel sessions on one
-  // day SHARE a number and a log file, each appending its own `##` section: 45, 47
-  // and 48 each hold three. So two rows pointing at one file are two ENTRIES, and
-  // the row's identity is (file, subject) rather than the file alone. This table
-  // has an EMPTY header, so no `DIMENSION_HEADERS` entry can reach it.
+  // REASON, WHICH IS NOW A RULING RATHER THAN AN OWED ONE. `ADR-064` rules that a
+  // session number is a DAY-AND-SLOT ALLOCATION and not an identifier: parallel
+  // sessions on one day share a number and a log file, each appending its own
+  // `##` section, and the identifier of a session is (log file, `##` heading).
+  // The 83 files on disk hold 121 sections and the index carries 121 rows over 83
+  // first cells, so THE FIRST CELL HERE IS A POINTER AND NOT A KEY. This gate
+  // reads first cells as identities and is right to do so everywhere else.
   //
-  // THAT CONVENTION AND THIS GATE ARE IN CONFLICT AND ONE OF THEM MUST GIVE. A
-  // session number naming three different sessions is not an identifier, and
-  // WAVE-01 already recorded this registry racing twice with four entries numbered
-  // 31. The review desk registered the pair rather than renumbering thirty sessions
-  // while resolving a merge. IT IS A RULING THAT IS OWED, not a duplicate to repair,
-  // and it is the one register entry here that may legitimately grow before it
-  // shrinks.
-
-  // THE MONEY-PATH TEN ARE REPAIRED AND THIS ENTRY IS GONE, WHICH IS THE
-  // DIRECTION THIS REGISTER DECAYS IN. Session 78 read all ten pairs against
-  // primary sources: FOUR were contradictions and SIX were copies. The four are
-  // ruled in ADR-062 (`G-ELIGIBLE` reads `identities.status = 'active'`,
-  // `G-FREEZE-CLEARED` keeps its expiry disjunct, `G-HOLD-REQUIRED` keeps the
-  // severity 4+ band, `G-ENFORCEMENT-RESTRICT` requires the investigating-to-
-  // enforced path); the six landed as ADR-061 repairs, each keeping one half
-  // verbatim. The register loses the file ENTIRELY in the same commit as the
-  // repair, so the assertion below now speaks for seven files and not eight.
-  // THE WHOLE SESSION INDEX, TWICE. Lines 120 onward re-list sessions 1 to 74
-  // under a second header row, and the first copy stops at session 62. Written
-  // out rather than expressed as a range: a range is a rule, and a rule that
-  // has to be re-derived on every repair is how a register stops being read.
+  // THE MERGE IS REPAIRED AND THE CONVENTION IS WHAT IS LEFT. This entry held 59
+  // keys while the file carried the whole index TWICE under a re-inserted header
+  // row. Forty of those were the second copy and they are gone; the NINETEEN
+  // below are the convention, and every one of them is a file holding two to four
+  // sections. Written out rather than expressed as a range: a range is a rule,
+  // and a rule that has to be re-derived on every repair is how a register stops
+  // being read.
+  //
+  // THESE NINETEEN NAME A REPAIR THIS GATE IS STILL WAITING FOR, and it is not
+  // the repair the register assumes. ADR-064 section 4 rules the destination:
+  // this table's first column is a DIMENSION rather than an identity, exactly as
+  // `From` is on a transition table keyed by (From, To, Guard), and it cannot
+  // reach `DIMENSION_HEADERS` today only because its header is EMPTY. Giving the
+  // table the header `Session` and adding `session` to `DIMENSION_HEADERS` takes
+  // this entry to zero without renumbering anything. That is deliberately NOT
+  // done here: the exemption is corpus-wide, and the control that makes it safe,
+  // `CI-06/session-index-matches-sections`, is not written. The two land together
+  // or neither does.
   [
     'docs/sessions/README.md',
     [
-      '2026-08-19 - session 75',
-      '2026-08-13 - session 1',
-      '2026-08-13 - session 2',
-      '2026-08-13 - session 3',
-      '2026-08-13 - session 4',
-      '2026-08-13 - session 5',
-      '2026-08-14 - session 6',
-      '2026-08-14 - session 7',
-      '2026-08-14 - session 8',
-      '2026-08-14 - session 9',
-      '2026-08-14 - session 10',
-      '2026-08-14 - session 11',
-      '2026-08-14 - session 12',
-      '2026-08-14 - session 13',
-      '2026-08-14 - session 14',
-      '2026-08-14 - session 15',
-      '2026-08-14 - session 16',
-      '2026-08-14 - session 17',
-      '2026-08-15 - session 18',
-      '2026-08-15 - session 19',
-      '2026-08-15 - session 20',
-      '2026-08-15 - session 21',
-      '2026-08-15 - session 22',
-      '2026-08-15 - session 23',
-      '2026-08-15 - session 24',
-      '2026-08-15 - session 25',
-      '2026-08-15 - session 26',
-      '2026-08-15 - session 27',
-      '2026-08-15 - session 28',
-      '2026-08-15 - session 29',
-      '2026-08-15 - session 30',
       '2026-08-16 - session 31',
       '2026-08-16 - session 32',
       '2026-08-16 - session 33',
-      '2026-08-16 - session 34',
-      '2026-08-16 - session 36',
-      '2026-08-16 - session 37',
-      '2026-08-16 - session 38',
-      '2026-08-16 - session 39',
       '2026-08-16 - session 40',
-      '2026-08-16 - session 41',
       '2026-08-16 - session 42',
-      '2026-08-16 - session 43',
-      '2026-08-16 - session 44',
       '2026-08-16 - session 45',
-      '2026-08-16 - session 46',
       '2026-08-16 - session 47',
       '2026-08-17 - session 48',
       '2026-08-17 - session 49',
       '2026-08-17 - session 50',
       '2026-08-17 - session 51',
       '2026-08-17 - session 52',
-      '2026-08-17 - session 53',
       '2026-08-17 - session 54',
       '2026-08-17 - session 55',
       '2026-08-18 - session 56',
       '2026-08-18 - session 57',
       '2026-08-18 - session 58',
       '2026-08-18 - session 59',
+      '2026-08-19 - session 75',
     ],
   ],
 ]);
