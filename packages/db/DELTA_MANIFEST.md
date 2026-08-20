@@ -8,11 +8,11 @@ last_updated: 2026-08-16
 
 **The completeness gate reads this file.** [ADR-026](../../docs/decisions/ADR-026.md) requires that every `SD-nn` and `U-nn` appearing anywhere in `docs/` appears **exactly once** here with a disposition. A count nobody can drift is better than a count someone remembers to update.
 
-<!--gen:manifest_changes-->107<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+<!--gen:manifest_changes-->108<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
 
 **The count moved from 93 to 94 by founder ruling (2026-08-14).** `U-06` is the sixth unnumbered change, found while folding. [ADR-026](../../docs/decisions/ADR-026.md)'s table of five did not carry it. See section 5.
 
-**It moved from 94 to <!--gen:manifest_changes-->107<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+**It moved from 94 to <!--gen:manifest_changes-->108<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
@@ -214,6 +214,31 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 **`0039` is not in section 1's table**, on [`0032`](migrations/0032_trading_calendar_holidays_coverage_revisions.sql)'s precedent: that table records what the fold created and is closed at 27, and a later migration that creates tables gets its own section instead. `0039` creates two tables and one view, supersedes nothing, and edits no merged file.
 
 **One thing found while writing it, recorded rather than left for the next reader.** [`packages/db/test/migrations.integration.test.ts`](test/migrations.integration.test.ts) asserted the on-disk migration sequence is `1..n` contiguous, under a comment claiming `CI-06h` "asserts the same thing" and that the local copy was "the weaker half". **Both halves of that claim were false.** It was not weaker, it was **stricter in the one direction [ADR-036](../../docs/decisions/ADR-036.md) rules out**: gaplessness is asserted over allocated **plus reserved**, "so a branch holding a reservation shows a hole and passes". `0038` is reserved for the money-path adjustment migration and is sequenced **last** in FOLD-03, so any branch writing `0039` first has a legal reserved hole and the old assertion failed on it. The property is not lost, it is deferred to `CI-06h` by name; re-implementing the allocation parser in vitest would be `OQ-P1-04`'s defect, which the parser's own header names as the thing not to do.
+
+## 4c. FOLD-04: [ADR-069](../../docs/decisions/ADR-069.md), 1 numbered delta
+
+**Session `I4` of [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md), the admin capability parity closure.** The number is allocated by this row existing, on section 4a's rule.
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| SD-M6-11 | `admin_actions` | `initiative text NOT NULL CHECK (initiative IN ('enforcement','trader_request','operational'))` and `on_behalf_of_identity_id uuid NULL REFERENCES identities(id) ON DELETE RESTRICT`, with the **biconditional** constraint `admin_actions_on_behalf_matches_initiative` asserting `(on_behalf_of_identity_id IS NOT NULL) = (initiative = 'trader_request')`, plus the partial index `admin_actions_on_behalf_idx` that is the dual-timeline read | 0043 | **landed** |
+
+**`0043` was RESERVED AS CONTINGENT and the contingency was tested rather than assumed.** [ALLOCATION](../../docs/decisions/ALLOCATION.md)'s row required the parity session to *"confirm the delta before spending the number"* and to release it *"if the attribution is expressible without one"*. **It is, and initiative is not**, which is a different question that the reservation's wording did not separate.
+
+| Property [ADR-069](../../docs/decisions/ADR-069.md) requires | Carried before `0043`? |
+|---|---|
+| **Attributed to the admin** | **Yes.** [`0017`](migrations/0017_events_and_audit.sql) gives `admin_actions` `actor`, `action`, `subject_kind`, `subject_id`, `reason NOT NULL`, `before`, `after`, `evidence_refs` and `ip` |
+| **A mandatory reason** | **Yes**, and the `NOT NULL` is the existing control |
+| **The trader half of the dual timeline** | **Yes.** `events.actor_kind` is `CHECK (actor_kind IN ('system','trader','admin','vendor'))` with `actor_id`, `identity_id` and `account_id`, and `GET /accounts/:accountId/timeline` is a projection of `events` |
+| **On whose initiative the action was taken** | **No, nowhere.** Nothing distinguished an admin acting **on** a trader from an admin acting **for** one |
+
+**The finding that decided it.** `CloseRequest` carries `kind: "enforcement" | "trader_request" | "operational"` on `POST /admin/accounts/:accountId/close`, which is the one trader-requested admin act the corpus already models, and **that field has no column anywhere**: [`0007`](migrations/0007_accounts.sql)'s `account_status_history` carries `from_status`, `to_status`, `from_phase`, `to_phase` and a nullable `reason`, and no `kind`. So the existence proof the parity audit builds its argument on **cannot be queried as one**. `0043` takes that vocabulary unchanged rather than inventing a second one.
+
+**Why it lands before any of the eighteen parity routes exists.** `admin_actions` is append-only ([`0026`](migrations/0026_roles_and_grants.sql) revokes `UPDATE` and `DELETE` from `merit_app` and from `PUBLIC`) and its retention is forever. **A discriminator added after rows exist leaves every historical row `NULL`, and `NULL` is then ambiguous between "Merit's own act" and "written before the column existed".** It is unambiguous only if it is never null, and never null only if it arrives while the table is empty. E2 makes a merged migration unfixable rather than expensive, so this is the last cheap moment.
+
+**`0043` is not in section 1's table**, on `0032`'s and `0039`'s precedent: that table is closed at 27 and records what the fold created. `0043` creates no table, supersedes nothing and edits no merged file.
+
+**No probe ships with it, and that is a choice rather than an omission.** The biconditional is a `CHECK`, so the workflow's forward-only apply proves it **installs**; a probe would prove it **refuses**. Wiring one needs a step in [`corpus.yml`](../../.github/workflows/corpus.yml) and a pin in [`gates.mjs`](../../scripts/corpus/gates.mjs) under `CI-06s`, **neither of which was in the writing session's fence**, and an unpinned probe is `OI-07` for the fifth time. `0041` shipped without one for the same reason.
 
 ## 5. The seven unnumbered changes
 
@@ -694,6 +719,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **`OI-11`** | `0035`'s session | **allocated, open.** **A duplicate row in an allocation table is invisible to every gate.** `allocated()` accumulates claims into a `Set`, so the two adjacent rows both claiming `0034` produced one member and twelve gates passed. The check is cheap and blocked on a cleanup: the ADR table claims `039` to `046` twice each and the migration table claims `0033` twice, so it fails on arrival. See [ALLOCATION](../../docs/decisions/ALLOCATION.md) |
 | **`OI-12`** | `0035`'s session | **allocated, open.** **A calendar `INSERT` moves no watermark.** `0033` guards every way a day can change; a day backfilled inside an existing coverage window changes the day sequence retroactively with no revision row, and every stamped `rule_states` row still claims a watermark that looks current. ADR-045 owns `trading_calendar`'s guards and ADR-047 does not rule it |
 | **`OI-13`** | `0035`'s session | **allocated, open.** **B.4 step 4's audited rewrite has no grant.** `0026` revoked `UPDATE` on `rule_states` from `merit_app` and `PUBLIC` and no `SECURITY DEFINER` function performs it. Pre-existing and identical for `engine_version`; `calendar_revision_id` makes a second caller for a path that has none |
+| **`OI-15`** | `0043`'s session | **allocated, open.** **[The `admin_actions` design record](../../docs/architecture/data-model/admin_actions.md) does not carry `SD-M6-11`'s two columns, its `CHECK` or its fourth index.** The migration is the truth and the record trails it by one session, which is `OI-01`'s shape on a smaller surface. **No gate sees this**: `CI-06i` reconciles the TABLE set in both directions and nothing in the runner reconciles COLUMNS, so a design record can contradict its own DDL indefinitely and every gate passes. Recorded here rather than left as prose because `docs/architecture/data-model/` was not in the writing session's fence and four sibling sessions were in flight against `M06` |
 | **`OI-14`** | `0035`'s session | **allocated, open.** **The replay job must refuse an empty in-scope set.** If the engine never populates `calendar_revision_id`, every row reads as out of scope after the first correction, the audit compares nothing, and an audit that has stopped looking reports exactly like one that found nothing (FM-17). No per-row constraint can tell "not yet written" from "pristine calendar" without fabricating, so it belongs to the job |
 
 ### Section numbers
@@ -711,6 +737,8 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **19** | `0035`'s session | **allocated.** `0035` lands |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
+
+**It has been used twice more and neither use took a row above, which is stated rather than repaired.** `4b` records FOLD-03's single delta and `4c` records FOLD-04's. **A lettered section deliberately claims no number**, so the sequence this table allocates is undisturbed by either, and adding rows for them would make the table's own key ambiguous between a number and a name. **The sentence above is the allocation**: a fold that adds a delta section appends the next letter after `4c` and does not enter it here.
 
 ### What no gate checks, stated rather than implied
 
