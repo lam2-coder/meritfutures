@@ -1262,6 +1262,25 @@ const ci06h = {
           'unlocked half still refuses, or that the three NOT NULLs the ' +
           'predicate depends on and does not name are still there (OI-07)',
       ],
+      // ADR-068, AUTH AND THEREFORE MONEY PATH. Pinned in the commit that
+      // wires it, which is the rule rather than the exception now: OI-07 has
+      // four recorded occurrences of a probe wired and left unpinned.
+      //
+      // Deleting this step deletes the only assertion that the session-type
+      // boundary holds IN BOTH DIRECTIONS. The forward guard alone passes an
+      // inventory of refusals with the ordering hole wide open, and the hole is
+      // an impersonation token resolving on the trader auth path, which GS-303
+      // calls the failure that makes every other control on that table
+      // decorative. It is also the only step asserting that an ORDINARY TRADER
+      // SESSION STILL OPENS with the mirror installed.
+      [
+        'probe_impersonation_session_type.sql',
+        "ADR-068's session-type boundary is no longer probed, so nothing " +
+          'asserts that the mirror closes the ordering hole, that a restricted ' +
+          'identity is still impersonable (GS-302), that ordinary trader login ' +
+          'still works, or that C2 reads the explicit exit rather than the ' +
+          'expiry alone',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
