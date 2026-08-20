@@ -3855,24 +3855,15 @@ const CI06U_REGISTER = new Map([
       'vg-1 to vg-12',
     ],
   ],
-  // THE MONEY-PATH ONE. The guard table defines ten guards twice, and
-  // `G-ELIGIBLE`'s two definitions disagree about the identity clause while
-  // both cite ADR-041. Which one is the ruling is not a parse's question.
-  [
-    'docs/architecture/STATE_MACHINES.md',
-    [
-      'g-clamp',
-      'g-eligible',
-      'g-enforcement-restrict',
-      'g-freeze-cleared / g-freeze-enforced',
-      'g-freeze-during-flight',
-      'g-hold-enforced',
-      'g-hold-released',
-      'g-hold-required',
-      'g-no-in-flight',
-      'g-restriction-lifted',
-    ],
-  ],
+  // THE MONEY-PATH TEN ARE REPAIRED AND THIS ENTRY IS GONE, WHICH IS THE
+  // DIRECTION THIS REGISTER DECAYS IN. Session 78 read all ten pairs against
+  // primary sources: FOUR were contradictions and SIX were copies. The four are
+  // ruled in ADR-062 (`G-ELIGIBLE` reads `identities.status = 'active'`,
+  // `G-FREEZE-CLEARED` keeps its expiry disjunct, `G-HOLD-REQUIRED` keeps the
+  // severity 4+ band, `G-ENFORCEMENT-RESTRICT` requires the investigating-to-
+  // enforced path); the six landed as ADR-061 repairs, each keeping one half
+  // verbatim. The register loses the file ENTIRELY in the same commit as the
+  // repair, so the assertion below now speaks for seven files and not eight.
   // All three allocation tables, the ADR numbers, the migration numbers and the
   // letters. `r` is NOT here: the file argues that duplicate deliberately and
   // the two rows are byte-identical but for one link, so the dedupe reached it.
