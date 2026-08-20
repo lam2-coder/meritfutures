@@ -95,7 +95,7 @@ describe('the named set, which is what makes this not a report builder', () => {
     const sql = ddl();
     const check = /digest\s+text NOT NULL CHECK \(digest IN \(([\s\S]*?)\)\)/.exec(sql);
     expect(check, '0040 does not constrain `digest` to a closed set').not.toBeNull();
-    const named = [...check![1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    const named = [...(check?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     // EXACTLY, in both directions. A fifth value admitted here is the report
     // builder ADR-066 section 8 rejected, arriving one custom report at a time;
     // a missing one is a digest the ruling sized and nobody can schedule.
@@ -169,7 +169,7 @@ describe('GS-288: the alarm fires on the delivery record, never on the job', () 
     const sql = ddl();
     const check = /outcome\s+text NOT NULL CHECK \(outcome IN \(([^)]*)\)\)/.exec(sql);
     expect(check, '0040 does not constrain `outcome`').not.toBeNull();
-    const values = [...check![1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    const values = [...(check?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     // A skip that can be RECORDED as an outcome is a skip that reads as normal
     // in a list of outcomes, and the acceptance is that a failed delivery
     // alarms and never silently skips.
@@ -287,11 +287,11 @@ describe('the boundaries this file is not allowed to cross', () => {
     const sql = ddl();
     const revoke = /REVOKE\s+UPDATE\s*,\s*DELETE\s+ON ([\s\S]*?) FROM merit_app, PUBLIC/.exec(sql);
     expect(revoke, '0040 does not revoke UPDATE and DELETE').not.toBeNull();
-    expect(revoke![1]).toContain('report_deliveries');
+    expect(revoke?.[1]).toContain('report_deliveries');
     // Deliberate: recipients change and a schedule gets disabled, each an
     // INV-M6-01 admin_actions row. Revoking here would make a schedule
     // unchangeable, which is not what append-only is for.
-    expect(revoke![1]).not.toContain('report_schedules');
+    expect(revoke?.[1]).not.toContain('report_schedules');
   });
 
   test('the ritual runbook names the digest as its input, not as an implication', () => {
