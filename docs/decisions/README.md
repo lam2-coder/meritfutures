@@ -93,6 +93,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-063](ADR-063.md) | `SET A` keeps `INV-M5-17`, `18` and `19`, and one of the six rows is not a collision but a duplicate  (2026-08-20, status: proposed) |
 | [ADR-065](ADR-065.md) | One key, one row; a blank line inside a table hides every row below it from every gate; and `CI-06<letter>` has run out of alphabet  (2026-08-20, status: proposed) |
 | [ADR-064](ADR-064.md) | A session number is an allocation and not an identifier; identity is `(log file, section heading)`, the renumber is declined rather than defaulted into, and a hole is an unspent allocation  (2026-08-20, status: proposed) |
+| [ADR-070](ADR-070.md) | Plan configuration is first-class versioned config, the `rules` blob stays and its PUBLICATION is constrained instead, and contract limits are Merit-owned with the transport left to the vendor call  (2026-08-20, status: proposed) |
 | [ADR-071](ADR-071.md) | `M21`, the Plan Designer and Simulation Console, admitted as a new module after FREEZE, with the Monte Carlo harness named as a dependency that does not exist  (2026-08-20, status: proposed) |
 
 ## Gate closures
