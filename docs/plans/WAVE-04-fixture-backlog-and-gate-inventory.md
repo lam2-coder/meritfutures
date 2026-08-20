@@ -82,6 +82,57 @@ rules it cites against the set the engine declares: a fixture citing an undeclar
 that. An inverted fixture is written before the rule and flips on its own when the rule
 lands. **So the M1 backlog is bounded by W2 and W3, not by W1.**
 
+### 2.0 CONDITION W1 IS WRONG AS WRITTEN, AND SO IS THE COUNT OF 16 (2026-08-20, session 110)
+
+**`W3` returned 0 of 6 and its argument holds against the tree.** The condition
+below says the code must be "reachable from the loader, which imports
+`@merit/rules-engine`'s public entry point". **The planning session verified the
+EXPORT MAP and never read the pipeline**, which is the primary-source failure
+this plan's own section 5 argues against, landing on its author inside the
+document that argues it.
+
+[`packages/golden-loader/src/run.ts`](../../packages/golden-loader/src/run.ts)
+imports **two symbols**:
+
+```
+import { advanceDay, initialState } from '@merit/rules-engine';
+```
+
+**Not `evaluatePayout`. Not `applySettlement`.** And `diffEvents` in
+[`compare.ts`](../../packages/golden-loader/src/compare.ts) takes
+`readonly { readonly type: string }[]` against `readonly string[]`, so **events
+compare by type string only**.
+
+| | |
+|---|---|
+| **REACHABLE** | Whatever `advanceDay` writes onto `RuleState`: `withdrawableCents`, `engineGates`, `engineEligible`, `payoutsSettledCount`, `lifetimeSettledCents`, `payoutAnchorDay`, `cadenceAnchorDay`, `breached`, `breachKind`. `GS-025` pins `withdrawable_cents` exactly this way and is the precedent |
+| **NOT REACHABLE** | Anything returned only by `evaluatePayout` or `applySettlement`. `PayoutEvaluation` carries `asOfTradingDay`, `contextEligible`, `eligible` and **`clamp`**, so **no fixture can assert `clamp_reason` or `trader_cents` today**. `SettlementFact` is five fields and **none is a status**, so a failed transfer produces no fact at all |
+
+**`outside-loader-boundary` does not cover this**, and that gap is why the error
+survived: that term was defined for code living in `apps/worker` (the replay
+scenarios). "In the engine, exported, and never called by `runFixture`" is a
+**different blocker and the most common one**. `ADR-072` names it.
+
+**THE COUNTS IN 2.1 AND 2.2 ARE SUSPENDED, NOT RESTATED.** Replacing them with a
+second set derived the same afternoon by the same session that got them wrong is
+the move this repository keeps finding. `W1`'s status table is the authority, as
+`W1`'s prompt already required, and **the number it derives is the number that
+stands.** What is certain today is that 16 is an upper bound and that
+`W3`'s six are not in it.
+
+**`W3`'s reasoning is on `claude/wave04-w3-settlement-ladder-fixtures` at
+`fbd6e03`**, re-derived against `types.ts`, `rules.ts`, `loader.ts`, `compare.ts`,
+`run.ts` and M01 section 3.5, and it is worth reading rather than re-deriving.
+**It also verified `GS-241`'s two figures by hand under TR-01 and they match the
+registry exactly**, so the row is right and only its reachability was wrong.
+
+**The gate this wants is not written and is not `W8`'s.** Nothing in the tree
+asserts that a scenario queued as writable has an assertion the fixture pipeline
+can actually reach. That is checkable, and preferring a gate to more care is what
+section 5 says to do about exactly this.
+
+---
+
 ### 2.1 The partition, and it sums to 276
 
 | Tier | What holds it | Count |
