@@ -3709,6 +3709,474 @@ const ci06t = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06u  No markdown table in docs/ has two rows with the same first-cell key
+// -----------------------------------------------------------------------------
+// THE DEFECT IS THE MERGE, AND THE GATE IS NOT A BETTER MERGE SCRIPT. The review
+// desk resolves conflicts KEEP-BOTH and then dedupes only lines longer than 60
+// characters that are byte-identical after comment stripping. Two sessions
+// appending to the same markdown table do not produce two appended rows: they
+// produce a copy of every row the table ALREADY HAD, and every copy carrying a
+// different link, a different count or a different wording is under the dedupe's
+// reach and survives. Three occurrences are on record before this gate:
+// `ADR-050` twice in the decisions README with DIFFERENT titles, fourteen `CI-06`
+// rows in STRATEGY, and duplicated passages in STATE recorded as `OI-10`.
+//
+// ONLY ONE OF THE THREE WAS CAUGHT BY A GATE, and it was caught by accident.
+// `CI-06p` asserts that each `CI-06<letter>` heads at most one row of STRATEGY
+// section 4.4, because that is the table it was written for. The defect is not
+// table-specific and neither is the remedy: a merge script runs on one machine
+// under one operator, a gate runs on every pull request. This is `CI-06p`'s
+// first assertion, generalised to every table in `docs/`.
+//
+// -----------------------------------------------------------------------------
+// SCOPE, WHICH WAS SURVEYED BEFORE THE ASSERTION WAS WRITTEN
+// -----------------------------------------------------------------------------
+// The survey of 2026-08-19 read 861 tables and 6,693 body rows on a clean `main`
+// and found 211 repeated first cells in 12 files. They are TWO POPULATIONS and
+// the gate would be useless if it conflated them.
+//
+// FIRST: tables whose first column is a DIMENSION and not an identity. A
+// transition table's row is keyed by (From, To, Guard) and many transitions
+// leave one state; a STRIDE table's first cell is one of six threat categories
+// by construction. Repetition there is the shape of the table, not damage to it,
+// and no amount of merging makes it a defect. Those are exempted BY THE HEADER
+// OF THE FIRST COLUMN, in `DIMENSION_HEADERS` below, one entry per shape with
+// the table that earns it named.
+//
+// SECOND: tables whose first column IS a key, where a repeat means the registry
+// can no longer answer the question it exists to answer. 105 of those survive
+// the exemptions, in 8 files, and THREE OF THE PAIRS CONTRADICT EACH OTHER:
+// `G-ELIGIBLE` in STATE_MACHINES is defined once as `identities.status <>
+// 'restricted'` and once as `identities.status = 'active'`, both citing ADR-041,
+// on the money path; INDEX gives `M05` two different purposes; STATE says both
+// `21` checks and `Eleven`. `docs/sessions/README.md` carries the ENTIRE session
+// index twice, one copy truncated at session 62.
+//
+// THE 105 ARE REGISTERED RATHER THAN EXEMPTED, and the difference is the whole
+// design. `falsify.mjs` runs every gate against the tree as it stands and a gate
+// that cannot pass there is an ERROR, so a gate landing red on 105 findings
+// cannot land at all. The register pins the exact (file, key) pairs that exist
+// on `main` today. A NEW duplicate is a finding. And a register entry that no
+// longer names a real duplicate is ALSO a finding, so a repair forces the
+// register down by one rather than leaving an exemption behind it. That is the
+// direction an allowlist has to decay in; `CI-06l` states the same rule about
+// its own exemption list, and `CI-06e` prints its accepted set on every run for
+// the same reason this one prints its register size.
+//
+// FIVE THINGS IT DOES NOT DO, written here rather than left to be discovered.
+//   1. IT READS THE FIRST CELL AND NOTHING ELSE. Two rows with the same key and
+//      identical content are the same finding as two that contradict, and this
+//      gate cannot tell them apart. Which of a contradictory pair is TRUE is a
+//      question for a founder ruling, never for a parse.
+//   2. THE SCOPE JUDGMENT IS RECORDED, NOT DERIVED. `DIMENSION_HEADERS` is a
+//      reading of six table shapes by a session. A NEW table whose first column
+//      is a dimension under a header not in that list is a false finding, and
+//      the remedy is to add the header WITH ITS ARGUMENT, never to relax the
+//      matching. The list decays loudly, which is the safe direction: a stale
+//      exemption matching no table is reported.
+//   3. THE REGISTER IS PER (FILE, KEY), NOT PER TABLE. A key duplicated in two
+//      different tables of one file is one register entry, so repairing one of
+//      the two tables does not shrink the register. It is the coarser grain on
+//      purpose: a per-table register would key on a line number and go stale on
+//      every edit above it.
+//   4. IT INHERITS THE TWO-REF GAP `CI-06f`, `CI-06h` and `CI-06p` each declare.
+//      A pull request appending a row that a sibling branch has already appended
+//      is the exact defect this gate is for, and this run sees ONE ref. It
+//      catches the duplication when the branches merge, which is one merge later
+//      than anybody would like and is still before `main`.
+//   5. A ROW SPLIT ACROSS LINES IS OUT OF REACH. A table cell carrying a literal
+//      newline is not expressible in GitHub-flavoured markdown, so this is a
+//      boundary of the format rather than of the parser, but a row whose leading
+//      `|` is indented past a list marker parses as prose here and is claimed as
+//      nothing.
+const CI06U_DOCS = 'docs/';
+
+// A first column whose header names a DIMENSION rather than an IDENTITY. Each
+// entry is one argued table shape, and each is only here because the survey
+// found it firing.
+const DIMENSION_HEADERS = new Map([
+  // STATE_MACHINES's transition tables. A row is keyed by (From, To, Guard) and
+  // `active` has four outgoing edges. The GUARD table in the same file is NOT
+  // exempt and is where ten of the 105 are.
+  ['from', 'STATE_MACHINES transition tables: a row is keyed by (From, To, Guard)'],
+  // SECURITY's STRIDE tables. S/T/R/I/D/E is a six-value category and section
+  // 2.6 alone lists four spoofing scenarios.
+  ['threat', 'SECURITY STRIDE tables: the first cell is one of six threat categories'],
+  // WAVE-01's session table. Rank is a priority band holding six sessions.
+  ['rank', 'WAVE-01: a priority band, many sessions to a rank'],
+  // Session 58's before/after table. Group is A / F / H over golden scenarios.
+  ['group', 'session logs: a grouping column over the rows being reported'],
+  // STATE's citation tables. `0007_accounts.sql` is cited twice for two
+  // different claims, which is what a citation table is for.
+  ['source', 'citation tables: one source saying two things is the point of the table'],
+  // M02's ingest dedupe matrix. `new` is an INPUT CONDITION, not an identifier.
+  ['digest', 'M02 dedupe matrix: the first cell is an input condition'],
+]);
+
+// THE REGISTER. Every (file, key) pair whose duplicate exists on `main` as of
+// 2026-08-19, surveyed before the assertion was written. NOT ONE OF THESE IS
+// ACCEPTED AS CORRECT; each is a repair this session's fence did not reach, and
+// each is named in the session log with what the two rows say. The register
+// SHRINKS ONLY: an entry that no longer names a duplicate is reported, so the
+// day a file is repaired is the day its entry has to go.
+const CI06U_REGISTER = new Map([
+  // THE SESSIONS INDEX IS NOT A MERGE ARTIFACT AND IS REGISTERED FOR A DIFFERENT
+  // REASON. Since session 45 the convention has been that parallel sessions on one
+  // day SHARE a number and a log file, each appending its own `##` section: 45, 47
+  // and 48 each hold three. So two rows pointing at one file are two ENTRIES, and
+  // the row's identity is (file, subject) rather than the file alone. This table
+  // has an EMPTY header, so no `DIMENSION_HEADERS` entry can reach it.
+  //
+  // THAT CONVENTION AND THIS GATE ARE IN CONFLICT AND ONE OF THEM MUST GIVE. A
+  // session number naming three different sessions is not an identifier, and
+  // WAVE-01 already recorded this registry racing twice with four entries numbered
+  // 31. The review desk registered the pair rather than renumbering thirty sessions
+  // while resolving a merge. IT IS A RULING THAT IS OWED, not a duplicate to repair,
+  // and it is the one register entry here that may legitimately grow before it
+  // shrinks.
+
+  // Three plan documents rowed twice by the INDEX merge. M05's two rows give it
+  // two different purposes: "bounded freeze, reset" and "the 48 hour
+  // enforcement window". The registry that decides whether a thing exists.
+  ['docs/INDEX.md', ['m03-billing-checkout.md', 'm04-trader-portal.md', 'm05-payout-system.md']],
+  // The P1-item table, recorded as OI-10. Its two `CI-06, corpus integrity`
+  // rows say `21` checks and `Eleven` checks.
+  [
+    'docs/STATE.md',
+    [
+      'ci-01, ci-02, ci-05',
+      'ci-03, golden files',
+      'ci-04, ci-07 to ci-09',
+      'ci-06, corpus integrity',
+      'ci-06h, migration install',
+      'the monorepo scaffold',
+      'the reconciled schema and migrations',
+      'tradingcalendar as data',
+      'vg-1 to vg-12',
+    ],
+  ],
+  // THE MONEY-PATH ONE. The guard table defines ten guards twice, and
+  // `G-ELIGIBLE`'s two definitions disagree about the identity clause while
+  // both cite ADR-041. Which one is the ruling is not a parse's question.
+  [
+    'docs/architecture/STATE_MACHINES.md',
+    [
+      'g-clamp',
+      'g-eligible',
+      'g-enforcement-restrict',
+      'g-freeze-cleared / g-freeze-enforced',
+      'g-freeze-during-flight',
+      'g-hold-enforced',
+      'g-hold-released',
+      'g-hold-required',
+      'g-no-in-flight',
+      'g-restriction-lifted',
+    ],
+  ],
+  // All three allocation tables, the ADR numbers, the migration numbers and the
+  // letters. `r` is NOT here: the file argues that duplicate deliberately and
+  // the two rows are byte-identical but for one link, so the dedupe reached it.
+  // These fifteen carry a reservation row and a merged row for one number,
+  // which is exactly the State column ADR-034 deleted, growing back as rows.
+  [
+    'docs/decisions/ALLOCATION.md',
+    [
+      '0033',
+      '0034',
+      '039',
+      '040',
+      '041',
+      '042',
+      '043',
+      '044',
+      '045',
+      '046',
+      '050',
+      '054',
+      '055',
+      '057',
+      '059',
+      'k',
+      'l',
+      'm',
+    ],
+  ],
+  // `INV-M5-17`, `INV-M5-18` and `INV-M5-19` each state TWO ENTIRELY DIFFERENT
+  // invariants. An invariant id that means two things cannot be cited.
+  ['docs/plans/M05-payout-system.md', ['inv-m5-01', 'inv-m5-17', 'inv-m5-18', 'inv-m5-19']],
+  ['docs/plans/M12-statistic-definitions.md', ['s-14', 's-15']],
+  ['docs/plans/M20-wallet.md', ['inv-m20-06']],
+  // THE WHOLE SESSION INDEX, TWICE. Lines 120 onward re-list sessions 1 to 74
+  // under a second header row, and the first copy stops at session 62. Written
+  // out rather than expressed as a range: a range is a rule, and a rule that
+  // has to be re-derived on every repair is how a register stops being read.
+  [
+    'docs/sessions/README.md',
+    [
+      '2026-08-19 - session 75',
+      '2026-08-13 - session 1',
+      '2026-08-13 - session 2',
+      '2026-08-13 - session 3',
+      '2026-08-13 - session 4',
+      '2026-08-13 - session 5',
+      '2026-08-14 - session 6',
+      '2026-08-14 - session 7',
+      '2026-08-14 - session 8',
+      '2026-08-14 - session 9',
+      '2026-08-14 - session 10',
+      '2026-08-14 - session 11',
+      '2026-08-14 - session 12',
+      '2026-08-14 - session 13',
+      '2026-08-14 - session 14',
+      '2026-08-14 - session 15',
+      '2026-08-14 - session 16',
+      '2026-08-14 - session 17',
+      '2026-08-15 - session 18',
+      '2026-08-15 - session 19',
+      '2026-08-15 - session 20',
+      '2026-08-15 - session 21',
+      '2026-08-15 - session 22',
+      '2026-08-15 - session 23',
+      '2026-08-15 - session 24',
+      '2026-08-15 - session 25',
+      '2026-08-15 - session 26',
+      '2026-08-15 - session 27',
+      '2026-08-15 - session 28',
+      '2026-08-15 - session 29',
+      '2026-08-15 - session 30',
+      '2026-08-16 - session 31',
+      '2026-08-16 - session 32',
+      '2026-08-16 - session 33',
+      '2026-08-16 - session 34',
+      '2026-08-16 - session 36',
+      '2026-08-16 - session 37',
+      '2026-08-16 - session 38',
+      '2026-08-16 - session 39',
+      '2026-08-16 - session 40',
+      '2026-08-16 - session 41',
+      '2026-08-16 - session 42',
+      '2026-08-16 - session 43',
+      '2026-08-16 - session 44',
+      '2026-08-16 - session 45',
+      '2026-08-16 - session 46',
+      '2026-08-16 - session 47',
+      '2026-08-17 - session 48',
+      '2026-08-17 - session 49',
+      '2026-08-17 - session 50',
+      '2026-08-17 - session 51',
+      '2026-08-17 - session 52',
+      '2026-08-17 - session 53',
+      '2026-08-17 - session 54',
+      '2026-08-17 - session 55',
+      '2026-08-18 - session 56',
+      '2026-08-18 - session 57',
+      '2026-08-18 - session 58',
+      '2026-08-18 - session 59',
+    ],
+  ],
+]);
+
+// A delimiter row: `|---|---|`, `| :--- | ---: |`. It carries no data and is not
+// a body row. A SECOND one inside a table is not skipped quietly by accident --
+// it is a keep-both artifact in its own right, and STRATEGY section 4.4 carries
+// one today -- but naming it is `CI-06p`'s business, not this gate's.
+const isDelimiterRow = (line) => /^\s*\|[\s|:-]*\|\s*$/.test(line) && line.includes('-');
+
+// A table is a MAXIMAL RUN OF CONSECUTIVE `|` LINES carrying at least one
+// delimiter row, which is what GitHub renders as one table. Reading a second
+// delimiter row as the start of a second table is the reading that makes the
+// `docs/sessions/README.md` defect invisible: the duplicate index there sits
+// under a re-inserted header, and two tables that happen to be adjacent have no
+// duplicate between them.
+//
+// Fenced blocks are skipped whole. A worked example of a table inside a fence is
+// quoted prose, and `CI-06t` masks fences for the same reason.
+function markdownTables(body) {
+  const lines = body.split('\n');
+  const out = [];
+  let fence = null;
+  let run = null;
+  const flush = () => {
+    if (run && run.some((r) => isDelimiterRow(r.raw))) out.push(run);
+    run = null;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const f = /^\s*(```+|~~~+)/.exec(line);
+    if (f) {
+      if (fence && line.trim().startsWith(fence)) fence = null;
+      else if (!fence) fence = f[1];
+      flush();
+      continue;
+    }
+    if (fence) continue;
+    if (line.trimStart().startsWith('|')) (run ??= []).push({ n: i + 1, raw: line });
+    else flush();
+  }
+  flush();
+  return out;
+}
+
+// The cells of one row. A pipe escaped as `\|` is content and does not split,
+// which is how a cell carrying a regex or an SQL alternation survives.
+function rowCells(raw) {
+  let s = raw.trim();
+  if (s.startsWith('|')) s = s.slice(1);
+  if (s.endsWith('|')) s = s.slice(0, -1);
+  return s.split(/(?<!\\)\|/);
+}
+
+// A cell to the key it claims. Link text rather than link target, because the
+// `r` rows of the letter table differ ONLY in their target and are the same
+// claim; emphasis stripped, because a row bolded on one branch and plain on the
+// other is one key and a gate that read them as two would miss the merge it
+// exists for.
+//
+// `_` IS NOT STRIPPED and that is deliberate. It is an emphasis marker in
+// markdown and an identifier character in this corpus, where first cells carry
+// `held_pending_review` and `phone_hash`. Stripping it would fold
+// `hold_expires` and `holdexpires` into one key, which invents a duplicate;
+// inventing one is worse than missing one here, because a false finding in a
+// merge gate is how the gate gets switched off.
+const firstCellKey = (cell) =>
+  cell
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]*>/g, '')
+    .replace(/[`*~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+const ci06u = {
+  id: 'CI-06u',
+  title: 'No markdown table in docs/ has two rows with the same first-cell key',
+  covers:
+    "CI-06p's first assertion, generalised off the one table it was written for. In every " +
+    'markdown table under docs/, no two body rows carry the same first cell, because the ' +
+    'review desk merge script resolves keep-both and re-appends rows a table already had. ' +
+    'SCOPE IS STATED IN TWO PLACES AND NEITHER IS A RELAXATION. Tables whose first column ' +
+    'is a DIMENSION rather than an identity (transition tables keyed by From, STRIDE ' +
+    'tables keyed by threat category, and four more) are out of scope by header, one ' +
+    'argued shape per entry, and an exemption matching no table is a finding. The 105 ' +
+    'duplicate keys the 2026-08-19 survey found on main are REGISTERED, not exempted: a ' +
+    'register entry that no longer names a real duplicate is a finding, so the register ' +
+    'shrinks as repairs land and cannot become furniture. ' +
+    'FIVE THINGS IT DOES NOT DO. It reads the first cell and nothing else, so two rows ' +
+    'that CONTRADICT each other are the same finding as two that are identical, and which ' +
+    'half is true is a founder ruling. The dimension list is a recorded reading of six ' +
+    'table shapes, not a derivation, so a new dimension column under a new header is a ' +
+    'false finding whose remedy is another argued entry. The register is per (file, key) ' +
+    'and not per table, so a key duplicated in two tables of one file is one entry. It ' +
+    'inherits the one-ref gap CI-06f, CI-06h and CI-06p each declare, and catches a ' +
+    'cross-branch duplication at the merge rather than at the pull request. And a row ' +
+    'indented past a list marker parses as prose and is claimed as nothing.',
+  run() {
+    const findings = [];
+    const files = markdownFiles().filter((p) => p.startsWith(CI06U_DOCS));
+    // Rule 2 on a glob-shaped input, which is the shape that returns empty
+    // instead of throwing. A prefix that stops matching would make every table
+    // in the corpus unread and every duplicate pass.
+    if (files.length === 0) {
+      throw new Error(`no markdown files under ${CI06U_DOCS}; the gate cannot run`);
+    }
+
+    const found = new Map(); // file -> Set(key)
+    const exemptionUsed = new Set();
+    let tables = 0;
+    let inScope = 0;
+
+    for (const file of files.sort()) {
+      const body = read(file);
+      for (const rows of markdownTables(body)) {
+        tables++;
+        const delimiterAt = rows.findIndex((r) => isDelimiterRow(r.raw));
+        // The header is the row above the first delimiter. A table opening ON a
+        // delimiter has no header and is in scope: `docs/sessions/README.md`'s
+        // second copy opens that way and it is the largest finding here.
+        const header =
+          delimiterAt > 0 ? firstCellKey(rowCells(rows[delimiterAt - 1].raw)[0] ?? '') : '';
+        if (DIMENSION_HEADERS.has(header)) {
+          exemptionUsed.add(header);
+          continue;
+        }
+        inScope++;
+        const seen = new Map();
+        let past = false;
+        for (const row of rows) {
+          if (isDelimiterRow(row.raw)) {
+            past = true;
+            continue;
+          }
+          if (!past) continue;
+          const key = firstCellKey(rowCells(row.raw)[0] ?? '');
+          // An empty first cell claims nothing. The corpus's two-column layout
+          // tables carry `| | |` continuation rows by the hundred and a gate
+          // that read them as one repeated key would report every one of them.
+          if (!key) continue;
+          if (!seen.has(key)) {
+            seen.set(key, row.n);
+            continue;
+          }
+          if (!found.has(file)) found.set(file, new Set());
+          found.get(file).add(key);
+          if (CI06U_REGISTER.get(file)?.includes(key)) continue;
+          findings.push(
+            `${file}:${row.n}: the first cell "${key.slice(0, 60)}" already heads the row at ` +
+              `line ${seen.get(key)} of the same table (opens at line ${rows[0].n}). Two rows ` +
+              'for one key is the keep-both merge, and the registry can no longer answer the ' +
+              'question it exists to answer. Keep ONE row',
+          );
+        }
+      }
+    }
+
+    if (tables === 0) {
+      throw new Error(
+        `CI-06u parsed zero markdown tables under ${CI06U_DOCS}. This corpus is written in ` +
+          'tables, so zero means the table parser has stopped matching and every duplicate ' +
+          'row in the tree would pass for the wrong reason',
+      );
+    }
+
+    // THE REGISTER SHRINKS ONLY. An entry naming a duplicate that is no longer
+    // there is a repair that landed without the register following it, and a
+    // register nobody has to maintain is an exemption list that outlives its
+    // reason. This is the same assertion CI-06l makes about its own exemptions.
+    let registered = 0;
+    for (const [file, keys] of CI06U_REGISTER) {
+      for (const key of keys) {
+        registered++;
+        if (found.get(file)?.has(key)) continue;
+        findings.push(
+          `${file}: the register claims "${key}" is a known duplicate and it is not one on ` +
+            'this ref. Either the repair landed and this line goes, or the file moved and ' +
+            'the register moved with it. A register entry that names nothing exempts nothing ' +
+            'and hides the next one',
+        );
+      }
+    }
+
+    // An exemption matching no table has the same problem in the other list.
+    for (const [header, why] of DIMENSION_HEADERS) {
+      if (exemptionUsed.has(header)) continue;
+      findings.push(
+        `no table under ${CI06U_DOCS} has "${header}" as its first-column header, and the ` +
+          `dimension exemption for it (${why}) now covers nothing. Delete it: an exemption ` +
+          'nobody can point at a table for is how a scope decision stops being reviewable',
+      );
+    }
+
+    console.log(
+      `       CI-06u note: ${inScope} of ${tables} tables in scope, ` +
+        `${tables - inScope} exempt by first-column header (${[...DIMENSION_HEADERS.keys()].join(', ')}); ` +
+        `${registered} known duplicate key(s) registered across ${CI06U_REGISTER.size} file(s), ` +
+        'each one a repair this gate is waiting for',
+    );
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -3733,6 +4201,7 @@ const GATES = [
   ci06s,
   adr026,
   ci06t,
+  ci06u,
 ];
 
 function main() {
