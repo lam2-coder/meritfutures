@@ -709,6 +709,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **`OI-12`** | `0035`'s session | **allocated, open.** **A calendar `INSERT` moves no watermark.** `0033` guards every way a day can change; a day backfilled inside an existing coverage window changes the day sequence retroactively with no revision row, and every stamped `rule_states` row still claims a watermark that looks current. ADR-045 owns `trading_calendar`'s guards and ADR-047 does not rule it |
 | **`OI-13`** | `0035`'s session | **allocated, open.** **B.4 step 4's audited rewrite has no grant.** `0026` revoked `UPDATE` on `rule_states` from `merit_app` and `PUBLIC` and no `SECURITY DEFINER` function performs it. Pre-existing and identical for `engine_version`; `calendar_revision_id` makes a second caller for a path that has none |
 | **`OI-14`** | `0035`'s session | **allocated, open.** **The replay job must refuse an empty in-scope set.** If the engine never populates `calendar_revision_id`, every row reads as out of scope after the first correction, the audit compares nothing, and an audit that has stopped looking reports exactly like one that found nothing (FM-17). No per-row constraint can tell "not yet written" from "pristine calendar" without fabricating, so it belongs to the job |
+| **`OI-24`** | `ADR-068`'s session, [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2` | **allocated, open, and DELIBERATELY NOT REPAIRED.** [M06](../../docs/plans/M06-admin-ops-console.md) section 2 opens *"Six deltas, each from a failure mode below"* and the table now carries **seven**. **Session 89 already corrected this line once**, from *"Five deltas"*, and `SD-M6-10` makes it wrong again three sessions later. **Four concurrent sessions are each about to move it**, which is the proof that the count cannot be hand-maintained rather than an argument that it can be maintained harder. **The remedy is named and is [ADR-034](../../docs/decisions/ADR-034.md)'s own**: the count becomes a `<!--gen:-->` span under `CI-06g`, computed from the delta table it describes, and then no session touches it again. **Not implemented here**: [`gates.mjs`](../../scripts/corpus/gates.mjs) is held by three concurrent sessions and this one already carries four forced fence extensions. **For the review desk.** |
 
 ### Section numbers
 
@@ -723,6 +724,8 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **17** | this session | **allocated.** `0033` lands |
 | **18** | `0034`'s session | **allocated.** `0034` lands. **This row was written into the file as a heading and never into this table**, one section after the table was created to stop exactly that |
 | **19** | `0035`'s session | **allocated.** `0035` lands |
+| **20** | `0036`'s session | **allocated.** `0036` lands. **This row was written into the file as a heading and never into this table**, which is the identical omission the `18` row above records one section earlier. Added here by `0042`'s session, which is the third occurrence of the same miss and the reason `OI-24` exists |
+| **21** | `ADR-068`'s session | **allocated.** `0042` lands |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
 
@@ -1112,3 +1115,56 @@ ERROR:  new row for relation "daily_marks" violates check constraint "daily_mark
 `psql` exits **3**. Under `0036` the same row commits. That is EC-157's claim, run rather than argued.
 
 **The day-sequence property suite is flipped in the same commit rather than deleted.** It watched every non-zero-adjustment mark **violate** the stored constraint; it now watches them **pass**, and the branch on whether the adjustment is zero is gone, which is itself the finding: under `0014` that branch existed because zero was the only value at which the constraint and the two invariants agreed. Kept rather than removed as redundant, because it is what fails if a later migration puts the adjustment back into the closing identity.
+
+---
+
+## 21. `0042` lands, and the guard that mattered was the one nobody writes (2026-08-20)
+
+**`ADR-068`, `SD-M6-10`, [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2`. AUTH, therefore MONEY PATH.** Two tables, three `CHECK` constraints, three trigger functions and three triggers, and two narrow `REVOKE` statements.
+
+### Install verification (PostgreSQL 16.13, 2026-08-20)
+
+**`0001` to `0042` applied forward-only from an empty database under `ON_ERROR_STOP=1`, zero errors.** `0038` and `0040` are legal reserved holes under [ADR-036](../../docs/decisions/ADR-036.md), so the applied sequence is `0001` to `0037`, `0039`, `0041`, `0042`.
+
+**Every figure below is read from the catalogue rather than grepped from the DDL**, which is [ADR-034](../../docs/decisions/ADR-034.md)'s rule applied to this file's own claims.
+
+| | `0001` to `0041` | `0001` to `0042` | Delta |
+|---|---|---|---|
+| tables (`pg_tables`) | 104 | **106** | +2 |
+| indexes (`pg_indexes`) | 362 | **369** | +7 |
+| check constraints (`pg_constraint`, `contype='c'`) | 414 | **421** | +7 |
+| triggers (`pg_trigger`, not internal) | 10 | **13** | +3 |
+
+**Two of the eight figures above were written from arithmetic before they were measured, and both were wrong.** The index and check-constraint counts for `0001` to `0041` were assumed to be three below the new totals, on the reasoning that `0042` declares three named indexes and three named table constraints. **The real deltas are seven and seven**: the count includes the two primary keys and the `token_hash` unique index, which are indexes nobody writes the word `INDEX` for, and the three column-level `CHECK`s on `reason_code`, `reason_detail` and `end_reason`, which are constraints nobody writes the word `CONSTRAINT` for. **They were corrected by querying the counterfactual database rather than by recounting the DDL**, which is the only method that could have caught them, and this paragraph is here because the arithmetic was persuasive and wrong in the same direction twice.
+
+**The grant asymmetry was verified from `information_schema.role_table_grants` and not from the `REVOKE` text**, because a revoke that names the wrong role reads exactly like one that names the right one:
+
+| Role | `impersonation_sessions` | `impersonation_page_views` |
+|---|---|---|
+| `merit_app` | `INSERT, SELECT, UPDATE` | `INSERT, SELECT` |
+| `merit_analytics` | **no grant of any kind** | **no grant of any kind** |
+
+**`UPDATE` survives on one table and not the other, and that is the intended shape.** Recording the explicit exit is an update to a row that already exists, so revoking `UPDATE` on `impersonation_sessions` would make every session unclosable. `IMPERSONATION-C1` fires on `UPDATE OF token_hash`, so the boundary survives the one update that is allowed. This is why the append-only list in [DATA_MODEL section 1](../../docs/architecture/data-model/README.md) gains **one** table rather than two.
+
+### The probe, and the two seeded violations it was watched failing on
+
+[`scripts/db/probe_impersonation_session_type.sql`](../../scripts/db/probe_impersonation_session_type.sql). **Five success cases before the first rejection**, then seven rejections. All twelve fire against `0042`.
+
+| Seed | What happened |
+|---|---|
+| **The mirror trigger dropped**, forward guard left in place | **`REJECTION 1` STILL PASSED** and `REJECTION 2` failed. This is the entire argument for two triggers stated as evidence: a guard only on `impersonation_sessions` is satisfied by writing the `sessions` row **second**, and an inventory of refusals reports it green. The hole it leaves is an impersonation token resolving on the trader auth path, which `GS-303` calls the failure that makes every other control on that table decorative |
+| **`IMPERSONATION-C2`'s bound rewritten as plain `expires_at`** | **`REJECTION 4` STILL PASSED** and `REJECTION 5` failed. The naive bound admits a page view recorded after an **explicit exit** but before the original expiry, which is a view of a trader's account after the session ended, recorded as though the session were live. `LEAST(expires_at, COALESCE(ended_at, expires_at))` is the whole difference and only `REJECTION 5` can see it |
+
+**The counterfactual against `0001` to `0041` fails on the FIRST SUCCESS CASE**, `relation "impersonation_sessions" does not exist`. The probe cannot pass vacuously against a schema with none of this in it, which is `0034`'s stated test applied here.
+
+### Two fixture facts found by running rather than by reading
+
+Both are recorded in the probe itself, where the next author writing a fixture against these tables will hit them.
+
+1. **`identities_status_is_explained`** ([`0002`](migrations/0002_identity.sql):73) requires a `status_reason` on any identity that is not `active`. `GS-302` needs a **`restricted`** subject, so the fixture carries one.
+2. **`sessions.auth_factor` is `NOT NULL`, and it is [`0029`](migrations/0029_phone_identity_and_auth.sql)'s rather than [`0002`](migrations/0002_identity.sql)'s.** Reading `CREATE TABLE sessions` alone does not show it. **This is the corpus's recurring error class in its cheapest form**: a claim about a table checked against the file that created it rather than against the table as it now stands.
+
+### One finding recorded and not repaired
+
+**`ADR-026`'s completeness gate reads this file, and its finding text says otherwise.** [`gates.mjs:1537`](../../scripts/corpus/gates.mjs) scans `docs/**` **and `packages/db/DELTA_MANIFEST.md`**; [`gates.mjs:1542`](../../scripts/corpus/gates.mjs) reports `cited in docs/`. A first draft of section 4c named two unclaimed `SD-M6-nn` numbers outright on the theory that this file is exempt from the gate that reads it, and **the gate caught it while its own message pointed at the one file set that did not contain the citation.** Left unrepaired: `gates.mjs` is held by three concurrent sessions and a shared file earns a minimal diff.
+
