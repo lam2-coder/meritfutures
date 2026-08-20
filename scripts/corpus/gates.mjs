@@ -3835,22 +3835,6 @@ const CI06U_REGISTER = new Map([
   // and it is the one register entry here that may legitimately grow before it
   // shrinks.
 
-  // The P1-item table, recorded as OI-10. Its two `CI-06, corpus integrity`
-  // rows say `21` checks and `Eleven` checks.
-  [
-    'docs/STATE.md',
-    [
-      'ci-01, ci-02, ci-05',
-      'ci-03, golden files',
-      'ci-04, ci-07 to ci-09',
-      'ci-06, corpus integrity',
-      'ci-06h, migration install',
-      'the monorepo scaffold',
-      'the reconciled schema and migrations',
-      'tradingcalendar as data',
-      'vg-1 to vg-12',
-    ],
-  ],
   // THE MONEY-PATH TEN ARE REPAIRED AND THIS ENTRY IS GONE, WHICH IS THE
   // DIRECTION THIS REGISTER DECAYS IN. Session 78 read all ten pairs against
   // primary sources: FOUR were contradictions and SIX were copies. The four are

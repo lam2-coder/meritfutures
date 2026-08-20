@@ -1872,11 +1872,22 @@ const SCOPE_CASES = [
     // tree where the gate was working. `firstRegisteredDuplicate` says the rest.
     expect: (d) =>
       `the register claims "${repairedRegisteredDuplicate(d).key}" is a known duplicate`,
+    // THE SEED REMOVES THE WHOLE DUPLICATION, not one row of it, and the
+    // difference is not cosmetic. Deleting a single row assumes every
+    // registered claim carries exactly two, which was true until
+    // `docs/sessions/README.md` became the last file in the register: the
+    // parallel-session convention gives sessions 31, 49, 50 and 56 FOUR rows
+    // each, so removing one leaves three and `repairedRegisteredDuplicate`
+    // finds nothing below two. The case then threw `seed anchor not found` on
+    // a tree where the gate was working, which is the same shape as the
+    // hardcoded `inv-m20-06` target this seed already outgrew once.
     seed: (d) => {
-      const { file, at } = firstRegisteredDuplicate(d);
+      const { file, key } = firstRegisteredDuplicate(d);
       const p = join(d, file);
       const lines = readFileSync(p, 'utf8').split('\n');
-      lines.splice(at, 1);
+      // Keep the first row carrying the key and drop the rest. That IS the
+      // repair, so the register entry must now name nothing.
+      for (const at of rowsCarrying(d, file, key).slice(1).reverse()) lines.splice(at, 1);
       writeFileSync(p, lines.join('\n'));
     },
   },
