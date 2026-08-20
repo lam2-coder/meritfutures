@@ -150,9 +150,46 @@ const addMigrationRow = (body, number, state) => {
   return `${body.slice(0, at)}\n| ${number} | falsify probe | **reserved.** ${state} |${body.slice(at)}`;
 };
 
+// The ADR table's counterpart to `addMigrationRow`, written for `CI-06w`'s
+// per-table boundary. THE TWO NUMERIC TABLES CLAIM OVERLAPPING INTEGER RANGES:
+// the ADR table claims 1 to 71 and the migration table 1 to 45, so a gate that
+// merged them into one map would report every number below 45 as claimed twice
+// and would be red on arrival. Pinning that boundary means writing the SAME
+// number into either table and asserting the two outcomes differ.
+const addAdrRow = (body, number, state) => {
+  const heading = '## Number allocation';
+  const start = body.indexOf(heading);
+  if (start === -1) throw new Error('seed anchor not found: the ADR allocation table');
+  // Bounded to its own section, for the reason `addMigrationRow` states one
+  // helper down: the last table row of an unbounded slice belongs to a table
+  // further down the file, and the seed would then reserve nothing.
+  const after = body.slice(start + heading.length);
+  const end = after.search(/\n## /);
+  const section = end === -1 ? after : after.slice(0, end);
+  const rows = [...section.matchAll(/^\|.*\|$/gm)];
+  if (rows.length < 3) throw new Error('seed anchor found no rows in the ADR table');
+  const last = rows[rows.length - 1];
+  const at = start + heading.length + last.index + last[0].length;
+  return `${body.slice(0, at)}\n| ${number} | falsify probe | **reserved.** ${state} |${body.slice(at)}`;
+};
+
 const nextFreeMigration = (dir) =>
   String(nextFree(dir, '## Migration number allocation')).padStart(4, '0');
 const nextFreeAdr = (dir) => String(nextFree(dir, '## Number allocation')).padStart(3, '0');
+
+// A number the migration table ALREADY claims: `nextFree`'s mirror image, and
+// the anchor `CI-06w`'s seed needs. Derived rather than pinned, on the standing
+// rider: a seed naming `0034` goes silent the day ADR-065's merge lands and
+// reports a tidy `did not fire`. Gaplessness over allocated-plus-reserved is
+// `CI-06h`'s own assertion, so everything below the first free number is
+// claimed by construction.
+const lastClaimedMigration = (dir) => {
+  const free = nextFree(dir, '## Migration number allocation');
+  if (free <= 1) {
+    throw new Error('seed anchor not found: the migration table claims no number at all');
+  }
+  return String(free - 1).padStart(4, '0');
+};
 
 /**
  * The HIGHEST numbered ADR entry file that exists in the tree.
@@ -1021,6 +1058,35 @@ const SEEDS = {
           `| seeded-c | nor this one |\n`,
       ),
   },
+  'CI-06w': {
+    what: 'a second allocation row claiming a number the table already claims',
+    real:
+      '0034 was claimed by ADR-047 for the rule_states calendar revision and by ADR-046 for ' +
+      'the reversible contact addresses, in ADJACENT ROWS of one table on one ref, and ' +
+      'fifteen gates passed over it because allocated() folded both claims into one Set ' +
+      'member. Recovery was free only because the second file was still unwritten, and a ' +
+      'merged migration is sacred (E2)',
+    // DERIVED, and the number is one the table already holds rather than a free
+    // one. A seed claiming a FREE number opens no duplicate and would report a
+    // gate that cannot fail; a seed naming a live number by literal goes silent
+    // the day that row moves. `lastClaimedMigration` is neither.
+    //
+    // `expect` resolves against the SEEDED tree, and the seeded row does not
+    // move the first free number, so it names the same number before and after.
+    // That is the `CI-06l` lesson, applied before it bit.
+    expect: (d) => `${lastClaimedMigration(d)} is claimed by 2 rows`,
+    seed: (d) => {
+      const claimed = lastClaimedMigration(d);
+      edit(d, 'docs/decisions/ALLOCATION.md', (b) =>
+        addMigrationRow(
+          b,
+          claimed,
+          'a SECOND claim on a number this table already claims, which is the ' +
+            'shape ADR-046 and ADR-047 landed in adjacent rows',
+        ),
+      );
+    },
+  },
 };
 
 // =============================================================================
@@ -1794,6 +1860,96 @@ const SCOPE_CASES = [
         'docs/GLOSSARY.md',
         (b) => `${b}\n<!-- seeded -->\n\n| solo-line | one pipe line alone is prose |\n`,
       ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06w. THE SEED PROVES IT FIRES ON TWO VERBATIM ROWS. Neither case below
+  // is that shape, because two verbatim rows is the population the gate is
+  // easiest to get right on.
+  //
+  // Both boundaries name a way to write the SAME gate and have it be wrong in
+  // one direction only, and each is pinned from both sides. A duplicate gate is
+  // relaxed by making it quieter, so a case asserting only PASS proves nothing:
+  // every `expect: 'PASS'` here carries a control that must fire.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06w/adjacent-ranges-do-not-overlap',
+    gate: 'CI-06w',
+    what: 'a range row claiming numbers that BEGIN where the table stops, which must NOT be a finding',
+    expect: 'PASS',
+    // THE ALLOCATION TABLES ARE WRITTEN IN RANGES -- `001 to 032`, `0001 to
+    // 0028` -- and a gate reading the first cell as a LITERAL passes both sides
+    // of this pair. It would report two rows reading `0034` and stay silent on
+    // `0001 to 0034` beside `0034`, which is the same double claim written the
+    // way this table actually writes claims.
+    //
+    // The pair is two two-number ranges, shifted past each other by two. The
+    // seed's BEGINS at the first free number, so it touches the table's top
+    // without overlapping it: adjacency is not a claim. The control's ENDS at
+    // the highest claimed number, so both of its numbers are claimed twice.
+    //
+    // NEITHER RANGE MOVES THE FIRST FREE NUMBER, which is why the control's
+    // range sits entirely inside the claimed region rather than straddling the
+    // top by one. A straddling range would claim `free` and push `nextFree`
+    // upward, and `expect` -- resolved against the SEEDED tree -- would then
+    // name a number claimed only once and report a working gate as broken.
+    // That is the `CI-06l` lesson again, and it bit here during writing.
+    control: {
+      expect: (d) => `${lastClaimedMigration(d)} is claimed by 2 rows`,
+      seed: (d) => {
+        const top = lastClaimedMigration(d);
+        const from = String(Number(top) - 1).padStart(4, '0');
+        edit(d, 'docs/decisions/ALLOCATION.md', (b) =>
+          addMigrationRow(b, `${from} to ${top}`, 'a range ending ON the highest claimed number'),
+        );
+      },
+    },
+    seed: (d) => {
+      const free = nextFreeMigration(d);
+      const top = String(Number(free) + 1).padStart(4, '0');
+      edit(d, 'docs/decisions/ALLOCATION.md', (b) =>
+        addMigrationRow(b, `${free} to ${top}`, 'a range beginning where the table stops'),
+      );
+    },
+  },
+  {
+    name: 'CI-06w/one-number-in-two-different-tables-is-two-claims',
+    gate: 'CI-06w',
+    what: 'the same number claimed once in the ADR table and once in the migration table, which must NOT be a finding',
+    expect: 'PASS',
+    // A KEY IS SCOPED TO ITS OWN TABLE, and this is the case that says so.
+    // ALLOCATION's two numeric tables claim OVERLAPPING INTEGER RANGES -- ADR
+    // 1 to 71, migrations 1 to 45 -- so the obvious wrong implementation, one
+    // map over all three tables, reports every number below 45 as claimed twice
+    // and is red on arrival on a clean tree. It is wrong in the LOUD direction,
+    // which is the one that gets a gate deleted rather than relaxed.
+    //
+    // The seed claims the first free MIGRATION number, which the ADR table
+    // already claims as an ADR. Two tables, one integer, two legitimate claims.
+    //
+    // The control writes the identical row into the ADR table instead, where
+    // that number is already claimed. The two trees differ in WHICH TABLE the
+    // row lands in and in nothing else, so a control that goes quiet means the
+    // number was never claimed there and the PASS above is vacuous.
+    control: {
+      expect: (d) => `ADR-${nextFreeMigration(d).slice(1)} is claimed by 2 rows`,
+      seed: (d) => {
+        const n = nextFreeMigration(d);
+        edit(d, 'docs/decisions/ALLOCATION.md', (b) =>
+          addAdrRow(b, n.slice(1), 'a second claim, in the table that already claims it'),
+        );
+      },
+    },
+    seed: (d) => {
+      const n = nextFreeMigration(d);
+      edit(d, 'docs/decisions/ALLOCATION.md', (b) =>
+        addMigrationRow(
+          b,
+          n,
+          'free as a migration, and claimed as an ADR by the table above. Two ' +
+            'registries, one integer, and neither claim is a duplicate of the other',
+        ),
+      );
+    },
   },
   {
     name: 'CI-06t/unclosed-before-a-good-span-later',
