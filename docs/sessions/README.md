@@ -223,3 +223,4 @@ must be recoverable from its own file alone.
 | [2026-08-19 - Session 75](2026-08-19-session-75.md) | ADR-059 signed as a split: the layer column on M01's fifty rules, the halt open question named, and the seed comment |
 | [2026-08-19 - Session 75](2026-08-19-session-75.md) | `CI-06u`: no markdown table in `docs/` has two rows with the same first-cell key, and the 105 the survey found |
 | [2026-08-19 - Session 75](2026-08-19-session-75.md) | ADR-060 folded, INV-15's closed six-member enumeration, and RE-P-15 written |
+| [2026-08-20 - Session 77](2026-08-20-session-77.md) | ADR-061 proposed: when a duplicated table key is a repair that lands by commit and when it is an amendment that needs a ruling |
