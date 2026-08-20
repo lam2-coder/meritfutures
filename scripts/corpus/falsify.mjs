@@ -730,6 +730,28 @@ const SEEDS = {
       );
     },
   },
+  'CI-06u': {
+    what: 'a table row duplicated under an identifier already in the table, which is what keep-both leaves behind',
+    real:
+      "the review desk's merge script resolves conflicts KEEP-BOTH and dedupes only lines " +
+      'over 60 characters that are byte-identical, so two sessions appending to one table ' +
+      "duplicate the table's EXISTING rows and any reformatting defeats the dedupe. It " +
+      'produced two ADR-050 rows with different titles, fourteen duplicate CI-06 rows in ' +
+      'STRATEGY, and a docs/sessions/README.md carrying the entire session table twice',
+    // The target is M05's invariant table, which is on the known list at four
+    // duplicates: a FIFTH takes the file past its ratchet, so this seed watches
+    // the ratchet's growth arm rather than the bare assertion the `in` scope
+    // case covers. The two together are the whole gate.
+    expect: 'duplicated identifier(s) against a ratchet of 4',
+    seed: (d) =>
+      edit(d, 'docs/plans/M05-payout-system.md', (b) => {
+        const lines = b.split('\n');
+        const at = lines.findIndex((l) => /^\| INV-M5-08 /.test(l));
+        if (at === -1) throw new Error('the CI-06u seed found no INV-M5-08 row to duplicate');
+        lines.splice(at + 1, 0, lines[at]);
+        return lines.join('\n');
+      }),
+  },
   'CI-06p': {
     what: 'a CI-06 letter claimed two past the last one, leaving the letters between it claimed by nobody',
     real:
@@ -910,6 +932,75 @@ function seedProposedAdr(d, withApproval) {
 }
 
 const SCOPE_CASES = [
+  // ---------------------------------------------------------------------------
+  // CI-06u. THE SCOPE IS THE RULING, SO THE SCOPE IS WHAT THESE WATCH.
+  //
+  // The gate asserts that an IDENTIFIER heads at most one row of a docs/ table.
+  // A survey of clean main found 123 duplicated first cells and most were
+  // legitimate grouping columns, so the pair below is not decoration: the `in`
+  // case proves the assertion fires, and the `out` case proves it does NOT fire
+  // on the from-states and group letters that repeat by design. A gate that
+  // caught both would be relaxed within a week, and a gate relaxed to fit is the
+  // outcome the survey exists to prevent.
+  //
+  // The third watches the RATCHET rather than the assertion. A known-duplicate
+  // count that may only shrink is worth nothing if nobody lowers it when repairs
+  // land, so a file that has been REPAIRED must be a finding too.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06u/in',
+    gate: 'CI-06u',
+    what: 'one identifier heading two rows of a docs/ table, which MUST be a finding',
+    expect: 'INV-PROBE-01 heads more than one row',
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'docs/PROBE_DUPLICATE_ID.md'),
+        '---\nstatus: draft\ndepends_on: []\nlast_updated: 2026-08-19\n---\n\n' +
+          '# Probe\n\n| ID | Claim |\n|---|---|\n' +
+          '| INV-PROBE-01 | the first session wrote this one |\n' +
+          '| INV-PROBE-01 | and the merge kept the other session\'s copy of the same row |\n',
+      ),
+  },
+  {
+    name: 'CI-06u/out',
+    gate: 'CI-06u',
+    what: 'a grouping column repeating by design, which must NOT be a finding',
+    expect: 'PASS',
+    seed: (d) =>
+      writeFileSync(
+        join(d, 'docs/PROBE_GROUPING_COLUMN.md'),
+        '---\nstatus: draft\ndepends_on: []\nlast_updated: 2026-08-19\n---\n\n' +
+          '# Probe\n\n' +
+          // A transition table. The first cell is the FROM state and repeats
+          // once per transition out of it, which is STATE_MACHINES' shape.
+          '| From | To | On |\n|---|---|---|\n' +
+          '| active | breached | the floor is broken |\n' +
+          '| active | graduated | the ladder completes |\n' +
+          '| active | closed_admin | an admin closes it |\n\n' +
+          // And a Group column, which is what a session log repeats.
+          '| Group | Row |\n|---|---|\n| A | GS-003 |\n| A | GS-004 |\n| F | GS-059 |\n',
+      ),
+  },
+  {
+    name: 'CI-06u/ratchet-stale',
+    gate: 'CI-06u',
+    what: 'a known-duplicate file that has been REPAIRED, which MUST be a finding',
+    // The ratchet only ratchets if lowering it is compulsory. M20 carries
+    // exactly one duplicated identifier, so removing it drops the file to zero
+    // against a ratchet of one, and the gate must say so rather than pass a
+    // count it has quietly outgrown.
+    expect: 'CI06U_KNOWN is stale',
+    seed: (d) =>
+      edit(d, 'docs/plans/M20-wallet.md', (b) => {
+        const lines = b.split('\n');
+        const at = lines.findIndex(
+          (l, i) => l.startsWith('| INV-M20-06 ') && lines[i - 1]?.startsWith('| INV-M20-06 '),
+        );
+        if (at === -1) throw new Error('the CI-06u ratchet seed found no duplicate INV-M20-06');
+        lines.splice(at, 1);
+        return lines.join('\n');
+      }),
+  },
   {
     name: 'CI-06b/out',
     gate: 'CI-06b',
