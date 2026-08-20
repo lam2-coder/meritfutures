@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/golden-scenarios/README.md, ../../research/TOP10_FIRMS.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M04-trader-portal.md, M05-payout-system.md, M07-risk-abuse.md, M09-marketing-site.md, M11-certificates-social-proof.md, M12-transparency-platform.md, M19-kyc-identity.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-20
 ---
 
 # M18: Graduation Track
@@ -85,7 +85,7 @@ The trader-facing face of [M01](M01-rules-engine.md)'s payout ladder, and whatev
 
 | Not M18 | Whose job | Why the boundary is here |
 |---|---|---|
-| The ladder rule itself | [M1](M01-rules-engine.md) | `ladder.payouts_to_graduate` is plan config and INV-17 is the engine's. M18 renders and explains it |
+| The ladder rule itself | [M1](M01-rules-engine.md) | `phase_funded.max_payouts` is plan config and INV-17 is the engine's. M18 renders and explains it. **This row read `ladder.payouts_to_graduate` until 2026-08-20**, which [ADR-030](../decisions/ADR-030.md) superseded and [GLOSSARY:204](../GLOSSARY.md) calls "the superseded key name"; [`validate.ts:218`](../../packages/rules-engine/src/plan/validate.ts) and [`settle.ts:197`](../../packages/rules-engine/src/payout/settle.ts) both read the canonical one |
 | Any payout | [M5](M05-payout-system.md) | Including the last one. Graduation is a consequence of the final settlement, never a gate before it |
 | Deciding a trader is good | [M13](M13-trader-analytics-journal.md), and nobody | Graduation is **mechanical**: it is the ladder ending. If an invitation adds a judgment, that judgment is the module's biggest risk (AS-M18-06) |
 | Certificates | [M11](M11-certificates-social-proof.md) | CT-M11-03 is the graduation card |
@@ -105,6 +105,8 @@ The trader-facing face of [M01](M01-rules-engine.md)'s payout ladder, and whatev
 | INV-M18-08 | If GP-M18-02 ships, the third party is **named**, the compensation arrangement is **disclosed**, and Merit makes no representation about the third party's terms | [legal/](../legal/README.md). An introduction Merit is paid for and does not disclose is the affiliate-disclosure problem with a bigger consequence |
 | INV-M18-09 | Graduated accounts remain fully readable: history, analytics, certificates, and evidence | [M13](M13-trader-analytics-journal.md) OQ-M13-04's reasoning. A trader's record is theirs after the account ends |
 | INV-M18-10 | The graduating cohort is a **risk cohort**, reviewed before any benefit is conferred | AS-M18-03, AS-M18-07. Completing a ladder is the exact outcome a successful undetected ring produces |
+| INV-M18-11 | **A ladder unlock reads the hard-merged identity and nothing weaker** | [ADR-070](../decisions/ADR-070.md) section 3, on [M07](M07-risk-abuse.md)'s own rule that "only a hard merge changes what a trader may buy". Structural rather than checked: `plan_size_unlocks.identity_id` is a foreign key to `identities`, a merge repoints ownership into that row, and no read behind the table joins `identity_links`. **Two soft-linked accounts each completing a ladder and each unlocking a larger tier is one identity acquiring two larger tiers**, which is cap aggregation reached through a feature rather than through an attack |
+| INV-M18-12 | **An unlock changes what may be PURCHASED and changes no rule on any account** | `INV-M18-07` restated for the mechanism that most looks like it violates it. An unlock names a `plan_version_sizes` row the identity may now buy; the account opened against it gets that version's published rules like everyone, which is INV-M18-07's own enforcement note. Asserted rather than argued, by [`plan-size-unlocks.test.ts`](../../packages/db/test/plan-size-unlocks.test.ts): the table **has nowhere to put a rule parameter**, over a vocabulary derived from `plan_version_sizes` rather than listed |
 
 ---
 
@@ -117,6 +119,7 @@ Small, because most of what this module needs was reserved in Wave 2.
 | SD-M18-01 | `accounts` | add `graduated_at timestamptz null`, `graduation_path text null check in ('continuation','third_party_intro','live_program')`, `terminal_settlement_id uuid null` | The `graduated` phase exists in the approved model; what is missing is **which** graduation happened and whether the terminal settlement (INV-M18-05) occurred. Without the second, a graduated account holding a balance is indistinguishable from one that paid out fully |
 | SD-M18-02 | new `graduation_benefits` | `id`, `identity_id`, `account_id`, `benefit_code`, `accrued_cents`, `basis text`, `conferred_at null`, `withheld_reason null`, `criteria_version` | INV-M18-06 and INV-M18-10. `accrued_cents` with a stated `basis` is what stops a vault display becoming a projection, and `withheld_reason` is what lets the risk review in INV-M18-10 hold a benefit without silently dropping it |
 | SD-M18-03 | new `graduation_invitations` | `id`, `identity_id`, `program_ref`, `issued_at`, `accepted_at null`, `declined_at null`, `expires_at`, `terms_version` | Only if GP-M18-01 or GP-M18-02 ever ships. Recorded here so that the shape is decided before commercial pressure decides it, and so that `terms_version` exists from the first invitation rather than being added after the first dispute |
+| SD-M18-04 | new `plan_size_unlocks` | `id`, `identity_id`, `plan_version_id`, `unlocked_size_cents`, `earned_account_id`, `earned_at`, `revoked_at null`, `revoked_reason null`; unique on `(identity_id, plan_version_id, unlocked_size_cents)` | [ADR-070](../decisions/ADR-070.md) section 3 and section 3.4 below. **The `identity_id` foreign key is the ruling itself**, not a field the ruling constrains: a hard merge repoints ownership into the surviving `identities` row and `identity_links` repoints nothing, so a soft-linked pair sharing an unlock is unrepresentable rather than forbidden. **Not filed in `loyalty_benefit_grants` or `graduation_benefits`**, for the reasons section 3.4 gives |
 
 ---
 
@@ -182,6 +185,41 @@ stateDiagram-v2
       mechanical ladder. AS-M18-06.
     end note
 ```
+
+---
+
+### 3.4 The ladder unlock, which is a purchase entitlement and not a rule change
+
+[ADR-070](../decisions/ADR-070.md) section 3 rules that completing a ladder **optionally** unlocks a larger size tier for the same identity, per plan version, **with the unlock rule explicit rather than implied by ordering**. `SD-M18-04` is the record; [`0044`](../../packages/db/migrations/0044_fee_back_and_ladder_unlock.sql) is the schema.
+
+**The trigger is `G-LADDER-COMPLETE` and it is already computed.** [`settle.ts:197`](../../packages/rules-engine/src/payout/settle.ts) evaluates `payoutsSettledCount >= plan.funded.maxPayouts` immediately after a settlement, which is `R-49` and is the same expression that emits `account.graduated`. **The key is `phase_funded.max_payouts`** ([ADR-030](../decisions/ADR-030.md)); `ladder.payouts_to_graduate` is the superseded spelling and no new artifact uses it.
+
+#### The configuration, and the default that must be inert
+
+| Field | Type | Note |
+|---|---|---|
+| `phase_funded.ladder_unlock.enabled` | boolean | Absent or `false` is inert, which is `GS-308`. **The optional case is the one nobody writes**, and it is half of this gap's golden coverage |
+| `phase_funded.ladder_unlock.unlocks_size_cents` | integer > 0 | The published `plan_version_sizes.size_cents` the identity may now buy |
+
+#### `OQ-F5-03`, answered by which table the key points at
+
+[FOLD-05](FOLD-05-plan-config-and-designer.md) section 4.2 states the danger exactly: **"a soft-linked pair sharing an unlock is a cap-aggregation bug wearing a loyalty feature's clothes."** [M07](M07-risk-abuse.md) is already careful here, and its rule is one sentence: **"only a hard merge changes what a trader may buy."**
+
+**The schema makes that structural, so no query has to remember it.** A hard merge **repoints ownership into the surviving `identities` row** and records an `identity_merges` row; `identity_links` carries soft and hard-link edges with a confidence and repoints nothing. So `identities.id` **is** the hard-merged grain, and `plan_size_unlocks.identity_id` referencing it **is** ADR-070's ruling rather than a field the ruling constrains. There is no column here that could hold a link, and a soft-linked pair sharing an unlock is **unrepresentable** rather than forbidden. `INV-M18-11`.
+
+#### Why this is not `INV-M18-07` being violated
+
+**`INV-M18-07` says graduation confers no rule change on any account, and it is the invariant a reader will think this breaks.** The reconciliation is that an unlock changes **which `plan_version_sizes` row the identity may purchase**, and nothing else. The account opened against that row gets the plan version's published rules like everyone, which is `INV-M18-07`'s own enforcement note in its own words.
+
+**"A larger runway" in ADR-070 section 3 is a marketed label, not a rule parameter.** `GS-309` reads "a plan marketed under a runway label", which is gap 3's disclosure surface; every other use of the word in this corpus is the trading calendar's coverage runway. So nothing in this gap touches drawdown, buffer, or any per-size scalar.
+
+**And that claim is asserted rather than left as prose**, because this corpus prefers a gate over care. [`plan-size-unlocks.test.ts`](../../packages/db/test/plan-size-unlocks.test.ts) derives the rule-scalar vocabulary **from `plan_version_sizes` itself** rather than listing it, and asserts that `plan_size_unlocks` has nowhere to put one: a grant writes a row of that table, that table has no field that is a rule scalar, therefore no grant can move one on any row. It was watched failing on a seeded `unlock_drawdown_cents` column, on its own finding. `INV-M18-12`.
+
+#### Where it sits relative to M14, which is the boundary worth stating
+
+**An unlock is not a loyalty mechanic and must not be filed as one.** [M14](M14-loyalty-retention.md) `INV-M14-11` says no loyalty mechanic moves a per-account bound and `INV-M14-12` says cross-account loyalty confers **no rule difference, no risk mitigation, and no payout precedence**. An unlock is earned on **one account under one plan version**, from that account's own completed ladder, not from cross-account criteria, and filing it in `loyalty_benefit_grants` would put a purchase entitlement inside the structure those two invariants exist to keep inert.
+
+**It is not `graduation_benefits` either**, and the reason is the same defect `GS-306` names one module over: that table carries `accrued_cents bigint NOT NULL` and `basis text NOT NULL`, so an unlock would land as `accrued_cents = 0` with a basis explaining that it is not money. **A zero-value row asserting that nothing happened is what both halves of this fold refuse.**
 
 ---
 
@@ -410,7 +448,7 @@ M18 supplies a panel on [M6](M06-admin-ops-console.md): ordinal distribution, gr
 
 | ID | Dependency | Owner | Consequence if unmet |
 |---|---|---|---|
-| DEP-M18-01 | M1 owns `ladder.payouts_to_graduate` and INV-17, and M5 emits the final settlement before any graduation transition | M1, M5 | INV-M18-04 fails and graduation lands in the middle of the most sensitive payout an account makes |
+| DEP-M18-01 | M1 owns `phase_funded.max_payouts` ([ADR-030](../decisions/ADR-030.md); `ladder.payouts_to_graduate` is the superseded name) and INV-17, and M5 emits the final settlement before any graduation transition | M1, M5 | INV-M18-04 fails and graduation lands in the middle of the most sensitive payout an account makes |
 | DEP-M18-02 | M5 supports a terminal settlement that is not a payout ordinal and carries no cap | M5 | AS-M18-05's stranded balance has no mechanism, and zero denial fails at an accounting boundary |
 | DEP-M18-03 | M7 accepts a graduating-cohort review request and returns clear or a cited flag | M7 | INV-M18-10 cannot operate, and any benefit is conferred blind on the cohort most enriched for undetected rings |
 | DEP-M18-04 | M9 renders the finiteness disclosure on every plan's rules page and links the public graduation page | M9 | AS-M18-02's disclosure does not reach the moment it matters, which is before purchase |
