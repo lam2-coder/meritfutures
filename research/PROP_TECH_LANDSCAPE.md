@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-20
 ---
 
 # Prop-Tech Vendor Landscape (Constitution §1)
@@ -165,6 +165,49 @@ mobile native apps; leaderboards/contests; n-tier sub-IB trees; no-code program 
 - **Calibration confirmation:** FPFX's 14% pass / 45% funded-to-payout aligns with §5.3 bands; no band change proposed.
 - **Wave 1 amendment, 2026-08-14 (no gate reopened).** The actual Axcera Futures Solution brochure (February 2026) was obtained, the doc's first primary vendor source. Folded in: verified pricing (section 1.2), the stealth rev-share gotcha named as a pricing-trap pattern, the 3-year TCO comparison (section 2.1), matrix cell corrections, SHOULD/LATER nuggets routed to M8/M11/M12/M17, and Black Arrow/BookMap/DeepMap added to DATA_CAPABILITIES' inventory. Nothing contradicts an approved decision; the brochure narrows unknowns and strengthens the build case, so the doc stays `approved`.
 - **Corroboration note:** the brochure still lists ProjectX as a supported platform despite the Feb 2026 exclusivity, which dates the platform list and confirms vendor marketing lags market structure. Weigh brochure platform lists as corroborating evidence only.
+
+## 6. The vendor-parity assessment (2026-08-20)
+
+**This is the answer to "are we missing table stakes", and it is cited at the FREEZE review.** A baseline check against the PropAccount vendor demo referred six items. [ADR-066](../docs/decisions/ADR-066.md) admits five surfaces, excludes two candidates and sizes every admitted component; [FOLD-03](../docs/plans/FOLD-03-vendor-parity-gap-fill.md) section 7 is the content this section transcribes. **This document is research rather than a frozen plan, so it moves without a ruling**; the sizing rows it points at are [DELIVERY_PLAN](../docs/DELIVERY_PLAN.md)'s and are `ADR-066`'s.
+
+### 6.1 The finding: Merit is at or above vendor baseline on every demoed surface
+
+**Every structural advantage below is cited to where it is specified rather than asserted.** A parity claim that cannot be pointed at is a marketing sentence, and this document is read at a gate.
+
+| Advantage | Vendor baseline | Where Merit specifies it |
+|---|---|---|
+| **Instant auto-approval** | A requested / approved / pending **human queue** | [M05:80](../docs/plans/M05-payout-system.md) `INV-M5-01`, "There is no code path that denies an eligible request", enforced by `payout_requests.status` having **no `denied` value** |
+| **Open liability, live** | An **open-positions tab** | [M06:161](../docs/plans/M06-admin-ops-console.md), live Open Liability under [ADR-020](../docs/decisions/ADR-020.md) tier 2 |
+| **CVaR reserve coverage** | none | [M06:90](../docs/plans/M06-admin-ops-console.md) `P-M6-07`, the reserve coverage ratio against a **live** rail balance, with [M06:413](../docs/plans/M06-admin-ops-console.md) `DEP-M6-05` supplying **`CVaR99 at rho = 0.30`** as its denominator |
+| **Pass-rate CUSUM** | none | [M06:89](../docs/plans/M06-admin-ops-console.md) `P-M6-06`, `S_t = max(0, S_(t-1) + (x_t - mu_0 - 0.5*sigma))`, alarming at 4 to 5 sigma |
+| **Loss-ratio breaker** | none | [M06:88](../docs/plans/M06-admin-ops-console.md) `P-M6-05`, per-plan trailing 30-day ratio with a **breaker at 6000bp** and the sample size shown beside it |
+| **A scored identity graph** | **duplicate-IP lists** | [M07:49](../docs/plans/M07-risk-abuse.md) `INV-M7-01`, "an identity link is a **signal with a confidence**, never a proof", carried as `confidence_bp` |
+| **Biometric dedupe** | none | [M07:42](../docs/plans/M07-risk-abuse.md), M7 consumes M19's verification result and dedupe hit **as graph edges**; [M07:90](../docs/plans/M07-risk-abuse.md) makes a dedupe hit one of the two routes to a hard merge |
+| **Behavioural fingerprinting** | none | [M07:118](../docs/plans/M07-risk-abuse.md) `D-17`, a behavioral fingerprint against the banned corpus over `fills` and `daily_marks`, **flag-and-review only** |
+| **The wallet** | none | [M20](../docs/plans/M20-wallet.md), and [ADR-019](../docs/decisions/ADR-019.md) makes it structural rather than a feature: the cadence anchor is the wallet-credit day |
+| **The transparency platform** | none | [M12](../docs/plans/M12-transparency-platform.md) |
+| **An indicative realtime layer** | none | [ADR-020](../docs/decisions/ADR-020.md)'s two-tier data plane, bounded by [M06:56](../docs/plans/M06-admin-ops-console.md) `INV-M6-12`: an indicative figure is never presented as an as-of-last-closed figure, and **no breaker, alarm or task threshold reads one** |
+| **Evidence packs** | none | [M06:15](../docs/plans/M06-admin-ops-console.md), confirmed as two tiers at the Wave 3 batch 1 gate (`AS-M6-01`, `SD-M6-04`) |
+| **Replay determinism** | none | [M01:115](../docs/plans/M01-rules-engine.md) `INV-04`, replaying every mark from day one reproduces stored state **byte-identically** |
+
+**Two candidates are stated exclusions rather than oversights**, on the founder's ruling recorded at [ADR-066](../docs/decisions/ADR-066.md) section 6. **Platform downloads**: Rithmic credentials already unlock the platform menu and the marketing site covers platform choice, so there is no gap to fill. **Competitions**: excluded, not a gap, and not revisited by this fold. **Neither is revisited without a new ruling**, which is the reason they are written here: an exclusion that lives only in a session's reasoning is an exclusion the next parity check re-litigates.
+
+### 6.2 What the check cost, which is the most useful line in this section
+
+**Four of the six referred items were mis-scoped against our own tree.** [ADR-066](../docs/decisions/ADR-066.md) section 0 carries each correction with its `file:line`; the summary is that the referral was reading the demo more carefully than the corpus.
+
+| # | The referral said | The tree says |
+|---|---|---|
+| 1 | A shared economic-calendar dataset is a **design choice**, embed or API | **An outstanding commitment.** `DEP-M7-06` has declared it as a data dependency since M07 was written, `FM-M7-08` has required a staleness alarm, and **no table satisfies either** |
+| 2 | Recurring delivery of "the reporting layer's saved views" | **No reporting layer and no saved views exist.** A report builder is not admitted; a fixed, named digest set over panels M06 already has is |
+| 3 | "The existing M16 **four**-class ruling" | **Five classes.** A fold citing four would have written a false citation into a frozen document |
+| 4 | Manual balance adjustment behind **dual control** | [ADR-010](../docs/decisions/ADR-010.md)'s sensitive set is a **closed list of five** and an adjustment is not on it, so that is `ADR-067` and is money path |
+
+**The largest of the five admitted surfaces is not new scope at all.** `D-04`'s news-window clustering has been **unimplementable for the whole life of the corpus** and no gate noticed, because a declared dependency with no satisfying object is invisible to every check this repository runs. **The parity check found a hole in the corpus rather than a hole against a competitor**, and that is the honest summary of what the exercise was worth.
+
+**The case for the two MUSTs is internal and does not rest on the vendor.** The calendar closes a commitment made when M07 was written and unsatisfied since; the bounce alert closes a path where a trader is locked out of OTP login with no signal anywhere. **Both would be MUST if no competitor existed.** What the parity check did was cause somebody to look.
+
+---
 
 ## Sources
 
