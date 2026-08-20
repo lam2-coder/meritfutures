@@ -3901,11 +3901,7 @@ const CI06U_REGISTER = new Map([
       'm',
     ],
   ],
-  // `INV-M5-17`, `INV-M5-18` and `INV-M5-19` each state TWO ENTIRELY DIFFERENT
-  // invariants. An invariant id that means two things cannot be cited.
-  ['docs/plans/M05-payout-system.md', ['inv-m5-01', 'inv-m5-17', 'inv-m5-18', 'inv-m5-19']],
   ['docs/plans/M12-statistic-definitions.md', ['s-14', 's-15']],
-  ['docs/plans/M20-wallet.md', ['inv-m20-06']],
   // THE WHOLE SESSION INDEX, TWICE. Lines 120 onward re-list sessions 1 to 74
   // under a second header row, and the first copy stops at session 62. Written
   // out rather than expressed as a range: a range is a rule, and a rule that
