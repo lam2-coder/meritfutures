@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M10-integrations.md, M15-discord-integration.md, M19-kyc-identity.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-20
 ---
 
 # M16: Notification Center
@@ -70,6 +70,7 @@ Every notification kind belongs to exactly one class, and the class decides what
 | INV-M16-10 | Every trader-facing message about money states the two legs honestly | [M09](M09-marketing-site.md) INV-M9-09 and AS-M9-06 applied to transactional copy: wallet credit is same day, external withdrawal is 2 to 3 business days, and neither appears alone |
 | INV-M16-11 | Rate limiting and coalescing never apply to the security or money classes | A quota that can drop a freeze notice is a quota that will, on the busiest day, which is the day it matters. **[ADR-039](../decisions/ADR-039.md) records this invariant as CONFIRMED, not amended**, and `rate_limit_exempt` is generated as `class IN ('security','money')`, which is this sentence in DDL |
 | INV-M16-12 | **The exemption is post-identity, and the split is the invariant.** A message to an authenticated recipient at an address Merit already holds is `INV-M16-11`'s subject. A message to an **attacker-supplied destination before any identity exists** is not, and it carries per-number, per-IP and per-country velocity plus a **global cost circuit breaker** | NC-M16-05, `SD-M16-04`'s `otp_send_budget`, and `SD-M16-07`'s generated `rate_limit_exempt`. **The breaker degrades rather than stopping**, and its trip, its degraded window and its recovery each alarm. [SECURITY](../architecture/SECURITY.md) C-28, AS-M16-07 |
+| INV-M16-13 | **A spam complaint suppresses the marketing class and nothing else.** It is recorded against the **destination**, never against the message, and it is not a preference edit | `SD-M16-08`'s `contact_channels.complained_at`, section 3.4, GS-295. A complaint that suppressed every class would silence the freeze notice, which section 1.2's table already forbids. **The classes a complaint may not reach are exactly the ones no preference may reach**, so this invariant adds no new line and applies the one that exists to a second writer |
 
 **`INV-M16-11` is CONFIRMED, not amended, and [ADR-039](../decisions/ADR-039.md) says so in those words.** Nothing about it moves: the security and money classes stay exempt from rate limiting and coalescing, for exactly the reason written beside it. **What changed is that a fifth class exists which is neither of them**, so the exemption no longer reaches the pre-identity surface by default.
 
@@ -79,7 +80,7 @@ Every notification kind belongs to exactly one class, and the class decides what
 
 ## 2. Entities and schema deltas
 
-M16 consumes the approved `notifications` and `notification_preferences` ([DATA_MODEL section 10](../architecture/data-model/README.md)). **Seven deltas: three at the schema-delta reconciliation and four at [FOLD-01](FOLD-01-phone-identity.md).**
+M16 consumes the approved `notifications` and `notification_preferences` ([DATA_MODEL section 10](../architecture/data-model/README.md)). **Eight deltas: three at the schema-delta reconciliation, four at [FOLD-01](FOLD-01-phone-identity.md), and one at [FOLD-03](FOLD-03-vendor-parity-gap-fill.md).**
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -95,6 +96,12 @@ M16 consumes the approved `notifications` and `notification_preferences` ([DATA_
 | SD-M16-05 | `otp_challenges` | add `channel check in ('email','sms')` and `destination_hash`; `email_normalized` relaxed to nullable under `otp_challenges_exactly_one_destination` | SMS OTP. **Exactly one destination, and it is the one the channel names**: two destinations on one challenge is a code delivered twice, which halves the work of intercepting it, and zero is a challenge nobody can answer. `channel` takes **no default** deliberately, because `DEFAULT 'email'` would let a handler that forgot to set it write a well-formed email challenge and leave a CHECK doing a type's job |
 | SD-M16-06 | `contact_channels` | `kind` check widened to `('email','push','sms')`, dropped and re-added under an explicit name | **[FOLD-01](FOLD-01-phone-identity.md) finding 4: `INV-M16-03` could not notify a prior *number*.** `0019` wrote the check inline with no row shape for a phone, so ADR-039 (c)'s "notify the prior number **and** email" had nothing to notify and was unbuildable. `contact_channels_live_uq` is already per `(identity_id, kind)`, so it needs no change and now means one live SMS destination per identity, which is what (b) implies for the delivery side |
 | SD-M16-07 | `notification_kinds` | `class` gains `pre_identity_auth`; new **`rate_limit_exempt boolean` generated from `class`**; `notification_kinds_immutable_never_coalesced` widened to the new class | NC-M16-05, INV-M16-12. **Generated, on `mutable`'s precedent from `SD-M16-01` and for the same reason**: as an ordinary boolean, one careless seed row marking the registration-OTP kind exempt restores SMS pumping and nothing objects. Generated, the two facts cannot disagree at all. `mutable` then gives the right answer for the new class **without being touched**, which is worth naming as the payoff of the original decision |
+
+**The FOLD-03 delta**, from [ADR-066](../decisions/ADR-066.md), specified in section 3.4.
+
+| ID | Table | Change | Why it is not optional |
+|---|---|---|---|
+| SD-M16-08 | `contact_channels` | add `complained_at timestamptz null`, and a partial index over the rows where it is set | INV-M16-13, GS-295. **A complaint has to be a durable fact about the destination or the send path has no question it can ask**, and both places it looks like it belongs are wrong: `notifications.delivery_status` would overwrite `delivered` and destroy the proof of notice, and `notification_preferences` would create a writer that skips `INV-M16-04`'s confirmation. Section 3.4 states each refusal. **`bounced` needs no delta at all**: [`0019`](../../packages/db/migrations/0019_notifications_and_community.sql) already carries the value, and what was missing was the specification rather than the column |
 
 ---
 
@@ -112,6 +119,8 @@ stateDiagram-v2
     queued --> dispatched: handed to M10 with a dispatch_ref
     dispatched --> delivered: provider confirms
     dispatched --> failed: provider reports failure
+    dispatched --> bounced: provider reports the destination is undeliverable
+    bounced --> [*]
     failed --> queued: retry, same idempotency key
     failed --> dead_letter: attempts exhausted
     delivered --> read: trader opens it (in-app), or the provider reports it
@@ -119,6 +128,14 @@ stateDiagram-v2
       Security and money classes can reach
       neither suppressed nor coalesced.
       INV-M16-02, INV-M16-11.
+    end note
+    note right of bounced
+      TERMINAL, and deliberately not a
+      failed --> queued retry. A hard bounce
+      re-sent is sending reputation spent on
+      an address that does not exist, and on
+      the security or money class it alarms.
+      Section 3.4, FM-M16-09, GS-293.
     end note
 ```
 
@@ -183,6 +200,48 @@ stateDiagram-v2
     end note
 ```
 
+### 3.4 Delivery outcomes, and why a complaint is not one
+
+**Two things arrive from the provider after Merit has handed a message over, and they are different facts at different grains.** [ADR-066](../decisions/ADR-066.md) admits both and sizes them MUST; this section is where they are specified.
+
+| Outcome | Grain | Where it is stored | Terminal |
+|---|---|---|---|
+| **`bounced`** | one message to one destination | `notifications.delivery_status`, **a value [`0019`](../../packages/db/migrations/0019_notifications_and_community.sql) already carries** | **Yes.** It is never retried |
+| **spam complaint** | **the destination**, and it outlives the message | `contact_channels.complained_at` (`SD-M16-08`, [`0041`](../../packages/db/migrations/0041_contact_channel_complaints.sql)) | Not applicable. It is a standing state of an address |
+
+**`bounced` was already a legal value and no document said so.** `0019`'s check reads `delivery_status IN ('pending', 'delivered', 'bounced', 'suppressed', 'failed')`, and section 3.1's machine had no `bounced` state until this entry added one. **The schema could store an outcome the specification did not describe**, which is drift in the opposite direction from the kind `mutable` being a generated column exists to prevent, and it is the reason `0041` turns out to be smaller than its reservation assumed.
+
+**A bounce is terminal and it is not `failed`.** `failed --> queued: retry, same idempotency key` is right for a provider that was briefly unreachable and wrong for an address that does not exist. Re-sending a hard bounce spends sending reputation, and **the reputation is what the money class rides** (section 9.1's own metric says so).
+
+**A bounce on the security class is an access incident rather than a deliverability statistic.** Section 1.2 makes the security class exempt from rate limits and from preference opt-outs, which is exactly why a bounce on it cannot be read as a preference: **nobody chose it.** A registration or login OTP that bounced is a trader locked out of their own account, and the delivery record is the only place that fact exists. FM-M16-09, GS-293.
+
+**The alarm fires on the delivery record, never on a job.** [ADR-066](../decisions/ADR-066.md) states this for the digest alarm and the reason carries here unchanged: a sweep that reports success is not evidence that the work happened.
+
+#### Why `spam_complaint` is refused as a `delivery_status` value
+
+The obvious implementation is a sixth value in `0019`'s check, and [ALLOCATION](../decisions/ALLOCATION.md)'s reservation for `0041` describes exactly that. **It is refused on three grounds and the third is the one that decides it.**
+
+1. **A complaint follows delivery, so writing it into `delivery_status` overwrites `delivered` and destroys the proof of notice.** `INV-M16-09` says proof of notice is the dispatch record plus the delivery receipt. Under the obvious implementation, **a trader who complains about a freeze notice erases Merit's evidence that the freeze notice arrived, by complaining about it.**
+2. **It would quietly relax a constraint.** `notifications_delivered_has_timestamp` reads `delivery_status <> 'delivered' OR delivered_at IS NOT NULL`. A row moved off `delivered` stops being covered by it, so `delivered_at` could then be cleared with nothing objecting.
+3. **The grains differ.** A bounce is about one message. A complaint is about the address, it outlives every message, and its effect is on every marketing message Merit sends that destination afterwards. **Stored per message, the send path has no question it can ask.**
+
+#### Why it is not a `notification_preferences` row either
+
+`notification_preferences` is the trader's own choice, and `INV-M16-04` makes editing it a security-class ceremony that confirms to the existing contact **before** it takes effect. A complaint cannot go through that ceremony, because Merit cannot ask the complainer to confirm. **Writing complaint suppression as preference rows would therefore create a second writer to that table which skips the confirmation**, and `AS-M16-02` is the scenario about an attacker muting the alarms first. An unconfirmed writer reachable from a forged provider webhook is the mechanism it warns about.
+
+**It is not a supersession either.** Marking the channel `superseded_at` would leave the identity with no live channel of that kind under `contact_channels_live_uq`, so **the security class would have nowhere to go** — the lock-out `GS-293` exists to prevent, arriving through the remedy rather than through the fault.
+
+#### What the send path does with it
+
+| Class | On a destination with `complained_at` set |
+|---|---|
+| NC-M16-01 security, NC-M16-02 money | **Sent, unchanged.** No preference reaches these classes and a complaint is not stronger than a preference |
+| NC-M16-03 account state | Sent. The class permits a channel choice and never silence, and the complainer chose nothing |
+| NC-M16-04 marketing | **Suppressed**, and the suppression is the marketing class's own `delivery_status = 'suppressed'` row |
+| NC-M16-05 pre-identity auth | Not reachable. It is a policy row and never a `notifications` row (section 1.2), and there is no `contact_channels` row before an identity exists |
+
+**Every non-marketing suppression still pages**, per section 9.2, and that alarm is what makes INV-M16-13 checkable rather than merely stated.
+
 ---
 
 ## 4. API endpoints touched
@@ -224,6 +283,8 @@ stateDiagram-v2
 | FM-M16-06 | A new kind switches itself on for everyone | The most loyal traders get spammed by a release | Default is the class default, and a migration adding a kind is reviewed for it | INV-M16-08. AS-M16-06 |
 | FM-M16-07 | A freeze notice tips off a ring member mid-investigation | The investigation's subject learns its timing | Trader-tier content only, and the freeze notice is required regardless (AS-M16-01) | The tension is resolved in favour of telling the trader, deliberately, with reasoning |
 | FM-M16-08 | Vendor outage delays money-class messages | Silence during exactly the event that kills payout trust | [M10](M10-integrations.md)'s queue depth and dead-letter age | In-app is always written even when email fails, so the message exists somewhere the trader can reach |
+| FM-M16-09 | A security or money class message bounces and nothing alarms | **A trader is locked out of OTP login and no signal exists anywhere.** The one class nobody may opt out of is the one whose delivery nobody was watching | `delivery_status = 'bounced'` on a security or money class row, alarmed **on the delivery record** rather than on a job (section 9.2) | Section 3.4. The bounce is terminal and is never retried into silence. GS-293 |
+| FM-M16-10 | A spam complaint suppresses more than the marketing class | **A complaint about a newsletter silences the freeze notice** | INV-M16-13, and section 9.1's non-marketing suppression counter, which must be zero | The complaint is recorded against the destination and consulted for the marketing class only (section 3.4). GS-295 |
 
 ---
 
@@ -365,7 +426,7 @@ Bound by [M19 section 7.9](M19-kyc-identity.md)'s milestone-not-accusation rule.
 | Proof-of-notice field semantics | `M16-N-nn` | 5 | every commit | merge |
 | Registry completeness and default-on-new-kind | `M16-R-nn` | 4 | every commit | merge |
 | Negative authz (D5) | `M16-A-nn` | 5 | every commit | merge |
-| Golden fixtures | `GS-nnn` | 6 owned (GS-192 to GS-197) | every commit | merge |
+| Golden fixtures | `GS-nnn` | **11 owned**: GS-192 to GS-197, GS-270 to GS-271, GS-293 to GS-295 | every commit | merge |
 
 ### 8.2 Named scenarios owned by this module
 
@@ -377,6 +438,13 @@ Bound by [M19 section 7.9](M19-kyc-identity.md)'s milestone-not-accusation rule.
 | GS-195 | A template referencing a detector name and a population comparison | Lint failure. A template referencing published rule values and the trader's own facts passes. AS-M16-04 |
 | GS-196 | Notice disputed with `read_at` null and with `read_at` set | The answer comes from dispatch plus delivery in both cases; `read_at` is never cited. AS-M16-05 |
 | GS-197 | A migration adds a new kind | Marketing defaults **off**; the class is stated in the migration; an unclassified kind fails the registry test. AS-M16-06 |
+| GS-270 | A pumping run drives registration OTP volume at attacker-controlled premium-rate numbers | The three velocity scopes bite and `rate_limit_exempt` is false for the pre-identity class **by construction**. [ADR-039](../decisions/ADR-039.md) amendment 2, AS-M16-07 |
+| GS-271 | The cost breaker trips mid-registration | Registration **completes** and the funding gate holds it until phone verification lands. The trip, the degraded window and the recovery each alarm. INV-M16-12 |
+| GS-293 | A security-class message bounces | The alarm fires **on the delivery record** and the trader is not silently locked out. The bounce is terminal and is not retried. Section 3.4, FM-M16-09 |
+| GS-294 | An admin resends a notice after its template has changed | The stored `rendered_body` snapshot is delivered, never a re-render, so proof of notice survives a template change. **The resend surface itself is [M6](M06-admin-ops-console.md)'s**; what M16 owns is the snapshot it re-sends. INV-M16-05, FM-M16-05 |
+| GS-295 | A trader files a spam complaint | Marketing-class delivery is suppressed and **the security class is untouched**. INV-M16-13, section 3.4's send-path table |
+
+**`GS-270` and `GS-271` were owned by this module from [ADR-039](../decisions/ADR-039.md) and this table never listed them.** The ownership index carried eleven while section 8.1 said six, and the two that were missing are the pair that pins amendment 2. They are added here rather than reported, because a count corrected without the rows behind it is the same defect one line further on.
 
 ### 8.3 Coverage rule
 
@@ -398,6 +466,7 @@ Bound by [M19 section 7.9](M19-kyc-identity.md)'s milestone-not-accusation rule.
 | Prior-contact security notices sent | AS-M16-02's control firing. A non-zero count here is the countermeasure working, and each one deserves a look |
 | Contact-change-then-preference-change sequences | The takeover pattern, counted rather than merely alerted, because the rate is the input to tuning the risk severity |
 | Bounce and complaint rate by sending domain | Deliverability of the money class depends on the reputation the marketing class spends |
+| **Bounces by class, counted per message** | The row above is a **deliverability statistic at the domain grain**. This one is the access-incident count. **A single bounce on the security class is the whole signal**, and an aggregate by domain cannot show it |
 | **Pre-identity OTP spend, against budget, by country and globally** | AS-M16-07. **The attacker's yield is denominated in money, so the control has to be too.** A count of sends cannot distinguish a busy signup day from a pumping campaign aimed at the most expensive destinations available |
 | **Pre-identity OTP sends per number and per IP, distribution** | The three velocity scopes as a distribution rather than a threshold. The shape of the tail is what tunes `send_limit`, and there is no data to tune it on before beta |
 | **Time spent degraded, and `deferred_registrations` during each window** | The founder ruling's reported figure. **A queue nobody drains is a fail-open with extra steps**, and the count is the only thing that makes the queue visible |
@@ -418,6 +487,8 @@ Bound by [M19 section 7.9](M19-kyc-identity.md)'s milestone-not-accusation rule.
 | **Cost breaker recovers** | any | alert, with the window's `deferred_registrations` in the message. The recovery is where the queue becomes somebody's work |
 | **A `pre_identity_auth` kind observed `rate_limit_exempt`** | any | **page**. It is a generated column, so this cannot happen without the generation having been dropped, which is `SD-M16-01`'s stated failure mode arriving on the newer column |
 | **An override on `otp_send_budget` past its `override_expires_at`** | any | **page**. An indefinite override is a disabled breaker with a nicer name, which is `0016`'s ruling |
+| **A `bounced` outcome on a security or money class message** | any | **page.** On the security class it is an **access incident** and not a deliverability statistic: an OTP that bounced is a locked-out trader. It fires on the delivery record rather than on a job ([ADR-066](../decisions/ADR-066.md)). Section 3.4, FM-M16-09, GS-293 |
+| **A spam complaint recorded against a destination** | any | **alert, never page.** A complaint is ordinary on the marketing class and the record itself is the response. **It becomes a page only if a non-marketing message is suppressed afterwards**, which is the counter above that must be zero. INV-M16-13, FM-M16-10, GS-295 |
 
 ### 9.3 Dashboard
 
