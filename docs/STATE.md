@@ -1804,3 +1804,17 @@ at line 68.
 **Recorded and not acted on.** This file cites `INV-M5-17` and `INV-M5-18` for [M05](plans/M05-payout-system.md)'s SET B invariants, and M05 still carries both numbers **twice with different meanings** on this ref, so `S3`'s renumbering has not merged. **No number was guessed**: the citation is left exactly as it stands and re-points when `S3` lands.
 
 **The position:** `docs/STATE.md` is out of `CI06U_REGISTER` entirely, so the register reports **97 known duplicate keys across 7 files**, down from 106 across 8. `node scripts/corpus/gates.mjs check` reports <!--gen:gate_count-->22<!--/gen--> of <!--gen:gate_count-->22<!--/gen--> passing, `CI-06g` and `CI-06t` included; `falsify.mjs` reports every gate clean and dirty with 30 scope cases and 10 loader cases; `pnpm vitest run` is 939 passing and 42 skipped across 62 files.
+
+## Session 105: the WAVE-03 merge, and three findings the merge produced (2026-08-20)
+
+**Eight pull requests merged and `main` is green.** `CI06U_REGISTER` goes **106 keys across 8 files to 59 across 1**: [`docs/sessions/README.md`](sessions/README.md), which is `S9`'s and the last of the 106. `node scripts/corpus/gates.mjs check` reports 22 of 22, `falsify.mjs` is clean and dirty with 30 scope cases and 10 loader cases, `check:invariants` is 7 of 7, and `pnpm vitest run` is 62 files and 939 passing.
+
+**The wave reproduced its own defect in its own merges.** Seven of eight pull requests conflicted and almost every conflict was the session index, because every session appends one row to one table. **The resolutions are three different rules and treating them as one is what went wrong**: registry rows are a **union**, `CI06U_REGISTER` is a **deletion and never a union**, and generated spans are **regenerated**. The register was unioned once, on the `S4` merge, and the count went **up** from 91 to 93 before `CI-06u` caught it.
+
+**`OI-19`: no gate detects a conflict marker.** `<<<<<<< HEAD` stood in [INDEX](INDEX.md) and [STATE](STATE.md) and 22 of 22 gates passed over it. An unresolved marker in a frozen document is two contradictory statements shipped as one. **It needs no letter**: [ADR-065](decisions/ADR-065.md) rules the successor identifier is a slug, so it is `CI-06/conflict-markers`.
+
+**`OI-20`: the session registry could not hold a three-digit session number.** `gates.mjs` matched `session-\d{2}\.md`, exactly two digits, so session 105 was not a registry entry and `CI-06c` refused it. **The cap was invisible for ninety-nine sessions and then blocked five at once**, since [FOLD-05](plans/FOLD-05-plan-config-and-designer.md) had already allocated 98 to 104. Widened to `\d{2,}`; the underlying question is `ADR-064`'s.
+
+**`OI-21`: the `CI-06u` falsification seed decays as the corpus is repaired, and `S9` will end it.** The seed anchors on a live register entry. It has outgrown two anchors already, and **`S9` takes the register to zero**, at which point it can anchor on nothing. The gate's own falsification is tied to the defect the gate exists to remove. **`S9`'s prompt must carry this**, and the answer is a synthetic fixture rather than a live entry.
+
+**Next:** `S9`, which owns the remaining 59 keys and `ADR-064`. **It cannot take the register below 19 without ruling that a session number is an identifier**, and that ruling renumbers about thirty sessions.

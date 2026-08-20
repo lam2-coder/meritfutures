@@ -215,7 +215,12 @@ const REGISTRIES = [
     id: 'sessions',
     dir: 'docs/sessions',
     readme: 'docs/sessions/README.md',
-    entry: (f) => /^docs\/sessions\/\d{4}-\d{2}-\d{2}-session-\d{2}\.md$/.test(f),
+    // `\d{2,}` and not `\d{2}`. The corpus passed session 99 on 2026-08-20 and
+    // FOLD-05 had already allocated 98 to 104, so a two-digit pattern silently
+    // stopped recognising session files as registry entries: CI-06c reported
+    // them missing from INDEX and CI-06n could not see them at all. The cap was
+    // invisible for 99 sessions and then blocked five at once.
+    entry: (f) => /^docs\/sessions\/\d{4}-\d{2}-\d{2}-session-\d{2,}\.md$/.test(f),
   },
   {
     id: 'golden-scenarios',

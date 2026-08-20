@@ -233,3 +233,4 @@ must be recoverable from its own file alone.
 | [2026-08-20 - Session 80](2026-08-20-session-80.md) | M12's S-14/S-15 pairs renumbered and INDEX's M03/M04/M05 rows deduped, each chosen per row; ADR-061 would have escalated three of the five keys and a renumber has nothing for its agreement test to answer |
 | [2026-08-20 - Session 82](2026-08-20-session-82.md) | `ADR-065`: one key one row, the blank-line parser trap, the `u` collision ruled, and the letter registry is out of alphabet |
 | [2026-08-20 - Session 81](2026-08-20-session-81.md) | STATE's P1-item table repaired: nine duplicated keys, the span-carrying row kept in each, and OI-10's "Deduplicated 2026-08-16" was false |
+| [2026-08-20 - Session 105](2026-08-20-session-105.md) | the WAVE-03 merge: eight pull requests landed, the register down from 106 keys across 8 files to 59 across 1, and two findings the merge produced that no branch could see |
