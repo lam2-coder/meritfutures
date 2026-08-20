@@ -8,11 +8,11 @@ last_updated: 2026-08-16
 
 **The completeness gate reads this file.** [ADR-026](../../docs/decisions/ADR-026.md) requires that every `SD-nn` and `U-nn` appearing anywhere in `docs/` appears **exactly once** here with a disposition. A count nobody can drift is better than a count someone remembers to update.
 
-<!--gen:manifest_changes-->107<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+<!--gen:manifest_changes-->108<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
 
 **The count moved from 93 to 94 by founder ruling (2026-08-14).** `U-06` is the sixth unnumbered change, found while folding. [ADR-026](../../docs/decisions/ADR-026.md)'s table of five did not carry it. See section 5.
 
-**It moved from 94 to <!--gen:manifest_changes-->107<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+**It moved from 94 to <!--gen:manifest_changes-->108<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
@@ -214,6 +214,20 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 **`0039` is not in section 1's table**, on [`0032`](migrations/0032_trading_calendar_holidays_coverage_revisions.sql)'s precedent: that table records what the fold created and is closed at 27, and a later migration that creates tables gets its own section instead. `0039` creates two tables and one view, supersedes nothing, and edits no merged file.
 
 **One thing found while writing it, recorded rather than left for the next reader.** [`packages/db/test/migrations.integration.test.ts`](test/migrations.integration.test.ts) asserted the on-disk migration sequence is `1..n` contiguous, under a comment claiming `CI-06h` "asserts the same thing" and that the local copy was "the weaker half". **Both halves of that claim were false.** It was not weaker, it was **stricter in the one direction [ADR-036](../../docs/decisions/ADR-036.md) rules out**: gaplessness is asserted over allocated **plus reserved**, "so a branch holding a reservation shows a hole and passes". `0038` is reserved for the money-path adjustment migration and is sequenced **last** in FOLD-03, so any branch writing `0039` first has a legal reserved hole and the old assertion failed on it. The property is not lost, it is deferred to `CI-06h` by name; re-implementing the allocation parser in vitest would be `OQ-P1-04`'s defect, which the parser's own header names as the thing not to do.
+
+## 4c. FOLD-04: `ADR-068`, 1 numbered delta
+
+**Claimed under [ADR-026](../../docs/decisions/ADR-026.md) in the commit that writes the delta, on `4a`'s and `4b`'s precedent.** `ADR-068` is **auth and therefore money path**, so the row lands with the module plan rather than after the migration.
+
+| ID | Table | Change | Migration | Disposition |
+|---|---|---|---|---|
+| SD-M6-10 | new `impersonation_sessions`, `impersonation_page_views` | the distinct session type: the admin actor, the subject identity, the controlled-vocabulary reason and its non-blank detail, the start and the hard expiry, the explicit exit, and the page-view audit. Three `CHECK` guards bound the box and make an exit complete. **The load-bearing part is not a column**: two triggers refuse any `token_hash` that exists in `sessions.refresh_token_hash`, **in both directions**, so a token minted for impersonation cannot resolve on the trader auth path at all | 0042 | **landed** |
+
+**The three `SD-M6-nn` numbers between `06` and `10` are unclaimed and are not this session's.** [FOLD-03](../../docs/plans/FOLD-03-vendor-parity-gap-fill.md) `F2` and `F3` both write [M06](../../docs/plans/M06-admin-ops-console.md) concurrently and the run is left for them.
+
+**They are named by position here, and the first draft of this paragraph named them outright on the theory that this file is exempt from its own gate.** It is not. [`gates.mjs:1537`](../../scripts/corpus/gates.mjs) scans `docs/**` **and `packages/db/DELTA_MANIFEST.md`**, so a number written here needs a row here exactly as one written under `docs/` does. **The gate's finding text at [`gates.mjs:1542`](../../scripts/corpus/gates.mjs) says `cited in docs/` and points the reader at the one file set that does not contain the citation**, which is why the theory survived being typed. Recorded rather than repaired: `gates.mjs` is held by three concurrent sessions and a shared file earns a minimal diff.
+
+---
 
 ## 5. The seven unnumbered changes
 
