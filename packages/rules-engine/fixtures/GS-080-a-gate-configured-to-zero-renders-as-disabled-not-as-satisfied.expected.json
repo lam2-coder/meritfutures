@@ -1,0 +1,64 @@
+{
+  "end_state": {
+    "trading_day": "2026-11-20",
+    "phase": "funded",
+    "balance_cents": 5150000,
+    "floor_open_cents": 4870000,
+    "floor_cents": 4900000,
+    "floor_locked": false,
+    "high_water_balance_cents": 5150000,
+    "withdrawable_cents": 50000,
+    "traded_days_count": 5,
+    "win_days_count": 5,
+    "consistency_best_day_cents": 30000,
+    "consistency_period_profit_cents": 150000,
+    "payouts_settled_count": 0,
+    "breached": false,
+    "engine_eligible": true,
+    "engine_gates": {
+      "traded_days": {
+        "pass": true,
+        "skipped": true,
+        "have": 5,
+        "need": 0
+      },
+      "win_days": {
+        "pass": true,
+        "have": 5,
+        "need": 5,
+        "floor_cents": 15000
+      },
+      "buffer": {
+        "pass": true,
+        "have_cents": 150000,
+        "need_cents": 100000
+      },
+      "consistency": {
+        "pass": true,
+        "skipped": false,
+        "profit_needed_to_dilute_cents": 0
+      },
+      "cadence_gap": {
+        "pass": true,
+        "skipped": true,
+        "trading_days_since_last_payout": null,
+        "need": 5
+      },
+      "minimum_amount": {
+        "pass": true,
+        "withdrawable_cents": 50000,
+        "cap_cents": 150000,
+        "min_payout_cents": 10000
+      }
+    }
+  },
+  "events": [
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed"
+  ],
+  "pins": "that a gate CONFIGURED TO ZERO renders as DISABLED and not as satisfied, and that the disabled gate does not weaken the conjunction: R-33's `traded_days` reports `pass: true, skipped: true` at `min_trading_days: 0` while the other five engine gates are independently satisfied, so INV-15's closed six all pass and `engine_eligible` is TRUE. The operator this protects is CV-19's TWO-FIELD rendering rather than a boolean: `skipped: true` beside `pass: true`, where `pass` alone cannot distinguish a gate that was turned off from one that was evaluated and met, and `skipped` alone would either block every payout on all three v1 plans or render a never-evaluated gate as satisfied",
+  "note": "THIS IS THE FIRST FIXTURE IN THE DIRECTORY TO PIN `engine_eligible: true`, AND THE BLOCKER IS DISCHARGED RATHER THAN WAIVED. GS-064 pins the `false` direction; GS-055 declined to pin the flag at all and GS-060's header names this row's blocker in its own words. ADR-060 ruled R-38 a CONTEXT gate, and its own section 3 is explicit that the ruling \"DOES NOT BY ITSELF MAKE `engine_eligible: true` PINNABLE\" -- the load-bearing edit was item 1 of its fold list, putting the closed enumeration into M01's INV-15. M01 section 1.5 now carries it: \"The engine gates are the closed six R-33, R-34, R-35, R-36, R-37, R-39\", derived in that document rather than transcribed from `types.ts`. So the conjunction this file asserts is read out of a PLAN DOCUMENT, which is the whole of TR-01 and is precisely the substitution ADR-060 warned a careless session would make. ALL SIX GATES ARE PINNED AND THAT IS DELIBERATE: `engine_eligible: true` is a claim about a conjunction, and pinning the flag while leaving a term unstated would be an outcome assertion wearing an operator assertion's clothes. The six are the arithmetic: traded days 5 against a minimum of 0 (DISABLED), win days 5 against 5, buffer 150,000c against 100,000c, consistency 300,000,000 against 450,000,000 by R-29's cross multiplication, cadence gap unanchored and therefore skipped by R-37, and the minimum amount `min(50,000, 150,000)` against 10,000c by R-39. R-38 IS ABSENT FROM THE EXPECTATION AND ITS ABSENCE IS THE ASSERTION, since ADR-060 rules it a context gate and INV-15's six do not include it. TWO GATES REPORT `skipped: true` AND THEY ARE NOT THE SAME CLAIM. R-33's is CV-19's CONFIGURED disablement, which is this row's subject and is true on all three v1 plans by ADR-015. R-37's is the trivial case of an unanchored account -- there is no previous payout, so there is no gap to clear -- and it is pinned only because leaving it out of a six-term conjunction would leave the arithmetic incomplete. `consistency.skipped` IS PINNED `false` FOR THE SAME REASON AND IT IS THE THIRD SHAPE: period profit is 150,000c, which is positive, so R-30 does not fire and the gate is genuinely EVALUATED. Reading the three together is what the row means by \"the same `skipped` shape the consistency denominator rule uses\": one vocabulary, three different reasons, and a reader can tell which is which. `best_day_share_bp` IS NOT PINNED AND THE REASON IS TR-01 RATHER THAN INDIFFERENCE. R-29 states the verdict as an integer cross multiplication and says in the same row that \"NO DIVISION EXISTS ANYWHERE IN THE ENGINE\"; the share is a rendered ratio that only division produces, and M01 states no formula for it. API_CONTRACT declares the field twice and under two different names, `max_bp` in both places against the engine's `maxDayShareBp`. A fixture pinning 2000bp here would be transcribing an implementation's arithmetic into a golden file, which is the one thing TR-01 forbids, so this file pins the verdict and the dilution figure M01 DOES state -- zero, because the gate passes -- and stays silent about the ratio. `next_eligible_trading_day` is unpinned for a narrower reason: the type gives `null` two meanings, not waiting and outside the loaded slice, and a pin that cannot distinguish them asserts less than it appears to. THE FLOOR NUMBERS ARE PINNED BECAUSE A STREAM THAT MOVED THE FLOOR WOULD BE A DIFFERENT SCENARIO. Each close is a new high, so R-13 trails to `5,150,000 - 250,000 = 4,900,000` and R-18's floor at open on the last day is the previous close's `4,870,000`. THE LOCK NEVER FIRES: 150,000c of profit against Appendix A.1's 260,000c trigger, so this file states nothing about the floor-lock reading STATE.md catalogues as disputed and is unaffected by ADR-052."
+}
