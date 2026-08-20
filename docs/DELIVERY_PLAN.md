@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../MERIT_BUILD_MASTER_PROMPT.md, decisions/README.md, STATE.md, INDEX.md, testing/STRATEGY.md, testing/SIMULATION_HARNESS.md, GUIDE_BRIEFING.md, plans/M15-discord-integration.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-20
 ---
 
 # Delivery Plan
@@ -55,6 +55,31 @@ last_updated: 2026-08-16
 **The triage recovers roughly 4 weeks** against a plan that treated all ten as launch scope, and it is why 18 rather than 22.
 
 **M15 is the first thing the triage has given back, and it gave back days rather than weeks.** The row is kept in the table with its reasoning rather than deleted, because the useful record is not that M15 is launch scope; it is that a module the three tests placed at LATER was moved by an invariant in a different module, and the next module to move will most likely move the same way. **A triage test set that cannot see a cross-module invariant is a triage test set with a known blind spot**, and this is its first instance rather than an exception to it.
+
+---
+
+### 2.1 The vendor-parity components ([ADR-066](decisions/ADR-066.md), 2026-08-20)
+
+**Sized by the same launch-blocking test as the table above, and sized per COMPONENT rather than per item.** [ADR-066](decisions/ADR-066.md) section 1 is what these rows transcribe. **[FOLD-03](plans/FOLD-03-vendor-parity-gap-fill.md) section 4 summarises the split as "four of the six are SHOULD" and that sentence is deliberately not carried here**: the ruling records that it does not survive a component-level count at either grain, and a sizing sentence is exactly the thing a roadmap reader quotes.
+
+| Component | Verdict | Reasoning |
+|---|---|---|
+| **The Tier-1 economic calendar dataset** (`0039`) | **MUST** | **Not new scope.** `DEP-M7-06` has declared it since M07 was written and `FM-M7-08` has required its staleness alarm; no table satisfies either, so `D-04` has never been implementable. It is a repair |
+| **The daily liability digest** | **MUST** | Test 1. The C8 weekly risk ritual's input is **currently a human remembering to look**. Open Liability, Eligible-Next-7-Days and the reserve coverage ratio ([M06:90](plans/M06-admin-ops-console.md) `P-M6-07`) |
+| **The weekly loss-ratio and CUSUM digest** | **MUST** | Test 1, same ground. A control that exists and does not arrive is a control that enforces nothing |
+| **The delivery-failure alarm** | **MUST** | **The one MUST that is not obvious.** It reads the delivery record and never the job's own report, on [M05:91](plans/M05-payout-system.md) `INV-M5-18`'s stated ground that a job reporting success is not evidence that the work happened |
+| **`bounced` and `spam_complaint` as outcomes** | **MUST** | Test 2. [M16](plans/M16-notification-center.md)'s security class is exempt from rate limits and opt-outs, so a bounce on it is an **incident** rather than a preference |
+| **The bounce and complaint alert** | **MUST** | Test 2. **OTP login depends on deliverability**: a silently bounced OTP is a locked-out trader with no signal anywhere |
+| **The M04 calendar panel** | **SHOULD** | Trader-facing convenience. The dataset is the commitment; the panel is the parity item |
+| **The flag-queue digest** | **SHOULD** | Useful, and nothing depends on it |
+| **The monthly revenue and cohort digest** | **SHOULD** | Useful, and nothing depends on it |
+| **All six duplicate-signal views** | **SHOULD** | Pure surface over signals [M07](plans/M07-risk-abuse.md) already carries. Real operator value, **no new capability and no new detector** |
+| **Admin resend** | **SHOULD** | Re-sends the stored `rendered_body` and re-renders nothing, so proof of notice survives a template change |
+| **Admin download** | **SHOULD** | Convenience over a query [M16](plans/M16-notification-center.md) already answers |
+
+**Six MUST components and six SHOULD.** The MUST set is the whole of what launch blocks on, and **neither of its two reasons is the vendor**: the calendar closes a commitment unsatisfied since M07 was written, and the bounce alert closes an OTP lockout with no signal. Both would be MUST if no competitor existed.
+
+**Manual balance adjustment is deliberately absent from this table.** It is the one referred item on the money path, it amends [ADR-010](decisions/ADR-010.md)'s sensitive set, and it is `ADR-067`'s to rule and size. It is named here so its absence reads as a decision rather than an omission.
 
 ---
 
