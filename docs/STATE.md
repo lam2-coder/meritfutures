@@ -1833,18 +1833,29 @@ at line 68.
 
 **The position:** `node scripts/corpus/gates.mjs check` reports <!--gen:gate_count-->24<!--/gen--> of <!--gen:gate_count-->24<!--/gen--> passing, `pnpm vitest run` is 63 files and 956 passing, lint and typecheck are clean. **Next:** `F4` and `F5` are concurrent and unblocked; `F2` and `F3` are serial behind this session on [M06](plans/M06-admin-ops-console.md), whose merge surface is **one row**. **`F6` is `ADR-067` and `0038`, money path, its own session, plan mode.** [ADR-066](decisions/ADR-066.md) is still `proposed` and unsigned.
 
+---
+
+## WAVE-04 is planned: the fixture backlog is sixteen fixtures of available work, not 276 (2026-08-20, session 107)
+
+[WAVE-04](plans/WAVE-04-fixture-backlog-and-gate-inventory.md), eight sessions, six concurrent. `ADR-072`, `ADR-073` and `ADR-074` reserved in [ALLOCATION](decisions/ALLOCATION.md) before any session starts; **no migration number and no `CI-06` letter**, because its four gates take slugs under [ADR-065](decisions/ADR-065.md).
+
+**`OI-25`: the fixture backlog, and the subtraction is not the plan.** 40 fixtures stand against <!--gen:gs_count-->316<!--/gen--> registered scenarios, both verified by running rather than by reading. **Of the 276, sixteen are writable today.** 243 belong to modules with no code **and to no fixture format**, which is the load-bearing half: the format is `packages/rules-engine/fixtures/GS-NNN-*.yaml`, a day stream folded through the engine, and it is M1-shaped in every field, so even a module whose code landed tomorrow would have nowhere to write. 14 need one ruling each (a publish-time expectation, where a replay golden runs, a multi-account fold, a calendar record key for the session open and close) and 3 are held on `OI-16` and on ingest carrying no instant. **Every fixture on disk is M1-owned and not one belongs to any other module.**
+
+**"The engine has not implemented the rule yet" is NOT a blocker, and that is [ADR-048](decisions/ADR-048.md) working.** A fixture citing an undeclared rule must load and derive inverted, and [`falsify.mjs`](../scripts/corpus/falsify.mjs) holds a scope case saying so. The M1 backlog is bounded by what the format can express and by what is still an open question, never by what the engine has reached.
+
+**`OI-26`: `CI-07`, `CI-08` and `CI-09` do not exist, so P1 is not closed and has not been since it was declared closed.** That finding is correct and **three workflows is not what follows from it**. No app carries a `build` script and there is no bundler, so `CI-07` would gate a production build that does not exist; Playwright is not installed and the three surfaces are 75 source lines between them. **`ADR-073` rules what closes a row** (implemented, or a dated activation condition naming the artifact it waits for) and `CI-06/gate-inventory` makes the condition load bearing. **`CI-09` is built**, because three of its four legs have a subject, and it is what finally calls `packages/harness`.
+
+**Six claims in the brief that produced the plan did not survive contact with the tree, and section 1 of WAVE-04 carries all six with the command that checked each.** Two are worth repeating here:
+
+- **`OI-19` and `OI-20` were already taken**, by the conflict-marker gate and the three-digit session number, and the highest allocated is `OI-24`. The two new items are **`OI-25` and `OI-26`**. **The collision arrived inside the prompt asking for the gate that catches collisions**, which is the same duplicate-key class WAVE-03 spent nine sessions on.
+- **`<<<<<<< HEAD` never stood in a commit.** No commit reachable from any branch head or any pull-request head has ever carried a leading marker in any `.md`, `.ts`, `.mjs` or `.json` file: `git log --all -G'^<<<<<<< ' -- '*.md' '*.ts' '*.mjs' '*.json'` returns nothing. It stood in a **working tree** during a merge, and the record disagrees with itself on the gate count besides (22 in session 105 and in this file, 24 in session 106). **`CI-06/conflict-markers` is still worth writing**, because the boundary it protects is the push and not the history, and **its falsification case must seed a marker rather than anchor on a historical one**, which `OI-21` is the argument for.
+
+**Three findings recorded and deliberately not repaired**, each needing a file WAVE-04 fences to somebody else: the `gs_count` generated span sits in the wrong row of [section 33.2](testing/golden-scenarios/33-ownership-index-and-coverage-reconciliation.md)'s running total (FOLD-02 reads 316 where the arithmetic gives 284, and `CI-06g` passes because the span's **value** matches its query while the gate says nothing about which **cell** it is in); [`packages/golden-loader/README.md`](../packages/golden-loader/README.md) heads a section "24 of 30 fixtures pass" against 40 fixtures all holding; and section 33.3's row asserting constitution 5.2's minimum of 40 golden **files** answers it with 316 **definitions**, which happens to be true because the file count is exactly 40.
 ## Session 106: the fold queue is empty, and the next wave is not corpus work (2026-08-20)
-
 **Eleven pull requests merged. WAVE-03, FOLD-03, FOLD-04 and FOLD-05 are complete.** `main` reports <!--gen:gate_count-->24<!--/gen--> of <!--gen:gate_count-->24<!--/gen--> gates, `falsify.mjs` clean and dirty with 35 scope cases, 7 of 7 invariants, and **74 test files with 1085 passing**.
-
 **`CI06U_REGISTER` holds 19 keys in one file, from 106 across eight.** The 19 are the parallel-session convention [ADR-064](decisions/ADR-064.md) ruled valid. **The register cannot go lower without renumbering about thirty sessions**, and that ruling deliberately declined to.
-
 **The corpus is now genuinely done and the next wave is the first that is not corpus work.** Two items, neither of which needs a fold plan:
-
 **`OI-19`: the fixture backlog. 40 fixtures against <!--gen:gs_count-->316<!--/gen--> registered golden scenarios.** The scenarios are specified and the fixtures that execute them mostly are not. This is P2's remaining work and it is the largest single gap between the specification and the tree.
-
 **`OI-20`: `CI-07`, `CI-08` and `CI-09` do not exist.** `CI-01` to `CI-06` run in Actions. P1's definition of done is the **full** [STRATEGY](testing/STRATEGY.md) gate inventory, so P1 is not closed.
-
 **Two gates are named and unwritten**, both cheap and both under [ADR-065](decisions/ADR-065.md)'s slug rule so neither needs a letter: **`CI-06/conflict-markers`**, because `<<<<<<< HEAD` stood in this file and in [INDEX](INDEX.md) while 24 of 24 passed; and **`CI-06/identifier-series`**, because `SD-M6-nn` and `M6-N-nn` were each found mid-wave to be shared registries with no allocation table, both by a session reading rather than by a gate.
-
 **The build position is unchanged by all of this and that is the point.** `apps/admin` is 44 lines, `apps/portal` 33, `apps/site` 34. **Roughly 15% of the eighteen-week plan**, in weeks 2 to 4. The rules engine is behind us; nothing a trader touches has been started.
