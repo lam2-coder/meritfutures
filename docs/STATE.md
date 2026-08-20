@@ -1832,3 +1832,19 @@ at line 68.
 **`OI-23`: one of this session's own new tests could not fail, and the seeded-violation pass is the only reason it is known.** The no-timezone assertion was `/\btime_?zone\b/`, which **cannot match `display_timezone`** because `_` is a word character and there is no boundary before `timezone`. A seeded column passed. Replaced by pinning the whole column set. **The general form is worth carrying**: a `\b`-anchored pattern over `snake_case` identifiers is a check that silently narrows to whole-token matches, and this corpus is written in `snake_case`.
 
 **The position:** `node scripts/corpus/gates.mjs check` reports <!--gen:gate_count-->24<!--/gen--> of <!--gen:gate_count-->24<!--/gen--> passing, `pnpm vitest run` is 63 files and 956 passing, lint and typecheck are clean. **Next:** `F4` and `F5` are concurrent and unblocked; `F2` and `F3` are serial behind this session on [M06](plans/M06-admin-ops-console.md), whose merge surface is **one row**. **`F6` is `ADR-067` and `0038`, money path, its own session, plan mode.** [ADR-066](decisions/ADR-066.md) is still `proposed` and unsigned.
+
+## Session 106: the fold queue is empty, and the next wave is not corpus work (2026-08-20)
+
+**Eleven pull requests merged. WAVE-03, FOLD-03, FOLD-04 and FOLD-05 are complete.** `main` reports <!--gen:gate_count-->24<!--/gen--> of <!--gen:gate_count-->24<!--/gen--> gates, `falsify.mjs` clean and dirty with 35 scope cases, 7 of 7 invariants, and **74 test files with 1085 passing**.
+
+**`CI06U_REGISTER` holds 19 keys in one file, from 106 across eight.** The 19 are the parallel-session convention [ADR-064](decisions/ADR-064.md) ruled valid. **The register cannot go lower without renumbering about thirty sessions**, and that ruling deliberately declined to.
+
+**The corpus is now genuinely done and the next wave is the first that is not corpus work.** Two items, neither of which needs a fold plan:
+
+**`OI-19`: the fixture backlog. 40 fixtures against <!--gen:gs_count-->316<!--/gen--> registered golden scenarios.** The scenarios are specified and the fixtures that execute them mostly are not. This is P2's remaining work and it is the largest single gap between the specification and the tree.
+
+**`OI-20`: `CI-07`, `CI-08` and `CI-09` do not exist.** `CI-01` to `CI-06` run in Actions. P1's definition of done is the **full** [STRATEGY](testing/STRATEGY.md) gate inventory, so P1 is not closed.
+
+**Two gates are named and unwritten**, both cheap and both under [ADR-065](decisions/ADR-065.md)'s slug rule so neither needs a letter: **`CI-06/conflict-markers`**, because `<<<<<<< HEAD` stood in this file and in [INDEX](INDEX.md) while 24 of 24 passed; and **`CI-06/identifier-series`**, because `SD-M6-nn` and `M6-N-nn` were each found mid-wave to be shared registries with no allocation table, both by a session reading rather than by a gate.
+
+**The build position is unchanged by all of this and that is the point.** `apps/admin` is 44 lines, `apps/portal` 33, `apps/site` 34. **Roughly 15% of the eighteen-week plan**, in weeks 2 to 4. The rules engine is behind us; nothing a trader touches has been started.
