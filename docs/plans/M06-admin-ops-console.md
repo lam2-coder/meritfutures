@@ -62,6 +62,7 @@ That last clause drives more design here than any technical requirement. A contr
 ## 2. Entities and schema deltas
 
 M6 consumes [DATA_MODEL sections 8, 9, and 10](../architecture/data-model/README.md) as approved. Seven deltas, each from a failure mode below. **`SD-M6-06` is the exception to "below": its failure mode is [M07](M07-risk-abuse.md) `FM-M7-08` rather than one of this module's, because the dataset is owned here and consumed there.** **`SD-M6-07` is the second exception and for the opposite reason: its failure mode is this module's and is not in section 6 either**, because a digest that stops arriving is a failure of the console's *delivery* rather than of any panel it renders, and section 6 was closed before there was anything to deliver.
+M6 consumes [DATA_MODEL sections 8, 9, and 10](../architecture/data-model/README.md) as approved. **Each delta below traces to a failure mode, and the table is the count** ([ADR-034](../decisions/ADR-034.md): this sentence read "Six deltas" while the table grew past six, which is the drift that rule exists to end). **Two rows do not trace to a failure mode of this module's and each says so in its own cell:** `SD-M6-06`'s is [M07](M07-risk-abuse.md) `FM-M7-08`, because the dataset is owned here and consumed there, and `SD-M6-11`'s is [ADR-069](../decisions/ADR-069.md)'s ruling in section 11, because it exists to make a distinction auditable rather than to prevent an enumerated failure.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -76,6 +77,7 @@ M6 consumes [DATA_MODEL sections 8, 9, and 10](../architecture/data-model/README
 | SD-M6-10 | new `impersonation_sessions` and `impersonation_page_views` | `impersonation_sessions`: `id`, `admin_user_id` -> `users(id)`, **`subject_identity_id` -> `identities(id)`**, `token_hash bytea not null unique`, `reason_code text not null` over a controlled vocabulary, `reason_detail text not null` and non-blank, `started_at`, `expires_at`, `ended_at null`, `ended_by null`, `end_reason null`. Three guards: `impersonation_box_is_bounded` (`expires_at > started_at AND expires_at <= started_at + interval '2 hours'`), `impersonation_exit_is_complete` and `impersonation_exit_within_box`. `impersonation_page_views`: `id`, `impersonation_session_id`, `path`, `viewed_at`, append-only by grant, bounded to its session's box by `impersonation_page_view_within_box`. Two triggers implement `IMPERSONATION-C1` **in both directions** against `sessions.refresh_token_hash`. Routes: `POST /admin/identities/:identityId/impersonate` and `POST /admin/impersonation/:id/exit` | `ADR-068`, **auth and therefore money path**. The requirement that needs schema rather than middleware is the second one: a token minted for impersonation **cannot satisfy a trader authorization**. The trader auth path resolves a bearer token by `refresh_token_hash` on `sessions`, so if no `sessions` row can ever carry an impersonation token's hash, that lookup cannot return a row for one and **elevation under [SECURITY](../architecture/SECURITY.md) `C-27` is unreachable by construction rather than by rule**. The table also carries **no `user_id`, no `auth_factor`, no `elevated_at` and no `elevated_by_factor`**, which is structural and not an omission. The **2 hour ceiling** is what makes the time box a time box: a configurable duration with no ceiling is a setting, not a bound. `GS-300` to `GS-303` |
 
 **The three numbers between `SD-M6-06` and `SD-M6-10` are deliberately left unclaimed.** [FOLD-03](FOLD-03-vendor-parity-gap-fill.md) `F2` and `F3` both write this module and neither has claimed a delta yet, so `ADR-068` claims high and leaves them the run below it. There is no `SD-M6-nn` allocation table to read, which is [ADR-034](../decisions/ADR-034.md)'s condition exactly, and the remedy available to a session that cannot create one is to claim high and say so where the next writer looks. **They are named by position rather than by identifier on purpose**: `ADR-026`'s completeness gate reads an `SD-nn` token anywhere under `docs/` as a citation, so writing the two numbers out would demand a manifest row for a delta nobody has designed.
+| SD-M6-11 | `admin_actions` | add `initiative text not null check in ('enforcement','trader_request','operational')` and `on_behalf_of_identity_id uuid null references identities(id)`, with a **biconditional** `CHECK` that the identity is set exactly when `initiative = 'trader_request'`, plus a partial index on `(on_behalf_of_identity_id, created_at desc)` | Section 11, [ADR-069](../decisions/ADR-069.md), `0043`. **Attribution was already carried and initiative was not.** [`0017`](../../packages/db/migrations/0017_events_and_audit.sql) gives `actor`, `reason not null`, `before` and `after`, so nothing distinguishes an admin acting **on** a trader from an admin acting **for** one, and in a dispute those are different defences. The vocabulary is `CloseRequest.kind`'s, unchanged, because row 33 of section 11.2 is the one trader-requested admin act the corpus already models; **that field has no column anywhere today** and lands in the `after` jsonb or nowhere. It arrives before any parity route exists because `admin_actions` is append-only and retained forever, so a discriminator added later leaves every historical row `NULL` and `NULL` is then ambiguous between *"Merit's own act"* and *"written before the column existed"* |
 
 ---
 
@@ -556,3 +558,107 @@ The fourth is **a payout hold, a payout freeze or a wallet-withdrawal freeze sta
 | DEP-M6-06 | M19 owns identity changes; no admin route edits a verified identity | M19 | AS-M6-06's highest-value social-engineering target exists as a click |
 | DEP-M6-07 | [M2](M02-rithmic-bridge.md) consumes `identity.restricted` and revokes platform trading on every account the identity holds, and re-enables on a documented restore | M2 | **The restriction halts four legs and leaves the trader trading.** M2's `DEP-M2-06` is the same dependency stated from the other end, and its `FM-M2-15` is the assertion that catches it. **The restore half currently has no event to depend on**, which is section 5's gap and session 6's file |
 | DEP-M6-08 | [M5](M05-payout-system.md) supplies the hold and freeze expiry query, and [M7](M07-risk-abuse.md) supplies severity 4 as the band `G-HOLD-REQUIRED` reads | M5, M7 | The fourth unsuppressible alarm has no query to fire on, which makes it an alarm defined against nothing. **This is the dependency OQ-M6-01's ruling created**, and it is listed because an unsuppressible alarm that never fires is indistinguishable from a suppressed one |
+
+---
+
+## 11. Admin capability parity ([ADR-069](../decisions/ADR-069.md))
+
+**Added after FREEZE by [ADR-069](../decisions/ADR-069.md), which is [FOLD-04](FOLD-04-impersonation-and-admin-parity.md) section 5's ruling. Its input is [the admin capability parity audit](../reviews/2026-08-20-admin-parity-audit.md).**
+
+**Why this table exists, in one sentence that is the whole argument.** Actions taken through impersonation are **attributed to the trader**, which corrupts the audit trail and weakens an evidence pack precisely where an evidence pack is worth most, in a dispute or a chargeback representment. **An admin-attributed action preserves provenance; an impersonated one destroys it.** So parity is not a nicety that makes read-only impersonation tolerable: **it is the condition that makes read-only correct**, and where it is missing, read-only is a missing feature wearing a principle's clothes.
+
+**The baseline this table replaces.** Before `ADR-069` the admin surface contained **zero** endpoints performing a trader action on a trader's behalf. Every admin mutation in the corpus was enforcement, correction, configuration, conferral or annotation. **None of them was the trader's own act performed by an admin.**
+
+### 11.1 What every route in this section carries
+
+| Property | Mechanism |
+|---|---|
+| **`owner` role only** | Not `ops`, not `readonly`. `ADR-069` section 8 rules this at v1 and records the account-recovery group as the real future ask |
+| **Attributed to the admin** | `admin_actions.actor`. **The trader is never the recorded actor of an action they did not take** |
+| **A mandatory reason** | `admin_actions.reason NOT NULL`, which is the existing control and not a new one |
+| **On whose initiative** | `admin_actions.initiative = 'trader_request'` and `on_behalf_of_identity_id` set to the subject identity (`SD-M6-11`). The `CHECK` is a biconditional, so neither half can be omitted |
+| **A dual-timeline audit** | The `admin_actions` row **and** an `events` row carrying `actor_kind = 'admin'`, which `GET /accounts/:accountId/timeline` projects to the trader. **The trader sees that an operator acted** |
+| **A `M6-N-nn` negative-authz test per route per role** | By section 8.1's own rule, not by an ordinal claimed here. **18 route-and-verb pairs across three roles** |
+
+### 11.2 The matrix
+
+**Thirty-four trader-side mutating actions**, enumerated from [API_CONTRACT](../architecture/API_CONTRACT.md) sections 3 to 7 plus the surface tables of the module plans owning routes the contract does not carry. **Reads are out of scope. Webhooks are provider-to-Merit. `/internal/*` is `admin_sso` already.**
+
+Classes: **NEW** is a route `ADR-069` creates; **E** existed before it; **OQ** is blocked on section 11.4; **EXCLUDED** is a permanent declared exclusion, section 11.3.
+
+| # | Trader action | Class | `owner` admin equivalent |
+|---|---|---|---|
+| 1 | `POST /auth/otp` | EXCLUDED | none, and none is correct |
+| 2 | `POST /auth/verify` | EXCLUDED | none, and none is correct |
+| 3 | `POST /auth/elevate` | EXCLUDED | none, and none is correct |
+| 4 | `POST /auth/passkey/register/options`, `/verify` | EXCLUDED | none, and none is correct |
+| 5 | `POST /auth/passkey/login/options`, `/verify` | EXCLUDED | none, and none is correct |
+| 6 | `POST /auth/logout` | EXCLUDED | none. The support-shaped version is row 7 |
+| 7 | `POST /sessions/:id/revoke` | **NEW** | `POST /admin/identities/:identityId/sessions/revoke`. Revokes **every** session the identity holds, because the support case is *"I think my account is compromised"* and an operator cannot enumerate session ids the trader can see. **A compromised trader who cannot reach their own portal previously had no path to revocation at all** |
+| 8 | `POST /phone/verify` | EXCLUDED | none. The row's whole value is that the handset holder produced the code |
+| 9 | `POST /phone/change` | **NEW** | `POST /admin/identities/:identityId/phone-change`. **Opens the D4 ceremony, and does not complete it**: see 11.2a. Sets `withdrawal_hold_until` identically and **the operator cannot waive it** |
+| 10 | `POST /phone/change/:id/cancel` | **NEW** | `POST /admin/phone-change/:requestId/cancel`. The abuse-response half: what a trader does when a change they did not start is running against their number, and what a support agent told about it on the phone previously could not do |
+| 11 | `POST /me/contact-channels` and `DELETE` | **NEW** | `POST /admin/identities/:identityId/contact-channels` and `DELETE /admin/identities/:identityId/contact-channels/:channelId`. **An added channel is unverified until possession is proved**, per 11.2a. Two verbs, one row |
+| 12 | `POST /checkout` | **NEW**, blocked | `POST /admin/identities/:identityId/checkout`. **Blocked behind `OQ-F4-01`**, because `accept_tos_version_ids` is a required field and row 32 is unruled |
+| 13 | `POST /checkout` with `payment_method = "wallet"` | **NEW**, blocked | The same path with `payment_method = "wallet"`. **Counted as its own row** because [M20](M20-wallet.md) section 3.2 supplies a distinct authorization path and a distinct refusal surface. Also blocked behind `OQ-F4-01` |
+| 14 | `POST /accounts/:accountId/reset` | **NEW**, blocked | `POST /admin/accounts/:accountId/reset`. Blocked behind `OQ-F4-01` for the same reason. **The reset-velocity risk signal reads `events.actor_kind`** and does not count an operator-originated reset against the trader |
+| 15 | `POST /offers/redeem` | **NEW**, blocked | `POST /admin/identities/:identityId/offers/redeem`. Blocked behind `OQ-F4-01`. **`POST /admin/offers/:id/revoke` could take an offer away and nothing could apply one.** See 11.5 finding 1 |
+| 16 | `POST /accounts/:accountId/payout` | **NEW** | `POST /admin/accounts/:accountId/payout`. **Origination, which is the missing half**: `release` and `enforce` resolve a request the trader already made and `release` *"posts the stored decision unchanged and re-evaluates nothing"*. This route **re-evaluates every gate**. Not dual controlled, on the asymmetry `ADR-069` section 5 states |
+| 17 | `POST /wallet/withdrawals` | **NEW** | `POST /admin/identities/:identityId/wallet/withdrawals`. **DUAL CONTROLLED** against `dual_control_approvals` by payload hash (`SD-M6-05`, INV-M6-08), on [M20](M20-wallet.md)'s `POST /admin/wallet/:identityId/correct` precedent. Carries KYC verified, destination cooling window, name-match score, the $100 minimum and `G-NO-IN-FLIGHT` unchanged |
+| 18 | `POST /kyc/session` | OQ | **`OQ-F4-02`.** The admin KYC surface reads and adjudicates; nothing initiates |
+| 19 | `POST /kyc/reverify` | OQ | **`OQ-F4-02`**, recorded separately because the answers may differ |
+| 20 | `POST /affiliate/links` | **NEW** | `POST /admin/affiliates/:affiliateId/links`. **There is no admin affiliate console at all today**, which is wider than this row |
+| 21 | `POST /affiliate/creatives` | **NEW** | `POST /admin/affiliates/:affiliateId/creatives`, the **submit** half only. See 11.5 finding 2 |
+| 22 | `PATCH /me/notification-preferences` | **NEW** | `PATCH /admin/identities/:identityId/notification-preferences`. **[M16](M16-notification-center.md)'s high-severity pattern must read `actor_kind` before it fires**, or this route generates severity flags on Merit's own support staff (EC-115, GS-193) |
+| 23 | `POST /notifications/:id/read` | EXCLUDED | none. `read_at` is the proof-of-notice input |
+| 24 | `POST /me/discord/link` | EXCLUDED | none. Impossible rather than forbidden |
+| 25 | `DELETE /me/discord/link` | **NEW** | `DELETE /admin/identities/:identityId/discord/link`. **A live enforcement need**: a restricted or closed identity keeps its synced Discord roles until the trader themself unlinks |
+| 26 | `PATCH /me/discord/roles` | **NEW** | `PATCH /admin/identities/:identityId/discord/roles`. Row 25 one granularity finer |
+| 27 | `PATCH /me/leaderboard` | **NEW** | `PATCH /admin/identities/:identityId/leaderboard`. Takes effect on the next publish and removes historical entries (INV-M11-10). **A trader asking support to take their name off a public page is a routine request and there was no route for it** |
+| 28 | `POST`, `PATCH /journal` | EXCLUDED | none. The journal is the trader's private reflection |
+| 29 | `DELETE /journal` | **NEW** | `DELETE /admin/identities/:identityId/journal`. **Counted separately from row 28 because it is an erasure path**, and the privacy runbook makes erasure an obligation Merit owes rather than a convenience the trader enjoys. **An obligation with no operator route is one Merit cannot discharge for a trader who cannot log in** |
+| 30 | `POST /me/invitations/:id/accept` and `/decline` | OQ | **`OQ-F4-01`.** A terms acceptance wearing a program invitation's shape. **The `decline` leg may separate from the `accept` leg**, since declining accepts nothing |
+| 31 | `POST /me/review-requests/opt-out` | **NEW** | `POST /admin/identities/:identityId/review-requests/opt-out`. **The population most likely to ask support to stop contacting them is the least likely to still be logging in** |
+| 32 | **Contract signature**, that is `accept_tos_version_ids` | OQ | **`OQ-F4-01`.** There is no signature route: acceptance is a required field on rows 12 and 14, so **this question gates the commerce group rather than sitting beside it** |
+| 33 | **Account-closure request** | E | `POST /admin/accounts/:accountId/close` with `kind: "trader_request"`. **No gap and no trader route.** This row is the shape the eighteen took, and it is the existence proof that the pattern works |
+| 34 | **Any plan-config-affecting action** | E | `POST /admin/plans/:planId/versions`, `POST /admin/plans/versions/:versionId/publish`. **No gap and no trader route by construction.** It was never a parity question |
+
+**Eighteen rows close, across 17 distinct paths and 18 route-and-verb pairs.** Rows 12 and 13 share a path and differ by `payment_method`; row 11 is one row carrying two verbs. **The D5 count is 18 per role**, because section 8.1 counts a mutating route and a route is a path with a verb.
+
+### 11.2a Two boundaries this section does not cross, stated because they look crossed
+
+**AS-M6-06 says "identity changes have no admin path at all" and rows 9, 10 and 11 do not create one.** The distinction is between **editing a verified identity** and **opening a ceremony**, and it is the difference between an affordance an attacker wants and one they cannot use.
+
+- **No route in this section writes a verified identity attribute.** DEP-M6-06 stands unchanged: M19 owns identity changes, a genuine case goes through M19's re-verification runbook, and none of the eighteen touches a KYC-verified name, date of birth or document.
+- **Row 9 opens the D4 phone-change ceremony and cannot complete it.** Completion requires `POST /phone/verify`, which is **row 8 and permanently excluded**, so the possession proof still has to be produced by whoever holds the handset. An operator who opens the ceremony has started a clock and proved nothing.
+- **Row 11 adds an unverified channel.** [EC-115](../edge-cases/EC-115.md)'s ceremony holds: the existing contact is notified immediately and unmutably, and **the new contact must verify before becoming usable.**
+- **The 48 hour `withdrawal_hold_until` is not waivable by an operator.** It is the control that makes a phone-change ceremony safe to open, and *"a hold an operator can waive is not a hold"*.
+
+**So the highest-value social-engineering target still does not exist as an affordance**, which is what AS-M6-06 requires. What exists is the ability to **start** a ceremony whose proofs are unchanged, for a trader who cannot start it themselves.
+
+### 11.3 The excluded set, which is `GS-304`'s exclusion list
+
+**Ten rows are permanent, declared exclusions.** `GS-304` is a coverage test, and **a coverage test with no exclusion list fails on ten rows on arrival**, which is how a gate gets switched off. **An addition to this list is an amendment to [ADR-069](../decisions/ADR-069.md) and not a commit.**
+
+| Rows | Why an admin equivalent would be a different and worse act |
+|---|---|
+| 1, 2, 4, 5 | **Credential forgery.** Issuing a trader's OTP, consuming their challenge or registering a passkey on their identity manufactures a login factor for an account the operator does not hold. **Strictly worse than impersonation**, because the session produced is indistinguishable from the trader's own with no impersonation record attached at all |
+| 3 | **Elevation is `passkey or dual_channel`** (C-27). An operator holds neither on the trader's behalf, and a path that let one be asserted admin-side would delete C-27 |
+| 6 | **Ending one's own session is not a support act.** Row 7 is the support-shaped version and is classed differently on purpose |
+| 8 | **The row's whole value is that the handset holder produced the code.** An admin-completed verification writes an [ADR-022](../decisions/ADR-022.md) hard-link edge asserting a possession nobody demonstrated, which corrupts [M07](M07-risk-abuse.md)'s graph rather than the audit trail |
+| 23 | **An admin marking a notification read manufactures evidence that the trader saw it.** `read_at` is the input to the proof-of-notice query (AS-M16-05), so this is the audit-trail corruption the fold exists to prevent, arriving through the parity door instead of the impersonation one |
+| 24 | **Impossible rather than forbidden.** The confirming half happens on Discord under the trader's own Discord identity |
+| 28 | **The journal is the trader's private reflection.** An admin writing in it is not a support action under any attribution, and *"an admin can do every trader action"* stated without exceptions would include writing in a trader's diary |
+
+### 11.4 The two blocked questions
+
+| Question | What it blocks | Status |
+|---|---|---|
+| **`OQ-F4-01`, contract and terms acceptance** | Rows 30 and 32, **and rows 12, 13, 14 and 15 as a consequence**, because `accept_tos_version_ids` is required on checkout and reset. `tos_acceptances` is append-only and is *"the first artifact any enforcement dispute asks for"* (INV-M3-09) | Open. [ADR-069](../decisions/ADR-069.md) section 7 carries a narrow exception scoped to **the acceptance step alone**, `owner` only, dual controlled, with a marker on the `tos_acceptances` row itself. **Not pre-approved** |
+| **`OQ-F4-02`, KYC assertion** | Rows 18 and 19 | Open, and it is a vendor question before it is a policy one. *"Merit never proxies documents"* (INV-M19-07) and `POST /kyc/session` returns a hosted URL, so the act is **creating a provider session**, not making an identity assertion. [ADR-069](../decisions/ADR-069.md) section 7 carries a narrow exception with **no** dual control, and the asymmetry is deliberate. **Prerequisite: a vendor answer in writing** |
+
+### 11.5 Three findings this enumeration produced that are not parity gaps
+
+1. **`POST /offers/redeem` is cited by its consumer and absent from its owner.** [M14](M14-loyalty-retention.md) names M17 as owning redemption and [M17](M17-offers-engine.md)'s surface table does not carry the route. Row 15's admin equivalent is specified against a trader route whose owning plan does not list it. **Owed to M17, and not repaired here.**
+2. **Affiliate creative approval has no route on either surface.** [M08](M08-affiliate-system.md) says creatives are *"submitted for approval"* and no endpoint approves them. Row 21 closes the **submit** half only; creating an approver route would be new admin capability unrelated to parity. **Owed to M08.**
+3. **The eighteen routes are owed to [API_CONTRACT](../architecture/API_CONTRACT.md).** Its surface tables and its section 12 negative-authz matrix carry none of them, and `CI-06k` requires a declared required-factor cell per row. **API_CONTRACT was not in the fence of the session that wrote this section**, so the debt is named here rather than left for the implementing session to find.
