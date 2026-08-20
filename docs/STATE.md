@@ -1788,7 +1788,7 @@ at line 68.
 
 **The position:** `node scripts/corpus/gates.mjs check` reports <!--gen:gate_count-->22<!--/gen--> of <!--gen:gate_count-->22<!--/gen--> passing, `falsify.mjs` reports all of them clean and dirty with 30 scope cases and 10 loader cases, and `pnpm run check:invariants` reports 7 of 7. **Next is `S1`, `ADR-061`, alone at the front**, because every other session's authority to land a repair by commit is that ruling.
 
-## Session 77: FOLD-03, and the economic calendar was already owed (2026-08-20)
+## Session 86: FOLD-03, and the economic calendar was already owed (2026-08-20)
 
 **Six items referred from a PropAccount vendor baseline check are planned in [FOLD-03](plans/FOLD-03-vendor-parity-gap-fill.md).** `ADR-066` and `ADR-067` are reserved unwritten, migrations `0038` to `0041` are claimed, and **GS-285 to GS-299 are registered as golden-scenario section 36** with the ownership partition and provenance table updated. **No module plan was folded**: a fold into a frozen document without a ruling is the commit the constitution forbids, and `ADR-066` does not exist yet.
 
