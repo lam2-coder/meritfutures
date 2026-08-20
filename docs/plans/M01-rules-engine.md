@@ -123,7 +123,7 @@ Each is enforced somewhere real. "Enforced by review" is not an entry in this ta
 | INV-12 | Breach is terminal: no state advances after it | Property RE-P-10, GS-063 |
 | INV-13 | Phase moves only eval to funded to closed or graduated, never backwards | Property RE-P-11 |
 | INV-14 | Applying the same trading day twice is a no-op on state | Property RE-P-13, GS-047 |
-| INV-15 | `engine_eligible == AND(every engine gate)` with no shortcut path | Property RE-P-15 |
+| INV-15 | `engine_eligible == AND(every engine gate)` with no shortcut path. **The engine gates are the closed six R-33, R-34, R-35, R-36, R-37, R-39**, enumerated and derived directly below this table ([ADR-060](../decisions/ADR-060.md)) | Property RE-P-15 |
 | INV-16 | An account's `plan_version_id` is an input and is never chosen by the engine | Type signature, update trigger on the table |
 | INV-17 | Lifetime settled extraction per account `<= ladder_count * max cap in the schedule` | Property RE-P-17, the liability bound |
 | INV-18 | `mark.opening_balance_cents == prior.balance_cents + mark.adjustment_cents` | Asserted at DO-3, violation raises reconciliation (EC-047) |
@@ -133,6 +133,33 @@ Each is enforced somewhere real. "Enforced by review" is not an entry in this ta
 | INV-22 | No settled payout's `eligibility_snapshot` is ever rewritten, by replay, by correction, or by an engine upgrade | Append-only grant, Appendix B protocol, GS-074 |
 | INV-23 | Context gates (frozen, recon, KYC, in flight) never enter the replayed state or its hash | SD-06, Appendix B |
 | INV-24 | The engine emits events but never commands: nothing it returns moves money by itself | Output type carries facts only; M5 posts the ledger |
+
+#### The engine gates, enumerated
+
+**INV-15's "every engine gate" is a closed six-member set, and this is where it is enumerated ([ADR-060](../decisions/ADR-060.md)).** The invariant named a set that no document listed, which is why nothing could be derived from it: a fixture author reading `AND(every engine gate)` had no referent, and the only closed list in the repository lived in the engine's own types. **The enumeration below is derived from this document. It is not transcribed from that file**, because a list copied out of the engine and back into the specification grades the engine against itself with one document in between, which is TR-01 defeated rather than satisfied.
+
+**The derivation, in one step.** [Group F](#group-f-funded-gates) is R-33 to R-41. It is a topical group, not the enumeration, and three of its nine rows are definitionally not terms in the conjunction:
+
+| Row removed | Why it is not a term |
+|---|---|
+| R-38, one payout in flight | its input `hasPayoutInFlight` is declared on `ExternalGates` (section 2.1), which is context and is never replayed (INV-23, SD-06) |
+| R-40, context gates | it **is** the context-gate rule. A conjunction defined in contradistinction to the context gates cannot contain the row that enumerates them |
+| R-41, eligibility is the conjunction | it is the conjunction, `eligible = engineEligible && contextEligible`, and not a term in either operand |
+
+**Six rows remain and they are the engine gates:**
+
+| # | Rule | Gate |
+|---|---|---|
+| 1 | R-33 | minimum trading days |
+| 2 | R-34 | win days |
+| 3 | R-35 | buffer and withdrawable |
+| 4 | R-36 | funded consistency |
+| 5 | R-37 | cadence gap |
+| 6 | R-39 | minimum payout |
+
+**R-38 is excluded from `engineEligible`, not from eligibility.** It binds through `contextEligible` and is part of `eligible` by R-41. The distinction is load bearing rather than cosmetic: `engine_eligible` is a stored column and is inside the state hash (SD-08), so a term whose value the caller supplies today and may supply differently tomorrow would flip stored rows retroactively and make INV-04's nightly replay comparison diverge on every account. That is SD-06's own stated reason for existing.
+
+**Two of the six can report `skipped: true` and still satisfy the conjunction**: R-33 when `min_trading_days` is configured 0, which is every v1 plan, and R-36 when R-30's denominator rule skips the period. A skipped gate reports `pass: true`, so the set is closed at six whether or not a given plan funds every gate.
 
 ---
 
@@ -338,7 +365,7 @@ flowchart TD
 | DO-6 | `tradedDaysCount += mark.fillCount > 0 ? 1 : 0`. `winDaysCount += win_day && !halted ? 1 : 0`. Consistency accumulators updated if the day is inside the current period | R-08, R-09, R-04 |
 | DO-7 | `hwb = max(hwb, closingBalanceCents)`, then `floor = hwb - drawdownCents` for trailing, then the lock test. Order matters: trailing then locking, never the reverse | R-13, R-15 |
 | DO-8 | Eval: test the pass condition and either pass (applying the funded reset in the same step) or defer. Funded: test the ladder, which can also fire here if a settlement graduated the account | R-26 to R-31, R-49 |
-| DO-9 | Evaluate every engine gate, compute `engineEligible`, compute `stateHash`, emit `day.closed` with the full payload | R-33 to R-41 |
+| DO-9 | Evaluate every engine gate, compute `engineEligible`, compute `stateHash`, emit `day.closed` with the full payload. **The engine gates are the six of INV-15.** R-38 and R-40 are context and are resolved at read time; R-41 is the conjunction and is formed at read time from this day's `engineEligible` and the caller's context | R-33 to R-37, R-39 |
 
 ### 3.2 Eval phase machine
 
@@ -505,6 +532,19 @@ Every gate is evaluated independently and reported gate by gate. `engineEligible
 | R-39 | Minimum payout | **Engine** | `min_payout_cents` | `min(withdrawable, cap) >= 10000` (`>=`, exactly 100.00 is eligible) | GS-042 |
 | R-40 | Context gates | **Engine** | n/a | Account `active` and phase `funded`; KYC `verified`; not `payoutsFrozen` at account or identity level; not `reconBlocked`. Evaluated at read time, excluded from the replayed state | GS-044 |
 | R-41 | Eligibility is the conjunction | **Engine** | n/a | `eligible = engineEligible && contextEligible`, with no shortcut path and no override anywhere in the codebase | INV-15 |
+**This group is topical and it contains both kinds.** Membership of Group F is not membership of `engineEligible`. The engine gates are the closed six R-33, R-34, R-35, R-36, R-37 and R-39, enumerated under INV-15 in section 1.5. **R-38 and R-40 are context gates** and R-41 is the conjunction itself ([ADR-060](../decisions/ADR-060.md)).
+
+| ID | Gate | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|
+| R-33 | Minimum trading days | `phase_funded.min_trading_days` | `tradedDaysCount >= min_trading_days` (`>=`), counted from the funded reset, not from account open. **Configured 0 on all three v1 plans, which disables the gate**: it reports `pass: true, skipped: true` and is rendered as disabled rather than as satisfied (CV-19, [ADR-015](../decisions/ADR-015.md)) | RE-U-033, GS-080 |
+| R-34 | Win days | `win_days.required_count` | `winDaysCount >= required_count` (`>=`), counted over trading days strictly after `payoutAnchorDay` | GS-006, GS-053 |
+| R-35 | Buffer and withdrawable | `buffer_bp` to `buffer_cents` | `withdrawable = max(0, balance_cents - size_cents - buffer_cents)`. The buffer is permanent and is never withdrawable | GS-025 |
+| R-36 | Funded consistency | `phase_funded.consistency.*` | R-29 arithmetic over the period defined by R-47. Payout-gated: failing **delays** eligibility and never breaches, never denies retroactively | GS-024 |
+| R-37 | Cadence gap | `cadence_gap_trading_days` | `count(trading days d : cadenceAnchorDay < d <= basisDay) >= cadence_gap_trading_days` (`>=`), computed by `calendar.sequence` subtraction. **`cadenceAnchorDay` is the last settled payout's wallet-credit day** ([ADR-019](../decisions/ADR-019.md)), which is the same trading day as its basis day because the internal leg is instant. This **supersedes [ADR-013](../decisions/ADR-013.md)'s effective-day anchor**; the two-anchor structure is unchanged and the two anchors now coincide. Passes trivially when it is null (no gap on the first payout). On any plan where `cadence_gap_trading_days <= required_win_days` this gate is **dominated** by R-34 and never binds (EC-049) | GS-059, GS-082, EC-039 |
+| R-38 | One payout in flight | n/a | **Applies to the external leg only** ([ADR-019](../decisions/ADR-019.md)): no wallet-to-rail withdrawal for this identity in `approved`, `transferring`, or `frozen`. The internal leg completes in one transaction, so there is no window for a second request to arrive inside and AS-01 is structurally resolved rather than gated. The rule survives on the external leg as the liability control it always was. **This is a context gate and not a term in `engineEligible`**: its input `hasPayoutInFlight` is declared on `ExternalGates` (section 2.1), it never enters the replayed state or its hash (INV-23, SD-06), and it binds through `contextEligible` at read time, so it is part of `eligible` by R-41 (INV-15, [ADR-060](../decisions/ADR-060.md)) | GS-052, GS-053 |
+| R-39 | Minimum payout | `min_payout_cents` | `min(withdrawable, cap) >= 10000` (`>=`, exactly 100.00 is eligible) | GS-042 |
+| R-40 | Context gates | n/a | Account `active` and phase `funded`; KYC `verified`; not `payoutsFrozen` at account or identity level; not `reconBlocked`. Evaluated at read time, excluded from the replayed state | GS-044 |
+| R-41 | Eligibility is the conjunction | n/a | `eligible = engineEligible && contextEligible`, with no shortcut path and no override anywhere in the codebase | INV-15 |
 
 #### Group G: payout arithmetic
 
@@ -816,7 +856,7 @@ Each carries the arithmetic, because a scenario without numbers is an anecdote.
 
 **Why it nearly works.** Each request is individually correct. Every gate passes. There is no rule in the constitution that stops it, and the withdrawable check does not stop it either if the ledger position for an approved-but-unsettled payout is not yet reflected.
 
-**Counter, now designed in.** G-NO-IN-FLIGHT (R-38) is part of eligibility, backed by the SD-09 partial unique index so the engine is not the only line of defence. GS-052 asserts the refusal; GS-053 asserts that a request fired the instant the first settles fails the **win-day** gate rather than paying, which is the second line.
+**Counter, now designed in.** G-NO-IN-FLIGHT (R-38) is part of `eligible`, through `contextEligible` and not through `engineEligible` (INV-15, [ADR-060](../decisions/ADR-060.md)), backed by the SD-09 partial unique index so the engine is not the only line of defence. GS-052 asserts the refusal; GS-053 asserts that a request fired the instant the first settles fails the **win-day** gate rather than paying, which is the second line.
 
 **Residual.** None at account level. At identity level, ten accounts can each hold one in-flight payout, which is AS-09.
 

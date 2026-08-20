@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-19
 ---
 
 # M5: Payout System
@@ -85,7 +85,7 @@ There is no approval step in either list because there is no approver. That abse
 | INV-M5-05 | A duplicate settlement webhook produces exactly one settlement, one win-day reset, and one ledger transaction | Unique `provider_transfer_id`, unique `idempotency_key` on `ledger_transactions`. B4 #8, GS-037 |
 | INV-M5-06 | A retry never double-pays, including across a restore from backup | The same `idempotency_key` on every attempt, generated **before** the first send and persisted in the same transaction. B4 #19, GS-048, AS-M5-06 |
 | INV-M5-07 | `applySettlement` is called exactly once per settled payout, with both trading days recorded | M1's DEP D-M5-1. Idempotent on `payout_request_id`, plus a per-account advisory lock shared with the batch |
-| INV-M5-08 | At most one payout is in flight per account | Partial unique index (M1's SD-09), **not** only the engine gate, because the engine is not the only writer. M1's DEP D-M5-2, GS-052 |
+| INV-M5-08 | At most one payout is in flight per account | Partial unique index (M1's SD-09), **not** only the in-flight context gate (R-38), because the engine is not the only writer. R-38 is a **context** gate and not a term in `engineEligible` ([ADR-060](../decisions/ADR-060.md), M1's INV-15 and SD-06), so the index is not a second line behind an engine gate: it is the only line inside the engine's replayed state, and the gate it backs is resolved at read time. M1's DEP D-M5-2, GS-052 |
 | INV-M5-09 | An account that breaches after approval and before settlement is still paid | Constitution M1's FM-18 and [M01 section 3.3](M01-rules-engine.md). The snapshot was true when taken and the money was already the trader's |
 | INV-M5-17 | **A held request that reaches auto-release pays, even if the account breached during the hold** | [ADR-040](../decisions/ADR-040.md). INV-M5-09's **first** clause governs (the snapshot was true when it was taken); its second does not apply, because nothing was posted and nothing was yet the trader's. The first clause wins because the alternative is that **Merit's own hold cost the trader money**, which is the exact shape zero denial exists to make impossible. Pinned by a golden scenario rather than left to reasoning |
 | INV-M5-18 | **No payout request sits past its hold or freeze expiry** | Asserted nightly **on the query**, evaluated independently of whether the hourly sweep reported success ([M02](M02-rithmic-bridge.md) FM-M2-11's idiom applied to the releaser: a job that reports success is not evidence that the work happened). It is the **fourth unsuppressible alarm**, amending [M06](M06-admin-ops-console.md) OQ-M6-01, because a releaser that is not running is an alarm and an alarm that can be muted is not a control |
