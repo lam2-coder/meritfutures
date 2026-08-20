@@ -65,7 +65,10 @@ function section710(): string {
   const start = body.indexOf('## 7.10 The standing duplicate-signal views');
   expect(start, 'M06 has no section 7.10').toBeGreaterThan(-1);
   const end = body.indexOf('\n## ', start + 1);
-  expect(end, 'section 7.10 is unterminated; the bound would swallow the rest of M06').toBeGreaterThan(start);
+  expect(
+    end,
+    'section 7.10 is unterminated; the bound would swallow the rest of M06',
+  ).toBeGreaterThan(start);
   const text = body.slice(start, end);
   // Rule 2 on a derived input: a bound that silently collapsed to a heading
   // would make every absence assertion below pass against nothing.
@@ -108,7 +111,7 @@ function prose(path: string): string {
 // Five read `identity_signals`. The sixth reads `destination_ref`, and that is
 // a finding rather than an inconsistency: M07:84's "settlement-rail identity"
 // is `kind = 'rise_identity'`, who the rail says the payee is, and D-09 at
-// M07:114 reads where the money actually went. The table below is the
+// M07:116 reads where the money actually went. The table below is the
 // distinction expressed as a fixture.
 const SIGNAL_VIEWS = [
   { view: 'Shared IP', kinds: ['ip', 'asn'] },
@@ -152,7 +155,10 @@ describe('M06 section 7.10: the six views read signals that exist', () => {
     for (const { view, kinds: named } of SIGNAL_VIEWS) {
       for (const kind of named) {
         expect(text, `${view} does not name kind '${kind}'`).toContain(`'${kind}'`);
-        expect(kinds, `${view} reads kind '${kind}', which identity_signals does not allow`).toContain(kind);
+        expect(
+          kinds,
+          `${view} reads kind '${kind}', which identity_signals does not allow`,
+        ).toContain(kind);
       }
     }
   });
@@ -174,8 +180,12 @@ describe('M06 section 7.10: the six views read signals that exist', () => {
     expect(text).toContain('`payout_transfers.destination_ref`');
     expect(text).toContain('`wallet_withdrawals.destination_ref`');
     // ADR-028 split the legs. The wallet half is the one a view would omit.
-    expect(ddl(PAYOUTS)).toMatch(/CREATE TABLE payout_transfers[\s\S]*destination_ref\s+text NOT NULL/);
-    expect(ddl(WALLET)).toMatch(/CREATE TABLE wallet_withdrawals[\s\S]*destination_ref\s+text NOT NULL/);
+    expect(ddl(PAYOUTS)).toMatch(
+      /CREATE TABLE payout_transfers[\s\S]*destination_ref\s+text NOT NULL/,
+    );
+    expect(ddl(WALLET)).toMatch(
+      /CREATE TABLE wallet_withdrawals[\s\S]*destination_ref\s+text NOT NULL/,
+    );
   });
 
   test('rise_identity is a signal and is NOT what the destination view reads', () => {
@@ -200,7 +210,9 @@ describe('M06 section 7.10: the tiers are read, never derived', () => {
     const text = section710();
     expect(text).toContain('`identity_links.confidence_bp`');
     expect(text).toContain('hard-link ceiling');
-    expect(ddl(IDENTITY)).toMatch(/confidence_bp\s+integer NOT NULL CHECK \(confidence_bp BETWEEN 0 AND 10000\)/);
+    expect(ddl(IDENTITY)).toMatch(
+      /confidence_bp\s+integer NOT NULL CHECK \(confidence_bp BETWEEN 0 AND 10000\)/,
+    );
   });
 
   test('the section states no numeric basis-point threshold of its own', () => {
@@ -210,7 +222,10 @@ describe('M06 section 7.10: the tiers are read, never derived', () => {
     // score (ADR-022); a second place that holds a threshold is a second answer.
     const text = section710();
     const thresholds = text.match(/\b\d+\s*bp\b/g) ?? [];
-    expect(thresholds, `section 7.10 states its own threshold(s): ${thresholds.join(', ')}`).toEqual([]);
+    expect(
+      thresholds,
+      `section 7.10 states its own threshold(s): ${thresholds.join(', ')}`,
+    ).toEqual([]);
   });
 
   test('a soft link renders as a soft link and changes nothing a trader may buy', () => {
@@ -227,7 +242,9 @@ describe('M06 section 7.10: the tiers are read, never derived', () => {
     expect(text).toContain('SD-M7-04');
     expect(text).toMatch(/suppressed edges? .*aggregate/i);
     expect(ddl(IDENTITY)).toMatch(/suppressed\s+boolean NOT NULL DEFAULT false/);
-    expect(prose(IDENTITY)).toContain('stays visible as history and stops contributing to enforcement');
+    expect(prose(IDENTITY)).toContain(
+      'stays visible as history and stops contributing to enforcement',
+    );
   });
 });
 
