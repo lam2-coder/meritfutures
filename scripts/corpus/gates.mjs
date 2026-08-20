@@ -3804,19 +3804,29 @@ const ci06t = {
 // the table that earns it named.
 //
 // SECOND: tables whose first column IS a key, where a repeat means the registry
-// can no longer answer the question it exists to answer. 105 of those survive
-// the exemptions, in 8 files, and THREE OF THE PAIRS CONTRADICT EACH OTHER:
+// can no longer answer the question it exists to answer. THE SURVEY MEASURED
+// 106 OF THOSE SURVIVING THE EXEMPTIONS, IN 8 FILES, ON 2026-08-19 -- a frozen
+// historical figure, dated and attributed here on purpose, and THE ONLY COUNT
+// LEFT IN THIS HEADER. It is what the gate was written against, it is what
+// session 75's log, WAVE-03 and ADR-061 all cite, and nothing recomputes it, so
+// it cannot drift. The header said `105` for five sites and a week while the
+// runner printed 106 on every run; see the note at the foot of this gate for
+// what the register holds TODAY, which is a different question and a moving
+// one. THREE OF THE PAIRS CONTRADICT EACH OTHER:
 // `G-ELIGIBLE` in STATE_MACHINES is defined once as `identities.status <>
 // 'restricted'` and once as `identities.status = 'active'`, both citing ADR-041,
 // on the money path; INDEX gives `M05` two different purposes; STATE says both
 // `21` checks and `Eleven`. `docs/sessions/README.md` carries the ENTIRE session
 // index twice, one copy truncated at session 62.
 //
-// THE 105 ARE REGISTERED RATHER THAN EXEMPTED, and the difference is the whole
+// THEY ARE REGISTERED RATHER THAN EXEMPTED, and the difference is the whole
 // design. `falsify.mjs` runs every gate against the tree as it stands and a gate
-// that cannot pass there is an ERROR, so a gate landing red on 105 findings
-// cannot land at all. The register pins the exact (file, key) pairs that exist
-// on `main` today. A NEW duplicate is a finding. And a register entry that no
+// that cannot pass there is an ERROR, so a gate landing red on the survey's
+// findings could not land at all. The register pins the exact (file, key) pairs
+// that exist on the ref it is read against, and THE RUNNER PRINTS ITS SIZE ON
+// EVERY RUN rather than restating it here: repairs move that number and a copy
+// of it in a comment is ADR-034's class, inside the gate written to catch
+// registries disagreeing with themselves. A NEW duplicate is a finding. And a register entry that no
 // longer names a real duplicate is ALSO a finding, so a repair forces the
 // register down by one rather than leaving an exemption behind it. That is the
 // direction an allowlist has to decay in; `CI-06l` states the same rule about
@@ -3857,7 +3867,12 @@ const CI06U_DOCS = 'docs/';
 const DIMENSION_HEADERS = new Map([
   // STATE_MACHINES's transition tables. A row is keyed by (From, To, Guard) and
   // `active` has four outgoing edges. The GUARD table in the same file is NOT
-  // exempt and is where ten of the 105 are.
+  // exempt, and it carried ten of the survey's duplicates until ADR-062's
+  // session repaired them; it carries none today. THE COUNT IS GONE FROM THIS
+  // LINE RATHER THAN CORRECTED TO ZERO: what this comment is for is the
+  // ARGUMENT that one table in this file is exempt and its neighbour is not,
+  // and a running total beside it was stale within two sessions of being
+  // written. The register prints its own size.
   ['from', 'STATE_MACHINES transition tables: a row is keyed by (From, To, Guard)'],
   // SECURITY's STRIDE tables. S/T/R/I/D/E is a six-value category and section
   // 2.6 alone lists four spoofing scenarios.
@@ -4028,10 +4043,11 @@ const ci06u = {
     'SCOPE IS STATED IN TWO PLACES AND NEITHER IS A RELAXATION. Tables whose first column ' +
     'is a DIMENSION rather than an identity (transition tables keyed by From, STRIDE ' +
     'tables keyed by threat category, and four more) are out of scope by header, one ' +
-    'argued shape per entry, and an exemption matching no table is a finding. The 105 ' +
-    'duplicate keys the 2026-08-19 survey found on main are REGISTERED, not exempted: a ' +
-    'register entry that no longer names a real duplicate is a finding, so the register ' +
-    'shrinks as repairs land and cannot become furniture. ' +
+    'argued shape per entry, and an exemption matching no table is a finding. The duplicate ' +
+    'keys the 2026-08-19 survey found on main are REGISTERED, not exempted: a register entry ' +
+    'that no longer names a real duplicate is a finding, so the register shrinks as repairs ' +
+    'land and cannot become furniture. Its size is PRINTED ON EVERY RUN rather than stated ' +
+    'here, because a repair moves it and this text does not. ' +
     'FIVE THINGS IT DOES NOT DO. It reads the first cell and nothing else, so two rows ' +
     'that CONTRADICT each other are the same finding as two that are identical, and which ' +
     'half is true is a founder ruling. The dimension list is a recorded reading of six ' +
