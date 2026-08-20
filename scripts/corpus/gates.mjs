@@ -3711,6 +3711,176 @@ const ci06t = {
 // -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// CI-06u  AN IDENTIFIER HEADS AT MOST ONE ROW OF ANY docs/ MARKDOWN TABLE
+// -----------------------------------------------------------------------------
+// THE DEFECT CLASS, AND IT HAS CORRUPTED main-BOUND BRANCHES THREE TIMES. The
+// merge script resolves conflicts KEEP-BOTH and then dedupes only lines longer
+// than 60 characters that are byte-identical after comment stripping. When two
+// sessions append to one markdown table, keep-both does not interleave the two
+// additions -- it duplicates the table's EXISTING rows, and those survive the
+// dedupe the moment anything has reformatted them.
+//
+// `CI-06p` caught the fourteen duplicate `CI-06` rows in STRATEGY, and only
+// because it happens to assert uniqueness over ONE table. This generalises it.
+//
+// THE SCOPE IS AN IDENTIFIER, AND THAT IS A RULING RATHER THAN A RELAXATION.
+// A survey of clean `main` before this assertion existed found 123 duplicated
+// first cells across 12 files, and MOST ARE LEGITIMATE: a transition table's
+// first cell is a FROM state and repeats once per transition out of it, a STRIDE
+// table repeats its category, `WAVE-01` repeats a wave number across its
+// sessions, a session log repeats a rule group down a Group column, and
+// ALLOCATION stacks superseded numeric generations on purpose. **A gate that
+// fired on those would be switched off inside a week.**
+//
+// What none of those is, is an IDENTIFIER. The defect worth a gate is an id
+// that resolves to TWO THINGS, and that is what this asserts: a first cell that
+// is a corpus identifier (`INV-M5-17`, `G-ELIGIBLE`, `ADR-050`, `S-14`) or a
+// markdown LINK to a document heads at most one row of its table. Under that
+// scope the 123 fall to 78, and every survivor is a real defect.
+//
+// THE SCOPE SEPARATES THE TWO INSIDE ONE FILE, WHICH IS WHY IT IS NOT A FILE
+// EXEMPTION LIST. `STATE_MACHINES.md` carries BOTH: its transition tables repeat
+// `active` and `provisioning_pending` by design and are out of scope, and its
+// gate table defines **`G-ELIGIBLE` twice with contradictory predicates** --
+// `identities.status <> 'restricted'` on one row and `identities.status =
+// 'active'` on the other. A file-level exemption would have hidden that.
+//
+// AND THE SHARPEST SURVIVORS ARE NOT MERGE ARTIFACTS AT ALL. `M05` carries
+// `INV-M5-17`, `INV-M5-18` and `INV-M5-19` twice each WITH DIFFERENT MEANINGS:
+// "a held request that reaches auto-release pays" against "no hold and no freeze
+// outlives its expiry". A reader citing `INV-M5-17` cannot know which is meant.
+//
+// IT IS A RATCHET, BECAUSE IT CANNOT BE A CLEAN ASSERTION TODAY. Seven files
+// carry real duplicates and repairing them is a documentation fence this session
+// does not hold. STATE's own sentence is that "a gate which fails on arrival is
+// a gate somebody switches off", so the known set is a COUNT PER FILE that may
+// shrink and may never grow, and a count that has FALLEN is a finding too: a
+// stale exemption is how a ratchet quietly stops ratcheting.
+//
+// WHAT IT DOES NOT PROVE, DECLARED RATHER THAN OMITTED. A repair and a new
+// duplicate landing in the same file cancel in that file's count; a duplicate in
+// any file NOT on the list fires immediately. It does not read the merge script,
+// which runs on one machine and is not in this tree. It says nothing about two
+// rows with DIFFERENT ids stating the same thing. And a label that is not
+// identifier-shaped is out of scope even when duplicated, which is a real gap:
+// STATE's P1 table repeats "**CI-06, corpus integrity**" four times and this
+// gate cannot see it, because a rule that could would fire on every Group column
+// in the corpus.
+
+/** Bold and code fences are presentation; the identifier is what is inside. */
+const ci06uKey = (cell) => cell.replace(/\*\*/g, '').replace(/`/g, '').trim();
+
+/** `INV-M5-17`, `G-ELIGIBLE`, `ADR-050`, `S-14`, `CI-06u`, `PW-02a`. */
+const CI06U_IDENT = /^[A-Z][A-Za-z0-9]*-[A-Za-z0-9.-]+$/;
+/** `[M05-payout-system.md](plans/M05-payout-system.md)`, a session-log row. */
+const CI06U_LINK = /^\[[^\]]+\]\([^)]+\)$/;
+
+const ci06uInScope = (cell) => {
+  const key = ci06uKey(cell);
+  return CI06U_IDENT.test(key) || CI06U_LINK.test(key);
+};
+
+/** Files carrying real duplicates on arrival. May shrink; may never grow. */
+const CI06U_KNOWN = {
+  'docs/sessions/README.md': 58,
+  'docs/architecture/STATE_MACHINES.md': 9,
+  'docs/plans/M05-payout-system.md': 4,
+  'docs/INDEX.md': 3,
+  'docs/plans/M12-statistic-definitions.md': 2,
+  'docs/STATE.md': 1,
+  'docs/plans/M20-wallet.md': 1,
+};
+
+/** Every in-scope first cell that heads more than one row of one table. */
+function duplicateTableIdentifiers(body) {
+  const lines = body.split('\n');
+  const dupes = [];
+  let table = null;
+  const flush = () => {
+    if (table !== null) {
+      for (const [key, at] of table) if (at.length > 1 && ci06uInScope(key)) dupes.push({ key, at });
+    }
+    table = null;
+  };
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!/^\s*\|/.test(line)) {
+      flush();
+      continue;
+    }
+    const first = (line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|')[0] ?? '').trim();
+    // The `---|---` separator is not a row, and the header is the row before it.
+    if (/^[\s:|-]+$/.test(first) && first.includes('-')) continue;
+    if (table === null) {
+      table = new Map(); // this line is the header
+      continue;
+    }
+    if (first === '') continue; // a continuation cell states no identity
+    if (!table.has(first)) table.set(first, []);
+    table.get(first).push(i + 1);
+  }
+  flush();
+  return dupes;
+}
+
+const ci06u = {
+  id: 'CI-06u',
+  title: 'An identifier heads at most one row of any docs/ markdown table',
+  covers:
+    'every markdown table under docs/, asserting that a first cell which is a corpus ' +
+    'identifier or a document link heads at most one row of its table. This is the merge ' +
+    "script's keep-both corruption made visible: it duplicates a table's existing rows and " +
+    'its dedupe only drops byte-identical lines, which any reformatting defeats. ' +
+    'THE SCOPE IS THE RULING. A grouping column repeats by design -- a from-state, a ' +
+    'STRIDE category, a wave number, a rule group -- and a gate firing on those would be ' +
+    'switched off; an identifier resolving to two things is the defect worth a gate. ' +
+    'FOUR THINGS IT DOES NOT DO. It is a RATCHET over seven files that carry real ' +
+    'duplicates today, so a repair and a new duplicate in the SAME file cancel in that ' +
+    "file's count, while a duplicate in any other file fires immediately. It does not " +
+    'read the merge script, which runs on one machine and is not in this tree. It says ' +
+    'nothing about two rows with DIFFERENT ids stating one thing. And a duplicated LABEL ' +
+    'is out of scope even when it is corruption, which STATE\'s repeated P1 rows are.',
+  run() {
+    const findings = [];
+    const docs = markdownFiles().filter((p) => p.startsWith('docs/'));
+    if (docs.length === 0) throw new Error('no docs/ markdown found; the gate cannot run');
+
+    const seen = new Set();
+    for (const file of docs) {
+      const dupes = duplicateTableIdentifiers(read(file));
+      const allowed = CI06U_KNOWN[file];
+      if (allowed === undefined) {
+        for (const d of dupes) {
+          findings.push(
+            `${file}:${d.at.join(',')}: ${ci06uKey(d.key).slice(0, 60)} heads more than one ` +
+              'row of one table. Two sessions appended to it and the merge kept both copies ' +
+              'of a row rather than interleaving the two additions',
+          );
+        }
+        continue;
+      }
+      seen.add(file);
+      if (dupes.length > allowed) {
+        findings.push(
+          `${file}: ${dupes.length} duplicated identifier(s) against a ratchet of ${allowed}. ` +
+            'The known set may shrink and may never grow',
+        );
+      } else if (dupes.length < allowed) {
+        findings.push(
+          `${file}: ${dupes.length} duplicated identifier(s) against a ratchet of ${allowed}. ` +
+            `Repairs landed and CI06U_KNOWN is stale: lower it to ${dupes.length}, because a ` +
+            'ratchet nobody tightens is one that has stopped ratcheting',
+        );
+      }
+    }
+    for (const file of Object.keys(CI06U_KNOWN)) {
+      if (!seen.has(file)) findings.push(`${file}: on the known list and not found under docs/`);
+    }
+    return findings;
+  },
+};
+
 const GATES = [
   ci06a,
   ci06b,
@@ -3733,6 +3903,7 @@ const GATES = [
   ci06s,
   adr026,
   ci06t,
+  ci06u,
 ];
 
 function main() {
