@@ -149,3 +149,4 @@ and within a number by the order the sections appear in the file.
 | [2026-08-20 - Session 99](2026-08-20-session-99.md) | `ADR-070`: plan config is versioned, the `rules` blob stays and its publication is constrained, and contract limits are Merit-owned |
 | [2026-08-20 - Session 105](2026-08-20-session-105.md) | the WAVE-03 merge: eight pull requests landed, the register down from 106 keys across 8 files to 59 across 1, and two findings the merge produced that no branch could see |
 | [2026-08-20 - Session 98](2026-08-20-session-98.md) | the plan-config completeness audit: 47 parameters, 3 first-class, 11 materialized, 29 versioned-unconstrained, 4 absent. The referral's taxonomy was missing the state that holds 11 of them, and the exemplary table has one column with no constraint at all |
+| [2026-08-20 - Session 83](2026-08-20-session-83.md) | CI-06v: no orphan table fragment, and the gate inventory was its own first finding |

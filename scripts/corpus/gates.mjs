@@ -3880,9 +3880,14 @@ const CI06U_REGISTER = new Map([
 
 // A delimiter row: `|---|---|`, `| :--- | ---: |`. It carries no data and is not
 // a body row. A SECOND one inside a table is not skipped quietly by accident --
-// it is a keep-both artifact in its own right, and STRATEGY section 4.4 carries
-// one today -- but naming it is `CI-06p`'s business, not this gate's.
+// it is a keep-both artifact in its own right -- but naming it is `CI-06p`'s
+// business, not this gate's. STRATEGY section 4.4 carried one until session 83
+// removed it with the orphan run it had split off; the general case stands.
 const isDelimiterRow = (line) => /^\s*\|[\s|:-]*\|\s*$/.test(line) && line.includes('-');
+
+// `CI-06v`'s single-line concession, named rather than written as a bare `2` at
+// the comparison. A run shorter than this claims nothing.
+const ORPHAN_MIN_ROWS = 2;
 
 // A table is a MAXIMAL RUN OF CONSECUTIVE `|` LINES carrying at least one
 // delimiter row, which is what GitHub renders as one table. Reading a second
@@ -3894,12 +3899,21 @@ const isDelimiterRow = (line) => /^\s*\|[\s|:-]*\|\s*$/.test(line) && line.inclu
 // Fenced blocks are skipped whole. A worked example of a table inside a fence is
 // quoted prose, and `CI-06t` masks fences for the same reason.
 function markdownTables(body) {
+  return markdownRuns(body).filter((run) => run.some((r) => isDelimiterRow(r.raw)));
+}
+
+// EVERY maximal run, including the ones `markdownTables` throws away. The split
+// exists so `CI-06v` reads the discarded half rather than carrying a second copy
+// of this loop: two expressions of one concept that agree today is the defect
+// session 20 removed from this runner when `CI-06b` and `CI-06c` carried two
+// regexes for one document set, ten lines apart, agreeing until they did not.
+function markdownRuns(body) {
   const lines = body.split('\n');
   const out = [];
   let fence = null;
   let run = null;
   const flush = () => {
-    if (run && run.some((r) => isDelimiterRow(r.raw))) out.push(run);
+    if (run) out.push(run);
     run = null;
   };
   for (let i = 0; i < lines.length; i++) {
@@ -4078,6 +4092,78 @@ const ci06u = {
   },
 };
 
+const ci06v = {
+  id: 'CI-06v',
+  title: 'No orphan table fragment under docs/',
+  covers:
+    'A run of consecutive pipe lines carrying NO delimiter row is a finding. Such a run ' +
+    'renders as prose rather than as a table, and every table gate in this runner drops ' +
+    'it on the floor: `markdownTables` keeps a run only if it carries a delimiter, so an ' +
+    'orphan fragment is not a table nobody checked, it is rows nobody can see. ' +
+    'THE CAUSE IT IS AIMED AT is the review desk merge script resolving keep-both ' +
+    'mid-table, which re-inserts a header and a delimiter and leaves a blank line behind ' +
+    'them; the rows below the blank become an orphan run. STRATEGY section 4.4 carried ' +
+    'one of exactly that shape holding six of its own gate rows, CI-06u\'s among them, ' +
+    'and ADR-065 records four more in ALLOCATION\'s letter table. ' +
+    'THE RULE ON RUN LENGTH IS TWO, AND IT IS A CHOICE. A single isolated pipe line ' +
+    'claims nothing: a sentence that happens to start with a pipe, or a one-row table ' +
+    'quoted illustratively outside a fence, is prose and a gate that called it a fragment ' +
+    'would be reporting on English. Measured over docs/ when this gate was written, ' +
+    'there are ZERO single isolated pipe lines, so the concession costs nothing today and ' +
+    'is made against tomorrow. ' +
+    'FOUR THINGS IT DOES NOT DO. It does not read cells, so a fragment whose rows ' +
+    'contradict the table above them is the same finding as one that repeats it, and ' +
+    'which half is true is a founder ruling. It cannot see a genuine ONE-row orphan, by ' +
+    'the rule above. It says nothing about a table that is well formed and wrong: a ' +
+    'delimiter row is the whole test, so a run carrying a delimiter passes however ' +
+    'damaged its content is, which is CI-06u\'s business and not this gate\'s. And it ' +
+    'inherits the one-ref gap CI-06f, CI-06h, CI-06p and CI-06u each declare: it catches ' +
+    'a fragment introduced by a merge at the merge, never at the pull request that fed it.',
+  run() {
+    const findings = [];
+    const files = markdownFiles().filter((p) => p.startsWith(CI06U_DOCS));
+    // Rule 2 on a glob-shaped input. A prefix that stopped matching would make
+    // every fragment in the corpus pass for the wrong reason.
+    if (files.length === 0) {
+      throw new Error(`no markdown files under ${CI06U_DOCS}; the gate cannot run`);
+    }
+
+    let runs = 0;
+    let orphanRows = 0;
+    for (const file of files.sort()) {
+      for (const run of markdownRuns(read(file))) {
+        runs++;
+        if (run.some((r) => isDelimiterRow(r.raw))) continue;
+        // The single-line concession, stated in `covers` and applied here.
+        if (run.length < ORPHAN_MIN_ROWS) continue;
+        orphanRows += run.length;
+        findings.push(
+          `${file}:${run[0].n}-${run[run.length - 1].n}: ${run.length} consecutive pipe ` +
+            'lines carry no delimiter row, so they render as prose and no table gate reads ' +
+            `them. First row: ${run[0].raw.trim().slice(0, 70)}`,
+        );
+      }
+    }
+
+    // Rule 2 again, on the parser rather than on the input. This corpus is
+    // written in tables; zero runs means the run splitter has stopped matching
+    // and every fragment in the tree would pass silently.
+    if (runs === 0) {
+      throw new Error(
+        `CI-06v parsed zero pipe runs under ${CI06U_DOCS}. This corpus is written in ` +
+          'tables, so zero means the run splitter has stopped matching and this gate is ' +
+          'asserting nothing',
+      );
+    }
+
+    console.log(
+      `       CI-06v note: ${runs} pipe run(s) under ${CI06U_DOCS}, ` +
+        `minimum orphan length ${ORPHAN_MIN_ROWS}; ${orphanRows} orphan row(s) found`,
+    );
+    return findings;
+  },
+};
+
 // -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
@@ -4104,6 +4190,7 @@ const GATES = [
   adr026,
   ci06t,
   ci06u,
+  ci06v,
 ];
 
 function main() {

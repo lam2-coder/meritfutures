@@ -991,6 +991,36 @@ const SEEDS = {
           `| seeded-term | what the other session wrote, which is not the same claim |\n`,
       ),
   },
+
+  'CI-06v': {
+    what: 'a run of consecutive pipe lines carrying no delimiter row',
+    real:
+      "the review desk's merge script resolves conflicts keep-both, so a session appending " +
+      'to a table can land a SECOND header row and a SECOND delimiter row inside it with a ' +
+      'blank line behind them. The rows below that blank line are then a run with no ' +
+      'delimiter: markdownTables discards it, every table gate in the runner stops reading ' +
+      'it, and GitHub draws it as prose. It has happened twice on main: six rows of ' +
+      "STRATEGY section 4.4's own gate inventory, CI-06u's row among them, repaired by " +
+      "session 83; and four runs holding nine rows in ALLOCATION's letter table, recorded " +
+      'by ADR-065 and repaired by session S6',
+    // THE SEED IS THE REAL SHAPE AND NOT A BARE FRAGMENT. A run of loose pipe
+    // lines with nothing above them would fire the gate and would prove it fires
+    // on a population that does not occur. What lands on main is a WELL FORMED
+    // table followed by a re-inserted header, a re-inserted delimiter and a
+    // blank, and it is the blank that orphans everything under it.
+    expect: 'consecutive pipe lines carry no delimiter row',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded: the keep-both merge artifact CI-06v is aimed at -->\n\n` +
+          `| Term | Meaning |\n|---|---|\n| seeded-a | the table is well formed to here |\n` +
+          `| Term | Meaning |\n|---|---|\n\n` +
+          `| seeded-b | this row is below the blank and no table gate reads it |\n` +
+          `| seeded-c | nor this one |\n`,
+      ),
+  },
 };
 
 // =============================================================================
@@ -1669,6 +1699,101 @@ const SCOPE_CASES = [
       lines.splice(i + 1, 0, line);
       writeFileSync(join(d, STRATEGY_DOC_F), lines.join('\n'));
     },
+  },
+  {
+    name: 'CI-06v/a-heading-between-two-tables-is-not-a-finding',
+    gate: 'CI-06v',
+    what: 'two genuinely separate tables split by a HEADING, which must NOT be a finding',
+    expect: 'PASS',
+    // THE BOUNDARY IS THE RUN, NOT THE DOCUMENT. A heading is a non-pipe line,
+    // so it ends the run exactly as a blank line does, and the two tables are
+    // two runs that each carry their own delimiter. This case exists because
+    // the obvious wrong implementation counts delimiters per FILE or per
+    // SECTION, and both readings pass the seed above while calling every
+    // multi-table document in this corpus a finding.
+    //
+    // The control keeps the heading and deletes the second delimiter, which is
+    // the single edit that turns two lawful tables into one lawful table and
+    // one orphan.
+    control: {
+      expect: 'consecutive pipe lines carry no delimiter row',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\n\n| Term | Meaning |\n|---|---|\n| ctl-a | first table |\n\n` +
+            `#### A heading between them\n\n| Term | Meaning |\n| ctl-b | second table, no delimiter |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| Term | Meaning |\n|---|---|\n| scope-a | first table |\n\n` +
+          `#### A heading between them\n\n| Term | Meaning |\n|---|---|\n| scope-b | second table |\n`,
+      ),
+  },
+  {
+    name: 'CI-06v/a-pipe-line-inside-a-fence-claims-nothing',
+    gate: 'CI-06v',
+    what: 'an orphan-shaped fragment inside a fenced block, which must NOT be a finding',
+    expect: 'PASS',
+    // A worked example of a broken table is exactly what a document ABOUT this
+    // gate would quote, and CI-06t masks fences for the same reason. Without
+    // this case, the first entry explaining CI-06v to a reader becomes a
+    // finding against itself.
+    //
+    // The control is the identical text with the fence removed, which is the
+    // single edit that separates quoted prose from corpus content.
+    control: {
+      expect: 'consecutive pipe lines carry no delimiter row',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) => `${b}\n<!-- control -->\n\n| ctl-x | no delimiter |\n| ctl-y | none here either |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n\`\`\`\n| fenced-x | no delimiter |\n| fenced-y | none here either |\n\`\`\`\n`,
+      ),
+  },
+  {
+    name: 'CI-06v/a-single-pipe-line-claims-nothing',
+    gate: 'CI-06v',
+    what: 'ONE isolated pipe line, which must NOT be a finding',
+    expect: 'PASS',
+    // ORPHAN_MIN_ROWS IS 2 AND THIS CASE IS WHERE THAT CHOICE IS ASSERTED
+    // RATHER THAN STATED. A single line starting with a pipe is prose: a
+    // sentence, or a one-row table quoted illustratively. Measured over docs/
+    // when the gate was written, there are ZERO of them, so the concession
+    // costs nothing today and is made against tomorrow.
+    //
+    // The control adds ONE adjacent pipe line and nothing else, so the pair
+    // brackets the minimum exactly: one passes, two fire. A future edit
+    // dropping the minimum to 1 fires this case; a future edit raising it to 3
+    // stops the control.
+    control: {
+      expect: 'consecutive pipe lines carry no delimiter row',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) => `${b}\n<!-- control -->\n\n| ctl-solo | and a second line below it |\n| ctl-pair | which makes a run of two |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) => `${b}\n<!-- seeded -->\n\n| solo-line | one pipe line alone is prose |\n`,
+      ),
   },
   {
     name: 'CI-06t/unclosed-before-a-good-span-later',
