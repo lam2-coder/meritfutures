@@ -32,13 +32,14 @@
 import type {
   AssertionFailure,
   BreachKind,
+  CalendarSlice,
   Cents,
   ClampReason,
   ExternalGates,
   ResolvedPlan,
   RuleState,
 } from '@merit/rules-engine';
-import type { ContractSpec, PopulationSpec, SimSession } from '@merit/rithmic';
+import type { ContractSpec, PopulationSpec, SimAccount, SimSession } from '@merit/rithmic';
 import type { Ratio } from './ratio.js';
 import type { CalibrationSource, Provenance } from './provenance.js';
 
@@ -233,13 +234,20 @@ export interface Trial {
   /** `PP-05`. This account was drawn into the risk-up cohort. */
   readonly inRiskUpCohort: boolean;
   /**
-   * Requests the engine approved whose effective day fell past the window.
+   * Requests the engine approved that never settled. `0` or `1`.
    *
-   * REPORTED RATHER THAN DROPPED. A run whose window ends mid-cadence leaves
-   * approved payouts unsettled, and a harness that silently discarded them would
-   * under-report liability by exactly the amount nobody could see.
+   * TWO WAYS TO GET ONE, AND BOTH ARE REPORTED RATHER THAN DROPPED. The window
+   * can end before the effective day arrives, and the account can breach or have
+   * a day refused while a request is in flight. A harness that silently
+   * discarded either would under-report liability by exactly the amount nobody
+   * could see, and the second case is a real one: `GS-064` is breach and payout
+   * eligibility on the same day.
+   *
+   * It is never more than one because `R-38` blocks a second request while an
+   * external leg is outstanding, and the trial loop supplies that fact rather
+   * than deciding it. `trial.ts` throws if a second is ever queued.
    */
-  readonly requestsUnsettledAtWindowEnd: number;
+  readonly approvedRequestsNeverSettled: number;
   /** The finding, on a trial that ended `refused`. */
   readonly refusal: AssertionFailure | null;
   /** The last state the fold wrote. `null` only if the very first day refused. */
@@ -251,10 +259,19 @@ export interface TrialInput {
   readonly seed: string;
   readonly engineVersion: string;
   readonly plan: ResolvedPlan;
-  /** One account out of `buildPopulation`, by index. */
-  readonly accountIndex: number;
+  /** One account out of `buildPopulation`. Built by the caller, never here. */
+  readonly account: SimAccount;
   readonly sessions: readonly SimSession[];
   readonly specs: readonly ContractSpec[];
+  /**
+   * The slice the whole run shares, built once by `run.ts`.
+   *
+   * ONE SLICE FOR EVERY TRIAL, WHICH IS WHAT MAKES THE SEQUENCES COMPARABLE.
+   * `R-37` counts a cadence gap by sequence subtraction, and two accounts folded
+   * against two slices with different `sequenceBase` values would be counting on
+   * two different rulers.
+   */
+  readonly calendar: CalendarSlice;
   readonly behaviour: TrialBehaviour;
   /**
    * `R-40`'s gates, the caller's to resolve (`INV-23`).
@@ -365,7 +382,7 @@ export interface FunnelCounts {
   readonly graduated: number;
   readonly refused: number;
   readonly settledPayouts: number;
-  readonly requestsUnsettledAtWindowEnd: number;
+  readonly approvedRequestsNeverSettled: number;
 }
 
 /** Every figure a run produces, each with its own provenance and sample size. */
