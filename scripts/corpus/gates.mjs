@@ -3873,34 +3873,23 @@ const CI06U_REGISTER = new Map([
       'g-restriction-lifted',
     ],
   ],
-  // All three allocation tables, the ADR numbers, the migration numbers and the
-  // letters. `r` is NOT here: the file argues that duplicate deliberately and
-  // the two rows are byte-identical but for one link, so the dedupe reached it.
-  // These fifteen carry a reservation row and a merged row for one number,
-  // which is exactly the State column ADR-034 deleted, growing back as rows.
-  [
-    'docs/decisions/ALLOCATION.md',
-    [
-      '0033',
-      '0034',
-      '039',
-      '040',
-      '041',
-      '042',
-      '043',
-      '044',
-      '045',
-      '046',
-      '050',
-      '054',
-      '055',
-      '057',
-      '059',
-      'k',
-      'l',
-      'm',
-    ],
-  ],
+  // `docs/decisions/ALLOCATION.md` WAS HERE WITH EIGHTEEN KEYS AND IS GONE,
+  // repaired rather than exempted by [ADR-065] (WAVE-03 session S6).
+  //
+  // THE COMMENT THAT STOOD HERE WAS FALSE ABOUT `r` AND IS CORRECTED RATHER
+  // THAN DELETED. It read: "`r` is NOT here: the file argues that duplicate
+  // deliberately and the two rows are byte-identical but for one link, so the
+  // dedupe reached it." Both halves were wrong. The two `r` rows were NOT
+  // byte-identical but for a link -- they differed by a whole parenthetical
+  // clause -- and no dedupe reached them. `r` was absent because the two rows
+  // sat in DIFFERENT UNPARSED FRAGMENTS: four blank lines split that table into
+  // five runs, `markdownTables()` keeps only a run carrying a delimiter row, and
+  // the two `r` rows were in runs two and three. THIS GATE NEVER COMPARED THEM.
+  //
+  // The same was true of `u`, where it mattered more: two DIFFERENT gates
+  // claimed one letter and nothing in the runner could see it. Nine rows were
+  // outside every table gate's reach. `CI-06v` is reserved for the executable
+  // form of the no-blank-line rule.
   // `INV-M5-17`, `INV-M5-18` and `INV-M5-19` each state TWO ENTIRELY DIFFERENT
   // invariants. An invariant id that means two things cannot be cited.
   ['docs/plans/M05-payout-system.md', ['inv-m5-01', 'inv-m5-17', 'inv-m5-18', 'inv-m5-19']],
