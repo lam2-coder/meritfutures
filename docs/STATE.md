@@ -1837,7 +1837,7 @@ at line 68.
 
 ## WAVE-04 is planned: the fixture backlog is sixteen fixtures of available work, not 276 (2026-08-20, session 107)
 
-[WAVE-04](plans/WAVE-04-fixture-backlog-and-gate-inventory.md), eight sessions, five concurrent. `ADR-072`, `ADR-073` and `ADR-074` reserved in [ALLOCATION](decisions/ALLOCATION.md) before any session starts; **no migration number and no `CI-06` letter**, because its four gates take slugs under [ADR-065](decisions/ADR-065.md).
+[WAVE-04](plans/WAVE-04-fixture-backlog-and-gate-inventory.md), eight sessions, six concurrent. `ADR-072`, `ADR-073` and `ADR-074` reserved in [ALLOCATION](decisions/ALLOCATION.md) before any session starts; **no migration number and no `CI-06` letter**, because its four gates take slugs under [ADR-065](decisions/ADR-065.md).
 
 **`OI-25`: the fixture backlog, and the subtraction is not the plan.** 40 fixtures stand against <!--gen:gs_count-->316<!--/gen--> registered scenarios, both verified by running rather than by reading. **Of the 276, sixteen are writable today.** 243 belong to modules with no code **and to no fixture format**, which is the load-bearing half: the format is `packages/rules-engine/fixtures/GS-NNN-*.yaml`, a day stream folded through the engine, and it is M1-shaped in every field, so even a module whose code landed tomorrow would have nowhere to write. 14 need one ruling each (a publish-time expectation, where a replay golden runs, a multi-account fold, a calendar record key for the session open and close) and 3 are held on `OI-16` and on ingest carrying no instant. **Every fixture on disk is M1-owned and not one belongs to any other module.**
 

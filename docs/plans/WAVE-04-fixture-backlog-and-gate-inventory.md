@@ -4,7 +4,7 @@ depends_on: [../STATE.md, ../decisions/ALLOCATION.md, ../testing/STRATEGY.md, ..
 last_updated: 2026-08-20
 ---
 
-# WAVE-04: the fixture backlog and the gate inventory, eight sessions, five of them concurrent
+# WAVE-04: the fixture backlog and the gate inventory, eight sessions, six of them concurrent
 
 **A wave plan, not a module plan.** It carries no design and one ruling only by
 reference. It is the partition, the allocation table and the prompt set for the
@@ -259,12 +259,12 @@ claimed, which is exactly how `SD-M6-nn` and `M6-N-nn` were allocated one wave a
 | **1** | **W3** | Six fixtures: settlement, corrections and the ladder | 110 | `claude/wave04-w3-settlement-ladder-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-035*`, `GS-057*`, `GS-058*`, `GS-066*`, `GS-082*`, `GS-241*` | **money path** |
 | **1** | **W4** | Four fixtures: the day fold and its boundaries | 111 | `claude/wave04-w4-day-fold-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-047*`, `GS-049*`, `GS-059*`, `GS-079*` | **money path** |
 | **1** | **W5** | `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` | 112 | `claude/wave04-w5-adr073-gate-inventory` | `docs/decisions/ADR-073.md`, `docs/decisions/README.md`, `docs/testing/STRATEGY.md` | non-money |
-| **2** | **W6** | `ADR-074`, what a `<PREFIX>-nn` definition site is, with the survey | 113 | `claude/wave04-w6-adr074-identifier-series` | `docs/decisions/ADR-074.md`, `docs/decisions/README.md`, `docs/reviews/2026-08-21-identifier-series-survey.md` | non-money |
+| **1** | **W6** | `ADR-074`, what a `<PREFIX>-nn` definition site is, with the survey | 113 | `claude/wave04-w6-adr074-identifier-series` | `docs/decisions/ADR-074.md`, `docs/decisions/README.md`, `docs/reviews/2026-08-21-identifier-series-survey.md` | non-money |
 | **2** | **W7** | `CI-09`, the nightly workflow | 114 | `claude/wave04-w7-ci09-nightly` | `.github/workflows/`, `scripts/ci/` | non-money |
 | **3** | **W8** | The four `CI-06` slug gates, four commits, in order | 115 | `claude/wave04-w8-slug-gates` | `scripts/corpus/`, `docs/testing/STRATEGY.md` | non-money |
 
-**Five run at once: `W1`, `W2`, `W3`, `W4` and `W5`.** The reasons, stated rather than
-left to be inferred:
+**Six run at once: `W1`, `W2`, `W3`, `W4`, `W5` and `W6`.** The reasons, stated rather
+than left to be inferred:
 
 - **`W2`, `W3` and `W4` share one directory and are fenced BY FILE.** Every file each
   writes is **new**, and the twelve `GS-nnn` prefixes across the three sessions are
@@ -281,10 +281,16 @@ left to be inferred:
   touches `docs/INDEX.md`: the golden-scenarios directory has **one** INDEX row for the
   directory and a per-file table in its own README, so `W1`'s new section file needs a
   README row and no INDEX row.
-- **`W6` and `W7` cannot start until rank 1 merges, for different reasons.** `W7` needs
-  `ADR-073` to have ruled which of `CI-09`'s four legs it builds. `W6` needs nothing from
-  rank 1 and is held back only because `W8` must follow it and `W8` must follow
-  everything.
+- **`W6` joins rank 1 because its fence is disjoint and nothing in rank 1 feeds it.** It
+  writes `docs/decisions/ADR-074.md` and a survey under `docs/reviews/`, which **carries
+  no README and no INDEX row**, so the survey needs no registry entry and collides with
+  nobody. The only files it shares with `W1` and `W5` are `docs/decisions/README.md` and
+  `docs/sessions/README.md`, and **both are union appends** under the merge discipline
+  above. Holding it to rank 2 would buy a serial round and change nothing, because `W8`
+  waits on all of rank 1 regardless.
+- **`W7` cannot start until `W5` merges.** It needs `ADR-073` to have ruled which of
+  `CI-09`'s four legs it builds, and a session that guesses that ruling is a session that
+  builds the wrong three.
 - **`W8` runs last and alone, and it is the only session that writes
   [`gates.mjs`](../../scripts/corpus/gates.mjs).** All four gates live in that file and
   [`falsify.mjs`](../../scripts/corpus/falsify.mjs), so they cannot be concurrent with
@@ -730,11 +736,10 @@ build CI-09; that is W7 and it reads your ruling.
 
 ---
 
-### W6: `ADR-074`, what a `<PREFIX>-nn` definition site is (session 113, AFTER RANK 1 MERGES)
+### W6: `ADR-074`, what a `<PREFIX>-nn` definition site is (session 113)
 
 ```
-Branch: claude/wave04-w6-adr074-identifier-series   (from origin/main, AFTER
-        rank 1 has merged)
+Branch: claude/wave04-w6-adr074-identifier-series   (from origin/main)
 Fence:  docs/decisions/ADR-074.md, docs/decisions/README.md,
         docs/reviews/2026-08-21-identifier-series-survey.md, plus your session
         log.
