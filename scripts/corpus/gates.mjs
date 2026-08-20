@@ -3835,10 +3835,12 @@ const CI06U_REGISTER = new Map([
   // and it is the one register entry here that may legitimately grow before it
   // shrinks.
 
-  // Three plan documents rowed twice by the INDEX merge. M05's two rows give it
-  // two different purposes: "bounded freeze, reset" and "the 48 hour
-  // enforcement window". The registry that decides whether a thing exists.
-  ['docs/INDEX.md', ['m03-billing-checkout.md', 'm04-trader-portal.md', 'm05-payout-system.md']],
+  // REPAIRED by session 80 and the entry is gone rather than emptied. Three plan
+  // documents were rowed twice by the INDEX merge and M05's two rows gave it two
+  // different purposes, "bounded freeze, reset" against "the 48 hour enforcement
+  // window". The repair was per row rather than per block, because the richer row
+  // was the FIRST for M03 and M04 and the SECOND for M05: a block delete in either
+  // direction would have lost content. The register shrinks by one file.
   // The P1-item table, recorded as OI-10. Its two `CI-06, corpus integrity`
   // rows say `21` checks and `Eleven` checks.
   [
@@ -3904,7 +3906,11 @@ const CI06U_REGISTER = new Map([
   // `INV-M5-17`, `INV-M5-18` and `INV-M5-19` each state TWO ENTIRELY DIFFERENT
   // invariants. An invariant id that means two things cannot be cited.
   ['docs/plans/M05-payout-system.md', ['inv-m5-01', 'inv-m5-17', 'inv-m5-18', 'inv-m5-19']],
-  ['docs/plans/M12-statistic-definitions.md', ['s-14', 's-15']],
+  // REPAIRED by session 80 and the entry is gone rather than emptied. `S-14` and
+  // `S-15` each headed two rows of the founder sign-off table, one RULED and one
+  // UNSIGNED in each pair. The ruled rows kept their identifiers, because a row
+  // with a signature against it cannot move, and the unsigned pair took `S-17`
+  // and `S-18`. Nothing outside M12 cited either number, so no citation moved.
   ['docs/plans/M20-wallet.md', ['inv-m20-06']],
   // THE WHOLE SESSION INDEX, TWICE. Lines 120 onward re-list sessions 1 to 74
   // under a second header row, and the first copy stops at session 62. Written
