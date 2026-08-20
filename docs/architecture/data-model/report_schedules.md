@@ -1,0 +1,28 @@
+### report_schedules
+**[ADR-066](../../decisions/ADR-066.md) section 3.** The scheduled delivery of a **fixed, named digest set**, created by [`0040`](../../../packages/db/migrations/0040_report_schedules.sql) (`SD-M6-07`, [M06](../../plans/M06-admin-ops-console.md) section 3.6). It is configuration, and the history of what it delivered lives in [`report_deliveries`](report_deliveries.md).
+
+**`digest` is a closed vocabulary of four and that CHECK is the whole difference between this table and the module [ADR-066](../../decisions/ADR-066.md) refused.** The referral asked for recurring delivery of "the reporting layer's saved views"; neither object exists anywhere in the corpus, so a report builder is not admitted and what is scheduled is four digests over panels [M06](../../plans/M06-admin-ops-console.md) section 3.1 already defines. Without the CHECK, "the named set" is a sentence in a plan and the first session asked for a custom report adds a row.
+
+| Column | Type | Constraints | Why |
+|---|---|---|---|
+| `id` | uuid | pk, default `gen_random_uuid()` | It appears in an admin route, which is the split from [`economic_calendar`](economic_calendar.md)'s bigint identity |
+| `digest` | text | not null, check in `daily_liability`, `weekly_loss_ratio_cusum`, `weekly_flag_queue`, `monthly_revenue_cohort` | **The closed set.** `daily_liability` is `P-M6-01`, `P-M6-03` and `P-M6-07`'s reserve coverage ratio, which reads a **live** rail balance ([M05](../../plans/M05-payout-system.md) `SD-M5-03`). `weekly_loss_ratio_cusum` is `P-M6-05` with its sample size and `P-M6-06`. The other two are the flag-queue summary and the monthly revenue and cohort |
+| `cadence` | text | not null, **generated always as** a total `CASE` over `digest`, stored | Cadence is a **property of the digest** rather than a choice, so as an ordinary column a daily liability digest could be scheduled monthly by one careless insert. Generated, the two facts cannot disagree. [`notification_kinds.mutable`](notification_kinds.md) and `rate_limit_exempt` are the idiom |
+| `format` | text | not null, check in `csv`, `pdf` | [FOLD-03](../../plans/FOLD-03-vendor-parity-gap-fill.md) section 5.2. Transcribed onto every attempt as well, because this column is mutable and a historical delivery must not be rewritten by next month's preference |
+| `channel` | text | not null, check in `email`, `sftp` | Email is **MUST**, SFTP push is **SHOULD** and is a second credential surface (`OQ-F3-04`, open). It reuses **no [M02](../../plans/M02-rithmic-bridge.md) code path**: M02's SFTP is a vendor wire format provisional under [ADR-005](../../decisions/ADR-005.md), and coupling them would make a reporting change a provisioning incident |
+| `recipients` | text[] | not null, cardinality >= 1, no NULL, blank or duplicate element | Where it goes, in the channel's own vocabulary: a mailbox for `email`, a configured destination name for `sftp`. **Never a credential**, and there is deliberately no column that could hold one: [ADR-010](../../decisions/ADR-010.md) owns the sensitive set |
+| `enabled` | boolean | not null default true | A schedule is turned off rather than deleted, because a deleted schedule takes its delivery history's referent with it and the alarm's question stops being answerable for every window it ever covered |
+| `created_by` | text | not null, non-blank | `0002_identity`'s `actor` idiom |
+| `created_at`, `updated_at` | timestamptz | not null default now() | |
+
+Indexes: unique `report_schedules_live_uq (digest, channel) WHERE enabled`; `report_schedules_enabled_idx (cadence, digest) WHERE enabled`, the scheduler's read.
+
+Constraints: `report_schedules_has_recipients`; `report_schedules_recipients_wellformed`; `report_schedules_created_by_stated`. The array checks call `report_recipients_are_wellformed(text[])`, an IMMUTABLE function on [`statistic_definitions`](statistic_definitions.md)' `measures_are_distinct` precedent, because a CHECK may not contain a subquery and both duplicate-detection and per-element blankness need one.
+
+**Mutable, deliberately, and it is the one table of the pair that is.** Recipients change and a schedule gets disabled; every such change is an `INV-M6-01` [`admin_actions`](admin_actions.md) row with actor, reason, before and after. Not readable by `merit_analytics`: `recipients` is a list of Merit operators' mailboxes, so the eventual grant is a decision about staff data rather than a formality. Retention: forever.
+
+**One enabled schedule per digest per channel, and that unique index is a control rather than tidiness.** Two enabled schedules for the same digest and channel give the alarm's "did it arrive" question two answers, and they deliver the artifact twice, which is the fastest way to teach an operator to ignore it. A second recipient does not need a second schedule.
+
+**There is no `next_due_at` column and that is deliberate.** A stored next-due is a second source of truth for when a digest is owed, and it drifts the moment a run is late. The cadence plus the calendar answers it, and [`report_deliveries`](report_deliveries.md)`.due_at` records which window an attempt actually discharged.
+
+**Admitting a fifth digest is a two-place edit and the schema makes it one.** Executed against PostgreSQL 16.13: a generated column is computed **before** CHECK constraints, so an unknown `digest` is refused by the NOT NULL on `cadence` and the error names `cadence` for a defect in `digest`. Dropping that NOT NULL and re-inserting shows `report_schedules_digest_check` firing, so both are live and each refuses a widening of the other. [ADR-066](../../decisions/ADR-066.md) section 8's refused report builder cannot arrive one arm at a time.

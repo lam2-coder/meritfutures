@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/STATE_MACHINES.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../legal/README.md, ../testing/golden-scenarios/README.md, ../../research/ADVERSARY_DOSSIER.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M05-payout-system.md, M06-admin-ops-console.md, M07-risk-abuse.md, M08-affiliate-system.md, M14-loyalty-retention.md, M17-offers-engine.md, M19-kyc-identity.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-20
 ---
 
 # M20: Merit Wallet
@@ -68,6 +68,7 @@ The `trader_wallet` ledger position per identity ([M05](M05-payout-system.md) SD
 | INV-M20-12 | **A withdrawal carrying a live halt cannot reach `settled`** | [ADR-040](../decisions/ADR-040.md), enforced by `wallet_withdrawals_live_freeze_blocks_settlement` in [`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql). **`0011` gave this table `frozen_at`, `freeze_flag_id`, `freeze_expires_at` and a freeze-expiry index, and `wallet_withdrawal_status` has never had a frozen value**: the halt was representable and entirely unenforced for four migrations, so a halted withdrawal still matched the open index and nothing refused settlement. Nobody wrote that defect; it arrived by writing half a mechanism and reading the other half as done |
 | INV-M20-13 | **A halt is orthogonal to the rail state and is never collapsed into it** | The halt is `frozen_at` and its two companions on the row, exactly as `payouts_frozen` and `recon_blocked` ride alongside the account machine. A halted withdrawal is still `approved` or `transferring` as far as the rail is concerned, and putting an orthogonal hold in the rail's status column is `SD-M5-06`'s named mistake, where the engine's gates and the rail's gates sharing one column **is** the defect |
 | INV-M20-14 | **A halt expires, and release resumes the rail rather than re-paying** | Same 48 hours and the same hourly sweep as the payout hold. The money is already the trader's, so there is nothing to pay again. `wallet_withdrawals_open_idx` is re-created under the same name and the same predicate so **a halted row stays visible** to the operator and the sweep: a halt that removes the row from the only index anyone scans is a halt nobody can find |
+| INV-M20-15 | **A fee-back credit is `promotional_credit`, and at most one exists per settled payout** | [ADR-070](../decisions/ADR-070.md) section 2 and section 3.6 below. The first half holds **by construction**: the credit posts into a class the withdrawable calculation does not read, so withdrawable-until-earned cannot be violated and no rule has to forbid it. The second half is `promotional_credit_grants_fee_back_settlement_uq` in [`0044`](../../packages/db/migrations/0044_fee_back_and_ladder_unlock.sql), because a settlement that retries is the ordinary shape of this write rather than an exotic one |
 
 ---
 
@@ -81,6 +82,7 @@ M20 consumes [M05](M05-payout-system.md)'s approved SD-M5-06 (`wallet_withdrawal
 | SD-M20-02 | new `wallet_spend_limits` | `identity_id`, `daily_cents`, `rolling_7d_cents`, `reason`, `set_by`, `effective_from` | INV-M20-07 and [SECURITY](../architecture/SECURITY.md) C-23. Per identity rather than global, because the limit that matters is on the compromised session and a global limit either throttles legitimate traders or is set so high it does nothing |
 | SD-M20-03 | `wallet_withdrawals` (extends [M05](M05-payout-system.md) SD-M5-06) | add `source_provenance_summary jsonb`, `earliest_credit_at` | AS-M20-01 and AS-M20-05. A withdrawal needs to know **what it is made of** and **how long that value has been in the wallet**, or the provenance rule and the chargeback-window hold have nothing to evaluate against |
 | SD-M20-04 | new `wallet_dormancy` | `identity_id`, `last_activity_at`, `notified_at[]`, `state check in ('active','dormant','escheat_review')`, `jurisdiction_hint` | INV-M20-09 and AS-M20-07. Unclaimed-property obligations are jurisdictional and real, and the alternative to a state machine is discovering the obligation during an audit |
+| SD-M20-05 | `promotional_credit_grants` (extends [M17](M17-offers-engine.md) SD-M17-03), `plan_versions` | add `source_payout_request_id uuid null` and a **partial unique index over the rows where it is set**; add `plan_versions.fee_back_repeats boolean not null default false`, materialized at publish and **pinned to `false` by a named CHECK** | [ADR-070](../decisions/ADR-070.md) section 2, section 3.6 below. **The credit itself needs no delta at all**: `promotional_credit` is an existing ledger class and its grant table already carries the amount, the expiry, consumption and revocation. What is missing is **which settlement produced a grant**, which no existing source column can say, and the **idempotency** that stops a retried settlement crediting twice. The locked flag is `repeats`, and section 3.6 is why |
 
 ---
 
@@ -194,6 +196,40 @@ stateDiagram-v2
       to Merit. INV-M20-09, AS-M20-07.
     end note
 ```
+
+---
+
+### 3.6 The fee-back credit, and why `repeats` is not a configurable field yet
+
+[ADR-070](../decisions/ADR-070.md) section 2 rules a configurable credit of the evaluation fee, or any amount, to the wallet on the **Nth payout**. It is the cheapest of that ADR's four gaps and this section says why before it says what is new.
+
+**Nothing here is a new ledger concept.** `promotional_credit` is an existing class ([ADR-019](../decisions/ADR-019.md), 0009), deliberately outside the withdrawable set, and `promotional_credit_grants` ([M17](M17-offers-engine.md) SD-M17-03, 0024) is an existing table with an amount, an expiry, consumption, revocation and a funding purchase. **So "withdrawable until earned" holds by construction rather than by rule**: the credit posts into a class the withdrawable calculation does not read, which is INV-M14-10 doing the work and INV-M20-15's first half restating it.
+
+#### The configuration, and the field ADR-070's list does not have
+
+It sits on `plan_versions.rules`, unconstrained in the blob and constrained at publication, per [ADR-070](../decisions/ADR-070.md) section 1.
+
+| Field | Type | Note |
+|---|---|---|
+| `phase_funded.fee_back.enabled` | boolean | **The off state, and the only off state.** Zero is not a configurable amount |
+| `phase_funded.fee_back.trigger_ordinal` | integer >= 1 | `N`. The settled payout ordinal that fires it |
+| `phase_funded.fee_back.amount` | `{ mode: 'fixed_cents', cents > 0 }` or `{ mode: 'evaluation_fee_paid' }` | Under `evaluation_fee_paid` the grant's existing `funding_purchase_id` names the evaluation purchase, which is **the same row a chargeback claws back**, so the column is reused rather than duplicated |
+| `phase_funded.fee_back.repeats` | boolean | **`false` is the only writable value.** See below |
+| `phase_funded.fee_back.expires_after_days` | integer > 0 | **ADR-070 section 2 names three config fields and this is a fourth, found from the schema rather than from the ruling.** `promotional_credit_grants.expires_at` is `NOT NULL` and 0024 states why: "an unexpiring promotional balance is a liability wearing a marketing label, and it is also an escheatment question nobody wants." A fee-back rule cannot post without an expiry term, so the config has to carry one |
+
+**`GS-306` is the off case and it is not the same as the constraint that backs it.** `promotional_credit_grants.amount_cents` already carries `CHECK (amount_cents > 0)`, so a zero-value grant is **unwritable** and a fee-back configured to zero fails loudly instead of writing a journal entry asserting that nothing happened. That is the backstop. `GS-306` requires something stronger, that **nothing posts at all**, which is why zero is `enabled: false` rather than an amount: the rule must not fire, and the CHECK is what catches the day somebody configures zero anyway.
+
+#### `repeats` ships locked, and the lock is a constraint rather than a convention
+
+**`AS-M20-01`'s counter #5 is the control that bounds every other credit source**, in its own words: "the promotional budget is capped per identity and per resolved entity, which is [M17](M17-offers-engine.md)'s issuance discipline, and it is the upstream control that makes this bounded regardless of the conversion rate."
+
+**A fee-back credit is issued by a payout, by the plan version, and not through M17's issuance path.** So it is outside that cap. With `repeats: true` the five steps of AS-M20-01 close into a loop that funds itself: credit buys an evaluation, the evaluation reaches funded, the payout issues credit. Under [M05](M05-payout-system.md) `INV-M5-01`'s zero denial that is a liability with no ceiling and no owner, and [M14](M14-loyalty-retention.md) `AS-M14-02` already records that a hedged pair earns the streak side of the same machine by construction.
+
+> **So `plan_versions.fee_back_repeats` is materialized at publish and pinned to `false` by `plan_versions_fee_back_repeats_locked`. `true` is unwritable.**
+
+**The lock is stated as a constraint on purpose.** Recording this as an open question alone would leave a config field that can be set to `true` before anybody has ruled on it, and a control that depends on nobody flipping a writable flag is not one. Dropping a named CHECK is a migration with a date and an author; setting a boolean is neither.
+
+**`OQ-M20-06` asks when it may be unlocked, not whether it should have been locked.**
 
 ---
 
@@ -461,6 +497,12 @@ M20 supplies the float panel on [M6](M06-admin-ops-console.md): total float, its
 **OQ-M20-04 (as asked). What is the dormancy policy, and has escheatment been mapped?** AS-M20-07 establishes that forfeiture is unacceptable and indefinite holding is non-compliant. Proposed: **contact escalation starting at 12 months of inactivity, escheatment tracked per jurisdiction, published policy stating Merit never keeps a balance.** The mapping is a legal task and the trigger dates vary by state, so it needs to be on the calendar rather than in someone's memory.
 
 **OQ-M20-05. Should wallet spend on evaluations be encouraged at all?** There is a strategic question underneath this module that nobody has asked: a wallet that traders spend back into evaluations is a closed-loop currency with excellent unit economics and a slightly uncomfortable story, because the firm's revenue then partly comes from recycling its own payouts. Merit's transparency position may be better served by making withdrawal the obvious default and spend the convenience, rather than the reverse. Proposed: **no discount, no incentive, and no nudge toward wallet spend**, ever, and the withdrawal path is at least as prominent as the spend path in [M04](M04-trader-portal.md) SC-M4-10. Recommendation is to record this as a design principle now, because the incentive to erode it will arrive with the first slow month.
+
+**OQ-M20-06. When may `phase_funded.fee_back.repeats` be unlocked, and what has to be true first?** [ADR-070](../decisions/ADR-070.md) section 2 lists `repeats` as one of three configuration fields and rules nothing about it. Section 3.6 above is why it ships pinned to `false` by a named CHECK rather than as a writable boolean: a fee-back credit is issued **by a payout, by the plan version**, outside [M17](M17-offers-engine.md)'s per-identity issuance cap, which `AS-M20-01`'s counter #5 names as the control that bounds every other credit source. A repeating fee-back therefore closes that scenario's chain into a loop that funds itself, under zero denial, with no ceiling.
+
+**This question is deliberately narrow.** It does **not** ask whether the lock was right; the lock is the conservative reading of a control M20 already relies on, and it costs a plan shape nobody has asked to sell. It asks **what would have to be demonstrably true for the lock to come off**, and the proposed answer is one thing: **M17's issuance cap counts plan-version-issued credits against the same per-identity and per-resolved-entity budget as offer-issued ones.** Until then a repeating fee-back is credit issuance with no issuer.
+
+**M17 is not this session's to change**, so the requirement is stated here and the mechanism belongs to whoever next opens that module. Note also that `AS-M20-01`'s residual applies unchanged: the honest trader who converts a promotional evaluation into a payout should, and this lock does not touch them, because a **single** fee-back on the Nth payout is bounded by the ladder that `INV-17` already caps.
 
 ---
 
