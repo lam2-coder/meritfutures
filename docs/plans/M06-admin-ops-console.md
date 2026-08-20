@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, FOLD-02-enforcement-window-and-suspension.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-20
 ---
 
 # M6: Admin and Ops Console
@@ -61,7 +61,7 @@ That last clause drives more design here than any technical requirement. A contr
 
 ## 2. Entities and schema deltas
 
-M6 consumes [DATA_MODEL sections 8, 9, and 10](../architecture/data-model/README.md) as approved. Six deltas, each from a failure mode below. **`SD-M6-06` is the exception to "below": its failure mode is [M07](M07-risk-abuse.md) `FM-M7-08` rather than one of this module's, because the dataset is owned here and consumed there.**
+M6 consumes [DATA_MODEL sections 8, 9, and 10](../architecture/data-model/README.md) as approved. Seven deltas, each from a failure mode below. **`SD-M6-06` is the exception to "below": its failure mode is [M07](M07-risk-abuse.md) `FM-M7-08` rather than one of this module's, because the dataset is owned here and consumed there.** **`SD-M6-07` is the second exception and for the opposite reason: its failure mode is this module's and is not in section 6 either**, because a digest that stops arriving is a failure of the console's *delivery* rather than of any panel it renders, and section 6 was closed before there was anything to deliver.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -71,6 +71,7 @@ M6 consumes [DATA_MODEL sections 8, 9, and 10](../architecture/data-model/README
 | SD-M6-04 | `evidence_packs` | add `audience text not null check in ('internal','trader','counsel','regulator')`, `redaction_profile text not null`, `includes_detector_detail boolean not null` | AS-M6-01. A pack given to a trader in a dispute is a channel that discloses detector thresholds to the adversary who triggered them. The audience must be a declared, audited property of the export rather than a judgment made in the moment |
 | SD-M6-05 | new `dual_control_approvals` | `id`, `subject_kind`, `subject_id`, `requested_by`, `requested_at`, `payload_hash`, `approved_by null`, `approved_at null`, `expires_at`, `status check in ('pending','approved','expired','withdrawn')` | [ADR-010](../decisions/ADR-010.md) requires a second approval within a window. That needs a row: without one, "dual control" is two clicks by the same session and the control is theatre, which Appendix D explicitly warns is worse than nothing because it reads as a control in an audit |
 | SD-M6-06 | new `economic_calendar` and `economic_calendar_loads` | `economic_calendar`: `id`, `load_id`, `event_key`, `occurrence_key`, `tier smallint check between 1 and 3`, `scheduled_release_at timestamptz`, `release_trading_day date`, `revision integer`, `revision_reason null`, unique `(event_key, occurrence_key, revision)`, plus the view `economic_calendar_current`. `economic_calendar_loads`: `id`, `source_id`, `coverage_start_day`, `coverage_end_day`, `source_digest`, `actor`. Both append-only by grant | **It is not new scope.** [M07](M07-risk-abuse.md) `DEP-M7-06` has read "a maintained Tier-1 economic calendar, as data \| **M6 admin, seed** \| D-04 fires on the wrong windows" since M07 was written, and **no table satisfied it**, so `D-04` news-window clustering has been unimplementable for the whole life of the corpus. The dataset is owned here because `DEP-M7-06` assigns it here. The **revision** is load bearing: a release time moves and `D-04`'s window must move with it, so it is a new row rather than an update ([ADR-066](../decisions/ADR-066.md) section 2, GS-286). The **loads** table is `FM-M7-08`'s staleness clock on `trading_calendar_loads`' precedent, and without it an exhausted calendar is indistinguishable from a quiet week |
+| SD-M6-07 | new `report_schedules` and `report_deliveries` | `report_schedules`: `id`, `digest text` **check in a closed set of four**, `cadence` **generated from `digest`**, `format check in ('csv','pdf')`, `channel check in ('email','sftp')`, `recipients text[]` non-empty, `enabled`, `created_by`. `report_deliveries`: `schedule_id`, `due_at`, `attempt`, `covers_through_trading_day`, the transcribed `channel` and `format`, `recipients_attempted`, `recipients_omitted`, `omission_reason`, `outcome check in ('delivered','failed')`, `failure_reason`, `attempted_at`, `delivered_at`, `artifact_digest bytea`. The delivery table is append-only by grant; the schedule table is not | **The C8 weekly risk ritual's input is currently a human remembering to look.** Section 3.6. The `digest` CHECK is what makes "this is not a report builder" a schema fact rather than a sentence in [ADR-066](../decisions/ADR-066.md), and `report_deliveries` is the load-bearing half: **the delivery-failure alarm reads it and never the job's own report**, which is [M05](M05-payout-system.md) `INV-M5-18`'s construction on a second sweep. Without `due_at` the alarm has nothing to fire on, because absence is only detectable against an expectation |
 | SD-M6-09 | new `account_adjustments` | `id`, `identity_id not null`, `account_id null`, `direction check in ('credit','debit')`, `amount_cents > 0` as a **magnitude** with `direction` carrying the sign, `reason_code check in ('goodwill','reconciliation_error','promotional_credit')`, `reason_note not null` and non-empty, `destination check in ('trader_wallet','promotional_credit')`, `ledger_transaction_id not null unique`, `promotional_credit_grant_id null`, `reverses_adjustment_id null`, `actor not null`, `dual_control_threshold_cents not null`, `dual_control_approval_id null`, `evidence_pack_id null`. Append-only by grant. Constraints: `reason_picks_destination`, `promotional_names_its_grant`, `debit_is_a_reversal`, `no_self_reversal`, `dual_control_above_threshold`, a partial unique index allowing **at most one reversal per adjustment**, and three assertions (`ADJ-C1`, `ADJ-C2`, `ADJ-C3`) | [ADR-067](../decisions/ADR-067.md), [`0038`](../../packages/db/migrations/0038_account_adjustments.sql). **It is the first admin route in this corpus that moves money to a named person and the first table that permits taking money back**, so every property of it is a constraint rather than a policy. **Never a balance mutation:** an adjustment posts a ledger transaction or it does not exist, and `ADJ-C2` goes past what `identity_restriction_restore_is_complete` can do by reading the posting and asserting it **is** the adjustment, to the account, the identity, the cent and the sign. **The destination is never `trader_withdrawable`**, because [`gates.ts:78`](../../packages/rules-engine/src/payout/gates.ts) computes withdrawable from the trading balance, so a ledger credit there would buy no eligibility and only make the ledger disagree with the engine. **A debit is only ever the exact reversal of a credit this table posted**, which is what keeps it clear of `INV-M6-03`. **Two console requirements ride on this row** rather than on invariant numbers this session did not claim ([ADR-067](../decisions/ADR-067.md) section 10): the adjustment surface **renders `identities.status`**, because an adjustment against a `restricted` or `closed` identity is permitted and must therefore not be invisible; and the live Open Liability figure in section 3.5 carries a **third term, same-day adjustment postings at par**, which is authoritative rather than indicative and so does not weaken `INV-M6-12` |
 
 ---
@@ -172,6 +173,64 @@ Sensitive set, per [ADR-010](../decisions/ADR-010.md): payout cap, split, cadenc
 - **It is visually distinct from every authoritative figure on the page**, and it sits beside the as-of figure rather than replacing it. Two numbers, both labeled, is the entire design.
 
 **And P-M6-09 governs it like everything else.** When data trust is red the live figure is suppressed rather than shown, because a live number derived from a feed we already distrust is worse than no number: it is the confident wrong answer AS-M6-04 is about, arriving faster.
+
+### 3.6 Scheduled digest delivery ([ADR-066](../decisions/ADR-066.md), SD-M6-07)
+
+**The panels above are read by a founder who remembers to open them.** Constitution section 7 requires a weekly risk ritual and [WEEKLY_RISK_RITUAL](../ops/runbooks/WEEKLY_RISK_RITUAL.md) is the checklist, but **its input has until now been attention**. A control that exists and does not arrive is a control that enforces nothing, and this module already said so about itself: section 9's alert list calls the weekly digest of active suppressions "the single most useful recurring artifact this module produces" and **specifies no mechanism anywhere for delivering it**.
+
+**This is not a scheduler over a report builder, and [ADR-066](../decisions/ADR-066.md) section 8 refuses one.** The parity referral asked for recurring delivery of "the reporting layer's saved views"; a grep for `saved view` and `reporting layer` across `docs/plans/` and `docs/architecture/` returns nothing, so admitting the item as written would mean designing a reporting layer inside a parity gap-fill. What is admitted is **four named digests over panels this section already defines**.
+
+#### The four, and the panels each is made of
+
+| Digest | Cadence | Built from | Size |
+|---|---|---|---|
+| **Liability** | daily | P-M6-01 Open Liability, P-M6-03 Eligible-Next-7-Days, and **P-M6-07's reserve coverage ratio, which reads a live rail balance** ([M05](M05-payout-system.md) `SD-M5-03`) | **MUST** |
+| **Plan loss ratios and CUSUM** | weekly | P-M6-05 with its sample size beside it (INV-M6-07) and P-M6-06 | **MUST** |
+| **Flag queue summary** | weekly | The queue's depth and age by severity, section 9's `admin.flags_open` | SHOULD |
+| **Revenue and cohort** | monthly | Section 3.1's commercial figures and the completed-ladder cohort | SHOULD |
+
+**The two MUSTs earn it from the ritual rather than from the report.** They are the C8 ritual's input, so a schedule that silently stops is a weekly risk review that silently stops. The other two are useful and nothing depends on them, which is exactly the distinction [DELIVERY_PLAN](../DELIVERY_PLAN.md) sizes on.
+
+**Cadence is not a per-schedule choice.** It is generated from the digest in the schema, so a daily liability digest cannot be scheduled monthly by a careless write. And **the digest vocabulary is closed at four by a CHECK**: admitting a fifth is a migration, which is a ruling, which is what stops the refused report builder arriving one custom report at a time.
+
+#### The alarm fires on the delivery record, never on the job
+
+**This is [M05](M05-payout-system.md) `INV-M5-18`'s idiom, deliberately reused rather than reinvented.** That invariant is asserted *"on the QUERY, never on the job"*, evaluated independently of whether the sweep reported success, on the stated ground that **a job that reports success is not evidence that the work happened** ([M02](M02-rithmic-bridge.md) `FM-M2-11`). A second sweep with the same shape gets the same control.
+
+- **The alarm reads [`report_deliveries`](../architecture/data-model/report_deliveries.md)**: an enabled schedule whose window has closed with no `delivered` row is the finding. The dead-man switch is in [CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md), on the same footing as the freeze-expiry assertion.
+- **`due_at` is what makes that askable at all.** Absence is only detectable against an expectation, so the window an attempt discharges is stored on the attempt. Without it, "nothing arrived" and "not due yet" are the same empty result set, which is [`economic_calendar_loads`](../architecture/data-model/economic_calendar_loads.md)'s coverage bound one table over.
+- **There is deliberately no `skipped` outcome.** Two values, `delivered` and `failed`. A skip that can be *recorded* as an outcome is a skip that reads as normal in a list of outcomes, and the acceptance is that a failed delivery alarms and **never silently skips**. A run that declines to send writes `failed` with its reason, or it writes nothing and the missing row is the finding. Both roads reach a human.
+- **The delivery log is append-only by grant.** An `UPDATE`-able outcome makes the alarm's own evidence editable by the process the alarm exists to distrust.
+
+**These belong in section 9's metric table and are placed here instead**, because three sibling sessions are editing this document under [ADR-066](../decisions/ADR-066.md) at the same time and an appended subsection collides with nothing while an edited shared table collides with everything. The metrics are `admin.report_deliveries_failed` and, the one that matters, **`admin.report_windows_undelivered`, which is zero, always, and is computed from the table rather than from the job's report.**
+
+#### Channels, and the one that is a second credential surface
+
+**Email is the MUST channel. SFTP push is admitted as SHOULD.** `OQ-F3-04` stands and the founder closes it at signature: SFTP is a **second credential surface**, which makes "is email alone acceptable for v1" a security question rather than a convenience one.
+
+**It reuses no [M02](M02-rithmic-bridge.md) code path, and this is a boundary rather than a preference.** M02's SFTP is a **vendor wire format** held provisional under [ADR-005](../decisions/ADR-005.md) pending the Rithmic call. Coupling them would make a change to a report a **provisioning incident**, which is the wrong blast radius by two modules. Mechanically, [`0040`](../../packages/db/migrations/0040_report_schedules.sql) references no M02 object and stores no credential: `recipients` names a destination, and [ADR-010](../decisions/ADR-010.md) already owns the sensitive credential set.
+
+#### INV-M6-10 is not weakened, and the schema is where that is enforced
+
+**No digest is a bulk identity export.** The liability digest is aggregate. The flag-queue digest carries **counts and links, never trader-identifying rows**, which keeps it inside INV-M6-10's rule that trader-identifying data renders only when the query names a specific subject.
+
+**The delivery table holds no artifact, only its SHA-256.** A table of rendered digest bodies **would be** the bulk export, sitting behind an admin route, created by the feature that was admitted on the promise that it was not one. The hash answers "was what arrived what we generated" and answers nothing about any trader.
+
+#### Tying it to the ritual, in the runbook rather than by implication
+
+**[WEEKLY_RISK_RITUAL](../ops/runbooks/WEEKLY_RISK_RITUAL.md) now names the digest as its input**, and the ritual's first action is to check that the digest arrived. That sentence is the whole point of the feature: the ritual and the artifact were specified in different documents, months apart, and neither said the other existed.
+
+#### Golden scenarios
+
+**GS-288, GS-289 and GS-290 are already registered** in [GOLDEN_SCENARIOS section 36](../testing/golden-scenarios/36-gs-285-to-gs-299-the-vendor-parity-gap-fill.md) and are **not renumbered here**. GS-288 pins the alarm firing from the delivery record while the job reports success. GS-289 pins the aggregate digest satisfying INV-M6-10. **GS-290 is the one whose mechanism is easiest to under-build**: a schedule naming a removed recipient degrades to the remaining recipients **and records the removal**, so an omission with no stated reason is unwritable and, more sharply, **a delivery that reached nobody cannot be recorded as `delivered` at all**. Full degradation to zero recipients is not a degraded success; it is a failure that has learned to look like one.
+
+#### Two things recorded rather than quietly decided
+
+**The weekly suppression digest is NOT one of the four, and it is the artifact section 9 calls the most useful one this module produces.** It is derivable from `alarm_suppressions` and this mechanism could carry it tomorrow. **It is not scheduled here** because [ADR-066](../decisions/ADR-066.md) sized a set of four and a fifth digest is a ruling rather than a session's judgment, which is the same closed-vocabulary discipline the `digest` CHECK enforces on everybody else. It is named so the next reader finds the gap rather than assuming the mechanism forgot it.
+
+**OQ-M6-04 asked whether the founder wants a daily digest or only alarms**, and recommended "yes, daily, one screen, and it is the first thing built in this module, because the habit is the control". [ADR-066](../decisions/ADR-066.md) sizes the daily liability digest **MUST**, which answers the delivery half of that question and leaves the "one screen" half and the "only alarms" alternative to the founder. **The question is not marked ruled here**, because a session closing a founder question on its own authority is the failure the ADR discipline exists against.
+
+**And this subsection took the number `3.6` while three sibling sessions were writing this document.** If it collides at merge, the remedy is section 3.3a's and [DELTA_MANIFEST](../../packages/db/DELTA_MANIFEST.md) section 4b's: a letter suffix, which inserts a section without disturbing what cites the next number.
 
 ---
 
@@ -319,6 +378,63 @@ GS-117.
 | Every view is logged as an access to the underlying identities | An investigator browsing the graph is reading personal data across many people |
 
 **The failure this prevents is [AS-M6-01](#)'s, one layer up.** A cluster view that renders thresholds next to a trader-facing export is a single screenshot that gives away the whole detection posture. The audience scoping is not a feature of the pack; it is a property of the surface.
+
+## 7.10 The standing duplicate-signal views
+
+[ADR-066](../decisions/ADR-066.md) section 4, [FOLD-03](FOLD-03-vendor-parity-gap-fill.md) section 5.3. **Six standing views, sized SHOULD.** They are placed beside the explorer because that is where every row of them jumps to, and they answer the question an operator asks before opening a graph: **which shared thing is worth opening a graph about.**
+
+**Nothing here is a detector and nothing here is new.** Every signal these views read has been in the tree since [`0002`](../../packages/db/migrations/0002_identity.sql), and the two that arrived later arrived with their own rulings. **The views compute no confidence**, hold no threshold, and write no row. What they add is a standing query and an ordering; [M07](M07-risk-abuse.md) records in one sentence that no detector is duplicated.
+
+### The six, with what each one actually reads
+
+| View | The read | Grouped on |
+|---|---|---|
+| **Shared IP** | `identity_signals` where `kind = 'ip'`, with `kind = 'asn'` rendered beside it rather than merged into it | `value_hash`. The ASN is the weaker neighbour of the same observation and merging the two would make a datacenter range look like an address |
+| **Shared device fingerprint** | `identity_signals` where `kind = 'device'` | `value_hash` |
+| **Shared payment fingerprint** | `identity_signals` where `kind = 'payment'` | `value_hash`, which is the BIN plus last four **hashed**. `value_preview` is what the operator sees, and [`0002`](../../packages/db/migrations/0002_identity.sql)'s own example of it is `visa ****4242`: deliberately not enough to reconstruct the value it previews |
+| **Shared phone or carrier** | `identity_signals` where `kind` is `'phone'` or `'phone_carrier'` (`U-07`), against `identity_phones` (`SD-M19-05`) for the carrier metadata `D-18` captures | `value_hash`, and **the two kinds are separate views on one screen rather than one view**, because [`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql) states the weights differ: `phone` is the high-weight node [ADR-039](../decisions/ADR-039.md) turns on, and `phone_carrier` alone is a country rather than a fleet |
+| **Shared KYC match** | `identity_signals` where `kind = 'kyc_identity'` | `value_hash` |
+| **Shared payout destination** | `payout_transfers.destination_ref` **and** `wallet_withdrawals.destination_ref` | `destination_ref`. **This is the one view that is not a signal at all**, and the paragraph below is why |
+
+**The payout-destination view reads two tables and neither of them is `identity_signals`, which is the one thing in this section a reader should not take on trust.** The approved signal model at [M07](M07-risk-abuse.md):84 ends *"settlement-rail identity"*, and that is `identity_signals.kind = 'rise_identity'`: **who the rail says the payee is.** `D-09` destination concentration reads something different, [M07](M07-risk-abuse.md):116's *"one `destination_ref` receiving payouts from more than one unrelated identity"*, which is **where the money actually went**. They are not the same fact and a view that substituted one for the other would quietly answer the other question. **Both legs are read because [ADR-028](../decisions/ADR-028.md) split them**: `transferring` left `payout_requests` and the external leg lives on `wallet_withdrawals` (`SD-M5-06`), so a view reading `payout_transfers` alone would show a clean board while a destination collected wallet withdrawals from four identities. That is `D-09`'s own stated case, *"the strongest mule detector available"*, going blind on the leg [ADR-019](../decisions/ADR-019.md) created.
+
+### The row, and the number it is sorted on
+
+**Each row shows the signal, the linked identities, the account count, the aggregate open liability, and a jump to section 7.9.**
+
+**The default sort is aggregate open liability, descending, and it is [ADR-066](../decisions/ADR-066.md)'s ruling rather than a preference.** [M07](M07-risk-abuse.md):94 says *"A shared IP is a coffee shop; a shared device is a household; a shared card is a family. None of them is a person."* **A view sorted by signal count therefore puts the coffee shop first and teaches the operator to spend the morning on it.** Sorting by liability is the whole difference between a risk tool and a curiosity, and **GS-291** asserts it: a shared IP across three identities ranks **below** a shared payment fingerprint across two carrying more liability.
+
+**The liability figure is `P-M6-01`'s and no other, which needs saying because three numbers on this module's own home page could plausibly fill the column.**
+
+| Constraint | Why it binds here specifically |
+|---|---|
+| **It includes wallet balances** | `INV-M6-11`. A sort key that excluded them would rank a group holding its money in the wallet below a group holding the same money in an account, which is liability blindness reintroduced by the sort order rather than by the panel |
+| **It is the authoritative as-of-last-closed figure, never section 3.5's live one** | `INV-M6-12`. A live figure in this column makes the **ordering** of a risk surface a function of an intraday vendor feed, and [ADR-020](../decisions/ADR-020.md)'s hard rule is that the live number decides nothing automatically. A sort is a decision about what the operator looks at first |
+| **The column names its as-of and its source** | `INV-M6-04`, on every number this module renders |
+| **It is suppressed when `P-M6-09` is red rather than shown** | The rows still render; the liability column and therefore the sort do not. A ranking computed from data we have said we do not trust is `AS-M6-04` with the ordering attached |
+| **Identities are counted once per row** | An identity holding four accounts contributes its liability once and its accounts four times, and the two columns are read by the same operator in the same glance |
+
+### The tiers, and the distinction that makes summing safe
+
+**A soft link renders as a soft link, aggregates no cap, and changes nothing the trader may buy.** [M07](M07-risk-abuse.md):94: *"Only a hard merge changes what a trader may buy."* **GS-292** pins it.
+
+**Summing liability across a soft-linked group is not cap aggregation, and conflating the two is the mistake this paragraph exists to refuse.** [M07](M07-risk-abuse.md) section 3.1 says caps do not aggregate across a soft link, which is a statement about **what a trader is entitled to buy**. The column here adds up **what Merit already owes** the identities in the row, which is true whether or not they are one person and is arithmetic rather than a finding. **A view that read "caps do not aggregate" as "do not add these numbers up" would have no sort key at all**, and a view that read the sum as a merged cap would enforce a merge nobody decided. The row is evidence of exposure; only the merge is a decision.
+
+| The view must | Because |
+|---|---|
+| **Render the tier**, taking it from `identity_links.confidence_bp` and the hard-link ceiling and **never deriving one** | [ADR-022](../decisions/ADR-022.md) made the graph scored and `D-16` owns the score. A second place that computes confidence is a second answer to the same question |
+| **Exclude suppressed edges from the aggregate and keep them visible as history** | `SD-M7-04`, `INV-M7-09`. [`0002`](../../packages/db/migrations/0002_identity.sql) is explicit that a suppressed edge *"stays visible as history and stops contributing to enforcement"*, and a sort key is where an unsuppressed-in-effect edge would come back to life unnoticed |
+| **Trigger no state change of any kind** | These are read surfaces. Enforcement entry points are section 3.3a's and section 7.9's, both of which require a typed reason, a cited flag and an evidence pack |
+
+### Access, and the entry point that cannot be the only one
+
+**`INV-M6-10` holds and is not weakened.** Naming a signal and listing the identities that share it **is a specific-subject query**: the subject is the signal. **The list of signals is not a list of humans**, no view offers an all-identities browse, and there is no export affordance on any of the six. **Every view is logged as an access to the underlying identities**, in section 7.9's terms and for section 7.9's reason.
+
+**The jump to section 7.9 is a convenience and not the way in**, which is [ADR-041](../decisions/ADR-041.md)'s argument applied one surface over. [ADR-022](../decisions/ADR-022.md) tiers the explorer to **v1.x** and these views are sized **SHOULD**, so a row whose only destination was the explorer would be a surface that does nothing at all until a post-launch module lands. **Every row therefore also opens the identity drill-down at section 3.2a**, which is a v1 surface, and the explorer jump arrives with the explorer.
+
+**No schema delta is claimed by this section and none is needed**, which was the finding before it was the outcome: all six views read tables that exist. **The reservation this session held in this module's delta sequence is released unspent, and it is released by position rather than by name** for the reason [M07](M07-risk-abuse.md) section 2 already records: `ADR-026`'s completeness gate reads any `SD-` identifier under `docs/` as a claim, so writing the number in order to decline it creates the claim the sentence is refusing to make.
+
+**GS-291 and GS-292 are cited here and section 8.2 is not edited.** They are already registered and already owned by this module in the golden-scenario ownership index, which is what `CI-06d` reads; section 8.2's table is being appended to by a concurrent session in this same fold, and a second writer in one table is how a merge eats a row.
 
 ## 8. Test plan
 

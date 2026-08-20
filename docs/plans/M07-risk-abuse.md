@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../../research/ADVERSARY_DOSSIER.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M06-admin-ops-console.md, M20-wallet.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, FOLD-02-enforcement-window-and-suspension.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-20
 ---
 
 # M7: Risk and Abuse
@@ -92,6 +92,8 @@ Signals, per the approved model: normalized email, device fingerprint, IP and AS
 | **Soft link** | An edge with a confidence. Caps do **not** aggregate. Surfaces in the graph and feeds detectors | Shared device, shared payment fingerprint, shared normalized email, shared IP or ASN, and D-15's and D-18's footprint signals |
 
 **Only a hard merge changes what a trader may buy.** A shared IP is a coffee shop; a shared device is a household; a shared card is a family. None of them is a person, and treating them as one is AS-M7-04. What a soft link does is make the cluster **visible**, and visibility is what the detectors and the admin need.
+
+**[M06](M06-admin-ops-console.md) section 7.10's six standing duplicate-signal views are views over these signals and these tiers ([ADR-066](../decisions/ADR-066.md) section 4), duplicating no detector in section 3.2 and computing no confidence of their own.**
 
 **The middle tier is not a hedge, and it is worth saying why it earns its own row rather than being filed under one of its neighbours.** A verified phone is genuinely stronger than a soft link: real mobile numbers are scarce where emails are free to mint, which is the whole premise of ADR-039, so the edge deserves the hard ceiling. It is genuinely weaker than a merge: **carriers reassign numbers**, so the same edge that catches a fleet operator also catches whoever legitimately inherits their number ninety days later ([M19](M19-kyc-identity.md) AS-M19-09). Filing it under **soft link** would waste the strongest cheap identity signal available. Filing it under **hard merge** would aggregate an innocent person's caps on a carrier's administrative decision. **The third tier is what a signal looks like when it is strong evidence about a number and weak evidence about a human**, and `identity_phones`' deliberately non-unique `phone_hash` index is that distinction expressed in DDL.
 
