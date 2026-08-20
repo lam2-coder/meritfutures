@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md]
-last_updated: 2026-08-19
+last_updated: 2026-08-20
 ---
 
 # M5: Payout System
@@ -99,6 +99,7 @@ There is no approval step in either list because there is no approver. That abse
 | INV-M5-16 | An identity-scoped ledger halt pages immediately and carries an escalation clock to global | [ADR-016](../decisions/ADR-016.md) as accepted. Without the clock, scoping the halt creates a slower version of AS-M5-05 in which one attributable imbalance buys an indefinitely unexamined corner of the ledger |
 | INV-M5-21 | **A held request has posted nothing.** No ledger transaction, no wallet credit, no anchor advance, no win-day reset | The ledger is the discriminator between `held_pending_review` and `frozen` ([ADR-040](../decisions/ADR-040.md)), and it is what makes release mean two different acts: **approve and pay** on a hold, **let settlement proceed** on a freeze. Enforcement on a hold reverses nothing because nothing was posted; enforcement on a freeze needs LT-03 |
 | INV-M5-22 | **A withdrawal carrying a live freeze cannot settle** | `wallet_withdrawals_live_freeze_blocks_settlement` ([`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql)). SD-M5-09, and it closes a gap this module shipped: `0011` gave the table its freeze clock and `wallet_withdrawal_status` never gained a frozen value, so **the halt was representable and unenforced** |
+| INV-M5-23 | **A refusal on the impersonation boundary is never expressed as a gate result.** An impersonation session's payout request is refused at authorization, **before** `G-ELIGIBLE` is evaluated: no eligibility snapshot is taken, no `payout_requests` row is written, and **no `payout.blocked` is emitted** | [ADR-068](../decisions/ADR-068.md) requirement 1, `GS-300`, section 3.6. [STATE_MACHINES](../architecture/STATE_MACHINES.md) section 2 rules that a request failing `G-ELIGIBLE` returns the **gate breakdown** and emits `payout.blocked`, which is the trader's own eligibility answer and reaches the trader's timeline. **An impersonation session is not a trader who was ineligible**, so modelling the refusal as a failing gate would write a false eligibility story onto a real account and emit an event asserting something untrue about a human who did nothing. The two refusals are the same status code and different records, and the record is the part that survives into an evidence pack |
 
 ---
 
@@ -287,6 +288,30 @@ stateDiagram-v2
 ### 3.5 The external leg's halt, which is enforcement rather than a state
 
 **The asymmetry is deliberate and is stated so it does not read as an oversight.** On `payout_requests` the hold **replaces** approval and is mutually exclusive with every other status, so it is a status. On `wallet_withdrawals` the halt is **orthogonal** to the rail state: a halted withdrawal is still `approved` or `transferring` as far as Rise is concerned. So SD-M5-09 gives the external leg **a CHECK and a visible row rather than a state**, on the same 48 hour clock and the same hourly sweep. **Release resumes the rail; it does not re-pay**, because the money is already the trader's.
+
+---
+
+### 3.6 What an impersonation session meets on this module's routes (ADR-068)
+
+**M5 owns two of [ADR-068](../decisions/ADR-068.md)'s seven blocked routes and the site of its one tripwire.** This section writes the refusals and rules none of them: [ADR-068](../decisions/ADR-068.md) is the authority, [`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql) is the session-type boundary, and the identifiers `M6-N-01`, `M6-N-03` and `M6-N-04` are claimed in [M06](M06-admin-ops-console.md) section 8.1a.
+
+| Route | Refused by | What this module adds |
+|---|---|---|
+| `POST /accounts/:accountId/payout` | **explicit** (`M6-N-01`, `GS-300`) | The refusal's **placement**, below, and INV-M5-23 |
+| `POST /wallet/withdrawals` | **`C-27`, inherited** (`M6-N-03`) | **Nothing**, and saying so is the point |
+| payout-destination change | **`C-27`, inherited** (`M6-N-04`) | **No route exists.** The tripwire's future owner, below |
+
+**The payout refusal is an authorization decision and not a twelfth gate, which is INV-M5-23 and is the only substantive thing this module contributes.** [STATE_MACHINES](../architecture/STATE_MACHINES.md) section 2 is explicit that a request failing `G-ELIGIBLE` *"is still never created: the API returns the gate breakdown and emits `payout.blocked`"*. That path is built for a trader who did not qualify, and every artefact on it says so: an eligibility snapshot, a gate breakdown the trader can read, and an event that lands on the account timeline. **An impersonation session is not a trader who did not qualify.** Routing its refusal down that path would put a false eligibility story on a real account, emit `payout.blocked` about a human who did nothing, and leave both in the record that [M06](M06-admin-ops-console.md)'s evidence pack later exports as fact. **The refusal is the same `403` either way and a completely different record, and the record is the half that survives.**
+
+**Where it sits in the ordered behavior.** Before section 1.1's first step, beside the authentication check rather than inside the evaluation. **Nothing about the account is read**, because reading it is the act being refused.
+
+**`POST /wallet/withdrawals` gets no new enforcement here, deliberately.** [SECURITY:45](../architecture/SECURITY.md) `C-27` already refuses an external withdrawal from any session that cannot elevate, and **an impersonation session can never elevate**: `C-27`'s elevation columns are `sessions.elevated_at` and `sessions.elevated_by_factor` ([`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql)), and [`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql) carries **neither, nor a `user_id` nor an `auth_factor`**. There is no column an elevation could be written to, so the refusal is a fact about the schema rather than a rule somebody must remember. **Writing a second refusal here would state that this module enforces what `C-27` already enforces**, and the reading a later engineer takes from two controls covering one route is that one of them is redundant ([ADR-068](../decisions/ADR-068.md) section 1). `C-27` is not the copy: it is what protects a SIM-swapped **trader** session, which has nothing to do with impersonation.
+
+**The corollary runs the other way and belongs beside the refusal rather than in the ADR.** If a later change ever gives an impersonation session a way to elevate, **this refusal disappears silently** and no assertion in this module fails, because nothing here asserts it. `M6-N-03` exists to pin the **outcome** for that reason.
+
+**`M6-N-04` is a tripwire, and this is the document its future owner will be reading.** `grep destination` over [API_CONTRACT](../architecture/API_CONTRACT.md) returns three hits and **none of them is a route**: two are the OTP challenge's `destination` field and the third is section 12's `D5` row naming the capability under `C-27`. **The capability is enumerated in the negative-authz matrix and the route that would perform it is unwritten.** Merit's destination handling lives on this module's rail (`C-11`'s 48 hour cooling, `C-12`'s name match, `payout_transfers.destination_name_match`), so **when that route is written it will be written here or in [M19](M19-kyc-identity.md)**, and whoever writes it owns converting `M6-N-04` from a conditional into a live test. **That sentence is the deliverable**, and it is placed here because an inventory showing seven blocked routes and seven tests, one of which asserts against a `404`, reads as coverage and is not.
+
+**The alert `GS-300` requires is not raised here, and it has one home rather than four.** `GS-300` reads *"rejected server side, **and alerted**"*, and the same refusal occurs on this module's routes, on [M19](M19-kyc-identity.md)'s and on [M20](M20-wallet.md)'s. **One alarm written into four module plans is four alarms that drift**, which is the defect this corpus names more often than any other, so it is [SECURITY](../architecture/SECURITY.md) `C-20`'s list and is not a row in section 9.2.
 
 ---
 

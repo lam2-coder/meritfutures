@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../architecture/data-model/README.md, ../design/DESIGN_SYSTEM.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M03-billing-checkout.md, M19-kyc-identity.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-20
 ---
 
 # M4: Trader Portal
@@ -54,6 +54,7 @@ The portal is where Merit's product promise either lands or does not. Everything
 | INV-M4-14 | A sensitive action the current session is not elevated for renders **disabled**, carrying C-27's reason and the route to elevate, in the same component | [ADR-039](../decisions/ADR-039.md) amendment 4. Enforced the way INV-M4-02 and INV-M4-11 are enforced: a sensitive-action component takes a required `required_factor` prop and a required `session_elevation` prop, and one that renders the control without both does not compile. **The boundary is shown, never hit.** Section 3.7 |
 | INV-M4-15 | The portal never computes whether a session is elevated, and the disabled state is a convenience rather than a control | The server declares the required factor per endpoint and reports the session's own factor and elevation; the portal renders both and decides nothing. Asserted by the negative-authz suite, which calls every sensitive endpoint from a **single-factor session that the client rendered as disabled** and requires the refusal to come from the server anyway. This is INV-M4-06 and section 1.2's "not rendering a link is a convenience, never a control" applied to the one new boundary, and it is stated separately because it fails differently: INV-M4-14 fails at compile time and INV-M4-15 fails in a test |
 | INV-M4-16 | The economic calendar panel's source is `economic_calendar` and no external origin. No embed, iframe, or third-party calendar widget renders anywhere in the portal | [ADR-066](../decisions/ADR-066.md) section 2, and it is **the only mechanical form of "one source of truth for when was the news"**. The panel reads Merit's row through `economic_calendar_current`, the same view [M07](M07-risk-abuse.md) `D-04` reads, so a revised release time moves both or neither. An embed cannot carry a revision, cannot be staleness-monitored and cannot be joined to `fills`, so one rendered beside the panel would satisfy the display and satisfy none of `DEP-M7-06`, `D-04` or `FM-M7-08`. Section 3.8, GS-285 |
+| INV-M4-17 | **An impersonation session renders the trader's screen, and the only permitted divergences are the persistent banner and the disabled state on the routes [ADR-068](../decisions/ADR-068.md) blocks** | Section 3.9. The banner is app-shell chrome with **no dismiss control in the component's API**, so it cannot be closed rather than being hard to close; the disabled state is INV-M4-15's convenience and never the control, and `GS-300` calls each blocked route directly for that reason. **A third divergence is a defect.** The reason this session type exists is that Merit deleted the credential, so there is no "what do you see on your screen" that survives a trader who cannot describe a screen ([ADR-068](../decisions/ADR-068.md) section 0), and **a support tool that renders a different page has stopped answering the question it was built for**. Stated as an invariant because the pressure runs one way: every later "while we are in here, show the operator one more thing" is individually reasonable and collectively the end of the tool |
 
 ---
 
@@ -202,6 +203,45 @@ The wallet is where the trader's money sits between earning it and withdrawing i
 **A stale calendar is stated rather than hidden, and this is INV-M4-12's rule applied to a second surface.** Section 3.6 already refuses to let a live number silently freeze, because a frozen number looks exactly like a quiet market. **An empty calendar panel looks exactly like a quiet week**, and it is the same failure: the trader reads "nothing scheduled" and trades into a release. So when the calendar is past its staleness threshold the panel says so, in the same render, rather than showing an empty list it cannot stand behind. `GS-287` pins the detector half of the same moment.
 
 **What the panel deliberately does not do.** It does not tell the trader that trading a news window is prohibited, because it is not: `D-04` detects a **pattern across many events** and [M07](M07-risk-abuse.md):109 is explicit that "one trade around a release is a normal trading day". A panel that implied otherwise would be a rule the corpus does not contain, rendered in the client, which is `INV-M4-08`'s failure in a new place.
+
+---
+
+### 3.9 The impersonation banner, and why the trader never sees it (ADR-068)
+
+[ADR-068](../decisions/ADR-068.md) requirement 4 says a **persistent** banner for the whole session, and requirement 7 says the trader is **not** told an impersonation session happened. Read as two rules about one screen those contradict each other. **The resolution is not a rule anybody has to remember.** The trader authentication path resolves a bearer token on `sessions.refresh_token_hash` ([`0002_identity.sql:342`](../../packages/db/migrations/0002_identity.sql)), and `IMPERSONATION-C1` in [`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql) refuses that row **in both directions**, so an impersonation token can never be the token a trader's own session carries. **The banner renders inside the impersonation session and there is no other session it could reach**, which makes non-disclosure a consequence of the session-type boundary rather than a portal responsibility.
+
+**This module writes the surface and rules none of it.** [ADR-068](../decisions/ADR-068.md) rules the properties, [`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql) enforces the box, and the four explicit refusals are server-side authorization decisions in [M05](M05-payout-system.md), [M19](M19-kyc-identity.md) and [M20](M20-wallet.md). **No component named here refuses anything.**
+
+**What "not a dismissible toast" means mechanically**, stated because "persistent" is a word a builder can satisfy with a toast that comes back:
+
+| Property | What it means here |
+|---|---|
+| **It occupies layout** | A reserved band in the app shell, never an overlay. Nothing stacks over it, nothing scrolls it away, and no `z-index` accident can lose it |
+| **It has no dismiss control** | The component takes no `dismissible` prop and no `onDismiss`. **The absence of the prop is the control**, in the idiom INV-M4-02 and INV-M4-11 already use. A disabled close button is a close button somebody re-enables |
+| **It renders on every screen** | Shell chrome, so it is on all of section 3.1's screens **and on every error, empty and loading state**. A banner absent from the error page is absent exactly when an operator is somewhere unexpected |
+| **It survives reload and deep link** | It renders from the session the server resolved, never from client state. A banner held in memory is gone on the first hard refresh, which is the ordinary way an operator works |
+| **It is not a screen** | **No `SC-M4-nn` is claimed**, on section 3.8's precedent: chrome across every screen is not a new one, and section 3.1's table does not move |
+
+**What it says.** Every field is a column on `impersonation_sessions` ([`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql)) rather than a string the portal composes:
+
+| Field | Column | Why it is on the banner |
+|---|---|---|
+| That this is an impersonation session | the session type itself | An operator's read of this screen is otherwise indistinguishable from the trader's, which is both the point of the tool and the risk of it |
+| The admin actor | `admin_user_id` | An operator on a shared machine or a second window has to see whose session this is without leaving the page |
+| The subject | `subject_identity_id` | The wrong subject is the mistake this banner exists to surface in one second rather than in one page |
+| The reason | `reason_code` and `reason_detail` | Requirement 5. The vocabulary is closed and the detail is `NOT NULL` and non-blank, so there is always something true to render |
+| The expiry | `expires_at` | Below, and it is the one field this module argues for rather than transcribes |
+| An explicit exit | writes `ended_at`, `ended_by` and `end_reason` | [FOLD-04](FOLD-04-impersonation-and-admin-parity.md) section 4.1 requires an explicit exit that is its own audited event, so it is a control **on the banner** and not a closed browser tab |
+
+**The expiry is rendered, and section 3.7 refuses to render exactly this kind of clock, so the divergence is argued rather than assumed.** Section 3.7 keeps the elevation window off the screen because **a visible countdown is a prompt to hurry and hurrying is the attacker's ally**, and its audience is a trader under pressure. **This clock has the opposite audience and the opposite meaning.** It is a **box** rather than a window of opportunity, its subject is the operator rather than the target, and `GS-301` is the failure that hiding it produces: a session that reaches expiry mid-view, whose next request is refused, on a page that still looks live. **An operator surprised by an expiry re-initiates**, which writes a second `impersonation_sessions` row with a second reason for one piece of work, and a support practice that routinely re-initiates is the practice that eventually asks for [ADR-068](../decisions/ADR-068.md) section 5's two hour ceiling to be raised. **Showing the box is what keeps the box from being argued with.**
+
+**The clock is displayed and is never authoritative.** The banner renders `expires_at` as the server declared it. The refusal at expiry is the server's, and `IMPERSONATION-C2` makes a page view outside the session's box **unwritable**, so a request served late fails at the moment it tries to record itself rather than succeeding quietly. **A client that believes the session is live is not evidence that it is**, which is INV-M4-15's sentence applied to a clock instead of to an elevation.
+
+**The blocked controls render disabled, and that is the second deliberate divergence from the trader's screen.** [ADR-068](../decisions/ADR-068.md) requirement 1 is **server-side rejection, never UI hiding**, and `GS-300` calls the route directly for that reason. The disabled state is rendered anyway, for section 3.7's reason one audience over: an operator who discovers the boundary by hitting it has learned that this surface offers actions its API refuses, and that lesson does not stay inside one session. **The refusal is the server's and the disabled state changes no authorization**, which is INV-M4-15 unchanged and not a second reading of it.
+
+**Two divergences is the whole permitted list, and that is INV-M4-17.** The operator sees the trader's screen **plus one band and minus the affordances for the routes [ADR-068](../decisions/ADR-068.md) blocks**, and nothing else. A third divergence is a defect rather than a feature, because [ADR-068](../decisions/ADR-068.md) section 0 says why this session type exists at all: Merit is passwordless, there is no credential to walk a trader through, and impersonation is what is left of "what do you see on your screen". **A tool that renders a different screen has stopped answering that question.**
+
+**What the banner is not, in one line, because the two failure modes must not be closed on the same side.** Its absence is a **disclosure defect and never an authorization defect**. A refusal that stopped working is not repaired by rendering a banner, and a banner that stopped rendering does not make a refusal fail. It is also **not** a disclosure to the trader and **not** a substitute for the audit trail: requirement 6's record is `impersonation_page_views`, which stores the **route template and never the resolved path** ([`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql)), because that table is read by people reviewing an operator's conduct rather than by people who need the trader's account id a second time.
 
 ---
 

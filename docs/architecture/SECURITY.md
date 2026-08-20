@@ -1,7 +1,7 @@
 ---
 status: approved
-depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, API_CONTRACT.md, data-model/README.md, STATE_MACHINES.md, ../../research/SECURITY_LANDSCAPE.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, ../plans/FOLD-02-enforcement-window-and-suspension.md]
-last_updated: 2026-08-16
+depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, API_CONTRACT.md, data-model/README.md, STATE_MACHINES.md, ../../research/SECURITY_LANDSCAPE.md, ../../research/VIBE_FAILURE_POSTMORTEMS.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, ../decisions/ADR-068.md, ../plans/FOLD-02-enforcement-window-and-suspension.md]
+last_updated: 2026-08-20
 ---
 
 # Security Architecture (Constitution Appendix D, instantiated)
@@ -35,7 +35,7 @@ Controls carry stable IDs so plans, tests, and code comments can cite them.
 | C-17 | Structured logs with PII and token redaction; audit trail separated from debug logs | INFRA |
 | C-18 | Named negative-authz test per endpoint per resource, in CI | [API_CONTRACT §12](API_CONTRACT.md#12-negative-authz-test-matrix-d5-required-in-ci) |
 | C-19 | Canary tokens in the database and repository as tripwires | INFRA |
-| C-20 | Alerting on admin login, failed-auth bursts, payout-config changes, role grants, SFTP failures, out-of-hours admin actions | INFRA |
+| C-20 | Alerting on admin login, failed-auth bursts, payout-config changes, role grants, SFTP failures, out-of-hours admin actions, **impersonation session initiation, and every refusal on the impersonation boundary** | INFRA. **The last two are [ADR-068](../decisions/ADR-068.md) and `GS-300`**, which requires an impersonation session's payout attempt to be *"rejected server side, **and alerted**"*. The same refusal occurs on four modules' routes, so it is one alarm here rather than four rows drifting apart in four module plans. §3.1 |
 | C-21 | Server-authoritative pricing, eligibility, and clamping; the client can only ever reduce a payout | checkout, payout endpoints |
 | C-22 | OpenAPI and docs endpoints return 404 in production; `/internal/*` only on the admin origin | API |
 | C-23 | **Wallet-spend velocity limits** per identity, with excess delayed rather than refused | wallet-funded checkout ([M03](../plans/M03-billing-checkout.md) section 3.4), §4.7 |
@@ -157,6 +157,39 @@ The [D0 checklist](../../research/SECURITY_LANDSCAPE.md) mapped onto the real en
 | `POST /admin/plans/*` | config tampering | C-08, C-10, publish immutability trigger, C-20 |
 | `POST /internal/batch/run`, `GET /internal/*` | API9 | C-08, C-22, guarded and idempotent |
 | `GET /health` | information disclosure | minimal payload, no version or dependency detail |
+
+### 3.1 The impersonation session's refusal map (ADR-068)
+
+[ADR-068](../decisions/ADR-068.md) admits a **read-only, money-blind, time-boxed, reasoned, audited and undisclosed** session type, distinct from a trader session by a database constraint in [`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql). Seven routes are refused to it. **Four of those refusals are new and three are `C-27` doing work it was already doing**, and the split is recorded in this document because this is where a reader checks. A reader who finds seven refusals in impersonation-specific code and `C-27` implemented separately has found what looks like a redundant control, and **the reading they take from two controls covering one route is that one of them can be deleted.**
+
+| Route | Test | Refused by | Where the surface is specified |
+|---|---|---|---|
+| `POST /accounts/:accountId/payout` | `M6-N-01` | **explicit** | [M05](../plans/M05-payout-system.md) §3.6, `GS-300` |
+| `POST /checkout` with `payment_method = wallet` | `M6-N-02` | **explicit** | [M20](../plans/M20-wallet.md) §3.7 |
+| `POST /wallet/withdrawals` | `M6-N-03` | **C-27**, inherited | [M05](../plans/M05-payout-system.md) §3.6, [M20](../plans/M20-wallet.md) §3.7 |
+| A payout-destination change | `M6-N-04` | **C-27**, inherited | **No route exists.** A tripwire, [M05](../plans/M05-payout-system.md) §3.6 |
+| `POST /phone/change` and `POST /me/contact-channels` | `M6-N-05` | **C-27**, inherited | [M19](../plans/M19-kyc-identity.md) §3.5 |
+| `POST /checkout`, the purchase itself | `M6-N-06` | **explicit** | [M03](../plans/M03-billing-checkout.md). **Owed**, and named as owed in [M20](../plans/M20-wallet.md) §3.7 |
+| `POST /kyc/session` and `POST /kyc/reverify` | `M6-N-07` | **explicit** | [M19](../plans/M19-kyc-identity.md) §3.5 |
+| An impersonation token replayed as a trader token | `M6-N-08` | `IMPERSONATION-C1` | [`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql), `GS-303` |
+
+**Why C-27 refuses three of them with no new machinery.** C-27 requires **a passkey assertion or a dual-channel confirmation** for a payout-destination change, a contact change of either kind, or an external withdrawal, and that elevation is performed **as the trader**. [ADR-068](../decisions/ADR-068.md) requirement 2 is that an impersonation session **never inherits or intercepts the trader's OTP or passkey**, so it has neither and can obtain neither. **The schema says the same thing more strongly than the ruling does:** C-27's elevation columns are `sessions.auth_factor`, `sessions.elevated_at` and `sessions.elevated_by_factor` ([`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql), `SD-M4-04`), and [`0042`](../../packages/db/migrations/0042_impersonation_sessions.sql) carries **none of them, and no `user_id` either**. **There is no column an elevation could be written to**, so "it cannot elevate" is a fact about the tables rather than a rule somebody has to remember.
+
+**The redundancy is deliberate and neither half is the copy.** C-27 protects a **SIM-swapped trader session**, which has nothing to do with impersonation: its own sentence is that such a session *"can see everything and change nothing"*. The impersonation refusals protect against an operator. **Two controls that happen to cover one route are not one control written twice**, and this paragraph exists so that the next reader who notices the overlap does not resolve it by deleting a control.
+
+**The corollary runs the other way and is the reason three outcome tests exist.** If a later change ever gives an impersonation session a way to elevate, **three refusals disappear silently**, and no impersonation-specific assertion fails, because the three inherited ones were never asserted against impersonation-specific code. `M6-N-03`, `M6-N-04` and `M6-N-05` assert the **outcome** for exactly that reason, so the outcome stays pinned whichever control produces it.
+
+**The rows this map owes to the D5 matrix, and the vocabulary that cannot express them yet.** C-18 places the negative-authz matrix at [API_CONTRACT §12](API_CONTRACT.md#12-negative-authz-test-matrix-d5-required-in-ci), and `CI-06k` reads its **Required factor** column against a **closed** vocabulary: `none`, `session`, `passkey`, `dual_channel`, `passkey or dual_channel`, `admin_sso`. **No token in that list is true of an impersonation refusal**, and the failure is not cosmetic:
+
+- **`passkey or dual_channel` would assert that an elevation reaches the route.** It does not and cannot, per the paragraph above, so the cell would be **false in the direction that reads as coverage**, which is the "control that exists and enforces nothing" class this corpus keeps finding.
+- **`session` would assert it is an ordinary read surface**, which is what these routes are not.
+- **`admin_sso` is the operator surface**, and an impersonation session is initiated **from** that surface rather than being one.
+
+**The honest cell is a token that does not exist**, and it is proposed here as **`never`**: no factor reaches this route from this session type, at all, ever. **It is proposed and not claimed.** [API_CONTRACT](API_CONTRACT.md) is not in this session's fence, and adding a token to a closed vocabulary changes **what `CI-06k` accepts**, which is a gate change rather than a transcription. So the eight rows above are **owed to [API_CONTRACT §12](API_CONTRACT.md)**, [FOLD-04](../plans/FOLD-04-impersonation-and-admin-parity.md)'s own definition of done requires them there, and this map is where their content is settled in the meantime.
+
+**This map deliberately names no route for initiating or ending an impersonation session.** None is written in [API_CONTRACT](API_CONTRACT.md); the surface is [M06](../plans/M06-admin-ops-console.md)'s and is not in this fence. **Inventing an endpoint name inside a security document is how a control comes to be written against an endpoint nobody built.** What is ruled without needing one: initiation is an `owner` and `ops` capability and **never `readonly`** ([ADR-068](../decisions/ADR-068.md) §2 against [API_CONTRACT](API_CONTRACT.md)'s closed role list, because initiating a session that appears to its subject as themselves is an **action**); it happens only from `ADMIN_ORIGIN` under hardware-key SSO (C-08, [ADR-012](../decisions/ADR-012.md)); and initiation and refusal both alert under C-20.
+
+**No `M6-N-nn` identifier is claimed by this fold's surfaces, and the count is zero rather than unstated.** [M06](../plans/M06-admin-ops-console.md) section 8.1a claims `M6-N-01` to `M6-N-08` and says the router enumeration continues from `M6-N-09`. **Those eight already cover all seven blocked routes and the replay negative**, so the surfaces specified in [M04](../plans/M04-trader-portal.md), [M05](../plans/M05-payout-system.md), [M19](../plans/M19-kyc-identity.md) and [M20](../plans/M20-wallet.md) produce no new one. The only unclaimed rows this capability implies are the **RBAC rows for the initiation and exit routes across the three roles**, and those are router-enumerated rows in [M06](../plans/M06-admin-ops-console.md), which is not in this fence. **An ordinal claimed outside the registry that records it is precisely the collision section 8.1a exists to prevent.**
 
 ## 4. Payout-path hardening (D4 in detail)
 
