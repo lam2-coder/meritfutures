@@ -150,4 +150,5 @@ and within a number by the order the sections appear in the file.
 | [2026-08-20 - Session 100](2026-08-20-session-100.md) | `ADR-071`: `M21` admitted as the first new module after FREEZE, with the Monte Carlo harness named as a dependency that does not exist |
 | [2026-08-20 - Session 105](2026-08-20-session-105.md) | the WAVE-03 merge: eight pull requests landed, the register down from 106 keys across 8 files to 59 across 1, and two findings the merge produced that no branch could see |
 | [2026-08-20 - Session 98](2026-08-20-session-98.md) | the plan-config completeness audit: 47 parameters, 3 first-class, 11 materialized, 29 versioned-unconstrained, 4 absent. The referral's taxonomy was missing the state that holds 11 of them, and the exemplary table has one column with no constraint at all |
+| [2026-08-20 - Session 84](2026-08-20-session-84.md) | `CI-06w`: the allocation registries read as multisets, `OI-11` closed, and a count that was doing two jobs |
 | [2026-08-20 - Session 83](2026-08-20-session-83.md) | CI-06v: no orphan table fragment, and the gate inventory was its own first finding |
