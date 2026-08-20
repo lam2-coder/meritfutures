@@ -8,11 +8,11 @@ last_updated: 2026-08-16
 
 **The completeness gate reads this file.** [ADR-026](../../docs/decisions/ADR-026.md) requires that every `SD-nn` and `U-nn` appearing anywhere in `docs/` appears **exactly once** here with a disposition. A count nobody can drift is better than a count someone remembers to update.
 
-<!--gen:manifest_changes-->107<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+<!--gen:manifest_changes-->110<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
 
 **The count moved from 93 to 94 by founder ruling (2026-08-14).** `U-06` is the sixth unnumbered change, found while folding. [ADR-026](../../docs/decisions/ADR-026.md)'s table of five did not carry it. See section 5.
 
-**It moved from 94 to <!--gen:manifest_changes-->107<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+**It moved from 94 to <!--gen:manifest_changes-->110<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
@@ -214,6 +214,20 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 **`0039` is not in section 1's table**, on [`0032`](migrations/0032_trading_calendar_holidays_coverage_revisions.sql)'s precedent: that table records what the fold created and is closed at 27, and a later migration that creates tables gets its own section instead. `0039` creates two tables and one view, supersedes nothing, and edits no merged file.
 
 **One thing found while writing it, recorded rather than left for the next reader.** [`packages/db/test/migrations.integration.test.ts`](test/migrations.integration.test.ts) asserted the on-disk migration sequence is `1..n` contiguous, under a comment claiming `CI-06h` "asserts the same thing" and that the local copy was "the weaker half". **Both halves of that claim were false.** It was not weaker, it was **stricter in the one direction [ADR-036](../../docs/decisions/ADR-036.md) rules out**: gaplessness is asserted over allocated **plus reserved**, "so a branch holding a reservation shows a hole and passes". `0038` is reserved for the money-path adjustment migration and is sequenced **last** in FOLD-03, so any branch writing `0039` first has a legal reserved hole and the old assertion failed on it. The property is not lost, it is deferred to `CI-06h` by name; re-implementing the allocation parser in vitest would be `OQ-P1-04`'s defect, which the parser's own header names as the thing not to do.
+
+## 4c. FOLD-05: [ADR-071](../../docs/decisions/ADR-071.md) and `M21`, 3 numbered deltas
+
+**Session `P4` of [FOLD-05](../../docs/plans/FOLD-05-plan-config-and-designer.md), which writes [M21](../../docs/plans/M21-plan-designer.md), the first module admitted after FREEZE.** The identifiers are allocated by these rows existing, on section 4a's rule: only ADR numbers and migration numbers have an allocation table, and a delta identifier is claimed by its manifest row.
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| SD-M21-01 | new `simulation_runs` | the persisted simulation run and its provenance: the `rules` and sizes digests the run was over, the calibration identity, digest and observation date, the harness and engine versions, the seed, the sample size, and the sweep columns that make one arm of a sensitivity sweep an individually traceable run. **Digests rather than a `plan_version_id` alone**, because a run is over a draft and a draft is mutable | 0045 | **reserved** |
+| SD-M21-02 | `plan_versions` | add `decided_on_simulation_run_id`, `simulation_waiver_reason`, and a `CHECK` that a published row carries **exactly one** of them. `AS-M21-01`'s structural remedy: the run is where the number is produced and the publish record is where the consequence lands, so tracing has to reach the second, and "no simulation was run" has to be a recorded decision rather than a null | 0045 | **reserved** |
+| SD-M21-03 | new `competitor_plan_models` | the modelled competitor configurations requirement (c) compares against, each carrying `observed_on` and a source reference, superseded by a new row rather than updated. A side-by-side against an undated competitor config is the stale-calibration failure in a second costume | **unallocated** | **reserved** |
+
+**`0045` was reserved CONTINGENT and [M21](../../docs/plans/M21-plan-designer.md) section 2.1 is what spends it.** [ALLOCATION](../../docs/decisions/ALLOCATION.md)'s row made the reservation conditional on the plan naming a persisted run, on the reasoning that a console recomputing on demand and storing nothing needs no table. The plan names one, and the argument it makes is that the other three adversarial scenarios are answered by showing the reader something while the stale-calibration one is not: staleness has no tell at the moment of the decision, so the only remedy that survives an inattentive reader is a record.
+
+**`SD-M21-03` deliberately claims no migration number.** It is not `M21`'s simulation-run record, and folding it into `0045` would stretch a reservation whose text names something else. The number is claimed in [ALLOCATION](../../docs/decisions/ALLOCATION.md) by whichever session writes the migration, and [M21](../../docs/plans/M21-plan-designer.md) `OQ-M21-06` carries it.
 
 ## 5. The seven unnumbered changes
 
