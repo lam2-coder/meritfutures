@@ -3835,10 +3835,6 @@ const CI06U_REGISTER = new Map([
   // and it is the one register entry here that may legitimately grow before it
   // shrinks.
 
-  // Three plan documents rowed twice by the INDEX merge. M05's two rows give it
-  // two different purposes: "bounded freeze, reset" and "the 48 hour
-  // enforcement window". The registry that decides whether a thing exists.
-  ['docs/INDEX.md', ['m03-billing-checkout.md', 'm04-trader-portal.md', 'm05-payout-system.md']],
   // The P1-item table, recorded as OI-10. Its two `CI-06, corpus integrity`
   // rows say `21` checks and `Eleven` checks.
   [
@@ -3855,57 +3851,15 @@ const CI06U_REGISTER = new Map([
       'vg-1 to vg-12',
     ],
   ],
-  // THE MONEY-PATH ONE. The guard table defines ten guards twice, and
-  // `G-ELIGIBLE`'s two definitions disagree about the identity clause while
-  // both cite ADR-041. Which one is the ruling is not a parse's question.
-  [
-    'docs/architecture/STATE_MACHINES.md',
-    [
-      'g-clamp',
-      'g-eligible',
-      'g-enforcement-restrict',
-      'g-freeze-cleared / g-freeze-enforced',
-      'g-freeze-during-flight',
-      'g-hold-enforced',
-      'g-hold-released',
-      'g-hold-required',
-      'g-no-in-flight',
-      'g-restriction-lifted',
-    ],
-  ],
-  // All three allocation tables, the ADR numbers, the migration numbers and the
-  // letters. `r` is NOT here: the file argues that duplicate deliberately and
-  // the two rows are byte-identical but for one link, so the dedupe reached it.
-  // These fifteen carry a reservation row and a merged row for one number,
-  // which is exactly the State column ADR-034 deleted, growing back as rows.
-  [
-    'docs/decisions/ALLOCATION.md',
-    [
-      '0033',
-      '0034',
-      '039',
-      '040',
-      '041',
-      '042',
-      '043',
-      '044',
-      '045',
-      '046',
-      '050',
-      '054',
-      '055',
-      '057',
-      '059',
-      'k',
-      'l',
-      'm',
-    ],
-  ],
-  // `INV-M5-17`, `INV-M5-18` and `INV-M5-19` each state TWO ENTIRELY DIFFERENT
-  // invariants. An invariant id that means two things cannot be cited.
-  ['docs/plans/M05-payout-system.md', ['inv-m5-01', 'inv-m5-17', 'inv-m5-18', 'inv-m5-19']],
-  ['docs/plans/M12-statistic-definitions.md', ['s-14', 's-15']],
-  ['docs/plans/M20-wallet.md', ['inv-m20-06']],
+  // THE MONEY-PATH TEN ARE REPAIRED AND THIS ENTRY IS GONE, WHICH IS THE
+  // DIRECTION THIS REGISTER DECAYS IN. Session 78 read all ten pairs against
+  // primary sources: FOUR were contradictions and SIX were copies. The four are
+  // ruled in ADR-062 (`G-ELIGIBLE` reads `identities.status = 'active'`,
+  // `G-FREEZE-CLEARED` keeps its expiry disjunct, `G-HOLD-REQUIRED` keeps the
+  // severity 4+ band, `G-ENFORCEMENT-RESTRICT` requires the investigating-to-
+  // enforced path); the six landed as ADR-061 repairs, each keeping one half
+  // verbatim. The register loses the file ENTIRELY in the same commit as the
+  // repair, so the assertion below now speaks for seven files and not eight.
   // THE WHOLE SESSION INDEX, TWICE. Lines 120 onward re-list sessions 1 to 74
   // under a second header row, and the first copy stops at session 62. Written
   // out rather than expressed as a range: a range is a rule, and a rule that

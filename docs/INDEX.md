@@ -10,7 +10,7 @@ last_updated: 2026-08-18
 
 **Every document is `approved` except [M02](plans/M02-rithmic-bridge.md)**, held at `review` by [ADR-005](decisions/ADR-005.md) pending the Rithmic vendor call. `CLAUDE.md` and `README.md` are living operational files and carry no gate status.
 
-**<!--gen:adr_count-->61<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](decisions/ADR-034.md)).
+**<!--gen:adr_count-->65<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios.** Changing a frozen document requires an ADR, not a commit. **These three numbers are generated spans under [CI-06g](testing/STRATEGY.md)**, rewritten from the registries rather than maintained by hand, because every hand-maintained count in this corpus that has been checked has been found wrong ([ADR-034](decisions/ADR-034.md)).
 
 Every doc in the corpus, one line each. **If a thing is not in this file, it does not exist.** Regenerated whenever any doc is added or changes status. Status values: `draft | review | approved | frozen`. Owner is who moves the doc to its next status (claude drafts; founder approves gates).
 
@@ -78,9 +78,6 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [M02-rithmic-bridge.md](plans/M02-rithmic-bridge.md) | Provisioning, ingest, reconciliation, simulator, streaming path, the provisional revocation and restoration leg, and the vendor-confirmation agenda whose count is its own table. Held at `review` by [ADR-005](decisions/ADR-005.md) | review | founder |
 | [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method, the registration lookup as a second call site and the two cost lines a signup drives, and the restriction refusal that closes the card leg the wallet leg already refused | approved | founder |
 | [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, the C-27 authority boundary shown rather than hit, Appendix F gate | approved | founder |
-| [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, bounded freeze, reserve | approved | founder |
-| [M03-billing-checkout.md](plans/M03-billing-checkout.md) | PSP abstraction, coupons, resets, chargebacks, MID failover, wallet as a payment method | approved | founder |
-| [M04-trader-portal.md](plans/M04-trader-portal.md) | Dashboard, payout center, wallet screen, indicative live layer, certificates, Appendix F gate | approved | founder |
 | [M05-payout-system.md](plans/M05-payout-system.md) | Two-leg payouts, ledger, the 48 hour enforcement window (pre-approval hold and bounded freeze), reserve | approved | founder |
 | [M06-admin-ops-console.md](plans/M06-admin-ops-console.md) | Liability dashboard, CUSUM, breakers, two-tier evidence packs, dual control, the identity drill-down, restriction and restore as launch-available actions, and the fourth unsuppressible alarm | approved | founder |
 | [M07-risk-abuse.md](plans/M07-risk-abuse.md) | Entity resolution, three link tiers, eighteen detectors, copy-trading clause, flags queue, canaries | approved | founder |

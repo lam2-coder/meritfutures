@@ -235,6 +235,94 @@ function nextFreeLetter(dir) {
 // The CI-06 letters the runner implements, read from the tree COPY's gates.mjs
 // rather than from ROOT's, on the same reasoning as `nextFree`: the copy is what
 // the gate will read.
+/**
+ * The first `(file, key)` the copy's own `CI06U_REGISTER` claims is a known
+ * duplicate, read out of `gates.mjs` rather than named here.
+ *
+ * IT WAS NAMED HERE AND THE NAMING BROKE, which is why it derives now. The seed
+ * below hardcoded `inv-m20-06` in `M20-wallet.md`; `ADR-063`'s session repaired
+ * that duplicate and removed the register entry, and this case went
+ * `DID NOT FAIL` on a tree where the gate was working perfectly. **A seed that
+ * names a defect the corpus is allowed to repair has an expiry date nobody
+ * records**, which is `CI-06m`'s seed's stated reason for deriving its target
+ * and `CI-06l`'s lesson before it.
+ *
+ * The register shrinks every time one of these is repaired, so this returns the
+ * FIRST remaining entry and throws when there are none. An empty register is
+ * the day this whole case stops being expressible, and it should say so loudly
+ * rather than pass.
+ */
+function firstRegisteredDuplicate(dir) {
+  const body = readFileSync(join(dir, 'scripts/corpus/gates.mjs'), 'utf8');
+  const start = body.indexOf('CI06U_REGISTER');
+  if (start === -1) throw new Error('seed anchor not found: no CI06U_REGISTER in gates.mjs');
+
+  // Every `(file, key)` the register claims, in order.
+  const claims = [];
+  for (const entry of body.slice(start).matchAll(/\[\s*'([^']+\.md)',\s*\[([^\]]*)\]/g)) {
+    for (const k of entry[2].matchAll(/'([^']+)'/g)) claims.push({ file: entry[1], key: k[1] });
+  }
+
+  // THE FIRST CLAIM WHOSE ROWS THIS SEED CAN ACTUALLY FIND, and the loop is the
+  // point rather than a fallback. The gate normalises a first cell before
+  // comparing it, so a registered key can be a link target (`m03-billing-
+  // checkout.md`) that no row spells literally. Reimplementing that
+  // normalisation here would be a SECOND EXPRESSION OF ONE CONCEPT, which is
+  // the defect ADR-036 exists against, so this matches loosely and then
+  // requires TWO rows before touching anything. A loose match that plants the
+  // wrong row still fails the case, because `expect` pins the key the finding
+  // must name.
+  for (const claim of claims) {
+    const rows = rowsCarrying(dir, claim.file, claim.key);
+    if (rows.length >= 2) return { ...claim, at: rows[rows.length - 1] };
+  }
+  throw new Error(
+    'seed anchor not found: no CI06U_REGISTER claim resolves to two rows under one key. ' +
+      'Either every registered duplicate has been repaired, which is the goal and means ' +
+      'this case is no longer expressible, or the register has drifted from the files it ' +
+      'names. Delete this case and say which, rather than leaving a seed that cannot fire',
+  );
+}
+
+/**
+ * The claim the seed repaired, read back off the SEEDED tree.
+ *
+ * `expect` and `seed` are resolved against DIFFERENT TREES and this case
+ * reported `FAILED OFF-TARGET` until they were made complementary: both called
+ * `firstRegisteredDuplicate`, and on the seeded copy the row was already gone,
+ * so `expect` skipped past the repaired claim to the next one and demanded a
+ * finding about a file the seed never touched. That is the `CI-06p` seed's
+ * recorded lesson, which its own comment states as "`expect` is resolved
+ * against the SEEDED tree".
+ *
+ * Every registered claim carries two or more rows on a clean tree, or the gate
+ * would already be reporting it. So after the seed exactly one carries fewer,
+ * and that one is the repair.
+ */
+function repairedRegisteredDuplicate(dir) {
+  const body = readFileSync(join(dir, 'scripts/corpus/gates.mjs'), 'utf8');
+  const start = body.indexOf('CI06U_REGISTER');
+  for (const entry of body.slice(start).matchAll(/\[\s*'([^']+\.md)',\s*\[([^\]]*)\]/g)) {
+    for (const k of entry[2].matchAll(/'([^']+)'/g)) {
+      if (rowsCarrying(dir, entry[1], k[1]).length < 2) return { file: entry[1], key: k[1] };
+    }
+  }
+  throw new Error('seed anchor not found: no registered claim was repaired on the seeded tree');
+}
+
+/** Line indices whose first table cell mentions `key`, case-insensitively. */
+function rowsCarrying(dir, file, key) {
+  const lines = readFileSync(join(dir, file), 'utf8').split('\n');
+  const needle = key.toLowerCase();
+  const out = [];
+  lines.forEach((line, i) => {
+    if (!line.startsWith('|')) return;
+    const first = (line.split('|')[1] ?? '').toLowerCase();
+    if (first.includes(needle)) out.push(i);
+  });
+  return out;
+}
+
 function implementedLettersIn(dir) {
   const body = readFileSync(join(dir, 'scripts/corpus/gates.mjs'), 'utf8');
   const out = [...body.matchAll(/id:\s*'CI-06([a-z])'/g)].map((m) => m[1]).sort();
@@ -624,9 +712,9 @@ const SEEDS = {
   'CI-06o': {
     what: 'a model SDK imported by a file on the money path',
     real:
-      'ADR-044 section 8 specified this prohibition and then said it was prose: a rule '
-      + 'that says no model on the money path and is enforced by people remembering it is '
-      + 'a control that exists, stays valid, and enforces nothing',
+      'ADR-044 section 8 specified this prohibition and then said it was prose: a rule ' +
+      'that says no model on the money path and is enforced by people remembering it is ' +
+      'a control that exists, stays valid, and enforces nothing',
     // THE SEEDED FILE IS NEW RATHER THAN AN EDIT TO AN EXISTING ONE, so the seed
     // cannot go stale when the file it would have edited is renamed, and so the
     // violation is the whole of what the file contains.
@@ -634,8 +722,8 @@ const SEEDS = {
     seed: (d) =>
       writeFileSync(
         join(d, 'packages/rules-engine/src/narrate.ts'),
-        'import Anthropic from \'@anthropic-ai/sdk\';\n'
-          + 'export const explain = async (why: string) => new Anthropic().messages.create({ why });\n',
+        "import Anthropic from '@anthropic-ai/sdk';\n" +
+          'export const explain = async (why: string) => new Anthropic().messages.create({ why });\n',
       ),
   },
   'CI-06q': {
@@ -1774,15 +1862,20 @@ const SCOPE_CASES = [
     // assertion those 105 lines survive every repair and the gate ends up
     // asserting nothing about eight of the files it reads.
     //
-    // It seeds the REPAIR, not the damage: `M20-wallet.md` carries two
-    // `INV-M20-06` rows saying different things, one of them goes, and the gate
-    // must now object to its own register rather than say nothing.
-    expect: 'the register claims "inv-m20-06" is a known duplicate and it is not one on this ref',
+    // It seeds the REPAIR, not the damage: a file the register names carries two
+    // rows under one key, one of them goes, and the gate must now object to its
+    // own register rather than say nothing.
+    //
+    // THE TARGET IS DERIVED FROM THE COPY'S OWN REGISTER, and it used to be
+    // named. It read `inv-m20-06` in `M20-wallet.md` until `ADR-063`'s session
+    // repaired that duplicate, and this case then reported `DID NOT FAIL` on a
+    // tree where the gate was working. `firstRegisteredDuplicate` says the rest.
+    expect: (d) =>
+      `the register claims "${repairedRegisteredDuplicate(d).key}" is a known duplicate`,
     seed: (d) => {
-      const p = join(d, 'docs/plans/M20-wallet.md');
+      const { file, at } = firstRegisteredDuplicate(d);
+      const p = join(d, file);
       const lines = readFileSync(p, 'utf8').split('\n');
-      const at = lines.findIndex((l) => /^\|\s*INV-M20-06\s*\|/.test(l));
-      if (at === -1) throw new Error('seed anchor not found: no `| INV-M20-06 |` row in M20');
       lines.splice(at, 1);
       writeFileSync(p, lines.join('\n'));
     },
