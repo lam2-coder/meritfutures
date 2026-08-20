@@ -220,8 +220,8 @@ Published on the method index **with their reasons**, because an unexplained abs
 | S-13 | **ST-07** publishing a structural 100 percent with the full freeze decomposition | As drafted | ☐ approve ☐ amend |
 | S-14 | **The published value is `bigint` with a unit**, not `numeric`. Every statistic's unit is fixed in the table above | [ADR-031](../decisions/ADR-031.md) | **Ruled 2026-08-14** |
 | S-15 | **Each statistic declares its measure set**, and a publish run emitting one measure emits all of them | [ADR-032](../decisions/ADR-032.md) | **Ruled 2026-08-14** |
-| S-14 | The **three exclusions**, with their reasons published verbatim | As drafted | ☐ approve ☐ amend |
-| S-15 | `effective_from` for every v1 definition is **launch plus 30 days** | As drafted | ☐ approve ☐ amend |
+| S-17 | The **three exclusions**, with their reasons published verbatim | As drafted | ☐ approve ☐ amend |
+| S-18 | `effective_from` for every v1 definition is **launch plus 30 days** | As drafted | ☐ approve ☐ amend |
 | **S-16 (APPROVED at FREEZE)** | **[OQ-M12-04](../decisions/gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md)**: the first number publishes whatever it says, with no approval step | **Confirm the consequence in advance**: a bad first quarter publishes, is screenshotted, and cannot be withdrawn | ☐ approve ☐ amend |
 
 **S-16 is the one that matters most and it is not a definition.** [M12](M12-transparency-platform.md) INV-M12-08 removes the approval step deliberately, so that Merit can say there is no approval step. **That control is only real if its consequence is accepted before the data exists**, and accepting it afterwards is not available: the first time a founder wants to hold a number is the moment the claim stops being true.
