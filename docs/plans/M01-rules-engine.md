@@ -441,62 +441,79 @@ floor(d) = floorLocked ? floor_lock_floor_at_cents
 
 Fifty rules. Every one carries its config field, its exact arithmetic in integer cents, its comparison operator, and the golden file that pins its boundary. **The operator column is the contract**: it is what the engine executes, what `copy_blocks` publishes, and what the fixture asserts. All three or none.
 
+**The `Computed by` column names the LAYER that performs each rule, added by [ADR-059](../decisions/ADR-059.md) (recommendations 1, 3 and 4 accepted 2026-08-19; recommendation 2 refused).** Forty-six rows read **Engine**. Four read something else, and those four are exactly the rules the engine does not compute: **R-01** (Ingest), **R-05** (Calendar data), **R-11** (the caller's query), **R-20** (the M2 bridge). Before this column a reader of the specification could not tell which rules this module is responsible for, because a discharged rule carried a `Config` cell and an `Arithmetic and operator` cell filled in exactly like the forty-six.
+
+**The source of the four is [`packages/rules-engine/test/rule-coverage.ts`](../../packages/rules-engine/test/rule-coverage.ts)'s `DISCHARGED_ELSEWHERE`, and the direction is ONE WAY.** That export already runs, is already compared against `IMPLEMENTED_RULES` by `implemented-rules.test.ts`, and already carries a per-rule reason. **This document is made to agree with the assertion; the assertion is never edited to agree with this document.** If the two ever disagree, the test file is right and this table is stale.
+
+**A `Computed by` cell that is not `Engine` is not a deferral and does not mean the rule is unimplemented.** It means the rule is discharged by a layer outside this module, so no engine branch can be written for it and none is owed:
+
+| Rule | Discharged by | What holds it, in that layer |
+|---|---|---|
+| R-01 | **Ingest** | `DailyMark` carries `fillCount` and no fill, so there is no execution timestamp here to contain. The instant lives at ingest ([`0013_ingest.sql`](../../packages/db/migrations/0013_ingest.sql)'s `executed_at`), and so does the containment lookup |
+| R-05 | **Calendar data** | `trading_calendar.session_open_at` and `session_close_at`, and [`0032`](../../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql)'s constraints over them. `CalendarDay` carries neither column, so the timezone conversion R-05 forbids is unwritable here rather than merely unwritten |
+| R-11 | **The caller's query** | The `superseded_by is null` predicate, and replay recomputing forward. `DailyMark` carries no supersession field, so there is no branch a superseded mark could take |
+| R-20 | **M2 bridge** | M2's setpoint push (`DEP-M2-03`). `INV-01` forbids the engine to perform I/O, so what it owes is the number, and `day.closed.floorCents` carries it on every day |
+
+**R-04 stays `Engine` and R-06 stays `Engine`, deliberately.** R-04 is implemented and exercised on both branches; what is missing is a publisher for the `halted` input, which is a retrieval question and is recorded as one in [STATE](../STATE.md)'s `OI-16`, not a layer boundary. R-06 is the engine's own forward-only fold and needs a clock only to write the scenario that pins it, never to execute the rule.
+
+**The gate that would compare this column to `rule-coverage.ts` is not written and no [CI-06](../testing/STRATEGY.md) letter is claimed for it here**, per [ADR-034](../decisions/ADR-034.md) and [ADR-036](../decisions/ADR-036.md): the letter is claimed in [ALLOCATION](../decisions/ALLOCATION.md) by the session that writes the artifact. This column is that gate's prerequisite, which is the whole reason [ADR-059](../decisions/ADR-059.md) amends a frozen document rather than writing the check alone.
+
 #### Group A: time and calendar
 
-| ID | Rule | Config | Arithmetic and operator | Pinned by |
-|---|---|---|---|---|
-| R-01 | A fill belongs to the trading day whose session contains its execution timestamp | `trading_calendar` | Session containment lookup. Never a UTC date cast | GS-001, GS-030 |
-| R-02 | Counters advance only on trading days, and advance whether or not the trader traded | `trading_calendar` | Gap counting is `calendar.sequence` subtraction, never date arithmetic | GS-002 |
-| R-03 | A half day is a full trading day for every counter | `is_half_day` | No effect on any comparison | GS-003, GS-032 |
-| R-04 | On a halted session, day counters advance and win days do not | `halted` | `winDaysCount += (win_day && !halted) ? 1 : 0` | GS-004, GS-031 |
-| R-05 | Session bounds are stored UTC instants derived from CT session definitions | `trading_calendar` | DST is data. No arithmetic anywhere converts a timezone | GS-030 |
-| R-06 | Every evaluation is against the last closed day and nothing more recent | n/a | The engine only ever sees closed days | GS-035 |
+| ID | Rule | Computed by | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|---|
+| R-01 | A fill belongs to the trading day whose session contains its execution timestamp | **Ingest** | `trading_calendar` | Session containment lookup. Never a UTC date cast | GS-001, GS-030 |
+| R-02 | Counters advance only on trading days, and advance whether or not the trader traded | **Engine** | `trading_calendar` | Gap counting is `calendar.sequence` subtraction, never date arithmetic | GS-002 |
+| R-03 | A half day is a full trading day for every counter | **Engine** | `is_half_day` | No effect on any comparison | GS-003, GS-032 |
+| R-04 | On a halted session, day counters advance and win days do not | **Engine** | `halted` | `winDaysCount += (win_day && !halted) ? 1 : 0` | GS-004, GS-031 |
+| R-05 | Session bounds are stored UTC instants derived from CT session definitions | **Calendar data** | `trading_calendar` | DST is data. No arithmetic anywhere converts a timezone | GS-030 |
+| R-06 | Every evaluation is against the last closed day and nothing more recent | **Engine** | n/a | The engine only ever sees closed days | GS-035 |
 
 #### Group B: marks
 
-| ID | Rule | Config | Arithmetic and operator | Pinned by |
-|---|---|---|---|---|
-| R-07 | Mark identity, opening | n/a | `opening == prior.balance + adjustment` (INV-18). Failure raises reconciliation, never a computed guess | EC-047 |
-| R-08 | Traded day | n/a | `fill_count > 0` (strict `>`) | GS-005 |
-| R-09 | Win day | `win_days.floor_bp` to `win_day_floor_cents` | `realized_pnl_cents >= win_day_floor_cents` (`>=`, so exactly at the floor counts) | GS-006, GS-007 |
-| R-10 | Non-trading balance movements are applied between sessions and carried in `adjustment_cents` | n/a | The withdrawal lands at the open of `effectiveTradingDay`, never inside a session | GS-065, D-M2-2 |
-| R-11 | The engine reads only live marks | `superseded_by is null` | A correction supersedes and replay recomputes forward | GS-034 |
+| ID | Rule | Computed by | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|---|
+| R-07 | Mark identity, opening | **Engine** | n/a | `opening == prior.balance + adjustment` (INV-18). Failure raises reconciliation, never a computed guess | EC-047 |
+| R-08 | Traded day | **Engine** | n/a | `fill_count > 0` (strict `>`) | GS-005 |
+| R-09 | Win day | **Engine** | `win_days.floor_bp` to `win_day_floor_cents` | `realized_pnl_cents >= win_day_floor_cents` (`>=`, so exactly at the floor counts) | GS-006, GS-007 |
+| R-10 | Non-trading balance movements are applied between sessions and carried in `adjustment_cents` | **Engine** | n/a | The withdrawal lands at the open of `effectiveTradingDay`, never inside a session | GS-065, D-M2-2 |
+| R-11 | The engine reads only live marks | **The caller's query** | `superseded_by is null` | A correction supersedes and replay recomputes forward | GS-034 |
 
 #### Group C: floor and drawdown
 
-| ID | Rule | Config | Arithmetic and operator | Pinned by |
-|---|---|---|---|---|
-| R-12 | Initial floor | `drawdown.amount_bp` to `drawdown_cents` | `floor = size_cents - drawdown_cents` at account open, and again at the funded reset with the funded drawdown | GS-008 |
-| R-13 | Trailing-EOD floor | `drawdown.type = "trailing_eod"` | `hwb' = max(hwb, closing_balance_cents)`; `floor' = hwb' - drawdown_cents`. Uses the **closing** balance only; the intraday high never raises it. `hwb` stops updating once `floorLocked` | GS-009, GS-011 |
-| R-14 | The floor never retreats | n/a | Follows from `max`. Asserted separately because it is the property a future change is most likely to break, and since [ADR-014](../decisions/ADR-014.md) it has **no exceptions at all** | GS-010, GS-081 |
-| R-15 | Floor lock | `drawdown.lock.*` to `floor_lock_at_profit_cents`, `floor_lock_floor_at_cents` | Trigger: `closing_balance_cents - size_cents >= floor_lock_at_profit_cents` (`>=`). Effect: `floor = floor_lock_floor_at_cents`, `floorLocked = true`, `hwb` frozen, all permanently. CV-12 puts the locked value **at or above** the trailing floor of the day before the lock, so the lock day never lowers the stored floor. It does **not** make the two equal on the lock day itself: a close that overshoots the trigger locks strictly below the floor the trail alone would have produced, which is what [ADR-052](../decisions/ADR-052.md) corrected and [ADR-057](../decisions/ADR-057.md) carried to this row. See CV-12. Enabled on all three v1 plans at `floor_lock_floor_at_cents = size_cents + 10,000c` ([ADR-014](../decisions/ADR-014.md)) | GS-015, GS-016, GS-024 |
-| R-16 | Static drawdown | `drawdown.type = "static"` | `floor = size_cents - drawdown_cents` for the life of the account | RE-U-016 |
-| R-17 | Intraday trailing is config-supported and unimplemented | `drawdown.type = "intraday_trailing"` | Rejected at publish by CV-01 | GS-078 |
-| R-18 | The breach comparator is the floor **at the open** | n/a | `floorOpenCents = prior.floorCents`. Trailing happens at DO-7, strictly after the breach check at DO-4 | GS-012 |
-| R-19 | **There is no post-payout floor recompute** | `post_payout_floor_rule.mode = "none"`, CV-18 | A settled payout reduces `balanceCents` and changes nothing else about the floor: `floorCents`, `highWaterBalanceCents`, and `floorLocked` all carry through untouched. The trader's loss room after an extraction is therefore the [buffer](../GLOSSARY.md#buffer), or the buffer minus the lock offset once locked, and that is what the rules page must say ([ADR-014](../decisions/ADR-014.md)) | GS-081, GS-065, RE-U-019 |
-| R-20 | The auto-liquidation setpoint pushed to the platform equals the current floor | n/a | Re-pushed whenever the floor moves. A clean liquidation lands exactly on the floor and survives; slippage below it breaches. Since [ADR-014](../decisions/ADR-014.md) the floor only ever moves **up**, so a stale setpoint is always too permissive rather than too strict, which is the safe direction for the trader and a bounded, measurable cost to the firm (D-M2-3) | GS-013, GS-014, D-M2-3 |
+| ID | Rule | Computed by | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|---|
+| R-12 | Initial floor | **Engine** | `drawdown.amount_bp` to `drawdown_cents` | `floor = size_cents - drawdown_cents` at account open, and again at the funded reset with the funded drawdown | GS-008 |
+| R-13 | Trailing-EOD floor | **Engine** | `drawdown.type = "trailing_eod"` | `hwb' = max(hwb, closing_balance_cents)`; `floor' = hwb' - drawdown_cents`. Uses the **closing** balance only; the intraday high never raises it. `hwb` stops updating once `floorLocked` | GS-009, GS-011 |
+| R-14 | The floor never retreats | **Engine** | n/a | Follows from `max`. Asserted separately because it is the property a future change is most likely to break, and since [ADR-014](../decisions/ADR-014.md) it has **no exceptions at all** | GS-010, GS-081 |
+| R-15 | Floor lock | **Engine** | `drawdown.lock.*` to `floor_lock_at_profit_cents`, `floor_lock_floor_at_cents` | Trigger: `closing_balance_cents - size_cents >= floor_lock_at_profit_cents` (`>=`). Effect: `floor = floor_lock_floor_at_cents`, `floorLocked = true`, `hwb` frozen, all permanently. CV-12 puts the locked value **at or above** the trailing floor of the day before the lock, so the lock day never lowers the stored floor. It does **not** make the two equal on the lock day itself: a close that overshoots the trigger locks strictly below the floor the trail alone would have produced, which is what [ADR-052](../decisions/ADR-052.md) corrected and [ADR-057](../decisions/ADR-057.md) carried to this row. See CV-12. Enabled on all three v1 plans at `floor_lock_floor_at_cents = size_cents + 10,000c` ([ADR-014](../decisions/ADR-014.md)) | GS-015, GS-016, GS-024 |
+| R-16 | Static drawdown | **Engine** | `drawdown.type = "static"` | `floor = size_cents - drawdown_cents` for the life of the account | RE-U-016 |
+| R-17 | Intraday trailing is config-supported and unimplemented | **Engine** | `drawdown.type = "intraday_trailing"` | Rejected at publish by CV-01 | GS-078 |
+| R-18 | The breach comparator is the floor **at the open** | **Engine** | n/a | `floorOpenCents = prior.floorCents`. Trailing happens at DO-7, strictly after the breach check at DO-4 | GS-012 |
+| R-19 | **There is no post-payout floor recompute** | **Engine** | `post_payout_floor_rule.mode = "none"`, CV-18 | A settled payout reduces `balanceCents` and changes nothing else about the floor: `floorCents`, `highWaterBalanceCents`, and `floorLocked` all carry through untouched. The trader's loss room after an extraction is therefore the [buffer](../GLOSSARY.md#buffer), or the buffer minus the lock offset once locked, and that is what the rules page must say ([ADR-014](../decisions/ADR-014.md)) | GS-081, GS-065, RE-U-019 |
+| R-20 | The auto-liquidation setpoint pushed to the platform equals the current floor | **M2 bridge** | n/a | Re-pushed whenever the floor moves. A clean liquidation lands exactly on the floor and survives; slippage below it breaches. Since [ADR-014](../decisions/ADR-014.md) the floor only ever moves **up**, so a stale setpoint is always too permissive rather than too strict, which is the safe direction for the trader and a bounded, measurable cost to the firm (D-M2-3) | GS-013, GS-014, D-M2-3 |
 
 #### Group D: breach
 
-| ID | Rule | Config | Arithmetic and operator | Pinned by |
-|---|---|---|---|---|
-| R-21 | Floor breach | n/a | `low_balance_cents < floorOpenCents` (**strict `<`**, touching the floor is not a breach) | GS-013, GS-014 |
-| R-22 | Hard daily loss limit | `daily_loss_limit.type = "hard"` | `-realized_pnl_cents > daily_loss_limit_cents` (**strict `>`**, a loss exactly at the limit survives). Aligned with R-21's strict `<` at the M1 gate (OQ-6), **amending the approved STATE_MACHINES G-BREACH guard**, which carried `>=`. Published as "more than". No v1 plan configures a daily loss limit | RE-U-022, GS-079 |
-| R-23 | Soft daily loss limit | `daily_loss_limit.type = "soft"` | Never a breach. The engine emits a fact; Rithmic performs any enforcement | RE-U-023 |
-| R-24 | Breach is terminal and immediate | n/a | Phase to `closed`, no further state is ever written for the account | GS-063, INV-12 |
-| R-25 | Breach beats everything on the same day | n/a | Ordering law DO-4 before DO-8. No `phase.passed`, no eligibility, no graduation | GS-063, GS-064 |
+| ID | Rule | Computed by | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|---|
+| R-21 | Floor breach | **Engine** | n/a | `low_balance_cents < floorOpenCents` (**strict `<`**, touching the floor is not a breach) | GS-013, GS-014 |
+| R-22 | Hard daily loss limit | **Engine** | `daily_loss_limit.type = "hard"` | `-realized_pnl_cents > daily_loss_limit_cents` (**strict `>`**, a loss exactly at the limit survives). Aligned with R-21's strict `<` at the M1 gate (OQ-6), **amending the approved STATE_MACHINES G-BREACH guard**, which carried `>=`. Published as "more than". No v1 plan configures a daily loss limit | RE-U-022, GS-079 |
+| R-23 | Soft daily loss limit | **Engine** | `daily_loss_limit.type = "soft"` | Never a breach. The engine emits a fact; Rithmic performs any enforcement | RE-U-023 |
+| R-24 | Breach is terminal and immediate | **Engine** | n/a | Phase to `closed`, no further state is ever written for the account | GS-063, INV-12 |
+| R-25 | Breach beats everything on the same day | **Engine** | n/a | Ordering law DO-4 before DO-8. No `phase.passed`, no eligibility, no graduation | GS-063, GS-064 |
 
 #### Group E: evaluation phase
 
-| ID | Rule | Config | Arithmetic and operator | Pinned by |
-|---|---|---|---|---|
-| R-26 | Profit target | `phase_eval.profit_target_bp` to `profit_target_cents` | `closing_balance_cents - size_cents >= profit_target_cents` (`>=`) | GS-017, GS-018 |
-| R-27 | Minimum trading days, eval | `phase_eval.min_trading_days` | `tradedDaysCount >= min_trading_days` (`>=`) | RE-U-027 |
-| R-28 | Eval consistency is evaluated at pass time only and is dilutable | `phase_eval.consistency.*` | Tested only on days where R-26 and R-27 already hold. Failing defers the pass and emits `phase.pass_deferred_consistency`. **It never fails an account** | GS-020 |
-| R-29 | Consistency arithmetic | `consistency.max_day_share_bp` | `best_day_cents * 10000 <= max_day_share_bp * period_profit_cents`. Integer cross-multiplication in `bigint`. **No division exists anywhere in the engine** | GS-023, GS-024 |
-| R-30 | Consistency denominator rule | n/a | Skipped entirely unless `period_profit_cents > 0` (strict `>`). A skipped gate reports `pass: true, skipped: true` | GS-021, GS-022 |
-| R-31 | Eval pass effects | n/a | Phase to `funded`; `balance = size_cents`; `hwb = size_cents`; `floor = size_cents - funded drawdown_cents`; traded days, win days, and consistency accumulators to zero; `consistencyPeriodStartDay = the day after the pass day`. **Eval profit is not carried into the funded phase** | GS-019, GS-070 |
-| R-32 | Eval expiry | `phase_eval.max_days` | `null` in all v1 plans, so unreachable. When set, elapsed trading days `>` the limit expires the account | RE-U-032 |
+| ID | Rule | Computed by | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|---|
+| R-26 | Profit target | **Engine** | `phase_eval.profit_target_bp` to `profit_target_cents` | `closing_balance_cents - size_cents >= profit_target_cents` (`>=`) | GS-017, GS-018 |
+| R-27 | Minimum trading days, eval | **Engine** | `phase_eval.min_trading_days` | `tradedDaysCount >= min_trading_days` (`>=`) | RE-U-027 |
+| R-28 | Eval consistency is evaluated at pass time only and is dilutable | **Engine** | `phase_eval.consistency.*` | Tested only on days where R-26 and R-27 already hold. Failing defers the pass and emits `phase.pass_deferred_consistency`. **It never fails an account** | GS-020 |
+| R-29 | Consistency arithmetic | **Engine** | `consistency.max_day_share_bp` | `best_day_cents * 10000 <= max_day_share_bp * period_profit_cents`. Integer cross-multiplication in `bigint`. **No division exists anywhere in the engine** | GS-023, GS-024 |
+| R-30 | Consistency denominator rule | **Engine** | n/a | Skipped entirely unless `period_profit_cents > 0` (strict `>`). A skipped gate reports `pass: true, skipped: true` | GS-021, GS-022 |
+| R-31 | Eval pass effects | **Engine** | n/a | Phase to `funded`; `balance = size_cents`; `hwb = size_cents`; `floor = size_cents - funded drawdown_cents`; traded days, win days, and consistency accumulators to zero; `consistencyPeriodStartDay = the day after the pass day`. **Eval profit is not carried into the funded phase** | GS-019, GS-070 |
+| R-32 | Eval expiry | **Engine** | `phase_eval.max_days` | `null` in all v1 plans, so unreachable. When set, elapsed trading days `>` the limit expires the account | RE-U-032 |
 
 **R-31 is the single largest trader-facing fact in this document.** A funded account starts at the account size and the eval profit is gone. It is why the [buffer](../GLOSSARY.md#buffer) gate has anything to work on, why the funded time gates can do their job of letting reversion happen before cash leaves, and why an eval pass is a qualification rather than a payday. It must be stated in plain language on the rules page, on the eval progress card, and in the pass email, because a trader who discovers it at the moment of passing will tell everyone. See OQ-2.
 
@@ -504,6 +521,17 @@ Fifty rules. Every one carries its config field, its exact arithmetic in integer
 
 Every gate is evaluated independently and reported gate by gate. `engineEligible` is the conjunction of the engine gates; the context gates are combined at read time (INV-23).
 
+| ID | Gate | Computed by | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|---|
+| R-33 | Minimum trading days | **Engine** | `phase_funded.min_trading_days` | `tradedDaysCount >= min_trading_days` (`>=`), counted from the funded reset, not from account open. **Configured 0 on all three v1 plans, which disables the gate**: it reports `pass: true, skipped: true` and is rendered as disabled rather than as satisfied (CV-19, [ADR-015](../decisions/ADR-015.md)) | RE-U-033, GS-080 |
+| R-34 | Win days | **Engine** | `win_days.required_count` | `winDaysCount >= required_count` (`>=`), counted over trading days strictly after `payoutAnchorDay` | GS-006, GS-053 |
+| R-35 | Buffer and withdrawable | **Engine** | `buffer_bp` to `buffer_cents` | `withdrawable = max(0, balance_cents - size_cents - buffer_cents)`. The buffer is permanent and is never withdrawable | GS-025 |
+| R-36 | Funded consistency | **Engine** | `phase_funded.consistency.*` | R-29 arithmetic over the period defined by R-47. Payout-gated: failing **delays** eligibility and never breaches, never denies retroactively | GS-024 |
+| R-37 | Cadence gap | **Engine** | `cadence_gap_trading_days` | `count(trading days d : cadenceAnchorDay < d <= basisDay) >= cadence_gap_trading_days` (`>=`), computed by `calendar.sequence` subtraction. **`cadenceAnchorDay` is the last settled payout's wallet-credit day** ([ADR-019](../decisions/ADR-019.md)), which is the same trading day as its basis day because the internal leg is instant. This **supersedes [ADR-013](../decisions/ADR-013.md)'s effective-day anchor**; the two-anchor structure is unchanged and the two anchors now coincide. Passes trivially when it is null (no gap on the first payout). On any plan where `cadence_gap_trading_days <= required_win_days` this gate is **dominated** by R-34 and never binds (EC-049) | GS-059, GS-082, EC-039 |
+| R-38 | One payout in flight | **Engine** | n/a | **Applies to the external leg only** ([ADR-019](../decisions/ADR-019.md)): no wallet-to-rail withdrawal for this identity in `approved`, `transferring`, or `frozen`. The internal leg completes in one transaction, so there is no window for a second request to arrive inside and AS-01 is structurally resolved rather than gated. The rule survives on the external leg as the liability control it always was | GS-052, GS-053 |
+| R-39 | Minimum payout | **Engine** | `min_payout_cents` | `min(withdrawable, cap) >= 10000` (`>=`, exactly 100.00 is eligible) | GS-042 |
+| R-40 | Context gates | **Engine** | n/a | Account `active` and phase `funded`; KYC `verified`; not `payoutsFrozen` at account or identity level; not `reconBlocked`. Evaluated at read time, excluded from the replayed state | GS-044 |
+| R-41 | Eligibility is the conjunction | **Engine** | n/a | `eligible = engineEligible && contextEligible`, with no shortcut path and no override anywhere in the codebase | INV-15 |
 **This group is topical and it contains both kinds.** Membership of Group F is not membership of `engineEligible`. The engine gates are the closed six R-33, R-34, R-35, R-36, R-37 and R-39, enumerated under INV-15 in section 1.5. **R-38 and R-40 are context gates** and R-41 is the conjunction itself ([ADR-060](../decisions/ADR-060.md)).
 
 | ID | Gate | Config | Arithmetic and operator | Pinned by |
@@ -520,22 +548,22 @@ Every gate is evaluated independently and reported gate by gate. `engineEligible
 
 #### Group G: payout arithmetic
 
-| ID | Rule | Config | Arithmetic and operator | Pinned by |
-|---|---|---|---|---|
-| R-42 | Cap resolution | `payout_cap_schedule` to `payout_cap_schedule_cents` | `ordinal = payoutsSettledCount + 1`; the cap is the `cap_cents` of the last schedule entry whose `from_ordinal <= ordinal` | RE-U-042 |
-| R-43 | Clamp | n/a | `effective_request = amount_cents ?? min(withdrawable, cap)`; `approved = min(effective_request, cap, withdrawable)`; eligible only if `approved >= min_payout_cents`. `clamp_reason` is `cap`, `withdrawable`, `requested`, or `none` on an exact tie | GS-026 to GS-028, GS-042 |
-| R-44 | Split, remainder to the trader | `split_bp` | `trader = (approved * split_bp + 9999) / 10000` in integer division (a ceiling); `firm = approved - trader`. The legs always sum exactly. Rounding favors the trader, by at most one cent, and the published copy says so | GS-029 |
-| R-45 | Ordinal assignment | n/a | `ordinal = payoutsSettledCount + 1`. A failed attempt does not consume an ordinal (SD-05) | GS-066 |
+| ID | Rule | Computed by | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|---|
+| R-42 | Cap resolution | **Engine** | `payout_cap_schedule` to `payout_cap_schedule_cents` | `ordinal = payoutsSettledCount + 1`; the cap is the `cap_cents` of the last schedule entry whose `from_ordinal <= ordinal` | RE-U-042 |
+| R-43 | Clamp | **Engine** | n/a | `effective_request = amount_cents ?? min(withdrawable, cap)`; `approved = min(effective_request, cap, withdrawable)`; eligible only if `approved >= min_payout_cents`. `clamp_reason` is `cap`, `withdrawable`, `requested`, or `none` on an exact tie | GS-026 to GS-028, GS-042 |
+| R-44 | Split, remainder to the trader | **Engine** | `split_bp` | `trader = (approved * split_bp + 9999) / 10000` in integer division (a ceiling); `firm = approved - trader`. The legs always sum exactly. Rounding favors the trader, by at most one cent, and the published copy says so | GS-029 |
+| R-45 | Ordinal assignment | **Engine** | n/a | `ordinal = payoutsSettledCount + 1`. A failed attempt does not consume an ordinal (SD-05) | GS-066 |
 
 #### Group H: settlement, post-payout, ladder
 
-| ID | Rule | Config | Arithmetic and operator | Pinned by |
-|---|---|---|---|---|
-| R-46 | Settlement advances both anchors | n/a | `payoutAnchorDay = fact.basisTradingDay`; `cadenceAnchorDay = fact.effectiveTradingDay`. Both stored, both replayable. Confirmed at the gate, [ADR-013](../decisions/ADR-013.md) | EC-039, GS-082 |
-| R-47 | Win days and the consistency period reset on settlement, anchored to the basis day | `win_days.reset_on_payout` | `winDaysCount = count of win days d > payoutAnchorDay`; `consistencyPeriodStartDay = the next trading day after payoutAnchorDay`. Progress earned during the transfer window is **kept**, because it happened after the snapshot the payout was based on | GS-053, GS-068 |
-| R-48 | **The floor is untouched by settlement** | `post_payout_floor_rule.mode = "none"` | R-19. The balance falls at the open of `effectiveTradingDay`; `floorCents`, `highWaterBalanceCents`, and `floorLocked` are carried through unchanged. INV-21 is guaranteed by config validation (CV-11, CV-17) rather than by a compensating recompute, which is the stronger arrangement because it fails at publish time instead of at settlement time | GS-065, GS-081, INV-21 |
-| R-49 | Ladder graduation | `ladder.payouts_to_graduate` | `payoutsSettledCount >= payouts_to_graduate` (`>=`), evaluated immediately after a settlement. Phase to `graduated`, account closed, **and the `graduation_eligible` flag set**. **No live invitation is emitted** ([ADR-024](../decisions/ADR-024.md)): eligibility is a review-pool flag, and invitation is a discretionary operator action taken from that pool, outside the engine | GS-067, GS-240 |
-| R-50 | Lifetime accounting | n/a | `lifetimeSettledCents += approvedCents`. INV-17 bounds it at `ladder * max cap` | RE-P-17 |
+| ID | Rule | Computed by | Config | Arithmetic and operator | Pinned by |
+|---|---|---|---|---|---|
+| R-46 | Settlement advances both anchors | **Engine** | n/a | `payoutAnchorDay = fact.basisTradingDay`; `cadenceAnchorDay = fact.effectiveTradingDay`. Both stored, both replayable. Confirmed at the gate, [ADR-013](../decisions/ADR-013.md) | EC-039, GS-082 |
+| R-47 | Win days and the consistency period reset on settlement, anchored to the basis day | **Engine** | `win_days.reset_on_payout` | `winDaysCount = count of win days d > payoutAnchorDay`; `consistencyPeriodStartDay = the next trading day after payoutAnchorDay`. Progress earned during the transfer window is **kept**, because it happened after the snapshot the payout was based on | GS-053, GS-068 |
+| R-48 | **The floor is untouched by settlement** | **Engine** | `post_payout_floor_rule.mode = "none"` | R-19. The balance falls at the open of `effectiveTradingDay`; `floorCents`, `highWaterBalanceCents`, and `floorLocked` are carried through unchanged. INV-21 is guaranteed by config validation (CV-11, CV-17) rather than by a compensating recompute, which is the stronger arrangement because it fails at publish time instead of at settlement time | GS-065, GS-081, INV-21 |
+| R-49 | Ladder graduation | **Engine** | `ladder.payouts_to_graduate` | `payoutsSettledCount >= payouts_to_graduate` (`>=`), evaluated immediately after a settlement. Phase to `graduated`, account closed, **and the `graduation_eligible` flag set**. **No live invitation is emitted** ([ADR-024](../decisions/ADR-024.md)): eligibility is a review-pool flag, and invitation is a discretionary operator action taken from that pool, outside the engine | GS-067, GS-240 |
+| R-50 | Lifetime accounting | **Engine** | n/a | `lifetimeSettledCents += approvedCents`. INV-17 bounds it at `ladder * max cap` | RE-P-17 |
 
 ### 3.6 Reference algorithm
 
