@@ -45,7 +45,7 @@ the prose beside it has said 105 since the same day.
 
 ### 2.1 Four stray blank lines shatter ALLOCATION's letter table
 
-[ALLOCATION](../decisions/ALLOCATION.md) carries blank lines at :149, :152, :155 and :158,
+[ALLOCATION](../decisions/ALLOCATION.md) carries blank lines at :160, :163, :166 and :169,
 inside what reads as one table. `markdownTables()` builds a table from a **maximal run of
 consecutive pipe lines carrying at least one delimiter row**, so the letter table is five
 runs and only the first has a delimiter. **The other four are discarded whole: seven rows,
@@ -53,9 +53,18 @@ runs and only the first has a delimiter. **The other four are discarded whole: s
 
 **That, and not the dedupe, is why `r` is absent from the register.**
 
+**And this plan's own reservation commit made the fourth fragment worse, which is
+recorded rather than quietly corrected.** The `v` and `w` rows this plan reserved
+were appended after the second `u` row, **inside the unparsed fragment**, so they sit
+at :171 and :172 where no table gate reads them. `CI-06p` sees them because
+`strategyGateLetters()` and `allocatedLetters()` are line regexes, which is why
+gaplessness passed and nothing objected. **Two more rows in the blind spot is not a
+new defect class; it is the same one, committed by the session that documented it.**
+`S6` absorbs them when it merges the fragments.
+
 ### 2.2 The letter `u` is claimed by two different gates
 
-:157 claims `u` for the table-key gate that shipped. :159 claims `u` for
+:168 claims `u` for the table-key gate that shipped. :170 claims `u` for
 [ADR-059](../decisions/ADR-059.md)'s M01-column gate, reserved and unwritten.
 `allocatedLetters()` returns a `Set`, and `CI-06p` asserts uniqueness over
 [STRATEGY](../testing/STRATEGY.md) rather than over this file. **A live collision inside
@@ -669,8 +678,9 @@ pre-reserved every number it spends, in one commit, before any session started.
 NO SESSION IN THIS WAVE TOUCHES ALLOCATION EXCEPT YOU. That is what buys the
 concurrency, and it is why you must NOT add a reservation row for anything.
 
-THE FOUR BLANK LINES, AND THE TRAP. Verified 2026-08-20: :149, :152, :155 and
-:158 are blank lines inside the letter table. markdownTables() builds a table
+THE FOUR BLANK LINES, AND THE TRAP. Re-verified after this plan's own
+reservation commits shifted them: :160, :163, :166 and :169 are blank lines
+inside the letter table. markdownTables() builds a table
 from a maximal run of consecutive pipe lines carrying at least one delimiter
 row, so the letter table is FIVE runs and only the first has a delimiter. Seven
 rows, q through u, are read by NO TABLE GATE and render as prose.
@@ -680,15 +690,15 @@ rows, q through u, are read by NO TABLE GATE and render as prose.
   AND u IN THE SAME COMMIT AS THE BLANK LINES, or CI-06u fails on your own pull
   request. This is the single instruction most likely to burn this session.
 
-  r, at :151 and :153: the two rows AGREE, same gate, same description. :153
+  r, at :161 and :164: the two rows AGREE, same gate, same description. :164
   links WAVE-01; :151 carries a parenthetical about PR #96 that :153 dropped.
   Merge under ADR-061 and say which you kept. THE RECORD'S STATED REASON FOR
   r's ABSENCE FROM THE REGISTER IS FALSE: gates.mjs:3876 and session 75 both
   say the rows are byte-identical but for one link and the dedupe reached one.
   Both stand on main and they differ by a clause. Correct that comment.
 
-  u, at :157 and :159: TWO DIFFERENT GATES CLAIM ONE LETTER. :157 is the
-  table-key gate that shipped. :159 is ADR-059's M01-column gate, reserved and
+  u, at :168 and :170: TWO DIFFERENT GATES CLAIM ONE LETTER. :168 is the
+  table-key gate that shipped. :170 is ADR-059's M01-column gate, reserved and
   unwritten. THIS IS A REAL COLLISION, not a State-column artifact, and it is
   invisible because allocatedLetters() returns a Set and CI-06p asserts
   uniqueness over STRATEGY rather than over this file. ADR-034's existing rule
@@ -776,7 +786,7 @@ render as prose on GitHub. CI-06u could not see seven rows of ALLOCATION,
 including a live double-claim of its own letter, for exactly this reason.
 
 THE FIVE FINDINGS ON MAIN AS OF 2026-08-20, four of which S6 will have cleared:
-  docs/decisions/ALLOCATION.md:150-151, :153-154, :156-157, :159   (S6)
+  docs/decisions/ALLOCATION.md:161-162, :164-165, :167-168, :170-172   (S6)
   docs/testing/STRATEGY.md:238-243, SIX ROWS, hiding CI-06p, q, r, t, s and u.
     The cause is at :235 to :237: a re-inserted header row, a re-inserted
     delimiter row, and a blank line. THE GATE INVENTORY DOES NOT RENDER SIX OF
