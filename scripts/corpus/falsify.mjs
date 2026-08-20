@@ -232,68 +232,85 @@ function nextFreeLetter(dir) {
   throw new Error(`seed anchor exhausted: the "${LETTER_HEADING}" table claims a through x`);
 }
 
-// The CI-06 letters the runner implements, read from the tree COPY's gates.mjs
-// rather than from ROOT's, on the same reasoning as `nextFree`: the copy is what
-// the gate will read.
+// =============================================================================
+// THE CI-06u REPAIR CASE SEEDS ITS OWN FIXTURE (ADR-064)
+// =============================================================================
+// A SEED MAY NOT PIN TO A LIVE IDENTIFIER, and a live REGISTER ENTRY is a live
+// identifier. The case below has now outgrown three anchors, each failing the
+// same way one level further out:
+//
+//   1. `inv-m20-06` in `M20-wallet.md`, hardcoded. `ADR-063`'s session repaired
+//      that duplicate, the entry went, and the case reported DID NOT FAIL on a
+//      tree where the gate was working.
+//   2. The register's FIRST claim, derived. It assumed every claim carries
+//      exactly two rows; `docs/sessions/README.md` carries FOUR under sessions
+//      31, 49, 50 and 56, so deleting one left three and the read-back found
+//      nothing. SEED IS STALE, again on a working tree.
+//   3. Any live claim at all. `ADR-064` takes the register from 59 keys to 19
+//      and names the two lines that take it to zero. Emptying it on today's tree
+//      was measured directly: `gates.mjs check` reports `CI-06u` failing with
+//      130 findings, and `falsify.mjs` reports 5 problems, the first being
+//      `SEED IS STALE  seed anchor not found: no CI06U_REGISTER claim resolves
+//      to two rows under one key`.
+//
+// THE GATE'S OWN FALSIFICATION WAS TIED TO THE DEFECT THE GATE EXISTS TO
+// REMOVE, so the wave's success was what would end it. There is no live anchor
+// that fixes that, because the corpus is ALLOWED to repair every one of them.
+//
+// So the seed builds its own. It writes a two-rows-under-one-key table, adds it
+// to the COPY's register, and then removes the second row, which is the repair
+// the case is about. Both halves are constructed, so the case holds on a tree
+// whose real register is empty and it can never again report a stale anchor as
+// a working gate.
+const SEEDED_REGISTER_FILE = 'docs/GLOSSARY.md';
+
+// Unmistakable on purpose. `rowsCarrying` matches a first cell by SUBSTRING, so
+// a key that reads like corpus vocabulary could match a row the seed did not
+// write and repair somebody else's table.
+const SEEDED_REGISTER_KEY = 'seeded-register-fixture-key';
+
 /**
- * The first `(file, key)` the copy's own `CI06U_REGISTER` claims is a known
- * duplicate, read out of `gates.mjs` rather than named here.
+ * The fixture table, two rows under one key, appended to the copy.
  *
- * IT WAS NAMED HERE AND THE NAMING BROKE, which is why it derives now. The seed
- * below hardcoded `inv-m20-06` in `M20-wallet.md`; `ADR-063`'s session repaired
- * that duplicate and removed the register entry, and this case went
- * `DID NOT FAIL` on a tree where the gate was working perfectly. **A seed that
- * names a defect the corpus is allowed to repair has an expiry date nobody
- * records**, which is `CI-06m`'s seed's stated reason for deriving its target
- * and `CI-06l`'s lesson before it.
- *
- * The register shrinks every time one of these is repaired, so this returns the
- * FIRST remaining entry and throws when there are none. An empty register is
- * the day this whole case stops being expressible, and it should say so loudly
- * rather than pass.
+ * It is a plain `Term` table because that is what the gate reads as an identity
+ * column: `DIMENSION_HEADERS` exempts `From`, `Threat`, `Rank`, `Group`,
+ * `Source` and `Digest`, and a fixture headed by one of those would be out of
+ * scope and would assert nothing.
  */
-function firstRegisteredDuplicate(dir) {
-  const body = readFileSync(join(dir, 'scripts/corpus/gates.mjs'), 'utf8');
-  const start = body.indexOf('CI06U_REGISTER');
-  if (start === -1) throw new Error('seed anchor not found: no CI06U_REGISTER in gates.mjs');
-
-  // Every `(file, key)` the register claims, in order.
-  const claims = [];
-  for (const entry of body.slice(start).matchAll(/\[\s*'([^']+\.md)',\s*\[([^\]]*)\]/g)) {
-    for (const k of entry[2].matchAll(/'([^']+)'/g)) claims.push({ file: entry[1], key: k[1] });
-  }
-
-  // THE FIRST CLAIM WHOSE ROWS THIS SEED CAN ACTUALLY FIND, and the loop is the
-  // point rather than a fallback. The gate normalises a first cell before
-  // comparing it, so a registered key can be a link target (`m03-billing-
-  // checkout.md`) that no row spells literally. Reimplementing that
-  // normalisation here would be a SECOND EXPRESSION OF ONE CONCEPT, which is
-  // the defect ADR-036 exists against, so this matches loosely and then
-  // requires TWO rows before touching anything. A loose match that plants the
-  // wrong row still fails the case, because `expect` pins the key the finding
-  // must name.
-  for (const claim of claims) {
-    const rows = rowsCarrying(dir, claim.file, claim.key);
-    if (rows.length >= 2) return { ...claim, at: rows[rows.length - 1] };
-  }
-  throw new Error(
-    'seed anchor not found: no CI06U_REGISTER claim resolves to two rows under one key. ' +
-      'Either every registered duplicate has been repaired, which is the goal and means ' +
-      'this case is no longer expressible, or the register has drifted from the files it ' +
-      'names. Delete this case and say which, rather than leaving a seed that cannot fire',
+const seedRegisterFixture = (dir) => {
+  edit(
+    dir,
+    SEEDED_REGISTER_FILE,
+    (b) =>
+      `${b}\n<!-- seeded: the CI-06u register fixture -->\n\n| Term | Meaning |\n|---|---|\n` +
+      `| ${SEEDED_REGISTER_KEY} | the row that stays |\n` +
+      `| ${SEEDED_REGISTER_KEY} | the row the repair removes |\n`,
   );
-}
+  edit(dir, 'scripts/corpus/gates.mjs', (b) =>
+    once(
+      b,
+      'const CI06U_REGISTER = new Map([',
+      `const CI06U_REGISTER = new Map([\n  ['${SEEDED_REGISTER_FILE}', ['${SEEDED_REGISTER_KEY}']],`,
+    ),
+  );
+};
 
 /**
  * The claim the seed repaired, read back off the SEEDED tree.
  *
  * `expect` and `seed` are resolved against DIFFERENT TREES and this case
- * reported `FAILED OFF-TARGET` until they were made complementary: both called
- * `firstRegisteredDuplicate`, and on the seeded copy the row was already gone,
- * so `expect` skipped past the repaired claim to the next one and demanded a
- * finding about a file the seed never touched. That is the `CI-06p` seed's
- * recorded lesson, which its own comment states as "`expect` is resolved
- * against the SEEDED tree".
+ * reported `FAILED OFF-TARGET` until they were made complementary: both derived
+ * their target from the register's first live claim, and on the seeded copy the
+ * row was already gone, so `expect` skipped past the repaired claim to the next
+ * one and demanded a finding about a file the seed never touched. That is the
+ * `CI-06p` seed's recorded lesson, which its own comment states as "`expect` is
+ * resolved against the SEEDED tree".
+ *
+ * IT STILL READS BACK RATHER THAN NAMING `SEEDED_REGISTER_KEY`, even though the
+ * seed now constructs both halves. `expect` is the only thing standing between
+ * "the seed ran" and "the seed did what it says": if the fixture stops being
+ * written, or the register edit stops landing, this throws instead of demanding
+ * a finding that would never come.
  *
  * Every registered claim carries two or more rows on a clean tree, or the gate
  * would already be reporting it. So after the seed exactly one carries fewer,
@@ -323,6 +340,9 @@ function rowsCarrying(dir, file, key) {
   return out;
 }
 
+// The CI-06 letters the runner implements, read from the tree COPY's gates.mjs
+// rather than from ROOT's, on the same reasoning as `nextFree`: the copy is what
+// the gate will read.
 function implementedLettersIn(dir) {
   const body = readFileSync(join(dir, 'scripts/corpus/gates.mjs'), 'utf8');
   const out = [...body.matchAll(/id:\s*'CI-06([a-z])'/g)].map((m) => m[1]).sort();
@@ -1857,37 +1877,49 @@ const SCOPE_CASES = [
     gate: 'CI-06u',
     what: 'a registered duplicate that has been REPAIRED, which must be a finding',
     // THE DIRECTION AN ALLOWLIST DECAYS IN, and the reason the register is a
-    // register rather than an exemption list. The gate ships green over 105
-    // known duplicates it cannot repair inside its fence; without this
-    // assertion those 105 lines survive every repair and the gate ends up
-    // asserting nothing about eight of the files it reads.
+    // register rather than an exemption list. Without this assertion a register
+    // line survives every repair and the gate ends up asserting nothing about
+    // the files it reads.
     //
-    // It seeds the REPAIR, not the damage: a file the register names carries two
-    // rows under one key, one of them goes, and the gate must now object to its
-    // own register rather than say nothing.
+    // It seeds the REPAIR, not the damage: a registered file carries two rows
+    // under one key, one of them goes, and the gate must now object to its own
+    // register rather than say nothing.
     //
-    // THE TARGET IS DERIVED FROM THE COPY'S OWN REGISTER, and it used to be
-    // named. It read `inv-m20-06` in `M20-wallet.md` until `ADR-063`'s session
-    // repaired that duplicate, and this case then reported `DID NOT FAIL` on a
-    // tree where the gate was working. `firstRegisteredDuplicate` says the rest.
+    // THE FIXTURE IS SYNTHETIC AND THE CASE NO LONGER TOUCHES A LIVE REGISTER
+    // ENTRY. `seedRegisterFixture` above says why, and what the three anchors
+    // this case outgrew each cost. The short form: the register is a debt the
+    // corpus is expected to pay off, so anchoring the gate's own falsification
+    // to it made the wave's success the thing that would end the case.
     expect: (d) =>
       `the register claims "${repairedRegisteredDuplicate(d).key}" is a known duplicate`,
     // THE SEED REMOVES THE WHOLE DUPLICATION, not one row of it, and the
-    // difference is not cosmetic. Deleting a single row assumes every
-    // registered claim carries exactly two, which was true until
-    // `docs/sessions/README.md` became the last file in the register: the
-    // parallel-session convention gives sessions 31, 49, 50 and 56 FOUR rows
-    // each, so removing one leaves three and `repairedRegisteredDuplicate`
-    // finds nothing below two. The case then threw `seed anchor not found` on
-    // a tree where the gate was working, which is the same shape as the
-    // hardcoded `inv-m20-06` target this seed already outgrew once.
+    // difference is not cosmetic. Deleting a single row assumes the claim
+    // carries exactly two, which `docs/sessions/README.md` broke when it became
+    // the last file in the register: the parallel-session convention gives
+    // sessions 31, 33, 49, 50 and 56 FOUR rows each, so removing one leaves
+    // three and `repairedRegisteredDuplicate` finds nothing below two. The
+    // fixture is written with two rows, but the loop stays general so a fixture
+    // that later grows a third row does not silently stop firing.
     seed: (d) => {
-      const { file, key } = firstRegisteredDuplicate(d);
+      seedRegisterFixture(d);
+      const file = SEEDED_REGISTER_FILE;
+      const key = SEEDED_REGISTER_KEY;
+      // RULE 2 ON THE FIXTURE ITSELF. If the table the seed just wrote does not
+      // read back as a duplicate, the repair below removes nothing and the case
+      // would demand a finding no gate can produce.
+      const rows = rowsCarrying(d, file, key);
+      if (rows.length < 2) {
+        throw new Error(
+          `seed anchor not found: the fixture table wrote ${rows.length} row(s) under ` +
+            `"${key}" in ${file} and the repair needs two. The append landed somewhere ` +
+            '`rowsCarrying` cannot see it',
+        );
+      }
       const p = join(d, file);
       const lines = readFileSync(p, 'utf8').split('\n');
       // Keep the first row carrying the key and drop the rest. That IS the
       // repair, so the register entry must now name nothing.
-      for (const at of rowsCarrying(d, file, key).slice(1).reverse()) lines.splice(at, 1);
+      for (const at of rows.slice(1).reverse()) lines.splice(at, 1);
       writeFileSync(p, lines.join('\n'));
     },
   },
