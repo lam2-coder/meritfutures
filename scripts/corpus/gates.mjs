@@ -3835,10 +3835,6 @@ const CI06U_REGISTER = new Map([
   // and it is the one register entry here that may legitimately grow before it
   // shrinks.
 
-  // Three plan documents rowed twice by the INDEX merge. M05's two rows give it
-  // two different purposes: "bounded freeze, reset" and "the 48 hour
-  // enforcement window". The registry that decides whether a thing exists.
-  ['docs/INDEX.md', ['m03-billing-checkout.md', 'm04-trader-portal.md', 'm05-payout-system.md']],
   // The P1-item table, recorded as OI-10. Its two `CI-06, corpus integrity`
   // rows say `21` checks and `Eleven` checks.
   [
@@ -3892,7 +3888,6 @@ const CI06U_REGISTER = new Map([
       'm',
     ],
   ],
-  ['docs/plans/M12-statistic-definitions.md', ['s-14', 's-15']],
   // THE WHOLE SESSION INDEX, TWICE. Lines 120 onward re-list sessions 1 to 74
   // under a second header row, and the first copy stops at session 62. Written
   // out rather than expressed as a range: a range is a rule, and a rule that
