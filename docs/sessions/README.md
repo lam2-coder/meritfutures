@@ -223,3 +223,4 @@ must be recoverable from its own file alone.
 | [2026-08-19 - Session 75](2026-08-19-session-75.md) | ADR-059 signed as a split: the layer column on M01's fifty rules, the halt open question named, and the seed comment |
 | [2026-08-19 - Session 75](2026-08-19-session-75.md) | `CI-06u`: no markdown table in `docs/` has two rows with the same first-cell key, and the 105 the survey found |
 | [2026-08-19 - Session 75](2026-08-19-session-75.md) | ADR-060 folded, INV-15's closed six-member enumeration, and RE-P-15 written |
+| [2026-08-20 - Session 76](2026-08-20-session-76.md) | WAVE-03 planned: the 106 duplicate registry keys sequenced into nine sessions, five concurrent, with every number reserved before any session runs. Five claims in the record refuted against the tree, three findings no gate can see, and the letter registry's wall |
