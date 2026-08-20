@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-18
+last_updated: 2026-08-19
 ---
 
 # STATE
@@ -1706,3 +1706,43 @@ at line 68.
 **Two weaker degradations PASSED and are recorded rather than dropped.** Forcing the funded drawdown `type`, and forcing both `type` and `drawdown_cents`, both left the lineup distinct, because its three plans differ in several fields at once. The assertion catches an adapter that has stopped reading its input, which is the failure mode it is written for, and not every single-field drift. Reported because a control's blind spot found while proving it bites is worth more than the proof.
 
 **The position:** `pnpm vitest run` reports **61 files, 915 passed, 40 skipped**, from 60 / 908 / 40. The seven new tests are the non-vacuity assertions and no property was added: `--project property` alone is **12 files, 194 passed, 1 skipped**, unchanged. **18 of 18 gates pass. 7 of 7 invariants hold.** A repo-wide grep finds **exactly one definition site for each of the three names**.
+
+---
+
+## ADR-059 is signed as a split: the layer column lands, the exclusion is refused, and `OI-16` names the halt question (2026-08-19, session 75)
+
+**[ADR-059](decisions/ADR-059.md) is signed on three of its four recommendations. RECOMMENDATION 2 IS REFUSED.** The founder's ruling is the one [section 6](decisions/ADR-059.md) argued for at full strength against the entry's own recommendation: **no row leaves group A until the receiving suite is named.** `GS-001`, `GS-030` and `GS-035` keep their place in the M1 partition denominator and keep their held-back reasons. Nothing is excluded, no disposition is added to the golden-scenario registry, and the denominator in [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md) is untouched.
+
+**That refusal is the load-bearing half and it is recorded first**, because the entry's own alternatives section shows how easily it is re-derived: four sessions in a row re-derived the blocked-rows table, and a fifth reading this file must find the ruling before it finds the recommendation.
+
+| Recommendation | Verdict | What landed |
+|---|---|---|
+| **1.** A layer column on [M01](plans/M01-rules-engine.md) section 3.5 | **GRANTED** | `Computed by` on all fifty rows. Forty-six read **Engine**; four do not |
+| **2.** Exclude three rows and drop the denominator | **REFUSED** | Nothing. No row moved, no denominator changed, no registry disposition added |
+| **3.** `GS-004` and `GS-031` held on a named open question | **GRANTED** | `OI-16` below |
+| **4.** Comments on `generate.mjs`'s two constant `halted: false` writes | **GRANTED** | Two comments, no behaviour change. [`0004_catalog.sql`](../packages/db/migrations/0004_catalog.sql) is not amended |
+
+**The layer column's direction is one way and the document says so at the column.** The source is [`rule-coverage.ts`](../packages/rules-engine/test/rule-coverage.ts)'s `DISCHARGED_ELSEWHERE`, an export that already runs and is already compared against `IMPLEMENTED_RULES`; M01 is made to agree with it and never the reverse. Four rows read something other than the engine: **R-01** (ingest), **R-05** (calendar data), **R-11** (the caller's query), **R-20** (the M2 bridge). **R-04 stays `Engine` deliberately**, which is the whole content of RECOMMENDATION 3: the rule is implemented and exercised on both branches, and what is missing is a publisher for its input.
+
+### `OI-16`: does any feed Merit will hold report a whole-session halt or limit lock?
+
+| | |
+|---|---|
+| **The question** | **Does any market-data or platform feed Merit will hold report a whole-session halt or limit lock, at the granularity `R-04` consumes it (one boolean per trading day per product)?** If one does, name the feed and the field. If none does, `halted` has no publisher and the answer is a decision about whether Merit sources one |
+| **State** | **BLOCKED ON A RETRIEVAL.** Not blocked on a design, not blocked on a type, and **not the same state as the three rows RECOMMENDATION 2 would have excluded** |
+| **What it holds** | `GS-004` and `GS-031`, both of which stay in group A and stay in the denominator |
+| **Who** | The founder or the vendor call. There is no engineering content in it, which puts it with `OI-01` and `OI-06` in the standing count of items waiting on a founder or third-party action |
+| **What it does NOT hold** | `R-04` itself. The rule is implemented, declared, published in the constitution's B4 answer and restated in [GLOSSARY](GLOSSARY.md), [EC-013](edge-cases/EC-012-to-033-appendix-b4-battery.md) and [M14](plans/M14-loyalty-retention.md)'s `GS-185`. Merit has told traders what happens on a halted session and undeclaring the rule is not on the table |
+| **Why it is not folded in with the other three** | Session 55 recorded what happens when rows with different blockers are filed together: *"GS-004 AND GS-031 WERE FILED BESIDE GS-003 AS IF ONE THING BLOCKED ALL FOUR"*, and the transcription then moved two of the four. A layer boundary is permanent; a retrieval is an errand |
+
+**The honest limit on the question, carried from ADR-059 section 6 rather than dropped:** *"I could not find it"* and *"it does not exist"* are different claims, and only the first is proven. The entry grepped the tree and found no publisher. It did not read a vendor specification, and that is exactly what the retrieval is.
+
+### Three findings the work produced, none of them decided here
+
+**First, ADR-059's free `CI-06` letter is stale.** The entry names *"the letter after `r`"* as free for the gate that would compare M01's new column to `rule-coverage.ts`. **`s` and `t` were both claimed and implemented on 2026-08-18**, by sessions 68 and 69, and both are live in [STRATEGY](testing/STRATEGY.md). **The free letter is `u`, and this session CLAIMS it and does not write the gate.** That is the prescribed order rather than a half measure: [ADR-034](decisions/ADR-034.md) and [ADR-036](decisions/ADR-036.md) both rule that the letter is claimed in [ALLOCATION](decisions/ALLOCATION.md) **before** the artifact exists, so a reservation row is what a session owes when it has made a gate cheap and has not built it. The row is written, `gates.mjs allocation` reports `CI-06u  absent  no gate in this runner`, and `CI-06p` passes because gaplessness is asserted over allocated plus reserved. **The gate itself is outside this session's fence** (`scripts/corpus/gates.mjs` is not `docs/`), and a gate arrives with its own seeded violation watched failing, which is a session's work rather than a paragraph's.
+
+**Second, that gate is now cheap and its shape is worth naming.** With the column in place the check is one comparison in [`gates.mjs`](../scripts/corpus/gates.mjs) with no database: parse M01 section 3.5's eight tables, take the first cell and the `Computed by` cell of each of the fifty rows, and assert that a row reading `Engine` appears in `IMPLEMENTED_RULES` and a row reading anything else appears in `DISCHARGED_ELSEWHERE`, both directions. **It is a gate that reads a plan document against a test file**, which the corpus has no instance of yet, and that is the reason to be careful with its parser rather than a reason to defer it: `CI-06n`, `CI-06g`, `registryIds()` and `CI-06t`'s own first draft are four recorded cases of a reader looser than the property it claimed.
+
+**Third, no receiving suite for `GS-001` and `GS-030` was found.** The refusal's condition is that a row may leave group A once the suite that will verify it is named, and this session looked: **ingest has no fixture suite.** [`0013_ingest.sql`](../packages/db/migrations/0013_ingest.sql) declares the storage and [M02](plans/M02-rithmic-bridge.md) holds at `review` under [ADR-005](decisions/ADR-005.md) pending the vendor call, so the layer that owes `R-01` has no test directory to receive a scenario. **The condition is unmet and no row moved.** It is reported as a finding rather than acted on, exactly as the ruling instructs.
+
+**Position, each figure produced by a command rather than quoted:** **21 of 21 gates pass**, `npx vitest run` reports **61 files, 929 passed, 42 skipped** (unchanged: no test file and no `src/` file was touched), the calendar generator's own suite is **50 of 50**, and the layer column agrees with both exports in both directions -- 46 `Engine` rows against 46 in `IMPLEMENTED_RULES`, 4 non-engine rows against the 4 in `DISCHARGED_ELSEWHERE`, with nothing in either difference. **`0038` stays free and `CI-06u` is claimed and unwritten.**

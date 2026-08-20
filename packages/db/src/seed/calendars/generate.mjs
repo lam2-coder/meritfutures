@@ -999,6 +999,14 @@ export function generate(source) {
         trading_day: key,
         is_holiday: true,
         is_half_day: false,
+        // ADR-059 (recommendations 1, 3 and 4 accepted 2026-08-19). CONSTANT
+        // `false`, and the value is missing rather than known to be absent. No
+        // feed anywhere in the tree publishes a whole-session halt or limit
+        // lock, so this generator has nothing to read; `OI-16` holds the
+        // retrieval question and `GS-004` and `GS-031` are blocked on it. On a
+        // holiday row there is additionally no session for a halt to apply to.
+        // `R-04` itself is implemented and exercised on both branches: what is
+        // missing is a publisher, never the rule.
         halted: false,
         session_open_ct: null,
         session_open_at: null,
@@ -1032,6 +1040,12 @@ export function generate(source) {
       trading_day: key,
       is_holiday: false,
       is_half_day: Boolean(early),
+      // ADR-059. CONSTANT `false` for the reason given at the holiday row
+      // above, and it is NOT a claim that no session is ever halted. Line 331
+      // of `0004_catalog.sql` already declares `halted boolean NOT NULL DEFAULT
+      // false`, so this write agrees with the column's own default; that
+      // migration is merged and is deliberately NOT superseded, because a
+      // correct default does not justify a supersession (E2).
       halted: false,
       session_open_ct: ctWallString(openDay, openCt),
       session_open_at: utcString(ctWallToInstant(openDay, openCt, `${key} open`)),
