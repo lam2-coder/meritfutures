@@ -231,3 +231,4 @@ must be recoverable from its own file alone.
 | [2026-08-20 - Session 87](2026-08-20-session-87.md) | ADR-066: the vendor-parity gap-fill, five surfaces admitted and the calendar found to be an outstanding commitment |
 | [2026-08-20 - Session 79](2026-08-20-session-79.md) | The `INV-M5` collision, ruled as a merge and a renumber |
 | [2026-08-20 - Session 80](2026-08-20-session-80.md) | M12's S-14/S-15 pairs renumbered and INDEX's M03/M04/M05 rows deduped, each chosen per row; ADR-061 would have escalated three of the five keys and a renumber has nothing for its agreement test to answer |
+| [2026-08-20 - Session 82](2026-08-20-session-82.md) | `ADR-065`: one key one row, the blank-line parser trap, the `u` collision ruled, and the letter registry is out of alphabet |

@@ -3860,34 +3860,6 @@ const CI06U_REGISTER = new Map([
   // enforced path); the six landed as ADR-061 repairs, each keeping one half
   // verbatim. The register loses the file ENTIRELY in the same commit as the
   // repair, so the assertion below now speaks for seven files and not eight.
-  // All three allocation tables, the ADR numbers, the migration numbers and the
-  // letters. `r` is NOT here: the file argues that duplicate deliberately and
-  // the two rows are byte-identical but for one link, so the dedupe reached it.
-  // These fifteen carry a reservation row and a merged row for one number,
-  // which is exactly the State column ADR-034 deleted, growing back as rows.
-  [
-    'docs/decisions/ALLOCATION.md',
-    [
-      '0033',
-      '0034',
-      '039',
-      '040',
-      '041',
-      '042',
-      '043',
-      '044',
-      '045',
-      '046',
-      '050',
-      '054',
-      '055',
-      '057',
-      '059',
-      'k',
-      'l',
-      'm',
-    ],
-  ],
   // THE WHOLE SESSION INDEX, TWICE. Lines 120 onward re-list sessions 1 to 74
   // under a second header row, and the first copy stops at session 62. Written
   // out rather than expressed as a range: a range is a rule, and a rule that
