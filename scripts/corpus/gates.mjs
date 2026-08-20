@@ -3839,22 +3839,21 @@ const CI06U_REGISTER = new Map([
   // two different purposes: "bounded freeze, reset" and "the 48 hour
   // enforcement window". The registry that decides whether a thing exists.
   ['docs/INDEX.md', ['m03-billing-checkout.md', 'm04-trader-portal.md', 'm05-payout-system.md']],
-  // The P1-item table, recorded as OI-10. Its two `CI-06, corpus integrity`
-  // rows say `21` checks and `Eleven` checks.
-  [
-    'docs/STATE.md',
-    [
-      'ci-01, ci-02, ci-05',
-      'ci-03, golden files',
-      'ci-04, ci-07 to ci-09',
-      'ci-06, corpus integrity',
-      'ci-06h, migration install',
-      'the monorepo scaffold',
-      'the reconciled schema and migrations',
-      'tradingcalendar as data',
-      'vg-1 to vg-12',
-    ],
-  ],
+  // `docs/STATE.md` HAD NINE KEYS HERE AND IS REPAIRED. Session 81, 2026-08-20,
+  // under ADR-061. The P1-item table carried TWO WHOLE COPIES of itself, the
+  // second column-padded by prettier so the review desk's byte-identical dedupe
+  // could not see it; all eleven padded rows were character-identical to their
+  // twins once the padding was stripped, which is ADR-061's agreement test met
+  // mechanically rather than by reading. The two pairs that did NOT agree, both
+  // inside the first copy, were resolved on the review desk's instruction and on
+  // tree evidence rather than by picking a row: `ci-06, corpus integrity` read
+  // `Eleven` in one row against a generated `gate_count` span in the other, and
+  // `gates.mjs check` prints 22; `the reconciled schema and migrations` read
+  // hand-typed table and trigger totals in one row against generated spans in the
+  // other, and its deleted row also asserted `0029` to `0031` were "reserved and
+  // unwritten" after all three had merged, which OI-10 already records as false.
+  // THE SPAN-CARRYING ROW SURVIVED IN BOTH CASES. This entry's own note used to
+  // say the two rows say `21` and `Eleven`; the tree said `22` and `Eleven`.
   // THE MONEY-PATH ONE. The guard table defines ten guards twice, and
   // `G-ELIGIBLE`'s two definitions disagree about the identity clause while
   // both cite ADR-041. Which one is the ruling is not a parse's question.
