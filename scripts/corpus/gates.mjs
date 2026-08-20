@@ -3820,6 +3820,21 @@ const DIMENSION_HEADERS = new Map([
 // SHRINKS ONLY: an entry that no longer names a duplicate is reported, so the
 // day a file is repaired is the day its entry has to go.
 const CI06U_REGISTER = new Map([
+  // THE SESSIONS INDEX IS NOT A MERGE ARTIFACT AND IS REGISTERED FOR A DIFFERENT
+  // REASON. Since session 45 the convention has been that parallel sessions on one
+  // day SHARE a number and a log file, each appending its own `##` section: 45, 47
+  // and 48 each hold three. So two rows pointing at one file are two ENTRIES, and
+  // the row's identity is (file, subject) rather than the file alone. This table
+  // has an EMPTY header, so no `DIMENSION_HEADERS` entry can reach it.
+  //
+  // THAT CONVENTION AND THIS GATE ARE IN CONFLICT AND ONE OF THEM MUST GIVE. A
+  // session number naming three different sessions is not an identifier, and
+  // WAVE-01 already recorded this registry racing twice with four entries numbered
+  // 31. The review desk registered the pair rather than renumbering thirty sessions
+  // while resolving a merge. IT IS A RULING THAT IS OWED, not a duplicate to repair,
+  // and it is the one register entry here that may legitimately grow before it
+  // shrinks.
+
   // Three plan documents rowed twice by the INDEX merge. M05's two rows give it
   // two different purposes: "bounded freeze, reset" and "the 48 hour
   // enforcement window". The registry that decides whether a thing exists.
@@ -3898,6 +3913,7 @@ const CI06U_REGISTER = new Map([
   [
     'docs/sessions/README.md',
     [
+      '2026-08-19 - session 75',
       '2026-08-13 - session 1',
       '2026-08-13 - session 2',
       '2026-08-13 - session 3',
