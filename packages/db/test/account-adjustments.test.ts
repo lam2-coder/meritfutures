@@ -120,9 +120,10 @@ describe('0038: the destination, which is the whole ruling (ADR-067 section 2)',
     // account_adjustments.amount_cents is a magnitude. Getting this backwards
     // is the error 0009 records landing four times in one day on LT-01.
     const body = fn('assert_adjustment_posting_matches');
-    const credit = /IF NEW\.direction = 'credit' THEN\s+want_position := (-?)NEW\.amount_cents;\s+want_revenue\s+:=\s+(-?)\s*NEW\.amount_cents;/.exec(
-      body,
-    );
+    const credit =
+      /IF NEW\.direction = 'credit' THEN\s+want_position := (-?)NEW\.amount_cents;\s+want_revenue\s+:=\s+(-?)\s*NEW\.amount_cents;/.exec(
+        body,
+      );
     expect(credit, 'the credit branch does not have the expected shape').not.toBeNull();
     expect(credit?.[1], 'a credit must post a NEGATIVE (credit) leg to the position').toBe('-');
     expect(credit?.[2], 'a credit must post a POSITIVE (debit) leg to fees_revenue').toBe('');
@@ -132,7 +133,9 @@ describe('0038: the destination, which is the whole ruling (ADR-067 section 2)',
 describe('0038: never a balance mutation (ADR-067 section 1)', () => {
   test('ledger_transaction_id is NOT NULL and unique', () => {
     const sql = ddl();
-    expect(sql).toMatch(/ledger_transaction_id\s+uuid NOT NULL REFERENCES ledger_transactions\(id\)/);
+    expect(sql).toMatch(
+      /ledger_transaction_id\s+uuid NOT NULL REFERENCES ledger_transactions\(id\)/,
+    );
     expect(sql).toContain('CREATE UNIQUE INDEX account_adjustments_transaction_uq');
   });
 
@@ -204,7 +207,9 @@ describe('0038: dual control, the reason, and the promotional pairing', () => {
 
   test('the reason vocabulary is exactly three values and closed in the migration', () => {
     const sql = ddl();
-    const check = /reason_code\s+text NOT NULL CHECK \(reason_code IN \(([\s\S]*?)\n\s*\)\)/.exec(sql);
+    const check = /reason_code\s+text NOT NULL CHECK \(reason_code IN \(([\s\S]*?)\n\s*\)\)/.exec(
+      sql,
+    );
     expect(check, 'no reason_code CHECK found').not.toBeNull();
     const values = [...(check?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
     expect(values).toEqual(['goodwill', 'reconciliation_error', 'promotional_credit']);
@@ -231,8 +236,15 @@ describe('0038: what it deliberately does not do', () => {
     // Every vocabulary this table needs already existed, which is the evidence
     // that the destination ruling is right. An ALTER on any of these would mean
     // it did not.
-    for (const table of ['wallet_entries', 'ledger_accounts', 'ledger_transactions', 'identities']) {
-      expect(sql, `0038 must not ALTER ${table}`).not.toMatch(new RegExp(`ALTER TABLE\\s+${table}`));
+    for (const table of [
+      'wallet_entries',
+      'ledger_accounts',
+      'ledger_transactions',
+      'identities',
+    ]) {
+      expect(sql, `0038 must not ALTER ${table}`).not.toMatch(
+        new RegExp(`ALTER TABLE\\s+${table}`),
+      );
     }
     expect(sql).not.toMatch(/ALTER TYPE/);
     expect(sql).not.toMatch(/CREATE TYPE/);
@@ -251,9 +263,7 @@ describe('0038: what it deliberately does not do', () => {
   test('append-only by grant, against PUBLIC as well as merit_app', () => {
     // Without this every constraint above is bypassable: write a compliant row,
     // then edit it. The deferred assertions are INSERT triggers.
-    expect(ddl()).toMatch(
-      /REVOKE UPDATE, DELETE ON account_adjustments FROM merit_app, PUBLIC;/,
-    );
+    expect(ddl()).toMatch(/REVOKE UPDATE, DELETE ON account_adjustments FROM merit_app, PUBLIC;/);
   });
 });
 
