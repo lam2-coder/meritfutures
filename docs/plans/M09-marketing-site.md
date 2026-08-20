@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M03-billing-checkout.md, M04-trader-portal.md, M12-transparency-platform.md, M19-kyc-identity.md]
-last_updated: 2026-08-14
+last_updated: 2026-08-20
 ---
 
 # M9: Marketing Site and Content
@@ -56,20 +56,53 @@ Three of those surfaces are unlike the rest and deserve naming up front, because
 | INV-M9-09 | Marketing prose never claims a payout timing the wallet does not deliver | [ADR-019](../decisions/ADR-019.md). The internal leg is same day to the Merit Wallet; the external leg is 2 to 3 business days. Both are stated, and the second is never omitted to make the first read better (AS-M9-06) |
 | INV-M9-10 | The marketing origin holds no session, no trader data, and no write path | [SECURITY](../architecture/SECURITY.md) C-08's separation logic applied downward: the most-attacked and least-privileged surface in the estate is also the one with nothing to steal |
 | INV-M9-11 | A page rendering a **superseded** plan version is reachable, labeled, and never the default | Permanent per-version URLs. A trader pinned to v1 must be able to read v1's public page, and a stranger must never land on it by accident (AS-M9-07) |
+| INV-M9-12 | **The plan display name, the marketed size label and the internal size are three independent fields, and only `size_cents` is ever computed on.** The label is rendered and never parsed, never rounded, and never converted back into a number | [ADR-070](../decisions/ADR-070.md) section 4, section 2.1. `plans.name` names the plan, `plan_version_sizes.marketed_size_label` (SD-M9-04) describes the size, and `plan_version_sizes.size_cents` **is** the size. The label is typed as an opaque display string on the way in and rendered verbatim on the way out, so VG-M9-1's no-literals lint (INV-M9-01) and section 8.3's parity rule between them still cover every figure on the page. GS-309 |
+| INV-M9-13 | **The marketed label is versioned with the plan version, and an absent one renders a stated default rather than an empty string** | [ADR-070](../decisions/ADR-070.md) section 4 rules the label onto the version rather than onto `plans`, so it is immutable once published for the same reason every other published parameter is. The stated default is the capital figure derived from `size_cents` (section 2.1), and the empty string is **unwritable**: SD-M9-04's `CHECK` leaves `null` as the only representation of absent, so there is exactly one case to render rather than two. GS-310 |
 
 ---
 
 ## 2. Entities and schema deltas
 
-M9 is overwhelmingly a consumer. It reads `plans`, `plan_versions`, `plan_version_sizes`, `tos_versions`, and `geo_restrictions` as approved in [DATA_MODEL](../architecture/data-model/README.md), and M12's published aggregate. Three deltas.
+M9 is overwhelmingly a consumer. It reads `plans`, `plan_versions`, `plan_version_sizes`, `tos_versions`, and `geo_restrictions` as approved in [DATA_MODEL](../architecture/data-model/README.md), and M12's published aggregate. **Four deltas**, the fourth admitted by [ADR-070](../decisions/ADR-070.md) and specified in section 2.1.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
 | SD-M9-01 | `plan_versions` | add `public_slug text not null` and `public_visible boolean not null default false` | A plan version needs a stable, permanent public URL that survives being superseded (INV-M9-11), and a version can exist as published-for-engine while not yet being the one on sale. Deriving the URL from the version number instead would make the archive URL change whenever numbering does, which breaks exactly the links AS-M9-07 depends on |
 | SD-M9-02 | new `content_documents` | `id`, `kind check in ('page','post','faq','legal')`, `slug`, `locale`, `title`, `body_mdx`, `version integer`, `published_at`, `superseded_by uuid null`, `author`, `checksum bytea` | Legal pages are **versioned documents with acceptance consequences**, and the constitution requires ToS, Privacy, and Risk Disclosure to be versioned. Once legal pages need version history, giving blog posts a different storage mechanism means two content systems and one of them without an audit trail. `checksum` is what makes "the page a trader accepted" a provable artifact rather than a git blame |
 | SD-M9-03 | new `page_revalidations` | `id`, `trigger text`, `reference_id uuid`, `paths text[]`, `requested_at`, `completed_at null`, `status check in ('pending','ok','failed')` | INV-M9-04 makes revalidation part of the publish transaction's definition of done. An invalidation that is fire-and-forget is a cache that is usually right, and "usually right" on a price page is AS-M9-01 |
+| SD-M9-04 | `plan_version_sizes` | add `marketed_size_label text null`, with `check (marketed_size_label is null or btrim(marketed_size_label) <> '')` | [ADR-070](../decisions/ADR-070.md) section 4 rules the marketed label **versioned with the plan version**, and this is the per-version, per-size row, so the label is pinned by the write that already pins the price. On `plans` it would be a disclosure an operator could change on a Tuesday about an account sold on a Monday; inside `plan_versions.rules` it would put a rendered string into the blob the engine reads for structure. **The `CHECK` is what gives GS-310 one case instead of two**: absent is `null`, and an empty string cannot be written at all. The migration is owed and is not written here (section 2.1) |
 
 **One thing deliberately not modelled: no analytics or visitor table.** Traffic analytics live with the vendor ([M10](M10-integrations.md)); nothing about a visitor is written to Merit's database from the marketing origin. That keeps INV-M9-10 true by construction rather than by policy.
+
+### 2.1 Three name fields, and only one of them is a number (ADR-070)
+
+**A plan can be marketed by runway or by style rather than by a capital figure.** That is what [ADR-070](../decisions/ADR-070.md) section 4 admits, folding [FOLD-05](FOLD-05-plan-config-and-designer.md) section 4.3, and the change is smaller than it reads: two of the three fields already exist and the third is a nullable column.
+
+| Field | Where it lives | What it is | Versioned |
+|---|---|---|---|
+| **Plan display name** | `plans.name`, which exists | The product's identity across every version it ever had | **No.** It names the plan, not a term of sale, and it is the same string on v1 and on v9. The residual is OQ-M9-05 |
+| **Marketed size label** | `plan_version_sizes.marketed_size_label`, SD-M9-04, new | What this size is called on the site: a capital figure, a runway, or a style | **Yes**, with the plan version. That is the ruling |
+| **Internal size** | `plan_version_sizes.size_cents`, which exists | The number every computation reads, in integer cents | **Yes**, and it does not move |
+
+**The three are independent in the direction that matters**: a label may be changed at the next publish without `size_cents` moving, and `size_cents` may move without the label following, and neither is derived from the other. **Independence is the feature and it is also the whole risk.**
+
+**The risk is disclosure, not display, and this is the sentence the fold exists for.** A page that renders the wrong label is not a page with a typo. It is Merit describing, in its own published words, an account it will enforce against a different number.
+
+**And the label is the one number-bearing string on this site that no lint can check.** INV-M9-07's VG-M9-2 works because it can see a currency figure in *prose* and demand it come from config instead. The marketed label **is** config, so it passes that lint by construction, and it can still read "$50K" beside a `size_cents` of 2,500,000. **No gate can close that**, and the reason is worth stating rather than leaving as a gap somebody later tries to fill: a capital figure, a runway and a style name are all legitimate labels for the same row, so deciding whether a label agrees with a number would require knowing what the label means, and the entire point of the field is that Merit chooses what it means.
+
+**So the control is immutability rather than validation, and that is why `OQ-F5-04` is answered the way it is.** A label on `plans` would be a string with no version to diff and no record that it moved. A label on the version cannot move at all: a published `plan_versions` row is immutable ([M3](M03-billing-checkout.md) section 3.3), so restating a label means **publishing a new version**, which is `validatePlan`, a diff a human reads, and dual control where [ADR-010](../decisions/ADR-010.md)'s set applies. **A trader keeps the label they were sold under for the same reason they keep the cap they were sold under**, and no new mechanism carries it.
+
+**It is authored where `price_cents` is authored**, on the publish payload's per-size entry, and it lands on the same row in the same transaction ([M3](M03-billing-checkout.md) INV-M3-12). **It is therefore not MATERIALIZED**, in the sense [`0004_catalog.sql`](../../packages/db/migrations/0004_catalog.sql) uses for `floor_lock_enabled`: nothing projects it from `rules`, so there is no second copy and no `CV-nn` agreement to assert. There is one place it is written and one place it is read.
+
+**What the label is not allowed to be.**
+
+- **Not an input to anything.** It does not appear on `PlanVersionSizeRow` and does not enter `validatePlan`, on [`types.ts`](../../packages/rules-engine/src/types.ts)'s own stated rule that what the engine may not see, it may not validate. A label the engine can read is a label a rule can eventually branch on.
+- **Not the size selector's key and not a URL segment.** Both stay derived from `size_cents`. A label that addressed a page would make a rename move every URL, which breaks exactly the permanence INV-M9-11 and AS-M9-07 are built on.
+- **Not parsed.** Nothing anywhere reads a number back out of it.
+
+**The rendering rule, stated once so every surface shares it.** A surface that names a size renders the pinned version's `marketed_size_label`, and **every figure on that same surface is computed from `size_cents`**: the price, the drawdown, the profit target, the buffer, the win-day floor and the cap schedule. The two never swap roles. That is `GS-309`.
+
+**The absent case has a stated rendering, which is `GS-310`.** When `marketed_size_label` is null, the surface renders **the capital figure derived from `size_cents`**, formatted by the same helper every other cents value on the page goes through. It is the default that cannot be wrong: it is the internal truth rendered directly, it is never empty, and a plan with no marketing opinion about a size gets an honest description of it rather than a blank. **A dash, a placeholder and the plan name were each rejected**: the first two render a size page with no size on it, and the third is already on the page and says nothing about this row.
 
 ---
 
@@ -143,7 +176,7 @@ M9 owns no authenticated endpoint. It consumes the public catalog and one intern
 
 | Endpoint | M9's role | Notes |
 |---|---|---|
-| `GET /plans` | Consumes | Public, cached. Returns the currently sellable versions with their materialized sizes ([API_CONTRACT section 4](../architecture/API_CONTRACT.md)) |
+| `GET /plans` | Consumes | Public, cached. Returns the currently sellable versions with their materialized sizes ([API_CONTRACT section 4](../architecture/API_CONTRACT.md)). **Must also carry each size's `marketed_size_label`** (SD-M9-04, DEP-M9-07); that contract amendment is owed and is not written here |
 | `GET /plans/:planId/versions/:version` | Consumes | The rules JSON **and** `copy_blocks`. The same object marketing renders and the engine executes, which is the constitution's own phrasing and the reason the endpoint exists |
 | `GET /public/stats` **NEW** | Consumes | [M12](M12-transparency-platform.md)'s published aggregate: values, trailing window, as-of trading day, and method reference. M9 renders and never computes (INV-M9-06) |
 | `POST /internal/revalidate` **NEW** | Owns | Called by the publish action and by content publishing. Admin origin and service credential only, path allowlisted, never reachable from the public internet. Writes `page_revalidations` (SD-M9-03) |
@@ -179,6 +212,7 @@ M9 is a leaf. It emits little and consumes the catalog.
 | FM-M9-06 | Legal page superseded while a checkout is open | A trader accepts a version they did not read | `tos_versions` is pinned into the checkout session at open ([M3](M03-billing-checkout.md)), exactly as the plan version is (B4 #12) | The pinned version wins. The mechanism already exists for prices and is reused rather than reinvented |
 | FM-M9-07 | A superseded plan version's URL 404s | Every link a trader, an affiliate, or a reviewer ever shared to that plan breaks | Link check over `plan_versions.public_slug` in CI | Permanent per-version URLs (SD-M9-01, INV-M9-11). A 404 on a rules page a trader was enforced against is an evidentiary problem as well as a marketing one |
 | FM-M9-08 | CDN cache poisoning or an unsanctioned edge rewrite | The public face of a financial product serves attacker content | Subresource integrity, immutable deploys, and a synthetic content check against the build checksum | Strict CSP, no third-party script on the pricing or rules routes, and the build digest asserted post-deploy. [SECURITY](../architecture/SECURITY.md) C-14 and INFRA |
+| FM-M9-09 | A marketed size label describes a size the row does not carry | A trader buys under one description and is enforced against a different number. **This is a disclosure failure and not a rendering one**, and the page it happened on is not evidence of it: the page rendered the config faithfully | **No gate detects it** (section 2.1). The publish diff ([M3](M03-billing-checkout.md) section 3.3) is where a human sees the label beside that row's `size_cents`, and it is the only place | The label is immutable on a published version, so the exposure is bounded to what was approved at that publish rather than open-ended. Correcting it is a **new version**, never an edit, and the old label stays readable at its permanent URL (INV-M9-11) so the correction is a record rather than an erasure |
 
 ---
 
@@ -276,7 +310,7 @@ M9 is a leaf. It emits little and consumes the catalog.
 
 | Suite | Prefix | Count | Runs | Blocks |
 |---|---|---|---|---|
-| Config-render parity (page values against `GET /plans`) | `M9-C-nn` | 9 | every commit | merge |
+| Config-render parity (page values against `GET /plans`) | `M9-C-nn` | 11 | every commit | merge |
 | Build lints VG-M9-1 and VG-M9-2 (no literals, no prose parameters) | `M9-L-nn` | 4 | every commit | merge |
 | Publish and revalidation ordering | `M9-R-nn` | 6 | every commit | merge |
 | Content versioning and permanent URLs | `M9-V-nn` | 5 | every commit | merge |
@@ -284,7 +318,7 @@ M9 is a leaf. It emits little and consumes the catalog.
 | Accessibility and Appendix F conformance | `M9-A-nn` | 5 | every commit | merge |
 | Link integrity over every `public_slug` and legal version | `M9-K-01` | 1 | nightly | nightly alarm |
 | Synthetic stale-content probe against live config | `M9-S-01` | 1 | continuous in production | page |
-| Golden fixtures | `GS-nnn` | 7 owned (GS-142 to GS-148) | every commit | merge |
+| Golden fixtures | `GS-nnn` | 9 owned (GS-142 to GS-148, GS-309, GS-310) | every commit | merge |
 
 ### 8.2 Named scenarios owned by this module
 
@@ -297,10 +331,14 @@ M9 is a leaf. It emits little and consumes the catalog.
 | GS-146 | A `copy_block` whose wording contradicts its rule's operator | Publish validation fails. "More than" against `>=` does not reach a page. AS-M9-05 |
 | GS-147 | Payout copy with one leg omitted | Lint fails on headline, social card, email subject, and OG image. AS-M9-06 |
 | GS-148 | A superseded plan version's public URL | Resolves, is labeled superseded, names its successor, and is excluded from indexing and navigation. AS-M9-07 |
+| GS-309 | A plan marketed under a runway label is rendered and priced | The label renders, and the price, drawdown, profit target, buffer, win-day floor and cap on the same surface are every one of them computed from `size_cents`. The label reaches no computation and is never parsed. Section 2.1, INV-M9-12 |
+| GS-310 | The marketed label is absent | The surface renders the capital figure derived from `size_cents`: never an empty string, never a placeholder, never the plan name. The empty string is unwritable (SD-M9-04), so `null` is the only absent case there is. Section 2.1, INV-M9-13 |
 
 ### 8.3 Coverage rule
 
 **Every value rendered on a public page is asserted equal to the same value fetched from the API in the same test run.** Not a snapshot of an expected number: a comparison against the source. A snapshot test of a price page proves the page has not changed, which is precisely the wrong property for a page whose job is to change with its configuration.
+
+**The marketed size label extends that rule and reverses one half of it.** The label is asserted equal to the pinned version's `marketed_size_label`, and **every figure on the same surface is asserted equal to a value derived from `size_cents`** rather than merely equal to something. A test that checks only that the label rendered passes on a page that also priced from it, which is the one failure GS-309 exists to catch (INV-M9-12).
 
 ---
 
@@ -344,6 +382,8 @@ M9 owns a small one: divergence count, revalidation health, stats age, and Core 
 
 **OQ-M9-03. In restricted jurisdictions, does the site serve a notice, a hard block, or the normal page?** AS-M9-04 argues that solicitation and sale are different acts and that only sale is currently defended. Proposed: **notice plus call-to-action suppression**, with the restricted list published. This is a counsel question and the answer changes what gets built, so it should be asked at the same sitting as the restricted-list determination that constitution section 10 already leaves open.
 
+**OQ-M9-05. Is `plans.name` pinned to the version a trader bought, the way the marketed size label now is?** [ADR-070](../decisions/ADR-070.md) rules the **size label** onto the plan version and says nothing about the plan name, and section 2.1 leaves `plans.name` where it is on the reasoning that a plan name is the product's identity across every version rather than a term of the sale. **The residual is real and the founder should see it rather than have the fold quietly close it**: renaming a plan changes what every trader who ever bought it sees their own account called, on every surface, with no version to diff and no record that it moved. It is a weaker case than the size label, because a name describes a product and a label describes a number, and it is not nothing. Proposed: **leave `plans.name` mutable and make a rename a recorded, dual-controlled admin action**, which costs one line in the console rather than a column and a migration and buys the record that is the only thing actually missing. Adding it to [ADR-010](../decisions/ADR-010.md)'s closed sensitive set is an amendment to that ADR and not an application of it, so this is a proposal and not a ruling.
+
 **OQ-M9-04. Is the stats page linked from the primary navigation at launch, or introduced after enough history exists to be meaningful?** The transparency moat is the point, and a pass rate computed over six weeks of beta is a number with enormous error bars that will nonetheless be quoted forever (AS-M9-03). Proposed: **publish from day one, with the sample size and window shown as prominently as the value, and a stated minimum sample below which the figure renders as "not yet meaningful" rather than as a number.** M12 owns the threshold; this question is only whether the link is in the main navigation on launch day. Recommendation: yes, because a transparency page that appears once the numbers look good is not a transparency page.
 
 ---
@@ -358,3 +398,4 @@ M9 owns a small one: divergence count, revalidation health, stats age, and Core 
 | DEP-M9-04 | `geo_restrictions` is the single source for checkout enforcement, campaign targeting, and the site notice | M3, M8 | The targeting configuration and the enforcement configuration drift, which is AS-M9-04's worst version |
 | DEP-M9-05 | `tos_versions` rows are created by content publishing and pinned into checkout sessions | M3 | FM-M9-06: a trader accepts a version they did not read |
 | DEP-M9-06 | M8's creative approval carries an expiry when a creative embeds a statistic | M8 | AS-M9-03's third counter does not exist, and compliance approves a future number nobody has seen |
+| DEP-M9-07 | `GET /plans` and the version endpoint carry each size's `marketed_size_label`, and [M3](M03-billing-checkout.md)'s publish diff shows it beside that row's `size_cents` | M1, M3 | The site has nothing to render, and **the only human-readable check on a field no gate can validate does not exist** (section 2.1, FM-M9-09). The [API_CONTRACT](../architecture/API_CONTRACT.md) amendment this implies is owed and is deliberately not written here, which is a fence statement rather than a design one |
