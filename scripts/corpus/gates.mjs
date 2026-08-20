@@ -370,31 +370,78 @@ function adrEntries() {
   return out;
 }
 
-function allocated(body, heading) {
+// One allocation table's body, with the absolute line number of its first line
+// so a finding can name the ROW rather than the key alone. `CI-06w` reports two
+// rows claiming one number and "0034 is claimed twice" is not actionable
+// without the two line numbers; every other reader here ignores the offset.
+//
+// The bound is a PARAMETER because the letter table needs a different one, and
+// the difference is not style: it is the LAST `##` section in ALLOCATION.md, so
+// `\n## ` runs to end of file there and every table row in the prose below it
+// would claim a letter. See `allocatedLetterClaims` for the long form.
+function allocationSection(body, heading, bound) {
   const start = body.indexOf(heading);
   if (start === -1) throw new Error(`allocation table not found: "${heading}"`);
-  const rest = body.slice(start + heading.length);
-  const next = rest.search(/\n## /);
-  const claimed = new Set();
+  const from = start + heading.length;
+  const rest = body.slice(from);
+  const next = rest.search(bound);
+  return {
+    text: next === -1 ? rest : rest.slice(0, next),
+    // `heading` carries no newline, so the slice ending just past it ends on
+    // the heading's own line, and `text`'s line `i` is at `firstLine + i`.
+    firstLine: body.slice(0, from).split('\n').length,
+  };
+}
+
+// THE CLAIMS AS A MULTISET: number -> the line of every row claiming it.
+//
+// THIS FUNCTION IS THE REPAIR FOR `OI-11` AND `allocated()` BELOW IS NOW A VIEW
+// OF IT. It returned a `Set` directly for fifteen gates, so TWO ROWS CLAIMING
+// `0034` PRODUCED ONE MEMBER: gaplessness held, every-number-on-disk-is-claimed
+// held, and the table whose entire purpose is to make a duplicate claim visible
+// could not see one. `ADR-046` and `ADR-047` both claimed `0034` in ADJACENT
+// ROWS of one file on one ref and nothing reported it.
+//
+// The remedy is NOT a second parser in `CI-06w`. Two expressions of "what does
+// this table claim" agree until they do not, which is the defect session 20
+// removed from this runner when `CI-06b` and `CI-06c` carried one document set
+// twice. `CI-06w` asserts over THIS map, the one `CI-06f` and `CI-06h` read
+// through, so a future refactor collapsing it back into a `Set` breaks the gate
+// loudly rather than making it vacuous.
+function allocatedClaims(body, heading) {
+  const { text, firstLine } = allocationSection(body, heading, /\n## /);
+  const claims = new Map();
   let rows = 0;
-  for (const line of (next === -1 ? rest : rest.slice(0, next)).split('\n')) {
-    if (!line.startsWith('|')) continue;
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith('|')) continue;
     // `| 001 to 032 |`, `| **033** |`, `| 0001 to 0028 |`. The header row and
     // the `|---|` separator do not match, which is how they are skipped.
     const m = /^\s*\*{0,2}(\d{3,4})\*{0,2}(?:\s+to\s+\*{0,2}(\d{3,4})\*{0,2})?\s*$/.exec(
-      line.split('|')[1] ?? '',
+      lines[i].split('|')[1] ?? '',
     );
     if (!m) continue;
     rows++;
     const to = m[2] ? Number(m[2]) : Number(m[1]);
-    for (let n = Number(m[1]); n <= to; n++) claimed.add(n);
+    // A RANGE ROW CLAIMS EVERY NUMBER IN IT, one row-line per number, so an
+    // overlap between `001 to 032` and a later `032` is the same finding as two
+    // identical rows. That is the direction a per-row-literal check would miss.
+    for (let n = Number(m[1]); n <= to; n++) {
+      if (!claims.has(n)) claims.set(n, []);
+      claims.get(n).push(firstLine + i);
+    }
   }
   // A table that parses to nothing is a gate with an empty reservation set,
   // which reports every hole and no false pass. It is still a runner that has
   // lost its input, and rule 2 of this file says that is an ERROR, not a pass.
   if (rows === 0) throw new Error(`allocation table claims no numbers: "${heading}"`);
-  return claimed;
+  return claims;
 }
+
+// The set view, which is what gaplessness and every-number-is-claimed want. It
+// is DERIVED rather than parsed a second time, which is the whole of the
+// arrangement above.
+const allocated = (body, heading) => new Set(allocatedClaims(body, heading).keys());
 
 // -----------------------------------------------------------------------------
 // CI-06a  Link check
@@ -2849,29 +2896,37 @@ const GATE_INVENTORY = '### 4.4 Corpus integrity';
 // letter. The two numeric tables each have a `##` sibling beneath them and never
 // had this problem, which is exactly why copying their bound would have been
 // wrong in a way nothing would have reported.
-function allocatedLetters(body) {
-  const start = body.indexOf(LETTER_ALLOCATION);
-  if (start === -1) throw new Error(`allocation table not found: "${LETTER_ALLOCATION}"`);
-  const rest = body.slice(start + LETTER_ALLOCATION.length);
-  const next = rest.search(/\n#{1,6} /);
-  const claimed = new Set();
+// The multiset, for the reason `allocatedClaims` states one registry over: a
+// `Set` here hid a LIVE double claim of the letter `u` by two different gates
+// for twenty-two gates, and `CI-06p`'s uniqueness assertion could not see it
+// because `CI-06p` reads STRATEGY's rows and the second claim was in this file.
+function allocatedLetterClaims(body) {
+  const { text, firstLine } = allocationSection(body, LETTER_ALLOCATION, /\n#{1,6} /);
+  const claims = new Map();
   let rows = 0;
-  for (const line of (next === -1 ? rest : rest.slice(0, next)).split('\n')) {
-    if (!line.startsWith('|')) continue;
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith('|')) continue;
     const m = /^\s*\*{0,2}`?([a-z])`?\*{0,2}(?:\s+to\s+\*{0,2}`?([a-z])`?\*{0,2})?\s*$/.exec(
-      line.split('|')[1] ?? '',
+      lines[i].split('|')[1] ?? '',
     );
     if (!m) continue;
     rows++;
     const to = (m[2] ?? m[1]).charCodeAt(0);
-    for (let c = m[1].charCodeAt(0); c <= to; c++) claimed.add(String.fromCharCode(c));
+    for (let c = m[1].charCodeAt(0); c <= to; c++) {
+      const letter = String.fromCharCode(c);
+      if (!claims.has(letter)) claims.set(letter, []);
+      claims.get(letter).push(firstLine + i);
+    }
   }
   // Rule 2. A table that parses to nothing is a gate with an empty reservation
   // set: it reports every hole and no false pass, and it is still a runner that
   // has lost its input.
   if (rows === 0) throw new Error(`allocation table claims no letters: "${LETTER_ALLOCATION}"`);
-  return claimed;
+  return claims;
 }
+
+const allocatedLetters = (body) => new Set(allocatedLetterClaims(body).keys());
 
 // The letters the runner actually implements, read from GATES rather than from
 // STRATEGY's table, because the runner is the artifact and the table is the
