@@ -9,10 +9,10 @@
 | **M1 rules engine** | GS-001 to GS-032, GS-034 to GS-035, GS-042, GS-044, GS-047, GS-049, GS-052 to GS-083, GS-141, GS-241 to GS-242 | 73 |
 | **M2 Rithmic bridge** | GS-033, GS-043, GS-084 to GS-093, GS-138 | 13 |
 | **M3 billing and checkout** | GS-038 to GS-041, GS-094 to GS-099, GS-239, GS-250, GS-252, GS-272, GS-280 | 15 |
-| **M4 trader portal** | GS-100 to GS-105, GS-132 to GS-133, GS-246 to GS-247, GS-266 to GS-269 | 14 |
+| **M4 trader portal** | GS-100 to GS-105, GS-132 to GS-133, GS-246 to GS-247, GS-266 to GS-269, GS-285 | 15 |
 | **M5 payout system** | GS-036 to GS-037, GS-048, GS-051, GS-106 to GS-111, GS-128 to GS-129, GS-131, GS-139, GS-248 to GS-249, GS-273 to GS-276, GS-278 | 21 |
-| **M6 admin and ops console** | GS-112 to GS-117, GS-130, GS-251, GS-279, GS-282, GS-284 | 11 |
-| **M7 risk and abuse** | GS-046, GS-050, GS-118 to GS-122, GS-134 to GS-137, GS-235 to GS-238 | 15 |
+| **M6 admin and ops console** | GS-112 to GS-117, GS-130, GS-251, GS-279, GS-282, GS-284, GS-288 to GS-292, GS-296 to GS-299 | 20 |
+| **M7 risk and abuse** | GS-046, GS-050, GS-118 to GS-122, GS-134 to GS-137, GS-235 to GS-238, GS-286 to GS-287 | 17 |
 | **M8 affiliate system** | GS-045, GS-123 to GS-127, GS-140, GS-281 | 8 |
 | **M9 marketing site** | GS-142 to GS-148 | 7 |
 | **M10 integrations** | GS-149 to GS-154, GS-254 | 7 |
@@ -21,15 +21,15 @@
 | **M13 analytics and journal** | GS-172 to GS-178 | 7 |
 | **M14 loyalty and retention** | GS-179 to GS-185, GS-243 to GS-245 | 10 |
 | **M15 Discord integration** | GS-186 to GS-191 | 6 |
-| **M16 notification center** | GS-192 to GS-197, GS-270 to GS-271 | 8 |
+| **M16 notification center** | GS-192 to GS-197, GS-270 to GS-271, GS-293 to GS-295 | 11 |
 | **M17 offers engine** | GS-198 to GS-204, GS-253 | 8 |
 | **M18 graduation track** | GS-205 to GS-211, GS-240 | 8 |
 | **M19 KYC and identity** | GS-212 to GS-221, GS-232 to GS-234, GS-256 to GS-257, GS-258 to GS-265, GS-283 | 24 |
 | **M20 Merit Wallet** | GS-222 to GS-231, GS-277 | 11 |
 | **INFRA and cross-cutting** | GS-255 | 1 |
-| | | **<!--gen:gs_count-->284<!--/gen-->** |
+| | | **<!--gen:gs_count-->299<!--/gen-->** |
 
-**Numbering is contiguous from GS-001 to GS-284 with no gaps and no duplicates**, which CI-06d asserts on every push ([STRATEGY](../STRATEGY.md) section 4.4).
+**Numbering is contiguous from GS-001 to GS-299 with no gaps and no duplicates**, which CI-06d asserts on every push ([STRATEGY](../STRATEGY.md) section 4.4).
 
 **The sum of the column above is asserted too, and it was not until 2026-08-16.** The table read **257** against a registry of 284 for as long as `GS-258` to `GS-284` existed: `FOLD-01` and `FOLD-02` added twenty-seven scenarios and **nobody owned one of them**, while this file went on describing itself as a partition. The old sentence here claimed the sum agreed with the registry "or the build fails", and **no check existed** — which is how the claim survived being false. `CI-06d` now asserts the partition covers every `GS-nnn` **exactly once**, in both directions, so the next fold that adds scenarios and forgets this table fails on a robot rather than on a reader who happened to add up a column.
 
@@ -54,7 +54,7 @@ These carry an assertion in more than one module's suite. The primary owner in 3
 | GS-252 compromised operator edits a live plan version | M3 | M6 |
 | GS-253 mass coupon redemption with price probing | M3 | M17 |
 
-### 33.2 How the registry reached <!--gen:gs_count-->284<!--/gen-->
+### 33.2 How the registry reached <!--gen:gs_count-->299<!--/gen-->
 
 | Source | Range | Added | Running total |
 |---|---|---|---|
@@ -69,9 +69,10 @@ These carry an assertion in more than one module's suite. The primary owner in 3
 | **Wave 4: the Appendix D0 attack battery** | GS-246 to GS-255 | 10 | 255 |
 | **Wave 4: verification UX, renumbered out of a collision** | GS-256 to GS-257 | 2 | 257 |
 | **[FOLD-01](../../plans/FOLD-01-phone-identity.md): phone identity and the authority boundary** ([ADR-039](../../decisions/ADR-039.md)) | GS-258 to GS-272 | 15 | 272 |
-| **[FOLD-02](../../plans/FOLD-02-enforcement-window-and-suspension.md): the enforcement window and identity restriction** ([ADR-040](../../decisions/ADR-040.md), [ADR-041](../../decisions/ADR-041.md)) | GS-273 to GS-284 | 12 | **<!--gen:gs_count-->284<!--/gen-->** |
+| **[FOLD-02](../../plans/FOLD-02-enforcement-window-and-suspension.md): the enforcement window and identity restriction** ([ADR-040](../../decisions/ADR-040.md), [ADR-041](../../decisions/ADR-041.md)) | GS-273 to GS-284 | 12 | **<!--gen:gs_count-->299<!--/gen-->** |
+| **[FOLD-03](../../plans/FOLD-03-vendor-parity-gap-fill.md): the vendor-parity gap-fill** (`ADR-066`, `ADR-067`, both reserved and unwritten) | GS-285 to GS-299 | 15 | 299 |
 
-**The registry was quoted at 242 going into Wave 4 and stood at 257 leaving it**, and the two folds since have taken it to <!--gen:gs_count-->284<!--/gen-->. The fifteen are not scope creep: ten discharge an obligation [SECURITY](../../architecture/SECURITY.md) recorded for this wave, three carry a founder ruling, and two fix a collision in which one number answered to two fixtures.
+**The registry was quoted at 242 going into Wave 4 and stood at 257 leaving it**, and the three folds since have taken it to <!--gen:gs_count-->299<!--/gen-->. The fifteen are not scope creep: ten discharge an obligation [SECURITY](../../architecture/SECURITY.md) recorded for this wave, three carry a founder ruling, and two fix a collision in which one number answered to two fixtures.
 
 ### 33.3 Constitution and research coverage
 
@@ -81,7 +82,7 @@ These carry an assertion in more than one module's suite. The primary owner in 3
 | Appendix D0, 10 attack scenarios | GS-246 to GS-255, `GS-(245 + n)` is D0 item `n` | yes |
 | Appendix A adversary taxonomy, 9 schemes | Distributed across M7 (GS-118 to GS-122, GS-134 to GS-137), M19 (GS-212 to GS-221), M20 (GS-222 to GS-231), and M1's adversarial set (GS-052 to GS-070) | yes |
 | Constitution section 5.2's named examples | GS-020, GS-028, GS-041, GS-050, GS-059, GS-063, GS-065, GS-082 | yes |
-| Section 5.2's minimum of 40 golden files | <!--gen:gs_count-->284<!--/gen--> defined | yes |
+| Section 5.2's minimum of 40 golden files | <!--gen:gs_count-->299<!--/gen--> defined | yes |
 
 ### 33.4 What is not here yet, and why
 

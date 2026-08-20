@@ -16,7 +16,7 @@ P1 is done except TradingCalendar's data. [`packages/rules-engine`](../../packag
 
 | Briefed | Verified | Where |
 |---|---|---|
-| 272 golden scenarios exist | **<!--gen:gs_count-->284<!--/gen-->.** `GS-001` to `GS-284`, gapless | [golden-scenarios](../testing/golden-scenarios/README.md), sections 34 and 35 added `GS-258` to `GS-284` |
+| 272 golden scenarios exist | **<!--gen:gs_count-->299<!--/gen-->.** `GS-001` to `GS-284`, gapless | [golden-scenarios](../testing/golden-scenarios/README.md), sections 34 and 35 added `GS-258` to `GS-284` |
 | Three mechanisms enforce engine purity | Correct, **and none of the three can see the case P2 introduces**: a capability passed as an argument. [`merit/engine-purity`](../../packages/eslint-plugin-merit/rules/engine-purity.js) says so in its own header | `packages/eslint-plugin-merit/rules/engine-purity.js` |
 
 **The registry total is not the number P2 owes.** [DELIVERY_PLAN section 4](../DELIVERY_PLAN.md)'s done-condition is "all **engine-executable** golden files green". The ownership partition gives M1 **73** scenarios; the rest belong to the portal, the wallet, KYC, marketing and the others. **That partition is itself stale**: it sums to 257 and does not cover `GS-258` to `GS-284`.
