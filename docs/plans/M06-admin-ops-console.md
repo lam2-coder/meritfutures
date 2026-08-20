@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/API_CONTRACT.md, ../architecture/EVENTS.md, ../architecture/SECURITY.md, ../architecture/INFRA.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M05-payout-system.md, M07-risk-abuse.md, FOLD-02-enforcement-window-and-suspension.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-20
 ---
 
 # M6: Admin and Ops Console
@@ -377,6 +377,63 @@ GS-117.
 | Every view is logged as an access to the underlying identities | An investigator browsing the graph is reading personal data across many people |
 
 **The failure this prevents is [AS-M6-01](#)'s, one layer up.** A cluster view that renders thresholds next to a trader-facing export is a single screenshot that gives away the whole detection posture. The audience scoping is not a feature of the pack; it is a property of the surface.
+
+## 7.10 The standing duplicate-signal views
+
+[ADR-066](../decisions/ADR-066.md) section 4, [FOLD-03](FOLD-03-vendor-parity-gap-fill.md) section 5.3. **Six standing views, sized SHOULD.** They are placed beside the explorer because that is where every row of them jumps to, and they answer the question an operator asks before opening a graph: **which shared thing is worth opening a graph about.**
+
+**Nothing here is a detector and nothing here is new.** Every signal these views read has been in the tree since [`0002`](../../packages/db/migrations/0002_identity.sql), and the two that arrived later arrived with their own rulings. **The views compute no confidence**, hold no threshold, and write no row. What they add is a standing query and an ordering; [M07](M07-risk-abuse.md) records in one sentence that no detector is duplicated.
+
+### The six, with what each one actually reads
+
+| View | The read | Grouped on |
+|---|---|---|
+| **Shared IP** | `identity_signals` where `kind = 'ip'`, with `kind = 'asn'` rendered beside it rather than merged into it | `value_hash`. The ASN is the weaker neighbour of the same observation and merging the two would make a datacenter range look like an address |
+| **Shared device fingerprint** | `identity_signals` where `kind = 'device'` | `value_hash` |
+| **Shared payment fingerprint** | `identity_signals` where `kind = 'payment'` | `value_hash`, which is the BIN plus last four **hashed**. `value_preview` is what the operator sees, and [`0002`](../../packages/db/migrations/0002_identity.sql)'s own example of it is `visa ****4242`: deliberately not enough to reconstruct the value it previews |
+| **Shared phone or carrier** | `identity_signals` where `kind` is `'phone'` or `'phone_carrier'` (`U-07`), against `identity_phones` (`SD-M19-05`) for the carrier metadata `D-18` captures | `value_hash`, and **the two kinds are separate views on one screen rather than one view**, because [`0029`](../../packages/db/migrations/0029_phone_identity_and_auth.sql) states the weights differ: `phone` is the high-weight node [ADR-039](../decisions/ADR-039.md) turns on, and `phone_carrier` alone is a country rather than a fleet |
+| **Shared KYC match** | `identity_signals` where `kind = 'kyc_identity'` | `value_hash` |
+| **Shared payout destination** | `payout_transfers.destination_ref` **and** `wallet_withdrawals.destination_ref` | `destination_ref`. **This is the one view that is not a signal at all**, and the paragraph below is why |
+
+**The payout-destination view reads two tables and neither of them is `identity_signals`, which is the one thing in this section a reader should not take on trust.** The approved signal model at [M07](M07-risk-abuse.md):84 ends *"settlement-rail identity"*, and that is `identity_signals.kind = 'rise_identity'`: **who the rail says the payee is.** `D-09` destination concentration reads something different, [M07](M07-risk-abuse.md):116's *"one `destination_ref` receiving payouts from more than one unrelated identity"*, which is **where the money actually went**. They are not the same fact and a view that substituted one for the other would quietly answer the other question. **Both legs are read because [ADR-028](../decisions/ADR-028.md) split them**: `transferring` left `payout_requests` and the external leg lives on `wallet_withdrawals` (`SD-M5-06`), so a view reading `payout_transfers` alone would show a clean board while a destination collected wallet withdrawals from four identities. That is `D-09`'s own stated case, *"the strongest mule detector available"*, going blind on the leg [ADR-019](../decisions/ADR-019.md) created.
+
+### The row, and the number it is sorted on
+
+**Each row shows the signal, the linked identities, the account count, the aggregate open liability, and a jump to section 7.9.**
+
+**The default sort is aggregate open liability, descending, and it is [ADR-066](../decisions/ADR-066.md)'s ruling rather than a preference.** [M07](M07-risk-abuse.md):94 says *"A shared IP is a coffee shop; a shared device is a household; a shared card is a family. None of them is a person."* **A view sorted by signal count therefore puts the coffee shop first and teaches the operator to spend the morning on it.** Sorting by liability is the whole difference between a risk tool and a curiosity, and **GS-291** asserts it: a shared IP across three identities ranks **below** a shared payment fingerprint across two carrying more liability.
+
+**The liability figure is `P-M6-01`'s and no other, which needs saying because three numbers on this module's own home page could plausibly fill the column.**
+
+| Constraint | Why it binds here specifically |
+|---|---|
+| **It includes wallet balances** | `INV-M6-11`. A sort key that excluded them would rank a group holding its money in the wallet below a group holding the same money in an account, which is liability blindness reintroduced by the sort order rather than by the panel |
+| **It is the authoritative as-of-last-closed figure, never section 3.5's live one** | `INV-M6-12`. A live figure in this column makes the **ordering** of a risk surface a function of an intraday vendor feed, and [ADR-020](../decisions/ADR-020.md)'s hard rule is that the live number decides nothing automatically. A sort is a decision about what the operator looks at first |
+| **The column names its as-of and its source** | `INV-M6-04`, on every number this module renders |
+| **It is suppressed when `P-M6-09` is red rather than shown** | The rows still render; the liability column and therefore the sort do not. A ranking computed from data we have said we do not trust is `AS-M6-04` with the ordering attached |
+| **Identities are counted once per row** | An identity holding four accounts contributes its liability once and its accounts four times, and the two columns are read by the same operator in the same glance |
+
+### The tiers, and the distinction that makes summing safe
+
+**A soft link renders as a soft link, aggregates no cap, and changes nothing the trader may buy.** [M07](M07-risk-abuse.md):94: *"Only a hard merge changes what a trader may buy."* **GS-292** pins it.
+
+**Summing liability across a soft-linked group is not cap aggregation, and conflating the two is the mistake this paragraph exists to refuse.** [M07](M07-risk-abuse.md) section 3.1 says caps do not aggregate across a soft link, which is a statement about **what a trader is entitled to buy**. The column here adds up **what Merit already owes** the identities in the row, which is true whether or not they are one person and is arithmetic rather than a finding. **A view that read "caps do not aggregate" as "do not add these numbers up" would have no sort key at all**, and a view that read the sum as a merged cap would enforce a merge nobody decided. The row is evidence of exposure; only the merge is a decision.
+
+| The view must | Because |
+|---|---|
+| **Render the tier**, taking it from `identity_links.confidence_bp` and the hard-link ceiling and **never deriving one** | [ADR-022](../decisions/ADR-022.md) made the graph scored and `D-16` owns the score. A second place that computes confidence is a second answer to the same question |
+| **Exclude suppressed edges from the aggregate and keep them visible as history** | `SD-M7-04`, `INV-M7-09`. [`0002`](../../packages/db/migrations/0002_identity.sql) is explicit that a suppressed edge *"stays visible as history and stops contributing to enforcement"*, and a sort key is where an unsuppressed-in-effect edge would come back to life unnoticed |
+| **Trigger no state change of any kind** | These are read surfaces. Enforcement entry points are section 3.3a's and section 7.9's, both of which require a typed reason, a cited flag and an evidence pack |
+
+### Access, and the entry point that cannot be the only one
+
+**`INV-M6-10` holds and is not weakened.** Naming a signal and listing the identities that share it **is a specific-subject query**: the subject is the signal. **The list of signals is not a list of humans**, no view offers an all-identities browse, and there is no export affordance on any of the six. **Every view is logged as an access to the underlying identities**, in section 7.9's terms and for section 7.9's reason.
+
+**The jump to section 7.9 is a convenience and not the way in**, which is [ADR-041](../decisions/ADR-041.md)'s argument applied one surface over. [ADR-022](../decisions/ADR-022.md) tiers the explorer to **v1.x** and these views are sized **SHOULD**, so a row whose only destination was the explorer would be a surface that does nothing at all until a post-launch module lands. **Every row therefore also opens the identity drill-down at section 3.2a**, which is a v1 surface, and the explorer jump arrives with the explorer.
+
+**No schema delta is claimed by this section and none is needed**, which was the finding before it was the outcome: all six views read tables that exist. **The reservation this session held in this module's delta sequence is released unspent, and it is released by position rather than by name** for the reason [M07](M07-risk-abuse.md) section 2 already records: `ADR-026`'s completeness gate reads any `SD-` identifier under `docs/` as a claim, so writing the number in order to decline it creates the claim the sentence is refusing to make.
+
+**GS-291 and GS-292 are cited here and section 8.2 is not edited.** They are already registered and already owned by this module in the golden-scenario ownership index, which is what `CI-06d` reads; section 8.2's table is being appended to by a concurrent session in this same fold, and a second writer in one table is how a merge eats a row.
 
 ## 8. Test plan
 
