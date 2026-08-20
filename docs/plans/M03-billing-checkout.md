@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../../MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, ../architecture/data-model/README.md, ../architecture/STATE_MACHINES.md, ../architecture/EVENTS.md, ../architecture/API_CONTRACT.md, ../architecture/SECURITY.md, ../decisions/README.md, ../edge-cases/README.md, ../testing/golden-scenarios/README.md, M01-rules-engine.md, M02-rithmic-bridge.md, M07-risk-abuse.md, M10-integrations.md, M16-notification-center.md, M19-kyc-identity.md, M20-wallet.md, FOLD-02-enforcement-window-and-suspension.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-20
 ---
 
 # M3: Billing and Checkout
@@ -63,12 +63,13 @@ Every arrow above can fail, and each failure has a named compensation in section
 | INV-M3-13 | A wallet-funded purchase debits the wallet **in the same transaction** that creates the purchase, and never creates a purchase it could not fund | Wallet balance is Merit's own ledger, so there is no third party and no asynchronous confirmation. The debit and the purchase commit together or neither does, which makes the entire PSP webhook machinery inapplicable to this path rather than merely unused |
 | INV-M3-14 | A wallet debit never takes an identity's balance below zero, and there is no credit facility anywhere in checkout | Check constraint plus the transaction in INV-M3-13. A negative wallet balance would be Merit lending money to a trader, which is a product nobody decided to build |
 | INV-M3-15 | **An identity whose `identities.status` is `restricted` completes no purchase and no reset, by any payment method** | [ADR-041](../decisions/ADR-041.md), section 3.5. Checked **server side**, at the same point in the checkout transaction as the per-identity cap (INV-M3-08), on the resolved [identity](../GLOSSARY.md#trader-identity) rather than on the user or the email. It is a **hard limit and never a flag**, so it is a named refusal with a stated reason and never a silent decline, on OQ-M3-03's own reasoning that a silent decline teaches a ring to try a different email while an explicit one does not. **The check covers all three `payment_method` values including `mixed`**, which is the one that would otherwise half-fail |
+| INV-M3-16 | **The marketed size label a buyer is shown at checkout is the pinned version's, and no figure at checkout is computed from it** | [ADR-070](../decisions/ADR-070.md) section 4, [M9](M09-marketing-site.md) section 2.1, section 3.6. **It needs no new mechanism and that is the whole point**: the label is a column on `plan_version_sizes` ([M9](M09-marketing-site.md) SD-M9-04) and INV-M3-01 already pins `plan_version_id` write-once at checkout start, so the label is pinned by the write that pins the price. INV-M3-02 is unchanged and unweakened: price, discount and cap eligibility are computed server side from `plan_version_sizes`, and what they read is `size_cents`. Where the label is absent, checkout renders the same stated default the public site does. GS-309, GS-310 |
 
 ---
 
 ## 2. Entities and schema deltas
 
-M3 consumes [DATA_MODEL sections 4 and 5](../architecture/data-model/README.md) as approved. Five deltas.
+M3 consumes [DATA_MODEL sections 4 and 5](../architecture/data-model/README.md) as approved. **Six deltas.** This line read "Five deltas" over six rows from the day [ADR-019](../decisions/ADR-019.md) added SD-M3-06, which is [ADR-034](../decisions/ADR-034.md)'s class of defect: a hand-maintained count beside the thing it counts. **No delta is added by [ADR-070](../decisions/ADR-070.md)** -- gap 3's column is [M9](M09-marketing-site.md)'s SD-M9-04, written by this module's publish path and specified in section 3.6.
 
 | ID | Table | Change | Why it is not optional |
 |---|---|---|---|
@@ -162,6 +163,10 @@ Publishing is where marketing and the engine are forced to be the same thing. Tw
 
 **The typing is not cosmetic and the reason is worth carrying.** After [ADR-019](../decisions/ADR-019.md) the cadence check fires on all three v1 plans, meaning "these two gates co-bind" on two of them and "this gate can never bind" on the third. Rendering all three identically would put two false positives in front of the founder on every publish, and a diff whose warnings are usually noise is a diff that gets approved without reading, which is the failure this gate exists to prevent. The renderer therefore groups by severity and `warning` sorts first.
 
+**And the diff is where the marketed size label is read by a human, because nothing else can read it** ([ADR-070](../decisions/ADR-070.md) section 4). [M9](M09-marketing-site.md) section 2.1 states why: a capital figure, a runway and a style name are all legitimate labels for the same size row, so whether a label agrees with a number is a judgment and not an assertion. **The diff therefore shows each size's `marketed_size_label` beside that size's `size_cents`, on the same line**, and that is the entire mechanical contribution this module makes to a disclosure control. **It is a review surface and this document calls it one** rather than dressing it as a check.
+
+**It carries no `CV-nn` and no `PW-nn`, deliberately.** The label is not on `PlanVersionSizeRow` and does not enter `validatePlan`, on [M1](M01-rules-engine.md)'s own rule that what the engine may not see, it may not validate. It is authored on the publish payload's per-size entry exactly where `price_cents` is, and INV-M3-12 lands it on the same row in the same transaction, so there is no second copy anywhere and no agreement to assert.
+
 ---
 
 ### 3.4 The wallet as a payment method (ADR-019)
@@ -217,6 +222,24 @@ So the position before this fold, stated as the behaviour it produces:
 **A restricted trader could buy with a card and could not buy with money Merit already owes them.** That is the wrong way round on every reading: the wallet balance is the one funding source that involves no card network, no chargeback exposure and no third party, and it was the only one the enforcement reached. It is also the shape [ADR-041](../decisions/ADR-041.md) found twice elsewhere in this fold, where **the control existed in the paragraph explaining why the attack fails and nowhere that binds**, arriving here as a control that binds in exactly one of the three places it was believed to.
 
 **`mixed` is the case that shows why this could not be left to the wallet gate.** Refusing at the wallet leg refuses **after** the checkout transaction has begun composing a PSP session, so the correct outcome is reached through a compensation path (section 3.1's released wallet debit) rather than through a refusal. A hard limit checked at the resolved-identity step refuses before anything exists, which is where every other hard limit in this module is checked and is why the check goes there rather than being inferred from the wallet's.
+
+### 3.6 What checkout shows and what checkout computes (ADR-070)
+
+**Checkout renders the pinned version's marketed size label and prices from that version's `size_cents`.** That is INV-M3-16, and it is one sentence because it is one mechanism: [ADR-070](../decisions/ADR-070.md) section 4 makes the label a versioned field, [M9](M09-marketing-site.md) SD-M9-04 gives it a column on `plan_version_sizes`, and INV-M3-01 already pins `plan_version_id` write-once when the checkout session opens. **The label therefore arrives pinned without a second pin**, exactly as `copy_blocks` and the accepted `tos_versions` set already do ([M9](M09-marketing-site.md) FM-M9-06's mechanism, reused rather than reinvented).
+
+**Three surfaces are named so none is left to inference.**
+
+| Surface | What it renders | What it computes from |
+|---|---|---|
+| **The checkout page** | The pinned version's `marketed_size_label` | `plan_version_sizes` for price, discount and cap eligibility (INV-M3-02), reading `size_cents` |
+| **The receipt** | The label as it stood at the purchase, which is the pinned version's and cannot later differ | The amounts already written on the `purchases` row |
+| **The reset diff** (section 3.5, AS-M3-05) | Both labels when the label moved between versions | `size_cents` on both sides |
+
+**The reset diff is the one that would otherwise be missed.** A reset onto a version whose **label** moved while `size_cents` did not is a changed description of an unchanged account, and it belongs in the same diff a changed cap does rather than in a quieter one. GS-098 already refuses to take payment without acknowledgement when the rules differ; **a label that differs is a disclosure that differs**, which is [ADR-070](../decisions/ADR-070.md)'s whole reading of this gap, and the acknowledgement is the same acknowledgement.
+
+**Where the label is absent, checkout renders the capital figure derived from `size_cents`**, never an empty string, which is [M9](M09-marketing-site.md) section 2.1's stated default applied at the one surface where the trader is about to pay. **A blank where a size should be, on a payment page, is the worst instance of `GS-310` in the estate**, and it is why the default is stated once and shared rather than defined per surface.
+
+---
 
 ## 4. API endpoints touched
 
@@ -395,7 +418,7 @@ A **SEON-class digital-footprint vendor** runs at checkout, supplying email and 
 | Saga integration with compensation | `M3-G-nn` | 9 | every commit | merge |
 | Negative authz (D5, per endpoint per resource) | `M3-N-nn` | 7 | every commit | merge |
 | Publish validation (delegates to M1's `RE-C-nn`) | `M3-P-nn` | 5 | every commit | merge |
-| Golden fixtures | `GS-nnn` | 6 owned (GS-094 to GS-099), plus GS-038 to GS-041 and GS-046 shared | every commit | merge |
+| Golden fixtures | `GS-nnn` | 6 owned (GS-094 to GS-099), plus GS-038 to GS-041 and GS-046 shared, and GS-309 and GS-310 asserted here and owned by [M9](M09-marketing-site.md) | every commit | merge |
 
 ### 8.2 Named scenarios owned by this module
 
@@ -407,6 +430,8 @@ A **SEON-class digital-footprint vendor** runs at checkout, supplying email and 
 | GS-097 | Coupon restricted by purchase kind | A `new`-only code is refused on a reset with `conflict`, and a code with no `applies_to_kind` cannot be created at all. AS-M3-04 |
 | GS-098 | Reset onto a changed plan version renders the diff | Parent on v1, current is v3 with a lower cap: the reset flow shows the changed rules from `copy_blocks` and refuses to take payment without explicit acknowledgement. AS-M3-05 |
 | GS-099 | Webhook citing an unknown purchase reference | Rejected, alarmed, no purchase and no account created. Asserts that Merit's own `purchases` row is a precondition for any paid state. AS-M3-06 |
+
+**`GS-309` and `GS-310` are asserted at checkout and are not claimed here.** They are [M9](M09-marketing-site.md)'s, registered to it in [golden-scenarios section 33](../testing/golden-scenarios/33-ownership-index-and-coverage-reconciliation.md), and the checkout assertion is the same scenario at a second surface rather than a second scenario: the label renders and the price is computed from `size_cents`, on the pinned version, with the stated default where the label is absent (section 3.6, INV-M3-16). Claiming a `GS-nnn` here for the same behaviour would put one assertion in two registries, which is the shape `CI-06d` reconciles against.
 
 ### 8.3 Coverage rule
 
