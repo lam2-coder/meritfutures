@@ -8,11 +8,11 @@ last_updated: 2026-08-16
 
 **The completeness gate reads this file.** [ADR-026](../../docs/decisions/ADR-026.md) requires that every `SD-nn` and `U-nn` appearing anywhere in `docs/` appears **exactly once** here with a disposition. A count nobody can drift is better than a count someone remembers to update.
 
-<!--gen:manifest_changes-->107<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+<!--gen:manifest_changes-->109<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
 
 **The count moved from 93 to 94 by founder ruling (2026-08-14).** `U-06` is the sixth unnumbered change, found while folding. [ADR-026](../../docs/decisions/ADR-026.md)'s table of five did not carry it. See section 5.
 
-**It moved from 94 to <!--gen:manifest_changes-->107<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+**It moved from 94 to <!--gen:manifest_changes-->109<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
@@ -20,7 +20,7 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->39<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->40<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -192,6 +192,8 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 | SD-M16-07 | `notification_kinds` | `class` gains `pre_identity_auth`, and a new `rate_limit_exempt boolean` **generated from `class`**. `notification_kinds_immutable_never_coalesced` widened to the new class | 0029 | **landed** |
 | SD-M16-08 | `contact_channels` | add `complained_at timestamptz null` and a partial index over the rows where it is set. The spam complaint recorded **against the destination**, suppressing the marketing class and nothing else. **`bounced` needed no delta**: `0019` already carries the value and what was missing was [M16](../../docs/plans/M16-notification-center.md) section 3.4's specification. `spam_complaint` is refused as a `delivery_status` because a complaint follows delivery and would overwrite the proof of notice `INV-M16-09` rests on | 0041 | **landed** |
 | SD-M4-04 | `sessions` | add `auth_factor`, `elevated_at`, `elevated_by_factor`. **C-27 is unenforceable without it**: a handler cannot refuse an SMS-established session for a sensitive action if the session never recorded how it was established | 0029 | **landed** |
+| SD-M20-05 | `promotional_credit_grants`, `plan_versions` | The fee-back credit, [ADR-070](../../docs/decisions/ADR-070.md) section 2. **No new ledger class and no new grant table**: `promotional_credit` is 0009's and the grant table is 0024's, so the delta is `source_payout_request_id` plus a **partial unique index making one fee-back per settlement structural**, which is what stops a retried settlement crediting twice. `plan_versions` gains `fee_back_repeats`, materialized at publish on [`0004:183`](migrations/0004_catalog.sql)'s own pattern and **locked to `false` by a named CHECK**: a fee-back is issued by a payout rather than through M17's issuance path, so `repeats: true` closes AS-M20-01's chain into a self-funding loop outside the only cap that bounds it. `OQ-M20-06` asks when it may be unlocked | 0044 | **landed** |
+| SD-M18-04 | new `plan_size_unlocks` | The ladder unlock, [ADR-070](../../docs/decisions/ADR-070.md) section 3, triggered by `payoutsSettledCount >= phase_funded.max_payouts` (`G-LADDER-COMPLETE`). **`OQ-F5-03` is answered by which table the key points at**: a hard merge repoints ownership into the surviving `identities` row and `identity_links` repoints nothing, so an FK to `identities(id)` makes a soft-linked pair sharing an unlock **unrepresentable** rather than forbidden. Not filed in `loyalty_benefit_grants`, which `INV-M14-11` and `INV-M14-12` keep inert, nor in `graduation_benefits`, whose `accrued_cents NOT NULL` would force the zero-value row `GS-306` exists to prevent | 0044 | **landed** |
 
 `U-07` is in section 5 with the other unnumbered changes.
 
@@ -404,7 +406,7 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->39<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->104<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->40<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->105<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -654,7 +656,7 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->104<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**, across <!--gen:migration_files-->39<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->105<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->10<!--/gen--> triggers**, across <!--gen:migration_files-->40<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
 
 ---
 
@@ -734,7 +736,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->39<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->40<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
 
 | | Before `0033` | After `0033` |
 |---|---|---|
@@ -809,7 +811,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->39<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->40<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
 
 | | Before `0034` | After `0034` |
 |---|---|---|
