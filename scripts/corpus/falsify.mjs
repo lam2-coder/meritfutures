@@ -1139,7 +1139,65 @@ function seedProposedAdr(d, withApproval) {
   );
 }
 
+/**
+ * ADR-065 T3's seed anchor, DERIVED rather than pinned for `lastAdrId`'s reason.
+ * It rewrites the disposition cell of a row whose artifact is present, turning a
+ * correctly-amended row back into a reservation. Pinning a number would name a
+ * row that a later renumber moves, and the seed would then plant nothing while
+ * reporting a tidy `did not fire`.
+ */
+const reserveLandedRow = (d, heading, keyOf, present) => {
+  const p = join(d, 'docs/decisions/ALLOCATION.md');
+  const lines = readFileSync(p, 'utf8').split('\n');
+  const start = lines.findIndex((l) => l.startsWith(heading));
+  if (start < 0) throw new Error(`seed anchor not found: ${heading}`);
+  for (let i = start; i < lines.length; i++) {
+    if (i > start && lines[i].startsWith('## ')) break;
+    if (!lines[i].startsWith('|')) continue;
+    const cells = lines[i].split('|');
+    const m = /^\s*\*{0,2}(\d{3,4})\*{0,2}\s*$/.exec(cells[1] ?? '');
+    if (!m || !present.has(Number(m[1]))) continue;
+    cells[cells.length - 2] = ' **Reserved, unwritten.** seeded by falsify ';
+    lines[i] = cells.join('|');
+    writeFileSync(p, lines.join('\n'));
+    return keyOf(Number(m[1]));
+  }
+  throw new Error(`seed anchor not found: no landed row under ${heading}`);
+};
+
+const presentAdrNumbers = (d) =>
+  new Set(
+    readdirSync(join(d, 'docs/decisions'))
+      .map((f) => /^ADR-(\d{3})\.md$/.exec(f))
+      .filter(Boolean)
+      .map((m) => Number(m[1])),
+  );
+
+const presentMigrationNumbers = (d) =>
+  new Set(
+    readdirSync(join(d, 'packages/db/migrations'))
+      .map((f) => /^(\d{4})_/.exec(f))
+      .filter(Boolean)
+      .map((m) => Number(m[1])),
+  );
+
 const SCOPE_CASES = [
+  {
+    name: 'CI-06f/t3-stale-reservation',
+    gate: 'CI-06f',
+    what: 'an ADR row still reading "Reserved, unwritten" once its entry exists, which MUST be a finding',
+    expect: (d) =>
+      `ADR-${String(reserveLandedRow(d, '## Number allocation', (n) => n, presentAdrNumbers(d))).padStart(3, '0')}: the allocation row still reads "Reserved, unwritten"`,
+    seed: () => {},
+  },
+  {
+    name: 'CI-06h/t3-stale-reservation',
+    gate: 'CI-06h',
+    what: 'a migration row still reading "Reserved, unwritten" once its file exists, which MUST be a finding',
+    expect: (d) =>
+      `${String(reserveLandedRow(d, '## Migration number allocation', (n) => n, presentMigrationNumbers(d))).padStart(4, '0')}: the allocation row still reads "Reserved, unwritten"`,
+    seed: () => {},
+  },
   {
     name: 'CI-06b/out',
     gate: 'CI-06b',
