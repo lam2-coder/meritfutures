@@ -110,6 +110,24 @@ import { foldSettlements, settlementFoldArbitrary } from './settlement-fold.js';
 const RUNS = 300;
 const REACHABILITY = 1_500;
 
+/**
+ * THE REACHABILITY SAMPLE IS SEEDED AND THE PROPERTIES ABOVE ARE NOT.
+ *
+ * The block below asserts COUNTS -- that a case is REACHED -- and its rarest is
+ * a conjunction: a settlement day that ALSO graduated (`resetsThatGraduated`)
+ * needs `R-49` to fire on the same day a reset lands. An unseeded sample makes
+ * that a coin flip, and it came up zero on CI for PR #145, a docs-only change,
+ * which is the one failure mode that teaches a reader to re-run instead of to
+ * read. This file's own line 108 anticipated it: "the rarest case here is a
+ * conjunction, and a check that passes on a lucky seed".
+ *
+ * The seed is arbitrary and fixed. The PROPERTIES still draw fresh cases on
+ * every run, because they assert a law rather than a census. This is the idiom
+ * `engine-eligible-conjunction.property.test.ts` established at its own
+ * `REACHABILITY_SEED`.
+ */
+const REACHABILITY_SEED = 20_260_820;
+
 // -----------------------------------------------------------------------------
 // The lineup
 // -----------------------------------------------------------------------------
@@ -410,7 +428,7 @@ describe('the support reaches the cases PT-02 is about', () => {
               if (step.phaseAfter === 'closed' || step.phaseAfter === 'graduated') seen.terminal++;
             }
           }),
-          { numRuns: REACHABILITY },
+          { numRuns: REACHABILITY, seed: REACHABILITY_SEED },
         );
       }
     }

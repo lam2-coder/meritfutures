@@ -11,6 +11,10 @@
     "typecheck": "tsc --noEmit",
     "start": "node --experimental-strip-types src/index.ts"
   },
+  "//": "IT DEPENDS ON THE ENGINE FOR ITS TYPES AND FOR NOTHING ELSE, and the reason is INV-M9-01. M9 section 1.2: `M9 reads plan_versions. It contains no threshold, no price, and no rule text of its own`. A site that re-declared `PlanRulesJson` and `PlanVersionSizeRow` would be a SECOND TRANSCRIPTION of the stored shapes, and the marketing-versus-implementation gap constitution 0.5 names is exactly what a second transcription is. Importing the engine's own transcription means the shape marketing renders and the shape the engine executes cannot diverge without a compile error. It is `apps/worker`'s arrow, for a narrower reason: the worker folds through the engine, this app only reads its types. RI-01 is unaffected, because the arrow still points one way.",
+  "dependencies": {
+    "@merit/rules-engine": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
