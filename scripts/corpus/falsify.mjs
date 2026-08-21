@@ -42,6 +42,7 @@ import {
   rmSync,
   renameSync,
   readdirSync,
+  statSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { basename, join, dirname, resolve } from 'node:path';
@@ -1147,6 +1148,34 @@ const SEEDS = {
       writeFileSync(join(d, FIXTURE_DIR, `${id}-${SEED_MARK}.expected.json`), '{}\n');
     },
   },
+  // ADR-074's rule is "exactly one", and the violation seeded is the SECOND
+  // site rather than the missing one, on purpose. A missing site is the shape a
+  // careless author produces; a SECOND site is the shape a merge produces, and
+  // it is the one the corpus has actually suffered -- `CI-06u`'s register holds
+  // 19 duplicate first cells today, every one of them from the review desk's
+  // keep-both resolution. It is also the harder half to see by eye: the
+  // identifier IS defined, twice, and both definitions look right.
+  //
+  // DERIVED, and re-derivable after the seed. The target is the first declared
+  // series whose register is a WHOLE FILE (a section register would put the
+  // appended row outside the section, changing nothing) and its first member.
+  // Appending a row for an EXISTING member changes the site count and never the
+  // member set or its ordering, so `expect` names the same identifier before and
+  // after -- which is the `CI-06l` trap, checked for rather than tripped over.
+  'CI-06/identifier-series': {
+    what: 'a second definition site for an identifier inside its own declared register',
+    real:
+      'ADR-014 leads four table rows, its register row and three in ADR-052 and ADR-057 whose ' +
+      'first column is the SOURCE BEING QUOTED, which is why ADR-074 scopes the search to a ' +
+      'declared register rather than enumerating the exceptions. The duplicate-definition ' +
+      "shape itself is the review desk's keep-both merge: CI-06u's register holds 19 duplicate " +
+      'first cells on main today',
+    expect: (d) => `${declaredFileRegister(d).id} has 2 definition sites`,
+    seed: (d) => {
+      const { register, id } = declaredFileRegister(d);
+      edit(d, register, (b) => `${b}\n| ${id} | a second definition, seeded by falsify |\n`);
+    },
+  },
 };
 
 // =============================================================================
@@ -1300,6 +1329,121 @@ const rewriteFixtureRow = (d, pick, rewrite) => {
   writeFileSync(p, lines.join('\n'));
   return row.id;
 };
+
+// -----------------------------------------------------------------------------
+// CI-06/identifier-series readers
+// -----------------------------------------------------------------------------
+// THESE ARE A SECOND, LOOSER READER ON PURPOSE, which is the arrangement CI-06l
+// arrived at and recorded: the gate's reader is anchored and strict, the
+// harness's finds the same site before and after the edit. A harness that
+// imported the gate's own parser would agree with it by construction and could
+// never catch it reading the wrong thing.
+const DECLARED_TABLE = /const DECLARED_SERIES = new Map\(\[([\s\S]*?)^\]\);/m;
+const PENDING_TABLE = /const PENDING_SERIES = new Map\(\[([\s\S]*?)^\]\);/m;
+
+const seriesTable = (d, pattern) => {
+  const src = readFileSync(join(d, 'scripts/corpus/gates.mjs'), 'utf8');
+  const block = pattern.exec(src);
+  if (!block) throw new Error('seed anchor not found: the series table in gates.mjs');
+  const out = [];
+  for (const m of block[1].matchAll(/^\s*\['([A-Za-z0-9-]+)',\s*(?:'|")/gm)) {
+    const line = block[1].slice(m.index, block[1].indexOf('\n', m.index));
+    const detail = /^\s*\['[A-Za-z0-9-]+',\s*(?:'([^']*)'|"([^"]*)")/.exec(line);
+    out.push({ series: m[1], detail: (detail && (detail[1] ?? detail[2])) ?? '' });
+  }
+  if (out.length === 0) throw new Error('seed anchor not found: no rows in the series table');
+  return out;
+};
+
+const walkMarkdown = (d, sub = '.', out = []) => {
+  for (const e of readdirSync(join(d, sub))) {
+    if (e === 'node_modules' || e === '.git') continue;
+    const rel = sub === '.' ? e : `${sub}/${e}`;
+    if (statSync(join(d, rel)).isDirectory()) walkMarkdown(d, rel, out);
+    else if (rel.endsWith('.md')) out.push(rel);
+  }
+  return out;
+};
+
+const seriesMembersIn = (d) => {
+  const members = new Map();
+  for (const f of walkMarkdown(d)) {
+    const masked = readFileSync(join(d, f), 'utf8').replace(/^```[\s\S]*?^```/gm, '');
+    for (const m of masked.matchAll(/\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)-(\d{2,3})\b/g)) {
+      if (!members.has(m[1])) members.set(m[1], new Set());
+      members.get(m[1]).add(m[0]);
+    }
+  }
+  return members;
+};
+
+// Definition sites for every identifier over the whole tree, ignoring the
+// corpus/entry distinction the gate makes. Loose on purpose, per the note above.
+const anySiteCounts = (d) => {
+  const counts = new Map();
+  for (const f of walkMarkdown(d)) {
+    for (const line of readFileSync(join(d, f), 'utf8').split('\n')) {
+      let text = null;
+      if (/^#{1,6}\s/.test(line)) text = line.replace(/^#{1,6}\s+/, '');
+      else if (line.startsWith('|')) text = line.split('|')[1] ?? '';
+      if (text === null) continue;
+      const m = /^[*`[]*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)-(\d{2,3})\b/.exec(text.trim());
+      if (m) counts.set(`${m[1]}-${m[2]}`, (counts.get(`${m[1]}-${m[2]}`) ?? 0) + 1);
+    }
+  }
+  return counts;
+};
+
+// The first declared series whose register is a WHOLE FILE, with its first
+// member. A section register would put an appended row OUTSIDE the section and
+// the seed would change nothing, which is a seed reporting a gate that cannot
+// fail. Re-derivable after the seed: appending a row for an EXISTING member
+// changes the site count and never the member set or its ordering.
+const declaredFileRegister = (d) => {
+  const members = seriesMembersIn(d);
+  for (const { series, detail } of seriesTable(d, DECLARED_TABLE)) {
+    if (detail.includes('##') || !detail.endsWith('.md')) continue;
+    const ids = [...(members.get(series) ?? [])].sort();
+    if (ids.length === 0) continue;
+    return { series, register: detail, id: ids[0] };
+  }
+  throw new Error('seed anchor not found: no declared series with a whole-file register');
+};
+
+// The smallest pending series ALL of whose members have zero definition sites
+// today, so appending one row each makes every member singly defined and the
+// entry stops naming a defect. A member already at one site would reach two and
+// the series would stay broken, which passes the case for the wrong reason.
+const pendingWithNoSites = (d) => {
+  const members = seriesMembersIn(d);
+  const counts = anySiteCounts(d);
+  let best = null;
+  for (const { series } of seriesTable(d, PENDING_TABLE)) {
+    const ids = [...(members.get(series) ?? [])];
+    if (ids.length === 0 || ids.some((id) => (counts.get(id) ?? 0) !== 0)) continue;
+    if (best === null || ids.length < best.ids.length) best = { series, ids: ids.sort() };
+  }
+  if (best === null) throw new Error('seed anchor not found: no pending series with zero sites');
+  return best;
+};
+
+// The pending series the seed actually repaired, read back out of the rows it
+// wrote. THIS IS THE CI-06l TRAP AND IT WAS WALKED INTO ON THE FIRST RUN, which
+// is the harness working: `pendingWithNoSites` selects on "every member has zero
+// sites", the seed gives every member a site, and re-deriving after the seed
+// therefore names the NEXT series while the gate correctly names the one that
+// was repaired. It was watched reporting FAILED OFF-TARGET in exactly that
+// state. A seed that changes the property its own `expect` selects on must read
+// its mark back rather than re-derive.
+const seededPendingSeries = (d) => {
+  for (const line of readFileSync(join(d, 'docs/GLOSSARY.md'), 'utf8').split('\n')) {
+    if (!line.startsWith('|') || !line.includes(PENDING_SEED_MARK)) continue;
+    const m = /^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)-\d{2,3}\s*\|/.exec(line);
+    if (m) return m[1];
+  }
+  throw new Error(`seed anchor not found: no row marked ${PENDING_SEED_MARK} in docs/GLOSSARY.md`);
+};
+const PENDING_SEED_MARK = 'a definition site, seeded by falsify';
 
 const presentAdrNumbers = (d) =>
   new Set(
@@ -2608,6 +2752,93 @@ const SCOPE_CASES = [
       const f = readdirSync(join(d, FIXTURE_DIR)).find((x) => /^GS-\d{3}-.*\.expected\.json$/.test(x));
       if (!f) throw new Error(`seed anchor not found: no .expected.json in ${FIXTURE_DIR}`);
       rmSync(join(d, FIXTURE_DIR, f));
+    },
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/identifier-series. THREE BOUNDARIES, ONE DIRECTION EACH, and the first
+  // two are the halves of ADR-074's rule that a reader would most reasonably
+  // assume the other way round.
+  // ---------------------------------------------------------------------------
+  {
+    // A BOLD LEAD IS NOT A DEFINITION SITE, and this is the direction that keeps
+    // the gate from reporting on English. ADR-074 section 1 rejects the shape by
+    // argument: a bold span opening a line is this corpus's ordinary emphasis
+    // idiom, present thousands of times.
+    //
+    // The control is what makes the PASS mean something: the SAME text, in the
+    // SAME register, written as a table row instead, must fail. Without it a
+    // gate that had stopped reading the register at all would pass this case.
+    name: 'CI-06/identifier-series/bold-lead',
+    gate: 'CI-06/identifier-series',
+    what: 'a bold lead naming an identifier inside its register, which must NOT be a definition site',
+    expect: 'PASS',
+    control: {
+      expect: (d) => `${declaredFileRegister(d).id} has 2 definition sites`,
+      seed: (d) => {
+        const { register, id } = declaredFileRegister(d);
+        edit(d, register, (b) => `${b}\n| ${id} | a row, which IS a definition site |\n`);
+      },
+    },
+    seed: (d) => {
+      const { register, id } = declaredFileRegister(d);
+      edit(d, register, (b) => `${b}\n**${id}** is discussed here in prose, in bold, mid-document.\n`);
+    },
+  },
+  {
+    // EVERY OCCURRENCE OUTSIDE THE DECLARED REGISTER IS A CITATION AND IS
+    // UNCONSTRAINED. This is the whole content of "inside the declared
+    // register", and it is the direction ADR-074 section 1 says the union of
+    // shapes gets wrong on 364 members: every EC and every ADR has both a
+    // document and a register row, and a rule that cannot tell a register row
+    // from the document it points at calls the corpus's own discipline a
+    // violation.
+    //
+    // So: a second row leading with the same identifier, in a file that is NOT
+    // its register, must be read as a citation. The control puts the identical
+    // row INSIDE the register and must fail.
+    name: 'CI-06/identifier-series/outside-the-register',
+    gate: 'CI-06/identifier-series',
+    what: 'a row leading with an identifier in a file that is not its register, which must NOT be a finding',
+    expect: 'PASS',
+    control: {
+      expect: (d) => `${declaredFileRegister(d).id} has 2 definition sites`,
+      seed: (d) => {
+        const { register, id } = declaredFileRegister(d);
+        edit(d, register, (b) => `${b}\n| ${id} | inside the register, which IS a second site |\n`);
+      },
+    },
+    seed: (d) => {
+      const { id } = declaredFileRegister(d);
+      edit(d, 'docs/GLOSSARY.md', (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | cited outside its register |\n`);
+    },
+  },
+  {
+    // THE PENDING REGISTER MUST NOT BECOME FURNITURE, and this is the only
+    // direction that proves it. ADR-074 section 5 gives the register
+    // CI06U_REGISTER's defining property in terms: "a register entry that no
+    // longer names a real defect is a finding. So it shrinks as repairs land and
+    // cannot become furniture."
+    //
+    // Repair one pending series in the copy by giving every member exactly one
+    // definition site, and the ENTRY must become the finding. The target is
+    // derived as the smallest pending series all of whose members have zero
+    // sites today, so that one appended row each lands them on exactly one: a
+    // member already at one site would reach two and the series would stay
+    // broken, passing this case for the wrong reason.
+    name: 'CI-06/identifier-series/pending-repaired',
+    gate: 'CI-06/identifier-series',
+    what: 'a pending series whose members all became singly defined, which MUST make its entry a finding',
+    expect: (d) => `PENDING_SERIES holds ${seededPendingSeries(d)} and every one of its`,
+    seed: (d) => {
+      const { ids } = pendingWithNoSites(d);
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n\n| | |\n|---|---|\n` +
+          ids.map((id) => `| ${id} | ${PENDING_SEED_MARK} |`).join('\n') +
+          '\n',
+      );
     },
   },
 ];
