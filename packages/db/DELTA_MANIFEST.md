@@ -793,6 +793,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **18** | `0034`'s session | **allocated.** `0034` lands. **This row was written into the file as a heading and never into this table**, one section after the table was created to stop exactly that |
 | **19** | `0035`'s session | **allocated.** `0035` lands |
 | **21** | `0038`'s session ([ADR-067](../../docs/decisions/ADR-067.md)) | **allocated.** `0038` lands. **`20` is claimed by a heading and has no row here**, which is exactly the defect the `18` row above records happening one section after this table was created to stop it; it is left for `0036`'s session rather than filled in on its behalf, because a row written on somebody else's behalf is a claim nobody made. **`0037` has no section at all**, found in the same pass |
+| **22** | session 95, the signing pass | **allocated.** Four merged migration headers go stale when their ADRs are signed. **Section 21 is claimed TWICE**, by `0038``s session and `0042``s; cite as `section 21 (0038)` and `section 21 (0042)` on this table`s standing rule |
 | **20** | `0036`'s session | **allocated.** `0036` lands. **This row was written into the file as a heading and never into this table**, which is the identical omission the `18` row above records one section earlier. Added here by `0042`'s session, which is the third occurrence of the same miss and the reason `OI-24` exists |
 | **21** | `ADR-068`'s session | **allocated.** `0042` lands |
 
@@ -1273,3 +1274,15 @@ Both are recorded in the probe itself, where the next author writing a fixture a
 2. **`sessions.auth_factor` is `NOT NULL`, and it is [`0029`](migrations/0029_phone_identity_and_auth.sql)'s rather than [`0002`](migrations/0002_identity.sql)'s.** Reading `CREATE TABLE sessions` alone does not show it. **This is the corpus's recurring error class in its cheapest form**: a claim about a table checked against the file that created it rather than against the table as it now stands.
 ### One finding recorded and not repaired
 **`ADR-026`'s completeness gate reads this file, and its finding text says otherwise.** [`gates.mjs:1537`](../../scripts/corpus/gates.mjs) scans `docs/**` **and `packages/db/DELTA_MANIFEST.md`**; [`gates.mjs:1542`](../../scripts/corpus/gates.mjs) reports `cited in docs/`. A first draft of section 4c named two unclaimed `SD-M6-nn` numbers outright on the theory that this file is exempt from the gate that reads it, and **the gate caught it while its own message pointed at the one file set that did not contain the citation.** Left unrepaired: `gates.mjs` is held by three concurrent sessions and a shared file earns a minimal diff.
+
+---
+
+## 22. Four merged migration headers went stale the day the ADRs were signed (2026-08-21)
+
+**[`0038`](migrations/0038_account_adjustments.sql):83, [`0041`](migrations/0041_contact_channel_complaints.sql):15, [`0043`](migrations/0043_admin_attributed_actions.sql):11 and [`0044`](migrations/0044_fee_back_and_ladder_unlock.sql):17 each name their ruling as `status: proposed, founder approval PENDING`.** [ADR-066](../../docs/decisions/ADR-066.md), [ADR-067](../../docs/decisions/ADR-067.md), [ADR-069](../../docs/decisions/ADR-069.md) and [ADR-070](../../docs/decisions/ADR-070.md) were all **granted on 2026-08-21**, so all four sentences are now false.
+
+**NONE OF THE FOUR IS EDITED, AND THAT IS THE RULE RATHER THAN A CHOICE.** Migrations are sacred: once merged, never edited, only superseded ([E2](../../MERIT_BUILD_MASTER_PROMPT.md)). A header comment is not a constraint and supersession exists for schema, not for prose, so **there is nothing to supersede and nothing to edit.** The correct disposition is to record the staleness where a reader looks it up, which is this file.
+
+**It is worth stating as a class rather than as four rows.** A migration header that cites the approval STATE of its ruling is citing a value that moves after the file is frozen. **The durable citation is the ADR number; the approval state is not durable and should not have been transcribed into an immutable artifact.** Four files did it, which makes it a pattern rather than an oversight, and the next money-path migration should cite the ruling and not its status.
+
+**No gate catches this and none is proposed here.** `CI-06q` checks that a dated citation of a founder ruling resolves to a declared ruling, and these citations carry no date. A gate asserting that migration prose agrees with ADR status would be asserting agreement between a frozen file and a moving value, which is the defect rather than the check.
