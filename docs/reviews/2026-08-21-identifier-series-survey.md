@@ -565,3 +565,50 @@ to run against a question a person chose to ask.
    narrow rule and 128 under the broad one. **A gate scoped to all series arrives as an
    ERROR under [`falsify.mjs`](../../scripts/corpus/falsify.mjs)**, so the ruling owes
    `W8` a decision about scope, and owes it before implementation rather than during.
+
+---
+
+## 7. The partition of all 215, added 2026-08-21 by session 125
+
+**Arithmetic over section 3's table, not a second measurement of the tree.** Nothing above
+this line changed. [`ADR-074`](../decisions/ADR-074.md) stated a scope of 118 series over
+1,086 members and said the figure existed *"so `W8` can check that its transcription
+reproduced it"*; `W8` ran that check and it failed. **This section is the retrace, kept
+with the measurement it is a retrace of**, because the ruling names this file as where the
+list lives and a reader who doubts the ruling's count comes here.
+
+**Every row of the section 3 table falls into exactly one of the ruling's four
+dispositions, and both columns close:**
+
+| Disposition | Series | Members | What it is |
+|---|---|---|---|
+| **Exempt** | 50 | 698 | `ADR-074` section 4, classes X1 to X4. **51 entries over 50 distinct series**: `PRE-ADR` is named by X1 and by X3 both |
+| **In scope** | 117 | 1,083 | Its four register classes, read as they are written |
+| **Pending** | 36 | 281 | Its section 5, narrowed to the series it names |
+| **Claimed as nothing** | 12 | 44 | In no list. `WAVE`, `RE-D`, `CT`, `OQ-P1`, `OQ`, `OQ-062`, `OQ-F2`, `D0`, `OQ-DS`, `OQ-RB`, `OQ-SH`, `OQ-TS` |
+| **Total** | **215** | **2,106** | Every row of section 3, placed once |
+
+**Where the withdrawn figures came from.** The module class row's **96** is this table's 100
+series registered in an `M02` to `M21` plan, being 80 rows plus the 20 `AS-M*` that are
+heading-defined in those same plans, less the two module-scoped delta forms that are exempt
+and less `S` and `D`, which the ruling's testing row counts again. **It is 3 high because
+the residue still counts `ST`, `M6-N` and `INV-M6`, which section 5 claims at the same time
+as pending.** The design row's **7** is the number of `OQ-*` sub-series it names, which is
+the figure the sentence beneath it states in words, copied into the column that counts the
+class; **the row names nine series and `DG` and `SS` were dropped with the seven.** The
+stated **118** is the faithful sum of those two and the two correct ones. **The stated 1,086
+reproduces from no reading at all**: the four classes as named hold 1,083 and the
+118-series set as the subtotals compose it holds 1,114.
+
+**Two readings of this file's own table that a later session should not re-derive.**
+
+- **The last three columns score `D2` alone**, as section 3's preamble says. So `ST` reads
+  `7 / 0 / 0` here and is nonetheless doubled under the ruling's **row OR heading** rule:
+  each of its members has a heading in the statistic-definitions plan, a units row in the
+  same file, and a publication row in the transparency plan. **`ADR-074`'s claim about it
+  is right and this table is not evidence against it.**
+- **`OQ-F6`'s rows concentrate in `docs/decisions`, which is what this table says**, and
+  they are in the ADR that raises the question. [Session 115](../sessions/2026-08-21-session-115.md)
+  recorded a session log as their only home; the log carries a second copy and the copy is
+  a citation. **The rows are also indented inside a list item**, which is why a parse
+  anchored to column zero found none of them.

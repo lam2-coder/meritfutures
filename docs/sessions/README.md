@@ -33,10 +33,18 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | ~~**122**~~ | ~~The four Tier 2 fixture-shape rulings, [WAVE-04 section 2.3](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md)~~ | **WRITTEN.** Struck, and its entry is below |
 | ~~**123**~~ | ~~[WAVE-05](../plans/WAVE-05-tier2-fixture-shapes.md) `X1`, the six comments naming the `GS-nnn` each assertion site discharges~~ | **WRITTEN.** Struck, and its entry is below |
 | ~~**124**~~ | ~~WAVE-05 `X6`, `GS-030`'s surviving half in [`trading-calendar-generator.test.ts`](../../packages/db/test/trading-calendar-generator.test.ts)~~ | **WRITTEN.** Struck, and its entry is below |
-| **125** | [ADR-074](../decisions/ADR-074.md)'s four disagreements, reported by `CI-06/identifier-series` in session 115 and unresolved inside a `proposed` ruling | dispatched, unwritten |
+| ~~**125**~~ | ~~[ADR-074](../decisions/ADR-074.md)'s four disagreements, reported by `CI-06/identifier-series` in session 115 and unresolved inside a `proposed` ruling~~ | **WRITTEN.** Struck, and its entry is below |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
+**A STRUCK ROW AND ITS LIVE TWIN ARE ONE KEY TO `CI-06u`, AND THAT WAS CHECKED RATHER
+THAN ASSUMED.** A keep-both merge of this table produces `~~**123**~~` beside `**123**`,
+which happened on `123`, `124` and `125` in the 2026-08-21 merge round. **The obvious
+worry is that the gate reads first cells literally and would see two different keys.**
+It does not: seeding the live twin makes `CI-06u` fail, naming the key as `123` with the
+`~~` and the `**` stripped. So the strikethrough rule costs this table nothing, and the
+duplicate is caught whether or not a merge resolves it by reading first.
+
 A deleted row is indistinguishable from a number nobody ever claimed, which is the state
 this table exists to end; [ADR-065](../decisions/ADR-065.md) T3 amends a landed reservation
 in place for the same reason. **Session 119 deleted `114` and `115` and session 122 struck
@@ -207,3 +215,4 @@ the two deleted rows are restored above.
 | [2026-08-21 - Session 122](2026-08-21-session-122.md) | the four Tier 2 fixture-shape rulings: `ADR-076`, and none of the fourteen needs a second fixture format |
 | [2026-08-21 - Session 123](2026-08-21-session-123.md) | WAVE-05 `X1`: six assertion sites name the registry row they discharge, and no assertion moved. **The six are one per `covered-elsewhere` row that did not already name itself**, which is four in `plan-validate.test.ts` and not five, because `GS-083` names itself three times there. **`GS-072`'s cited site executes nothing**: the permutation block is `skipIf(!replayExists)`, the engine exports no `replay`, and the body throws, so a row `ADR-076` counts as covered has no executed assertion and `X8`'s grep cannot tell. `X5` is not blocked by this session, which the wave plan says it is |
 | [2026-08-21 - Session 124](2026-08-21-session-124.md) | WAVE-05 `X6`: `GS-030`'s surviving half, **one test**, and it is a count and not a duration. One trading day and one row across each of the six transitions, with the close instants either side pinning that the clock DID move, without which the count would pass on any ordinary fortnight. **One perturbation passed and is recorded because it did**: a one-day shift off a Sunday changes no weekday. The `X7` evidence is widened from two transitions and sixteen sessions to **six and 60**, every one 23 hours, and the falsified sentence is separated into three claims whose truth values differ |
+| [2026-08-21 - Session 125](2026-08-21-session-125.md) | the four `ADR-074` disagreements, resolved in place while the ruling is still unsigned |
