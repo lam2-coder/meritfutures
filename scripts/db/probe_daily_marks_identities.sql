@@ -47,7 +47,11 @@ BEGIN
   INSERT INTO plan_versions (plan_id, version, status, rules, public_slug, created_by)
     VALUES (v_plan, 1, 'draft', '{"schema_version":1}'::jsonb, 'ec157-probe', v_user)
     RETURNING id INTO v_pv;
-  UPDATE plan_versions SET status = 'published', published_at = now() WHERE id = v_pv;
+  -- 0045 SD-M21-02: a published version records what it was decided on, or
+  -- says in writing why no run was consulted. A probe database has no runs.
+  UPDATE plan_versions SET status = 'published', published_at = now(),
+         simulation_waiver_reason = 'probe fixture: no simulation run exists in a probe database (0045, SD-M21-02)'
+   WHERE id = v_pv;
 
   INSERT INTO purchases (identity_id, user_id, plan_version_id, size_cents, kind,
                          list_price_cents, amount_paid_cents, psp, psp_reference,

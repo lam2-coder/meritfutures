@@ -39,9 +39,11 @@ BEGIN
   INSERT INTO plans (code, name) VALUES ('probe_plan', 'Probe') RETURNING id INTO plan;
 
   INSERT INTO plan_versions (plan_id, version, status, rules, copy_blocks,
-                             public_slug, public_visible, published_at, created_by)
+                             public_slug, public_visible, published_at, created_by,
+                             simulation_waiver_reason)
   VALUES (plan, 1, 'published', '{"phase_funded":{"max_payouts":5}}'::jsonb,
-          '{"floor":"never resets"}'::jsonb, 'probe-slug-v1', true, now(), 'probe')
+          '{"floor":"never resets"}'::jsonb, 'probe-slug-v1', true, now(), 'probe',
+          'probe fixture: no simulation run exists in a probe database (0045, SD-M21-02)')
   RETURNING id INTO pv;
 
   -- ---------------------------------------------------------------------------
@@ -80,9 +82,11 @@ BEGIN
 
   -- A second published row for the rejection probes, since the first is retired.
   INSERT INTO plan_versions (plan_id, version, status, rules, copy_blocks,
-                             public_slug, public_visible, published_at, created_by)
+                             public_slug, public_visible, published_at, created_by,
+                             simulation_waiver_reason)
   VALUES (plan, 2, 'published', '{"phase_funded":{"max_payouts":5}}'::jsonb,
-          '{"floor":"never resets"}'::jsonb, 'probe-slug-v2', false, now(), 'probe')
+          '{"floor":"never resets"}'::jsonb, 'probe-slug-v2', false, now(), 'probe',
+          'probe fixture: no simulation run exists in a probe database (0045, SD-M21-02)')
   RETURNING id INTO pv;
 
   -- ---------------------------------------------------------------------------

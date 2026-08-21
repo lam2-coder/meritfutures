@@ -1402,6 +1402,19 @@ const ci06h = {
           'still works, or that C2 reads the explicit exit rather than the ' +
           'expiry alone',
       ],
+      // 0045, SD-M21-02. The publish-decision record is the only control
+      // standing between a published rule contract and the amnesia FM-M21-03
+      // names. It is a CHECK, so nothing but a probe can watch it refuse, and
+      // its blank-waiver floor is a SEPARATE constraint precisely because
+      // num_nonnulls counts '' as present.
+      [
+        'probe_simulation_decision_record.sql',
+        'nothing asserts that a published plan_version records what it was ' +
+          'decided on, that the recorded exception stays cheap while the ' +
+          'unrecorded one is impossible, that a blank waiver is refused by its ' +
+          'own named floor, or that calibrationDigest()\'s HEX output decodes ' +
+          'to the 32 bytea bytes the column requires',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);

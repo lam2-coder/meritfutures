@@ -49,7 +49,10 @@ INSERT INTO plan_versions (id, plan_id, version, status, rules, public_slug,
 -- Inserted as draft then published, because plan_versions_published_has_timestamp
 -- requires published_at and 0027's immutability trigger only guards UPDATES of
 -- an ALREADY-published row.
-UPDATE plan_versions SET status = 'published', published_at = now()
+-- 0045 SD-M21-02: a published version records what it was decided on, or says
+-- in writing why no run was consulted. A probe database has no runs.
+UPDATE plan_versions SET status = 'published', published_at = now(),
+       simulation_waiver_reason = 'probe fixture: no simulation run exists in a probe database (0045, SD-M21-02)'
  WHERE id = '11200000-0000-0000-0000-000000000001';
 INSERT INTO purchases (id, identity_id, user_id, plan_version_id, size_cents,
                        kind, list_price_cents, amount_paid_cents, psp,

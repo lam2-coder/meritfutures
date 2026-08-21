@@ -459,3 +459,19 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_impersonation_session_type.sql
+
+      # 0045, SD-M21-01 and SD-M21-02. SUCCESSES LEAD, because 0034's guard
+      # rejected everything and passed thirty-two rejection assertions doing it.
+      #
+      # SUCCESS 1 IS THE ONE THAT CANNOT BE WRITTEN AS A COMMENT. calibrationDigest()
+      # returns HEX and calibration_digest is bytea, so the probe writes a row
+      # through the real decode with an actual producer output. REJECTION 7 is
+      # its mirror: the same string stored undecoded is 64 bytes and is refused.
+      #
+      # REJECTION 3 pins the blank-waiver floor as a SEPARATE named constraint.
+      # num_nonnulls counts '' as present, so without it a waiver of '' would
+      # satisfy "exactly one" while recording nothing at all.
+      - name: Probe M21's publish-decision record (0045)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_simulation_decision_record.sql
