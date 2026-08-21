@@ -369,13 +369,17 @@ claimed, which is exactly how `SD-M6-nn` and `M6-N-nn` were allocated one wave a
 
 ## 7. The wave
 
+**`W3`, `W4` and `W5` WERE RENUMBERED TO 116, 117 AND 118 ON 2026-08-21, AND THE REASON IS A FOUNDER RULING RATHER THAN A TIDY-UP.** This table claimed 108 to 115 while [WAVE-04](#) was being planned. Three concurrent app sessions then ran and took **110, 111 and 112** for the [M09](M09-marketing-site.md) site shell, the [M04](M04-trader-portal.md) portal read surfaces and the [M06](M06-admin-ops-console.md) admin read surface, all three of which have merged. **The collision was found by session 111 before it wrote its log, put to the founder, and ruled: the app session keeps 111 and `W4` renumbers, with 116 the first free number.** That ruling is applied here to all three collided rows.
+
+**`W1`, `W2`, `W6`, `W7` and `W8` did NOT collide and keep 108, 109, 113, 114 and 115.** Only the three that were actually taken move, which is [ADR-064](../decisions/ADR-064.md)'s rule applied forward: a session number is a day-and-slot allocation, the sessions that ran own the numbers they ran under, and the table allocates around them rather than rewriting history.
+
 | Rank | # | Session | Log | Branch | Fence | Regime |
 |---|---|---|---|---|---|---|
 | **1** | **W1** | `ADR-072`, fixture writability and the status registry | 108 | `claude/wave04-w1-adr072-fixture-writability` | `docs/decisions/ADR-072.md`, `docs/decisions/README.md`, `docs/testing/golden-scenarios/39-fixture-status-and-blockers.md`, `docs/testing/golden-scenarios/README.md` | non-money |
 | **1** | **W2** | Six fixtures: payout arithmetic and the gate object | 109 | `claude/wave04-w2-payout-arithmetic-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-026*`, `GS-027*`, `GS-028*`, `GS-029*`, `GS-042*`, `GS-080*` | **money path** |
-| **1** | **W3** | Six fixtures: settlement, corrections and the ladder | 110 | `claude/wave04-w3-settlement-ladder-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-035*`, `GS-057*`, `GS-058*`, `GS-066*`, `GS-082*`, `GS-241*` | **money path** |
-| **1** | **W4** | Four fixtures: the day fold and its boundaries | 111 | `claude/wave04-w4-day-fold-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-047*`, `GS-049*`, `GS-059*`, `GS-079*` | **money path** |
-| **1** | **W5** | `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` | 112 | `claude/wave04-w5-adr073-gate-inventory` | `docs/decisions/ADR-073.md`, `docs/decisions/README.md`, `docs/testing/STRATEGY.md` | non-money |
+| **1** | **W3** | Six fixtures: settlement, corrections and the ladder | 116 | `claude/wave04-w3-settlement-ladder-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-035*`, `GS-057*`, `GS-058*`, `GS-066*`, `GS-082*`, `GS-241*` | **money path** |
+| **1** | **W4** | Four fixtures: the day fold and its boundaries | 117 | `claude/wave04-w4-day-fold-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-047*`, `GS-049*`, `GS-059*`, `GS-079*` | **money path** |
+| **1** | **W5** | `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` | 118 | `claude/wave04-w5-adr073-gate-inventory` | `docs/decisions/ADR-073.md`, `docs/decisions/README.md`, `docs/testing/STRATEGY.md` | non-money |
 | **1** | **W6** | `ADR-074`, what a `<PREFIX>-nn` definition site is, with the survey | 113 | `claude/wave04-w6-adr074-identifier-series` | `docs/decisions/ADR-074.md`, `docs/decisions/README.md`, `docs/reviews/2026-08-21-identifier-series-survey.md` | non-money |
 | **2** | **W7** | `CI-09`, the nightly workflow | 114 | `claude/wave04-w7-ci09-nightly` | `.github/workflows/`, `scripts/ci/` | non-money |
 | **3** | **W8** | The four `CI-06` slug gates, four commits, in order | 115 | `claude/wave04-w8-slug-gates` | `scripts/corpus/`, `docs/testing/STRATEGY.md` | non-money |
@@ -641,7 +645,7 @@ write a gate, do not touch the engine, do not write a seventh scenario.
 
 ---
 
-### W3: six fixtures, settlement, corrections and the ladder (session 110, MONEY PATH)
+### W3: six fixtures, settlement, corrections and the ladder (session 116, MONEY PATH)
 
 ```
 Branch: claude/wave04-w3-settlement-ladder-fixtures   (from origin/main)
@@ -713,7 +717,7 @@ STOP CONDITION. Six fixture pairs, or fewer with the count reported. Stop.
 
 ---
 
-### W4: four fixtures, the day fold and its boundaries (session 111, MONEY PATH)
+### W4: four fixtures, the day fold and its boundaries (session 117, MONEY PATH)
 
 ```
 Branch: claude/wave04-w4-day-fold-fixtures   (from origin/main)
@@ -776,7 +780,7 @@ STOP CONDITION. Four fixture pairs, or fewer with the count reported. Stop.
 
 ---
 
-### W5: `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` (session 112)
+### W5: `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` (session 118)
 
 ```
 Branch: claude/wave04-w5-adr073-gate-inventory   (from origin/main)
