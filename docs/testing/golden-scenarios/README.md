@@ -72,3 +72,4 @@ the FOLD-01 registries session added a section and made them wrong.
 | [36. GS-285 to GS-299](36-gs-285-to-gs-299-the-vendor-parity-gap-fill.md) | the vendor-parity gap-fill (FOLD-03) |
 | [37. GS-300 to GS-304](37-gs-300-to-gs-304-impersonation-and-admin-parity.md) | impersonation and admin capability parity (FOLD-04) |
 | [38. GS-305 to GS-316](38-gs-305-to-gs-316-plan-config-and-the-designer.md) | plan configuration and the designer console (FOLD-05) |
+| [39. Fixture status and blockers](39-fixture-status-and-blockers.md) | a status and a stated blocker for all <!--gen:gs_count-->316<!--/gen--> rows ([ADR-072](../../decisions/ADR-072.md)) |
