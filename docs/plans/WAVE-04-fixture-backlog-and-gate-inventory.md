@@ -82,6 +82,123 @@ rules it cites against the set the engine declares: a fixture citing an undeclar
 that. An inverted fixture is written before the rule and flips on its own when the rule
 lands. **So the M1 backlog is bounded by W2 and W3, not by W1.**
 
+### 2.0 CONDITION W1 IS WRONG AS WRITTEN, AND SO IS THE COUNT OF 16 (2026-08-20, session 110)
+
+**`W3` returned 0 of 6 and its argument holds against the tree.** The condition
+below says the code must be "reachable from the loader, which imports
+`@merit/rules-engine`'s public entry point". **The planning session verified the
+EXPORT MAP and never read the pipeline**, which is the primary-source failure
+this plan's own section 5 argues against, landing on its author inside the
+document that argues it.
+
+[`packages/golden-loader/src/run.ts`](../../packages/golden-loader/src/run.ts)
+imports **two symbols**:
+
+```
+import { advanceDay, initialState } from '@merit/rules-engine';
+```
+
+**Not `evaluatePayout`. Not `applySettlement`.** And `diffEvents` in
+[`compare.ts`](../../packages/golden-loader/src/compare.ts) takes
+`readonly { readonly type: string }[]` against `readonly string[]`, so **events
+compare by type string only**.
+
+| | |
+|---|---|
+| **REACHABLE** | Whatever `advanceDay` writes onto `RuleState`: `withdrawableCents`, `engineGates`, `engineEligible`, `payoutsSettledCount`, `lifetimeSettledCents`, `payoutAnchorDay`, `cadenceAnchorDay`, `breached`, `breachKind`. `GS-025` pins `withdrawable_cents` exactly this way and is the precedent |
+| **NOT REACHABLE** | Anything returned only by `evaluatePayout` or `applySettlement`. `PayoutEvaluation` carries `asOfTradingDay`, `contextEligible`, `eligible` and **`clamp`**, so **no fixture can assert `clamp_reason` or `trader_cents` today**. `SettlementFact` is five fields and **none is a status**, so a failed transfer produces no fact at all |
+
+**`outside-loader-boundary` does not cover this**, and that gap is why the error
+survived: that term was defined for code living in `apps/worker` (the replay
+scenarios). "In the engine, exported, and never called by `runFixture`" is a
+**different blocker and the most common one**. `ADR-072` names it.
+
+**THE COUNTS IN 2.1 AND 2.2 ARE SUSPENDED, NOT RESTATED.** Replacing them with a
+second set derived the same afternoon by the same session that got them wrong is
+the move this repository keeps finding. `W1`'s status table is the authority, as
+`W1`'s prompt already required, and **the number it derives is the number that
+stands.** What is certain today is that 16 is an upper bound and that
+`W3`'s six are not in it.
+
+**`W3`'s reasoning is on `claude/wave04-w3-settlement-ladder-fixtures` at
+`fbd6e03`**, re-derived against `types.ts`, `rules.ts`, `loader.ts`, `compare.ts`,
+`run.ts` and M01 section 3.5, and it is worth reading rather than re-deriving.
+**It also verified `GS-241`'s two figures by hand under TR-01 and they match the
+registry exactly**, so the row is right and only its reachability was wrong.
+
+### The harm was not wasted work, and `W2` is the session that named it
+
+**`W2` returned 1 of 6 independently and reached the same wall from the other
+side.** Its statement of the consequence is sharper than the one above and is the
+reason this repair is not a bookkeeping note:
+
+> `R-43` and `R-44` are in `IMPLEMENTED_RULES`, so a fixture citing them derives
+> **direct** and must match. It never could. Writing them would have produced a
+> **permanent false red on a money path**, indistinguishable from the engine
+> defect a golden failure is supposed to mean.
+
+**That is worse than an unwritable fixture and it is why half-rows were correctly
+declined twice.** [ADR-048](../decisions/ADR-048.md)'s polarity derivation is what
+makes a fixture safe to write before its rule lands; it offers **no protection at
+all** against a fixture whose assertion the pipeline cannot reach, because
+polarity is derived from the CITATION and never from the assertion. A direct
+fixture that can never match does not read as "not implemented yet". It reads as
+a broken engine, on the payout path, permanently.
+
+### THE JUSTIFICATION IN 2.2 CONTRADICTS SECTION 2, AND NO SOURCE READING WAS NEEDED TO SEE IT
+
+**`W2` also found the error without leaving this document.** Section 2 states, in
+bold, that *"the engine has not implemented the rule yet is NOT a blocker, and
+that is the design working."* Section 2.2 then justifies putting all six payout
+scenarios in Tier 1 because **"`R-43` and `R-44` are declared."**
+
+**If declaration is not what blocks, declaration cannot be what unblocks.** The
+two paragraphs are incompatible and they sit four hundred words apart in one
+file. **The justification answers condition W1 while the binding constraint was
+always condition W2, the format.** Reading `run.ts` would have caught it; so
+would reading this plan's own two paragraphs together, and that is the cheaper
+check that was also skipped.
+
+**And [`fixtures/README.md`](../../packages/rules-engine/fixtures/README.md)'s
+held-back table already said it**, in the file `W2`'s own prompt instructed it to
+read in full before writing anything. **The answer was written down, in the file
+the plan pointed at, and the plan contradicted it anyway.**
+
+### What `W2` and `W3` actually landed, and one ruling they raise
+
+| | |
+|---|---|
+| **`W3`** | **0 of 6.** `GS-035`, `GS-057`, `GS-058`, `GS-066`, `GS-082`, `GS-241` all blocked, each with the field and the file cited. `GS-241`'s two figures verified by hand under TR-01 and **matching the registry exactly** |
+| **`W2`** | **1 of 6.** `GS-080` written, derives direct, matched `advanceDay` on the first run with **fifteen hand-computed values and nothing edited**. `GS-026` to `GS-029` and `GS-042` blocked by ONE fact rather than five |
+| **Coverage moved less than the count suggests** | `GS-080` is a **Group F** fixture, not Group G. **The payout arithmetic these two sessions were sent to cover is still one fixture deep, at `GS-025`** |
+
+**`GS-042` IS ONE THIRD REACHABLE AND NEEDS A RULING THIS PLAN CANNOT TAKE.** Its
+`>=` boundary is a `RuleState` field; the exact tie and the one-cent request are
+both `clamp` results. `W2` declined it on `GS-060`'s stated standard, **"BOTH
+HALVES OR NEITHER"**, which batch 10 applied to exactly this trade. **But
+`GS-060`'s blocker was temporary and `GS-042`'s is structural**, so waiting costs
+more here than it did there. `W2`'s recommendation is to **split the registry row
+rather than relax the standard**, and it correctly declined to take that decision
+itself.
+
+### Two stale blockers in `fixtures/README.md`, found and deliberately not fixed
+
+Both are outside `W2`'s fence, which was shared with two concurrent sessions.
+
+- **`compare.ts` diffs nested expectations by leaf path now**, and the README's
+  held-back table still lists that as a blocker.
+- **Polarity is wired and enforced at 41 direct and 0 inverted.** The README
+  still says every fixture is inverted.
+
+---
+
+**The gate this wants is not written and is not `W8`'s.** Nothing in the tree
+asserts that a scenario queued as writable has an assertion the fixture pipeline
+can actually reach. That is checkable, and preferring a gate to more care is what
+section 5 says to do about exactly this.
+
+---
+
 ### 2.1 The partition, and it sums to 276
 
 | Tier | What holds it | Count |
@@ -252,13 +369,17 @@ claimed, which is exactly how `SD-M6-nn` and `M6-N-nn` were allocated one wave a
 
 ## 7. The wave
 
+**`W3`, `W4` and `W5` WERE RENUMBERED TO 116, 117 AND 118 ON 2026-08-21, AND THE REASON IS A FOUNDER RULING RATHER THAN A TIDY-UP.** This table claimed 108 to 115 while [WAVE-04](#) was being planned. Three concurrent app sessions then ran and took **110, 111 and 112** for the [M09](M09-marketing-site.md) site shell, the [M04](M04-trader-portal.md) portal read surfaces and the [M06](M06-admin-ops-console.md) admin read surface, all three of which have merged. **The collision was found by session 111 before it wrote its log, put to the founder, and ruled: the app session keeps 111 and `W4` renumbers, with 116 the first free number.** That ruling is applied here to all three collided rows.
+
+**`W1`, `W2`, `W6`, `W7` and `W8` did NOT collide and keep 108, 109, 113, 114 and 115.** Only the three that were actually taken move, which is [ADR-064](../decisions/ADR-064.md)'s rule applied forward: a session number is a day-and-slot allocation, the sessions that ran own the numbers they ran under, and the table allocates around them rather than rewriting history.
+
 | Rank | # | Session | Log | Branch | Fence | Regime |
 |---|---|---|---|---|---|---|
 | **1** | **W1** | `ADR-072`, fixture writability and the status registry | 108 | `claude/wave04-w1-adr072-fixture-writability` | `docs/decisions/ADR-072.md`, `docs/decisions/README.md`, `docs/testing/golden-scenarios/39-fixture-status-and-blockers.md`, `docs/testing/golden-scenarios/README.md` | non-money |
 | **1** | **W2** | Six fixtures: payout arithmetic and the gate object | 109 | `claude/wave04-w2-payout-arithmetic-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-026*`, `GS-027*`, `GS-028*`, `GS-029*`, `GS-042*`, `GS-080*` | **money path** |
-| **1** | **W3** | Six fixtures: settlement, corrections and the ladder | 110 | `claude/wave04-w3-settlement-ladder-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-035*`, `GS-057*`, `GS-058*`, `GS-066*`, `GS-082*`, `GS-241*` | **money path** |
-| **1** | **W4** | Four fixtures: the day fold and its boundaries | 111 | `claude/wave04-w4-day-fold-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-047*`, `GS-049*`, `GS-059*`, `GS-079*` | **money path** |
-| **1** | **W5** | `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` | 112 | `claude/wave04-w5-adr073-gate-inventory` | `docs/decisions/ADR-073.md`, `docs/decisions/README.md`, `docs/testing/STRATEGY.md` | non-money |
+| **1** | **W3** | Six fixtures: settlement, corrections and the ladder | 116 | `claude/wave04-w3-settlement-ladder-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-035*`, `GS-057*`, `GS-058*`, `GS-066*`, `GS-082*`, `GS-241*` | **money path** |
+| **1** | **W4** | Four fixtures: the day fold and its boundaries | 117 | `claude/wave04-w4-day-fold-fixtures` | **BY FILE.** `packages/rules-engine/fixtures/GS-047*`, `GS-049*`, `GS-059*`, `GS-079*` | **money path** |
+| **1** | **W5** | `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` | 118 | `claude/wave04-w5-adr073-gate-inventory` | `docs/decisions/ADR-073.md`, `docs/decisions/README.md`, `docs/testing/STRATEGY.md` | non-money |
 | **1** | **W6** | `ADR-074`, what a `<PREFIX>-nn` definition site is, with the survey | 113 | `claude/wave04-w6-adr074-identifier-series` | `docs/decisions/ADR-074.md`, `docs/decisions/README.md`, `docs/reviews/2026-08-21-identifier-series-survey.md` | non-money |
 | **2** | **W7** | `CI-09`, the nightly workflow | 114 | `claude/wave04-w7-ci09-nightly` | `.github/workflows/`, `scripts/ci/` | non-money |
 | **3** | **W8** | The four `CI-06` slug gates, four commits, in order | 115 | `claude/wave04-w8-slug-gates` | `scripts/corpus/`, `docs/testing/STRATEGY.md` | non-money |
@@ -524,7 +645,7 @@ write a gate, do not touch the engine, do not write a seventh scenario.
 
 ---
 
-### W3: six fixtures, settlement, corrections and the ladder (session 110, MONEY PATH)
+### W3: six fixtures, settlement, corrections and the ladder (session 116, MONEY PATH)
 
 ```
 Branch: claude/wave04-w3-settlement-ladder-fixtures   (from origin/main)
@@ -596,7 +717,7 @@ STOP CONDITION. Six fixture pairs, or fewer with the count reported. Stop.
 
 ---
 
-### W4: four fixtures, the day fold and its boundaries (session 111, MONEY PATH)
+### W4: four fixtures, the day fold and its boundaries (session 117, MONEY PATH)
 
 ```
 Branch: claude/wave04-w4-day-fold-fixtures   (from origin/main)
@@ -659,7 +780,7 @@ STOP CONDITION. Four fixture pairs, or fewer with the count reported. Stop.
 
 ---
 
-### W5: `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` (session 112)
+### W5: `ADR-073`, what closes `CI-07`, `CI-08` and `CI-09` (session 118)
 
 ```
 Branch: claude/wave04-w5-adr073-gate-inventory   (from origin/main)

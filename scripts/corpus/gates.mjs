@@ -783,12 +783,55 @@ const ci06e = {
 // -----------------------------------------------------------------------------
 // CI-06f  ADR numbers unique, and gapless over allocated PLUS reserved
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// ADR-065 T3, made checkable: a reservation row that outlived its reservation
+// -----------------------------------------------------------------------------
+// T3 rules that when a claimed artifact lands, its reservation row is AMENDED IN
+// PLACE rather than joined by a second row. `CI-06w` enforces the second half of
+// that (one key, at most one row). NOTHING ENFORCED THE FIRST HALF, and the cost
+// is measured rather than asserted: on 2026-08-20 the two tables carried TWELVE
+// rows reading "Reserved, unwritten" for artifacts that were sitting on disk,
+// against 43 rows that were correct. Four consecutive sessions recorded the debt
+// and none could close it, because the session that lands a file does not hold
+// ALLOCATION.md in its fence at the moment it lands.
+//
+// A STALE RESERVATION IS THE DANGEROUS DIRECTION, which is why this is a gate and
+// not a tidy-up. `allocated()` treats a reserved number as legitimately absent,
+// so CI-06f and CI-06h both stop reporting a hole at that number. A row that says
+// "reserved" forever is a permanent exemption from the gaplessness check, granted
+// by a sentence nobody re-reads.
+//
+// IT READS THE LAST CELL, because that is where the disposition lives in both
+// tables, and it reuses `allocationSection` rather than scanning the file again:
+// a second reader of these tables is OQ-P1-04's defect, which is the whole reason
+// `allocatedClaims` is one function serving two gates.
+function reservedRowDispositions(body, heading) {
+  const { text } = allocationSection(body, heading, /\n## /);
+  const out = new Map();
+  for (const line of text.split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const cells = line.split('|').filter((c, i, a) => i > 0 && i < a.length - 1);
+    if (cells.length < 2) continue;
+    const m = /^\s*\*{0,2}(\d{3,4})\*{0,2}\s*$/.exec(cells[0] ?? '');
+    if (!m) continue;
+    out.set(Number(m[1]), cells[cells.length - 1]);
+  }
+  return out;
+}
+
+// One phrasing, checked as one string, because both tables use it verbatim and a
+// looser match would catch "reserved" in ordinary prose about a reservation.
+const READS_UNWRITTEN = (cell) => /\*\*Reserved, unwritten/.test(cell);
+
 const ci06f = {
   id: 'CI-06f',
   title: 'ADR numbers are unique and gapless over allocated plus reserved',
   covers:
     'uniqueness and gaplessness across the docs/decisions/ entry files, against the ' +
-    'allocation table, plus that each entry file is named for the ADR its heading declares. ' +
+    'allocation table, plus that each entry file is named for the ADR its heading declares, ' +
+    'plus ADR-065 T3: a row may not still read "Reserved, unwritten" once its entry file ' +
+    'exists, because `allocated()` treats a reserved number as legitimately absent and a row ' +
+    'left reserved is therefore a permanent exemption from the gaplessness check above. ' +
     'The cross-branch half (a PR may not claim a number already on main) belongs ' +
     'to the CI job, which can see both refs; this run cannot.',
   run() {
@@ -814,11 +857,23 @@ const ci06f = {
     // The allocation table is the reserved set: any number it names is allowed
     // to be absent, because a sibling branch holds it. Shared with CI-06h since
     // ADR-036; see `allocated` for why it is one function.
-    const alloc = allocated(read(ALLOCATION_DOC), ADR_ALLOCATION);
+    const allocBody = read(ALLOCATION_DOC);
+    const alloc = allocated(allocBody, ADR_ALLOCATION);
     const max = Math.max(...seen, ...alloc);
     for (let n = 1; n <= max; n++) {
       if (!seen.has(n) && !alloc.has(n)) {
         findings.push(`ADR-${String(n).padStart(3, '0')} is neither present nor reserved (a hole)`);
+      }
+    }
+    // ADR-065 T3: the entry exists, so the row may no longer call itself unwritten.
+    for (const [n, cell] of reservedRowDispositions(allocBody, ADR_ALLOCATION)) {
+      if (seen.has(n) && READS_UNWRITTEN(cell)) {
+        findings.push(
+          `ADR-${String(n).padStart(3, '0')}: the allocation row still reads "Reserved, unwritten" ` +
+            'and the entry file exists. ADR-065 T3 amends the reservation row IN PLACE when the ' +
+            'artifact lands; a row left reserved is a permanent exemption from this gate\'s own ' +
+            'gaplessness check',
+        );
       }
     }
     return findings;
@@ -1133,7 +1188,9 @@ const ci06h = {
   covers:
     'migration filenames number 1..n with no duplicates, every number on disk is ' +
     'claimed by a row of the migration allocation table in DECISIONS.md, every ' +
-    'hole matches a reservation, and the corpus workflow still carries the ' +
+    'hole matches a reservation, no row still reads "Reserved, unwritten" once its ' +
+    'file is on disk (ADR-065 T3, the same assertion CI-06f makes for entries), ' +
+    'and the corpus workflow still carries the ' +
     'ON_ERROR_STOP apply, the must-fail re-apply, the database-derived counts, ' +
     'the whole-schema NO-FLOATS assertion and every probe pinned in the ' +
     "required-needle list below. THAT LIST IS THE COUNT: this line read 'all " +
@@ -1167,7 +1224,8 @@ const ci06h = {
     // that used to live here is subsumed: a missing 0001 that nobody reserved
     // is the n = 1 hole.
     const pad = (n) => String(n).padStart(4, '0');
-    const alloc = allocated(read(ALLOCATION_DOC), MIGRATION_ALLOCATION);
+    const allocBody = read(ALLOCATION_DOC);
+    const alloc = allocated(allocBody, MIGRATION_ALLOCATION);
     const max = Math.max(...seen.keys(), ...alloc);
     for (let n = 1; n <= max; n++) {
       if (!seen.has(n) && !alloc.has(n)) {
@@ -1181,6 +1239,22 @@ const ci06h = {
         findings.push(
           `${f}: ${pad(n)} is not claimed by the migration allocation table in ` +
             `${ALLOCATION_DOC}. Claim the number there before writing the file (ADR-036)`,
+        );
+      }
+    }
+
+    // ADR-065 T3, the migration half of CI-06f's assertion. The file is on disk,
+    // so the row may no longer call itself unwritten. Migrations make this
+    // sharper than ADRs do: a migration is SPENT the moment it merges, and
+    // `0041` and `0044` both landed under a filename the reservation did not
+    // name, so a row left reading "reserved" is also a row still advertising a
+    // filename nobody wrote.
+    for (const [n, cell] of reservedRowDispositions(allocBody, MIGRATION_ALLOCATION)) {
+      if (seen.has(n) && READS_UNWRITTEN(cell)) {
+        findings.push(
+          `${pad(n)}: the allocation row still reads "Reserved, unwritten" and ${seen.get(n)} ` +
+            'is on disk. ADR-065 T3 amends the reservation row IN PLACE when the artifact ' +
+            'lands; a row left reserved is a permanent exemption from the hole check above',
         );
       }
     }
