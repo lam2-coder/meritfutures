@@ -64,6 +64,10 @@ importers:
         version: 4.1.10(@types/node@22.20.1)(vite@8.2.1(@types/node@22.20.1))
 
   apps/admin:
+    dependencies:
+      '@merit/rules-engine':
+        specifier: workspace:*
+        version: link:../../packages/rules-engine
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -88,6 +92,10 @@ importers:
         version: 4.1.10(@types/node@22.20.1)(vite@8.2.1(@types/node@22.20.1))
 
   apps/site:
+    dependencies:
+      '@merit/rules-engine':
+        specifier: workspace:*
+        version: link:../../packages/rules-engine
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
