@@ -47,12 +47,27 @@ export class FigureError extends Error {
 }
 
 /**
- * Constitution M6 fixes the panel list at ten and M06 section 3.1 names them
- * `P-M6-01` to `P-M6-10`. A figure belongs to one of them, and the check is
- * here rather than in a review comment because the panel id is what the page
- * orders on and what a reader of a stale screenshot matches against the plan.
+ * WHERE ON THE PAGE A FIGURE COMES FROM, and it is a closed roster because the
+ * roster is what a reader of a stale screenshot matches against the plan.
+ *
+ * M06 section 3.1 names ten panels, `P-M6-01` to `P-M6-10`.
+ *
+ * `AS-M6-04` IS THE ELEVENTH MEMBER AND IT IS A CITATION RATHER THAN A CLAIM.
+ * AS-M6-04's counter is "three named numbers, never one, each with its own
+ * definition printed next to it", and its third number is **remaining ladder
+ * exposure**, `sum((ladder - payouts_settled) * cap)`. That number is stored:
+ * `0009` carries `remaining_ladder_exposure_cents NOT NULL`. **Section 3.1's
+ * panel table has no row for it**, so the page owes a figure that the panel
+ * roster cannot name.
+ *
+ * The remedy available to a session fenced to `apps/admin` is to cite the
+ * identifier that already exists rather than to mint `P-M6-11`. ADR-034's rule
+ * is the reason: a `P-M6-nn` written here is a claim on a series with no
+ * allocation table, made by a session that cannot add the row to the document
+ * that owns it. So the third number's origin is the scenario that requires it,
+ * and the gap is recorded in the session log for whoever holds M06 next.
  */
-const PANEL_ID = /^P-M6-(0[1-9]|10)$/;
+const ORIGIN_ID = /^(P-M6-(0[1-9]|10)|AS-M6-04)$/;
 
 /**
  * WHEN A FIGURE WAS TRUE, AND WHAT IT WAS READ FROM. Both halves are required
@@ -90,8 +105,8 @@ export type Authority = 'authoritative' | 'indicative';
 
 /** A number this page may render, with everything INV-M6-04 requires beside it. */
 export interface Figure {
-  /** `P-M6-01` to `P-M6-10`. */
-  readonly panel: string;
+  /** `P-M6-01` to `P-M6-10`, or `AS-M6-04` for the number no panel names. */
+  readonly origin: string;
   /** What the number is called on the page. */
   readonly label: string;
   /** What the number MEANS, printed beside it. AS-M6-04. */
@@ -110,7 +125,7 @@ export interface Figure {
  * supplier is late is a panel nobody notices is missing.
  */
 export interface AbsentFigure {
-  readonly panel: string;
+  readonly origin: string;
   readonly label: string;
   readonly definition: string;
   /** Why there is no number. Names the missing supplier, never "unavailable". */
@@ -147,12 +162,13 @@ function requireUtcInstant(instant: string): string {
   return instant;
 }
 
-function requirePanel(panel: string): string {
-  if (!PANEL_ID.test(panel))
+function requireOrigin(origin: string): string {
+  if (!ORIGIN_ID.test(origin))
     throw new FigureError(
-      `${JSON.stringify(panel)} is not one of P-M6-01 to P-M6-10, and constitution M6 fixes the panel list`,
+      `${JSON.stringify(origin)} is not one of P-M6-01 to P-M6-10 or AS-M6-04, ` +
+        'and M06 section 3.1 fixes the roster this page renders',
     );
-  return panel;
+  return origin;
 }
 
 /**
@@ -160,7 +176,7 @@ function requirePanel(panel: string): string {
  * rather than a convenience.
  */
 export function figure(fields: {
-  panel: string;
+  origin: string;
   label: string;
   definition: string;
   cents: Cents;
@@ -170,7 +186,7 @@ export function figure(fields: {
   return {
     kind: 'figure',
     figure: {
-      panel: requirePanel(fields.panel),
+      origin: requireOrigin(fields.origin),
       label: requireText(fields.label, 'label'),
       definition: requireText(fields.definition, 'definition'),
       cents: fields.cents,
@@ -189,7 +205,7 @@ export function figure(fields: {
  * by the schema is the same silence, spelled.
  */
 export function absent(fields: {
-  panel: string;
+  origin: string;
   label: string;
   definition: string;
   reason: string;
@@ -197,7 +213,7 @@ export function absent(fields: {
   return {
     kind: 'absent',
     absent: {
-      panel: requirePanel(fields.panel),
+      origin: requireOrigin(fields.origin),
       label: requireText(fields.label, 'label'),
       definition: requireText(fields.definition, 'definition'),
       reason: requireText(fields.reason, 'reason'),

@@ -21,7 +21,7 @@ import {
 const AS_OF = { instant: '2026-08-20T21:00:00.000Z', source: 'liability_snapshots' };
 
 const OPEN = {
-  panel: 'P-M6-01',
+  origin: 'P-M6-01',
   label: 'Open liability',
   definition: 'sum(withdrawable) across funded accounts plus wallet balances',
   cents: 500_000n,
@@ -68,15 +68,19 @@ describe('M6-A-02: AS-M6-04, the definition is a field and the renderer cannot d
     expect(line).toContain('liability_snapshots');
   });
 
-  test('a panel outside constitution M6 fixed list is refused', () => {
-    expect(() => figure({ ...OPEN, panel: 'P-M6-11' })).toThrow(FigureError);
-    expect(() => figure({ ...OPEN, panel: 'liability' })).toThrow(FigureError);
+  test('an origin outside the roster is refused, P-M6-11 included', () => {
+    expect(() => figure({ ...OPEN, origin: 'P-M6-11' })).toThrow(FigureError);
+    expect(() => figure({ ...OPEN, origin: 'liability' })).toThrow(FigureError);
+  });
+
+  test('AS-M6-04 is on the roster, because its third number has no panel', () => {
+    expect(() => figure({ ...OPEN, origin: 'AS-M6-04' })).not.toThrow();
   });
 });
 
 describe('M6-A-03: absent is a value and zero is not', () => {
   const GAP_FIELDS = {
-    panel: 'P-M6-03',
+    origin: 'P-M6-03',
     label: 'Largest single identity share',
     definition: 'the largest single identity share of the eligible-next-7-days total',
     reason: 'no column: SD-M6-01 identity-max did not land in 0009',
