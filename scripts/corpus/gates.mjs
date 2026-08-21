@@ -4699,6 +4699,409 @@ const conflictMarkers = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06/fixture-inventory  The fixture registry and the fixture directory agree
+// -----------------------------------------------------------------------------
+// THE DIRECTION THIS GATE OWNS HAS BEEN NAMED AND UNIMPLEMENTED SINCE CI-03 WAS
+// WRITTEN, AND CI-03 SAYS SO ON EVERY RUN IN ITS OWN WORDS: "The inventory check
+// for a registry row with no fixture is CI-06's and is not switched on." A
+// sentence that reports its own hole on every run for as long as nobody writes
+// the gate is the most polite form of a silent failure there is.
+//
+// FIVE ASSERTIONS, AND THE PARTITION IS THE POINT. `39-fixture-status-and-
+// blockers.md` is a registry of 316 rows whose STATUS COLUMN IS A CLAIM ABOUT
+// THE DIRECTORY. ADR-072 says so in the document's own words: "`status` is
+// derived from the directory and not from this file". A claim about the
+// directory that nothing compares to the directory is a claim.
+//
+//   1. ONE ROW PER REGISTERED SCENARIO, BOTH DIRECTIONS. The registry set is
+//      read from the OTHER section files and never from the status document
+//      itself, which is what stops the assertion being circular: reading the
+//      status document for its own scope would let a row define the very
+//      identifier it is then checked against, so an invented id would register
+//      itself and pass. Spelling an unregistered id out here would also be a
+//      CI-06d finding in its own right, which is that gate doing its job on
+//      this one's documentation.
+//   2. EVERY FIXTURE ON DISK HAS A `written` ROW. This is the direction CI-03
+//      names. It is the one that catches a fixture landing without the registry
+//      moving, which is exactly what happened three times in this wave.
+//   3. NO ROW CLAIMS `written` WITHOUT BOTH FILES. A fixture is a `.yaml` and
+//      its `.expected.json` sibling; one without the other is a scenario the
+//      loader cannot run and the registry calls done.
+//   4. EVERY `blocked` ROW NAMES A BLOCKER FROM THE CLOSED VOCABULARY AND A
+//      CITATION, and every row that is NOT blocked names NO blocker.
+//   5. THE TWO SUMMARY TABLES ARE DERIVED FROM THE ROWS. They are
+//      hand-maintained counts sitting above 316 hand-maintained rows, which is
+//      ADR-034's class, and CI-06g cannot reach them because they are not
+//      generated spans.
+//
+// ASSERTION 4 IS NARROWED AGAINST THE BRIEF, DELIBERATELY AND IN WRITING. The
+// W8 brief says "every NON-WRITTEN row names a blocker from the closed
+// vocabulary AND a citation". Read literally that flags the two `writable` rows,
+// and it is the document that says otherwise: "`writable` means all three of
+// ADR-072's conditions hold now. `blocked` means at least one fails". A blocker
+// on a `writable` row is a contradiction and the absence of one is correct. So
+// the assertion runs on `blocked` rows, and the `writable` and `written` rows
+// get the OPPOSITE assertion rather than none: they must name no blocker at all.
+// Every row is covered in both directions and no row is covered by nothing.
+//
+// ITS FIRST RUN IS RED AND THE THREE FINDINGS ARE REGISTERED RATHER THAN
+// TOLERATED. `GS-049`, `GS-059` and `GS-080` are on disk and their rows do not
+// say `written`: W2 (session 109) wrote `GS-080` and W4 (session 117) wrote
+// `GS-059` and `GS-049`, and the status document is `W1`'s file, which is not in
+// this session's fence. The register is `CI06U_REGISTER`'s idiom exactly and
+// carries its defining property: A REGISTER ENTRY THAT NO LONGER NAMES A REAL
+// DEFECT IS ITSELF A FINDING. So it shrinks as the repair lands, it cannot
+// become furniture, and its size prints on every run rather than being restated
+// in prose. It registers three NAMED rows and never a blanket tolerance: a
+// fourth fixture landing without its row moving fails on the day it lands.
+//
+// WHAT THE REGISTER DOES NOT DECIDE. `GS-049`'s row reads `blocked /
+// format-cannot-express` on the argument that the scenario carries three probe
+// shapes and one fixture is one stream. Whether one fixture DISCHARGES that row
+// is a disposition question for the session that owns the file, not a parse, and
+// this gate takes no view: it asserts only that a fixture on disk and a row that
+// denies it cannot both stand.
+const FIXTURE_STATUS_DOC = 'docs/testing/golden-scenarios/39-fixture-status-and-blockers.md';
+const FIXTURE_DIR = 'packages/rules-engine/fixtures';
+
+// WRITTEN IN THE RUNNER, NOT DERIVED FROM THE DOCUMENT, on ADR-074 section 2's
+// argument: a vocabulary computed from the terms currently in use admits every
+// typo as a new term and can never fail. Assertion 5 then checks the document's
+// summary table against this list in both directions, so the two cannot drift
+// and a genuinely new blocker is a deliberate edit here.
+const FIXTURE_STATUSES = ['written', 'writable', 'blocked'];
+const FIXTURE_BLOCKERS = [
+  'no-fixture-format',
+  'format-cannot-express',
+  'vendor-call',
+  'outside-loader-boundary',
+  'open-question',
+  'no-plan-record-value',
+];
+
+// Each entry names a REAL defect and the session that created it. An entry that
+// stops naming one is a finding (CI06U_REGISTER's property), so this map is the
+// list of repairs the gate is waiting for and not a list of things it forgives.
+const CI06FIXTURE_REGISTER = new Map([
+  [
+    'GS-080',
+    'W2 (session 109) wrote the fixture and the row still reads `writable`. Repair: the ' +
+      'row moves to `written` with its citation pointing at the fixture, in the file W1 owns',
+  ],
+  [
+    'GS-059',
+    'W4 (session 117) wrote the fixture and the row still reads `writable`. Repair: as above',
+  ],
+  [
+    'GS-049',
+    'W4 (session 117) wrote the fixture and the row still reads `blocked / ' +
+      'format-cannot-express`. Whether ONE fixture discharges a row arguing three probe ' +
+      'shapes is a disposition for the session that owns the file and is not decided here',
+  ],
+]);
+
+// The registry set, read from every section file EXCEPT the status document. A
+// scope that included the status document would be circular: the row would
+// define the identifier the row is then checked against.
+function goldenRegistryIds() {
+  const dir = 'docs/testing/golden-scenarios';
+  const files = readdirSync(join(ROOT, dir))
+    .filter((f) => /^\d{2}-.*\.md$/.test(f))
+    .filter((f) => join(dir, f) !== FIXTURE_STATUS_DOC)
+    .sort()
+    .map((f) => join(dir, f));
+  if (files.length === 0) {
+    throw new Error(`no GS section files in ${dir} outside the status document; scope is empty`);
+  }
+  const body = files.map((f) => read(f)).join('\n');
+  const ids = new Set([...body.matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1]));
+  if (ids.size === 0) {
+    throw new Error(`no GS identifiers in ${dir} outside the status document; scope is empty`);
+  }
+  return ids;
+}
+
+// A row is `| GS-nnn | status | blocker | citation |`. Read positionally rather
+// than by header name, and the row shape is asserted rather than assumed: a row
+// with the wrong number of cells is a finding here and not a silent skip.
+function fixtureStatusRows() {
+  const rows = [];
+  const lines = read(FIXTURE_STATUS_DOC).split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!/^\|\s*GS-\d{3}\s*\|/.test(line)) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    rows.push({
+      id: /GS-\d{3}/.exec(cells[0])[0],
+      status: (cells[1] ?? '').replace(/[`*]/g, ''),
+      blocker: (cells[2] ?? '').replace(/[`*]/g, ''),
+      citation: cells[3] ?? '',
+      cells: cells.length,
+      n: i + 1,
+    });
+  }
+  if (rows.length === 0) {
+    throw new Error(`no GS rows parsed from ${FIXTURE_STATUS_DOC}; the gate cannot run`);
+  }
+  return rows;
+}
+
+// The fixtures on disk, keyed by scenario. `.yaml` and `.expected.json` are
+// tracked separately because assertion 3 is about the PAIR and reporting "no
+// fixture" for a scenario missing only its expectation would name the wrong
+// repair.
+function fixturesOnDisk() {
+  if (!existsSync(join(ROOT, FIXTURE_DIR))) {
+    throw new Error(`${FIXTURE_DIR} does not exist; the fixture directory has moved or is gone`);
+  }
+  const found = new Map();
+  for (const f of readdirSync(join(ROOT, FIXTURE_DIR)).sort()) {
+    const m = /^(GS-\d{3})-.*?(\.expected\.json|\.yaml)$/.exec(f);
+    if (!m) continue;
+    const entry = found.get(m[1]) ?? { yaml: [], expected: [] };
+    if (m[2] === '.yaml') entry.yaml.push(f);
+    else entry.expected.push(f);
+    found.set(m[1], entry);
+  }
+  if (found.size === 0) {
+    throw new Error(`no GS fixtures found in ${FIXTURE_DIR}; every "written" row would fail`);
+  }
+  return found;
+}
+
+// The two summary tables above the rows. Read by a FLAT scan for a row whose
+// first cell is a declared term and whose second parses as an integer, which is
+// safe here rather than lax: a data row's first cell is always `GS-nnn`, and a
+// blocker term appears in a data row's THIRD cell and never its first, so no
+// data row can be mistaken for a summary row.
+function fixtureSummaryCounts(vocabulary) {
+  const declared = new Map();
+  for (const line of read(FIXTURE_STATUS_DOC).split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim().replace(/[`*]/g, ''));
+    if (cells.length < 2) continue;
+    if (!vocabulary.includes(cells[0])) continue;
+    if (!/^\d+$/.test(cells[1])) continue;
+    declared.set(cells[0], Number(cells[1]));
+  }
+  return declared;
+}
+
+const fixtureInventory = {
+  id: 'CI-06/fixture-inventory',
+  title: 'The fixture registry and the fixture directory agree, in both directions',
+  covers:
+    'The 316 rows of docs/testing/golden-scenarios/39-fixture-status-and-blockers.md against ' +
+    'the golden-scenario registry and against packages/rules-engine/fixtures. FIVE ' +
+    'ASSERTIONS. (1) Every registered GS-nnn has exactly one row and every row names a ' +
+    'registered scenario, with the registry read from the OTHER section files so the scope ' +
+    'is not circular. (2) Every fixture on disk has a "written" row -- THE DIRECTION CI-03 ' +
+    'REPORTS AS NOT SWITCHED ON, on every run, in its own words. (3) No row claims "written" ' +
+    'without BOTH the .yaml and its .expected.json sibling. (4) Every "blocked" row names a ' +
+    'blocker from the closed vocabulary AND a citation, and every row that is not blocked ' +
+    'names NO blocker. (5) The two summary tables equal the counts derived from the rows, ' +
+    'and their term lists equal the closed vocabularies in both directions. ' +
+    'ASSERTION 4 IS NARROWED AGAINST THE W8 BRIEF, IN WRITING. The brief says every ' +
+    'NON-WRITTEN row names a blocker, which would flag the two "writable" rows; the document ' +
+    'defines writable as all three ADR-072 conditions holding, so a blocker there is a ' +
+    'contradiction. Those rows get the opposite assertion rather than none. ' +
+    'THE VOCABULARIES ARE WRITTEN IN THE RUNNER AND NOT DERIVED (ADR-074 section 2): a ' +
+    'vocabulary computed from the terms in use admits every typo and can never fail. ' +
+    'THREE ROWS ARE REGISTERED, NOT EXEMPTED. GS-049, GS-059 and GS-080 are on disk with ' +
+    'rows that deny it, written by W2 and W4 into a file this session does not fence. A ' +
+    'register entry that no longer names a real defect is a finding, so the register shrinks ' +
+    'as the repair lands; its size prints on every run and is deliberately not restated ' +
+    'here. A FOURTH such fixture fails on the day it lands. ' +
+    'TWO THINGS IT DOES NOT DO. It does not read a fixture body, so a .yaml that pins the ' +
+    'wrong thing is CI-03 and the loader cases, never this gate. And it takes no view on ' +
+    'whether one fixture DISCHARGES a row arguing several probe shapes, which is a ' +
+    'disposition for the session that owns the file.',
+  run() {
+    const findings = [];
+    const rows = fixtureStatusRows();
+    const registry = goldenRegistryIds();
+    const disk = fixturesOnDisk();
+
+    // -- 1. one row per registered scenario, both directions --------------
+    const byId = new Map();
+    for (const r of rows) {
+      if (r.cells !== 4) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: the ${r.id} row has ${r.cells} cells, not the four ` +
+            'this table declares (id, status, blocker, citation). A row this gate cannot read ' +
+            'positionally is a row it would otherwise skip in silence',
+        );
+      }
+      byId.set(r.id, [...(byId.get(r.id) ?? []), r.n]);
+    }
+    for (const id of [...byId.keys()].sort()) {
+      const at = byId.get(id);
+      if (at.length > 1) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}: ${id} has ${at.length} rows, at line(s) ${at.join(', ')}. ` +
+            'One row per scenario: two rows are two statuses and the registry cannot say which',
+        );
+      }
+    }
+    for (const id of [...registry].sort()) {
+      if (!byId.has(id)) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}: ${id} is registered in the golden-scenario registry and has ` +
+            'no row here, so its fixture status is stated nowhere (ADR-072)',
+        );
+      }
+    }
+    for (const id of [...byId.keys()].sort()) {
+      if (!registry.has(id)) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}: ${id} has a row here and is not in the golden-scenario ` +
+            'registry, so the row states a status for a scenario that does not exist',
+        );
+      }
+    }
+
+    // -- 2. every fixture on disk has a `written` row ----------------------
+    const written = new Set(rows.filter((r) => r.status === 'written').map((r) => r.id));
+    const stale = [];
+    for (const id of [...disk.keys()].sort()) {
+      if (written.has(id)) continue;
+      const row = rows.find((r) => r.id === id);
+      const says = row ? `reads "${row.status}"` : 'has no row at all';
+      if (CI06FIXTURE_REGISTER.has(id)) {
+        stale.push(id);
+        continue;
+      }
+      findings.push(
+        `${FIXTURE_STATUS_DOC}: ${id} has a fixture on disk (${disk.get(id).yaml.join(', ')}) ` +
+          `and its row ${says}. This is the direction CI-03 reports as not switched on: a ` +
+          'fixture landed and the registry did not move. Either the row becomes "written" ' +
+          'with a citation pointing at the fixture, or the fixture is not a fixture',
+      );
+    }
+
+    // The register's own property, and the reason it cannot become furniture:
+    // an entry naming a row that has since been repaired is a finding here.
+    for (const [id, why] of CI06FIXTURE_REGISTER) {
+      if (!disk.has(id)) {
+        findings.push(
+          `scripts/corpus/gates.mjs: CI06FIXTURE_REGISTER holds ${id} and no fixture for it is ` +
+            `on disk, so the entry no longer names a real defect. Remove it. (${why})`,
+        );
+      } else if (written.has(id)) {
+        findings.push(
+          `scripts/corpus/gates.mjs: CI06FIXTURE_REGISTER holds ${id} and its row now reads ` +
+            '"written", so the entry no longer names a real defect. Remove it, in the commit ' +
+            'that repairs the row (WAVE-03: a register entry goes with its repair)',
+        );
+      }
+    }
+
+    // -- 3. no `written` row without both files ---------------------------
+    for (const r of rows.filter((x) => x.status === 'written')) {
+      const on = disk.get(r.id);
+      if (!on || on.yaml.length === 0) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} claims "written" and no ${r.id}-*.yaml is in ` +
+            `${FIXTURE_DIR}. ADR-072: the status is derived from the directory, not from this file`,
+        );
+        continue;
+      }
+      if (on.expected.length === 0) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} claims "written" and has ${on.yaml.join(', ')} ` +
+            'with no .expected.json sibling. A fixture with no expectation is a scenario the ' +
+            'loader cannot run and the registry calls done',
+        );
+      }
+    }
+
+    // -- 4. status and blocker vocabulary, and the citation ---------------
+    for (const r of rows) {
+      if (!FIXTURE_STATUSES.includes(r.status)) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} has status "${r.status}", which is not one of ` +
+            `${FIXTURE_STATUSES.join(', ')} (ADR-072)`,
+        );
+        continue;
+      }
+      if (r.status === 'blocked') {
+        if (!FIXTURE_BLOCKERS.includes(r.blocker)) {
+          findings.push(
+            `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} is blocked and names "${r.blocker}", which ` +
+              `is not in the closed vocabulary (${FIXTURE_BLOCKERS.join(', ')}). A blocker ` +
+              'outside the vocabulary is a reason nobody can count or clear',
+          );
+        }
+        if (r.citation === '') {
+          findings.push(
+            `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} is blocked and cites nothing. ADR-072 ` +
+              'requires a stated blocker WITH a citation that supports it; a blocker with no ' +
+              'citation is an assertion, which is the thing the table replaced',
+          );
+        }
+      } else if (r.blocker !== '') {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} is "${r.status}" and still names the blocker ` +
+            `"${r.blocker}". Only a blocked row has a blocker: writable means every ADR-072 ` +
+            'condition holds, and written means the fixture is on disk',
+        );
+      }
+    }
+
+    // -- 5. the summary tables are derived from the rows -------------------
+    const derived = new Map(FIXTURE_STATUSES.map((s) => [s, 0]));
+    const derivedBlockers = new Map(FIXTURE_BLOCKERS.map((b) => [b, 0]));
+    for (const r of rows) {
+      if (derived.has(r.status)) derived.set(r.status, derived.get(r.status) + 1);
+      if (r.status === 'blocked' && derivedBlockers.has(r.blocker)) {
+        derivedBlockers.set(r.blocker, derivedBlockers.get(r.blocker) + 1);
+      }
+    }
+    for (const [vocabulary, actual, what] of [
+      [FIXTURE_STATUSES, derived, 'status'],
+      [FIXTURE_BLOCKERS, derivedBlockers, 'blocker'],
+    ]) {
+      const declared = fixtureSummaryCounts(vocabulary);
+      for (const term of vocabulary) {
+        if (!declared.has(term)) {
+          findings.push(
+            `${FIXTURE_STATUS_DOC}: the ${what} summary table has no row for "${term}", which ` +
+              `the rows below use ${actual.get(term)} time(s). A vocabulary term with no ` +
+              'summary row is a count nobody maintains',
+          );
+          continue;
+        }
+        if (declared.get(term) !== actual.get(term)) {
+          findings.push(
+            `${FIXTURE_STATUS_DOC}: the ${what} summary says ${declared.get(term)} row(s) are ` +
+              `"${term}" and the rows below give ${actual.get(term)}. This is a ` +
+              'hand-maintained count over hand-maintained rows (ADR-034) and CI-06g cannot ' +
+              'reach it, because it is not a generated span',
+          );
+        }
+      }
+      for (const term of declared.keys()) {
+        if (vocabulary.includes(term)) continue;
+        findings.push(
+          `${FIXTURE_STATUS_DOC}: the ${what} summary declares "${term}", which is not in the ` +
+            "runner's closed vocabulary. Adding a term is a deliberate edit to gates.mjs " +
+            '(ADR-074 section 2: a vocabulary derived from what is in use can never fail)',
+        );
+      }
+    }
+
+    console.log(
+      `       CI-06/fixture-inventory note: ${rows.length} row(s) against ${registry.size} ` +
+        `registered scenario(s) and ${disk.size} fixture(s) on disk ` +
+        `(${[...derived].map(([s, n]) => `${n} ${s}`).join(', ')}); ` +
+        `${stale.length} stale row(s) registered across ${CI06FIXTURE_REGISTER.size} entry ` +
+        '(entries), each one a repair this gate is waiting for',
+    );
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -4727,6 +5130,7 @@ const GATES = [
   ci06v,
   ci06w,
   conflictMarkers,
+  fixtureInventory,
 ];
 
 function main() {

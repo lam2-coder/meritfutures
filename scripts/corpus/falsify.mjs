@@ -1115,6 +1115,38 @@ const SEEDS = {
     expect: `line begins with the conflict marker "${'<'.repeat(7)}"`,
     seed: (d) => edit(d, 'docs/STATE.md', (b) => `${b}\n${'<'.repeat(7)} HEAD\n`),
   },
+  // THE VIOLATION IS THE ONE CI-03 REPORTS AS NOT SWITCHED ON, and it is the one
+  // that had actually happened three times when the gate was written. A fixture
+  // lands and the registry does not move.
+  //
+  // A FOURTH SCENARIO, DERIVED, BECAUSE THREE ARE REGISTERED. Seeding one of
+  // GS-049, GS-059 or GS-080 would land on a register entry and the gate would
+  // correctly stay quiet, which is a seed that proves the register works and
+  // nothing about the assertion. So the seed picks a row that is BLOCKED AND HAS
+  // NO FIXTURE ON DISK -- a set no register entry can be in, by construction --
+  // and gives it one.
+  //
+  // `expect` RESOLVES AGAINST THE SEEDED TREE, which is the CI-06l lesson
+  // applied before it bit here: re-deriving "the first blocked row with no
+  // fixture" after the seed would name the NEXT row while the gate correctly
+  // names the one that was seeded. So the seeded file carries a marker in its
+  // name and `expect` reads the id back out of the tree the gate will read.
+  'CI-06/fixture-inventory': {
+    what: 'a fixture on disk whose registry row does not say "written"',
+    real:
+      'GS-080 (W2, session 109), GS-059 and GS-049 (W4, session 117) all landed on disk while ' +
+      "their rows went on reading writable or blocked. CI-03 has reported this direction as " +
+      "CI-06's and not switched on, on every run, since it was written",
+    expect: (d) => `${seededFixtureId(d)} has a fixture on disk`,
+    seed: (d) => {
+      const id = blockedWithNoFixture(d);
+      writeFileSync(
+        join(d, FIXTURE_DIR, `${id}-${SEED_MARK}.yaml`),
+        `# seeded by falsify.mjs: a fixture whose row does not say written\nscenario: ${id}\n`,
+      );
+      writeFileSync(join(d, FIXTURE_DIR, `${id}-${SEED_MARK}.expected.json`), '{}\n');
+    },
+  },
 };
 
 // =============================================================================
@@ -1191,6 +1223,82 @@ const reserveLandedRow = (d, heading, keyOf, present) => {
     return keyOf(Number(m[1]));
   }
   throw new Error(`seed anchor not found: no landed row under ${heading}`);
+};
+
+// -----------------------------------------------------------------------------
+// CI-06/fixture-inventory readers
+// -----------------------------------------------------------------------------
+// EVERY SEED BELOW MARKS WHAT IT TOUCHED AND EVERY `expect` READS THE MARK BACK.
+// `expect` is resolved against the SEEDED tree, so a seed that changes the very
+// property its `expect` re-derives names the NEXT row while the gate correctly
+// names the one that moved -- watched happening on CI-06l, reported as
+// FAILED OFF-TARGET, and avoided here by construction rather than by care.
+const FIXTURE_STATUS_PATH = 'docs/testing/golden-scenarios/39-fixture-status-and-blockers.md';
+const FIXTURE_DIR = 'packages/rules-engine/fixtures';
+const SEED_MARK = 'seeded-by-falsify';
+
+const fixtureRows = (d) =>
+  readFileSync(join(d, FIXTURE_STATUS_PATH), 'utf8')
+    .split('\n')
+    .map((line, i) => ({ line, n: i }))
+    .filter(({ line }) => /^\|\s*GS-\d{3}\s*\|/.test(line))
+    .map(({ line, n }) => {
+      const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+      return {
+        n,
+        line,
+        cells,
+        id: /GS-\d{3}/.exec(cells[0])[0],
+        status: (cells[1] ?? '').replace(/[`*]/g, ''),
+      };
+    });
+
+const fixtureIdsOnDisk = (d) =>
+  new Set(
+    readdirSync(join(d, FIXTURE_DIR))
+      .map((f) => /^(GS-\d{3})-.*\.yaml$/.exec(f))
+      .filter(Boolean)
+      .map((m) => m[1]),
+  );
+
+// A row that is BLOCKED and has NO fixture on disk. No register entry can be in
+// that set, because every registered entry names a row whose fixture exists, so
+// a seed drawn from here can never land on one and go quiet for the wrong reason.
+const blockedWithNoFixture = (d) => {
+  const on = fixtureIdsOnDisk(d);
+  const row = fixtureRows(d).find((r) => r.status === 'blocked' && !on.has(r.id));
+  if (!row) throw new Error('seed anchor not found: no blocked row without a fixture on disk');
+  return row.id;
+};
+
+// The id the seed wrote a fixture for, read back out of the directory.
+const seededFixtureId = (d) => {
+  const f = readdirSync(join(d, FIXTURE_DIR)).find((x) => x.includes(SEED_MARK));
+  if (!f) throw new Error(`seed anchor not found: no ${SEED_MARK} fixture in ${FIXTURE_DIR}`);
+  return /^(GS-\d{3})-/.exec(f)[1];
+};
+
+// The id of the row a seed rewrote, read back out of the mark it left in the
+// row's own citation cell.
+const markedFixtureRow = (d) => {
+  const row = fixtureRows(d).find((r) => r.line.includes(SEED_MARK));
+  if (!row) throw new Error(`seed anchor not found: no row marked ${SEED_MARK}`);
+  return row.id;
+};
+
+// Rewrite one row in place, marking its citation cell so `expect` can find it
+// again after the property it was chosen by has been changed.
+const rewriteFixtureRow = (d, pick, rewrite) => {
+  const p = join(d, FIXTURE_STATUS_PATH);
+  const lines = readFileSync(p, 'utf8').split('\n');
+  const row = fixtureRows(d).find(pick);
+  if (!row) throw new Error('seed anchor not found: no fixture row matching the seed predicate');
+  const cells = [...row.cells];
+  rewrite(cells);
+  cells[3] = `${cells[3]} (${SEED_MARK})`;
+  lines[row.n] = `| ${cells.join(' | ')} |`;
+  writeFileSync(p, lines.join('\n'));
+  return row.id;
 };
 
 const presentAdrNumbers = (d) =>
@@ -2422,6 +2530,85 @@ const SCOPE_CASES = [
     expect: `pnpm-workspace.yaml:`,
     seed: (d) =>
       edit(d, 'pnpm-workspace.yaml', (b) => `${b}\n${'>'.repeat(7)} theirs-side-branch\n`),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/fixture-inventory. FIVE ASSERTIONS, ONE SEED, THREE CASES.
+  //
+  // SEEDS carries one violation per gate, which is assertion 2. The three cases
+  // below carry the ones a single seed cannot reach, on CI-06k's precedent one
+  // gate over. The first is the most important thing in this file about this
+  // gate: it is the case that stops the REGISTER becoming an exemption list.
+  // ---------------------------------------------------------------------------
+  {
+    // THE REGISTER MUST NOT BE ABLE TO BECOME FURNITURE, and this is the only
+    // direction that proves it. The gate ships red-turned-quiet by three
+    // registered rows; a register that merely silenced them would be an
+    // exemption list with a better name, and would go on silencing them forever
+    // after the repair landed.
+    //
+    // So: repair one registered row to `written` in the copy. The row is now
+    // correct AND the register entry now names nothing, and the second of those
+    // MUST be a finding. This is CI06U_REGISTER's defining property asserted
+    // rather than described, and WAVE-03's rule that a register entry travels in
+    // the same commit as its repair.
+    name: 'CI-06/fixture-inventory/register-repaired',
+    gate: 'CI-06/fixture-inventory',
+    what: 'a registered stale row repaired to "written", which MUST make its register entry a finding',
+    expect: (d) => `CI06FIXTURE_REGISTER holds ${markedFixtureRow(d)} and its row now reads`,
+    seed: (d) => {
+      const on = fixtureIdsOnDisk(d);
+      rewriteFixtureRow(
+        d,
+        (r) => on.has(r.id) && r.status !== 'written',
+        (cells) => {
+          cells[1] = 'written';
+          cells[2] = '';
+        },
+      );
+    },
+  },
+  {
+    // ASSERTION 4 IS NARROWED AGAINST THE BRIEF AND THIS IS THE LOUD DIRECTION
+    // OF THE NARROWING. The brief asks for a blocker on every NON-WRITTEN row,
+    // which would flag the two `writable` rows; the document defines writable as
+    // every ADR-072 condition holding, so a blocker there is a contradiction and
+    // its absence is correct.
+    //
+    // A narrowing tested only from the quiet side is indistinguishable from a
+    // gate that stopped reading those rows. This case shows the writable rows
+    // are still READ: give one a blocker, from the closed vocabulary so the
+    // finding cannot be the vocabulary check firing instead, and it must fail.
+    name: 'CI-06/fixture-inventory/writable-with-a-blocker',
+    gate: 'CI-06/fixture-inventory',
+    what: 'a writable row that names a blocker, which MUST be a finding',
+    expect: (d) => `${markedFixtureRow(d)} is "writable" and still names the blocker`,
+    seed: (d) =>
+      rewriteFixtureRow(
+        d,
+        (r) => r.status === 'writable',
+        (cells) => {
+          cells[2] = 'vendor-call';
+        },
+      ),
+  },
+  {
+    // ASSERTION 3, WHICH THE SEED CANNOT REACH. A `written` row whose `.yaml` is
+    // present and whose `.expected.json` is not is a scenario the loader cannot
+    // run and the registry calls done, and it is the half of "both files" that a
+    // reader checking the directory by eye would miss: the fixture IS there.
+    //
+    // The expectation is deleted rather than the fixture, on purpose. Deleting
+    // the `.yaml` would fire the "no fixture at all" branch, which is a
+    // different finding, and the case would pass while asserting the wrong one.
+    name: 'CI-06/fixture-inventory/written-with-no-expectation',
+    gate: 'CI-06/fixture-inventory',
+    what: 'a written row whose .expected.json is gone while its .yaml remains, which MUST be a finding',
+    expect: 'with no .expected.json sibling',
+    seed: (d) => {
+      const f = readdirSync(join(d, FIXTURE_DIR)).find((x) => /^GS-\d{3}-.*\.expected\.json$/.test(x));
+      if (!f) throw new Error(`seed anchor not found: no .expected.json in ${FIXTURE_DIR}`);
+      rmSync(join(d, FIXTURE_DIR, f));
+    },
   },
 ];
 
