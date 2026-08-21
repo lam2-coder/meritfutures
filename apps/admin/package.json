@@ -11,6 +11,10 @@
     "typecheck": "tsc --noEmit",
     "start": "node --experimental-strip-types src/index.ts"
   },
+  "//": "IT DEPENDS ON THE ENGINE FOR ONE TYPE AND FOR NOTHING ELSE. `Cents` is `bigint` and M01 section 2.1's INV-02 is where that is decided, so a second spelling of it here would be a second answer to \"what is money\" in the one application whose subject is how much of it Merit owes. The import is TYPE-ONLY and `verbatimModuleSyntax` erases it, so no engine code is reachable at runtime from this deployable and M06 section 1.2 holds unchanged: \"M6 aggregates numbers other modules computed. It has no arithmetic on a rule\". RI-04's constraint is that no APP depends on another app; the arrow to a package is the one packages/harness already draws.",
+  "dependencies": {
+    "@merit/rules-engine": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
