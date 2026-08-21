@@ -26,12 +26,19 @@ dispatched against a number claims it before it runs. **`119` is this session an
 
 | Number | Claimed for | State |
 |---|---|---|
+| ~~**114**~~ | ~~WAVE-04 `W7`, `CI-09` the nightly workflow~~ | **WRITTEN.** Struck, and its entry is below |
+| ~~**115**~~ | ~~WAVE-04 `W8`, three of the four `CI-06` slug gates~~ | **WRITTEN.** Struck, and its entry is below |
 | **120** | `0045_simulation_runs.sql`, `SD-M21-01` and `SD-M21-02` ([M21](../plans/M21-plan-designer.md) section 2.1) | dispatched, unwritten |
-| **121** | WAVE-04 `W9`, `CI-06/gate-inventory`, which cannot run until `114` and `115` have merged | dispatched, unwritten |
+| **121** | WAVE-04 `W9`, `CI-06/gate-inventory` | **UNBLOCKED 2026-08-21.** `114` and `115` have both merged, so the gate can see `CI-09` implemented |
 | ~~**122**~~ | ~~The four Tier 2 fixture-shape rulings, [WAVE-04 section 2.3](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md)~~ | **WRITTEN.** Struck, and its entry is below |
 
 **A row moves out of this table by being written, not by being edited.** When the session
-lands, its entry joins the list below and its row here is struck.
+lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
+A deleted row is indistinguishable from a number nobody ever claimed, which is the state
+this table exists to end; [ADR-065](../decisions/ADR-065.md) T3 amends a landed reservation
+in place for the same reason. **Session 119 deleted `114` and `115` and session 122 struck
+its own row through**, on one sentence that did not say which, so the sentence now does and
+the two deleted rows are restored above.
 
 ## Entries
 
