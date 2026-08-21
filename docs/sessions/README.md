@@ -34,6 +34,11 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | ~~**123**~~ | ~~[WAVE-05](../plans/WAVE-05-tier2-fixture-shapes.md) `X1`, the six comments naming the `GS-nnn` each assertion site discharges~~ | **WRITTEN.** Struck, and its entry is below |
 | ~~**124**~~ | ~~WAVE-05 `X6`, `GS-030`'s surviving half in [`trading-calendar-generator.test.ts`](../../packages/db/test/trading-calendar-generator.test.ts)~~ | **WRITTEN.** Struck, and its entry is below |
 | ~~**125**~~ | ~~[ADR-074](../decisions/ADR-074.md)'s four disagreements, reported by `CI-06/identifier-series` in session 115 and unresolved inside a `proposed` ruling~~ | **WRITTEN.** Struck, and its entry is below |
+| ~~**126**~~ | ~~Three signatures and one refusal on the four `proposed` ADRs~~ | **WRITTEN.** Struck, and its entry is below |
+| **127** | [WAVE-05](../plans/WAVE-05-tier2-fixture-shapes.md) `X2`, section 39 gains `covered-elsewhere` and the stale rows move | dispatched, unwritten |
+| **128** | WAVE-05 `X3` and `X4`, `GS-141`'s severity half and the sole-error equalities, one file | dispatched, unwritten |
+| **129** | WAVE-05 `X5`, `GS-071` at scale in [`replay.test.ts`](../../apps/worker/test/replay.test.ts) | dispatched, unwritten |
+| **130** | WAVE-05 `X7`, the ADR repairing `GS-030`'s and `EC-012`'s falsified clause | dispatched, unwritten |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
