@@ -253,8 +253,8 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 
 | Delta | Table | Change | Migration | Status |
 |---|---|---|---|---|
-| SD-M21-01 | new `simulation_runs` | the persisted simulation run and its provenance: the `rules` and sizes digests the run was over, the calibration identity, digest and observation date, the harness and engine versions, the seed, the sample size, and the sweep columns that make one arm of a sensitivity sweep an individually traceable run. **Digests rather than a `plan_version_id` alone**, because a run is over a draft and a draft is mutable | 0045 | **reserved** |
-| SD-M21-02 | `plan_versions` | add `decided_on_simulation_run_id`, `simulation_waiver_reason`, and a `CHECK` that a published row carries **exactly one** of them. `AS-M21-01`'s structural remedy: the run is where the number is produced and the publish record is where the consequence lands, so tracing has to reach the second, and "no simulation was run" has to be a recorded decision rather than a null | 0045 | **reserved** |
+| SD-M21-01 | new `simulation_runs` | the persisted simulation run and its provenance: the `rules` and sizes digests the run was over, the calibration identity, digest and observation date, the harness and engine versions, the seed, the sample size, and the sweep columns that make one arm of a sensitivity sweep an individually traceable run. **Digests rather than a `plan_version_id` alone**, because a run is over a draft and a draft is mutable | 0045 | **landed**, session 120 |
+| SD-M21-02 | `plan_versions` | add `decided_on_simulation_run_id`, `simulation_waiver_reason`, and a `CHECK` that a published row carries **exactly one** of them. `AS-M21-01`'s structural remedy: the run is where the number is produced and the publish record is where the consequence lands, so tracing has to reach the second, and "no simulation was run" has to be a recorded decision rather than a null | 0045 | **landed**, session 120 |
 | SD-M21-03 | new `competitor_plan_models` | the modelled competitor configurations requirement (c) compares against, each carrying `observed_on` and a source reference, superseded by a new row rather than updated. A side-by-side against an undated competitor config is the stale-calibration failure in a second costume | **unallocated** | **reserved** |
 
 **`0045` was reserved CONTINGENT and [M21](../../docs/plans/M21-plan-designer.md) section 2.1 is what spends it.** [ALLOCATION](../../docs/decisions/ALLOCATION.md)'s row made the reservation conditional on the plan naming a persisted run, on the reasoning that a console recomputing on demand and storing nothing needs no table. The plan names one, and the argument it makes is that the other three adversarial scenarios are answered by showing the reader something while the stale-calibration one is not: staleness has no tell at the moment of the decision, so the only remedy that survives an inattentive reader is a record.
@@ -778,6 +778,9 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **`OI-15`** | `0043`'s session | **allocated, open.** **[The `admin_actions` design record](../../docs/architecture/data-model/admin_actions.md) does not carry `SD-M6-11`'s two columns, its `CHECK` or its fourth index.** The migration is the truth and the record trails it by one session, which is `OI-01`'s shape on a smaller surface. **No gate sees this**: `CI-06i` reconciles the TABLE set in both directions and nothing in the runner reconciles COLUMNS, so a design record can contradict its own DDL indefinitely and every gate passes. Recorded here rather than left as prose because `docs/architecture/data-model/` was not in the writing session's fence and four sibling sessions were in flight against `M06` |
 | **`OI-14`** | `0035`'s session | **allocated, open.** **The replay job must refuse an empty in-scope set.** If the engine never populates `calendar_revision_id`, every row reads as out of scope after the first correction, the audit compares nothing, and an audit that has stopped looking reports exactly like one that found nothing (FM-17). No per-row constraint can tell "not yet written" from "pristine calendar" without fabricating, so it belongs to the job |
 | **`OI-24`** | `ADR-068`'s session, [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2` | **allocated, open, and DELIBERATELY NOT REPAIRED.** [M06](../../docs/plans/M06-admin-ops-console.md) section 2 opens *"Six deltas, each from a failure mode below"* and the table now carries **seven**. **Session 89 already corrected this line once**, from *"Five deltas"*, and `SD-M6-10` makes it wrong again three sessions later. **Four concurrent sessions are each about to move it**, which is the proof that the count cannot be hand-maintained rather than an argument that it can be maintained harder. **The remedy is named and is [ADR-034](../../docs/decisions/ADR-034.md)'s own**: the count becomes a `<!--gen:-->` span under `CI-06g`, computed from the delta table it describes, and then no session touches it again. **Not implemented here**: [`gates.mjs`](../../scripts/corpus/gates.mjs) is held by three concurrent sessions and this one already carries four forced fence extensions. **For the review desk.** |
+| **`OI-27`** | session 120, `0045` | **allocated, open, and it is a LIVE INSTANCE of the thing [ADR-074](../../docs/decisions/ADR-074.md) is about.** This session read the `OI` table in THIS FILE, which stops at `OI-24`, and allocated `OI-25`. **`OI-25` and `OI-26` were already taken**: allocated in [WAVE-04 section 6](../../docs/plans/WAVE-04-fixture-backlog-and-gate-inventory.md) and recorded in [STATE](../../docs/STATE.md), which is **one identifier series with two definition sites** and neither one names the other. The near-miss is worth more than the renumber: `CI-06/identifier-series` is being written against `ADR-074` in a sibling session as this lands, and **this is exactly the collision it would have caught**, found by a founder read rather than by a gate. Renumbered to `OI-27`. **Second finding, same cause, and DELIBERATELY NOT REPAIRED**: `## 21.` is claimed TWICE in this file, at the `0038` section and again at the `0042` section, and the section-number table in section 16 carries **both** rows. `22` remains the maximum, so section `23` below is correctly numbered. **The table that exists to end section-number drift is carrying the drift.** It belongs to [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2`, is outside this session's fence, and a money-path session does not repair another session's numbering |
+| **`OI-28`** | session 120, `0045` | **allocated, open, and it needs an ADR rather than a commit.** `simulation_runs.calibration_observed_at` is a `date`, so `CI-06m` requires it to declare one of exactly three closed unit tokens, and **none of the three names what this column is**. `wall clock` is refuted by its own definition, *"Merit's own clock, answered only by `now()`"*: this column is never `now()`, and writing `now()` into it is precisely the defect it exists to prevent. `trading day` is *"answered only by TradingCalendar"* and a calibration vendor does not observe on the exchange session boundary. `rail clock` is **declared**, because its operative half, *"quoted and never computed by Merit"*, is exactly true and [`affiliate_commissions.chargeback_window_ends_on`](../../docs/architecture/data-model/affiliate_commissions.md) already carries it for the same reason. **The noun is still wrong: a calibration vendor is not a rail.** Widening `UNIT_TOKENS` amends [ADR-042](../../docs/decisions/ADR-042.md)'s closed set and is **not** done from a money-path session, so the candidate ADR is named as owed. Argued in the open at [`simulation_runs`](../../docs/architecture/data-model/simulation_runs.md) rather than picked quietly, because picking the nearest-looking token is how three rows passed `CI-06m` by accident |
+| **`OI-29`** | session 120, `0045` | **allocated, open, and it is the honest boundary of a `CHECK`.** `plan_versions_publish_decision_recorded` makes the link to a simulation run EXIST. **Nothing makes it SOUND**, because a `CHECK` cannot read another table. Writable today and satisfying the constraint: a publish decided on a `failed` run; a publish decided on a run over a draft that has since been edited, so `rules_digest` no longer matches; a publish decided on a run belonging to a different plan entirely. Closing it needs a trigger or an application publish path, and [`0004`](migrations/0004_catalog.sql) already states the trade in its own words, that a trigger *"is a weaker control: it can be disabled, and it fires per row rather than per constraint"*. **Stated in the migration header and in the design record**, not only here, because the next reader of that FK is standing at the column and not in this file |
 
 ### Section numbers
 
@@ -794,6 +797,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **19** | `0035`'s session | **allocated.** `0035` lands |
 | **21** | `0038`'s session ([ADR-067](../../docs/decisions/ADR-067.md)) | **allocated.** `0038` lands. **`20` is claimed by a heading and has no row here**, which is exactly the defect the `18` row above records happening one section after this table was created to stop it; it is left for `0036`'s session rather than filled in on its behalf, because a row written on somebody else's behalf is a claim nobody made. **`0037` has no section at all**, found in the same pass |
 | **22** | session 95, the signing pass | **allocated.** Four merged migration headers go stale when their ADRs are signed. **Section 21 is claimed TWICE**, by `0038``s session and `0042``s; cite as `section 21 (0038)` and `section 21 (0042)` on this table`s standing rule |
+| **23** | session 120, `0045` ([ADR-071](../../docs/decisions/ADR-071.md)) | **allocated.** `0045` lands. **`21` is claimed twice above**, by `0038`'s session and by `ADR-068`'s, so `22` is the true maximum and this is the next free number rather than the row count. `OI-27` records it |
 | **20** | `0036`'s session | **allocated.** `0036` lands. **This row was written into the file as a heading and never into this table**, which is the identical omission the `18` row above records one section earlier. Added here by `0042`'s session, which is the third occurrence of the same miss and the reason `OI-24` exists |
 | **21** | `ADR-068`'s session | **allocated.** `0042` lands |
 
@@ -1286,3 +1290,87 @@ Both are recorded in the probe itself, where the next author writing a fixture a
 **It is worth stating as a class rather than as four rows.** A migration header that cites the approval STATE of its ruling is citing a value that moves after the file is frozen. **The durable citation is the ADR number; the approval state is not durable and should not have been transcribed into an immutable artifact.** Four files did it, which makes it a pattern rather than an oversight, and the next money-path migration should cite the ruling and not its status.
 
 **No gate catches this and none is proposed here.** `CI-06q` checks that a dated citation of a founder ruling resolves to a declared ruling, and these citations carry no date. A gate asserting that migration prose agrees with ADR status would be asserting agreement between a frozen file and a moving value, which is the defect rather than the check.
+
+---
+
+## 23. `0045` lands, and the exception it makes cheap is the one it exists to record (2026-08-21)
+
+**Session 120.** `SD-M21-01` and `SD-M21-02`, [M21](../../docs/plans/M21-plan-designer.md) section 2.1, under [ADR-071](../../docs/decisions/ADR-071.md) section 4. `SD-M21-03` claims no number and `OQ-M21-06` still carries it.
+
+**The ruling is one sentence: a published plan version resolves to the simulation run it was decided on, or it carries a written waiver saying why no run was consulted. Exactly one of two, never neither.** [M21](../../docs/plans/M21-plan-designer.md) `FM-M21-03` names what that ends, *"a publish lands with no link to the simulation it was decided on ... the amnesia the module was admitted to end"*. The design principle is **make the recorded exception cheap and the unrecorded one impossible**: a copy-only publish takes the waiver in one sentence, and what no publish can be is silent, because afterwards an absent link and a lost link are the same thing.
+
+### The install, from empty, with every figure queried rather than counted
+
+All 45 migrations applied forward-only into an empty PostgreSQL 16.13 under `ON_ERROR_STOP=1`. Read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` against the applied schema, because **two catalogue figures in this repository were written from arithmetic and both were wrong**:
+
+```
+tables=111        (110 at 0044, so 0045 adds exactly one)
+indexes=392
+constraints=879
+triggers=16
+simulation_runs columns=19
+```
+
+Re-applying `0045` to the same database fails, which is what forward-only means:
+
+```
+ERROR:  relation "simulation_runs" already exists
+```
+
+`simulation_runs` carries **12 named CHECK constraints** plus its primary key and one foreign key, and **2 partial indexes**. Every constraint is named, so every rejection below can be attributed to one.
+
+### The probe: six successes, eight rejections, two `0028` interactions
+
+`scripts/db/probe_simulation_decision_record.sql`, run against the full set. **Successes lead**, per [ADR-035](../../docs/decisions/ADR-035.md): `0034`'s guard rejected everything and passed thirty-two rejection assertions while doing it.
+
+```
+SUCCESS 1   | calibrationDigest() hex (64 chars) decoded to exactly 32 bytea bytes and satisfied the CHECK
+SUCCESS 2   | a queued run writes with completed_at NULL, and sample_size 0 IS storable
+SUCCESS 3   | a DRAFT with neither a run nor a waiver still writes: authoring is untouched
+SUCCESS 4   | a published version resolving to its simulation run writes
+SUCCESS 5   | a published version carrying a written waiver writes: the exception is CHEAP
+SUCCESS 6   | a sweep arm with all three columns writes, alongside runs carrying none
+REJECTION 1 | publish with NEITHER refused by plan_versions_publish_decision_recorded (SQLSTATE 23514)
+REJECTION 2 | publish with BOTH refused by plan_versions_publish_decision_recorded (SQLSTATE 23514)
+REJECTION 3 | BLANK waiver refused by plan_versions_simulation_waiver_not_blank, which the exactly-one CHECK cannot do
+REJECTION 4 | running + completed_at refused by simulation_runs_terminal_has_completion
+REJECTION 5 | complete without completed_at refused by simulation_runs_terminal_has_completion
+REJECTION 6 | a sweep arm naming a parameter but no sweep refused by simulation_runs_sweep_arm_is_whole
+REJECTION 7 | the hex string stored UNDECODED (64 bytes) refused by simulation_runs_calibration_digest_is_sha256
+REJECTION 8 | sample_size -1 refused by simulation_runs_sample_size_nonneg, matching provenanceFor exactly
+0028 A      | the draft -> published UPDATE writing the decision SUCCEEDS: 0028 does not block it
+0028 B      | a published row REFUSES to have its decision moved, via 0028's derived pinned set
+```
+
+**`SUCCESS 1` and `REJECTION 7` are the same seam from both sides, and they are the one place this migration meets running code.** `calibrationDigest()` returns **hex** and `calibration_digest` is `bytea`, so the probe writes a row through the real decode using an actual producer output, then shows the same string stored **undecoded** being refused at 64 bytes. A header comment cannot reach that seam and this file's own convention is that a claim about running code is watched, not asserted.
+
+**`REJECTION 3` is why the blank floor is a second named constraint.** `num_nonnulls` counts the empty string as **present**, so a waiver of `''` satisfies "exactly one" while recording nothing at all: the publish would pass the control and the reader would learn no reason. A compound constraint passes for one reason and fails for two, so the floor is separate and named, and the probe asserts the rejection comes from **that** constraint rather than from the exactly-one check.
+
+**`REJECTION 4` and `REJECTION 5` are the two halves of a biconditional.** An implication passes the first and admits the second.
+
+### The counterfactual is not what the plan predicted, and this is the honest record of it
+
+The session plan predicted the probe would fail, against a database built from `0001` to `0044` only, on the publish-with-neither assertion. **It fails earlier**, at `SUCCESS 1`:
+
+```
+ERROR:  relation "simulation_runs" does not exist
+```
+
+That proves the **table** is load-bearing and proves nothing about the **CHECK**, which is the control the ruling actually rests on. So the isolated counterfactual was run instead, and it is the one that means something:
+
+```
+COUNTERFACTUAL AT 0044: a publish with NEITHER field was ACCEPTED, rows=1
+```
+
+The identical insert at `0045` is refused by `plan_versions_publish_decision_recorded`. **Accepted before, refused after, same statement.** A probe that passes with and without the thing it probes asserts nothing, and a predicted counterfactual that was never run asserts less.
+
+### Three existing probes broke, and that is the constraint working
+
+`probe_daily_marks_identities`, `probe_payout_hold` and `probe_plan_version_immutability` each publish a `plan_versions` fixture and each began failing the moment `0045` applied. **Exactly those three**: the other three probes touching the table leave it at `draft` and were untouched, which is itself a check on the constraint's scope. Each now carries a `simulation_waiver_reason` naming itself as a fixture. Precedent: *"`0035` broke a probe written before it, and CI is what said so."* **11 of 11 probes green** against the full set, and `assert_no_floats` holds on the applied schema.
+
+### What did not get done, stated rather than left to be discovered
+
+- **No `CHECK` can assert the link is SOUND.** `OI-29`. A publish decided on a `failed` run, or on a run over a since-edited draft, satisfies the constraint. A `CHECK` cannot read another table. Stated in the migration header and in the design record, not only here.
+- **`swept_value_bp` ships under a name that is not always true.** `OI-29`'s sibling finding, recorded in the design record: [M21](../../docs/plans/M21-plan-designer.md) section 3.4's own worked example sweeps `max_payouts`, a count of 5 and not a basis point. The plan's row is the authority this migration transcribes, so the column keeps the plan's name and the mismatch goes to the founder's read.
+- **The unit vocabulary has no word for a calibration vendor's observation date.** `OI-28`, with the candidate ADR named as owed. `rail clock` is declared and argued in the open rather than picked quietly.
+- **One identifier series, two definition sites.** `OI-27`, and it is a live instance of [ADR-074](../../docs/decisions/ADR-074.md)'s subject found by a founder read rather than by the gate being built for it this hour.
