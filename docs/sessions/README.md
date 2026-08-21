@@ -31,6 +31,7 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | ~~**120**~~ | ~~`0045_simulation_runs.sql`, `SD-M21-01` and `SD-M21-02` ([M21](../plans/M21-plan-designer.md) section 2.1)~~ | **WRITTEN.** Struck, and its entry is below |
 | **121** | WAVE-04 `W9`, `CI-06/gate-inventory` | **UNBLOCKED 2026-08-21.** `114` and `115` have both merged, so the gate can see `CI-09` implemented |
 | ~~**122**~~ | ~~The four Tier 2 fixture-shape rulings, [WAVE-04 section 2.3](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md)~~ | **WRITTEN.** Struck, and its entry is below |
+| **123** | [WAVE-05](../plans/WAVE-05-tier2-fixture-shapes.md) `X1`, the six assertion-site comments | **CLAIMED 2026-08-21.** Depends on nothing, and `X2`, `X3`, `X4` and `X8` depend on it |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
