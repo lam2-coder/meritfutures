@@ -60,17 +60,35 @@ import {
 // A `Record<CvId, string>` DOES NOT COMPILE WITH A MEMBER MISSING, which is what
 // makes "19, one per CV rule" checkable rather than counted by hand. ADR-034
 // exists because hand-maintained counts drift; this one cannot.
+//
+// AND THREE OF THESE RULES DISCHARGE A GOLDEN-SCENARIO ROW, WHICH THE ENTRIES NOW
+// SAY. ADR-076 section 2 rules `GS-076`, `GS-077` and `GS-078` `covered-elsewhere`,
+// alongside `GS-083` at its own block below: the scenario has no golden fixture AND
+// its assertion is executed here, which are answers to two different questions. A
+// registry row is discharged when its assertion RUNS somewhere a gate can read, not
+// when a file appears in `fixtures/`. `CI-06/fixture-inventory` grows a reading that
+// greps this file for the id (WAVE-05 `X8`), so the id is written at the rule it
+// belongs to rather than in a plan.
 
 const CV_ASSERTIONS: Record<CvId, string> = {
+  // GS-078: intraday trailing drawdown selected in v1. "Config-supported and
+  // explicitly unimplemented. Publishing it fails loudly rather than computing
+  // something plausible." Asserted by `RE-C-01` below and by `SEEDS['CV-01']`.
   'CV-01': 'drawdown.type is trailing_eod or static, on BOTH phases (R-17)',
   'CV-02': 'drawdown_cents > 0, strict',
   'CV-03': 'profit_target_cents > 0 when the eval phase is enabled',
   'CV-04': 'phase_eval.min_trading_days >= 1',
   'CV-05': 'required_count >= 1 and win_day_floor_cents > 0',
+  // GS-077: a consistency threshold of 0 bp or above 10000 bp, "impossible and
+  // meaningless configurations respectively". BOTH of the row's halves are
+  // asserted by `RE-C-06` below, at 0 and at 10001, against 1 and 10000 passing.
   'CV-06': '0 < max_day_share_bp <= 10000 when consistency is enabled',
   'CV-07': 'buffer_cents >= 0',
   'CV-08': 'cadence_gap_trading_days >= 0',
   'CV-09': 'the cap schedule is non-empty, starts at ordinal 1, increases, every cap > 0',
+  // GS-076: a cap below the minimum payout, under which "nobody can ever be paid".
+  // "Publish fails with the failing validation rule named", which `RE-C-10` below
+  // asserts with `toContain` and `SEEDS['CV-10']` asserts in both validators.
   'CV-10': 'every cap_cents >= min_payout_cents',
   'CV-11': 'buffer_cents > floor_lock_floor_at_cents - size_cents, when locked',
   'CV-12': 'floor_lock_at_profit_cents == drawdown + (floor_at - size), when locked',
@@ -132,6 +150,19 @@ describe('Appendix A.4  the approved lineup publishes', () => {
   //   PW-03           Core EOD: info (150,000 > 100,000)
   //                   Merit Rapid: not fired (100,000 = 100,000)
   //                   Direct: not fired (150,000 = 150,000)
+  //
+  // GS-141, "the publish diff types co-binding apart from dominated", is discharged
+  // HERE and only in part, which ADR-076 section 2 rules `covered-elsewhere` and
+  // records the residual of in the same breath. The block below asserts the row's
+  // first half as an EXACT-SET equality rather than a containment: `PW-02a` on Core
+  // EOD and Direct, `PW-02b` on Merit Rapid, and nothing else emitted.
+  //
+  // WHAT IT DOES NOT ASSERT IS THE ROW'S LAST SENTENCE. "Asserts the two are never
+  // rendered identically" is a claim about the `info` against `warning` severity and
+  // the distinct text; `diffIds` compares ids, so both are unasserted today. Both
+  // values are constructed in `validate.ts` (`PW-02a` and `PW-02b`), so the missing
+  // assertion is one `expect` in this describe and it is WAVE-05 `X3`, not this file
+  // being unable to reach it.
   it.each([
     ['Core EOD 50K', coreRules(), CORE_50K_SIZE, ['PW-01', 'PW-02a', 'PW-03']],
     ['Merit Rapid 50K', RAPID_RULES, RAPID_50K_SIZE, ['PW-01', 'PW-02b']],
