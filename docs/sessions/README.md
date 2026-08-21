@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-20
+last_updated: 2026-08-21
 ---
 
 # SESSION LOG
@@ -164,3 +164,4 @@ and within a number by the order the sections appear in the file.
 | [2026-08-20 - Session 104](2026-08-20-session-104.md) | FOLD-05 P7: `packages/harness`, the Monte Carlo harness `DEP-M21-01` names. A trial loop and an aggregator over the day model, folded through the real engine, with every result carrying its calibration identity and its own sample size. `AS-08` turned out to be a direct requirement on the port that lives in M01 rather than in the harness document, `RE-S-nn` names two different lists across two approved documents, and one of M21's three unidentified outputs looks like `RE-S-04` under another name |
 | [2026-08-20 - Session 107](2026-08-20-session-107.md) | WAVE-04 planning: eight sessions for the fixture backlog (`OI-25`) and the gate inventory (`OI-26`). **The backlog is 276 rows and sixteen fixtures of available work**, because 243 scenarios have no module code AND no fixture format. Six claims in the brief did not survive the tree, including both `OI` numbers, which were already taken |
 | [2026-08-20 - Session 106](2026-08-20-session-106.md) | the fold queue closes: eleven pull requests merged, 24 of 24 gates, and the merge discipline the wave established by getting it wrong once |
+| [2026-08-21 - Session 112](2026-08-21-session-112.md) | M06's read surface: the liability home page, AS-M6-04's three numbers each carrying its own definition, and P-M6-09 gating all of them. Two corpus findings the build produced: **`SD-M6-01`'s identity-max columns are in no migration while the manifest records the delta as landed**, and **AS-M6-04's third number has no panel id anywhere in M06** while `0009` stores it. `P-M6-11` was not minted. Four panels are blocked on named suppliers and `P-M6-07` is blocked on `OI-01`, which said the columns needed a home "before M06 is built" |
