@@ -1532,6 +1532,11 @@ const pipelineRowsIn = (d) => {
   return rows;
 };
 
+// The first row of the table, by position and not by content, so it is stable
+// under a seed that empties a Closure cell. Selecting on what the cell SAYS
+// would re-derive to the NEXT row after the seed, which is the CI-06l trap.
+const firstPipelineRow = (d) => pipelineRowsIn(d)[0];
+
 const implementedRow = (d) => {
   const row = pipelineRowsIn(d).find((r) => r.closure.includes('**Implemented'));
   if (!row) throw new Error('seed anchor not found: no row claiming an implementation');
@@ -1572,6 +1577,22 @@ const SCOPE_CASES = [
   // unrelated things and watched failing on one of them is taken on trust for
   // the rest.
   // -------------------------------------------------------------------------
+  {
+    name: 'CI-06/gate-inventory/no-disposition-at-all',
+    gate: 'CI-06/gate-inventory',
+    what: "a row carrying none of the three dispositions, which is ADR-073's headline case",
+    // WATCHED HERE RATHER THAN IN `SEEDS`, deliberately and with the cost stated.
+    // The seeded violation is the ARRIVAL, because that is the assertion ADR-073
+    // section 8 says an implementer leaves out. This one is the ruling's own
+    // sentence -- "a row that is none of the three is a finding" -- and it is the
+    // state every row of this table was in before W5 added the Closure column, so
+    // leaving it unwatched would take the gate's primary assertion on trust.
+    expect: (d) => `${firstPipelineRow(d).id} carries no disposition`,
+    seed: (d) => {
+      const row = firstPipelineRow(d);
+      edit(d, STRATEGY_PATH, (b) => once(b, row.closure, 'deferred for now'));
+    },
+  },
   {
     name: 'CI-06/gate-inventory/implementation-names-no-workflow',
     gate: 'CI-06/gate-inventory',
