@@ -4508,6 +4508,1152 @@ const ci06w = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06/conflict-markers  No file carries a line beginning with a conflict marker
+// -----------------------------------------------------------------------------
+// THE RECORD THAT COMMISSIONED THIS GATE IS WRONG ABOUT ITS OWN EVIDENCE, AND
+// SAYING SO IS THE FIRST THING THIS BLOCK DOES. `OI-19` in STATE reads "`<<<<<<<
+// HEAD` stood in INDEX and STATE and 22 of 22 gates passed over it". It never
+// stood in a COMMIT. No commit reachable from any branch head or any
+// pull-request head has ever carried a leading marker in any `.md`, `.ts`,
+// `.mjs` or `.json` file:
+//
+//     git log --all -G'^<<<<<<< ' -- '*.md' '*.ts' '*.mjs' '*.json'
+//
+// returns nothing, run on this branch on 2026-08-21. It stood in a WORKING TREE
+// during a merge. The record also disagrees with itself on the gate count, 22 in
+// session 105 and in STATE against 24 in session 106.
+//
+// TWO THINGS FOLLOW AND BOTH ARE LOAD BEARING.
+//
+//   THE GATE IS STILL WORTH WRITING, because the boundary it protects is THE
+//   PUSH AND NOT THE HISTORY. The dirty tree is what CI and the founder read,
+//   `falsify.mjs` copies the working tree rather than a git worktree for exactly
+//   that reason, and a merge resolved by hand at the wrong moment is one `git
+//   add -A` away from being history. That the corpus has never shipped one is
+//   the state this gate exists to keep.
+//
+//   ITS FALSIFICATION CASE SEEDS A MARKER RATHER THAN ANCHORING ON A HISTORICAL
+//   ONE, because there is no historical one to anchor on. That is the better
+//   outcome and not a concession: `OI-21` records that a harness anchored to
+//   corpus state decays as the corpus is repaired, and a seeded anchor does not.
+//
+// THE LIVE COMPLICATION, MEASURED RATHER THAN ASSUMED. STATE carries the string
+// `<<<<<<< HEAD` THREE TIMES IN PROSE, at the `OI-19` entry and the two entries
+// that discuss it. Those are this gate's own subject matter written down. The
+// assertion is therefore "a line BEGINNING with a marker" and never "a file
+// containing one":
+//
+//     grep -n '^<<<<<<< ' docs/STATE.md
+//
+// returns nothing, re-run on this branch rather than taken from the brief, and
+// so does the same search over every tracked file for all four marker shapes
+// including diff3's `|||||||`. No exemption is registered because none is
+// needed. `CI-06/conflict-markers/mid-line` asserts that boundary in the harness
+// with a control on the other side of it, so the concession is watched rather
+// than claimed.
+//
+// THE MARKERS ARE SPELLED BY REPETITION AND NEVER AS LITERALS. A gate whose
+// source spells a marker at the start of one of its own lines is its own first
+// finding, and this repository has already paid for that class once: `CI-06t`
+// exists because a line of prose describing a `falsify.mjs` seed SPELLED A
+// GENERATED-SPAN OPENER OUT and `CI-06g` swallowed ten thousand characters of
+// unrelated text. Naming the shape instead of writing it is the same repair.
+//
+// SCOPE IS THE WHOLE TREE, NOT `docs/`. A conflict marker in a migration, a
+// workflow or a `.ts` file is worse than one in prose, not better. `allFiles()`
+// is what "tracked" means here, and the equality was measured rather than
+// assumed: on 2026-08-21 the runner's walk reached 1,022 files and `git
+// ls-files` returned the same 1,022, with no file on either side of the
+// difference. The walk is used rather than `git ls-files` because `falsify.mjs`
+// copies the tree WITHOUT `.git`, so a gate shelling out to git would report
+// ERROR in every seeded copy and could never be watched failing. The residual
+// gap is stated rather than hidden: a file that is ignored by `.gitignore` and
+// present on disk would be read here and is not tracked. Every current
+// `.gitignore` entry is build output or a crash journal, and none of it is
+// something git merges.
+const CONFLICT_MARKER_WIDTH = 7;
+const markerOf = (char) => char.repeat(CONFLICT_MARKER_WIDTH);
+
+// Each marker carries its own matcher and its own argument, because the three
+// are not equally unambiguous and pretending they are is how a gate acquires a
+// false finding.
+const CONFLICT_MARKERS = [
+  {
+    // The ours-side opener. Git writes seven `<`, a space and a label. The bare
+    // form with no label is matched too, because a half-finished hand
+    // resolution produces it and nothing legitimate in this tree begins with
+    // seven `<`: not markdown, not TypeScript, not SQL, not YAML, not JSON.
+    marker: markerOf('<'),
+    what: 'the ours-side opener',
+    match: (line) => line.startsWith(markerOf('<')),
+  },
+  {
+    // THE ONE AMBIGUOUS MARKER, AND IT IS ASSERTED ANYWAY. Git writes exactly
+    // seven `=` alone on the line, and a markdown setext H1 underline of exactly
+    // seven `=` is textually identical to it. So this matcher requires the WHOLE
+    // LINE, where the other two are prefix matches: `========` under a heading
+    // is eight and passes, and a setext underline is a shape a Merit document
+    // has never used (measured: zero lines in the tree begin with seven `=`).
+    // It is kept because a hand resolution that deletes the outer markers and
+    // leaves the middle one is exactly what a careless fix produces, and that is
+    // the only state the other two cannot see.
+    marker: markerOf('='),
+    what: 'the separator',
+    match: (line) => line.trimEnd() === markerOf('='),
+  },
+  {
+    // The theirs-side closer. Seven `>` at a line start is seven nested
+    // blockquotes in markdown, which no document in this corpus comes close to,
+    // and is nothing at all in every other file type here.
+    marker: markerOf('>'),
+    what: 'the theirs-side closer',
+    match: (line) => line.startsWith(markerOf('>')),
+  },
+];
+
+// DIFF3'S BASE MARKER IS DELIBERATELY NOT ASSERTED, in writing rather than by
+// omission. `merge.conflictStyle = diff3` or `zdiff3` writes a fourth marker of
+// seven `|` before the base section. Seven `|` at a line start is also a
+// markdown table row of empty cells, and this corpus is written in tables. The
+// exclusion costs nothing: diff3 writes the outer two markers as well as the
+// base one, so a diff3 conflict is caught twice over by the rows above.
+
+// A file git will not merge as text cannot carry a marker git wrote into it.
+// THE DISCRIMINATOR IS UTF-8 VALIDITY AND NOT A NUL BYTE, and the difference is
+// two real source files. `packages/rithmic/src/simulator/session.ts` and
+// `stream.ts` embed a literal NUL in a template literal as a composite-key
+// separator; a NUL test drops both from this gate's scope, which is the
+// "parser narrower than the property it claims" class this runner has now found
+// six times. A round-trip through UTF-8 keeps them and drops exactly the six
+// `.xlsx` workbooks, measured on 2026-08-21. It is derived rather than listed,
+// so a seventh binary file needs no edit here.
+const isUtf8Text = (buf) => Buffer.from(buf.toString('utf8'), 'utf8').equals(buf);
+
+const conflictMarkers = {
+  id: 'CI-06/conflict-markers',
+  title: 'No file carries a line beginning with a merge conflict marker',
+  covers:
+    'Every file the runner walks, not just docs/: no line BEGINS with one of the three ' +
+    'markers git writes into a file it could not merge. This is OI-19. ' +
+    'THE RECORD THAT COMMISSIONED IT IS WRONG ABOUT ITS OWN EVIDENCE and the gate says so ' +
+    'rather than inheriting it: no commit reachable from any branch head or pull-request ' +
+    "head has ever carried a leading marker (git log --all -G'^<<<<<<< ' returns nothing). " +
+    'It stood in a WORKING TREE during a merge. The gate is still worth writing because the ' +
+    'boundary it protects is the PUSH and not the history, and its falsification case ' +
+    'SEEDS a marker rather than anchoring on a historical one, which is OI-21 applied. ' +
+    'A LINE BEGINNING WITH A MARKER, NEVER A FILE CONTAINING ONE. STATE carries the opener ' +
+    'three times in PROSE, at the OI-19 entry and the two that discuss it, and all three ' +
+    'are mid-line. No exemption is registered because none is needed, and ' +
+    'CI-06/conflict-markers/mid-line asserts that boundary with a control on the far side. ' +
+    'THE SEPARATOR IS MATCHED AS A WHOLE LINE where the outer two are prefix matches, ' +
+    'because a markdown setext H1 underline of exactly seven equals signs is textually ' +
+    'identical to it; the tree carries zero such lines today. ' +
+    "DIFF3'S BASE MARKER OF SEVEN PIPES IS NOT ASSERTED: it is also a table row of empty " +
+    'cells, and diff3 writes the outer two markers anyway, so the case is caught twice over. ' +
+    'TWO THINGS IT DOES NOT DO. It reads the WORKING TREE through the runner walk rather ' +
+    'than through git, so a file ignored by .gitignore and present on disk is read here and ' +
+    'is not tracked; the walk and git ls-files returned the same 1,022 files when this was ' +
+    'written. And it skips a file that is not valid UTF-8, which is the six .xlsx workbooks ' +
+    'and nothing else -- a NUL-byte test would instead have dropped two .ts sources that ' +
+    'embed a literal NUL as a key separator.',
+  run() {
+    const findings = [];
+    const files = allFiles();
+
+    // Rule 2 on the input. An empty walk would make this gate report a clean
+    // tree for the one reason that means it read nothing.
+    if (files.length === 0) {
+      throw new Error('the runner walk reached zero files; CI-06/conflict-markers cannot run');
+    }
+
+    let scanned = 0;
+    let skipped = 0;
+    let lines = 0;
+    for (const file of files.sort()) {
+      const buf = readFileSync(join(ROOT, file));
+      if (!isUtf8Text(buf)) {
+        skipped++;
+        continue;
+      }
+      scanned++;
+      const body = buf.toString('utf8');
+      let n = 0;
+      for (const line of body.split('\n')) {
+        n++;
+        lines++;
+        const hit = CONFLICT_MARKERS.find((m) => m.match(line));
+        if (!hit) continue;
+        findings.push(
+          `${file}:${n}: line begins with the conflict marker "${hit.marker}" (${hit.what}). ` +
+            'Git writes this into a file it could not merge, so the file states two ' +
+            'contradictory things and ships as one. Resolve the merge; a generated span is ' +
+            'resolved by running: node scripts/corpus/gates.mjs generate',
+        );
+      }
+    }
+
+    // Rule 2 on the reader. Every markdown file in this corpus is text, so zero
+    // scanned means the UTF-8 discriminator has inverted and every marker in the
+    // tree is being skipped in silence.
+    if (scanned === 0) {
+      throw new Error(
+        `CI-06/conflict-markers read zero text files out of ${files.length}. The UTF-8 ` +
+          'check has inverted and every file in the tree is being skipped as binary',
+      );
+    }
+
+    console.log(
+      `       CI-06/conflict-markers note: ${lines} line(s) over ${scanned} text file(s); ` +
+        `${skipped} file(s) skipped as not valid UTF-8; ` +
+        `markers asserted: ${CONFLICT_MARKERS.map((m) => m.marker).join(' ')}`,
+    );
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// CI-06/fixture-inventory  The fixture registry and the fixture directory agree
+// -----------------------------------------------------------------------------
+// THE DIRECTION THIS GATE OWNS HAS BEEN NAMED AND UNIMPLEMENTED SINCE CI-03 WAS
+// WRITTEN, AND CI-03 SAYS SO ON EVERY RUN IN ITS OWN WORDS: "The inventory check
+// for a registry row with no fixture is CI-06's and is not switched on." A
+// sentence that reports its own hole on every run for as long as nobody writes
+// the gate is the most polite form of a silent failure there is.
+//
+// FIVE ASSERTIONS, AND THE PARTITION IS THE POINT. `39-fixture-status-and-
+// blockers.md` is a registry of 316 rows whose STATUS COLUMN IS A CLAIM ABOUT
+// THE DIRECTORY. ADR-072 says so in the document's own words: "`status` is
+// derived from the directory and not from this file". A claim about the
+// directory that nothing compares to the directory is a claim.
+//
+//   1. ONE ROW PER REGISTERED SCENARIO, BOTH DIRECTIONS. The registry set is
+//      read from the OTHER section files and never from the status document
+//      itself, which is what stops the assertion being circular: reading the
+//      status document for its own scope would let a row define the very
+//      identifier it is then checked against, so an invented id would register
+//      itself and pass. Spelling an unregistered id out here would also be a
+//      CI-06d finding in its own right, which is that gate doing its job on
+//      this one's documentation.
+//   2. EVERY FIXTURE ON DISK HAS A `written` ROW. This is the direction CI-03
+//      names. It is the one that catches a fixture landing without the registry
+//      moving, which is exactly what happened three times in this wave.
+//   3. NO ROW CLAIMS `written` WITHOUT BOTH FILES. A fixture is a `.yaml` and
+//      its `.expected.json` sibling; one without the other is a scenario the
+//      loader cannot run and the registry calls done.
+//   4. EVERY `blocked` ROW NAMES A BLOCKER FROM THE CLOSED VOCABULARY AND A
+//      CITATION, and every row that is NOT blocked names NO blocker.
+//   5. THE TWO SUMMARY TABLES ARE DERIVED FROM THE ROWS. They are
+//      hand-maintained counts sitting above 316 hand-maintained rows, which is
+//      ADR-034's class, and CI-06g cannot reach them because they are not
+//      generated spans.
+//
+// ASSERTION 4 IS NARROWED AGAINST THE BRIEF, DELIBERATELY AND IN WRITING. The
+// W8 brief says "every NON-WRITTEN row names a blocker from the closed
+// vocabulary AND a citation". Read literally that flags the two `writable` rows,
+// and it is the document that says otherwise: "`writable` means all three of
+// ADR-072's conditions hold now. `blocked` means at least one fails". A blocker
+// on a `writable` row is a contradiction and the absence of one is correct. So
+// the assertion runs on `blocked` rows, and the `writable` and `written` rows
+// get the OPPOSITE assertion rather than none: they must name no blocker at all.
+// Every row is covered in both directions and no row is covered by nothing.
+//
+// ITS FIRST RUN IS RED AND THE THREE FINDINGS ARE REGISTERED RATHER THAN
+// TOLERATED. `GS-049`, `GS-059` and `GS-080` are on disk and their rows do not
+// say `written`: W2 (session 109) wrote `GS-080` and W4 (session 117) wrote
+// `GS-059` and `GS-049`, and the status document is `W1`'s file, which is not in
+// this session's fence. The register is `CI06U_REGISTER`'s idiom exactly and
+// carries its defining property: A REGISTER ENTRY THAT NO LONGER NAMES A REAL
+// DEFECT IS ITSELF A FINDING. So it shrinks as the repair lands, it cannot
+// become furniture, and its size prints on every run rather than being restated
+// in prose. It registers three NAMED rows and never a blanket tolerance: a
+// fourth fixture landing without its row moving fails on the day it lands.
+//
+// WHAT THE REGISTER DOES NOT DECIDE. `GS-049`'s row reads `blocked /
+// format-cannot-express` on the argument that the scenario carries three probe
+// shapes and one fixture is one stream. Whether one fixture DISCHARGES that row
+// is a disposition question for the session that owns the file, not a parse, and
+// this gate takes no view: it asserts only that a fixture on disk and a row that
+// denies it cannot both stand.
+const FIXTURE_STATUS_DOC = 'docs/testing/golden-scenarios/39-fixture-status-and-blockers.md';
+const FIXTURE_DIR = 'packages/rules-engine/fixtures';
+
+// WRITTEN IN THE RUNNER, NOT DERIVED FROM THE DOCUMENT, on ADR-074 section 2's
+// argument: a vocabulary computed from the terms currently in use admits every
+// typo as a new term and can never fail. Assertion 5 then checks the document's
+// summary table against this list in both directions, so the two cannot drift
+// and a genuinely new blocker is a deliberate edit here.
+const FIXTURE_STATUSES = ['written', 'writable', 'blocked'];
+const FIXTURE_BLOCKERS = [
+  'no-fixture-format',
+  'format-cannot-express',
+  'vendor-call',
+  'outside-loader-boundary',
+  'open-question',
+  'no-plan-record-value',
+];
+
+// Each entry names a REAL defect and the session that created it. An entry that
+// stops naming one is a finding (CI06U_REGISTER's property), so this map is the
+// list of repairs the gate is waiting for and not a list of things it forgives.
+const CI06FIXTURE_REGISTER = new Map([
+  [
+    'GS-080',
+    'W2 (session 109) wrote the fixture and the row still reads `writable`. Repair: the ' +
+      'row moves to `written` with its citation pointing at the fixture, in the file W1 owns',
+  ],
+  [
+    'GS-059',
+    'W4 (session 117) wrote the fixture and the row still reads `writable`. Repair: as above',
+  ],
+  [
+    'GS-049',
+    'W4 (session 117) wrote the fixture and the row still reads `blocked / ' +
+      'format-cannot-express`. Whether ONE fixture discharges a row arguing three probe ' +
+      'shapes is a disposition for the session that owns the file and is not decided here',
+  ],
+]);
+
+// The registry set, read from every section file EXCEPT the status document. A
+// scope that included the status document would be circular: the row would
+// define the identifier the row is then checked against.
+function goldenRegistryIds() {
+  const dir = 'docs/testing/golden-scenarios';
+  const files = readdirSync(join(ROOT, dir))
+    .filter((f) => /^\d{2}-.*\.md$/.test(f))
+    .filter((f) => join(dir, f) !== FIXTURE_STATUS_DOC)
+    .sort()
+    .map((f) => join(dir, f));
+  if (files.length === 0) {
+    throw new Error(`no GS section files in ${dir} outside the status document; scope is empty`);
+  }
+  const body = files.map((f) => read(f)).join('\n');
+  const ids = new Set([...body.matchAll(/\b(GS-\d{3})\b/g)].map((m) => m[1]));
+  if (ids.size === 0) {
+    throw new Error(`no GS identifiers in ${dir} outside the status document; scope is empty`);
+  }
+  return ids;
+}
+
+// A row is `| GS-nnn | status | blocker | citation |`. Read positionally rather
+// than by header name, and the row shape is asserted rather than assumed: a row
+// with the wrong number of cells is a finding here and not a silent skip.
+function fixtureStatusRows() {
+  const rows = [];
+  const lines = read(FIXTURE_STATUS_DOC).split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!/^\|\s*GS-\d{3}\s*\|/.test(line)) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    rows.push({
+      id: /GS-\d{3}/.exec(cells[0])[0],
+      status: (cells[1] ?? '').replace(/[`*]/g, ''),
+      blocker: (cells[2] ?? '').replace(/[`*]/g, ''),
+      citation: cells[3] ?? '',
+      cells: cells.length,
+      n: i + 1,
+    });
+  }
+  if (rows.length === 0) {
+    throw new Error(`no GS rows parsed from ${FIXTURE_STATUS_DOC}; the gate cannot run`);
+  }
+  return rows;
+}
+
+// The fixtures on disk, keyed by scenario. `.yaml` and `.expected.json` are
+// tracked separately because assertion 3 is about the PAIR and reporting "no
+// fixture" for a scenario missing only its expectation would name the wrong
+// repair.
+function fixturesOnDisk() {
+  if (!existsSync(join(ROOT, FIXTURE_DIR))) {
+    throw new Error(`${FIXTURE_DIR} does not exist; the fixture directory has moved or is gone`);
+  }
+  const found = new Map();
+  for (const f of readdirSync(join(ROOT, FIXTURE_DIR)).sort()) {
+    const m = /^(GS-\d{3})-.*?(\.expected\.json|\.yaml)$/.exec(f);
+    if (!m) continue;
+    const entry = found.get(m[1]) ?? { yaml: [], expected: [] };
+    if (m[2] === '.yaml') entry.yaml.push(f);
+    else entry.expected.push(f);
+    found.set(m[1], entry);
+  }
+  if (found.size === 0) {
+    throw new Error(`no GS fixtures found in ${FIXTURE_DIR}; every "written" row would fail`);
+  }
+  return found;
+}
+
+// The two summary tables above the rows. Read by a FLAT scan for a row whose
+// first cell is a declared term and whose second parses as an integer, which is
+// safe here rather than lax: a data row's first cell is always `GS-nnn`, and a
+// blocker term appears in a data row's THIRD cell and never its first, so no
+// data row can be mistaken for a summary row.
+function fixtureSummaryCounts(vocabulary) {
+  const declared = new Map();
+  for (const line of read(FIXTURE_STATUS_DOC).split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim().replace(/[`*]/g, ''));
+    if (cells.length < 2) continue;
+    if (!vocabulary.includes(cells[0])) continue;
+    if (!/^\d+$/.test(cells[1])) continue;
+    declared.set(cells[0], Number(cells[1]));
+  }
+  return declared;
+}
+
+const fixtureInventory = {
+  id: 'CI-06/fixture-inventory',
+  title: 'The fixture registry and the fixture directory agree, in both directions',
+  covers:
+    'The 316 rows of docs/testing/golden-scenarios/39-fixture-status-and-blockers.md against ' +
+    'the golden-scenario registry and against packages/rules-engine/fixtures. FIVE ' +
+    'ASSERTIONS. (1) Every registered GS-nnn has exactly one row and every row names a ' +
+    'registered scenario, with the registry read from the OTHER section files so the scope ' +
+    'is not circular. (2) Every fixture on disk has a "written" row -- THE DIRECTION CI-03 ' +
+    'REPORTS AS NOT SWITCHED ON, on every run, in its own words. (3) No row claims "written" ' +
+    'without BOTH the .yaml and its .expected.json sibling. (4) Every "blocked" row names a ' +
+    'blocker from the closed vocabulary AND a citation, and every row that is not blocked ' +
+    'names NO blocker. (5) The two summary tables equal the counts derived from the rows, ' +
+    'and their term lists equal the closed vocabularies in both directions. ' +
+    'ASSERTION 4 IS NARROWED AGAINST THE W8 BRIEF, IN WRITING. The brief says every ' +
+    'NON-WRITTEN row names a blocker, which would flag the two "writable" rows; the document ' +
+    'defines writable as all three ADR-072 conditions holding, so a blocker there is a ' +
+    'contradiction. Those rows get the opposite assertion rather than none. ' +
+    'THE VOCABULARIES ARE WRITTEN IN THE RUNNER AND NOT DERIVED (ADR-074 section 2): a ' +
+    'vocabulary computed from the terms in use admits every typo and can never fail. ' +
+    'THREE ROWS ARE REGISTERED, NOT EXEMPTED. GS-049, GS-059 and GS-080 are on disk with ' +
+    'rows that deny it, written by W2 and W4 into a file this session does not fence. A ' +
+    'register entry that no longer names a real defect is a finding, so the register shrinks ' +
+    'as the repair lands; its size prints on every run and is deliberately not restated ' +
+    'here. A FOURTH such fixture fails on the day it lands. ' +
+    'TWO THINGS IT DOES NOT DO. It does not read a fixture body, so a .yaml that pins the ' +
+    'wrong thing is CI-03 and the loader cases, never this gate. And it takes no view on ' +
+    'whether one fixture DISCHARGES a row arguing several probe shapes, which is a ' +
+    'disposition for the session that owns the file.',
+  run() {
+    const findings = [];
+    const rows = fixtureStatusRows();
+    const registry = goldenRegistryIds();
+    const disk = fixturesOnDisk();
+
+    // -- 1. one row per registered scenario, both directions --------------
+    const byId = new Map();
+    for (const r of rows) {
+      if (r.cells !== 4) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: the ${r.id} row has ${r.cells} cells, not the four ` +
+            'this table declares (id, status, blocker, citation). A row this gate cannot read ' +
+            'positionally is a row it would otherwise skip in silence',
+        );
+      }
+      byId.set(r.id, [...(byId.get(r.id) ?? []), r.n]);
+    }
+    for (const id of [...byId.keys()].sort()) {
+      const at = byId.get(id);
+      if (at.length > 1) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}: ${id} has ${at.length} rows, at line(s) ${at.join(', ')}. ` +
+            'One row per scenario: two rows are two statuses and the registry cannot say which',
+        );
+      }
+    }
+    for (const id of [...registry].sort()) {
+      if (!byId.has(id)) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}: ${id} is registered in the golden-scenario registry and has ` +
+            'no row here, so its fixture status is stated nowhere (ADR-072)',
+        );
+      }
+    }
+    for (const id of [...byId.keys()].sort()) {
+      if (!registry.has(id)) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}: ${id} has a row here and is not in the golden-scenario ` +
+            'registry, so the row states a status for a scenario that does not exist',
+        );
+      }
+    }
+
+    // -- 2. every fixture on disk has a `written` row ----------------------
+    const written = new Set(rows.filter((r) => r.status === 'written').map((r) => r.id));
+    const stale = [];
+    for (const id of [...disk.keys()].sort()) {
+      if (written.has(id)) continue;
+      const row = rows.find((r) => r.id === id);
+      const says = row ? `reads "${row.status}"` : 'has no row at all';
+      if (CI06FIXTURE_REGISTER.has(id)) {
+        stale.push(id);
+        continue;
+      }
+      findings.push(
+        `${FIXTURE_STATUS_DOC}: ${id} has a fixture on disk (${disk.get(id).yaml.join(', ')}) ` +
+          `and its row ${says}. This is the direction CI-03 reports as not switched on: a ` +
+          'fixture landed and the registry did not move. Either the row becomes "written" ' +
+          'with a citation pointing at the fixture, or the fixture is not a fixture',
+      );
+    }
+
+    // The register's own property, and the reason it cannot become furniture:
+    // an entry naming a row that has since been repaired is a finding here.
+    for (const [id, why] of CI06FIXTURE_REGISTER) {
+      if (!disk.has(id)) {
+        findings.push(
+          `scripts/corpus/gates.mjs: CI06FIXTURE_REGISTER holds ${id} and no fixture for it is ` +
+            `on disk, so the entry no longer names a real defect. Remove it. (${why})`,
+        );
+      } else if (written.has(id)) {
+        findings.push(
+          `scripts/corpus/gates.mjs: CI06FIXTURE_REGISTER holds ${id} and its row now reads ` +
+            '"written", so the entry no longer names a real defect. Remove it, in the commit ' +
+            'that repairs the row (WAVE-03: a register entry goes with its repair)',
+        );
+      }
+    }
+
+    // -- 3. no `written` row without both files ---------------------------
+    for (const r of rows.filter((x) => x.status === 'written')) {
+      const on = disk.get(r.id);
+      if (!on || on.yaml.length === 0) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} claims "written" and no ${r.id}-*.yaml is in ` +
+            `${FIXTURE_DIR}. ADR-072: the status is derived from the directory, not from this file`,
+        );
+        continue;
+      }
+      if (on.expected.length === 0) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} claims "written" and has ${on.yaml.join(', ')} ` +
+            'with no .expected.json sibling. A fixture with no expectation is a scenario the ' +
+            'loader cannot run and the registry calls done',
+        );
+      }
+    }
+
+    // -- 4. status and blocker vocabulary, and the citation ---------------
+    for (const r of rows) {
+      if (!FIXTURE_STATUSES.includes(r.status)) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} has status "${r.status}", which is not one of ` +
+            `${FIXTURE_STATUSES.join(', ')} (ADR-072)`,
+        );
+        continue;
+      }
+      if (r.status === 'blocked') {
+        if (!FIXTURE_BLOCKERS.includes(r.blocker)) {
+          findings.push(
+            `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} is blocked and names "${r.blocker}", which ` +
+              `is not in the closed vocabulary (${FIXTURE_BLOCKERS.join(', ')}). A blocker ` +
+              'outside the vocabulary is a reason nobody can count or clear',
+          );
+        }
+        if (r.citation === '') {
+          findings.push(
+            `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} is blocked and cites nothing. ADR-072 ` +
+              'requires a stated blocker WITH a citation that supports it; a blocker with no ' +
+              'citation is an assertion, which is the thing the table replaced',
+          );
+        }
+      } else if (r.blocker !== '') {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} is "${r.status}" and still names the blocker ` +
+            `"${r.blocker}". Only a blocked row has a blocker: writable means every ADR-072 ` +
+            'condition holds, and written means the fixture is on disk',
+        );
+      }
+    }
+
+    // -- 5. the summary tables are derived from the rows -------------------
+    const derived = new Map(FIXTURE_STATUSES.map((s) => [s, 0]));
+    const derivedBlockers = new Map(FIXTURE_BLOCKERS.map((b) => [b, 0]));
+    for (const r of rows) {
+      if (derived.has(r.status)) derived.set(r.status, derived.get(r.status) + 1);
+      if (r.status === 'blocked' && derivedBlockers.has(r.blocker)) {
+        derivedBlockers.set(r.blocker, derivedBlockers.get(r.blocker) + 1);
+      }
+    }
+    for (const [vocabulary, actual, what] of [
+      [FIXTURE_STATUSES, derived, 'status'],
+      [FIXTURE_BLOCKERS, derivedBlockers, 'blocker'],
+    ]) {
+      const declared = fixtureSummaryCounts(vocabulary);
+      for (const term of vocabulary) {
+        if (!declared.has(term)) {
+          findings.push(
+            `${FIXTURE_STATUS_DOC}: the ${what} summary table has no row for "${term}", which ` +
+              `the rows below use ${actual.get(term)} time(s). A vocabulary term with no ` +
+              'summary row is a count nobody maintains',
+          );
+          continue;
+        }
+        if (declared.get(term) !== actual.get(term)) {
+          findings.push(
+            `${FIXTURE_STATUS_DOC}: the ${what} summary says ${declared.get(term)} row(s) are ` +
+              `"${term}" and the rows below give ${actual.get(term)}. This is a ` +
+              'hand-maintained count over hand-maintained rows (ADR-034) and CI-06g cannot ' +
+              'reach it, because it is not a generated span',
+          );
+        }
+      }
+      for (const term of declared.keys()) {
+        if (vocabulary.includes(term)) continue;
+        findings.push(
+          `${FIXTURE_STATUS_DOC}: the ${what} summary declares "${term}", which is not in the ` +
+            "runner's closed vocabulary. Adding a term is a deliberate edit to gates.mjs " +
+            '(ADR-074 section 2: a vocabulary derived from what is in use can never fail)',
+        );
+      }
+    }
+
+    console.log(
+      `       CI-06/fixture-inventory note: ${rows.length} row(s) against ${registry.size} ` +
+        `registered scenario(s) and ${disk.size} fixture(s) on disk ` +
+        `(${[...derived].map(([s, n]) => `${n} ${s}`).join(', ')}); ` +
+        `${stale.length} stale row(s) registered across ${CI06FIXTURE_REGISTER.size} entry ` +
+        '(entries), each one a repair this gate is waiting for',
+    );
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// CI-06/identifier-series  Every member of a declared series has ONE definition
+// -----------------------------------------------------------------------------
+// ADR-074, IMPLEMENTED AS RULED. Its scope, its exemptions and its
+// definition-site parse are that ruling's and not this session's. Where the
+// ruling and the tree disagree the disagreement is REPORTED and never resolved
+// by re-scoping, and there are four such places; each is named below and every
+// one is also in the pull request.
+//
+// THE RULE, QUOTED FROM ADR-074 SECTION 1 RATHER THAN PARAPHRASED:
+//
+//   "A definition site is a table row whose first cell LEADS with the
+//    identifier, or a markdown heading whose text LEADS with the identifier,
+//    occurring inside the series' DECLARED REGISTER. Every member of an
+//    in-scope series has exactly one. Every other occurrence anywhere in the
+//    repository is a citation and is unconstrained."
+//
+// Four things in that sentence are load bearing and each is a measurement.
+//
+//   "LEADS WITH", NOT "EQUALS". STATE writes its finding rows as
+//   `| **`OI-06`. The 48 hour payout-destination cooling window has no
+//   storage.** |`: identifier, full stop, then the finding, all in one cell. An
+//   equality rule reports the six rows that exist as six rows that do not.
+//
+//   A ROW OR A HEADING, AND NOT A BOLD LEAD. The heading shape carries the 42
+//   `AS-*` and `OQ-*` series that have no rows at all. The bold lead is
+//   rejected because a bold span opening a line is this corpus's ordinary
+//   emphasis idiom, present thousands of times, and admitting it makes the rule
+//   match prose.
+//
+//   INSIDE THE DECLARED REGISTER, WHICH IS THE WHOLE RULING. A first cell is
+//   not always an identity: `ADR-014` leads four rows, its own register row and
+//   three in ADR-052 and ADR-057 whose first column is THE SOURCE BEING QUOTED.
+//   Scoping the search to a named register removes that class instead of
+//   enumerating it. A register is a FILE, or a file and ONE `##` SECTION, and
+//   the section granularity is not a convenience: M01 section 1 holds `INV`'s
+//   24 definition rows and Appendix A holds one more for the same identifier in
+//   a COVERAGE table, so a file-wide register reports `INV` as broken. Measured
+//   here: section scoping is what takes `INV`, `CV` and `RB` from failing to
+//   clean.
+//
+//   THE SEARCH SPACE IS THE REPOSITORY, NOT `docs/`. Registers already live
+//   under `packages/`.
+//
+// THE SCOPE IS WRITTEN, NEVER DISCOVERED (ADR-074 section 2), and this is the
+// assertion the gate is worth nothing without. A gate whose scope is "every
+// series that currently satisfies the rule" PASSES FOREVER BY CONSTRUCTION: the
+// day a series breaks it leaves scope and the gate reports 115 of 115. So the
+// table below is a closed list, one argued entry each, and it is here rather
+// than in a document for CI-06w's reason: the registration and the
+// implementation are the same line and cannot drift apart.
+//
+// FOUR PLACES WHERE THE RULING AND THE TREE DISAGREE. Each is reported, none is
+// resolved by widening or narrowing on this session's authority.
+//
+//   1. THE COUNT DOES NOT REPRODUCE, AND ADR-074 SECTION 3 ASKS FOR EXACTLY
+//      THIS CHECK: "The count is stated so W8 can check that its transcription
+//      reproduced it." It states 118 series and 1,086 members. Transcribing its
+//      own four classes gives 117 and 1,083, and the two class subtotals are
+//      where it goes: the module row says 96 against the 93 its own rule
+//      enumerates, and the design row says 7 against the 9 series it lists by
+//      name (`DG`, `SS`, and seven `OQ-*`). The two errors are +3 and -2 and the
+//      TOTAL is therefore right by one. Nothing is added to close the gap:
+//      adding a series ADR-074 does not name would be choosing scope, which
+//      section 2 makes the ruling's job and not the runner's.
+//   2. `OQ-F6` IS RULED IN SCOPE AND HAS NO REGISTER THAT SECTION 1 ADMITS.
+//      Its only definition sites are table rows in a SESSION LOG, and a session
+//      log is a registry ENTRY rather than a corpus document (ADR-043). Section
+//      1 requires "a corpus document or a package README". The RULE governs the
+//      LIST that applies it, so `OQ-F6` is PENDING: a real defect, named, with
+//      the artifact it waits for. That is section 5's own mechanism and not an
+//      exemption; it is counted, and it fails the day a register appears
+//      without the series being promoted.
+//   3. `P-M6` IS RULED IN SCOPE AND HAS A MEMBER THAT WAS DELIBERATELY NOT
+//      MINTED. `P-M6-11` appears in session 112, which says so in terms: "a
+//      `P-M6-nn` written in application code is a claim on a series with no
+//      allocation table". Whoever holds M06 next decides whether the panel
+//      table gains a row or the third number lives inside `P-M6-01`'s block.
+//      That is a disposition and not a parse, so `P-M6` is PENDING with that
+//      decision named as the artifact.
+//   4. SECTION 5 NAMES TEN OF THE EIGHTEEN SERIES IN ITS FIRST PENDING CLASS.
+//      The other eight are not identified anywhere in the ruling or the survey,
+//      and eight of the twelve candidates in the tree would have to be picked
+//      by this session to reach the stated count. They are not. The pending
+//      register below holds the TEN THAT ARE NAMED plus `OQ-F6` and `P-M6`, and
+//      the shortfall against 44 is reported rather than filled in.
+//
+// SO: 115 SERIES, 1,070 MEMBERS, ZERO FINDINGS ON ARRIVAL, which is the state
+// ADR-074 section 6 rules the gate must arrive in, reached at three fewer
+// series than it states and with every difference written down. A gate over
+// 1,070 members that passes the day it is written has proven nothing yet; its
+// value is entirely in what it refuses tomorrow, and the two mechanisms that
+// make that real are the written scope above and the pending register below.
+
+// The DECLARED SCOPE. `series -> register`, where a register is a file, or a
+// file and one `##` section written after a `##` separator, or an ADR-043
+// registry directory. Grouped by ADR-074 section 3's four classes.
+const DECLARED_SERIES = new Map([
+  // ---------------------------------------------------------------------------
+  // 93 in the module plan that owns the series: `INV-M*`, `AS-M*`, `FM-M*`,
+  // `DEP-M*` and each module's own specials, in M02 through M21. `AS-M*` is
+  // defined by HEADING, consistently, which is the shape a row-only rule misses
+  // on 349 members. Two are declared rather than derived and would be wrong if
+  // derived: `M12` has TWO plan files and the series live in the transparency
+  // one, and `NC-M16` needs a section because M16 section 3 repeats its
+  // identifiers in a state table.
+  // ---------------------------------------------------------------------------
+  ['AN-M13', 'docs/plans/M13-trader-analytics-journal.md'],
+  ['AS-M10', 'docs/plans/M10-integrations.md'],
+  ['AS-M11', 'docs/plans/M11-certificates-social-proof.md'],
+  ['AS-M12', 'docs/plans/M12-transparency-platform.md'],
+  ['AS-M13', 'docs/plans/M13-trader-analytics-journal.md'],
+  ['AS-M14', 'docs/plans/M14-loyalty-retention.md'],
+  ['AS-M15', 'docs/plans/M15-discord-integration.md'],
+  ['AS-M16', 'docs/plans/M16-notification-center.md'],
+  ['AS-M17', 'docs/plans/M17-offers-engine.md'],
+  ['AS-M18', 'docs/plans/M18-graduation-track.md'],
+  ['AS-M19', 'docs/plans/M19-kyc-identity.md'],
+  ['AS-M2', 'docs/plans/M02-rithmic-bridge.md'],
+  ['AS-M20', 'docs/plans/M20-wallet.md'],
+  ['AS-M21', 'docs/plans/M21-plan-designer.md'],
+  ['AS-M3', 'docs/plans/M03-billing-checkout.md'],
+  ['AS-M4', 'docs/plans/M04-trader-portal.md'],
+  ['AS-M5', 'docs/plans/M05-payout-system.md'],
+  ['AS-M6', 'docs/plans/M06-admin-ops-console.md'],
+  ['AS-M7', 'docs/plans/M07-risk-abuse.md'],
+  ['AS-M8', 'docs/plans/M08-affiliate-system.md'],
+  ['AS-M9', 'docs/plans/M09-marketing-site.md'],
+  ['CT-M11', 'docs/plans/M11-certificates-social-proof.md'],
+  ['DEP-M10', 'docs/plans/M10-integrations.md'],
+  ['DEP-M11', 'docs/plans/M11-certificates-social-proof.md'],
+  ['DEP-M12', 'docs/plans/M12-transparency-platform.md'],
+  ['DEP-M13', 'docs/plans/M13-trader-analytics-journal.md'],
+  ['DEP-M14', 'docs/plans/M14-loyalty-retention.md'],
+  ['DEP-M15', 'docs/plans/M15-discord-integration.md'],
+  ['DEP-M16', 'docs/plans/M16-notification-center.md'],
+  ['DEP-M17', 'docs/plans/M17-offers-engine.md'],
+  ['DEP-M18', 'docs/plans/M18-graduation-track.md'],
+  ['DEP-M19', 'docs/plans/M19-kyc-identity.md'],
+  ['DEP-M2', 'docs/plans/M02-rithmic-bridge.md'],
+  ['DEP-M20', 'docs/plans/M20-wallet.md'],
+  ['DEP-M21', 'docs/plans/M21-plan-designer.md'],
+  ['DEP-M3', 'docs/plans/M03-billing-checkout.md'],
+  ['DEP-M4', 'docs/plans/M04-trader-portal.md'],
+  ['DEP-M5', 'docs/plans/M05-payout-system.md'],
+  ['DEP-M6', 'docs/plans/M06-admin-ops-console.md'],
+  ['DEP-M7', 'docs/plans/M07-risk-abuse.md'],
+  ['DEP-M8', 'docs/plans/M08-affiliate-system.md'],
+  ['DEP-M9', 'docs/plans/M09-marketing-site.md'],
+  ['FM-M10', 'docs/plans/M10-integrations.md'],
+  ['FM-M11', 'docs/plans/M11-certificates-social-proof.md'],
+  ['FM-M12', 'docs/plans/M12-transparency-platform.md'],
+  ['FM-M13', 'docs/plans/M13-trader-analytics-journal.md'],
+  ['FM-M14', 'docs/plans/M14-loyalty-retention.md'],
+  ['FM-M15', 'docs/plans/M15-discord-integration.md'],
+  ['FM-M16', 'docs/plans/M16-notification-center.md'],
+  ['FM-M17', 'docs/plans/M17-offers-engine.md'],
+  ['FM-M18', 'docs/plans/M18-graduation-track.md'],
+  ['FM-M19', 'docs/plans/M19-kyc-identity.md'],
+  ['FM-M2', 'docs/plans/M02-rithmic-bridge.md'],
+  ['FM-M20', 'docs/plans/M20-wallet.md'],
+  ['FM-M21', 'docs/plans/M21-plan-designer.md'],
+  ['FM-M3', 'docs/plans/M03-billing-checkout.md'],
+  ['FM-M4', 'docs/plans/M04-trader-portal.md'],
+  ['FM-M5', 'docs/plans/M05-payout-system.md'],
+  ['FM-M6', 'docs/plans/M06-admin-ops-console.md'],
+  ['FM-M7', 'docs/plans/M07-risk-abuse.md'],
+  ['FM-M8', 'docs/plans/M08-affiliate-system.md'],
+  ['FM-M9', 'docs/plans/M09-marketing-site.md'],
+  ['GP-M18', 'docs/plans/M18-graduation-track.md'],
+  ['IN-M10', 'docs/plans/M10-integrations.md'],
+  ['INV-M10', 'docs/plans/M10-integrations.md'],
+  ['INV-M11', 'docs/plans/M11-certificates-social-proof.md'],
+  ['INV-M12', 'docs/plans/M12-transparency-platform.md'],
+  ['INV-M13', 'docs/plans/M13-trader-analytics-journal.md'],
+  ['INV-M14', 'docs/plans/M14-loyalty-retention.md'],
+  ['INV-M15', 'docs/plans/M15-discord-integration.md'],
+  ['INV-M16', 'docs/plans/M16-notification-center.md'],
+  ['INV-M17', 'docs/plans/M17-offers-engine.md'],
+  ['INV-M18', 'docs/plans/M18-graduation-track.md'],
+  ['INV-M19', 'docs/plans/M19-kyc-identity.md'],
+  ['INV-M2', 'docs/plans/M02-rithmic-bridge.md'],
+  ['INV-M20', 'docs/plans/M20-wallet.md'],
+  ['INV-M21', 'docs/plans/M21-plan-designer.md'],
+  ['INV-M3', 'docs/plans/M03-billing-checkout.md'],
+  ['INV-M4', 'docs/plans/M04-trader-portal.md'],
+  ['INV-M5', 'docs/plans/M05-payout-system.md'],
+  ['INV-M7', 'docs/plans/M07-risk-abuse.md'],
+  ['INV-M8', 'docs/plans/M08-affiliate-system.md'],
+  ['INV-M9', 'docs/plans/M09-marketing-site.md'],
+  ['LM-M14', 'docs/plans/M14-loyalty-retention.md'],
+  ['LT', 'docs/plans/M05-payout-system.md'],
+  ['NC-M16', 'docs/plans/M16-notification-center.md##1. Purpose and invariants'],
+  ['OF-M17', 'docs/plans/M17-offers-engine.md'],
+  ['PL-M19', 'docs/plans/M19-kyc-identity.md'],
+  ['RS-M15', 'docs/plans/M15-discord-integration.md'],
+  ['SC-M4', 'docs/plans/M04-trader-portal.md'],
+  ['V-M2', 'docs/plans/M02-rithmic-bridge.md'],
+  ['WF-M20', 'docs/plans/M20-wallet.md'],
+  // ---------------------------------------------------------------------------
+  // 5 in M01, each in its own `##` section. ADR-074 section 3 labels this row
+  // "four series in three sections" and its count column says 5; five series in
+  // five sections is what the tree holds, and the sections are load bearing
+  // rather than decorative -- `INV` and `CV` both have a second, COVERAGE row in
+  // Appendix A for identifiers section 1 and section 2 already define.
+  // ---------------------------------------------------------------------------
+  ['INV', 'docs/plans/M01-rules-engine.md##1. Purpose and invariants'],
+  ['CV', 'docs/plans/M01-rules-engine.md##2. Entities and schema deltas'],
+  ['FM', 'docs/plans/M01-rules-engine.md##6. Failure modes'],
+  ['AS', 'docs/plans/M01-rules-engine.md##7. Adversarial scenarios'],
+  ['RE-P', 'docs/plans/M01-rules-engine.md##8. Test plan'],
+  // ---------------------------------------------------------------------------
+  // 10 in a testing or architecture document. `S` and `D` are in this class by
+  // ADR-074 section 3 and their registers are module plans, which is the
+  // ruling's classification and the tree's location disagreeing about a label
+  // rather than about a fact. `RB` needs a section: the runbooks README carries
+  // a definition table in section 2 and a carried-forward table in section 4.
+  // `FOLD`'s register is an ADR-043 registry DIRECTORY, which section 6 of the
+  // survey records as a real register shape for `EC` and `ADR` too.
+  // ---------------------------------------------------------------------------
+  ['C', 'docs/architecture/SECURITY.md'],
+  ['PT', 'docs/testing/STRATEGY.md'],
+  ['TR', 'docs/testing/STRATEGY.md'],
+  ['VG', 'docs/testing/STRATEGY.md'],
+  ['RE-S', 'docs/testing/SIMULATION_HARNESS.md'],
+  ['PP', 'docs/testing/SIMULATION_HARNESS.md'],
+  ['S', 'docs/plans/M12-statistic-definitions.md'],
+  ['D', 'docs/plans/M07-risk-abuse.md'],
+  ['RB', 'docs/ops/runbooks/README.md##2. The runbooks'],
+  ['FOLD', 'docs/testing/golden-scenarios'],
+  // ---------------------------------------------------------------------------
+  // 7 in a design or fold document. ADR-074 names NINE here and counts seven;
+  // the nine are these eight plus `OQ-F6`, which is pending below because its
+  // only definition sites are in a session log. Seven `OQ-*` sub-series are in
+  // scope and twenty are not, and the split is a finding rather than an
+  // inconsistency: the FOLD and PHASE plans register their open questions in the
+  // document that raises them and the MODULE plans do not. Same prefix, two
+  // conventions, one of them checkable. `OQ-P1` is clean and identically shaped
+  // to `OQ-P2` and ADR-074 does not name it, so it is undeclared and counted.
+  // ---------------------------------------------------------------------------
+  ['DG', 'docs/design/DESIGN_SYSTEM.md'],
+  ['SS', 'docs/design/DESIGN_SYSTEM.md'],
+  ['OQ-F3', 'docs/plans/FOLD-03-vendor-parity-gap-fill.md'],
+  ['OQ-F4', 'docs/plans/FOLD-04-impersonation-and-admin-parity.md'],
+  ['OQ-F5', 'docs/plans/FOLD-05-plan-config-and-designer.md'],
+  ['OQ-SE', 'docs/plans/P1-SE-trading-calendar.md'],
+  ['OQ-P2', 'docs/plans/P2-rules-engine.md'],
+  ['OQ-FREEZE', 'docs/STATE.md'],
+]);
+
+// THE PENDING REGISTER (ADR-074 section 5). 44 series are neither in scope nor
+// exempt, and calling them exempt would be the dishonest move that section
+// exists to avoid. They are PENDING: a real defect, named, with the artifact it
+// waits for.
+//
+// IT CARRIES `CI06U_REGISTER`'s DEFINING PROPERTY: a register entry that no
+// longer names a real defect is a FINDING. So it shrinks as repairs land and it
+// cannot become furniture. The predicate is stated rather than assumed: an entry
+// is still real while at least one member of the series lacks exactly one
+// definition site across every CORPUS DOCUMENT in the tree. A series every one
+// of whose members has become singly defined has effectively been repaired, and
+// the gate then fails until it is promoted into the declared scope IN THE SAME
+// COMMIT, which is WAVE-03's rule that a register entry travels with its repair.
+//
+// THIS HOLDS 38 AND ADR-074 STATES 44. Section 5 names ten of the eighteen in
+// its first class; the other eight are identified nowhere in the ruling or in
+// the survey, and picking eight of the twelve candidates in the tree would be
+// this session choosing scope. `OQ-F6` and `P-M6` are here for the reasons given
+// above and are the 37th and 38th. The shortfall is reported, not filled in.
+const PENDING_SERIES = new Map([
+  // A register with holes or doubles: the repair is to the register. Ten of the
+  // eighteen ADR-074 section 5 counts, which is all of the ones it names.
+  ['R', "a repair to M01's rule table: 13 members are doubled because a coverage table shares a section with the definition table"],
+  ['ST', "a repair to M12's table: 7 members doubled, the same coverage-beside-definition shape"],
+  ['RE-U', 'a table in the document that owns it; members have no row'],
+  ['L', 'a table in the fixtures README; members have no row'],
+  ['RI', 'a table in the tooling README; members have no row'],
+  ['HO', 'a table in the document that owns it; members have no row'],
+  ['M6-N', 'a table in M06; members have no row'],
+  ['INV-M6', 'a table in M06 covering every member; some have no row'],
+  ['PW', 'a table in the document that owns it; members have no row'],
+  ['OI', "an OI allocation table in ALLOCATION.md, superseding DELTA_MANIFEST section 16 (ADR-074 section 7). NOT this session's to move, and the gate does not wait on it: the day that table lands this entry stops naming a defect and the gate fails until OI is promoted in the same commit"],
+  // No register at all, small. Each needs a table in the document that owns it,
+  // or an argued move into ADR-074 section 4's class X3.
+  ['RE-C', 'a table in the document that owns it, or an argued move into X3'],
+  ['RE-R', 'a table in the document that owns it, or an argued move into X3'],
+  ['SF-M21', 'a table in M21, or an argued move into X3'],
+  ['DT', 'a table in the document that owns it, or an argued move into X3'],
+  ['PG-M9', 'a table in M09, or an argued move into X3'],
+  ['OQ-P', 'a register that is a corpus document: its rows are in docs/reviews, which ADR-074 section 1 rules can never be a register because a review record binds nothing by existing'],
+  // Ruled in scope by ADR-074 and moved here on ADR-074's own section 1 rule,
+  // with the disagreement reported rather than resolved by re-scoping.
+  ['OQ-F6', "a register in a CORPUS DOCUMENT. Its only definition sites today are table rows in a session log, and a session log is a registry ENTRY rather than a corpus document (ADR-043), which ADR-074 section 1 does not admit as a register"],
+  ['P-M6', "a disposition for whoever holds M06 next: session 112 records that P-M6-11 was deliberately NOT minted, and that the panel table either gains a row or the third number is declared to live inside P-M6-01's block"],
+  // `OQ-M*`, no register at all. Twenty series, and the ruling this waits on is
+  // expressly NOT ADR-074's to make, because it is a question about how rulings
+  // are recorded rather than about identifiers.
+  ['OQ-M2', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M3', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M4', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M5', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M6', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M7', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M8', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M9', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M10', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M11', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M12', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M13', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M14', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M15', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M16', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M17', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M18', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M19', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M20', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  ['OQ-M21', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+]);
+
+// The member census. Digits are TWO OR THREE, which is the survey's own floor
+// and is stated as a known gap rather than left implicit: `D0-1` is a
+// single-digit member and is invisible to this reader, exactly as it was to the
+// census ADR-074 is ruled on. Fenced blocks are masked, because a code fence
+// shows identifiers as EXAMPLES and a census that counts them is counting
+// documentation of the form.
+const SERIES_MEMBER = /\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)-(\d{2,3})\b/g;
+
+function seriesMembers() {
+  const members = new Map();
+  const files = markdownFiles();
+  if (files.length === 0) throw new Error('no markdown files; the identifier census is empty');
+  for (const file of files) {
+    const masked = read(file).replace(/^```[\s\S]*?^```/gm, '');
+    for (const m of masked.matchAll(SERIES_MEMBER)) {
+      if (!members.has(m[1])) members.set(m[1], new Set());
+      members.get(m[1]).add(m[0]);
+    }
+  }
+  if (members.size === 0) throw new Error('the identifier census found no series; it is vacuous');
+  return members;
+}
+
+// A register is a FILE, a file and one `##` SECTION after a `##` separator, or
+// an ADR-043 registry DIRECTORY. Returns null when it cannot be read, which the
+// caller reports as a finding rather than skipping.
+function registerBody(register) {
+  const [file, section] = register.split('##');
+  const path = join(ROOT, file);
+  if (!existsSync(path)) return null;
+  if (statSync(path).isDirectory()) {
+    const entries = readdirSync(path).filter((f) => extname(f) === '.md');
+    if (entries.length === 0) return null;
+    return entries.sort().map((f) => read(join(file, f))).join('\n');
+  }
+  const body = read(file);
+  if (!section) return body;
+  const lines = body.split('\n');
+  const start = lines.findIndex((l) => /^##\s/.test(l) && l.replace(/^##\s+/, '').trim() === section);
+  if (start === -1) return null;
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^##\s/.test(lines[i])) {
+      end = i;
+      break;
+    }
+  }
+  return lines.slice(start, end).join('\n');
+}
+
+// "LEADS WITH", not "equals", and emphasis, code ticks and a link opener are
+// stripped from the LEFT only. Stripping is CI-06u's `firstCellKey` idea and not
+// a second copy of it: this one answers a different question, whether one named
+// identifier opens the cell, rather than what the cell's key is.
+const leadsWith = (text, id) => new RegExp(`^[*\`[]*${id}\\b`).test(text.trim());
+
+// A row OR a heading, and NOT a bold lead. Counts the sites for one identifier
+// inside one register body.
+function definitionSites(body, id) {
+  let sites = 0;
+  for (const line of body.split('\n')) {
+    if (/^#{1,6}\s/.test(line)) {
+      if (leadsWith(line.replace(/^#{1,6}\s+/, ''), id)) sites++;
+      continue;
+    }
+    if (!line.startsWith('|')) continue;
+    const cells = line.split('|').slice(1, -1);
+    if (cells.length > 0 && leadsWith(cells[0], id)) sites++;
+  }
+  return sites;
+}
+
+// Every corpus document, concatenated once, for the pending register's
+// predicate. Registry ENTRIES are excluded through the runner's own
+// `isCorpusDocument`, which is what keeps a session log from counting as the
+// place a series is defined -- the exact reason `OQ-F6` is pending.
+function corpusDefinitionCounts() {
+  const counts = new Map();
+  for (const file of markdownFiles().filter(isCorpusDocument)) {
+    for (const line of read(file).split('\n')) {
+      let text = null;
+      if (/^#{1,6}\s/.test(line)) text = line.replace(/^#{1,6}\s+/, '');
+      else if (line.startsWith('|')) text = line.split('|')[1] ?? '';
+      if (text === null) continue;
+      const m = /^[*`[]*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)-(\d{2,3})\b/.exec(text.trim());
+      if (!m) continue;
+      const id = `${m[1]}-${m[2]}`;
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+const identifierSeries = {
+  id: 'CI-06/identifier-series',
+  title: 'Every member of a declared identifier series has exactly one definition site',
+  covers:
+    'ADR-074, implemented as ruled. A definition site is a TABLE ROW whose first cell LEADS ' +
+    'with the identifier, or a MARKDOWN HEADING whose text leads with it, occurring inside ' +
+    "the series' DECLARED REGISTER; every member of an in-scope series has exactly one, and " +
+    'every other occurrence anywhere in the repository is a citation and is unconstrained. ' +
+    'A register is a FILE, or a file and ONE ## SECTION, or an ADR-043 registry directory. ' +
+    'THE SCOPE IS WRITTEN AND NEVER COMPUTED (ADR-074 section 2), because a gate whose scope ' +
+    'is "every series that currently satisfies the rule" passes forever by construction: the ' +
+    'day a series breaks it leaves scope and the gate reports every series clean. ' +
+    'A BOLD LEAD IS NOT A DEFINITION SITE: a bold span opening a line is this corpus\'s ' +
+    'ordinary emphasis idiom and admitting it makes the rule match prose. SECTION ' +
+    'GRANULARITY IS LOAD BEARING, not a convenience: M01 section 1 holds INV\'s definition ' +
+    'rows and Appendix A holds a COVERAGE row for the same identifiers, so a file-wide ' +
+    'register reports INV, CV and RB as broken. ' +
+    'THE PENDING REGISTER IS THE SECOND TABLE (ADR-074 section 5): series that are neither ' +
+    'in scope nor exempt are named as real defects with the artifact each waits for, and an ' +
+    'entry that no longer names a defect is itself a finding, so it shrinks as repairs land ' +
+    'and cannot become furniture. UNDECLARED SERIES ARE CLAIMED AS NOTHING AND COUNTED ON ' +
+    'EVERY RUN, which is the honest measure of what this gate does not cover. ' +
+    'FOUR PLACES WHERE THE RULING AND THE TREE DISAGREE ARE REPORTED RATHER THAN RE-SCOPED: ' +
+    "ADR-074's stated 118 series and 1,086 members do not reproduce from its own four " +
+    'classes (117 and 1,083, with the module row 3 high and the design row 2 low); OQ-F6 is ' +
+    'ruled in scope with its only definition sites in a SESSION LOG, which section 1 does ' +
+    'not admit as a register; P-M6 is ruled in scope and P-M6-11 was deliberately not ' +
+    'minted; and section 5 names ten of the eighteen series in its first pending class. ' +
+    'THREE THINGS IT DOES NOT DO. The member census has a TWO-DIGIT FLOOR, so a ' +
+    'single-digit member is invisible to it exactly as it was to the census ADR-074 is ' +
+    'ruled on. It says nothing about the CONTENT of a definition, only that exactly one ' +
+    'exists. And it inherits the one-ref gap: two branches each defining one identifier is ' +
+    'caught at the merge and never at the pull request.',
+  run() {
+    const findings = [];
+    const members = seriesMembers();
+
+    // Rule 2 on both tables. An empty scope reports every series clean, which is
+    // the failure mode ADR-074 section 2 is written against.
+    if (DECLARED_SERIES.size === 0) throw new Error('DECLARED_SERIES is empty; the gate asserts nothing');
+    if (PENDING_SERIES.size === 0) throw new Error('PENDING_SERIES is empty; the register asserts nothing');
+
+    // -- the declared scope --------------------------------------------------
+    let scoped = 0;
+    for (const series of [...DECLARED_SERIES.keys()].sort()) {
+      const register = DECLARED_SERIES.get(series);
+      const body = registerBody(register);
+      if (body === null) {
+        findings.push(
+          `scripts/corpus/gates.mjs: ${series} declares the register "${register}" and it ` +
+            'cannot be read. A declared register that has moved makes every member of the ' +
+            'series unverifiable, and a scope entry matching nothing is itself a finding',
+        );
+        continue;
+      }
+      const ids = [...(members.get(series) ?? [])].sort();
+      if (ids.length === 0) {
+        findings.push(
+          `scripts/corpus/gates.mjs: ${series} is declared in scope and the census finds no ` +
+            'member of it anywhere. The series has been renamed or removed, and a scope entry ' +
+            'naming nothing is a finding (ADR-074 section 2)',
+        );
+        continue;
+      }
+      scoped += ids.length;
+      for (const id of ids) {
+        const sites = definitionSites(body, id);
+        if (sites === 1) continue;
+        findings.push(
+          sites === 0
+            ? `${register}: ${id} has NO definition site in its declared register. A row whose ` +
+              'first cell leads with it, or a heading whose text does, and neither exists: ' +
+              'every occurrence of it in the corpus is a citation of something undefined'
+            : `${register}: ${id} has ${sites} definition sites in its declared register and ` +
+              'must have exactly one. Two rows or headings leading with one identifier are two ' +
+              'definitions, and which is the definition cannot be read off the page',
+        );
+      }
+    }
+
+    // -- the pending register, and why it cannot become furniture ------------
+    const corpusSites = corpusDefinitionCounts();
+    let pendingMembers = 0;
+    for (const series of [...PENDING_SERIES.keys()].sort()) {
+      const ids = [...(members.get(series) ?? [])];
+      if (ids.length === 0) {
+        findings.push(
+          `scripts/corpus/gates.mjs: PENDING_SERIES holds ${series} and the census finds no ` +
+            'member of it. The entry no longer names a real defect. Remove it ' +
+            `(${PENDING_SERIES.get(series)})`,
+        );
+        continue;
+      }
+      pendingMembers += ids.length;
+      const undefinedMembers = ids.filter((id) => (corpusSites.get(id) ?? 0) !== 1);
+      if (undefinedMembers.length > 0) continue;
+      findings.push(
+        `scripts/corpus/gates.mjs: PENDING_SERIES holds ${series} and every one of its ` +
+          `${ids.length} members now has exactly one definition site in a corpus document, so ` +
+          'the entry no longer names a real defect. Promote it into DECLARED_SERIES with its ' +
+          'register, in the commit that repaired it (WAVE-03: a register entry goes with its ' +
+          `repair). It was waiting for: ${PENDING_SERIES.get(series)}`,
+      );
+    }
+
+    // -- what the gate does NOT cover, counted rather than assumed -----------
+    let undeclared = 0;
+    let undeclaredMembers = 0;
+    for (const [series, ids] of members) {
+      if (DECLARED_SERIES.has(series) || PENDING_SERIES.has(series)) continue;
+      undeclared++;
+      undeclaredMembers += ids.size;
+    }
+
+    console.log(
+      `       CI-06/identifier-series note: ${DECLARED_SERIES.size} declared series over ` +
+        `${scoped} member(s); ${PENDING_SERIES.size} pending over ${pendingMembers} member(s), ` +
+        'each one a repair this gate is waiting for; ' +
+        `${undeclared} series over ${undeclaredMembers} member(s) claimed as nothing. ` +
+        'ADR-074 section 3 states 118 declared and 1,086 members and section 5 states 44 ' +
+        'pending; the transcription reproduces neither and the differences are in this gate ' +
+        "block and in the pull request, not resolved by widening or narrowing the ruling's scope",
+    );
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -4535,6 +5681,9 @@ const GATES = [
   ci06u,
   ci06v,
   ci06w,
+  conflictMarkers,
+  fixtureInventory,
+  identifierSeries,
 ];
 
 function main() {

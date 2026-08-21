@@ -42,6 +42,7 @@ import {
   rmSync,
   renameSync,
   readdirSync,
+  statSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { basename, join, dirname, resolve } from 'node:path';
@@ -1087,6 +1088,94 @@ const SEEDS = {
       );
     },
   },
+  // THE ONE SEED IN THIS FILE THAT HAD NO HISTORICAL ANCHOR AVAILABLE, and the
+  // absence is the finding rather than a gap. `OI-19` says `<<<<<<< HEAD` stood
+  // in INDEX and STATE while the gates passed. It never stood in a COMMIT:
+  // `git log --all -G'^<<<<<<< '` over `.md`, `.ts`, `.mjs` and `.json` returns
+  // nothing on any branch head or pull-request head. It stood in a WORKING TREE
+  // during a merge, which is precisely the boundary the gate protects and
+  // precisely the state a git-history seed could not reproduce.
+  //
+  // SO THE SEED WRITES THE VIOLATION, and that is the better construction on
+  // this file's own terms. `OI-21` records that a harness anchored to corpus
+  // state decays as the corpus is repaired -- the two `0029` seeds went silent
+  // and vacuous when the allocation table moved under them. A seeded marker
+  // cannot go stale, because the tree it needs is one it creates.
+  //
+  // THE APPEND CARRIES NO ANCHOR ON PURPOSE. `once()` exists so a seed whose
+  // anchor moved announces itself; an append has nothing to move. `CI-06a`'s
+  // seed is built the same way and for the same reason.
+  'CI-06/conflict-markers': {
+    what: 'a line beginning with the ours-side conflict marker, seeded rather than anchored',
+    real:
+      'OI-19 records `<<<<<<< HEAD` standing in INDEX and STATE while 22 of 22 gates passed. ' +
+      'It never stood in a commit, only in a working tree during a merge, and the record ' +
+      'disagrees with itself on the count besides (22 in session 105 and in STATE, 24 in ' +
+      'session 106). The boundary the gate protects is the PUSH and not the history, so the ' +
+      'violation is seeded here rather than quoted from a history that does not hold one',
+    expect: `line begins with the conflict marker "${'<'.repeat(7)}"`,
+    seed: (d) => edit(d, 'docs/STATE.md', (b) => `${b}\n${'<'.repeat(7)} HEAD\n`),
+  },
+  // THE VIOLATION IS THE ONE CI-03 REPORTS AS NOT SWITCHED ON, and it is the one
+  // that had actually happened three times when the gate was written. A fixture
+  // lands and the registry does not move.
+  //
+  // A FOURTH SCENARIO, DERIVED, BECAUSE THREE ARE REGISTERED. Seeding one of
+  // GS-049, GS-059 or GS-080 would land on a register entry and the gate would
+  // correctly stay quiet, which is a seed that proves the register works and
+  // nothing about the assertion. So the seed picks a row that is BLOCKED AND HAS
+  // NO FIXTURE ON DISK -- a set no register entry can be in, by construction --
+  // and gives it one.
+  //
+  // `expect` RESOLVES AGAINST THE SEEDED TREE, which is the CI-06l lesson
+  // applied before it bit here: re-deriving "the first blocked row with no
+  // fixture" after the seed would name the NEXT row while the gate correctly
+  // names the one that was seeded. So the seeded file carries a marker in its
+  // name and `expect` reads the id back out of the tree the gate will read.
+  'CI-06/fixture-inventory': {
+    what: 'a fixture on disk whose registry row does not say "written"',
+    real:
+      'GS-080 (W2, session 109), GS-059 and GS-049 (W4, session 117) all landed on disk while ' +
+      "their rows went on reading writable or blocked. CI-03 has reported this direction as " +
+      "CI-06's and not switched on, on every run, since it was written",
+    expect: (d) => `${seededFixtureId(d)} has a fixture on disk`,
+    seed: (d) => {
+      const id = blockedWithNoFixture(d);
+      writeFileSync(
+        join(d, FIXTURE_DIR, `${id}-${SEED_MARK}.yaml`),
+        `# seeded by falsify.mjs: a fixture whose row does not say written\nscenario: ${id}\n`,
+      );
+      writeFileSync(join(d, FIXTURE_DIR, `${id}-${SEED_MARK}.expected.json`), '{}\n');
+    },
+  },
+  // ADR-074's rule is "exactly one", and the violation seeded is the SECOND
+  // site rather than the missing one, on purpose. A missing site is the shape a
+  // careless author produces; a SECOND site is the shape a merge produces, and
+  // it is the one the corpus has actually suffered -- `CI-06u`'s register holds
+  // 19 duplicate first cells today, every one of them from the review desk's
+  // keep-both resolution. It is also the harder half to see by eye: the
+  // identifier IS defined, twice, and both definitions look right.
+  //
+  // DERIVED, and re-derivable after the seed. The target is the first declared
+  // series whose register is a WHOLE FILE (a section register would put the
+  // appended row outside the section, changing nothing) and its first member.
+  // Appending a row for an EXISTING member changes the site count and never the
+  // member set or its ordering, so `expect` names the same identifier before and
+  // after -- which is the `CI-06l` trap, checked for rather than tripped over.
+  'CI-06/identifier-series': {
+    what: 'a second definition site for an identifier inside its own declared register',
+    real:
+      'ADR-014 leads four table rows, its register row and three in ADR-052 and ADR-057 whose ' +
+      'first column is the SOURCE BEING QUOTED, which is why ADR-074 scopes the search to a ' +
+      'declared register rather than enumerating the exceptions. The duplicate-definition ' +
+      "shape itself is the review desk's keep-both merge: CI-06u's register holds 19 duplicate " +
+      'first cells on main today',
+    expect: (d) => `${declaredFileRegister(d).id} has 2 definition sites`,
+    seed: (d) => {
+      const { register, id } = declaredFileRegister(d);
+      edit(d, register, (b) => `${b}\n| ${id} | a second definition, seeded by falsify |\n`);
+    },
+  },
 };
 
 // =============================================================================
@@ -1164,6 +1253,197 @@ const reserveLandedRow = (d, heading, keyOf, present) => {
   }
   throw new Error(`seed anchor not found: no landed row under ${heading}`);
 };
+
+// -----------------------------------------------------------------------------
+// CI-06/fixture-inventory readers
+// -----------------------------------------------------------------------------
+// EVERY SEED BELOW MARKS WHAT IT TOUCHED AND EVERY `expect` READS THE MARK BACK.
+// `expect` is resolved against the SEEDED tree, so a seed that changes the very
+// property its `expect` re-derives names the NEXT row while the gate correctly
+// names the one that moved -- watched happening on CI-06l, reported as
+// FAILED OFF-TARGET, and avoided here by construction rather than by care.
+const FIXTURE_STATUS_PATH = 'docs/testing/golden-scenarios/39-fixture-status-and-blockers.md';
+const FIXTURE_DIR = 'packages/rules-engine/fixtures';
+const SEED_MARK = 'seeded-by-falsify';
+
+const fixtureRows = (d) =>
+  readFileSync(join(d, FIXTURE_STATUS_PATH), 'utf8')
+    .split('\n')
+    .map((line, i) => ({ line, n: i }))
+    .filter(({ line }) => /^\|\s*GS-\d{3}\s*\|/.test(line))
+    .map(({ line, n }) => {
+      const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+      return {
+        n,
+        line,
+        cells,
+        id: /GS-\d{3}/.exec(cells[0])[0],
+        status: (cells[1] ?? '').replace(/[`*]/g, ''),
+      };
+    });
+
+const fixtureIdsOnDisk = (d) =>
+  new Set(
+    readdirSync(join(d, FIXTURE_DIR))
+      .map((f) => /^(GS-\d{3})-.*\.yaml$/.exec(f))
+      .filter(Boolean)
+      .map((m) => m[1]),
+  );
+
+// A row that is BLOCKED and has NO fixture on disk. No register entry can be in
+// that set, because every registered entry names a row whose fixture exists, so
+// a seed drawn from here can never land on one and go quiet for the wrong reason.
+const blockedWithNoFixture = (d) => {
+  const on = fixtureIdsOnDisk(d);
+  const row = fixtureRows(d).find((r) => r.status === 'blocked' && !on.has(r.id));
+  if (!row) throw new Error('seed anchor not found: no blocked row without a fixture on disk');
+  return row.id;
+};
+
+// The id the seed wrote a fixture for, read back out of the directory.
+const seededFixtureId = (d) => {
+  const f = readdirSync(join(d, FIXTURE_DIR)).find((x) => x.includes(SEED_MARK));
+  if (!f) throw new Error(`seed anchor not found: no ${SEED_MARK} fixture in ${FIXTURE_DIR}`);
+  return /^(GS-\d{3})-/.exec(f)[1];
+};
+
+// The id of the row a seed rewrote, read back out of the mark it left in the
+// row's own citation cell.
+const markedFixtureRow = (d) => {
+  const row = fixtureRows(d).find((r) => r.line.includes(SEED_MARK));
+  if (!row) throw new Error(`seed anchor not found: no row marked ${SEED_MARK}`);
+  return row.id;
+};
+
+// Rewrite one row in place, marking its citation cell so `expect` can find it
+// again after the property it was chosen by has been changed.
+const rewriteFixtureRow = (d, pick, rewrite) => {
+  const p = join(d, FIXTURE_STATUS_PATH);
+  const lines = readFileSync(p, 'utf8').split('\n');
+  const row = fixtureRows(d).find(pick);
+  if (!row) throw new Error('seed anchor not found: no fixture row matching the seed predicate');
+  const cells = [...row.cells];
+  rewrite(cells);
+  cells[3] = `${cells[3]} (${SEED_MARK})`;
+  lines[row.n] = `| ${cells.join(' | ')} |`;
+  writeFileSync(p, lines.join('\n'));
+  return row.id;
+};
+
+// -----------------------------------------------------------------------------
+// CI-06/identifier-series readers
+// -----------------------------------------------------------------------------
+// THESE ARE A SECOND, LOOSER READER ON PURPOSE, which is the arrangement CI-06l
+// arrived at and recorded: the gate's reader is anchored and strict, the
+// harness's finds the same site before and after the edit. A harness that
+// imported the gate's own parser would agree with it by construction and could
+// never catch it reading the wrong thing.
+const DECLARED_TABLE = /const DECLARED_SERIES = new Map\(\[([\s\S]*?)^\]\);/m;
+const PENDING_TABLE = /const PENDING_SERIES = new Map\(\[([\s\S]*?)^\]\);/m;
+
+const seriesTable = (d, pattern) => {
+  const src = readFileSync(join(d, 'scripts/corpus/gates.mjs'), 'utf8');
+  const block = pattern.exec(src);
+  if (!block) throw new Error('seed anchor not found: the series table in gates.mjs');
+  const out = [];
+  for (const m of block[1].matchAll(/^\s*\['([A-Za-z0-9-]+)',\s*(?:'|")/gm)) {
+    const line = block[1].slice(m.index, block[1].indexOf('\n', m.index));
+    const detail = /^\s*\['[A-Za-z0-9-]+',\s*(?:'([^']*)'|"([^"]*)")/.exec(line);
+    out.push({ series: m[1], detail: (detail && (detail[1] ?? detail[2])) ?? '' });
+  }
+  if (out.length === 0) throw new Error('seed anchor not found: no rows in the series table');
+  return out;
+};
+
+const walkMarkdown = (d, sub = '.', out = []) => {
+  for (const e of readdirSync(join(d, sub))) {
+    if (e === 'node_modules' || e === '.git') continue;
+    const rel = sub === '.' ? e : `${sub}/${e}`;
+    if (statSync(join(d, rel)).isDirectory()) walkMarkdown(d, rel, out);
+    else if (rel.endsWith('.md')) out.push(rel);
+  }
+  return out;
+};
+
+const seriesMembersIn = (d) => {
+  const members = new Map();
+  for (const f of walkMarkdown(d)) {
+    const masked = readFileSync(join(d, f), 'utf8').replace(/^```[\s\S]*?^```/gm, '');
+    for (const m of masked.matchAll(/\b([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)-(\d{2,3})\b/g)) {
+      if (!members.has(m[1])) members.set(m[1], new Set());
+      members.get(m[1]).add(m[0]);
+    }
+  }
+  return members;
+};
+
+// Definition sites for every identifier over the whole tree, ignoring the
+// corpus/entry distinction the gate makes. Loose on purpose, per the note above.
+const anySiteCounts = (d) => {
+  const counts = new Map();
+  for (const f of walkMarkdown(d)) {
+    for (const line of readFileSync(join(d, f), 'utf8').split('\n')) {
+      let text = null;
+      if (/^#{1,6}\s/.test(line)) text = line.replace(/^#{1,6}\s+/, '');
+      else if (line.startsWith('|')) text = line.split('|')[1] ?? '';
+      if (text === null) continue;
+      const m = /^[*`[]*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)-(\d{2,3})\b/.exec(text.trim());
+      if (m) counts.set(`${m[1]}-${m[2]}`, (counts.get(`${m[1]}-${m[2]}`) ?? 0) + 1);
+    }
+  }
+  return counts;
+};
+
+// The first declared series whose register is a WHOLE FILE, with its first
+// member. A section register would put an appended row OUTSIDE the section and
+// the seed would change nothing, which is a seed reporting a gate that cannot
+// fail. Re-derivable after the seed: appending a row for an EXISTING member
+// changes the site count and never the member set or its ordering.
+const declaredFileRegister = (d) => {
+  const members = seriesMembersIn(d);
+  for (const { series, detail } of seriesTable(d, DECLARED_TABLE)) {
+    if (detail.includes('##') || !detail.endsWith('.md')) continue;
+    const ids = [...(members.get(series) ?? [])].sort();
+    if (ids.length === 0) continue;
+    return { series, register: detail, id: ids[0] };
+  }
+  throw new Error('seed anchor not found: no declared series with a whole-file register');
+};
+
+// The smallest pending series ALL of whose members have zero definition sites
+// today, so appending one row each makes every member singly defined and the
+// entry stops naming a defect. A member already at one site would reach two and
+// the series would stay broken, which passes the case for the wrong reason.
+const pendingWithNoSites = (d) => {
+  const members = seriesMembersIn(d);
+  const counts = anySiteCounts(d);
+  let best = null;
+  for (const { series } of seriesTable(d, PENDING_TABLE)) {
+    const ids = [...(members.get(series) ?? [])];
+    if (ids.length === 0 || ids.some((id) => (counts.get(id) ?? 0) !== 0)) continue;
+    if (best === null || ids.length < best.ids.length) best = { series, ids: ids.sort() };
+  }
+  if (best === null) throw new Error('seed anchor not found: no pending series with zero sites');
+  return best;
+};
+
+// The pending series the seed actually repaired, read back out of the rows it
+// wrote. THIS IS THE CI-06l TRAP AND IT WAS WALKED INTO ON THE FIRST RUN, which
+// is the harness working: `pendingWithNoSites` selects on "every member has zero
+// sites", the seed gives every member a site, and re-deriving after the seed
+// therefore names the NEXT series while the gate correctly names the one that
+// was repaired. It was watched reporting FAILED OFF-TARGET in exactly that
+// state. A seed that changes the property its own `expect` selects on must read
+// its mark back rather than re-derive.
+const seededPendingSeries = (d) => {
+  for (const line of readFileSync(join(d, 'docs/GLOSSARY.md'), 'utf8').split('\n')) {
+    if (!line.startsWith('|') || !line.includes(PENDING_SEED_MARK)) continue;
+    const m = /^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*)-\d{2,3}\s*\|/.exec(line);
+    if (m) return m[1];
+  }
+  throw new Error(`seed anchor not found: no row marked ${PENDING_SEED_MARK} in docs/GLOSSARY.md`);
+};
+const PENDING_SEED_MARK = 'a definition site, seeded by falsify';
 
 const presentAdrNumbers = (d) =>
   new Set(
@@ -2336,6 +2616,230 @@ const SCOPE_CASES = [
           `${b}\n<!-- seeded -->\n\n| | |\n|---|---|\n` +
           `| | first |\n| | second |\n| | third |\n`,
       ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/conflict-markers. TWO BOUNDARIES, ONE DIRECTION EACH.
+  //
+  // The first is the LIVE complication rather than an invented one. STATE
+  // carries `<<<<<<< HEAD` three times in PROSE, at the `OI-19` entry and the
+  // two entries that discuss it, because the marker is that gate's own subject
+  // matter. The gate's assertion is "a line BEGINNING with a marker" and not
+  // "a file containing one", so those three sites are outside it BY THE RULE
+  // and no exemption is registered for them.
+  //
+  // A gate that quietly stopped matching would also pass this case, which is
+  // what the control is for: the same token, in the same file, moved to the
+  // start of its line, MUST fail. Without that, the PASS below is decoration.
+  //
+  // Both halves seed rather than anchor. The three prose sites are real today
+  // and the case deliberately does not depend on them: `OI-21` is the record of
+  // what happens to a harness pinned to corpus state, and if those entries are
+  // ever reworded this case still asserts the boundary.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06/conflict-markers/mid-line',
+    gate: 'CI-06/conflict-markers',
+    what: 'the marker written MID-LINE in prose, which the gate must NOT read as a finding',
+    expect: 'PASS',
+    control: {
+      expect: `line begins with the conflict marker "${'<'.repeat(7)}"`,
+      seed: (d) =>
+        edit(
+          d,
+          'docs/STATE.md',
+          (b) => `${b}\n${'<'.repeat(7)} HEAD is what git writes, and here it leads the line.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/STATE.md',
+        (b) => `${b}\nThe marker git writes is \`${'<'.repeat(7)} HEAD\`, quoted here mid-line.\n`,
+      ),
+  },
+  {
+    // THE SCOPE IS THE TREE AND NOT `docs/`, and this is the direction that
+    // proves it. Every other corpus gate in this runner is scoped to `docs/` or
+    // to one named file, so a reader is entitled to assume this one is too. A
+    // conflict marker in a workflow, a migration or a package manifest is worse
+    // than one in prose, not better: prose contradicts itself and a manifest
+    // fails to parse.
+    //
+    // `pnpm-workspace.yaml` is chosen because it is at the repository ROOT and
+    // outside every directory the other gates walk, so a gate narrowed to
+    // `docs/` -- or to markdown -- goes quiet here rather than merely quieter.
+    name: 'CI-06/conflict-markers/outside-docs',
+    gate: 'CI-06/conflict-markers',
+    what: 'a marker in a root-level non-markdown file, which MUST be a finding',
+    expect: `pnpm-workspace.yaml:`,
+    seed: (d) =>
+      edit(d, 'pnpm-workspace.yaml', (b) => `${b}\n${'>'.repeat(7)} theirs-side-branch\n`),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/fixture-inventory. FIVE ASSERTIONS, ONE SEED, THREE CASES.
+  //
+  // SEEDS carries one violation per gate, which is assertion 2. The three cases
+  // below carry the ones a single seed cannot reach, on CI-06k's precedent one
+  // gate over. The first is the most important thing in this file about this
+  // gate: it is the case that stops the REGISTER becoming an exemption list.
+  // ---------------------------------------------------------------------------
+  {
+    // THE REGISTER MUST NOT BE ABLE TO BECOME FURNITURE, and this is the only
+    // direction that proves it. The gate ships red-turned-quiet by three
+    // registered rows; a register that merely silenced them would be an
+    // exemption list with a better name, and would go on silencing them forever
+    // after the repair landed.
+    //
+    // So: repair one registered row to `written` in the copy. The row is now
+    // correct AND the register entry now names nothing, and the second of those
+    // MUST be a finding. This is CI06U_REGISTER's defining property asserted
+    // rather than described, and WAVE-03's rule that a register entry travels in
+    // the same commit as its repair.
+    name: 'CI-06/fixture-inventory/register-repaired',
+    gate: 'CI-06/fixture-inventory',
+    what: 'a registered stale row repaired to "written", which MUST make its register entry a finding',
+    expect: (d) => `CI06FIXTURE_REGISTER holds ${markedFixtureRow(d)} and its row now reads`,
+    seed: (d) => {
+      const on = fixtureIdsOnDisk(d);
+      rewriteFixtureRow(
+        d,
+        (r) => on.has(r.id) && r.status !== 'written',
+        (cells) => {
+          cells[1] = 'written';
+          cells[2] = '';
+        },
+      );
+    },
+  },
+  {
+    // ASSERTION 4 IS NARROWED AGAINST THE BRIEF AND THIS IS THE LOUD DIRECTION
+    // OF THE NARROWING. The brief asks for a blocker on every NON-WRITTEN row,
+    // which would flag the two `writable` rows; the document defines writable as
+    // every ADR-072 condition holding, so a blocker there is a contradiction and
+    // its absence is correct.
+    //
+    // A narrowing tested only from the quiet side is indistinguishable from a
+    // gate that stopped reading those rows. This case shows the writable rows
+    // are still READ: give one a blocker, from the closed vocabulary so the
+    // finding cannot be the vocabulary check firing instead, and it must fail.
+    name: 'CI-06/fixture-inventory/writable-with-a-blocker',
+    gate: 'CI-06/fixture-inventory',
+    what: 'a writable row that names a blocker, which MUST be a finding',
+    expect: (d) => `${markedFixtureRow(d)} is "writable" and still names the blocker`,
+    seed: (d) =>
+      rewriteFixtureRow(
+        d,
+        (r) => r.status === 'writable',
+        (cells) => {
+          cells[2] = 'vendor-call';
+        },
+      ),
+  },
+  {
+    // ASSERTION 3, WHICH THE SEED CANNOT REACH. A `written` row whose `.yaml` is
+    // present and whose `.expected.json` is not is a scenario the loader cannot
+    // run and the registry calls done, and it is the half of "both files" that a
+    // reader checking the directory by eye would miss: the fixture IS there.
+    //
+    // The expectation is deleted rather than the fixture, on purpose. Deleting
+    // the `.yaml` would fire the "no fixture at all" branch, which is a
+    // different finding, and the case would pass while asserting the wrong one.
+    name: 'CI-06/fixture-inventory/written-with-no-expectation',
+    gate: 'CI-06/fixture-inventory',
+    what: 'a written row whose .expected.json is gone while its .yaml remains, which MUST be a finding',
+    expect: 'with no .expected.json sibling',
+    seed: (d) => {
+      const f = readdirSync(join(d, FIXTURE_DIR)).find((x) => /^GS-\d{3}-.*\.expected\.json$/.test(x));
+      if (!f) throw new Error(`seed anchor not found: no .expected.json in ${FIXTURE_DIR}`);
+      rmSync(join(d, FIXTURE_DIR, f));
+    },
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/identifier-series. THREE BOUNDARIES, ONE DIRECTION EACH, and the first
+  // two are the halves of ADR-074's rule that a reader would most reasonably
+  // assume the other way round.
+  // ---------------------------------------------------------------------------
+  {
+    // A BOLD LEAD IS NOT A DEFINITION SITE, and this is the direction that keeps
+    // the gate from reporting on English. ADR-074 section 1 rejects the shape by
+    // argument: a bold span opening a line is this corpus's ordinary emphasis
+    // idiom, present thousands of times.
+    //
+    // The control is what makes the PASS mean something: the SAME text, in the
+    // SAME register, written as a table row instead, must fail. Without it a
+    // gate that had stopped reading the register at all would pass this case.
+    name: 'CI-06/identifier-series/bold-lead',
+    gate: 'CI-06/identifier-series',
+    what: 'a bold lead naming an identifier inside its register, which must NOT be a definition site',
+    expect: 'PASS',
+    control: {
+      expect: (d) => `${declaredFileRegister(d).id} has 2 definition sites`,
+      seed: (d) => {
+        const { register, id } = declaredFileRegister(d);
+        edit(d, register, (b) => `${b}\n| ${id} | a row, which IS a definition site |\n`);
+      },
+    },
+    seed: (d) => {
+      const { register, id } = declaredFileRegister(d);
+      edit(d, register, (b) => `${b}\n**${id}** is discussed here in prose, in bold, mid-document.\n`);
+    },
+  },
+  {
+    // EVERY OCCURRENCE OUTSIDE THE DECLARED REGISTER IS A CITATION AND IS
+    // UNCONSTRAINED. This is the whole content of "inside the declared
+    // register", and it is the direction ADR-074 section 1 says the union of
+    // shapes gets wrong on 364 members: every EC and every ADR has both a
+    // document and a register row, and a rule that cannot tell a register row
+    // from the document it points at calls the corpus's own discipline a
+    // violation.
+    //
+    // So: a second row leading with the same identifier, in a file that is NOT
+    // its register, must be read as a citation. The control puts the identical
+    // row INSIDE the register and must fail.
+    name: 'CI-06/identifier-series/outside-the-register',
+    gate: 'CI-06/identifier-series',
+    what: 'a row leading with an identifier in a file that is not its register, which must NOT be a finding',
+    expect: 'PASS',
+    control: {
+      expect: (d) => `${declaredFileRegister(d).id} has 2 definition sites`,
+      seed: (d) => {
+        const { register, id } = declaredFileRegister(d);
+        edit(d, register, (b) => `${b}\n| ${id} | inside the register, which IS a second site |\n`);
+      },
+    },
+    seed: (d) => {
+      const { id } = declaredFileRegister(d);
+      edit(d, 'docs/GLOSSARY.md', (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | cited outside its register |\n`);
+    },
+  },
+  {
+    // THE PENDING REGISTER MUST NOT BECOME FURNITURE, and this is the only
+    // direction that proves it. ADR-074 section 5 gives the register
+    // CI06U_REGISTER's defining property in terms: "a register entry that no
+    // longer names a real defect is a finding. So it shrinks as repairs land and
+    // cannot become furniture."
+    //
+    // Repair one pending series in the copy by giving every member exactly one
+    // definition site, and the ENTRY must become the finding. The target is
+    // derived as the smallest pending series all of whose members have zero
+    // sites today, so that one appended row each lands them on exactly one: a
+    // member already at one site would reach two and the series would stay
+    // broken, passing this case for the wrong reason.
+    name: 'CI-06/identifier-series/pending-repaired',
+    gate: 'CI-06/identifier-series',
+    what: 'a pending series whose members all became singly defined, which MUST make its entry a finding',
+    expect: (d) => `PENDING_SERIES holds ${seededPendingSeries(d)} and every one of its`,
+    seed: (d) => {
+      const { ids } = pendingWithNoSites(d);
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n\n| | |\n|---|---|\n` +
+          ids.map((id) => `| ${id} | ${PENDING_SEED_MARK} |`).join('\n') +
+          '\n',
+      );
+    },
   },
 ];
 
