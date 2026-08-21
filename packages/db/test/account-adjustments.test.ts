@@ -268,11 +268,31 @@ describe('0038: what it deliberately does not do', () => {
 });
 
 describe('ADR-067 and SD-M6-09 still say what 0038 was built from', () => {
-  test('the ADR is proposed with an unsigned approval line', () => {
+  test('the ADR is signed, and the signature records that E2s read has NOT happened', () => {
     const adr = read(ADR);
-    expect(adr.split('\n')[0]).toContain('status: proposed');
-    // It amends a frozen ADR on the money path, so the signature is E2's.
-    expect(adr).toContain('**Founder approval: PENDING.**');
+    // FLIPPED 2026-08-21 (session 95). This asserted `status: proposed` and a
+    // PENDING line, which was the right guard while 0038 shipped against an
+    // unapproved ruling: it stopped the migration reading as authorised.
+    //
+    // ADR-067 IS NOW GRANTED, so the old assertion pinned a state the corpus
+    // has left. It is flipped rather than deleted, because the property worth
+    // guarding did not go away -- it MOVED. The entry is on the money path,
+    // and the grant was an explicit founder DELEGATION rather than E2's
+    // line-by-line read. That distinction is the whole reason the signature is
+    // honest, and a later edit that quietly upgraded the wording to imply a
+    // read would put a false attestation into a document with a declared
+    // `regulator` audience (SD-M6-04). This test is what refuses that edit.
+    expect(adr.split('\n')[0]).toContain('status: accepted');
+    expect(adr).toContain('**Founder approval: GRANTED 2026-08-21.**');
+    expect(adr).toContain('not as a line-by-line read');
+    expect(adr).toContain('has not happened');
+  });
+
+  test('OQ-F6-01 is still open, so the dual-control CHECK is inert', () => {
+    // The grant approved the ROUTE and not the threshold. Until a number is
+    // written into the column the dual-control half is specification rather
+    // than enforcement, and the signature says so in those terms.
+    expect(read(ADR)).toContain('`OQ-F6-01` IS STILL OPEN');
   });
 
   test('the ADR states the ADR-010 amendment explicitly', () => {
