@@ -24,8 +24,6 @@ import {
 // a page at all.
 // =============================================================================
 
-const AS_OF = { instant: '2026-08-20T21:00:00.000Z', source: 'liability_snapshots' };
-
 /**
  * GS-115's book, as the registry states it: "an account with 500,000c
  * withdrawable, a 150,000c cap, and 6 ladder rungs left contributes 500,000c to
@@ -33,7 +31,7 @@ const AS_OF = { instant: '2026-08-20T21:00:00.000Z', source: 'liability_snapshot
  * remaining ladder exposure".
  */
 const GS_115: LiabilitySnapshot = {
-  asOf: AS_OF,
+  asOfInstant: '2026-08-20T21:00:00.000Z',
   withdrawableAcrossFundedCents: 500_000n,
   walletBalancesCents: 0n,
   boundedNearTermCents: 150_000n,

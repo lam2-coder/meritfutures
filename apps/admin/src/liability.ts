@@ -79,8 +79,17 @@ export class LiabilityError extends Error {
  * reserve and CVaR fields are the open half of that item.
  */
 export interface LiabilitySnapshot {
-  /** The row's own `as_of`, the last closed day. Every figure inherits it. */
-  readonly asOf: AsOf;
+  /**
+   * The row's own `as_of`, the last closed day, UTC and ISO-8601. Every figure
+   * this function builds inherits it.
+   *
+   * THE SOURCE IS NOT A FIELD HERE, WHICH IS THE POINT. INV-M6-04 requires a
+   * figure to name what it was read from, and this function reads exactly one
+   * table. A caller that could pass the source could mislabel the provenance of
+   * a number it did not compute, so the source is a property of the function
+   * and the instant is the only half the caller supplies.
+   */
+  readonly asOfInstant: string;
   /**
    * `0009.open_liability_cents`. ONE COMPONENT OF P-M6-01, NOT THE PANEL.
    * See the header. Never negative: the engine's own property suite asserts
@@ -120,6 +129,7 @@ export interface ThreeNumbers {
   };
 }
 
+/** The one table this file reads. INV-M6-04's `source`, for every figure below. */
 const SOURCE = 'liability_snapshots';
 
 function requireNonNegative(cents: Cents, column: string): Cents {
@@ -160,7 +170,7 @@ export function theThreeNumbers(snapshot: LiabilitySnapshot): ThreeNumbers {
         'and AS-M6-04 is what happens when one is rendered anyway',
     );
 
-  const asOf = snapshot.asOf;
+  const asOf: AsOf = { instant: snapshot.asOfInstant, source: SOURCE };
 
   return {
     openLiability: figure({
