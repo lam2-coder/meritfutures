@@ -1,0 +1,195 @@
+name: nightly
+
+# =============================================================================
+# CI-09, nightly (STRATEGY section 4.1). WAVE-04 W7, session 114.
+# =============================================================================
+# ONE LEG OF FOUR, AND THE COUNT IS THE RULING RATHER THAN THE BUDGET.
+# ADR-073 section 5 rules each of CI-09's four legs separately:
+#
+#   Simulation harness    BUILT. It "needs none" of the inputs the others wait
+#                         on: pure compute from a seed, folding the real engine
+#   Replay self-audit     WAITING, 2026-08-20, on a demo-world seed script.
+#                         `runReplayAudit` reads stored state, and with zero
+#                         rows its OI-14 refusal DOES NOT FIRE, so a nightly
+#                         would report `accountsAudited: 0, diverged: 0` and
+#                         exit green, every night, over nothing
+#   Stryker on the engine WAITING, 2026-08-20, on the VG-12 admission, whose
+#                         human half a session cannot grant itself
+#   Detector canary       WAITING, 2026-08-20, on M07's detector code. `canary`
+#                         appears in no `.ts` file in this tree
+#
+# THE THREE ABSENT LEGS ARE NOT SKIPPED STEPS AND MUST NOT BECOME ONE. ADR-073
+# rejects that shape by name: "a job whose every step is `if: false` satisfies
+# (a) by a parse and satisfies nothing else, and it is strictly worse than (b)
+# because it removes the day the condition would have fired." Their conditions
+# are read by `CI-06/gate-inventory`, which is a later session's.
+#
+# -----------------------------------------------------------------------------
+# WHAT THIS JOB IS FOR, WHICH IS A THING NOTHING ELSE IN THE PIPELINE DOES
+# -----------------------------------------------------------------------------
+# Session 106's landmine, confirmed against the tree by ADR-073 section 5:
+# `packages/harness` "exists with its own tests; nothing calls it", and no file
+# outside the package imports `@merit/harness`. THIS JOB IS ITS CONSUMER, at
+# SIMULATION_HARNESS section 1's own scale: "run 10,000 synthetic traders
+# through the real engine nightly in CI".
+#
+# -----------------------------------------------------------------------------
+# HOW A FAILURE IS SEEN, STATED PLAINLY BECAUSE THE HONEST ANSWER IS SMALL
+# -----------------------------------------------------------------------------
+# On a red run this job writes its full report to the Actions STEP SUMMARY of
+# the run and uploads `test-results/` as an artifact. Both are on the run page.
+#
+# WHO READS THAT PAGE TODAY: the Actions tab, plus GitHub's own email to the
+# account the schedule runs under when a scheduled workflow fails. That is the
+# whole of it. There is no page, no channel and no on-call.
+#
+# SIMULATION_HARNESS section 7.2 asks for more and does not have it: "a failed
+# band pages the same channel a nightly batch failure does". That channel does
+# not exist in this repository. The report says so on every run rather than
+# leaving a reader to infer that a green check means somebody is watching.
+#
+# AND THE DEAD-MAN SWITCH IS THE HALF THAT IS MISSING, NOT THE ALERT.
+# CRON_INVENTORY already carries this job's row -- "Simulation harness |
+# nightly | expected by 10:00 CT | run absent | S3" -- under a rule stated in
+# its own first line: "a job in this table without a dead-man switch is a job
+# that does not exist." Nothing here implements alerting on NON-RUN, and
+# GitHub disables scheduled workflows in a repository with 60 days of no
+# activity, which is exactly the "stops being scheduled" failure that register
+# was written for: no error, no alert, and a number that quietly stops moving.
+# Closing it means a check-in from outside the estate, which is CRON_INVENTORY's
+# own ruling and is not a thing a workflow file can do for itself.
+#
+# -----------------------------------------------------------------------------
+# THE SCHEDULE, AND WHY IT IS NOT AT THE TOP OF AN HOUR
+# -----------------------------------------------------------------------------
+# CRON_INVENTORY expects the simulation harness by 10:00 CT, which is 15:00 UTC
+# under CDT and 16:00 UTC under CST. GitHub's scheduler is UTC only, has no
+# timezone, and DELAYS scheduled runs under load, dropping them entirely at the
+# busiest minutes. `20 8 * * *` is 03:20 CT under CDT and 02:20 CST, which
+# leaves at least six hours of margin under either offset, and :20 rather than
+# :00 because the top of the hour is the most contended minute on the platform.
+#
+# `workflow_dispatch` IS A REQUIREMENT AND NOT A CONVENIENCE. SIMULATION_HARNESS
+# section 7.2: "money-path diffs run it out of band, before the change is
+# considered done rather than the next morning" (STRATEGY section 5). The seed
+# is an input for the other half of that paragraph: "the run is reproducible
+# from a recorded seed, and the seed is written into the report so a failure can
+# be re-run exactly rather than approximately."
+#
+# -----------------------------------------------------------------------------
+# IT DOES NOT RUN ON PUSH, AND THAT IS SECTION 7.2 RATHER THAN A COST DECISION
+# -----------------------------------------------------------------------------
+# "Not a merge blocker: a 10,000-trader Monte Carlo is not a pull-request-latency
+# operation, and its failures need a human to classify as a regression or a
+# drift." A stage that blocked merge on a drift nobody had classified is a stage
+# that gets bypassed with a flag, which STRATEGY section 1 is the argument
+# against. It is nonetheless a BLOCKING job in its own right: the runner exits
+# non-zero on a finding and nothing here is advisory.
+
+on:
+  schedule:
+    - cron: '20 8 * * *'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Run seed. Take it from the report of the run being reproduced.'
+        required: false
+        default: 'ci-09-nightly-001'
+      trials:
+        description: 'Accounts simulated. SIMULATION_HARNESS section 1 says 10,000.'
+        required: false
+        default: '10000'
+      sessions:
+        description: 'Trading sessions in the window. 252 is a weekday year.'
+        required: false
+        default: '252'
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ===========================================================================
+  # CI-09  Nightly, the simulation-harness leg
+  # ===========================================================================
+  simulation-harness:
+    name: CI-09 nightly simulation harness
+    runs-on: ubuntu-latest
+    # A NIGHTLY THAT HANGS IS A NIGHTLY NOBODY CANCELS. The default job timeout
+    # is six hours and the observed run is seconds of compute behind an install;
+    # ci.yml's CI-05 comment makes the same call for the same reason. Twenty
+    # minutes is roughly two orders of magnitude above the good case, which is
+    # the margin an install and a cold runner need.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # RIDER 3, OQ-P1-03. `.nvmrc` is the only place the Node version is
+          # written, and RI-05 fails any workflow that pins it inline.
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      # INSTALL IS THE FIRST STEP OF THE JOB AND NOT AN ASSUMPTION.
+      # `packages/harness` is a workspace package that resolves `@merit/rithmic`
+      # and `@merit/rules-engine` through pnpm's links, and a runner without them
+      # reads as the harness being broken rather than as an install that did not
+      # happen. Frozen for VG-12's reason, which is every other job's: an install
+      # allowed to update the lockfile is an install testing a tree that is not
+      # the tree under review.
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      # -----------------------------------------------------------------------
+      # The run
+      # -----------------------------------------------------------------------
+      # The defaults live in the runner rather than here, so a person running it
+      # on a laptop gets the same run CI does. The `||` fallbacks are for the
+      # scheduled event, where `inputs` is empty.
+      - name: CI-09 simulation harness
+        run: |
+          node scripts/ci/nightly-harness.mjs \
+            --seed "${{ github.event.inputs.seed || 'ci-09-nightly-001' }}" \
+            --trials "${{ github.event.inputs.trials || '10000' }}" \
+            --sessions "${{ github.event.inputs.sessions || '252' }}"
+
+      # THE GUARD IS "THERE IS A REPORT", NOT "THE JOB IS PASSING". The run whose
+      # report is most worth keeping is the one that went red, and `always()`
+      # alone would turn a crashed runner into a SECOND red step complaining
+      # about a file that could not exist. ci.yml's SBOM step learned that on
+      # this repository's first CI run.
+      - name: Keep the report
+        if: always() && hashFiles('test-results/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-09-nightly
+          path: test-results/
+          if-no-files-found: error
+          # Long enough for the C8 monthly retro to reach the run that produced
+          # a figure it is reading (HO-01's second consumer), and no longer: the
+          # report is an aggregate and the marks are never written anywhere.
+          retention-days: 45
+
+      # -----------------------------------------------------------------------
+      # The stage proves itself failing, in its own job
+      # -----------------------------------------------------------------------
+      # ci.yml's rule, inherited: "a stage cannot be green while the proof that
+      # it can fail lives somewhere a person deleted." It matters more here than
+      # there. A merge blocker that quietly stops asserting is caught by the next
+      # pull request that should have been stopped; a NIGHTLY that quietly stops
+      # asserting is green forever and nobody is looking.
+      #
+      # The two CI-09 cases seed the two findings this job exists to produce: a
+      # run that simulated nothing, and INV-17's bound moved by one cent. Both
+      # run at a small scale, because what they prove is the shape of the
+      # failure and not the size of the run.
+      - name: Gates are falsifiable
+        run: node scripts/ci/falsify-ci.mjs CI-09
