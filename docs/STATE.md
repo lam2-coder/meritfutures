@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->71<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->72<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1871,3 +1871,17 @@ at line 68.
 **So the repair is a gate rather than twelve edits.** The assertion is folded into `CI-06f` and `CI-06h` rather than taking a new letter: `a` through `w` are implemented, `x`, `y` and `z` are the harness's headroom, and [ADR-065](decisions/ADR-065.md) section 5 rules that no row may claim `x`. Both halves were **watched failing on a seeded violation** and both carry a permanent `falsify` scope case, so `main` now reports **<!--gen:gate_count-->24<!--/gen--> of <!--gen:gate_count-->24<!--/gen--> gates clean and dirty with 37 scope cases**.
 
 **`0041` and `0044` sharpen the migration half and are the reason it is worth stating separately.** Both landed under a filename their reservation did not name. A migration row left reading `reserved` is therefore not only stale, it is **still advertising a file nobody wrote**, and the row is the only place that discrepancy is visible.
+
+## Session 111: `apps/portal` stops being a stub, and it is the first surface a trader would recognise (2026-08-21)
+
+**[M04](plans/M04-trader-portal.md)'s READ surfaces are built.** The account list and detail (`SC-M4-02`, `SC-M4-03`), the equity series, the timeline, the eligibility display, section 3.8's economic-calendar panel, and the shell carrying [ADR-068](decisions/ADR-068.md)'s persistent impersonation band. Eleven source files and twelve suites, on `claude/m04-portal-read`. **85 test files and 1165 passing**, every gate clean, `RI-01` to `RI-07`, `falsify` clean.
+
+**The build position moves for the first time since FREEZE.** Session 106 recorded `apps/admin` at 44 lines, `apps/portal` at 33 and `apps/site` at 34, with the note that "nothing a trader touches has been started". One of the three is now started. `apps/admin` and `apps/site` are unchanged.
+
+**Four of the module's invariants are types rather than habits**, which is the property that makes a rendering layer with no framework worth building before the framework: `INV-M4-02`'s `as_of_trading_day` is a required prop on every view model carrying money, `INV-M4-01`'s money fields are formatted strings a component cannot add together, `INV-M4-05`'s gate state has three values so a skipped gate cannot render as satisfied, and `INV-M4-08`'s `CopyBlock` is a branded string no literal can satisfy, which makes section 3.4's placement of the funded-reset sentence structural.
+
+**Nothing that changes anything was built, and that boundary is asserted rather than promised.** No auth, no session handling, no payout request, no destination change, no contact change. All four are `C-27` money path under [CLAUDE.md](../CLAUDE.md)'s regime table and each needs its own [ADR-003](decisions/ADR-003.md) session. A suite in the app fails if an export ever starts looking like one of them.
+
+**Five things are owed by other owners** and are recorded in [session 111](sessions/2026-08-21-session-111.md) rather than repaired from inside a read session's fence: `INV-M4-01`'s lint rule does not exist and a weaker in-app substitute stands in for it; the consistency headroom is specified in section 3.3, is banned from the client by `INV-M4-01` and is returned by no endpoint; the economic-calendar panel has no [API_CONTRACT](architecture/API_CONTRACT.md) row despite `DEP-M4-09`; there is no `copy_blocks` key vocabulary anywhere in the corpus; and no currency symbol or display locale is ruled, so the formatter renders neither.
+
+**And session 111 was already allocated.** [WAVE-04](plans/WAVE-04-fixture-backlog-and-gate-inventory.md) section 7 claims 108 to 115 and 111 is `W4`. The collision was found before the log was written and the founder ruled that 111 stands here, so **`W4` must renumber and 116 is the first free number**. This is the `OI-19` collision one registry over, and it happened inside the wave plan written to prevent it.
