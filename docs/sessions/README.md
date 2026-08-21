@@ -17,6 +17,24 @@ section, so one file legitimately carries several rows here. The row identifies 
 the first cell only points at the file that holds it. Rows are ordered by session number,
 and within a number by the order the sections appear in the file.
 
+**Numbers CLAIMED and not yet written.** The 110, 111 and 112 collision of 2026-08-21 was
+not a numbering mistake, it was the absence of a claim: three app sessions and three
+[WAVE-04](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md) sessions each read the
+highest row here and each took the next number, correctly and simultaneously. **A number
+is free when no row claims it, and a row here is the only claim there is.** So a session
+dispatched against a number claims it before it runs. **`119` is this session and is written**, which is why it is in the entries below and not here.
+
+| Number | Claimed for | State |
+|---|---|---|
+| **114** | WAVE-04 `W7`, `CI-09` the nightly workflow | dispatched, unwritten |
+| **115** | WAVE-04 `W8`, three of the four `CI-06` slug gates | dispatched, unwritten |
+| **120** | `0045_simulation_runs.sql`, `SD-M21-01` and `SD-M21-02` ([M21](../plans/M21-plan-designer.md) section 2.1) | dispatched, unwritten |
+| **121** | WAVE-04 `W9`, `CI-06/gate-inventory`, which cannot run until `114` and `115` have merged | dispatched, unwritten |
+| **122** | The four Tier 2 fixture-shape rulings, [WAVE-04 section 2.3](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md) | dispatched, unwritten |
+
+**A row moves out of this table by being written, not by being edited.** When the session
+lands, its entry joins the list below and its row here is struck.
+
 ## Entries
 
 | | |
@@ -173,3 +191,4 @@ and within a number by the order the sections appear in the file.
 | [2026-08-20 - Session 116](2026-08-20-session-116.md) | WAVE-04 `W3`: **zero of six fixtures.** `L-11` was lifted and was never the binding clause on any of `GS-035`, `GS-057`, `GS-058`, `GS-066`, `GS-082` or `GS-241`; each is held by a clause that was always beside it, re-derived here against `types.ts`, `rules.ts`, `loader.ts` and M01. `GS-241`'s four figures were computed by hand and all four are correct, and the only half a fixture could reach is already pinned by `GS-067` |
 | [2026-08-20 - Session 117](2026-08-20-session-117.md) | WAVE-04 `W4`: the day fold and its boundaries. **Two golden fixtures of the four**, `GS-059` and `GS-049`, every expected end state derived by hand from M01 under `TR-01` and each watched failing on a perturbed pin. `GS-047` is blocked by `L-10`, the loader rule that states its own assertion, and `GS-079` by three plan columns that read `none`; the wave plan had both in Tier 1. `GS-059` finds `EC-049`'s domination claim failing by one trading day |
 | [2026-08-20 - Session 118](2026-08-20-session-118.md) | WAVE-04 `W5`: `ADR-073`, a gate-inventory row closes when it is implemented, when it carries a dated activation condition naming one artifact, or when a register outside Actions discharges it. **Four rows are open and not three**, because `CI-04` has no Actions job either, which STATE already said. `CI-09` ships **one leg of four**: the replay self-audit has a subject and no input, and would report a clean audit over zero accounts every night. `VG-11` is struck from `CI-07`, whose contents cell was a transcription of INFRA's gate graph |
+| [2026-08-21 - Session 119](2026-08-21-session-119.md) | the WAVE-04 merge: six pull requests, `#154` to `#159`, and three logs renumbered because six concurrent sessions each read the highest row and each took the next number correctly. **The collision was a missing claim, not a numbering mistake**, so a claim table now sits above these entries. `W8` ships three gates of four and `CI-06/gate-inventory` moves to `W9` whole rather than being softened to pass before `CI-09` exists. `adr_count` was wrong on BOTH sides of one conflict and the merged truth was neither |
