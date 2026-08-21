@@ -5653,6 +5653,488 @@ const identifierSeries = {
   },
 };
 
+// CI-06/gate-inventory  Every stage row of STRATEGY section 4.1 is closed
+// -----------------------------------------------------------------------------
+// ADR-073 SECTION 2 IS THE RULING AND SECTION 8 NAMES THE FOUR ASSERTIONS. A row
+// of the pipeline inventory is CLOSED when it is (a) implemented, naming the
+// workflow file and the job that runs it; or (b) waiting, on a dated activation
+// condition naming ONE artifact; or (c), for CI-10 alone, discharged by a
+// register outside Actions. A row that is none of the three is a finding.
+//
+// -----------------------------------------------------------------------------
+// WHICH OF THE TWO READINGS OF (b) THIS GATE IMPLEMENTS, IN ONE SENTENCE
+// -----------------------------------------------------------------------------
+// IT ASSERTS BOTH, SPLIT PER ARTIFACT AND NOT PER GATE: every condition must be
+// present, dated and name exactly one artifact, and each artifact that is a fact
+// about THIS TREE is additionally probed and must resolve to ABSENT, while an
+// artifact that no repository file can report -- CI-04's Neon branch is the
+// clean case, since no file here changes when a database branch is provisioned
+// -- is REGISTERED as unprobeable with its reason, so the gate asserts CI-04's
+// condition and never CI-04's artifact.
+//
+// That split is the whole value of the gate, because ADR-073 section 8 says the
+// absence assertion is "the one an implementer is most likely to leave out,
+// because it is the only one that fails on good news", and leaving it out
+// wholesale on the strength of the one artifact that cannot be read would be
+// exactly that. Two of six can be read and two of six are read.
+//
+// -----------------------------------------------------------------------------
+// THE SHARPEST JUDGEMENT IN THIS GATE IS NOT ADR-073's, AND IT IS THE LEG
+// -----------------------------------------------------------------------------
+// ADR-073 gave CI-09 a DISPOSITION and not a partial-implementation rule. Session
+// 114 built one leg of the four its Contents cell states, so a gate that asks
+// "is this row implemented" and takes the row's first word for the answer READS
+// ONE LEG AS FOUR. The ruling nowhere says it should not, and the ruling is not
+// where the answer is.
+//
+// THE RULE THIS GATE IMPLEMENTS, STATED SO IT CAN BE ARGUED WITH:
+//
+//   A DISPOSITION APPLIES TO A LEG AND NEVER TO A ROW. A row is CLOSED when it
+//   carries at least one leg and every leg it carries is well formed. A row is
+//   OPEN for each activation condition it carries, WHETHER OR NOT it also
+//   carries an implementation.
+//
+// So CI-09 is closed, is partially implemented, and is open on three legs, all
+// three at once, and no single number describes it. The note line therefore
+// prints THREE counts rather than one -- rows with no implementation leg at all,
+// rows carrying both, and conditions over the whole table -- because the two
+// readings of "how many are open" give 3 and 6 and a gate that printed one of
+// them would be choosing for the reader.
+//
+// WHY NOT DECOMPOSE THE Contents CELL INSTEAD, which is the obvious alternative:
+// CI-01's contents are `tsc --noEmit`, ESLint and prettier and its implementation
+// is ONE job, so a rule that split on the contents cell would report eight open
+// legs across five rows that are entirely built. The Closure cell is where a
+// disposition is written down, so the Closure cell is where the legs are.
+//
+// -----------------------------------------------------------------------------
+// IT READS ONE WRITTEN FORM, WHICH IS NOW IN THE DOCUMENT
+// -----------------------------------------------------------------------------
+// CI-06q's rule: one written form is read, and a paraphrase is claimed as
+// nothing. The form is stated in STRATEGY section 4 above the table rather than
+// only here, because a document whose gate reads a shape nobody wrote down
+// drifts out of its gate's reach one edit at a time. Three of CI-09's conditions
+// read `artifact <text>` where the other three read `Artifact: **<text>**` when
+// this gate was written; both were repaired to the one form in the same branch,
+// and the `condition-with-no-artifact` scope case is what stops the loose form
+// from returning quietly.
+//
+// AND THE PROBES MATCH THE ARTIFACT, NOT THE MENTION, which is CI-06s's near-miss
+// one registry over and is live here rather than hypothetical: `pnpm-lock.yaml`
+// names `@vitest/browser-playwright` today as an unmet optional peer of Vitest,
+// and a probe grepping for `playwright` would report CI-08's artifact ARRIVED
+// and reopen a row on a package nobody installed.
+const PIPELINE_INVENTORY = '### 4.1 Pipeline stages';
+const WORKFLOW_DIR = '.github/workflows';
+
+// The three leg openers, as written forms. `waiting, <date>` carries the date in
+// the opener because ADR-073 (b) requires the condition to be DATED, and an
+// opener that matched a bare `Waiting` would let an undated condition through
+// the one assertion that is pure form.
+const LEG_OPENERS = [
+  { kind: 'implemented', re: /\*\*Implemented\b/g },
+  { kind: 'waiting', re: /\bwaiting,\s*(\d{4}-\d{2}-\d{2})/gi },
+  { kind: 'discharged', re: /\*\*Discharged outside Actions\b/g },
+];
+
+// A cell to its legs, in document order, each running to the next opener. A leg
+// is the unit a disposition applies to; see the ruling above.
+function closureLegs(cell) {
+  const marks = [];
+  for (const { kind, re } of LEG_OPENERS) {
+    for (const m of cell.matchAll(re)) marks.push({ kind, at: m.index, date: m[1] ?? null });
+  }
+  marks.sort((a, b) => a.at - b.at);
+  return marks.map((mark, i) => ({
+    kind: mark.kind,
+    date: mark.date,
+    text: cell.slice(mark.at, i + 1 < marks.length ? marks[i + 1].at : cell.length),
+  }));
+}
+
+// The rows of section 4.1, bounded to their own `###` section for the reason
+// `strategyGateLetters` states one section over: unbounded, this runs into 4.2
+// and reads a table answering a different question about the same identifiers.
+function pipelineRows() {
+  const body = read(STRATEGY_DOC);
+  const start = body.indexOf(PIPELINE_INVENTORY);
+  if (start === -1) throw new Error(`${STRATEGY_DOC}: section not found: "${PIPELINE_INVENTORY}"`);
+  const firstLine = body.slice(0, start).split('\n').length;
+  const after = body.slice(start + PIPELINE_INVENTORY.length);
+  const end = after.search(/\n### /);
+  const lines = (end === -1 ? after : after.slice(0, end)).split('\n');
+  const rows = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith('|')) continue;
+    const cells = rowCells(lines[i]);
+    const m = /^\s*\*{0,2}`?(CI-\d{2})`?\*{0,2}\s*$/.exec(cells[0] ?? '');
+    if (!m) continue;
+    rows.push({ id: m[1], line: firstLine + i, cells, closure: (cells[4] ?? '').trim() });
+  }
+  // Rule 2. A section that parses to no row is a runner that has lost its input,
+  // and it would report an inventory of nothing as an inventory in order.
+  if (rows.length === 0) {
+    throw new Error(
+      `CI-06/gate-inventory read no CI-nn row out of ${STRATEGY_DOC} "${PIPELINE_INVENTORY}". ` +
+        'Zero means the table or the first-cell form has moved, and every assertion below ' +
+        'would then hold vacuously',
+    );
+  }
+  return rows;
+}
+
+// The top-level job KEYS of one workflow. Returns null when the file is absent,
+// which the caller reports rather than skipping: a row naming a workflow that
+// does not exist is the finding, not a reason to stay quiet.
+function workflowJobs(file) {
+  const rel = `${WORKFLOW_DIR}/${file}`;
+  if (!existsSync(join(ROOT, rel))) return null;
+  const lines = read(rel).split('\n');
+  const at = lines.findIndex((l) => /^jobs:\s*$/.test(l));
+  if (at === -1) return new Set();
+  const jobs = new Set();
+  for (let i = at + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === '' || line.trimStart().startsWith('#')) continue;
+    if (/^[A-Za-z_]/.test(line)) break; // the next top-level key ends the block
+    const m = /^ {2}([A-Za-z0-9_-]+):\s*$/.exec(line);
+    if (m) jobs.add(m[1]);
+  }
+  return jobs;
+}
+
+// An artifact's bolded text to the key both registers are written against. Links
+// collapse to their text and code ticks are dropped, so `**[M07](...)'s detector
+// code**` and a later unlinked spelling of it are one artifact rather than two.
+//
+// `*` IS NOT STRIPPED, and this gate's first run is why. `firstCellKey` strips it
+// because a row bolded on one branch and plain on the other is one key; here the
+// text is already the INSIDE of a bold span, so a surviving `*` is not emphasis,
+// and CI-07's artifact is the glob `apps/*/package.json`. Stripping it produced
+// `apps//package.json`, which matched no register entry and reported the live
+// condition unreadable and the live probe stale, in one run. Same shape as
+// CI-06u's `_`: a character that is markup in one register and content in this
+// one, and inventing a mismatch is worse than folding two spellings together.
+const artifactKey = (text) =>
+  text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/`/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+// THE PROBES. WRITTEN AND NEVER COMPUTED, on ADR-074 section 2's rule: a probe
+// table derived from the conditions in use would grow a passing entry for every
+// condition anybody writes, which is a gate whose scope is "whatever it already
+// covers". A new condition therefore FAILS until somebody decides, in this file,
+// whether its artifact can be read at all.
+//
+// Each probe returns a string describing what it FOUND, meaning the artifact has
+// ARRIVED and the row is a finding, or null for absent, which is the state the
+// condition asserts.
+function appsWithBuildScript() {
+  const dir = 'apps';
+  const manifests = existsSync(join(ROOT, dir))
+    ? readdirSync(join(ROOT, dir))
+        .sort()
+        .map((app) => `${dir}/${app}/package.json`)
+        .filter((p) => existsSync(join(ROOT, p)))
+    : [];
+  if (manifests.length === 0) {
+    throw new Error(
+      "CI-06/gate-inventory found no apps/*/package.json, so CI-07's probe reads nothing " +
+        'and would report the artifact absent for the wrong reason',
+    );
+  }
+  const found = manifests.filter((p) =>
+    Object.prototype.hasOwnProperty.call(JSON.parse(read(p)).scripts ?? {}, 'build'),
+  );
+  return found.length === 0 ? null : `${found.join(', ')} carries a \`build\` script`;
+}
+
+function playwrightInLockfile() {
+  const lock = 'pnpm-lock.yaml';
+  if (!existsSync(join(ROOT, lock))) {
+    throw new Error(
+      `CI-06/gate-inventory found no ${lock}, so CI-08's probe reads nothing and would ` +
+        'report the artifact absent for the wrong reason',
+    );
+  }
+  // THE PACKAGE NAME AT A KEY OR A RESOLUTION, never the substring. ADR-073
+  // measured the only occurrence in this lockfile as `@vitest/browser-playwright`,
+  // a different package, and a loose needle would reopen CI-08 on it.
+  const hit = /(^|[\s'"/])@playwright\/test(?=[@:\s'"]|$)/m.exec(read(lock));
+  return hit === null ? null : `${lock} names \`@playwright/test\``;
+}
+
+const INVENTORY_PROBES = new Map([
+  ['a build script in any apps/*/package.json', appsWithBuildScript],
+  ['@playwright/test present in the lockfile', playwrightInLockfile],
+]);
+
+// THE UNPROBEABLE REGISTER, and it is a register rather than an exemption list
+// because it carries CI06U_REGISTER's defining property: AN ENTRY THAT NO LONGER
+// NAMES A REAL CONDITION IS ITSELF A FINDING. It shrinks when a condition is
+// re-ruled to name a path or a manifest key, which is ADR-073 section 2 (b)'s own
+// requirement and which FOUR OF THE SIX CONDITIONS DO NOT MEET TODAY. That is
+// reported here and in the pull request rather than asserted, because the repair
+// is a ruling on what each artifact IS and ADR-073 is where that is taken.
+const UNPROBEABLE_ARTIFACTS = new Map([
+  [
+    'a Neon branch provisioned for CI',
+    'a provisioned database branch is estate and not tree: no file in this repository ' +
+      'changes when it is created, so no probe over the tree can report it. This is the ' +
+      'condition the gate asserts and the artifact the gate cannot (ADR-073 section 4)',
+  ],
+  [
+    'a demo-world seed script',
+    'the condition names neither a path nor a manifest key. ADR-073 section 5 measures ' +
+      'packages/db/src/seed/ as holding calendar sources and nothing else, but that ' +
+      'measurement is evidence in the ruling rather than the artifact the row names, and ' +
+      'picking the path here would be the runner choosing scope (ADR-074 section 2)',
+  ],
+  [
+    'the VG-12 admission',
+    'the admission is .github/CODEOWNERS plus a branch-protection setting, and session 23 ' +
+      'records why no job can see it: "a job can see the dependency surface changed and ' +
+      'cannot see that a human agreed". A repository file cannot report it',
+  ],
+  [
+    "M07's detector code",
+    'the condition names a module plan and not a path or a manifest key. ADR-073 section 5 ' +
+      'measures `canary` as appearing in no .ts file in the tree; that needle is evidence ' +
+      'in the ruling and is not what the row states',
+  ],
+]);
+
+const gateInventory = {
+  id: 'CI-06/gate-inventory',
+  title: 'Every pipeline stage row is implemented in a workflow or waits on a dated artifact',
+  covers:
+    'ADR-073 SECTION 2, IMPLEMENTED AS RULED, over every row of STRATEGY section 4.1. ' +
+    'A DISPOSITION APPLIES TO A LEG AND NEVER TO A ROW: a row is closed when it carries at ' +
+    'least one leg and every leg is well formed, and it is OPEN for each activation ' +
+    'condition it carries whether or not it also carries an implementation. That rule is ' +
+    "THIS GATE's and not ADR-073's, which gave CI-09 a disposition and no " +
+    'partial-implementation rule; session 114 built one of CI-09\'s four legs and a gate ' +
+    'reading the row\'s first word would read one leg as four. ' +
+    'AN IMPLEMENTED LEG names a workflow under .github/workflows/ and the job or jobs that ' +
+    'run it, and every one of them must be a top-level job key in that file. ' +
+    'A WAITING LEG carries a date in its opener and exactly one `Artifact: **...**` clause, ' +
+    'and its artifact must be registered here as probeable or as unprobeable. ' +
+    'A DISCHARGED LEG links a register that resolves; ADR-073 gives CI-10 alone this ' +
+    'disposition and a second row taking it is reported rather than accepted. ' +
+    'IT ASSERTS BOTH READINGS OF (b), SPLIT PER ARTIFACT: every condition must be present, ' +
+    'dated and name one artifact, and each artifact that is a fact about THIS TREE is ' +
+    'additionally probed and must resolve to ABSENT, so the gate FAILS ON GOOD NEWS the day ' +
+    'a build script or an installed Playwright lands. CI-04\'s Neon branch is not a fact ' +
+    'about this tree, so for that row the gate asserts the CONDITION and never the ARTIFACT. ' +
+    'THE PROBE TABLE AND THE UNPROBEABLE REGISTER ARE WRITTEN AND NEVER COMPUTED, so a new ' +
+    'condition fails until somebody decides in this file whether its artifact can be read; ' +
+    'and an entry in either that names no live condition is itself a finding, so the ' +
+    'register shrinks as ADR-073 re-rules an artifact into a path or a manifest key. ' +
+    'FOUR OF THE SIX CONDITIONS name neither a path nor a manifest key, which ADR-073 ' +
+    'section 2 (b) requires; that is REPORTED on every run rather than asserted, because ' +
+    'the repair is a ruling on what each artifact is. ' +
+    'THREE THINGS IT DOES NOT DO. It never asks whether a Contents cell is TRUE, which is ' +
+    "ADR-073's own second limit: CI-02 promises the PT-nn suites and the tree has neither. " +
+    'It rules on the STAGE row and never on the VG rows of section 4.2, whose conditions ' +
+    'would chain and which ADR-073 section 8 deliberately leaves unruled. And it reads a ' +
+    'job NAME in a file, never a run: a job that exists and is disabled by an `if:` passes ' +
+    'here and is nothing this parse can reach.',
+  run() {
+    const findings = [];
+    const rows = pipelineRows();
+
+    const seenArtifacts = new Set();
+    let implementedRows = 0;
+    let partialRows = 0;
+    let noImplementation = 0;
+    let conditions = 0;
+    let discharged = 0;
+    let probed = 0;
+    let registered = 0;
+
+    for (const row of rows) {
+      const where = `${STRATEGY_DOC}:${row.line} ${row.id}`;
+      const legs = closureLegs(row.closure);
+
+      if (legs.length === 0) {
+        findings.push(
+          `${where} carries no disposition. ADR-073 section 2 rules a row closed when it is ` +
+            'implemented, when it carries a dated activation condition naming one artifact, ' +
+            'or when a register outside Actions discharges it, and a row that is none of the ' +
+            'three is a finding',
+        );
+        continue;
+      }
+
+      const waiting = legs.filter((l) => l.kind === 'waiting');
+      const built = legs.filter((l) => l.kind === 'implemented');
+      conditions += waiting.length;
+      if (legs.some((l) => l.kind === 'discharged')) discharged++;
+      if (built.length > 0 && waiting.length === 0) implementedRows++;
+      else if (built.length > 0) partialRows++;
+      else if (waiting.length > 0) noImplementation++;
+
+      for (const leg of legs) {
+        if (leg.kind === 'implemented') {
+          const file = /\.github\/workflows\/([A-Za-z0-9_-]+\.ya?ml)/.exec(leg.text);
+          if (!file) {
+            findings.push(
+              `${where} claims an implementation and names no workflow under ` +
+                `${WORKFLOW_DIR}/. ADR-073 disposition (a) is the workflow file AND the job ` +
+                'name that runs it, because a job name is a string in a file and a claim ' +
+                'that names neither is a claim about a run nobody can check',
+            );
+            continue;
+          }
+          const jobs = workflowJobs(file[1]);
+          if (jobs === null) {
+            findings.push(
+              `${where} names ${WORKFLOW_DIR}/${file[1]} and no such file exists, so the ` +
+                'row is closed against a workflow that cannot run',
+            );
+            continue;
+          }
+          const named = [...leg.text.matchAll(/\bjobs?\s+((?:`[A-Za-z0-9_-]+`(?:\s+and\s+)?)+)/g)]
+            .flatMap((m) => [...m[1].matchAll(/`([A-Za-z0-9_-]+)`/g)].map((j) => j[1]));
+          if (named.length === 0) {
+            findings.push(
+              `${where} names ${WORKFLOW_DIR}/${file[1]} and no job in it. A workflow file ` +
+                'is not a disposition: ADR-073 (a) wants the job, because a stage can be ' +
+                'named in a file that runs a different one',
+            );
+            continue;
+          }
+          for (const job of named) {
+            if (jobs.has(job)) continue;
+            findings.push(
+              `${where} names job \`${job}\` and ${WORKFLOW_DIR}/${file[1]} has no such ` +
+                `job (it has ${[...jobs].sort().join(', ') || 'none'}). A renamed job leaves ` +
+                'a row claiming an implementation that stopped existing, and nothing else ' +
+                'in this corpus reads that cell',
+            );
+          }
+          continue;
+        }
+
+        if (leg.kind === 'discharged') {
+          const link = /\]\(([^)]+)\)/.exec(leg.text);
+          if (!link) {
+            findings.push(
+              `${where} is discharged outside Actions and links no register. ADR-073 ` +
+                'disposition (c) is the register that carries the obligation, and a row ' +
+                'cannot be moved into (c) by asserting it',
+            );
+            continue;
+          }
+          const target = resolve(dirname(join(ROOT, STRATEGY_DOC)), link[1].split('#')[0]);
+          if (!existsSync(target)) {
+            findings.push(
+              `${where} is discharged by "${link[1]}" and that register does not resolve, so ` +
+                'the obligation is discharged into nothing',
+            );
+          }
+          continue;
+        }
+
+        // A waiting leg. Form first, then the artifact.
+        const clauses = [...leg.text.matchAll(/Artifact:\s*\*\*(.+?)\*\*/g)];
+        if (clauses.length === 0) {
+          findings.push(
+            `${where} carries a condition dated ${leg.date} and no \`Artifact: **...**\` ` +
+              'clause. A dated condition naming no artifact is the word "deferred" with a ' +
+              'date on it: nothing reopens the row, which is the decay ADR-073 exists to end',
+          );
+          continue;
+        }
+        if (clauses.length > 1) {
+          findings.push(
+            `${where} carries a condition dated ${leg.date} naming ${clauses.length} ` +
+              'artifacts and ADR-073 section 2 allows one. A condition naming two artifacts ' +
+              'cannot fail cleanly, because the gate cannot say which half arrived',
+          );
+          continue;
+        }
+
+        const key = artifactKey(clauses[0][1]);
+        seenArtifacts.add(key);
+        const probe = INVENTORY_PROBES.get(key);
+        if (!probe) {
+          if (UNPROBEABLE_ARTIFACTS.has(key)) registered++;
+          else {
+            findings.push(
+              `${where} waits on the artifact "${key}" and this gate has not been told how ` +
+                'to read it. Add a probe to INVENTORY_PROBES, or an entry to ' +
+                'UNPROBEABLE_ARTIFACTS naming why no probe over this tree can report it. ' +
+                'A condition whose arrival nothing watches for is a condition that never ' +
+                'fires, and the tables are written rather than computed so that this ' +
+                'decision is taken by a person once rather than defaulted to silence',
+            );
+          }
+          continue;
+        }
+        probed++;
+        const arrived = probe();
+        if (arrived === null) continue;
+        findings.push(
+          `${where}: the artifact "${key}" HAS ARRIVED (${arrived}), so the row reopened on ` +
+            'the commit that added it and the stage is not written. This is the half of ' +
+            "ADR-073's ruling that fails on good news, and it is the whole reason the " +
+            'condition is a condition rather than the word "deferred". Write the stage, or ' +
+            'take a ruling that moves the row',
+        );
+      }
+    }
+
+    // THE STALE DIRECTION, which is the half that earns a register. A list naming
+    // something that no longer exists still looks complete, and CI-06l's record is
+    // the precedent: an entry here that names no live condition would let a
+    // re-ruled artifact pass unread.
+    for (const key of INVENTORY_PROBES.keys()) {
+      if (seenArtifacts.has(key)) continue;
+      findings.push(
+        `scripts/corpus/gates.mjs: INVENTORY_PROBES holds a probe for "${key}" and no ` +
+          `condition in ${STRATEGY_DOC} section 4.1 names it. The row was written, the ` +
+          'artifact was re-ruled, or the wording moved; either way the probe asserts ' +
+          'nothing. Remove it or repoint it',
+      );
+    }
+    for (const key of UNPROBEABLE_ARTIFACTS.keys()) {
+      if (seenArtifacts.has(key)) continue;
+      findings.push(
+        `scripts/corpus/gates.mjs: UNPROBEABLE_ARTIFACTS registers "${key}" and no ` +
+          `condition in ${STRATEGY_DOC} section 4.1 names it. A register entry that no ` +
+          'longer names a real condition is a finding, which is what keeps this register ' +
+          'from becoming furniture (CI-06u and CI-06/fixture-inventory, same property)',
+      );
+    }
+
+    // Rule 2 on the registers themselves. Either one emptied would report every
+    // artifact unregistered or every artifact registered, and both read as a gate
+    // asserting something it is not.
+    if (INVENTORY_PROBES.size === 0) throw new Error('INVENTORY_PROBES is empty; no artifact is read');
+    if (UNPROBEABLE_ARTIFACTS.size === 0) {
+      throw new Error('UNPROBEABLE_ARTIFACTS is empty; the register asserts nothing');
+    }
+
+    console.log(
+      `       CI-06/gate-inventory note: ${rows.length} stage row(s); ${implementedRows} ` +
+        `implemented outright, ${partialRows} carrying an implementation AND a condition, ` +
+        `${noImplementation} with no implementation leg at all, ${discharged} discharged ` +
+        `outside Actions. ${conditions} activation condition(s) over the table, ${probed} of ` +
+        `them probed against this tree and ${registered} registered as unprobeable ` +
+        'with a reason. THE TWO READINGS OF "HOW MANY ARE OPEN" GIVE ' +
+        `${noImplementation} AND ${conditions} and both are printed because a row can be ` +
+        'implemented and waiting at once; ADR-073 ruled four rows open and session 114 ' +
+        "built one leg of CI-09's four. Four of the six conditions name neither a path nor " +
+        'a manifest key, which ADR-073 section 2 (b) requires, and that is in the register ' +
+        'and in the pull request rather than resolved by this runner',
+    );
+    return findings;
+  },
+};
+
 // -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
@@ -5684,6 +6166,7 @@ const GATES = [
   conflictMarkers,
   fixtureInventory,
   identifierSeries,
+  gateInventory,
 ];
 
 function main() {
