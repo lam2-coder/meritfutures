@@ -1,0 +1,74 @@
+{
+  "end_state": {
+    "trading_day": "2026-12-24",
+    "phase": "funded",
+    "balance_cents": 5200000,
+    "floor_open_cents": 4950000,
+    "floor_cents": 4950000,
+    "floor_locked": false,
+    "high_water_balance_cents": 5200000,
+    "withdrawable_cents": 100000,
+    "traded_days_count": 10,
+    "win_days_count": 5,
+    "consistency_best_day_cents": 20000,
+    "consistency_period_profit_cents": 100000,
+    "consistency_period_start_day": "2026-12-18",
+    "payouts_settled_count": 1,
+    "payout_anchor_day": "2026-12-17",
+    "cadence_anchor_day": "2026-12-18",
+    "lifetime_settled_cents": 100000,
+    "breached": false,
+    "engine_eligible": false,
+    "engine_gates": {
+      "traded_days": {
+        "pass": true,
+        "skipped": true,
+        "have": 10,
+        "need": 0
+      },
+      "win_days": {
+        "pass": true,
+        "have": 5,
+        "need": 5,
+        "floor_cents": 15000
+      },
+      "buffer": {
+        "pass": true,
+        "have_cents": 200000,
+        "need_cents": 100000
+      },
+      "consistency": {
+        "pass": true,
+        "skipped": false
+      },
+      "cadence_gap": {
+        "pass": false,
+        "skipped": false,
+        "trading_days_since_last_payout": 4,
+        "need": 5,
+        "next_eligible_trading_day": "2026-12-28"
+      },
+      "minimum_amount": {
+        "pass": true,
+        "withdrawable_cents": 100000,
+        "cap_cents": 150000,
+        "min_payout_cents": 10000
+      }
+    }
+  },
+  "events": [
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "payout.win_days_reset",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed"
+  ],
+  "pins": "R-37 counts the cadence gap by `calendar.sequence` subtraction and never by date arithmetic, so a window that is SIX calendar days wide and FOUR trading days wide leaves a five-trading-day gate closed, and the date the gate resolves to is 2026-12-28 rather than the 2026-12-25 a contiguous-calendar engine would report",
+  "note": "THE PIN IS THE PAIR OF WIDTHS OVER ONE WINDOW, not the count alone. The cadence anchor is 2026-12-18 and the stream ends on 2026-12-24. By date arithmetic that window is SIX calendar days wide, which clears `cadence_gap_trading_days: 5` on Core EOD; by `calendar.sequence` subtraction it is FOUR (sequence 77 less sequence 73, counting 12-21, 12-22, 12-23 and 12-24), which does not. `trading_days_since_last_payout: 4` beside `pass: false` is R-02's \"never date arithmetic\" landing on R-37, and an engine that subtracted dates writes 6 into that field and `true` beside it. `next_eligible_trading_day: 2026-12-28` IS AS-06's COUNTER AND IS AN INDEPENDENT MEASUREMENT OF THE SAME FACT. The fifth counted trading day after the anchor is sequence 73 + 5 = 78. That is 2026-12-28, TEN CALENDAR DAYS after the anchor, against SEVEN for the same five trading days from an ordinary Friday anchor inside this calendar's coverage (2026-09-11 anchors 09-14, 09-15, 09-16, 09-17 and 09-18). AS-06 states that spread as \"7 calendar days in June and ... 9 to 10 across the year-end cluster\" and this is the 10. THE ENTIRE DIFFERENCE IS ONE TRANSCRIBED ABSENCE. 2026-12-25 is a holiday and is therefore not a row in `calendars/cme-2026.json`, transcribed from the committed Christmas artifact that file's `transcribed_from` block names; were it a session it would be sequence 78 and this field would read 2026-12-25. The absence is also why the counted window stops at four: 12-25 would have been the fifth. So one absence moves two pinned fields, and neither can absorb an error in the other. 2026-12-24 IS INSIDE THE COUNTED WINDOW AND IS THE TRANSCRIBED HALF DAY. R-03 is \"a half day is a full trading day for every counter\" with the operator column \"no effect on any comparison\", and R-37 is a comparison. An engine that skipped the shortened session, or scored it as a fraction, writes 3 into `trading_days_since_last_payout`. GS-003 pins R-03 against the day counters; this is the first fixture that puts it against a money gate. `win_days_count: 5` AND `trading_days_since_last_payout: 4` ARE THE SAME FIVE SESSIONS COUNTED FROM TWO ANCHORS, and the pair is stated rather than left implicit. R-34 counts win days strictly after `payoutAnchorDay`, which R-46 set to the basis day 2026-12-17, so its window is 12-18, 12-21, 12-22, 12-23 and 12-24: five. R-37 counts strictly after `cadenceAnchorDay`, which R-46 set to the effective day 2026-12-18, so its window is one session shorter: four. THIS IS EC-049's DOMINATION CLAIM FAILING BY EXACTLY ONE DAY. EC-049 says that on any plan where `cadence_gap_trading_days <= required_win_days` the cadence gate is dominated by R-34 and never binds, and Core EOD carries 5 and 5. The argument holds only while the two anchors coincide, which R-37's own row asserts they do \"because the internal leg is instant\"; every settlement in this directory, and R-10's \"the withdrawal lands at the open of `effectiveTradingDay`\", put the effective day one trading day after the basis day. When they differ, R-34's window is one session wider than R-37's and the cadence gate binds alone. That is what `engine_eligible: false` beside five passing gates records here, and it is reported rather than resolved: EC-049 and R-37's coincidence sentence cannot both be right, and moving either is an ADR. THE OTHER FIVE GATES ARE STATED SO THE SIXTH IS UNAMBIGUOUS. INV-15's closed six (ADR-060) are all present: `traded_days` is CV-19's disabled zero reporting `skipped: true`, `win_days` is 5 of 5, `buffer` is `balance - size` at 200,000c against a 100,000c permanent buffer, `consistency` is R-29's cross-multiplication over the R-47 period (20,000c best against 100,000c of period profit is 2,000bp against Core EOD's 3,000bp cap), and `minimum_amount` is `min(100,000, 150,000) >= 10,000`. Only `cadence_gap` is false, so `engine_eligible: false` has exactly one cause and a reader can name it. `consistency_period_start_day: 2026-12-18` IS R-47's \"next TRADING day after the basis day\" and it is an ordinary one here on purpose: the basis day 2026-12-17 is followed by 2026-12-18 in both the calendar and the sequence, so this fixture's holiday arithmetic sits entirely in R-37 and nowhere else. GS-068 is the file that owns the case where that field itself crosses a holiday. `floor_cents: 4950000` AND `high_water_balance_cents: 5200000` ARE R-48 AND R-13 HOLDING STILL. The settlement does not touch the floor (R-19, R-48), the high-water balance was set by the 2026-12-17 close and no later close exceeds it, and 4,950,000 is 5,200,000 less the 250,000c funded drawdown of Appendix A.1's 50K column. The lock never engages: the closing balance tops out 200,000c above size against a 260,000c trigger. `traded_days_count: 10` AGAINST TEN MARKS is R-08 on every day; R-47 resets the win-day and consistency counters and does not reset this one. THE EVENT ORDER PINS DO-2 BEFORE DO-9: `payout.win_days_reset` is sixth, ahead of the effective day's own `day.closed`."
+}
