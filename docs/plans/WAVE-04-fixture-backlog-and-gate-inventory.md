@@ -965,6 +965,24 @@ scripts/ci/. Stop. Do not build CI-07 and do not build CI-08.
 
 ### W8: the four `CI-06` slug gates, four commits, in order (session 115, LAST AND ALONE)
 
+**`W8` SHIPS THREE OF THESE FOUR AND `CI-06/gate-inventory` MOVES TO `W9`, SESSION 121,
+AMENDED 2026-08-21 AT THE `W1` TO `W6` MERGE.** The brief below reads *"AFTER `W1`, `W5`,
+`W6` AND `W7` HAVE ALL MERGED"* and gate 3 is the only one of the four that depends on
+`W7`: it must see `CI-09` implemented in a workflow, and `W7` is what implements it.
+**Serialising `W8` behind `W7` to satisfy one gate of four costs a whole session of
+wall-clock and buys nothing for the other three**, whose fences are `scripts/corpus/` and
+`docs/testing/STRATEGY.md` while `W7`'s are `.github/workflows/` and `scripts/ci/`. The two
+are disjoint and run concurrently.
+
+**So gate 3 keeps its own instruction rather than being weakened to pass early.** The brief
+says *"IT MUST SEE `CI-09` AS IMPLEMENTED. If it does not, `W7` has not merged and you are
+running out of order. Stop."* That sentence is why the gate moves rather than softens: a
+gate-inventory check that tolerated an unimplemented `CI-09` would be the third of these
+gates to be justified by a claim the tree refutes. **`W9` is one gate, its falsification
+case and its section 4.4 row, after both `114` and `115` have landed**, and `gate_count`
+moves 24 to 27 in `W8` and 27 to 28 in `W9` rather than 24 to 28 in one push.
+
+
 ```
 Branch: claude/wave04-w8-slug-gates   (from origin/main, AFTER W1, W5, W6 AND W7
         HAVE ALL MERGED)
