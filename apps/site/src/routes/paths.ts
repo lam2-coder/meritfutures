@@ -212,3 +212,30 @@ export function versionPageMeta(version: SitePlanVersionView): VersionPageMeta {
     navigable: onSale,
   };
 }
+
+/**
+ * INV-M9-04's "every page derived from it": what a plan version publish must
+ * invalidate before that version becomes purchasable.
+ *
+ * IT IS DERIVED AND NOT LISTED. A hand-maintained array of derived paths is a
+ * hand-maintained count in a different costume and it drifts the same way: the
+ * day a fourth per-version surface is added, the list is short by one, the
+ * publish reports ok having revalidated three of four, and AS-M9-01's window
+ * opens on the surface nobody added to the list. Every path here comes from the
+ * function that addresses that page, so a new surface cannot be added without
+ * passing through one of them.
+ *
+ * `/plans` IS INCLUDED AND IT IS NOT A PER-VERSION PAGE. It is the index the
+ * version appears on, so a publish that revalidated only the version's own
+ * pages would leave the pricing page quoting the previous one, which is
+ * FM-M9-01 exactly. The index is derived from the same publish and is therefore
+ * derived from it in the sense INV-M9-04 means.
+ */
+export function derivedPaths(version: SitePlanVersionView): readonly string[] {
+  return [
+    '/plans',
+    planVersionPath(version),
+    planVersionRulesPath(version),
+    ...version.sizes.map((size) => planVersionSizePath(version, size)),
+  ];
+}
