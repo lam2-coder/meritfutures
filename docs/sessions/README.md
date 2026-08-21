@@ -31,6 +31,7 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | ~~**120**~~ | ~~`0045_simulation_runs.sql`, `SD-M21-01` and `SD-M21-02` ([M21](../plans/M21-plan-designer.md) section 2.1)~~ | **WRITTEN.** Struck, and its entry is below |
 | **121** | WAVE-04 `W9`, `CI-06/gate-inventory` | **UNBLOCKED 2026-08-21.** `114` and `115` have both merged, so the gate can see `CI-09` implemented |
 | ~~**122**~~ | ~~The four Tier 2 fixture-shape rulings, [WAVE-04 section 2.3](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md)~~ | **WRITTEN.** Struck, and its entry is below |
+| ~~**125**~~ | ~~The four places [ADR-074](../decisions/ADR-074.md) and the tree disagree, resolved so the ruling can be signed~~ | **WRITTEN.** Struck, and its entry is below |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
@@ -201,3 +202,4 @@ the two deleted rows are restored above.
 | [2026-08-21 - Session 119](2026-08-21-session-119.md) | the WAVE-04 merge: six pull requests, `#154` to `#159`, and three logs renumbered because six concurrent sessions each read the highest row and each took the next number correctly. **The collision was a missing claim, not a numbering mistake**, so a claim table now sits above these entries. `W8` ships three gates of four and `CI-06/gate-inventory` moves to `W9` whole rather than being softened to pass before `CI-09` exists. `adr_count` was wrong on BOTH sides of one conflict and the merged truth was neither |
 | [2026-08-21 - Session 120](2026-08-21-session-120.md) | `0045` lands: `simulation_runs` and the publish-decision record. **Exactly one of two, never neither**: a published version resolves to its simulation run or carries a written waiver. The `>= 0` sample-size bound agrees with `provenanceFor` rather than with an instinct, and the hex-to-bytea seam is watched rather than claimed |
 | [2026-08-21 - Session 122](2026-08-21-session-122.md) | the four Tier 2 fixture-shape rulings: `ADR-076`, and none of the fourteen needs a second fixture format |
+| [2026-08-21 - Session 125](2026-08-21-session-125.md) | the four `ADR-074` disagreements, resolved in place while the ruling is still unsigned |
