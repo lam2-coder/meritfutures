@@ -1,0 +1,310 @@
+# GS-049  Fuzz: adversarial day sequences
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01,
+# GOLDEN_SCENARIOS section 1). Every number below traces to a document:
+#
+#   "Counters advance only on trading days, and advance whether or not the
+#   trader traded"                                             M01 R-02
+#   traded day is `fill_count > 0`, strict `>`                 M01 R-08
+#   win day is `realized_pnl_cents >= win_day_floor_cents`,
+#   `>=`, so exactly at the floor counts                       M01 R-09
+#   `hwb' = max(hwb, closing)`, `floor' = hwb' - drawdown`     M01 R-13
+#   the floor never retreats                                   M01 R-14
+#   lock trigger `closing - size >= at_profit`, and the effect
+#   is an ASSIGNMENT of `floor_lock_floor_at_cents`            M01 R-15, ADR-052
+#   the breach comparator is the floor AT THE OPEN            M01 R-18
+#   `low_balance_cents < floorOpenCents`, strict `<`           M01 R-21
+#   `best_day * 10000 <= max_day_share_bp * period_profit`,
+#   integer cross multiplication in bigint, no division        M01 R-29
+#   skipped entirely unless `period_profit > 0`, strict `>`    M01 R-30
+#   `withdrawable = max(0, balance - size - buffer)`           M01 R-35
+#   funded consistency is R-29 over the R-47 period            M01 R-36
+#   the win-day count never decreases                          M01 INV-08
+#   the traded-day count never decreases                       M01 INV-09
+#   50K size                 5,000,000c                        M01 Appendix A, sizes line
+#   Core EOD funded drawdown 250,000c at 50K, 500bp            M01 Appendix A.1
+#   Core EOD win day floor   15,000c at 50K, 30bp              M01 Appendix A.1
+#   Core EOD buffer          100,000c at 50K, 200bp            M01 Appendix A.1
+#   Core EOD funded consistency 3,000bp                        M01 Appendix A.1
+#   floor lock at 260,000c profit, locked floor size + 10,000c ADR-014
+#
+# THE REGISTRY ROW NAMES THREE PROBES AND THIS FILE CARRIES ALL THREE SHAPES.
+# TWO OF THEM IT PINS; THE THIRD'S LENGTH IT DOES NOT, AND THE SIBLING SAYS SO
+# RATHER THAN LEAVING A READER TO NOTICE. The row is "alternating 14,999 and
+# 15,001 days, a single 1,000,000 day into consistency math, and 100-day flat
+# grinds", and it adds "runs as a property suite as well as a fixture". The flat
+# grind here is TWELVE days and not one hundred, for a reason that is about the
+# format rather than about effort, and it is stated in full in the sibling's
+# note.
+#
+# THE CALENDAR SHAPE IS NOT LOAD BEARING ANYWHERE IN THIS FILE, which is the
+# opposite of GS-003 and GS-059 and is worth saying out loud. Twenty-one
+# contiguous sessions are used because twenty-one are needed; no holiday, no
+# early close and no absence is read by any assertion here. Every day in the
+# stream is one of `calendars/cme-2026.json`'s SYNTHETIC ordinary weekdays
+# except 2026-09-08, which is transcribed and is used only because it is the
+# session that follows the account's opening day.
+#
+# PROBE 1, DAYS 1 TO 8: ALTERNATING 15,001c AND 14,999c, AND IT IS A SEQUENCE
+# RATHER THAN A BOUNDARY. GS-006 and GS-007 already pin R-09's `>=` at
+# 15,000c from both sides on single days. What this probe adds is the counter
+# under ALTERNATION: four of the eight days clear the floor by one cent and four
+# miss it by one cent, so `win_days_count` must read 4 against
+# `traded_days_count` 8. An engine whose comparison drifted by a cent in either
+# direction reads 8 or 0 on this stream, and an engine that let the counter
+# follow the last day's verdict rather than accumulate reads 0 or 1. The two
+# counters are pinned together because a single count cannot tell those failures
+# apart.
+#
+# AND THE FLOOR CARRIES THE SAME CENT. The trailing floor is the closing high
+# less 250,000c, and the closes alternate between a value ending 001 and one
+# ending 000, so the floor does too: 4,765,001, then 4,780,000, then 4,795,001.
+# A floor that rounded anywhere would land on a whole thousand every day.
+#
+# PROBE 3, DAYS 9 TO 20: A FLAT GRIND, TWELVE DAYS OF ZERO. Zero realized, zero
+# fills, no balance movement. R-08's strict `>` means none of them is a traded
+# day and R-09 means none is a win day, so both counters stand still while the
+# calendar advances twelve sessions. INV-08 and INV-09 are that they never
+# DECREASE; the grind is where a counter that drifted downward would show it.
+# R-14 is the other half: the floor is 4,870,000 on the first flat day and
+# 4,870,000 on the twelfth, and a `max` written as a plain assignment anywhere
+# in R-13 would let it fall back to the day's close less the drawdown.
+#
+# PROBE 2, DAY 21: A SINGLE 1,000,000c DAY INTO CONSISTENCY MATH. This is the
+# probe the row is really about and it is the last day on purpose, so the whole
+# stream is the period it is measured against. R-29 is
+# `best_day * 10000 <= max_day_share_bp * period_profit` in `bigint`, with no
+# division deciding anything, and the two sides here are
+#
+#   best_day * 10000        = 1,000,000 * 10,000     = 10,000,000,000
+#   max_day_share_bp * profit = 3,000 * 1,120,000    =  3,360,000,000
+#
+# so the gate FAILS, and the number the trader is owed is
+# `profit_needed_to_dilute`, M01 section 3.6's `ceilDiv` over the difference:
+# ceil(6,640,000,000 / 3,000) = 2,213,334c. That last digit is the assertion.
+# 3,000 * 2,213,334 is 6,640,002,000, which clears; 3,000 * 2,213,333 is
+# 6,639,999,000, which does not. An engine that truncated instead of taking a
+# ceiling publishes a figure that leaves the trader one cent short of the gate
+# after doing exactly what it told them to do.
+#
+# THE JUMP ALSO CROSSES THE FLOOR LOCK, AND THAT IS NOT AN ACCIDENT OF THE
+# NUMBERS. 1,000,000c on a 50K account is 1,120,000c of profit against a
+# 260,000c trigger, so R-15 fires on a day that OVERSHOOTS it by 860,000c, which
+# is precisely the case ADR-052 ruled: the lock ASSIGNS `floor_lock_floor_at_cents`
+# and does not take a `max`, so the stored floor is 5,010,000 and not the
+# 5,870,000 the trail alone produced on the same day. The prior day's floor was
+# 4,870,000, so INV-06's day-over-day series still rises and CV-12 holds. There
+# is no way to put a 1,000,000c day into a funded Core EOD account without
+# reaching this branch, so the file states it rather than pretending the probe
+# is isolated.
+#
+# NOTHING BREACHES, ON PURPOSE. Every low sits above the floor the day opened
+# with (R-18, R-21), including the jump day, whose low is 5,115,000 against a
+# 4,870,000 floor at the open.
+id: GS-049
+name: fuzz adversarial day sequences
+source: M01 R-02, R-08, R-09, R-13, R-14, R-15, R-18, R-21, R-29, R-30, R-35, R-36, INV-08, INV-09
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  opened_on: 2026-09-04
+  size_cents: 5000000
+days:
+  # PROBE 1. Eight alternating days: 15,001c clears R-09's floor by one
+  # cent, 14,999c misses it by one. Four win days against eight traded days.
+  - trading_day: 2026-09-08
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5015001
+    high_balance_cents: 5020001
+    low_balance_cents: 4995000
+    realized_pnl_cents: 15001
+    fill_count: 1
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-09
+    opening_balance_cents: 5015001
+    closing_balance_cents: 5030000
+    high_balance_cents: 5035000
+    low_balance_cents: 5010001
+    realized_pnl_cents: 14999
+    fill_count: 1
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-10
+    opening_balance_cents: 5030000
+    closing_balance_cents: 5045001
+    high_balance_cents: 5050001
+    low_balance_cents: 5025000
+    realized_pnl_cents: 15001
+    fill_count: 1
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-11
+    opening_balance_cents: 5045001
+    closing_balance_cents: 5060000
+    high_balance_cents: 5065000
+    low_balance_cents: 5040001
+    realized_pnl_cents: 14999
+    fill_count: 1
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-14
+    opening_balance_cents: 5060000
+    closing_balance_cents: 5075001
+    high_balance_cents: 5080001
+    low_balance_cents: 5055000
+    realized_pnl_cents: 15001
+    fill_count: 1
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-15
+    opening_balance_cents: 5075001
+    closing_balance_cents: 5090000
+    high_balance_cents: 5095000
+    low_balance_cents: 5070001
+    realized_pnl_cents: 14999
+    fill_count: 1
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-16
+    opening_balance_cents: 5090000
+    closing_balance_cents: 5105001
+    high_balance_cents: 5110001
+    low_balance_cents: 5085000
+    realized_pnl_cents: 15001
+    fill_count: 1
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-09-17
+    opening_balance_cents: 5105001
+    closing_balance_cents: 5120000
+    high_balance_cents: 5125000
+    low_balance_cents: 5100001
+    realized_pnl_cents: 14999
+    fill_count: 1
+    traded_day: true
+    adjustment_cents: 0
+  # PROBE 3, the flat grind. Twelve sessions of zero realized and zero fills.
+  # Neither counter moves and the floor does not retreat. The length is short of
+  # the row's hundred and the sibling states why.
+  - trading_day: 2026-09-18
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-09-21
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-09-22
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-09-23
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-09-24
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-09-25
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-09-28
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-09-29
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-09-30
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-10-01
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-10-02
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  - trading_day: 2026-10-05
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 0
+    fill_count: 0
+    traded_day: false
+    adjustment_cents: 0
+  # PROBE 2. The single 1,000,000c day, last so the whole stream is the period
+  # it is measured against. It also crosses the R-15 lock trigger by 860,000c.
+  - trading_day: 2026-10-06
+    opening_balance_cents: 5120000
+    closing_balance_cents: 6120000
+    high_balance_cents: 6125000
+    low_balance_cents: 5115000
+    realized_pnl_cents: 1000000
+    fill_count: 4
+    traded_day: true
+    adjustment_cents: 0
+settlements: []

@@ -1,0 +1,146 @@
+# GS-080  A gate configured to zero renders as disabled, not as satisfied
+#
+# DERIVED FROM THE PLAN DOCUMENTS, NEVER FROM IMPLEMENTATION OUTPUT (TR-01).
+#
+#   "Funded `min_trading_days = 0` produces `pass: true, skipped: true` in
+#   `engine_gates`, the same shape the consistency denominator rule uses, and
+#   the eligibility response distinguishes it from a gate that was evaluated and
+#   passed. Asserts that `engineEligible` is unaffected. Exists because 'a gate
+#   that is always true' and 'a gate that is turned off' look identical in a
+#   boolean and must not look identical to a trader or a support agent"
+#                                                       GOLDEN_SCENARIOS GS-080
+#   CV-19  `phase_funded.min_trading_days >= 0`, and 0 MEANS THE GATE IS
+#          DISABLED and reports `pass: true, skipped: true`  M01 section 2.4
+#   INV-15 `engine_eligible == AND(every engine gate)` with no shortcut path,
+#          and THE ENGINE GATES ARE THE CLOSED SIX R-33, R-34, R-35, R-36,
+#          R-37, R-39                          M01 section 1.5, ADR-060
+#   R-33   `tradedDaysCount >= min_trading_days`, 0 disables the gate   M01 R-33
+#   R-34   `winDaysCount >= required_count`                            M01 R-34
+#   R-35   withdrawable `max(0, balance - size - buffer)`              M01 R-35
+#   R-36   funded consistency over the R-47 period                     M01 R-36
+#   R-37   trading days strictly after `cadenceAnchorDay`              M01 R-37
+#   R-39   `min(withdrawable, cap) >= min_payout_cents`                M01 R-39
+#   R-08   a traded day is a day with at least one fill                M01 R-08
+#   R-09   a win day is `realized_pnl >= win_day_floor_cents`          M01 R-09
+#   R-13   the floor trails the closing high                           M01 R-13
+#   R-18   the breach check compares the low against the floor AT OPEN M01 R-18
+#   R-29   `best_day * 10000 <= max_day_share_bp * period_profit`      M01 R-29
+#   R-30   a non-positive period profit SKIPS the consistency gate     M01 R-30
+#   size 5,000,000c, funded drawdown 250,000c, floor lock at 260,000c of profit,
+#   buffer 100,000c, win day floor 15,000c, win days required 5, FUNDED MIN
+#   TRADING DAYS 0, cadence gap 5 trading days, payout cap 150,000c,
+#   min payout 10,000c, consistency 3000bp
+#                                                       M01 Appendix A.1 at 50K
+#
+# WHY THIS ROW NEEDED ALL SIX GATES TO PASS AND NOT MERELY ONE TO BE SKIPPED.
+# The row asserts TWO things and the second is the harder one: that a DISABLED
+# gate renders as disabled, and that `engineEligible` is UNAFFECTED by it. A
+# stream where some other gate fails would pin `engine_eligible: false` and
+# prove nothing about the second half -- the flag would be false for a reason
+# that has nothing to do with R-33. So the disabled gate has to sit inside a
+# conjunction that is otherwise TRUE, where a `pass: false` on R-33 would be the
+# one term that flipped it. That is what this stream builds.
+#
+# THE STREAM, AND WHY EVERY DAY IS IDENTICAL. Five sessions, each a traded day
+# (R-08: one fill is the whole test) and each a win day (R-09: 30,000c against
+# the 15,000c floor). THE FIVE ARE EQUAL ON PURPOSE. R-29 is a cross
+# multiplication over the period, and five identical days put the best day at
+# exactly one fifth of period profit: `30,000 * 10,000 = 300,000,000` against
+# `3,000 * 150,000 = 450,000,000`, so the gate passes with room and the fixture
+# does not sit on the consistency boundary it is not about. GS-023 and GS-024
+# are the pair that owns that boundary.
+#
+# THE SIX GATES AT THE LAST CLOSE, WHICH IS THE ARITHMETIC INV-15 CONJOINS.
+#   R-33 traded days   5 against a minimum of 0    DISABLED, pass true, SKIPPED
+#   R-34 win days      5 against 5                 pass, exactly on the count
+#   R-35 buffer        150,000c against 100,000c   pass
+#   R-36 consistency   300,000,000 <= 450,000,000  pass, and NOT skipped
+#   R-37 cadence gap   no anchor, no gap to clear  pass, SKIPPED
+#   R-39 minimum       min(50,000, 150,000) = 50,000 >= 10,000   pass
+# Six passes, so `engine_eligible` is TRUE. R-38 IS NOT A TERM: ADR-060 rules it
+# a context gate and INV-15's closed six is what this fixture conjoins.
+#
+# `engine_eligible: true` IS PINNED HERE, AND IT IS THE FIRST FIXTURE IN THE
+# DIRECTORY TO PIN THAT DIRECTION. GS-064 pins `false`; GS-055 and GS-060
+# declined to pin `true` at all, and GS-060's header names GS-080's blocker in
+# its own words. THE BLOCKER IS DISCHARGED RATHER THAN IGNORED: ADR-060's own
+# section 3 says the ruling "DOES NOT BY ITSELF MAKE `engine_eligible: true`
+# PINNABLE" and puts the load-bearing edit on M01's INV-15, which now carries
+# the closed six-member enumeration at section 1.5. The set has a referent in a
+# PLAN DOCUMENT, so the conjunction above is derived from M01 rather than read
+# out of the engine's types, which is the substitution ADR-060 warned against.
+#
+# THE 30,000c DAY IS THE SMALLEST ROUND FIGURE THAT CLEARS EVERY GATE AT ONCE,
+# and the binding one is R-39 rather than R-34. Five win days need only 15,000c
+# each, which would close at 5,075,000c and leave withdrawable at ZERO: 75,000c
+# of profit is 25,000c short of the buffer alone. The minimum payout gate needs
+# `balance >= size + buffer + 10,000` = 5,110,000c, so the smallest qualifying
+# day is 22,000c. 30,000c is the round figure above it and it is not a boundary:
+# no gate in this file is being pinned one cent from its edge except R-34, which
+# is on 5 of 5 because the count is the row's own.
+#
+# THE LOCK IS UNTOUCHED AND THAT IS CHECKED RATHER THAN ASSUMED. 150,000c of
+# profit against a 260,000c trigger (Appendix A.1), so R-15 never fires and the
+# floor is R-13's trail throughout. This file therefore states nothing about the
+# floor-lock reading STATE.md catalogues as disputed.
+id: GS-080
+name: a gate configured to zero renders as disabled not as satisfied
+source: M01 R-08, R-09, R-13, R-18, R-29, R-30, R-33, R-34, R-35, R-36, R-37, R-39, R-41, CV-19, INV-15
+plan: CORE-50K
+calendar: cme-2026
+account:
+  phase: funded
+  # The open day precedes the first mark, which is the convention every funded
+  # fixture in this directory follows: `initialState` cannot open an account in
+  # `funded` on a plan that has an evaluation phase, and `advanceDay` refuses a
+  # mark that is not strictly after the prior it is handed (INV-14, R-06).
+  opened_on: 2026-11-13
+  size_cents: 5000000
+days:
+  # THE HIGH EQUALS THE CLOSE ON EVERY DAY, so R-11's "the floor ignores the
+  # intraday high" is not load bearing here. GS-011 is the fixture that owns it.
+  - trading_day: 2026-11-16
+    opening_balance_cents: 5000000
+    closing_balance_cents: 5030000
+    high_balance_cents: 5030000
+    low_balance_cents: 5000000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-17
+    opening_balance_cents: 5030000
+    closing_balance_cents: 5060000
+    high_balance_cents: 5060000
+    low_balance_cents: 5030000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-18
+    opening_balance_cents: 5060000
+    closing_balance_cents: 5090000
+    high_balance_cents: 5090000
+    low_balance_cents: 5060000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-19
+    opening_balance_cents: 5090000
+    closing_balance_cents: 5120000
+    high_balance_cents: 5120000
+    low_balance_cents: 5090000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
+  - trading_day: 2026-11-20
+    opening_balance_cents: 5120000
+    closing_balance_cents: 5150000
+    high_balance_cents: 5150000
+    low_balance_cents: 5120000
+    realized_pnl_cents: 30000
+    fill_count: 3
+    traded_day: true
+    adjustment_cents: 0
