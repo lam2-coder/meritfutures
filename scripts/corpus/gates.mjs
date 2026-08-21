@@ -4495,6 +4495,210 @@ const ci06w = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06/conflict-markers  No file carries a line beginning with a conflict marker
+// -----------------------------------------------------------------------------
+// THE RECORD THAT COMMISSIONED THIS GATE IS WRONG ABOUT ITS OWN EVIDENCE, AND
+// SAYING SO IS THE FIRST THING THIS BLOCK DOES. `OI-19` in STATE reads "`<<<<<<<
+// HEAD` stood in INDEX and STATE and 22 of 22 gates passed over it". It never
+// stood in a COMMIT. No commit reachable from any branch head or any
+// pull-request head has ever carried a leading marker in any `.md`, `.ts`,
+// `.mjs` or `.json` file:
+//
+//     git log --all -G'^<<<<<<< ' -- '*.md' '*.ts' '*.mjs' '*.json'
+//
+// returns nothing, run on this branch on 2026-08-21. It stood in a WORKING TREE
+// during a merge. The record also disagrees with itself on the gate count, 22 in
+// session 105 and in STATE against 24 in session 106.
+//
+// TWO THINGS FOLLOW AND BOTH ARE LOAD BEARING.
+//
+//   THE GATE IS STILL WORTH WRITING, because the boundary it protects is THE
+//   PUSH AND NOT THE HISTORY. The dirty tree is what CI and the founder read,
+//   `falsify.mjs` copies the working tree rather than a git worktree for exactly
+//   that reason, and a merge resolved by hand at the wrong moment is one `git
+//   add -A` away from being history. That the corpus has never shipped one is
+//   the state this gate exists to keep.
+//
+//   ITS FALSIFICATION CASE SEEDS A MARKER RATHER THAN ANCHORING ON A HISTORICAL
+//   ONE, because there is no historical one to anchor on. That is the better
+//   outcome and not a concession: `OI-21` records that a harness anchored to
+//   corpus state decays as the corpus is repaired, and a seeded anchor does not.
+//
+// THE LIVE COMPLICATION, MEASURED RATHER THAN ASSUMED. STATE carries the string
+// `<<<<<<< HEAD` THREE TIMES IN PROSE, at the `OI-19` entry and the two entries
+// that discuss it. Those are this gate's own subject matter written down. The
+// assertion is therefore "a line BEGINNING with a marker" and never "a file
+// containing one":
+//
+//     grep -n '^<<<<<<< ' docs/STATE.md
+//
+// returns nothing, re-run on this branch rather than taken from the brief, and
+// so does the same search over every tracked file for all four marker shapes
+// including diff3's `|||||||`. No exemption is registered because none is
+// needed. `CI-06/conflict-markers/mid-line` asserts that boundary in the harness
+// with a control on the other side of it, so the concession is watched rather
+// than claimed.
+//
+// THE MARKERS ARE SPELLED BY REPETITION AND NEVER AS LITERALS. A gate whose
+// source spells a marker at the start of one of its own lines is its own first
+// finding, and this repository has already paid for that class once: `CI-06t`
+// exists because a line of prose describing a `falsify.mjs` seed SPELLED A
+// GENERATED-SPAN OPENER OUT and `CI-06g` swallowed ten thousand characters of
+// unrelated text. Naming the shape instead of writing it is the same repair.
+//
+// SCOPE IS THE WHOLE TREE, NOT `docs/`. A conflict marker in a migration, a
+// workflow or a `.ts` file is worse than one in prose, not better. `allFiles()`
+// is what "tracked" means here, and the equality was measured rather than
+// assumed: on 2026-08-21 the runner's walk reached 1,022 files and `git
+// ls-files` returned the same 1,022, with no file on either side of the
+// difference. The walk is used rather than `git ls-files` because `falsify.mjs`
+// copies the tree WITHOUT `.git`, so a gate shelling out to git would report
+// ERROR in every seeded copy and could never be watched failing. The residual
+// gap is stated rather than hidden: a file that is ignored by `.gitignore` and
+// present on disk would be read here and is not tracked. Every current
+// `.gitignore` entry is build output or a crash journal, and none of it is
+// something git merges.
+const CONFLICT_MARKER_WIDTH = 7;
+const markerOf = (char) => char.repeat(CONFLICT_MARKER_WIDTH);
+
+// Each marker carries its own matcher and its own argument, because the three
+// are not equally unambiguous and pretending they are is how a gate acquires a
+// false finding.
+const CONFLICT_MARKERS = [
+  {
+    // The ours-side opener. Git writes seven `<`, a space and a label. The bare
+    // form with no label is matched too, because a half-finished hand
+    // resolution produces it and nothing legitimate in this tree begins with
+    // seven `<`: not markdown, not TypeScript, not SQL, not YAML, not JSON.
+    marker: markerOf('<'),
+    what: 'the ours-side opener',
+    match: (line) => line.startsWith(markerOf('<')),
+  },
+  {
+    // THE ONE AMBIGUOUS MARKER, AND IT IS ASSERTED ANYWAY. Git writes exactly
+    // seven `=` alone on the line, and a markdown setext H1 underline of exactly
+    // seven `=` is textually identical to it. So this matcher requires the WHOLE
+    // LINE, where the other two are prefix matches: `========` under a heading
+    // is eight and passes, and a setext underline is a shape a Merit document
+    // has never used (measured: zero lines in the tree begin with seven `=`).
+    // It is kept because a hand resolution that deletes the outer markers and
+    // leaves the middle one is exactly what a careless fix produces, and that is
+    // the only state the other two cannot see.
+    marker: markerOf('='),
+    what: 'the separator',
+    match: (line) => line.trimEnd() === markerOf('='),
+  },
+  {
+    // The theirs-side closer. Seven `>` at a line start is seven nested
+    // blockquotes in markdown, which no document in this corpus comes close to,
+    // and is nothing at all in every other file type here.
+    marker: markerOf('>'),
+    what: 'the theirs-side closer',
+    match: (line) => line.startsWith(markerOf('>')),
+  },
+];
+
+// DIFF3'S BASE MARKER IS DELIBERATELY NOT ASSERTED, in writing rather than by
+// omission. `merge.conflictStyle = diff3` or `zdiff3` writes a fourth marker of
+// seven `|` before the base section. Seven `|` at a line start is also a
+// markdown table row of empty cells, and this corpus is written in tables. The
+// exclusion costs nothing: diff3 writes the outer two markers as well as the
+// base one, so a diff3 conflict is caught twice over by the rows above.
+
+// A file git will not merge as text cannot carry a marker git wrote into it.
+// THE DISCRIMINATOR IS UTF-8 VALIDITY AND NOT A NUL BYTE, and the difference is
+// two real source files. `packages/rithmic/src/simulator/session.ts` and
+// `stream.ts` embed a literal NUL in a template literal as a composite-key
+// separator; a NUL test drops both from this gate's scope, which is the
+// "parser narrower than the property it claims" class this runner has now found
+// six times. A round-trip through UTF-8 keeps them and drops exactly the six
+// `.xlsx` workbooks, measured on 2026-08-21. It is derived rather than listed,
+// so a seventh binary file needs no edit here.
+const isUtf8Text = (buf) => Buffer.from(buf.toString('utf8'), 'utf8').equals(buf);
+
+const conflictMarkers = {
+  id: 'CI-06/conflict-markers',
+  title: 'No file carries a line beginning with a merge conflict marker',
+  covers:
+    'Every file the runner walks, not just docs/: no line BEGINS with one of the three ' +
+    'markers git writes into a file it could not merge. This is OI-19. ' +
+    'THE RECORD THAT COMMISSIONED IT IS WRONG ABOUT ITS OWN EVIDENCE and the gate says so ' +
+    'rather than inheriting it: no commit reachable from any branch head or pull-request ' +
+    "head has ever carried a leading marker (git log --all -G'^<<<<<<< ' returns nothing). " +
+    'It stood in a WORKING TREE during a merge. The gate is still worth writing because the ' +
+    'boundary it protects is the PUSH and not the history, and its falsification case ' +
+    'SEEDS a marker rather than anchoring on a historical one, which is OI-21 applied. ' +
+    'A LINE BEGINNING WITH A MARKER, NEVER A FILE CONTAINING ONE. STATE carries the opener ' +
+    'three times in PROSE, at the OI-19 entry and the two that discuss it, and all three ' +
+    'are mid-line. No exemption is registered because none is needed, and ' +
+    'CI-06/conflict-markers/mid-line asserts that boundary with a control on the far side. ' +
+    'THE SEPARATOR IS MATCHED AS A WHOLE LINE where the outer two are prefix matches, ' +
+    'because a markdown setext H1 underline of exactly seven equals signs is textually ' +
+    'identical to it; the tree carries zero such lines today. ' +
+    "DIFF3'S BASE MARKER OF SEVEN PIPES IS NOT ASSERTED: it is also a table row of empty " +
+    'cells, and diff3 writes the outer two markers anyway, so the case is caught twice over. ' +
+    'TWO THINGS IT DOES NOT DO. It reads the WORKING TREE through the runner walk rather ' +
+    'than through git, so a file ignored by .gitignore and present on disk is read here and ' +
+    'is not tracked; the walk and git ls-files returned the same 1,022 files when this was ' +
+    'written. And it skips a file that is not valid UTF-8, which is the six .xlsx workbooks ' +
+    'and nothing else -- a NUL-byte test would instead have dropped two .ts sources that ' +
+    'embed a literal NUL as a key separator.',
+  run() {
+    const findings = [];
+    const files = allFiles();
+
+    // Rule 2 on the input. An empty walk would make this gate report a clean
+    // tree for the one reason that means it read nothing.
+    if (files.length === 0) {
+      throw new Error('the runner walk reached zero files; CI-06/conflict-markers cannot run');
+    }
+
+    let scanned = 0;
+    let skipped = 0;
+    let lines = 0;
+    for (const file of files.sort()) {
+      const buf = readFileSync(join(ROOT, file));
+      if (!isUtf8Text(buf)) {
+        skipped++;
+        continue;
+      }
+      scanned++;
+      const body = buf.toString('utf8');
+      let n = 0;
+      for (const line of body.split('\n')) {
+        n++;
+        lines++;
+        const hit = CONFLICT_MARKERS.find((m) => m.match(line));
+        if (!hit) continue;
+        findings.push(
+          `${file}:${n}: line begins with the conflict marker "${hit.marker}" (${hit.what}). ` +
+            'Git writes this into a file it could not merge, so the file states two ' +
+            'contradictory things and ships as one. Resolve the merge; a generated span is ' +
+            'resolved by running: node scripts/corpus/gates.mjs generate',
+        );
+      }
+    }
+
+    // Rule 2 on the reader. Every markdown file in this corpus is text, so zero
+    // scanned means the UTF-8 discriminator has inverted and every marker in the
+    // tree is being skipped in silence.
+    if (scanned === 0) {
+      throw new Error(
+        `CI-06/conflict-markers read zero text files out of ${files.length}. The UTF-8 ` +
+          'check has inverted and every file in the tree is being skipped as binary',
+      );
+    }
+
+    console.log(
+      `       CI-06/conflict-markers note: ${lines} line(s) over ${scanned} text file(s); ` +
+        `${skipped} file(s) skipped as not valid UTF-8; ` +
+        `markers asserted: ${CONFLICT_MARKERS.map((m) => m.marker).join(' ')}`,
+    );
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
 const GATES = [
@@ -4522,6 +4726,7 @@ const GATES = [
   ci06u,
   ci06v,
   ci06w,
+  conflictMarkers,
 ];
 
 function main() {

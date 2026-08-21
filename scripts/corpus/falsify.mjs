@@ -1087,6 +1087,34 @@ const SEEDS = {
       );
     },
   },
+  // THE ONE SEED IN THIS FILE THAT HAD NO HISTORICAL ANCHOR AVAILABLE, and the
+  // absence is the finding rather than a gap. `OI-19` says `<<<<<<< HEAD` stood
+  // in INDEX and STATE while the gates passed. It never stood in a COMMIT:
+  // `git log --all -G'^<<<<<<< '` over `.md`, `.ts`, `.mjs` and `.json` returns
+  // nothing on any branch head or pull-request head. It stood in a WORKING TREE
+  // during a merge, which is precisely the boundary the gate protects and
+  // precisely the state a git-history seed could not reproduce.
+  //
+  // SO THE SEED WRITES THE VIOLATION, and that is the better construction on
+  // this file's own terms. `OI-21` records that a harness anchored to corpus
+  // state decays as the corpus is repaired -- the two `0029` seeds went silent
+  // and vacuous when the allocation table moved under them. A seeded marker
+  // cannot go stale, because the tree it needs is one it creates.
+  //
+  // THE APPEND CARRIES NO ANCHOR ON PURPOSE. `once()` exists so a seed whose
+  // anchor moved announces itself; an append has nothing to move. `CI-06a`'s
+  // seed is built the same way and for the same reason.
+  'CI-06/conflict-markers': {
+    what: 'a line beginning with the ours-side conflict marker, seeded rather than anchored',
+    real:
+      'OI-19 records `<<<<<<< HEAD` standing in INDEX and STATE while 22 of 22 gates passed. ' +
+      'It never stood in a commit, only in a working tree during a merge, and the record ' +
+      'disagrees with itself on the count besides (22 in session 105 and in STATE, 24 in ' +
+      'session 106). The boundary the gate protects is the PUSH and not the history, so the ' +
+      'violation is seeded here rather than quoted from a history that does not hold one',
+    expect: `line begins with the conflict marker "${'<'.repeat(7)}"`,
+    seed: (d) => edit(d, 'docs/STATE.md', (b) => `${b}\n${'<'.repeat(7)} HEAD\n`),
+  },
 };
 
 // =============================================================================
@@ -2336,6 +2364,64 @@ const SCOPE_CASES = [
           `${b}\n<!-- seeded -->\n\n| | |\n|---|---|\n` +
           `| | first |\n| | second |\n| | third |\n`,
       ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/conflict-markers. TWO BOUNDARIES, ONE DIRECTION EACH.
+  //
+  // The first is the LIVE complication rather than an invented one. STATE
+  // carries `<<<<<<< HEAD` three times in PROSE, at the `OI-19` entry and the
+  // two entries that discuss it, because the marker is that gate's own subject
+  // matter. The gate's assertion is "a line BEGINNING with a marker" and not
+  // "a file containing one", so those three sites are outside it BY THE RULE
+  // and no exemption is registered for them.
+  //
+  // A gate that quietly stopped matching would also pass this case, which is
+  // what the control is for: the same token, in the same file, moved to the
+  // start of its line, MUST fail. Without that, the PASS below is decoration.
+  //
+  // Both halves seed rather than anchor. The three prose sites are real today
+  // and the case deliberately does not depend on them: `OI-21` is the record of
+  // what happens to a harness pinned to corpus state, and if those entries are
+  // ever reworded this case still asserts the boundary.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06/conflict-markers/mid-line',
+    gate: 'CI-06/conflict-markers',
+    what: 'the marker written MID-LINE in prose, which the gate must NOT read as a finding',
+    expect: 'PASS',
+    control: {
+      expect: `line begins with the conflict marker "${'<'.repeat(7)}"`,
+      seed: (d) =>
+        edit(
+          d,
+          'docs/STATE.md',
+          (b) => `${b}\n${'<'.repeat(7)} HEAD is what git writes, and here it leads the line.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/STATE.md',
+        (b) => `${b}\nThe marker git writes is \`${'<'.repeat(7)} HEAD\`, quoted here mid-line.\n`,
+      ),
+  },
+  {
+    // THE SCOPE IS THE TREE AND NOT `docs/`, and this is the direction that
+    // proves it. Every other corpus gate in this runner is scoped to `docs/` or
+    // to one named file, so a reader is entitled to assume this one is too. A
+    // conflict marker in a workflow, a migration or a package manifest is worse
+    // than one in prose, not better: prose contradicts itself and a manifest
+    // fails to parse.
+    //
+    // `pnpm-workspace.yaml` is chosen because it is at the repository ROOT and
+    // outside every directory the other gates walk, so a gate narrowed to
+    // `docs/` -- or to markdown -- goes quiet here rather than merely quieter.
+    name: 'CI-06/conflict-markers/outside-docs',
+    gate: 'CI-06/conflict-markers',
+    what: 'a marker in a root-level non-markdown file, which MUST be a finding',
+    expect: `pnpm-workspace.yaml:`,
+    seed: (d) =>
+      edit(d, 'pnpm-workspace.yaml', (b) => `${b}\n${'>'.repeat(7)} theirs-side-branch\n`),
   },
 ];
 
