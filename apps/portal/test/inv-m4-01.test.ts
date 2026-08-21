@@ -23,6 +23,15 @@ import { expect, test } from 'vitest';
 //   lint rule is scoped to every app path, so a second surface rendering money
 //   is not covered until the rule lands.
 //
+//   IT ALSO FIRES ON A REGEX LITERAL, WHICH IT DID ON ITS FIRST WORKING DAY.
+//   `/_cents$/` in ../src/view/timeline.ts is a `/` beside a money-suffixed
+//   identifier and is not arithmetic. The resolution was to rewrite the source
+//   as `key.endsWith('_cents')` rather than to add a suppression, because a
+//   text check with no parser cannot be taught the difference and a suppression
+//   comment is the first hole in a control. Recording it here so the next
+//   author meets the finding already explained: if this fires on a regex, the
+//   regex is the thing to change.
+//
 //   STRONGER THAN NOTHING, in the way that matters today: the portal is the
 //   only application that renders money, this catches the direct form, and it
 //   fails a build rather than a review. FM-M4-01's detection column asks for "a
