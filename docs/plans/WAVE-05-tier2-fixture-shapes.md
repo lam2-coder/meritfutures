@@ -60,6 +60,10 @@ same shape as the `X1` before `X8` ordering below and was missed for the same re
 
 **`X3` and `X4` are one session** because they are one file and one describe block. **`X5` and `X6` are separate** because they are separate packages and neither blocks the other.
 
+**`X5` DEPENDS ON NOTHING, AND THE TABLE ABOVE SAYS IT DEPENDS ON `X1`.** Amended 2026-08-21, after `X1` ran. The row reads *"`X1`, same file"* against [`replay.test.ts`](../../apps/worker/test/replay.test.ts), and **`X1` never touched `apps/worker/test/` and owed nothing there**: `GS-071` is ruled `writable` by [ADR-076](../decisions/ADR-076.md) section 3, not `covered-elsewhere`, so no comment was owed at that site and `X8` never reads it. [Session 123](../sessions/2026-08-21-session-123.md) found this by running the fence rather than by reading the column.
+
+**Both of this table's dependency errors were in the Depends-on column and they point opposite ways**, which is the useful part: `X3` and `X4` were recorded as depending on nothing and depend on `X1` through a shared file, while `X5` was recorded as depending on `X1` and does not. **A per-item column cannot express a per-FILE collision in either direction**, and that is the defect rather than either individual cell.
+
 ---
 
 ## 3. What stays open after this wave, and on what
