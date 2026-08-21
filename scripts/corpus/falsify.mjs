@@ -43,6 +43,7 @@ import {
   renameSync,
   readdirSync,
   statSync,
+  existsSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { basename, join, dirname, resolve } from 'node:path';
@@ -1176,6 +1177,44 @@ const SEEDS = {
       edit(d, register, (b) => `${b}\n| ${id} | a second definition, seeded by falsify |\n`);
     },
   },
+  // THE SEEDED VIOLATION IS THE ARRIVAL, AND IT IS THE ONLY ONE THAT FAILS ON
+  // GOOD NEWS. ADR-073 section 8 names four assertions the gate must make and
+  // says of this one: "the third of those four is the assertion that does the
+  // work, and it is the one an implementer is most likely to leave out, because
+  // it is the only one that fails on good news". Every other assertion this gate
+  // makes fires on a document somebody wrote badly; THIS one fires on a commit
+  // somebody was right to land, which is the entire difference between an
+  // activation condition and the word "deferred".
+  //
+  // A `build` script rather than a Playwright install, because it is the smaller
+  // edit and because CI-07 is the row that sat unnoticed since P1 was declared
+  // closed -- ADR-073's own account of why the ruling exists.
+  //
+  // DERIVED FROM THE TREE AT SEED TIME. No app manifest is named here, so the
+  // seed follows a rename or a fourth app rather than going vacuous the way the
+  // two `0029` seeds did. The selector is stable under its own seed: adding a
+  // script does not change which manifest sorts first.
+  'CI-06/gate-inventory': {
+    what: "an activation condition's artifact ARRIVING: a `build` script in an app manifest reopens CI-07",
+    real:
+      'CI-07 has been open since P1 was declared closed and nothing could read its state, ' +
+      'which ADR-073 gives as the reason a "deferred" marker no gate reads is the same ' +
+      'marker. Its condition is a manifest key precisely so that the commit adding a ' +
+      'bundler reopens the row on the day it lands rather than whenever somebody rereads ' +
+      'the table',
+    expect: (d) => `HAS ARRIVED (${firstAppManifest(d)} carries`,
+    seed: (d) => {
+      const manifest = firstAppManifest(d);
+      edit(d, manifest, (b) => {
+        const m = JSON.parse(b);
+        if (m.scripts?.build) {
+          throw new Error(`seed anchor not found: ${manifest} already carries a build script`);
+        }
+        m.scripts = { ...(m.scripts ?? {}), build: 'echo seeded by falsify.mjs' };
+        return `${JSON.stringify(m, null, 2)}\n`;
+      });
+    },
+  },
 };
 
 // =============================================================================
@@ -1461,7 +1500,173 @@ const presentMigrationNumbers = (d) =>
       .map((m) => Number(m[1])),
   );
 
+// ---------------------------------------------------------------------------
+// CI-06/gate-inventory: readers for STRATEGY section 4.1
+// ---------------------------------------------------------------------------
+// EVERY SELECTOR BELOW IS STABLE UNDER ITS OWN SEED, checked rather than assumed,
+// because the CI-06l trap is that `expect` resolves against the SEEDED tree. The
+// obvious selector for case 1 -- "the first row naming a workflow" -- is NOT
+// stable: the seed removes the workflow, so re-deriving names the NEXT row while
+// the gate correctly names the one that moved. Selecting on `**Implemented`,
+// which no seed here removes, is stable by construction.
+const STRATEGY_PATH = 'docs/testing/STRATEGY.md';
+const PIPELINE_HEADING = '### 4.1 Pipeline stages';
+
+// The rows of section 4.1, bounded to the section as the gate bounds them. The
+// Closure cell is taken as the LAST cell rather than by index, so a pipe added to
+// an earlier column moves the seed rather than silently mutating a neighbour.
+const pipelineRowsIn = (d) => {
+  const body = readFileSync(join(d, STRATEGY_PATH), 'utf8');
+  const start = body.indexOf(PIPELINE_HEADING);
+  if (start === -1) throw new Error(`seed anchor not found: "${PIPELINE_HEADING}"`);
+  const after = body.slice(start + PIPELINE_HEADING.length);
+  const end = after.search(/\n### /);
+  const rows = [];
+  for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const cells = line.split(/(?<!\\)\|/).slice(1, -1);
+    const m = /^\s*\*{0,2}`?(CI-\d{2})`?\*{0,2}\s*$/.exec(cells[0] ?? '');
+    if (m) rows.push({ id: m[1], closure: (cells[cells.length - 1] ?? '').trim() });
+  }
+  if (rows.length === 0) throw new Error('seed anchor not found: no CI-nn row in section 4.1');
+  return rows;
+};
+
+const implementedRow = (d) => {
+  const row = pipelineRowsIn(d).find((r) => r.closure.includes('**Implemented'));
+  if (!row) throw new Error('seed anchor not found: no row claiming an implementation');
+  return row;
+};
+
+// The first row carrying BOTH an implementation leg and a dated condition. Today
+// that is CI-09, built on one leg of four by session 114, and it is the row the
+// whole partial-implementation ruling turns on.
+const bothLegsRow = (d) => {
+  const row = pipelineRowsIn(d).find(
+    (r) => r.closure.includes('**Implemented') && /\bwaiting,\s*\d{4}-\d{2}-\d{2}/i.test(r.closure),
+  );
+  if (!row) throw new Error('seed anchor not found: no row carrying an implementation AND a condition');
+  return row;
+};
+
+const firstArtifactRow = (d) => {
+  const row = pipelineRowsIn(d).find((r) => /Artifact:\s*\*\*(.+?)\*\*/.test(r.closure));
+  if (!row) throw new Error('seed anchor not found: no row carrying an `Artifact: **...**` clause');
+  return row;
+};
+
+const firstAppManifest = (d) => {
+  const app = readdirSync(join(d, 'apps'))
+    .sort()
+    .find((a) => existsSync(join(d, 'apps', a, 'package.json')));
+  if (!app) throw new Error('seed anchor not found: no apps/*/package.json');
+  return `apps/${app}/package.json`;
+};
+
 const SCOPE_CASES = [
+  // -------------------------------------------------------------------------
+  // CI-06/gate-inventory. Five cases, because ONE SEED WATCHES ONE ASSERTION and
+  // this gate makes four: the (a) job resolution in two halves, the (b) form
+  // inside a row that is ALSO implemented, and the register's stale direction.
+  // CI-06o's row states the rule these follow: a gate asserting several
+  // unrelated things and watched failing on one of them is taken on trust for
+  // the rest.
+  // -------------------------------------------------------------------------
+  {
+    name: 'CI-06/gate-inventory/implementation-names-no-workflow',
+    gate: 'CI-06/gate-inventory',
+    what: "an implemented row naming no workflow, which is the defect this branch repaired in CI-09's own row",
+    // NOT HYPOTHETICAL. CI-09's Closure cell read "Implemented for the simulation
+    // harness only" and named neither nightly.yml nor a job, because W5 wrote the
+    // row before session 114 wrote the workflow. ADR-073 (a) is the file AND the
+    // job, and a claim naming neither is a claim about a run nobody can check.
+    expect: (d) => `${implementedRow(d).id} claims an implementation and names no workflow`,
+    seed: (d) => {
+      const row = implementedRow(d);
+      edit(d, STRATEGY_PATH, (b) =>
+        once(b, row.closure, row.closure.replace(/\[`[^`]+\.ya?ml`\]\([^)]*\)/, 'a workflow')),
+      );
+    },
+  },
+  {
+    name: 'CI-06/gate-inventory/job-must-resolve',
+    gate: 'CI-06/gate-inventory',
+    what: 'a row naming a job the workflow it names does not have',
+    // THE HALF THAT ROTS QUIETLY. A workflow link keeps resolving after a job is
+    // renamed, so a row can go on claiming an implementation that stopped
+    // existing, and nothing else in this corpus reads that cell.
+    expect: (d) => `${implementedRow(d).id} names job \`no-such-job\``,
+    seed: (d) => {
+      const row = implementedRow(d);
+      edit(d, STRATEGY_PATH, (b) =>
+        once(b, row.closure, row.closure.replace(/\bjob `[A-Za-z0-9_-]+`/, 'job `no-such-job`')),
+      );
+    },
+  },
+  {
+    name: 'CI-06/gate-inventory/condition-inside-an-implemented-row',
+    gate: 'CI-06/gate-inventory',
+    what: 'a malformed condition in a row that ALSO carries an implementation, which must still be read',
+    // THIS IS THE CASE THE WHOLE PARTIAL-IMPLEMENTATION RULING RESTS ON. Session
+    // 114 built one of CI-09's four legs. A gate that asks "is this row
+    // implemented", sees the word, and stops READS ONE LEG AS FOUR -- and it
+    // would go silent on exactly this seed. A disposition applies to a leg and
+    // never to a row, and the only way to prove a runner believes that is to
+    // break a condition sitting behind an implementation and watch it reported.
+    expect: (d) => `${bothLegsRow(d).id} carries a condition dated`,
+    seed: (d) => {
+      const row = bothLegsRow(d);
+      edit(d, STRATEGY_PATH, (b) =>
+        once(b, row.closure, row.closure.replace(/\s*Artifact:\s*\*\*[^*]+\*\*\.?/, '')),
+      );
+    },
+  },
+  {
+    name: 'CI-06/gate-inventory/register-shrinks-when-an-artifact-is-re-ruled',
+    gate: 'CI-06/gate-inventory',
+    what: 'a register entry naming a condition the table no longer carries, which must be a finding',
+    // THE DIRECTION NOBODY LOOKS, and it is what separates a register from an
+    // exemption list. Four of the six conditions name neither a path nor a
+    // manifest key, which ADR-073 section 2 (b) requires, so four sit in
+    // UNPROBEABLE_ARTIFACTS waiting for a ruling that gives them one. The day
+    // that ruling lands the wording moves, and an entry that went on matching
+    // nothing would silence the gate on the very condition that just became
+    // readable. CI06U_REGISTER and CI06FIXTURE_REGISTER carry the same property.
+    expect: `and no condition in ${STRATEGY_PATH} section 4.1 names it`,
+    seed: (d) => {
+      const row = firstArtifactRow(d);
+      edit(d, STRATEGY_PATH, (b) =>
+        once(
+          b,
+          row.closure,
+          row.closure.replace(/(Artifact:\s*\*\*)([^*]+)(\*\*)/, '$1$2, re-ruled$3'),
+        ),
+      );
+    },
+  },
+  {
+    name: 'CI-06/gate-inventory/playwright-near-miss',
+    gate: 'CI-06/gate-inventory',
+    what: 'a lockfile naming a DIFFERENT package containing the word playwright, which must NOT reopen CI-08',
+    // THE NEAR-MISS IS LIVE IN THE TREE RATHER THAN INVENTED. ADR-073 measured
+    // the only occurrence of the word in pnpm-lock.yaml as
+    // `@vitest/browser-playwright`, an unmet optional peer of Vitest, and CI-08's
+    // condition is deliberately the DEPENDENCY. A probe grepping for the word
+    // would report CI-08's artifact arrived and reopen a merge-blocking row on a
+    // package nobody installed, which is CI-06s's mention-against-step boundary
+    // one registry over. The control is the genuine install on the far side.
+    expect: 'PASS',
+    control: {
+      seed: (d) => edit(d, 'pnpm-lock.yaml', (b) => `${b}\n  '@playwright/test': 1.56.0\n`),
+      expect: 'HAS ARRIVED',
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'pnpm-lock.yaml',
+        (b) => `${b}\n  # a playwright test runner peer, seeded by falsify.mjs\n  '@vitest/browser-playwright': 4.1.10\n`,
+      ),
+  },
   {
     name: 'CI-06f/t3-stale-reservation',
     gate: 'CI-06f',
