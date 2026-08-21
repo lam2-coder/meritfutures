@@ -229,6 +229,19 @@ function firstDifference(a: string, b: string): string {
   return 'no differing line, but the strings compared unequal';
 }
 
+// GS-073 IS DISCHARGED HERE, AND THE ROW IS NAMED SO A GATE CAN SEE IT. The row
+// reads "replay under a different process timezone and locale: `TZ=Asia/Kolkata`
+// and a non-English locale produce identical output. Guards the banned-construct
+// list", and section 39 rows it `blocked | outside-loader-boundary`. ADR-076
+// section 1 rules that both statements are true and answer different questions:
+// the scenario has no golden fixture, and its assertion executes below.
+//
+// THE SUBJECT IS THE FOLD AND NOT A REPLAY, WHICH IS THE HONEST STATEMENT OF WHAT
+// THIS COVERS. The engine exports no `replay` yet (P2-8), so no replay of any
+// scenario is executable anywhere in this tree today. STRATEGY section 3.1 rows
+// `PT-06` as "the executable form of GS-071 to GS-073" in an approved document,
+// and this gate is the half of `PT-06` that a spawned process can carry: the
+// first case below is `TZ=Asia/Kolkata` with `ja_JP.UTF-8`, the row's own pair.
 describe('RE-D-02: the fold is invariant under the process timezone and locale', () => {
   const baseline = digestUnder({ TZ: 'UTC', LC_ALL: 'C' });
 

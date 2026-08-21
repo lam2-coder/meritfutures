@@ -214,6 +214,20 @@ describe('PT-06: the fold is invariant under the process environment', () => {
   });
 });
 
+// GS-072 IS THE ROW ADR-076 SECTION 3 CITES AT THIS BLOCK, AND THE COMMENT SAYS
+// SO WITHOUT SAYING THE BLOCK PASSES. The row reads "replay with days delivered
+// in shuffled arrival order: canonical ordering is by trading day, not by
+// arrival. Same output", and section 39 rows it `blocked |
+// outside-loader-boundary`. Section 3 rules it `covered-elsewhere` on the ground
+// that this block "switches itself on the day the engine exports `replay`", so
+// "a ruling here would be a ruling about a skip that clears itself".
+//
+// WHAT RUNS TODAY IS NOTHING. `replayExists` is false, the describe is skipped by
+// derivation, and the test body below throws rather than asserting. So GS-072's
+// assertion is not EXECUTED, which is the condition section 1's governing rule
+// makes discharge depend on. The claim in this comment is that the row belongs
+// here when the block switches on, and it is not the claim that the row is
+// asserted now. See the pull request for session 123 (WAVE-05 `X1`).
 describe.skipIf(!replayExists)('PT-06: arrival-order permutation', () => {
   // SKIPPED BY DERIVATION, NOT BY A COMMENT. `replayExists` reads the engine's
   // public surface, so the day `replay` is exported this block runs. It appears

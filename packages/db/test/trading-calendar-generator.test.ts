@@ -304,6 +304,96 @@ describe('the DST transitions, discovered from IANA and checked against the publ
       '-05:00->-06:00',
     ]);
   });
+
+  // ---------------------------------------------------------------------------
+  // GS-030's surviving half, WAVE-05 `X6`
+  // ---------------------------------------------------------------------------
+  //
+  // THIS IS A COUNT AND NOT A DURATION, AND THE DISTINCTION IS THE WHOLE ITEM.
+  // `GS-030`'s registry row and EC-012 both pin "the 23 hour and 25 hour
+  // sessions each produce exactly one trading day and one mark". ADR-076
+  // section 5 falsifies the first clause of that sentence and rules that the
+  // second is the half this suite can assert: ONE TRADING DAY AND ONE ROW
+  // ACROSS EACH TRANSITION, WHATEVER THE CLOCK DID. The falsified arithmetic is
+  // `X7`'s ADR and is deliberately not asserted here; a case that reached for
+  // the 23 and the 25 is how the row came to be blocked in the first place.
+  //
+  // `FM-14` (M01) names the failure this is the detector for: "DST transition
+  // handled by arithmetic instead of data -> a duplicated or missing trading
+  // day at the boundary". So the expected row set is computed HERE, from the
+  // weekday, rather than taken from anything the generator produced, and the
+  // two independent statements have to agree.
+  //
+  // THE SECOND HALF IS WHAT MAKES THE FIRST MEAN ANYTHING. A case asserting
+  // only that ten weekdays produce ten rows passes on any ordinary fortnight
+  // and is not about DST at all. The close instants either side of the
+  // transition pin that the clock DID move: the same 16:00 CT wall time lands
+  // an hour apart in UTC, in the direction `kind` names.
+
+  /** `day` moved by `by` calendar days. UTC throughout, where a day is 24 hours. */
+  function shiftDay(day: string, by: number): string {
+    return new Date(Date.parse(`${day}T00:00:00Z`) + by * 86_400_000).toISOString().slice(0, 10);
+  }
+
+  /** The weekdays in `[from, to]`, derived from the weekday and from nothing else. */
+  function weekdaysBetween(from: string, to: string): string[] {
+    const out: string[] = [];
+    const end = Date.parse(`${to}T00:00:00Z`);
+    for (let t = Date.parse(`${from}T00:00:00Z`); t <= end; t += 86_400_000) {
+      const dow = new Date(t).getUTCDay();
+      if (dow !== 0 && dow !== 6) out.push(new Date(t).toISOString().slice(0, 10));
+    }
+    return out;
+  }
+
+  it('produces one trading day and one row across each transition, whatever the clock did', () => {
+    for (const transition of transitions) {
+      // Sunday to Sunday around the transition Sunday: two whole trading weeks,
+      // ten weekdays, and the transition sitting between them.
+      const from = shiftDay(transition.day, -7);
+      const to = shiftDay(transition.day, 7);
+      const where = `${transition.kind} ${transition.day}`;
+      const rows = build(
+        source({
+          coverage: { from, to, evidence_to: to },
+          holidays: [],
+          early_closes: [],
+        }),
+        { sourceFile: 'synthetic.json' },
+      ).rows;
+
+      // ONE TRADING DAY AND ONE ROW. None duplicated, none missing, and the
+      // Set is stated separately from the list because a duplicate and a
+      // reordering are different defects and `toEqual` alone reports both as
+      // "the arrays differ".
+      const days = rows.map((r) => r.trading_day);
+      expect(days, where).toEqual(weekdaysBetween(from, to));
+      expect(new Set(days).size, where).toBe(days.length);
+
+      // The transition day carries NO row, which is why the count is unchanged:
+      // it is a Sunday, and it falls in the gap between Friday's 16:00 close and
+      // Sunday's 17:00 open. No session contains it.
+      expect(days, where).not.toContain(transition.day);
+
+      // WHATEVER THE CLOCK DID. Both sessions close at the same CT wall time
+      // and their UTC instants are an hour apart: earlier after a spring
+      // forward, later after a fall back. R-05's "DST is data" in two rows.
+      const before = rows.filter((r) => r.trading_day < transition.day).at(-1);
+      const after = rows.find((r) => r.trading_day > transition.day);
+      expect(
+        [before?.session_close_ct?.slice(10), after?.session_close_ct?.slice(10)],
+        where,
+      ).toEqual(['T16:00:00', 'T16:00:00']);
+      expect(
+        [before?.session_close_at?.slice(11), after?.session_close_at?.slice(11)],
+        where,
+      ).toEqual(
+        transition.kind === 'spring_forward'
+          ? ['22:00:00Z', '21:00:00Z']
+          : ['21:00:00Z', '22:00:00Z'],
+      );
+    }
+  });
 });
 
 // -----------------------------------------------------------------------------
