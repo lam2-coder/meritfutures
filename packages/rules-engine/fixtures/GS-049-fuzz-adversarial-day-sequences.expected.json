@@ -1,0 +1,85 @@
+{
+  "end_state": {
+    "trading_day": "2026-10-06",
+    "phase": "funded",
+    "balance_cents": 6120000,
+    "floor_open_cents": 4870000,
+    "floor_cents": 5010000,
+    "floor_locked": true,
+    "high_water_balance_cents": 6120000,
+    "withdrawable_cents": 1020000,
+    "traded_days_count": 9,
+    "win_days_count": 5,
+    "consistency_best_day_cents": 1000000,
+    "consistency_period_profit_cents": 1120000,
+    "payouts_settled_count": 0,
+    "lifetime_settled_cents": 0,
+    "breached": false,
+    "engine_eligible": false,
+    "engine_gates": {
+      "traded_days": {
+        "pass": true,
+        "skipped": true,
+        "have": 9,
+        "need": 0
+      },
+      "win_days": {
+        "pass": true,
+        "have": 5,
+        "need": 5,
+        "floor_cents": 15000
+      },
+      "buffer": {
+        "pass": true,
+        "have_cents": 1120000,
+        "need_cents": 100000
+      },
+      "consistency": {
+        "pass": false,
+        "skipped": false,
+        "best_day_share_bp": 8928,
+        "max_day_share_bp": 3000,
+        "profit_needed_to_dilute_cents": 2213334
+      },
+      "cadence_gap": {
+        "pass": true,
+        "skipped": true,
+        "trading_days_since_last_payout": null,
+        "need": 5,
+        "next_eligible_trading_day": null
+      },
+      "minimum_amount": {
+        "pass": true,
+        "withdrawable_cents": 1020000,
+        "cap_cents": 150000,
+        "min_payout_cents": 10000
+      }
+    }
+  },
+  "events": [
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "day.closed",
+    "rule.floor_locked",
+    "day.closed"
+  ],
+  "pins": "R-29 decides consistency by integer cross multiplication and reports `profit_needed_to_dilute_cents` as a CEILING, so a 1,000,000c day against 1,120,000c of period profit needs 2,213,334c and never 2,213,333c; and R-09's `>=` holds a cent apart across an alternating stream, giving four win days out of eight",
+  "note": "THE THIRD PROBE'S LENGTH IS THE PROPERTY SUITE'S AND THIS IS THE READING, RECORDED SO A FOUNDER WHO DISAGREES CAN SEE WHAT WAS DECIDED. The registry row names three probes and adds \"runs as a property suite as well as a fixture\". This file carries all three SHAPES and pins two of them; the flat grind is twelve days rather than one hundred. TWO REASONS, AND THE SECOND IS THE ONE THAT DECIDES IT. First, `calendars/cme-2026.json` holds 83 sessions and a stream may name no day outside them (L-08), so one hundred is seventeen short of what the file can express, and this session's fence forbids extending it. Second, and this is the reason a longer calendar would not repair: A SIBLING PINS ONE `end_state`, and a grind's assertion is about the hundred states in between. The end state after twelve flat days and after one hundred is THE SAME STATE, field for field, because a flat day moves nothing: same balance, same floor, same two counters. The only thing a longer grind buys a golden file is a longer `events` list. A trajectory over generated sequences is what a property suite is for, and the row itself says the scenario runs as one; `RE-P-01`, `RE-P-03` and `RE-P-04` are where the monotonicity of the floor and the two counters is asserted over a length that means something. So the shape is here and the length is not, and neither half is claimed silently. THE STANDING OBJECTION THIS ANSWERS is the fixture directory's own, recorded against this scenario by name: writing one probe alone is \"a third of a row wearing a whole row's id\". That objection is about a fixture that carries less than its row and does not say so. This one carries every shape the row names, pins the two the format can pin, and names the third's vehicle. IT IS A READING AND IT MAY BE REJECTED; if the desk holds that the hundred days must be in the stream, this pair comes out and the row goes back to the held-back table with the second reason above written into it, which it did not have before. `win_days_count: 5` AND `traded_days_count: 9` ARE PROBE 1 AND PROBE 2 MEASURED IN ONE FIELD EACH. Eight alternating days give four win days and eight traded days; the twelve flat days add nothing to either, because R-08 is `fill_count > 0` with a strict `>` and zero fills is not a traded day; the jump day adds one to each. An engine whose R-09 comparison drifted one cent reads 8 or 0 win days on the alternating run, and one that let the counter follow the most recent day rather than accumulate reads 1. `consistency_best_day_cents: 1000000` AND `consistency_period_profit_cents: 1120000` ARE THE TWO OPERANDS OF R-29, STATED SO THE VERDICT CAN BE CHECKED WITHOUT RE-RUNNING ANYTHING. The best day is the jump and not the 15,001c days it dwarfs; the period profit is 120,000c from probe 1, zero from the twelve flat days, and 1,000,000c from the jump. `profit_needed_to_dilute_cents: 2213334` IS THE ASSERTION THIS FILE EXISTS FOR. It is M01 section 3.6's `ceilDiv` over `best * 10000 - bp * profit`, which is 10,000,000,000 less 3,360,000,000, over 3,000. The quotient is 2,213,333.33 and the published figure must be the CEILING: 3,000 * 2,213,334 = 6,640,002,000 clears the gate and 3,000 * 2,213,333 = 6,639,999,000 does not. A truncating engine writes 2,213,333 and publishes a number that leaves a trader one cent short after doing exactly what they were told. AS-13 and OQ-9 require this figure to be shown AT ALL TIMES, which is what makes a wrong one a trader-facing defect rather than a debug artifact. `best_day_share_bp: 8928` IS THE OTHER REPORTED NUMBER AND IT IS FLOORED, not rounded: 10,000,000,000 / 1,120,000 is 8,928.57. It is reported and never compared, which is the split M01 section 3.5's \"no division exists anywhere in the engine\" actually requires; the VERDICT beside it comes from cross multiplication. `floor_cents: 5010000` WITH `high_water_balance_cents: 6120000` IS ADR-052 ON A JUMP. The trail ran first and put the high-water balance at the jump day's close, so `floor = hwb - 250,000` would be 5,870,000; R-15's effect column is an ASSIGNMENT of `floor_lock_floor_at_cents`, which ADR-014 puts at `size + 10,000c`, so the stored floor is 5,010,000. The two fields disagreeing by 860,000c is the whole content of the ruling, and an engine that took a `max` writes 5,870,000 here and breaks CV-11's derivation of INV-21. INV-06 still holds on the stored series: the prior day's floor was 4,870,000 and 5,010,000 is above it. `floor_open_cents: 4870000` IS R-18 ON THE SAME DAY: the breach check compared against the floor the day OPENED with, which the twelve flat days left untouched, and not against either of the two values DO-7 then produced. `engine_eligible: false` HAS EXACTLY ONE CAUSE AND THE GATE RECORD NAMES IT. INV-15's closed six (ADR-060) are all stated: `traded_days` is CV-19's disabled zero reporting `skipped: true`, `win_days` is 5 of 5, `buffer` is `balance - size` at 1,120,000c against a 100,000c permanent buffer, `cadence_gap` skips because no settlement has set an anchor, and `minimum_amount` is `min(1,020,000, 150,000) >= 10,000`. Five pass and consistency fails, so this account is one 1,000,000c day away from a payout and the single day is what stops it. That is the row's own sentence, \"a single 1,000,000 day into consistency math\", read as an eligibility outcome rather than as an arithmetic curiosity. THE EVENT LIST PINS DO-7 BEFORE DO-9 ON THE JUMP DAY: `rule.floor_locked` is twenty-first, ahead of that day's own `day.closed`, because the lock is evaluated inside DO-7 and the day closes at DO-9. Twenty-one marks produce twenty-one `day.closed` events and exactly one lock."
+}
