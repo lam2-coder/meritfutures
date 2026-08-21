@@ -1859,3 +1859,15 @@ at line 68.
 **`OI-20`: `CI-07`, `CI-08` and `CI-09` do not exist.** `CI-01` to `CI-06` run in Actions. P1's definition of done is the **full** [STRATEGY](testing/STRATEGY.md) gate inventory, so P1 is not closed.
 **Two gates are named and unwritten**, both cheap and both under [ADR-065](decisions/ADR-065.md)'s slug rule so neither needs a letter: **`CI-06/conflict-markers`**, because `<<<<<<< HEAD` stood in this file and in [INDEX](INDEX.md) while 24 of 24 passed; and **`CI-06/identifier-series`**, because `SD-M6-nn` and `M6-N-nn` were each found mid-wave to be shared registries with no allocation table, both by a session reading rather than by a gate.
 **The build position is unchanged by all of this and that is the point.** `apps/admin` is 44 lines, `apps/portal` 33, `apps/site` 34. **Roughly 15% of the eighteen-week plan**, in weeks 2 to 4. The rules engine is behind us; nothing a trader touches has been started.
+
+## Session 95, continued: `ADR-065` T3 stops being a convention (2026-08-20)
+
+**Twelve allocation rows read `Reserved, unwritten` for artifacts that were sitting on disk.** Eight ADR rows (`062`, `063`, `064`, `066`, `067`, `068`, `070`, `071`) and four migration rows (`0038`, `0039`, `0042`, `0044`), against 43 rows that were correct. All twelve are amended in place, which is what [ADR-065](decisions/ADR-065.md) T3 requires and what four consecutive sessions recorded as owed without being able to close.
+
+**The reason none of them could close it is structural rather than anybody's oversight**: the session that lands a file does not hold [ALLOCATION](decisions/ALLOCATION.md) in its fence at the moment it lands, so the amendment is always somebody else's next commit.
+
+> **A STALE RESERVATION IS A PERMANENT EXEMPTION FROM A GATE, WHICH IS WHY THIS WAS NEVER A TIDY-UP.** `allocated()` treats a reserved number as **legitimately absent**, so for as long as a row says `Reserved, unwritten`, both [CI-06f](testing/STRATEGY.md) and [CI-06h](testing/STRATEGY.md) stop reporting a hole at that number. The rows were not merely out of date. They were switching off the check that guards the registry they belong to.
+
+**So the repair is a gate rather than twelve edits.** The assertion is folded into `CI-06f` and `CI-06h` rather than taking a new letter: `a` through `w` are implemented, `x`, `y` and `z` are the harness's headroom, and [ADR-065](decisions/ADR-065.md) section 5 rules that no row may claim `x`. Both halves were **watched failing on a seeded violation** and both carry a permanent `falsify` scope case, so `main` now reports **<!--gen:gate_count-->24<!--/gen--> of <!--gen:gate_count-->24<!--/gen--> gates clean and dirty with 37 scope cases**.
+
+**`0041` and `0044` sharpen the migration half and are the reason it is worth stating separately.** Both landed under a filename their reservation did not name. A migration row left reading `reserved` is therefore not only stale, it is **still advertising a file nobody wrote**, and the row is the only place that discrepancy is visible.
