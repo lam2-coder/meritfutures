@@ -1535,6 +1535,98 @@ const CASES = [
         () => run('pnpm', ['install', '--frozen-lockfile', '--ignore-scripts']),
       ),
   },
+
+  // ---------------------------------------------------------------------------
+  // CI-09  The nightly simulation harness
+  // ---------------------------------------------------------------------------
+  // THE STAGE IS NIGHTLY AND THE RULE IS NOT. P1 section 6: "every gate any of
+  // these sessions wires ships with a seeded violation, and must fail on that
+  // finding rather than merely exit non-zero." A gate that runs while nobody is
+  // watching needs that more than a merge blocker does, not less: a merge
+  // blocker that stops working is noticed by the next pull request, and a
+  // nightly that stops working is noticed by nobody.
+  //
+  // BOTH CASES RUN AT A SMALL SCALE AND THAT IS DELIBERATE. The seeded finding
+  // is a property of the run's SHAPE, and 10,000 trials would prove the same
+  // thing in twenty times the wall clock. The scale of the real run is
+  // `SIMULATION_HARNESS` section 1's own figure and is asserted by nothing here.
+  //
+  // The report is written into a throwaway tree rather than into `test-results/`
+  // for the reason the runner asserts at the end: this harness must change
+  // nothing, and `test-results/` carries no `.gitignore` entry.
+  {
+    id: 'CI-09/empty-funnel',
+    stage: 'CI-09',
+    // THE ONLY CASE IN THIS FILE THAT SEEDS NO FILE, and the shape is the seed.
+    // ADR-073 section 5 rejected CI-09's replay leg because with zero stored
+    // rows it "would report accountsAudited: 0, diverged: 0 and exit green,
+    // every night, over nothing", and ruled that "a leg whose activation
+    // condition is a seeded world must assert that the world is there". A
+    // one-session window is that world removed from the leg that WAS built: no
+    // account can pass an evaluation, so nothing reaches funded and every rate
+    // downstream divides by zero.
+    //
+    // WHAT MAKES IT WORTH A CASE IS THE SECOND NEEDLE. Under this seed the
+    // RE-S-06 bound still HOLDS, over zero funded accounts, and reports itself
+    // as passing. A nightly carrying only that assertion would be green on a run
+    // that simulated nothing, which is precisely the defect ADR-073 named one
+    // package to the left.
+    seeds:
+      'a one-session window, so no account reaches funded and every rate divides by zero. The RE-S-06 bound still HOLDS over the empty set and still reports pass',
+    needles: [
+      'EMPTY: reachedFunded, payers, settledPayouts',
+      'over 0 funded account(s)',
+      '1 check(s) FAILED: The run did something',
+    ],
+    run: () =>
+      run('node', [
+        'scripts/ci/nightly-harness.mjs',
+        '--trials',
+        '50',
+        '--sessions',
+        '1',
+        '--out',
+        join(temp(), 'ci-09.md'),
+      ]),
+  },
+  {
+    id: 'CI-09/lifetime-bound',
+    stage: 'CI-09',
+    // `INV-17`'S BOUND MOVED BY ONE CENT, WHICH IS THE SMALLEST EDIT THAT BREAKS
+    // IT. The scenario's accounts saturate the ladder, so the observed maximum
+    // sits at exactly `max_payouts * cap` on a clean run: `assertions.ts` calls
+    // that "the interesting case" and GS-055 is the path that reaches it. A
+    // bound one cent below it is therefore the mutant a run cannot absorb, and
+    // a nightly that did not report it would be asserting a bound it never
+    // compared anything against.
+    seeds:
+      "INV-17's bound reduced by one cent in lifetimeBoundCents, against a scenario whose accounts extract exactly max_payouts * cap",
+    needles: ['Lifetime extraction never exceeds', 'exceeds', '1 check(s) FAILED'],
+    run: () =>
+      seededEdit(
+        'packages/harness/src/assertions.ts',
+        (before) => {
+          const from = '  return BigInt(plan.funded.maxPayouts) * maxCapCents;';
+          // A MUTATION THAT DID NOT APPLY IS NOT A CLEAN RUN, it is a case that
+          // tested nothing, and the runner would report DID NOT FAIL as though
+          // the gate were weak.
+          if (!before.includes(from)) {
+            throw new Error(`the INV-17 mutant found no "${from}" in packages/harness/src/assertions.ts`);
+          }
+          return before.replace(from, '  return BigInt(plan.funded.maxPayouts) * maxCapCents - 1n;');
+        },
+        () =>
+          run('node', [
+            'scripts/ci/nightly-harness.mjs',
+            '--trials',
+            '200',
+            '--sessions',
+            '60',
+            '--out',
+            join(temp(), 'ci-09.md'),
+          ]),
+      ),
+  },
 ];
 
 // -----------------------------------------------------------------------------
