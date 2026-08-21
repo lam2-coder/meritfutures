@@ -46,6 +46,16 @@ last_updated: 2026-08-21
 | **`X7`** | **An ADR repairing `GS-030`'s and [EC-012](../edge-cases/EC-012-to-033-appendix-b4-battery.md)'s falsified clause.** Both are frozen and a commit cannot move either | `docs/decisions/`, `docs/testing/golden-scenarios/04-*`, `docs/edge-cases/` | `X6`, which is the evidence |
 | **`X8`** | **`CI-06/fixture-inventory` reads `covered-elsewhere`**: every such row's citation resolves and its file names the row's id | `scripts/corpus/gates.mjs`, [STRATEGY section 4.4](../testing/STRATEGY.md) | `X1` and `X2`, both of them |
 
+**`X3` AND `X4` DEPEND ON `X1` TOO, AND THE TABLE ABOVE SAYS THEY DEPEND ON NOTHING.**
+Amended 2026-08-21 at the dispatch of `X1`. `X3`'s and `X4`'s only file is
+[`plan-validate.test.ts`](../../packages/rules-engine/test/plan-validate.test.ts), and
+[ADR-076](../decisions/ADR-076.md) section 4 puts **five** of `X1`'s six comment sites in
+that same file: `GS-076` at `:74`, `GS-077` at `:70`, `GS-078` at `:65`, `GS-083` at `:874`
+and `GS-141` at `:135`. **Two sessions editing one describe block is a conflict, not a
+fence.** The Depends-on column reads per-item and the collision is per-FILE, which is the
+same shape as the `X1` before `X8` ordering below and was missed for the same reason.
+`X1` runs first and alone; `X3` and `X4` follow it.
+
 **`X1` before `X8` is not a preference.** [`falsify.mjs`](../../scripts/corpus/falsify.mjs) makes a gate that cannot pass the tree an ERROR, and the gate cannot pass six of eight rows until the comments land. That is the same ordering [ADR-073](../decisions/ADR-073.md) section 3 applied to `CI-07`.
 
 **`X3` and `X4` are one session** because they are one file and one describe block. **`X5` and `X6` are separate** because they are separate packages and neither blocks the other.
