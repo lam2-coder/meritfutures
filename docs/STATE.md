@@ -1979,3 +1979,42 @@ at line 68.
 **ONE ROW WAS FOUND EATEN BY ITS OWN PROSE AND IS REPAIRED.** Session 115's entry in [`docs/sessions/README.md`](sessions/README.md) spells `` `<<<<<<< HEAD` `` mid-line as its subject matter, a merge on `main` resolved **on that quoted marker**, and session 130's entry landed inside the wound: one mangled row instead of two. `CI-06/conflict-markers` declares this boundary in its own comment — it matches a line **beginning** with a marker and never a file **containing** one — and the boundary is right; **this is the first time it has cost a row.** Both rows are restored exactly from history rather than reconstructed by hand.
 
 **The position on this branch:** `node scripts/corpus/gates.mjs check` is <!--gen:gate_count-->28<!--/gen--> of <!--gen:gate_count-->28<!--/gen-->, `falsify.mjs` reports every gate clean-and-dirty over **52** scope cases and 10 loader cases, `pnpm exec vitest run` is 101 files with **1410 passing and 45 skipped**, and `format:check`, `lint`, `typecheck` and `gates.mjs generate` are clean. **`gate_count` does not move**: `covered-elsewhere` is a new assertion inside an existing gate and not a new gate. **The dispatch's expected 1409 does not reproduce**; `origin/main` measures 1410 on the same command today and this branch changes no test file. **Next:** `X8` is done and [WAVE-05](plans/WAVE-05-tier2-fixture-shapes.md) has no unclaimed item left; section 39's stale line numbers want a session that owns that file.
+
+---
+
+## Session 132: P2 is eight sessions, and six of its stated contents already existed (2026-08-22)
+
+**[P2-rules-engine-build](plans/P2-rules-engine-build.md) is `draft`.** It carries no ruling. It measures [P2](plans/P2-rules-engine.md), written 2026-08-16, against the tree at `edb2e13`, and dispatches what is left: **eight sessions, five of them concurrent**, each with a fence BY FILE, a money-path flag and a depends-on BY FILE. Claims `ADR-078` to `ADR-081`, migration `0046`, and session numbers **132 to 140**, all in one commit, so no dispatched session reads a register and takes the next free row.
+
+**Six of the eight things P2's stated contents amount to already exist and no entry recorded that they had.**
+
+| P2's stated content | State at `edb2e13` |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| The engine | **Two files short.** 46 of 50 rules, all six exported functions, the calendar four |
+| STRATEGY 5.1, unit and property | **Done for the seven P2 owns.** `PT-06`'s arrival-order half skipped by derivation on `replay` |
+| STRATEGY 5.2, golden replay files | **Done.** 43 of 43 written, all direct, all green |
+| STRATEGY 5.3, simulation harness | **Done**, and `CI-09` nightly consumes it |
+| The simulator, **file AND streaming** | **Both done.** `stream.ts` landed in `0b526c8` |
+| The nightly batch | **Done** |
+| The replay self-audit | **Done**, asserted at 250-day scale by session 129 |
+| `RE-D-01`, `RE-D-02`, `RE-D-03` | **Done and falsified**, though this document records them as *"Nothing"* three times |
+
+**What is left is two engine files, one `CHECK`, and four repairs already named by landed sessions.** `replay.ts` and `hash.ts`, both in [M01 section 1.3](plans/M01-rules-engine.md)'s layout; `rule_states_consistency_period_started`; [ADR-074](decisions/ADR-074.md) section 8's runner edits; the retired pre-`ADR-048` golden block; [section 39](testing/golden-scenarios/39-fixture-status-and-blockers.md)'s stale line numbers with `GS-071`; and [ADR-077](decisions/ADR-077.md)'s third recitation.
+
+### The one real defect, and why no gate could have seen it
+
+[`0015:193`](../packages/db/migrations/0015_rule_states.sql)'s `rule_states_consistency_period_started` requires `consistency_period_start_day <= trading_day`. [`progression.ts:339`](../packages/rules-engine/src/day/progression.ts) sets it to the trading day **after** the pass day, which is `R-47` and `AS-12` read correctly ([M01:987](plans/M01-rules-engine.md): *"trading days strictly after the anchor"*, and *"the eval pass day is excluded"*). **Every eval pass in the book would be rejected by Postgres on insert.**
+
+**CI-03 folds the engine and never touches a database; the migration suite installs the schema and never folds the engine.** Both halves are green about their own half. It was found by folding a funded life and looking at the row. `ADR-079` and migration `0046` are reserved.
+
+### A recorded finding that is false against the tree, and it is the transferable half
+
+[Session 129](sessions/2026-08-22-session-129.md)'s second money-path finding reads *"`R-15`'s permanent lock makes a rising funded life unstorable after the lock day"*, citing `rule_states_high_water_bounds_balance` at [`0015:208`](../packages/db/migrations/0015_rule_states.sql). **That constraint was superseded on 2026-08-17 by [`0037`](../packages/db/migrations/0037_supersede_rule_states_high_water_bounds_balance.sql) under [ADR-053](decisions/ADR-053.md), which is `accepted`**, and the replacement holds the bound only while the floor is unlocked.
+
+**The defect is not that the finding was wrong. It is that a merged constraint was cited by file and line without asking whether a later migration had superseded it**, which is the one question `E2`'s never-edit-only-supersede rule makes mandatory. Every other `0015` citation in the corpus is suspect the same way, and the audit is named for the next session holding [`DELTA_MANIFEST`](../packages/db/DELTA_MANIFEST.md) rather than absorbed into a planning session's fence.
+
+### Four items go to the founder rather than to a session
+
+`OQ-F6-01`, the dual-control threshold, **recommended at 10,000 cents** because [M20](plans/M20-wallet.md) `WF-M20-02` sets the external withdrawal minimum at $100 and [`0038:191`](../packages/db/migrations/0038_account_adjustments.sql) makes the threshold a `NOT NULL` column per row, so the `CHECK` is **inert** until a number exists. The **TradingCalendar transcription**, blocked on egress rather than on engineering and blocking none of the eight sessions. **`CI-04`'s Neon branch**, which no session can grant. And the **`E2` reads** on 134, 135, 138 and 140.
+
+**`CI-07`'s condition is not met by P2, measured rather than assumed.** No package declares a `build` script, there is no bundler, and none of the eight sessions introduces one.
