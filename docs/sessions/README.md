@@ -39,6 +39,7 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | **128** | WAVE-05 `X3` and `X4`, `GS-141`'s severity half and the sole-error equalities, one file | dispatched, unwritten |
 | **129** | WAVE-05 `X5`, `GS-071` at scale in [`replay.test.ts`](../../apps/worker/test/replay.test.ts) | dispatched, unwritten |
 | **130** | WAVE-05 `X7`, the ADR repairing `GS-030`'s and `EC-012`'s falsified clause | dispatched, unwritten |
+| **131** | WAVE-05 `X8`, the `covered-elsewhere` assertion inside `CI-06/fixture-inventory`, finishing pull request `#174` | dispatched, unwritten |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
