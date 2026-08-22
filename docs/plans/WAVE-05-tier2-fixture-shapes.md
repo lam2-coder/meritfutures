@@ -56,6 +56,22 @@ fence.** The Depends-on column reads per-item and the collision is per-FILE, whi
 same shape as the `X1` before `X8` ordering below and was missed for the same reason.
 `X1` runs first and alone; `X3` and `X4` follow it.
 
+**`X2` AND `X8` ARE ONE PULL REQUEST, AND SPLITTING THEM MADE `X2` UNMERGEABLE.** Amended
+2026-08-22, after `X2` ran. `X2` adds the `covered-elsewhere` status to
+[section 39](../testing/golden-scenarios/39-fixture-status-and-blockers.md); `FIXTURE_STATUSES`
+lives in `scripts/corpus/gates.mjs` and is **written in the runner on purpose**, because the
+gate's own comment rules that a vocabulary derived from the document *"admits every typo as a
+new term and can never fail"*. **So a session that adds a status and is fenced out of the
+runner cannot end green**, and `X2` ended red on nine findings: six rows carrying a status the
+gate does not know, and three `CI06FIXTURE_REGISTER` entries whose repair `X2` performed and
+whose removal the gate asks for *"in the commit that repairs the row"*.
+
+**The fence was the defect and the work was not.** `X2` moved six rows and correctly refused
+the seventh. **`X8` therefore extends `X2`'s branch rather than opening its own**, which is the
+[`0045`](../../packages/db/migrations/0045_simulation_runs.sql) precedent: `CI-06s` asserts a
+probe is run **and** pinned, so that session put the workflow step and the `ci06h` needle in one
+commit across a fence it declared. The same rule applied one round later and was not.
+
 **`X1` before `X8` is not a preference.** [`falsify.mjs`](../../scripts/corpus/falsify.mjs) makes a gate that cannot pass the tree an ERROR, and the gate cannot pass six of eight rows until the comments land. That is the same ordering [ADR-073](../decisions/ADR-073.md) section 3 applied to `CI-07`.
 
 **`X3` and `X4` are one session** because they are one file and one describe block. **`X5` and `X6` are separate** because they are separate packages and neither blocks the other.

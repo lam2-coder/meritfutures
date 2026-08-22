@@ -37,7 +37,8 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | ~~**126**~~ | ~~Three signatures and one refusal on the four `proposed` ADRs~~ | **WRITTEN.** Struck, and its entry is below |
 | **127** | [WAVE-05](../plans/WAVE-05-tier2-fixture-shapes.md) `X2`, section 39 gains `covered-elsewhere` and the stale rows move | dispatched, unwritten |
 | ~~**128**~~ | ~~WAVE-05 `X3` and `X4`, `GS-141`'s severity half and the sole-error equalities, one file~~ | **WRITTEN.** Struck, and its entry is below |
-| **129** | WAVE-05 `X5`, `GS-071` at scale in [`replay.test.ts`](../../apps/worker/test/replay.test.ts) | dispatched, unwritten |
+| ~~**129**~~ | ~~WAVE-05 `X5`, `GS-071` at scale in [`replay.test.ts`](../../apps/worker/test/replay.test.ts)~~ | **WRITTEN.** Struck, and its entry is below |
+| **131** | WAVE-05 `X8`, `CI-06/fixture-inventory` learns `covered-elsewhere`, **on `X2`'s branch** because the status and the vocabulary that validates it are one change | dispatched, unwritten |
 | ~~**130**~~ | ~~WAVE-05 `X7`, the ADR repairing `GS-030`'s and `EC-012`'s falsified clause~~ | **WRITTEN.** Struck, and its entry is below |
 
 **A row moves out of this table by being written, not by being edited.** When the session
