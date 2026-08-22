@@ -41,6 +41,22 @@ export type {
 // which is what M01 section 4 names for both endpoints and what makes "the
 // identical function with the identical inputs" true rather than aspirational.
 //
+// `replay` IS THE OPPOSITE RULING ON THE IDENTICAL CONTRADICTION, and ADR-078 is
+// why. Section 1.3's layout lists `replay.ts` exactly as it lists
+// `payout/clamp.ts`, section 3.7 writes `export function replay`, and 1.3's
+// prose does not list it among the six. THE BALANCE IS THE SAME AS THE CLAMP'S,
+// so the site count cannot decide it: a file in a layout is not a vote for
+// export, or `day/breach.ts` and `hash.ts` would be votes too.
+//
+// 1.3's RATIONALE decides it, and it points the other way here. "Every
+// additional export is a way for a caller to reimplement a rule slightly
+// differently" is SERVED by withholding the clamp, because `evaluatePayout`
+// still reaches it and no capability is lost. It is DEFEATED by withholding
+// `replay`, because no exported function reaches the whole-life fold, so every
+// caller that needs one writes it: `apps/worker/src/batch/replay.ts` already
+// did, with its own loop and its own break, which is precisely the second code
+// path M01 3.7 says does not exist.
+//
 // `applySettlement` TAKES A FOURTH ARGUMENT M01's SIGNATURE DOES NOT SHOW, and
 // ADR-049 is what authorises it: R-47 needs the trading day AFTER the basis day,
 // P2 section 1 names this function while closing OQ-P2-01, and "neither rule can
@@ -149,27 +165,6 @@ export { validatePlan } from './plan/validate.js';
 export { advanceDay, initialState } from './day/advance.js';
 export { applySettlement } from './payout/settle.js';
 export { evaluatePayout } from './payout/evaluate.js';
+export { replay, ReplayAssertionError } from './replay.js';
 export type { PayoutContext } from './payout/evaluate.js';
 export type { SettlementOutput } from './payout/settle.js';
-
-import type { EngineInput, EngineResult } from './types.js';
-
-/**
- * Evaluate one account's rule state against its pinned plan version.
- *
- * NOT IMPLEMENTED. This is the identity evaluation: it returns the state it was
- * given and emits nothing. M01 is where the rules arrive, under TR-02, which
- * means the golden fixtures exist and fail before the function does.
- *
- * It is written as the identity rather than as a throw so that the scaffold's
- * placeholder test asserts something true about the contract. When M01 lands,
- * that test fails and is replaced by fixtures derived from the plan documents.
- *
- * The signature is the deliverable of this session, not the body:
- * `(planConfigVersion, accountState, dayMarks[]) -> newState + events`, with
- * zero I/O, no clock, and the full pinned config required by the type rather
- * than defaulted.
- */
-export function evaluate(input: EngineInput): EngineResult {
-  return { newState: input.accountState, events: [] };
-}
