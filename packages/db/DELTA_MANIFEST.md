@@ -1374,3 +1374,52 @@ The identical insert at `0045` is refused by `plan_versions_publish_decision_rec
 - **`swept_value_bp` ships under a name that is not always true.** `OI-29`'s sibling finding, recorded in the design record: [M21](../../docs/plans/M21-plan-designer.md) section 3.4's own worked example sweeps `max_payouts`, a count of 5 and not a basis point. The plan's row is the authority this migration transcribes, so the column keeps the plan's name and the mismatch goes to the founder's read.
 - **The unit vocabulary has no word for a calibration vendor's observation date.** `OI-28`, with the candidate ADR named as owed. `rail clock` is declared and argued in the open rather than picked quietly.
 - **One identifier series, two definition sites.** `OI-27`, and it is a live instance of [ADR-074](../../docs/decisions/ADR-074.md)'s subject found by a founder read rather than by the gate being built for it this hour.
+
+---
+
+## 24. `0046` lands, and the constraint it replaces was pointed at the wrong column all along (2026-08-22)
+
+**Session 135.** [ADR-079](../../docs/decisions/ADR-079.md), `status: proposed`, unsigned. **No `SD-nn` and no `U-nn`: nothing is added to the schema.** One `CHECK` is retired and one is installed in its place, so this section records a supersession rather than a delta, which is `0036`'s and `0037`'s shape.
+
+**The defect is a reference point rather than a direction.** [`0015:193`](migrations/0015_rule_states.sql)'s `rule_states_consistency_period_started` required `consistency_period_start_day <= trading_day`. `R-47` defines the period start against the **anchor** and sets it to the next trading day **after** that anchor ([M01:563](../../docs/plans/M01-rules-engine.md), and [M01:737](../../docs/plans/M01-rules-engine.md) comments the line `// R-47, strict`). On the eval-pass row the anchor **is** the row's own day, so the period starts tomorrow and **every account that passes an evaluation wrote a row PostgreSQL refused**.
+
+**Why thirty-one migrations passed over it.** On a settlement row the anchor is the basis day, *"The LAST CLOSED DAY the decision used"* ([`0010:63`](migrations/0010_payouts.sql)), and the row is written for the effective day, *"the FIRST TRADING DAY WHOSE OPENING BALANCE REFLECTS THE WITHDRAWAL"* ([`0010:97`](migrations/0010_payouts.sql)), so `nextTradingDayAfter(basis) <= effective` and the predicate held. **It held by `<=` and not by equality**: `GS-068` is the case where the two differ, with Thanksgiving between basis `2026-11-25` and effective `2026-11-27`. Every case anybody thought to write was a case the constraint was right about, which is `0037`'s finding one screen up in the same table.
+
+### The install, from empty, with every figure queried rather than counted
+
+All 46 migrations applied forward-only into an empty PostgreSQL 16.13 under `ON_ERROR_STOP=1`.
+
+```
+tables=111        (unchanged from 0045: this migration adds no table)
+indexes=392       (unchanged)
+constraints=879   (unchanged, and that is the point: one CHECK out, one in)
+triggers=16
+rule_states CHECK constraints=12   (12 at 0045 and 12 at 0046)
+```
+
+**The unchanged total is worth stating rather than glossing.** A supersession that left the count moving would mean something else had been added or dropped alongside it, and the figure is the cheapest available check that nothing was.
+
+Re-applying `0046` to the same database fails, which is what forward-only means:
+
+```
+ERROR:  constraint "rule_states_consistency_period_started" of relation "rule_states" does not exist
+```
+
+### The defect, executed at `0045` before the repair was written
+
+```
+ERROR:  new row for relation "rule_states" violates check constraint
+        "rule_states_consistency_period_started"
+DETAIL:  Failing row contains (1, 11400000-..., 2026-01-01, funded, 4750000, f,
+         4750000, 5000000, 5000000, 0, 0, 0, 0, 0, 2026-01-02, 0, ...)
+```
+
+### The probe asserts in three directions, and the third is the one that nearly went missing
+
+[`probe_consistency_period_after_anchor.sql`](../../scripts/db/probe_consistency_period_after_anchor.sql), wired into the migrations job and pinned in `CI-06h`'s required list **in one commit**, which section 18 records as the rule rather than the exception after three occurrences of a probe wired and left unpinned.
+
+**The row this entry exists for is EXEMPT from the constraint it installs.** On the eval-pass row `payout_anchor_day IS NULL`, which is exactly `payouts_settled_count = 0` by `rule_states_settlements_imply_anchors`, so the replacement does not reach it. **"The row inserts clean at `0046`" is therefore satisfied by a constraint that refuses nothing, ever**, and without a third direction this migration would have shipped a `CHECK` watched only not-applying.
+
+`REJECTION 1` and `REJECTION 2` are the boundary either side of `R-47`'s *"strictly"*: a post-settlement row whose period starts **on** its anchor is refused, and one starting **before** it is refused. **Each asserts the constraint NAME** via `GET STACKED DIAGNOSTICS` rather than accepting a bare `check_violation`, which any of the table's twelve checks would satisfy — the same near-miss `0040` recorded when two of its twenty-four assertions were refused by a constraint other than the one they were aimed at.
+
+Three successes and five rejections at `0046`; the same file run against a database at `0045` fails at `SUCCESS 1` with exit 3.
