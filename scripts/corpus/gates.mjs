@@ -4757,23 +4757,26 @@ const conflictMarkers = {
 // get the OPPOSITE assertion rather than none: they must name no blocker at all.
 // Every row is covered in both directions and no row is covered by nothing.
 //
-// ITS FIRST RUN IS RED AND THE THREE FINDINGS ARE REGISTERED RATHER THAN
-// TOLERATED. `GS-049`, `GS-059` and `GS-080` are on disk and their rows do not
-// say `written`: W2 (session 109) wrote `GS-080` and W4 (session 117) wrote
-// `GS-059` and `GS-049`, and the status document is `W1`'s file, which is not in
-// this session's fence. The register is `CI06U_REGISTER`'s idiom exactly and
-// carries its defining property: A REGISTER ENTRY THAT NO LONGER NAMES A REAL
-// DEFECT IS ITSELF A FINDING. So it shrinks as the repair lands, it cannot
-// become furniture, and its size prints on every run rather than being restated
-// in prose. It registers three NAMED rows and never a blanket tolerance: a
-// fourth fixture landing without its row moving fails on the day it lands.
+// ITS FIRST RUN WAS RED, THE THREE FINDINGS WERE REGISTERED RATHER THAN
+// TOLERATED, AND THE REGISTER IS NOW EMPTY. `GS-049`, `GS-059` and `GS-080`
+// were on disk with rows that did not say `written`: W2 (session 109) wrote
+// `GS-080` and W4 (session 117) wrote `GS-059` and `GS-049`, and the status
+// document is `W1`'s file, which was not in that session's fence. The register
+// is `CI06U_REGISTER`'s idiom exactly and carries its defining property: A
+// REGISTER ENTRY THAT NO LONGER NAMES A REAL DEFECT IS ITSELF A FINDING.
+// Session 127 repaired all three rows and this gate then reported all three
+// ENTRIES, which is the property working rather than the gate misfiring; they
+// are removed in the commit that reads that finding. The map remains, empty,
+// because it registers NAMED rows and never a blanket tolerance: a fourth
+// fixture landing without its row moving fails on the day it lands.
 //
-// WHAT THE REGISTER DOES NOT DECIDE. `GS-049`'s row reads `blocked /
+// WHAT THE REGISTER DID NOT DECIDE. `GS-049`'s row read `blocked /
 // format-cannot-express` on the argument that the scenario carries three probe
 // shapes and one fixture is one stream. Whether one fixture DISCHARGES that row
 // is a disposition question for the session that owns the file, not a parse, and
 // this gate takes no view: it asserts only that a fixture on disk and a row that
-// denies it cannot both stand.
+// denies it cannot both stand. Section 39 now carries that disposition in prose
+// above its own table, which is where a disposition belongs.
 const FIXTURE_STATUS_DOC = 'docs/testing/golden-scenarios/39-fixture-status-and-blockers.md';
 const FIXTURE_DIR = 'packages/rules-engine/fixtures';
 
@@ -4795,23 +4798,18 @@ const FIXTURE_BLOCKERS = [
 // Each entry names a REAL defect and the session that created it. An entry that
 // stops naming one is a finding (CI06U_REGISTER's property), so this map is the
 // list of repairs the gate is waiting for and not a list of things it forgives.
-const CI06FIXTURE_REGISTER = new Map([
-  [
-    'GS-080',
-    'W2 (session 109) wrote the fixture and the row still reads `writable`. Repair: the ' +
-      'row moves to `written` with its citation pointing at the fixture, in the file W1 owns',
-  ],
-  [
-    'GS-059',
-    'W4 (session 117) wrote the fixture and the row still reads `writable`. Repair: as above',
-  ],
-  [
-    'GS-049',
-    'W4 (session 117) wrote the fixture and the row still reads `blocked / ' +
-      'format-cannot-express`. Whether ONE fixture discharges a row arguing three probe ' +
-      'shapes is a disposition for the session that owns the file and is not decided here',
-  ],
-]);
+//
+// IT IS EMPTY, AND IT GOT THERE THE WAY THE PROPERTY SAYS IT SHOULD. It held
+// `GS-080` (W2, session 109), `GS-059` and `GS-049` (W4, session 117): three
+// fixtures on disk whose rows read `writable` or `blocked`, in a file the
+// session that wrote the gate did not fence. Session 127 repaired all three
+// rows to `written`, at which point the entries stopped naming a real defect
+// and BECAME FINDINGS themselves -- which is what this map is for, and it is
+// the reason they are deleted here rather than left as a comment. The map stays
+// because the mechanism is not spent: a FOURTH fixture landing under a row that
+// does not move is a finding on the day it lands, and registering it by name is
+// how a repair gets recorded without a blanket tolerance being written.
+const CI06FIXTURE_REGISTER = new Map([]);
 
 // The registry set, read from every section file EXCEPT the status document. A
 // scope that included the status document would be circular: the row would
@@ -4920,11 +4918,11 @@ const fixtureInventory = {
     'contradiction. Those rows get the opposite assertion rather than none. ' +
     'THE VOCABULARIES ARE WRITTEN IN THE RUNNER AND NOT DERIVED (ADR-074 section 2): a ' +
     'vocabulary computed from the terms in use admits every typo and can never fail. ' +
-    'THREE ROWS ARE REGISTERED, NOT EXEMPTED. GS-049, GS-059 and GS-080 are on disk with ' +
-    'rows that deny it, written by W2 and W4 into a file this session does not fence. A ' +
-    'register entry that no longer names a real defect is a finding, so the register shrinks ' +
-    'as the repair lands; its size prints on every run and is deliberately not restated ' +
-    'here. A FOURTH such fixture fails on the day it lands. ' +
+    'ROWS ARE REGISTERED, NEVER EXEMPTED, AND THE REGISTER IS EMPTY TODAY. It held GS-049, ' +
+    'GS-059 and GS-080, on disk with rows that denied it; session 127 repaired all three and ' +
+    'the entries then became findings in their own right, which is the property working. Its ' +
+    'size prints on every run and is deliberately not restated here. A FOURTH such fixture ' +
+    'fails on the day it lands. ' +
     'TWO THINGS IT DOES NOT DO. It does not read a fixture body, so a .yaml that pins the ' +
     'wrong thing is CI-03 and the loader cases, never this gate. And it takes no view on ' +
     'whether one fixture DISCHARGES a row arguing several probe shapes, which is a ' +
@@ -5108,7 +5106,9 @@ const fixtureInventory = {
         `registered scenario(s) and ${disk.size} fixture(s) on disk ` +
         `(${[...derived].map(([s, n]) => `${n} ${s}`).join(', ')}); ` +
         `${stale.length} stale row(s) registered across ${CI06FIXTURE_REGISTER.size} entry ` +
-        '(entries), each one a repair this gate is waiting for',
+        (CI06FIXTURE_REGISTER.size === 0
+          ? '(entries), so every fixture on disk is claimed by a row that says so'
+          : '(entries), each one a repair this gate is waiting for'),
     );
     return findings;
   },
