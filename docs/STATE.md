@@ -2018,3 +2018,17 @@ at line 68.
 `OQ-F6-01`, the dual-control threshold, **recommended at 10,000 cents** because [M20](plans/M20-wallet.md) `WF-M20-02` sets the external withdrawal minimum at $100 and [`0038:191`](../packages/db/migrations/0038_account_adjustments.sql) makes the threshold a `NOT NULL` column per row, so the `CHECK` is **inert** until a number exists. The **TradingCalendar transcription**, blocked on egress rather than on engineering and blocking none of the eight sessions. **`CI-04`'s Neon branch**, which no session can grant. And the **`E2` reads** on 134, 135, 138 and 140.
 
 **`CI-07`'s condition is not met by P2, measured rather than assumed.** No package declares a `build` script, there is no bundler, and none of the eight sessions introduces one.
+
+---
+
+## CI-03's pre-ADR-048 block is retired, and ADR-048 finished without anybody recording it (2026-08-22, session 137)
+
+**`describe.runIf(!declaration.holds)` held 43 tests asserting that every fixture must NOT match, and it could not run again.** It was the assertion that stood before [ADR-048](decisions/ADR-048.md), waiting on a premise that stopped being true when CI-03's fold moved from `evaluate` to `advanceDay`. **ADR-048's design worked all the way through and no entry recorded that it finished:** the coverage block re-derives on every run and reports 43 fixtures deriving `direct`, 0 deriving `inverted`, every rule group A to H at 100 percent, and the derived direction **ENFORCED**.
+
+**Those 43 tests were 43 of the suite's 45 skips.** `pnpm vitest run` goes from 1410 passed / 45 skipped to **1410 passed / 2 skipped**, the passing count unmoved, and **the CI-03 coverage block is byte-identical**, captured through `$GITHUB_STEP_SUMMARY` and diffed rather than read.
+
+**The guard is kept and is not what was retired.** `checkDeclarationAgainstFold` still runs before any fixture is consulted, the report still prints the premise in bold when it does not hold, and `describe.runIf(declaration.holds)` still refuses to enforce a derived direction against a fold that reaches none of the cited rules. ADR-048 case 1 is a live failure mode; what went was the duplicate assertion.
+
+**Two comments described a fold the code had left**, and the correction of the second is a finding rather than tidying. [`polarity.ts`](../packages/golden-loader/src/polarity.ts) said `runFixture` "calls none of them: it calls `evaluate`, the scaffold's placeholder". It calls `initialState`, `buildCalendarSlice` and `advanceDay`. **The FOURTH-FAILURE-MODE reasoning around it is still live:** `advanceDay` reaches `applySettlement` at DO-2, but **`evaluatePayout` is read-time and is not on the fold's path at all**, and `R-40` and `R-41` are implemented there, are declared, and are cited by fixtures that derive `direct` and are asserted to match against a fold that never calls it. They pass because nothing those fixtures pin comes from there. **That is ADR-048 case 1 in its partial form, and the check catches only the total one.** Widening it is new mechanism and was not done.
+
+**Two items are left for whoever holds the objective, both out of that session's fence.** `determinism.test.ts` carries the mirror image of the retired block, a `test.skipIf(!stubbed)` placeholder whose own comment says it "disappears the day the loader moves"; it is one of the two skips that remain. And a regression to an identity fold would leave CI-03 green with a loud report, which was true before this change too.
