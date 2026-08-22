@@ -1415,6 +1415,21 @@ const ci06h = {
           'own named floor, or that calibrationDigest()\'s HEX output decodes ' +
           'to the 32 bytea bytes the column requires',
       ],
+      // 0046, ADR-079. Pinned in the commit that wires it. THE PIN MATTERS MORE
+      // HERE THAN THE STEP DOES: the eval-pass row this entry exists for is
+      // EXEMPT from the constraint it installs (payout_anchor_day IS NULL), so
+      // the only cases that watch the new constraint refuse anything are
+      // REJECTION 1 and REJECTION 2 in this file. Delete the step and nothing
+      // anywhere asserts that the replacement is a control rather than a shape.
+      [
+        'probe_consistency_period_after_anchor.sql',
+        "ADR-079's anchor-relative period bound is no longer probed, so " +
+          'nothing asserts that the eval-pass row 0015 refused is writable, ' +
+          'that a period starting ON its anchor is refused (AS-12, R-47 is ' +
+          'strict), that one starting before it is refused, that the retired ' +
+          'name is gone from the catalogue, or that both IS NULL guards are ' +
+          'still load bearing',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
