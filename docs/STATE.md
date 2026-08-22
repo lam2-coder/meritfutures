@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->77<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->78<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2018,3 +2018,13 @@ at line 68.
 `OQ-F6-01`, the dual-control threshold, **recommended at 10,000 cents** because [M20](plans/M20-wallet.md) `WF-M20-02` sets the external withdrawal minimum at $100 and [`0038:191`](../packages/db/migrations/0038_account_adjustments.sql) makes the threshold a `NOT NULL` column per row, so the `CHECK` is **inert** until a number exists. The **TradingCalendar transcription**, blocked on egress rather than on engineering and blocking none of the eight sessions. **`CI-04`'s Neon branch**, which no session can grant. And the **`E2` reads** on 134, 135, 138 and 140.
 
 **`CI-07`'s condition is not met by P2, measured rather than assumed.** No package declares a `build` script, there is no bundler, and none of the eight sessions introduces one.
+
+## `replay` is exported and the second code path is now the only one left (2026-08-22, session 134)
+
+**[ADR-078](decisions/ADR-078.md), `status: proposed`, approval line unsigned.** `replay` joins the rules engine's public surface, `ReplayAssertionError` with it, and `evaluate` -- the scaffold's identity stub -- is deleted. The surface goes **thirteen names to fourteen, gaining exactly one function**, pinned as an exact list in [`evaluate.golden.test.ts`](../packages/rules-engine/test/evaluate.golden.test.ts).
+
+**The ruling is not the site count, and the count the brief offered was wrong.** [M01](plans/M01-rules-engine.md) section 1.3's layout lists `payout/clamp.ts` exactly as it lists `replay.ts`, alongside five more implementation files whose functions are not exported, so **a file in a layout is not a vote for export**. The balance is identical to `clampPayout`'s and applied mechanically the precedent refuses the export. What decides it is 1.3's own rationale, *"every additional export is a way for a caller to reimplement a rule slightly differently"*: withholding the clamp **serves** it, because `evaluatePayout` still reaches the clamp, and withholding the fold **defeats** it, because nothing reaches a whole account life and [`apps/worker/src/batch/replay.ts`](../apps/worker/src/batch/replay.ts)`:253` had already written its own.
+
+**`PT-06`'s arrival-order permutation is LIVE and passing**, three tests where one was a named skip. Its seeded throw was watched firing first.
+
+**Two things are owed and neither is this session's.** [`apps/worker/src/batch/replay.ts`](../apps/worker/src/batch/replay.ts) still folds its own loop, so **M01 3.7's *"there is no second code path"* is still false on `main`** and migrating it is what makes the sentence true (sessions 138 and 140). `GS-071`'s row in [section 39](testing/golden-scenarios/39-fixture-status-and-blockers.md) is still `writable` (session 139).
