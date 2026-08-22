@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-21
+last_updated: 2026-08-22
 ---
 
 # SESSION LOG
@@ -40,6 +40,14 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | ~~**129**~~ | ~~WAVE-05 `X5`, `GS-071` at scale in [`replay.test.ts`](../../apps/worker/test/replay.test.ts)~~ | **WRITTEN.** Struck, and its entry is below |
 | ~~**130**~~ | ~~WAVE-05 `X7`, the ADR repairing `GS-030`'s and `EC-012`'s falsified clause~~ | **WRITTEN.** Struck, and its entry is below |
 | ~~**131**~~ | ~~WAVE-05 `X8`, `CI-06/fixture-inventory` learns `covered-elsewhere`, **on `X2`'s branch** because the status and the vocabulary that validates it are one change~~ | **WRITTEN.** Struck, and its entry is below |
+| **133** | `P2-a`, [ADR-074](../decisions/ADR-074.md) section 8's runner edits, after which `CI-06/identifier-series` reports 117 and 1,083 ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
+| **134** | `P2-b`, `replay` joins the rules engine's public surface (`ADR-078`). **MONEY PATH** ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
+| **135** | `P2-c`, the eval-pass `CHECK` on `rule_states` (`ADR-079`, migration `0046`). **MONEY PATH, `E2` READ** ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
+| **136** | `P2-d`, extending [ADR-073](../decisions/ADR-073.md) disposition (b) to the twelve `VG` rows (`ADR-080`) ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
+| **137** | `P2-f`, retiring the pre-[ADR-048](../decisions/ADR-048.md) golden block and one comment that is false about the code beneath it ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
+| **138** | `P2-g`, `hash.ts` into `packages/rules-engine` (`ADR-081`), **after 134**. **MONEY PATH** ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
+| **139** | `P2-e`, [section 39](../testing/golden-scenarios/39-fixture-status-and-blockers.md)'s stale line numbers, `GS-071`, and [ADR-077](../decisions/ADR-077.md)'s third recitation, **after 133** ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
+| **140** | `P2-h`, the worker's replay audit folds the engine's `replay`, **after 134 and 138**. **MONEY PATH** ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.

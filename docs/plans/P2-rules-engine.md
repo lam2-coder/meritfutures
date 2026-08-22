@@ -1,10 +1,12 @@
 ---
 status: draft
 depends_on: [M01-rules-engine.md, ../DELIVERY_PLAN.md, ../testing/STRATEGY.md, ../testing/golden-scenarios/README.md, P1-monorepo-scaffold.md, P1-SE-trading-calendar.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-22
 ---
 
 # P2: the rules engine
+
+> **This document is the plan as it was written on 2026-08-16 and it is left as it was written.** Its section 7 sequence has been overtaken by the tree: sessions executed `P2-8`'s content before `P2-7`'s, `P2-7` has since landed in full, and three of the five contents [DELIVERY_PLAN section 4](../DELIVERY_PLAN.md) gives P2 are done. **[P2-rules-engine-build](P2-rules-engine-build.md) measures this document against the tree at `edb2e13` and dispatches what is left**, which is eight sessions. It is not a rewrite of this one: this one is the record of what was planned, and the honest move is to measure against it rather than to edit it until the two agree.
 
 **A phase plan, not a module plan. Money path throughout.** [M01](M01-rules-engine.md) is the specification and this document does not re-specify it. What follows is the five things that make P2 the longest pole rather than transcription, the sequencing they force, and the four rulings that must land before any engine code does.
 
