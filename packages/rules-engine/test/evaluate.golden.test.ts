@@ -24,9 +24,9 @@ import * as engine from '../src/index.js';
 // that THE ENTRY POINT IS THE WHOLE PUBLIC SURFACE, so the loader has no route to
 // an internal. M01 section 1.3 names the surface -- six functions, "and nothing
 // else is exported, because every additional export is a way for a caller to
-// reimplement a rule slightly differently" -- and four of those six are now
-// written. So the list below is exact rather than open, and adding an export
-// without adding it here is still a red stage.
+// reimplement a rule slightly differently" -- and ALL SIX are now written. So
+// the list below is exact rather than open, and adding an export without
+// adding it here is still a red stage.
 //
 //   advanceDay, initialState   M01 section 1.3, four of the six. `resolvePlan`
 //   applySettlement            and `validatePlan` are P2-1.
@@ -44,25 +44,39 @@ import * as engine from '../src/index.js';
 //   IMPLEMENTED_RULES          ADR-048: "the engine exports the set of rule
 //                              identifiers it implements, and that export is
 //                              part of its public contract"
-//   evaluate                   the scaffold's stub, still what CI-03's polarity
-//                              probe folds, retired when the loader moves to
-//                              `advanceDay`
+//   replay                     ADR-078. M01 section 3.7's fold over a whole
+//   ReplayAssertionError       account life. THE CLAMP AND THE FOLD ARE THE
+//                              SAME CONTRADICTION RULED OPPOSITE WAYS, and
+//                              not because the sites were counted: 1.3's
+//                              layout lists `payout/clamp.ts` and `replay.ts`
+//                              alike. Withholding the clamp SERVES 1.3's
+//                              rationale because `evaluatePayout` reaches it;
+//                              withholding `replay` DEFEATS it, because no
+//                              export reaches the whole-life fold and
+//                              `apps/worker` had already written its own
+//
+// `evaluate` WAS HERE AND IS GONE (ADR-078). It was the scaffold's identity
+// stub and was never among 1.3's six. The line that used to sit here said the
+// polarity probe folds it; `engineIsIdentityStub` in `golden-loader/src/run.ts`
+// folds `advanceDay` and has for some time, so that sentence described a state
+// the code had already left. Both halves are corrected rather than deleted.
 test('the engine entry point is the whole public surface, and it is this exact list', () => {
   expect(Object.keys(engine).sort()).toEqual([
     'CalendarSliceError',
     'EngineInvariantError',
     'IMPLEMENTED_RULES',
+    'ReplayAssertionError',
     'advanceDay',
     'applySettlement',
     'buildCalendarSlice',
-    'evaluate',
     'evaluatePayout',
     'initialState',
     'lookupCalendarDay',
     'nextTradingDayAfter',
+    'replay',
     'resolvePlan',
     'validatePlan',
   ]);
-  expect(typeof engine.evaluate).toBe('function');
+  expect(typeof engine.replay).toBe('function');
   expect(typeof engine.advanceDay).toBe('function');
 });
