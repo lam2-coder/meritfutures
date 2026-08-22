@@ -32,7 +32,11 @@ function chain(pnl: readonly bigint[]): DailyMark[] {
     const iso = days[i];
     const realized = pnl[i];
     if (iso === undefined || realized === undefined) break;
-    const m = mark({ tradingDay: day(iso), openingBalanceCents: opening, realizedPnlCents: realized });
+    const m = mark({
+      tradingDay: day(iso),
+      openingBalanceCents: opening,
+      realizedPnlCents: realized,
+    });
     out.push(m);
     opening = m.closingBalanceCents;
   }

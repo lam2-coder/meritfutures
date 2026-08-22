@@ -369,7 +369,7 @@ describe.skipIf(!replayExists)('PT-06: arrival-order permutation', () => {
   test('any permutation of arrival order yields byte-identical stored state', () => {
     fc.assert(
       fc.property(
-        fc.shuffledSubarray(corpus.marks, {
+        fc.shuffledSubarray([...corpus.marks], {
           minLength: corpus.marks.length,
           maxLength: corpus.marks.length,
         }),
@@ -404,7 +404,7 @@ describe.skipIf(!replayExists)('PT-06: arrival-order permutation', () => {
     let reordered = 0;
     fc.assert(
       fc.property(
-        fc.shuffledSubarray(corpus.marks, {
+        fc.shuffledSubarray([...corpus.marks], {
           minLength: corpus.marks.length,
           maxLength: corpus.marks.length,
         }),
