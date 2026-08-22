@@ -2018,3 +2018,30 @@ at line 68.
 `OQ-F6-01`, the dual-control threshold, **recommended at 10,000 cents** because [M20](plans/M20-wallet.md) `WF-M20-02` sets the external withdrawal minimum at $100 and [`0038:191`](../packages/db/migrations/0038_account_adjustments.sql) makes the threshold a `NOT NULL` column per row, so the `CHECK` is **inert** until a number exists. The **TradingCalendar transcription**, blocked on egress rather than on engineering and blocking none of the eight sessions. **`CI-04`'s Neon branch**, which no session can grant. And the **`E2` reads** on 134, 135, 138 and 140.
 
 **`CI-07`'s condition is not met by P2, measured rather than assumed.** No package declares a `build` script, there is no bundler, and none of the eight sessions introduces one.
+
+---
+
+## Session 133: the gate reads the scope ADR-074 was signed with (2026-08-22)
+
+**`CI-06/identifier-series` reports 117 declared series over 1,083 members with zero findings**, from 115 and 1,070. [ADR-074](decisions/ADR-074.md)'s approval line named this as the one thing the signature created rather than settled: *"a signed ruling and a live gate disagree by two series, knowingly"* until section 8's runner edits land. **They have landed, and nothing in ADR-074 moved: it is signed.**
+
+**Section 8 lists five edits. Six were made, and the sixth is the one that matters most for what this document is for.** The gate's own printed note still quoted *"ADR-074 section 3 states 118 declared and 1,086 members and section 5 states 44 pending"*: the **pre-amendment** figures that section 3.1 retraced to 117 and 1,083 and that section 8 narrowed to 36. A session making the five edits and leaving the note would have reproduced, on every run, the error the amendment was signed to end.
+
+| The edit | What it was |
+| --- | --- |
+| **1** | `OQ-F6` into the declared scope, register [ADR-067](decisions/ADR-067.md), which section 1's widened register class admits as an ADR-043 entry that BINDS |
+| **2** | `P-M6` into the declared scope, register [M06](plans/M06-admin-ops-console.md) |
+| **3** | **A third table**: withheld members, a closed list, one argued entry each, one entry today. Excluded from the census, and **it fails in BOTH directions** |
+| **4** | The row test strips leading whitespace, so ADR-067's two-space-indented open-question table is three rows rather than prose |
+| **5** | The module class comment read 93 while its block held 92. **The design class comment read 7 while ADR-074's row names 9**, which is the same defect one block down and is in no list |
+| **6** | The note cites section 3 as retraced in section 3.1 and section 5 as narrowed by section 8 |
+
+**Whether the transcription still reproduces the ruled figures is COMPUTED and printed rather than asserted in prose.** Those figures are stated *on arrival*, and section 5's register shrinks as repairs land, so a promotion moves two of the three in opposite directions **by design**: a mismatch is news, not a defect, and it is printed rather than raised as a finding. A hand-written sentence claiming agreement is precisely how the note being repaired here went wrong.
+
+**The third table is the part with teeth, and it is watched.** [`falsify.mjs`](../scripts/corpus/falsify.mjs) goes from 52 scope cases to **55**: an entry whose identifier **acquires** a definition site in its own register is a finding, an entry whose identifier **stops appearing anywhere** is a finding, and the exemption itself passes only against a control that **deletes the entry** and must then report the member missing. Without that control the case would be satisfied by a gate that had stopped reading M06 at all.
+
+**Three measurements this session made rather than inherited.** The relaxed row test adds **exactly three definition sites in the whole repository**, all three in ADR-067, so it cannot create a double it does not also fix. **No pending entry changes state** under either widening applied to the pending predicate, at the amendment's commit and again at this one, which decides the judgement call section 8 left open: the predicate stays anchored to column zero and the line to move is named above the function. And the pending **member** figure reads 292 here against the ruling's 281 because **the ruling's 281 is the survey's count under `docs/` at `e23578a`, where it reproduces exactly**, while this gate counts the whole repository as section 1 requires. The **series** counts, which are the reproduction targets, agree exactly at 117 and 36.
+
+**One asymmetry is deliberate and is recorded so it is not tidied away.** `DECLARED_SERIES` and `PENDING_SERIES` both throw when empty; **the withheld table does not**. An empty withheld table is the **strict** end of the rule rather than the vacuous one, and section 5.1 states in terms what ends its single entry, so the day [M06](plans/M06-admin-ops-console.md) takes that disposition the correct edit is to remove the last row. A runner that threw would force the repair session to edit the runner in order to land the repair.
+
+**The position on this branch:** `node scripts/corpus/gates.mjs check` is <!--gen:gate_count-->28<!--/gen--> of <!--gen:gate_count-->28<!--/gen-->, `falsify.mjs` reports every gate clean-and-dirty over **55** scope cases and 10 loader cases, `pnpm exec vitest run` is 101 files with **1410 passing and 45 skipped**, and `check:invariants`, `typecheck`, `lint` and `format:check` are clean. **`gate_count` does not move**: three scope cases and a third table are new assertions inside an existing gate. **Next:** session **139** is unblocked, which the [P2 build plan](plans/P2-rules-engine-build.md) orders after this one so that [`gates.mjs`](../scripts/corpus/gates.mjs) is free.
