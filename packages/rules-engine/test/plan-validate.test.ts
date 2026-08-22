@@ -157,18 +157,47 @@ describe('Appendix A.4  the approved lineup publishes', () => {
   // first half as an EXACT-SET equality rather than a containment: `PW-02a` on Core
   // EOD and Direct, `PW-02b` on Merit Rapid, and nothing else emitted.
   //
-  // WHAT IT DOES NOT ASSERT IS THE ROW'S LAST SENTENCE. "Asserts the two are never
-  // rendered identically" is a claim about the `info` against `warning` severity and
-  // the distinct text; `diffIds` compares ids, so both are unasserted today. Both
-  // values are constructed in `validate.ts` (`PW-02a` and `PW-02b`), so the missing
-  // assertion is one `expect` in this describe and it is WAVE-05 `X3`, not this file
-  // being unable to reach it.
+  // AND THE ROW'S LAST SENTENCE IS THE CASE AFTER THIS ONE. "Asserts the two are
+  // never rendered identically" is a claim about the `info` against `warning`
+  // severity and the distinct text; `diffIds` compares ids, so neither reaches it.
+  // Both values are constructed in `validate.ts` (`PW-02a` and `PW-02b`), so the
+  // missing assertion was one `expect` in this describe and it is WAVE-05 `X3`,
+  // landed below, not this file being unable to reach it.
   it.each([
     ['Core EOD 50K', coreRules(), CORE_50K_SIZE, ['PW-01', 'PW-02a', 'PW-03']],
     ['Merit Rapid 50K', RAPID_RULES, RAPID_50K_SIZE, ['PW-01', 'PW-02b']],
     ['Direct 50K', DIRECT_RULES, DIRECT_50K_SIZE, ['PW-01', 'PW-02a']],
   ])('%s emits exactly A.4 publish diff', (_name, rules, size, expected) => {
     expect([...diffIds(validatePlan(rules, [size]))].sort()).toEqual([...expected].sort());
+  });
+
+  // GS-141's LAST SENTENCE, WHICH IS WAVE-05 `X3`. ADR-076 section 2 rules the row
+  // `covered-elsewhere` and records this residual in the same breath: the block above
+  // compares IDS through `diffIds`, so "the two are never rendered identically" is
+  // exactly the half an id comparison cannot see.
+  //
+  // THREE CLAUSES IN ONE `expect`, because no two of them are the row's claim. Two
+  // findings carrying the same text under different severities are rendered
+  // identically to a reader who reads the text, and one tone over two texts collapses
+  // co-binding into dominated at a glance. The row asks that BOTH differ, at once.
+  //
+  // THEY CANNOT BE READ OFF ONE PLAN. `validate.ts` builds them in the two arms of a
+  // single `if`, so no plan emits both; which plan carries which is A.4's own row and
+  // the exact-set block above has just pinned it.
+  it('PW-02a and PW-02b are never rendered identically, which is GS-141 last sentence', () => {
+    const pw = (r: ValidationResult, id: PwId) => r.diffs.find((d) => d.id === id);
+    const coBinding = pw(validatePlan(coreRules(), [CORE_50K_SIZE]), 'PW-02a');
+    const dominated = pw(validatePlan(RAPID_RULES, [RAPID_50K_SIZE]), 'PW-02b');
+
+    expect({
+      coBindingSeverity: coBinding?.severity,
+      dominatedSeverity: dominated?.severity,
+      textsDiffer: coBinding?.message !== dominated?.message,
+    }).toEqual({
+      coBindingSeverity: 'info',
+      dominatedSeverity: 'warning',
+      textsDiffer: true,
+    });
   });
 
   it('PW-03 fires on Core EOD and on neither of the other two, which is A.4 row three', () => {
