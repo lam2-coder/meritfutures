@@ -4720,7 +4720,7 @@ const conflictMarkers = {
 // sentence that reports its own hole on every run for as long as nobody writes
 // the gate is the most polite form of a silent failure there is.
 //
-// FIVE ASSERTIONS, AND THE PARTITION IS THE POINT. `39-fixture-status-and-
+// SIX ASSERTIONS, AND THE PARTITION IS THE POINT. `39-fixture-status-and-
 // blockers.md` is a registry of 316 rows whose STATUS COLUMN IS A CLAIM ABOUT
 // THE DIRECTORY. ADR-072 says so in the document's own words: "`status` is
 // derived from the directory and not from this file". A claim about the
@@ -4746,6 +4746,67 @@ const conflictMarkers = {
 //      hand-maintained counts sitting above 316 hand-maintained rows, which is
 //      ADR-034's class, and CI-06g cannot reach them because they are not
 //      generated spans.
+//   6. EVERY `covered-elsewhere` ROW'S CITED ASSERTION IS NOT DISABLED. The
+//      other three statuses are facts about a directory this gate lists. This
+//      one is a fact about a suite, and it is the only status whose evidence
+//      lives in a file nothing else here reads.
+//
+// ASSERTION 6 IS WRITTEN AGAINST ADR-076 SECTION 1'S RULING AND NOT AGAINST
+// WAVE-05 SECTION 2'S SENTENCE, AND THE DIFFERENCE IS THE WHOLE ITEM. The plan
+// asks that "every such row's citation resolves and its file names the row's
+// id". BOTH ARE TRUE OF `GS-072` AND ITS ASSERTION RUNS NOWHERE: the cited
+// block is `describe.skipIf(!replayExists)` over `Object.keys(engine)
+// .includes('replay')`, which is false, so the block reports a named skip, never
+// enters its body, and the body throws rather than asserting. ADR-076 is
+// WITHHELD on exactly that, in its own approval line, and the rule it gives
+// instead is the one implemented here: A ROW IS DISCHARGED WHEN ITS ASSERTION IS
+// EXECUTED SOMEWHERE A GATE CAN READ.
+//
+// HOW EXECUTION IS DETECTED IS RULED HERE, BECAUSE THE RULING SAYS "SOMEWHERE A
+// GATE CAN READ" AND NOT WHICH GATE. Two honest answers exist.
+//
+//   THE ONE BUILT: A STATIC PARSE that refuses a citation whose every naming of
+//   the row sits inside a construct carrying a modifier from `TEST_DISABLERS`,
+//   or inside the comment run immediately above one, which is where this corpus
+//   writes the id a block discharges. The vocabulary is the array and is not
+//   restated here, for `FIXTURE_STATUSES`' reason one file over. It reads files
+//   and nothing else, which is what every other check in this runner does.
+//
+//   THE ONE REFUSED: SHELLING OUT TO VITEST and reading which cases reported.
+//   It is genuinely stronger -- it would see a case that runs and fails, which
+//   the parse cannot -- and it is refused on two grounds that are not cost.
+//   FIRST, `falsify.mjs` copies the tree WITHOUT `node_modules`, on a decision
+//   its own loader-cases block states in terms, so a gate that needs a workspace
+//   resolution CANNOT BE WATCHED FAILING; and a gate nobody has watched fail is
+//   not a gate, which is the criterion this whole runner was chosen on. SECOND,
+//   STRATEGY says of this runner that "a gate with an install step is a gate
+//   that stops running on the day the install breaks", and a vitest gate is an
+//   install step wearing a different hat.
+//
+// WHAT ASSERTION 6 CANNOT SEE, and it is more than the other five leave out.
+// IT CANNOT SEE AN OUTCOME. A case that runs and FAILS reads here exactly like
+// one that runs and passes; the suite is what asserts that, and `CI-01` is what
+// runs the suite. IT CANNOT SEE WHICH case discharges the row, because the ids
+// that name the executing cases are BUILT AT RUNTIME -- `it(reC('CV-01'))`
+// composes `RE-C-01` from a template, so no parse in this tree reaches the title
+// `RE-C-01` -- which is why the reader asks whether the row's naming is DISABLED
+// and never whether the live naming is the assertion. A comment naming a row
+// beside a live suite that asserts something else entirely passes here. THAT IS
+// THE FLOOR AND THE DESK READ IS THE CEILING, and the floor is the half that
+// runs on every push. IT TAKES A CONDITIONAL AS DISABLED: `runIf` is in the list
+// beside `skip`, because a case that runs when a condition holds is a case this
+// gate cannot promise ran, and a false condition is the entire subject here.
+// AND IT READS EXTENT FROM INDENTATION, which prettier writes and
+// `pnpm run format:check` enforces; where it cannot, it says so and fails rather
+// than scoping a block to whatever it found.
+//
+// THE ONE READING IT DELIBERATELY DOES NOT TAKE. "Every naming must be live"
+// would refuse a file that names the row from a live assertion AND from a
+// skipped one, and that reader is BROADER THAN THE PROPERTY: section 39's rule
+// is that a named suite runs an assertion for the row, which such a file
+// satisfies. The strict half is not discarded, it is COUNTED -- the note prints
+// how many rows name themselves from inside a disabled block as well as outside
+// it, which is zero today and is the number to watch.
 //
 // ASSERTION 4 IS NARROWED AGAINST THE BRIEF, DELIBERATELY AND IN WRITING. The
 // W8 brief says "every NON-WRITTEN row names a blocker from the closed
@@ -4785,7 +4846,15 @@ const FIXTURE_DIR = 'packages/rules-engine/fixtures';
 // typo as a new term and can never fail. Assertion 5 then checks the document's
 // summary table against this list in both directions, so the two cannot drift
 // and a genuinely new blocker is a deliberate edit here.
-const FIXTURE_STATUSES = ['written', 'writable', 'blocked'];
+//
+// `covered-elsewhere` IS THE FOURTH AND IT ARRIVES WITH ASSERTION 6, NOT ALONE.
+// ADR-076 section 1 adds it to the STATUS column and leaves the blocker
+// vocabulary closed at six, on the argument that a blocker names which of W1,
+// W2, W3 fails and on these rows none has. A status term admitted here with no
+// assertion behind it would be the vacuity this list exists against, one column
+// over: every other status is a fact this gate checks against the directory,
+// and this one is a fact about a suite.
+const FIXTURE_STATUSES = ['written', 'writable', 'blocked', 'covered-elsewhere'];
 const FIXTURE_BLOCKERS = [
   'no-fixture-format',
   'format-cannot-express',
@@ -4880,6 +4949,94 @@ function fixturesOnDisk() {
   return found;
 }
 
+// -----------------------------------------------------------------------------
+// ASSERTION 6's readers: is the cited assertion RUNNING, or merely present
+// -----------------------------------------------------------------------------
+// THE VOCABULARY OF A DISABLED TEST CONSTRUCT, written out here for
+// FIXTURE_STATUSES' own reason and not computed from the tree. `runIf` is in the
+// list beside `skip` and `skipIf` deliberately: a case that runs only when a
+// condition holds is a case this gate cannot promise ran, and the whole subject
+// of assertion 6 is a condition that was false. `only` is handled apart, below,
+// because it does not disable the construct it sits on -- it silences every
+// OTHER case in the file, which is the same defect pointing the other way.
+const TEST_DISABLERS = ['skip', 'skipIf', 'todo', 'fails', 'runIf'];
+
+// A citation names a test file when its link target ends in one of these. The
+// filter is the first of section 39's three traps closed: "a path that resolves
+// is not a running assertion", and `validate.ts` names four of these six rows
+// beside the rule each one guards. A citation pointing there resolves, contains
+// the id, and executes nothing.
+const CITED_TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/;
+
+// Every `describe`, `it` and `test` in a source file, with its modifier chain,
+// the comment run immediately above it, and its extent.
+//
+// THE EXTENT IS READ FROM INDENTATION AND THAT IS A CHOICE WITH A PRICE. The
+// alternative is a JavaScript lexer inside a gate that has none, to answer a
+// question prettier already answers: the closer of a construct opened at column
+// N is the next non-blank line at column N or less, and in a formatted tree it
+// begins with `)` or `}`. WHEN IT DOES NOT, THE GATE SAYS SO AND FAILS rather
+// than scoping the block to whatever it found -- a reader that guesses an extent
+// would silently mis-scope a skip, which is the one thing this reader exists to
+// locate. `pnpm run format:check` is a merge blocker, so the assumption is one
+// the tree is already held to.
+//
+// THE COMMENT RUN IS PART OF THE BLOCK AND THAT IS NOT A CONVENIENCE. This
+// corpus writes the `GS-nnn` a block discharges in the comment ABOVE the
+// `describe`, which session 123 did for all six sites on purpose so a gate could
+// find them. A reader that took only the block body would find `GS-072` nowhere
+// inside `describe.skipIf(!replayExists)` and report the row clean.
+function testConstructs(src) {
+  const lines = src.split('\n');
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^(\s*)(describe|it|test)((?:\.[A-Za-z]+)*)\s*[(`]/.exec(lines[i]);
+    if (m === null) continue;
+    const [, indent, kind, chain] = m;
+    let end = 0;
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].trim() === '') continue;
+      if (/^\s*/.exec(lines[j])[0].length > indent.length) continue;
+      // `it.each([` closes its TABLE at the opener's own column and re-opens the
+      // call on the same line: `])('%s ...', (a, b) => {`. That line is a
+      // continuation of the opener and not its closer, and a reader that stopped
+      // there would scope every `.each` block to its argument list. Four of the
+      // six sites assertion 6 reads are written that way.
+      if (/^\s*[\]`,]/.test(lines[j])) continue;
+      end = /^\s*[)}]/.test(lines[j]) ? j + 1 : -1;
+      break;
+    }
+    let top = i;
+    while (top > 0 && /^\s*\/\//.test(lines[top - 1])) top--;
+    const mods = chain.split('.').filter(Boolean);
+    out.push({
+      n: i + 1,
+      spelling: `${kind}${chain}`,
+      mods,
+      disabled: mods.some((x) => TEST_DISABLERS.includes(x)),
+      only: mods.includes('only'),
+      top: top + 1,
+      end,
+    });
+  }
+  return out;
+}
+
+// The repository-relative link targets a citation cell names, resolved against
+// the status document's own directory. Anchors are dropped and absolute schemes
+// are skipped; `join` normalises the `../../../` these citations are written in.
+function citedPaths(citation) {
+  const dir = dirname(FIXTURE_STATUS_DOC);
+  const out = [];
+  for (const m of citation.matchAll(/\]\(([^)\s]+)\)/g)) {
+    const target = m[1].split('#')[0];
+    if (target === '' || /^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
+    const rel = join(dir, target);
+    if (!out.includes(rel)) out.push(rel);
+  }
+  return out;
+}
+
 // The two summary tables above the rows. Read by a FLAT scan for a row whose
 // first cell is a declared term and whose second parses as an integer, which is
 // safe here rather than lax: a data row's first cell is always `GS-nnn`, and a
@@ -4903,7 +5060,7 @@ const fixtureInventory = {
   title: 'The fixture registry and the fixture directory agree, in both directions',
   covers:
     'The 316 rows of docs/testing/golden-scenarios/39-fixture-status-and-blockers.md against ' +
-    'the golden-scenario registry and against packages/rules-engine/fixtures. FIVE ' +
+    'the golden-scenario registry and against packages/rules-engine/fixtures. SIX ' +
     'ASSERTIONS. (1) Every registered GS-nnn has exactly one row and every row names a ' +
     'registered scenario, with the registry read from the OTHER section files so the scope ' +
     'is not circular. (2) Every fixture on disk has a "written" row -- THE DIRECTION CI-03 ' +
@@ -4911,7 +5068,24 @@ const fixtureInventory = {
     'without BOTH the .yaml and its .expected.json sibling. (4) Every "blocked" row names a ' +
     'blocker from the closed vocabulary AND a citation, and every row that is not blocked ' +
     'names NO blocker. (5) The two summary tables equal the counts derived from the rows, ' +
-    'and their term lists equal the closed vocabularies in both directions. ' +
+    'and their term lists equal the closed vocabularies in both directions. (6) Every ' +
+    '"covered-elsewhere" row cites a TEST file that resolves, names the row, and does not ' +
+    'name it ONLY from inside a disabled construct (skip, skipIf, todo, fails, runIf) or the ' +
+    'comment run above one. ' +
+    'ASSERTION 6 IMPLEMENTS ADR-076 SECTION 1 AND NOT WAVE-05 SECTION 2, DELIBERATELY. The ' +
+    'plan asks that the citation resolve and the file name the id; both are true of GS-072, ' +
+    'whose cited block is a describe.skipIf over a false condition whose body throws, and ' +
+    'ADR-076 is WITHHELD on precisely that. The ruling makes discharge depend on the ' +
+    'assertion being EXECUTED, so that is what is asserted. ' +
+    'IT IS A STATIC PARSE AND NOT A VITEST RUN, RULED HERE. A run would be stronger and is ' +
+    'refused because falsify.mjs copies the tree without node_modules, so a gate needing a ' +
+    'workspace resolution can never be watched failing -- and a gate nobody has watched fail ' +
+    'is not a gate. THREE THINGS IT CANNOT SEE. It cannot see an OUTCOME, so a case that ' +
+    'runs and fails reads like one that passes. It cannot see WHICH case discharges the row, ' +
+    'because the executing ids are built at runtime (it(reC("CV-01")) composes RE-C-01 from ' +
+    'a template), so it asks whether the naming is disabled and never whether the live ' +
+    'naming is the assertion. And it reads block extent from INDENTATION, saying so and ' +
+    'failing where it cannot rather than scoping a block to whatever it found. ' +
     'ASSERTION 4 IS NARROWED AGAINST THE W8 BRIEF, IN WRITING. The brief says every ' +
     'NON-WRITTEN row names a blocker, which would flag the two "writable" rows; the document ' +
     'defines writable as all three ADR-072 conditions holding, so a blocker there is a ' +
@@ -5101,6 +5275,90 @@ const fixtureInventory = {
       }
     }
 
+    // -- 6. a `covered-elsewhere` row's assertion must be EXECUTED ---------
+    // ADR-076 section 1's governing rule, and NOT WAVE-05 section 2's sentence.
+    // The plan's row asks that "every such row's citation resolves and its file
+    // names the row's id"; both are true of GS-072, whose cited block is a
+    // `describe.skipIf` over a false condition and whose body throws rather than
+    // asserting, and ADR-076 is WITHHELD on exactly that. So the plan's
+    // assertion is implemented as its ruling states it and not as it spells it.
+    //
+    // The first condition, "the scenario has no golden fixture", needs no code
+    // here: assertion 2 already fails any row that is not `written` while a
+    // fixture for it sits on disk, and a `covered-elsewhere` row with a fixture
+    // is that finding.
+    let mixed = 0;
+    for (const r of rows.filter((x) => x.status === 'covered-elsewhere')) {
+      const cited = citedPaths(r.citation).filter((p) => CITED_TEST_FILE.test(p));
+      const resolved = cited.filter((p) => existsSync(join(ROOT, p)));
+      if (resolved.length === 0) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} is "covered-elsewhere" and no cited suite ` +
+            `EXECUTES it: its citation names ${cited.length} test file(s) and ${
+              cited.length === 0
+                ? 'a status meaning "a named suite runs it" has to name the suite'
+                : `none of them is on disk (${cited.join(', ')})`
+            }`,
+        );
+        continue;
+      }
+      let live = 0;
+      const why = [];
+      for (const p of resolved) {
+        const lines = read(p).split('\n');
+        const at = lines.flatMap((l, i) => (l.includes(r.id) ? [i + 1] : []));
+        if (at.length === 0) {
+          why.push(`${p} does not name ${r.id} anywhere`);
+          continue;
+        }
+        const constructs = testConstructs(lines.join('\n'));
+        const unreadable = constructs.filter((c) => c.end <= 0);
+        if (unreadable.length > 0) {
+          findings.push(
+            `${p}:${unreadable[0].n}: this gate cannot read where \`${unreadable[0].spelling}\` ` +
+              'closes, so it cannot tell whether it is skipped, and it refuses to guess. The ' +
+              'extent is read as the next non-blank line indented no deeper than the opener, ' +
+              'which prettier writes and `pnpm run format:check` enforces',
+          );
+          why.push(`${p} has a construct whose extent this gate cannot read`);
+          continue;
+        }
+        if (constructs.length === 0) {
+          why.push(`${p} declares no describe, it or test at all`);
+          continue;
+        }
+        const only = constructs.find((c) => c.only);
+        if (only) {
+          why.push(
+            `${p} carries \`${only.spelling}\` at :${only.n}, which silences every other case ` +
+              'in the file',
+          );
+          continue;
+        }
+        const dead = constructs.filter((c) => c.disabled);
+        const buried = at.filter((n) => dead.some((c) => n >= c.top && n <= c.end));
+        if (buried.length === at.length) {
+          const c = dead.find((x) => at[0] >= x.top && at[0] <= x.end);
+          why.push(
+            `${p} names ${r.id} at line(s) ${buried.join(', ')} and every one of them is inside ` +
+              `\`${c.spelling}\` opened at :${c.n}, which reports a named skip and never enters ` +
+              'its body',
+          );
+          continue;
+        }
+        if (buried.length > 0) mixed++;
+        live++;
+      }
+      if (live === 0) {
+        findings.push(
+          `${FIXTURE_STATUS_DOC}:${r.n}: ${r.id} is "covered-elsewhere" and no cited suite ` +
+            `EXECUTES it: ${why.join('; ')}. ADR-076 section 1 discharges a row when its ` +
+            'assertion is EXECUTED somewhere a gate can read, and "the path resolves and the ' +
+            'file names the id" is satisfied by a skipped block',
+        );
+      }
+    }
+
     console.log(
       `       CI-06/fixture-inventory note: ${rows.length} row(s) against ${registry.size} ` +
         `registered scenario(s) and ${disk.size} fixture(s) on disk ` +
@@ -5108,7 +5366,9 @@ const fixtureInventory = {
         `${stale.length} stale row(s) registered across ${CI06FIXTURE_REGISTER.size} entry ` +
         (CI06FIXTURE_REGISTER.size === 0
           ? '(entries), so every fixture on disk is claimed by a row that says so'
-          : '(entries), each one a repair this gate is waiting for'),
+          : '(entries), each one a repair this gate is waiting for') +
+        `; ${derived.get('covered-elsewhere')} covered-elsewhere row(s) read for EXECUTION, ` +
+        `${mixed} of them naming their row from inside a disabled block as well as outside it`,
     );
     return findings;
   },

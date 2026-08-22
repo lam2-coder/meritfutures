@@ -39,7 +39,7 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | **128** | WAVE-05 `X3` and `X4`, `GS-141`'s severity half and the sole-error equalities, one file | dispatched, unwritten |
 | **129** | WAVE-05 `X5`, `GS-071` at scale in [`replay.test.ts`](../../apps/worker/test/replay.test.ts) | dispatched, unwritten |
 | **130** | WAVE-05 `X7`, the ADR repairing `GS-030`'s and `EC-012`'s falsified clause | dispatched, unwritten |
-| **131** | WAVE-05 `X8`, the `covered-elsewhere` assertion inside `CI-06/fixture-inventory`, finishing pull request `#174` | dispatched, unwritten |
+| ~~**131**~~ | ~~WAVE-05 `X8`, the `covered-elsewhere` assertion inside `CI-06/fixture-inventory`, finishing pull request `#174`~~ | **WRITTEN.** Struck, and its entry is below |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
@@ -224,3 +224,4 @@ the two deleted rows are restored above.
 | [2026-08-21 - Session 125](2026-08-21-session-125.md) | the four `ADR-074` disagreements, resolved in place while the ruling is still unsigned |
 | [2026-08-21 - Session 126](2026-08-21-session-126.md) | three signatures and one refusal: `ADR-072`, `ADR-073` and `ADR-074` are `accepted` and **`ADR-076` is WITHHELD on the check its own approval line asked for** -- one of section 6's seven cited sites is a skipped block that throws rather than asserts. `ADR-072`'s prediction was tested by three sessions and was wrong once, in the safe direction. A paragraph claiming `CI-06u` cannot see a struck row and its live twin as one key was refuted by seeding one |
 | [2026-08-22 - Session 127](2026-08-22-session-127.md) | WAVE-05 `X2`: section 39 gains the `covered-elsewhere` status and **SIX** rows move to it, not the seven `ADR-076` section 6 lists. `GS-072`'s cited block was re-run rather than inherited and is still a skip that throws, so it stays `blocked` with a self-clearing citation. `GS-071` to `writable`, and `GS-049`, `GS-059` and `GS-080` to `written`, which empties `CI06FIXTURE_REGISTER` of all three entries it holds. **`GS-049` carries a disposition and not just a status.** The head counts are recomputed by reading the tree, and the status vocabulary the runner holds is now one term behind the document, which is `X8`'s and is red until it lands |
+| [2026-08-22 - Session 131](2026-08-22-session-131.md) | WAVE-05 `X8`: in progress |

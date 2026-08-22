@@ -1354,6 +1354,92 @@ const markedFixtureRow = (d) => {
   return row.id;
 };
 
+// The summary counts at the head of section 39, moved WITHOUT EITHER NUMBER
+// BEING WRITTEN HERE, on the same rule as `bumpSpan`: a hand-maintained count
+// inside the harness built to catch hand-maintained counts breaks the first time
+// the corpus does the ordinary thing.
+//
+// A seed that moves a row and leaves the summary alone fires assertion 5 as well
+// as its own finding, and a `PASS` case cannot tolerate a second finding at all.
+const bumpFixtureSummary = (body, term, delta) => {
+  const p = new RegExp(`(\\|\\s*\\*{0,2}\`?${term}\`?\\*{0,2}\\s*\\|\\s*\\*{0,2})(\\d+)(\\*{0,2}\\s*\\|)`);
+  const m = p.exec(body);
+  if (m === null) throw new Error(`seed anchor not found: the "${term}" summary row`);
+  return body.replace(p, `$1${Number(m[2]) + delta}$3`);
+};
+
+// The runner itself, seeded in the COPY. The loader cases already seed source
+// files for the same reason: some properties are properties OF the checker, and
+// the only way to watch one fail is to break it where the checker will read it.
+const GATES_PATH = 'scripts/corpus/gates.mjs';
+const seedFixtureRegisterEntry = (d, id) =>
+  edit(d, GATES_PATH, (b) =>
+    once(
+      b,
+      'const CI06FIXTURE_REGISTER = new Map([',
+      `const CI06FIXTURE_REGISTER = new Map([\n  ['${id}', 'seeded by falsify.mjs'],`,
+    ),
+  );
+
+// A scenario whose fixture is on disk AND whose row already says so. A register
+// entry naming one of these names no defect at all, by construction, whatever
+// the register happens to hold.
+const writtenWithAFixture = (d) => {
+  const on = fixtureIdsOnDisk(d);
+  const row = fixtureRows(d).find((r) => r.status === 'written' && on.has(r.id));
+  if (!row) throw new Error('seed anchor not found: no written row with a fixture on disk');
+  return row.id;
+};
+
+// THE ROW WHOSE CITED SUITE NAMES IT ONLY FROM INSIDE A DISABLED BLOCK, derived
+// from the tree and never pinned to `GS-072` (founder rider, 2026-08-15: a seed
+// derives its identifier at seed time). The derivation is deliberately the
+// SHAPE and not the id: the day the engine exports `replay` this skip clears,
+// the anchor is gone, and the case announces itself rather than retargeting
+// quietly onto some other row that happens to look similar.
+const SKIPPED_SITE = 'scripts/demo/test/replay-determinism.property.test.ts';
+const rowNamedOnlyInsideASkip = (d) => {
+  const lines = readFileSync(join(d, SKIPPED_SITE), 'utf8').split('\n');
+  const at = lines.findIndex((l) => /^\s*describe\.skipIf\(/.test(l));
+  if (at === -1) throw new Error(`seed anchor not found: no skipped describe in ${SKIPPED_SITE}`);
+  const ids = new Set();
+  for (let i = at - 1; i >= 0 && /^\s*\/\//.test(lines[i]); i--) {
+    for (const m of lines[i].matchAll(/\bGS-\d{3}\b/g)) ids.add(m[0]);
+  }
+  if (ids.size !== 1) {
+    throw new Error(
+      `seed anchor not found: the skipped block at ${SKIPPED_SITE}:${at + 1} names ` +
+        `${ids.size} golden-scenario rows, not one`,
+    );
+  }
+  return [...ids][0];
+};
+
+// Move that row to `covered-elsewhere`, leaving its citation exactly as it
+// stands. The citation is the claim under test and rewriting it would be the
+// case marking its own homework.
+const seedCoveredElsewhere = (d) => {
+  const id = rowNamedOnlyInsideASkip(d);
+  const row = fixtureRows(d).find((r) => r.id === id);
+  if (!row) throw new Error(`seed anchor not found: no section 39 row for ${id}`);
+  const was = row.status;
+  const blocker = (row.cells[2] ?? '').replace(/[`*]/g, '');
+  rewriteFixtureRow(
+    d,
+    (r) => r.id === id,
+    (cells) => {
+      cells[1] = 'covered-elsewhere';
+      cells[2] = '';
+    },
+  );
+  edit(d, FIXTURE_STATUS_PATH, (b) => {
+    let out = bumpFixtureSummary(b, was, -1);
+    out = bumpFixtureSummary(out, 'covered-elsewhere', 1);
+    return blocker === '' ? out : bumpFixtureSummary(out, blocker, -1);
+  });
+  return id;
+};
+
 // Rewrite one row in place, marking its citation cell so `expect` can find it
 // again after the property it was chosen by has been changed.
 const rewriteFixtureRow = (d, pick, rewrite) => {
@@ -2902,40 +2988,39 @@ const SCOPE_CASES = [
       edit(d, 'pnpm-workspace.yaml', (b) => `${b}\n${'>'.repeat(7)} theirs-side-branch\n`),
   },
   // ---------------------------------------------------------------------------
-  // CI-06/fixture-inventory. FIVE ASSERTIONS, ONE SEED, THREE CASES.
+  // CI-06/fixture-inventory. SIX ASSERTIONS, ONE SEED, FOUR CASES.
   //
-  // SEEDS carries one violation per gate, which is assertion 2. The three cases
+  // SEEDS carries one violation per gate, which is assertion 2. The four cases
   // below carry the ones a single seed cannot reach, on CI-06k's precedent one
   // gate over. The first is the most important thing in this file about this
   // gate: it is the case that stops the REGISTER becoming an exemption list.
+  // The last is assertion 6, and it is the one ADR-076 is withheld over.
   // ---------------------------------------------------------------------------
   {
     // THE REGISTER MUST NOT BE ABLE TO BECOME FURNITURE, and this is the only
-    // direction that proves it. The gate ships red-turned-quiet by three
+    // direction that proves it. The gate shipped red-turned-quiet by three
     // registered rows; a register that merely silenced them would be an
     // exemption list with a better name, and would go on silencing them forever
     // after the repair landed.
     //
-    // So: repair one registered row to `written` in the copy. The row is now
-    // correct AND the register entry now names nothing, and the second of those
-    // MUST be a finding. This is CI06U_REGISTER's defining property asserted
-    // rather than described, and WAVE-03's rule that a register entry travels in
-    // the same commit as its repair.
-    name: 'CI-06/fixture-inventory/register-repaired',
+    // THE SEED WRITES THE ENTRY RATHER THAN REPAIRING THE ROW, AND THAT IS A
+    // CHANGE THIS SESSION HAD TO MAKE. It used to repair a registered row to
+    // `written` in the copy and watch the entry become a finding. Session 127
+    // repaired all three rows on the tree and session 131 removed all three
+    // entries, so there is no longer a registered row to repair: the old seed
+    // would throw its anchor error forever, which is the harness announcing a
+    // stale seed correctly and is still a case asserting nothing.
+    //
+    // So it runs the other way. Register a scenario that is ALREADY `written`
+    // with its fixture on disk -- an entry naming no defect, by construction,
+    // whatever the register holds -- and the entry MUST be the finding. Same
+    // property, same branch of the gate, and an anchor that cannot go stale
+    // because the seed creates it.
+    name: 'CI-06/fixture-inventory/register-names-no-defect',
     gate: 'CI-06/fixture-inventory',
-    what: 'a registered stale row repaired to "written", which MUST make its register entry a finding',
-    expect: (d) => `CI06FIXTURE_REGISTER holds ${markedFixtureRow(d)} and its row now reads`,
-    seed: (d) => {
-      const on = fixtureIdsOnDisk(d);
-      rewriteFixtureRow(
-        d,
-        (r) => on.has(r.id) && r.status !== 'written',
-        (cells) => {
-          cells[1] = 'written';
-          cells[2] = '';
-        },
-      );
-    },
+    what: 'a register entry naming an already-repaired row, which MUST itself be a finding',
+    expect: (d) => `CI06FIXTURE_REGISTER holds ${writtenWithAFixture(d)} and its row now reads`,
+    seed: (d) => seedFixtureRegisterEntry(d, writtenWithAFixture(d)),
   },
   {
     // ASSERTION 4 IS NARROWED AGAINST THE BRIEF AND THIS IS THE LOUD DIRECTION
@@ -2978,6 +3063,45 @@ const SCOPE_CASES = [
       const f = readdirSync(join(d, FIXTURE_DIR)).find((x) => /^GS-\d{3}-.*\.expected\.json$/.test(x));
       if (!f) throw new Error(`seed anchor not found: no .expected.json in ${FIXTURE_DIR}`);
       rmSync(join(d, FIXTURE_DIR, f));
+    },
+  },
+  {
+    // ASSERTION 6, AND IT IS THE ACCEPTANCE TEST FOR THE WHOLE ITEM RATHER THAN
+    // ONE MORE CASE. ADR-076 is WITHHELD because its section 6 counts `GS-072`
+    // among seven rows moving to `covered-elsewhere`, and `GS-072`'s cited site
+    // is `describe.skipIf(!replayExists)` over a condition that is false: the
+    // block reports a named skip, never enters its body, and the body throws
+    // rather than asserting. WAVE-05 section 2 specifies the assertion as "the
+    // citation resolves and its file names the row's id", AND BOTH ARE TRUE OF
+    // `GS-072`. A gate built to that sentence admits the defect that withheld
+    // the ruling, so the ruling's own governing rule is what is implemented and
+    // this is where that is proven rather than claimed.
+    //
+    // THE TWO DIRECTIONS ARE THE POINT AND NEITHER MEANS ANYTHING ALONE. The
+    // control moves the row to `covered-elsewhere` and changes nothing else: the
+    // citation resolves, the file names the row, and the gate must still refuse
+    // it. The case below then makes ONE further edit -- it removes the `.skipIf`
+    // and touches nothing else -- and the gate must pass. Together they say the
+    // boundary is THE SKIP and not the row, the file or the citation, which no
+    // single direction can say.
+    //
+    // AND THE PASS DIRECTION IS ALSO THE HONEST STATEMENT OF THE GATE'S LIMIT.
+    // With the skip gone that block's body still THROWS, so what the case proves
+    // green is a suite that would fail if it ran. Assertion 6 reads whether an
+    // assertion is DISABLED and never whether it passes; the suite is what
+    // asserts that, and `CI-01` is what runs the suite. A reader who wants that
+    // sentence tested rather than written has it here.
+    name: 'CI-06/fixture-inventory/covered-elsewhere-must-execute',
+    gate: 'CI-06/fixture-inventory',
+    what: 'a covered-elsewhere row whose cited block is no longer skipped, which must NOT be a finding',
+    expect: 'PASS',
+    control: {
+      expect: (d) => `${markedFixtureRow(d)} is "covered-elsewhere" and no cited suite EXECUTES it`,
+      seed: (d) => seedCoveredElsewhere(d),
+    },
+    seed: (d) => {
+      seedCoveredElsewhere(d);
+      edit(d, SKIPPED_SITE, (b) => once(b, /^describe\.skipIf\([^)]*\)\(/m, 'describe('));
     },
   },
   // ---------------------------------------------------------------------------
