@@ -36,7 +36,7 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | ~~**125**~~ | ~~[ADR-074](../decisions/ADR-074.md)'s four disagreements, reported by `CI-06/identifier-series` in session 115 and unresolved inside a `proposed` ruling~~ | **WRITTEN.** Struck, and its entry is below |
 | ~~**126**~~ | ~~Three signatures and one refusal on the four `proposed` ADRs~~ | **WRITTEN.** Struck, and its entry is below |
 | **127** | [WAVE-05](../plans/WAVE-05-tier2-fixture-shapes.md) `X2`, section 39 gains `covered-elsewhere` and the stale rows move | dispatched, unwritten |
-| **128** | WAVE-05 `X3` and `X4`, `GS-141`'s severity half and the sole-error equalities, one file | dispatched, unwritten |
+| ~~**128**~~ | ~~WAVE-05 `X3` and `X4`, `GS-141`'s severity half and the sole-error equalities, one file~~ | **WRITTEN.** Struck, and its entry is below |
 | **129** | WAVE-05 `X5`, `GS-071` at scale in [`replay.test.ts`](../../apps/worker/test/replay.test.ts) | dispatched, unwritten |
 | **130** | WAVE-05 `X7`, the ADR repairing `GS-030`'s and `EC-012`'s falsified clause | dispatched, unwritten |
 
@@ -222,3 +222,4 @@ the two deleted rows are restored above.
 | [2026-08-21 - Session 124](2026-08-21-session-124.md) | WAVE-05 `X6`: `GS-030`'s surviving half, **one test**, and it is a count and not a duration. One trading day and one row across each of the six transitions, with the close instants either side pinning that the clock DID move, without which the count would pass on any ordinary fortnight. **One perturbation passed and is recorded because it did**: a one-day shift off a Sunday changes no weekday. The `X7` evidence is widened from two transitions and sixteen sessions to **six and 60**, every one 23 hours, and the falsified sentence is separated into three claims whose truth values differ |
 | [2026-08-21 - Session 125](2026-08-21-session-125.md) | the four `ADR-074` disagreements, resolved in place while the ruling is still unsigned |
 | [2026-08-21 - Session 126](2026-08-21-session-126.md) | three signatures and one refusal: `ADR-072`, `ADR-073` and `ADR-074` are `accepted` and **`ADR-076` is WITHHELD on the check its own approval line asked for** -- one of section 6's seven cited sites is a skipped block that throws rather than asserts. `ADR-072`'s prediction was tested by three sessions and was wrong once, in the safe direction. A paragraph claiming `CI-06u` cannot see a struck row and its live twin as one key was refuted by seeding one |
+| [2026-08-22 - Session 128](2026-08-22-session-128.md) | WAVE-05 `X3` and `X4`, one file: `GS-141`'s severity half and three sole-error equalities. STUB, in flight |
