@@ -57,6 +57,121 @@ import {
   type ProcessEnvironment,
 } from '../../../packages/golden-loader/test/harness/environment.js';
 import { DEFAULT_OPTIONS, runDemo } from '../main.js';
+import type { DailyMark, CalendarSlice, RuleState, TradingDay } from '../../../packages/rules-engine/src/index.js';
+import { buildPopulation, simulate } from '../../../packages/rithmic/src/index.js';
+import { asTradingDay, toCalendarSlice, toDailyMark } from '../bridge.js';
+import {
+  COHORTS,
+  CORE_EOD_50K,
+  DEFAULT_START_DAY,
+  DEMO_SPECS,
+  SEQUENCE_BASE,
+  populationSpec,
+  sessions as demoSessions,
+} from '../config.js';
+import { DEMO_ENGINE_VERSION } from '../fold.js';
+
+/**
+ * `JSON.stringify` cannot serialize a `bigint`, and every money field is one.
+ *
+ * BYTE-IDENTICAL IS THE CLAIM, so the comparison is over a canonical string
+ * rather than over `toStrictEqual`: a deep-equality helper that coerced a
+ * `bigint` to a `number` would pass on two states that differ past 2^53, which
+ * is the one place a money comparison must not be approximate.
+ */
+function canonical(states: readonly RuleState[]): string {
+  return JSON.stringify(states, (_k, v: unknown) =>
+    typeof v === 'bigint' ? `${v.toString()}n` : v,
+  );
+}
+
+/**
+ * One real account's marks, folded once to give the permutation its baseline.
+ *
+ * THE CORPUS IS THE DEMO POPULATION, on this file's own stated reason: a
+ * property over marks invented here would prove that `replay` sorts a list,
+ * where a property over the simulator's marks proves it folds a real account
+ * life the same way regardless of arrival order.
+ */
+function replayCorpus(): {
+  readonly marks: readonly DailyMark[];
+  readonly calendar: CalendarSlice;
+  readonly openedOn: TradingDay;
+  readonly baseline: readonly RuleState[];
+} {
+  const cohort = COHORTS[0];
+  if (cohort === undefined) throw new Error('the demo declares no cohort');
+
+  const sessionList = demoSessions(DEFAULT_START_DAY, 30);
+  const calendar = toCalendarSlice(sessionList, SEQUENCE_BASE);
+
+  const population = buildPopulation(populationSpec(cohort, 'pt-06-permutation', 1));
+  const account = population[0];
+  if (account === undefined) throw new Error('the demo population is empty');
+
+  const run = simulate({
+    seed: 'pt-06-permutation',
+    population: [account],
+    sessions: sessionList,
+    specs: DEMO_SPECS,
+    adjustments: [],
+  });
+
+  const marks: DailyMark[] = [];
+  for (const forSession of run.days) {
+    const simDay = forSession[0];
+    if (simDay !== undefined) marks.push(toDailyMark(simDay));
+  }
+
+  const firstSession = sessionList[0];
+  if (firstSession === undefined) throw new Error('the demo fold needs at least one session');
+  const openedOn = asTradingDay(firstSession.tradingDay);
+
+  // ONE CONTINUOUS LIFE, WHICH IS NOT THE SAME OBJECT AS THE DEMO'S RUN, and
+  // this was found by running rather than by reading.
+  //
+  // `foldAccount` in `../fold.js` folds in SEGMENTS: when an account passes its
+  // evaluation the platform account is re-provisioned at `size_cents` and the
+  // simulator starts again, so the demo's mark stream can contain a balance
+  // DISCONTINUITY. `replay` folds one account life straight through and refuses
+  // the discontinuity, correctly: `INV-18` is "opening balance is the prior
+  // balance plus the adjustment", and a re-provisioned account's opening balance
+  // is neither. Against 30 sessions of the first cohort it stops at the pass.
+  //
+  // So the corpus is the CONTIGUOUS PREFIX, taken by asking `replay` where it
+  // stops rather than by hard-coding a day the simulator could move. This is a
+  // property about arrival ORDER; feeding it a stream that is not one life would
+  // be testing re-provisioning instead, which is `foldAccount`'s subject.
+  const foldable = (candidate: readonly DailyMark[]): readonly RuleState[] | null => {
+    try {
+      return engine.replay(CORE_EOD_50K, candidate, [], calendar, DEMO_ENGINE_VERSION, openedOn);
+    } catch (e) {
+      if (e instanceof engine.ReplayAssertionError) return null;
+      throw e;
+    }
+  };
+
+  let corpusMarks: readonly DailyMark[] = marks;
+  let baseline = foldable(corpusMarks);
+  if (baseline === null) {
+    let stoppedAt: TradingDay | null = null;
+    try {
+      engine.replay(CORE_EOD_50K, corpusMarks, [], calendar, DEMO_ENGINE_VERSION, openedOn);
+    } catch (e) {
+      if (e instanceof engine.ReplayAssertionError) stoppedAt = e.tradingDay;
+      else throw e;
+    }
+    if (stoppedAt === null) throw new Error('replay refused and then did not');
+    const cut: TradingDay = stoppedAt;
+    corpusMarks = marks.filter((m) => m.tradingDay < cut);
+    baseline = foldable(corpusMarks);
+  }
+  if (baseline === null) {
+    throw new Error('no contiguous prefix of the demo corpus folds, so PT-06 has no subject');
+  }
+
+  return { marks: corpusMarks, calendar, openedOn, baseline };
+}
 
 /**
  * Small enough to fold many times inside a property, long enough that accounts
@@ -229,15 +344,81 @@ describe('PT-06: the fold is invariant under the process environment', () => {
 // here when the block switches on, and it is not the claim that the row is
 // asserted now. See the pull request for session 123 (WAVE-05 `X1`).
 describe.skipIf(!replayExists)('PT-06: arrival-order permutation', () => {
-  // SKIPPED BY DERIVATION, NOT BY A COMMENT. `replayExists` reads the engine's
-  // public surface, so the day `replay` is exported this block runs. It appears
-  // in the log as a named skip until then, which is CI-03's idiom (ADR-038):
-  // a stage that is green because it had nothing to run is not the same object
-  // as one that is green because it passed.
+  // LIVE BY DERIVATION, NOT BY AN EDIT. `replayExists` reads the engine's public
+  // surface, so this block switched on the day ADR-078 exported `replay` and it
+  // switches off again if the export is ever withdrawn. It stood as a named skip
+  // with a body that THREW until then, and that throw was watched firing in
+  // session 134 before the assertion below replaced it: an assertion nobody has
+  // seen reached is an assertion nobody has tested.
+  //
+  // STRATEGY section 3.1 is the claim being discharged: "any permutation of
+  // arrival order ... yields byte-identical stored state". `replay` sorts by
+  // trading day then `sourceHash` (M01 3.7's `byTradingDayThenId`, reconciled to
+  // the field a `DailyMark` actually carries), so the fold's output must not
+  // depend on the order the caller handed the marks in.
+  const corpus = replayCorpus();
+
+  test('the corpus is not vacuous', () => {
+    // The anti-vacuity guard for the property below, and it is the same shape as
+    // the one guarding the environment property above. A permutation property
+    // over one mark, or zero, passes forever while proving nothing.
+    expect(corpus.marks.length).toBeGreaterThan(5);
+    expect(corpus.baseline.length).toBeGreaterThan(5);
+  });
+
   test('any permutation of arrival order yields byte-identical stored state', () => {
-    throw new Error(
-      'the engine now exports `replay`, so PT-06s permutation half is expressible ' +
-        'and must be written. See P2 section 7, session P2-8.',
+    fc.assert(
+      fc.property(
+        fc.shuffledSubarray(corpus.marks, {
+          minLength: corpus.marks.length,
+          maxLength: corpus.marks.length,
+        }),
+        (arrived: readonly DailyMark[]) => {
+          const folded = engine.replay(
+            CORE_EOD_50K,
+            arrived,
+            [],
+            corpus.calendar,
+            DEMO_ENGINE_VERSION,
+            corpus.openedOn,
+          );
+
+          expect(
+            canonical(folded),
+            'the fold differed under a permutation of arrival order. `replay` ' +
+              'sorts its marks into a total order precisely so that it cannot, ' +
+              'and STRATEGY section 3.1 makes byte-identical stored state the ' +
+              'claim. A tie the sort does not break would produce exactly this',
+          ).toBe(canonical(corpus.baseline));
+        },
+      ),
+      { numRuns: 25 },
     );
+  });
+
+  test('and the arrival order genuinely moved while it was being folded', () => {
+    // THE ANTI-VACUITY PAIRING FOR THE PROPERTY ABOVE, on the same reasoning the
+    // environment property's sibling gives: if the shuffle silently stopped
+    // shuffling, the invariance property would pass because nothing changed
+    // rather than because nothing depended on what changed.
+    let reordered = 0;
+    fc.assert(
+      fc.property(
+        fc.shuffledSubarray(corpus.marks, {
+          minLength: corpus.marks.length,
+          maxLength: corpus.marks.length,
+        }),
+        (arrived: readonly DailyMark[]) => {
+          const same = arrived.every((m, i) => m === corpus.marks[i]);
+          if (!same) reordered += 1;
+        },
+      ),
+      { numRuns: 25 },
+    );
+    expect(
+      reordered,
+      'no generated permutation differed from the input order, so the property ' +
+        'above proved nothing about ordering',
+    ).toBeGreaterThan(0);
   });
 });
