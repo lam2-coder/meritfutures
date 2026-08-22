@@ -1440,6 +1440,47 @@ const seedCoveredElsewhere = (d) => {
   return id;
 };
 
+// A `writable` ROW CARRYING A BLOCKER, BUILT BY THE SEED RATHER THAN FOUND, and
+// it is the second seed in this file to make that move for the same reason.
+//
+// THE CHANGE THIS SESSION HAD TO MAKE. The old seed picked a row that already
+// read `writable` and gave it a blocker. `GS-071` was the last such row and it
+// left for `covered-elsewhere` when session 129 wrote its assertion, so the
+// predicate matches nothing and the case announces a stale anchor forever --
+// which is the harness reporting correctly and is still a case asserting
+// nothing. `register-names-no-defect` one entry up hit this exact shape when
+// session 131 emptied the register, and took this exact way out.
+//
+// So the seed CREATES the anchor. A `blocked` row is moved to `writable` with
+// its blocker left in place: the status is now one that means every ADR-072
+// condition holds, and the row still names a condition that fails. That is
+// assertion 4's contradiction exactly, on the same branch the old seed reached,
+// and the anchor cannot go stale while any row is blocked.
+//
+// A BLOCKED ROW AND NOT A WRITTEN ONE, deliberately. A `written` row has its
+// fixture on disk, and moving it fires assertion 2 as well -- a second finding
+// the case did not aim at and could pass on by accident.
+const seedWritableWithABlocker = (d) => {
+  const row = fixtureRows(d).find(
+    (r) => r.status === 'blocked' && (r.cells[2] ?? '').replace(/[`*]/g, '') !== '',
+  );
+  if (!row) throw new Error('seed anchor not found: no blocked row naming a blocker');
+  const blocker = row.cells[2].replace(/[`*]/g, '');
+  rewriteFixtureRow(
+    d,
+    (r) => r.id === row.id,
+    (cells) => {
+      cells[1] = 'writable';
+    },
+  );
+  edit(d, FIXTURE_STATUS_PATH, (b) => {
+    let out = bumpFixtureSummary(b, 'blocked', -1);
+    out = bumpFixtureSummary(out, 'writable', 1);
+    return bumpFixtureSummary(out, blocker, -1);
+  });
+  return row.id;
+};
+
 // Rewrite one row in place, marking its citation cell so `expect` can find it
 // again after the property it was chosen by has been changed.
 const rewriteFixtureRow = (d, pick, rewrite) => {
@@ -3078,26 +3119,23 @@ const SCOPE_CASES = [
   {
     // ASSERTION 4 IS NARROWED AGAINST THE BRIEF AND THIS IS THE LOUD DIRECTION
     // OF THE NARROWING. The brief asks for a blocker on every NON-WRITTEN row,
-    // which would flag the two `writable` rows; the document defines writable as
+    // which would flag any `writable` row; the document defines writable as
     // every ADR-072 condition holding, so a blocker there is a contradiction and
     // its absence is correct.
     //
     // A narrowing tested only from the quiet side is indistinguishable from a
-    // gate that stopped reading those rows. This case shows the writable rows
-    // are still READ: give one a blocker, from the closed vocabulary so the
-    // finding cannot be the vocabulary check firing instead, and it must fail.
+    // gate that stopped reading those rows. This case shows a writable row is
+    // still READ: build one carrying a blocker, from the closed vocabulary so
+    // the finding cannot be the vocabulary check firing instead, and it must
+    // fail. `seedWritableWithABlocker` says why the row is built rather than
+    // found: `writable` holds no row today and the term stays in the vocabulary
+    // regardless, so a seed that hunts for one asserts nothing the day the last
+    // one leaves.
     name: 'CI-06/fixture-inventory/writable-with-a-blocker',
     gate: 'CI-06/fixture-inventory',
     what: 'a writable row that names a blocker, which MUST be a finding',
     expect: (d) => `${markedFixtureRow(d)} is "writable" and still names the blocker`,
-    seed: (d) =>
-      rewriteFixtureRow(
-        d,
-        (r) => r.status === 'writable',
-        (cells) => {
-          cells[2] = 'vendor-call';
-        },
-      ),
+    seed: (d) => seedWritableWithABlocker(d),
   },
   {
     // ASSERTION 3, WHICH THE SEED CANNOT REACH. A `written` row whose `.yaml` is
