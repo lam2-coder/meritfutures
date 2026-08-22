@@ -73,7 +73,8 @@ import {
 const CV_ASSERTIONS: Record<CvId, string> = {
   // GS-078: intraday trailing drawdown selected in v1. "Config-supported and
   // explicitly unimplemented. Publishing it fails loudly rather than computing
-  // something plausible." Asserted by `RE-C-01` below and by `SEEDS['CV-01']`.
+  // something plausible." Asserted by `RE-C-01` below and by `SEEDS['CV-01']`,
+  // whose error set is pinned to `['CV-01']` exactly (WAVE-05 `X4`).
   'CV-01': 'drawdown.type is trailing_eod or static, on BOTH phases (R-17)',
   'CV-02': 'drawdown_cents > 0, strict',
   'CV-03': 'profit_target_cents > 0 when the eval phase is enabled',
@@ -81,14 +82,16 @@ const CV_ASSERTIONS: Record<CvId, string> = {
   'CV-05': 'required_count >= 1 and win_day_floor_cents > 0',
   // GS-077: a consistency threshold of 0 bp or above 10000 bp, "impossible and
   // meaningless configurations respectively". BOTH of the row's halves are
-  // asserted by `RE-C-06` below, at 0 and at 10001, against 1 and 10000 passing.
+  // asserted by `RE-C-06` below, at 0 and at 10001, against 1 and 10000 passing,
+  // and `SEEDS['CV-06']`'s error set is pinned to `['CV-06']` exactly (WAVE-05 `X4`).
   'CV-06': '0 < max_day_share_bp <= 10000 when consistency is enabled',
   'CV-07': 'buffer_cents >= 0',
   'CV-08': 'cadence_gap_trading_days >= 0',
   'CV-09': 'the cap schedule is non-empty, starts at ordinal 1, increases, every cap > 0',
   // GS-076: a cap below the minimum payout, under which "nobody can ever be paid".
   // "Publish fails with the failing validation rule named", which `RE-C-10` below
-  // asserts with `toContain` and `SEEDS['CV-10']` asserts in both validators.
+  // asserts with `toContain` and `SEEDS['CV-10']` asserts in both validators, its
+  // error set pinned to `['CV-10']` exactly (WAVE-05 `X4`).
   'CV-10': 'every cap_cents >= min_payout_cents',
   'CV-11': 'buffer_cents > floor_lock_floor_at_cents - size_cents, when locked',
   'CV-12': 'floor_lock_at_profit_cents == drawdown + (floor_at - size), when locked',
@@ -157,18 +160,47 @@ describe('Appendix A.4  the approved lineup publishes', () => {
   // first half as an EXACT-SET equality rather than a containment: `PW-02a` on Core
   // EOD and Direct, `PW-02b` on Merit Rapid, and nothing else emitted.
   //
-  // WHAT IT DOES NOT ASSERT IS THE ROW'S LAST SENTENCE. "Asserts the two are never
-  // rendered identically" is a claim about the `info` against `warning` severity and
-  // the distinct text; `diffIds` compares ids, so both are unasserted today. Both
-  // values are constructed in `validate.ts` (`PW-02a` and `PW-02b`), so the missing
-  // assertion is one `expect` in this describe and it is WAVE-05 `X3`, not this file
-  // being unable to reach it.
+  // AND THE ROW'S LAST SENTENCE IS THE CASE AFTER THIS ONE. "Asserts the two are
+  // never rendered identically" is a claim about the `info` against `warning`
+  // severity and the distinct text; `diffIds` compares ids, so neither reaches it.
+  // Both values are constructed in `validate.ts` (`PW-02a` and `PW-02b`), so the
+  // missing assertion was one `expect` in this describe and it is WAVE-05 `X3`,
+  // landed below, not this file being unable to reach it.
   it.each([
     ['Core EOD 50K', coreRules(), CORE_50K_SIZE, ['PW-01', 'PW-02a', 'PW-03']],
     ['Merit Rapid 50K', RAPID_RULES, RAPID_50K_SIZE, ['PW-01', 'PW-02b']],
     ['Direct 50K', DIRECT_RULES, DIRECT_50K_SIZE, ['PW-01', 'PW-02a']],
   ])('%s emits exactly A.4 publish diff', (_name, rules, size, expected) => {
     expect([...diffIds(validatePlan(rules, [size]))].sort()).toEqual([...expected].sort());
+  });
+
+  // GS-141's LAST SENTENCE, WHICH IS WAVE-05 `X3`. ADR-076 section 2 rules the row
+  // `covered-elsewhere` and records this residual in the same breath: the block above
+  // compares IDS through `diffIds`, so "the two are never rendered identically" is
+  // exactly the half an id comparison cannot see.
+  //
+  // THREE CLAUSES IN ONE `expect`, because no two of them are the row's claim. Two
+  // findings carrying the same text under different severities are rendered
+  // identically to a reader who reads the text, and one tone over two texts collapses
+  // co-binding into dominated at a glance. The row asks that BOTH differ, at once.
+  //
+  // THEY CANNOT BE READ OFF ONE PLAN. `validate.ts` builds them in the two arms of a
+  // single `if`, so no plan emits both; which plan carries which is A.4's own row and
+  // the exact-set block above has just pinned it.
+  it('PW-02a and PW-02b are never rendered identically, which is GS-141 last sentence', () => {
+    const pw = (r: ValidationResult, id: PwId) => r.diffs.find((d) => d.id === id);
+    const coBinding = pw(validatePlan(coreRules(), [CORE_50K_SIZE]), 'PW-02a');
+    const dominated = pw(validatePlan(RAPID_RULES, [RAPID_50K_SIZE]), 'PW-02b');
+
+    expect({
+      coBindingSeverity: coBinding?.severity,
+      dominatedSeverity: dominated?.severity,
+      textsDiffer: coBinding?.message !== dominated?.message,
+    }).toEqual({
+      coBindingSeverity: 'info',
+      dominatedSeverity: 'warning',
+      textsDiffer: true,
+    });
   });
 
   it('PW-03 fires on Core EOD and on neither of the other two, which is A.4 row three', () => {
@@ -804,6 +836,33 @@ describe('RE-C-oracle  the engine and the independent transcription agree', () =
     expect(oracleValidatePlan(toMaterialized(seed.rules, seed.size)).map((v) => v.id)).toContain(
       id,
     );
+  });
+
+  // GS-076, GS-077 AND GS-078 ARE STRENGTHENED HERE, WHICH IS WAVE-05 `X4`. ADR-076
+  // section 2 rules all three `covered-elsewhere` and records the strengthening as its
+  // first residual: the registry rows say "Publish fails with the failing validation
+  // rule named", which the `toContain` above satisfies exactly, so this is not a
+  // coverage gap being closed. It is the argument GS-083's own block makes below,
+  // applied to the three rows that were written the weaker way.
+  //
+  // THE ARGUMENT IS GS-083's IN ITS OWN WORDS. A `toContain` "would pass on a config
+  // that CV-09 or CV-10 also rejected, and then the file would be asserting that
+  // SOMETHING blocked rather than that CV-17 did". Each seed below is Appendix A.1's
+  // Core EOD at 50K with ONE field moved, so the rule named is the only rule that may
+  // fire; an equality is what says so and a containment is what cannot.
+  //
+  // THE EQUALITY IS ON THE ENGINE AND THE CONTAINMENT ABOVE STAYS ON THE ORACLE. The
+  // oracle transcribes the same nineteen rules and is not the subject of these rows;
+  // pinning its error set exactly would assert the two transcriptions agree on
+  // MULTIPLICITY, which no registry row asks for and which the case above already
+  // covers at the strength it was written for.
+  it.each([
+    ['GS-076', 'CV-10'],
+    ['GS-077', 'CV-06'],
+    ['GS-078', 'CV-01'],
+  ] as const)('%s: %s is the SOLE error its seed produces, not merely one of them', (_gs, id) => {
+    const seed = SEEDS[id];
+    expect(idsOf(validatePlan(seed.rules, [seed.size]))).toEqual([id]);
   });
 });
 

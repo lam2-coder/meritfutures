@@ -100,6 +100,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-074](ADR-074.md) | A definition site is a row or a heading inside a DECLARED register, and `CI-06/identifier-series` reads a written scope rather than a discovered one  (2026-08-20, status: proposed) |
 | [ADR-075](ADR-075.md) | the three extraction doors read `identities.status = 'active'`, and the two commerce doors are a different question  (2026-08-21, status: accepted) |
 | [ADR-076](ADR-076.md) | none of Tier 2's fourteen needs a second fixture format, because a registry row is a COVERAGE obligation and not a fixture obligation  (2026-08-21, status: proposed) |
+| [ADR-077](ADR-077.md) | there is no 25 hour session and there never was a 23 hour one either in the sense the registry means; the DST hour lands in the WEEKEND GAP, and nothing in the tree computes from any of it  (2026-08-22, status: proposed) |
 | [ADR-067](ADR-067.md) | An adjustment posts to the wallet and never to withdrawable, a debit may only reverse a credit this table itself posted, and the eligibility pair the fold plan offered is false because the corpus has two exits  (2026-08-20, status: proposed) |
 | [ADR-069](ADR-069.md) | Parity is the condition that makes read-only impersonation correct, and the eighteen gaps close at `owner` with the initiative recorded  (2026-08-20, status: proposed) |
 | [ADR-072](ADR-072.md) | A golden fixture is writable when three checkable conditions hold, and every registry row without one carries a stated blocker from a closed vocabulary  (2026-08-20, status: proposed) |
