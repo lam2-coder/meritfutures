@@ -159,11 +159,12 @@ describe('the fixture directory', () => {
 //
 // THE DECLARATION IS CHECKED BEFORE ANY FIXTURE IS CONSULTED. ADR-048 closes
 // three ways the derivation can be wrong that way; the check below closes the
-// fourth, which this repository is currently in. A rule can be implemented in
-// packages/rules-engine, with a passing RE-U-nn, and be unreachable from the
-// function this stage folds. When that is true, every fixture citing a declared
-// rule flips to `direct` against a fold computing none of them, and thirty
-// field diffs name a symptom while nothing names the cause.
+// fourth, which this repository WAS in until the fold moved from `evaluate` to
+// `advanceDay`. A rule can be implemented in packages/rules-engine, with a
+// passing RE-U-nn, and be unreachable from the function this stage folds. When
+// that is true, every fixture citing a declared rule flips to `direct` against a
+// fold computing none of them, and thirty field diffs name a symptom while
+// nothing names the cause.
 
 const named = (f: GoldenFixture): string => `${f.id} ${f.name}`;
 
@@ -197,46 +198,52 @@ describe('the declaration the derivation rests on', () => {
 });
 
 // -----------------------------------------------------------------------------
-// THE PER-FIXTURE ASSERTION, WHICH SWITCHES ON BY ITSELF
+// THE PER-FIXTURE ASSERTION, AND THE ONE THAT USED TO STAND BESIDE IT
 // -----------------------------------------------------------------------------
-// The derivation is REPORTED and not enforced while the premise it rests on does
-// not hold. The two blocks below are mutually exclusive and nothing is edited to
-// move between them: the moment the fold runs the functions the declaration
-// describes, `declaration.holds` goes true, the standing assertion stops running
-// and the derived one starts.
+// THERE WERE TWO BLOCKS HERE, mutually exclusive on `declaration.holds`: the
+// derived one below, and a pre-ADR-048 block under
+// `describe.runIf(!declaration.holds)` asserting that every fixture must NOT
+// match, because the folded function returned its input and emitted nothing.
 //
-// NO RULING SITS BEHIND THIS. This comment opened "FOUNDER RULING, 2026-08-17"
-// until the attribution was retracted in `coverage.ts` and twenty-eight lines
-// above; this was the third copy and it outlived the retraction. No such ruling
-// exists and none is needed, because the deferral is a tautology rather than a
-// decision: a derived direction cannot be enforced against a fold that reaches
-// none of the rules a fixture cites. `CI-06q` passes over the stale copy because
-// 2026-08-17 does carry three declared rulings, so the DATE resolves while the
-// CLAIM is false; the gate checks that an authority exists and never that it
-// says what is attributed to it.
+// THE PREMISE IT WAITED FOR STOPPED BEING TRUE. The fold moved from `evaluate`
+// to `advanceDay`, `declaration.holds` went true, and the derived block has been
+// the one running ever since: every fixture derives `direct`, every rule group
+// reports 100 percent, and the coverage block says ENFORCED. ADR-048's design
+// worked all the way through and no entry recorded that it finished. Its 43
+// tests were 43 of the suite's 45 skips and could only run again if the engine
+// regressed to an identity fold, at which point they would have asserted that
+// every fixture fails -- and passed, on an engine computing nothing.
+//
+// THE GUARD IS KEPT AND IS NOT WHAT WAS RETIRED. `checkDeclarationAgainstFold`
+// still runs before any fixture is consulted, the coverage block still prints
+// the premise in bold when it does not hold, and `describe.runIf(declaration.
+// holds)` below still refuses to enforce a derived direction against a fold that
+// reaches none of the cited rules. That is ADR-048 case 1 and it is a live
+// failure mode. What went was the duplicate assertion, not the check.
+//
+// WHAT THIS REMOVAL DOES NOT CHANGE, said plainly because a reader will ask. If
+// the fold ever regressed, this stage would go green with the premise printed in
+// bold and no per-fixture assertion running. That was equally true before: the
+// retired block passed against a stub, because a stub makes every fixture
+// mismatch and "must not match" is what it asserted. Making the regression RED
+// is a change in behaviour rather than a removal of dead code, so it is left to
+// whoever holds that objective.
 //
 // THIS IS NOT A `pending` FLAG BY ANOTHER NAME, and the difference is where it
 // lives. A `pending: true` is per fixture, is written in the fixture, and lets
 // ONE scenario stop asserting without anybody deciding to. This is one
 // condition, computed, covering the whole directory, printed in bold in the
 // stage's own output on every run, and no fixture can reach it.
-
-describe.runIf(!declaration.holds)(
-  'while the fold reaches none of the declared rules (TR-02)',
-  () => {
-    test.each(fixtures.map((f) => [named(f), f] as [string, GoldenFixture]))(
-      '%s does not yet match, because the folded function computes nothing',
-      (_label, fixture) => {
-        const { diffs } = runFixture(fixture);
-        // A FIXTURE THAT MATCHES HERE IS THE FAILURE. The folded function returns
-        // the state it was given and emits nothing, so a fixture it satisfies is
-        // a fixture pinning nothing at all. This is the assertion that stood
-        // before ADR-048 and it still means what it meant.
-        expect(diffs.length).toBeGreaterThan(0);
-      },
-    );
-  },
-);
+//
+// NO RULING SITS BEHIND THIS. The comment retired above opened "FOUNDER RULING,
+// 2026-08-17" until the attribution was retracted in `coverage.ts` and in the
+// declaration test above; that was the third copy and it outlived the
+// retraction. No such ruling exists and none is needed, because the deferral is
+// a tautology rather than a decision: a derived direction cannot be enforced
+// against a fold that reaches none of the rules a fixture cites. `CI-06q` passed
+// over the stale copy because 2026-08-17 does carry three declared rulings, so
+// the DATE resolved while the CLAIM was false; the gate checks that an authority
+// exists and never that it says what is attributed to it.
 
 describe.runIf(declaration.holds)('every fixture, in the direction its citation derives', () => {
   test.each(fixtures.map((f) => [named(f), f] as [string, GoldenFixture]))(
