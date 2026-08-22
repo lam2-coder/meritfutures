@@ -475,3 +475,20 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_simulation_decision_record.sql
+
+      # ADR-079, MONEY PATH. 0015 bounded consistency_period_start_day against
+      # the row's own trading_day; R-47 defines it against the ANCHOR and sets
+      # it to the next trading day AFTER that anchor, so EVERY EVAL-PASS ROW WAS
+      # UNWRITABLE. Executed at 0045 before the repair was written.
+      #
+      # SUCCESS 1 IS THE ROW 0015 REFUSED and it proves the constraint SILENT
+      # rather than permitting: on the eval-pass row payout_anchor_day IS NULL,
+      # so the replacement does not reach it. REJECTION 1 AND 2 ARE THE STEP
+      # THAT MATTERS. They are the boundary either side of R-47's "strictly",
+      # they are the only cases in this job that watch the new constraint refuse
+      # anything at all, and each asserts the CONSTRAINT NAME rather than a bare
+      # check_violation, which any constraint on the table would satisfy.
+      - name: Probe ADR-079's anchor-relative consistency period (0046)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_consistency_period_after_anchor.sql
