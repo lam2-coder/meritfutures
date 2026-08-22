@@ -22,7 +22,7 @@
 // carried forward, because the case it names -- an engine that returns its
 // input by reference and emits nothing -- is still worth a comment where the
 // new derivation lives". This is that place, and the warning turned out to
-// have more teeth than a comment: see `declarationReachesTheFold` below.
+// have more teeth than a comment: see `checkDeclarationAgainstFold` below.
 // =============================================================================
 
 // THIS MODULE IMPORTS NOTHING, AND THAT IS THE SAME ARGUMENT compare.ts MAKES
@@ -123,24 +123,36 @@ export function derivePolarity(source: string, declared: ReadonlySet<string>): D
 // without the rule being implemented", answered by cross-checking the declared
 // set against the passing `RE-U-nn` set: a declaration is not self-certifying.
 //
-// THERE IS A FOURTH, AND IT IS THE ONE THIS REPOSITORY IS IN. A rule can be
-// implemented in `packages/rules-engine` -- with a passing `RE-U-nn`, so the
-// ruled cross-check is satisfied -- and be UNREACHABLE FROM THE FUNCTION CI-03
-// FOLDS. ADR-048 speaks of "the engine" as one thing. M01 section 1.3 exports
-// six functions, and `runFixture` calls none of them: it calls `evaluate`, the
-// scaffold's placeholder, which returns the state it was given and emits
-// nothing. The declared rules live in `advanceDay`, `applySettlement` and
-// `evaluatePayout`.
+// THERE IS A FOURTH, AND THIS REPOSITORY WAS IN IT. A rule can be implemented
+// in `packages/rules-engine` -- with a passing `RE-U-nn`, so the ruled
+// cross-check is satisfied -- and be UNREACHABLE FROM THE FUNCTION CI-03 FOLDS.
+// ADR-048 speaks of "the engine" as one thing. M01 section 1.3 names several
+// functions and this stage folds one path through them.
+//
+// WHAT `runFixture` ACTUALLY CALLS, READ FROM run.ts RATHER THAN REMEMBERED:
+// `initialState`, `buildCalendarSlice` and `advanceDay`, and `advanceDay`
+// reaches `applySettlement` itself at DO-2. `engineIsIdentityStub` folds
+// `advanceDay` too, so the probe tracks the fold instead of trailing it. An
+// earlier version of this comment said `runFixture` called `evaluate`, the
+// scaffold's placeholder that returned its input and emitted nothing. That was
+// true when the check was written and it is why the check exists; the fold moved
+// and the comment did not.
+//
+// THE FAILURE MODE DID NOT MOVE WITH IT. `evaluatePayout` is read-time and is
+// not on this fold's path at all, so a rule implemented only there is declared
+// and unreachable from CI-03 exactly as the paragraph above describes.
 //
 // SO THE DECLARATION CAN BE TRUE OF THE PACKAGE AND FALSE OF THE FOLD, and
-// every fixture would then flip to `direct` and fail with a field diff that
-// says nothing about its subject. That is ADR-048 case 1 thirty times over: a
-// loud failure, but loud in a way that names the wrong cause.
+// every fixture citing such a rule flips to `direct` and fails with a field diff
+// that says nothing about its subject. That is ADR-048 case 1 thirty times over:
+// a loud failure, but loud in a way that names the wrong cause.
 //
 // THIS IS THE CHECK THAT NAMES THE RIGHT ONE, and it is the retired probe's
 // warning promoted from a comment to a mechanism, because the case it named
 // stopped being hypothetical. It consults no fixture, exactly as ADR-048 says a
-// declaration check should.
+// declaration check should. WHAT IT CATCHES IS THE TOTAL CASE -- a fold that
+// returns its input by reference and emits nothing -- and not the partial one
+// above, which is stated here rather than left for the next reader to derive.
 
 /** The scaffold-shaped probe the retired `engineIsIdentityStub` used. */
 interface FoldProbe {
