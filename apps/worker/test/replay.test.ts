@@ -27,7 +27,15 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { DailyMark, EngineGateResults, RuleState } from '@merit/rules-engine';
+import {
+  buildCalendarSlice,
+  type CalendarDay,
+  type CalendarSlice,
+  type DailyMark,
+  type EngineGateResults,
+  type RuleState,
+  type SettlementFact,
+} from '@merit/rules-engine';
 
 import { foldAccountDay } from '../src/batch/nightly.js';
 import type { AccountDay, RuleStateRow } from '../src/batch/ports.js';
@@ -625,5 +633,554 @@ describe('a divergence is never quiet', () => {
       'raiseDivergence:2026-08-12',
       'raiseDivergence:2026-08-13',
     ]);
+  });
+});
+
+// =============================================================================
+// 6. GS-071: a 250-day funded life, THE HASH FIRST AND THEN FIELD BY FIELD
+// =============================================================================
+// `GS-071` is "replay of a 250-day funded life reproduces every stored state
+// byte-identically", pinned as "the core determinism claim, asserted on state
+// hashes and then field by field"
+// (`docs/testing/golden-scenarios/06-gs-071-to-gs-078-...`). ADR-076 section 3
+// rules it `writable` HERE rather than in the golden loader, and rules why: the
+// loader may import the engine's published entry point only, and `replay.ts`
+// and `state-hash.ts` live in `apps/worker`. It also rules that the difference
+// between what block 1 already asserts and what this row asks for "is a SCALE
+// and not a shape".
+//
+// -----------------------------------------------------------------------------
+// THE ORDER IS THE POINT AND IT IS NOT A STYLE PREFERENCE
+// -----------------------------------------------------------------------------
+// NEITHER ASSERTION IS REDUNDANT AND THE NEXT READER WILL THINK ONE OF THEM IS,
+// which is the only reason this paragraph exists.
+//
+//   THE HASH tells you THAT two runs diverged and cannot tell you WHERE. It is
+//   the total assertion: thirty-two bytes over all nineteen columns, so a
+//   divergence ANYWHERE fails it, including in a field nobody thought to
+//   compare and in a field added to the row after this test was written.
+//
+//   THE FIELD COMPARISON tells you WHERE and is satisfied by a field nobody
+//   compared. On its own it is a list this file maintains by hand, and a list
+//   maintained by hand is a list that goes stale silently.
+//
+// So the hash is asserted FIRST, because it is the verdict, and the fields are
+// compared AFTER, because a verdict nobody can localise is a nightly page that
+// says "something moved". That is M01 Appendix B.2's own ordering
+// ("compare `state_hash` first, then diff field by field") asserted at test
+// scale rather than only implemented at run time in `diffStoredAgainstRecomputed`.
+//
+// DELETING EITHER ONE LOSES SOMETHING THE OTHER NEVER HAD.
+//
+// -----------------------------------------------------------------------------
+// 250 IS THE ROW'S NUMBER AND THE FIRST ASSERTION IS ABOUT THE SCALE
+// -----------------------------------------------------------------------------
+// A test that asserted this at four days under the `GS-071` name would discharge
+// nothing, and nothing about a passing determinism assertion says what it ran
+// over. So the case asserts the SHAPE OF THE LIFE before it asserts anything
+// about replaying it: 250 stored rows, every one of them `funded`, the R-31
+// reset visible on the first, and four settlements. If a future edit shortens
+// the stream, the case fails on the count rather than passing quietly at a
+// scale the row does not name.
+//
+// THE FIXTURES IN `fixtures.ts` CANNOT REACH THIS AND THAT IS WHY THE CALENDAR
+// AND THE MARKS ARE BUILT HERE. `CALENDAR` covers five sessions
+// (`2026-08-10..2026-08-14`) and `MARKS` above is four days that never leave the
+// eval phase: day 1 closes 30,000c up against a 300,000c target. Neither is a
+// defect; block 5's chain test needs four days and says so. A 250-day funded
+// life needs a 250-session calendar and a mark stream that passes the eval, and
+// building those in `fixtures.ts` would put them in `nightly-batch.test.ts`'s
+// import graph for no caller.
+
+// -----------------------------------------------------------------------------
+// The calendar: 260 sessions, as DATA and never as date arithmetic
+// -----------------------------------------------------------------------------
+// R-02 and AS-06: "gap counting is `calendar.sequence` subtraction, never date
+// arithmetic", and the calendar itself is maintained as data (CLAUDE.md). So the
+// sessions here are ENUMERATED rather than computed from a clock: twenty
+// sessions a month, which is what an exchange month is, over thirteen months.
+// Nothing in this file constructs a `Date`, which is also what keeps it inside
+// M01 section 1.4's banned-construct list even though the list binds the engine
+// and not its tests.
+//
+// 260 SESSIONS FOR 250 MARKS, and the ten spare are not padding. R-31 starts
+// the new consistency period on the trading day AFTER the eval pass, R-47 does
+// the same after each settlement, and R-37 resolves `nextEligibleTradingDay`
+// forward from the cadence anchor. A slice that ended on the last mark would
+// make those lookups land outside coverage, and ADR-049 rules that a typed
+// refusal rather than a null: the fold would refuse days it should close.
+
+const SCALE_MONTHS: readonly string[] = [
+  '2026-01',
+  '2026-02',
+  '2026-03',
+  '2026-04',
+  '2026-05',
+  '2026-06',
+  '2026-07',
+  '2026-08',
+  '2026-09',
+  '2026-10',
+  '2026-11',
+  '2026-12',
+  '2027-01',
+];
+
+/** Twenty sessions a month. The sequence is the calendar's, not an index. */
+const SCALE_SESSIONS: readonly CalendarDay[] = SCALE_MONTHS.flatMap((month, m) =>
+  Array.from({ length: 20 }, (_, d) => ({
+    tradingDay: td(`${month}-${String(d + 1).padStart(2, '0')}`),
+    isHalfDay: false,
+    halted: false,
+    sequence: 20_001 + m * 20 + d,
+  })),
+);
+
+const SCALE_CALENDAR: CalendarSlice = buildCalendarSlice({
+  days: SCALE_SESSIONS,
+  coverage: {
+    from: SCALE_SESSIONS[0]!.tradingDay,
+    to: SCALE_SESSIONS[SCALE_SESSIONS.length - 1]!.tradingDay,
+  },
+});
+
+/**
+ * GS-071's number, and the one this file must not quietly reduce.
+ *
+ * EVERY ONE OF THE 250 STORED ROWS IS `funded`, INCLUDING THE FIRST, and that
+ * is R-31 rather than an off-by-one. The eval pass and the funded reset happen
+ * in ONE step at DO-8: the day the account clears the 300,000c target is folded
+ * as an eval day and the row it writes already carries `phase: 'funded'`, the
+ * balance back at `size_cents`, and every counter at zero. So the life is 250
+ * funded rows, the first of which is the day the account became funded.
+ */
+const FUNDED_DAYS = 250;
+
+// -----------------------------------------------------------------------------
+// The life, and every number in it is bounded by a rule rather than chosen
+// -----------------------------------------------------------------------------
+// Core EOD at 50K (`PLAN`, transcribed from M01 Appendix A.1) leaves a narrow
+// band, and the band is what fixes the arithmetic below:
+//
+//   R-15  THE LOCK IS PERMANENT AND ASSIGNS (ADR-052). A close at
+//         5,260,000c (260,000c of profit) locks the floor at 5,010,000c and
+//         FREEZES `highWaterBalanceCents` for the rest of the account's life.
+//         `0015`'s `rule_states_high_water_bounds_balance` then rejects every
+//         later row whose balance exceeds the lock-day close, so a 250-day life
+//         that locks is a life whose rows no database would accept. THE STREAM
+//         THEREFORE NEVER REACHES 260,000c OF PROFIT: it peaks at 219,000c.
+//   R-35  the withdrawable is `balance - size - buffer`, and the buffer is
+//         100,000c, so the first 100,000c of profit is not payable. A payout of
+//         110,000c therefore needs 210,000c of profit standing, which is why the
+//         first settlement is on funded day 99 and not on funded day 9.
+//   R-49  `payoutsSettledCount >= max_payouts` GRADUATES the account, and
+//         `advanceDay` then returns at DO-2 because "no trading day follows".
+//         Core EOD's ladder is five, so the life settles FOUR times: a fifth
+//         would close the account on the day it fired and every session after
+//         it would fold into a graduated state rather than a funded one.
+//   R-09  a win day is `realized_pnl_cents >= 15,000c`, and R-29 wants the best
+//         day at or under 30 percent of the period's profit. Those pull opposite
+//         ways: five win days per ten sessions at 15,000c to 18,000c, against a
+//         period profit that has to reach at least 3.33x the best day before the
+//         consistency gate can pass. The cycle below satisfies both, which is
+//         why both gates MOVE across the life instead of sitting at one verdict.
+
+/**
+ * Ten sessions of realized P&L, repeated. `+20,000c` a cycle, best day
+ * `18,000c`, five win days.
+ *
+ * A CYCLE RATHER THAN A CONSTANT, because a constant daily P&L makes every gate
+ * monotone and a replay of a monotone stream cannot distinguish an engine that
+ * chains its own prior from one that recomputes each day from the mark. The
+ * partial sums inside the cycle run `+16, +7, +22, +10, +28, +21, +36, +22, +39,
+ * +20` (thousands of cents), so the balance oscillates by 32,000c inside every
+ * cycle while drifting up by 20,000c across it.
+ */
+const PNL_CYCLE: readonly bigint[] = [
+  16_000n,
+  -9_000n,
+  15_000n,
+  -12_000n,
+  18_000n,
+  -7_000n,
+  15_000n,
+  -14_000n,
+  17_000n,
+  -19_000n,
+];
+
+/**
+ * The four settlements: index into the life, and the amount approved.
+ *
+ * EACH IS AT OR UNDER THE WITHDRAWABLE STANDING THE DAY BEFORE, which is what
+ * makes the stream a life rather than four arbitrary debits, and the case
+ * ASSERTS that against the stored rows rather than stating it here: a
+ * transcribed figure is a figure that goes stale when the cycle moves. Every
+ * one is at or under R-39's 150,000c cap and at or over its 10,000c minimum,
+ * and they are 50 or 40 sessions apart, which clears R-37's five-trading-day
+ * cadence gap by a wide margin.
+ */
+const SETTLEMENT_SCHEDULE: readonly { readonly dayIndex: number; readonly cents: bigint }[] = [
+  { dayIndex: 100, cents: 110_000n },
+  { dayIndex: 150, cents: 105_000n },
+  { dayIndex: 200, cents: 100_000n },
+  { dayIndex: 240, cents: 80_000n },
+];
+
+/** The eval day: one session, straight through R-26's 300,000c target. */
+const EVAL_PROFIT_CENTS = 300_000n;
+
+interface LifeDay {
+  readonly mark: DailyMark;
+  readonly settlements: readonly SettlementFact[];
+}
+
+/**
+ * The 250 marks, derived from the fold's own balances.
+ *
+ * THE OPENING BALANCE IS READ OFF THE PRIOR STATE RATHER THAN RE-DERIVED, and
+ * that is the same choice `storedFor` above makes for the same reason. INV-18 is
+ * `opening == prior.balance + adjustment` and R-31 resets the balance to
+ * `size_cents` on the pass day; a fixture that computed its own openings would
+ * be a second implementation of R-31 living in a test, and it would disagree
+ * with the engine on the one day that matters most.
+ *
+ * IT IS NOT A CIRCULARITY. Nothing here asserts that the balances are right;
+ * `nightly-batch.test.ts` and the engine's own suites do that. What this builds
+ * is a coherent INPUT STREAM, and the assertion the stream feeds is that
+ * replaying it twice produces the same bytes.
+ */
+function buildLife(): readonly LifeDay[] {
+  const days: LifeDay[] = [];
+  let prior: RuleState | null = null;
+  let settledCount = 0;
+
+  for (let index = 0; index < FUNDED_DAYS; index += 1) {
+    const tradingDay = SCALE_SESSIONS[index]!.tradingDay;
+    const priorBalance = prior?.balanceCents ?? PLAN.sizeCents;
+
+    const fundedDay = index - 1;
+    const scheduled = SETTLEMENT_SCHEDULE.find((s) => s.dayIndex === index);
+
+    // SD-01 and R-10: a settled withdrawal lands at the OPEN of its effective
+    // day, in `adjustment_cents`, never inside the session.
+    const adjustmentCents = scheduled === undefined ? 0n : -scheduled.cents;
+    const openingBalanceCents = priorBalance + adjustmentCents;
+
+    const realizedPnlCents =
+      index === 0 ? EVAL_PROFIT_CENTS : PNL_CYCLE[fundedDay % PNL_CYCLE.length]!;
+    const closingBalanceCents = openingBalanceCents + realizedPnlCents;
+
+    const low =
+      openingBalanceCents < closingBalanceCents ? openingBalanceCents : closingBalanceCents;
+    const high =
+      openingBalanceCents > closingBalanceCents ? openingBalanceCents : closingBalanceCents;
+
+    const settlements: SettlementFact[] = [];
+    if (scheduled !== undefined) {
+      settledCount += 1;
+      settlements.push({
+        payoutRequestId: `0199c7a1-0000-7000-8000-${String(settledCount).padStart(12, '0')}`,
+        // R-45. The ordinal is `payoutsSettledCount + 1` at request time.
+        ordinal: settledCount,
+        approvedCents: scheduled.cents,
+        // R-46 and R-47. The decision was computed against the previous closed
+        // day, so the new consistency period starts on the day after it, which
+        // is this day. `rule_states_consistency_period_started` (`0015`) needs
+        // that `<= trading_day`, and equality is what it gets.
+        basisTradingDay: SCALE_SESSIONS[index - 1]!.tradingDay,
+        effectiveTradingDay: tradingDay,
+      });
+    }
+
+    const mark: DailyMark = {
+      tradingDay,
+      openingBalanceCents,
+      closingBalanceCents,
+      highBalanceCents: high + 1_000n,
+      lowBalanceCents: low - 1_000n,
+      realizedPnlCents,
+      adjustmentCents,
+      fillCount: 3 + (index % 4),
+      sourceHash: `gs-071-day-${String(index)}`,
+    };
+
+    days.push({ mark, settlements });
+
+    const fold = foldAccountDay(
+      {
+        accountId: ACCOUNT_A,
+        plan: PLAN,
+        prior,
+        mark,
+        settlements,
+        external: CLEAR,
+        openedOn: SCALE_SESSIONS[0]!.tradingDay,
+      },
+      SCALE_CALENDAR,
+      ENGINE_VERSION,
+      WATERMARK,
+    );
+    // A REFUSAL WHILE BUILDING IS A BROKEN FIXTURE AND IT SAYS SO. DO-3 refuses
+    // rather than throwing, so a stream that violated INV-18 or breached the
+    // floor would otherwise produce a short history and a green test over it.
+    if (fold.kind !== 'row') {
+      throw new Error(
+        `the GS-071 stream refused on ${tradingDay}: ` +
+          fold.assertions.map((a) => `${a.kind} ${a.detail}`).join('; '),
+      );
+    }
+    prior = fold.state;
+  }
+
+  return days;
+}
+
+const LIFE = buildLife();
+
+/** What the batch would have stored, folded once, chaining its own prior. */
+function storedLife(): readonly RuleStateRow[] {
+  const rows: RuleStateRow[] = [];
+  let prior: RuleState | null = null;
+  for (const day of LIFE) {
+    const fold = foldAccountDay(
+      {
+        accountId: ACCOUNT_A,
+        plan: PLAN,
+        prior,
+        mark: day.mark,
+        settlements: day.settlements,
+        external: CLEAR,
+        openedOn: SCALE_SESSIONS[0]!.tradingDay,
+      },
+      SCALE_CALENDAR,
+      ENGINE_VERSION,
+      WATERMARK,
+    );
+    if (fold.kind !== 'row') throw new Error('the GS-071 stream refused while storing');
+    rows.push(fold.row);
+    prior = fold.state;
+  }
+  return rows;
+}
+
+/**
+ * The inputs the replay is handed. `prior` is null on every one of them.
+ *
+ * INV-04 is "replaying every mark FROM DAY ONE", and `auditAccount` carries its
+ * own prior for exactly that reason, so the field is set to the value that would
+ * break a replay reading it.
+ */
+const scaleInputs = (): readonly AccountDayInput[] =>
+  LIFE.map((day) => ({
+    day: {
+      accountId: ACCOUNT_A,
+      plan: PLAN,
+      prior: null,
+      mark: day.mark,
+      settlements: day.settlements,
+      external: CLEAR,
+      openedOn: SCALE_SESSIONS[0]!.tradingDay,
+    } satisfies AccountDay,
+    calendar: SCALE_CALENDAR,
+  }));
+
+// -----------------------------------------------------------------------------
+// The field list, TRANSCRIBED, and the gate leaves IMPORTED
+// -----------------------------------------------------------------------------
+// The same boundary block 2 draws and for the same reason. The eighteen entries
+// below are transcribed from ADR-026 C-07's column list, so a renamed column
+// fails here rather than agreeing with itself; the twenty-five leaves are
+// expanded from `ENGINE_GATE_LEAVES` because that is a COVERAGE question about
+// column 19 and not a question about SQL.
+//
+// THEY READ THE ROW'S FIELDS AND NOT THE HASH'S RENDERERS, which is what makes
+// this an independent comparison rather than a second look at the same bytes.
+// `HASHED_COLUMNS[n].render` produced the string the hash consumed; comparing
+// two rows through it would fail only where the hash already failed.
+
+interface HashedFieldCase {
+  /** The `rule_states` column, or `engine_gates.<dotted.path>` for a leaf. */
+  readonly column: string;
+  readonly of: (row: RuleStateRow) => unknown;
+}
+
+function leafValue(gates: EngineGateResults, path: string): unknown {
+  const [head, tail] = path.split('.') as [keyof EngineGateResults, string];
+  return (gates[head] as unknown as Record<string, unknown>)[tail];
+}
+
+const HASHED_FIELDS: readonly HashedFieldCase[] = [
+  { column: 'account_id', of: (r) => r.accountId },
+  { column: 'trading_day', of: (r) => r.tradingDay },
+  { column: 'phase', of: (r) => r.phase },
+  { column: 'floor_cents', of: (r) => r.floorCents },
+  { column: 'floor_locked', of: (r) => r.floorLocked },
+  { column: 'floor_open_cents', of: (r) => r.floorOpenCents },
+  { column: 'high_water_balance_cents', of: (r) => r.highWaterBalanceCents },
+  { column: 'balance_cents', of: (r) => r.balanceCents },
+  { column: 'withdrawable_cents', of: (r) => r.withdrawableCents },
+  { column: 'traded_days_count', of: (r) => r.tradedDaysCount },
+  { column: 'win_days_count', of: (r) => r.winDaysCount },
+  { column: 'consistency_best_day_cents', of: (r) => r.consistencyBestDayCents },
+  { column: 'consistency_period_profit_cents', of: (r) => r.consistencyPeriodProfitCents },
+  { column: 'consistency_period_start_day', of: (r) => r.consistencyPeriodStartDay },
+  { column: 'payouts_settled_count', of: (r) => r.payoutsSettledCount },
+  { column: 'payout_anchor_day', of: (r) => r.payoutAnchorDay },
+  { column: 'cadence_anchor_day', of: (r) => r.cadenceAnchorDay },
+  { column: 'engine_eligible', of: (r) => r.engineEligible },
+  ...ENGINE_GATE_LEAVES.map((leaf) => ({
+    column: `engine_gates.${leaf.path}`,
+    of: (row: RuleStateRow) => leafValue(row.engineGates, leaf.path),
+  })),
+];
+
+/** Rendered, never raw: a bigint reaching an assertion message throws on it. */
+function show(value: unknown): string {
+  if (typeof value === 'bigint') return value.toString(10);
+  if (typeof value === 'string') return value;
+  return String(value);
+}
+
+/**
+ * Every field on every day that disagrees, NAMED.
+ *
+ * IT RETURNS A LIST RATHER THAN ASSERTING PER FIELD, so a failure prints the
+ * `trading_day` and the column and both values rather than "expected true to be
+ * false" on the 43rd expectation of the 137th day.
+ */
+function fieldMismatches(
+  stored: readonly RuleStateRow[],
+  recomputed: readonly RuleStateRow[],
+): readonly string[] {
+  const mismatches: string[] = [];
+  const days = stored.length < recomputed.length ? stored.length : recomputed.length;
+
+  for (let i = 0; i < days; i += 1) {
+    const s = stored[i]!;
+    const r = recomputed[i]!;
+    for (const field of HASHED_FIELDS) {
+      const left = field.of(s);
+      const right = field.of(r);
+      // `Object.is`, so two `bigint`s of equal value agree and `NaN` never does.
+      if (!Object.is(left, right)) {
+        mismatches.push(
+          `${s.tradingDay} ${field.column}: stored ${show(left)}, replay ${show(right)}`,
+        );
+      }
+    }
+  }
+  return mismatches;
+}
+
+describe('GS-071  a 250-day funded life replays byte-identically', () => {
+  it('replays 250 funded days: the hash first, and then field by field', () => {
+    const stored = storedLife();
+
+    // -------------------------------------------------------------------------
+    // 0. THE SCALE, BEFORE ANY CLAIM ABOUT REPLAYING IT
+    // -------------------------------------------------------------------------
+    // GS-071 says 250 funded days. A determinism assertion at four days would
+    // pass every expectation below and discharge nothing, and a passing
+    // assertion does not report what it ran over.
+    expect(stored).toHaveLength(FUNDED_DAYS);
+    expect(stored.filter((row) => row.phase === 'funded')).toHaveLength(FUNDED_DAYS);
+
+    // DAY ONE IS THE PASS DAY AND ITS ROW IS ALREADY FUNDED. R-31 moves the
+    // phase, resets the balance to `size_cents`, resets the floor to
+    // `size_cents - funded drawdown_cents` and zeroes every counter, all in the
+    // one DO-8 step that recognised the pass. The mark closed 300,000c above
+    // the size and the row it wrote carries the size, which is the reset
+    // visible in the stored data rather than in a comment.
+    expect(LIFE[0]!.mark.closingBalanceCents).toBe(PLAN.sizeCents + EVAL_PROFIT_CENTS);
+    expect(stored[0]!.balanceCents).toBe(PLAN.sizeCents);
+    expect(stored[0]!.floorCents).toBe(PLAN.sizeCents - PLAN.funded.drawdown.drawdownCents);
+    expect(stored[0]!.tradedDaysCount).toBe(0);
+    expect(stored[0]!.winDaysCount).toBe(0);
+
+    // THE LIFE THE ROWS DESCRIBE IS ONE AN ACCOUNT COULD HAVE HAD, which is
+    // what makes it a funded LIFE and not 250 folds of arbitrary numbers.
+    //
+    //   - four settlements, so R-49's five-payout ladder never graduates the
+    //     account and ends the stream early;
+    //   - each one at or under the withdrawable that was standing the day
+    //     before, so no payout exceeds what R-35 says the trader had;
+    //   - the floor never locks, so `highWaterBalanceCents` is never frozen
+    //     below a later balance and every row satisfies `0015`'s
+    //     `rule_states_high_water_bounds_balance`.
+    expect(stored[stored.length - 1]!.payoutsSettledCount).toBe(SETTLEMENT_SCHEDULE.length);
+    for (const settlement of SETTLEMENT_SCHEDULE) {
+      expect(stored[settlement.dayIndex - 1]!.withdrawableCents).toBeGreaterThanOrEqual(
+        settlement.cents,
+      );
+    }
+    expect(stored.filter((row) => row.floorLocked)).toHaveLength(0);
+    expect(stored.every((row) => row.highWaterBalanceCents >= row.balanceCents)).toBe(true);
+    // The lock trigger, stated as the margin the stream actually kept rather
+    // than as a number in a comment: 219,000c of profit at the peak against
+    // R-15's 260,000c. `floorLocked` above is the consequence; this is the
+    // input, and it is what a later edit to `PNL_CYCLE` would move first.
+    const peakProfitCents =
+      stored.reduce((peak, row) => (row.balanceCents > peak ? row.balanceCents : peak), 0n) -
+      PLAN.sizeCents;
+    expect(peakProfitCents).toBe(219_000n);
+    expect(peakProfitCents).toBeLessThan(
+      PLAN.funded.drawdown.lock.enabled ? PLAN.funded.drawdown.lock.atProfitCents : 0n,
+    );
+
+    // A SECOND, INDEPENDENT FOLD OF THE SAME 250 MARKS, WHICH IS WHAT INV-04
+    // ASKS FOR AND IS NOT AS TRIVIAL AS "THE SAME FUNCTION TWICE" SOUNDS.
+    // Two runs of one pure function disagree the moment anything on the path
+    // reads a clock, iterates an object's keys where the result reaches the
+    // output, or serializes through a locale: M01 section 1.4's banned-construct
+    // list is exactly the list of ways this expectation fails, and the hash
+    // makes 250 days of that observable in one comparison. `PT-06` is the
+    // property-test form over shuffled arrival order and randomized `TZ` and
+    // `LC_ALL`; this is the 250-day form of the same claim.
+    const replayed = storedLife();
+
+    // -------------------------------------------------------------------------
+    // 1. THE HASH, FIRST. The verdict: a divergence ANYWHERE fails this
+    // -------------------------------------------------------------------------
+    // Compared as one array of 250 hex digests rather than day by day, because
+    // a per-day loop that stopped early would assert over a prefix and report
+    // like a run that compared everything (FM-17).
+    expect(replayed.map((row) => row.stateHash.toString('hex'))).toEqual(
+      stored.map((row) => row.stateHash.toString('hex')),
+    );
+
+    // -------------------------------------------------------------------------
+    // 2. THEN FIELD BY FIELD. What makes a divergence diagnosable
+    // -------------------------------------------------------------------------
+    // 43 comparisons a day over 250 days: the eighteen `RuleState` columns, the
+    // account id, and column 19 expanded to its twenty-five leaves. The hash
+    // above already failed if any of these moved; this says WHICH.
+    expect(fieldMismatches(stored, replayed)).toEqual([]);
+    expect(HASHED_FIELDS).toHaveLength(18 + ENGINE_GATE_LEAVES.length);
+
+    // AND THE COMPARISON IS NOT VACUOUS, which the equality above cannot say.
+    // `leafValue` walks a dotted path by hand, so a mistyped or renamed path
+    // reads `undefined` on BOTH sides, agrees with itself, and removes a field
+    // from the comparison without removing a line from the list. That is the
+    // same shape `DELTA_MANIFEST` section 13 records one level down: a check
+    // that passes because it checked nothing.
+    const unread = HASHED_FIELDS.filter((field) =>
+      stored.some((row) => field.of(row) === undefined),
+    );
+    expect(unread.map((field) => field.column)).toEqual([]);
+
+    // -------------------------------------------------------------------------
+    // 3. AND THROUGH THE AUDIT ITSELF, which is what runs in production
+    // -------------------------------------------------------------------------
+    // The counts beside the zero are the assertion, exactly as in block 1: an
+    // audit that compared nothing also reports zero divergences.
+    const report = auditAccount(ACCOUNT_A, scaleInputs(), stored, CONFIG, WATERMARK);
+
+    expect(report.diverged).toBe(0);
+    expect(report.findings).toEqual([]);
+    expect(report.matched).toBe(FUNDED_DAYS);
+    expect(report.inScope).toBe(FUNDED_DAYS);
+    expect(report.storedRows).toBe(FUNDED_DAYS);
+    expect(report.outOfScope).toBe(0);
   });
 });
