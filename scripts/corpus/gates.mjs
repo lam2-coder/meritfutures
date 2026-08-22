@@ -5377,21 +5377,23 @@ const fixtureInventory = {
 // -----------------------------------------------------------------------------
 // CI-06/identifier-series  Every member of a declared series has ONE definition
 // -----------------------------------------------------------------------------
-// ADR-074, IMPLEMENTED AS RULED. Its scope, its exemptions and its
-// definition-site parse are that ruling's and not this session's. Where the
-// ruling and the tree disagree the disagreement is REPORTED and never resolved
-// by re-scoping, and there are four such places; each is named below and every
-// one is also in the pull request.
+// ADR-074 AS AMENDED ON 2026-08-21 AND SIGNED, IMPLEMENTED AS RULED. Its scope,
+// its exemptions and its definition-site parse are that ruling's and not this
+// session's. Where the ruling and the tree disagree the disagreement is REPORTED
+// and never resolved by re-scoping; session 115 reported four such places
+// against the ruling as it then stood, the amendment resolved all four, and the
+// last block of this comment is what each resolution cost this file.
 //
 // THE RULE, QUOTED FROM ADR-074 SECTION 1 RATHER THAN PARAPHRASED:
 //
 //   "A definition site is a table row whose first cell LEADS with the
 //    identifier, or a markdown heading whose text LEADS with the identifier,
 //    occurring inside the series' DECLARED REGISTER. Every member of an
-//    in-scope series has exactly one. Every other occurrence anywhere in the
-//    repository is a citation and is unconstrained."
+//    in-scope series has exactly one, unless it is a DECLARED WITHHELD member
+//    (section 5.1). Every other occurrence anywhere in the repository is a
+//    citation and is unconstrained."
 //
-// Four things in that sentence are load bearing and each is a measurement.
+// Five things in that sentence are load bearing and each is a measurement.
 //
 //   "LEADS WITH", NOT "EQUALS". STATE writes its finding rows as
 //   `| **`OI-06`. The 48 hour payout-destination cooling window has no
@@ -5408,12 +5410,28 @@ const fixtureInventory = {
 //   not always an identity: `ADR-014` leads four rows, its own register row and
 //   three in ADR-052 and ADR-057 whose first column is THE SOURCE BEING QUOTED.
 //   Scoping the search to a named register removes that class instead of
-//   enumerating it. A register is a FILE, or a file and ONE `##` SECTION, and
-//   the section granularity is not a convenience: M01 section 1 holds `INV`'s
-//   24 definition rows and Appendix A holds one more for the same identifier in
-//   a COVERAGE table, so a file-wide register reports `INV` as broken. Measured
-//   here: section scoping is what takes `INV`, `CV` and `RB` from failing to
-//   clean.
+//   enumerating it. A register is a FILE, a file and ONE `##` SECTION, or an
+//   ADR-043 registry DIRECTORY, and section granularity is not a convenience:
+//   M01 section 1 holds `INV`'s 24 definition rows and Appendix A holds one more
+//   for the same identifier in a COVERAGE table, so a file-wide register reports
+//   `INV` as broken. Measured here: section scoping is what takes `INV`, `CV`
+//   and `RB` from failing to clean. The amendment widens the class ONE FILE
+//   SHAPE FURTHER, to an ADR-043 registry ENTRY THAT BINDS: an `ADR`, an `EC`, a
+//   `GS`. Never a session log and never a review record, and section 1 gives one
+//   reason for both exclusions rather than two -- a review record binds nothing
+//   by existing, and a session log is never afterwards amended, so a defect
+//   inside either can never be repaired and an entry naming it could never
+//   close. `OQ-F6`'s register is admitted by that widening and by nothing else.
+//
+//   A TABLE ROW IS A ROW WHEREVER IT SITS ON THE LINE. ADR-067's open-question
+//   table is INDENTED TWO SPACES, inside a `- **Open questions for the
+//   founder:**` list item, which is this corpus's ordinary shape for a decision
+//   block's own tables. A parse anchored to column zero reads those three rows
+//   as prose and reports a series with a perfectly good register as having none.
+//   Leading whitespace is stripped before the ROW test only, which is the width
+//   section 1 rules and not one character more: an indented `#` is a heading in
+//   markdown only until the fourth space makes it a code block, and no clause
+//   asks for that judgement to be made here.
 //
 //   THE SEARCH SPACE IS THE REPOSITORY, NOT `docs/`. Registers already live
 //   under `packages/`.
@@ -5421,52 +5439,60 @@ const fixtureInventory = {
 // THE SCOPE IS WRITTEN, NEVER DISCOVERED (ADR-074 section 2), and this is the
 // assertion the gate is worth nothing without. A gate whose scope is "every
 // series that currently satisfies the rule" PASSES FOREVER BY CONSTRUCTION: the
-// day a series breaks it leaves scope and the gate reports 115 of 115. So the
-// table below is a closed list, one argued entry each, and it is here rather
+// day a series breaks it leaves scope and the gate reports 117 of 117. So the
+// tables below are closed lists, one argued entry each, and they are here rather
 // than in a document for CI-06w's reason: the registration and the
 // implementation are the same line and cannot drift apart.
 //
-// FOUR PLACES WHERE THE RULING AND THE TREE DISAGREE. Each is reported, none is
-// resolved by widening or narrowing on this session's authority.
+// THE FOUR DISAGREEMENTS SESSION 115 REPORTED, AND WHAT THE AMENDMENT DID WITH
+// EACH. This file carried all four as reported defects for one commit. None was
+// closed by re-scoping and none is closed here on this session's authority: the
+// ruling moved, in writing, and this is the transcription of where it moved to.
 //
-//   1. THE COUNT DOES NOT REPRODUCE, AND ADR-074 SECTION 3 ASKS FOR EXACTLY
-//      THIS CHECK: "The count is stated so W8 can check that its transcription
-//      reproduced it." It states 118 series and 1,086 members. Transcribing its
-//      own four classes gives 117 and 1,083, and the two class subtotals are
-//      where it goes: the module row says 96 against the 93 its own rule
-//      enumerates, and the design row says 7 against the 9 series it lists by
-//      name (`DG`, `SS`, and seven `OQ-*`). The two errors are +3 and -2 and the
-//      TOTAL is therefore right by one. Nothing is added to close the gap:
-//      adding a series ADR-074 does not name would be choosing scope, which
-//      section 2 makes the ruling's job and not the runner's.
-//   2. `OQ-F6` IS RULED IN SCOPE AND HAS NO REGISTER THAT SECTION 1 ADMITS.
-//      Its only definition sites are table rows in a SESSION LOG, and a session
-//      log is a registry ENTRY rather than a corpus document (ADR-043). Section
-//      1 requires "a corpus document or a package README". The RULE governs the
-//      LIST that applies it, so `OQ-F6` is PENDING: a real defect, named, with
-//      the artifact it waits for. That is section 5's own mechanism and not an
-//      exemption; it is counted, and it fails the day a register appears
-//      without the series being promoted.
-//   3. `P-M6` IS RULED IN SCOPE AND HAS A MEMBER THAT WAS DELIBERATELY NOT
-//      MINTED. `P-M6-11` appears in session 112, which says so in terms: "a
-//      `P-M6-nn` written in application code is a claim on a series with no
-//      allocation table". Whoever holds M06 next decides whether the panel
-//      table gains a row or the third number lives inside `P-M6-01`'s block.
-//      That is a disposition and not a parse, so `P-M6` is PENDING with that
-//      decision named as the artifact.
-//   4. SECTION 5 NAMES TEN OF THE EIGHTEEN SERIES IN ITS FIRST PENDING CLASS.
-//      The other eight are not identified anywhere in the ruling or the survey,
-//      and eight of the twelve candidates in the tree would have to be picked
-//      by this session to reach the stated count. They are not. The pending
-//      register below holds the TEN THAT ARE NAMED plus `OQ-F6` and `P-M6`, and
-//      the shortfall against 44 is reported rather than filled in.
+//   1. THE COUNT DID NOT REPRODUCE, AND ADR-074 SECTION 3 ASKED FOR EXACTLY
+//      THAT CHECK: "The count is stated so W8 can check that its transcription
+//      reproduced it." It stated 118 series and 1,086 members and the four
+//      classes transcribed to 117 and 1,083. SECTION 3.1 RETRACED EVERY FIGURE
+//      TO ITS SOURCE rather than adjusting the total: the module row's 96 was
+//      3 high because it counted three series section 5 claims as pending at the
+//      same time, the design row's 7 was 2 low because it copied the count of
+//      the `OQ-*` sub-series into the column counting the class, the two errors
+//      very nearly cancel, and 1,086 reproduces from no stated reading at all.
+//      117 and 1,083 now sit inside a partition of all 215 series and all 2,106
+//      members that CLOSES IN BOTH COLUMNS, which a corrected subtotal never
+//      would have.
+//   2. `OQ-F6` WAS RULED IN SCOPE WITH NO REGISTER SECTION 1 THEN ADMITTED, and
+//      this file reported its only definition sites as rows in a SESSION LOG.
+//      The reported evidence was wrong and the ruling was narrow, both:
+//      `OQ-F6`'s rows are in ADR-067, THE ENTRY THAT RAISES IT, and session 94
+//      carries a second copy, which is a citation. They were unreadable here for
+//      a second reason nobody had named: they are indented two spaces inside a
+//      list item and the row test was anchored to column zero. Section 1's
+//      register class widens to an ADR-043 entry that binds and the row test
+//      relaxes, so `OQ-F6` is IN SCOPE, register `docs/decisions/ADR-067.md`.
+//   3. `P-M6` WAS RULED IN SCOPE AND `P-M6-11` WAS DELIBERATELY NOT MINTED.
+//      A deliberate gap and an accidental one are different things and the
+//      ruling had vocabulary for only the second. SECTION 5.1 GIVES IT ONE: a
+//      WITHHELD MEMBER is an identifier of an in-scope series that a recorded
+//      decision declined to mint, it is excluded from its series' membership,
+//      and the series stays in scope. `P-M6` is IN SCOPE, register M06, with
+//      `P-M6-11` withheld on session 112's record and in the third table below.
+//   4. SECTION 5 NAMED TEN OF THE EIGHTEEN SERIES IN ITS FIRST PENDING CLASS.
+//      The other eight were identified nowhere in the ruling or the survey and
+//      twelve candidates in the tree could be argued into the description, so
+//      this file held the ten that are named and reported the shortfall. THE
+//      CLASS IS NARROWED TO THOSE TEN, on the ruling's own argument that an
+//      arbitrary eight would be a worse artifact than an honest ten: a pending
+//      entry's whole value is that it names one real defect and the repair that
+//      ends it, and eight entries picked to satisfy a total name neither.
 //
-// SO: 115 SERIES, 1,070 MEMBERS, ZERO FINDINGS ON ARRIVAL, which is the state
-// ADR-074 section 6 rules the gate must arrive in, reached at three fewer
-// series than it states and with every difference written down. A gate over
-// 1,070 members that passes the day it is written has proven nothing yet; its
-// value is entirely in what it refuses tomorrow, and the two mechanisms that
-// make that real are the written scope above and the pending register below.
+// SO: 117 SERIES, 1,083 MEMBERS, ZERO FINDINGS, which is the state ADR-074
+// section 6 rules the gate must arrive in, at the count the amended ruling
+// states and with nothing left over. A gate over 1,083 members that passes the
+// day it is written has proven nothing yet; its value is entirely in what it
+// refuses tomorrow, and the three mechanisms that make that real are the written
+// scope above, the pending register below, and the withheld table that fails in
+// BOTH directions.
 
 // The DECLARED SCOPE. `series -> register`, where a register is a file, or a
 // file and one `##` section written after a `##` separator, or an ADR-043
@@ -5480,6 +5506,11 @@ const DECLARED_SERIES = new Map([
   // derived: `M12` has TWO plan files and the series live in the transparency
   // one, and `NC-M16` needs a section because M16 section 3 repeats its
   // identifiers in a state table.
+  //
+  // THE COMMENT SAID 93 AND THE BLOCK HELD 92 UNTIL `P-M6` LANDED IN IT, which
+  // is ADR-074 section 8's fifth edit and is called out there rather than fixed
+  // quietly: a class comment that disagrees with its own list is one more figure
+  // that disagrees, inside the change that exists to end figures disagreeing.
   // ---------------------------------------------------------------------------
   ['AN-M13', 'docs/plans/M13-trader-analytics-journal.md'],
   ['AS-M10', 'docs/plans/M10-integrations.md'],
@@ -5568,6 +5599,7 @@ const DECLARED_SERIES = new Map([
   ['LT', 'docs/plans/M05-payout-system.md'],
   ['NC-M16', 'docs/plans/M16-notification-center.md##1. Purpose and invariants'],
   ['OF-M17', 'docs/plans/M17-offers-engine.md'],
+  ['P-M6', 'docs/plans/M06-admin-ops-console.md'],
   ['PL-M19', 'docs/plans/M19-kyc-identity.md'],
   ['RS-M15', 'docs/plans/M15-discord-integration.md'],
   ['SC-M4', 'docs/plans/M04-trader-portal.md'],
@@ -5605,29 +5637,33 @@ const DECLARED_SERIES = new Map([
   ['RB', 'docs/ops/runbooks/README.md##2. The runbooks'],
   ['FOLD', 'docs/testing/golden-scenarios'],
   // ---------------------------------------------------------------------------
-  // 7 in a design or fold document. ADR-074 names NINE here and counts seven;
-  // the nine are these eight plus `OQ-F6`, which is pending below because its
-  // only definition sites are in a session log. Seven `OQ-*` sub-series are in
-  // scope and twenty are not, and the split is a finding rather than an
-  // inconsistency: the FOLD and PHASE plans register their open questions in the
-  // document that raises them and the MODULE plans do not. Same prefix, two
-  // conventions, one of them checkable. `OQ-P1` is clean and identically shaped
-  // to `OQ-P2` and ADR-074 does not name it, so it is undeclared and counted.
+  // 9 in a design, fold or DECISION document, which is the number ADR-074
+  // section 3's row names and section 3.1 restores to its count column. Seven
+  // `OQ-*` sub-series are in scope and twenty are not, and the split is a
+  // finding rather than an inconsistency: the FOLD and PHASE plans register
+  // their open questions in the document that raises them and the MODULE plans
+  // do not. Same prefix, two conventions, one of them checkable. `OQ-F6` is the
+  // seventh and it obeys the same convention in a different FILE CLASS: the
+  // document that raises it is an ADR rather than a plan, which is why section
+  // 1's register class had to widen before it could be counted here. `OQ-P1` is
+  // clean and identically shaped to `OQ-P2` and ADR-074 does not name it, so it
+  // is undeclared and counted.
   // ---------------------------------------------------------------------------
   ['DG', 'docs/design/DESIGN_SYSTEM.md'],
   ['SS', 'docs/design/DESIGN_SYSTEM.md'],
   ['OQ-F3', 'docs/plans/FOLD-03-vendor-parity-gap-fill.md'],
   ['OQ-F4', 'docs/plans/FOLD-04-impersonation-and-admin-parity.md'],
   ['OQ-F5', 'docs/plans/FOLD-05-plan-config-and-designer.md'],
+  ['OQ-F6', 'docs/decisions/ADR-067.md'],
   ['OQ-SE', 'docs/plans/P1-SE-trading-calendar.md'],
   ['OQ-P2', 'docs/plans/P2-rules-engine.md'],
   ['OQ-FREEZE', 'docs/STATE.md'],
 ]);
 
-// THE PENDING REGISTER (ADR-074 section 5). 44 series are neither in scope nor
-// exempt, and calling them exempt would be the dishonest move that section
-// exists to avoid. They are PENDING: a real defect, named, with the artifact it
-// waits for.
+// THE PENDING REGISTER (ADR-074 section 5, as narrowed by section 8 resolution
+// 4). 36 series are neither in scope nor exempt, and calling them exempt would
+// be the dishonest move that section exists to avoid. They are PENDING: a real
+// defect, named, with the artifact it waits for.
 //
 // IT CARRIES `CI06U_REGISTER`'s DEFINING PROPERTY: a register entry that no
 // longer names a real defect is a FINDING. So it shrinks as repairs land and it
@@ -5638,14 +5674,15 @@ const DECLARED_SERIES = new Map([
 // the gate then fails until it is promoted into the declared scope IN THE SAME
 // COMMIT, which is WAVE-03's rule that a register entry travels with its repair.
 //
-// THIS HOLDS 38 AND ADR-074 STATES 44. Section 5 names ten of the eighteen in
-// its first class; the other eight are identified nowhere in the ruling or in
-// the survey, and picking eight of the twelve candidates in the tree would be
-// this session choosing scope. `OQ-F6` and `P-M6` are here for the reasons given
-// above and are the 37th and 38th. The shortfall is reported, not filled in.
+// THIS HOLDS 36 AND SO DOES THE AMENDED RULING. The first class is the ten it
+// names and not the eighteen it counted: the other eight were identified nowhere
+// in the ruling or in the survey, twelve candidates in the tree could be argued
+// into the description, and picking eight of twelve to reach a total is the move
+// section 5 refuses by name. `OQ-F6` and `P-M6` were the 37th and 38th entries
+// here for one commit and are now in the declared scope above.
 const PENDING_SERIES = new Map([
-  // A register with holes or doubles: the repair is to the register. Ten of the
-  // eighteen ADR-074 section 5 counts, which is all of the ones it names.
+  // A register with holes or doubles: the repair is to the register. The ten
+  // ADR-074 section 5 names, which is now the whole of its first class.
   ['R', "a repair to M01's rule table: 13 members are doubled because a coverage table shares a section with the definition table"],
   ['ST', "a repair to M12's table: 7 members doubled, the same coverage-beside-definition shape"],
   ['RE-U', 'a table in the document that owns it; members have no row'],
@@ -5664,10 +5701,6 @@ const PENDING_SERIES = new Map([
   ['DT', 'a table in the document that owns it, or an argued move into X3'],
   ['PG-M9', 'a table in M09, or an argued move into X3'],
   ['OQ-P', 'a register that is a corpus document: its rows are in docs/reviews, which ADR-074 section 1 rules can never be a register because a review record binds nothing by existing'],
-  // Ruled in scope by ADR-074 and moved here on ADR-074's own section 1 rule,
-  // with the disagreement reported rather than resolved by re-scoping.
-  ['OQ-F6', "a register in a CORPUS DOCUMENT. Its only definition sites today are table rows in a session log, and a session log is a registry ENTRY rather than a corpus document (ADR-043), which ADR-074 section 1 does not admit as a register"],
-  ['P-M6', "a disposition for whoever holds M06 next: session 112 records that P-M6-11 was deliberately NOT minted, and that the panel table either gains a row or the third number is declared to live inside P-M6-01's block"],
   // `OQ-M*`, no register at all. Twenty series, and the ruling this waits on is
   // expressly NOT ADR-074's to make, because it is a question about how rulings
   // are recorded rather than about identifiers.
@@ -5691,6 +5724,35 @@ const PENDING_SERIES = new Map([
   ['OQ-M19', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
   ['OQ-M20', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
   ['OQ-M21', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+]);
+
+// THE WITHHELD TABLE (ADR-074 section 5.1). A gap in a series has two possible
+// causes and the ruling as first written had vocabulary for only one of them.
+//
+//   "A WITHHELD MEMBER is an identifier of an in-scope series that a recorded
+//    decision declined to mint. It is excluded from its series' membership and
+//    its series stays IN SCOPE."
+//
+// IT IS DECLARED, NEVER INFERRED, and that is the whole difference between this
+// and a hole. So it is a third closed list beside the two above, in the same
+// idiom section 2 requires of both: one argued entry each, naming the
+// identifier, the record of the decision, and what would end it.
+//
+// IT FAILS IN BOTH DIRECTIONS, which is what stops it being the cheap way to
+// silence a finding. An entry whose identifier has ACQUIRED a definition site is
+// a finding: the decision not to mint it has been reversed and this table has
+// not been told. An entry whose identifier NO LONGER APPEARS ANYWHERE is a
+// finding too: the reason to withhold it has gone with it. Both are watched
+// failing in falsify.mjs, one case each, because an assertion nobody has seen
+// fire is a comment.
+//
+// A DEFINITION SITE HERE MEANS WHAT SECTION 1 SAYS IT MEANS: a row or a heading
+// inside the series' DECLARED REGISTER. An occurrence anywhere else is a
+// citation and is unconstrained, and reading the first direction any wider would
+// make the cited-in-a-session-log shape a finding, which is the opposite of what
+// section 5.1 exists to record.
+const WITHHELD_MEMBERS = new Map([
+  ['P-M6-11', "session 112 declined to mint it, in terms: \"a `P-M6-nn` written in application code is a claim on a series with no allocation table, made from a fence that cannot add the row to the document that owns it, which is ADR-034's condition exactly\". The code cites AS-M6-04, an identifier that already exists, and the session's roster carries the eleventh number with the reason beside it. It ends when whoever holds M06 next decides whether the panel table gains a row or the third number is declared to live inside P-M6-01's block, which is a question about M06's read surface and is not ADR-074's to take"],
 ]);
 
 // The member census. Digits are TWO OR THREE, which is the survey's own floor
@@ -5751,13 +5813,27 @@ const leadsWith = (text, id) => new RegExp(`^[*\`[]*${id}\\b`).test(text.trim())
 
 // A row OR a heading, and NOT a bold lead. Counts the sites for one identifier
 // inside one register body.
+//
+// A TABLE ROW IS A ROW WHEREVER IT SITS ON THE LINE (ADR-074 section 1, and
+// section 8's fourth edit). ADR-067's open-question table is indented two spaces
+// inside a list item, which is this corpus's ordinary shape for a decision
+// block's own tables, and a parse anchored to column zero reads its three rows
+// as prose. The widening was MEASURED before it was ruled and again here: it
+// adds no site anywhere in the declared scope except the three it was written
+// for, so it cannot create a double it does not also fix.
+//
+// THE HEADING TEST IS LEFT ANCHORED, deliberately. Section 1 strips whitespace
+// "before the row test" and says nothing about headings, an indented `#` stops
+// being a heading at the fourth space, and a widening the ruling did not ask for
+// is a widening nobody argued.
 function definitionSites(body, id) {
   let sites = 0;
-  for (const line of body.split('\n')) {
-    if (/^#{1,6}\s/.test(line)) {
-      if (leadsWith(line.replace(/^#{1,6}\s+/, ''), id)) sites++;
+  for (const raw of body.split('\n')) {
+    if (/^#{1,6}\s/.test(raw)) {
+      if (leadsWith(raw.replace(/^#{1,6}\s+/, ''), id)) sites++;
       continue;
     }
+    const line = raw.replace(/^\s+/, '');
     if (!line.startsWith('|')) continue;
     const cells = line.split('|').slice(1, -1);
     if (cells.length > 0 && leadsWith(cells[0], id)) sites++;
@@ -5767,8 +5843,19 @@ function definitionSites(body, id) {
 
 // Every corpus document, concatenated once, for the pending register's
 // predicate. Registry ENTRIES are excluded through the runner's own
-// `isCorpusDocument`, which is what keeps a session log from counting as the
-// place a series is defined -- the exact reason `OQ-F6` is pending.
+// `isCorpusDocument`, and its row test stays ANCHORED TO COLUMN ZERO.
+//
+// THAT IS THE JUDGEMENT CALL ADR-074 SECTION 8 LEFT OPEN, AND THIS IS THE
+// SESSION IT WAS LEFT TO. The declared scope now admits an ADR-043 entry as a
+// register and reads an indented row; this predicate admits neither, so a
+// pending series repaired inside an ADR entry, or in an indented table, would
+// not be detected. It is left as it stands and the reason is a measurement
+// rather than a preference: with both widenings applied here, NO PENDING ENTRY
+// CHANGES STATE, at the commit ADR-074 was amended and again at this one. The
+// asymmetry costs nothing today, and widening a predicate whose findings nobody
+// has seen fire would be the second copy of a rule with none of the evidence.
+// The day a repair does land inside an ADR entry, this is the line to move, and
+// this comment is here so that session does not have to rediscover it.
 function corpusDefinitionCounts() {
   const counts = new Map();
   for (const file of markdownFiles().filter(isCorpusDocument)) {
@@ -5803,17 +5890,23 @@ const identifierSeries = {
     'GRANULARITY IS LOAD BEARING, not a convenience: M01 section 1 holds INV\'s definition ' +
     'rows and Appendix A holds a COVERAGE row for the same identifiers, so a file-wide ' +
     'register reports INV, CV and RB as broken. ' +
+    'AN INDENTED TABLE ROW IS A ROW: ADR-067 writes its open-question table two spaces in, ' +
+    "inside a list item, which is this corpus's ordinary shape for a decision block's own " +
+    'tables, so leading whitespace is stripped before the row test and before that test only. ' +
     'THE PENDING REGISTER IS THE SECOND TABLE (ADR-074 section 5): series that are neither ' +
     'in scope nor exempt are named as real defects with the artifact each waits for, and an ' +
     'entry that no longer names a defect is itself a finding, so it shrinks as repairs land ' +
-    'and cannot become furniture. UNDECLARED SERIES ARE CLAIMED AS NOTHING AND COUNTED ON ' +
+    'and cannot become furniture. THE WITHHELD TABLE IS THE THIRD (ADR-074 section 5.1): an ' +
+    'identifier of an in-scope series that a RECORDED DECISION declined to mint is excluded ' +
+    'from its series membership while the series stays in scope, and the entry fails in BOTH ' +
+    'directions, when the identifier acquires a definition site and when it stops appearing ' +
+    'at all. UNDECLARED SERIES ARE CLAIMED AS NOTHING AND COUNTED ON ' +
     'EVERY RUN, which is the honest measure of what this gate does not cover. ' +
-    'FOUR PLACES WHERE THE RULING AND THE TREE DISAGREE ARE REPORTED RATHER THAN RE-SCOPED: ' +
-    "ADR-074's stated 118 series and 1,086 members do not reproduce from its own four " +
-    'classes (117 and 1,083, with the module row 3 high and the design row 2 low); OQ-F6 is ' +
-    'ruled in scope with its only definition sites in a SESSION LOG, which section 1 does ' +
-    'not admit as a register; P-M6 is ruled in scope and P-M6-11 was deliberately not ' +
-    'minted; and section 5 names ten of the eighteen series in its first pending class. ' +
+    'THE FOUR DISAGREEMENTS SESSION 115 REPORTED ARE RESOLVED BY THE AMENDMENT OF 2026-08-21 ' +
+    'AND NOT BY RE-SCOPING: section 3.1 retraces 118 and 1,086 to 117 and 1,083 inside a ' +
+    'partition of all 215 series that closes in both columns; OQ-F6 is in scope on a register ' +
+    'class that now admits the ADR entry raising it; P-M6 is in scope with P-M6-11 withheld; ' +
+    "and the first pending class is narrowed to the ten series it names. " +
     'THREE THINGS IT DOES NOT DO. The member census has a TWO-DIGIT FLOOR, so a ' +
     'single-digit member is invisible to it exactly as it was to the census ADR-074 is ' +
     'ruled on. It says nothing about the CONTENT of a definition, only that exactly one ' +
@@ -5823,8 +5916,18 @@ const identifierSeries = {
     const findings = [];
     const members = seriesMembers();
 
-    // Rule 2 on both tables. An empty scope reports every series clean, which is
-    // the failure mode ADR-074 section 2 is written against.
+    // Rule 2 on the two tables it is about. An empty scope reports every series
+    // clean, which is the failure mode ADR-074 section 2 is written against, and
+    // an empty pending register asserts nothing about the 36 defects it holds.
+    //
+    // THE WITHHELD TABLE IS DELIBERATELY NOT GUARDED THE SAME WAY, and the
+    // asymmetry is the point. An empty withheld table is the STRICT end of the
+    // rule and not the vacuous one: with no entry, every member of every scoped
+    // series must have a definition site. Section 5.1 declares one entry today
+    // and says in terms what ends it, so the day M06 takes that disposition the
+    // correct edit is to REMOVE THE LAST ROW, and a runner that threw on an
+    // empty table would make the repair session edit this line to land it. That
+    // is the furniture the register was designed against, pointing the other way.
     if (DECLARED_SERIES.size === 0) throw new Error('DECLARED_SERIES is empty; the gate asserts nothing');
     if (PENDING_SERIES.size === 0) throw new Error('PENDING_SERIES is empty; the register asserts nothing');
 
@@ -5841,8 +5944,12 @@ const identifierSeries = {
         );
         continue;
       }
-      const ids = [...(members.get(series) ?? [])].sort();
-      if (ids.length === 0) {
+      // The CENSUS first and the MEMBERSHIP second, because they answer
+      // different questions and only one of them is what section 5.1 narrows. A
+      // series whose only members are withheld has not been renamed away, so the
+      // scope-entry-names-nothing finding is asked of the census as it stands.
+      const census = [...(members.get(series) ?? [])].sort();
+      if (census.length === 0) {
         findings.push(
           `scripts/corpus/gates.mjs: ${series} is declared in scope and the census finds no ` +
             'member of it anywhere. The series has been renamed or removed, and a scope entry ' +
@@ -5850,6 +5957,7 @@ const identifierSeries = {
         );
         continue;
       }
+      const ids = census.filter((id) => !WITHHELD_MEMBERS.has(id));
       scoped += ids.length;
       for (const id of ids) {
         const sites = definitionSites(body, id);
@@ -5864,6 +5972,44 @@ const identifierSeries = {
               'definitions, and which is the definition cannot be read off the page',
         );
       }
+    }
+
+    // -- the withheld table, which fails in BOTH directions ------------------
+    // ADR-074 section 5.1. Neither direction is inferred from the tree: the
+    // entry is the claim, and both findings say the TABLE is wrong rather than
+    // the corpus, because a decision recorded in a session log cannot be
+    // repaired and only this list can be.
+    for (const id of [...WITHHELD_MEMBERS.keys()].sort()) {
+      const series = id.replace(/-\d{2,3}$/, '');
+      const register = DECLARED_SERIES.get(series);
+      if (register === undefined) {
+        findings.push(
+          `scripts/corpus/gates.mjs: WITHHELD_MEMBERS holds ${id} and ${series} is not in ` +
+            'DECLARED_SERIES. A withheld member is an identifier OF AN IN-SCOPE SERIES ' +
+            '(ADR-074 section 5.1); withholding a member of a series nothing asserts over ' +
+            'excludes it from a census it was never in',
+        );
+        continue;
+      }
+      if (!(members.get(series) ?? new Set()).has(id)) {
+        findings.push(
+          `scripts/corpus/gates.mjs: WITHHELD_MEMBERS holds ${id} and the census no longer ` +
+            'finds it anywhere. The reason to withhold it has gone with it, so the entry ' +
+            `names nothing. Remove it (${WITHHELD_MEMBERS.get(id)})`,
+        );
+        continue;
+      }
+      const body = registerBody(register);
+      if (body === null) continue; // already a finding above, against the series
+      const sites = definitionSites(body, id);
+      if (sites === 0) continue;
+      findings.push(
+        `${register}: ${id} is in WITHHELD_MEMBERS and has ${sites} definition site(s) in the ` +
+          'declared register of ' +
+          `${series}. The decision not to mint it has been REVERSED and the withheld table has ` +
+          'not been told: either the entry goes, in the commit that minted the identifier, or ' +
+          `the definition site does (${WITHHELD_MEMBERS.get(id)})`,
+      );
     }
 
     // -- the pending register, and why it cannot become furniture ------------
@@ -5900,14 +6046,35 @@ const identifierSeries = {
       undeclaredMembers += ids.size;
     }
 
+    // THE NOTE CITES THE AMENDED SECTIONS, and this is ADR-074 section 8's sixth
+    // edit: the figures it quoted before are the PRE-AMENDMENT ones, and a note
+    // that keeps quoting 118, 1,086 and 44 reproduces on every run the error the
+    // amendment was signed to end.
+    //
+    // WHETHER THE TRANSCRIPTION STILL AGREES IS COMPUTED AND NOT ASSERTED. The
+    // ruled figures are ON ARRIVAL, which is the tense section 3 uses, and the
+    // pending register SHRINKS AS REPAIRS LAND by section 5's own design: a
+    // promotion moves two of the three in opposite directions and is the gate
+    // working, not a defect. So a mismatch is PRINTED and is not a finding, and
+    // the sentence saying so is derived from the tables rather than written into
+    // a comment that can go quietly stale.
+    const reproduces =
+      DECLARED_SERIES.size === 117 && scoped === 1083 && PENDING_SERIES.size === 36;
     console.log(
       `       CI-06/identifier-series note: ${DECLARED_SERIES.size} declared series over ` +
-        `${scoped} member(s); ${PENDING_SERIES.size} pending over ${pendingMembers} member(s), ` +
-        'each one a repair this gate is waiting for; ' +
+        `${scoped} member(s), with ${WITHHELD_MEMBERS.size} withheld member(s) excluded from ` +
+        `that count (ADR-074 section 5.1); ${PENDING_SERIES.size} pending over ` +
+        `${pendingMembers} member(s), each one a repair this gate is waiting for; ` +
         `${undeclared} series over ${undeclaredMembers} member(s) claimed as nothing. ` +
-        'ADR-074 section 3 states 118 declared and 1,086 members and section 5 states 44 ' +
-        'pending; the transcription reproduces neither and the differences are in this gate ' +
-        "block and in the pull request, not resolved by widening or narrowing the ruling's scope",
+        'ADR-074 AS AMENDED ON 2026-08-21 states 117 declared series over 1,083 members ' +
+        '(section 3, retraced figure by figure in section 3.1) and 36 pending (section 5, ' +
+        `narrowed to the ten it names by section 8 resolution 4) ON ARRIVAL, and this run ` +
+        `${reproduces ? 'reproduces all three' : 'DOES NOT reproduce all three'}. ` +
+        "The pending MEMBER figure is a different kind of number: the ruling's 281 is the " +
+        'survey\'s count under docs/ at e23578a and reproduces there exactly, while this gate ' +
+        'counts the whole repository as section 1 requires and every document minted since ' +
+        "moves it, which is section 3's own rule that a count of identifiers is a fact about a " +
+        'moment rather than a transcription target',
     );
     return findings;
   },
