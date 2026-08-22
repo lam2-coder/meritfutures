@@ -1465,6 +1465,7 @@ const rewriteFixtureRow = (d, pick, rewrite) => {
 // never catch it reading the wrong thing.
 const DECLARED_TABLE = /const DECLARED_SERIES = new Map\(\[([\s\S]*?)^\]\);/m;
 const PENDING_TABLE = /const PENDING_SERIES = new Map\(\[([\s\S]*?)^\]\);/m;
+const WITHHELD_TABLE = /const WITHHELD_MEMBERS = new Map\(\[([\s\S]*?)^\]\);/m;
 
 const seriesTable = (d, pattern) => {
   const src = readFileSync(join(d, 'scripts/corpus/gates.mjs'), 'utf8');
@@ -1533,6 +1534,58 @@ const declaredFileRegister = (d) => {
     return { series, register: detail, id: ids[0] };
   }
   throw new Error('seed anchor not found: no declared series with a whole-file register');
+};
+
+// A WITHHELD MEMBER (ADR-074 section 5.1) and the declared register of the
+// series it belongs to. The first whose register is a WHOLE FILE, for
+// `declaredFileRegister`'s reason: a row appended to a file whose register is one
+// `##` SECTION lands outside the section and seeds nothing.
+//
+// STABLE UNDER EVERY SEED BELOW, which is the CI-06l trap checked for rather
+// than tripped over: all three read the TABLE in gates.mjs, and no seed here
+// touches the declared or withheld tables except the control that deletes the
+// entry, which is a control and re-derives nothing after itself.
+const withheldMember = (d) => {
+  const registers = new Map(seriesTable(d, DECLARED_TABLE).map((r) => [r.series, r.detail]));
+  for (const row of seriesTable(d, WITHHELD_TABLE)) {
+    const id = row.series;
+    const series = id.replace(/-\d{2,3}$/, '');
+    const register = registers.get(series);
+    if (!register || register.includes('##') || !register.endsWith('.md')) continue;
+    return { id, series, register };
+  }
+  throw new Error('seed anchor not found: no withheld member whose series has a whole-file register');
+};
+
+// The withheld identifier read back out of the row the seed wrote, which is the
+// same discipline `seededPendingSeries` records and for a sharper reason here:
+// the CONTROL below deletes the WITHHELD_MEMBERS entry, so re-deriving from the
+// table after that seed would find an EMPTY table and throw inside `expect`
+// rather than name the identifier the gate is about to report.
+const CITED_SEED_MARK = 'cited, not defined';
+const seededWithheldId = (d) => {
+  for (const line of readFileSync(join(d, 'docs/GLOSSARY.md'), 'utf8').split('\n')) {
+    if (!line.startsWith('|') || !line.includes(CITED_SEED_MARK)) continue;
+    const m = /^\|\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{2,3})\s*\|/.exec(line);
+    if (m) return m[1];
+  }
+  throw new Error(`seed anchor not found: no row marked "${CITED_SEED_MARK}" in docs/GLOSSARY.md`);
+};
+
+// Every occurrence of one identifier, gone from every markdown file. The
+// replacement carries NO CAPITALS on purpose: a substitute that looked like an
+// identifier would delete one census member and mint another, and the case would
+// pass on a finding about the wrong thing.
+const eraseIdentifier = (d, id) => {
+  let touched = 0;
+  for (const f of walkMarkdown(d)) {
+    const p = join(d, f);
+    const body = readFileSync(p, 'utf8');
+    if (!body.includes(id)) continue;
+    writeFileSync(p, body.split(id).join('the number this session declined to mint'));
+    touched++;
+  }
+  if (touched === 0) throw new Error(`seed anchor not found: ${id} appears in no markdown file`);
 };
 
 // The smallest pending series ALL of whose members have zero definition sites
@@ -3189,6 +3242,64 @@ const SCOPE_CASES = [
           ids.map((id) => `| ${id} | ${PENDING_SEED_MARK} |`).join('\n') +
           '\n',
       );
+    },
+  },
+  // ---------------------------------------------------------------------------
+  // THE WITHHELD TABLE (ADR-074 section 5.1). THREE CASES, because the table
+  // makes three claims and a table watched failing on one of them is taken on
+  // trust for the other two.
+  //
+  // Its two failing directions are what stop it being the cheap way to silence a
+  // finding: a withheld identifier that ACQUIRES a definition site is a finding,
+  // and one that STOPS APPEARING ANYWHERE is a finding. The third case is the
+  // exemption itself, and it is the one the whole table exists to buy: a member
+  // nobody minted must NOT be reported against its series, and the control
+  // deletes the entry to prove the pass is the table's doing rather than the
+  // gate having stopped reading M06.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06/identifier-series/withheld-acquired-a-site',
+    gate: 'CI-06/identifier-series',
+    what: 'a withheld identifier that acquires a row in its own register, which MUST make the entry a finding',
+    expect: (d) => `${withheldMember(d).id} is in WITHHELD_MEMBERS and has 1 definition site(s)`,
+    seed: (d) => {
+      const { id, register } = withheldMember(d);
+      edit(d, register, (b) => `${b}\n| ${id} | minted after all, seeded by falsify |\n`);
+    },
+  },
+  {
+    name: 'CI-06/identifier-series/withheld-vanished',
+    gate: 'CI-06/identifier-series',
+    what: 'a withheld identifier that no longer appears anywhere, which MUST make the entry a finding',
+    expect: (d) => `WITHHELD_MEMBERS holds ${withheldMember(d).id} and the census no longer finds it`,
+    seed: (d) => eraseIdentifier(d, withheldMember(d).id),
+  },
+  {
+    // THE EXEMPTION, AND THE ONLY DIRECTION THAT SHOWS THE TABLE EARNING ITS
+    // PLACE. A withheld member has no definition site by construction, so the
+    // gate must not report the series that owns it as broken; the seed adds a
+    // row leading with the identifier in a file that is NOT its register, which
+    // section 1 rules is a citation and unconstrained, and neither the row nor
+    // the missing definition may fire.
+    //
+    // The control removes the WITHHELD_MEMBERS entry and changes nothing else.
+    // Without it this case is satisfied by a gate that has stopped reading the
+    // register at all, and with it the pass means the exclusion did the work.
+    name: 'CI-06/identifier-series/withheld-is-excluded',
+    gate: 'CI-06/identifier-series',
+    what: 'a withheld member cited outside its register and defined nowhere, which must NOT be a finding',
+    expect: 'PASS',
+    control: {
+      expect: (d) => `${seededWithheldId(d)} has NO definition site in its declared register`,
+      seed: (d) => {
+        const { id } = withheldMember(d);
+        edit(d, 'docs/GLOSSARY.md', (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | ${CITED_SEED_MARK} |\n`);
+        edit(d, GATES_PATH, (b) => once(b, new RegExp(`^\\s*\\['${id}',[\\s\\S]*?\\],\\n`, 'm'), ''));
+      },
+    },
+    seed: (d) => {
+      const { id } = withheldMember(d);
+      edit(d, 'docs/GLOSSARY.md', (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | ${CITED_SEED_MARK} |\n`);
     },
   },
 ];
