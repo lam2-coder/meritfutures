@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-19
+last_updated: 2026-08-23
 ---
 
 # STATE
@@ -2109,6 +2109,74 @@ at line 68.
 **[ADR-077](decisions/ADR-077.md)'s struck clause is re-quoted in [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md), the third of its four recitations**, which that entry rowed as owed and could not reach. Only the quotation moved and the row's disposition did not. **The replacement is `GS-030`'s wording and not `EC-012`'s**, repairing the mis-attribution ADR-077 section 1 opens with: the line cites `GS-030`'s row and was quoting `EC-012`'s sentence, and the two carry different obligations.
 
 **The position on this branch:** `node scripts/corpus/gates.mjs check` is <!--gen:gate_count-->28<!--/gen--> of <!--gen:gate_count-->28<!--/gen-->, `falsify.mjs` is green over 55 scope cases and 10 loader cases, and `pnpm run verify` is clean end to end. **[`gates.mjs`](../scripts/corpus/gates.mjs) was inside the fence and needed no edit**: `covered-elsewhere` entered `FIXTURE_STATUSES` in [session 131](sessions/2026-08-22-session-131.md), both summary tables derive from the rows, and assertion 6 resolves the `apps/worker` suite without a special case. **[`falsify.mjs`](../scripts/corpus/falsify.mjs) was outside it and had to move**: an empty `writable` starved the seed that hunted for a writable row, reporting `SEED IS STALE`, so the seed now builds its anchor from a `blocked` row the way `register-names-no-defect` does. **Next:** three items are named at the foot of [session 139's log](sessions/2026-08-22-session-139.md), and the largest is section 39's `GS-030` blocker cell, ADR-077's fourth recitation, which owes a re-ruling rather than a re-quote.
+
+---
+
+## The `0015` citation audit: 102 sites checked, three stale, and the method generalises to one more (2026-08-23, session 141)
+
+**[Session 132](sessions/2026-08-22-session-132.md) named the defect and it was never the wrong finding.** [Session 129](sessions/2026-08-22-session-129.md) cited `rule_states_high_water_bounds_balance` at `0015:208` as live; [`0037`](../packages/db/migrations/0037_supersede_rule_states_high_water_bounds_balance.sql) had superseded it five days earlier under [ADR-053](decisions/ADR-053.md). **The defect is that a merged constraint was cited by file and line without asking whether a later migration had superseded it**, which rules every other `0015` citation suspect for the same reason. This is that audit.
+
+**BOTH NUMBERS, because a citation that resolves is as much a result as one that does not.** Every citation of a `0015` constraint anywhere in the repository was checked against the migration directory: **102 file:line sites, 99 resolved and 3 stale.** Collapsing multi-line quotations to one claim each gives **95 claims, the same three stale**. The site set is a reproducible grep over the eight constraint names `0015` defines plus every `0015:<line>` pointer into it, minus the definition file itself.
+
+**Two of `0015`'s eight constraints are retired**, `rule_states_high_water_bounds_balance` by `0037` and `rule_states_consistency_period_started` by [`0046`](../packages/db/migrations/0046_supersede_rule_states_consistency_period_started.sql). The other six are live and every citation of them resolves by construction.
+
+| Disposition | Sites | What it means |
+|---|---|---|
+| **Dated record** | 67 | A session log, a signed or proposed ADR, an [ALLOCATION](decisions/ALLOCATION.md) row, an append-only STATE section, a plan's dispatch brief. True on its date; rewriting it destroys the record |
+| **Supersession machinery** | 20 | `0037`, `0046` and their two probes. The retired name appears in order to retire it or to assert its absence |
+| **Live constraint** | 8 | One of the six `0015` constraints nothing has superseded |
+| **The string, not the constraint** | 4 | `CI-06s`'s near-miss: `corpus.yml` names `rule_states_high_water_bounds_balance` in a comment three lines above the step running `probe_rule_states_high_water_bound.sql`, and a loose parser reads that as coverage |
+| **STALE** | **3** | Below |
+
+### The three, all in one file, and none of them repairable from this fence
+
+**[`apps/worker/test/replay.test.ts`](../apps/worker/test/replay.test.ts) is the only file in the repository that cites a retired `0015` constraint as live.** `apps/worker` is outside this session's fence, so all three are reported and none is repaired. They are `OI-30` in [ALLOCATION](decisions/ALLOCATION.md).
+
+| Site | What it claims | What the tree says |
+|---|---|---|
+| **`:768`** | *"`0015`'s `rule_states_high_water_bounds_balance` then rejects every later row whose balance exceeds the lock-day close, so a 250-day life that locks is a life whose rows no database would accept"* | **Inverted, not merely stale.** `0037`'s replacement is `floor_locked OR high_water_balance_cents >= balance_cents`, so a LOCKED row is exactly the row the live constraint EXEMPTS. This is session 129's second finding, still standing in the file that produced it after session 132 refuted it in the plan and in STATE |
+| **`:1110`** | *"every row satisfies `0015`'s `rule_states_high_water_bounds_balance`"* | **Stale by name only.** The rows are unlocked, so they satisfy the live `_unlocked` form through its second disjunct, and the `expect` below the comment asserts exactly that. The constraint named has not existed since 2026-08-17 |
+| **`:889`** | *"`rule_states_consistency_period_started` (`0015`) needs that `<= trading_day`, and equality is what it gets"* | **The predicate named is not the one enforced.** `0046` compares `consistency_period_start_day > payout_anchor_day`. [`settle.ts:148`](../packages/rules-engine/src/payout/settle.ts) sets the anchor to the basis day, so these rows satisfy the live constraint STRICTLY. This is the one [session 135](sessions/2026-08-22-session-135.md) created and did not sweep, and the brief predicted it |
+
+**Session 135 ran the mandated grep and its own log is correct.** Its landmine reads *"`rule_states_consistency_period_started` is defined once, at `0015:193`, and nothing supersedes it"*, which was true when it was written and which its own migration then made false. **The grep it ran was for a SUPERSEDING migration before citing. The grep nobody ran was for EXISTING citations after superseding**, and that is the whole of the residue.
+
+### The method generalises, and there is one more
+
+**Retired is mechanical: a constraint name a migration `DROP`s and no migration `ADD`s back.** Over the whole migration directory that is **16 `DROP CONSTRAINT` statements, 9 of which re-add the same name in the same migration, leaving 7 retired names** across `0029`, `0036`, `0037` and `0046`. All seven were swept.
+
+| Retired name | By | Verdict |
+|---|---|---|
+| `contact_channels_kind_check`, `identity_signals_kind_check`, `notification_kinds_class_check`, `kyc_verifications_verification_purpose_check` | `0029`, each to a `*_allowed` name | **All resolve.** Every citation states the drop and the replacement in the same sentence, which is the shape the other three should have had |
+| `daily_marks_balance_arithmetic` | `0036`, to `daily_marks_inv19_closing_identity` | **ONE STALE.** Below |
+| `rule_states_high_water_bounds_balance` | `0037` | 2 stale, above |
+| `rule_states_consistency_period_started` | `0046` | 1 stale, above |
+
+**[`docs/architecture/data-model/README.md:376`](architecture/data-model/README.md) carries a live invariant row whose BOTH HALVES were falsified on 2026-08-16**, and its sibling document already says so. The row reads `| **closing = opening + realized_pnl + adjustment** (INV-18) | daily_marks_balance_arithmetic, checkable only because SD-01 exists |`. [`daily_marks.md:32`](architecture/data-model/daily_marks.md) records that the label was wrong, that `closing = opening + realized_pnl + adjustment` *"appears nowhere in M01"*, and that the constraint *"added the adjustment a second time, inside the day"* and refused the mark for **every settled payout** ([EC-157](edge-cases/EC-157.md) Repair A, `0036`). **`daily_marks.md`'s Constraints line was repaired and the enforcement table one directory up was not.**
+
+**It is inside this session's fence and it is deliberately not repaired**, because the brief says to report the generalisation and not widen the repair. **It is a two-line correction**, it needs no ruling, and `daily_marks.md:26`'s wording is already the replacement text.
+
+### The rule a gate could read, named and not written
+
+> **A retired constraint name may appear only where the appearance retires it or records it.** Its seed is fully derivable from `packages/db/migrations/*.sql` -- `{names in DROP CONSTRAINT} \ {names in ADD CONSTRAINT}` -- and the permitted sites are the migration that defined it, the migration that dropped it, a `scripts/db/probe_*.sql` asserting its absence, and a dated record (`docs/sessions/`, `docs/decisions/ADR-*.md`). **Every other appearance is a finding.**
+
+**It is `CI-06/retired-constraints` and it takes a slug rather than a letter**, per [ADR-065](decisions/ADR-065.md) and `OI-17`: 23 of the 24 usable `CI-06` letters are spent and `falsify.mjs` needs the headroom. **It ships with a dated register of the four findings above and the register can only shrink**, which is `CI-06u`'s shape, or it ships blocking after the four are repaired. **The scope is written and never computed**, per [ADR-074](decisions/ADR-074.md) section 2: an exemption set derived from "everything that currently passes" passes forever.
+
+**Two things it would not do, stated rather than discovered later.** It cannot see the **nine constraints dropped and re-added under the SAME name**, where the name resolves and the PREDICATE may have moved underneath a citation; that is not name-greppable and needs a different check. And it says nothing about whether a citation of a LIVE constraint describes it correctly, only that the constraint still exists. **Neither gap is what this audit found**, and both are the direction the next one should look.
+
+`scripts/corpus/` is outside this fence and no gate was written.
+
+### `OI-27` is closed: `OI` is allocated in one place, and two more double claims were found getting there
+
+**[ADR-074](decisions/ADR-074.md) section 7 had already ruled where.** *"`OI`'s allocation moves to [ALLOCATION](decisions/ALLOCATION.md) as a fourth table, superseding `DELTA_MANIFEST` section 16."* It named the session holding both files as the one to move it and said the move was not its own. **This is that session, and the table is landed.** [`DELTA_MANIFEST` section 16](../packages/db/DELTA_MANIFEST.md)'s `OI-nn` half now points at ALLOCATION and allocates nothing; its rows stay, because they are the only copy of several findings. **ALLOCATION carries the number and the manifest carries the finding**, which is section 7's own distinction.
+
+**Two more double claims, neither ever counted.** `OI-06` was on record. **`OI-19` and `OI-20` were not**: sessions 105 and 106 each took both numbers on 2026-08-20, and [WAVE-04 section 6](plans/WAVE-04-fixture-backlog-and-gate-inventory.md) renumbered session 106's pair to `OI-25` and `OI-26` *"in this plan and everywhere after it"*. **STATE is append-only, so session 106's two paragraphs still carry the old numbers and always will.** None of the three is renumbered: all six rows carry their subject in the first cell, on the manifest's own standing ruling that *"two rows sharing an identifier with no way to say which one you mean is a worse one, and it costs three words to close"*.
+
+**The check that would have caught session 120 is `CI-06w` extended to a fourth table**, one `OI` key to at most one row. WAVE-04's claim on `OI-25` and session 120's would have been two rows over one key in one file, which is exactly what that gate reads. It is a fourth entry in a list the runner already walks and it is **named and not written**, because `scripts/corpus/` is outside this fence.
+
+**ADR-074 section 7 predicts the wrong consequence and it was executed rather than believed.** It says *"the day that table lands this entry stops naming a defect and the gate fails until `OI` is promoted in the same commit"*. **`CI-06/identifier-series` does not fail**: its pending assertion fires only when EVERY member of a pending series has exactly one definition site. **Counted on the commit before the table: seven of twenty-nine members had exactly one, fifteen had two or more, and seven (`OI-17` to `OI-23`) had NONE**, because STATE defines those with a bold lead and ADR-074 itself rules that a bold lead is not a definition site. **Counted after: six of thirty have exactly one and twenty-four have two or more.** Promoting `OI` into `DECLARED_SERIES` means reconciling all thirty to one site each, which is a session and not a table. **28 of 28 in both states.**
+
+---
+
 ## Session 143: P3 planned, and the measurement comes back the OPPOSITE shape from P2's (2026-08-23)
 
 **[P3-ledger-billing-identity](plans/P3-ledger-billing-identity.md) is `draft`.** It carries no ruling. It measures [DELIVERY_PLAN section 4](DELIVERY_PLAN.md)'s six stated contents for P3 against the tree at `acd65a6` and dispatches what is left: **five sessions, and wave 1 is SERIAL**, each with a fence BY FILE, a money-path flag and a depends-on BY FILE. Claims `ADR-083` to `ADR-087`, migration `0047` and session numbers **144 to 148**, and **repairs `082`**, in one commit before anything else was written.

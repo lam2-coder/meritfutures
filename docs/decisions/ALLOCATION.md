@@ -1,12 +1,12 @@
 ---
 status: approved
 depends_on: [README.md]
-last_updated: 2026-08-22
+last_updated: 2026-08-23
 ---
 
 # Number allocation
 
-The three allocation registries, kept in one document because each is read AS A
+The four allocation registries, kept in one document because each is read AS A
 TABLE: `CI-06f`, `CI-06h` and `CI-06p` call one shared parser over the first cell of
 every row. A table split into a file per row is not a table, which is the same reason
 `DELTA_MANIFEST` stays single under [ADR-043](ADR-043.md).
@@ -193,3 +193,88 @@ The check is a handful of lines against a `Set` that already exists, and it is *
 **`ADR-049` is the one that moved, on a count rather than a guess**: 25 citing lines in 6 files against 70 in 20. And decisively, **37 of the other ruling's citations sit inside [`0034`](../../packages/db/migrations/0034_reversible_contact_addresses.sql), a merged migration constitution E2 forbids editing**, so that ruling was not renumberable at all. [ADR-034](ADR-034.md)'s tiebreak and E2 agree here, which they will not always do: **on this registry the ADR remedy and the migration rule can point in opposite directions**, and when they do, E2 wins because it is the one that cannot be complied with retroactively.
 
 **The parser was tightened only after a seed was watched not firing.** `CI-06f/duplicate-heading` in [`falsify.mjs`](../../scripts/corpus/falsify.mjs) reported `DID NOT FAIL` against the non-global parser and `in scope, failed` after it, in that order, because tightening a parser without one is how 109 phantom anchors happened.
+
+## `OI-nn` allocation, and why the fourth table is here rather than in the manifest
+
+**An `OI` number is claimed HERE, in the commit that opens the item.** [ADR-074](ADR-074.md)
+section 7 ruled it: `OI`'s allocation moves to this file as a fourth table, **superseding
+[`DELTA_MANIFEST` section 16](../../packages/db/DELTA_MANIFEST.md)**, whose `OI-nn` half now
+records the items that manifest opened and allocates nothing.
+
+**The premise that put the table in `packages/db/` has expired**, in the manifest's own words.
+Section 16 was written under [ADR-034](ADR-034.md) after two collisions in one day, on the
+stated argument that *"`OI-nn` and the section numbers are this document's own namespace"*.
+`OI-16` onward were opened by sessions about gate coverage, lint scope, the letter registry
+and the fixture inventory. **None of that is a schema-delta manifest's namespace**, and the
+manifest's table shows it: it holds nineteen numbers over twenty rows and stops at `OI-24`.
+
+**That gap is not theoretical and it is why this table exists.** [Session 120](../sessions/2026-08-21-session-120.md)
+read section 16, found `OI-24` as the maximum, and took `OI-25` -- which
+[WAVE-04 section 6](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md) and
+[STATE](../STATE.md) had already allocated. It was renumbered to `OI-27` and the near-miss
+was recorded as `OI-27` itself. **The same shape had already happened twice more and nothing
+had counted them**, which the three multiply-claimed rows below now state:
+
+| `OI-nn` | Claimed by | What it opens |
+|---|---|---|
+| `OI-01` | the schema-delta fold | `liability_snapshots` exists in two shapes. **Open** ([manifest section 8](../../packages/db/DELTA_MANIFEST.md)) |
+| `OI-02` | the schema-delta fold | `published_statistics` cannot express three of the seven ruled statistics. **Closed** by [ADR-032](ADR-032.md) |
+| `OI-03` | the schema-delta fold | `0026`'s append-only revoke list is a list, and a list drifts. **Open** |
+| `OI-04` | the schema-delta fold | Two legitimate single-column updates on append-only tables have no `SECURITY DEFINER` function. **Open** |
+| `OI-05` | the schema-delta fold | `0027`'s immutability trigger reads a column that does not exist. **Closed** by [ADR-035](ADR-035.md) and `0028` |
+| **`OI-06` (payout destinations)** | **CLAIMED TWICE, 2026-08-16.** [FOLD-01](../plans/FOLD-01-phone-identity.md)'s session | The 48 hour payout-destination cooling window has no storage. **Open** |
+| **`OI-06` (calendar prior image)** | **CLAIMED TWICE, 2026-08-16.** [P1-SE](../plans/P1-SE-trading-calendar.md)'s session | Nothing forces an `UPDATE` to `trading_calendar` to write a prior image. **Closed** by [ADR-045](ADR-045.md) and `0033` |
+| `OI-07` | FOLD-01 session 3 | `0029` had no committed probe. **Closed** 2026-08-16, and it is `CI-06s`'s origin |
+| `OI-08` | FOLD-01 session 3 | The NO-FLOATS `DO` block is positional. **Closed** 2026-08-16 |
+| `OI-09` | `0033`'s session | `CI-06n` accepts a link in prose where its own title says a row. **Open** |
+| `OI-10` | the review desk, 2026-08-16 | Keep-both merges duplicated four passages and no gate could see it. **Closed** by `CI-06u` |
+| `OI-11` | `0035`'s session | A duplicate row in an allocation table is invisible to every gate. **Closed** by `CI-06w` |
+| `OI-12` | `0035`'s session | A calendar `INSERT` moves no watermark. **Open** |
+| `OI-13` | `0035`'s session | `B.4` step 4's audited rewrite has no grant. **Open** |
+| `OI-14` | `0035`'s session | The replay job must refuse an empty in-scope set. **Open** |
+| `OI-15` | `0043`'s session | The `admin_actions` design record does not carry `SD-M6-11`'s columns. **Open** |
+| `OI-16` | session 75, [ADR-059](ADR-059.md) | Does any feed Merit will hold report a whole-session halt or limit lock? **Open** ([STATE](../STATE.md)) |
+| `OI-17` | session 76 | The `CI-06<letter>` registry has one free letter left. **Open**, and `ADR-065`'s slug rule is the remedy |
+| `OI-18` | session 86, FOLD-03 | `ADR-067`'s eligibility question has no safe default. **Open**, `OQ-F3-01` and `OQ-F3-02` |
+| **`OI-19` (conflict markers)** | **CLAIMED TWICE, 2026-08-20.** session 105 | No gate detects a conflict marker. **Closed** by `CI-06/conflict-markers` |
+| **`OI-19` (fixture backlog)** | **CLAIMED TWICE, 2026-08-20.** session 106 | The fixture backlog. **RENUMBERED to `OI-25`** by WAVE-04 section 6, *"in this plan and everywhere after it"*. STATE's session 106 paragraph still carries the old number and is append-only |
+| **`OI-20` (three-digit sessions)** | **CLAIMED TWICE, 2026-08-20.** session 105 | The session registry could not hold a three-digit session number. **Closed**, widened to `\d{2,}` |
+| **`OI-20` (`CI-07` to `CI-09`)** | **CLAIMED TWICE, 2026-08-20.** session 106 | `CI-07`, `CI-08` and `CI-09` do not exist, so P1 is not closed. **RENUMBERED to `OI-26`**, on the same WAVE-04 line and with the same append-only residue in STATE |
+| `OI-21` | session 105 | The `CI-06u` falsification seed decays as the corpus is repaired. **Closed** by session 131's synthetic anchor |
+| `OI-22` | session 89 | A test asserted the migration sequence is `1..n` contiguous, which [ADR-036](ADR-036.md) rules out. **Closed**, deferred to `CI-06h` |
+| `OI-23` | session 89 | A `\b`-anchored pattern over `snake_case` silently narrows to whole-token matches. **Closed** |
+| `OI-24` | session 95, [ADR-068](ADR-068.md), FOLD-04 `I2` | M06's hand-maintained delta count. **Open**, and the remedy is a `<!--gen:-->` span |
+| `OI-25` | [WAVE-04](../plans/WAVE-04-fixture-backlog-and-gate-inventory.md) section 6, derived by session 108 | The fixture backlog, derived rather than subtracted. **Open**, and not closed by [ADR-076](ADR-076.md) |
+| `OI-26` | WAVE-04 section 6, ruled by session 118 | The gate inventory and what closes a row. **Closed** by [ADR-073](ADR-073.md) and [ADR-080](ADR-080.md) |
+| `OI-27` | session 120, `0045` | One identifier series with two definition sites. **Closed by this table**, session 141 |
+| `OI-28` | session 120, `0045` | `simulation_runs.calibration_observed_at` names no unit token [ADR-042](ADR-042.md) declares. **Open**, session 142 |
+| `OI-29` | session 120, `0045` | `plan_versions_publish_decision_recorded` makes the link exist and nothing makes it sound. **Open**, and its digest half is `ADR-081`'s |
+| `OI-30` | session 141, the `0015` citation audit | Three citations in [`replay.test.ts`](../../apps/worker/test/replay.test.ts) name `0015` constraints that `0037` and `0046` retired. **Open**, and `apps/worker` was outside the auditing session's fence |
+
+**Three numbers are claimed twice and none is renumbered here**, on the manifest's own
+standing ruling: *"two rows sharing an identifier is a defect; two rows sharing an identifier
+with no way to say which one you mean is a worse one, and it costs three words to close."*
+Every one of the six rows carries its subject in the first cell, which is what makes them six
+distinct keys to `CI-06u` and what lets a citation say which item it means. **Renumbering any
+of them breaks every citation of whichever one moves**, and on `OI-19` and `OI-20` the
+renumber has already happened once, in WAVE-04, without STATE being able to follow it.
+
+**What a gate could read, named and not written.** [`CI-06w`](../testing/STRATEGY.md) already
+reads the three tables above as multisets, one key to at most one row; **extending it to this
+table is the check that would have caught session 120**, because WAVE-04's claim and session
+120's would have been two rows over one key in one file. It is a fourth entry in a list the
+runner already walks, and it is not written here because
+[`scripts/corpus/`](../../scripts/corpus/gates.mjs) is outside this session's fence.
+
+**`CI-06/identifier-series` does NOT promote `OI` on this commit, and that is measured rather
+than assumed.** [ADR-074](ADR-074.md) section 7 predicts *"the day that table lands this entry
+stops naming a defect and the gate fails until `OI` is promoted in the same commit"*. **It does
+not fail**, because the pending assertion fires only when EVERY member of a pending series has
+exactly one definition site, and no reading of this tree comes close. **Counted on the commit
+before this one: seven of the twenty-nine members had exactly one, fifteen had two or more,
+and seven (`OI-17` to `OI-23`) had NONE**, since STATE defines those with a bold lead and
+ADR-074 rules that a bold lead is not a definition site. **Counted after it: six of thirty
+have exactly one and twenty-four have two or more**, because this table adds a site to every
+member it names. **Reconciling all thirty to one site each is the promotion, and it is a
+session rather than a table**; this table is the allocator that session will promote `OI`
+onto. The gate was run in both states rather than reasoned about: 28 of 28 before and after.
