@@ -581,6 +581,52 @@ describe('a divergence is never quiet', () => {
     expect(report.findings[0]!.divergences[0]!.stored).toBe('<no stored row>');
   });
 
+  it('THE REFUSAL BOUNDARY: a refused day stops the chain and the rest is reported', () => {
+    // Stored is the CLEAN four-day chain, so the fixture is a history the batch
+    // really did write. What went wrong is on the INPUT side: day 3's mark opens
+    // one cent above the prior close, which fails `opening_mismatch` ("INV-18:
+    // opening balance is not the prior balance plus the adjustment"). The
+    // closing balance moves with it so the mark stays internally consistent and
+    // INV-18 is the ONLY thing wrong with it.
+    //
+    // DO-3 refuses rather than throwing, so the chain has no prior for day 3 and
+    // ends there. Days 3 and 4 are then reported by the other direction of the
+    // set alignment: rows storage holds that the replay never reproduced. AN
+    // AUDIT THAT STOPPED FOLDING MUST NOT REPORT LIKE ONE THAT AGREED (FM-17),
+    // which is why the assertion is on all four counts and not on `diverged`.
+    const stored = storedFor(ACCOUNT_A);
+    const inputs = inputsOf(ACCOUNT_A).map((input, index) =>
+      index === 2
+        ? {
+            ...input,
+            day: {
+              ...input.day,
+              mark: {
+                ...input.day.mark,
+                openingBalanceCents: input.day.mark.openingBalanceCents + 1n,
+                closingBalanceCents: input.day.mark.closingBalanceCents + 1n,
+              },
+            },
+          }
+        : input,
+    );
+
+    const report = auditAccount(ACCOUNT_A, inputs, stored, CONFIG, WATERMARK);
+
+    expect(report.matched).toBe(2);
+    expect(report.diverged).toBe(2);
+    expect(report.outOfScope).toBe(0);
+    expect(report.inScope).toBe(MARKS.length);
+    expect(report.findings.map((f) => f.tradingDay)).toEqual([
+      td('2026-08-12'),
+      td('2026-08-13'),
+    ]);
+    expect(report.findings.map((f) => f.divergences[0]!.recomputed)).toEqual([
+      '<no replayed row>',
+      '<no replayed row>',
+    ]);
+  });
+
   it('reports an unrenderable stored value instead of throwing the run', () => {
     const recomputed = storedFor(ACCOUNT_A)[0]!;
     // A jsonb decode that handed back a string where a count belongs. `count()`
