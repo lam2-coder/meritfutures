@@ -29,6 +29,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildCalendarSlice,
+  replay,
   type CalendarDay,
   type CalendarSlice,
   type DailyMark,
@@ -47,12 +48,26 @@ import {
   type AccountDayInput,
   type ReplayAuditConfig,
 } from '../src/batch/replay.js';
-import { ENGINE_GATE_LEAVES, stateHash } from '../src/batch/state-hash.js';
+import { ENGINE_GATE_LEAVES, stateHash, type StateHashSubject } from '../src/batch/state-hash.js';
 import { ACCOUNT_A, ACCOUNT_B, CALENDAR, CLEAR, ENGINE_VERSION, PLAN, td } from './fixtures.js';
 
 const WATERMARK = 11;
 
 const CONFIG: ReplayAuditConfig = { engineVersion: ENGINE_VERSION, mode: 'detect' };
+
+/**
+ * A stored row as the subject the hash reads.
+ *
+ * `RuleStateRow` satisfies `HashedState` structurally, which is what lets ONE
+ * set of renderers and ONE field list read both sides of the comparison:
+ * storage's rows and the engine's states. The row's own `stateHash` bytes do not
+ * come with it, which is B.2: the stored row is never re-hashed, and the
+ * comparison never has the chance to.
+ */
+const asSubject = (row: RuleStateRow): StateHashSubject => ({
+  accountId: row.accountId,
+  state: row,
+});
 
 // -----------------------------------------------------------------------------
 // A four-day life, which is the shortest history the chain test can use
@@ -247,7 +262,7 @@ describe('a faithful replay reproduces every stored row', () => {
 
   it('does not diff a row whose hash matches, which is B.2 in one line', () => {
     const [first] = storedFor(ACCOUNT_A);
-    expect(diffStoredAgainstRecomputed(first!, first!)).toEqual([]);
+    expect(diffStoredAgainstRecomputed(first!, asSubject(first!))).toEqual([]);
   });
 });
 
@@ -325,7 +340,7 @@ describe('every hashed column names itself when it moves', () => {
   for (const testCase of COLUMN_CASES) {
     it(`names ${testCase.column}`, () => {
       const stored = storedWith(recomputed, testCase.patch(recomputed));
-      const divergences = diffStoredAgainstRecomputed(stored, recomputed);
+      const divergences = diffStoredAgainstRecomputed(stored, asSubject(recomputed));
 
       expect(divergences).toHaveLength(1);
       expect(divergences[0]!.field).toBe(testCase.column);
@@ -376,7 +391,7 @@ describe('every engine_gates leaf names itself when it moves', () => {
       const stored = storedWith(recomputed, {
         engineGates: bumpLeaf(recomputed.engineGates, leaf.path),
       });
-      const divergences = diffStoredAgainstRecomputed(stored, recomputed);
+      const divergences = diffStoredAgainstRecomputed(stored, asSubject(recomputed));
 
       expect(divergences).toHaveLength(1);
       expect(divergences[0]!.field).toBe(`engine_gates.${leaf.path}`);
@@ -547,7 +562,7 @@ describe('a divergence is never quiet', () => {
     // cannot say why, which is the most alarming outcome available.
     const stored: RuleStateRow = { ...recomputed, stateHash: Buffer.alloc(32, 7) };
 
-    const divergences = diffStoredAgainstRecomputed(stored, recomputed);
+    const divergences = diffStoredAgainstRecomputed(stored, asSubject(recomputed));
 
     expect(divergences).toHaveLength(1);
     expect(divergences[0]!.field).toBe('state_hash');
@@ -617,10 +632,7 @@ describe('a divergence is never quiet', () => {
     expect(report.diverged).toBe(2);
     expect(report.outOfScope).toBe(0);
     expect(report.inScope).toBe(MARKS.length);
-    expect(report.findings.map((f) => f.tradingDay)).toEqual([
-      td('2026-08-12'),
-      td('2026-08-13'),
-    ]);
+    expect(report.findings.map((f) => f.tradingDay)).toEqual([td('2026-08-12'), td('2026-08-13')]);
     expect(report.findings.map((f) => f.divergences[0]!.recomputed)).toEqual([
       '<no replayed row>',
       '<no replayed row>',
@@ -641,7 +653,7 @@ describe('a divergence is never quiet', () => {
       stateHash: Buffer.alloc(32, 3),
     };
 
-    const divergences = diffStoredAgainstRecomputed(stored, recomputed);
+    const divergences = diffStoredAgainstRecomputed(stored, asSubject(recomputed));
 
     const found = divergences.find((d) => d.field === 'engine_gates.tradedDays.have');
     expect(found).toBeDefined();
@@ -1048,7 +1060,16 @@ const scaleInputs = (): readonly AccountDayInput[] =>
 interface HashedFieldCase {
   /** The `rule_states` column, or `engine_gates.<dotted.path>` for a leaf. */
   readonly column: string;
-  readonly of: (row: RuleStateRow) => unknown;
+  /**
+   * READ OFF A `StateHashSubject` AND NOT OFF A ROW, so the one list serves both
+   * sides of every comparison below: what storage holds, which arrives as
+   * `RuleStateRow`, and what the engine's `replay` folded, which arrives as
+   * `RuleState`. `StateHashSubject` is the shape ADR-026 C-07 actually covers --
+   * the account id, which is column 1 and is not on `RuleState`, plus the
+   * eighteen state fields -- so the list is transcribed against the thing it
+   * names rather than against one of the two carriers.
+   */
+  readonly of: (subject: StateHashSubject) => unknown;
 }
 
 function leafValue(gates: EngineGateResults, path: string): unknown {
@@ -1057,27 +1078,27 @@ function leafValue(gates: EngineGateResults, path: string): unknown {
 }
 
 const HASHED_FIELDS: readonly HashedFieldCase[] = [
-  { column: 'account_id', of: (r) => r.accountId },
-  { column: 'trading_day', of: (r) => r.tradingDay },
-  { column: 'phase', of: (r) => r.phase },
-  { column: 'floor_cents', of: (r) => r.floorCents },
-  { column: 'floor_locked', of: (r) => r.floorLocked },
-  { column: 'floor_open_cents', of: (r) => r.floorOpenCents },
-  { column: 'high_water_balance_cents', of: (r) => r.highWaterBalanceCents },
-  { column: 'balance_cents', of: (r) => r.balanceCents },
-  { column: 'withdrawable_cents', of: (r) => r.withdrawableCents },
-  { column: 'traded_days_count', of: (r) => r.tradedDaysCount },
-  { column: 'win_days_count', of: (r) => r.winDaysCount },
-  { column: 'consistency_best_day_cents', of: (r) => r.consistencyBestDayCents },
-  { column: 'consistency_period_profit_cents', of: (r) => r.consistencyPeriodProfitCents },
-  { column: 'consistency_period_start_day', of: (r) => r.consistencyPeriodStartDay },
-  { column: 'payouts_settled_count', of: (r) => r.payoutsSettledCount },
-  { column: 'payout_anchor_day', of: (r) => r.payoutAnchorDay },
-  { column: 'cadence_anchor_day', of: (r) => r.cadenceAnchorDay },
-  { column: 'engine_eligible', of: (r) => r.engineEligible },
+  { column: 'account_id', of: (s) => s.accountId },
+  { column: 'trading_day', of: (s) => s.state.tradingDay },
+  { column: 'phase', of: (s) => s.state.phase },
+  { column: 'floor_cents', of: (s) => s.state.floorCents },
+  { column: 'floor_locked', of: (s) => s.state.floorLocked },
+  { column: 'floor_open_cents', of: (s) => s.state.floorOpenCents },
+  { column: 'high_water_balance_cents', of: (s) => s.state.highWaterBalanceCents },
+  { column: 'balance_cents', of: (s) => s.state.balanceCents },
+  { column: 'withdrawable_cents', of: (s) => s.state.withdrawableCents },
+  { column: 'traded_days_count', of: (s) => s.state.tradedDaysCount },
+  { column: 'win_days_count', of: (s) => s.state.winDaysCount },
+  { column: 'consistency_best_day_cents', of: (s) => s.state.consistencyBestDayCents },
+  { column: 'consistency_period_profit_cents', of: (s) => s.state.consistencyPeriodProfitCents },
+  { column: 'consistency_period_start_day', of: (s) => s.state.consistencyPeriodStartDay },
+  { column: 'payouts_settled_count', of: (s) => s.state.payoutsSettledCount },
+  { column: 'payout_anchor_day', of: (s) => s.state.payoutAnchorDay },
+  { column: 'cadence_anchor_day', of: (s) => s.state.cadenceAnchorDay },
+  { column: 'engine_eligible', of: (s) => s.state.engineEligible },
   ...ENGINE_GATE_LEAVES.map((leaf) => ({
     column: `engine_gates.${leaf.path}`,
-    of: (row: RuleStateRow) => leafValue(row.engineGates, leaf.path),
+    of: (subject: StateHashSubject) => leafValue(subject.state.engineGates, leaf.path),
   })),
 ];
 
@@ -1096,8 +1117,8 @@ function show(value: unknown): string {
  * false" on the 43rd expectation of the 137th day.
  */
 function fieldMismatches(
-  stored: readonly RuleStateRow[],
-  recomputed: readonly RuleStateRow[],
+  stored: readonly StateHashSubject[],
+  recomputed: readonly StateHashSubject[],
 ): readonly string[] {
   const mismatches: string[] = [];
   const days = stored.length < recomputed.length ? stored.length : recomputed.length;
@@ -1111,7 +1132,7 @@ function fieldMismatches(
       // `Object.is`, so two `bigint`s of equal value agree and `NaN` never does.
       if (!Object.is(left, right)) {
         mismatches.push(
-          `${s.tradingDay} ${field.column}: stored ${show(left)}, replay ${show(right)}`,
+          `${s.state.tradingDay} ${field.column}: stored ${show(left)}, replay ${show(right)}`,
         );
       }
     }
@@ -1201,7 +1222,7 @@ describe('GS-071  a 250-day funded life replays byte-identically', () => {
     // 43 comparisons a day over 250 days: the eighteen `RuleState` columns, the
     // account id, and column 19 expanded to its twenty-five leaves. The hash
     // above already failed if any of these moved; this says WHICH.
-    expect(fieldMismatches(stored, replayed)).toEqual([]);
+    expect(fieldMismatches(stored.map(asSubject), replayed.map(asSubject))).toEqual([]);
     expect(HASHED_FIELDS).toHaveLength(18 + ENGINE_GATE_LEAVES.length);
 
     // AND THE COMPARISON IS NOT VACUOUS, which the equality above cannot say.
@@ -1211,12 +1232,52 @@ describe('GS-071  a 250-day funded life replays byte-identically', () => {
     // same shape `DELTA_MANIFEST` section 13 records one level down: a check
     // that passes because it checked nothing.
     const unread = HASHED_FIELDS.filter((field) =>
-      stored.some((row) => field.of(row) === undefined),
+      stored.some((row) => field.of(asSubject(row)) === undefined),
     );
     expect(unread.map((field) => field.column)).toEqual([]);
 
     // -------------------------------------------------------------------------
-    // 3. AND THROUGH THE AUDIT ITSELF, which is what runs in production
+    // 3. AND THROUGH THE ENGINE'S OWN `replay`, WHICH IS NOW THE AUDIT'S FOLD
+    // -------------------------------------------------------------------------
+    // ADR-078 exported `replay` because withholding it COMPELLED a second
+    // implementation, and `apps/worker/src/batch/replay.ts` was the one it named
+    // by path. `auditAccount` folds through it now instead of over its own loop,
+    // so the claim that has to be EXECUTED rather than argued is that the two
+    // are the same fold over this stream. Four things moved -- the arrival
+    // order, the settlement grouping, the assertion handling and the terminal
+    // break -- and any one of them changing the output changes these bytes.
+    //
+    // IT IS A DIFFERENTIAL AND NOT A SECOND LOOK AT THE SAME CALL. `stored` was
+    // folded by `foldAccountDay`, day by day, chaining its own prior: that is
+    // the implementation being replaced, still on this page, still folding.
+    //
+    // ASSERTED IN B.2's ORDER FOR B.2's REASON, exactly as above. The 250
+    // digests are the verdict; the 43 fields a day say WHERE, if it fails.
+    const engineStates = replay(
+      PLAN,
+      LIFE.map((day) => day.mark),
+      LIFE.flatMap((day) => day.settlements),
+      SCALE_CALENDAR,
+      ENGINE_VERSION,
+      SCALE_SESSIONS[0]!.tradingDay,
+    );
+    const engineSubjects: readonly StateHashSubject[] = engineStates.map((state) => ({
+      accountId: ACCOUNT_A,
+      state,
+    }));
+
+    // THE COUNT FIRST, because `replay` breaks at `closed` and at `graduated`. A
+    // stream that graduated early would fold fewer days, and both comparisons
+    // below would then run over a prefix and pass (FM-17).
+    expect(engineStates).toHaveLength(FUNDED_DAYS);
+
+    expect(engineSubjects.map((subject) => stateHash(subject).toString('hex'))).toEqual(
+      stored.map((row) => row.stateHash.toString('hex')),
+    );
+    expect(fieldMismatches(stored.map(asSubject), engineSubjects)).toEqual([]);
+
+    // -------------------------------------------------------------------------
+    // 4. AND THROUGH THE AUDIT ITSELF, which is what runs in production
     // -------------------------------------------------------------------------
     // The counts beside the zero are the assertion, exactly as in block 1: an
     // audit that compared nothing also reports zero divergences.
