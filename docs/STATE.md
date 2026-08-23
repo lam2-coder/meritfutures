@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->82<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->83<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2265,3 +2265,25 @@ at line 68.
 **This is the digest half [`OI-29`](plans/P2-rules-engine-build.md) needs and only that half.** Nothing in TypeScript computed a canonical digest over published rules; something does now. Its enforcement, a trigger or a publish path, is P3's and was not reached for.
 
 **It waits on the founder's `E2` read and must not be merged before it.** `134` and `135` merged on delegated authority without one. This entry adds a **hand-rolled cryptographic primitive to the money path**, which is the strongest case for a line-by-line read this project has produced.
+
+---
+
+## The `API` container has a deployable, and it is one codebase deployed twice (2026-08-23, session 144)
+
+**[ADR-083](decisions/ADR-083.md), `status: proposed`, approval line unsigned.** [OVERVIEW](architecture/OVERVIEW.md) section 2's C4 diagram had drawn `API [/api/v1]` inside the Merit boundary since 2026-08-13 and section 3's container table never rowed it, so every endpoint [API_CONTRACT](architecture/API_CONTRACT.md) specifies had no deployable to live in. [`apps/api`](../apps/api) exists, and section 3 rows it.
+
+**Three rulings, and the second is the one with a mechanism under it.** The API is its own deployable, not a server inside `apps/portal`. It is **one codebase deployed twice**, the surface chosen at startup. **Fastify 5** runs it, under `node --experimental-strip-types`, with no build step ever.
+
+**The placement argument is not the origin argument, and reaching for the origin argument would have got it wrong.** [P1 section 2.1](plans/P1-monorepo-scaffold.md)'s route-group sentence is about the admin console's separate origin, and [INFRA](architecture/INFRA.md) puts the portal and the API on the **same** origin, so that argument does not decide this. The sentence that does is [API_CONTRACT section 1](architecture/API_CONTRACT.md): the three UI surfaces are its clients and have *"no privileged back door"*. **A surface that contains the API has one by construction**, because a handler in the same package is an import away. [M04 section 4](plans/M04-trader-portal.md) already said it from the portal's side, *"M4 owns no endpoint"*, and `RI-04` closes it mechanically: section 2 draws three arrows into `API`, and an app may not depend on an app.
+
+**The 404 is what makes the second ruling structural rather than a preference.** [API_CONTRACT section 12](architecture/API_CONTRACT.md) requires **403** for a trader session on `/admin/*` and **404** for `/internal/*` from the public origin. 403 is what a permission check returns; **404 is what an absent route returns**. So the route set is selected at startup and the public deployment registers no operator path. A second codebase would have bought the same 404 and a second transcription of the error model, the idempotency rule and the pagination rule.
+
+**The partition is over path prefixes and never over the contract's section numbers, and section 9 is why.** It is headed *"Ops and internal (admin origin only)"* and holds `GET /health`, marked **Public**, beside `GET /internal/health/deep`, marked admin-origin only. Reading the heading puts the liveness probe on the admin origin.
+
+**Four framework properties measured, not assumed**, against `fastify@5.12.1` on Node `v22.22.2`: it runs under `--experimental-strip-types` with no build, an unregistered route answers **404**, `parseAs: 'buffer'` delivers the raw bytes before parsing that the webhook HMAC needs, and its 49-package tree declares **zero install scripts**, which is what `onlyBuiltDependencies: []` makes an admission decision. **Nothing is installed**: the `catalog:` block belongs to sessions 145 and 147, so `pnpm-lock.yaml` gains one importer entry and no package, and the workspace still declares zero runtime dependencies.
+
+**The dispatching brief's candidate approval clause did not survive being checked.** It read *"section 2's container list and section 3's container table name the same set"*. They do not and correctly never will: `packages/rules-engine` and `packages/rithmic` are rows with no box, because a C4 context diagram draws deployables and datastores and not libraries. The clause is asserted in the one direction that was false: **every container section 2 draws inside the Merit boundary has a row in section 3's table.**
+
+**Two twin defects are reported and untouched, both outside the fence, and the first is the higher-value one.** `RI-04`'s `DEPLOYABLES` list in [`repo-invariants.mjs`](../packages/tooling/checks/repo-invariants.mjs) is the literal `['site', 'portal', 'admin', 'worker']`, so the fifth deployable gets none of its three assertions and the invariant is now narrower than the tree it names. And [INFRA section 2](architecture/INFRA.md)'s Railway table names four services where this ruling needs six.
+
+**The position on this branch:** `node scripts/corpus/gates.mjs check` is <!--gen:gate_count-->28<!--/gen--> of <!--gen:gate_count-->28<!--/gen-->, `pnpm run verify` is clean end to end at **104 files, 1,486 passed and 1 skipped** against `origin/main`'s measured **103 and 1,476**, and `check:invariants` is 7 of 7. **P3's wave 3 was declined because its fences were paths inside a deployable that did not exist; `apps/api/src/**` is nameable now.** Nothing is signed.
