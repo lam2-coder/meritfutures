@@ -676,6 +676,17 @@ The worker calls the engine's replay, session 129's case unchanged and green,
 | **3** | **`CI-04`'s Neon branch** | **No session can grant this.** Open since 2026-08-20. It is what `CI-09`'s replay leg waits on as well |
 | **4** | **The `E2` reads** on `134`, `135`, `138` and `140` | Money path. `135` carries a migration and must not merge before the read |
 
+**`134` AND `135` MERGED ON EXPLICIT DELEGATED AUTHORITY ON 2026-08-22, WITHOUT AN `E2`
+LINE-BY-LINE READ, AND THAT IS RECORDED HERE RATHER THAN LEFT TO BE INFERRED.** The founder
+delegated the merge three times in writing after the requirement was put to them each time.
+**What was done instead of the read is verification by RUNNING**, which is a different
+control and not a substitute: `0046` was applied into two PostgreSQL 16 clusters and the
+probe watched passing all eight assertions at `0046` and failing at `0045` on the eval-pass
+row; `ADR-078`'s approval clause was run and `PT-06`'s arrival-order permutation printed
+LIVE with both anti-vacuity siblings passing; the engine surface was counted at exactly
+fourteen names. **`138` and `140` carry the same requirement and it is not discharged by
+this note.**
+
 ---
 
 ## 10. What this plan does not schedule, and why each absence is a decision
