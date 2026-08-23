@@ -48,6 +48,9 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | **138** | `P2-g`, `hash.ts` into `packages/rules-engine` (`ADR-081`), **after 134**. **MONEY PATH** ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
 | **139** | `P2-e`, [section 39](../testing/golden-scenarios/39-fixture-status-and-blockers.md)'s stale line numbers, `GS-071`, and [ADR-077](../decisions/ADR-077.md)'s third recitation, **after 133** ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
 | **140** | `P2-h`, the worker's replay audit folds the engine's `replay`, **after 134 and 138**. **MONEY PATH** ([P2 build plan](../plans/P2-rules-engine-build.md)) | **CLAIMED**, dispatched by session 133's plan |
+| **141** | The `0015` citation audit and `OI-27`, both named by [session 132](2026-08-22-session-132.md) as owed and not P2's | dispatched, unwritten |
+| **142** | `OI-28`, widening [ADR-042](../decisions/ADR-042.md)'s closed `UNIT_TOKENS` for a calibration vendor's observation date (`ADR-082`) | dispatched, unwritten |
+| **143** | P3 planned against the tree: ledger, billing and identity ([DELIVERY_PLAN](../DELIVERY_PLAN.md) section 4) | dispatched, unwritten |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
