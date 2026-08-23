@@ -1,0 +1,20 @@
+{
+  "name": "@merit/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The /api/v1 surface API_CONTRACT specifies. Railway services: api (public origin) and api-admin (ADMIN_ORIGIN), one codebase deployed twice per ADR-083.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "node --experimental-strip-types src/index.ts"
+  },
+  "//": "IT DECLARES NO RUNTIME DEPENDENCY, AND FASTIFY'S ABSENCE HERE IS THE FENCE RATHER THAN THE RULING. ADR-083 rules the framework; the version lives in `pnpm-workspace.yaml`'s `catalog:` block, which this session does not hold (P3 build plan section 6 gives it to sessions 145 and 147), and `.npmrc`'s `save-exact` plus VG-12 make a version a human approves once rather than a caret. So the manifest that would carry `\"fastify\": \"catalog:\"` carries nothing, and the shell is the four existing apps' shape: real structure, no wiring. THERE IS NO `build` SCRIPT AND THERE MUST NOT BE ONE. `CI-06/gate-inventory` probes every apps/*/package.json for that key and requires it ABSENT, because CI-07's row reads through an artifact that does not exist; a build script makes that gate fail on good news. Fastify 5 needs none, which is measured in ADR-083 section 5 rather than assumed.",
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
