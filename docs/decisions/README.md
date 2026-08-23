@@ -103,6 +103,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-077](ADR-077.md) | there is no 25 hour session and there never was a 23 hour one either in the sense the registry means; the DST hour lands in the WEEKEND GAP, and nothing in the tree computes from any of it  (2026-08-22, status: proposed) |
 | [ADR-078](ADR-078.md) | `replay` joins the rules engine's public surface, and the site count is not what decides it  (2026-08-22, status: proposed) |
 | [ADR-080](ADR-080.md) | a `VG` row closes on its NEXT link and never on its whole chain, and two of the twelve are unwired for no reason at all  (2026-08-22, status: proposed) |
+| [ADR-081](ADR-081.md) | `hash.ts` moves into the engine, and the SHA-256 is hand-rolled because a standing ruling says so  (2026-08-23, status: proposed) |
 | [ADR-082](ADR-082.md) | the closed unit vocabulary widens its DEFINITION and never its token list, and `rail clock` names its class after its commonest member  (2026-08-23, status: proposed) |
 | [ADR-067](ADR-067.md) | An adjustment posts to the wallet and never to withdrawable, a debit may only reverse a credit this table itself posted, and the eligibility pair the fold plan offered is false because the corpus has two exits  (2026-08-20, status: proposed) |
 | [ADR-069](ADR-069.md) | Parity is the condition that makes read-only impersonation correct, and the eighteen gaps close at `owner` with the initiative recorded  (2026-08-20, status: proposed) |

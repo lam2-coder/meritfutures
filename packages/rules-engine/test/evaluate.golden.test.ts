@@ -44,6 +44,24 @@ import * as engine from '../src/index.js';
 //   IMPLEMENTED_RULES          ADR-048: "the engine exports the set of rule
 //                              identifiers it implements, and that export is
 //                              part of its public contract"
+//   stateHash                  ADR-081. SD-08's canonical serialization and
+//   canonicalStateSerialization  digest, moved out of apps/worker into the
+//   StateHashError             file M01 section 1.3's layout names. SIX NAMES,
+//   HASHED_COLUMNS             GAINING EXACTLY TWO FUNCTIONS, and ADR-078's
+//   ENGINE_GATE_LEAVES         test decides them in TWO CASES rather than six
+//   EXCLUDED_COLUMNS           instances of one. The first four plus the error
+//                              are DEFEATED BY WITHHOLDING IN PRODUCTION:
+//                              nothing else computes the digest, and
+//                              apps/worker/src/batch/replay.ts walks
+//                              HASHED_COLUMNS at :167 and ENGINE_GATE_LEAVES at
+//                              :173 to name the diverged field, so withholding
+//                              a table makes the batch hand-maintain a second
+//                              copy of C-07's order. EXCLUDED_COLUMNS has NO
+//                              production consumer and is exported for a
+//                              different reason, said plainly: it keeps
+//                              apps/worker/test/state-hash.test.ts reachable,
+//                              and that file is the DIFFERENTIAL ORACLE for a
+//                              hand-rolled SHA-256, not a coverage exercise
 //   replay                     ADR-078. M01 section 3.7's fold over a whole
 //   ReplayAssertionError       account life. THE CLAMP AND THE FOLD ARE THE
 //                              SAME CONTRADICTION RULED OPPOSITE WAYS, and
@@ -63,20 +81,63 @@ import * as engine from '../src/index.js';
 test('the engine entry point is the whole public surface, and it is this exact list', () => {
   expect(Object.keys(engine).sort()).toEqual([
     'CalendarSliceError',
+    'ENGINE_GATE_LEAVES',
+    'EXCLUDED_COLUMNS',
     'EngineInvariantError',
+    'HASHED_COLUMNS',
     'IMPLEMENTED_RULES',
     'ReplayAssertionError',
+    'StateHashError',
     'advanceDay',
     'applySettlement',
     'buildCalendarSlice',
+    'canonicalStateSerialization',
     'evaluatePayout',
     'initialState',
     'lookupCalendarDay',
     'nextTradingDayAfter',
     'replay',
     'resolvePlan',
+    'stateHash',
     'validatePlan',
   ]);
   expect(typeof engine.replay).toBe('function');
   expect(typeof engine.advanceDay).toBe('function');
+});
+
+// THE COUNT IS SAID IN FUNCTIONS BECAUSE THAT IS WHAT SECTION 1.3'S REASON IS
+// ABOUT. ADR-078 corrected a false approval clause by counting this list rather
+// than a delta, and ADR-081's clause is written the same way: fourteen names to
+// twenty, and of the six only `stateHash` and `canonicalStateSerialization`
+// COMPUTE anything. The other four are a class and three frozen tables, none of
+// which a caller can reimplement a rule slightly differently with. Ten
+// functions become TWELVE; the other four new names are not functions.
+test('of the twenty names, exactly twelve are functions and ADR-081 added two', () => {
+  const functions = Object.keys(engine)
+    .filter((name) => typeof (engine as Record<string, unknown>)[name] === 'function')
+    .sort();
+
+  // A class is `typeof === 'function'` too, so the four error classes are
+  // named and subtracted rather than filtered by a predicate that cannot see
+  // the difference. `IMPLEMENTED_RULES` and the three tables are values.
+  const classes = [
+    'CalendarSliceError',
+    'EngineInvariantError',
+    'ReplayAssertionError',
+    'StateHashError',
+  ];
+  expect(functions.filter((name) => !classes.includes(name))).toEqual([
+    'advanceDay',
+    'applySettlement',
+    'buildCalendarSlice',
+    'canonicalStateSerialization',
+    'evaluatePayout',
+    'initialState',
+    'lookupCalendarDay',
+    'nextTradingDayAfter',
+    'replay',
+    'resolvePlan',
+    'stateHash',
+    'validatePlan',
+  ]);
 });

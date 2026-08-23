@@ -29,7 +29,7 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->81<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->82<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -2247,3 +2247,21 @@ at line 68.
 **Reported and not touched.** [`falsify.mjs`](../scripts/corpus/falsify.mjs)'s `real` field for `CI-06m` says *"the schema holds 49 `date` columns"*. The gate's own parser counts **54** on this tree. The field is prose explaining why the gate exists rather than an assertion, so nothing fails on it, and it is outside a fence that holds one falsify case. **The note line exists so that the next hand-maintained count of this population is the last one.**
 
 **The position on this branch:** `node scripts/corpus/gates.mjs check` is <!--gen:gate_count-->28<!--/gen--> of <!--gen:gate_count-->28<!--/gen-->, `falsify.mjs` is green over 56 scope cases and 10 loader cases, and `pnpm run verify` is clean end to end. **Nothing is signed.**
+
+---
+
+## `hash.ts` is in the engine and the SHA-256 is hand-rolled, on a ruling made in August (2026-08-23, session 138)
+
+**[ADR-081](decisions/ADR-081.md), `status: proposed`, approval line unsigned.** SD-08's canonical serialization and digest move from `apps/worker/src/batch/state-hash.ts` to [`packages/rules-engine/src/hash.ts`](../packages/rules-engine/src/hash.ts), where [M01 section 1.3](plans/M01-rules-engine.md)'s layout puts them. The public surface goes **fourteen names to twenty, gaining exactly two functions**, pinned as an exact list in [`evaluate.golden.test.ts`](../packages/rules-engine/test/evaluate.golden.test.ts) alongside a new sibling test that counts functions specifically.
+
+**The session made no design decision, and that is the shape of it.** The [2026-08-17 review desk](reviews/2026-08-17-review-desk.md) section 3 had already ruled the hand-roll and already refused the alternative: amending `RE-D-03` to exempt `node:crypto` is *"out on constitution grounds. Working agreements, section 9: never weaken a gate to pass it"*. What the session added is that **the desk named two mechanisms and there are three**. [`packages/rules-engine/tsconfig.json`](../packages/rules-engine/tsconfig.json)'s `"types": []` makes `node:crypto` and `Buffer` a **compile** error, which that file's own comment calls the one *"a lint-disable comment cannot route around"*. The hand-roll is not the better of two workable designs; it is the only shape that compiles.
+
+**No digest changed, and the before-value was taken before anything moved.** `6f640ab71dacea9cb5f7c8502e2e11cafb8ab126d1c79c9c9761087112f60d60`, measured on `origin/main` at `acd65a6` through the `node:crypto` path that existed there, now pinned as a hex literal in two test files.
+
+**`apps/worker/test/state-hash.test.ts` was not edited and became the strongest control in the session.** It hand-transcribes the serialization from ADR-026 C-07 and hashes it with `node:crypto`; routed through the shim it is an **independent implementation of the serialization AND an independent SHA-256** checked against the hand-rolled one. Under `"types": []` the engine's own test directory cannot import `node:crypto`, so it is the only place in the repository where the hand-roll meets OpenSSL.
+
+**Two seeded violations were watched failing.** A lone high surrogate encoded as itself instead of `U+FFFD` fails 7 tests; one flipped bit in `K[0]` fails 38. The wall clock is reported rather than tuned: **24.3 µs against `node:crypto`'s 16.0 µs per account, 121 ms against 80 ms across the nightly's 5,000 accounts.**
+
+**This is the digest half [`OI-29`](plans/P2-rules-engine-build.md) needs and only that half.** Nothing in TypeScript computed a canonical digest over published rules; something does now. Its enforcement, a trigger or a publish path, is P3's and was not reached for.
+
+**It waits on the founder's `E2` read and must not be merged before it.** `134` and `135` merged on delegated authority without one. This entry adds a **hand-rolled cryptographic primitive to the money path**, which is the strongest case for a line-by-line read this project has produced.
