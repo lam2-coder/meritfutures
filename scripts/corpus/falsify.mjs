@@ -2422,6 +2422,48 @@ const SCOPE_CASES = [
     },
   },
   {
+    name: 'CI-06m/widened-definition-is-not-a-fourth-token',
+    gate: 'CI-06m',
+    what: 'a fourth unit token invented for the counterparty ADR-082 widened `rail clock` to cover, which MUST be a finding',
+    // ADR-082's OWN CHECKABLE CLAUSE, and it is here because that ruling widened
+    // a definition and a widened definition is exactly what invites a session to
+    // widen the SET next.
+    //
+    // `rail clock` now reads "a third party's own clock ... a payment rail's, a
+    // calibration vendor's, any counterparty whose day Merit reads and never
+    // derives". The nearest thing to a correct guess after reading that sentence
+    // is `vendor clock`, written by a session that took "a calibration vendor's"
+    // for a licence rather than for a definition. It is refused, and the refusal
+    // is watched here rather than asserted in the ADR, because a token nobody
+    // has seen rejected is not a closed vocabulary.
+    //
+    // THE SEED TARGETS A `rail clock` ROW ON PURPOSE. Any declaring row would
+    // produce the same finding, and would prove less: the rows this ruling
+    // touched are the ones whose declarations a slide would move first, and
+    // seeding one of them says the widening reached the definition and stopped
+    // there.
+    //
+    // DERIVED, LIKE THE CASE ABOVE. A seed naming
+    // `simulation_runs.calibration_observed_at` by literal would go stale the day
+    // that column is superseded and would go stale SILENTLY, planting nothing
+    // while still reporting a run.
+    expect: 'declares `**Unit: vendor clock**`, which is not one of',
+    seed: (d) => {
+      const dir = join(d, 'docs/architecture/data-model');
+      for (const f of readdirSync(dir).sort()) {
+        if (!f.endsWith('.md')) continue;
+        const p = join(dir, f);
+        const lines = readFileSync(p, 'utf8').split('\n');
+        const i = lines.findIndex((l) => /\*\*Unit: rail clock\*\*/.test(l));
+        if (i === -1) continue;
+        lines[i] = lines[i].replace(/\*\*Unit: rail clock\*\*/, '**Unit: vendor clock**');
+        writeFileSync(p, lines.join('\n'));
+        return;
+      }
+      throw new Error('seed anchor not found: no design-record row declares `rail clock`');
+    },
+  },
+  {
     name: 'CI-06h/reserved',
     gate: 'CI-06h',
     what: 'a hole a sibling branch has reserved, which must NOT be a finding',
