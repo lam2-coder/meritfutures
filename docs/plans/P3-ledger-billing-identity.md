@@ -44,7 +44,7 @@ the file that took it, and every ruling it needs is proposed as an ADR for the f
 | Measurement | Command | Result |
 |---|---|---|
 | Gates | `node scripts/corpus/gates.mjs check` | **28 of 28 pass** |
-| Tests | `pnpm vitest run` | 101 files, **1,410 passed, 2 skipped** |
+| Tests | `pnpm exec vitest run` | 101 files, **1,417 passed, 1 skipped**. **[Session 139](../sessions/2026-08-22-session-139.md)'s entry records 1,410 and 2, and both moved**: sessions 134 and 137 landed between, and this figure is measured here rather than inherited |
 | Fixtures | `CI-06/fixture-inventory` | **316 rows, 43 on disk: 43 written, 0 writable, 266 blocked, 7 covered-elsewhere** |
 | Identifier series | `CI-06/identifier-series` | **117 series over 1,083 members**, reproducing [ADR-074](../decisions/ADR-074.md) as amended |
 | Gate inventory | `CI-06/gate-inventory` | **10 stage rows: 5 implemented, 1 implemented and conditioned, 3 with no implementation leg, 1 discharged outside Actions** |

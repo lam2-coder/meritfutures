@@ -2109,3 +2109,53 @@ at line 68.
 **[ADR-077](decisions/ADR-077.md)'s struck clause is re-quoted in [`fixtures/README.md`](../packages/rules-engine/fixtures/README.md), the third of its four recitations**, which that entry rowed as owed and could not reach. Only the quotation moved and the row's disposition did not. **The replacement is `GS-030`'s wording and not `EC-012`'s**, repairing the mis-attribution ADR-077 section 1 opens with: the line cites `GS-030`'s row and was quoting `EC-012`'s sentence, and the two carry different obligations.
 
 **The position on this branch:** `node scripts/corpus/gates.mjs check` is <!--gen:gate_count-->28<!--/gen--> of <!--gen:gate_count-->28<!--/gen-->, `falsify.mjs` is green over 55 scope cases and 10 loader cases, and `pnpm run verify` is clean end to end. **[`gates.mjs`](../scripts/corpus/gates.mjs) was inside the fence and needed no edit**: `covered-elsewhere` entered `FIXTURE_STATUSES` in [session 131](sessions/2026-08-22-session-131.md), both summary tables derive from the rows, and assertion 6 resolves the `apps/worker` suite without a special case. **[`falsify.mjs`](../scripts/corpus/falsify.mjs) was outside it and had to move**: an empty `writable` starved the seed that hunted for a writable row, reporting `SEED IS STALE`, so the seed now builds its anchor from a `blocked` row the way `register-names-no-defect` does. **Next:** three items are named at the foot of [session 139's log](sessions/2026-08-22-session-139.md), and the largest is section 39's `GS-030` blocker cell, ADR-077's fourth recitation, which owes a re-ruling rather than a re-quote.
+## Session 143: P3 planned, and the measurement comes back the OPPOSITE shape from P2's (2026-08-23)
+
+**[P3-ledger-billing-identity](plans/P3-ledger-billing-identity.md) is `draft`.** It carries no ruling. It measures [DELIVERY_PLAN section 4](DELIVERY_PLAN.md)'s six stated contents for P3 against the tree at `acd65a6` and dispatches what is left: **five sessions, and wave 1 is SERIAL**, each with a fence BY FILE, a money-path flag and a depends-on BY FILE. Claims `ADR-083` to `ADR-087`, migration `0047` and session numbers **144 to 148**, and **repairs `082`**, in one commit before anything else was written.
+
+**NONE of P3's six stated contents exists as application code**, and the one thing the phase asks for that does exist was P2's.
+
+| P3's stated content | State at `acd65a6` |
+| --- | --- |
+| The ledger | **Schema only.** `0009`, the `LEDGER-C1` and `LEDGER-C2` triggers, a probe running in CI. Zero TypeScript |
+| Billing and checkout | **Schema only.** No `PspAdapter`, no endpoint, **and no deployable to host one** |
+| Coupons and affiliate attribution | **Schema only** |
+| The provisioning saga against the simulator | **HALF, and the half that exists is P2's.** The simulator is complete in both modes; the saga does not exist |
+| M19 KYC, composite trigger set | **Schema only.** The set is RULED and no code reads it |
+| `ADR-023` enrichment, observe mode | **Nothing** |
+
+### The six gaps are one gap, and it is named in no phase's contents
+
+**The workspace declares ZERO runtime dependencies.** [`packages/db/src/index.ts`](../packages/db/src/index.ts) declares `ScopedDb` as an interface with **one field** and states *"NEITHER THE CLIENT NOR THE ACCESSOR EXISTS YET"*; [`apps/worker/src/batch/ports.ts`](../apps/worker/src/batch/ports.ts) is written against ports **because** there is no connection and says so; and [OVERVIEW section 2](architecture/OVERVIEW.md)'s C4 diagram declares an `API [/api/v1]` container that **section 3's container table does not row**, so every endpoint [API_CONTRACT](architecture/API_CONTRACT.md) specifies has nowhere to live.
+
+**[ADR-008](decisions/ADR-008.md) made `scopedDb` part of its own acceptance rather than a follow-up, and it was never built. [ADR-006](decisions/ADR-006.md) made the job interface's narrowness a review criterion, and nothing in this tree enqueues anything.** Both are `accepted`. **P1's contents do not name a database client, P2's do not, P3's do not, and all six of P3's need one.** That is a [DELIVERY_PLAN](DELIVERY_PLAN.md) question and the plan sends it up rather than rewriting the phase, on [session 136](sessions/2026-08-22-session-136.md)'s precedent about the same document.
+
+### `CI-04` is three facts and this record carried one of them
+
+**A PostgreSQL database in CI EXISTS TODAY**, in [`corpus.yml`](../.github/workflows/corpus.yml)'s `postgres:16` service, with all migrations applied forward-only and **twelve** `scripts/db/probe_*.sql` steps executing against it. **`CI-04`'s NAMED ARTIFACT, a Neon branch, does not.** And **`CI-04`'s SUBJECT has never run**: [`vitest.config.ts`](../vitest.config.ts) declares the `integration` project and no workflow selects it, `ci.yml` running `--project unit --project property` and `golden.yml` running `--project golden`.
+
+**All three belong in front of the founder, because the first alone invites the reading that the row is nearly closed.** What the re-ruling would give up is stateable and is `ADR-085`'s own foreclosure sentence: **a service container is empty-and-migrated per run and a Neon branch is a branch of a real one.** `CI-06/gate-inventory` cannot see any of it and says so: `CI-04`'s artifact *"is not a fact about this tree"*, so that row's condition is asserted and never probed.
+
+### P3 does not wait on the vendor call, and it meets it at exactly one point
+
+**Does not wait, measured.** [M02](plans/M02-rithmic-bridge.md) declares `platform: 'rithmic' | 'simulator'`, `INV-M2-11` puts both through one parser, both simulator modes are exported, and section 3.5 states the streaming mode exists so the live layer is developable before any agreement. **The plan schedules nothing against the call.**
+
+**Meets it once, and the point is P3's own definition of done.** [Section 39](testing/golden-scenarios/39-fixture-status-and-blockers.md) rows **all fourteen M2 scenarios** `blocked / vendor-call`, and **`GS-138` is one of them**. `GS-138` is the fixture `INV-M2-13` cites, and DELIVERY_PLAN's third done-clause for P3 is *"fail-closed provisioning holding an unconfirmed setpoint out of trading"*, which is that invariant verbatim. **P3's third done-clause names an assertion the registry says cannot be written.** Whether [ADR-076 section 1](decisions/ADR-076.md) discharges it against the SIMULATOR is a ruling and the plan does not take it.
+
+### `ADR-082` was dispatched with no allocation row, and reserving `083` is what made it visible
+
+[`docs/sessions/README.md`](sessions/README.md) dispatches session 142 naming `ADR-082` and **ALLOCATION's table ends at `081`.** `CI-06f` could not catch it: gaplessness is over allocated plus reserved and **an unreserved number at the TOP of the sequence opens no hole**. Reserving `083` is the event that turns it into a **middle** hole, which is [ADR-055](decisions/ADR-055.md)'s session exactly. **The subject was not invented, it was written down**, so this session wrote `082`'s row on session 142's behalf, on the `044` precedent. **142 will write one too; the duplicate is EXPECTED rather than discovered**, `CI-06w` reads the table as a multiset, and the merge keeps one row.
+
+### Two things measured rather than assumed, and one fence that was too small
+
+**`CI-07`'s condition is still not met.** No package declares a `build` script and none of the five sessions introduces one, on the pattern the four existing apps already use under `node --experimental-strip-types`. **It is one ruling away**: `ADR-083` picking a bundler-needing framework makes `CI-06/gate-inventory` **fail on good news**, and session 144's prompt fences against it explicitly.
+
+**Wave 1 is SERIAL and the plan refuses to pretend otherwise.** P2 ran five concurrent; every wave-1 session here adds the workspace's first runtime dependencies and [`pnpm-lock.yaml`](../pnpm-lock.yaml) is one file. Four concurrent branches would each merge cleanly alone and none of them together.
+
+**The dispatching fence omitted [`docs/INDEX.md`](INDEX.md) and would have ended this session red.** `CI-06c` reads INDEX completeness in both directions and a new plan document with no row is a finding. It is [session 127](sessions/2026-08-22-session-127.md)'s failure aimed at the session that was told about it, and the fence was widened by one row in one file with the reason stated.
+
+**Two collisions exist in rows nobody dispatched carefully.** Sessions **141** and **142** were both sent to *"the next session holding `DELTA_MANIFEST`"* in one sentence and collide on it; **142** additionally holds [`scripts/corpus/gates.mjs`](../scripts/corpus/gates.mjs), where `UNIT_TOKENS` lives. Both order ahead of the P3 sessions holding those files.
+
+**Wave 3, the six module slices, is deliberately NOT dispatched and claims no numbers**, because every one of its fences is a path inside the deployable `ADR-083` has not yet named, and a fence by a path that does not exist is the WAVE-05 defect in its worst form.
+
+**The position on this branch:** `node scripts/corpus/gates.mjs check` is 28 of 28, `falsify.mjs` reports every gate clean-and-dirty over 55 scope cases and 10 loader cases, and `pnpm run verify` is clean end to end at **101 files, 1,417 passed and 1 skipped**. **That is not the 1,410 and 45, nor the 1,410 and 2, that the two most recent entries record**: sessions 134 and 137 both moved it and the plan measures it rather than inheriting it. No count moves *here*, because this session writes no code. **Next:** four items go to the founder rather than to a session -- `OQ-F6-01` at 10,000 cents with its arithmetic, `CI-04`'s two doors, `GS-138`'s blocker, and whether DELIVERY_PLAN section 4's P3 contents are amended to name the runtime. Then dispatch **144**, which nothing blocks.
