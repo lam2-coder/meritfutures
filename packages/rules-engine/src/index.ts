@@ -162,9 +162,54 @@ export type { RuleId } from './rules.js';
 export { resolvePlan } from './plan/resolve.js';
 export { validatePlan } from './plan/validate.js';
 
+// `hash.ts` IS ADR-081, AND IT IS ADR-078's TEST APPLIED A SECOND TIME. Section
+// 1.3's layout lists `hash.ts` exactly as it lists `payout/clamp.ts` and
+// `replay.ts`, so the site count decides nothing here either; what decides it is
+// whether withholding SERVES or DEFEATS "every additional export is a way for a
+// caller to reimplement a rule slightly differently". `apps/worker/src/batch/
+// state-hash.ts` was the second implementation, in the open, exactly as
+// `apps/worker`'s own fold was for `replay`.
+//
+// SIX NAMES, GAINING EXACTLY TWO FUNCTIONS, and they are TWO CASES rather than
+// six instances of one:
+//
+//   `stateHash`, `canonicalStateSerialization`, `HASHED_COLUMNS` and
+//   `ENGINE_GATE_LEAVES` are DEFEATED BY WITHHOLDING IN PRODUCTION. Nothing
+//   else computes the digest, `apps/worker/src/batch/replay.ts` walks the
+//   column table at `:167` and the leaf table at `:173` to name which field
+//   diverged, and withholding either table makes the batch hand-maintain a
+//   second copy of C-07's order. `StateHashError` rides with them: it computes
+//   nothing and has no second implementation to drift from, which is the
+//   reasoning below for `EngineEvent` and ADR-078's for `ReplayAssertionError`.
+//
+//   `EXCLUDED_COLUMNS` HAS NO PRODUCTION CONSUMER AND IS EXPORTED ANYWAY, for a
+//   different reason that is stated rather than blended into the first. It is
+//   reachable from `apps/worker` only through this entry point, and what needs
+//   to reach it is `apps/worker/test/state-hash.test.ts`, the DIFFERENTIAL
+//   ORACLE: an independent transcription of the whole serialization hashed with
+//   an independent SHA-256, which is the only external check the hand-rolled
+//   digest has. A test is a legitimate reason to export a table PRECISELY WHEN
+//   it is that, and not when it is a coverage exercise. This is not a licence
+//   to export a frozen table nothing reads.
+
 export { advanceDay, initialState } from './day/advance.js';
 export { applySettlement } from './payout/settle.js';
 export { evaluatePayout } from './payout/evaluate.js';
 export { replay, ReplayAssertionError } from './replay.js';
+export {
+  canonicalStateSerialization,
+  ENGINE_GATE_LEAVES,
+  EXCLUDED_COLUMNS,
+  HASHED_COLUMNS,
+  StateHashError,
+  stateHash,
+} from './hash.js';
 export type { PayoutContext } from './payout/evaluate.js';
 export type { SettlementOutput } from './payout/settle.js';
+export type {
+  ExcludedColumn,
+  GateLeaf,
+  HashedColumn,
+  HashedState,
+  StateHashSubject,
+} from './hash.js';
