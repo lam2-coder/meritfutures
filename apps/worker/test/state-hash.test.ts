@@ -601,3 +601,137 @@ describe('it refuses rather than hashing something plausible', () => {
     expect(() => stateHash(withState({ tradedDaysCount: 12.5 }))).toThrow(StateHashError);
   });
 });
+
+// =============================================================================
+// ADR-081. EVERYTHING ABOVE THIS LINE IS UNCHANGED BY THE MOVE, AND THAT IS THE
+// POINT
+// =============================================================================
+// The implementation left this file for `packages/rules-engine/src/hash.ts` and
+// the imports above still name `../src/batch/state-hash.js`, which is now a
+// re-export shim. So every assertion above -- the hand transcription of C-07,
+// the nineteen mutations, the twenty-five leaf mutations, the exclusions --
+// exercises the ENGINE, and this file became something better than a test of
+// `apps/worker`: it is an INDEPENDENT IMPLEMENTATION of the whole serialization
+// AND an independent SHA-256, checked against the engine's.
+//
+// That matters because ADR-081's SHA-256 is HAND-ROLLED, applying the
+// 2026-08-17 review desk section 3. Under `"types": []` the engine's own test
+// directory cannot import `node:crypto` either, so this file is the only place
+// in the repository where the hand-roll meets OpenSSL. Not one line above was
+// edited to make it pass.
+//
+// TWO THINGS ARE ADDED HERE AND NOTHING IS ALTERED ABOVE.
+
+describe('ADR-081: the move changed no digest', () => {
+  it('reproduces the digest measured on origin/main BEFORE the move', () => {
+    // Taken at acd65a6, through the `createHash('sha256')` that lived in this
+    // file at the time. A before-value measured afterwards with the new code
+    // proves nothing, so it was measured first and written down.
+    expect(stateHash(SUBJECT).toString('hex')).toBe(
+      '6f640ab71dacea9cb5f7c8502e2e11cafb8ab126d1c79c9c9761087112f60d60',
+    );
+  });
+
+  it('serializes to the 309 bytes that digest was taken over', () => {
+    expect(Buffer.byteLength(canonicalStateSerialization(SUBJECT), 'utf8')).toBe(309);
+  });
+
+  it('still returns a Buffer, which is what ports.ts and replay.ts require', () => {
+    // The engine returns `Uint8Array`; the shim wraps it. `.equals()` is a
+    // `Buffer` method and `replay.ts:161` calls it, so this is load bearing.
+    expect(Buffer.isBuffer(stateHash(SUBJECT))).toBe(true);
+    expect(stateHash(SUBJECT).equals(stateHash(SUBJECT))).toBe(true);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// The differential block: the hand-rolled encoder and digest against Node's
+// -----------------------------------------------------------------------------
+// THE SUBTLEST DEFECT CLASS IN ADR-081 IS THE UTF-8 ENCODER, and no fixture
+// reaches it, because every value in a real `rule_states` row is ASCII. Under
+// `"types": []` the engine cannot call `Buffer.byteLength`, so `hash.ts` writes
+// the encoder out, and it has to agree with Node on inputs a `TextEncoder`
+// would also have to think about: an unpaired surrogate, which both Node and
+// the WHATWG encoder replace with `U+FFFD`.
+//
+// `phase` is the injection point. It renders through `text()` with no shape
+// assertion, so an arbitrary string reaches the framing and the digest through
+// the real serializer rather than through a test double.
+//
+// BOTH HALVES ARE ASSERTED EVERY TIME, and that is not belt and braces. A
+// digest that matches while the length prefix disagrees would mean both sides
+// are wrong the same way, which is exactly what a single-sided check cannot
+// see.
+
+/** The cases that decide the encoder, each named for what it is testing. */
+const SURROGATES: readonly (readonly [string, string])[] = [
+  ['a lone HIGH surrogate', '\ud800'],
+  ['a lone LOW surrogate', '\udc00'],
+  ['a HIGH surrogate followed by a NON-surrogate, so the pair never forms', '\ud800a'],
+  ['a HIGH surrogate at the very end of the string', 'a\ud800'],
+  ['a valid PAIR', '𝄞'],
+  ['a valid PAIR followed by a lone low', '𝄞\udfff'],
+  ['two valid PAIRS adjacent', '𝄞𝄞'],
+  ['a low surrogate BEFORE a high one, which is never a pair', '\udc00\ud800'],
+];
+
+/**
+ * UTF-8 length differs from UTF-16 length here, so these cross the 55/56 and
+ * 63/64 seams in BYTES while sitting at other lengths in units. A padding bug
+ * that only shows at a block boundary would otherwise be reached by no case.
+ */
+const BOUNDARY_STRADDLERS: readonly string[] = [
+  // '€' is 3 bytes and 1 unit: n units of it plus filler lands byte lengths
+  // either side of both seams while the string length says something else.
+  ...[16, 17, 18, 20, 21, 39, 40, 41].map((units) => '€'.repeat(units)),
+  // '𝄞' is 4 bytes and 2 units.
+  ...[13, 14, 15, 16, 29, 30, 31].map((units) => '𝄞'.repeat(units)),
+  // ASCII runs, so the two lengths agree and the seam is where it looks.
+  ...[0, 1, 54, 55, 56, 57, 63, 64, 65, 119, 120, 200].map((n) => 'x'.repeat(n)),
+];
+
+describe("the hand-rolled encoder and digest agree with node:crypto's", () => {
+  const check = (value: string): void => {
+    const subject = withState({ phase: value as RuleState['phase'] });
+    const serialization = canonicalStateSerialization(subject);
+
+    // Half one: the length prefix counts BYTES, as Node counts them.
+    const bytes = Buffer.byteLength(value, 'utf8');
+    expect(serialization).toContain(`${String(bytes)}:${value}`);
+
+    // Half two: the digest is SHA-256 of exactly those bytes.
+    const independent = createHash('sha256').update(serialization, 'utf8').digest();
+    expect(stateHash(subject).equals(independent)).toBe(true);
+  };
+
+  it.each(SURROGATES)('%s', (_what, value) => {
+    check(value);
+  });
+
+  it('agrees across every SHA-256 block seam, in bytes rather than in units', () => {
+    for (const value of BOUNDARY_STRADDLERS) check(value);
+    // Anti-vacuity: the straddlers must actually straddle. Without this, a
+    // list that silently stopped producing multi-byte strings would keep the
+    // loop above green while testing nothing the ASCII cases do not.
+    const byteLengths = new Set(BOUNDARY_STRADDLERS.map((v) => Buffer.byteLength(v, 'utf8')));
+    expect(byteLengths.has(55)).toBe(true);
+    expect(byteLengths.has(56)).toBe(true);
+    expect(byteLengths.has(63)).toBe(true);
+    expect(byteLengths.has(64)).toBe(true);
+    expect(BOUNDARY_STRADDLERS.some((v) => Buffer.byteLength(v, 'utf8') !== v.length)).toBe(true);
+  });
+
+  it('distinguishes an unpaired surrogate from the replacement character it encodes as', () => {
+    // Both render as EF BF BD, so their digests are EQUAL, and that equality is
+    // Node's behaviour rather than a defect. Asserted so a future encoder that
+    // "fixed" it would be caught changing a stored hash.
+    const lone = withState({ phase: '\ud800' as RuleState['phase'] });
+    const replacement = withState({ phase: '�' as RuleState['phase'] });
+    expect(stateHash(lone).equals(stateHash(replacement))).toBe(true);
+    expect(
+      stateHash(lone).equals(
+        createHash('sha256').update(canonicalStateSerialization(replacement), 'utf8').digest(),
+      ),
+    ).toBe(true);
+  });
+});
