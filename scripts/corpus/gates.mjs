@@ -2291,11 +2291,43 @@ const CAL_FIXTURE_DIR = 'packages/rules-engine/fixtures/calendars';
 // An open vocabulary would defeat the check within a release: every cell would
 // declare its own phrasing, no two would agree, and "the unit is named" would
 // become "some words about time are present".
+//
+// ADR-082 WIDENED THE THIRD DEFINITION AND ADDED NO TOKEN, and the distinction
+// is what keeps the sentence above true. The set is closed because it partitions
+// on ONE question with exactly three answers: who answers this date, and may
+// Merit compute it? Merit's exchange calendar, Merit's own clock, or neither.
+// `rail clock` is the third answer, and its name is its first and commonest
+// member rather than its boundary; a calibration vendor's observation date is
+// the same answer with a different counterparty. A fourth token would partition
+// on "who is the counterparty" instead, which has no finite answer set, and the
+// next date column from a KYC provider or a market-data feed would have as good
+// a claim to its own token as this one had. That is the direction the paragraph
+// above names, so the widening moves the DEFINITION and never the token list.
 const UNIT_TOKENS = [
   { token: 'trading day', why: 'the exchange CT trading day, answered only by TradingCalendar' },
   { token: 'wall clock', why: "Merit's own clock, answered only by now()" },
-  { token: 'rail clock', why: "the rail's own clock, quoted and never computed by Merit" },
+  {
+    token: 'rail clock',
+    why:
+      "a third party's own clock, quoted and never computed by Merit: a payment rail's, " +
+      "a calibration vendor's, any counterparty whose day Merit reads and never derives " +
+      '(ADR-082). `rail` names the class after its commonest member and is not a claim ' +
+      'that the counterparty is a payment rail',
+  },
 ];
+// THE DEFINITIONS ARE PRINTED WITH THE FINDING, and until ADR-082 they were
+// not. `why` was carried beside every token and rendered nowhere: the finding
+// offered `trading day | wall clock | rail clock` and no definition of any of
+// them, so a session standing at a failing column had to open THIS FILE to
+// learn what it was choosing between. Session 120 did exactly that, and the
+// item it opened is the one ADR-082 closes.
+//
+// That is the widening's own delivery mechanism. A definition that reaches the
+// decision only if the reader goes looking for it is prose, and ADR-042 already
+// ruled that prose is not a control. A token's meaning belongs where the token
+// is refused.
+const unitVocabulary = () => UNIT_TOKENS.map((u) => `\`${u.token}\` (${u.why})`).join(' | ');
+
 // THE DECLARATION IS A MARKER, NOT A MENTION, and that distinction was learned
 // rather than designed. The first version of this check matched the token
 // anywhere in the row, and three rows passed it by accident: `basis_trading_day`
@@ -2649,6 +2681,19 @@ const ci06m = {
     if (dates.length === 0) {
       throw new Error('no `date` columns found in the migrations; the unit check cannot run');
     }
+    // THE TALLY IS PRINTED SO THAT A VOCABULARY CHANGE CANNOT RE-CLASSIFY A
+    // COLUMN IN SILENCE, and it is here because ADR-082 needed the figure and
+    // this gate did not have one. A definition may be widened without any token
+    // string moving, in which case every declaration must resolve exactly as it
+    // did before; that claim is worth nothing if the only way to check it is to
+    // read 57 design-record rows by hand. The note makes the before and the
+    // after two lines of one runner's output.
+    //
+    // It counts RESOLUTIONS and not declarations. A design record may answer for
+    // two columns in one row (`created_at`, `updated_at`), so the tally sums to
+    // the number of date columns that resolved and not to the number of markers
+    // on disk, and those are different numbers on purpose.
+    const tally = new Map(UNIT_TOKENS.map((u) => [u.token, 0]));
     for (const ref of dates) {
       const [table, column] = ref.split('.');
       const { path, row, missingFile } = designRow(table, column);
@@ -2668,22 +2713,31 @@ const ci06m = {
         findings.push(
           `${ref}: its row in ${path} names no unit. A date column's unit is not derivable from ` +
             `its type and only sometimes from its name. Declare one, as \`**Unit: <token>**\`, ` +
-            `from: ${UNIT_TOKENS.map((u) => u.token).join(' | ')}`,
+            `from: ${unitVocabulary()}`,
         );
         continue;
       }
       if (typeof declared === 'object') {
         findings.push(
           `${ref}: its row declares \`**Unit: ${declared.invalid}**\`, which is not one of ` +
-            `${UNIT_TOKENS.map((u) => u.token).join(' | ')}.` +
+            `${UNIT_TOKENS.map((u) => u.token).join(' | ')}. The three are: ${unitVocabulary()}.` +
             (BUSINESS_DAY.test(declared.invalid)
               ? ' "business day" is the rail\'s language (ADR-042): Merit quotes it and never' +
                 ' computes it, and there is no business-day calendar in this system.'
               : ' The vocabulary is closed so that two rows cannot declare the same unit in two' +
                 ' spellings and agree only by accident.'),
         );
+        continue;
       }
+      tally.set(declared, tally.get(declared) + 1);
     }
+
+    console.log(
+      `       CI-06m note: ${dates.length} \`date\` column(s) in scope over ` +
+        `${UNIT_TOKENS.length} token(s); ` +
+        `${UNIT_TOKENS.map((u) => `${tally.get(u.token)} ${u.token}`).join(', ')}; ` +
+        `${dates.length - [...tally.values()].reduce((a, b) => a + b, 0)} unresolved`,
+    );
 
     return findings;
   },
