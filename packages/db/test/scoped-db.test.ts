@@ -63,12 +63,16 @@ const IDENTITY = 'i-1' as IdentityId;
  */
 const SQL_NAME: Readonly<Record<TableKey, string>> = {
   identities: 'identities',
+  users: 'users',
+  sessions: 'sessions',
+  planVersions: 'plan_versions',
   accounts: 'accounts',
   ledgerAccounts: 'ledger_accounts',
   ledgerEntries: 'ledger_entries',
   ledgerTransactions: 'ledger_transactions',
   treasuryBalances: 'treasury_balances',
   liabilitySnapshots: 'liability_snapshots',
+  ruleStates: 'rule_states',
 };
 
 /**
@@ -208,14 +212,14 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 104 are unreachable through either accessor.
-  test('7 declared tables, 7 scope rules, 0 reachable without one', () => {
+  // rounded up: the other 100 are unreachable through either accessor.
+  test('11 declared tables, 11 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(7);
-    expect(rules).toBe(7);
+    expect(declared).toBe(11);
+    expect(rules).toBe(11);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
@@ -402,6 +406,10 @@ describe('the predicates discriminate', () => {
   test('a firm table has no scoped reading, and says so rather than returning nothing', () => {
     expect(() => scopePredicate('treasuryBalances', IDENTITY)).toThrow(/belongs to no identity/);
     expect(() => scopePredicate('liabilitySnapshots', IDENTITY)).toThrow(/systemDb/);
+    // EVERY firm table, not the two somebody remembered. `plan_versions` is the
+    // third and the public rules pages read it, so the refusal is the thing
+    // that says "unscoped ON PURPOSE" out loud rather than by omission.
+    expect(() => scopePredicate('planVersions', IDENTITY)).toThrow(/belongs to no identity/);
   });
 });
 
@@ -422,54 +430,204 @@ describe('the accessors', () => {
   });
 });
 
+/**
+ * ADR-094'S FOLD. The result of replaying one table's migration history.
+ *
+ * `columns`  the column-name set AS OF THE LAST MIGRATION.
+ * `added`    the names the replay applied, in migration order. Empty for an
+ *            undrifted table, and NON-EMPTY SOMEWHERE is asserted below --
+ *            a fold that quietly did nothing would leave every per-table
+ *            comparison green for any table whose transcription was ALSO
+ *            missing the later columns, which is ADR-084 section 7's failure.
+ * `refused`  statements outside the fold's one-member vocabulary. Any of these
+ *            turns the suite red, exactly as all four shapes do today.
+ */
+interface ColumnFold {
+  readonly columns: readonly string[];
+  readonly added: readonly string[];
+  readonly refused: readonly string[];
+}
+
+/** Split on commas that are NOT inside parentheses. */
+function topLevelParts(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const ch of text) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+    } else current += ch;
+  }
+  parts.push(current);
+  return parts.map((part) => part.trim()).filter((part) => part.length > 0);
+}
+
+/**
+ * Every `ALTER TABLE <table> ...;` statement in one migration file.
+ *
+ * COMMENTS COME OUT FIRST, for `ddlColumns`' reason: `0043` writes
+ * `-- SD-M6-11` INSIDE a statement, and a comment containing a comma splits
+ * where no clause boundary is.
+ *
+ * THE NON-GREEDY MATCH TO THE FIRST `;` IS CHECKED RATHER THAN TRUSTED. A
+ * semicolon inside parentheses would truncate the statement and the fold would
+ * then read a partial clause list as a complete one, so an unbalanced statement
+ * THROWS instead of being folded.
+ */
+function alterStatementsFor(fileSql: string, table: string): string[] {
+  const sqlText = fileSql.replace(/--[^\n]*/g, '');
+  const found: string[] = [];
+  for (const statement of sqlText.match(
+    /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?[\s\S]*?;/gi,
+  ) ?? []) {
+    const named = /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?([a-z_]+)"?/i.exec(statement)?.[1];
+    if (named !== table) continue;
+    let depth = 0;
+    for (const ch of statement) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+    }
+    if (depth !== 0) {
+      throw new Error(
+        `ALTER TABLE ${table} statement has unbalanced parentheses, so the match to the ` +
+          `first ";" truncated it and the fold cannot read it: ${statement.slice(0, 120)}`,
+      );
+    }
+    found.push(statement);
+  }
+  return found;
+}
+
+/**
+ * ONE TABLE, REPLAYED. ADR-094.
+ *
+ * A transcription reads a table AS OF THE LAST MIGRATION and never as of its
+ * `CREATE TABLE`. This walks the migration set in order, starts from the
+ * `CREATE TABLE` column set, and folds every later `ADD COLUMN` onto it.
+ *
+ * THE VOCABULARY IS CLOSED AT ONE MEMBER AND THE DEFAULT IS FAIL. `DROP
+ * COLUMN`, `ALTER COLUMN` and `RENAME` are REFUSED and never skipped, so the
+ * refusal `schema.ts`'s header describes is narrowed rather than deleted: a
+ * table whose history contains one of them still cannot be registered.
+ *
+ * `ALTER COLUMN` is refused even though it CANNOT change a column-name set, and
+ * ADR-094 section 3 is why: the axis it does move -- type and nullability -- is
+ * one this suite has never compared, on any registered table, so exempting it
+ * would register a table verified on every axis except the one that changed.
+ */
+function foldTable(table: string): ColumnFold {
+  const files = migrationFiles();
+  const read = (file: string): string => readFileSync(join(MIGRATIONS, file), 'utf8');
+  const createdIn = files.findIndex((file) =>
+    new RegExp(`CREATE TABLE ${table} \\(`, 'i').test(read(file)),
+  );
+  if (createdIn < 0) throw new Error(`no CREATE TABLE for ${table}`);
+
+  // MIGRATION ORDER IS CHECKED RATHER THAN BELIEVED. Lexical filename order
+  // equals numeric order only while the four-digit prefix holds, and a
+  // statement folded onto a table that does not exist yet is a fold reading
+  // its history backwards.
+  for (const earlier of files.slice(0, createdIn)) {
+    if (alterStatementsFor(read(earlier), table).length > 0) {
+      throw new Error(
+        `${earlier} alters ${table}, which ${files[createdIn] ?? '?'} creates. The fold ` +
+          'applies files in name order and that order is wrong here.',
+      );
+    }
+  }
+
+  const columns = new Set(ddlColumns(read(files[createdIn] ?? ''), table));
+  const added: string[] = [];
+  const refused: string[] = [];
+
+  for (const file of files.slice(createdIn)) {
+    for (const statement of alterStatementsFor(read(file), table)) {
+      // A statement that touches no column at all -- ADD CONSTRAINT is the only
+      // shape in this tree -- changes nothing the transcription states.
+      if (!/\b(ADD|DROP|ALTER)\s+COLUMN\b|\bRENAME\b/i.test(statement)) continue;
+
+      // THE DEFAULT IS FAIL. Everything but `ADD COLUMN` is refused, including a
+      // statement that mixes one in.
+      if (/\b(DROP|ALTER)\s+COLUMN\b|\bRENAME\b/i.test(statement)) {
+        refused.push(`${file}: ${statement.slice(0, 90).replace(/\s+/g, ' ')}`);
+        continue;
+      }
+
+      const body = statement.replace(/^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?/i, '');
+      const names = topLevelParts(body.replace(/;\s*$/, ''))
+        .map((clause) => /^ADD\s+COLUMN\s+"?([a-z_][a-z0-9_]*)"?/i.exec(clause)?.[1])
+        .filter((name): name is string => name !== undefined);
+
+      // A MIS-PARSE IS LOUD RATHER THAN ABSORBED. A statement the shape check
+      // called `ADD COLUMN` that yields no name means the clause splitter and
+      // the shape check disagree, and a name already present means the same
+      // column was read twice -- both would otherwise vanish into a Set.
+      if (names.length === 0) {
+        throw new Error(
+          `${file}: an ADD COLUMN against ${table} parsed to no column name: ` +
+            statement.slice(0, 120).replace(/\s+/g, ' '),
+        );
+      }
+      for (const name of names) {
+        if (columns.has(name)) {
+          throw new Error(`${file}: ADD COLUMN ${table}.${name}, which is already in the set`);
+        }
+        columns.add(name);
+        added.push(name);
+      }
+    }
+  }
+
+  return { columns: [...columns].sort(), added, refused };
+}
+
 describe('the TypeScript schema has not drifted from the DDL', () => {
   // ADR-008's "types are generated from the schema so drift is a compile error"
-  // is FALSE on this tree and ADR-084 supersedes it. This is what replaces it.
-  const sqlText = allMigrationSql();
+  // is FALSE on this tree and ADR-084 supersedes it. This is what replaces it,
+  // and ADR-094 is what makes it read a table's WHOLE history rather than its
+  // first statement.
 
-  test('the seven map to the SQL names the DDL uses', () => {
+  test('every registered table maps to the SQL name the DDL uses', () => {
     for (const [key, sqlName] of DDL_NAMES) {
       expect(getTableName(TABLES[key] as PgTable)).toBe(sqlName);
     }
   });
 
   for (const [key, sqlName] of DDL_NAMES) {
-    test(`${sqlName}: the TS column set equals the CREATE TABLE column set`, () => {
-      expect(sqlNames(key)).toEqual(ddlColumns(sqlText, sqlName));
+    test(`${sqlName}: the TS column set equals the set as of the LAST migration`, () => {
+      expect(sqlNames(key)).toEqual(foldTable(sqlName).columns);
     });
   }
 
-  // THE ABSENCE THIS ASSERTION RESTS ON, RE-RUN AT TEST TIME RATHER THAN
-  // MEASURED ONCE AND WRITTEN DOWN. Comparing against the `CREATE TABLE` body is
-  // only sound while no LATER migration changes the table's columns. Session 145
-  // measured that absence wide -- ADD, DROP, ALTER and RENAME, not `ADD COLUMN`
-  // textually -- and this re-derives it on every run, so the day one lands the
-  // check FAILS rather than silently reading a stale CREATE.
-  test('no later migration changes a column on any of the seven', () => {
-    const sevenSqlNames = DDL_NAMES.map(([, n]) => n);
-    const offenders: string[] = [];
-
-    for (const file of migrationFiles()) {
-      const text = readFileSync(join(MIGRATIONS, file), 'utf8');
-      const statements = text.match(
-        /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?([a-z_]+)"?([\s\S]*?);/gi,
-      );
-      for (const statement of statements ?? []) {
-        const table = /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?([a-z_]+)"?/i.exec(statement)?.[1];
-        if (table === undefined || !sevenSqlNames.includes(table)) continue;
-        // ADD CONSTRAINT does not change a column set. Two exist and both are
-        // named in ADR-084: ledger_transactions in 0009 and accounts in 0010.
-        if (/\bADD\s+CONSTRAINT\b/i.test(statement)) continue;
-        if (/\b(ADD|DROP|ALTER)\s+COLUMN\b|\bRENAME\b/i.test(statement)) {
-          offenders.push(`${file}: ${statement.slice(0, 90).replace(/\s+/g, ' ')}`);
-        }
-      }
-    }
-
-    expect(offenders).toEqual([]);
+  // THE REFUSAL, NARROWED RATHER THAN DELETED. It used to read "no later
+  // migration changes a column on any of the seven" and it was what made the
+  // `CREATE TABLE` body a sound proxy for the table. The proxy is gone -- the
+  // fold reads the whole history -- and what remains is the part that is still
+  // true: a shape the fold does not read is a shape nothing here verifies.
+  test('no later migration changes a column in a shape ADR-094 does not fold', () => {
+    const refused = DDL_NAMES.flatMap(([, sqlName]) => foldTable(sqlName).refused);
+    expect(refused).toEqual([]);
   });
 
-  test('the seven are each created exactly once, so there is one CREATE to read', () => {
+  // THE FOLD IS WATCHED WORKING RATHER THAN ASSUMED TO. A fold that returned
+  // each `CREATE TABLE` set unchanged would leave every assertion above green
+  // for any table whose transcription ALSO omitted the later columns, because
+  // both sides would be wrong in the same direction. This is the one assertion
+  // that fails in that case, and it is ADR-094's checkable clause.
+  test('the fold is not vacuous: a registered table gains columns after its CREATE', () => {
+    const gained = DDL_NAMES.filter(([, sqlName]) => foldTable(sqlName).added.length > 0).map(
+      ([, sqlName]) => sqlName,
+    );
+    expect(
+      gained.length,
+      `no registered table replays an ADD COLUMN: ${gained.join(', ')}`,
+    ).toBeGreaterThan(0);
+  });
+
+  test('every registered table is created exactly once, so there is one CREATE to fold onto', () => {
     for (const [, sqlName] of DDL_NAMES) {
       const matches = allMigrationSql().match(new RegExp(`CREATE TABLE ${sqlName} \\(`, 'gi'));
       expect(matches?.length, sqlName).toBe(1);
