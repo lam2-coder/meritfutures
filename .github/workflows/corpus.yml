@@ -492,3 +492,30 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_consistency_period_after_anchor.sql
+
+      # 0047, ADR-087, OI-29. MONEY PATH. The FK on plan_versions proves a
+      # simulation run was NAMED; nothing proved what it says, because a CHECK
+      # cannot read another table. Two of DELTA_MANIFEST's three unsound publish
+      # states close here and the third does not: `rules_digest` has no producer
+      # in the tree, so there is nothing for a digest comparison to agree with.
+      #
+      # SUCCESSES LEAD, and every one of them also passes at 0046: they are the
+      # shapes that did NOT change. SUCCESS 3 asserts the SURVIVING HOLE, a run
+      # anchored to no version deciding any publish, so the day somebody closes
+      # it the probe says what they broke.
+      #
+      # CASES `0045 A` AND `0045 B` ARE THE DIRECTION A WIDER TRIGGER WOULD HAVE
+      # BROKEN. A BEFORE ROW trigger fires before the table's CHECK constraints,
+      # so both rows reach 0047's guard first and must pass through it to be
+      # refused BY NAME by plan_versions_publish_decision_recorded, as they were
+      # at 0046.
+      #
+      # Each rejection asserts the CHECK NAMED IN THE MESSAGE rather than a bare
+      # check_violation: a trigger RAISE carries no CONSTRAINT_NAME, so the
+      # sibling probe's GET STACKED DIAGNOSTICS CONSTRAINT_NAME technique is
+      # unavailable and matching on 'OI-29 check A' / 'OI-29 check B' is the
+      # equivalent discrimination.
+      - name: Probe OI-29's publish-decision soundness (0047)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_publish_decision_is_sound.sql

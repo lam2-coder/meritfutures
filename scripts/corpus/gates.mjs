@@ -1571,6 +1571,31 @@ const ci06h = {
           'name is gone from the catalogue, or that both IS NULL guards are ' +
           'still load bearing',
       ],
+      // 0047, ADR-087, OI-29, MONEY PATH. Pinned in the commit that wires it.
+      //
+      // THE PIN CARRIES A DIRECTION THE STEP DOES NOT. Two of this probe's
+      // sixteen assertions -- `0045 A` and `0045 B` -- exist to prove that
+      // 0047's trigger does NOT answer the two rows 0045's CHECK is supposed to
+      // refuse. A BEFORE ROW trigger fires before the table's CHECK
+      // constraints, so a later migration widening this guard by one clause
+      // would silently take over those refusals and every caller resolving
+      // publish failures by constraint name would stop working. Nothing else in
+      // this job would notice, because both rows would still be refused.
+      //
+      // And SUCCESS 3 asserts a HOLE rather than a control: a simulation run
+      // anchored to no plan version still decides any publish, because 0045
+      // makes that column nullable on purpose. Delete this step and the only
+      // executable record of what OI-29b still costs goes with it.
+      [
+        'probe_publish_decision_is_sound.sql',
+        "ADR-087's publish-decision soundness is no longer probed, so nothing " +
+          'asserts that a publish decided on a failed, queued or running run is ' +
+          'refused, that a run anchored to another plan or another version of ' +
+          'the same plan is refused, that both the INSERT and the publish-' +
+          "transition UPDATE are guarded, that 0045's two CHECK refusals still " +
+          "arrive by name, or that 0028's immutability guard still answers " +
+          'first on a published row (OI-29)',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
