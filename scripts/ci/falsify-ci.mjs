@@ -378,6 +378,53 @@ const CASES = [
   },
 
   // ---------------------------------------------------------------------------
+  // CI-04  The integration project, ADR-085
+  // ---------------------------------------------------------------------------
+  // ONE SEED PER ASSERTION, because the project holds exactly two and a single
+  // seed would leave the other never watched failing. Both need no database,
+  // which is the whole of what CI-04's first leg covers (ADR-085 ruling 1).
+  //
+  // EVERY SEEDED FILENAME CARRIES THE MARK AND STILL PARSES AS A MIGRATION.
+  // `0002___falsify__*.sql` starts `0002_`, so the test's `^(\d{4})_` sees it,
+  // and it contains `__falsify__`, so `sweep()` can remove it after a killed
+  // run. A seed the sweeper cannot see would be a stray file left in
+  // `packages/db/migrations`, which is the one directory in this repository
+  // where a stray file is a numbering collision for the next session.
+  {
+    id: 'CI-04/duplicate-migration-number',
+    stage: 'CI-04',
+    seeds:
+      'a second migration numbered 0002, which is the collision E2 makes unrenumberable once merged',
+    needles: ['migration filenames are uniquely numbered'],
+    run: () =>
+      seededInTree(
+        {
+          [`packages/db/migrations/0002_${MARK}_duplicate.sql`]:
+            '-- Seeded by falsify-ci. Not a migration; it exists to collide on 0002.\nSELECT 1;\n',
+        },
+        () => run('pnpm', ['exec', 'vitest', 'run', '--project', 'integration']),
+      ),
+  },
+  {
+    id: 'CI-04/unexplained-hole',
+    stage: 'CI-04',
+    // 0099 is far above both the highest migration on disk (0046) and the
+    // highest ALLOCATION reserves (0047), so 0048 through 0098 become holes the
+    // table does not explain. The number is deliberately not max+2: a seed one
+    // past the reservation would go green the day somebody reserves one more.
+    seeds: 'a migration numbered 0099, leaving 0048 to 0098 as holes ALLOCATION does not explain',
+    needles: ['every number below the highest is on disk or reserved in ALLOCATION'],
+    run: () =>
+      seededInTree(
+        {
+          [`packages/db/migrations/0099_${MARK}_hole.sql`]:
+            '-- Seeded by falsify-ci. Not a migration; it exists to open a hole below itself.\nSELECT 1;\n',
+        },
+        () => run('pnpm', ['exec', 'vitest', 'run', '--project', 'integration']),
+      ),
+  },
+
+  // ---------------------------------------------------------------------------
   // CI-02  RE-D-01 and RE-D-02
   // ---------------------------------------------------------------------------
   {
