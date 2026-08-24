@@ -430,7 +430,7 @@ in flight.** Two lessons are applied literally:
 | # | Slice | Fence, by file | Money | Depends on, by file |
 |---|---|---|---|---|
 | **`P4-a`** | **The drift ruling, and the three P4 tables that need it.** How an `ADR-084` transcription reads a table whose column set is a `CREATE TABLE` plus later `ADD COLUMN`s, then `plan_versions`, `rule_states` and `sessions` enter `schema.ts` and `scope.ts` under it | `packages/db/src/schema.ts`, `packages/db/src/scope.ts`, `packages/db/test/scoped-db.test.ts`, `docs/decisions/ADR-0NN.md` (new), `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | **YES.** A scope rule is where "forgot to scope" stops being available, and `SCOPE_RULES` is the tenancy registry ([session 159](../sessions/2026-08-24-session-159.md)'s reasoning, adopted) | nothing. **145 landed.** It goes FIRST |
-| **`P4-b`** | **The other ten P4 read tables enter the transcription**: `plan_version_sizes`, `content_documents`, `page_revalidations`, `statistic_definitions`, `published_statistics`, `proof_links`, `review_requests`, `certificates`, `daily_marks`, `purchases`. **All ten measured clean of later column changes**, so no ruling is needed | `packages/db/src/schema.ts`, `packages/db/src/scope.ts`, `packages/db/test/scoped-db.test.ts`, `STATE` (append), `sessions/` | **YES**, same reason | **`P4-a`** via `schema.ts` and `scope.ts`. **Strictly serial with it** |
+| **`P4-b`** | **The other ten P4 read tables enter the transcription**: `plan_version_sizes`, `content_documents`, `page_revalidations`, `statistic_definitions`, `published_statistics`, `proof_links`, `review_requests`, `certificates`, `daily_marks`, `purchases`. **All ten measured clean of later column changes**, so no ruling is needed | `packages/db/src/schema.ts`, `packages/db/src/scope.ts`, `packages/db/test/scoped-db.test.ts`, `STATE` (append), `sessions/` | **YES**, same reason | **`P4-a`** via `schema.ts` and `scope.ts`. **Strictly serial with it until [ADR-092](../decisions/ADR-092.md) section 5's `DDL_NAMES` line lands, and concurrent with it after**: this section's amendment below |
 | **`P4-c`** | **The UI framework is RULED, and `CI-07`'s cell plus `VG-2`'s chain move in the same commit.** `ADR-083` rules the API's runtime and nothing about a UI; M04 and M09 both name Next.js and the workspace holds none | `docs/decisions/ADR-0NN.md` (new), `pnpm-workspace.yaml` (`catalog:` only), `pnpm-lock.yaml`, `apps/portal/package.json`, `apps/site/package.json`, `docs/testing/STRATEGY.md` (**section 4.1's `CI-07` row and section 4.2's `VG-2` row only**), `scripts/corpus/gates.mjs` (the inventory register only), `scripts/corpus/falsify.mjs`, `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | no | **173** via `gates.mjs` and `falsify.mjs` |
 | **`P4-d`** | **Fastify enters the catalog and `apps/api` gets a route registry**, and `VG-3` and `VG-6` are re-disposed together. **Four measurements proposed this same slice** ([M03's `M3-c`](../sessions/2026-08-24-session-157.md), [M06's `A`](../sessions/2026-08-24-session-160.md), [M16's `S4`](../sessions/2026-08-24-session-165.md), [M19's `M19-1`](../sessions/2026-08-24-session-168.md)) | `pnpm-workspace.yaml` (`catalog:` only), `pnpm-lock.yaml`, `apps/api/package.json`, `apps/api/src/**`, `apps/api/test/**`, `docs/testing/STRATEGY.md` (**section 4.2's `VG-3` and `VG-6` rows only**), `scripts/corpus/gates.mjs` (the `VG` register only), `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | no by content, and **high consequence**: the registry's SHAPE decides whether [M19's seven route slices](../sessions/2026-08-24-session-168.md) serialize | **`P4-c`** via `pnpm-lock.yaml`; **173** via `gates.mjs`; **176** via `apps/api/**` |
 
@@ -438,6 +438,21 @@ in flight.** Two lessons are applied literally:
 This is [P3 wave 1](P3-ledger-billing-identity.md)'s finding on two files instead of one: four concurrent
 branches would each merge cleanly alone and none of them together. **`P4-a`/`P4-b` and `P4-c`/`P4-d` share
 no file with each other**, so the two pairs may run concurrently as pairs.
+
+**AMENDED by [ADR-092](../decisions/ADR-092.md) section 8 item 2: `P4-a` and `P4-b` may no longer need to
+be strictly serial.** Their table sets are disjoint, `plan_versions`, `rule_states` and `sessions` against
+the other ten, and **this section's own table measures `P4-b`'s ten as clean of later column changes**, so
+`P4-b` does not depend on `P4-a`'s drift ruling. Under that ruling they are concurrent with one loud
+conflict, **once its section 5 line lands**: `DDL_NAMES` derived from `SQL_NAME` or declared total over
+`TableKey`.
+
+**THAT LINE IS NOT IN THE TREE AS THIS AMENDMENT IS WRITTEN, AND THE DEPENDENCY IS STATED HERE RATHER THAN
+ASSUMED DISCHARGED.** It is `P4-a`'s to carry and [session 182](../sessions/README.md) is landing it
+concurrently with this amendment. **Until it merges the two remain serial**, for the reason
+[ADR-092](../decisions/ADR-092.md) section 5 measures rather than predicts: a keep-both merge that keeps
+both sides of `TABLES` and one side of `DDL_NAMES` typechecks at exit 0, passes at 25 tests against a
+baseline of 26, and **silently loses a registered table's drift assertion**. **`P4-a` still goes first if
+the two are run in sequence**, because it carries the drift ruling and that precondition.
 
 **`P4-c` must state what it does to `VG-10` and must NOT expire it.** Section 4.1: `VG-10` is the only
 conjunctive row in the table, and `CI-07` landing satisfies one of its two legs.
@@ -480,7 +495,7 @@ in flight.
 
 | File | Held by | Why it collides, and the resolution |
 |---|---|---|
-| **[`packages/db/src/schema.ts`](../../packages/db/src/schema.ts)** and **[`scope.ts`](../../packages/db/src/scope.ts)** | **`P4-a`, `P4-b`**, and **ten of the fourteen module measurements' first slices** | **THE LARGEST COLLISION IN THE ESTATE AND IT IS NOT VISIBLE FROM INSIDE ANY MODULE.** `SCOPE_RULES` is total over `TableKey` by a `satisfies` clause, so the two files move together **or the workspace does not compile**. Treat them as ONE unit of contention. Within P4: **`P4-a` then `P4-b`, strictly serial.** Across phases: **RULED, by [ADR-092](../decisions/ADR-092.md) section 2**: **the owner is the TABLE and not the module**, a table being registered once by the first session that needs it and the registration not re-argued, and **the queue is the TYPE CHECKER and not a document**, a session computing its own slice from `TABLE_KEYS` and dispatching concurrently with any other whose remaining table set is disjoint |
+| **[`packages/db/src/schema.ts`](../../packages/db/src/schema.ts)** and **[`scope.ts`](../../packages/db/src/scope.ts)** | **`P4-a`, `P4-b`**, and **ten of the fourteen module measurements' first slices** | **THE LARGEST COLLISION IN THE ESTATE AND IT IS NOT VISIBLE FROM INSIDE ANY MODULE.** `SCOPE_RULES` is total over `TableKey` by a `satisfies` clause, so the two files move together **or the workspace does not compile**. Treat them as ONE unit of contention. Within P4: **`P4-a` then `P4-b`, strictly serial until [ADR-092](../decisions/ADR-092.md) section 5's `DDL_NAMES` line lands, and concurrent after it**, per section 8's amendment. Across phases: **RULED, by [ADR-092](../decisions/ADR-092.md) section 2**: **the owner is the TABLE and not the module**, a table being registered once by the first session that needs it and the registration not re-argued, and **the queue is the TYPE CHECKER and not a document**, a session computing its own slice from `TABLE_KEYS` and dispatching concurrently with any other whose remaining table set is disjoint |
 | **[`packages/db/test/scoped-db.test.ts`](../../packages/db/test/scoped-db.test.ts)** | **`P4-a`, `P4-b`** | Same serialization, and harder to see: `DDL_NAMES` is one list and **`P4-a` additionally changes the drift assertion's rule**. A branch that adds a table here without its rule typechecks and the merge of two such branches typechecks too, which is the case that gets waved through ([session 159](../sessions/2026-08-24-session-159.md)) |
 | **[`pnpm-lock.yaml`](../../pnpm-lock.yaml)** and **[`pnpm-workspace.yaml`](../../pnpm-workspace.yaml)** | **`P4-c`, `P4-d`, `P4-i`** | **SERIAL, three ways.** [P3 wave 1](P3-ledger-billing-identity.md)'s lesson verbatim: a lockfile cannot be appended to per row, and three branches each merge cleanly alone and none of them together. Order **`P4-c`, `P4-d`, `P4-i`**. Each catalog edit is its own `VG-12` admission and folding them into one diff is cheaper and worse |
 | **[`scripts/corpus/gates.mjs`](../../scripts/corpus/gates.mjs)** and **[`falsify.mjs`](../../scripts/corpus/falsify.mjs)** | **`P4-c`, `P4-d`, `P4-i`**, and **session 173, CLAIMED** | **Four ways, and 173 is already dispatched.** Every artifact-bearing slice must shrink the unprobeable register in the same commit its `Closure` cell moves, because *an entry naming no live condition is itself a finding*. **173 goes first**, and the three P4 slices order behind it and behind each other |
@@ -612,8 +627,9 @@ Already in flight, and both order AHEAD of P4:
   173  gates.mjs, falsify.mjs, STRATEGY 4.4     ->  blocks P4-c, P4-d, P4-i
   176  apps/portal/**, apps/api/**              ->  blocks P4-d, P4-h, P4-i
 
-Wave 1, two pairs, each pair serial, the pairs concurrent with each other:
+Wave 1, two pairs, the pairs concurrent with each other:
   P4-a  the drift ruling + 3 tables    MONEY   ->  P4-b  the other 10 tables    MONEY
+        ^ serial only until ADR-092 section 5's DDL_NAMES line lands with P4-a; concurrent after it
   P4-c  the UI framework + CI-07/VG-2          ->  P4-d  fastify + the registry + VG-3/VG-6
 
 Wave 2, after wave 1:
