@@ -106,6 +106,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-081](ADR-081.md) | `hash.ts` moves into the engine, and the SHA-256 is hand-rolled because a standing ruling says so  (2026-08-23, status: proposed) |
 | [ADR-082](ADR-082.md) | the closed unit vocabulary widens its DEFINITION and never its token list, and `rail clock` names its class after its commonest member  (2026-08-23, status: proposed) |
 | [ADR-083](ADR-083.md) | the API is its own deployable, one codebase deployed twice, and Fastify runs it  (2026-08-23, status: proposed) |
+| [ADR-084](ADR-084.md) | `ScopedDb` gets a real client, the scope is a DECLARED registry, and one consequence of ADR-008 is superseded  (2026-08-23, status: proposed) |
 | [ADR-067](ADR-067.md) | An adjustment posts to the wallet and never to withdrawable, a debit may only reverse a credit this table itself posted, and the eligibility pair the fold plan offered is false because the corpus has two exits  (2026-08-20, status: proposed) |
 | [ADR-069](ADR-069.md) | Parity is the condition that makes read-only impersonation correct, and the eighteen gaps close at `owner` with the initiative recorded  (2026-08-20, status: proposed) |
 | [ADR-072](ADR-072.md) | A golden fixture is writable when three checkable conditions hold, and every registry row without one carries a stated blocker from a closed vocabulary  (2026-08-20, status: proposed) |
