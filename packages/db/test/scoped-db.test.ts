@@ -113,6 +113,54 @@ function ddlColumns(rawSql: string, table: string): string[] {
   );
 }
 
+/**
+ * Whole column DEFINITIONS from a `CREATE TABLE` body, keyed by column name.
+ *
+ * The definitions carry the inline `REFERENCES`, which is what lets a scope rule
+ * be checked against the DATABASE rather than against itself.
+ */
+function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
+  const sqlText = rawSql.replace(/--[^\n]*/g, '');
+  const at = sqlText.search(new RegExp(`CREATE TABLE ${table} \\(`, 'i'));
+  if (at < 0) throw new Error(`no CREATE TABLE for ${table}`);
+  const body = sqlText.slice(sqlText.indexOf('(', at) + 1);
+  let depth = 0;
+  let end = -1;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') {
+      if (depth === 0) {
+        end = i;
+        break;
+      }
+      depth--;
+    }
+  }
+  const parts: string[] = [];
+  let paren = 0;
+  let current = '';
+  for (const ch of body.slice(0, end)) {
+    if (ch === '(') paren++;
+    if (ch === ')') paren--;
+    if (ch === ',' && paren === 0) {
+      parts.push(current);
+      current = '';
+    } else current += ch;
+  }
+  parts.push(current);
+
+  const defs = new Map<string, string>();
+  for (const raw of parts) {
+    const line = raw.trim().replace(/\s+/g, ' ');
+    if (line.length === 0) continue;
+    if (/^(CONSTRAINT|PRIMARY KEY|UNIQUE|CHECK|FOREIGN KEY|EXCLUDE)\b/i.test(line)) continue;
+    const name = line.split(' ')[0];
+    if (name !== undefined && name.length > 0) defs.set(name, line);
+  }
+  return defs;
+}
+
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
   // rounded up: the other 104 are unreachable through either accessor.
@@ -184,6 +232,90 @@ describe('every rule resolves against the schema', () => {
           `${key} is a semi-join, so ${rule.via}.${rule.foreignColumn} must NOT be a PK`,
         ).toBe(false);
       }
+    }
+  });
+});
+
+describe('a scope rule is checked against the DDL, not against itself', () => {
+  // THE TEST THAT WOULD HAVE CAUGHT THE SEED THAT SURVIVED. Session 145 seeded
+  // `accounts` scoped by `user_id` instead of `identity_id` and ALL TWENTY-TWO
+  // assertions passed, because the render test took its expected column FROM THE
+  // RULE and so was asserting the code against itself.
+  //
+  // A USER IS A LOGIN AND AN IDENTITY IS THE PERSON, and ADR-041 is why they are
+  // two columns. Scoping accounts by `user_id` returns a DIFFERENT SET OF ROWS,
+  // silently, for every trader whose identity has more than one login -- which is
+  // the exact failure ADR-008 scoped the wrapper to bound.
+  //
+  // The expectation therefore comes from the MIGRATIONS: an `owned` column must
+  // be declared `REFERENCES identities(id)` in the DDL. `user_id` references
+  // `users(id)` and `treasury_balances.recorded_by` references `users(id)`, so
+  // both are refused by the database's own declaration rather than by a list
+  // somebody remembered to update.
+  const sqlText = allMigrationSql();
+  const SQL_NAME: Readonly<Record<TableKey, string>> = {
+    identities: 'identities',
+    accounts: 'accounts',
+    ledgerAccounts: 'ledger_accounts',
+    ledgerEntries: 'ledger_entries',
+    ledgerTransactions: 'ledger_transactions',
+    treasuryBalances: 'treasury_balances',
+    liabilitySnapshots: 'liability_snapshots',
+  };
+
+  test('every owned rule names a column the DDL declares REFERENCES identities(id)', () => {
+    for (const key of TABLE_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'owned') continue;
+      const defs = ddlColumnDefs(sqlText, SQL_NAME[key]);
+      const def = defs.get(rule.column);
+      expect(def, `${SQL_NAME[key]}.${rule.column} is not a column`).toBeDefined();
+      expect(
+        def ?? '',
+        `${SQL_NAME[key]}.${rule.column} must reference identities(id), and its DDL is: ${def ?? ''}`,
+      ).toMatch(/REFERENCES\s+identities\s*\(\s*id\s*\)/i);
+    }
+  });
+
+  test('the root rule is the identities table itself', () => {
+    for (const key of TABLE_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'root') continue;
+      expect(SQL_NAME[key]).toBe('identities');
+      expect(rule.column).toBe('id');
+    }
+  });
+
+  test('every derived rule names a foreign key the DDL actually declares', () => {
+    for (const key of TABLE_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'derived') continue;
+      const here = ddlColumnDefs(sqlText, SQL_NAME[key]).get(rule.localColumn);
+      const there = ddlColumnDefs(sqlText, SQL_NAME[rule.via]).get(rule.foreignColumn);
+      expect(here, `${SQL_NAME[key]}.${rule.localColumn}`).toBeDefined();
+      expect(there, `${SQL_NAME[rule.via]}.${rule.foreignColumn}`).toBeDefined();
+
+      // The edge is declared in ONE of the two directions and either is valid:
+      // ledger_entries.ledger_account_id -> ledger_accounts(id) points forward,
+      // and ledger_entries.transaction_id -> ledger_transactions(id) is the
+      // reverse edge ledger_transactions traverses.
+      const forward = new RegExp(`REFERENCES\\s+${SQL_NAME[rule.via]}\\s*\\(`, 'i').test(
+        here ?? '',
+      );
+      const reverse = new RegExp(`REFERENCES\\s+${SQL_NAME[key]}\\s*\\(`, 'i').test(there ?? '');
+      expect(
+        forward || reverse,
+        `no declared FK between ${SQL_NAME[key]}.${rule.localColumn} and ${SQL_NAME[rule.via]}.${rule.foreignColumn}`,
+      ).toBe(true);
+    }
+  });
+
+  test('no firm table carries a column referencing identities, so the class is not hiding one', () => {
+    for (const key of TABLE_KEYS) {
+      if (SCOPE_RULES[key].class !== 'firm') continue;
+      const defs = [...ddlColumnDefs(sqlText, SQL_NAME[key]).values()];
+      const reaching = defs.filter((d) => /REFERENCES\s+identities\s*\(/i.test(d));
+      expect(reaching, `${SQL_NAME[key]} reaches identities directly`).toEqual([]);
     }
   });
 });
