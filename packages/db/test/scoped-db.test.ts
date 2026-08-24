@@ -36,6 +36,51 @@ import {
 const MIGRATIONS = fileURLToPath(new URL('../migrations/', import.meta.url));
 const IDENTITY = 'i-1' as IdentityId;
 
+/**
+ * THE TABLE-TO-SQL-NAME MAP, STATED ONCE, TOTAL, AND AT MODULE SCOPE.
+ *
+ * ADR-092 SECTION 5 IS WHY IT IS ONE STATEMENT AND NOT TWO. This file used to
+ * carry the same seven pairs twice: this map, total by `Record<TableKey, _>`,
+ * and a `DDL_NAMES` array beside the drift assertions that was not. Deleting a
+ * pair from the array left `tsc --noEmit` at exit 0 and the suite GREEN at 25
+ * tests against a baseline of 26 -- a registered, scoped table silently lost
+ * its per-table drift assertion and the test count went DOWN. That was the one
+ * concurrent-merge hazard on this pair with no loud failure, watched happening
+ * rather than predicted, and two hand-maintained statements of one map is the
+ * exact drift class `src/schema.ts`'s own header says this package exists to
+ * remove.
+ *
+ * OMITTING A TABLE HERE IS NOW A COMPILE ERROR, and `DDL_NAMES` below is
+ * DERIVED from `TABLE_KEYS`, so a registered table cannot be absent from the
+ * drift assertions at all.
+ *
+ * IT IS STILL WRITTEN BY HAND AND THAT IS DELIBERATE. Deriving it from
+ * `getTableName(TABLES[key])` would remove the last hand-maintained copy and
+ * would make the assertion at `the seven map to the SQL names the DDL uses`
+ * compare `getTableName` with itself -- the schema asserted against the schema,
+ * which is ADR-084 section 7's failure exactly. The independent statement IS
+ * the check.
+ */
+const SQL_NAME: Readonly<Record<TableKey, string>> = {
+  identities: 'identities',
+  accounts: 'accounts',
+  ledgerAccounts: 'ledger_accounts',
+  ledgerEntries: 'ledger_entries',
+  ledgerTransactions: 'ledger_transactions',
+  treasuryBalances: 'treasury_balances',
+  liabilitySnapshots: 'liability_snapshots',
+};
+
+/**
+ * Every registered table, paired with its SQL name. DERIVED from `TABLE_KEYS`
+ * and never listed: the drift assertions below iterate this, so the set they
+ * cover is the set the registry declares, by construction rather than by
+ * anyone remembering.
+ */
+const DDL_NAMES: ReadonlyArray<readonly [TableKey, string]> = TABLE_KEYS.map(
+  (key) => [key, SQL_NAME[key]] as const,
+);
+
 const columnsOf = (key: TableKey): Record<string, PgColumn> =>
   getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
 
@@ -253,15 +298,6 @@ describe('a scope rule is checked against the DDL, not against itself', () => {
   // both are refused by the database's own declaration rather than by a list
   // somebody remembered to update.
   const sqlText = allMigrationSql();
-  const SQL_NAME: Readonly<Record<TableKey, string>> = {
-    identities: 'identities',
-    accounts: 'accounts',
-    ledgerAccounts: 'ledger_accounts',
-    ledgerEntries: 'ledger_entries',
-    ledgerTransactions: 'ledger_transactions',
-    treasuryBalances: 'treasury_balances',
-    liabilitySnapshots: 'liability_snapshots',
-  };
 
   test('every owned rule names a column the DDL declares REFERENCES identities(id)', () => {
     for (const key of TABLE_KEYS) {
@@ -390,16 +426,6 @@ describe('the TypeScript schema has not drifted from the DDL', () => {
   // ADR-008's "types are generated from the schema so drift is a compile error"
   // is FALSE on this tree and ADR-084 supersedes it. This is what replaces it.
   const sqlText = allMigrationSql();
-
-  const DDL_NAMES: ReadonlyArray<readonly [TableKey, string]> = [
-    ['identities', 'identities'],
-    ['accounts', 'accounts'],
-    ['ledgerAccounts', 'ledger_accounts'],
-    ['ledgerEntries', 'ledger_entries'],
-    ['ledgerTransactions', 'ledger_transactions'],
-    ['treasuryBalances', 'treasury_balances'],
-    ['liabilitySnapshots', 'liability_snapshots'],
-  ];
 
   test('the seven map to the SQL names the DDL uses', () => {
     for (const [key, sqlName] of DDL_NAMES) {
