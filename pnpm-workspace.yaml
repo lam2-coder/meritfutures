@@ -30,9 +30,21 @@ onlyBuiltDependencies: []
 catalog:
   '@eslint/js': 10.0.1
   '@types/node': 22.20.1
+  # `@types/pg` is a DEV type package and `pg` is a runtime dependency, so they
+  # are versioned independently and are not expected to match. ADR-084.
+  '@types/pg': 8.23.1
+  # THE DRIVER IS `pg` AND ADR-006 DECIDES IT, NOT PREFERENCE. `pg-boss@12.27.0`
+  # declares `pg: ^8.22.0` in its own `dependencies`, and ADR-006's consequence is
+  # that enqueue participates in the same transaction as the state change that
+  # caused it. A transaction is per-connection, so a second driver is a second
+  # pool and that consequence stops being implementable. postgres.js costs 0
+  # transitive packages against `pg`'s 6 and is the better VG-12 answer in
+  # isolation; it is refused here because it is not in isolation. ADR-084.
+  'drizzle-orm': 0.45.2
   eslint: 10.8.1
   fast-check: 4.9.0
   globals: 17.11.0
+  pg: 8.23.0
   prettier: 3.9.6
   # TypeScript 6.0.3 rather than 7.0.2, and the constraint is checkable:
   # typescript-eslint@8.67.0 (and its canary) declare
