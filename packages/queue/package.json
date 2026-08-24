@@ -1,0 +1,22 @@
+{
+  "name": "@merit/queue",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The job interface ADR-006 made a review criterion, and pg-boss behind it. The only package permitted to name the queue vendor.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT DECLARES NO WORKSPACE DEPENDENCY, AND @merit/db's ABSENCE IS THE DESIGN RATHER THAN AN OMISSION. The queue never opens a connection and never holds one: `enqueue` takes the caller's OPEN TRANSACTION as its first argument, and the pg-boss instance is constructed over an executor handed in from outside. So this package cannot open a second pool even by mistake, which is the property ADR-006's transactional enqueue needs and ADR-084 section 2 states as the reason `pg` was chosen over postgres.js. It also declares no `pg` and no `drizzle-orm`: `merit/no-raw-db-client` (VG-4) bans both here, and the ban is satisfiable precisely because the executor is injected. `pg-boss` is NOT on that rule's list and is not meant to be, because it is not a client: it is a consumer of one.",
+  "dependencies": {
+    "pg-boss": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -14,15 +14,31 @@
 // if app paths are a glob.
 //
 // The queue is pg-boss inside the same Postgres (ADR-006), so the job store
-// participates in the same transactions and the same PITR as the money data. It
-// arrives with the first job.
+// participates in the same transactions and the same PITR as the money data.
+// THE INTERFACE NOW EXISTS AND THE JOB STORE DOES NOT (ADR-086, session 147).
+// `@merit/queue` publishes `JobQueue` and `pgBossQueue`, whose `enqueue` takes
+// the caller's open transaction as its first argument; what has not landed is
+// the migration that installs pg-boss's schema, and `pgBossQueue` is configured
+// `migrate: false` precisely so that gap fails loudly rather than being closed
+// by a library running DDL on the money database at boot.
+//
+// NOTHING HERE IMPORTS IT YET, and the reason is a manifest rather than a
+// design. `apps/worker/package.json` declares `@merit/rules-engine` and nothing
+// else; adding `@merit/queue` to it is outside session 147's fence, and under
+// `node-linker=isolated` an undeclared import does not resolve at all. So the
+// wiring is one manifest line and one call, in the session that brings the first
+// job with it.
 //
 // THE FIRST JOB IS THE NIGHTLY BATCH, and it is here as a function rather than
 // as a scheduled worker. `runNightlyBatch` takes its ports as an argument and
-// this app has no adapter to give it, because no Drizzle client exists yet
-// (`packages/db` says so in its own header). What is real is the fold, the row,
-// and the hash; what is not is the wiring, and the difference is visible in the
-// type rather than left to a reader.
+// this app has no adapter to give it. THAT IS NO LONGER BECAUSE THE CLIENT DOES
+// NOT EXIST: `packages/db` said so in its own header until ADR-084 landed
+// `scopedDb(identity)` and `systemDb(reason)` on 2026-08-23, and that header now
+// reads "BOTH HALVES NOW EXIST". What is missing is an adapter implementing
+// `BatchPorts` over those accessors, which is a smaller and more specific gap
+// than the one this comment used to name. What is real is the fold, the row, and
+// the hash; what is not is the wiring, and the difference is visible in the type
+// rather than left to a reader.
 
 export { foldAccountDay, runNightlyBatch } from './batch/nightly.js';
 export type {
@@ -88,7 +104,14 @@ export type {
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;
 
-/** Still not a scheduled application: the batch exists, the queue does not. */
+/**
+ * Still not a scheduled application, and the missing piece has moved.
+ *
+ * The batch exists, the queue's INTERFACE exists (ADR-086), and what is absent
+ * is the job store: pg-boss's schema is not in `packages/db/migrations`, so
+ * there is nothing to enqueue into. `CRON_INVENTORY` is not this session's
+ * either, so the jobs themselves are still nobody's.
+ */
 export function main(): void {
-  console.log(`merit ${SERVICE}: nightly batch built, no scheduler yet`);
+  console.log(`merit ${SERVICE}: nightly batch built, job interface built, no job store yet`);
 }
