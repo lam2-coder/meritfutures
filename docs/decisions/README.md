@@ -26,13 +26,13 @@ grouped these rulings live in [gates/](gates/).
 
 | ADR | Title |
 |---|---|
-| [ADR-001](ADR-001.md) | Repo root stands in for `merit/`  (2026-08-13, status: proposed) |
+| [ADR-001](ADR-001.md) | Repo root stands in for `merit/`  (2026-08-13, status: accepted) |
 | [ADR-002](ADR-002.md) | Rithmic ingest path is SFTP-first, both directions  (2026-08-13, status: accepted) |
 | [ADR-003](ADR-003.md) | Session-length policy on money vs non-money paths  (2026-08-13, status: accepted) |
 | [ADR-004](ADR-004.md) | CLAUDE_CODE_PLAYBOOK.md location (research/ vs docs/)  (2026-08-13, status: accepted) |
-| [ADR-006](ADR-006.md) | Queue technology is pg-boss (Postgres-only)  (2026-08-13, status: proposed) |
-| [ADR-007](ADR-007.md) | Hosting is managed Postgres (Neon) plus Railway plus Cloudflare  (2026-08-13, status: proposed) |
-| [ADR-008](ADR-008.md) | ORM is Drizzle  (2026-08-13, status: proposed) |
+| [ADR-006](ADR-006.md) | Queue technology is pg-boss (Postgres-only)  (2026-08-13, status: accepted) |
+| [ADR-007](ADR-007.md) | Hosting is managed Postgres (Neon) plus Railway plus Cloudflare  (2026-08-13, status: accepted) |
+| [ADR-008](ADR-008.md) | ORM is Drizzle  (2026-08-13, status: accepted) |
 | [ADR-005](ADR-005.md) | Rithmic vendor call deferred; M2 ingest specifics are provisional  (2026-08-13, status: accepted) |
 | [ADR-009](ADR-009.md) | Payout amount is optional and defaults to the maximum eligible  (2026-08-13, status: accepted) |
 | [ADR-010](ADR-010.md) | Dual control on cap, split, gap, and treasury credentials, with both keys founder-held at launch  (2026-08-13, status: accepted) |
@@ -59,10 +59,10 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-030](ADR-030.md) | Plan-config key names are `max_payouts` and `kyc.triggers`  (2026-08-14, status: accepted) |
 | [ADR-031](ADR-031.md) | The published statistic is `bigint` with a unit, and its no-floats exemption is retired  (2026-08-14, status: accepted) |
 | [ADR-032](ADR-032.md) | `measure` on `published_statistics`, and the pair invariant as DDL  (2026-08-14, status: accepted) |
-| [ADR-033](ADR-033.md) | The reviewer subagent is a citation check, not an adversarial one  (2026-08-14, status: proposed) |
+| [ADR-033](ADR-033.md) | The reviewer subagent is a citation check, not an adversarial one  (2026-08-14, status: accepted) |
 | [ADR-034](ADR-034.md) | ADR numbers are allocated, not guessed, and no document states a derivable count  (2026-08-14, status: accepted) |
 | [ADR-035](ADR-035.md) | `0027`'s published-plan-version immutability trigger reads a column that does not exist  (2026-08-15, status: accepted) |
-| [ADR-036](ADR-036.md) | Migration numbers are allocated, not guessed, and the allocation gate lives where the number set already lives  (2026-08-15, status: proposed) |
+| [ADR-036](ADR-036.md) | Migration numbers are allocated, not guessed, and the allocation gate lives where the number set already lives  (2026-08-15, status: accepted) |
 | [ADR-037](ADR-037.md) | A shorthand may not restate a value the config owns  (2026-08-15, status: accepted) |
 | [ADR-038](ADR-038.md) | A CI stage states, in its own output, what it currently proves  (2026-08-15, status: accepted) |
 | [ADR-039](ADR-039.md) | Auth is passkeys plus email OTP plus SMS OTP, and a verified phone is an identity signal  (2026-08-15, status: accepted) |
@@ -87,29 +87,29 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-058](ADR-058.md) | The calendar source publishes forward-only, so a full forward year never exists and the six-month horizon alarm can never be cleared  (2026-08-18, status: accepted) |
 | [ADR-060](ADR-060.md) | `engine_eligible` contains the six funded gates and not R-38, and the reason it was unrulable is that no document ever enumerated them  (2026-08-18, status: accepted) |
 | [ADR-059](ADR-059.md) | The three engine inputs group A is blocked on, framed as three questions, and the disposition of the five registry rows that no answer to them can free  (2026-08-18, status: accepted) |
-| [ADR-061](ADR-061.md) | A duplicated table key is a repair when a session can state that both rows say the same thing, and an amendment when it cannot  (2026-08-20, status: proposed) |
-| [ADR-066](ADR-066.md) | Five vendor-parity surfaces admitted, two excluded, and the largest of the five is not new scope but an outstanding commitment nobody had noticed was unsatisfied  (2026-08-20, status: proposed) |
-| [ADR-062](ADR-062.md) | The payout gate reads `identities.status = 'active'`, and three more of section 10's ten duplicated guards were contradictions rather than copies  (2026-08-20, status: proposed) |
-| [ADR-063](ADR-063.md) | `SET A` keeps `INV-M5-17`, `18` and `19`, and one of the six rows is not a collision but a duplicate  (2026-08-20, status: proposed) |
-| [ADR-065](ADR-065.md) | One key, one row; a blank line inside a table hides every row below it from every gate; and `CI-06<letter>` has run out of alphabet  (2026-08-20, status: proposed) |
-| [ADR-064](ADR-064.md) | A session number is an allocation and not an identifier; identity is `(log file, section heading)`, the renumber is declined rather than defaulted into, and a hole is an unspent allocation  (2026-08-20, status: proposed) |
-| [ADR-068](ADR-068.md) | impersonation is a distinct session type that cannot elevate, so three of its seven refusals are ones the corpus already makes  (2026-08-20, status: proposed) |
-| [ADR-070](ADR-070.md) | Plan configuration is first-class versioned config, the `rules` blob stays and its PUBLICATION is constrained instead, and contract limits are Merit-owned with the transport left to the vendor call  (2026-08-20, status: proposed) |
-| [ADR-071](ADR-071.md) | `M21`, the Plan Designer and Simulation Console, admitted as a new module after FREEZE, with the Monte Carlo harness named as a dependency that does not exist  (2026-08-20, status: proposed) |
-| [ADR-073](ADR-073.md) | A gate-inventory row closes when it is implemented or carries a dated activation condition, `CI-09` ships one leg of four, and `VG-11` is struck from `CI-07`  (2026-08-20, status: proposed) |
-| [ADR-074](ADR-074.md) | A definition site is a row or a heading inside a DECLARED register, and `CI-06/identifier-series` reads a written scope rather than a discovered one  (2026-08-20, status: proposed) |
+| [ADR-061](ADR-061.md) | A duplicated table key is a repair when a session can state that both rows say the same thing, and an amendment when it cannot  (2026-08-20, status: accepted) |
+| [ADR-066](ADR-066.md) | Five vendor-parity surfaces admitted, two excluded, and the largest of the five is not new scope but an outstanding commitment nobody had noticed was unsatisfied  (2026-08-20, status: accepted) |
+| [ADR-062](ADR-062.md) | The payout gate reads `identities.status = 'active'`, and three more of section 10's ten duplicated guards were contradictions rather than copies  (2026-08-20, status: accepted) |
+| [ADR-063](ADR-063.md) | `SET A` keeps `INV-M5-17`, `18` and `19`, and one of the six rows is not a collision but a duplicate  (2026-08-20, status: accepted) |
+| [ADR-065](ADR-065.md) | One key, one row; a blank line inside a table hides every row below it from every gate; and `CI-06<letter>` has run out of alphabet  (2026-08-20, status: accepted) |
+| [ADR-064](ADR-064.md) | A session number is an allocation and not an identifier; identity is `(log file, section heading)`, the renumber is declined rather than defaulted into, and a hole is an unspent allocation  (2026-08-20, status: accepted) |
+| [ADR-068](ADR-068.md) | impersonation is a distinct session type that cannot elevate, so three of its seven refusals are ones the corpus already makes  (2026-08-20, status: accepted) |
+| [ADR-070](ADR-070.md) | Plan configuration is first-class versioned config, the `rules` blob stays and its PUBLICATION is constrained instead, and contract limits are Merit-owned with the transport left to the vendor call  (2026-08-20, status: accepted) |
+| [ADR-071](ADR-071.md) | `M21`, the Plan Designer and Simulation Console, admitted as a new module after FREEZE, with the Monte Carlo harness named as a dependency that does not exist  (2026-08-20, status: accepted) |
+| [ADR-073](ADR-073.md) | A gate-inventory row closes when it is implemented or carries a dated activation condition, `CI-09` ships one leg of four, and `VG-11` is struck from `CI-07`  (2026-08-20, status: accepted) |
+| [ADR-074](ADR-074.md) | A definition site is a row or a heading inside a DECLARED register, and `CI-06/identifier-series` reads a written scope rather than a discovered one  (2026-08-20, status: accepted) |
 | [ADR-075](ADR-075.md) | the three extraction doors read `identities.status = 'active'`, and the two commerce doors are a different question  (2026-08-21, status: accepted) |
 | [ADR-076](ADR-076.md) | none of Tier 2's fourteen needs a second fixture format, because a registry row is a COVERAGE obligation and not a fixture obligation  (2026-08-21, status: accepted) |
-| [ADR-077](ADR-077.md) | there is no 25 hour session and there never was a 23 hour one either in the sense the registry means; the DST hour lands in the WEEKEND GAP, and nothing in the tree computes from any of it  (2026-08-22, status: proposed) |
-| [ADR-078](ADR-078.md) | `replay` joins the rules engine's public surface, and the site count is not what decides it  (2026-08-22, status: proposed) |
-| [ADR-080](ADR-080.md) | a `VG` row closes on its NEXT link and never on its whole chain, and two of the twelve are unwired for no reason at all  (2026-08-22, status: proposed) |
-| [ADR-081](ADR-081.md) | `hash.ts` moves into the engine, and the SHA-256 is hand-rolled because a standing ruling says so  (2026-08-23, status: proposed) |
-| [ADR-082](ADR-082.md) | the closed unit vocabulary widens its DEFINITION and never its token list, and `rail clock` names its class after its commonest member  (2026-08-23, status: proposed) |
-| [ADR-083](ADR-083.md) | the API is its own deployable, one codebase deployed twice, and Fastify runs it  (2026-08-23, status: proposed) |
-| [ADR-084](ADR-084.md) | `ScopedDb` gets a real client, the scope is a DECLARED registry, and one consequence of ADR-008 is superseded  (2026-08-23, status: proposed) |
-| [ADR-067](ADR-067.md) | An adjustment posts to the wallet and never to withdrawable, a debit may only reverse a credit this table itself posted, and the eligibility pair the fold plan offered is false because the corpus has two exits  (2026-08-20, status: proposed) |
-| [ADR-069](ADR-069.md) | Parity is the condition that makes read-only impersonation correct, and the eighteen gaps close at `owner` with the initiative recorded  (2026-08-20, status: proposed) |
-| [ADR-072](ADR-072.md) | A golden fixture is writable when three checkable conditions hold, and every registry row without one carries a stated blocker from a closed vocabulary  (2026-08-20, status: proposed) |
+| [ADR-077](ADR-077.md) | there is no 25 hour session and there never was a 23 hour one either in the sense the registry means; the DST hour lands in the WEEKEND GAP, and nothing in the tree computes from any of it  (2026-08-22, status: accepted) |
+| [ADR-078](ADR-078.md) | `replay` joins the rules engine's public surface, and the site count is not what decides it  (2026-08-22, status: accepted) |
+| [ADR-080](ADR-080.md) | a `VG` row closes on its NEXT link and never on its whole chain, and two of the twelve are unwired for no reason at all  (2026-08-22, status: accepted) |
+| [ADR-081](ADR-081.md) | `hash.ts` moves into the engine, and the SHA-256 is hand-rolled because a standing ruling says so  (2026-08-23, status: accepted) |
+| [ADR-082](ADR-082.md) | the closed unit vocabulary widens its DEFINITION and never its token list, and `rail clock` names its class after its commonest member  (2026-08-23, status: accepted) |
+| [ADR-083](ADR-083.md) | the API is its own deployable, one codebase deployed twice, and Fastify runs it  (2026-08-23, status: accepted) |
+| [ADR-084](ADR-084.md) | `ScopedDb` gets a real client, the scope is a DECLARED registry, and one consequence of ADR-008 is superseded  (2026-08-23, status: accepted) |
+| [ADR-067](ADR-067.md) | An adjustment posts to the wallet and never to withdrawable, a debit may only reverse a credit this table itself posted, and the eligibility pair the fold plan offered is false because the corpus has two exits  (2026-08-20, status: accepted) |
+| [ADR-069](ADR-069.md) | Parity is the condition that makes read-only impersonation correct, and the eighteen gaps close at `owner` with the initiative recorded  (2026-08-20, status: accepted) |
+| [ADR-072](ADR-072.md) | A golden fixture is writable when three checkable conditions hold, and every registry row without one carries a stated blocker from a closed vocabulary  (2026-08-20, status: accepted) |
 
 ## Gate closures
 
@@ -121,4 +121,4 @@ grouped these rulings live in [gates/](gates/).
 | [Consolidated founder addendum and batch 2 gate closure (2026-08-14)](gates/consolidated-founder-addendum-and-batch-2-gate-closure-2026-08-14.md) | 2 | 5 |
 | [FREEZE gate closure (2026-08-14)](gates/freeze-gate-closure-2026-08-14.md) | 4 | 17 |
 | [Unsigned ADR audit (2026-08-18)](gates/unsigned-adr-audit-2026-08-18.md) | 0 | 0 |
-| [ADR-079](ADR-079.md) | the consistency period is bounded against the ANCHOR, not against the row's own trading day  (2026-08-22, status: proposed) |
+| [ADR-079](ADR-079.md) | the consistency period is bounded against the ANCHOR, not against the row's own trading day  (2026-08-22, status: accepted) |

@@ -2307,6 +2307,33 @@ at line 68.
 
 ---
 
+## Seven ADRs signed, and every one of the seven was already merged ([session 149](sessions/2026-08-23-session-149.md), 2026-08-23)
+
+**[ADR-077](decisions/ADR-077.md) through [ADR-083](decisions/ADR-083.md) are `accepted`**, granted on the founder's explicit delegated authority. The notes above record each of them as `proposed` and unsigned, and **those notes are the record of their moment and are left standing**; this one is the record of the day the signatures were given.
+
+**The defect being closed is not that seven entries were unsigned. It is that all seven were LIVE.** `0046` is a merged money-path migration, `hash.ts` is a hand-rolled cryptographic primitive inside the engine, `rail clock` is a live token in `UNIT_TOKENS`, and `apps/api` is a deployable. **A gate enforcing an unsigned proposal is the same defect as a ruling nobody enforces, one direction over** ([session 126](sessions/2026-08-21-session-126.md) on [ADR-073](decisions/ADR-073.md)), and it had recurred sevenfold.
+
+**Two entries could not be signed as written, and running their own clauses is what found it.**
+
+- **[ADR-078](decisions/ADR-078.md)'s approval clause was FALSE against the tree.** It named *"exactly the fourteen names"* pinned in [`evaluate.golden.test.ts`](../packages/rules-engine/test/evaluate.golden.test.ts); [ADR-081](decisions/ADR-081.md) had already moved that list to twenty. The clause is **time-anchored** and then signed, because [ADR-076](decisions/ADR-076.md) was WITHHELD on exactly this ground and signing around it would have retired that standard silently. **The word that drifted was `exactly`**, in an entry whose own text argues that naming a list defeats drift: true of the list's contents, false of its length.
+- **[ADR-077](decisions/ADR-077.md)'s clause SPLIT.** The absence held; the enumeration offered as evidence did not. Its own mandated grep returns **sixteen files against section 5.3's eight**. All eight additions were read and **none subtracts a session open from a session close**; two are ordering comparisons, two are probes, four are prose and fixture literals. Section 5.3 is amended in place. **A sixth FILE exists; a sixth computation of the kind the clause names does not.**
+
+**[ADR-081](decisions/ADR-081.md)'s hand-rolled SHA-256 was differentially re-tested for the signature**: a fresh oracle sharing no code with `hash.ts`, run against `node:crypto` over **281 inputs**, covering every length 0 to 200, every block and padding boundary in one-byte and two-byte encodings, lone high and lone low surrogates, astral pairs, and the entry's framing at every field count 1 to 19. **281 of 281 matched.** `RI-07` PASS; the digest is pinned in two files.
+
+### A registry column had been wrong for twenty rows and no gate can reach it
+
+**`CI-06r` compares an ADR heading with that same ADR's body**, and its `covers` line says so: *"IT COMPARES A FILE WITH ITSELF AND CAN CHECK NEITHER HALF AGAINST THE GATE RECORD."* Nothing compares that heading against the **row in [`decisions/README`](decisions/README.md) that transcribes it**, so a row records the status on the day it was written and never moves. **Twenty rows were stale before this session opened**, [ADR-071](decisions/ADR-071.md) to [ADR-074](decisions/ADR-074.md) among them, signed a day earlier. **27 rows repaired**, derived from each heading rather than typed, plus four session claim rows that read CLAIMED while their entries sat in the list below them.
+
+**The gate that would catch it is *"a registry row transcribing a status agrees with its source"*, and it is named here rather than written**, because a new `CI-06` letter inside a signing session is a second objective.
+
+### Two E2 reads are owed and a signature does not discharge either
+
+[`0046`](../packages/db/migrations/0046_supersede_rule_states_consistency_period_started.sql) under [ADR-079](decisions/ADR-079.md), and [`hash.ts`](../packages/rules-engine/src/hash.ts) under [ADR-081](decisions/ADR-081.md). Both are merged and a migration is never edited. [P2](plans/P2-rules-engine-build.md) section 9 already carries the same debt for sessions `134` and `135`, so **four money-path files are now merged on delegated authority without the line-by-line read the constitution reserves for exactly this class.** ADR-081 says of itself that it asks for the real read, and the signature records the debt rather than retiring it.
+
+**The position:** <!--gen:gate_count-->28<!--/gen--> of <!--gen:gate_count-->28<!--/gen--> gates, 7 of 7 invariants, `falsify` green over 56 scope and 10 loader cases, `format:check` clean. **No code changed in this session**; the diff is seven ADRs, two registries and a session log.
+
+---
+
 ## `ScopedDb` is real, and the suite that validates it did not work the first time (2026-08-23, session 145)
 
 **[ADR-084](decisions/ADR-084.md) is `proposed` and unsigned.** `scopedDb(identity)` and `systemDb(reason)` exist, [ADR-008](decisions/ADR-008.md)'s *"part of the acceptance, not a follow-up"* clause is discharged after ten days, and the workspace has its first runtime dependencies. **Seven tables of 111 are reachable and it is reported as seven of 111**: the other 104 have no rule in `SCOPE_RULES`, which is declared against a mapped type, so naming one is a compile error at the call site rather than an unscoped read at runtime.
