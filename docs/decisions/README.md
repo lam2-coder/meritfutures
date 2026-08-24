@@ -117,6 +117,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-087](ADR-087.md) | the publish decision resolves to a run that FINISHED and ran over THIS row, and the digest half stays open because it has no producer  (2026-08-24, status: accepted) |
 | [ADR-088](ADR-088.md) | the ADR registry and the session index are generated from the files they index, and the CLAIM table never will be  (2026-08-24, status: accepted) |
 | [ADR-089](ADR-089.md) | six Railway services, and `portal-api` was a fused process name rather than an origin label  (2026-08-24, status: accepted) |
+| [ADR-090](ADR-090.md) | "one rail" binds on the destination and the detector, and the affiliate settlement leg is a sibling table rather than a widened `payout_transfers`  (2026-08-24, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
