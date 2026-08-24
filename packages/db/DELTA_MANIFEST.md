@@ -796,7 +796,8 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **`OI-24`** | `ADR-068`'s session, [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2` | **allocated, open, and DELIBERATELY NOT REPAIRED.** [M06](../../docs/plans/M06-admin-ops-console.md) section 2 opens *"Six deltas, each from a failure mode below"* and the table now carries **seven**. **Session 89 already corrected this line once**, from *"Five deltas"*, and `SD-M6-10` makes it wrong again three sessions later. **Four concurrent sessions are each about to move it**, which is the proof that the count cannot be hand-maintained rather than an argument that it can be maintained harder. **The remedy is named and is [ADR-034](../../docs/decisions/ADR-034.md)'s own**: the count becomes a `<!--gen:-->` span under `CI-06g`, computed from the delta table it describes, and then no session touches it again. **Not implemented here**: [`gates.mjs`](../../scripts/corpus/gates.mjs) is held by three concurrent sessions and this one already carries four forced fence extensions. **For the review desk.** |
 | **`OI-27`** | session 120, `0045` | **allocated, open, and it is a LIVE INSTANCE of the thing [ADR-074](../../docs/decisions/ADR-074.md) is about.** This session read the `OI` table in THIS FILE, which stops at `OI-24`, and allocated `OI-25`. **`OI-25` and `OI-26` were already taken**: allocated in [WAVE-04 section 6](../../docs/plans/WAVE-04-fixture-backlog-and-gate-inventory.md) and recorded in [STATE](../../docs/STATE.md), which is **one identifier series with two definition sites** and neither one names the other. The near-miss is worth more than the renumber: `CI-06/identifier-series` is being written against `ADR-074` in a sibling session as this lands, and **this is exactly the collision it would have caught**, found by a founder read rather than by a gate. Renumbered to `OI-27`. **Second finding, same cause, and DELIBERATELY NOT REPAIRED**: `## 21.` is claimed TWICE in this file, at the `0038` section and again at the `0042` section, and the section-number table in section 16 carries **both** rows. `22` remains the maximum, so section `23` below is correctly numbered. **The table that exists to end section-number drift is carrying the drift.** It belongs to [FOLD-04](../../docs/plans/FOLD-04-impersonation-and-admin-parity.md) `I2`, is outside this session's fence, and a money-path session does not repair another session's numbering **CLOSED 2026-08-23 by [session 141](../../docs/sessions/2026-08-23-session-141.md)**: `OI` is allocated in [ALLOCATION](../../docs/decisions/ALLOCATION.md) and this table points at it. **Two more double claims were found while building that table and neither had ever been counted**: sessions 105 and 106 each took `OI-19` and `OI-20` on 2026-08-20, and WAVE-04 renumbered session 106's pair to `OI-25` and `OI-26` while [STATE](../../docs/STATE.md), being append-only, still carries the old numbers |
 | **`OI-28`** | session 120, `0045` | **allocated, open, and it needs an ADR rather than a commit.** `simulation_runs.calibration_observed_at` is a `date`, so `CI-06m` requires it to declare one of exactly three closed unit tokens, and **none of the three names what this column is**. `wall clock` is refuted by its own definition, *"Merit's own clock, answered only by `now()`"*: this column is never `now()`, and writing `now()` into it is precisely the defect it exists to prevent. `trading day` is *"answered only by TradingCalendar"* and a calibration vendor does not observe on the exchange session boundary. `rail clock` is **declared**, because its operative half, *"quoted and never computed by Merit"*, is exactly true and [`affiliate_commissions.chargeback_window_ends_on`](../../docs/architecture/data-model/affiliate_commissions.md) already carries it for the same reason. **The noun is still wrong: a calibration vendor is not a rail.** Widening `UNIT_TOKENS` amends [ADR-042](../../docs/decisions/ADR-042.md)'s closed set and is **not** done from a money-path session, so the candidate ADR is named as owed. Argued in the open at [`simulation_runs`](../../docs/architecture/data-model/simulation_runs.md) rather than picked quietly, because picking the nearest-looking token is how three rows passed `CI-06m` by accident |
-| **`OI-29`** | session 120, `0045` | **allocated, open, and it is the honest boundary of a `CHECK`.** `plan_versions_publish_decision_recorded` makes the link to a simulation run EXIST. **Nothing makes it SOUND**, because a `CHECK` cannot read another table. Writable today and satisfying the constraint: a publish decided on a `failed` run; a publish decided on a run over a draft that has since been edited, so `rules_digest` no longer matches; a publish decided on a run belonging to a different plan entirely. Closing it needs a trigger or an application publish path, and [`0004`](migrations/0004_catalog.sql) already states the trade in its own words, that a trigger *"is a weaker control: it can be disabled, and it fires per row rather than per constraint"*. **Stated in the migration header and in the design record**, not only here, because the next reader of that FK is standing at the column and not in this file |
+| **`OI-29`** | session 120, `0045` | **allocated, PARTLY CLOSED by [`0047`](migrations/0047_publish_decision_is_sound.sql) under [ADR-087](../../docs/decisions/ADR-087.md) (session 148), and amended in place rather than joined by a second row.** `plan_versions_publish_decision_recorded` makes the link to a simulation run EXIST and a `CHECK` cannot make it SOUND. **Two of the three states named below are now unwritable**: a publish decided on a run that is not `complete` is refused by `OI-29 check A`, and a publish decided on a run anchored to any plan version other than the row being published is refused by `OI-29 check B`, which is stronger than the state it closes because same-plan-different-version is the identical defect. **THE THIRD DOES NOT CLOSE AND IT IS RE-FILED AS `OI-29b`**: a publish decided on a run over a since-edited draft, whose `rules_digest` no longer matches. `0047` is a TRIGGER, and [`0004:183`](migrations/0004_catalog.sql)'s cost stands unhedged: it can be disabled and it fires per row. The alternative lost on a fact rather than a preference, that no application publish path exists in `apps/` at all |
+| **`OI-29b`** | session 148, `0047`, [ADR-087](../../docs/decisions/ADR-087.md) | **allocated, open, and NARROWED rather than new.** `OI-29`'s staleness state, which `0047` could not reach. **`simulation_runs.rules_digest` HAS NO PRODUCER**: `grep -rn 'rules_digest\|rulesDigest' --include='*.ts' --include='*.mjs' packages/ apps/ scripts/` returns nothing, and [ADR-081](../../docs/decisions/ADR-081.md)'s claim to have landed *"the digest half `OI-29` needs"* does not survive reading [`hash.ts:557`](../../packages/rules-engine/src/hash.ts), whose `HASHED_COLUMNS` is nineteen **`rule_states`** columns. What ADR-081 landed is a pure SHA-256 and a framing discipline, reusable and pointed at another subject. **`pgcrypto` IS installed** ([`0001:22`](migrations/0001_extensions_and_enums.sql)) so `digest(rules::text,'sha256')` runs today, and the refusal to install it is therefore a RULING: `jsonb::text` sorts keys but **is not canonical over numbers**, measured, so `{"a":1.0}` and `{"a":1}` digest differently and the comparison would REFUSE A LEGITIMATE PUBLISH. No temporal proxy exists either: `plan_versions` carries no `updated_at`. **Check B narrows what survives**: after `0047` the staleness case reaches only a run whose `plan_version_id` IS NULL, which [`0045:66`](migrations/0045_simulation_runs.sql) makes nullable on purpose. **Closing that last branch would break `SUCCESS 4` and case `0028 A` of [`probe_simulation_decision_record.sql`](../../scripts/db/probe_simulation_decision_record.sql)**, both of which assert a NULL-anchored publish WRITABLE, so it is a change to what `0045` ruled and needs its own ADR. `SUCCESS 3` of [`probe_publish_decision_is_sound.sql`](../../scripts/db/probe_publish_decision_is_sound.sql) asserts the hole so the day somebody closes it the probe says what they broke |
 
 ### Section numbers
 
@@ -816,6 +817,7 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 | **23** | session 120, `0045` ([ADR-071](../../docs/decisions/ADR-071.md)) | **allocated.** `0045` lands. **`21` is claimed twice above**, by `0038`'s session and by `ADR-068`'s, so `22` is the true maximum and this is the next free number rather than the row count. `OI-27` records it |
 | **20** | `0036`'s session | **allocated.** `0036` lands. **This row was written into the file as a heading and never into this table**, which is the identical omission the `18` row above records one section earlier. Added here by `0042`'s session, which is the third occurrence of the same miss and the reason `OI-24` exists |
 | **21** | `ADR-068`'s session | **allocated.** `0042` lands |
+| **25** | session 148, `0047` ([ADR-087](../../docs/decisions/ADR-087.md)) | **allocated.** `0047` lands. **SECTION 24 IS CLAIMED BY A HEADING AND HAS NO ROW HERE**, which is the fourth time (`18`, `20` and `24` were each written as a heading and never as a row), and it is named rather than added because `24` is session 135's to claim. **This is the first section in the file to record a repair that does NOT close the item it was written for**: `OI-29` goes to PARTLY CLOSED and `OI-29b` opens above |
 
 **`4a` is a section and not a number**, inserted between 4 and 5 to record FOLD-01's deltas without disturbing what cites 5. It is the escape hatch when a section belongs in the middle, and it is recorded here so the next session finds it before inventing a second one.
 
@@ -1439,3 +1441,107 @@ DETAIL:  Failing row contains (1, 11400000-..., 2026-01-01, funded, 4750000, f,
 `REJECTION 1` and `REJECTION 2` are the boundary either side of `R-47`'s *"strictly"*: a post-settlement row whose period starts **on** its anchor is refused, and one starting **before** it is refused. **Each asserts the constraint NAME** via `GET STACKED DIAGNOSTICS` rather than accepting a bare `check_violation`, which any of the table's twelve checks would satisfy — the same near-miss `0040` recorded when two of its twenty-four assertions were refused by a constraint other than the one they were aimed at.
 
 Three successes and five rejections at `0046`; the same file run against a database at `0045` fails at `SUCCESS 1` with exit 3.
+
+---
+
+## 25. `0047` lands, and the entry that closes `OI-29` closes two thirds of it (2026-08-24)
+
+**Session 148.** [ADR-087](../../docs/decisions/ADR-087.md), `status: proposed`, unsigned. **No `SD-nn` and no `U-nn`: nothing is added to the schema.** One function and two triggers are installed and nothing is retired, so this section records an ADDITION rather than a delta or a supersession, which is a third shape for this file.
+
+**It supersedes nothing, and that is the answer to a question the reservation expected to be live.** [ADR-053](../../docs/decisions/ADR-053.md) refused to reuse a superseded constraint's name because that leaves every existing reference pointing at a constraint whose meaning changed. **The question does not arise here**: `plan_versions_publish_decision_recorded` is not wrong, it is INCOMPLETE, and it keeps standing beside the trigger. The question was asked and answered rather than skipped.
+
+### The reservation cited the wrong file, and the mandatory grep is the only reason anyone knows
+
+[ALLOCATION](../../docs/decisions/ALLOCATION.md)'s rows for `ADR-087` and `0047`, and [P3 section 8](../../docs/plans/P3-ledger-billing-identity.md), all put `plan_versions_publish_decision_recorded` in [`0004_catalog.sql`](migrations/0004_catalog.sql).
+
+```
+$ grep -n 'plan_versions_publish_decision_recorded' packages/db/migrations/*.sql
+0045_simulation_runs.sql:236:  ADD CONSTRAINT plan_versions_publish_decision_recorded CHECK (
+```
+
+**One line, and it is `0045`'s.** The constraint arrived with both columns it reads, in session 120, as `SD-M21-02`. `0004` is the right citation for a different fact: [`0004:183`](migrations/0004_catalog.sql) is where the trigger's cost is stated and [`0045:48`](migrations/0045_simulation_runs.sql) quotes it from there. **Two facts, one file number, fused, and the fusion propagated into three documents.**
+
+**The instruction that caught it was aimed elsewhere.** It exists because [session 129](../../docs/sessions/2026-08-22-session-129.md) cited `0015:208` after [`0037`](migrations/0037_supersede_rule_states_high_water_bounds_balance.sql) had already repaired it, a *later* migration missed. **This was an origin cited too early**, the opposite direction, and the same grep catches both.
+
+### The defect, measured at `0046` before a line of the repair was written
+
+`0001` to `0046` applied forward-only into an empty PostgreSQL 16.13 under `ON_ERROR_STOP=1`. All three of the states this file names inserted clean, each satisfying `plan_versions_publish_decision_recorded`:
+
+```
+NOTICE:  WRITABLE AT 0046 (1): publish decided on a FAILED run
+NOTICE:  WRITABLE AT 0046 (2): publish decided on a run belonging to a DIFFERENT plan
+NOTICE:  WRITABLE AT 0046 (3): publish decided on a run naming NO plan version
+```
+
+**`ADR-079`'s rule, applied to a migration that adds rather than replaces: a control that refuses nothing is the failure to measure first.**
+
+### The install, from empty, with every figure queried rather than counted
+
+All 47 migrations applied forward-only into an empty PostgreSQL 16.13 under `ON_ERROR_STOP=1`.
+
+```
+tables=111        (unchanged from 0046: this migration adds no table)
+indexes=392       (unchanged)
+checks=474        (unchanged: no CHECK is added, dropped or replaced)
+triggers=16 -> 18 (one function, two attachments)
+```
+
+**Three unchanged figures and one that moves is the whole shape of this migration**, and stating them is the cheapest available check that nothing else came along with it.
+
+Re-applying `0047` to the same database fails, which is what forward-only means:
+
+```
+ERROR:  function "assert_publish_decision_is_sound" already exists with same argument types
+```
+
+### Two of three, and the third is re-filed rather than glossed
+
+| DELTA_MANIFEST's state | Disposition at `0047` |
+|---|---|
+| A publish decided on a **`failed`** run | **CLOSED.** `OI-29 check A`, and it is written `= 'complete'` rather than `<> 'failed'`: `simulation_runs_status_known` admits four values, so negating the state that motivated the guard would leave `queued` and `running` through, and a queued run has produced no numbers at all |
+| A publish decided on a run over a **since-edited draft** | **NOT CLOSED.** Re-filed as `OI-29b` |
+| A publish decided on a run belonging to a **different plan** | **CLOSED.** `OI-29 check B`, and stronger than the state asks: the test is the ROW, so a run over another VERSION of the same plan is refused too |
+
+**The third does not close because `rules_digest` has no producer.** `grep -rn 'rules_digest\|rulesDigest' --include='*.ts' --include='*.mjs' packages/ apps/ scripts/` returns nothing. [ADR-081](../../docs/decisions/ADR-081.md) records that `hash.ts` is *"THE DIGEST HALF `OI-29` NEEDS"*; read at the file, [`hash.ts:557`](../../packages/rules-engine/src/hash.ts)'s `HASHED_COLUMNS` is nineteen **`rule_states`** columns and [`hash.ts:691`](../../packages/rules-engine/src/hash.ts) takes a `StateHashSubject`. **What ADR-081 landed is a reusable SHA-256 and a framing discipline pointed at another subject.**
+
+**And the database could hash it, which is why this is a ruling.** `pgcrypto` is installed at [`0001:22`](migrations/0001_extensions_and_enums.sql), so `digest(rules::text,'sha256')` runs today. Installing it would define the canonical serialization of the rule contract to be `jsonb::text`, in a trigger, on the money path, binding a writer that does not exist. Measured on the same cluster:
+
+```
+SELECT digest('{"a":1.0}'::jsonb::text,'sha256') = digest('{"a":1}'::jsonb::text,'sha256');  -->  f
+
+'{"a":1.0}'::jsonb::text     -->  {"a": 1.0}
+'{"a":1.00}'::jsonb::text    -->  {"a": 1.00}
+'{"a":1e2}'::jsonb::text     -->  {"a": 100}
+'{"a":1,"a":2}'::jsonb::text -->  {"a": 2}
+```
+
+**`jsonb::text` sorts keys and normalizes whitespace and is not canonical over numbers.** A draft re-saved with `5.0` where it held `5` digests differently while being the same contract, so the check would **refuse a legitimate publish**. That is the direction a money path cannot fail in. There is no temporal fallback either: `plan_versions` carries `created_at`, `published_at` and `retired_at` and **no `updated_at`**, so a draft edit leaves no timestamp to compare a run against.
+
+### The probe asserts in every direction the guard can go, and two of them watch a guard NOT firing
+
+[`probe_publish_decision_is_sound.sql`](../../scripts/db/probe_publish_decision_is_sound.sql), wired into the migrations job and pinned in `CI-06h`'s required list **in one commit**, which section 18 records as the rule rather than the exception after three occurrences of a probe wired and left unpinned.
+
+**Rejections assert the check named in the MESSAGE, not the SQLSTATE alone.** A trigger `RAISE` carries no `CONSTRAINT_NAME`, so the sibling probe's `GET STACKED DIAGNOSTICS CONSTRAINT_NAME` technique is unavailable here; matching `OI-29 check A` / `OI-29 check B` is the equivalent discrimination, and without it a row refused by any of the table's checks, or by `0028`, would score as this trigger working.
+
+**Cases `0045 A` and `0045 B` are the direction a wider guard would have broken, and they are the reason the file is longer than its two checks.** A `BEFORE ROW` trigger fires **before** the table's `CHECK` constraints, so the two rows `plan_versions_publish_decision_recorded` exists to refuse reach this trigger first. Both must pass **through** it and be refused **by name**, exactly as at `0046`. A guard scoped one clause wider would take over those refusals silently: both rows would still be refused, nothing in the job would fail, and every caller resolving publish failures by constraint name would stop working.
+
+**`SUCCESS 3` asserts a HOLE rather than a control**, which no other probe in this repository does. A run anchored to no plan version still decides any publish, because `0045` makes that column nullable on purpose. It is in the probe output so that the day somebody closes `OI-29b`, the probe says what they broke.
+
+**Sixteen assertions at `0047`, five successes leading.** The same file run against a database at `0046` fails at `REJECTION 1` with exit 3:
+
+```
+psql:scripts/db/probe_publish_decision_is_sound.sql:421: ERROR:  a publish decided on a FAILED run was accepted
+CONTEXT:  PL/pgSQL function inline_code_block line 183 at RAISE
+```
+
+**Every SUCCESS above it passed at `0046`, and that is the point**: the successes are not what changed, and a probe whose successes also broke at the counterfactual would be measuring the fixtures rather than the guard.
+
+### `0045`'s own probe was run at `0047`, because compatibility is a claim like any other
+
+[`probe_simulation_decision_record.sql`](../../scripts/db/probe_simulation_decision_record.sql) is pinned and `0047` must not disturb it. Run against the database at `0047` it reports **all 16 of its own assertions unchanged**, including `REJECTION 1` and `REJECTION 2` arriving by constraint name and `0028 A` still permitting the publish transition.
+
+**That run is also what decided the shape of check B.** Requiring a non-`NULL` anchor would close the last branch of `OI-29b` and would turn `SUCCESS 4` and `0028 A` into rejections, both of which `0045` asserts **writable**. Turning an asserted-writable shape into a refusal is a change to what `0045` ruled rather than an enforcement of it, and that file is outside session 148's fence. **The constraint on the repair was found by running the neighbour, not by reading it.**
+
+### One check was available, is not one of the three, and is deliberately not installed
+
+`completed_at <= published_at` costs nothing extra in the same trigger and would refuse a publish citing a run that had not finished when the decision was recorded. **A money-path migration that installs an unruled constraint because it was cheap is how a schema acquires rules nobody decided**, and the next reader cannot tell which of its controls were ruled and which were convenient. [ADR-087 section 6](../../docs/decisions/ADR-087.md) records it as a candidate for a ruling.
