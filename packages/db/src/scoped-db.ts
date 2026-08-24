@@ -28,7 +28,7 @@
 // somebody has to join.
 
 import { and, eq, exists, sql, type SQL } from 'drizzle-orm';
-import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
+import { QueryBuilder, type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
 
 import { client } from './client.js';
 import { SCOPE_RULES, TABLES, type ScopedTableKey, type TableKey } from './scope.js';
@@ -66,6 +66,12 @@ function columnByName(table: PgTable, sqlName: string): PgColumn {
  *
  * `derived` recurses into the table it reaches through, and the recursion
  * terminates because every chain ends at `owned` or `root`.
+ *
+ * BUILT WITH A STANDALONE `QueryBuilder` AND NOT WITH `client()`, so that
+ * constructing a predicate NEEDS NO CONNECTION. The unit suite asserts the SQL
+ * of all seven rules without a database, which it could not do if predicate
+ * construction opened a pool -- and a scope rule nobody can assert cheaply is a
+ * scope rule nobody asserts.
  */
 export function scopePredicate(key: TableKey, identityId: IdentityId): SQL {
   const rule = SCOPE_RULES[key];
@@ -95,7 +101,7 @@ export function scopePredicate(key: TableKey, identityId: IdentityId): SQL {
       // nobody reads.
       const via = TABLES[rule.via] as PgTable;
       return exists(
-        client()
+        new QueryBuilder()
           .select({ one: sql`1` })
           .from(via)
           .where(
