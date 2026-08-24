@@ -120,6 +120,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-090](ADR-090.md) | "one rail" binds on the destination and the detector, and the affiliate settlement leg is a sibling table rather than a widened `payout_transfers`  (2026-08-24, status: accepted) |
 | [ADR-091](ADR-091.md) | analytics is granted `rule_states`, because denying it FORCES the attack the denial cites, and M13's claim that the thresholds are unreachable does not survive `engine_gates`  (2026-08-24, status: proposed) |
 | [ADR-092](ADR-092.md) | `schema.ts` and `scope.ts` are transcribed ONCE PER MODULE, the owner is the TABLE rather than the module, and the queue is the TYPE CHECKER rather than a document  (2026-08-24, status: accepted) |
+| [ADR-093](ADR-093.md) | auth is P3's, because the phase whose title already says "identity" is the one whose own stated contents cannot ship without it  (2026-08-24, status: accepted) |
 <!--/gen-->
 
 ## Gate closures
