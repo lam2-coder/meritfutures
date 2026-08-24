@@ -8,11 +8,11 @@
 // -----------------------------------------------------------------------------
 // WHY THIS IS ITS OWN DEPLOYABLE AND NOT A SERVER INSIDE apps/portal
 // -----------------------------------------------------------------------------
-// The temptation is real and it has a document behind it: INFRA section 2 names
-// the Railway service `portal-api`, INFRA section 13.2 puts "portal and API" on
-// one origin, and OVERVIEW section 7's application zone reads "API + portal +
-// site". Every one of those is about DEPLOYMENT topology, and none of them is
-// about who owns the endpoint.
+// The temptation is real and it had three documents behind it. INFRA section 2
+// named one Railway service `portal-api`; ADR-089 retired that name as the very
+// fusion this file refuses, and 2.1 rows `portal` and `api` apart. The other two
+// still read that way: 13.2 puts "portal and API" on one origin, OVERVIEW 7's
+// zone reads "API + portal + site". Both DEPLOYMENT topology, neither ownership.
 //
 // THE SENTENCE THAT DECIDES IT is API_CONTRACT section 1: "The portal, admin
 // console, and site are the first clients of this API and have NO PRIVILEGED

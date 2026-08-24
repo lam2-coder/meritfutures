@@ -9,8 +9,8 @@
 // makes "everywhere" mechanical, and it is wired: `merit/no-raw-db-client`
 // runs over this path in CI-01 and blocks merge on a raw client import.
 //
-// It deploys as `portal-api` rather than `portal`: the service name is INFRA
-// section 2's and is reproduced rather than invented.
+// It deploys as `portal`, INFRA section 2.1's name, reproduced not invented. It
+// read `portal-api` until ADR-089 ruled that name a fused PROCESS, not an origin.
 //
 // -----------------------------------------------------------------------------
 // WHAT IS BUILT, AND WHAT THE ABSENCES MEAN
@@ -38,7 +38,7 @@
 // is what this app now exports.
 
 /** The Railway service this app deploys as (INFRA section 2). */
-export const SERVICE = 'portal-api' as const;
+export const SERVICE = 'portal' as const;
 
 /**
  * Not an application yet. It is a deployable that starts.
