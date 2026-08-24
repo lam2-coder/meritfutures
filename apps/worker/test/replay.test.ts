@@ -823,10 +823,19 @@ const FUNDED_DAYS = 250;
 //   R-15  THE LOCK IS PERMANENT AND ASSIGNS (ADR-052). A close at
 //         5,260,000c (260,000c of profit) locks the floor at 5,010,000c and
 //         FREEZES `highWaterBalanceCents` for the rest of the account's life.
-//         `0015`'s `rule_states_high_water_bounds_balance` then rejects every
-//         later row whose balance exceeds the lock-day close, so a 250-day life
-//         that locks is a life whose rows no database would accept. THE STREAM
-//         THEREFORE NEVER REACHES 260,000c OF PROFIT: it peaks at 219,000c.
+//         `0015:208`'s `rule_states_high_water_bounds_balance` REJECTED every
+//         later row whose balance exceeded the lock-day close WHEN THIS FILE
+//         WAS WRITTEN, and `0037` retired that name on 2026-08-17. The live
+//         constraint is `rule_states_high_water_bounds_balance_unlocked`,
+//         `floor_locked OR high_water_balance_cents >= balance_cents`, which
+//         EXEMPTS the locked row rather than refusing it, and post-lock the
+//         schema asserts no relation between the two columns at all (ADR-053).
+//         So a locked life is one the database now accepts, and what holds the
+//         shape here are this file's own assertions: `floorLocked` empty and
+//         `hwb >= balance` on all 250 rows. THE STREAM THEREFORE NEVER REACHES
+//         260,000c OF PROFIT: it peaks at 219,000c, which keeps that live
+//         constraint on its BINDING branch for every row rather than on its
+//         exemption.
 //   R-35  the withdrawable is `balance - size - buffer`, and the buffer is
 //         100,000c, so the first 100,000c of profit is not payable. A payout of
 //         110,000c therefore needs 210,000c of profit standing, which is why the
@@ -944,8 +953,15 @@ function buildLife(): readonly LifeDay[] {
         approvedCents: scheduled.cents,
         // R-46 and R-47. The decision was computed against the previous closed
         // day, so the new consistency period starts on the day after it, which
-        // is this day. `rule_states_consistency_period_started` (`0015`) needs
-        // that `<= trading_day`, and equality is what it gets.
+        // is this day. `rule_states_consistency_period_started` (`0015:193`)
+        // needed that `<= trading_day` and got equality WHEN THIS FILE WAS
+        // WRITTEN; `0046` retired that name and the live constraint is
+        // `rule_states_consistency_period_after_anchor`, which needs the period
+        // start STRICTLY AFTER `payout_anchor_day` (ADR-079). R-46 sets that
+        // anchor to the BASIS day on the line below, so the row clears the live
+        // constraint by one session rather than by equality, and NOTHING in the
+        // schema now bounds the period start against `trading_day` in either
+        // direction.
         basisTradingDay: SCALE_SESSIONS[index - 1]!.tradingDay,
         effectiveTradingDay: tradingDay,
       });
@@ -1173,8 +1189,13 @@ describe('GS-071  a 250-day funded life replays byte-identically', () => {
     //   - each one at or under the withdrawable that was standing the day
     //     before, so no payout exceeds what R-35 says the trader had;
     //   - the floor never locks, so `highWaterBalanceCents` is never frozen
-    //     below a later balance and every row satisfies `0015`'s
-    //     `rule_states_high_water_bounds_balance`.
+    //     below a later balance and every row satisfies `0037`'s
+    //     `rule_states_high_water_bounds_balance_unlocked` on its BINDING
+    //     branch: `floor_locked` is false on all 250, so the disjunction
+    //     reduces to `high_water_balance_cents >= balance_cents`, which is what
+    //     the assertion below checks. `0015`'s unqualified
+    //     `rule_states_high_water_bounds_balance` is retired and names nothing
+    //     in the live schema.
     expect(stored[stored.length - 1]!.payoutsSettledCount).toBe(SETTLEMENT_SCHEDULE.length);
     for (const settlement of SETTLEMENT_SCHEDULE) {
       expect(stored[settlement.dayIndex - 1]!.withdrawableCents).toBeGreaterThanOrEqual(
