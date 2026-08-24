@@ -89,9 +89,9 @@ export type Environment = Readonly<Record<string, string | undefined>>;
 /**
  * The Railway service each surface deploys as.
  *
- * INFRA section 2's table names four services and none of them is this one; see
- * ADR-083 section 7, which reports that rather than editing a document outside
- * this session's fence. The names are service names and never hostnames:
+ * INFRA section 2.1 rows both of these names, one row each with its own value
+ * of `MERIT_API_SURFACE`; that table named four services and neither of these
+ * until ADR-089. The names are service names and never hostnames:
  * `ADMIN_ORIGIN`'s value is never written into this repository (ADR-012,
  * INFRA section 13.2), and `api-admin` names the service that runs there
  * without naming where that is.

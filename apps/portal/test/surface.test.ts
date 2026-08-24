@@ -36,7 +36,7 @@ test('every read surface is reachable from the package entry point', () => {
 });
 
 test('the deployable still starts and still names its Railway service', () => {
-  expect(portal.SERVICE).toBe('portal-api');
+  expect(portal.SERVICE).toBe('portal');
   expect(() => portal.main()).not.toThrow();
 });
 
