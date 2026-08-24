@@ -86,9 +86,18 @@ export default defineConfig({
         test: { name: 'golden', include: GOLDEN },
       },
       {
-        // CI-04. A Neon branch per run, so this stage cannot run on a fork pull
-        // request and must degrade honestly rather than appear green
-        // (P1 section 2.2). Wiring that degradation is CI's job, not this file's.
+        // CI-04, and the stage now EXISTS and selects this project: `ci.yml`'s
+        // `integration` job runs `vitest run --project integration` (ADR-085).
+        // Until 2026-08-24 no workflow selected it, which is why the record
+        // blamed a Neon branch that was never the blocker. A project nothing
+        // selects is a suite that has never run.
+        //
+        // THE FORK-PULL-REQUEST DEGRADATION ARRIVES WITH THE DATABASE, NOT
+        // BEFORE IT. A Neon branch per run cannot run on a fork PR and must
+        // degrade honestly rather than appear green (P1 section 2.2) -- but the
+        // assertions this project holds today need no database at all, so there
+        // is nothing yet to degrade. STRATEGY section 4.1 keeps the Neon branch
+        // as CI-04's second leg with its condition dated and unchanged.
         test: { name: 'integration', include: INTEGRATION },
       },
     ],

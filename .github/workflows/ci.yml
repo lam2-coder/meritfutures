@@ -3,16 +3,36 @@ name: ci
 # =============================================================================
 # CI-01, CI-02 and CI-05 (STRATEGY section 4.1), session S-C of P1 section 6.
 # =============================================================================
-# Three stages. Each runs on every push, each blocks on its own, and NONE OF
+# Four stages. Each runs on every push, each blocks on its own, and NONE OF
 # THEM `needs:` ANOTHER. That is the ruling rather than a preference:
 # STRATEGY section 4.1 makes them separate rows because a lint failure must not
-# hide a security finding behind a skipped job. `corpus.yml` is the fourth
-# stage, CI-06, and is a separate file with a separate owner.
+# hide a security finding behind a skipped job. `corpus.yml` is CI-06 and is a
+# separate file with a separate owner.
 #
 #   CI-01  Lint and types      tsc --noEmit, ESLint (VG-4), prettier, RI-01..05
 #   CI-02  Unit and property   Vitest, the `unit` and `property` projects
+#   CI-04  Integration         Vitest, the `integration` project. ADR-085
 #   CI-05  Security static     gitleaks (VG-1), semgrep, pnpm audit,
 #                              syft SBOM + grype scan, --frozen-lockfile (VG-12)
+#
+# -----------------------------------------------------------------------------
+# WHAT CI-04 IS GREEN ABOUT TODAY, AND WHAT IT IS NOT (ADR-085)
+# -----------------------------------------------------------------------------
+# IT HAS NO DATABASE, AND THAT IS RULED RATHER THAN DEFERRED. STRATEGY section
+# 4.1's Integration row is "A Neon branch per CI run, torn down at job end", and
+# it rejects by name both substitutes a session would reach for: Testcontainers,
+# because "it tests a Postgres that is not the one production runs", and a
+# shared CI database. So the database is CI-04's SECOND leg and it keeps its
+# dated condition; this job is the first leg.
+#
+# The two assertions this buys today need no database and have never run in CI:
+# migration filenames are uniquely numbered, and every number below the highest
+# is on disk or reserved in ALLOCATION. Both land immediately before session 148
+# carries `0047`.
+#
+# The `integration` project was declared and selected by NO workflow, which is
+# why the record blamed a Neon branch that was never the blocker. A project
+# nothing selects is a suite that has never run.
 #
 # -----------------------------------------------------------------------------
 # EVERY STAGE PROVES ITSELF FAILING, IN ITS OWN JOB
@@ -447,3 +467,41 @@ jobs:
 
       - name: Gates are falsifiable
         run: node scripts/ci/falsify-ci.mjs CI-05
+
+  # ===========================================================================
+  # CI-04  Integration
+  # ===========================================================================
+  # ADR-085. The stage exists because the `integration` project existed and
+  # nothing ran it; see the header for what it does and does not cover.
+  integration:
+    name: CI-04 integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      # ONE PROJECT, NAMED, for the reason CI-02's step gives one table up: a
+      # bare `vitest run` would make this stage go red for a CI-02 failure with
+      # no way to tell them apart.
+      #
+      # `--passWithNoTests` must never be added here either. Vitest exits
+      # non-zero when a selected project matches no test files, and that is the
+      # only thing standing between this stage and reporting green for having
+      # looked at nothing, which is precisely the state CI-04 was in before
+      # ADR-085: a declared project no workflow selected.
+      - name: Integration suite
+        run: pnpm exec vitest run --project integration
+
+      - name: Gates are falsifiable
+        run: node scripts/ci/falsify-ci.mjs CI-04

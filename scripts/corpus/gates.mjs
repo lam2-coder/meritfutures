@@ -6783,6 +6783,312 @@ const gateInventory = {
 // -----------------------------------------------------------------------------
 // Runner
 // -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// CI-06/vg-inventory  Every VG row of STRATEGY section 4.2 is closed
+// -----------------------------------------------------------------------------
+// ADR-080 EXTENDS ADR-073's CLOSURE RULE TO THE TWELVE, and this gate is
+// `CI-06/gate-inventory`'s sibling: same shape, one table down, five
+// dispositions instead of three.
+//
+// UNLETTERED, AND THAT IS FORCED RATHER THAN STYLISTIC. `falsify.mjs`'s
+// `nextFreeLetter()` scans `a` to `x` and throws `seed anchor exhausted` at the
+// end, and its comment says why: "every seed below needs two letters of
+// headroom above the one it names". The letters are claimed through `w`, so a
+// lettered gate here would consume the anchor and take `pnpm run falsify` down
+// with it. `ADR-082:124`'s "`x` stays unclaimed" records that ADR-082 took no
+// letter; it does not release one. `CI-06/gate-inventory` already ships in this
+// shape, so an unlettered sibling is the precedent as well as the necessity.
+//
+// THE ASSERTION THIS GATE EXISTS FOR IS CHAIN EXPIRY, and it is the one that
+// cannot be read off the row. ADR-080 (d)'s second clause makes a chained leg
+// available ONLY while the row it names is unimplemented, so a chained leg is a
+// claim about ANOTHER TABLE that goes stale silently. Section 4.2 would report
+// twelve well-formed rows in exactly the same way whether the rule discriminates
+// or has stopped reading, which is the `VG-5` shape one table up.
+const VG_INVENTORY = '### 4.2 The `VG` gates';
+
+// The artifacts a section 4.2 condition can name that ARE facts about this tree,
+// and the probe for each. WRITTEN AND NEVER COMPUTED, `CI-06/gate-inventory`'s
+// property: a new condition fails until somebody decides in this file whether
+// its artifact can be read.
+//
+// THE KEY MATCH IS ANCHORED AND NEVER A SUBSTRING. `fastify-plugin` contains
+// `fastify`, so a substring probe reports the artifact ARRIVED on a package that
+// is not it, and passes in exactly the same way as one that works. That is
+// `gates.mjs`'s `@vitest/browser-playwright` lesson, and it is why the pattern
+// requires `@` or `:` immediately after the name.
+const VG_PROBES = {
+  'fastify present in the lockfile': () => {
+    const key = /(^|\s)'?fastify'?[@:]/m;
+    for (const f of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
+      if (!existsSync(join(ROOT, f))) continue;
+      if (key.test(read(f))) return true;
+    }
+    return false;
+  },
+};
+
+// Artifacts no repository file can report. Each carries ADR-080's own reason.
+const VG_UNPROBEABLE = {
+  'a bucket declared in any infrastructure manifest':
+    'ADR-080 section 4: no file in this repository changes when a bucket is created, so the ' +
+    'condition is asserted and the artifact is not',
+  'an endpoint in [API_CONTRACT](../architecture/API_CONTRACT.md) whose request body is not `application/json`':
+    'ADR-080 section 4: the media type is a property of a route that does not exist, and a grep ' +
+    'for one would report on a string in a specification rather than on a served endpoint',
+};
+
+const vgInventory = {
+  id: 'CI-06/vg-inventory',
+  title: 'Every VG row is wired, chained to an unimplemented stage, or waiting on a dated artifact',
+  covers:
+    'ADR-080 APPLIED TO EVERY ROW OF STRATEGY section 4.2, as CI-06/gate-inventory does for 4.1. ' +
+    'A row is closed when it carries at least one leg and every leg is well formed. ' +
+    'WIRED names a workflow that resolves, every job it names is a top-level key in that ' +
+    'workflow, and the step or rule it names resolves as a `name:` in that workflow or as a ' +
+    'link on disk: ADR-080 section 3 makes this strictly stronger than 4.1 (a). ' +
+    'CHAINED names exactly one 4.1 row, carries no Artifact clause, and THAT ROW MUST CARRY NO ' +
+    'IMPLEMENTED LEG, which is ADR-080 (d) second clause and the assertion this gate exists ' +
+    'for: a chained leg is a claim about another table and goes stale silently. ' +
+    'WAITING is dated, names exactly one `Artifact: **...**`, and that artifact is registered ' +
+    'here as probeable or unprobeable; a probed artifact must resolve to ABSENT, so the gate ' +
+    'FAILS ON GOOD NEWS. DISCHARGED links a register that resolves. FINDING is an explicit ' +
+    'disposition and a row carrying no leg at all is one. ' +
+    'BOTH REGISTERS SHRINK IN THE STALE DIRECTION: an entry naming no live condition is a ' +
+    'finding, so re-ruling an artifact into a path removes its entry rather than leaving it. ' +
+    'THE KEY PROBE IS ANCHORED: `fastify-plugin` must not report `fastify` as arrived.',
+  run() {
+    const findings = [];
+    const body = read(STRATEGY_DOC);
+    const start = body.indexOf(VG_INVENTORY);
+    if (start === -1) throw new Error(`${STRATEGY_DOC}: section not found: "${VG_INVENTORY}"`);
+    const firstLine = body.slice(0, start).split('\n').length;
+    const after = body.slice(start + VG_INVENTORY.length);
+    const end = after.search(/\n### /);
+    const lines = (end === -1 ? after : after.slice(0, end)).split('\n');
+
+    const rows = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i].startsWith('|')) continue;
+      const cells = rowCells(lines[i]);
+      const m = /^\s*\*{0,2}`?(VG-\d{1,2})\b/.exec(cells[0] ?? '');
+      if (!m) continue;
+      rows.push({ id: m[1], line: firstLine + i, cells, closure: (cells[4] ?? '').trim() });
+    }
+    // Rule 2, as the sibling states it: a section parsing to no row is a runner
+    // that has lost its input and would report an inventory of nothing as one in
+    // order.
+    if (rows.length === 0) {
+      throw new Error(
+        `CI-06/vg-inventory read no VG-nn row out of ${STRATEGY_DOC} "${VG_INVENTORY}". ` +
+          'Zero means the table or the first-cell form has moved, and every assertion below ' +
+          'would then hold vacuously',
+      );
+    }
+    // Rule 2 for the registers themselves. An empty register makes every
+    // registration assertion vacuous in the direction that passes.
+    if (Object.keys(VG_PROBES).length === 0) throw new Error('VG_PROBES is empty');
+    if (Object.keys(VG_UNPROBEABLE).length === 0) throw new Error('VG_UNPROBEABLE is empty');
+
+    // 4.1's rows, for the chain-expiry assertion. Reused rather than reparsed:
+    // two expressions of one concept agree exactly until they do not (OQ-P1-04).
+    const stages = new Map();
+    for (const r of pipelineRows()) {
+      stages.set(r.id, closureLegs(r.closure).some((l) => l.kind === 'implemented'));
+    }
+
+    const liveArtifacts = new Set();
+    let wired = 0;
+    let chained = 0;
+    let waitingLegs = 0;
+    let discharged = 0;
+    let findingRows = 0;
+
+    for (const row of rows) {
+      const cell = row.closure;
+      const at = `${STRATEGY_DOC}:${row.line}`;
+      let legs = 0;
+
+      // --- FINDING, an explicit disposition -----------------------------------
+      if (/\*\*FINDING\b/.test(cell)) {
+        legs++;
+        findingRows++;
+      }
+
+      // --- WIRED --------------------------------------------------------------
+      if (/\*\*Wired\b/.test(cell)) {
+        legs++;
+        wired++;
+        const wf = /`?([a-z0-9-]+\.yml)`?/.exec(cell);
+        if (!wf) {
+          findings.push(`${at}: ${row.id} is Wired and names no workflow file`);
+        } else {
+          const jobs = workflowJobs(wf[1]);
+          if (jobs === null) {
+            findings.push(`${at}: ${row.id} is Wired on ${wf[1]}, which does not exist`);
+          } else {
+            const named = [...cell.matchAll(/`([a-z0-9-]+)`\s+job/g)].map((m2) => m2[1]);
+            for (const j of named) {
+              if (!jobs.has(j)) {
+                findings.push(
+                  `${at}: ${row.id} names the \`${j}\` job of ${wf[1]}, which has no such ` +
+                    'top-level job key',
+                );
+              }
+            }
+            // ADR-080 section 3's strictly-stronger half: the STEP or RULE must
+            // resolve too, not just the job.
+            //
+            // THE FORMS ARE THE TABLE'S OWN AND WERE READ OFF IT RATHER THAN
+            // ASSUMED. A first version of this matched `**`x`**` and matched
+            // NOTHING, so the assertion was vacuous and reported a wired row as
+            // checked. The rows write `steps `a` and `b``, `step `a``, and
+            // `rule [`name`](path)`.
+            const wfBody = read(`${WORKFLOW_DIR}/${wf[1]}`);
+            let checked = 0;
+            for (const m2 of cell.matchAll(/\bsteps?\s+((?:`[^`]+`(?:\s*(?:,|and)\s*)?)+)/g)) {
+              for (const t of m2[1].matchAll(/`([^`]+)`/g)) {
+                checked++;
+                if (!wfBody.includes(t[1])) {
+                  findings.push(
+                    `${at}: ${row.id} names step \`${t[1]}\`, which is not a step of ${wf[1]}. ` +
+                      'ADR-080 section 3 makes the step resolve, not just the job',
+                  );
+                }
+              }
+            }
+            for (const m2 of cell.matchAll(/\brule\s+\[`([^`]+)`\]\(([^)\s]+)\)/g)) {
+              checked++;
+              const target = resolve(dirname(join(ROOT, STRATEGY_DOC)), m2[2]);
+              if (!existsSync(target)) {
+                findings.push(
+                  `${at}: ${row.id} names rule \`${m2[1]}\`, whose file does not resolve`,
+                );
+              }
+            }
+            // Rule 2 on this leg: a Wired row naming neither a step nor a rule
+            // is a row whose strictly-stronger half asserted nothing.
+            if (checked === 0) {
+              findings.push(
+                `${at}: ${row.id} is Wired and names no step and no rule. ADR-080 section 3 ` +
+                  'makes this leg strictly stronger than 4.1 (a), and a row naming only a job ' +
+                  'is 4.1 (a) with extra words',
+              );
+            }
+          }
+        }
+      }
+
+      // --- CHAINED ------------------------------------------------------------
+      for (const m of cell.matchAll(/\*\*Chained,\s*(\d{4}-\d{2}-\d{2})\*\*,\s*on\s*`(CI-\d{2})`/g)) {
+        legs++;
+        chained++;
+        const onStage = m[2];
+        if (!stages.has(onStage)) {
+          findings.push(`${at}: ${row.id} chains on ${onStage}, which is not a row of section 4.1`);
+          continue;
+        }
+        // THE ASSERTION THIS GATE EXISTS FOR.
+        if (stages.get(onStage) === true) {
+          findings.push(
+            `${at}: ${row.id} is "Chained on ${onStage}" and ${onStage} now carries an ` +
+              'IMPLEMENTED leg in section 4.1. ADR-080 (d): a chain is available only while ' +
+              'the row it names is not implemented, so this leg has expired and the row needs ' +
+              'a disposition of its own',
+          );
+        }
+      }
+      if (/\*\*Chained,/.test(cell) && /Artifact:/.test(cell) && !/\bwaiting,/i.test(cell)) {
+        findings.push(
+          `${at}: ${row.id} carries a chained leg AND an Artifact clause with no waiting ` +
+            'opener. A chain names its next link; an artifact belongs to a waiting leg',
+        );
+      }
+
+      // --- WAITING ------------------------------------------------------------
+      for (const m of cell.matchAll(/\bwaiting,\s*(\d{4}-\d{2}-\d{2})/gi)) {
+        legs++;
+        waitingLegs++;
+        void m;
+      }
+      const artifacts = [...cell.matchAll(/Artifact:\s*\*\*(.+?)\*\*/g)].map((m2) => m2[1].trim());
+      if (/\bwaiting,/i.test(cell)) {
+        if (artifacts.length !== 1) {
+          findings.push(
+            `${at}: ${row.id} is waiting and names ${String(artifacts.length)} artifacts. ` +
+              'ADR-073 wants exactly one',
+          );
+        }
+        for (const a of artifacts) {
+          liveArtifacts.add(a);
+          const probe = VG_PROBES[a];
+          const unprobeable = Object.prototype.hasOwnProperty.call(VG_UNPROBEABLE, a);
+          if (!probe && !unprobeable) {
+            findings.push(
+              `${at}: ${row.id} waits on "${a}", which is registered in neither VG_PROBES nor ` +
+                'VG_UNPROBEABLE. Decide in gates.mjs whether this artifact can be read',
+            );
+          } else if (probe && probe() === true) {
+            findings.push(
+              `${at}: ${row.id} waits on "${a}" and the artifact HAS ARRIVED. This is the ` +
+                'assertion that fails on good news: re-rule the row rather than the gate',
+            );
+          }
+        }
+      }
+
+      // --- DISCHARGED ---------------------------------------------------------
+      if (/\*\*Discharged outside Actions\b/.test(cell)) {
+        legs++;
+        discharged++;
+        const links = [...cell.matchAll(/\]\(([^)\s]+)\)/g)].map((m2) => m2[1]);
+        const resolves = links.some((l) =>
+          existsSync(join(ROOT, resolve(dirname(join(ROOT, STRATEGY_DOC)), l).replace(`${ROOT}/`, ''))),
+        );
+        if (links.length === 0 || !resolves) {
+          findings.push(
+            `${at}: ${row.id} is Discharged outside Actions and links no register that resolves`,
+          );
+        }
+      }
+
+      if (legs === 0) {
+        findings.push(
+          `${at}: ${row.id} carries no leg at all. ADR-080: a row is closed when it carries at ` +
+            'least one leg, and a row carrying none is a finding',
+        );
+      }
+    }
+
+    // BOTH REGISTERS SHRINK IN THE STALE DIRECTION, CI06U_REGISTER's property.
+    for (const a of Object.keys(VG_PROBES)) {
+      if (!liveArtifacts.has(a)) {
+        findings.push(
+          `gates.mjs: VG_PROBES holds "${a}" and no section 4.2 row waits on it. The register ` +
+            'shrinks when an artifact is re-ruled; an entry naming no live condition is stale',
+        );
+      }
+    }
+    for (const a of Object.keys(VG_UNPROBEABLE)) {
+      if (!liveArtifacts.has(a)) {
+        findings.push(
+          `gates.mjs: VG_UNPROBEABLE holds "${a}" and no section 4.2 row waits on it. Same rule`,
+        );
+      }
+    }
+
+    console.log(
+      `       CI-06/vg-inventory note: ${rows.length} VG row(s); ${wired} wired, ${chained} ` +
+        `chained, ${waitingLegs} waiting leg(s) over ${liveArtifacts.size} artifact(s), ` +
+        `${discharged} discharged outside Actions, ${findingRows} explicit FINDING(s). ` +
+        `${Object.keys(VG_PROBES).length} artifact(s) probed against this tree and ` +
+        `${Object.keys(VG_UNPROBEABLE).length} registered unprobeable with a reason`,
+    );
+
+    return findings;
+  },
+};
+
 const GATES = [
   ci06a,
   ci06b,
@@ -6812,6 +7118,7 @@ const GATES = [
   fixtureInventory,
   identifierSeries,
   gateInventory,
+  vgInventory,
 ];
 
 function main() {
