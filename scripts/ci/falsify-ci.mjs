@@ -612,6 +612,62 @@ const CASES = [
       ),
   },
   {
+    // ADR-084's FIRST REFUSAL. `treasury_balances` and `liability_snapshots`
+    // belong to no identity, so they are not members of `ScopedTableKey` and the
+    // scoped accessor cannot be asked for them.
+    //
+    // THIS IS AT CI-01 AND NOT IN THE VITEST SUITE, for the reason the R-17 case
+    // below already states: vitest runs transpiled code and a type error is gone
+    // by then. A unit test "asserting" this would assert nothing.
+    id: 'CI-01/scope-firm-table-refused',
+    stage: 'CI-01',
+    seeds:
+      'a `firm` table passed to scopedDb, which ADR-084 makes unrepresentable rather than merely wrong. The needle is the TYPE NAME: an unrelated TS error in packages/db would exit non-zero without proving the refusal',
+    needles: ['ScopedTableKey', `${MARK}-firm.ts`],
+    run: () =>
+      seededInTree(
+        {
+          [`packages/db/src/${MARK}-firm.ts`]:
+            "import { scopedDb, type IdentityId } from './scoped-db.js';\n\n" +
+            "export const rows = scopedDb('i-1' as IdentityId).rows('treasuryBalances');\n",
+        },
+        () => run('pnpm', ['--filter', '@merit/db', 'run', 'typecheck']),
+      ),
+  },
+  {
+    // ADR-084's SECOND REFUSAL. `systemDb(reason)` returns a BRANDED handle that
+    // is not assignable to `ScopedDb`, so an unscoped reader cannot be smuggled
+    // into a function that asked for a scoped one.
+    //
+    // THE SEED CARRIES `identityId` DELIBERATELY. Without it TypeScript reports
+    // "Property 'identityId' is missing", which passes a naive needle while
+    // proving the WRONG THING: that the shapes differ, not that the brands do.
+    // With it present, the only remaining incompatibility is `__brand`, so the
+    // needle can demand exactly that and the case fails if the brand ever stops
+    // being what refuses.
+    id: 'CI-01/scope-system-db-not-assignable',
+    stage: 'CI-01',
+    seeds:
+      "systemDb's return assigned to a ScopedDb, with `identityId` present on the value so that the BRAND is the only thing left to refuse it",
+    needles: ['__brand', `${MARK}-brand.ts`],
+    run: () =>
+      seededInTree(
+        {
+          [`packages/db/src/${MARK}-brand.ts`]:
+            "import type { ScopedDb, IdentityId, SystemReason } from './scoped-db.js';\n" +
+            "import type { TableKey } from './scope.js';\n\n" +
+            'declare const unscoped: {\n' +
+            "  readonly __brand: 'SystemDb';\n" +
+            '  readonly reason: SystemReason;\n' +
+            '  readonly identityId: IdentityId;\n' +
+            '  rows<K extends TableKey>(key: K): Promise<unknown[]>;\n' +
+            '};\n\n' +
+            'export const smuggled: ScopedDb = unscoped;\n',
+        },
+        () => run('pnpm', ['--filter', '@merit/db', 'run', 'typecheck']),
+      ),
+  },
+  {
     id: 'CI-01/engine-purity',
     stage: 'CI-01',
     seeds: "a wall-clock read inside the engine's source",
@@ -1611,9 +1667,14 @@ const CASES = [
           // tested nothing, and the runner would report DID NOT FAIL as though
           // the gate were weak.
           if (!before.includes(from)) {
-            throw new Error(`the INV-17 mutant found no "${from}" in packages/harness/src/assertions.ts`);
+            throw new Error(
+              `the INV-17 mutant found no "${from}" in packages/harness/src/assertions.ts`,
+            );
           }
-          return before.replace(from, '  return BigInt(plan.funded.maxPayouts) * maxCapCents - 1n;');
+          return before.replace(
+            from,
+            '  return BigInt(plan.funded.maxPayouts) * maxCapCents - 1n;',
+          );
         },
         () =>
           run('node', [
