@@ -56,6 +56,7 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | ~~**146**~~ | ~~`P3-c`, `CI-04` acquires an artifact and a selected project, and `VG-3` and `VG-6` expire with it (`ADR-085`), **after 142 and 145** ([P3 build plan](../plans/P3-ledger-billing-identity.md))~~ | **WRITTEN.** Struck, and its entry is below |
 | **147** | `P3-d`, the job interface and pg-boss ([ADR-006](../decisions/ADR-006.md)) behind it (`ADR-086`), **after 146**. **MONEY PATH** ([P3 build plan](../plans/P3-ledger-billing-identity.md)) | **CLAIMED**, dispatched by session 143's plan |
 | **148** | `P3-e`, `OI-29`'s enforcement: the publish decision becomes SOUND and not only present (`ADR-087`, migration `0047`), **after 141, 142 and 146**. **MONEY PATH, `E2` READ** ([P3 build plan](../plans/P3-ledger-billing-identity.md)) | **CLAIMED**, dispatched by session 143's plan |
+| **156** | `VG-8`'s `PreToolUse` half, which [ADR-080](../decisions/ADR-080.md) ruled a **FINDING** rather than a waiting row: three documents name the hook as its implementation and [`.claude/settings.json`](../../.claude/settings.json) carries `SessionStart` and `Stop` only. Implements a signed ruling, so it mints no ADR | **CLAIMED**, dispatched by session 155 |
 | ~~**152**~~ | ~~The ADR registry table and the session ENTRY table become GENERATED spans (`ADR-088`); the CLAIM table is deliberately NOT generated~~ | **WRITTEN.** Struck, and its entry is below |
 
 **A row moves out of this table by being written, not by being edited.** When the session
