@@ -7114,6 +7114,538 @@ const vgInventory = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// CI-06/retired-constraints  A retired constraint name appears only where the
+// appearance retires it or records it
+// -----------------------------------------------------------------------------
+// THE CORPUS MANDATES ONE HALF OF A SUPERSESSION AND HAS NEVER MANDATED THE
+// OTHER. Before a constraint is cited the rule is to grep the migration
+// directory for a superseding definition, and session 135 ran exactly that grep
+// and was right to. The second sweep has never been run by anybody: once a
+// migration supersedes a constraint, the citations ALREADY MERGED against the
+// old name go on saying what the database used to do, and no rule and no gate
+// looks at them.
+//
+// SESSION 141 MEASURED IT ON `0015` ALONE. 102 citation sites, 99 resolving and
+// 3 stale, all three in one test file, and ONE OF THE THREE WAS INVERTED rather
+// than merely out of date: the replacement predicate EXEMPTS the locked row the
+// comment said it refused, and that comment was the stated justification for
+// what the test caps its profit at. Session 151 repaired those three. THIS GATE
+// IS WHAT STOPS THE FOURTH.
+//
+// SEEDED FROM THE MIGRATION DIRECTORY AND NEVER FROM A HAND LIST, which is
+// session 141's own design constraint: a hand-maintained list of retired names
+// is the same defect one level up, stale on the day the next supersession lands.
+// RETIRED IS MECHANICAL: a name some migration DROPs and no migration ADDs back.
+// Sixteen `DROP CONSTRAINT` statements less nine same-name re-adds is seven
+// today, over four migrations, and the set grows by itself.
+//
+// UNLETTERED, AND THAT IS FORCED RATHER THAN STYLISTIC, on the reasoning
+// `CI-06/vg-inventory` states: `falsify.mjs`'s `nextFreeLetter()` scans `a` to
+// `x` and its own comment says every seed needs two letters of headroom above
+// the one it names, so a lettered gate here consumes the seed anchor and takes
+// `pnpm run falsify` down with it. `CI-06/gate-inventory` and
+// `CI-06/vg-inventory` already ship in this shape.
+//
+// BOTH DIRECTIONS, and the second is the one a gate of this shape forgets. A
+// retired name outside a permitted class is a finding; AND a run that parses NO
+// retired name at all THROWS, because a scanner holding an empty needle list
+// reports a clean tree for the one reason that means it read nothing. That is
+// `CI-06/vg-inventory`'s rule 2, asserted here on the migration parse, on the
+// walk, on the reader, and on both registers.
+//
+// TWO THINGS IT DOES NOT DO, in writing so that nobody counts them as covered.
+// THE NINE SAME-NAME RE-ADDS ARE NOT ASSERTED: `0032` and eight others dropped a
+// constraint and re-added it under its own name with a changed predicate, so the
+// NAME resolves for every citation while the PREDICATE moved underneath it. That
+// is not name-greppable and session 141 named it as the weaker shape it does not
+// close. And this gate asserts EXISTENCE, NEVER CONTENT: whether a citation of a
+// LIVE constraint describes it correctly is outside it.
+const RETIRED_MIGRATION_DIR = 'packages/db/migrations';
+
+// A comment is not a statement. `0032` carries the words `ADD CONSTRAINT below`
+// in a comment explaining what it deliberately does not prove, and a parser
+// reading that as a re-add would UN-RETIRE a name and shrink the needle list in
+// silence, which is the one direction of this parse that fails quietly.
+const withoutSqlComments = (body) =>
+  body.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '');
+
+// {names some migration DROPs} minus {names some migration ADDs}. Order does not
+// enter it: a name dropped in `0029` and re-added in `0029` is live, and so is
+// one re-added ten migrations later, because the question this gate asks is
+// whether the name exists in the schema at all.
+function retiredConstraints() {
+  const dropped = new Map();
+  const added = new Set();
+  let statements = 0;
+  for (const file of sqlFiles()) {
+    const body = withoutSqlComments(read(file));
+    for (const m of body.matchAll(/\bDROP\s+CONSTRAINT\s+(?:IF\s+EXISTS\s+)?([a-z0-9_]+)/gi)) {
+      statements++;
+      const name = m[1].toLowerCase();
+      if (!dropped.has(name)) dropped.set(name, basename(file));
+    }
+    for (const m of body.matchAll(/\bADD\s+CONSTRAINT\s+([a-z0-9_]+)/gi)) {
+      added.add(m[1].toLowerCase());
+    }
+  }
+  return { statements, retired: new Map([...dropped].filter(([n]) => !added.has(n))) };
+}
+
+// WHERE THE APPEARANCE RETIRES IT OR RECORDS IT. WRITTEN AND NEVER COMPUTED, per
+// ADR-074 section 2 and for the reason session 141 gives: an exemption set
+// derived from what currently passes passes forever. A new class fails until
+// somebody decides in this file that it dates its own contents.
+//
+// THE TEST FOR THE DATED CLASSES is session 141's own: whether a reader who
+// wants to know what the database does TODAY would land on the sentence. A
+// `## 2026-08-22 - Session 129` heading dates its own contents and a code
+// comment does not. Two documents that are dated in practice are NOT here and
+// are registered instead, deliberately: ALLOCATION is amended in place under
+// ADR-065 T3 and DELTA_MANIFEST is a live specification, so neither is
+// append-only and a row in either does not date itself.
+const RETIRED_PERMITTED = [
+  {
+    what: 'the migration directory',
+    match: (f) => f.startsWith(`${RETIRED_MIGRATION_DIR}/`) && extname(f) === '.sql',
+    why:
+      'the migration that defined the constraint and the migration that dropped it. A merged ' +
+      'migration is never edited and only superseded (constitution E2), so it is a dated ' +
+      'record of a schema by construction',
+  },
+  {
+    what: 'the absence probes',
+    match: (f) => /^scripts\/db\/probe_[a-z0-9_]+\.sql$/.test(f),
+    why:
+      'a probe naming a retired constraint is asserting that it is GONE. Removing the name ' +
+      'from the probe is removing the assertion',
+  },
+  {
+    what: 'the session logs',
+    match: (f) => f.startsWith('docs/sessions/'),
+    why:
+      'a session log is a record of a position on a date and rewriting it destroys the only ' +
+      'thing it is for. Session 129 found a defect that is stale as a claim about today and ' +
+      'correct as a record of what that session found, which is why session 132 refuted it in ' +
+      'a new entry rather than editing the old one',
+  },
+  {
+    what: 'the signed rulings',
+    match: (f) => /^docs\/decisions\/ADR-[A-Za-z0-9-]+\.md$/.test(f),
+    why:
+      'an ADR is dated, signed and superseded rather than edited. ADR-052 still quotes the ' +
+      'retired constraint verbatim four rulings later, and that is the ruling being legible ' +
+      'rather than the corpus being wrong',
+  },
+  {
+    what: 'STATE',
+    match: (f) => f === 'docs/STATE.md',
+    why:
+      'STATE is append-only and every section carries its own date. It is the only live ' +
+      'document exempted as a class, and it is exempted because appending is the normal act ' +
+      'and a register pinning its count would fail on every session that reports one of these',
+  },
+];
+
+// THE REGISTER. Every file outside the permitted classes that cites a retired
+// constraint on `main` as of 2026-08-24, surveyed before the assertion was
+// written. NOT ONE OF THESE IS ACCEPTED AS CORRECT: each is a site this
+// session's fence did not reach, and the one still WRONG is named as such.
+//
+// IT CARRIES CI06U_REGISTER's DEFINING PROPERTY AND ONE MORE. It SHRINKS ONLY,
+// so an entry naming no citation is reported and the day a file is repaired is
+// the day its number moves. And it PINS THE COUNT, in both directions, which is
+// the assertion the gate exists for: three stale citations were merged into one
+// file before anybody counted, and a register that only said "this file is
+// known" would have taken the fourth in silence.
+//
+// KEYED BY FILE AND COUNT, NEVER BY CONSTRAINT NAME, and that is load-bearing
+// rather than tidy. Spelling a retired name here would make this file a citation
+// site of it, so the register would have to register itself and every edit to it
+// would move its own number. The needles come from the migration directory and
+// nothing in this block names one.
+const RETIRED_REGISTER = new Map([
+  [
+    '.github/workflows/corpus.yml',
+    {
+      sites: 3,
+      why:
+        "the migrations job's comments state what two superseded constraints asserted and why " +
+        'each probe names the REPLACEMENT. `CI-06s`\'s near-miss is here: one of these comments ' +
+        'sits three lines above the step it describes, which is why that gate matches the STEP ' +
+        'and not the mention',
+    },
+  ],
+  [
+    'apps/worker/test/replay.test.ts',
+    {
+      sites: 3,
+      why:
+        'THE THREE SESSION 141 FOUND, repaired by session 151 and now tensed: each states the ' +
+        'retirement, the migration that did it and the live name. Registered rather than ' +
+        'exempted because this gate reads existence and not tense, and because this is the ' +
+        'file the whole defect was found in',
+    },
+  ],
+  [
+    'docs/architecture/data-model/README.md',
+    {
+      sites: 1,
+      why:
+        'THE ONE STILL WRONG, and it is a live invariant-to-enforcement row rather than a ' +
+        'record. Both halves of it were falsified on 2026-08-16 by the migration that retired ' +
+        'the constraint it names, its sibling document one directory down already carries the ' +
+        'repaired wording, and session 141 reported it inside its own fence and was told not ' +
+        'to widen the repair. It is not in this fence either. TWO LINES, NO RULING',
+    },
+  ],
+  [
+    'docs/architecture/data-model/contact_channels.md',
+    {
+      sites: 1,
+      why:
+        'records that `0019` wrote the check inline so Postgres generated the name, and that ' +
+        '`0029` re-added it under a chosen one so the next widening does not depend on a ' +
+        'generated name staying generated',
+    },
+  ],
+  [
+    'docs/architecture/data-model/daily_marks.md',
+    {
+      sites: 2,
+      why:
+        'the Constraints line names the superseding constraint and says what it supersedes; ' +
+        'the paragraph under it records what the row said until 2026-08-16 and why that was ' +
+        'wrong. This is the shape session 141 says the stale sites should have had',
+    },
+  ],
+  [
+    'docs/architecture/data-model/identity_signals.md',
+    {
+      sites: 1,
+      why: "the same shape as contact_channels: `0029`'s drop and re-add, stated in one sentence",
+    },
+  ],
+  [
+    'docs/architecture/data-model/kyc_verifications.md',
+    {
+      sites: 1,
+      why: "the same shape again: `0003` wrote the check inline and `0029` renamed it",
+    },
+  ],
+  [
+    'docs/architecture/data-model/phone_change_requests.md',
+    {
+      sites: 1,
+      why:
+        "cites `0029`'s lesson about a generated name as the reason this table's foreign keys " +
+        'are named rather than generated',
+    },
+  ],
+  [
+    'docs/decisions/ALLOCATION.md',
+    {
+      sites: 5,
+      why:
+        'the ADR and migration rows that allocated the two supersessions and the ruling behind ' +
+        'each. Dated in practice and NOT exempted as a class: ALLOCATION is amended in place ' +
+        'under ADR-065 T3, so it is not append-only and a row in it does not date itself',
+    },
+  ],
+  [
+    'docs/edge-cases/EC-157.md',
+    {
+      sites: 2,
+      why:
+        "the entry whose Repair A produced the superseding migration. It names the constraint " +
+        'in order to rule on it, which is the permitted shape in a document that is not ' +
+        'append-only',
+    },
+  ],
+  [
+    'docs/edge-cases/README.md',
+    { sites: 1, why: 'the registry preamble summarising what EC-157 found' },
+  ],
+  [
+    'docs/plans/P2-rules-engine-build.md',
+    {
+      sites: 5,
+      why:
+        'A DISPATCH DOCUMENT, and the class session 141 flagged as still owed. Its `P2-c` brief ' +
+        'reads as pending work against a constraint that has since been retired, including a ' +
+        'quoted DDL block, so a session dispatched from it for a later slice would read that ' +
+        'section as owed. Not repairable from this fence',
+    },
+  ],
+  [
+    'docs/testing/STRATEGY.md',
+    {
+      sites: 1,
+      why:
+        "`CI-06s`'s row quotes the corpus.yml comment in order to explain why that gate matches " +
+        'the STEP and not the mention. Section 4.4 is in this fence for its own row only',
+    },
+  ],
+  [
+    'packages/db/DELTA_MANIFEST.md',
+    {
+      sites: 7,
+      why:
+        'the two supersession sections, which name the retired constraint in order to retire it ' +
+        'and quote verbatim the PostgreSQL error that names it. Dated in practice and NOT ' +
+        'exempted as a class: the manifest is a live specification of the schema delta, and a ' +
+        'reader asking what the database does today does land in it',
+    },
+  ],
+  [
+    'packages/rules-engine/fixtures/GS-056-locked-floor-converts-the-account-into-a-free-option.expected.json',
+    {
+      sites: 1,
+      why:
+        'an expectation `note` recording the constraint this fixture was nearly withdrawn ' +
+        'against, on a blocker that had been lifted two days before it was written',
+    },
+  ],
+  [
+    'packages/rules-engine/fixtures/GS-065-settled-payout-drops-the-balance-toward-a-floor-that-does-not-move.expected.json',
+    { sites: 1, why: 'the same batch and the same note' },
+  ],
+  [
+    'packages/rules-engine/fixtures/README.md',
+    { sites: 1, why: "that batch's own record of the blocker and why it did not hold" },
+  ],
+  [
+    'packages/rules-engine/src/day/floor.ts',
+    {
+      sites: 1,
+      why:
+        'THE SITE THAT FOUND EVERYTHING. It cites the same constraint at the same line as the ' +
+        'three stale ones and RESOLVES, because it is TENSED: it says the constraint rejected ' +
+        'such a row when a named ADR was written. One code comment carried its own date and ' +
+        'three did not, and that was the whole difference',
+    },
+  ],
+  [
+    'packages/rules-engine/test/generators/day-sequence.property.test.ts',
+    {
+      sites: 1,
+      why: 'records what the retired constraint and the two mark invariants jointly implied for the generator',
+    },
+  ],
+  [
+    'packages/rules-engine/test/generators/validate-day-sequence.ts',
+    { sites: 2, why: "the same session's validator, carrying the same reasoning twice" },
+  ],
+  [
+    'scripts/corpus/gates.mjs',
+    {
+      sites: 2,
+      why:
+        "`CI-06s`'s comment and `covers` line, which name a retired constraint in order to state " +
+        'the near-miss that gate is written against. THIS GATE ADDS NONE OF ITS OWN: it is ' +
+        'seeded from the migration directory and spells no constraint name anywhere, which is ' +
+        'why the register above is keyed by file and count rather than by name',
+    },
+  ],
+]);
+
+const retiredConstraintsGate = {
+  id: 'CI-06/retired-constraints',
+  title: 'A retired constraint name appears only where the appearance retires it or records it',
+  covers:
+    "SESSION 141's RULE, SEEDED FROM THE MIGRATION DIRECTORY AND NEVER FROM A HAND LIST. " +
+    'RETIRED is {names some migration DROPs} minus {names some migration ADDs}, parsed with SQL ' +
+    'comments stripped because a comment is not a statement and a comment read as a re-add ' +
+    'shrinks the needle list in silence. ' +
+    'THE MATCH IS ANCHORED ON BOTH SIDES AND IS NEVER A SUBSTRING, and both edges are ' +
+    'load-bearing here rather than hypothetical: one superseding migration names its ' +
+    'replacement by SUFFIXING the retired name, so a loose right edge reports the LIVE ' +
+    "constraint at every site naming it, and each supersession migration's own FILENAME embeds " +
+    'the retired name after `supersede_`, so a loose left edge turns every link to that file ' +
+    'into a finding. ' +
+    'A CITATION IS A (LINE, NAME) PAIR outside the permitted classes. The permitted classes are ' +
+    'WRITTEN AND NEVER COMPUTED (ADR-074 section 2): an exemption set derived from what ' +
+    'currently passes passes forever. ' +
+    'RETIRED_REGISTER PINS THE COUNT IN BOTH DIRECTIONS, which is the assertion this gate ' +
+    'exists for: three stale citations reached one file before anybody counted, and a register ' +
+    'saying only "this file is known" would have taken the fourth in silence. It SHRINKS ONLY, ' +
+    'CI06U_REGISTER\'s property, and BOTH registers do: a permitted class exempting nothing and ' +
+    'a register entry naming nothing are each a finding. ' +
+    'RULE 2 EVERYWHERE, because every assertion here is over a needle list: zero migrations, ' +
+    'zero DROP statements, zero retired names, zero files walked or zero files read all THROW ' +
+    'rather than reporting a clean tree for the one reason that means nothing was checked. ' +
+    'TWO THINGS IT DOES NOT DO. The NINE same-name re-adds are not asserted: a constraint ' +
+    'dropped and re-added under its own name with a changed predicate keeps resolving by name ' +
+    'while its predicate moves underneath, and that is not name-greppable. And it asserts ' +
+    'EXISTENCE, NEVER CONTENT: whether a citation of a LIVE constraint describes it correctly ' +
+    'is outside it.',
+  run() {
+    const findings = [];
+
+    // Rule 2 on the seed, in three steps, because each one fails differently and
+    // all three end in a needle list of nothing.
+    const migrations = sqlFiles();
+    if (migrations.length === 0) {
+      throw new Error(
+        `CI-06/retired-constraints read no .sql file out of ${RETIRED_MIGRATION_DIR}. The seed ` +
+          'is the migration directory and there is nothing to seed from',
+      );
+    }
+    const { statements, retired } = retiredConstraints();
+    if (statements === 0) {
+      throw new Error(
+        `CI-06/retired-constraints parsed no DROP CONSTRAINT statement out of ${migrations.length} ` +
+          'migration(s). The corpus has retired constraints, so zero means the parse has lost ' +
+          'its input rather than that nothing was ever dropped',
+      );
+    }
+    if (retired.size === 0) {
+      throw new Error(
+        `CI-06/retired-constraints parsed ${statements} DROP CONSTRAINT statement(s) and no ` +
+          'retired constraint name, so the needle list is empty and every assertion below would ' +
+          'hold vacuously. Either every dropped name is re-added, which is a schema fact worth ' +
+          'stating rather than passing on, or the ADD parse is over-matching',
+      );
+    }
+    if (RETIRED_PERMITTED.length === 0) throw new Error('RETIRED_PERMITTED is empty');
+
+    // `\b` written out. The names are `[a-z0-9_]+` by construction, so there is
+    // no metacharacter to escape and no case to fold beyond the lowercase above.
+    const needles = [...retired]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, droppedBy]) => ({
+        name,
+        droppedBy,
+        re: new RegExp(`(?<![A-Za-z0-9_])${name}(?![A-Za-z0-9_])`),
+      }));
+
+    const files = allFiles();
+    if (files.length === 0) {
+      throw new Error('the runner walk reached zero files; CI-06/retired-constraints cannot run');
+    }
+
+    const cited = new Map();
+    const exempted = new Map(RETIRED_PERMITTED.map((c) => [c.what, 0]));
+    let scanned = 0;
+    let skipped = 0;
+    let permittedSites = 0;
+    for (const file of files.sort()) {
+      const buf = readFileSync(join(ROOT, file));
+      // The six .xlsx workbooks and nothing else, on CI-06/conflict-markers'
+      // measurement. A NUL-byte test would instead drop two .ts sources that
+      // embed a literal NUL as a key separator.
+      if (!isUtf8Text(buf)) {
+        skipped++;
+        continue;
+      }
+      scanned++;
+      const permitted = RETIRED_PERMITTED.find((c) => c.match(file));
+      const lines = buf.toString('utf8').split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        for (const needle of needles) {
+          if (!needle.re.test(lines[i])) continue;
+          if (permitted) {
+            permittedSites++;
+            exempted.set(permitted.what, exempted.get(permitted.what) + 1);
+            continue;
+          }
+          if (!cited.has(file)) cited.set(file, []);
+          cited.get(file).push({ ...needle, line: i + 1 });
+        }
+      }
+    }
+
+    // Rule 2 on the reader, CI-06/conflict-markers' assertion exactly: zero text
+    // files means the UTF-8 discriminator has inverted and every citation in the
+    // tree is being skipped in silence.
+    if (scanned === 0) {
+      throw new Error(
+        `CI-06/retired-constraints read zero text files out of ${files.length}. The UTF-8 check ` +
+          'has inverted and every file in the tree is being skipped as binary',
+      );
+    }
+    // Rule 2 on the seed one last time. The migration directory is permitted and
+    // every retired name is dropped inside it, so a run where no needle matches
+    // anywhere means the matcher is broken rather than that the tree is clean.
+    if (permittedSites === 0) {
+      throw new Error(
+        `CI-06/retired-constraints matched none of its ${needles.length} retired name(s) in any ` +
+          'permitted file. Every retired name is DROPped inside the migration directory, which ' +
+          'is a permitted class, so zero here means the matcher is not matching',
+      );
+    }
+
+    for (const [file, sites] of [...cited].sort()) {
+      const entry = RETIRED_REGISTER.get(file);
+      const at = sites.map((s) => `${s.line} (\`${s.name}\`, dropped by ${s.droppedBy})`).join(', ');
+      if (!entry) {
+        for (const site of sites) {
+          findings.push(
+            `${file}:${site.line}: cites the retired constraint \`${site.name}\`, which ` +
+              `${site.droppedBy} dropped and no migration re-adds. A retired name may appear ` +
+              'only where the appearance retires it or records it. If this site records a ' +
+              'position on a date it belongs in a permitted class; if it describes the live ' +
+              'schema it is wrong. Adding a line to RETIRED_REGISTER without reading the site ' +
+              'is neither',
+          );
+        }
+        continue;
+      }
+      if (sites.length > entry.sites) {
+        findings.push(
+          `${file}: carries ${sites.length} citation(s) of a retired constraint and ` +
+            `RETIRED_REGISTER claims ${entry.sites}, at line(s) ${at}. THIS IS THE ASSERTION ` +
+            'THE GATE EXISTS FOR: three stale citations reached one file before anybody counted ' +
+            'them, and the register is what stops the fourth',
+        );
+      } else if (sites.length < entry.sites) {
+        findings.push(
+          `${file}: carries ${sites.length} citation(s) of a retired constraint and ` +
+            `RETIRED_REGISTER claims ${entry.sites}, at line(s) ${at}. The register SHRINKS ` +
+            'ONLY, so the day a site is repaired is the day its number moves. An entry standing ' +
+            'above what the file holds is a repair nobody recorded',
+        );
+      }
+    }
+
+    // BOTH REGISTERS SHRINK IN THE STALE DIRECTION, CI06U_REGISTER's property
+    // and CI-06/vg-inventory's pair of them.
+    const onDisk = new Set(files);
+    for (const [file, entry] of RETIRED_REGISTER) {
+      if (cited.has(file)) continue;
+      const reason = !onDisk.has(file)
+        ? 'no such file is in the runner walk'
+        : RETIRED_PERMITTED.some((c) => c.match(file))
+          ? 'the file is exempted as a permitted class, so the entry can never do anything'
+          : 'no line in it cites a retired constraint';
+      findings.push(
+        `gates.mjs: RETIRED_REGISTER holds "${file}" (${entry.sites} site(s)) and ${reason}. ` +
+          'The entry has done its work and goes; a register that only ever grows stops being a ' +
+          'decision and becomes a list',
+      );
+    }
+    for (const [what, n] of exempted) {
+      if (n > 0) continue;
+      findings.push(
+        `gates.mjs: the permitted class "${what}" exempts no citation in this tree. An ` +
+          'exemption that permits nothing is a rule nobody relies on, and it goes the same way ' +
+          'a stale register entry does',
+      );
+    }
+
+    console.log(
+      `       CI-06/retired-constraints note: ${statements} DROP CONSTRAINT statement(s) over ` +
+        `${migrations.length} migration(s) leave ${needles.length} retired name(s); ` +
+        `${scanned} file(s) read and ${skipped} skipped as not UTF-8; ${permittedSites} site(s) ` +
+        `exempted across ${RETIRED_PERMITTED.length} permitted class(es) and ` +
+        `${[...cited.values()].reduce((n, s) => n + s.length, 0)} site(s) over ${cited.size} ` +
+        `file(s) outside them, against a register of ${RETIRED_REGISTER.size} file(s)`,
+    );
+
+    return findings;
+  },
+};
+
 const GATES = [
   ci06a,
   ci06b,
@@ -7144,6 +7676,7 @@ const GATES = [
   identifierSeries,
   gateInventory,
   vgInventory,
+  retiredConstraintsGate,
 ];
 
 function main() {
