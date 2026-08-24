@@ -33,6 +33,16 @@ catalog:
   # `@types/pg` is a DEV type package and `pg` is a runtime dependency, so they
   # are versioned independently and are not expected to match. ADR-084.
   '@types/pg': 8.23.1
+  # THE REACT TYPES LAND WITH THE FRAMEWORK AND NOT WITH THE FIRST PAGE, and the
+  # reason is a collision rather than tidiness. ADR-095 ruling 1: P4 section 9
+  # rows `pnpm-lock.yaml` as SERIAL three ways across P4-c, P4-d and P4-i, and
+  # the two slices that actually write pages, P4-e and P4-h, hold neither this
+  # file nor the lockfile in their fences. A page-writing slice that had to add
+  # `@types/react` would be joining a serialization nobody scheduled it into.
+  # They are DEV type packages against runtime `react` and `react-dom` and are
+  # versioned independently of them, which is ADR-084's `@types/pg` argument.
+  '@types/react': 19.2.18
+  '@types/react-dom': 19.2.5
   # THE DRIVER IS `pg` AND ADR-006 DECIDES IT, NOT PREFERENCE. `pg-boss@12.28.0`
   # declares `pg: ^8.23.0` in its own `dependencies`, and ADR-006's consequence is
   # that enqueue participates in the same transaction as the state change that
@@ -51,6 +61,31 @@ catalog:
   eslint: 10.8.1
   fast-check: 4.9.0
   globals: 17.11.0
+  # THE UI FRAMEWORK, ADR-095. App Router, in `apps/portal` and `apps/site` and
+  # in NO other package: `apps/api` is ADR-083's Fastify deployable and takes
+  # none, and `apps/admin` is M06's and is in no P4 slice, so ADR-095 declines to
+  # decide it. M04:25 and M09:23 both name Next.js and no ADR had ever ruled a UI
+  # technology; ADR-083 is the entry that looks like it does and its only
+  # occurrence of the name is a REJECTED ALTERNATIVE for the API.
+  #
+  # WHAT THIS ADMISSION COSTS, DIFFED FROM THE LOCKFILE THIS COMMIT WRITES. The
+  # closure goes 179 -> 230, `+51`, of which 36 are per-platform binaries
+  # (`@next/swc-*`, `@img/*`, `@emnapi/runtime`), so one host installs far fewer.
+  # FIFTEEN PACKAGES ARE THE REAL ADMISSION: @next/env, @swc/helpers,
+  # @types/react, @types/react-dom, baseline-browser-mapping, caniuse-lite,
+  # client-only, csstype, next, react, react-dom, scheduler, sharp, styled-jsx,
+  # tslib. `pnpm audit --audit-level=low` reports no known vulnerabilities and
+  # `pnpm install` ignores no build script, so `onlyBuiltDependencies: []` above
+  # is unchanged and still means what it says.
+  #
+  # 16.3.2 RATHER THAN AN OLDER MAJOR, AND THE REFUSAL IS THE POINT. This version
+  # declares `@playwright/test` as an OPTIONAL PEER, pnpm writes a package's peer
+  # block into the lockfile verbatim, and CI-08's probe read that declaration as
+  # an install. An older major that happens not to declare it would have kept the
+  # gate quiet, which is choosing a version to hide a defect. ADR-095 section 8:
+  # the probe is repaired to read an entry KEY, and CI-08's row is untouched
+  # because nothing about it was wrong.
+  next: 16.3.2
   pg: 8.23.0
   # THE QUEUE, ADR-006. It is in this catalog and not in `packages/db`'s because
   # `packages/queue` is the only package that names it: pg-boss is BEHIND the job
@@ -60,6 +95,12 @@ catalog:
   # workspace holds ONE driver rather than two. ADR-086.
   'pg-boss': 12.28.0
   prettier: 3.9.6
+  # `next@16.3.2` declares `react` and `react-dom` as REQUIRED peers at
+  # `^18.2.0 || ^19.0.0`. They are pinned here rather than left to
+  # `autoInstallPeers`, because a peer pnpm chooses is a version nobody approved
+  # and `.npmrc`'s `save-exact` exists to stop exactly that. ADR-095.
+  react: 19.2.8
+  'react-dom': 19.2.8
   # TypeScript 6.0.3 rather than 7.0.2, and the constraint is checkable:
   # typescript-eslint@8.67.0 (and its canary) declare
   # `peerDependencies.typescript: ">=4.8.4 <6.1.0"`, so TypeScript 7 has no
