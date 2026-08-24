@@ -16,9 +16,18 @@
 // into `payout/` or `ledger/` paths without the confirm flag", and it is
 // deliberately NOT implemented here: neither VG-8 row carries it, no `payout/`
 // or `ledger/` path exists in this tree yet, and "the confirm flag" is named in
-// those two lines and defined nowhere in the corpus. Implementing an undefined
-// predicate would be inventing specification. It is reported as a finding
+// those two lines and DEFINED NOWHERE: a grep over the repository returns exactly
+// the two lines that name it and no definition. Implementing an undefined
+// predicate would be inventing specification, so it is reported as a finding
 // instead, and it belongs to C10's hook set rather than to VG-8.
+//
+// THAT CLAUSE IS LIVE WORK RATHER THAN A HYPOTHETICAL, and session 156's first
+// draft of this comment said the opposite. It claimed no such path exists yet.
+// `packages/rules-engine/src/payout/` HAS EXISTED SINCE 2026-08-21 and holds
+// clamp.ts, evaluate.ts, gates.ts and settle.ts. There is no `ledger/`
+// directory; the ledger is `packages/db/migrations/0009_ledger.sql`. So the
+// only thing standing between C10's fourth clause and an implementation is the
+// undefined flag, which makes defining it a real next step and not housekeeping.
 //
 // THE TRADEOFF THIS FILE TAKES, STATED ONCE.
 // A hook that matches nothing to avoid false positives is decoration. A hook
