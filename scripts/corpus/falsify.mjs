@@ -1244,6 +1244,135 @@ const SEEDS = {
       });
     },
   },
+
+  // THE SECOND SWEEP OF A SUPERSESSION, which the corpus has never mandated.
+  // Session 135 ran the grep the rules DO mandate, for a superseding migration
+  // BEFORE citing a constraint, and was right to; the grep for EXISTING
+  // citations AFTER superseding has never been run by anybody, and three stale
+  // ones reached one test file, one of them stating the OPPOSITE of what the
+  // replacement predicate does. The seed is that exact act.
+  //
+  // THE NAME IS DERIVED AND NEVER SPELLED. A constraint name is a live
+  // identifier under the standing rider: the set grows the day the next
+  // supersession merges. It is also the gate's own design constraint one level
+  // down, and a harness carrying a hand list would rot in the place gates.mjs
+  // refuses to.
+  'CI-06/retired-constraints': {
+    what: 'a retired constraint name cited in a document that neither retires it nor records it',
+    real:
+      'the mandated grep runs BEFORE a constraint is cited and nobody has ever run the one ' +
+      'AFTER superseding, so 3 of 102 citation sites went stale unnoticed and were found by ' +
+      'hand a week later. Session 151 repaired those three. This is what stops the fourth, and ' +
+      'the fourth arrives in a document nobody is rereading',
+    expect: (d) => `cites the retired constraint \`${retiredNamesIn(d)[0].name}\``,
+    seed: (d) => {
+      const { name } = retiredNamesIn(d)[0];
+      if (existsSync(join(d, RETIRED_SEED_DOC))) {
+        throw new Error(`seed anchor not found: ${RETIRED_SEED_DOC} already exists`);
+      }
+      writeFileSync(
+        join(d, RETIRED_SEED_DOC),
+        '---\nstatus: draft\ndepends_on: []\nlast_updated: 2026-08-24\n---\n\n' +
+          `# Seeded by falsify.mjs\n\nThe \`${name}\` CHECK refuses such a row.\n`,
+      );
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
+// CI-06/retired-constraints: readers for the migration directory and the register
+// ---------------------------------------------------------------------------
+// The document the seeds plant into. `docs/architecture/` is in none of the
+// gate's permitted classes and no register entry names this path, so a file here
+// is a finding by construction and stays one however the corpus is rearranged.
+const RETIRED_SEED_DOC = 'docs/architecture/PROBE_RETIRED_CITATION.md';
+
+// A file that exists, cites nothing, and is in neither register. Pinned as a
+// PATH the way LOCKFILE and STRATEGY_PATH are, and the seed that uses it asserts
+// all three properties rather than assuming them.
+const RETIRED_CLEAN_FILE = 'pnpm-workspace.yaml';
+
+// The gate's own matcher, which is `\b` written out. Reproduced here rather than
+// approximated, because two scope cases below turn on exactly where its edges
+// fall.
+const retiredNameRe = (name) => new RegExp(`(?<![A-Za-z0-9_])${name}(?![A-Za-z0-9_])`);
+
+// {names some migration DROPs} minus {names some migration ADDs}, read out of
+// the COPY, with SQL comments stripped exactly as the gate strips them. Reading
+// ROOT would reintroduce the class one level down: a name retired in the source
+// tree and re-added in the seeded one.
+const retiredNamesIn = (d) => {
+  const dir = join(d, 'packages/db/migrations');
+  const dropped = new Map();
+  const added = new Set();
+  for (const f of readdirSync(dir).sort()) {
+    if (!f.endsWith('.sql')) continue;
+    const body = readFileSync(join(dir, f), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/--[^\n]*/g, '');
+    for (const m of body.matchAll(/\bDROP\s+CONSTRAINT\s+(?:IF\s+EXISTS\s+)?([a-z0-9_]+)/gi)) {
+      if (!dropped.has(m[1].toLowerCase())) dropped.set(m[1].toLowerCase(), f);
+    }
+    for (const m of body.matchAll(/\bADD\s+CONSTRAINT\s+([a-z0-9_]+)/gi)) {
+      added.add(m[1].toLowerCase());
+    }
+  }
+  const retired = [...dropped]
+    .filter(([n]) => !added.has(n))
+    .sort(([a], [b]) => a.localeCompare(b));
+  if (retired.length === 0) {
+    throw new Error('seed anchor not found: no retired constraint in the migration directory');
+  }
+  return retired.map(([name, file]) => ({ name, file }));
+};
+
+// The retired name whose SUPERSEDING MIGRATION EMBEDS IT IN ITS OWN FILENAME,
+// which is the left half of the anchoring case. Found by shape rather than
+// pinned, so it survives any renaming that keeps the property.
+const supersededByFilenameIn = (d) => {
+  const hit = retiredNamesIn(d).find((n) => n.file.includes(n.name));
+  if (!hit) {
+    throw new Error('seed anchor not found: no migration filename embeds the name it retires');
+  }
+  return hit;
+};
+
+// RETIRED_REGISTER, read out of the copy's gates.mjs at seed time, sorted by the
+// number of sites. The two count cases have to name a file the register already
+// holds, and picking one by hand is `soleWaiterVgRow`'s lesson a second time: an
+// entry repaired away leaves the case firing on the wrong finding. The entry
+// with the MOST sites is the one with headroom and it moves with the register.
+const retiredRegisterIn = (d) => {
+  const body = readFileSync(join(d, 'scripts/corpus/gates.mjs'), 'utf8');
+  const start = body.indexOf('const RETIRED_REGISTER = new Map([');
+  if (start === -1) throw new Error('seed anchor not found: const RETIRED_REGISTER');
+  const end = body.indexOf('\n]);', start);
+  if (end === -1) throw new Error('seed anchor not found: the end of RETIRED_REGISTER');
+  const entries = [
+    ...body.slice(start, end).matchAll(/\[\s*'([^']+)',\s*\{\s*sites:\s*(\d+)/g),
+  ].map((m) => ({ file: m[1], sites: Number(m[2]) }));
+  // Rule 2 of gates.mjs applied to the harness: a parser that reads nothing has
+  // lost its input, and an empty list here would seed nothing while still
+  // reporting a tidy `did not fire`.
+  if (entries.length === 0) throw new Error('seed anchor found no entry in RETIRED_REGISTER');
+  return entries.sort((a, b) => b.sites - a.sites || a.file.localeCompare(b.file));
+};
+
+// The newest dated session log, which is a permitted class by name.
+const latestSessionLogIn = (d) => {
+  const files = readdirSync(join(d, 'docs/sessions'))
+    .filter((f) => /^\d{4}-\d{2}-\d{2}-session-\d+\.md$/.test(f))
+    .sort();
+  if (files.length === 0) throw new Error('seed anchor not found: no dated session log');
+  return `docs/sessions/${files[files.length - 1]}`;
+};
+
+// The control both PASS cases below need: the BARE name, in the one document
+// that is in no permitted class. Without it, a gate that had stopped reading
+// anything at all would pass both of them and look correctly scoped.
+const seedBareRetiredName = (d) => {
+  const { name } = retiredNamesIn(d)[0];
+  writeFileSync(join(d, RETIRED_SEED_DOC), `A row is refused by \`${name}\`.\n`);
 };
 
 // =============================================================================
@@ -1840,6 +1969,147 @@ const soleWaiterVgRow = (d) => {
 const LOCKFILE = 'pnpm-lock.yaml';
 
 const SCOPE_CASES = [
+  // -------------------------------------------------------------------------
+  // CI-06/retired-constraints. Six cases, on CI-06o's rule that a gate
+  // asserting several unrelated things and watched failing on one is taken on
+  // trust for the rest. The SEEDS entry watches a NEW file; these watch the
+  // register in both directions, the vacuity throw, and both edges of the
+  // anchored match.
+  // -------------------------------------------------------------------------
+  {
+    name: 'CI-06/retired-constraints/a-fourth-citation-in-a-registered-file',
+    gate: 'CI-06/retired-constraints',
+    what: 'one MORE citation inside a file the register already holds, which is the fourth this gate exists to stop',
+    // THE CASE THE GATE WAS BUILT FOR. A register that said only "this file is
+    // known" would take the next citation in silence, which is how three
+    // arrived in one file before anybody counted. The count is pinned, so the
+    // fourth has to be decided rather than merged.
+    expect: (d) => {
+      const e = retiredRegisterIn(d)[0];
+      return `${e.file}: carries ${e.sites + 1} citation(s)`;
+    },
+    seed: (d) => {
+      const e = retiredRegisterIn(d)[0];
+      const { name } = retiredNamesIn(d)[0];
+      edit(d, e.file, (b) => `${b}\nseeded by falsify.mjs: ${name}\n`);
+    },
+  },
+  {
+    name: 'CI-06/retired-constraints/the-register-shrinks-when-a-site-is-repaired',
+    gate: 'CI-06/retired-constraints',
+    what: 'a register entry standing ABOVE what its file holds, which is the stale direction CI06U_REGISTER’s property requires',
+    // The register SHRINKS ONLY. The day a site is repaired is the day its
+    // number moves, and an entry left standing is a repair nobody recorded. The
+    // seed raises the number rather than repairing the file, which is the same
+    // discrepancy from the other side and needs no judgement about which line
+    // in a live document may be deleted.
+    expect: (d) => {
+      const e = retiredRegisterIn(d)[0];
+      return `${e.file}: carries ${e.sites - 1} citation(s) of a retired constraint and RETIRED_REGISTER claims ${e.sites}`;
+    },
+    seed: (d) => {
+      const e = retiredRegisterIn(d)[0];
+      const path = e.file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const anchor = new RegExp(`('${path}',\\s*\\{\\s*sites:\\s*)${e.sites}\\b`);
+      edit(d, 'scripts/corpus/gates.mjs', (b) => once(b, anchor, `$1${e.sites + 1}`));
+    },
+  },
+  {
+    name: 'CI-06/retired-constraints/a-register-entry-that-names-nothing',
+    gate: 'CI-06/retired-constraints',
+    what: 'a register entry for a file that cites nothing at all, which is the other half of the shrink-only property',
+    expect: () => 'and no line in it cites a retired constraint',
+    seed: (d) => {
+      if (!existsSync(join(d, RETIRED_CLEAN_FILE))) {
+        throw new Error(`seed anchor not found: ${RETIRED_CLEAN_FILE}`);
+      }
+      const body = readFileSync(join(d, RETIRED_CLEAN_FILE), 'utf8');
+      for (const { name } of retiredNamesIn(d)) {
+        if (retiredNameRe(name).test(body)) {
+          throw new Error(
+            `seed anchor not found: ${RETIRED_CLEAN_FILE} already cites a retired constraint`,
+          );
+        }
+      }
+      if (retiredRegisterIn(d).some((e) => e.file === RETIRED_CLEAN_FILE)) {
+        throw new Error(`seed anchor not found: ${RETIRED_CLEAN_FILE} is already registered`);
+      }
+      edit(d, 'scripts/corpus/gates.mjs', (b) =>
+        once(
+          b,
+          'const RETIRED_REGISTER = new Map([',
+          'const RETIRED_REGISTER = new Map([\n  [\n    ' +
+            `'${RETIRED_CLEAN_FILE}',\n    { sites: 1, why: 'seeded by falsify.mjs' },\n  ],`,
+        ),
+      );
+    },
+  },
+  {
+    name: 'CI-06/retired-constraints/no-retired-name-parses-at-all',
+    gate: 'CI-06/retired-constraints',
+    what: 'a migration directory in which every dropped name is re-added, which empties the needle list and makes every assertion below it hold vacuously',
+    // RULE 2, AND THE ONE A SEEDED GATE OF THIS SHAPE MOST NEEDS. Every
+    // assertion this gate makes is a scan for a list of names, so a run that
+    // parses zero names reports a clean tree for the one reason that means
+    // nothing was checked. It must THROW, and an ERROR is a non-zero exit
+    // rather than a skip.
+    expect: () => 'no retired constraint name',
+    seed: (d) => {
+      const names = retiredNamesIn(d);
+      const number = nextFreeMigration(d);
+      writeFileSync(
+        join(d, `packages/db/migrations/${number}_falsify_readds_every_retired_name.sql`),
+        `${names
+          .map(({ name }) => `ALTER TABLE seeded_by_falsify ADD CONSTRAINT ${name} CHECK (true);`)
+          .join('\n')}\n`,
+      );
+    },
+  },
+  {
+    name: 'CI-06/retired-constraints/a-session-log-is-a-dated-record',
+    gate: 'CI-06/retired-constraints',
+    what: 'a retired constraint named in a dated session log, which records a position rather than describing the schema and must NOT be read',
+    // MUST NOT FIRE. A session log is a record of what was true on a date, and
+    // rewriting one destroys the only thing it is for: session 129's finding is
+    // stale as a claim about today and correct as a record, which is why
+    // session 132 refuted it in a new entry rather than editing the old one.
+    expect: () => 'PASS',
+    control: {
+      expect: (d) => `cites the retired constraint \`${retiredNamesIn(d)[0].name}\``,
+      seed: seedBareRetiredName,
+    },
+    seed: (d) => {
+      const { name } = retiredNamesIn(d)[0];
+      edit(d, latestSessionLogIn(d), (b) => `${b}\n<!-- seeded by falsify.mjs: ${name} -->\n`);
+    },
+  },
+  {
+    name: 'CI-06/retired-constraints/the-filename-and-the-suffix-are-not-citations',
+    gate: 'CI-06/retired-constraints',
+    what: 'a link to the superseding migration and a LONGER identifier built on the retired name, neither of which is a citation of it',
+    // MUST NOT FIRE, AND BOTH EDGES ARE LOAD-BEARING HERE RATHER THAN
+    // HYPOTHETICAL. One supersession names its replacement by SUFFIXING the
+    // retired name, so a loose right edge reports the LIVE constraint at every
+    // site naming it; and each supersession migration's own filename embeds the
+    // retired name after `supersede_`, so a loose left edge turns every link to
+    // that file, in INDEX, in ALLOCATION and in a dozen session logs, into a
+    // finding. This is the @vitest/browser-playwright lesson on a name that is
+    // a prefix of a live one.
+    expect: () => 'PASS',
+    control: {
+      expect: (d) => `cites the retired constraint \`${retiredNamesIn(d)[0].name}\``,
+      seed: seedBareRetiredName,
+    },
+    seed: (d) => {
+      const { name, file } = supersededByFilenameIn(d);
+      writeFileSync(
+        join(d, RETIRED_SEED_DOC),
+        `Superseded by [\`${file}\`](../../packages/db/migrations/${file}); the live ` +
+          `constraint is \`${name}_seeded_suffix\`.\n`,
+      );
+    },
+  },
+
   // -------------------------------------------------------------------------
   // CI-06/vg-inventory. Six cases, on CI-06o's rule that a gate asserting
   // several unrelated things and watched failing on one is taken on trust for
