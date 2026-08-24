@@ -8,9 +8,18 @@ under instruction, because a measurement taken on a tree the measurer is quietly
 is not a measurement.
 
 **Every figure below is anchored to `a0c7916`**, which was `origin/main` when this session
-opened and when it committed. `git diff --stat origin/main -- docs/plans docs/architecture`
-returns empty on the branch this file lands on, so the measured files are `main`'s and not
-this branch's.
+opened. `git diff --stat a0c7916 origin/main -- docs/plans docs/architecture` returns empty,
+so the measured files are `main`'s and not this branch's.
+
+**`main` moved once while this session ran, and the figures survive it.** `origin/main` was
+`a0c7916` at the start and `a33adef` at the last `git fetch`, the two commits between them
+being [`#233`](https://github.com/lam2-coder/meritfutures/pull/233), which changes two lines
+of [`decisions/ALLOCATION.md`](../decisions/ALLOCATION.md) and nothing else.
+**No measured file moved**, so every count here holds at `a33adef` as well. This is
+[P4 section 11 rule 3](../plans/P4-portal-and-site.md) applied rather than recited: twelve of
+the fourteen measurement sessions recorded a claim that was true at their base commit and
+false by the time they committed, and the only defence is to re-fetch and say which commits
+moved.
 
 ---
 
