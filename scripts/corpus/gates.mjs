@@ -6788,17 +6788,43 @@ const vgInventory = {
               }
             }
             // ADR-080 section 3's strictly-stronger half: the STEP or RULE must
-            // resolve too. A `name:` in that workflow, or a link on disk.
-            const steps = [...cell.matchAll(/\*\*`([^`]+)`\*\*/g)].map((m2) => m2[1]);
+            // resolve too, not just the job.
+            //
+            // THE FORMS ARE THE TABLE'S OWN AND WERE READ OFF IT RATHER THAN
+            // ASSUMED. A first version of this matched `**`x`**` and matched
+            // NOTHING, so the assertion was vacuous and reported a wired row as
+            // checked. The rows write `steps `a` and `b``, `step `a``, and
+            // `rule [`name`](path)`.
             const wfBody = read(`${WORKFLOW_DIR}/${wf[1]}`);
-            for (const step of steps) {
-              const onDisk = existsSync(join(ROOT, step));
-              if (!wfBody.includes(step) && !onDisk) {
+            let checked = 0;
+            for (const m2 of cell.matchAll(/\bsteps?\s+((?:`[^`]+`(?:\s*(?:,|and)\s*)?)+)/g)) {
+              for (const t of m2[1].matchAll(/`([^`]+)`/g)) {
+                checked++;
+                if (!wfBody.includes(t[1])) {
+                  findings.push(
+                    `${at}: ${row.id} names step \`${t[1]}\`, which is not a step of ${wf[1]}. ` +
+                      'ADR-080 section 3 makes the step resolve, not just the job',
+                  );
+                }
+              }
+            }
+            for (const m2 of cell.matchAll(/\brule\s+\[`([^`]+)`\]\(([^)\s]+)\)/g)) {
+              checked++;
+              const target = resolve(dirname(join(ROOT, STRATEGY_DOC)), m2[2]);
+              if (!existsSync(target)) {
                 findings.push(
-                  `${at}: ${row.id} names \`${step}\`, which is neither a step of ${wf[1]} nor ` +
-                    'a path on disk. ADR-080 section 3 makes the step resolve, not just the job',
+                  `${at}: ${row.id} names rule \`${m2[1]}\`, whose file does not resolve`,
                 );
               }
+            }
+            // Rule 2 on this leg: a Wired row naming neither a step nor a rule
+            // is a row whose strictly-stronger half asserted nothing.
+            if (checked === 0) {
+              findings.push(
+                `${at}: ${row.id} is Wired and names no step and no rule. ADR-080 section 3 ` +
+                  'makes this leg strictly stronger than 4.1 (a), and a row naming only a job ' +
+                  'is 4.1 (a) with extra words',
+              );
             }
           }
         }

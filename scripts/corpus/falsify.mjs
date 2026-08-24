@@ -1215,6 +1215,35 @@ const SEEDS = {
       });
     },
   },
+
+  // The same shape one table down, and the same reason: ADR-073 section 8 calls
+  // the absence assertion "the one an implementer is most likely to leave out,
+  // because it is the only one that fails on good news", and ADR-080 inherits
+  // it. VG-3 and VG-6 wait on `fastify` in the lockfile, so the commit that
+  // installs it reopens both rows on the day it lands.
+  //
+  // THE KEY IS ANCHORED AND THE NEAR-MISS IS A SCOPE CASE. `fastify-plugin`
+  // contains `fastify`; a substring probe would fire here and pass in exactly
+  // the same way as one that works, which is the @vitest/browser-playwright
+  // lesson. The pair is deliberate: this seed proves the probe FIRES, and
+  // `fastify-near-miss` proves it does not fire on the wrong package.
+  'CI-06/vg-inventory': {
+    what: "an activation condition's artifact ARRIVING: a real `fastify` key in the lockfile reopens VG-3 and VG-6",
+    real:
+      'VG-3 and VG-6 chained on CI-04 until 2026-08-24 and the chain EXPIRED when CI-04 got ' +
+      'an implemented leg (ADR-085). Their condition is a lockfile key precisely so that the ' +
+      'commit installing the framework reopens both rows on the day it lands rather than ' +
+      'whenever somebody rereads the table',
+    expect: () => 'HAS ARRIVED',
+    seed: (d) => {
+      edit(d, LOCKFILE, (b) => {
+        if (/(^|\s)'?fastify'?[@:]/m.test(b)) {
+          throw new Error('seed anchor not found: the lockfile already carries a fastify key');
+        }
+        return `${b}\n  fastify@5.12.1:\n    resolution: {integrity: sha512-seededByFalsify}\n`;
+      });
+    },
+  },
 };
 
 // =============================================================================
@@ -1748,7 +1777,162 @@ const firstAppManifest = (d) => {
   return `apps/${app}/package.json`;
 };
 
+// ---------------------------------------------------------------------------
+// CI-06/vg-inventory: readers for STRATEGY section 4.2
+// ---------------------------------------------------------------------------
+// Same bounding rule as 4.1's readers above, and the same stability discipline:
+// every selector below is chosen so that its own seed does not move it.
+const VG_HEADING = '### 4.2 The `VG` gates';
+
+const vgRowsIn = (d) => {
+  const body = readFileSync(join(d, STRATEGY_PATH), 'utf8');
+  const start = body.indexOf(VG_HEADING);
+  if (start === -1) throw new Error(`${STRATEGY_PATH}: "${VG_HEADING}" not found`);
+  const after = body.slice(start + VG_HEADING.length);
+  const end = after.search(/\n### /);
+  const rows = [];
+  for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
+    if (!line.startsWith('|')) continue;
+    const cells = line.trim().replace(/^\||\|$/g, '').split('|');
+    const m = /^\s*\*{0,2}`?(VG-\d{1,2})\b/.exec(cells[0] ?? '');
+    if (!m) continue;
+    rows.push({ id: m[1], closure: (cells[cells.length - 1] ?? '').trim() });
+  }
+  if (rows.length === 0) throw new Error('no VG rows parsed; the seed anchor has moved');
+  return rows;
+};
+
+/** The first row carrying a chained leg. Stable: no seed here removes a chain. */
+const chainedVgRow = (d) => {
+  const row = vgRowsIn(d).find((r) => /\*\*Chained,/.test(r.closure));
+  if (!row) throw new Error('no chained VG row; the chain-expiry seed has no anchor');
+  return row;
+};
+
+/** The first row carrying a waiting leg with an artifact. */
+const waitingVgRow = (d) => {
+  const row = vgRowsIn(d).find((r) => /\bwaiting,/i.test(r.closure) && /Artifact:/.test(r.closure));
+  if (!row) throw new Error('no waiting VG row with an artifact');
+  return row;
+};
+
+/** The first row carrying a Wired leg with a bolded step. */
+const wiredVgRow = (d) => {
+  // The forms are the table's own: `steps \`a\` and \`b\``, `step \`a\``. Read off
+  // the rows rather than assumed; a first version matched `**\`x\`**` and matched
+  // nothing, which made the gate's step assertion vacuous.
+  const row = vgRowsIn(d).find((r) => /\*\*Wired\b/.test(r.closure) && /\bsteps?\s+`/.test(r.closure));
+  if (!row) throw new Error('no wired VG row naming a step');
+  return row;
+};
+
+/** A waiting row whose artifact NO OTHER row waits on, so re-wording it empties a register entry. */
+const soleWaiterVgRow = (d) => {
+  const rows = vgRowsIn(d).filter((r) => /Artifact:\s*\*\*/.test(r.closure));
+  const art = (r) => /Artifact:\s*\*\*(.+?)\*\*/.exec(r.closure)?.[1] ?? '';
+  const counts = new Map();
+  for (const r of rows) counts.set(art(r), (counts.get(art(r)) ?? 0) + 1);
+  const row = rows.find((r) => counts.get(art(r)) === 1);
+  if (!row) throw new Error('every waiting artifact has more than one waiter; the seed has no anchor');
+  return row;
+};
+
+const LOCKFILE = 'pnpm-lock.yaml';
+
 const SCOPE_CASES = [
+  // -------------------------------------------------------------------------
+  // CI-06/vg-inventory. Six cases, on CI-06o's rule that a gate asserting
+  // several unrelated things and watched failing on one is taken on trust for
+  // the rest. The chain-expiry case is the one this gate exists for.
+  // -------------------------------------------------------------------------
+  {
+    name: 'CI-06/vg-inventory/no-disposition-at-all',
+    gate: 'CI-06/vg-inventory',
+    what: 'a VG row carrying no leg at all, which is ADR-080’s headline case',
+    expect: (d) => `${vgRowsIn(d)[0].id} carries no leg at all`,
+    seed: (d) => {
+      const row = vgRowsIn(d)[0];
+      edit(d, STRATEGY_PATH, (b) => once(b, row.closure, 'not decided yet'));
+    },
+  },
+  {
+    name: 'CI-06/vg-inventory/wired-names-no-step',
+    gate: 'CI-06/vg-inventory',
+    what: 'a Wired row whose named step resolves nowhere, which is ADR-080 section 3’s strictly-stronger half',
+    // THE HALF 4.1 DOES NOT ASSERT. A workflow link and a job key both keep
+    // resolving after a step is renamed, so a Wired row can go on naming a run
+    // that stopped existing.
+    expect: (d) => `${wiredVgRow(d).id} names step \`no-such-step\``,
+    seed: (d) => {
+      const row = wiredVgRow(d);
+      edit(d, STRATEGY_PATH, (b) =>
+        once(b, row.closure, row.closure.replace(/(\bsteps?\s+)`[^`]+`/, '$1`no-such-step`')),
+      );
+    },
+  },
+  {
+    name: 'CI-06/vg-inventory/chained-on-an-implemented-row',
+    gate: 'CI-06/vg-inventory',
+    what: 'a chain pointed at a 4.1 row that IS implemented, which is the expiry ADR-080 (d) rules and the reason this gate exists',
+    // THE CASE THE GATE WAS BUILT FOR. A chained leg is a claim about ANOTHER
+    // TABLE, so it goes stale with no edit to the row that carries it, and
+    // section 4.2 reads identically whether the rule discriminates or has
+    // stopped. CI-01 is chosen because it is implemented outright and no seed
+    // here touches it.
+    expect: (d) => `${chainedVgRow(d).id} is "Chained on CI-01"`,
+    seed: (d) => {
+      const row = chainedVgRow(d);
+      edit(d, STRATEGY_PATH, (b) =>
+        once(b, row.closure, row.closure.replace(/on `CI-\d{2}`/, 'on `CI-01`')),
+      );
+    },
+  },
+  {
+    name: 'CI-06/vg-inventory/condition-with-no-artifact',
+    gate: 'CI-06/vg-inventory',
+    what: 'a waiting leg naming no artifact, which is the ADR-073 form ADR-080 inherits',
+    expect: (d) => `${waitingVgRow(d).id} is waiting and names 0 artifacts`,
+    seed: (d) => {
+      const row = waitingVgRow(d);
+      edit(d, STRATEGY_PATH, (b) =>
+        once(b, row.closure, row.closure.replace(/Artifact:\s*\*\*.+?\*\*/, 'Artifact: soon')),
+      );
+    },
+  },
+  {
+    name: 'CI-06/vg-inventory/register-shrinks-when-an-artifact-is-re-ruled',
+    gate: 'CI-06/vg-inventory',
+    what: 'a register entry naming no live condition, which is the stale direction CI06U_REGISTER’s property requires',
+    // The register must SHRINK when ADR-080 re-rules an artifact into a path.
+    // Re-wording the row leaves the entry naming nothing, and a register that
+    // only ever grows stops being a decision and becomes a list.
+    expect: () => 'and no section 4.2 row waits on it',
+    // THE SEED MUST REMOVE THE LAST WAITER, not any waiter. `fastify` has TWO
+    // (VG-3 and VG-6), so re-wording one leaves the register entry live and the
+    // case fires on the wrong finding. Found by running it. `soleWaiterVgRow`
+    // picks a row whose artifact nothing else waits on.
+    seed: (d) => {
+      const row = soleWaiterVgRow(d);
+      edit(d, STRATEGY_PATH, (b) =>
+        once(b, row.closure, row.closure.replace(/Artifact:\s*\*\*(.+?)\*\*/, 'Artifact: **something else entirely**')),
+      );
+    },
+  },
+  {
+    name: 'CI-06/vg-inventory/fastify-near-miss',
+    gate: 'CI-06/vg-inventory',
+    what: 'fastify-plugin in the lockfile must NOT reopen a row waiting on fastify (the substring lesson)',
+    // MUST NOT FIRE. `fastify-plugin` contains `fastify`, so a probe matching on
+    // substring reports the artifact ARRIVED on a package that is not it, and
+    // passes in exactly the same way as one that works. This is the
+    // @vitest/browser-playwright case. Its control is the SEEDS entry for this
+    // gate, which seeds a REAL fastify key and requires HAS ARRIVED.
+    expect: () => 'PASS',
+    seed: (d) => {
+      edit(d, LOCKFILE, (b) => `${b}\n  fastify-plugin@5.0.1:\n    resolution: {integrity: sha512-seeded}\n`);
+    },
+  },
+
   // -------------------------------------------------------------------------
   // CI-06/gate-inventory. Five cases, because ONE SEED WATCHES ONE ASSERTION and
   // this gate makes four: the (a) job resolution in two halves, the (b) form
