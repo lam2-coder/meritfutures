@@ -113,6 +113,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-083](ADR-083.md) | the API is its own deployable, one codebase deployed twice, and Fastify runs it  (2026-08-23, status: accepted) |
 | [ADR-084](ADR-084.md) | `ScopedDb` gets a real client, the scope is a DECLARED registry, and one consequence of ADR-008 is superseded  (2026-08-23, status: accepted) |
 | [ADR-085](ADR-085.md) | `CI-04`'s artifact was never the Neon branch, and two `VG` chains expire the moment it says so  (2026-08-24, status: proposed) |
+| [ADR-087](ADR-087.md) | the publish decision resolves to a run that FINISHED and ran over THIS row, and the digest half stays open because it has no producer  (2026-08-24, status: proposed) |
 | [ADR-088](ADR-088.md) | the ADR registry and the session index are generated from the files they index, and the CLAIM table never will be  (2026-08-24, status: proposed) |
 | [ADR-089](ADR-089.md) | six Railway services, and `portal-api` was a fused process name rather than an origin label  (2026-08-24, status: proposed) |
 <!--/gen-->
