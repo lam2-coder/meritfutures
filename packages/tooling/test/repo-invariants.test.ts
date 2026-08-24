@@ -3,7 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 
-import { CHECKS, COVERAGE_NEEDLES, REPO_ROOT, needle } from '../checks/repo-invariants.mjs';
+import {
+  CHECKS,
+  COVERAGE_NEEDLES,
+  DEPLOYABLES,
+  REPO_ROOT,
+  needle,
+} from '../checks/repo-invariants.mjs';
 
 // =============================================================================
 // EACH INVARIANT IS WATCHED FAILING BEFORE IT IS TRUSTED
@@ -62,7 +68,12 @@ function cleanTree(): string {
     'packages/rules-engine/src/floor.ts',
     'export const floorAt = (n: number): number => (n < 0 ? 0 : n);\n',
   );
-  for (const app of ['site', 'portal', 'admin', 'worker']) {
+  // RI-04's OWN LIST, NOT A SECOND COPY OF IT. This read `['site', 'portal',
+  // 'admin', 'worker']` while DEPLOYABLES read the same four, so the two agreed
+  // by coincidence until ADR-083 added `apps/api` to the tree and neither list
+  // learned about it. A fixture that maintains its own copy of the thing under
+  // test cannot fail when that thing goes stale; it just goes stale in step.
+  for (const app of DEPLOYABLES) {
     write(root, `apps/${app}/package.json`, JSON.stringify({ name: `@merit/${app}` }));
   }
   // RI-06's two inputs. The fixture registers one rule and attaches it, which is
