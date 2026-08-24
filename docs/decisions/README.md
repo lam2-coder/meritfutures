@@ -121,6 +121,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-091](ADR-091.md) | analytics is granted `rule_states`, because denying it FORCES the attack the denial cites, and M13's claim that the thresholds are unreachable does not survive `engine_gates`  (2026-08-24, status: proposed) |
 | [ADR-092](ADR-092.md) | `schema.ts` and `scope.ts` are transcribed ONCE PER MODULE, the owner is the TABLE rather than the module, and the queue is the TYPE CHECKER rather than a document  (2026-08-24, status: accepted) |
 | [ADR-093](ADR-093.md) | auth is P3's, because the phase whose title already says "identity" is the one whose own stated contents cannot ship without it  (2026-08-24, status: accepted) |
+| [ADR-094](ADR-094.md) | a transcription reads a table AS OF THE LAST MIGRATION, and the drift assertion becomes a REPLAY whose vocabulary is one member wide and whose default is FAIL  (2026-08-24, status: accepted) |
 | [ADR-096](ADR-096.md) | an unauthenticated public read goes over HTTP to the public API, and `apps/site` never links `packages/db` at all  (2026-08-24, status: accepted) |
 | [ADR-097](ADR-097.md) | OUTCOME 1 OF THE THREE. The vocabulary ALREADY HAS the term, it is `outside-loader-boundary`, and `GS-143` and `GS-144` are MIS-FILED. No seventh term, no row leaves section 39, and the closed six stay closed  (2026-08-24, status: accepted) |
 <!--/gen-->
