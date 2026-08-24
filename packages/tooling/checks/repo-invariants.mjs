@@ -318,7 +318,7 @@ const ri03 = {
 };
 
 // -----------------------------------------------------------------------------
-// RI-04  The four deployables are four packages
+// RI-04  Each deployable is its own package
 // -----------------------------------------------------------------------------
 // ADR-012 puts the admin console on a separate apex domain, SECURITY treats one
 // owned admin as total loss, and STRATEGY section 2 chose Playwright over
@@ -327,17 +327,42 @@ const ri03 = {
 // application with three route groups. That choice is invisible for months, is
 // a re-platform to undo, and it silently converts a security control into a URL
 // convention.
-const DEPLOYABLES = ['site', 'portal', 'admin', 'worker'];
+//
+// `api` IS HERE BECAUSE ADR-083 RULED IT A FIFTH DEPLOYABLE, and its absence
+// from this list between sessions 144 and 147 is the exact failure mode the
+// check exists to prevent, mirrored: RI-04 reported PASS while asserting
+// nothing whatsoever about apps/api. ADR-083 section 3 leans on this check by
+// name -- "RI-04 in repo-invariants.mjs refuses an app that depends on an app"
+// -- as the mechanical reason the API cannot live inside one of the three UI
+// surfaces, so a list that omitted it left that argument unenforced against the
+// one deployable it was written about. The order matches OVERVIEW section 2's
+// `subgraph Merit`: Site, Portal, Admin, API, Worker.
+// EXPORTED SO THE TEST'S SYNTHETIC FIXTURE IS BUILT FROM THIS LIST rather than
+// from a second copy of it. The fixture held its own `['site', 'portal',
+// 'admin', 'worker']`, so adding `api` here turned the fixture's clean-tree
+// case red -- which is the drift working as designed, caught one layer down.
+// Two lists is the defect; one list read twice is the fix.
+export const DEPLOYABLES = ['site', 'portal', 'admin', 'api', 'worker'];
 
 /** @type {Invariant} */
 const ri04 = {
   id: 'RI-04',
-  title: 'site, portal, admin and worker are four separate deployables',
+  // COMPUTED FROM THE LIST, NOT WRITTEN BESIDE IT. The title read "site, portal,
+  // admin and worker are four separate deployables" while the list held four,
+  // so adding a fifth would have left a hand-maintained count contradicting the
+  // thing it names -- which is precisely what RI-05's `covers` calls "a
+  // hand-maintained count in a different costume, and it drifts the same way".
+  // Nothing reads this file as text, so a computed title costs nothing here;
+  // the test that names each check uses `c.title` only as a label.
+  title: `${DEPLOYABLES.join(', ')} are ${DEPLOYABLES.length} separate deployables`,
   covers:
-    'each of the four has its own directory under apps/ with its own ' +
+    'each entry in DEPLOYABLES has its own directory under apps/ with its own ' +
     'package.json and a distinct package name, and no app depends on another ' +
     'app. It does NOT check the deployment configuration, which does not exist ' +
-    'yet: it checks the shape that makes a separate deployment possible.',
+    'yet: it checks the shape that makes a separate deployment possible. It ' +
+    'also does NOT check that apps/ holds nothing BEYOND this list, so a sixth ' +
+    'application directory added without an entry here is invisible to it, ' +
+    'exactly as apps/api was.',
   run(root) {
     /** @type {string[]} */
     const findings = [];

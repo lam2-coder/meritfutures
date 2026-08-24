@@ -48,7 +48,7 @@
 // =============================================================================
 
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join, dirname, relative, resolve, extname } from 'node:path';
+import { join, dirname, relative, resolve, extname, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -892,6 +892,52 @@ const ci06f = {
 // rows in the EC and GS registries gives 22 and 301; counting DISTINCT
 // IDENTIFIERS gives the corpus's 140 and 257. Both are "a script deriving it"
 // and one is wrong, so the query is written down beside the key.
+// -----------------------------------------------------------------------------
+// ADR-088's three helpers, beside the two queries that use them.
+// -----------------------------------------------------------------------------
+// The ADR ENTRY set is narrower than `REGISTRIES`' `decisions` predicate, which
+// also admits `gates/`. A gate closure is a record of a signing session and has
+// never had a row in the ADR table; including it here would invent eight rows.
+const adrEntryFiles = () =>
+  markdownFiles()
+    .filter((f) => /^docs\/decisions\/ADR-(?:\d{3}|D\d+)\.md$/.test(f))
+    .sort();
+
+// The same predicate `REGISTRIES` uses, with its `\d{2,}` intact: a two-digit
+// pattern silently stopped recognising session files at 99 and the cap was
+// invisible for 99 sessions.
+//
+// SORTED BY (date, session number) AND NOT BY FILENAME, because filenames sort
+// `session-9` after `session-10` and the table would reorder itself the first
+// time it was generated.
+const sessionEntryFiles = () =>
+  markdownFiles()
+    .filter((f) => /^docs\/sessions\/\d{4}-\d{2}-\d{2}-session-\d{2,}\.md$/.test(f))
+    .sort((a, b) => {
+      const key = (f) => {
+        const m = /(\d{4}-\d{2}-\d{2})-session-(\d+)\.md$/.exec(f);
+        return [m[1], Number(m[2])];
+      };
+      const [da, na] = key(a);
+      const [db, nb] = key(b);
+      return da === db ? na - nb : da < db ? -1 : 1;
+    });
+
+// `ADR-D1` carries no three-digit number. It is pinned immediately after
+// `ADR-015`, which is where the registry has carried it since it was written;
+// sorting it to either end would move a row for no reason anybody asked for.
+const adrSortKey = (id) => (id === 'ADR-D1' ? 15.5 : Number(id.slice(4)));
+
+// THE LINK TEXT COMES FROM THE FILENAME AND NEVER FROM THE HEADING. The headings
+// carry variants the table has never carried: two read `Session 95, continued`
+// and several read `Session 134 (P2-b)`, while every one of the 183 rows reads
+// `<date> - Session <n>`. The filename is the one canonical source for both
+// halves of the link, so the label cannot drift when a heading style does.
+const sessionLabel = (file) => {
+  const m = /(\d{4}-\d{2}-\d{2})-session-(\d+)\.md$/.exec(file);
+  return `${m[1]} - Session ${Number(m[2])}`;
+};
+
 const SPAN_QUERIES = {
   // DISTINCT NUMBERED IDENTIFIERS, read from the entry headings rather than by
   // counting files (ADR-043). Counting files would count ADR-D1, which is outside
@@ -950,6 +996,95 @@ const SPAN_QUERIES = {
   // found wrong. The E2 set grows whenever a money-path migration lands, which
   // is precisely when nobody is thinking about a sentence in STATE.
   e2_files: () => sqlFiles().filter((f) => read(f).includes('E2 READ: MONEY PATH')).length,
+
+  // ---------------------------------------------------------------------------
+  // ADR-088. THE TWO REGISTRY TABLES, DERIVED FROM THE FILES THEY INDEX.
+  // ---------------------------------------------------------------------------
+  // EVERY OTHER SPAN IN THIS MAP RETURNS A SCALAR. These two return a TABLE, and
+  // nothing in the mechanism had to change to allow it: `spansIn` already matches
+  // with the `s` flag so a span body may span lines, and `generate` writes
+  // `String(query())` verbatim. A multi-line span was expressible for as long as
+  // the mechanism has existed and no query had used it.
+  //
+  // WHY THESE TWO. Measured over the last 25 FIRST-PARENT merges, which is one
+  // merge per session: `docs/sessions/README.md` is touched by 25 of 25 and
+  // `docs/decisions/README.md` by 10 of 25. They are the first and third most
+  // contended files in the tree, and a row transcribed by hand once per session
+  // is ADR-034's subject exactly. Session 149 found 27 ADR rows carrying a stale
+  // status word, four of them signed the day before.
+  //
+  // THE STATUS COLUMN CANNOT DRIFT AFTER THIS, because it is no longer copied.
+  // `CI-06r` compares an ADR heading with its own body and says so in its own
+  // covers line: it "COMPARES A FILE WITH ITSELF AND CAN CHECK NEITHER HALF
+  // AGAINST THE GATE RECORD". Nothing compared that heading to the row
+  // transcribing it, and now nothing needs to.
+  //
+  // THE ROW IS THE HEADING, WHICH IS ONLY LOSSLESS BECAUSE TEN HEADINGS MOVED
+  // FIRST. Five README rows carried a richer summary than the ADR's own heading
+  // and five differed in capitalisation; ADR-088 authorises the ten edits that
+  // make the heading say what its row said. The eleventh differing row, ADR-080,
+  // needed no edit: there the heading was already the majority convention and it
+  // is the row that adopts it.
+  //
+  // ORDER IS NUMERIC ASCENDING, and that moves seven rows plus `ADR-D1`. The
+  // order it replaces is order-of-append, which is not an order a reader can scan
+  // for a number. `ADR-D1` carries no three-digit number and is pinned where the
+  // registry has always carried it, immediately after `ADR-015`, by the rule
+  // below rather than by accident.
+  // THE SPAN OWNS THE HEADER AND DELIMITER ROWS TOO, not just the body, and that
+  // is `CI-06v`'s doing rather than a preference. A `<!--gen:` line terminates a
+  // table for that gate's parser, so an opener sitting between `|---|---|` and
+  // the first row leaves the body as an orphan fragment: "85 consecutive pipe
+  // lines carry no delimiter row, so they render as prose and no table gate reads
+  // them". The whole table inside the span is the only arrangement where the
+  // delimiter and its rows cannot be separated by the generator.
+  adr_registry: () => {
+    const rows = adrEntryFiles().map((file) => {
+      const heading = read(file).split('\n', 1)[0];
+      const m = /^## (ADR-[0-9A-Za-z]+): (.*)$/.exec(heading);
+      if (!m) throw new Error(`${file}: first line is not an ADR heading`);
+      return { file: basename(file), id: m[1], title: m[2] };
+    });
+    rows.sort((a, b) => adrSortKey(a.id) - adrSortKey(b.id));
+    const body = rows.map((r) => `| [${r.id}](${r.file}) | ${r.title} |`).join('\n');
+    return `\n| ADR | Title |\n|---|---|\n${body}\n`;
+  },
+
+  // ADR-088, and the key is ADR-064's, which is signed: "identity is
+  // `(log file, section heading)`". So a row is one `##` SECTION, not one file.
+  // 145 files hold 185 sections, and before this span the table carried 183 rows:
+  // session 95's second and third sections had never been indexed at all.
+  //
+  // THE TEXT COMES FROM THE SECTION'S OWN `<!--index:` LINE AND NEVER FROM THE
+  // HEADING. Checked at source before this was written: session 49's four rows
+  // differ from its four headings in every one, and carry text no heading has, so
+  // generating from headings would rewrite 183 rows to say less. The marker is
+  // deliberately NOT a `gen:` span: it is an input to one, `spansIn` cannot see
+  // it, and `CI-06t` does not count it.
+  //
+  // A SECTION WITH NO MARKER IS A FINDING RATHER THAN A SKIPPED ROW, because a
+  // silently omitted row is the defect this span exists to end.
+  session_entries: () => {
+    const rows = [];
+    for (const file of sessionEntryFiles()) {
+      const lines = read(file).split('\n');
+      let heading = null;
+      for (const line of lines) {
+        if (line.startsWith('## ')) {
+          if (heading) throw new Error(`${file}: section "${heading}" has no <!--index: --> line`);
+          heading = line.slice(3).trim();
+          continue;
+        }
+        const m = /^<!--index:\s*(.*?)\s*-->$/.exec(line);
+        if (!m) continue;
+        if (!heading) throw new Error(`${file}: an index line precedes any section heading`);
+        rows.push(`| [${sessionLabel(file)}](${basename(file)}) | ${m[1]} |`);
+        heading = null;
+      }
+      if (heading) throw new Error(`${file}: section "${heading}" has no <!--index: --> line`);
+    }
+    return `\n| | |\n|---|---|\n${rows.join('\n')}\n`;
+  },
 };
 
 // Keys STRATEGY names as derivable that this runner deliberately does not
@@ -1018,7 +1153,7 @@ const ci06g = {
           continue;
         }
         const actual = String(query());
-        if (content.trim() !== actual) {
+        if (content.trim() !== actual.trim()) {
           findings.push(
             `${file}: span "${name}" reads "${content.trim()}", its query gives "${actual}". ` +
               'Run: node scripts/corpus/gates.mjs generate',
@@ -1047,7 +1182,13 @@ function generate() {
       const query = SPAN_QUERIES[name];
       if (!query) continue;
       const actual = String(query());
-      if (content.trim() === actual) continue;
+      // COMPARED TRIMMED, WRITTEN VERBATIM. ADR-088's two table spans return a
+      // value that OPENS AND CLOSES WITH A NEWLINE, so that the rows sit on
+      // their own lines under the table's delimiter row instead of the first row
+      // being welded to the opener comment. Collapsing that layout detaches the
+      // body from its `|---|---|` and `CI-06v` reports the whole table as an
+      // orphan fragment, which is how this was found.
+      if (content.trim() === actual.trim()) continue;
       next = next.replace(full, `<!--gen:${name}-->${actual}<!--/gen-->`);
       console.log(`${file}: ${name} ${content.trim()} -> ${actual}`);
       changed++;
@@ -4098,6 +4239,13 @@ const CI06U_REGISTER = new Map([
   // `CI-06/session-index-matches-sections`, is not written. The two land together
   // or neither does.
   [
+    // `2026-08-20 - session 95` JOINED THIS LIST WHEN THE TABLE BECAME GENERATED
+    // (ADR-088) and it is not a new defect. That file has held three `##`
+    // sections since the day it was written and the hand-maintained table
+    // carried ONE row for it, so two of its sections were unindexed and its key
+    // was not a duplicate. Generating the table from the sections surfaces the
+    // other two, and a file sharing one path across several sections is exactly
+    // the ADR-061 T3 shape the other twenty keys here already have.
     'docs/sessions/README.md',
     [
       '2026-08-16 - session 31',
@@ -4119,6 +4267,7 @@ const CI06U_REGISTER = new Map([
       '2026-08-18 - session 58',
       '2026-08-18 - session 59',
       '2026-08-19 - session 75',
+      '2026-08-20 - session 95',
     ],
   ],
 ]);
