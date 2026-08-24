@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Trader dashboard, payout center, certificates, KYC status, referrals. Railway service: portal-api.",
+  "description": "Trader dashboard, payout center, certificates, KYC status, referrals. Railway service: portal.",
   "exports": {
     ".": "./src/index.ts"
   },

@@ -4,7 +4,7 @@ import { SERVICE, main } from '../src/index.js';
 
 // CI-02, the `unit` project.
 test('portal deploys as its own Railway service', () => {
-  expect(SERVICE).toBe('portal-api');
+  expect(SERVICE).toBe('portal');
 });
 
 test('the deployable starts', () => {
