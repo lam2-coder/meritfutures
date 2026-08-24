@@ -529,6 +529,14 @@ module measurement in the wave needs at least one.
    it is the single decision that most changes how many of the remaining phases can run concurrently. It
    is not a planning session's to take.
 
+   **ANSWERED by [ADR-092](../decisions/ADR-092.md), which took it as a ruling and not as a plan's
+   choice, and section 8 item 4 is the dispatch consequence: TEN OF THE TEN MEASURED TRANSCRIPTION SLICES
+   MAY BE DISPATCHED CONCURRENTLY**, with exactly one intersecting pair,
+   [M5-1](../sessions/2026-08-24-session-159.md) and [M20-a](../sessions/2026-08-24-session-169.md) over
+   four wallet tables, **whose second merger rebases four rows out**. That is a loud cost paid once rather
+   than a design question. **It carries the same precondition section 8's amendment states**, ADR-092
+   section 5's `DDL_NAMES` line, which is `P4-a`'s and is not in the tree as this is written.
+
 2. **Whether a gate reconciles a module plan's endpoint table against API_CONTRACT.**
    [Session 165](../sessions/2026-08-24-session-165.md) proposed it and declined to write it, on the ground
    that *"writing it turns the corpus red on however many other modules share the defect, and measuring
