@@ -70,10 +70,10 @@
 // abstraction both harness headers refuse.
 // =============================================================================
 
-import { buildCalendarSlice } from '../src/index.js';
-import type { CalendarSlice, DailyMark, ResolvedPlan, TradingDay } from '../src/index.js';
-import type { DaySequence, DailyMark as GeneratedMark } from './generators/day-input.js';
-import type { MaterializedPlan } from './generators/plan-config.js';
+import { buildCalendarSlice } from '../src/index.ts';
+import type { CalendarSlice, DailyMark, ResolvedPlan, TradingDay } from '../src/index.ts';
+import type { DaySequence, DailyMark as GeneratedMark } from './generators/day-input.ts';
+import type { MaterializedPlan } from './generators/plan-config.ts';
 
 /**
  * A published plan projected back to the shape the generator reads.

@@ -22,8 +22,8 @@
 // argument; this file just declares the route.
 // =============================================================================
 
-import { defineRoutes } from '../registry.js';
-import { LIVENESS_PATH } from '../surface.js';
+import { defineRoutes } from '../registry.ts';
+import { LIVENESS_PATH } from '../surface.ts';
 
 export default defineRoutes({
   name: 'health',

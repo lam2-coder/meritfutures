@@ -5,7 +5,7 @@ import {
   formatCents,
   formatOptionalBasisPoints,
   formatOptionalCents,
-} from '../src/format/money.js';
+} from '../src/format/money.ts';
 
 // =============================================================================
 // M4-R: the formatter is exact, and it refuses what it cannot render exactly

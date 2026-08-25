@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 
-import { derivedPaths } from '../src/routes/paths.js';
-import { geoNotice } from '../src/routes/geo.js';
-import { sizeRow, sizeView, versionView } from './fixtures.js';
+import { derivedPaths } from '../src/routes/paths.ts';
+import { geoNotice } from '../src/routes/geo.ts';
+import { sizeRow, sizeView, versionView } from './fixtures.ts';
 
 import type { Cents } from '@merit/rules-engine';
 

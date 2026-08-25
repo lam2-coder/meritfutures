@@ -97,10 +97,10 @@
 import fc from 'fast-check';
 import { beforeAll, describe, expect, test } from 'vitest';
 
-import { applySettlement, type ResolvedPlan } from '../src/index.js';
-import { CORE_50K, MERIT_RAPID_50K } from './fixtures-in-code.js';
-import { materializedFrom } from './generator-bridge.js';
-import { foldSettlements, settlementFoldArbitrary } from './settlement-fold.js';
+import { applySettlement, type ResolvedPlan } from '../src/index.ts';
+import { CORE_50K, MERIT_RAPID_50K } from './fixtures-in-code.ts';
+import { materializedFrom } from './generator-bridge.ts';
+import { foldSettlements, settlementFoldArbitrary } from './settlement-fold.ts';
 
 // Enough runs that a settlement, a reset over a POSITIVE count and an eval pass
 // are each visited many times over. `REACHABILITY` below is what turns that from

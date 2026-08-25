@@ -60,11 +60,11 @@
 import fc from 'fast-check';
 import { beforeAll, describe, expect, test } from 'vitest';
 
-import { applySettlement, type Cents, type ResolvedPlan } from '../src/index.js';
-import { CORE_50K, MERIT_RAPID_50K } from './fixtures-in-code.js';
-import { materializedFrom } from './generator-bridge.js';
-import { foldSettlements, settlementFoldArbitrary } from './settlement-fold.js';
-import type { SsRuleId } from './generators/validate-settlement-sequence.js';
+import { applySettlement, type Cents, type ResolvedPlan } from '../src/index.ts';
+import { CORE_50K, MERIT_RAPID_50K } from './fixtures-in-code.ts';
+import { materializedFrom } from './generator-bridge.ts';
+import { foldSettlements, settlementFoldArbitrary } from './settlement-fold.ts';
+import type { SsRuleId } from './generators/validate-settlement-sequence.ts';
 
 const RUNS = 300;
 // Larger than PT-02's, and for a reason that was measured rather than guessed:

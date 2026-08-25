@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { SERVICE, main } from '../src/index.js';
+import { SERVICE, main } from '../src/index.ts';
 
 // CI-02, the `unit` project.
 test('portal deploys as its own Railway service', () => {

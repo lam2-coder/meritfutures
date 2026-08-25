@@ -12,8 +12,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { buildPopulation } from '@merit/rithmic';
-import { runHarness, sequenceOf, toCalendarSlice, asTradingDay, TrialError } from '../src/index.js';
-import type { HarnessRunInput } from '../src/index.js';
+import { runHarness, sequenceOf, toCalendarSlice, asTradingDay, TrialError } from '../src/index.ts';
+import type { HarnessRunInput } from '../src/index.ts';
 import {
   CANONICAL_BEHAVIOUR,
   CANONICAL_CALIBRATION,
@@ -27,7 +27,7 @@ import {
   CANONICAL_SPECS,
   SIM_PLAN,
   SIM_PLAN_NO_EVAL,
-} from './canonical.js';
+} from './canonical.ts';
 
 const RUN: HarnessRunInput = {
   seed: CANONICAL_SEED,

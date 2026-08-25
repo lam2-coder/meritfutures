@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
-import { COPY_KEYS, MissingCopyBlockError, copyBlock } from '../src/copy/copy-block.js';
-import type { PinnedPlanCopy } from '../src/copy/copy-block.js';
+import { COPY_KEYS, MissingCopyBlockError, copyBlock } from '../src/copy/copy-block.ts';
+import type { PinnedPlanCopy } from '../src/copy/copy-block.ts';
 
 // =============================================================================
 // INV-M4-08: no rule text is authored in the portal

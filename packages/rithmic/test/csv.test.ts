@@ -7,7 +7,7 @@ import {
   renderCsv,
   CsvRenderError,
   DECLARED_CSV_QUIRKS,
-} from '../src/simulator/csv.js';
+} from '../src/simulator/csv.ts';
 
 // CI-02, the `unit` project.
 //

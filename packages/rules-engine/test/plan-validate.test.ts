@@ -25,9 +25,9 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import { resolvePlan } from '../src/plan/resolve.js';
-import { validatePlan } from '../src/plan/validate.js';
+import { advanceDay } from '../src/day/advance.ts';
+import { resolvePlan } from '../src/plan/resolve.ts';
+import { validatePlan } from '../src/plan/validate.ts';
 import type {
   BreachDetectedEvent,
   Cents,
@@ -41,10 +41,10 @@ import type {
   RuleState,
   SettlementFact,
   ValidationResult,
-} from '../src/types.js';
+} from '../src/types.ts';
 
-import { validatePlan as oracleValidatePlan } from './generators/validate-plan.js';
-import type { MaterializedPlan } from './generators/plan-config.js';
+import { validatePlan as oracleValidatePlan } from './generators/validate-plan.ts';
+import type { MaterializedPlan } from './generators/plan-config.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -52,7 +52,7 @@ import {
   day,
   fundedPrior,
   mark,
-} from './fixtures-in-code.js';
+} from './fixtures-in-code.ts';
 
 // -----------------------------------------------------------------------------
 // The registry, exhaustive by construction
@@ -118,7 +118,7 @@ import {
   c,
   coreRules,
   coreSize,
-} from './published-plans-in-code.js';
+} from './published-plans-in-code.ts';
 
 /** The whole lineup's shape: one rules jsonb, N size rows. */
 const check = (

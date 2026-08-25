@@ -43,8 +43,8 @@ import type {
   DailyLossLimit,
   Drawdown,
   MaterializedPlan,
-} from './plan-config.js';
-import type { CvId } from './validate-plan.js';
+} from './plan-config.ts';
+import type { CvId } from './validate-plan.ts';
 
 /**
  * The four ruled sizes, from M01 Appendix A: "25K is 2,500,000c, 50K is

@@ -13,11 +13,11 @@
 
 import { expect, test } from 'vitest';
 
-import { EngineInvariantError } from '../src/errors.js';
-import { capForOrdinal, clampPayout, ordinalForNextPayout } from '../src/payout/clamp.js';
-import type { Cents, ResolvedPlan, RuleState } from '../src/types.js';
-import { CORE_50K, fundedPrior, withCapSchedule } from './fixtures-in-code.js';
-import { reU } from './rule-coverage.js';
+import { EngineInvariantError } from '../src/errors.ts';
+import { capForOrdinal, clampPayout, ordinalForNextPayout } from '../src/payout/clamp.ts';
+import type { Cents, ResolvedPlan, RuleState } from '../src/types.ts';
+import { CORE_50K, fundedPrior, withCapSchedule } from './fixtures-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 /**
  * A funded state carrying a stated withdrawable.

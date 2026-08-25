@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { describeDiff, diffEndState, diffEvents, snakeToCamel } from '../src/index.js';
+import { describeDiff, diffEndState, diffEvents, snakeToCamel } from '../src/index.ts';
 
 // =============================================================================
 // THE PROOF THAT THE LOADER FAILS WHEN AN EXPECTED END STATE DOES NOT MATCH

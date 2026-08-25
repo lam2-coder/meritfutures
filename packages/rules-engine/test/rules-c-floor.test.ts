@@ -16,12 +16,12 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay, initialState } from '../src/day/advance.js';
-import { resolvePlan } from '../src/plan/resolve.js';
-import { validatePlan } from '../src/plan/validate.js';
-import { advanceFloor, initialFloorCents } from '../src/day/floor.js';
-import { EngineInvariantError } from '../src/errors.js';
-import type { DayOutput, DrawdownType, ResolvedPlan, RuleState } from '../src/types.js';
+import { advanceDay, initialState } from '../src/day/advance.ts';
+import { resolvePlan } from '../src/plan/resolve.ts';
+import { validatePlan } from '../src/plan/validate.ts';
+import { advanceFloor, initialFloorCents } from '../src/day/floor.ts';
+import { EngineInvariantError } from '../src/errors.ts';
+import type { DayOutput, DrawdownType, ResolvedPlan, RuleState } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -32,9 +32,9 @@ import {
   mark,
   withStaticDrawdown,
   withoutFloorLock,
-} from './fixtures-in-code.js';
-import { CORE_50K_SIZE, CORE_FUNDED, coreRules } from './published-plans-in-code.js';
-import { reU } from './rule-coverage.js';
+} from './fixtures-in-code.ts';
+import { CORE_50K_SIZE, CORE_FUNDED, coreRules } from './published-plans-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 /** One funded day, folded. Every test in this file is one of these. */
 function fold(

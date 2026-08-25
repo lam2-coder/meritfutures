@@ -54,8 +54,8 @@
 // =============================================================================
 
 import type { Cents } from '@merit/rules-engine';
-import type { DataTrust } from './data-trust.js';
-import { type Figure, type Reading, authoritative, figure } from './figure.js';
+import type { DataTrust } from './data-trust.ts';
+import { type Figure, type Reading, authoritative, figure } from './figure.ts';
 
 /** The intraday movement implied by the indicative feed. Signed. */
 export interface IndicativeMovement {

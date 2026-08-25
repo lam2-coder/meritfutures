@@ -25,9 +25,9 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import { isTradedDay, isWinDay } from '../src/day/counters.js';
-import type { CalendarDay, DailyMark, DayOutput } from '../src/types.js';
+import { advanceDay } from '../src/day/advance.ts';
+import { isTradedDay, isWinDay } from '../src/day/counters.ts';
+import type { CalendarDay, DailyMark, DayOutput } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -36,8 +36,8 @@ import {
   day,
   fundedPrior,
   mark,
-} from './fixtures-in-code.js';
-import { reU } from './rule-coverage.js';
+} from './fixtures-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 const OPEN_SESSION: CalendarDay = {
   tradingDay: day('2026-11-03'),

@@ -65,18 +65,18 @@
 import fc from 'fast-check';
 import { beforeAll, describe, expect, test } from 'vitest';
 
-import { advanceDay } from '../src/index.js';
-import type { Cents, ResolvedPlan, RuleState, SettlementFact, TradingDay } from '../src/index.js';
+import { advanceDay } from '../src/index.ts';
+import type { Cents, ResolvedPlan, RuleState, SettlementFact, TradingDay } from '../src/index.ts';
 import {
   ACCOUNT_OPENED_ON,
   CORE_50K,
   ENGINE_VERSION,
   MERIT_RAPID_50K,
   withStaticDrawdown,
-} from './fixtures-in-code.js';
-import { daySequenceArbitrary } from './generators/day-sequence.js';
-import type { DaySequence, DailyMark as GeneratedMark } from './generators/day-input.js';
-import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.js';
+} from './fixtures-in-code.ts';
+import { daySequenceArbitrary } from './generators/day-sequence.ts';
+import type { DaySequence, DailyMark as GeneratedMark } from './generators/day-input.ts';
+import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.ts';
 
 // Enough runs that a pass, a settlement and a graduation are each visited many
 // times over. `REACHABILITY` below is what turns that from an assumption into a

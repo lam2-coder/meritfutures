@@ -19,9 +19,9 @@ import {
   HARNESS_VERSION,
   provenanceFor,
   ProvenanceError,
-} from '../src/index.js';
-import type { CalibrationSource } from '../src/index.js';
-import { CANONICAL_CALIBRATION, CANONICAL_ENGINE_VERSION, CANONICAL_SEED } from './canonical.js';
+} from '../src/index.ts';
+import type { CalibrationSource } from '../src/index.ts';
+import { CANONICAL_CALIBRATION, CANONICAL_ENGINE_VERSION, CANONICAL_SEED } from './canonical.ts';
 
 const withBands = (edit: (source: CalibrationSource) => CalibrationSource): CalibrationSource =>
   edit(CANONICAL_CALIBRATION);

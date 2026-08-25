@@ -8,8 +8,8 @@ import {
   buildServer,
   defineRoutes,
   discoverRouteModules,
-} from '../src/index.js';
-import type { RouteModule } from '../src/index.js';
+} from '../src/index.ts';
+import type { RouteModule } from '../src/index.ts';
 
 // CI-02, the `unit` project.
 //

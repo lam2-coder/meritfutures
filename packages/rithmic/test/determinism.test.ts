@@ -4,10 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
-import { canonicalInput, CANONICAL_POPULATION_SPEC, CANONICAL_SEED } from './canonical.js';
-import { renderRun } from '../src/simulator/emit.js';
-import { buildPopulation } from '../src/simulator/population.js';
-import { simulate } from '../src/simulator/session.js';
+import { canonicalInput, CANONICAL_POPULATION_SPEC, CANONICAL_SEED } from './canonical.ts';
+import { renderRun } from '../src/simulator/emit.ts';
+import { buildPopulation } from '../src/simulator/population.ts';
+import { simulate } from '../src/simulator/session.ts';
 
 // CI-02, the `unit` project.
 //

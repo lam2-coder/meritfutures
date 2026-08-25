@@ -35,7 +35,7 @@
 // on, because picking one would hand an account a floor rule nobody published.
 // =============================================================================
 
-import { EngineInvariantError } from '../errors.js';
+import { EngineInvariantError } from '../errors.ts';
 import type {
   BasisPoints,
   CapScheduleStep,
@@ -53,7 +53,7 @@ import type {
   PublishedDailyLossLimit,
   PublishedDrawdown,
   ResolvedPlan,
-} from '../types.js';
+} from '../types.ts';
 
 /**
  * CV-01's narrowing, and the only place the three-member union becomes the

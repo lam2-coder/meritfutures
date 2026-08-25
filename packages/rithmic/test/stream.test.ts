@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest';
 
-import { canonicalInput, CANONICAL_SEED } from './canonical.js';
-import { renderRun } from '../src/simulator/emit.js';
-import { simulate } from '../src/simulator/session.js';
-import { foldStream, sampleTicks, streamRun, StreamError } from '../src/simulator/stream.js';
-import { formatMoney, DECLARED_CSV_QUIRKS } from '../src/simulator/csv.js';
-import { EOD_REPORT_COLUMNS } from '../src/simulator/eod-report.js';
-import type { LiveAccountTick } from '../src/simulator/stream.js';
+import { canonicalInput, CANONICAL_SEED } from './canonical.ts';
+import { renderRun } from '../src/simulator/emit.ts';
+import { simulate } from '../src/simulator/session.ts';
+import { foldStream, sampleTicks, streamRun, StreamError } from '../src/simulator/stream.ts';
+import { formatMoney, DECLARED_CSV_QUIRKS } from '../src/simulator/csv.ts';
+import { EOD_REPORT_COLUMNS } from '../src/simulator/eod-report.ts';
+import type { LiveAccountTick } from '../src/simulator/stream.ts';
 
 // CI-02, the `unit` project.
 //

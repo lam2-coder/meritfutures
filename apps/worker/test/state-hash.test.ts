@@ -29,7 +29,7 @@ import {
   StateHashError,
   stateHash,
   type StateHashSubject,
-} from '../src/batch/state-hash.js';
+} from '../src/batch/state-hash.ts';
 
 const td = (s: string): TradingDay => s as TradingDay;
 

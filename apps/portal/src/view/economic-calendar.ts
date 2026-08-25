@@ -65,7 +65,7 @@
 // `revision_reason`, which is a column, and there is no field a warning
 // sentence could be written into.
 
-import type { EconomicCalendarOccurrence, EconomicCalendarPanelResponse } from '../api/types.js';
+import type { EconomicCalendarOccurrence, EconomicCalendarPanelResponse } from '../api/types.ts';
 
 /** DEP-M7-06 and D-04 read Tier-1. So does the panel. */
 const TIER_ONE = 1;

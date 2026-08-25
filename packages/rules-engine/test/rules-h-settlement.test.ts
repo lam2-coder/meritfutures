@@ -12,9 +12,9 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import { applySettlement } from '../src/payout/settle.js';
-import type { Cents, DayOutput, RuleState, SettlementFact, TradingDay } from '../src/types.js';
+import { advanceDay } from '../src/day/advance.ts';
+import { applySettlement } from '../src/payout/settle.ts';
+import type { Cents, DayOutput, RuleState, SettlementFact, TradingDay } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -23,8 +23,8 @@ import {
   day,
   fundedPrior,
   mark,
-} from './fixtures-in-code.js';
-import { reU } from './rule-coverage.js';
+} from './fixtures-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 /**
  * A settled payout of one full CORE-50K cap.

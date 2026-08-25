@@ -62,8 +62,8 @@ import type {
   ReconciliationFinding,
   RuleStateRow,
   StoredContextGates,
-} from './ports.js';
-import { stateHash } from './state-hash.js';
+} from './ports.ts';
+import { stateHash } from './state-hash.ts';
 
 export interface NightlyBatchConfig {
   /** The day being closed. Every account is folded for this day and no other. */

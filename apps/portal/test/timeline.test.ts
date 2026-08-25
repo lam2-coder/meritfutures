@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
-import type { TimelineItem } from '../src/api/types.js';
-import { toTimelineView } from '../src/view/timeline.js';
+import type { TimelineItem } from '../src/api/types.ts';
+import { toTimelineView } from '../src/view/timeline.ts';
 
 // =============================================================================
 // M4-R: the account timeline, which filters nothing

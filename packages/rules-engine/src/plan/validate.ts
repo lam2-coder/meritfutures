@@ -71,7 +71,7 @@ import type {
   PublishedDrawdown,
   PublishedConsistency,
   ValidationResult,
-} from '../types.js';
+} from '../types.ts';
 
 /** CV-15's literal, which is the ONE money value M01 fixes in the document itself. */
 const MIN_PAYOUT_CENTS = 10_000n;

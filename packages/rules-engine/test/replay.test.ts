@@ -8,9 +8,9 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import { ReplayAssertionError, replay } from '../src/replay.js';
-import type { DailyMark } from '../src/types.js';
+import { advanceDay } from '../src/day/advance.ts';
+import { ReplayAssertionError, replay } from '../src/replay.ts';
+import type { DailyMark } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -18,7 +18,7 @@ import {
   ENGINE_VERSION,
   day,
   mark,
-} from './fixtures-in-code.js';
+} from './fixtures-in-code.ts';
 
 /**
  * A contiguous life over the calendar window: every opening balance is the prior

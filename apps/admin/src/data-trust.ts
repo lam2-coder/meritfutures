@@ -38,7 +38,7 @@
 // until a ruling says otherwise.
 // =============================================================================
 
-import { type AsOf, FigureError } from './figure.js';
+import { type AsOf, FigureError } from './figure.ts';
 
 /** Thrown when data trust cannot be assessed. Never resolved to green. */
 export class DataTrustError extends Error {

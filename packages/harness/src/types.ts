@@ -40,8 +40,8 @@ import type {
   RuleState,
 } from '@merit/rules-engine';
 import type { ContractSpec, PopulationSpec, SimAccount, SimSession } from '@merit/rithmic';
-import type { Ratio } from './ratio.js';
-import type { CalibrationSource, Provenance } from './provenance.js';
+import type { Ratio } from './ratio.ts';
+import type { CalibrationSource, Provenance } from './provenance.ts';
 
 // -----------------------------------------------------------------------------
 // What the population does, beyond what the day model already draws

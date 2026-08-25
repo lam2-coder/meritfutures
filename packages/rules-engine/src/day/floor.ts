@@ -45,8 +45,8 @@
 // (GS-011, GS-012).
 // =============================================================================
 
-import { EngineInvariantError } from '../errors.js';
-import type { Cents, DrawdownRules } from '../types.js';
+import { EngineInvariantError } from '../errors.ts';
+import type { Cents, DrawdownRules } from '../types.ts';
 
 /**
  * R-12. `floor = size_cents - drawdown_cents`, at account open and again at the

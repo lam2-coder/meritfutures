@@ -23,28 +23,28 @@
 // second import path for the rulebook and eventually a place someone patched it.
 // =============================================================================
 
-export { runHarness, runSweep, RunError } from './run.js';
+export { runHarness, runSweep, RunError } from './run.ts';
 export type {
   SweepArm,
   SweepArmResult,
   SweepResult,
   SweepSampleFloor,
   SweptValueUnit,
-} from './run.js';
+} from './run.ts';
 
-export { runTrial, checkBehaviour, TrialError } from './trial.js';
+export { runTrial, checkBehaviour, TrialError } from './trial.ts';
 
-export { aggregate, funnelCounts, checkCommercial, AggregateError } from './aggregate.js';
+export { aggregate, funnelCounts, checkCommercial, AggregateError } from './aggregate.ts';
 
 export {
   checkBands,
   checkLifetimeBound,
   lifetimeBoundCents,
   AssertionInputError,
-} from './assertions.js';
+} from './assertions.ts';
 
-export { OUTPUT_CATALOGUE, outputDefinition } from './outputs.js';
-export type { OutputDefinition } from './outputs.js';
+export { OUTPUT_CATALOGUE, outputDefinition } from './outputs.ts';
+export type { OutputDefinition } from './outputs.ts';
 
 export {
   HARNESS_VERSION,
@@ -52,8 +52,8 @@ export {
   checkCalibrationSource,
   provenanceFor,
   ProvenanceError,
-} from './provenance.js';
-export type { BandUnit, CalibrationBand, CalibrationSource, Provenance } from './provenance.js';
+} from './provenance.ts';
+export type { BandUnit, CalibrationBand, CalibrationSource, Provenance } from './provenance.ts';
 
 // The exact-rational surface. A caller that renders a result needs `format` and
 // `toBasisPoints`; a caller that compares two needs `compare`. Neither should
@@ -73,8 +73,8 @@ export {
   subtract,
   toBasisPoints,
   RatioError,
-} from './ratio.js';
-export type { Ratio } from './ratio.js';
+} from './ratio.ts';
+export type { Ratio } from './ratio.ts';
 
 // The seam, exported because the demo and any later consumer should cross it
 // through this package rather than writing a third copy of it.
@@ -85,7 +85,7 @@ export {
   toDailyMark,
   tradingDaysAfter,
   BridgeError,
-} from './bridge.js';
+} from './bridge.ts';
 
 export type {
   Aggregate,
@@ -106,4 +106,4 @@ export type {
   TrialBehaviour,
   TrialInput,
   TrialOutcome,
-} from './types.js';
+} from './types.ts';

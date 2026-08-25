@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { drawKey, draws, DrawError } from '../src/simulator/rng.js';
+import { drawKey, draws, DrawError } from '../src/simulator/rng.ts';
 
 // CI-02, the `unit` project.
 //

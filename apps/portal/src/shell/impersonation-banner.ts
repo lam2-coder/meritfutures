@@ -64,7 +64,7 @@
 // Formatting the instant for an operator's locale is a design-system concern
 // and is deliberately not decided here.
 
-import type { ImpersonationSession } from '../api/types.js';
+import type { ImpersonationSession } from '../api/types.ts';
 
 /**
  * The exit, which is a CONTROL ON THE BANNER rather than a closed browser tab.

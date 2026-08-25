@@ -66,7 +66,7 @@ export type {
   ImpersonationSession,
   MarkListItem,
   TimelineItem,
-} from './api/types.js';
+} from './api/types.ts';
 
 // -----------------------------------------------------------------------------
 // INV-M4-01's only permitted consumer of a money field.
@@ -76,20 +76,20 @@ export {
   formatCents,
   formatOptionalBasisPoints,
   formatOptionalCents,
-} from './format/money.js';
+} from './format/money.ts';
 
 // -----------------------------------------------------------------------------
 // INV-M4-08. A rule sentence the portal cannot have written.
 // -----------------------------------------------------------------------------
-export { COPY_KEYS, MissingCopyBlockError, copyBlock } from './copy/copy-block.js';
-export type { CopyBlock, PinnedPlanCopy } from './copy/copy-block.js';
+export { COPY_KEYS, MissingCopyBlockError, copyBlock } from './copy/copy-block.ts';
+export type { CopyBlock, PinnedPlanCopy } from './copy/copy-block.ts';
 
 // -----------------------------------------------------------------------------
 // The read surfaces.
 // -----------------------------------------------------------------------------
-export type { AccountState, Tier, Tiered } from './view/as-of.js';
+export type { AccountState, Tier, Tiered } from './view/as-of.ts';
 
-export { toAccountCard, toAccountDetail, toAccountList } from './view/accounts.js';
+export { toAccountCard, toAccountDetail, toAccountList } from './view/accounts.ts';
 export type {
   AccountCardView,
   AccountDetailView,
@@ -100,9 +100,9 @@ export type {
   FundedProgressView,
   NoProgressView,
   ProgressView,
-} from './view/accounts.js';
+} from './view/accounts.ts';
 
-export { toEligibilityView } from './view/eligibility.js';
+export { toEligibilityView } from './view/eligibility.ts';
 export type {
   ConsistencyMeterView,
   EligibilityView,
@@ -110,22 +110,22 @@ export type {
   GateId,
   GateState,
   GateView,
-} from './view/eligibility.js';
+} from './view/eligibility.ts';
 
-export { toEquitySeries } from './view/marks.js';
-export type { EquityPlotValues, EquityPointView, EquitySeriesView } from './view/marks.js';
+export { toEquitySeries } from './view/marks.ts';
+export type { EquityPlotValues, EquityPointView, EquitySeriesView } from './view/marks.ts';
 
-export { toTimelineView } from './view/timeline.js';
-export type { TimelineDetail, TimelineEntryView, TimelineView } from './view/timeline.js';
+export { toTimelineView } from './view/timeline.ts';
+export type { TimelineDetail, TimelineEntryView, TimelineView } from './view/timeline.ts';
 
-export { toEconomicCalendarPanel } from './view/economic-calendar.js';
-export type { EconomicCalendarPanelView, ReleaseView } from './view/economic-calendar.js';
+export { toEconomicCalendarPanel } from './view/economic-calendar.ts';
+export type { EconomicCalendarPanelView, ReleaseView } from './view/economic-calendar.ts';
 
 // -----------------------------------------------------------------------------
 // The shell every screen renders inside. ADR-068 requirement 4, INV-M4-09.
 // -----------------------------------------------------------------------------
-export { toPortalErrorKind, toShellView } from './shell/app-shell.js';
-export type { ContentState, PortalErrorKind, ShellView } from './shell/app-shell.js';
+export { toPortalErrorKind, toShellView } from './shell/app-shell.ts';
+export type { ContentState, PortalErrorKind, ShellView } from './shell/app-shell.ts';
 
-export { toImpersonationBanner } from './shell/impersonation-banner.js';
-export type { ImpersonationBannerView, ImpersonationExit } from './shell/impersonation-banner.js';
+export { toImpersonationBanner } from './shell/impersonation-banner.ts';
+export type { ImpersonationBannerView, ImpersonationExit } from './shell/impersonation-banner.ts';

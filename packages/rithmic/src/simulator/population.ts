@@ -18,8 +18,8 @@
 // every fixture derived against the population.
 // =============================================================================
 
-import { drawKey, draws, type Range } from './rng.js';
-import type { PopulationSpec, SimAccount } from './types.js';
+import { drawKey, draws, type Range } from './rng.ts';
+import type { PopulationSpec, SimAccount } from './types.ts';
 
 /** Thrown when a spec cannot produce a population. Never silently repaired. */
 export class PopulationSpecError extends Error {

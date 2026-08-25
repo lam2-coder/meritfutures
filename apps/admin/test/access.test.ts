@@ -5,8 +5,8 @@ import {
   OriginError,
   PUBLIC_ORIGIN_VARS,
   resolveAdminOrigin,
-} from '../src/origin.js';
-import { ADMIN_ROLES, RoleError, mayReadLiabilityHome, requireAdminRole } from '../src/roles.js';
+} from '../src/origin.ts';
+import { ADMIN_ROLES, RoleError, mayReadLiabilityHome, requireAdminRole } from '../src/roles.ts';
 
 // =============================================================================
 // M6-A: who may open the page, and what it is served from
