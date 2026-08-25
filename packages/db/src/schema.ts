@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// FIFTY-EIGHT TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 53 are not reachable through either accessor: `SCOPE_RULES` is total
+// SIXTY-ONE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 50 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE FIFTY-EIGHT ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE SIXTY-ONE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. EIGHT
-// of the fifty-eight below carry later columns -- `sessions`, `plan_versions`,
+// of the sixty-one below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests` and `admin_actions` -- and none of them could be
 // registered at all before ADR-094, which is why the ruling came before the
@@ -2107,6 +2107,136 @@ export const impersonationPageViews = pgTable('impersonation_page_views', {
     .references(() => impersonationSessions.id),
   route: text('route').notNull(),
   viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// affiliates -- 0005_affiliate_program.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// AN AFFILIATE IS AN IDENTITY, and that is the table's own DDL comment rather
+// than an inference: `identity_id uuid NOT NULL REFERENCES identities(id) ON
+// DELETE RESTRICT`. It is what makes the self-deal check possible at all (B4
+// #16), and it is what makes "the affiliate is a human Merit has restricted"
+// (INV-M8-12) a query rather than a guess.
+//
+// `parent_id` IS THE TRAP AND IT IS NOT THE SCOPE. It references this same
+// table, reserved for sub-IB trees and unused in v1, so a derived rule through
+// it would scope a person's own affiliate row to their RECRUITER. The direct
+// column the database declares against `identities(id)` is the rule.
+//
+// `balance_cents` IS MONEY AND IT IS SIGNED. Negative is owed to Merit, which
+// is the case SD-M8-04 exists for, and `affiliates_negative_balance_has_clock`
+// ties it to `negative_balance_since` in both directions. Integer cents,
+// transcribed as `bigint` with `mode: 'bigint'`, never a float.
+//
+// `tos_version_id` CARRIES NO `.references()` HERE. `tos_versions` is not one
+// of this file's tables, and this file's rule is that a claimed constraint
+// nothing in this package checks is worse than the column alone.
+export const affiliates = pgTable('affiliates', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  // `citext` and NOT `text`: a referral code that differs only in casing is the
+  // same code to every human who types it.
+  code: citext('code').notNull().unique(),
+  parentId: uuid('parent_id').references((): AnyPgColumn => affiliates.id),
+  level: smallint('level').notNull().default(0),
+  commissionBp: integer('commission_bp').notNull(),
+  status: text('status').notNull().default('active'),
+  tosVersionId: uuid('tos_version_id').notNull(),
+  // The fast gate. SD-M8-03 gives it a record of WHAT was approved; this stays
+  // as the boolean.
+  creativeApproved: boolean('creative_approved').notNull().default(false),
+  chargebackRateBp: integer('chargeback_rate_bp').notNull().default(0),
+  // SD-M8-04. INV-M8-06. Signed integer cents.
+  balanceCents: bigint('balance_cents', { mode: 'bigint' }).notNull().default(0n),
+  // SD-M8-04. The clock on a carried debt. A debt with no start date is one
+  // nobody escalates, and the escalation is the enforcement.
+  negativeBalanceSince: date('negative_balance_since'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// affiliate_creatives -- 0005_affiliate_program.sql. DERIVED: `affiliate_id`
+// -> affiliates, one hop.
+// -----------------------------------------------------------------------------
+// SD-M8-03, INV-M8-08. WHAT WAS APPROVED, rather than the bare boolean on the
+// parent row: NFA I-26-12 requires the disclosure to accompany the claim, and
+// that is a PER-CREATIVE fact. `affiliate_id uuid NOT NULL REFERENCES
+// affiliates(id) ON DELETE RESTRICT` is the only path to an identity and it is
+// single-valued, so the hop cannot multiply rows.
+//
+// `reviewed_by` IS `text` AND NOT A `users` FOREIGN KEY. The DDL declares it
+// `text NULL` with no reference, so there is nothing here a derived rule could
+// traverse even if the reviewer were the tenancy, and the reviewer is not: a
+// creative belongs to the affiliate who submitted it and not to the operator
+// who read it.
+//
+// `disclosure_version_id` CARRIES NO `.references()`, for `affiliates`' reason:
+// its target `tos_versions` is not one of this file's tables.
+export const affiliateCreatives = pgTable('affiliate_creatives', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  affiliateId: uuid('affiliate_id')
+    .notNull()
+    .references(() => affiliates.id),
+  kind: text('kind').notNull(),
+  // The URL, or a storage reference for something that has none.
+  urlOrRef: text('url_or_ref').notNull(),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }).notNull().defaultNow(),
+  status: text('status').notNull().default('pending'),
+  reviewedBy: text('reviewed_by'),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  disclosureVersionId: uuid('disclosure_version_id'),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// affiliate_clicks -- 0005_affiliate_program.sql. DERIVED: `affiliate_id` ->
+// affiliates, one hop.
+// -----------------------------------------------------------------------------
+// THE 30-DAY COOKIE WINDOW'S RAW EVENTS. High volume and never in a URL, so the
+// key is `bigint GENERATED ALWAYS AS IDENTITY` rather than a uuid.
+//
+// A CLICK BELONGS TO THE AFFILIATE AND NOT TO THE PERSON WHO CLICKED, and the
+// DDL is what says so: there is no identity column, no `user_id` and no
+// `purchase_id` on this table at all. `ip`, `user_agent` and
+// `click_fingerprint` are the closest things to a clicker and NONE of them is a
+// tenancy -- an IP reaches whoever shares a network and a fingerprint reaches
+// whoever shares a browser, which is `sessions.device_fingerprint_id`'s trap
+// arriving on a different table.
+//
+// `click_fingerprint` IS `bytea` AND IS TRANSCRIBED AS ONE. Declaring it
+// `text()` would compile and would satisfy the column-name comparison the suite
+// runs, which is exactly the axis ADR-094 section 3 records is checked nowhere.
+//
+// `suspicious_reason` IS SET BY THE DETECTOR AND NOT BY THE CLICK HANDLER. Null
+// means "not examined", which is a different state from "examined and clean",
+// and SD-M8-02 is why the four provenance columns exist at all: last-touch
+// attribution over a 30 day window is stealable by volume, and the theft is
+// invisible without knowing where a click came from (AS-M8-03).
+//
+// NO `updated_at`. A click is an observation and observations are not edited.
+export const affiliateClicks = pgTable('affiliate_clicks', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  affiliateId: uuid('affiliate_id')
+    .notNull()
+    .references(() => affiliates.id),
+  clickToken: uuid('click_token').notNull().defaultRandom(),
+  ip: inet('ip'),
+  userAgent: text('user_agent'),
+  landingPath: text('landing_path'),
+  clickedAt: timestamp('clicked_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M8-02. The single highest-value one: a click with no referrer arriving
+  // at a deep product path is the signature of an injected pixel rather than a
+  // person who read something and followed a link.
+  referrerHost: text('referrer_host'),
+  landingIsDirect: boolean('landing_is_direct').notNull().default(false),
+  clickFingerprint: bytea('click_fingerprint'),
+  suspiciousReason: text('suspicious_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // -----------------------------------------------------------------------------
