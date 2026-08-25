@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// THIRTY-FOUR TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 77 are not reachable through either accessor: `SCOPE_RULES` is total
+// THIRTY-EIGHT TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 73 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE THIRTY-FOUR ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE THIRTY-EIGHT ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. FOUR
-// of the thirty-four below carry later columns -- `sessions`, `plan_versions`,
+// of the thirty-eight below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states` and `admin_actions` -- and none of them could be registered at
 // all before ADR-094, which is why the ruling came before the transcription
 // rather than after it.
@@ -837,6 +837,144 @@ export const reviewRequests = pgTable('review_requests', {
   providerRef: text('provider_ref'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// -----------------------------------------------------------------------------
+// coupons -- 0006_commerce.sql. FIRM: no identity column, and no correct one.
+// -----------------------------------------------------------------------------
+// A DISCOUNT CODE IS THE FIRM'S OFFER AND NOT A BUYER'S ROW. What a buyer holds
+// is the REDEMPTION, which is the next table down and carries `identity_id`.
+//
+// `affiliate_id` CARRIES NO `references()` AND IT IS NOT AN OMISSION: it names
+// `affiliates`, which nobody has registered, so the rule this file's header
+// states applies and the COLUMN alone is transcribed.
+//
+// `code` IS `citext` AND THAT IS THE POINT OF THE COLUMN. Redemption is
+// case-insensitive, so `LAUNCH50` and `launch50` are one code rather than two,
+// and a `text()` here would compile, would satisfy the column-name comparison,
+// and would be a wrong transcription on the one axis nothing checks.
+export const coupons = pgTable('coupons', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: citext('code').notNull(),
+  discountKind: text('discount_kind').notNull(),
+  discountBp: integer('discount_bp'),
+  discountCents: bigint('discount_cents', { mode: 'bigint' }),
+  affiliateId: uuid('affiliate_id'),
+  // Null means unlimited, which is why the column is nullable rather than
+  // defaulted to a large number.
+  maxRedemptions: integer('max_redemptions'),
+  redemptionCount: integer('redemption_count').notNull().default(0),
+  // PER IDENTITY, NOT PER EMAIL: an email limit is a limit on typing.
+  perIdentityLimit: integer('per_identity_limit').notNull().default(1),
+  startsAt: timestamp('starts_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  isActive: boolean('is_active').notNull().default(true),
+  // SD-M3-04. Reset pricing and new-purchase pricing are DIFFERENT PRODUCTS
+  // WITH DIFFERENT MARGINS, and without these two one leaked launch code
+  // discounts resets forever (AS-M3-04).
+  appliesToKind: text('applies_to_kind').notNull().default('any'),
+  firstPurchaseOnly: boolean('first_purchase_only').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// coupon_redemptions -- 0006_commerce.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// THE ROW IS AN ATOMIC CLAIM AND NOT A READ-THEN-WRITE (B4 #11), which is why
+// two tabs cannot both win a single-use code: the insert is the race and
+// `coupon_redemptions_live_claim_uq` decides it.
+//
+// `purchase_id` IS NULLABLE BY DESIGN -- null while the claim is HELD and the
+// payment is in flight -- and it is NOT the scope. A row that was claimed and
+// abandoned never gets one, and it is still that identity's row: a rule through
+// `purchases` would hide exactly the claim-and-abandon pattern this table is
+// shaped to keep.
+export const couponRedemptions = pgTable('coupon_redemptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  couponId: uuid('coupon_id')
+    .notNull()
+    .references(() => coupons.id),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  purchaseId: uuid('purchase_id').references(() => purchases.id),
+  claimedAt: timestamp('claimed_at', { withTimezone: true }).notNull().defaultNow(),
+  // The row SURVIVES a release, so claim-and-abandon is visible rather than
+  // erased.
+  releasedAt: timestamp('released_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// psp_webhook_events -- 0006_commerce.sql. FIRM: a third party's assertion.
+// -----------------------------------------------------------------------------
+// KEPT SEPARATELY FROM `events` BECAUSE THESE ARE THIRD-PARTY ASSERTIONS AND
+// NOT FACTS MERIT GENERATED, which is the table's own DDL comment and is what
+// decides the class. The buyer's row is `purchases`; this is Merit's log of what
+// a processor said, including what it said that did not verify.
+//
+// `purchase_id` IS THE TRAP AND IT IS NULLABLE. It is written by the PROCESSING
+// path, so a derived rule would make a row's tenancy a function of whether the
+// handler has run yet: the same event would belong to nobody while deferred and
+// to somebody once applied. A `rejected_signature` row belongs to nobody at all,
+// permanently, and a class that answers "who owns this" differently before and
+// after a job runs is not an answer.
+export const pspWebhookEvents = pgTable('psp_webhook_events', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  psp: text('psp').notNull(),
+  providerEventId: text('provider_event_id').notNull(),
+  eventType: text('event_type').notNull(),
+  // RECORDED, NOT ASSUMED. A payload whose signature did not verify is still
+  // stored, and stored with the fact that it did not verify.
+  signatureVerified: boolean('signature_verified').notNull(),
+  payload: jsonb('payload').notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  processingResult: text('processing_result'),
+  // SD-M3-01. Somewhere to park a deferred event and something to drive its
+  // re-evaluation (INV-M3-04). The canonical case is a refund arriving before
+  // its payment (FM-M3-03): applying it would record a refund against nothing.
+  purchaseId: uuid('purchase_id').references(() => purchases.id),
+  deferredUntil: timestamp('deferred_until', { withTimezone: true }),
+  deferAttempts: integer('defer_attempts').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// mid_health -- 0006_commerce.sql. FIRM: one row per PSP per window.
+// -----------------------------------------------------------------------------
+// SD-M3-03. Failover needs A DECISION RECORD rather than a live computation, and
+// the row is about a PROCESSOR rather than about a person. There is no identity
+// column and there is no correct one.
+//
+// THE COMPOSITE PRIMARY KEY IS `(psp, window_start)` and it is a table-level
+// clause in the DDL, so it is declared here in the table config rather than on a
+// column. `attempts` is the denominator for `decline_rate_bp` and
+// `card_settled_count` is the denominator for `chargeback_rate_bp`: both rates
+// are computed against CARD volume and never total volume, because wallet
+// purchases carry no chargeback exposure and a healthy shift toward wallet
+// funding would otherwise look like a deteriorating ratio and trip failover for
+// no reason at all (AS-M3-02). The column names carry that rule and this
+// transcription keeps them.
+export const midHealth = pgTable(
+  'mid_health',
+  {
+    psp: text('psp').notNull(),
+    windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+    windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    declines: integer('declines').notNull().default(0),
+    cardSettledCount: integer('card_settled_count').notNull().default(0),
+    chargebacks: integer('chargebacks').notNull().default(0),
+    // Basis points, integer, like every ratio in this schema.
+    declineRateBp: integer('decline_rate_bp').notNull(),
+    chargebackRateBp: integer('chargeback_rate_bp').notNull(),
+    state: text('state').notNull(),
+    stateChangedAt: timestamp('state_changed_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.psp, t.windowStart] })],
+);
 
 // -----------------------------------------------------------------------------
 // admin_actions -- 0017_events_and_audit.sql, 0043_admin_attributed_actions.sql.
