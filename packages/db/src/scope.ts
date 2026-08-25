@@ -80,12 +80,16 @@ import {
   statisticDefinitions,
   treasuryBalances,
   users,
+  walletDormancy,
+  walletEntries,
+  walletSpendLimits,
+  walletWithdrawals,
 } from './schema.js';
 
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FIFTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FIFTY-SEVEN OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -154,6 +158,10 @@ export const TABLES = {
   planBreakerState,
   reportDeliveries,
   reportSchedules,
+  walletEntries,
+  walletWithdrawals,
+  walletSpendLimits,
+  walletDormancy,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -542,6 +550,34 @@ export const SCOPE_RULES = {
   reportSchedules: {
     class: 'firm',
     why: "WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. `recipients text[] NOT NULL` holds Merit's own staff addresses or a configured SFTP destination, never a trader's, and the row exists to give the C8 weekly risk ritual an input other than a human remembering to look. There is no identity column and there is no correct one. NO CREDENTIAL IS STORED HERE and there is deliberately no column that could hold one, so this table is not a fifth credential surface arriving without a ruling.",
+  },
+
+  walletEntries: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql). THE TRAP IS `ledger_transaction_id`, WHICH IS ALSO NOT NULL AND READS EXACTLY LIKE A LEGITIMATE HOP: `ledger_transaction_id uuid NOT NULL REFERENCES ledger_transactions(id)`, and `ledger_transactions` is registered `derived`, so a rule through it would compile AND terminate. It would also answer a DIFFERENT QUESTION -- whose ledger accounts appear on this transaction, rather than whose wallet holds this entry -- and the two agree only while no transaction ever touches two identities' accounts, which nothing in the schema enforces and which double-entry makes the normal case rather than the exception. `reference_id uuid NOT NULL` carries no FK at all because it is POLYMORPHIC: `provenance` decides whether it names a payout request, a purchase or the entry this one corrects, so it names no one table and is not traversable by a vocabulary whose `derived` member names one table.",
+  },
+
+  walletWithdrawals: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql). THE TRAP HERE IS NULLABILITY RATHER THAN TARGET: `freeze_flag_id uuid NULL REFERENCES risk_flags(id)` points at a table that IS registered and IS `owned` on its own `identity_id`, so a derived rule through it terminates at the right identity and is still wrong -- the column is NULL on every withdrawal nobody froze, so the rule would return a person only the withdrawals that were held against them and silently omit every ordinary one. The withdrawal is the EXTERNAL leg (SD-M5-06, ADR-028) and a payout request is the internal one; they are separate tables because the engine's gates and the rail's gates must not share a status column, and the person whose settled balance is moving is named on the row.",
+  },
+
+  walletSpendLimits: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: '`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT`, and it is half of the PRIMARY KEY `(identity_id, effective_from)` (0011_wallet.sql). THE LIMIT IS PER IDENTITY AND NOT GLOBAL BY DESIGN (INV-M20-07, SECURITY C-23): the limit that matters is the one on the compromised session, so the row is a fact about one person rather than a firm-wide setting, and a `firm` rule here would be the same misreading as scoping a global throttle. The composite key makes the table a HISTORY: a change is a new row, so the limit in force on the day of an incident stays readable, and `set_by text NOT NULL` records the operator without reaching an identity -- it is a free-text actor label with no foreign key, so no derivation exists through it.',
+  },
+
+  walletDormancy: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid PRIMARY KEY REFERENCES identities(id) ON DELETE RESTRICT` (0011_wallet.sql). `nullable: false` IS READ OFF `PRIMARY KEY` RATHER THAN OFF THE WORDS `NOT NULL`, which are absent because a primary key already implies them; this is the only one of the four wallet tables where that is true, and it is stated so a later reader does not go looking for the missing words. One row per identity: the row IS that person's dormancy position, and there is no surrogate key and no second identity column. `jurisdiction_hint` is a HINT and not a determination -- escheatment is a counsel question (OQ-M20-04 as ruled) -- so it carries no tenancy of its own, and `notified_at timestamptz[]` is the notification SEQUENCE rather than a reference to anything.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
