@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// FIFTY-THREE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 58 are not reachable through either accessor: `SCOPE_RULES` is total
+// FIFTY-EIGHT TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 53 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE FIFTY-THREE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE FIFTY-EIGHT ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. EIGHT
-// of the fifty-three below carry later columns -- `sessions`, `plan_versions`,
+// of the fifty-eight below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests` and `admin_actions` -- and none of them could be
 // registered at all before ADR-094, which is why the ruling came before the
@@ -2108,3 +2108,213 @@ export const impersonationPageViews = pgTable('impersonation_page_views', {
   route: text('route').notNull(),
   viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// -----------------------------------------------------------------------------
+// contract_specs -- 0004_catalog.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE INSTRUMENT CATALOGUE. What a tick is worth, per symbol, per effective
+// date. No identity owns a contract specification and there is no column that
+// could carry one: the row is a fact about `ES` between two dates, identical for
+// every trader who ever traded it.
+//
+// THE PRIMARY KEY IS COMPOSITE, `(symbol, effective_from)`, and it is
+// transcribed rather than replaced by a surrogate. A spec change is ANOTHER ROW
+// with its own effective date, not an UPDATE, which is what makes a per-
+// instrument figure computed months ago reproducible today.
+//
+// `tick_size` IS AN EXACT RATIONAL AND `tick_value_cents` IS AN INTEGER, the
+// same discipline `fills` applies to price and for the same reason: a tick value
+// that rounds is a per-instrument result that disagrees with the mark.
+export const contractSpecs = pgTable(
+  'contract_specs',
+  {
+    symbol: text('symbol').notNull(),
+    exchange: text('exchange').notNull(),
+    tickSizeNumerator: bigint('tick_size_numerator', { mode: 'bigint' }).notNull(),
+    tickSizeDenominator: bigint('tick_size_denominator', { mode: 'bigint' }).notNull(),
+    tickValueCents: bigint('tick_value_cents', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).notNull().default('USD'),
+    isMicro: boolean('is_micro').notNull().default(false),
+    // `effective_to` NULL means current.
+    effectiveFrom: date('effective_from').notNull(),
+    effectiveTo: date('effective_to'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.symbol, t.effectiveFrom] })],
+);
+
+// -----------------------------------------------------------------------------
+// fills -- 0013_ingest.sql. DERIVED: `account_id` -> accounts, one hop.
+// -----------------------------------------------------------------------------
+// ONE EXECUTION, AS THE VENDOR REPORTED IT. The row reaches an identity through
+// its account and through nothing else; every other reference on it points at
+// the ingest machinery -- `ingest_file_id`, `raw_row_id` -- or at another fill.
+//
+// PRICE IS AN EXACT RATIONAL, NEVER A FLOAT, and the pair of bigints is the
+// whole reason: a price that rounds is a P&L that disagrees with the vendor's.
+// The constitution's no-floats rule reaches this table through the marks it
+// feeds.
+//
+// `trading_day` IS OURS AND `trading_day_vendor` IS THEIRS (SD-M2-04), with
+// `trading_day_source` recording which produced the stored value. Both are kept
+// because "when did it happen" and "when did we learn it" are different
+// questions and a correction is exactly where they diverge.
+//
+// `correction_of` REFERENCES THIS SAME TABLE, so the correction chain never
+// leaves the account it belongs to and a scoped read returns the corrected fill
+// beside the correction. That is `daily_marks.superseded_by`'s shape exactly and
+// it is why neither column widens the tenancy.
+//
+// `ingest_file_id` and `raw_row_id` reference `ingest_files` and
+// `raw_ingest_rows`, which are not this file's tables, so the COLUMN alone is
+// transcribed and the foreign key is left to the database.
+export const fills = pgTable('fills', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  platform: text('platform').notNull().default('rithmic'),
+  platformFillId: text('platform_fill_id').notNull(),
+  // B3 reservations, used rather than added: round-trip derivation reads all
+  // three of `order_id`, `venue` and `correction_of` (M13 section 2).
+  orderId: text('order_id'),
+  venue: text('venue'),
+  // Joins `contract_specs`, which is the tick value's only source (DEP-M13-03).
+  symbol: text('symbol').notNull(),
+  // `text` with a CHECK rather than an enum, and the transcription follows the
+  // DDL: where the DDL and a neighbouring type disagree, the DDL wins.
+  side: text('side').notNull(),
+  quantity: integer('quantity').notNull(),
+  priceNumerator: bigint('price_numerator', { mode: 'bigint' }).notNull(),
+  priceDenominator: bigint('price_denominator', { mode: 'bigint' }).notNull(),
+  executedAt: timestamp('executed_at', { withTimezone: true }).notNull(),
+  // RESOLVED THROUGH THE CALENDAR, never from the timestamp's UTC date.
+  tradingDay: date('trading_day').notNull(),
+  correctionOf: bigint('correction_of', { mode: 'bigint' }).references(
+    (): AnyPgColumn => fills.id,
+  ),
+  isCorrected: boolean('is_corrected').notNull().default(false),
+  // References `ingest_files`, which is not one of this file's tables.
+  ingestFileId: uuid('ingest_file_id').notNull(),
+  // References `raw_ingest_rows`, which is not one of this file's tables.
+  rawRowId: bigint('raw_row_id', { mode: 'bigint' }).notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  tradingDayVendor: date('trading_day_vendor'),
+  tradingDaySource: text('trading_day_source').notNull().default('calendar'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// round_trips -- 0022_analytics_journal.sql. DERIVED: `account_id` -> accounts,
+// one hop.
+// -----------------------------------------------------------------------------
+// FILLS GROUPED INTO TRADES, ONCE AND VERSIONED. The grouping IS the finding:
+// scaling in and out, reversals and overnight positions make "how many trades
+// did I take" ambiguous, so `derivation_version` pins which rule produced the
+// row and a change to that rule is a dated event rather than a trade count that
+// quietly moved (INV-M13-10).
+//
+// `net_result_cents` IS PRESENTATIONAL AND NEVER RECONCILES THE ACCOUNT. The
+// money number is `daily_marks`' (INV-M13-02), and the column carries a DDL
+// comment saying so. Registering this table makes it READABLE and nothing else:
+// no scope rule enforces that separation.
+//
+// `entry_fills` AND `exit_fills` ARE `bigint[]`, matching `fills.id`, which is
+// `bigint GENERATED ALWAYS AS IDENTITY`. M13 section 2's `SD-M13-01` cell says
+// `uuid[]` and the DDL is the source; the plan's cell could never have
+// referenced a fill.
+//
+// THE TWO ARRAY CONSTRAINTS IN `0022` READ `array_length` AND ARE NOT WHAT THE
+// DATABASE ENFORCES: `0028_supersede_plan_version_immutability.sql` re-states
+// `round_trips_has_entry` and `round_trips_closed_has_exit` on `cardinality`, so
+// an empty array is refused. Both statements are `ADD CONSTRAINT` work, which
+// ADR-094's fold reads and discards, so neither touches the column set below.
+export const roundTrips = pgTable('round_trips', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  instrument: text('instrument').notNull(),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+  // NULL while the position is open.
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+  tradingDay: date('trading_day').notNull(),
+  direction: text('direction').notNull(),
+  maxSize: integer('max_size').notNull(),
+  entryFills: bigint('entry_fills', { mode: 'bigint' }).array().notNull(),
+  exitFills: bigint('exit_fills', { mode: 'bigint' }).array().notNull().default([]),
+  grossResultCents: bigint('gross_result_cents', { mode: 'bigint' }).notNull(),
+  feeCents: bigint('fee_cents', { mode: 'bigint' }).notNull().default(0n),
+  // PRESENTATIONAL. NEVER RECONCILES THE ACCOUNT (INV-M13-02).
+  netResultCents: bigint('net_result_cents', { mode: 'bigint' }).notNull(),
+  derivationVersion: integer('derivation_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// journal_entries -- 0022_analytics_journal.sql. OWNED: `identity_id`.
+// -----------------------------------------------------------------------------
+// THE TRADER'S OWN NOTES. Merit reads them for nothing: M13 section 3.4 is an
+// absence rather than a state machine -- journal text is never a detector input,
+// never a default support view, never in the internal evidence tier.
+//
+// TWO COLUMNS REACH A PERSON AND ONLY ONE OF THEM IS TOTAL. `identity_id` is
+// `NOT NULL REFERENCES identities(id)` and is the author; `account_id` is
+// NULLABLE, because a `day`-scoped entry need name no account. Scoping by the
+// account would silently drop every entry that names none, which is a wrong
+// answer that returns rows.
+//
+// `deleted_at` IS A TOMBSTONE AND NOT THE END STATE. A hard-delete job removes
+// the row afterwards, which is what makes deletion a promise rather than a
+// claim (INV-M13-07); the soft phase exists so the delete is undoable inside a
+// short window and so the job has something to find. A scoped read that ignored
+// it would return deleted entries, and no scope rule prevents that: registering
+// this table makes it readable and nothing else.
+//
+// `reference_id` NAMES A ROUND TRIP WHEN `scope` IS `round_trip` AND CARRIES NO
+// FOREIGN KEY, so it is transcribed as a bare `uuid`.
+export const journalEntries = pgTable('journal_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  accountId: uuid('account_id').references(() => accounts.id),
+  scope: text('scope').notNull(),
+  referenceId: uuid('reference_id'),
+  body: text('body').notNull(),
+  tags: text('tags').array().notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M13-02. THE TOMBSTONE, not the end state.
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+// -----------------------------------------------------------------------------
+// analytics_snapshots -- 0022_analytics_journal.sql. DERIVED: `account_id` ->
+// accounts, one hop.
+// -----------------------------------------------------------------------------
+// THE EXPENSIVE SHAPES, COMPUTED ONCE PER ACCOUNT PER CLOSED DAY in the batch
+// rather than per page load (INV-M13-06, AS-M13-07).
+//
+// `inputs_digest` IS WHAT MAKES INV-M13-10 CHECKABLE: if the digest changed, the
+// marks changed, and the trader is told why. Without it a corrected mark
+// silently moves a trader's historical statistics and the only evidence is that
+// they remember a different number. It is `bytea` and is transcribed as one.
+//
+// THE PRIMARY KEY IS COMPOSITE, `(account_id, as_of_trading_day)`, which is the
+// grain: one snapshot per account per closed day, replaced rather than
+// accumulated.
+export const analyticsSnapshots = pgTable(
+  'analytics_snapshots',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    asOfTradingDay: date('as_of_trading_day').notNull(),
+    payload: jsonb('payload').notNull(),
+    inputsDigest: bytea('inputs_digest').notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.asOfTradingDay] })],
+);

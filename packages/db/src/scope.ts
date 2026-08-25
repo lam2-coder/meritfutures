@@ -31,9 +31,11 @@ import {
   accounts,
   adminActions,
   alarmSuppressions,
+  analyticsSnapshots,
   certificates,
   contactChannels,
   contentDocuments,
+  contractSpecs,
   correlationGroups,
   couponRedemptions,
   coupons,
@@ -44,12 +46,14 @@ import {
   economicCalendar,
   economicCalendarLoads,
   evidencePacks,
+  fills,
   identities,
   identityPhones,
   identityRestrictionEpisodes,
   identitySignals,
   impersonationPageViews,
   impersonationSessions,
+  journalEntries,
   kycFunnelEvents,
   kycVerifications,
   ledgerAccounts,
@@ -74,6 +78,7 @@ import {
   reportSchedules,
   reviewRequests,
   riskFlags,
+  roundTrips,
   ruleStates,
   sanctionsScreenings,
   sessions,
@@ -85,7 +90,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FIFTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FIFTY-EIGHT OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -154,6 +159,11 @@ export const TABLES = {
   planBreakerState,
   reportDeliveries,
   reportSchedules,
+  contractSpecs,
+  fills,
+  roundTrips,
+  journalEntries,
+  analyticsSnapshots,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -542,6 +552,44 @@ export const SCOPE_RULES = {
   reportSchedules: {
     class: 'firm',
     why: "WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. `recipients text[] NOT NULL` holds Merit's own staff addresses or a configured SFTP destination, never a trader's, and the row exists to give the C8 weekly risk ritual an input other than a human remembering to look. There is no identity column and there is no correct one. NO CREDENTIAL IS STORED HERE and there is deliberately no column that could hold one, so this table is not a fifth credential surface arriving without a ruling.",
+  },
+  contractSpecs: {
+    class: 'firm',
+    why: "THE INSTRUMENT CATALOGUE: what a tick is worth, per symbol, per effective date (0004_catalog.sql). No identity owns a contract specification and there is no column that could carry one -- the row is a fact about `ES` between two dates and is identical for every trader who ever traded it. THE PRIMARY KEY IS `(symbol, effective_from)` AND A SPEC CHANGE IS ANOTHER ROW, which is what makes a per-instrument figure computed months ago reproducible today. M13 section 7 requires the tick value to come from this table and never from a multiplier in analytics code (B4 #14), and a firm class is what says the read is the estate's rather than a person's.",
+  },
+
+  fills: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0013_ingest.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. ONE EXECUTION AS THE VENDOR REPORTED IT, and every other reference on the row points at the ingest machinery -- `ingest_file_id` to `ingest_files`, `raw_row_id` to `raw_ingest_rows` -- or at another fill: `correction_of` REFERENCES THIS SAME TABLE, so the correction chain never leaves the account it belongs to and a scoped read returns the corrected fill beside its correction, which is `daily_marks.superseded_by`'s shape exactly. What Merit ingested and then corrected is the trader's own evidence.",
+  },
+
+  roundTrips: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0022_analytics_journal.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THE ROW IS A GROUPING OF THAT ACCOUNT'S OWN FILLS and the tenancy is the account's one hop out, which is `daily_marks`' rule exactly; `entry_fills` and `exit_fills` are `bigint[]` naming `fills.id` and are NOT a second path to an identity, because every fill in them is that same account's by construction. `derivation_version` pins WHICH grouping rule produced the row and contributes nothing to who may read it. REGISTERING THIS TABLE MAKES IT READABLE AND NOTHING ELSE: `net_result_cents` is presentational, `daily_marks` reconciles the account (INV-M13-02), and no scope rule enforces that separation.",
+  },
+
+  journalEntries: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` (0022_analytics_journal.sql). TWO COLUMNS ON THIS ROW REACH A PERSON AND ONLY ONE OF THEM IS TOTAL: `account_id` is NULLABLE, because a `day`-scoped entry need name no account, so scoping through it would silently drop every entry that names none -- a wrong answer that returns rows rather than an error. `identity_id` is the AUTHOR and the notes are the trader's own; Merit reads them for nothing, and M13 section 3.4 is an absence rather than a state machine. `deleted_at` IS A TOMBSTONE AND NOT THE END STATE, and a scoped read returns soft-deleted rows: registering this table makes it readable and the purge job is what makes deletion a promise (INV-M13-07).",
+  },
+
+  analyticsSnapshots: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0022_analytics_journal.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. The grain is the PRIMARY KEY, `(account_id, as_of_trading_day)`: ONE SNAPSHOT PER ACCOUNT PER CLOSED DAY, so this is `daily_marks`' and `rule_states`' rule again and the day contributes nothing to who may read it. `payload jsonb` HOLDS COMPUTED STATISTICS ABOUT ONE ACCOUNT and reaches no other identity; `inputs_digest` is a hash of the input rows and not a reference to them.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
