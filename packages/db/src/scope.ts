@@ -33,18 +33,33 @@ import {
   ledgerEntries,
   ledgerTransactions,
   liabilitySnapshots,
+  planVersions,
+  ruleStates,
+  sessions,
   treasuryBalances,
+  users,
 } from './schema.js';
 
-/** The seven. `TableKey` is exactly `keyof` this object, by construction. */
+/**
+ * The registry. `TableKey` is exactly `keyof` this object, by construction.
+ *
+ * ELEVEN OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * TABLE: a table is registered ONCE by the first session that needs it, the
+ * registration is never re-argued, and a session computes its own slice from
+ * `TABLE_KEYS` on the tree it opened rather than from a roster.
+ */
 export const TABLES = {
   identities,
+  users,
+  sessions,
+  planVersions,
   accounts,
   ledgerAccounts,
   ledgerEntries,
   ledgerTransactions,
   treasuryBalances,
   liabilitySnapshots,
+  ruleStates,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -110,6 +125,27 @@ export const SCOPE_RULES = {
     why: 'The row IS the identity. `identity_merges` repoints ownership, so `identities.id` is the hard-merged grain and the only correct root.',
   },
 
+  users: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: '`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0002_identity.sql). A USER IS A LOGIN AND AN IDENTITY IS THE PERSON, and ADR-041 is why they are two tables: an identity may hold MORE THAN ONE user, so scoping this table by its own `id` would return a strict subset of the person and scoping by `identity_id` returns all of their logins.',
+  },
+
+  sessions: {
+    class: 'derived',
+    via: 'users',
+    localColumn: 'user_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "THE ROW REACHES AN IDENTITY THROUGH `users` AND THROUGH NOTHING ELSE, and the other candidate column is this file's own named trap: `device_fingerprint_id` references `identity_signals`, so a derivation through it reaches WHOEVER SHARES A DEVICE rather than whoever logged in. `user_id uuid NOT NULL REFERENCES users(id)` is single-valued, so the hop cannot multiply rows. A session belongs to a LOGIN, so an identity holding two logins has sessions under both and a scoped read returns both, which is what the trader-visible active-sessions list (SD-M4-03) is for.",
+  },
+
+  planVersions: {
+    class: 'firm',
+    why: 'The published product catalogue. There is no identity column and there is no correct one: EVERY identity is sold the same plan version, and the link runs the other way -- `accounts.plan_version_id` names the version an account was bought under -- so ownership flows FROM the catalogue rather than to it. The public rules pages read it unscoped and that is not a leak: a published plan version is the contract the firm offers in public.',
+  },
+
   accounts: {
     class: 'owned',
     column: 'identity_id',
@@ -150,6 +186,15 @@ export const SCOPE_RULES = {
   liabilitySnapshots: {
     class: 'firm',
     why: "EC-095's three named numbers, aggregated across every identity. There is no identity column and there is no correct one: a per-identity slice of a firm-wide liability total is not a smaller version of it.",
+  },
+
+  ruleStates: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0015_rule_states.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. The grain is ONE ROW PER ACCOUNT PER TRADING DAY: the day is the grain and the tenancy is the account's, so this is `accounts`' rule exactly one hop out and the day contributes nothing to who may read it.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
