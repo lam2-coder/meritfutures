@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// THIRTY-EIGHT TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 73 are not reachable through either accessor: `SCOPE_RULES` is total
+// FORTY-THREE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 68 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE THIRTY-EIGHT ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE FORTY-THREE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. FOUR
-// of the thirty-eight below carry later columns -- `sessions`, `plan_versions`,
+// of the forty-three below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states` and `admin_actions` -- and none of them could be registered at
 // all before ADR-094, which is why the ruling came before the transcription
 // rather than after it.
@@ -60,6 +60,7 @@ import {
   inet,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -131,6 +132,23 @@ export const statisticMeasure = pgEnum('statistic_measure', [
   'p50',
   'p95',
   'count',
+]);
+// 0001_extensions_and_enums.sql. `risk_flags.status` is the ONE column in this
+// file's risk set that is an enum rather than `text` plus a CHECK, and the
+// difference is the DDL's and not a preference: `detector_runs.status` takes a
+// CHECK list in 0008 and is transcribed as `text` for that reason.
+//
+// INV-M7-02 IS NOT IN THIS TYPE AND NOTHING HERE IMPLIES IT IS. M07 says a
+// detector may write no status other than 'open' and names a PERMISSION as the
+// enforcement; the enum carries all four members because a reviewer legitimately
+// moves a flag through them. Session 161 measured that the permission does not
+// exist yet (0026 creates three roles and no detector role), and a transcription
+// does not repair a grant.
+export const riskFlagStatus = pgEnum('risk_flag_status', [
+  'open',
+  'investigating',
+  'dismissed',
+  'enforced',
 ]);
 
 // -----------------------------------------------------------------------------
@@ -839,6 +857,218 @@ export const reviewRequests = pgTable('review_requests', {
 });
 
 // -----------------------------------------------------------------------------
+// identity_signals -- 0002_identity.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// THE ENTITY GRAPH'S NODES, AND ONE ROW IS ONE IDENTITY'S OBSERVATION OF ONE
+// THING. `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE
+// RESTRICT` is on the row, so two identities behind one coffee-shop IP produce
+// TWO rows and the `owned` rule returns each identity exactly its own.
+//
+// THIS TABLE IS THE OTHER END OF `scope.ts`'s NAMED TRAP AND IS NOT THE TRAP
+// ITSELF. `sessions.device_fingerprint_id` references this table, so deriving
+// SESSIONS through it reaches whoever shares a device; that is a defect in a
+// rule for `sessions` and says nothing about this table, whose own identity
+// column is direct, single and NOT NULL.
+//
+// `value_hash` IS `bytea` AND IS NOT APPROXIMATED AS `text`. INV-M7-08: the
+// card BIN, the device id and the IP are stored as digests and never raw, which
+// is the column's own DDL comment. ADR-094 section 3 records that this package
+// compares column NAMES and never types, so a `text` here would be a wrong
+// transcription that every assertion in the suite would pass.
+//
+// `kind` IS `text` WITH A CHECK AND THE LIVE CHECK IS WIDER THAN 0002's. 0029
+// supersedes it with `identity_signals_kind_allowed` over TEN values, adding
+// 'phone' and 'phone_carrier' for ADR-039. That is a CONSTRAINT change and not
+// a column change, so ADR-094's fold reads it and discards it; it is written
+// here because the table is read AS OF THE LAST MIGRATION and a reader taking
+// the 0002 list as current would be eight of ten.
+//
+// THE SUPERSEDED CONSTRAINT IS DELIBERATELY NOT NAMED. `CI-06/retired-constraints`
+// found the first draft of this comment naming it, correctly: a retired name may
+// appear only where the appearance retires it or records it, and this file
+// describes the LIVE schema. Registering `schema.ts` as a recording site to keep
+// the name would be widening a register to fit a comment.
+export const identitySignals = pgTable('identity_signals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  kind: text('kind').notNull(),
+  // INV-M7-08. HASHED, never raw.
+  valueHash: bytea('value_hash').notNull(),
+  // The only human-readable half, deliberately not enough to reconstruct the
+  // value it previews.
+  valuePreview: text('value_preview'),
+  firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull().defaultNow(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
+  observationCount: integer('observation_count').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// detector_definitions -- 0008_risk.sql. FIRM.
+// -----------------------------------------------------------------------------
+// A DETECTOR'S PARAMETERS, VERSIONED, WITH AN EFFECTIVE DATE. No identity owns
+// a threshold Merit tunes about its whole population, and the link runs the
+// other way: a `detector_runs` row names the detector and version it ran under.
+//
+// `is_sensitive` DEFAULTS TO TRUE AND THE DEFAULT IS THE POINT (SD-M7-03): a
+// detector parameter that leaks tells the adversary exactly where the line is,
+// so a new detector is protected before anybody remembers to protect it.
+//
+// THE PRIMARY KEY IS COMPOSITE, `(detector, version)`, and it is transcribed
+// rather than replaced by a surrogate. A version is not a revision of a row, it
+// is another row, which is what makes tuning a threshold a DATA change with a
+// recorded effective date rather than a deploy.
+export const detectorDefinitions = pgTable(
+  'detector_definitions',
+  {
+    detector: text('detector').notNull(),
+    version: text('version').notNull(),
+    parameters: jsonb('parameters').notNull(),
+    description: text('description').notNull(),
+    effectiveFrom: date('effective_from').notNull(),
+    effectiveTo: date('effective_to'),
+    // SD-M7-03. Marks the parameters that MUST NEVER REACH A TRADER.
+    isSensitive: boolean('is_sensitive').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.detector, t.version] })],
+);
+
+// -----------------------------------------------------------------------------
+// detector_runs -- 0008_risk.sql. FIRM.
+// -----------------------------------------------------------------------------
+// ONE ROW PER DETECTOR PER NIGHT, OVER THE WHOLE POPULATION. There is no
+// identity column and there is no correct one: a run scans every account and
+// the identities it touches are its OUTPUT, recorded on `risk_flags`, rather
+// than its owner.
+//
+// `synthetic_expected` AND `synthetic_found` ARE INV-M7-07 (SD-M7-01). A
+// detector whose query silently returns nothing looks exactly like a clean
+// night, and seeded synthetic positives are the only way to tell. 0008's
+// `detector_runs_synthetics_match_status` makes the counters and the state
+// agree in the DATABASE -- `status <> 'ok' OR synthetic_found >=
+// synthetic_expected` -- so a run that missed a seeded positive cannot claim
+// 'ok'. That constraint is the control; nothing in this file is.
+//
+// `status` IS `text` AND NOT AN ENUM because 0008 constrains it with a CHECK
+// over 'ok', 'failed' and 'degraded' rather than a `CREATE TYPE`, and the
+// transcription follows the DDL. 'degraded' is distinct from 'failed' on
+// purpose: a run that completed and found fewer synthetics than it seeded did
+// not fail, it produced an answer that must not be trusted.
+export const detectorRuns = pgTable('detector_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  detector: text('detector').notNull(),
+  detectorVersion: text('detector_version').notNull(),
+  tradingDay: date('trading_day').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  rowsScanned: integer('rows_scanned').notNull().default(0),
+  flagsRaised: integer('flags_raised').notNull().default(0),
+  // SD-M7-01. INV-M7-07.
+  syntheticExpected: integer('synthetic_expected').notNull().default(0),
+  syntheticFound: integer('synthetic_found').notNull().default(0),
+  // SD-M7-01 adds 'degraded' to the CHECK list.
+  status: text('status').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// risk_flags -- 0008_risk.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// A FLAG IS ABOUT A PERSON AND THE ROW SAYS SO: `identity_id uuid NOT NULL
+// REFERENCES identities(id) ON DELETE RESTRICT`. `account_id` is also present,
+// is NULLABLE, and is NOT the scope -- a flag can be about the identity with no
+// account named at all (entity_cap, payment_velocity, name_mismatch), so
+// deriving through `accounts` would drop exactly the flags that are about the
+// person rather than about one of their accounts.
+//
+// REGISTERING A TABLE MAKES IT READABLE AND NOTHING ELSE, and on this table the
+// distinction is worth stating out loud. A scope rule answers HOW A ROW REACHES
+// AN IDENTITY; it does not answer who may read it. INV-M7-10 says a trader's
+// evidence pack carries no detector detail, and 0008's
+// `evidence_packs_trader_gets_no_detector_detail` is where that is enforced --
+// on `evidence_packs`, which is not this table and is not registered here.
+// Nothing in this rule grants a trader a read of `evidence` or of `flag_type`.
+//
+// `severity` IS `smallint` WITH `CHECK (severity BETWEEN 1 AND 5)`. A SCORED
+// QUEUE, NOT A BOOLEAN, and since ADR-040 severity 4 is load bearing:
+// `G-HOLD-REQUIRED` holds a payout on an unresolved 4+ flag, which is why this
+// table is money-ADJACENT even though nothing here writes money.
+//
+// `sla_due_at` AND `first_touched_at` ARE SD-M7-02 AND ARE BOTH NULLABLE. The
+// promise is not the columns, it is `risk_flags_high_severity_has_sla` --
+// `severity < 4 OR sla_due_at IS NOT NULL` -- so severity 4 and 5 carry a clock
+// and 1 to 3 do not. `first_touched_at` is separate from `resolved_at` on
+// purpose: "someone looked" and "someone decided" are different service levels
+// and only the first can be promised in hours.
+export const riskFlags = pgTable('risk_flags', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  accountId: uuid('account_id').references(() => accounts.id),
+  flagType: text('flag_type').notNull(),
+  // A SCORED QUEUE, NOT A BOOLEAN.
+  severity: smallint('severity').notNull(),
+  status: riskFlagStatus('status').notNull().default('open'),
+  // Reserved: 'internal' or 'vendor:<name>', so a vendor detector plugs in
+  // without a migration.
+  source: text('source').notNull().default('internal'),
+  detectorRunId: uuid('detector_run_id').references(() => detectorRuns.id),
+  // THE NUMBERS BEHIND THE ACCUSATION, NEVER A BARE LABEL.
+  evidence: jsonb('evidence').notNull(),
+  firstDetectedOn: date('first_detected_on').notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  resolvedBy: text('resolved_by'),
+  resolutionNote: text('resolution_note'),
+  // SD-M7-02.
+  slaDueAt: timestamp('sla_due_at', { withTimezone: true }),
+  firstTouchedAt: timestamp('first_touched_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// correlation_groups -- 0008_risk.sql. FIRM.
+// -----------------------------------------------------------------------------
+// A GROUP-LEVEL FINDING SPANNING THREE OR MORE ACCOUNTS, AND NO IDENTITY OWNS
+// ONE. `correlation_groups_is_a_group` starts the table at three members -- a
+// group of one is a pair detector with extra steps and a group of two is
+// `identity_links`' job -- and M07 section 3.4 filters same-identity clustering
+// AT THE DETECTOR, so a row that exists is a finding ABOUT MORE THAN ONE
+// identity by construction.
+//
+// THE `firm` CLASS HERE IS A REFUSAL AND NOT A DEFAULT. `member_account_ids` is
+// `uuid[]`, which the four-class vocabulary cannot traverse in any case --
+// `DerivedRule` names one `localColumn` against one `foreignColumn` and an array
+// is neither a `hop` nor a `semi-join` -- but the reason it must not be
+// traversed is stronger than the reason it cannot be: returning the row to each
+// member would tell every member which OTHER accounts the detector grouped them
+// with, which is a cross-identity read and the BOLA failure ADR-008 scoped the
+// accessor to bound. Firm makes it `systemDb`-only, and `scopePredicate` says so
+// by throwing rather than by returning nothing.
+//
+// `statistic` AND `threshold` ARE `numeric` AND THAT IS NOT A NO-FLOATS
+// VIOLATION. The rule governs FINANCIAL paths; a correlation coefficient is not
+// one, and rounding it to cents would be the actual error. 0008's own comment
+// says this.
+export const correlationGroups = pgTable('correlation_groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tradingDay: date('trading_day').notNull(),
+  // The group AS A SET. Decomposing it into rows would make "which accounts did
+  // this result cover" a query rather than a fact.
+  memberAccountIds: uuid('member_account_ids').array().notNull(),
+  method: text('method').notNull(),
+  statistic: numeric('statistic').notNull(),
+  threshold: numeric('threshold').notNull(),
+  detectorRunId: uuid('detector_run_id').references(() => detectorRuns.id),
+  evidence: jsonb('evidence').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
 // coupons -- 0006_commerce.sql. FIRM: no identity column, and no correct one.
 // -----------------------------------------------------------------------------
 // A DISCOUNT CODE IS THE FIRM'S OFFER AND NOT A BUYER'S ROW. What a buyer holds
@@ -1056,8 +1286,12 @@ export const evidencePacks = pgTable('evidence_packs', {
 // identity, so a second restriction on a restricted human is a database refusal
 // rather than a duplicate record.
 //
-// `flag_id` CARRIES NO `.references()` because `risk_flags` is not one of this
-// file's tables. The column is transcribed and the edge is left to the database.
+// `flag_id` CARRIES `.references()` BECAUSE SESSION 192 REGISTERED `risk_flags`,
+// and this file's rule is a property of the merged tree rather than of either
+// branch: the FK is declared INLINE in 0031's `CREATE TABLE` body and its target
+// is now one of this file's tables, so both halves of the condition hold. It was
+// written without the edge on a tree where `risk_flags` was unregistered, and
+// the merge is what made the rule apply.
 //
 // THE RESTORE IS THE HALF THAT GETS SKIPPED UNDER PRESSURE (INV-M6-14), and
 // `identity_restriction_restore_is_complete` makes `restored_at`, `restored_by`
@@ -1068,7 +1302,9 @@ export const identityRestrictionEpisodes = pgTable('identity_restriction_episode
   identityId: uuid('identity_id')
     .notNull()
     .references(() => identities.id),
-  flagId: uuid('flag_id').notNull(),
+  flagId: uuid('flag_id')
+    .notNull()
+    .references(() => riskFlags.id),
   tosClause: text('tos_clause').notNull(),
   reason: text('reason').notNull(),
   openedBy: uuid('opened_by')
