@@ -47,6 +47,8 @@ import {
   dailyMarks,
   detectorDefinitions,
   detectorRuns,
+  discordAnnouncements,
+  discordLinks,
   dualControlApprovals,
   economicCalendar,
   economicCalendarLoads,
@@ -71,6 +73,9 @@ import {
   ledgerEntries,
   ledgerTransactions,
   liabilitySnapshots,
+  loyaltyBenefitGrants,
+  loyaltyCriteria,
+  loyaltyStates,
   midHealth,
   notificationKinds,
   notificationPreferences,
@@ -123,7 +128,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * NINETY-ONE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * NINETY-SIX OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -262,6 +267,11 @@ export const TABLES = {
   ingestFiles,
   rawIngestRows,
   reconciliations,
+  loyaltyCriteria,
+  loyaltyStates,
+  loyaltyBenefitGrants,
+  discordLinks,
+  discordAnnouncements,
   geoRestrictions,
   tosVersions,
   tosAcceptances,
@@ -876,6 +886,36 @@ export const SCOPE_RULES = {
     foreignColumn: 'id',
     traversal: 'hop',
     why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0014_marks.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THE GRAIN IS ONE ACCOUNT'S BALANCE, OURS BESIDE THEIRS, FOR ONE TRADING DAY, which is `daily_marks`' rule exactly and the day contributes nothing to who may read the row. `source_ingest_file_id` IS THE TRAP AND IT IS THIS MODULE'S CHARACTERISTIC ONE: it is a foreign key to `ingest_files`, which is FIRM, so a derivation through it constructs no predicate and throws, and it is NULLABLE besides, so even a firm-free version of the reading would drop every row reconciled before SD-M2-06 landed. `delta_cents` is GENERATED from the two balances and `resolved_by` is an operator name on 0002's `actor` idiom rather than a `users` row.",
+  },
+  loyaltyCriteria: {
+    class: 'firm',
+    why: "VERSIONED PROMISES, AND A PROMISE BELONGS TO NOBODY UNTIL IT IS EARNED (0023_loyalty_and_graduation.sql). The table holds the PUBLISHED DEFINITION of a benefit rather than an instance of one, it carries no identity column, and there is no correct one, because criteria that differed per trader would not be published criteria -- which is `statistic_definitions`' reason applied to promises rather than to statistics, and 0023's own COMMENT ON TABLE says so. THE DIRECTION OF THE EDGE IS WHAT DECIDES IT: `loyalty_benefit_grants` cites `(benefit_code, criteria_version)` and carries the identity itself, so ownership flows FROM the grant and never from the criteria, and a `derived` rule the other way would hand every trader the whole published catalogue. THE GRAIN IS `(benefit_code, version)` AND IT IS THE WHOLE PRIMARY KEY, so the table has no `uuid` of its own; `superseded_by text NULL` names a successor CODE with no foreign key and cannot address the pair, which is transcribed rather than repaired. A version is what stops a criteria change silently rewriting what past traders were promised (INV-M14-07, INV-M14-09), so a superseded row stays firm for exactly as long as a live one.",
+  },
+
+  loyaltyStates: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0023_loyalty_and_graduation.sql), and it is the ONLY column that reaches a person: every other column is a counter. THE IDENTITY IS THE GRAIN BY RULING AND NOT BY CONVENIENCE -- INV-M14-12 computes cross-account loyalty at the identity grain from completed ladders -- so there is no account column here to be tempted by and no `accounts` hop to write. THE COMPOSITE PRIMARY KEY `(identity_id, as_of_trading_day)` IS A HISTORY AND NOT A SECOND OWNER, which is `analytics_snapshots`' and `daily_marks`' shape: ONE STATE PER IDENTITY PER CLOSED DAY, and the day contributes nothing to who may read it. THE STATE IS DERIVED AND NEVER HAND-GRANTED (INV-M14-03), so a scoped read returns a reproduction rather than a balance, and `inputs_digest bytea NOT NULL` is the tamper indication: recompute, compare, and a mismatch is a finding. Registering the table makes it readable and confers no tier on anybody, because a tier here is a record of spending and surviving and is invisible to risk, to the payout path and to support's default view (INV-M14-05).",
+  },
+
+  loyaltyBenefitGrants: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0023_loyalty_and_graduation.sql), which is `promotional_credit_grants`' shape and its reason: a grant is a named person's entitlement from the moment it exists and the DDL has no way to write an unowned one. THE TRAP IS `(benefit_code, criteria_version)` AND IT IS A COMPOSITE FOREIGN KEY TO A FIRM TABLE: `loyalty_benefit_grants_criteria_fk` points at `loyalty_criteria (benefit_code, version)`, `loyalty_criteria` is FIRM, and `DerivedRule.via` is `TableKey` and includes every firm key -- so a derivation through it would compile at every call site and throw the first time anybody read this table. It is also a TWO-COLUMN edge and `DerivedRule` names one column, so the rule could not be written truthfully even if the parent carried an identity. `consumed_ref uuid NULL` IS THE SECOND TRAP AND IT IS POLYMORPHIC: 0023 declares it as an M17 offer id OR an M03 purchase id with NO foreign key, so it names two possible parents and reaches neither, and the single-spend guarantee is the partial unique index rather than a reference. A REVOKED GRANT IS STILL THIS IDENTITY'S ROW, tied to a reason by `loyalty_benefit_grants_revocation_is_explained`, because INV-M14-09 forbids retroactive withdrawal in both directions and a disappearance is how that promise gets broken quietly.",
+  },
+
+  discordLinks: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0019_notifications_and_community.sql), and it is the table's ONLY reference. A LINK IS A CONSENT AND CONSENT IS THE PERSON'S. THE PRIMARY KEY IS THE PAIR `(identity_id, discord_user_id)` AND THE SECOND HALF NAMES NO ROW HERE: `discord_user_id text NOT NULL` is a FOREIGN platform's key, so it is not a hop, not an owner, and not a grain the way a trading day is on `loyalty_states`. `role_opt_ins text[]` IS PER-ROLE CONSENT (INV-M15-01) rather than a boolean, because a role is a public statement about a person and consent to be in a server is not consent to be labeled in it. `revoked_at` IS THE END STATE AND THE ROW SURVIVES IT: `discord_links_live_discord_user_uq` is partial on `revoked_at IS NULL`, so revocation frees the Discord account rather than deleting the record, and a scoped read returns revoked links as the trader's own history. REGISTERING THIS TABLE MAKES IT READABLE AND NOTHING ELSE, which is worth saying here rather than anywhere else: INV-M15-03 forbids this link from ever being an authentication factor, a recovery path or a support-verification method, and its enforcement is STRUCTURAL, by grant, outside this package entirely -- so nothing in `scope.ts` implements it and nothing here should be read as doing so.",
+  },
+
+  discordAnnouncements: {
+    class: 'firm',
+    why: "EVERY MESSAGE MERIT HAS EVER POSTED IN ITS OWN COMMUNITY, AND THE ROW IS MERIT SPEAKING (0019_notifications_and_community.sql, INV-M15-04, INV-M15-05). There is no identity column and there is no correct one: a post to a public channel is addressed to the ROOM, so a per-identity slice of it is not a smaller version of it, and the trader-facing row for the same fact is the `notifications` row, which carries the identity. `event_id bigint NULL REFERENCES events(id) ON DELETE RESTRICT` IS THE ONE COLUMN THAT LOOKS LIKE A PATH AND IT IS NOT ONE, twice over: `events` is UNREGISTERED and deliberately so -- it carries `identity_id` and `account_id` both nullable with no CHECK tying them, so neither column covers the reads the corpus makes of it -- and this column is NULLABLE besides, because a status post has no causing event, so a derivation through it would drop exactly the announcements nobody's event caused. `integration_dispatches.event_id` is the same column with the same treatment one migration earlier. ANNOUNCEMENTS ARE TEMPLATE-ONLY: `template_code text NOT NULL` means there is no free-text send path using the bot credential, and `rendered_body` is STORED rather than re-rendered, so what was said stays a fact about the past after the template moves.",
   },
   geoRestrictions: {
     class: 'firm',
