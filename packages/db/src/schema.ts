@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// FIFTY-NINE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 52 are not reachable through either accessor: `SCOPE_RULES` is total
+// SIXTY-ONE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 50 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE FIFTY-NINE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE SIXTY-ONE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. EIGHT
-// of the fifty-nine below carry later columns -- `sessions`, `plan_versions`,
+// of the sixty-one below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests` and `admin_actions` -- and none of them could be
 // registered at all before ADR-094, which is why the ruling came before the
@@ -2363,4 +2363,94 @@ export const supportContextViews = pgTable('support_context_views', {
   viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
   ipHash: bytea('ip_hash'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// plans -- 0004_catalog.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE PRODUCT CATALOGUE'S ROOT, three rows: `core_eod`, `merit_rapid`, `direct`.
+// There is no identity column and there is no correct one, which is
+// `plan_versions`' reason one hop further up: every identity is offered the same
+// three plans, and the link runs the other way -- a version names its plan, an
+// account names its version -- so ownership flows FROM the catalogue and never
+// into it.
+//
+// `is_active` IS A DELISTING FLAG AND NOT A DELETION. The DDL's own words are
+// that a plan nobody can buy still has to explain the accounts sold under it,
+// which is the same reasoning that makes a published version immutable.
+//
+// `code` CARRIES NO `direct`-TO-`rapid_daily` ALIAS. ADR-013 renamed it at the
+// M1 gate with no row to migrate, and the DDL records that the old code is not
+// carried forward.
+export const plans = pgTable('plans', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: text('code').notNull(),
+  name: text('name').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// simulation_runs -- 0045_simulation_runs.sql. FIRM.
+// -----------------------------------------------------------------------------
+// A MONTE CARLO RUN OVER A PROPOSED PLAN CONFIG, recorded so a published version
+// can be traced to the projection it was decided on (M21 `INV-M21-05`). There is
+// no identity column and there is no correct one: the subject of a run is a
+// PARAMETER SET, the population it simulates is synthetic, and no person's rows
+// are read to produce it.
+//
+// `requested_by` IS THE TRAP AND IT IS WEAKER THAN THE ONE `treasury_balances`
+// CARRIES, NOT STRONGER. It is bare `text NOT NULL` with no foreign key at all,
+// on `dual_control_approvals.requested_by`'s precedent, so it does not even name
+// a `users` row -- and if it did, scoping by it would return the firm's plan
+// economics to whichever operator pressed the button, which is this file's own
+// named `recorded_by` failure in a second costume.
+//
+// A `derived` RULE THROUGH `plan_versions` WOULD THROW RATHER THAN MISLEAD, and
+// it is the available mistake here: `plan_version_id` reads like a hop and is
+// not one, because `plan_versions` is firm and a chain terminates at `owned` or
+// at `root` or it does not terminate. It is also NULLABLE by design -- the run
+// is over a DRAFT, which may not yet be a row -- so the digests beside it are
+// what say which config was actually simulated.
+//
+// `seed` IS `text` AND NOT A NUMBER, transcribed rather than preferred:
+// `Provenance.seed` is typed `string`, and a seed stored as a bigint would
+// round-trip some seeds and not others. `sample_size` is `integer` with a
+// `>= 0` CHECK because `provenanceFor` throws only below zero, so a zero-sample
+// run is legal in the harness and has to be storable.
+//
+// `calibration_observed_at` IS A `date` AND THE DAY THE FIGURES WERE OBSERVED,
+// never the day of the run. The three digests are `bytea`, on the same
+// convention `rule_states.state_hash` and `dual_control_approvals.payload_hash`
+// already hold, each with a `length = 32` CHECK the database keeps.
+export const simulationRuns = pgTable('simulation_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  planVersionId: uuid('plan_version_id').references(() => planVersions.id),
+  rulesDigest: bytea('rules_digest').notNull(),
+  sizesDigest: bytea('sizes_digest').notNull(),
+  calibrationId: text('calibration_id').notNull(),
+  calibrationDigest: bytea('calibration_digest').notNull(),
+  calibrationObservedAt: date('calibration_observed_at').notNull(),
+  harnessVersion: text('harness_version').notNull(),
+  engineVersion: text('engine_version').notNull(),
+  seed: text('seed').notNull(),
+  sampleSize: integer('sample_size').notNull(),
+  // ALL THREE OR NONE, kept by `simulation_runs_sweep_arm_is_whole`. An arm
+  // naming a parameter but no sweep is an arm of nothing.
+  sweepId: uuid('sweep_id'),
+  sweptParameter: text('swept_parameter'),
+  // THE NAME IS THE PLAN'S AND IS NOT ALWAYS TRUE: M21 section 3.4 sweeps
+  // `max_payouts`, which is a count and not a basis point. 0045 kept the plan's
+  // name deliberately and this is a transcription of that column.
+  sweptValueBp: bigint('swept_value_bp', { mode: 'bigint' }),
+  // `text` WITH A CHECK, NOT A pg ENUM. 0045 declares
+  // `status text NOT NULL CHECK (status IN ('queued','running','complete','failed'))`
+  // and 0001 mints no enum for it, so the four values live in the constraint.
+  status: text('status').notNull(),
+  outputs: jsonb('outputs').notNull().default({}),
+  requestedBy: text('requested_by').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
 });

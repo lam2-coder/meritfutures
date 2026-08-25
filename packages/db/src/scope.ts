@@ -69,6 +69,7 @@ import {
   pageRevalidations,
   phoneChangeRequests,
   planBreakerState,
+  plans,
   planVersions,
   planVersionSizes,
   proofLinks,
@@ -82,6 +83,7 @@ import {
   ruleStates,
   sanctionsScreenings,
   sessions,
+  simulationRuns,
   statisticDefinitions,
   supportContextViews,
   treasuryBalances,
@@ -91,7 +93,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FIFTY-NINE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * SIXTY-ONE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -189,6 +191,8 @@ export const TABLES = {
   integrationContracts,
   integrationDispatches,
   supportContextViews,
+  plans,
+  simulationRuns,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -620,6 +624,14 @@ export const SCOPE_RULES = {
     column: 'identity_id',
     nullable: false,
     why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` (0018_integrations.sql). ONE ROW PER TIME A SUPPORT AGENT READ A TRADER'S IDENTITY GRAPH, and the row is about THE TRADER WHO WAS READ rather than the agent who read: that is `impersonation_sessions`' question one surface out and it has the same answer. THERE IS NO SECOND IDENTITY COLUMN TO CHOOSE BETWEEN AND THAT IS STRUCTURAL: `agent_ref text NOT NULL` is an actor string declaring no foreign key, so the agent side is not a path to anybody, where `impersonation_sessions.admin_user_id` does reference `users` and is this file's own named trap. A support read happens OUTSIDE the admin origin's IP allowlist and hardware-key SSO, so an unaudited one is an unmonitored back door into the crown jewel (AS-M10-01, dossier item 9); `fields_returned` records what was RETURNED rather than what was requested, because a log of the request cannot answer what the agent actually saw. REGISTERING THIS TABLE MAKES IT READABLE AND NOTHING ELSE: per-agent breadth monitoring is a property of the read path and no scope rule enforces it.",
+  },
+  plans: {
+    class: 'firm',
+    why: "THE PRODUCT CATALOGUE'S ROOT: three rows, `core_eod`, `merit_rapid` and `direct`. There is no identity column and there is no correct one, and it is `plan_versions`' reason one hop further up -- EVERY identity is offered the same three plans, and the link runs the other way: a version names its plan and an account names its version, so ownership flows FROM the catalogue and never into it. `is_active` DELISTS AND NEVER DELETES, on the table's own DDL reasoning that a plan nobody can buy still has to explain the accounts sold under it, so a retired row is firm for exactly as long as the live one. A `derived` rule through `plan_versions` would be the refused shape twice over, since that parent is firm as well.",
+  },
+  simulationRuns: {
+    class: 'firm',
+    why: "A MONTE CARLO RUN OVER A PROPOSED PLAN CONFIG, kept so a published version resolves to the projection it was decided on (M21 INV-M21-05). There is no identity column and there is no correct one: the subject of a run is a PARAMETER SET, its population is synthetic, and no person's rows are read to produce it. THE TRAP IS `requested_by`, and it is weaker than `treasury_balances.recorded_by` rather than stronger -- it is bare `text NOT NULL` with no foreign key at all, so it names no `users` row to derive through, and had it been one, scoping by it would return the firm's plan economics to whichever operator pressed the button. `plan_version_id` IS THE OTHER AVAILABLE MISTAKE and a `derived` rule through it THROWS rather than misleads: `scopePredicate` recurses into the via table, `plan_versions` is firm, and a chain terminates at `owned` or at `root` or it does not terminate. It is NULLABLE besides, because the run is over a DRAFT that may not yet be a row, which is what the two digests beside it exist to pin.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 

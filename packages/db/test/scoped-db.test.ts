@@ -121,6 +121,8 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   integrationContracts: 'integration_contracts',
   integrationDispatches: 'integration_dispatches',
   supportContextViews: 'support_context_views',
+  plans: 'plans',
+  simulationRuns: 'simulation_runs',
 };
 
 /**
@@ -260,9 +262,9 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 52 are unreachable through either accessor.
+  // rounded up: the other 50 are unreachable through either accessor.
   //
-  // `identity_links` IS ONE OF THE 52 AND ITS ABSENCE IS DELIBERATE. It carries
+  // `identity_links` IS ONE OF THE 50 AND ITS ABSENCE IS DELIBERATE. It carries
   // TWO identity columns against an `owned` rule that names one, ADR-092 section
   // 9 names it as a per-table ruling and takes neither, and a transcription
   // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
@@ -282,13 +284,13 @@ describe('the registry is total', () => {
   // rather than a second judgment: its only path to an identity is
   // `attribution_id`, `DerivedRule.via` is `TableKey`, and an unregistered
   // table has no key to name.
-  test('59 declared tables, 59 scope rules, 0 reachable without one', () => {
+  test('61 declared tables, 61 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(59);
-    expect(rules).toBe(59);
+    expect(declared).toBe(61);
+    expect(rules).toBe(61);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
