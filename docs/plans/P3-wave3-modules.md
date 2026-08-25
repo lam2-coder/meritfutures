@@ -134,6 +134,14 @@ instead that the marketing site *"is not a reader of this database at all"*, rea
 remedy is unavailable here**, because under that same ruling `apps/api` is the process the site reads
 THROUGH. `P3-f` takes it.
 
+**That precedent stopped being a ruling and became a shipped adapter while this branch was open.**
+[Session 210](../sessions/2026-08-25-session-210.md) merged `P4-e` at `14dc406`: `apps/site/src/catalog/adapter.ts`
+resolves the site's four read ports over HTTP with **zero `packages/db` imports, no pool and no credential**,
+and **two of the four ports are implemented as REFUSALS because no document gives their reads an address**.
+So the argument above is now load-bearing in the tree rather than only in an entry: **the site's unserved
+reads are waiting on routes in `apps/api`**, and `apps/api` is the one process that cannot answer
+"read over HTTP instead" when it meets a `firm` table.
+
 ---
 
 ## 4. The second precondition, and ADR-094 wrote its specification and did not number it
