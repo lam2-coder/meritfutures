@@ -4,16 +4,26 @@
   "private": true,
   "type": "module",
   "description": "Trader dashboard, payout center, certificates, KYC status, referrals. Railway service: portal.",
+  "//next": "THE FRAMEWORK IS ADR-095's AND THE `build` SCRIPT IS WHY CI-07 MOVED IN THE SAME COMMIT. M04 section 1.1 calls this app \"a Next.js App Router application, mobile first, consuming `/api/v1` and nothing else\", and until ADR-095 no ADR in this corpus ruled a UI technology at all. The version lives in `pnpm-workspace.yaml`'s `catalog:` block, so VG-12's approval happens once on a diff to that block rather than once per manifest. THE `build` SCRIPT IS A PROBED ARTIFACT AND IT ARRIVED HERE. `CI-06/gate-inventory` read every `apps/*/package.json` for that key and required it ABSENT, so this line reopened `CI-07` on the commit that added it, which is the half of ADR-073's ruling that fails on good news working exactly as designed. `CI-07`'s cell is re-ruled in the same commit (ADR-095 section 6) and its artifact is now a `page`, `layout` or `route` file under `apps/*/src/app/`, because the script exists and has nothing to build: `next build` here exits 1 on \"Couldn't find any `pages` or `app` directory\". THERE IS STILL NO PAGE, NO LAYOUT, NO ROUTE AND NO `next.config`. ADR-095 ruling 6 admits a dependency and rules a boundary; the first rendered document is P4-e's and P4-h's. AND NO ROUTE HANDLER OR SERVER ACTION MAY SERVE `/api/v1` OR ANY OPERATOR PATH. ADR-083 section 3 and ADR-095 ruling 3. ADR-095's own approval clause records that NOTHING in this repository refuses one today, which is a gap named rather than a control claimed. THE `start` SCRIPT CHANGES TOO, AND THAT IS NOT INCIDENTAL. It read `node --experimental-strip-types src/index.ts`, which starts a module that serves nothing; the four non-UI apps keep that shape and this one cannot. A Railway service whose start command runs an export surface is a manifest that is wrong in the direction that looks like it works. `next start` is wrong in the honest direction until a page exists. A `dev` script lands here for the same fence reason the React types do: P4-e and P4-h write the pages and hold no manifest that could add one.",
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build": "next build",
+    "dev": "next dev",
     "typecheck": "tsc --noEmit",
-    "start": "node --experimental-strip-types src/index.ts"
+    "start": "next start"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "dependencies": {
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   }
 }
