@@ -60,12 +60,16 @@ import {
   notificationKinds,
   notificationPreferences,
   notifications,
+  offerExperiments,
+  offers,
   otpSendBudget,
   pageRevalidations,
   phoneChangeRequests,
   planBreakerState,
   planVersions,
   planVersionSizes,
+  priceFloors,
+  promotionalCreditGrants,
   proofLinks,
   pspWebhookEvents,
   publishedStatistics,
@@ -85,7 +89,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FIFTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FIFTY-SEVEN OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -154,6 +158,10 @@ export const TABLES = {
   planBreakerState,
   reportDeliveries,
   reportSchedules,
+  offerExperiments,
+  priceFloors,
+  offers,
+  promotionalCreditGrants,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -542,6 +550,29 @@ export const SCOPE_RULES = {
   reportSchedules: {
     class: 'firm',
     why: "WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. `recipients text[] NOT NULL` holds Merit's own staff addresses or a configured SFTP destination, never a trader's, and the row exists to give the C8 weekly risk ritual an input other than a human remembering to look. There is no identity column and there is no correct one. NO CREDENTIAL IS STORED HERE and there is deliberately no column that could hold one, so this table is not a fifth credential surface arriving without a ruling.",
+  },
+  offerExperiments: {
+    class: 'firm',
+    why: "AN EXPERIMENT IS A THING MERIT RUNS AND NOT A THING ANYBODY OWNS. There is no identity column and there is no correct one: an arm is assigned to a POPULATION and the hypothesis is about the population, so a per-identity slice of an experiment is not a smaller version of it. `arms jsonb` holds arm DEFINITIONS rather than enrolments and there is no enrolment table in this tree, so nothing here reaches an identity even one hop out. The row a person actually holds is the `offers` row naming `experiment_id`, and that table carries the identity. `varies` is CHECKed to price, presentation and bundle_contents with no fourth value, which is 0024's own header: an experiment that varies a rule, a gate or a plan parameter cannot be written down at all (AS-M17-07).",
+  },
+
+  priceFloors: {
+    class: 'firm',
+    why: "THE HARD STOP UNDER STACKING ARITHMETIC, AND IT IS THE FIRM'S NUMBER (0024_offers.sql). The table declares no foreign key at all, carries no identity column, and there is no correct one, because a floor that differed per trader would not be a floor; `approved_by text NOT NULL` is an approver rather than a `users` row, on 0002's `actor` idiom. THE GRAIN IS `(product_ref, effective_from)` AND IT IS THE WHOLE PRIMARY KEY, so the table has no `uuid` of its own, and `dual_control_approvals.subject_id` is `uuid NOT NULL` (0016:227) -- so the dual control M17:150, EC-119 and `data-model/price_floors.md:2` all assert over this table cannot name its subject. THAT IS A FINDING AND NOT A REPAIR: a repair is a migration and a transcription holds none. Registering the table changes nothing about it either way, because a firm table is refused by the scoped accessor at compile time.",
+  },
+
+  offers: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: true,
+    why: "NULLABLE ON PURPOSE, AND THE DDL MAKES IT BICONDITIONAL. `offers_identity_scope_matches` CHECKs `(scope = 'identity' AND identity_id IS NOT NULL) OR (scope <> 'identity' AND identity_id IS NULL)`, so filtering `identity_id = $1` returns EXACTLY the rows the schema says are that person's and excludes every `public` and `segment` row without a second predicate, because SQL NULL never equals anything. THIS IS `ledger_accounts`' SHAPE AND NOT `coupons`': a coupon has no identity column and no correct one, while this row has one the DDL declares `REFERENCES identities(id)`, which is also why `firm` is refused here by the suite's own assertion rather than by taste. THE TRAP IS `experiment_id`: it is a foreign key to `offer_experiments`, which is FIRM, so a `derived` rule through it compiles at every call site -- `DerivedRule.via` is `TableKey` and includes every firm key -- and throws the first time anybody reads it. `loyalty_grant_id` is the same shape one table further out. WHAT THIS RULE DOES NOT RETURN IS SAID OUT LOUD: a `segment` offer names no segment, because the table has no segment column at all, so it is unreachable from any identity under any class in this vocabulary, and a scoped read of this table is THE OFFERS ADDRESSED TO A PERSON rather than the offers available to them.",
+  },
+
+  promotionalCreditGrants: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "THE TABLE THAT MINTS VALUE, and `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on the row (0024_offers.sql). A grant is a named person's entitlement from the moment it exists and the DDL has no way to write an unowned one. NEVER WITHDRAWABLE (OQ-FREEZE-01): its own ledger class `promotional_credit` at 0009, and no `wallet_entries.provenance` value at 0011. `funding_purchase_id` IS THE DELTA'S CONTENT AND IS NOT THE SCOPE: it is NULLABLE, because a loyalty-issued or fee-back-issued grant has no funding purchase, so a derivation through `purchases` would return only the grants somebody bought and would drop exactly the ones no purchase funded. `source_offer_id` IS THE OTHER TRAP AND IT IS THIS MODULE'S CHARACTERISTIC ONE -- a redemption pointing at its catalogue row reads like a legitimate hop -- and it is nullable besides, so a grant issued from a `public` offer would reach nobody at all through it. `source_payout_request_id` is 0044's later column, folded by ADR-094, and is a settlement rather than a person.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
