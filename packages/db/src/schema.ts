@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// FIFTY-THREE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 58 are not reachable through either accessor: `SCOPE_RULES` is total
+// FIFTY-SEVEN TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 54 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE FIFTY-THREE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE FIFTY-SEVEN ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. EIGHT
-// of the fifty-three below carry later columns -- `sessions`, `plan_versions`,
+// of the fifty-seven below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests` and `admin_actions` -- and none of them could be
 // registered at all before ADR-094, which is why the ruling came before the
@@ -162,6 +162,22 @@ export const riskFlagStatus = pgEnum('risk_flag_status', [
   'investigating',
   'dismissed',
   'enforced',
+]);
+
+// ADR-019's external leg, and the enum is where ADR-028's split is actually
+// recorded: `transferring` LEFT `payout_requests` and lives here, beside
+// `cooling` and `cancelled`, which the internal leg has no use for at all. The
+// seven members are 0001's seven and the order is 0001's order, because a
+// Postgres enum is ORDERED and a reordered transcription would be a false
+// statement about a type this file does not create.
+export const walletWithdrawalStatus = pgEnum('wallet_withdrawal_status', [
+  'requested',
+  'cooling',
+  'approved',
+  'transferring',
+  'settled',
+  'failed',
+  'cancelled',
 ]);
 
 // -----------------------------------------------------------------------------
@@ -2107,4 +2123,166 @@ export const impersonationPageViews = pgTable('impersonation_page_views', {
     .references(() => impersonationSessions.id),
   route: text('route').notNull(),
   viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// wallet_entries -- 0011_wallet.sql. OWNED: `identity_id`, NOT NULL. MONEY PATH.
+// -----------------------------------------------------------------------------
+// THE WALLET'S OWN STATEMENT, AND IT IS NOT THE LEDGER. The ledger records that
+// money moved into `trader_wallet`; only this table records WHAT KIND of money
+// arrived, which is why `provenance` exists as a column rather than as a join.
+// Append-only: a correction is a new row and never an update.
+//
+// `direction` AND `amount_cents` DO NOT USE THE LEDGER'S SIGN CONVENTION, and
+// 0011 says so in its own words: `amount_cents` is a MAGNITUDE, always positive,
+// and `direction` carries the sign. Reusing the chart-of-accounts convention for
+// a second question is the shape of error ADR-027 was reversed over.
+//
+// `provenance` IS A CLOSED LIST OF THREE AND `text` HERE IS NOT A WIDENING. The
+// DDL enforces `CHECK (provenance IN ('payout','refund_wallet_funded',
+// 'correction'))`; there is no `deposit` member and none may be added without
+// counsel and an ADR (INV-WALLET-NO-DEPOSITS), and there is no
+// `promotional_credit` member either, which OQ-FREEZE-01 ruled deliberately: the
+// loyalty perk is never withdrawable and lives in `promotional_credit_grants`.
+// A CHECK is not a Postgres enum, so transcribing it as one would be a false
+// statement about the column's type.
+//
+// `reference_id` IS POLYMORPHIC AND CARRIES NO `.references()`, because 0011
+// declares none: the row it names is a payout request, a purchase or the entry
+// this one corrects, decided by `provenance`. The database does not resolve it
+// and neither does this file.
+export const walletEntries = pgTable('wallet_entries', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  direction: text('direction').notNull(),
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  provenance: text('provenance').notNull(),
+  // The business event, human readable.
+  cause: text('cause').notNull(),
+  referenceId: uuid('reference_id').notNull(),
+  // Every wallet movement is posted. An entry with no ledger transaction is
+  // money that moved outside the ledger.
+  ledgerTransactionId: uuid('ledger_transaction_id')
+    .notNull()
+    .references(() => ledgerTransactions.id),
+  // The running balance AFTER this entry, stored so a divergence from the
+  // recomputed one is a DETECTABLE tamper indication rather than an invisible.
+  balanceAfterCents: bigint('balance_after_cents', { mode: 'bigint' }).notNull(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// wallet_withdrawals -- 0011_wallet.sql. OWNED: `identity_id`, NOT NULL. MONEY
+// PATH.
+// -----------------------------------------------------------------------------
+// THE EXTERNAL LEG, AND IT IS A DIFFERENT OBJECT FROM A PAYOUT REQUEST. A payout
+// request is a CLAIM AGAINST AN ACCOUNT evaluated by the engine; a withdrawal is
+// a MOVEMENT OF AN ALREADY-SETTLED BALANCE evaluated against KYC and destination
+// rules (SD-M5-06). ADR-028 made the split concrete and this table owns
+// `transferring`, `cooling` and `cancelled`.
+//
+// `destination_ref` IS THE PROVIDER-SIDE DESTINATION ID AND NEVER BANK DETAILS,
+// which is the same line `identity_phones` holds on documents: Merit stores a
+// reference to what the provider holds and does not proxy the instrument.
+//
+// `freeze_flag_id` REFERENCES `risk_flags` AND IS NOT A SECOND ROUTE TO AN
+// IDENTITY. It cites the flag a freeze was taken under, is NULL on an unfrozen
+// row, and `wallet_withdrawals_freeze_is_complete` ties the three freeze columns
+// together so a hold can never be indefinite and uncited.
+//
+// `source_provenance_summary` IS WHAT THE WITHDRAWAL IS MADE OF and
+// `earliest_credit_at` IS HOW LONG THAT VALUE HAS BEEN HERE (SD-M20-03). A
+// wallet holding $500 of settled payout and $99 of `refund_wallet_funded` is not
+// the same object as one holding $599 of payout, and the chargeback-window hold
+// has nothing to evaluate against without the second column.
+export const walletWithdrawals = pgTable('wallet_withdrawals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  destinationRef: text('destination_ref').notNull(),
+  status: walletWithdrawalStatus('status').notNull().default('requested'),
+  idempotencyKey: text('idempotency_key').notNull(),
+  requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+  frozenAt: timestamp('frozen_at', { withTimezone: true }),
+  freezeFlagId: uuid('freeze_flag_id').references(() => riskFlags.id),
+  freezeExpiresAt: timestamp('freeze_expires_at', { withTimezone: true }),
+  destinationNameMatch: boolean('destination_name_match'),
+  // Basis points, CHECKed BETWEEN 0 AND 10000 by the DDL.
+  nameMatchScore: integer('name_match_score'),
+  nameMatchMethod: text('name_match_method'),
+  nameMatchReviewedBy: text('name_match_reviewed_by'),
+  sourceProvenanceSummary: jsonb('source_provenance_summary').notNull().default({}),
+  earliestCreditAt: timestamp('earliest_credit_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// wallet_spend_limits -- 0011_wallet.sql. OWNED: `identity_id`, NOT NULL. MONEY
+// PATH.
+// -----------------------------------------------------------------------------
+// PER IDENTITY RATHER THAN GLOBAL, AND THE REASON IS THE WHOLE DESIGN
+// (INV-M20-07, SECURITY C-23): the limit that matters is the one on THE
+// COMPROMISED SESSION, and a global limit is either a throttle on legitimate
+// traders or is set so high it does nothing.
+//
+// THE PRIMARY KEY IS COMPOSITE AND THAT IS WHAT MAKES THIS A HISTORY. `(
+// identity_id, effective_from)` means a limit change is a NEW ROW, so the limit
+// in force on the day of an incident is still readable afterwards; a single-row
+// per-identity table would overwrite the evidence with the remedy.
+export const walletSpendLimits = pgTable(
+  'wallet_spend_limits',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    dailyCents: bigint('daily_cents', { mode: 'bigint' }).notNull(),
+    rolling7dCents: bigint('rolling_7d_cents', { mode: 'bigint' }).notNull(),
+    reason: text('reason').notNull(),
+    setBy: text('set_by').notNull(),
+    effectiveFrom: timestamp('effective_from', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.identityId, table.effectiveFrom] })],
+);
+
+// -----------------------------------------------------------------------------
+// wallet_dormancy -- 0011_wallet.sql. OWNED: `identity_id`, the PRIMARY KEY.
+// MONEY PATH.
+// -----------------------------------------------------------------------------
+// UNCLAIMED-PROPERTY OBLIGATIONS ARE JURISDICTIONAL AND REAL (INV-M20-09), and
+// the alternative to a state machine is DISCOVERING THE OBLIGATION DURING AN
+// AUDIT. Escheatment itself is a counsel question (OQ-M20-04 as ruled), which is
+// why `jurisdiction_hint` is a HINT: it records Merit's best guess so counsel has
+// something to correct rather than nothing to look at.
+//
+// `identity_id` IS THE PRIMARY KEY, SO ONE ROW PER IDENTITY AND NO SURROGATE. It
+// is `NOT NULL` by being the key rather than by carrying the words, which is why
+// the `owned` rule's `nullable: false` is read off `PRIMARY KEY` here and off
+// `NOT NULL` on the other three.
+//
+// `notified_at` IS AN ARRAY BECAUSE THE NOTIFICATION SCHEDULE IS A SEQUENCE. The
+// question is "did we notify them", answered by the whole sequence; a single
+// timestamp would let the second notice overwrite the proof of the first, and
+// `wallet_dormancy_review_was_noticed` is the CHECK that reads it.
+//
+// `state` IS A CLOSED LIST OF THREE ENFORCED BY A CHECK AND NOT BY AN ENUM
+// ('active', 'dormant', 'escheat_review'), so `text` here is the transcription
+// and not a widening.
+export const walletDormancy = pgTable('wallet_dormancy', {
+  identityId: uuid('identity_id')
+    .primaryKey()
+    .references(() => identities.id),
+  lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull(),
+  notifiedAt: timestamp('notified_at', { withTimezone: true }).array().notNull().default([]),
+  state: text('state').notNull().default('active'),
+  jurisdictionHint: text('jurisdiction_hint'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
