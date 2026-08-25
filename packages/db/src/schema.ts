@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// FORTY TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 71 are not reachable through either accessor: `SCOPE_RULES` is total
+// FIFTY-THREE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 58 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE FORTY ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE FIFTY-THREE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -30,12 +30,12 @@
 // which is ADR-094. That entry rules the replay's vocabulary CLOSED at one
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
-// one lands the check fails rather than silently reading a stale CREATE. SEVEN
-// of the forty below carry later columns -- `sessions`, `plan_versions`,
-// `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`
-// and `phone_change_requests` -- and none of them could be registered at all
-// before ADR-094, which is why the ruling came before the transcription rather
-// than after it.
+// one lands the check fails rather than silently reading a stale CREATE. EIGHT
+// of the fifty-three below carry later columns -- `sessions`, `plan_versions`,
+// `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
+// `phone_change_requests` and `admin_actions` -- and none of them could be
+// registered at all before ADR-094, which is why the ruling came before the
+// transcription rather than after it.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -1675,4 +1675,436 @@ export const phoneChangeRequests = pgTable('phone_change_requests', {
   newPhoneEncryptedAt: timestamp('new_phone_encrypted_at', { withTimezone: true }),
   priorNotifiedSmsDispatchId: uuid('prior_notified_sms_dispatch_id'),
   priorNotifiedEmailNotificationId: uuid('prior_notified_email_notification_id'),
+});
+
+// -----------------------------------------------------------------------------
+// admin_actions -- 0017_events_and_audit.sql, 0043_admin_attributed_actions.sql.
+// FIRM.
+// -----------------------------------------------------------------------------
+// MERIT'S RECORD OF ITS OWN OPERATORS, and `reason text NOT NULL` is the whole
+// control: 0017's own words are "NO UNEXPLAINED ADMIN ACTION, EVER".
+//
+// TWO LATER COLUMNS, AND THIS IS THE FIRST REGISTERED TABLE WHOSE DRIFT IS
+// M06's. `initiative` and `on_behalf_of_identity_id` arrive in 0043 as two
+// `ADD COLUMN` statements, which ADR-094's fold replays; the third statement in
+// that file is an `ADD CONSTRAINT` carrying the biconditional, which the fold
+// reads and discards.
+//
+// `on_behalf_of_identity_id` CARRIES NO `.references()` AND THAT IS THE FILE'S
+// RULE RATHER THAN AN OVERSIGHT. Its `REFERENCES identities(id)` is declared
+// inline on an `ALTER TABLE ... ADD COLUMN`, not in the `CREATE TABLE` body,
+// and the fold extracts the column NAME from an `ADD COLUMN` clause and nothing
+// else. Claiming the edge here would be claiming something nothing in this
+// package checks.
+export const adminActions = pgTable('admin_actions', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  actor: text('actor').notNull(),
+  action: text('action').notNull(),
+  // POLYMORPHIC AND UNCONSTRAINED. `subject_id` is a bare uuid with no foreign
+  // key, discriminated by `subject_kind`: a session, a phone-change request, a
+  // payout request, a plan version. It does not name an identity.
+  subjectKind: text('subject_kind').notNull(),
+  subjectId: uuid('subject_id').notNull(),
+  reason: text('reason').notNull(),
+  before: jsonb('before').notNull(),
+  after: jsonb('after').notNull(),
+  evidenceRefs: jsonb('evidence_refs').notNull().default([]),
+  ip: inet('ip'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M6-11, 0043. ON WHOSE INITIATIVE, which is not who performed it.
+  initiative: text('initiative').notNull(),
+  // SD-M6-11, 0043. Set exactly when `initiative = 'trader_request'`, by the
+  // biconditional CHECK in the same migration.
+  onBehalfOfIdentityId: uuid('on_behalf_of_identity_id'),
+});
+
+// -----------------------------------------------------------------------------
+// evidence_packs -- 0008_risk.sql. DERIVED: `account_id` -> accounts, one hop.
+// -----------------------------------------------------------------------------
+// AN EXPORT OF ONE ACCOUNT'S EVIDENCE, so the row is about whoever holds that
+// account. `account_id uuid NOT NULL REFERENCES accounts(id)` is the only path
+// and it is single-valued, so the hop cannot multiply rows.
+//
+// `audience` AND `includes_detector_detail` ARE THE COMBINATION 0008 MAKES
+// UNREPRESENTABLE (SD-M6-04): a pack destined for a trader may never carry
+// detector detail, because a pack given to a trader in a dispute is a channel
+// that discloses thresholds to the adversary who triggered them.
+export const evidencePacks = pgTable('evidence_packs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  requestedBy: text('requested_by').notNull(),
+  reason: text('reason').notNull(),
+  contentSha256: bytea('content_sha256').notNull(),
+  // Private object storage, signed URL only. Never a public path.
+  storageRef: text('storage_ref').notNull(),
+  generatedAt: timestamp('generated_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M6-04.
+  audience: text('audience').notNull(),
+  redactionProfile: text('redaction_profile').notNull(),
+  includesDetectorDetail: boolean('includes_detector_detail').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// identity_restriction_episodes -- 0031_payout_hold_and_identity_restriction.sql.
+// OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// ONE ROW PER TIME MERIT RESTRICTED A PERSON, and the row is about that person.
+// `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on
+// it, and `identity_restriction_open_uq` allows at most one open episode per
+// identity, so a second restriction on a restricted human is a database refusal
+// rather than a duplicate record.
+//
+// `flag_id` CARRIES NO `.references()` because `risk_flags` is not one of this
+// file's tables. The column is transcribed and the edge is left to the database.
+//
+// THE RESTORE IS THE HALF THAT GETS SKIPPED UNDER PRESSURE (INV-M6-14), and
+// `identity_restriction_restore_is_complete` makes `restored_at`, `restored_by`
+// and `restore_evidence` all-or-none. `sla_due_at` is one of INV-M6-13's three
+// clocks and no admin route may write it after the row exists.
+export const identityRestrictionEpisodes = pgTable('identity_restriction_episodes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  flagId: uuid('flag_id').notNull(),
+  tosClause: text('tos_clause').notNull(),
+  reason: text('reason').notNull(),
+  openedBy: uuid('opened_by')
+    .notNull()
+    .references(() => users.id),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull().defaultNow(),
+  // ADR-040's 48 hour SLA, where a payout is pending. Null when none is.
+  slaDueAt: timestamp('sla_due_at', { withTimezone: true }),
+  restoredAt: timestamp('restored_at', { withTimezone: true }),
+  restoredBy: uuid('restored_by').references(() => users.id),
+  restoreEvidence: text('restore_evidence'),
+  evidencePackId: uuid('evidence_pack_id').references(() => evidencePacks.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// plan_breaker_state -- 0016_treasury_controls.sql. FIRM.
+// -----------------------------------------------------------------------------
+// ONE ROW PER PLAN PER EVALUATION DAY, and a per-plan loss ratio is an aggregate
+// over every account on the plan. There is no identity column and there is no
+// correct one: a per-identity slice of a plan's loss ratio is not a smaller
+// version of it, which is `published_statistics`' reason on an internal surface.
+//
+// `plan_id` CARRIES NO `.references()` because `plans` is not one of this file's
+// tables.
+//
+// `sample_size` BESIDE `min_sample` IS SD-M6-02 AND INV-M6-07: below its own
+// minimum the only honest state is `insufficient_data`, and
+// `plan_breaker_state_respects_min_sample` makes that structural rather than
+// procedural. An `insufficient_data` breaker is never a breach.
+export const planBreakerState = pgTable(
+  'plan_breaker_state',
+  {
+    planId: uuid('plan_id').notNull(),
+    evaluatedOn: date('evaluated_on').notNull(),
+    metric: text('metric').notNull(),
+    numeratorCents: bigint('numerator_cents', { mode: 'bigint' }).notNull(),
+    denominatorCents: bigint('denominator_cents', { mode: 'bigint' }).notNull(),
+    // SD-M6-02.
+    sampleSize: integer('sample_size').notNull(),
+    ratioBp: integer('ratio_bp').notNull(),
+    thresholdBp: integer('threshold_bp').notNull(),
+    // SD-M6-02.
+    minSample: integer('min_sample').notNull(),
+    state: text('state').notNull(),
+    // An override is dated and expires. An indefinite override is a disabled
+    // breaker with a nicer name.
+    overrideReason: text('override_reason'),
+    overrideExpiresAt: timestamp('override_expires_at', { withTimezone: true }),
+    changedBy: text('changed_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.planId, table.evaluatedOn] })],
+);
+
+// -----------------------------------------------------------------------------
+// alarm_suppressions -- 0016_treasury_controls.sql. FIRM.
+// -----------------------------------------------------------------------------
+// MERIT MUTING ITS OWN ALARM. The row is about an operational decision Merit
+// made about its own monitoring, never about a person: `scope jsonb` may NAME an
+// account or an identity, and a jsonb payload is not a column a predicate can be
+// written against.
+//
+// `expires_at NOT NULL` IS THE CONTROL (SD-M6-03, INV-M6-06) and it is real. The
+// UNSUPPRESSIBLE SET IS NOT: `alarm_key text NOT NULL` carries no CHECK and no
+// reference list, so this table will accept a row muting the ledger-imbalance
+// alarm as readily as any other. That is M06 section 3.5's own stated limit and
+// OQ-M6-05 is the open question; nothing here closes it.
+export const alarmSuppressions = pgTable('alarm_suppressions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  alarmKey: text('alarm_key').notNull(),
+  scope: jsonb('scope').notNull().default({}),
+  reason: text('reason').notNull(),
+  suppressedBy: text('suppressed_by').notNull(),
+  suppressedAt: timestamp('suppressed_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M6-03.
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  releasedAt: timestamp('released_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// dual_control_approvals -- 0016_treasury_controls.sql. FIRM.
+// -----------------------------------------------------------------------------
+// TWO OPERATORS, ONE SENSITIVE ACT. The row is about Merit's own authorisation
+// procedure. `subject_id uuid NOT NULL` is polymorphic and carries no foreign
+// key, discriminated by `subject_kind`, so it does not name an identity.
+//
+// `dual_control_approvals_second_person` IS THE CONTROL ITSELF, IN DDL: the
+// approver is not the requester. Without it the table records two clicks by one
+// session and calls it dual control, which Appendix D names as worse than
+// nothing because it reads as a control in an audit.
+export const dualControlApprovals = pgTable('dual_control_approvals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  subjectKind: text('subject_kind').notNull(),
+  subjectId: uuid('subject_id').notNull(),
+  requestedBy: text('requested_by').notNull(),
+  requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M6-05. Pins WHAT is being approved, so an approval cannot travel to a
+  // different payload.
+  payloadHash: bytea('payload_hash').notNull(),
+  approvedBy: text('approved_by'),
+  approvedAt: timestamp('approved_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  status: text('status').notNull().default('pending'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// account_adjustments -- 0038_account_adjustments.sql. OWNED: `identity_id`,
+// NOT NULL. MONEY.
+// -----------------------------------------------------------------------------
+// THE FIRST ADMIN SURFACE IN THIS CORPUS THAT MOVES MONEY TO A NAMED PERSON, and
+// the first table that permits taking it back (ADR-067). `identity_id uuid NOT
+// NULL REFERENCES identities(id) ON DELETE RESTRICT` is on the row and
+// `account_id` is NULLABLE, so the identity is the scope and the account is not:
+// an adjustment may name no account at all and would then be unreachable under
+// an account-derived rule.
+//
+// `amount_cents` IS A MAGNITUDE AND `direction` CARRIES THE SIGN, checked
+// positive in the DDL. NEVER A BALANCE MUTATION: `ledger_transaction_id uuid NOT
+// NULL UNIQUE` means an adjustment posts a ledger transaction or it does not
+// exist.
+//
+// `promotional_credit_grant_id` CARRIES NO `.references()` because
+// `promotional_credit_grants` is not one of this file's tables.
+export const accountAdjustments = pgTable('account_adjustments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  accountId: uuid('account_id').references(() => accounts.id),
+  direction: text('direction').notNull(),
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  reasonCode: text('reason_code').notNull(),
+  reasonNote: text('reason_note').notNull(),
+  // NEVER `trader_withdrawable`: the engine computes withdrawable from the
+  // trading balance, so a ledger credit there would buy no eligibility and only
+  // make the ledger disagree with the engine.
+  destination: text('destination').notNull(),
+  ledgerTransactionId: uuid('ledger_transaction_id')
+    .notNull()
+    .references(() => ledgerTransactions.id),
+  promotionalCreditGrantId: uuid('promotional_credit_grant_id'),
+  // A debit is only ever the exact reversal of a credit this table posted.
+  reversesAdjustmentId: uuid('reverses_adjustment_id').references(
+    (): AnyPgColumn => accountAdjustments.id,
+  ),
+  actor: text('actor').notNull(),
+  dualControlThresholdCents: bigint('dual_control_threshold_cents', { mode: 'bigint' }).notNull(),
+  dualControlApprovalId: uuid('dual_control_approval_id').references(() => dualControlApprovals.id),
+  evidencePackId: uuid('evidence_pack_id').references(() => evidencePacks.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// economic_calendar_loads -- 0039_economic_calendar.sql. FIRM.
+// -----------------------------------------------------------------------------
+// ONE ROW PER INGESTED PUBLICATION OF A THIRD PARTY'S RELEASE SCHEDULE. There is
+// no identity column and there is no correct one: a load is the same load for
+// every reader, and `actor text NOT NULL` is a loader or an operator rather than
+// a `users` row, which is 0002's `actor` idiom.
+//
+// THE COVERAGE WINDOW IS WHAT MAKES STALENESS ANSWERABLE (FM-M7-08). A D-04 run
+// over a day outside every load's coverage must REFUSE rather than report no
+// releases, because "no releases" and "we never loaded that week" produce the
+// same empty result set and mean opposite things.
+export const economicCalendarLoads = pgTable('economic_calendar_loads', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  sourceId: text('source_id').notNull(),
+  coverageStartDay: date('coverage_start_day').notNull(),
+  coverageEndDay: date('coverage_end_day').notNull(),
+  sourceDigest: bytea('source_digest').notNull(),
+  actor: text('actor').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// economic_calendar -- 0039_economic_calendar.sql. FIRM.
+// -----------------------------------------------------------------------------
+// WHEN A TIER-1 MACRO RELEASE IS SCHEDULED, which is a fact about the world and
+// not about anybody. Every identity reads the same calendar, and D-04's news
+// windows are computed from it for all of them at once.
+//
+// `revision` IS THE LOAD-BEARING COLUMN. 0 is the original publication and each
+// revision of a release time is a NEW ROW at the next number, so "what did the
+// calendar say when D-04 read it" is answerable forever. A flag raised against a
+// trader has to be defensible months later.
+export const economicCalendar = pgTable('economic_calendar', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  loadId: bigint('load_id', { mode: 'bigint' })
+    .notNull()
+    .references(() => economicCalendarLoads.id),
+  eventKey: text('event_key').notNull(),
+  occurrenceKey: text('occurrence_key').notNull(),
+  tier: smallint('tier').notNull(),
+  // One instant, in UTC, no timezone column. Rendered per trader.
+  scheduledReleaseAt: timestamp('scheduled_release_at', { withTimezone: true }).notNull(),
+  releaseTradingDay: date('release_trading_day').notNull(),
+  revision: integer('revision').notNull(),
+  // Required on a revision, refused on an original, by an equivalence CHECK.
+  revisionReason: text('revision_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// report_schedules -- 0040_report_schedules.sql. FIRM.
+// -----------------------------------------------------------------------------
+// WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. The
+// recipients are Merit's own staff and the row is about the firm's C8 weekly
+// risk ritual, not about any trader.
+//
+// `cadence` IS A GENERATED COLUMN AND THAT IS THE POINT (SD-M6-07): the cadence
+// is a PROPERTY OF THE DIGEST rather than a choice, so as an ordinary column a
+// daily liability digest could be scheduled monthly by one careless insert and
+// nothing would object.
+//
+// NO CREDENTIAL IS STORED HERE and there is deliberately no column that could
+// hold one. `recipients` is a mailbox for `email` and a configured destination
+// name for `sftp`.
+export const reportSchedules = pgTable('report_schedules', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  digest: text('digest').notNull(),
+  cadence: text('cadence')
+    .notNull()
+    .generatedAlwaysAs(
+      sql`CASE ${sql.identifier('digest')} WHEN 'daily_liability' THEN 'daily' WHEN 'weekly_loss_ratio_cusum' THEN 'weekly' WHEN 'weekly_flag_queue' THEN 'weekly' WHEN 'monthly_revenue_cohort' THEN 'monthly' END`,
+    ),
+  format: text('format').notNull(),
+  channel: text('channel').notNull(),
+  recipients: text('recipients').array().notNull(),
+  // Turned off rather than deleted: a deleted schedule takes its delivery
+  // history's referent with it and the alarm's question stops being answerable.
+  enabled: boolean('enabled').notNull().default(true),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// report_deliveries -- 0040_report_schedules.sql. FIRM.
+// -----------------------------------------------------------------------------
+// ONE ROW PER ATTEMPT TO DELIVER A DIGEST. Its only foreign key is
+// `schedule_id -> report_schedules(id)`, and `report_schedules` is FIRM, so a
+// `derived` rule here would not be a milder mistake: `scopePredicate` recurses
+// into the via table and a chain terminates at `owned` or at `root` or it does
+// not terminate. A firm parent makes the whole chain firm.
+//
+// THE DELIVERY-FAILURE ALARM READS THIS TABLE AND NEVER THE JOB'S OWN REPORT.
+// `due_at` is what makes absence detectable at all: without it "nothing arrived"
+// and "not due yet" are the same empty result set.
+//
+// `artifact_digest bytea NULL` IS THE SHA-256 AND NEVER THE ARTIFACT. A table of
+// rendered digest bodies would be the bulk export, sitting behind an admin
+// route, created by the feature admitted on the promise that it was not one.
+export const reportDeliveries = pgTable('report_deliveries', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  scheduleId: uuid('schedule_id')
+    .notNull()
+    .references(() => reportSchedules.id),
+  dueAt: timestamp('due_at', { withTimezone: true }).notNull(),
+  // A retry is a NEW ROW rather than an update of the failed one.
+  attempt: integer('attempt').notNull(),
+  // INV-M6-04: every number names its as-of moment and its source.
+  coversThroughTradingDay: date('covers_through_trading_day').notNull(),
+  // Transcribed at attempt time rather than joined from the mutable schedule.
+  channel: text('channel').notNull(),
+  format: text('format').notNull(),
+  recipientsAttempted: text('recipients_attempted').array().notNull(),
+  recipientsOmitted: text('recipients_omitted').array().notNull().default([]),
+  omissionReason: text('omission_reason'),
+  // Two values. There is no `skipped`.
+  outcome: text('outcome').notNull(),
+  failureReason: text('failure_reason'),
+  attemptedAt: timestamp('attempted_at', { withTimezone: true }).notNull().defaultNow(),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  artifactDigest: bytea('artifact_digest'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// impersonation_sessions -- 0042_impersonation_sessions.sql. OWNED:
+// `subject_identity_id`, NOT NULL. AUTH.
+// -----------------------------------------------------------------------------
+// THE ROW IS ABOUT THE TRADER WHO WAS IMPERSONATED, and `admin_user_id` is this
+// package's own named trap: `scope.ts`'s header says a mechanical foreign-key
+// walk reaches THE ADMIN'S IDENTITY, not the subject's, and returns rows for the
+// wrong person with no error anywhere. `subject_identity_id uuid NOT NULL
+// REFERENCES identities(id) ON DELETE RESTRICT` is the column the database
+// declares against `identities(id)`, and it is the one a dispute turns on.
+//
+// THE TABLE CARRIES NO `user_id`, NO `auth_factor`, NO `elevated_at` AND NO
+// `elevated_by_factor`, WHICH IS STRUCTURAL AND NOT AN OMISSION (ADR-068). The
+// trader auth path resolves a bearer token by `refresh_token_hash` on
+// `sessions`, so a token minted here cannot satisfy a trader authorization by
+// construction rather than by rule.
+//
+// NO `created_at`. `started_at` is the row's clock and the two-hour ceiling is
+// measured from it by `impersonation_box_is_bounded`; a configurable duration
+// with no ceiling is a setting rather than a bound.
+export const impersonationSessions = pgTable('impersonation_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  adminUserId: uuid('admin_user_id')
+    .notNull()
+    .references(() => users.id),
+  subjectIdentityId: uuid('subject_identity_id')
+    .notNull()
+    .references(() => identities.id),
+  tokenHash: bytea('token_hash').notNull(),
+  reasonCode: text('reason_code').notNull(),
+  reasonDetail: text('reason_detail').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  endedBy: uuid('ended_by').references(() => users.id),
+  endReason: text('end_reason'),
+});
+
+// -----------------------------------------------------------------------------
+// impersonation_page_views -- 0042_impersonation_sessions.sql. DERIVED:
+// `impersonation_session_id` -> impersonation_sessions, one hop.
+// -----------------------------------------------------------------------------
+// EVERY PAGE AN OPERATOR SAW WHILE WEARING A TRADER'S SESSION, and it reaches an
+// identity through the session's SUBJECT rather than through its admin. The
+// chain is one hop to `impersonation_sessions`, which is `owned` by
+// `subject_identity_id`, so it terminates at an identity and the trap the parent
+// table names is not re-entered here.
+//
+// `route` IS THE COLUMN NAME. M06 section 11 specifies `path`; 0042 writes
+// `route`, and the DDL is the source.
+export const impersonationPageViews = pgTable('impersonation_page_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  impersonationSessionId: uuid('impersonation_session_id')
+    .notNull()
+    .references(() => impersonationSessions.id),
+  route: text('route').notNull(),
+  viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
 });

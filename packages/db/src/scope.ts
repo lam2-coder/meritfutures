@@ -27,7 +27,10 @@
 // rather than reachable and unscoped.
 
 import {
+  accountAdjustments,
   accounts,
+  adminActions,
+  alarmSuppressions,
   certificates,
   contactChannels,
   contentDocuments,
@@ -37,9 +40,16 @@ import {
   dailyMarks,
   detectorDefinitions,
   detectorRuns,
+  dualControlApprovals,
+  economicCalendar,
+  economicCalendarLoads,
+  evidencePacks,
   identities,
   identityPhones,
+  identityRestrictionEpisodes,
   identitySignals,
+  impersonationPageViews,
+  impersonationSessions,
   kycFunnelEvents,
   kycVerifications,
   ledgerAccounts,
@@ -53,12 +63,15 @@ import {
   otpSendBudget,
   pageRevalidations,
   phoneChangeRequests,
+  planBreakerState,
   planVersions,
   planVersionSizes,
   proofLinks,
   pspWebhookEvents,
   publishedStatistics,
   purchases,
+  reportDeliveries,
+  reportSchedules,
   reviewRequests,
   riskFlags,
   ruleStates,
@@ -72,7 +85,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FORTY OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FIFTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -128,6 +141,19 @@ export const TABLES = {
   kycVerifications,
   phoneChangeRequests,
   sanctionsScreenings,
+  accountAdjustments,
+  adminActions,
+  alarmSuppressions,
+  dualControlApprovals,
+  economicCalendar,
+  economicCalendarLoads,
+  evidencePacks,
+  identityRestrictionEpisodes,
+  impersonationPageViews,
+  impersonationSessions,
+  planBreakerState,
+  reportDeliveries,
+  reportSchedules,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -438,6 +464,84 @@ export const SCOPE_RULES = {
     column: 'identity_id',
     nullable: false,
     why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0003_kyc.sql). ONE ROW PER TIME MERIT SCREENED A PERSON, and the row is ABOUT THAT PERSON. It is a separate table from `kyc_verifications` rather than a field on it because folding it in would put a legally mandatory refusal in the same column as a blurry-photo rejection (INV-M19-05), and the separation is a tenancy fact as well as a review-path one: `reviewed_by` names a MERIT REVIEWER and is deliberately NOT a second path to an identity, for `treasury_balances.recorded_by`'s reason exactly -- it records who asserted the outcome and says nothing about whose screening it is. `list_refs` names which lists were screened and carries no person's name at all.",
+  },
+  accountAdjustments: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: '`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0038_account_adjustments.sql), and THE IDENTITY IS THE SCOPE BECAUSE THE ACCOUNT IS NULLABLE: `account_id uuid NULL` means an adjustment may name no account at all, so a derived rule through `accounts` would leave every accountless adjustment unreachable while looking correct on the ones that have one. This is the first table in the corpus that moves money to a named person and the first that permits taking it back (ADR-067), so the rows a scoped read returns are exactly the credits and reversals against that human -- which is the point: an adjustment nobody can see is a correction nobody can contest.',
+  },
+
+  adminActions: {
+    class: 'firm',
+    why: 'MERIT\'S RECORD OF ITS OWN OPERATORS. `reason text NOT NULL` is the control and 0017 states it as "NO UNEXPLAINED ADMIN ACTION, EVER"; the audience for that record is an auditor and never the subject. THE TEMPTING RULE IS `owned` ON `on_behalf_of_identity_id` AND IT IS WRONG IN THE DIRECTION THAT RETURNS ROWS: 0043 sets that column exactly when `initiative = trader_request`, by a biconditional CHECK, so a scoped read would return the actions Merit took FOR a person and silently omit every enforcement action it took AGAINST them -- a strict subset of the rows about that human, presented as all of them, which is `purchases`\' refusal on a different pair of columns. There is no column naming the identity an enforcement row is about: `subject_id uuid NOT NULL` is polymorphic, discriminated by `subject_kind`, and declares no foreign key at all.',
+  },
+
+  alarmSuppressions: {
+    class: 'firm',
+    why: "MERIT MUTING ITS OWN ALARM. The row records an operational decision about Merit's monitoring, and `expires_at NOT NULL` (SD-M6-03, INV-M6-06) is the control that makes the mute temporary. `scope jsonb NOT NULL` MAY NAME AN ACCOUNT OR AN IDENTITY AND THAT DOES NOT MAKE THE ROW THEIRS: a jsonb payload declares no foreign key, so there is nothing a predicate could compare, and a suppression is Merit's decision not to look rather than a fact about whoever it covers. THE UNSUPPRESSIBLE SET IS ENFORCED BY NOTHING TODAY -- `alarm_key text NOT NULL` carries no CHECK and no reference list -- which is M06 section 3.5's own stated limit and OQ-M6-05's open question, and nothing here closes it.",
+  },
+
+  dualControlApprovals: {
+    class: 'firm',
+    why: "TWO OPERATORS, ONE SENSITIVE ACT. The row is about Merit's own authorisation procedure and `dual_control_approvals_second_person` puts the control in DDL: the approver is not the requester. `subject_id uuid NOT NULL` is polymorphic, discriminated by `subject_kind`, and declares no foreign key, so it names the OBJECT being approved -- a price floor, a treasury movement, an adjustment -- rather than a person. `requested_by` and `approved_by` are `text` actor strings and not `users` rows, so there is no identity column here in either direction.",
+  },
+
+  economicCalendar: {
+    class: 'firm',
+    why: "WHEN A TIER-1 MACRO RELEASE IS SCHEDULED, which is a fact about the world rather than about anybody. Every identity reads the same calendar and D-04's news windows are computed from it for all of them at once. `load_id` reaches `economic_calendar_loads`, which is itself firm, so a derived rule would terminate at a firm parent and throw rather than being a milder mistake. `revision` makes each moved release time a NEW row, so what the calendar said when a detector read it is answerable forever -- which is what makes a flag raised against a trader defensible, and it is still a property of the calendar and not of the trader.",
+  },
+
+  economicCalendarLoads: {
+    class: 'firm',
+    why: "ONE ROW PER INGESTED PUBLICATION OF A THIRD PARTY'S RELEASE SCHEDULE. There is no identity column and there is no correct one: a load is the same load for every reader. `actor text NOT NULL` is 0002's actor idiom -- a loader or an operator, not a `users` row -- so it is not a path to anybody. The coverage window is what makes staleness answerable (FM-M7-08): a D-04 run over a day outside every load's coverage must refuse rather than report no releases, and that refusal is firm-wide.",
+  },
+
+  evidencePacks: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0008_risk.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. A pack is an EXPORT OF ONE ACCOUNT'S EVIDENCE and the row is about whoever holds that account, which is why `audience` exists at all: SD-M6-04 makes a trader a possible recipient of a pack about themselves, and `evidence_packs_trader_gets_no_detector_detail` is what stops that channel from disclosing detector thresholds to the adversary who triggered them. REGISTERING THIS TABLE MAKES IT READABLE AND NOTHING ELSE -- the redaction profile is a property of the export and no scope rule enforces it.",
+  },
+
+  identityRestrictionEpisodes: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0031_payout_hold_and_identity_restriction.sql). ONE ROW PER TIME MERIT RESTRICTED A PERSON, and the row is ABOUT THAT PERSON rather than about the operator who opened it: `opened_by` and `restored_by` both reference `users` and are `treasury_balances.recorded_by`'s trap exactly -- they record WHO ACTED and say nothing about whose restriction it is. `identity_restriction_open_uq` allows at most one OPEN episode per identity, so the closed ones accumulate and a scoped read returns the whole history, which is what makes a contested enforcement defensible months later.",
+  },
+
+  impersonationPageViews: {
+    class: 'derived',
+    via: 'impersonationSessions',
+    localColumn: 'impersonation_session_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`impersonation_session_id uuid NOT NULL REFERENCES impersonation_sessions(id) ON DELETE RESTRICT` (0042_impersonation_sessions.sql). NOT NULL and single-valued, so a join cannot multiply rows. EVERY PAGE AN OPERATOR SAW WHILE WEARING A TRADER'S SESSION, reaching an identity through the session's SUBJECT rather than through its admin, so the parent's trap is not re-entered one hop out. `impersonation_page_view_within_box` bounds every view to its session's two-hour box, which is what makes the read log complete rather than merely present.",
+  },
+
+  impersonationSessions: {
+    class: 'owned',
+    column: 'subject_identity_id',
+    nullable: false,
+    why: "`subject_identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` (0042_impersonation_sessions.sql). THE OTHER CANDIDATE COLUMN IS THIS FILE'S OWN NAMED TRAP: `admin_user_id` references `users`, so a derivation through it reaches THE ADMIN'S IDENTITY rather than the subject's and returns rows for the wrong person with no error anywhere. The row is about the trader who was worn, and ADR-069's whole argument is that provenance is what an evidence pack turns on: an admin-attributed action preserves it and an impersonated one destroys it, so the record of who was impersonated, by whom, for how long and why must be the SUBJECT'S row. The table carries no `user_id`, no `auth_factor`, no `elevated_at` and no `elevated_by_factor`, which is structural rather than an omission.",
+  },
+
+  planBreakerState: {
+    class: 'firm',
+    why: "ONE ROW PER PLAN PER EVALUATION DAY, and a per-plan loss ratio is an aggregate over every account on that plan. There is no identity column and there is no correct one: a per-identity slice of a plan's loss ratio is not a smaller version of it, which is `published_statistics`' reason on an internal surface. `plan_id` reaches `plans`, the product catalogue, so a derived rule would not be a milder mistake -- it would terminate at a firm parent and throw. The breaker is a control on MERIT'S OWN EXPOSURE and the trader-visible consequence of it is a plan being paused, which is a fact about the plan.",
+  },
+
+  reportDeliveries: {
+    class: 'firm',
+    why: 'ONE ROW PER ATTEMPT TO DELIVER A DIGEST TO MERIT\'S OWN STAFF. Its only foreign key is `schedule_id -> report_schedules(id)` and that parent is FIRM, so a derived rule here is `plan_version_sizes`\' refused shape exactly: `scopePredicate` recurses into the via table, the via table is firm, and a chain terminates at `owned` or at `root` or it does not terminate. The delivery-failure alarm reads this table and never the job\'s own report, and `due_at` is what makes absence detectable at all, because without it "nothing arrived" and "not due yet" are the same empty result set.',
+  },
+
+  reportSchedules: {
+    class: 'firm',
+    why: "WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. `recipients text[] NOT NULL` holds Merit's own staff addresses or a configured SFTP destination, never a trader's, and the row exists to give the C8 weekly risk ritual an input other than a human remembering to look. There is no identity column and there is no correct one. NO CREDENTIAL IS STORED HERE and there is deliberately no column that could hold one, so this table is not a fifth credential surface arriving without a ruling.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
