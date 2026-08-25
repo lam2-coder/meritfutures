@@ -1849,6 +1849,41 @@ export const identityRestrictionEpisodes = pgTable('identity_restriction_episode
 });
 
 // -----------------------------------------------------------------------------
+// ledger_halts -- 0016_treasury_controls.sql. OWNED, AND THE COLUMN IS NOT NULL.
+// -----------------------------------------------------------------------------
+// `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` at
+// 0016:55, and the DDL states the requirement in the direction that decides the
+// rule in its own comment: "null is not permitted, because a halt with no
+// subject is the global halt and the global halt is not a row, it is an
+// incident." So the class is `owned` and it needed no per-table ruling; what it
+// needed was a session that reached it, and ADR-092 section 9 named it as one of
+// four nobody would.
+//
+// THE OTHER COLUMNS ARE EVIDENCE AND CLOCKS AND NONE OF THEM REACHES A PERSON.
+// `halted_by` and `released_by` are `text` -- a detector name or an operator --
+// and not `uuid REFERENCES users(id)`, which is what would otherwise look like a
+// second path to an identity. `evidence jsonb` holds whatever tripped the
+// detector; a scope rule states which ROWS reach an identity and nothing about
+// what is inside one.
+export const ledgerHalts = pgTable('ledger_halts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  reasonCode: text('reason_code').notNull(),
+  reasonNote: text('reason_note').notNull(),
+  evidence: jsonb('evidence').notNull().default({}),
+  haltedAt: timestamp('halted_at', { withTimezone: true }).notNull().defaultNow(),
+  haltedBy: text('halted_by').notNull(),
+  escalateAt: timestamp('escalate_at', { withTimezone: true }).notNull(),
+  escalatedAt: timestamp('escalated_at', { withTimezone: true }),
+  releasedAt: timestamp('released_at', { withTimezone: true }),
+  releasedBy: text('released_by'),
+  releaseNote: text('release_note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
 // plan_breaker_state -- 0016_treasury_controls.sql. FIRM.
 // -----------------------------------------------------------------------------
 // ONE ROW PER PLAN PER EVALUATION DAY, and a per-plan loss ratio is an aggregate
