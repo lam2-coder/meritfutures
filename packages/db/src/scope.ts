@@ -52,6 +52,7 @@ import {
   fills,
   graduationBenefits,
   graduationInvitations,
+  idempotencyKeys,
   identities,
   identityPhones,
   identityRestrictionEpisodes,
@@ -101,6 +102,8 @@ import {
   simulationRuns,
   statisticDefinitions,
   supportContextViews,
+  tradingCalendarLoads,
+  tradingCalendarRevisions,
   treasuryBalances,
   users,
   walletDormancy,
@@ -112,7 +115,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * EIGHTY OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * EIGHTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -162,6 +165,36 @@ import {
  * column is correct still names a DIFFERENT identity inside `jsonb`, which no
  * scope rule can express and which INV-M4-06 forbids the portal to receive.
  * A transcription rules nothing, so this is reported and not allocated.
+ *
+ * `identity_merges` IS ABSENT AND IT IS THE FOURTH MEMBER OF `identity_links`'s
+ * AND `dedupe_matches`'s CLASS RATHER THAN A NEW ONE. It carries
+ * `surviving_identity_id` AND `merged_identity_id`, both `uuid NOT NULL
+ * REFERENCES identities(id) ON DELETE RESTRICT` (0002_identity.sql), both
+ * indexed -- `identity_merges_surviving_idx` and `identity_merges_merged_idx` --
+ * and `identity_merges_distinct` CHECKs that they are DIFFERENT, so every row of
+ * this table is a statement about two people by construction. `OwnedRule.column`
+ * is ONE column: naming the survivor drops the row from the merged identity,
+ * which INV-M7-06 and 0002's own comment keep alive precisely because "the
+ * pre-merge history is what a dispute about a grandfathered cap is argued from";
+ * naming the merged one drops it from the survivor, whom the grandfathered cap
+ * now binds. Both return rows and neither raises. `firm` is refused by the
+ * suite's own "no firm table carries a column referencing identities" assertion
+ * and would be a lie besides.
+ *
+ * THE ARGUMENT FOR TAKING `surviving_identity_id` WAS CONSIDERED AND IS RECORDED
+ * RATHER THAN LEFT FOR THE NEXT SESSION TO RE-DERIVE. A hard merge repoints
+ * ownership into the surviving `identities` row, `identities.id` is the
+ * hard-merged grain, and `users.md` says one identity holds several users only
+ * through a merge -- so the merged identity arguably never holds a scoped
+ * session and the survivor's column would cover every real read. THAT IS AN
+ * INFERENCE ABOUT APPLICATION BEHAVIOUR FROM PROSE, and the DDL says the
+ * opposite twice: two NOT NULL identity columns and an index on each. The second
+ * reason is `events`' second reason arriving as a COLUMN instead of as `jsonb`:
+ * `identity_merges_distinct` GUARANTEES that whichever side is chosen, the row
+ * hands the reader another identity's uuid, beside `evidence jsonb` written by a
+ * detector -- which is what INV-M4-06 forbids the portal to receive. ADR-092
+ * section 3 names this class as a per-TABLE ruling and takes neither column, and
+ * a transcription rules nothing.
  */
 export const TABLES = {
   identities,
@@ -244,6 +277,9 @@ export const TABLES = {
   priceFloors,
   offers,
   promotionalCreditGrants,
+  idempotencyKeys,
+  tradingCalendarLoads,
+  tradingCalendarRevisions,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -806,6 +842,22 @@ export const SCOPE_RULES = {
     column: 'identity_id',
     nullable: false,
     why: "THE TABLE THAT MINTS VALUE, and `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on the row (0024_offers.sql). A grant is a named person's entitlement from the moment it exists and the DDL has no way to write an unowned one. NEVER WITHDRAWABLE (OQ-FREEZE-01): its own ledger class `promotional_credit` at 0009, and no `wallet_entries.provenance` value at 0011. `funding_purchase_id` IS THE DELTA'S CONTENT AND IS NOT THE SCOPE: it is NULLABLE, because a loyalty-issued or fee-back-issued grant has no funding purchase, so a derivation through `purchases` would return only the grants somebody bought and would drop exactly the ones no purchase funded. `source_offer_id` IS THE OTHER TRAP AND IT IS THIS MODULE'S CHARACTERISTIC ONE -- a redemption pointing at its catalogue row reads like a legitimate hop -- and it is nullable besides, so a grant issued from a `public` offer would reach nobody at all through it. `source_payout_request_id` is 0044's later column, folded by ADR-094, and is a settlement rather than a person.",
+  },
+  idempotencyKeys: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: true,
+    why: "`identity_id uuid NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0017_events_and_audit.sql), and it is the ONLY column in the body that reaches a person: `key` is the client's own token, `endpoint` is a route, `request_hash` is a digest and `response_body` is a stored response. NULLABLE IS HOW THE UNOWNED REPLAY IS EXCLUDED, and SQL does the excluding: a key replayed by an unauthenticated caller carries no identity and no correct one, so `identity_id = $1` drops it without a second predicate because NULL never equals anything. THE DDL AGREES IN ITS OWN INDEX: `idempotency_keys_identity_idx (identity_id)` is declared WHERE NOT NULL, so the database already treats the null rows as a separate population. THIS IS `ledger_accounts`' SHAPE AND NOT `offers`': there is NO CHECK making the nullability biconditional here, so `identity_id IS NULL` means NO IDENTITY WAS RECORDED and never THE FIRM OWNS IT, which is why the rule is `owned` on the column the DDL declares against `identities(id)` rather than `firm`. WHAT THIS RULE DOES NOT BOUND IS SAID OUT LOUD: `response_body jsonb` holds a stored response VERBATIM by 0017's own comment, and a scope rule states which ROWS reach an identity and nothing about what is inside one.",
+  },
+
+  tradingCalendarLoads: {
+    class: 'firm',
+    why: "THE EXCHANGE'S CALENDAR BELONGS TO NO TRADER AND THIS ROW IS THE PROVENANCE OF ONE LOAD OF IT (0032_trading_calendar_holidays_coverage_revisions.sql). The table declares no foreign key at all, carries no identity and no account column, and there is no correct one: a coverage window that differed per trader would not be a coverage window. `actor text NOT NULL` is a free-text operator string on 0002's `actor` idiom rather than a `users` reference, which is the same shape `treasury_balances.recorded_by` is refused for being. THE ROW IS WHAT MAKES `WE DO NOT KNOW ABOUT THIS DAY` AN ANSWER (ADR-042 F-4): a day inside `[coverage_start_day, coverage_end_day]` with no `trading_calendar` row is a bug in the load, and a day outside them is UNKNOWN, so the batch refuses rather than guessing. ITS NEIGHBOUR IS REFUSED AND THIS TABLE IS NOT, DERIVED PER TABLE RATHER THAN INHERITED: 0032's two `ALTER TABLE trading_calendar ALTER COLUMN ... DROP NOT NULL` statements are refused by ADR-094's one-member fold, and replayed across all 47 migrations this table carries NO `ALTER TABLE` of any shape.",
+  },
+
+  tradingCalendarRevisions: {
+    class: 'firm',
+    why: "A CORRECTION TO THE EXCHANGE CALENDAR IS A STATEMENT ABOUT A DAY, AND A DAY BELONGS TO NOBODY (0032_trading_calendar_holidays_coverage_revisions.sql). No column reaches an identity or an account: `trading_day` is a date, `prior_row` is `to_jsonb(OLD)` of a `trading_calendar` row, `source_digest` is a SHA-256, `incident_ref` is an incident label, and `actor` is the same free-text operator string its sibling carries. `dependent_row_count` IS THE COLUMN MOST LIKELY TO BE MISREAD AS TENANCY AND IT IS A COUNT: the number of rows in `fills`, `daily_marks` and `rule_states` that depend on this trading day, asserted a second time by 0033's trigger under ADR-045. Those three tables are each scoped to an identity and this number is not, because a count across every account is a property of the DAY -- zero is an ordinary data change and non-zero is an incident, which is what `trading_calendar_revisions_incident_named_when_dependent` reads. `trading_day` DECLARES AN INLINE FK TO `trading_calendar`, WHICH IS UNREGISTRABLE, so a `derived` rule through it cannot be written at all: `DerivedRule.via` is `TableKey` and `trading_calendar` is not a member, ADR-094's fold refusing it. Replayed across all 47 migrations this table carries no `ALTER TABLE` of any shape and does not inherit the file's refusal.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 

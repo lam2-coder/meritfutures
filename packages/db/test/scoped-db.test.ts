@@ -142,6 +142,9 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   priceFloors: 'price_floors',
   offers: 'offers',
   promotionalCreditGrants: 'promotional_credit_grants',
+  idempotencyKeys: 'idempotency_keys',
+  tradingCalendarLoads: 'trading_calendar_loads',
+  tradingCalendarRevisions: 'trading_calendar_revisions',
 };
 
 /**
@@ -281,9 +284,9 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 31 are unreachable through either accessor.
+  // rounded up: the other 28 are unreachable through either accessor.
   //
-  // `identity_links` IS ONE OF THE 31 AND ITS ABSENCE IS DELIBERATE. It carries
+  // `identity_links` IS ONE OF THE 28 AND ITS ABSENCE IS DELIBERATE. It carries
   // TWO identity columns against an `owned` rule that names one, ADR-092 section
   // 9 names it as a per-table ruling and takes neither, and a transcription
   // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
@@ -312,13 +315,23 @@ describe('the registry is total', () => {
   // rather than a second judgment: its only path to an identity is
   // `attribution_id`, `DerivedRule.via` is `TableKey`, and an unregistered
   // table has no key to name.
-  test('80 declared tables, 80 scope rules, 0 reachable without one', () => {
+  //
+  // `identity_merges` IS THE FOURTH MEMBER OF THAT CLASS AND IT LEFT THIS WAVE
+  // UNREGISTERED. `surviving_identity_id` and `merged_identity_id` are both
+  // `uuid NOT NULL REFERENCES identities(id)`, both indexed, and
+  // `identity_merges_distinct` CHECKs that they are DIFFERENT -- so naming the
+  // survivor drops the row from the merged identity that INV-M7-06 keeps alive
+  // to argue a grandfathered cap from, and naming the merged one drops it from
+  // the survivor the cap now binds. Both return rows and neither raises. `firm`
+  // is refused by the assertion below that no firm table carries a column
+  // referencing identities.
+  test('83 declared tables, 83 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(80);
-    expect(rules).toBe(80);
+    expect(declared).toBe(83);
+    expect(rules).toBe(83);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
