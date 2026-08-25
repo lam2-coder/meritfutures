@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// SIXTY-FOUR TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 47 are not reachable through either accessor: `SCOPE_RULES` is total
+// EIGHTY TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 31 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE SIXTY-FOUR ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE EIGHTY ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -30,12 +30,13 @@
 // which is ADR-094. That entry rules the replay's vocabulary CLOSED at one
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
-// one lands the check fails rather than silently reading a stale CREATE. NINE
-// of the sixty-four below carry later columns -- `sessions`, `plan_versions`,
+// one lands the check fails rather than silently reading a stale CREATE. TEN
+// of the eighty below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
-// `phone_change_requests`, `admin_actions` and `payout_requests` -- and none of
-// them could be registered at all before ADR-094, which is why the ruling came
-// before the transcription rather than after it.
+// `phone_change_requests`, `admin_actions`, `payout_requests` and
+// `promotional_credit_grants` -- and none of them could be registered at all
+// before ADR-094, which is why the ruling came before the transcription rather
+// than after it.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -2637,4 +2638,708 @@ export const passkeys = pgTable('passkeys', {
   label: text('label'),
   lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// integration_contracts -- 0018_integrations.sql. FIRM.
+// -----------------------------------------------------------------------------
+// WHAT MERIT IS ALLOWED TO SEND A VENDOR, one row per integration per event per
+// version. The row is about a CONTRACT WITH A THIRD PARTY and never about a
+// trader: it carries no identity column and there is no correct one, because
+// the same contract governs every dispatch to that vendor for every identity.
+//
+// `field_allowlist` HOLDS FIELD NAMES AND NEVER VALUES, which is why a contract
+// is reviewable by someone who does not read the repository. It is an ALLOWLIST
+// rather than a denylist because a denylist defaults to sending: a field added
+// to an event next year reaches no vendor until somebody adds it here.
+//
+// `approved_by text NOT NULL` IS 0002'S ACTOR IDIOM AND NOT A `users` ROW, so
+// there is no reference to walk and `treasury_balances.recorded_by`'s trap does
+// not arise. It records WHO AUTHORISED THE DISCLOSURE, which is a fact about
+// Merit's own approval procedure.
+//
+// `integration_contracts_enabled_has_fields` WAS DROPPED AND RE-ADDED UNDER ITS
+// OWN NAME BY 0028, `cardinality` for `array_length`, and that is constraint
+// work rather than a column change: ADR-094's fold reads the statement, finds no
+// column shape in it, and discards it.
+export const integrationContracts = pgTable('integration_contracts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  integration: text('integration').notNull(),
+  eventName: text('event_name').notNull(),
+  fieldAllowlist: text('field_allowlist').array().notNull(),
+  // Defaults to OFF. A contract that arrived enabled would be a disclosure that
+  // began the moment the row was inserted.
+  enabled: boolean('enabled').notNull().default(false),
+  // Evaluated over the allowlisted fields only, and at SEND time (INV-M10-08).
+  guardExpression: text('guard_expression'),
+  version: integer('version').notNull().default(1),
+  approvedBy: text('approved_by').notNull(),
+  approvedAt: timestamp('approved_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// integration_dispatches -- 0018_integrations.sql. OWNED: `identity_id`,
+// NULLABLE.
+// -----------------------------------------------------------------------------
+// WHAT MERIT TOLD A VENDOR ABOUT A PERSON. The row is ABOUT the identity named
+// on it rather than about whoever's action produced the event, and the endpoint
+// M10 section 4 owns says so in its own name: `GET
+// /admin/identities/:identityId/disclosures` is every field ever sent about
+// this identity, per vendor, read from this table.
+//
+// `identity_id` IS NULLABLE AND THAT IS `ledger_accounts`' SHAPE RATHER THAN A
+// GAP. Not every dispatch is about a person -- a MID health change and an
+// uptime alert are about the firm -- and filtering `identity_id = $1` excludes
+// those rows WITHOUT a second predicate, because SQL NULL never equals
+// anything. The DDL's own comment states the requirement in that direction: the
+// dispatches that are not about a person must not be findable by an identity
+// search that returns them anyway.
+//
+// THE NULLABILITY HERE IS A PERMANENT PROPERTY OF THE DISPATCH AND NOT A LATE
+// BINDING, WHICH IS WHERE THIS TABLE PARTS FROM `psp_webhook_events`. That
+// table's `purchase_id` is bound by the handler DURING processing, so a derived
+// rule would make a row's tenancy a function of whether a job has run yet;
+// `identity_id` here is decided when the dispatch row is written and no status
+// transition moves it. `status` runs over `queued`, `sent`, `failed` and
+// `dropped_by_guard`, and none of the four changes whose disclosure it is.
+//
+// `event_id` REFERENCES `events(id)`, WHICH IS NOT REGISTERED, so the column is
+// transcribed alone and carries no `.references()`. It is also not a scope: the
+// event is Merit's own fact and this row is the DISCLOSURE of it, so a chain
+// through `events` would answer a different question from the one the breach
+// and privacy requests ask.
+//
+// `fields_sent` IS WHAT ACTUALLY WENT rather than what the contract permitted,
+// and it is field NAMES rather than values (INV-M10-12), so the audit trail of
+// a telephone number's disclosure never becomes a second copy of the number.
+export const integrationDispatches = pgTable('integration_dispatches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  integration: text('integration').notNull(),
+  eventId: bigint('event_id', { mode: 'bigint' }),
+  identityId: uuid('identity_id').references(() => identities.id),
+  fieldsSent: text('fields_sent').array().notNull(),
+  status: text('status').notNull(),
+  // A retry re-uses the idempotency key rather than writing a second row, so
+  // the count lives on the row it belongs to.
+  attempts: integer('attempts').notNull().default(0),
+  responseCode: integer('response_code'),
+  dispatchedAt: timestamp('dispatched_at', { withTimezone: true }),
+  idempotencyKey: text('idempotency_key').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// support_context_views -- 0018_integrations.sql. OWNED: `identity_id`, NOT
+// NULL.
+// -----------------------------------------------------------------------------
+// ONE ROW PER TIME A SUPPORT AGENT READ A TRADER'S IDENTITY GRAPH, and the row
+// is about THE TRADER WHO WAS READ. That is `impersonation_sessions`' question
+// asked one surface out, and it has the same answer: the identity a row is
+// ABOUT is the subject of the read, never the actor who caused it.
+//
+// THERE IS NO SECOND IDENTITY COLUMN TO CHOOSE BETWEEN, WHICH IS STRUCTURAL.
+// `agent_ref text NOT NULL` is an actor string and not a `users` row, so the
+// agent side declares no foreign key and there is nothing a predicate could
+// walk -- unlike `impersonation_sessions.admin_user_id`, which does reference
+// `users` and is this package's own named trap. `identity_id uuid NOT NULL
+// REFERENCES identities(id) ON DELETE RESTRICT` is the one identity column the
+// database declares here.
+//
+// `fields_returned` IS WHAT WAS RETURNED AND NOT WHAT WAS REQUESTED. A view
+// that logged the request cannot answer what the agent actually saw, which is
+// the question a social-engineering incident asks (AS-M10-01, dossier item 9).
+//
+// `ip_hash bytea NULL` IS A DIGEST AND NEVER AN ADDRESS. This is an audit of
+// Merit's own staff and the audit must not itself become a second store of
+// personal data about them.
+export const supportContextViews = pgTable('support_context_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agentRef: text('agent_ref').notNull(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  fieldsReturned: text('fields_returned').array().notNull(),
+  conversationRef: text('conversation_ref'),
+  viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+  ipHash: bytea('ip_hash'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// simulation_runs -- 0045_simulation_runs.sql. FIRM.
+// -----------------------------------------------------------------------------
+// A MONTE CARLO RUN OVER A PROPOSED PLAN CONFIG, recorded so a published version
+// can be traced to the projection it was decided on (M21 `INV-M21-05`). There is
+// no identity column and there is no correct one: the subject of a run is a
+// PARAMETER SET, the population it simulates is synthetic, and no person's rows
+// are read to produce it.
+//
+// `requested_by` IS THE TRAP AND IT IS WEAKER THAN THE ONE `treasury_balances`
+// CARRIES, NOT STRONGER. It is bare `text NOT NULL` with no foreign key at all,
+// on `dual_control_approvals.requested_by`'s precedent, so it does not even name
+// a `users` row -- and if it did, scoping by it would return the firm's plan
+// economics to whichever operator pressed the button, which is this file's own
+// named `recorded_by` failure in a second costume.
+//
+// A `derived` RULE THROUGH `plan_versions` WOULD THROW RATHER THAN MISLEAD, and
+// it is the available mistake here: `plan_version_id` reads like a hop and is
+// not one, because `plan_versions` is firm and a chain terminates at `owned` or
+// at `root` or it does not terminate. It is also NULLABLE by design -- the run
+// is over a DRAFT, which may not yet be a row -- so the digests beside it are
+// what say which config was actually simulated.
+//
+// `seed` IS `text` AND NOT A NUMBER, transcribed rather than preferred:
+// `Provenance.seed` is typed `string`, and a seed stored as a bigint would
+// round-trip some seeds and not others. `sample_size` is `integer` with a
+// `>= 0` CHECK because `provenanceFor` throws only below zero, so a zero-sample
+// run is legal in the harness and has to be storable.
+//
+// `calibration_observed_at` IS A `date` AND THE DAY THE FIGURES WERE OBSERVED,
+// never the day of the run. The three digests are `bytea`, on the same
+// convention `rule_states.state_hash` and `dual_control_approvals.payload_hash`
+// already hold, each with a `length = 32` CHECK the database keeps.
+export const simulationRuns = pgTable('simulation_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  planVersionId: uuid('plan_version_id').references(() => planVersions.id),
+  rulesDigest: bytea('rules_digest').notNull(),
+  sizesDigest: bytea('sizes_digest').notNull(),
+  calibrationId: text('calibration_id').notNull(),
+  calibrationDigest: bytea('calibration_digest').notNull(),
+  calibrationObservedAt: date('calibration_observed_at').notNull(),
+  harnessVersion: text('harness_version').notNull(),
+  engineVersion: text('engine_version').notNull(),
+  seed: text('seed').notNull(),
+  sampleSize: integer('sample_size').notNull(),
+  // ALL THREE OR NONE, kept by `simulation_runs_sweep_arm_is_whole`. An arm
+  // naming a parameter but no sweep is an arm of nothing.
+  sweepId: uuid('sweep_id'),
+  sweptParameter: text('swept_parameter'),
+  // THE NAME IS THE PLAN'S AND IS NOT ALWAYS TRUE: M21 section 3.4 sweeps
+  // `max_payouts`, which is a count and not a basis point. 0045 kept the plan's
+  // name deliberately and this is a transcription of that column.
+  sweptValueBp: bigint('swept_value_bp', { mode: 'bigint' }),
+  // `text` WITH A CHECK, NOT A pg ENUM. 0045 declares
+  // `status text NOT NULL CHECK (status IN ('queued','running','complete','failed'))`
+  // and 0001 mints no enum for it, so the four values live in the constraint.
+  status: text('status').notNull(),
+  outputs: jsonb('outputs').notNull().default({}),
+  requestedBy: text('requested_by').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+});
+
+// -----------------------------------------------------------------------------
+// contract_specs -- 0004_catalog.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE INSTRUMENT CATALOGUE. What a tick is worth, per symbol, per effective
+// date. No identity owns a contract specification and there is no column that
+// could carry one: the row is a fact about `ES` between two dates, identical for
+// every trader who ever traded it.
+//
+// THE PRIMARY KEY IS COMPOSITE, `(symbol, effective_from)`, and it is
+// transcribed rather than replaced by a surrogate. A spec change is ANOTHER ROW
+// with its own effective date, not an UPDATE, which is what makes a per-
+// instrument figure computed months ago reproducible today.
+//
+// `tick_size` IS AN EXACT RATIONAL AND `tick_value_cents` IS AN INTEGER, the
+// same discipline `fills` applies to price and for the same reason: a tick value
+// that rounds is a per-instrument result that disagrees with the mark.
+export const contractSpecs = pgTable(
+  'contract_specs',
+  {
+    symbol: text('symbol').notNull(),
+    exchange: text('exchange').notNull(),
+    tickSizeNumerator: bigint('tick_size_numerator', { mode: 'bigint' }).notNull(),
+    tickSizeDenominator: bigint('tick_size_denominator', { mode: 'bigint' }).notNull(),
+    tickValueCents: bigint('tick_value_cents', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).notNull().default('USD'),
+    isMicro: boolean('is_micro').notNull().default(false),
+    // `effective_to` NULL means current.
+    effectiveFrom: date('effective_from').notNull(),
+    effectiveTo: date('effective_to'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.symbol, t.effectiveFrom] })],
+);
+
+// -----------------------------------------------------------------------------
+// fills -- 0013_ingest.sql. DERIVED: `account_id` -> accounts, one hop.
+// -----------------------------------------------------------------------------
+// ONE EXECUTION, AS THE VENDOR REPORTED IT. The row reaches an identity through
+// its account and through nothing else; every other reference on it points at
+// the ingest machinery -- `ingest_file_id`, `raw_row_id` -- or at another fill.
+//
+// PRICE IS AN EXACT RATIONAL, NEVER A FLOAT, and the pair of bigints is the
+// whole reason: a price that rounds is a P&L that disagrees with the vendor's.
+// The constitution's no-floats rule reaches this table through the marks it
+// feeds.
+//
+// `trading_day` IS OURS AND `trading_day_vendor` IS THEIRS (SD-M2-04), with
+// `trading_day_source` recording which produced the stored value. Both are kept
+// because "when did it happen" and "when did we learn it" are different
+// questions and a correction is exactly where they diverge.
+//
+// `correction_of` REFERENCES THIS SAME TABLE, so the correction chain never
+// leaves the account it belongs to and a scoped read returns the corrected fill
+// beside the correction. That is `daily_marks.superseded_by`'s shape exactly and
+// it is why neither column widens the tenancy.
+//
+// `ingest_file_id` and `raw_row_id` reference `ingest_files` and
+// `raw_ingest_rows`, which are not this file's tables, so the COLUMN alone is
+// transcribed and the foreign key is left to the database.
+export const fills = pgTable('fills', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  platform: text('platform').notNull().default('rithmic'),
+  platformFillId: text('platform_fill_id').notNull(),
+  // B3 reservations, used rather than added: round-trip derivation reads all
+  // three of `order_id`, `venue` and `correction_of` (M13 section 2).
+  orderId: text('order_id'),
+  venue: text('venue'),
+  // Joins `contract_specs`, which is the tick value's only source (DEP-M13-03).
+  symbol: text('symbol').notNull(),
+  // `text` with a CHECK rather than an enum, and the transcription follows the
+  // DDL: where the DDL and a neighbouring type disagree, the DDL wins.
+  side: text('side').notNull(),
+  quantity: integer('quantity').notNull(),
+  priceNumerator: bigint('price_numerator', { mode: 'bigint' }).notNull(),
+  priceDenominator: bigint('price_denominator', { mode: 'bigint' }).notNull(),
+  executedAt: timestamp('executed_at', { withTimezone: true }).notNull(),
+  // RESOLVED THROUGH THE CALENDAR, never from the timestamp's UTC date.
+  tradingDay: date('trading_day').notNull(),
+  correctionOf: bigint('correction_of', { mode: 'bigint' }).references((): AnyPgColumn => fills.id),
+  isCorrected: boolean('is_corrected').notNull().default(false),
+  // References `ingest_files`, which is not one of this file's tables.
+  ingestFileId: uuid('ingest_file_id').notNull(),
+  // References `raw_ingest_rows`, which is not one of this file's tables.
+  rawRowId: bigint('raw_row_id', { mode: 'bigint' }).notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  tradingDayVendor: date('trading_day_vendor'),
+  tradingDaySource: text('trading_day_source').notNull().default('calendar'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// round_trips -- 0022_analytics_journal.sql. DERIVED: `account_id` -> accounts,
+// one hop.
+// -----------------------------------------------------------------------------
+// FILLS GROUPED INTO TRADES, ONCE AND VERSIONED. The grouping IS the finding:
+// scaling in and out, reversals and overnight positions make "how many trades
+// did I take" ambiguous, so `derivation_version` pins which rule produced the
+// row and a change to that rule is a dated event rather than a trade count that
+// quietly moved (INV-M13-10).
+//
+// `net_result_cents` IS PRESENTATIONAL AND NEVER RECONCILES THE ACCOUNT. The
+// money number is `daily_marks`' (INV-M13-02), and the column carries a DDL
+// comment saying so. Registering this table makes it READABLE and nothing else:
+// no scope rule enforces that separation.
+//
+// `entry_fills` AND `exit_fills` ARE `bigint[]`, matching `fills.id`, which is
+// `bigint GENERATED ALWAYS AS IDENTITY`. M13 section 2's `SD-M13-01` cell says
+// `uuid[]` and the DDL is the source; the plan's cell could never have
+// referenced a fill.
+//
+// THE TWO ARRAY CONSTRAINTS IN `0022` READ `array_length` AND ARE NOT WHAT THE
+// DATABASE ENFORCES: `0028_supersede_plan_version_immutability.sql` re-states
+// `round_trips_has_entry` and `round_trips_closed_has_exit` on `cardinality`, so
+// an empty array is refused. Both statements are `ADD CONSTRAINT` work, which
+// ADR-094's fold reads and discards, so neither touches the column set below.
+export const roundTrips = pgTable('round_trips', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  instrument: text('instrument').notNull(),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull(),
+  // NULL while the position is open.
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+  tradingDay: date('trading_day').notNull(),
+  direction: text('direction').notNull(),
+  maxSize: integer('max_size').notNull(),
+  entryFills: bigint('entry_fills', { mode: 'bigint' }).array().notNull(),
+  exitFills: bigint('exit_fills', { mode: 'bigint' }).array().notNull().default([]),
+  grossResultCents: bigint('gross_result_cents', { mode: 'bigint' }).notNull(),
+  feeCents: bigint('fee_cents', { mode: 'bigint' }).notNull().default(0n),
+  // PRESENTATIONAL. NEVER RECONCILES THE ACCOUNT (INV-M13-02).
+  netResultCents: bigint('net_result_cents', { mode: 'bigint' }).notNull(),
+  derivationVersion: integer('derivation_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// journal_entries -- 0022_analytics_journal.sql. OWNED: `identity_id`.
+// -----------------------------------------------------------------------------
+// THE TRADER'S OWN NOTES. Merit reads them for nothing: M13 section 3.4 is an
+// absence rather than a state machine -- journal text is never a detector input,
+// never a default support view, never in the internal evidence tier.
+//
+// TWO COLUMNS REACH A PERSON AND ONLY ONE OF THEM IS TOTAL. `identity_id` is
+// `NOT NULL REFERENCES identities(id)` and is the author; `account_id` is
+// NULLABLE, because a `day`-scoped entry need name no account. Scoping by the
+// account would silently drop every entry that names none, which is a wrong
+// answer that returns rows.
+//
+// `deleted_at` IS A TOMBSTONE AND NOT THE END STATE. A hard-delete job removes
+// the row afterwards, which is what makes deletion a promise rather than a
+// claim (INV-M13-07); the soft phase exists so the delete is undoable inside a
+// short window and so the job has something to find. A scoped read that ignored
+// it would return deleted entries, and no scope rule prevents that: registering
+// this table makes it readable and nothing else.
+//
+// `reference_id` NAMES A ROUND TRIP WHEN `scope` IS `round_trip` AND CARRIES NO
+// FOREIGN KEY, so it is transcribed as a bare `uuid`.
+export const journalEntries = pgTable('journal_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  accountId: uuid('account_id').references(() => accounts.id),
+  scope: text('scope').notNull(),
+  referenceId: uuid('reference_id'),
+  body: text('body').notNull(),
+  tags: text('tags').array().notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M13-02. THE TOMBSTONE, not the end state.
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+});
+
+// -----------------------------------------------------------------------------
+// analytics_snapshots -- 0022_analytics_journal.sql. DERIVED: `account_id` ->
+// accounts, one hop.
+// -----------------------------------------------------------------------------
+// THE EXPENSIVE SHAPES, COMPUTED ONCE PER ACCOUNT PER CLOSED DAY in the batch
+// rather than per page load (INV-M13-06, AS-M13-07).
+//
+// `inputs_digest` IS WHAT MAKES INV-M13-10 CHECKABLE: if the digest changed, the
+// marks changed, and the trader is told why. Without it a corrected mark
+// silently moves a trader's historical statistics and the only evidence is that
+// they remember a different number. It is `bytea` and is transcribed as one.
+//
+// THE PRIMARY KEY IS COMPOSITE, `(account_id, as_of_trading_day)`, which is the
+// grain: one snapshot per account per closed day, replaced rather than
+// accumulated.
+export const analyticsSnapshots = pgTable(
+  'analytics_snapshots',
+  {
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    asOfTradingDay: date('as_of_trading_day').notNull(),
+    payload: jsonb('payload').notNull(),
+    inputsDigest: bytea('inputs_digest').notNull(),
+    computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.accountId, t.asOfTradingDay] })],
+);
+
+// -----------------------------------------------------------------------------
+// graduation_benefits -- 0023_loyalty_and_graduation.sql. OWNED: `identity_id`,
+// NOT NULL. SD-M18-02.
+// -----------------------------------------------------------------------------
+// THE ROW REACHES AN IDENTITY TWICE AND THE DIRECT COLUMN IS THE RULE, which is
+// `certificates`' shape and its unrepaired finding in a third place (after
+// `contact_channels.superseded_by` and `phone_change_requests.old_phone_id`).
+// `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` and
+// `account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` both
+// reach an identity, `accounts` is itself `owned` on `identity_id`, and NO
+// CONSTRAINT TIES THE TWO: nothing in the DDL says this row's `identity_id` is
+// the same identity that owns its `account_id`. The direct column is the rule
+// because a derived rule would make the tenancy depend on a join rather than on
+// a column the database declares against `identities(id)`.
+//
+// `accrued_cents` IS THE VAULT NUMBER AND `basis` IS WHY IT IS NOT A PROJECTION.
+// Both are NOT NULL together (INV-M18-06): a number on a screen with no stated
+// derivation is read as a promise. `basis` is `text` and `accrued_cents` is
+// `bigint`, integer cents, never a float.
+//
+// `conferred_at` AND `withheld_reason` ARE BOTH NULLABLE AND BOTH DECIDED. The
+// table's own `graduation_benefits_not_both_conferred_and_withheld` CHECK is
+// what makes them exclusive, and it is the database's rather than this file's:
+// a CHECK constraint is not a column, so nothing in `packages/db` compares it.
+// A withheld benefit HOLDS rather than disappears, which is INV-M18-10.
+export const graduationBenefits = pgTable('graduation_benefits', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  benefitCode: text('benefit_code').notNull(),
+  accruedCents: bigint('accrued_cents', { mode: 'bigint' }).notNull(),
+  basis: text('basis').notNull(),
+  conferredAt: timestamp('conferred_at', { withTimezone: true }),
+  withheldReason: text('withheld_reason'),
+  criteriaVersion: integer('criteria_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// graduation_invitations -- 0025_reserved_sequence.sql. OWNED: `identity_id`,
+// NOT NULL. SD-M18-03.
+// -----------------------------------------------------------------------------
+// RESERVED AND EMPTY AT LAUNCH, AND THAT IS A FACT ABOUT THE ROWS RATHER THAN
+// ABOUT THE RULE. `0025`'s own `COMMENT ON TABLE` says no live program exists
+// (OQ-M18-01), and a scope rule states how a row WOULD reach an identity, so an
+// empty table gets the same rule a full one would. Registering it does not ship
+// a program and confers no read on anybody: ADR-092 section 9 is explicit that
+// registration makes a table readable through the scoped accessor and nothing
+// else.
+//
+// ONE IDENTITY COLUMN AND NO SECOND PATH. Unlike `graduation_benefits` one
+// table up, this row names no account: an invitation is issued to the PERSON
+// rather than earned by one of their accounts, which is why `identity_id` is
+// the only reference in the body.
+//
+// NO `updated_at`, AND IT IS STRUCTURAL. `accepted_at` and `declined_at` are the
+// row's clocks and `graduation_invitations_one_response` makes them exclusive,
+// so a response is a column that fills rather than a row that is edited.
+export const graduationInvitations = pgTable('graduation_invitations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  programRef: text('program_ref').notNull(),
+  issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+  declinedAt: timestamp('declined_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  termsVersion: integer('terms_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// plan_size_unlocks -- 0044_fee_back_and_ladder_unlock.sql. OWNED:
+// `identity_id`, NOT NULL. SD-M18-04.
+// -----------------------------------------------------------------------------
+// THE ROW CARRIES THIS PACKAGE'S NAMED TRAP AND IS NOT DERIVED THROUGH IT.
+// `plan_version_id uuid NOT NULL REFERENCES plan_versions(id) ON DELETE
+// RESTRICT` reads exactly like the `hop` `daily_marks` and `rule_states` make to
+// `accounts`, and it is not one: `plan_versions` is FIRM, so a derivation
+// through it constructs no predicate and throws the first time anybody reads
+// this table. A LADDER'S RUNGS ARE THE SAME FOR EVERYONE AND A TRADER'S POSITION
+// ON IT IS THEIR OWN, and the FK to the rung definition is what makes the two
+// look alike in a column list.
+//
+// `identity_id` IS ADR-070 SECTION 3'S RULING IN DDL RATHER THAN A FIELD THE
+// RULING CONSTRAINS. `identities.id` is the hard-merged grain -- a merge
+// repoints ownership into that row -- and nothing in this table reaches
+// `identity_links`, so a soft-linked pair sharing an unlock is UNREPRESENTABLE
+// rather than forbidden (INV-M18-11).
+//
+// `earned_account_id` IS THE SECOND PATH AND IS NOT THE RULE, for
+// `graduation_benefits`' reason exactly: it is `NOT NULL REFERENCES
+// accounts(id)`, `accounts` is `owned`, and no constraint ties the account's
+// identity to this row's. It records WHICH LADDER COMPLETED, which is what a
+// dispute is argued from, and says nothing about who holds the entitlement.
+//
+// `unlocked_size_cents` NAMES A `plan_version_sizes.size_cents` AND IS
+// DELIBERATELY NOT A FOREIGN KEY TO THAT ROW. The entitlement is to the SIZE, so
+// a later version publishing the same size honours an unlock earned against it.
+// `bigint`, integer cents.
+//
+// THE ROW IS THE ENTITLEMENT AND THERE IS NO STATE MACHINE. `revoked_at` and
+// `revoked_reason` are nullable together and tied by
+// `plan_size_unlocks_revocation_is_explained`, a CHECK this file does not
+// transcribe and nothing in `packages/db` compares.
+export const planSizeUnlocks = pgTable('plan_size_unlocks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  planVersionId: uuid('plan_version_id')
+    .notNull()
+    .references(() => planVersions.id),
+  unlockedSizeCents: bigint('unlocked_size_cents', { mode: 'bigint' }).notNull(),
+  earnedAccountId: uuid('earned_account_id')
+    .notNull()
+    .references(() => accounts.id),
+  earnedAt: timestamp('earned_at', { withTimezone: true }).notNull().defaultNow(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  revokedReason: text('revoked_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// offer_experiments -- 0024_offers.sql. FIRM.
+// -----------------------------------------------------------------------------
+// AN EXPERIMENT IS A THING MERIT RUNS, NOT A THING ANYBODY OWNS. There is no
+// identity column and there is no correct one: an arm is assigned to a
+// population and its hypothesis is about the population, so a per-identity slice
+// of an experiment is not a smaller version of it. The row a person holds is the
+// `offers` row that names `experiment_id`, and that table carries the identity.
+//
+// `varies` IS THE RULE IN DDL, checked to `price`, `presentation` and
+// `bundle_contents` with NO fourth value, so an experiment that varies a rule, a
+// gate or a plan parameter cannot be written down at all (AS-M17-07). Adding a
+// member is an ADR, which is 0024's own header.
+//
+// `winner_arm` and `arms` NAME NOBODY. `arms jsonb` holds arm definitions rather
+// than enrolments, and there is no enrolment table in this tree, so nothing here
+// reaches an identity even one hop out.
+export const offerExperiments = pgTable('offer_experiments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  hypothesis: text('hypothesis').notNull(),
+  arms: jsonb('arms').notNull(),
+  varies: text('varies').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  winnerArm: text('winner_arm'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// price_floors -- 0024_offers.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE HARD STOP UNDER STACKING ARITHMETIC, AND IT IS THE FIRM'S NUMBER. The row
+// says what a product may never be sold below; it declares no foreign key at
+// all, carries no identity column, and there is no correct one, because a floor
+// that differed per trader would not be a floor. `approved_by text NOT NULL` is
+// an approver rather than a `users` row, which is 0002's `actor` idiom.
+//
+// THE GRAIN IS `(product_ref, effective_from)` AND IT IS THE WHOLE PRIMARY KEY,
+// so the table has no `uuid` of its own. Session 166 read the consequence and it
+// is a FINDING rather than anything this transcription may act on:
+// `dual_control_approvals.subject_id` is `uuid NOT NULL` (0016:227), so the dual
+// control M17:150, EC-119 and `data-model/price_floors.md:2` all assert over this
+// table cannot name its subject. A repair is a migration and a transcription
+// holds none.
+//
+// `product_ref` IS BARE TEXT ON BOTH SIDES OF THE CLAMP. `offers.product_ref` is
+// bare text too, with no FK, no domain and no shared CHECK, so the floor lookup
+// is a text join. Transcribed as it is written.
+export const priceFloors = pgTable(
+  'price_floors',
+  {
+    productRef: text('product_ref').notNull(),
+    // Integer cents, per the constitution and DATA_MODEL section 1.
+    floorCents: bigint('floor_cents', { mode: 'bigint' }).notNull(),
+    // NOT NULL. For a Direct plan the floor is a LIABILITY decision, and one
+    // with no written rationale is one nobody can defend at the next review.
+    reason: text('reason').notNull(),
+    effectiveFrom: timestamp('effective_from', { withTimezone: true }).notNull(),
+    approvedBy: text('approved_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.productRef, table.effectiveFrom] })],
+);
+
+// -----------------------------------------------------------------------------
+// offers -- 0024_offers.sql. OWNED: `identity_id`, NULLABLE. MONEY.
+// -----------------------------------------------------------------------------
+// AN OFFER CHANGES THE PRICE OF A KNOWN THING AND MAY NEVER CHANGE THE THING
+// (INV-M17-02, INV-M17-03).
+//
+// NULLABLE ON PURPOSE, AND THE DDL MAKES IT BICONDITIONAL.
+// `offers_identity_scope_matches` CHECKs `(scope = 'identity' AND identity_id IS
+// NOT NULL) OR (scope <> 'identity' AND identity_id IS NULL)`, so filtering
+// `identity_id = $1` returns EXACTLY the rows the schema says are that person's
+// and excludes every `public` and `segment` row without a second predicate,
+// because SQL NULL never equals anything. That is `ledger_accounts`' shape, not
+// `coupons`': a coupon has no identity column and no correct one, and this table
+// has one the DDL declares against `identities(id)`.
+//
+// `experiment_id` IS THE TRAP AND IT IS THE ONE THIS MODULE MAKES PLAUSIBLE. It
+// is a foreign key to `offer_experiments`, which is FIRM, so a `derived` rule
+// through it would compile at every call site -- `DerivedRule.via` is `TableKey`
+// and includes every firm key -- and throw the first time anybody read it.
+// `loyalty_grant_id` is the same shape one table further out and is not even
+// registrable: `loyalty_benefit_grants` is not one of this file's tables, so the
+// column carries no `.references()`.
+//
+// `criteria_version` IS A BARE `integer` THAT CANNOT ADDRESS THE ROW IT NAMES.
+// `loyalty_criteria`'s primary key is `(benefit_code, version)`, so a version
+// number alone selects nothing. Transcribed as written; it is 0024's shape and
+// not this file's to repair.
+export const offers = pgTable('offers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // Bare `text` with NO CHECK. The six OF-M17-nn values are unrepresented in
+  // DDL, in the same file whose header argues that a CHECK is the schema
+  // enforcing the rule. The argument was applied to `varies` and not here.
+  offerType: text('offer_type').notNull(),
+  scope: text('scope').notNull(),
+  identityId: uuid('identity_id').references(() => identities.id),
+  productRef: text('product_ref').notNull(),
+  // STATED CONTENTS BEFORE PAYMENT (ADR-019a). Explicit, never derived at
+  // redemption: a bundle whose contents are computed when it is redeemed is a
+  // bundle whose contents were not stated.
+  contents: jsonb('contents').notNull(),
+  priceCents: bigint('price_cents', { mode: 'bigint' }).notNull(),
+  // Stored beside `price_cents` so the discount is a FACT rather than a
+  // comparison against a list price that may since have moved.
+  listPriceCents: bigint('list_price_cents', { mode: 'bigint' }).notNull(),
+  currency: char('currency', { length: 3 }).notNull().default('USD'),
+  maxRedemptions: integer('max_redemptions'),
+  redemptionsUsed: integer('redemptions_used').notNull().default(0),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  criteriaVersion: integer('criteria_version'),
+  // NO `.references()`: `loyalty_benefit_grants` is not one of this file's
+  // tables.
+  loyaltyGrantId: uuid('loyalty_grant_id'),
+  experimentArm: text('experiment_arm'),
+  experimentId: uuid('experiment_id').references(() => offerExperiments.id),
+  createdBy: text('created_by').notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// promotional_credit_grants -- 0024_offers.sql, later columns from
+// 0044_fee_back_and_ladder_unlock.sql. OWNED: `identity_id`, NOT NULL. MONEY.
+// -----------------------------------------------------------------------------
+// THIS IS THE TABLE THAT MINTS VALUE, and `identity_id uuid NOT NULL REFERENCES
+// identities(id) ON DELETE RESTRICT` is on the row. A grant is a named person's
+// entitlement from the moment it exists; there is no unowned grant and the DDL
+// has no way to write one.
+//
+// NEVER WITHDRAWABLE (OQ-FREEZE-01). Promotional credit is rendered inside the
+// wallet screen and is NOT wallet value: it has its own ledger class
+// (`promotional_credit`, 0009) and no `wallet_entries.provenance` value (0011).
+//
+// `funding_purchase_id` IS THE DELTA'S REAL CONTENT AND IT IS NOT THE SCOPE. A
+// credit needs to know what funded it or a chargeback cannot claw back the
+// credit it paid for (AS-M17-06). It is NULLABLE -- a loyalty-issued or
+// fee-back-issued grant has no funding purchase -- so a derivation through
+// `purchases` would return only the grants somebody bought, and the rows it
+// would drop are exactly the ones no purchase funded.
+//
+// `source_offer_id` IS THE OTHER TRAP AND IT IS THIS MODULE'S CHARACTERISTIC
+// ONE. A redemption pointing at its catalogue row reads like a legitimate hop,
+// and here the hop would be to `offers`, whose own rule is `owned` with a
+// NULLABLE column: a grant issued from a `public` offer would reach nobody at
+// all. The column is nullable besides. The identity is on the row and nothing
+// else is needed.
+//
+// `source_payout_request_id` IS 0044's LATER COLUMN, folded by ADR-094's
+// one-member vocabulary. It carries no `.references()`: the FK was added by
+// `ALTER TABLE ... ADD COLUMN` rather than declared in the `CREATE TABLE` body,
+// and `payout_requests` is not one of this file's tables either.
+export const promotionalCreditGrants = pgTable('promotional_credit_grants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  sourceOfferId: uuid('source_offer_id').references(() => offers.id),
+  fundingPurchaseId: uuid('funding_purchase_id').references(() => purchases.id),
+  // NOT NULL. Promotional credit expires; that is what distinguishes it from a
+  // payable. An unexpiring promotional balance is a liability wearing a
+  // marketing label.
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  consumedCents: bigint('consumed_cents', { mode: 'bigint' }).notNull().default(0n),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  revokedReason: text('revoked_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M20-05, 0044. The settled payout that triggered a fee-back credit, NULL
+  // on every offer-issued grant.
+  sourcePayoutRequestId: uuid('source_payout_request_id'),
 });
