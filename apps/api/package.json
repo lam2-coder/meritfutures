@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit",
     "start": "node --experimental-strip-types src/index.ts"
   },
-  "//": "IT DECLARES NO RUNTIME DEPENDENCY, AND FASTIFY'S ABSENCE HERE IS THE FENCE RATHER THAN THE RULING. ADR-083 rules the framework; the version lives in `pnpm-workspace.yaml`'s `catalog:` block, which this session does not hold (P3 build plan section 6 gives it to sessions 145 and 147), and `.npmrc`'s `save-exact` plus VG-12 make a version a human approves once rather than a caret. So the manifest that would carry `\"fastify\": \"catalog:\"` carries nothing, and the shell is the four existing apps' shape: real structure, no wiring. THERE IS NO `build` SCRIPT AND THERE MUST NOT BE ONE. `CI-06/gate-inventory` probes every apps/*/package.json for that key and requires it ABSENT, because CI-07's row reads through an artifact that does not exist; a build script makes that gate fail on good news. Fastify 5 needs none, which is measured in ADR-083 section 5 rather than assumed.",
+  "//": "IT DECLARED NO RUNTIME DEPENDENCY UNTIL ADR-100 AND FASTIFY'S ABSENCE WAS THE FENCE RATHER THAN THE RULING. ADR-083 ruling 3 chose the framework and deliberately did not install it: the version lives in `pnpm-workspace.yaml`'s `catalog:` block, which session 144 did not hold, and `.npmrc`'s `save-exact` plus VG-12 make a version a human approves once rather than a caret. ADR-100 is that admission -- every package named, every resolution checked for a registry entry carrying a `sha512` integrity hash, `pnpm audit --audit-level=low` run and the closure delta stated -- and it is why `\"fastify\": \"catalog:\"` is below. THERE IS NO `build` SCRIPT AND THERE MUST NOT BE ONE. `CI-06/gate-inventory` probes every apps/*/package.json for that key and requires it ABSENT, because CI-07's row reads through an artifact that does not exist; a build script makes that gate fail on good news. Fastify 5 needs none, which ADR-083 section 5 measured and which `pnpm run start` now demonstrates rather than predicts: `node --experimental-strip-types src/index.ts` serves the registry with nothing compiled.",
+  "dependencies": {
+    "fastify": "catalog:"
+  },
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
