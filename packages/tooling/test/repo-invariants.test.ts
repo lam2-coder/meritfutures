@@ -8,6 +8,7 @@ import {
   COVERAGE_NEEDLES,
   DEPLOYABLES,
   REPO_ROOT,
+  SURFACE_OWNER,
   needle,
 } from '../checks/repo-invariants.mjs';
 
@@ -76,6 +77,19 @@ function cleanTree(): string {
   for (const app of DEPLOYABLES) {
     write(root, `apps/${app}/package.json`, JSON.stringify({ name: `@merit/${app}` }));
   }
+  // RI-09'S INPUT, AND IT IS THE FIXTURE'S OWN VOCABULARY RATHER THAN A COPY OF
+  // THE REPOSITORY'S. The check parses `BASE_PATH` and `OPERATOR_PREFIXES` out
+  // of whatever `apps/<owner>/src/surface.ts` the tree it is given holds, which
+  // is what keeps the two lists in one place; the case below that rewrites this
+  // file and watches the finding follow is what proves that rather than
+  // asserting it. The spelling here matches the real one so the seeded cases
+  // read like the defect they stand for.
+  write(
+    root,
+    `apps/${SURFACE_OWNER}/src/surface.ts`,
+    "export const BASE_PATH = '/api/v1';\n" +
+      "export const OPERATOR_PREFIXES = ['/admin', '/internal'] as const;\n",
+  );
   // RI-06's two inputs. The fixture registers one rule and attaches it, which is
   // the shape the invariant demands; the seeded cases below break it in each
   // direction separately.
@@ -321,6 +335,109 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
     expect(findings('RI-07', root)).toEqual([]);
   });
+
+  // ---------------------------------------------------------------------------
+  // RI-09, AND THE FIRST TWO CASES ARE THE RULING (ADR-098) STATED AS A TEST
+  // ---------------------------------------------------------------------------
+  // ADR-095's approval clause is a path and four green commands: seed
+  // `apps/portal/src/app/api/v1/admin/payouts/route.ts` and nothing in the
+  // estate refuses it. The first case is that exact path and demands a finding.
+  // The second is the direction a check written carelessly gets wrong, and it
+  // matters more: `apps/api` OWNS this surface, so a route there must pass. A
+  // check that refused both would be unusable the day P4-d writes the first
+  // handler, and nobody would find that out until then.
+  test("RI-09 catches ADR-095's own seed, an operator route inside a UI deployable", () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/portal/src/app/api/v1/admin/payouts/route.ts',
+      'export function GET(): Response { return new Response("{}"); }\n',
+    );
+    const out = findings('RI-09', root).join('\n');
+    expect(out).toContain('apps/portal/src/app/api/v1/admin/payouts/route.ts');
+    expect(out).toContain('spells `/api/v1/admin` inside apps/portal');
+  });
+
+  test('RI-09 does NOT refuse the same route under the deployable that owns the surface', () => {
+    const root = cleanTree();
+    write(
+      root,
+      `apps/${SURFACE_OWNER}/src/app/api/v1/admin/payouts/route.ts`,
+      'export function GET(): Response { return new Response("{}"); }\n',
+    );
+    write(
+      root,
+      `apps/${SURFACE_OWNER}/src/routes/admin/payouts.ts`,
+      'export const payouts = (): string => "ok";\n',
+    );
+    expect(findings('RI-09', root)).toEqual([]);
+  });
+
+  test('RI-09 does NOT refuse an api directory that is not below a routing root', () => {
+    // `apps/portal/src/api/types.ts` EXISTS ON MAIN and is the portal's
+    // TRANSCRIPTION of the wire types -- ADR-083 section 3 cites it as evidence
+    // the portal is on the far side of the boundary, so a check that refused it
+    // would refuse the thing the ruling holds up as correct. It is `src/api`,
+    // not `app/api`, and the difference is exactly the framework's.
+    const root = cleanTree();
+    write(root, 'apps/portal/src/api/types.ts', 'export type Money = { cents: number };\n');
+    expect(findings('RI-09', root)).toEqual([]);
+  });
+
+  test('RI-09 catches an operator route that does not carry the base path', () => {
+    // App Router serves `app/internal/jobs/route.ts` at `/internal/jobs`. The
+    // base-path shape cannot see this one, which is why there is more than one.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/site/src/app/internal/jobs/route.ts',
+      'export function GET(): Response { return new Response("{}"); }\n',
+    );
+    expect(findings('RI-09', root).join('\n')).toContain(
+      'puts `internal` directly below the routing root `app` in apps/site',
+    );
+  });
+
+  test('RI-09 sees through a route group, which the URL does not carry', () => {
+    // `(ops)` is invisible in the URL, so a naive "the segment under the
+    // routing root" test reads `(ops)` and finds nothing. Skipping it makes the
+    // check catch MORE, which is the only direction a skip may run in here.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/site/src/app/(ops)/admin/payouts/route.ts',
+      'export function GET(): Response { return new Response("{}"); }\n',
+    );
+    expect(findings('RI-09', root).join('\n')).toContain('`admin` directly below the routing root');
+  });
+
+  test('RI-09 catches a Pages Router api directory with no version segment', () => {
+    const root = cleanTree();
+    write(root, 'apps/portal/src/pages/api/hello.ts', 'export default (): null => null;\n');
+    expect(findings('RI-09', root).join('\n')).toContain(
+      'an API surface inside a UI deployable by',
+    );
+  });
+
+  test("RI-09 reads the tree's OWN operator prefixes rather than a copy of them", () => {
+    // THE CASE THAT PROVES THE TWO LISTS ARE ONE LIST. A third prefix in
+    // surface.ts must move the check without an edit here; if this file held
+    // its own `['/admin', '/internal']`, the two would drift silently and the
+    // drift is the entire failure mode RI-09 exists inside.
+    const root = cleanTree();
+    write(
+      root,
+      `apps/${SURFACE_OWNER}/src/surface.ts`,
+      "export const BASE_PATH = '/api/v1';\n" +
+        "export const OPERATOR_PREFIXES = ['/admin', '/internal', '/ops'] as const;\n",
+    );
+    write(
+      root,
+      'apps/portal/src/app/ops/route.ts',
+      'export function GET(): Response { return new Response("{}"); }\n',
+    );
+    expect(findings('RI-09', root).join('\n')).toContain('`/ops` is an OPERATOR_PREFIXES entry');
+  });
 });
 
 // -----------------------------------------------------------------------------
@@ -332,6 +449,7 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     ['RI-03', 'vitest.config.ts'],
     ['RI-05', '.nvmrc'],
     ['RI-07', 'packages/rules-engine/src/index.ts'],
+    ['RI-09', `apps/${SURFACE_OWNER}/src/surface.ts`],
   ])('%s throws when %s is gone', (id, input) => {
     const root = cleanTree();
     renameSync(join(root, input), join(root, `${input}.moved`));
@@ -342,6 +460,16 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     const root = cleanTree();
     write(root, 'pnpm-workspace.yaml', 'packages:\n');
     expect(() => findings('RI-01', root)).toThrow(/claims no packages/);
+  });
+
+  test('RI-09 throws when OPERATOR_PREFIXES parses to nothing', () => {
+    // THE DIRECTION THAT MATTERS. An empty prefix list would make RI-09 report
+    // PASS while asserting nothing at all about the operator surface, which is
+    // the half it was written for -- and it is the same shape as RI-04
+    // reporting PASS about a deployable its literal did not name.
+    const root = cleanTree();
+    write(root, `apps/${SURFACE_OWNER}/src/surface.ts`, "export const BASE_PATH = '/api/v1';\n");
+    expect(() => findings('RI-09', root)).toThrow(/cannot run/);
   });
 
   test('RI-07 throws when the graph walk reaches only the entry point', () => {

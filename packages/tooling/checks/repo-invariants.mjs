@@ -764,7 +764,248 @@ const ri07 = {
   },
 };
 
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07];
+// -----------------------------------------------------------------------------
+// RI-09  Only apps/api spells a path on the API surface
+// -----------------------------------------------------------------------------
+// ADR-083 CLOSES THE OPERATOR PATH WITH TWO STATUS CODES ONE ROW APART, AND
+// NOTHING HELD THE DOOR. Its section 4 reads API_CONTRACT section 12's matrix:
+// a trader session calling `/admin/*` gets 403, and calling `/internal/*` from
+// the public origin gets 404. "403 is what a permission check returns. 404 is
+// what an ABSENT ROUTE returns", so the route set is chosen at startup and the
+// public deployment answers 404 by having nothing there. `surface.ts` is that
+// partition and `surface.test.ts` watches it in both directions.
+//
+// ALL OF THAT IS ABOUT apps/api, AND NONE OF IT IS ABOUT ANYWHERE ELSE. A file
+// that serves `/api/v1/admin/payouts` from inside a UI deployable makes the
+// path exist on the public origin without apps/api registering anything, and
+// the estate says nothing: seeded on `main`, `pnpm run lint`, `pnpm -r run
+// typecheck`, this file, `gates.mjs check` and the full suite are byte-identical
+// to the clean tree. RI-04 iterates deployables and asks whether one DEPENDS on
+// another; it never asks what one SERVES, and a route handler declares no
+// dependency at all. `merit/no-raw-db-client` bans a client import, not a route.
+// ADR-098 is the ruling that this absence is a PROPERTY rather than an
+// ASSUMPTION, and this check is that property.
+//
+// WHY A PATH CHECK AND NOT A LINT RULE. RI-07's header states the rule this
+// follows: "the defect is a PATH and not a line". A filesystem-routing
+// framework turns a directory name into a URL, so the violation is complete
+// before any statement is written and an exported `GET` is a consequence rather
+// than the cause. ESLint is attached to globs and reads files one at a time; it
+// is the wrong instrument for an assertion about where a file IS.
+//
+// THE TWO LISTS ARE READ FROM apps/api/src/surface.ts AND NEVER WRITTEN HERE.
+// `BASE_PATH` and `OPERATOR_PREFIXES` are the contract's own vocabulary and
+// they live in one file. RI-06 has the same relationship to the ESLint plugin:
+// parse the source of truth, implement the comparison. A second copy of
+// `['/admin', '/internal']` in this file would drift the day the contract grows
+// a third operator prefix, and it would drift SILENTLY, which is the whole
+// failure mode this check exists inside.
+
+/** The one deployable that owns the API surface. ADR-083 ruling 1. */
+export const SURFACE_OWNER = 'api';
+
+/**
+ * Directory names a filesystem-routing framework treats as the root of its URL
+ * space, so that the segment BELOW one of these is a URL segment.
+ *
+ * DELIBERATELY ONLY THE TWO NEXT.JS SPELLS, because Next.js App Router is the
+ * only such framework this workspace admits (ADR-095 ruling 1, `apps/portal`
+ * and `apps/site`). A guess at SvelteKit's `routes` would have refused
+ * `apps/site/src/routes/`, which exists today and is seven pure render
+ * functions rather than a router. A framework this workspace has not admitted
+ * is a new entry here, and the `covers` line says so rather than pretending
+ * the list is exhaustive.
+ */
+const ROUTING_ROOTS = ['app', 'pages'];
+
+/**
+ * Segments a Next.js route path carries that the URL does not: route groups
+ * `(marketing)` and parallel routes `@modal`.
+ *
+ * Skipped so the check catches MORE, never less. `app/(ops)/admin/route.ts`
+ * serves `/admin`, and a naive "the segment under the routing root" test would
+ * read `(ops)` and find nothing. Private `_folders` are deliberately NOT
+ * skipped and are deliberately not exempted either: this check asserts a
+ * SPELLING, not a prediction about what one framework version happens to
+ * route, and a path under `_lib` that spells the operator surface is still a
+ * path that spells the operator surface.
+ *
+ * @param {string} segment
+ * @returns {boolean}
+ */
+const isUrlInvisible = (segment) =>
+  (segment.startsWith('(') && segment.endsWith(')')) || segment.startsWith('@');
+
+/**
+ * The two lists ADR-083 partitions on, read out of `apps/api/src/surface.ts`.
+ *
+ * Parsed from the text rather than imported: this file has no build step and
+ * `surface.ts` is TypeScript, and RI-06 already established that parsing the
+ * source of truth beats keeping a second copy of it. Anything that fails to
+ * parse THROWS, on the file's second rule: a check that cannot reach its inputs
+ * is not a check that passed.
+ *
+ * @param {string} root
+ * @returns {{ rel: string, baseSegments: string[], operatorSegments: string[] }}
+ */
+export function apiSurfaceVocabulary(root) {
+  const rel = `apps/${SURFACE_OWNER}/src/surface.ts`;
+  if (!existsSync(join(root, rel)))
+    throw new Error(`${rel} does not exist; RI-09 has no surface vocabulary and cannot run`);
+  const source = read(root, rel);
+
+  const base = /\bBASE_PATH\s*=\s*['"]([^'"]+)['"]/.exec(source);
+  if (!base?.[1]) throw new Error(`${rel}: no \`BASE_PATH\` literal found; RI-09 cannot run`);
+  const baseSegments = base[1].split('/').filter(Boolean);
+  if (baseSegments.length === 0)
+    throw new Error(
+      `${rel}: \`BASE_PATH\` is \`${base[1]}\`, which has no segments; RI-09 cannot run`,
+    );
+
+  const block = /\bOPERATOR_PREFIXES\s*=\s*\[([^\]]*)\]/.exec(source);
+  if (block?.[1] === undefined)
+    throw new Error(`${rel}: no \`OPERATOR_PREFIXES\` array found; RI-09 cannot run`);
+  const operatorSegments = [...block[1].matchAll(/['"]\/([^'"/]+)['"]/g)].map((m) => String(m[1]));
+  if (operatorSegments.length === 0)
+    throw new Error(
+      `${rel}: \`OPERATOR_PREFIXES\` parsed to zero prefixes; RI-09 would be asserting ` +
+        'nothing about the operator surface, which is the half it exists for',
+    );
+
+  return { rel, baseSegments, operatorSegments };
+}
+
+/**
+ * Where a run of segments starts inside a path, or -1.
+ *
+ * @param {string[]} segments
+ * @param {string[]} run
+ * @returns {number}
+ */
+function indexOfRun(segments, run) {
+  for (let i = 0; i + run.length <= segments.length; i++) {
+    if (run.every((want, k) => segments[i + k] === want)) return i;
+  }
+  return -1;
+}
+
+/** @type {Invariant} */
+const ri09 = {
+  id: 'RI-09',
+  // COMPUTED, for the reason RI-04's title is computed and RI-05's `covers`
+  // states: a count written beside a list is a hand-maintained count in a
+  // different costume, and it drifts the same way.
+  title:
+    `Of ${DEPLOYABLES.length} deployables only apps/${SURFACE_OWNER} holds a file whose ` +
+    'path spells a route on the API surface',
+  covers:
+    'every file under each deployable in DEPLOYABLES except apps/' +
+    SURFACE_OWNER +
+    ", in three path shapes read against apps/api/src/surface.ts's own " +
+    "`BASE_PATH` and `OPERATOR_PREFIXES`: the base path's segments appearing " +
+    'consecutively anywhere in the path, an operator prefix sitting directly ' +
+    'below the base path or below a routing root, and an `api` segment sitting ' +
+    'directly below a routing root. FOUR THINGS IT DOES NOT SEE, each of which ' +
+    'a green result must not be read as covering. (1) It reads PATHS, so a ' +
+    'route reached by a catch-all segment, a rewrite, a middleware or a hand-' +
+    'written router table declares nothing this check can find; the spelling is ' +
+    'the convention a filesystem-routing framework makes load-bearing and not ' +
+    'the only way to serve a path. (2) ROUTING_ROOTS holds the two Next.js ' +
+    'spells because ADR-095 admits Next.js and nothing else; another ' +
+    "framework's routing root is a new entry here, though the base-path shape " +
+    'is framework-independent and catches it anyway. (3) It does not read ' +
+    'apps/api, which OWNS the surface: that half is surface.ts and ' +
+    'surface.test.ts. (4) It does not read packages/, because a package routes ' +
+    'nothing on its own and reaches an origin only through a deployable ' +
+    'depending on it, which is RI-04. It is also NOT the mechanism ADR-095 ' +
+    'section 9 item 5 owes for a server component importing packages/db: that ' +
+    'defect is an import and this one is a path.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    if (!DEPLOYABLES.includes(SURFACE_OWNER))
+      throw new Error(
+        `\`${SURFACE_OWNER}\` is not in DEPLOYABLES, so RI-09 would exempt a deployable that ` +
+          'does not exist and read one that owns nothing; RI-09 cannot run',
+      );
+    const { rel: surfaceRel, baseSegments, operatorSegments } = apiSurfaceVocabulary(root);
+    const basePath = `/${baseSegments.join('/')}`;
+    const operators = new Set(operatorSegments);
+
+    let inspected = 0;
+    for (const app of DEPLOYABLES) {
+      if (app === SURFACE_OWNER) continue;
+      const appDir = `apps/${app}`;
+      // A MISSING DEPLOYABLE IS RI-04'S FINDING AND NOT THIS ONE'S. Reporting
+      // it here too would print one defect twice and make a reader think two
+      // properties broke.
+      if (!existsSync(join(root, appDir))) continue;
+
+      for (const file of walk(root, appDir)) {
+        inspected++;
+        const segments = file.split('/').slice(2, -1); // drop `apps/<app>`, drop the filename
+        const visible = segments.filter((s) => !isUrlInvisible(s));
+
+        const baseAt = indexOfRun(visible, baseSegments);
+        const under = baseAt === -1 ? undefined : visible[baseAt + baseSegments.length];
+        if (under !== undefined && operators.has(under)) {
+          findings.push(
+            `${file} spells \`${basePath}/${under}\` inside apps/${app}. API_CONTRACT ` +
+              `section 12 requires 404 for the operator surface from the public origin, and ` +
+              `ADR-083 section 4 makes that 404 the ROUTER's: apps/${SURFACE_OWNER} chooses ` +
+              'its route set at startup and the public deployment registers nothing there. A ' +
+              `path served from apps/${app} is not in that route set and cannot be kept out ` +
+              `of it (${surfaceRel} is the vocabulary this reads)`,
+          );
+          continue;
+        }
+        if (baseAt !== -1) {
+          findings.push(
+            `${file} spells \`${basePath}\` inside apps/${app}. ADR-083 ruling 1: the API is ` +
+              `its own deployable and not a server inside a UI surface, on API_CONTRACT ` +
+              'section 1\'s "no privileged back door" -- a surface that CONTAINS the API has ' +
+              'one by construction, because a handler in the same package is an import away',
+          );
+          continue;
+        }
+
+        const rootAt = visible.findIndex((s) => ROUTING_ROOTS.includes(s));
+        const below = rootAt === -1 ? undefined : visible[rootAt + 1];
+        if (below !== undefined && operators.has(below)) {
+          findings.push(
+            `${file} puts \`${below}\` directly below the routing root \`${visible[rootAt]}\` ` +
+              `in apps/${app}, which serves \`/${below}\` on that deployable's origin. ` +
+              `\`/${below}\` is an OPERATOR_PREFIXES entry in ${surfaceRel}: API_CONTRACT ` +
+              'heads those sections "admin origin only" and ADR-083 ruling 2 gives them to ' +
+              `the operator deployment alone`,
+          );
+          continue;
+        }
+        if (below !== undefined && below === baseSegments[0]) {
+          findings.push(
+            `${file} puts \`${below}\` directly below the routing root \`${visible[rootAt]}\` ` +
+              `in apps/${app}. That directory is an API surface inside a UI deployable by the ` +
+              "framework's own convention, which ADR-083 ruling 1 and ADR-095 ruling 3 both " +
+              'refuse -- the second by name, because the framework admitted there is the one ' +
+              'ADR-083 named as the alternative it was foreclosing',
+          );
+        }
+      }
+    }
+
+    // A CHECK THAT READ NO FILES IS NOT A CHECK THAT PASSED. Four deployables
+    // hold source, so a walk that inspected nothing means the tree moved under
+    // this check rather than that the property holds.
+    if (inspected === 0)
+      throw new Error(
+        'RI-09 inspected 0 files across the non-owner deployables. That is a walk that found ' +
+          'nothing, not a property that holds',
+      );
+    return findings;
+  },
+};
+
+export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri09];
 
 function main() {
   const [arg] = process.argv.slice(2);
