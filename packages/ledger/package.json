@@ -1,0 +1,20 @@
+{
+  "name": "@merit/ledger",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Double-entry posting. A balanced posting is the only representable one: an entry exists only as one half of a transfer, so the legs of any posting sum to exactly zero by construction.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT DECLARES NO WORKSPACE DEPENDENCY AND @merit/db's ABSENCE IS THE DESIGN RATHER THAN AN OMISSION, on packages/queue's own precedent. ADR-006's central consequence is that a posting commits in the SAME transaction as the state change that caused it, and a library able to reach a pool is a library that can open its own transaction and lose that consequence at every call site that forgets. `postTransaction` takes the caller's OPEN transaction as its FIRST argument with no overload that omits it, so this package cannot open a connection even by mistake. It also declares no `pg` and no `drizzle-orm`: `merit/no-raw-db-client` (VG-4) bans both here, and the ban is satisfiable precisely because the writer is injected. The cost is that `LedgerTx` RESTATES the subset of ADR-102's `SystemTx` this path uses, which is ADR-092 section 5's two-statements-of-one-fact hazard, and it is closed the only way it can be from here: the suite READS packages/db/src/scoped-db.ts and compares the two.",
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

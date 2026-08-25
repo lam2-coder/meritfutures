@@ -72,6 +72,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   ledgerAccounts: 'ledger_accounts',
   ledgerEntries: 'ledger_entries',
   ledgerTransactions: 'ledger_transactions',
+  ledgerHalts: 'ledger_halts',
   treasuryBalances: 'treasury_balances',
   liabilitySnapshots: 'liability_snapshots',
   dailyMarks: 'daily_marks',
@@ -318,6 +319,13 @@ describe('the registry is total', () => {
   // `matched_identity_id`, so a row whose own tenancy column is right still
   // names a DIFFERENT identity inside the payload.
   //
+  // `ledger_halts` WAS A FOURTH AND IT IS NO LONGER ONE. ADR-092 section 9 named
+  // four tables "no session would reach" and this is the first of them to be
+  // registered: `identity_id uuid NOT NULL REFERENCES identities(id)` at
+  // 0016:55, so its class was never in doubt and what it lacked was a session
+  // whose fence contained it. ADR-103 is that session, and the table is now
+  // reachable through a scoped read for the first time.
+  //
   // `attributions` IS THE SIBLING ADR-092 SECTION 9 NAMES BESIDE IT AND IT IS
   // ABSENT FOR THE SAME REASON. `buyer_identity_id` and `affiliate_identity_id`
   // are both `uuid NOT NULL REFERENCES identities(id)` and they are TWO
@@ -331,13 +339,13 @@ describe('the registry is total', () => {
   // rather than a second judgment: its only path to an identity is
   // `attribution_id`, `DerivedRule.via` is `TableKey`, and an unregistered
   // table has no key to name.
-  test('99 declared tables, 99 scope rules, 0 reachable without one', () => {
+  test('100 declared tables, 100 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(99);
-    expect(rules).toBe(99);
+    expect(declared).toBe(100);
+    expect(rules).toBe(100);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;

@@ -3034,10 +3034,18 @@ const MODEL_ENDPOINT_HOSTS = [
 ];
 
 /**
- * The paths assertion 1 scans. ADR-044 names four money paths and one of them
- * exists; the other three are listed as the names assertion 2 watches for.
+ * The paths assertion 1 scans. ADR-044 names four money paths and TWO of them
+ * now exist; the other two are listed as the names assertion 2 watches for.
+ *
+ * `packages/ledger` JOINED THIS LIST BECAUSE ASSERTION 2 DEMANDED IT. ADR-103
+ * landed the posting path and this gate failed on the good news, naming the
+ * package and quoting its own rule back: a directory whose name carries one of
+ * `MONEY_PATH_WORDS` and is absent from this list means ADR-044 prohibition 1 is
+ * not enforced over it. That is the mechanism working exactly as its own header
+ * describes -- "DISCOVERS money paths independently of its own scope list" --
+ * and the remedy is this line rather than an exemption.
  */
-const CI06O_SCOPE = ['packages/rules-engine'];
+const CI06O_SCOPE = ['packages/rules-engine', 'packages/ledger'];
 
 /**
  * How assertion 2 RECOGNISES a money path without being told.
