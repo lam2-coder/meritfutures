@@ -337,6 +337,52 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // RI-10, AND BOTH DIRECTIONS ARE SEEDED BECAUSE BOTH HAPPENED ON 2026-08-25
+  // ---------------------------------------------------------------------------
+  // The first case is the defect as it lived here: 686 specifiers wrote `./x.js`
+  // for files that are `x.ts`, every deployable died on its own first relative
+  // import with ERR_MODULE_NOT_FOUND, and typecheck, lint, gates and the whole
+  // Vitest suite were green throughout. RI-07 walked the same graph and passed,
+  // because `resolveRelative` maps `.js` onto `.ts` on purpose.
+  //
+  // The second case is the direction the REPAIR got wrong, and it matters as
+  // much: three of those 686 sites named a real `.js` file, because
+  // packages/eslint-plugin-merit/index.js is genuine JavaScript. A check that
+  // only looked for `.js` specifiers would have blessed the broken repair.
+  test('RI-10 catches a `.js` specifier naming a file that is `.ts`', () => {
+    const root = cleanTree();
+    write(root, 'packages/db/src/thing.ts', 'export const thing = 1;\n');
+    write(
+      root,
+      'packages/db/src/uses-it.ts',
+      "import { thing } from './thing.js';\nexport { thing };\n",
+    );
+    const out = findings('RI-10', root).join('\n');
+    expect(out).toContain('packages/db/src/uses-it.ts');
+    expect(out).toContain('`./thing.js` names no file');
+    expect(out).toContain('packages/db/src/thing.ts is what is there');
+  });
+
+  test('RI-10 catches the reverse: a `.ts` specifier naming a file that is genuinely `.js`', () => {
+    const root = cleanTree();
+    write(root, 'packages/db/src/legacy.js', 'export const legacy = 1;\n');
+    write(
+      root,
+      'packages/db/src/uses-legacy.ts',
+      "import { legacy } from './legacy.ts';\nexport { legacy };\n",
+    );
+    const out = findings('RI-10', root).join('\n');
+    expect(out).toContain('packages/db/src/uses-legacy.ts');
+    expect(out).toContain('`./legacy.ts` names no file');
+  });
+
+  test('RI-10 does NOT refuse a bare specifier, which resolves through package exports', () => {
+    const root = cleanTree();
+    write(root, 'packages/db/src/bare.ts', "import { z } from 'drizzle-orm';\nexport { z };\n");
+    expect(findings('RI-10', root)).toEqual([]);
+  });
+
+  // ---------------------------------------------------------------------------
   // RI-09, AND THE FIRST TWO CASES ARE THE RULING (ADR-098) STATED AS A TEST
   // ---------------------------------------------------------------------------
   // ADR-095's approval clause is a path and four green commands: seed
