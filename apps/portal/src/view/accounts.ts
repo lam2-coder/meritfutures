@@ -36,11 +36,11 @@
 // may see. A composed sentence is where both of those get broken by somebody
 // being helpful.
 
-import type { AccountDetail, AccountListItem } from '../api/types.js';
-import type { CopyBlock, PinnedPlanCopy } from '../copy/copy-block.js';
-import { COPY_KEYS, copyBlock } from '../copy/copy-block.js';
-import { formatCents, formatOptionalBasisPoints, formatOptionalCents } from '../format/money.js';
-import type { AccountState } from './as-of.js';
+import type { AccountDetail, AccountListItem } from '../api/types.ts';
+import type { CopyBlock, PinnedPlanCopy } from '../copy/copy-block.ts';
+import { COPY_KEYS, copyBlock } from '../copy/copy-block.ts';
+import { formatCents, formatOptionalBasisPoints, formatOptionalCents } from '../format/money.ts';
+import type { AccountState } from './as-of.ts';
 
 /** One reason the server has blocked a payout path on this account. */
 export type BlockedReason = 'payouts_frozen' | 'recon_blocked' | 'kyc_required';

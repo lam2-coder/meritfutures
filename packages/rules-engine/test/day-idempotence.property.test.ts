@@ -49,8 +49,8 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import { advanceDay } from '../src/index.js';
-import type { DayOutput, ResolvedPlan, RuleState } from '../src/index.js';
+import { advanceDay } from '../src/index.ts';
+import type { DayOutput, ResolvedPlan, RuleState } from '../src/index.ts';
 import {
   ACCOUNT_OPENED_ON,
   CORE_50K,
@@ -58,12 +58,12 @@ import {
   MERIT_RAPID_50K,
   day,
   fundedPrior,
-} from './fixtures-in-code.js';
-import { daySequenceArbitrary } from './generators/day-sequence.js';
-import type { DaySequence } from './generators/day-input.js';
-import { materializedFrom, sliceOf } from './generator-bridge.js';
-import { foldSequence } from './property-harness.js';
-import type { FoldStep } from './property-harness.js';
+} from './fixtures-in-code.ts';
+import { daySequenceArbitrary } from './generators/day-sequence.ts';
+import type { DaySequence } from './generators/day-input.ts';
+import { materializedFrom, sliceOf } from './generator-bridge.ts';
+import { foldSequence } from './property-harness.ts';
+import type { FoldStep } from './property-harness.ts';
 
 const RUNS = 250;
 const REACHABILITY = 800;

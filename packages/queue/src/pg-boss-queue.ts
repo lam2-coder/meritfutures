@@ -53,7 +53,7 @@ import type {
   JobQueue,
   JobRequest,
   JobTransaction,
-} from './job-queue.js';
+} from './job-queue.ts';
 
 /**
  * The Postgres schema pg-boss owns.

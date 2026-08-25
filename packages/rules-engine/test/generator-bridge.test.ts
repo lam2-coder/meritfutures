@@ -30,10 +30,10 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import type { ResolvedPlan } from '../src/index.js';
-import { CORE_50K, MERIT_RAPID_50K, withStaticDrawdown } from './fixtures-in-code.js';
-import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.js';
-import { daySequenceArbitrary } from './generators/day-sequence.js';
+import type { ResolvedPlan } from '../src/index.ts';
+import { CORE_50K, MERIT_RAPID_50K, withStaticDrawdown } from './fixtures-in-code.ts';
+import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.ts';
+import { daySequenceArbitrary } from './generators/day-sequence.ts';
 
 /** `JSON.stringify` throws on `bigint`, and `toEngineMark`'s output is six of them. */
 const stable = (v: unknown): string =>

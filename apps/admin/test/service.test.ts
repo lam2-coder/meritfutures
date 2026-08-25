@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
-import * as admin from '../src/index.js';
-import { SERVICE, main } from '../src/index.js';
+import * as admin from '../src/index.ts';
+import { SERVICE, main } from '../src/index.ts';
 
 // CI-02, the `unit` project.
 test('admin deploys as its own Railway service', () => {

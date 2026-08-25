@@ -18,15 +18,15 @@ import { describe, expect, it } from 'vitest';
 
 import type { ExternalGates } from '@merit/rules-engine';
 
-import { foldAccountDay, runNightlyBatch } from '../src/batch/nightly.js';
-import type { NightlyBatchConfig } from '../src/batch/nightly.js';
+import { foldAccountDay, runNightlyBatch } from '../src/batch/nightly.ts';
+import type { NightlyBatchConfig } from '../src/batch/nightly.ts';
 import type {
   AccountDay,
   BatchPorts,
   ReconciliationFinding,
   ReplayDivergenceFinding,
   RuleStateRow,
-} from '../src/batch/ports.js';
+} from '../src/batch/ports.ts';
 
 import {
   ACCOUNT_A,
@@ -37,7 +37,7 @@ import {
   ENGINE_VERSION,
   accountDay,
   td,
-} from './fixtures.js';
+} from './fixtures.ts';
 
 // -----------------------------------------------------------------------------
 // A recording port pair

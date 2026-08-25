@@ -33,9 +33,9 @@
 
 import { expect, test } from 'vitest';
 
-import { tradingDaysBetween } from '../src/calendar.js';
-import { advanceDay } from '../src/day/advance.js';
-import type { CalendarDay, DailyMark, DayOutput, RuleState } from '../src/types.js';
+import { tradingDaysBetween } from '../src/calendar.ts';
+import { advanceDay } from '../src/day/advance.ts';
+import type { CalendarDay, DailyMark, DayOutput, RuleState } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -46,8 +46,8 @@ import {
   fundedPrior,
   mark,
   windowWith,
-} from './fixtures-in-code.js';
-import { reU } from './rule-coverage.js';
+} from './fixtures-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 const WIN_DAY = {
   tradingDay: day('2026-11-03'),

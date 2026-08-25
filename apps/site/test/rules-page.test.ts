@@ -2,11 +2,11 @@ import { expect, test } from 'vitest';
 
 import type { Cents } from '@merit/rules-engine';
 
-import { money } from '../src/render/cents.js';
-import { DisclosureError } from '../src/render/disclosure.js';
-import type { RulesPage } from '../src/routes/rules.js';
-import { RulesPageError, assertRuleTextIsPublished, rulesPage } from '../src/routes/rules.js';
-import { BUILT_AT, label, sizeRow, sizeView, versionView } from './fixtures.js';
+import { money } from '../src/render/cents.ts';
+import { DisclosureError } from '../src/render/disclosure.ts';
+import type { RulesPage } from '../src/routes/rules.ts';
+import { RulesPageError, assertRuleTextIsPublished, rulesPage } from '../src/routes/rules.ts';
+import { BUILT_AT, label, sizeRow, sizeView, versionView } from './fixtures.ts';
 
 // CI-02, the `unit` project. M9-C-nn and M9-V-nn.
 

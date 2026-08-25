@@ -18,11 +18,11 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { EngineInvariantError } from '../src/errors.js';
-import { resolvePlan } from '../src/plan/resolve.js';
-import type { PlanVersionId, PlanVersionSizeRow } from '../src/types.js';
+import { EngineInvariantError } from '../src/errors.ts';
+import { resolvePlan } from '../src/plan/resolve.ts';
+import type { PlanVersionId, PlanVersionSizeRow } from '../src/types.ts';
 
-import { CORE_50K, MERIT_RAPID_50K } from './fixtures-in-code.js';
+import { CORE_50K, MERIT_RAPID_50K } from './fixtures-in-code.ts';
 import {
   CORE_50K_SIZE,
   CORE_EVAL,
@@ -34,7 +34,7 @@ import {
   c,
   coreRules,
   coreSize,
-} from './published-plans-in-code.js';
+} from './published-plans-in-code.ts';
 
 describe('resolvePlan  two transcriptions of Appendix A agree', () => {
   it('CORE-50K resolves to the value the unit suite has been folding since group B', () => {

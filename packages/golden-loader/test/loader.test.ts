@@ -15,7 +15,7 @@ import {
   registryIds,
   runFixture,
   unusedAwaitingEntries,
-} from '../src/index.js';
+} from '../src/index.ts';
 
 // =============================================================================
 // EVERY LOADER RULE IS WATCHED FAILING ON A SEEDED VIOLATION

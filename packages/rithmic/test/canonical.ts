@@ -33,8 +33,8 @@ import type {
   PopulationSpec,
   SimSession,
   SimulationInput,
-} from '../src/simulator/types.js';
-import { buildPopulation } from '../src/simulator/population.js';
+} from '../src/simulator/types.ts';
+import { buildPopulation } from '../src/simulator/population.ts';
 
 export const CANONICAL_SEED = 'merit-sim-canonical-001';
 

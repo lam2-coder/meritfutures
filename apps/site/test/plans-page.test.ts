@@ -2,11 +2,11 @@ import { expect, test } from 'vitest';
 
 import type { Cents } from '@merit/rules-engine';
 
-import type { SiteCatalog } from '../src/catalog/types.js';
-import { money } from '../src/render/cents.js';
-import { DisclosureError } from '../src/render/disclosure.js';
-import { plansPage, sellableVersions } from '../src/routes/plans.js';
-import { BUILT_AT, label, sizeRow, sizeView, versionView } from './fixtures.js';
+import type { SiteCatalog } from '../src/catalog/types.ts';
+import { money } from '../src/render/cents.ts';
+import { DisclosureError } from '../src/render/disclosure.ts';
+import { plansPage, sellableVersions } from '../src/routes/plans.ts';
+import { BUILT_AT, label, sizeRow, sizeView, versionView } from './fixtures.ts';
 
 // CI-02, the `unit` project. M9-C-nn: config-render parity, and M9-D-nn's
 // layout half.

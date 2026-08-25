@@ -109,7 +109,7 @@ import type {
 import { advanceDay, evaluatePayout } from '@merit/rules-engine';
 import type { BalanceAdjustment, SimAccount } from '@merit/rithmic';
 import { drawKey, draws, simulate } from '@merit/rithmic';
-import { asTradingDay, sequenceOf, toDailyMark, tradingDaysAfter } from './bridge.js';
+import { asTradingDay, sequenceOf, toDailyMark, tradingDaysAfter } from './bridge.ts';
 import type {
   RequestPolicy,
   SettledPayout,
@@ -117,7 +117,7 @@ import type {
   TrialBehaviour,
   TrialInput,
   TrialOutcome,
-} from './types.js';
+} from './types.ts';
 
 /** Thrown when a trial cannot be run as specified, or when the harness contradicts itself. */
 export class TrialError extends Error {

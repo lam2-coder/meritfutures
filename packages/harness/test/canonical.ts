@@ -40,8 +40,8 @@
 import type { BasisPoints, ExternalGates, PlanVersionId, ResolvedPlan } from '@merit/rules-engine';
 import type { ContractSpec, PopulationSpec, SimSession } from '@merit/rithmic';
 import { civilFromDays, parseTradingDay } from '@merit/rithmic';
-import type { CalibrationSource } from '../src/provenance.js';
-import type { CommercialInputs, TrialBehaviour } from '../src/types.js';
+import type { CalibrationSource } from '../src/provenance.ts';
+import type { CommercialInputs, TrialBehaviour } from '../src/types.ts';
 
 /** The one cast that makes a basis point a `BasisPoints`, as the engine's suites spell it. */
 const bp = (n: number): BasisPoints => n as BasisPoints;

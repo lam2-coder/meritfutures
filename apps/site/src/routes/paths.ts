@@ -38,8 +38,8 @@
 // The other surfaces are real and carry no identifier until one is allocated.
 // =============================================================================
 
-import type { SitePlanVersionView, SiteSizeView } from '../catalog/types.js';
-import { sizeSegment } from '../render/size-label.js';
+import type { SitePlanVersionView, SiteSizeView } from '../catalog/types.ts';
+import { sizeSegment } from '../render/size-label.ts';
 
 // -----------------------------------------------------------------------------
 // The surface inventory

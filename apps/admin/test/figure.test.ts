@@ -8,7 +8,7 @@ import {
   formatCents,
   readingIsPresent,
   render,
-} from '../src/figure.js';
+} from '../src/figure.ts';
 
 // =============================================================================
 // M6-A: liability figure vocabulary

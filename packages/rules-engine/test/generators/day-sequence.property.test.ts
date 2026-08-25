@@ -34,15 +34,15 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import { daySequenceArbitrary } from './day-sequence.js';
-import type { DaySequence } from './day-input.js';
+import { daySequenceArbitrary } from './day-sequence.ts';
+import type { DaySequence } from './day-input.ts';
 import {
   checkStoredClosingIdentity,
   DS_RULE_IDS,
   DS_RULE_SOURCES,
   validateDaySequence,
-} from './validate-day-sequence.js';
-import type { DsRuleId } from './validate-day-sequence.js';
+} from './validate-day-sequence.ts';
+import type { DsRuleId } from './validate-day-sequence.ts';
 
 // Enough runs that a branch reached by one boolean is visited in both
 // directions many times over. The reachability block below is what turns that

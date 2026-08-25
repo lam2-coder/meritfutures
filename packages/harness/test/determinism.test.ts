@@ -21,8 +21,8 @@ import { describe, expect, it } from 'vitest';
 import { simulate } from '@merit/rithmic';
 import type { SimAccount, SimDay } from '@merit/rithmic';
 import { buildPopulation } from '@merit/rithmic';
-import { runHarness } from '../src/index.js';
-import type { HarnessRunInput } from '../src/index.js';
+import { runHarness } from '../src/index.ts';
+import type { HarnessRunInput } from '../src/index.ts';
 import {
   CANONICAL_BEHAVIOUR,
   CANONICAL_CALIBRATION,
@@ -35,7 +35,7 @@ import {
   CANONICAL_SESSIONS,
   CANONICAL_SPECS,
   SIM_PLAN,
-} from './canonical.js';
+} from './canonical.ts';
 
 const RUN: HarnessRunInput = {
   seed: CANONICAL_SEED,

@@ -9,9 +9,9 @@
 import fc from 'fast-check';
 import { expect, test } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import { replay } from '../src/replay.js';
-import type { DailyMark } from '../src/types.js';
+import { advanceDay } from '../src/day/advance.ts';
+import { replay } from '../src/replay.ts';
+import type { DailyMark } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -19,7 +19,7 @@ import {
   ENGINE_VERSION,
   day,
   mark,
-} from './fixtures-in-code.js';
+} from './fixtures-in-code.ts';
 
 const DAYS = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06'] as const;
 

@@ -31,13 +31,13 @@ const ruleTester = new RuleTester({
 ruleTester.run('no-calendar-in-expiry-path', noCalendarInExpiryPath, {
   valid: [
     // The wall clock, which is the unit the ruling REQUIRES here.
-    "import { now } from '../clock.js';",
+    "import { now } from '../clock.ts';",
     // The sweep's own neighbours.
-    "import { releaseHold } from './release.js';",
+    "import { releaseHold } from './release.ts';",
     "import { scopedDb } from '@merit/db';",
     // A module whose name merely contains the word, which is not the calendar.
-    "import { calendarWidget } from './ui/calendar-widget.js';",
-    "import { CalendarIcon } from './icons/calendar-icon.js';",
+    "import { calendarWidget } from './ui/calendar-widget.ts';",
+    "import { CalendarIcon } from './icons/calendar-icon.ts';",
     // Naming a trading day in a comment or a string is not importing one.
     "export const LABEL = 'next trading day';",
     // The expiry arithmetic the ruling wants: hours, from a timestamp.
@@ -59,12 +59,12 @@ ruleTester.run('no-calendar-in-expiry-path', noCalendarInExpiryPath, {
     },
     {
       name: 'the engine-style short specifier',
-      code: "import * as calendar from './calendar.js';",
+      code: "import * as calendar from './calendar.ts';",
       errors: [{ messageId: 'calendarImport' }],
     },
     {
       name: 'reached through a barrel file, which is the one-character evasion',
-      code: "import { nextTradingDay } from '../lib/index.js';",
+      code: "import { nextTradingDay } from '../lib/index.ts';",
       errors: [{ messageId: 'calendarBinding' }],
     },
     {
@@ -85,7 +85,7 @@ ruleTester.run('no-calendar-in-expiry-path', noCalendarInExpiryPath, {
     {
       name: 'THE SCENARIO THE RULING EXISTS FOR: five trading days from now, in a freeze sweep',
       code:
-        "import { addTradingDays } from '../lib/index.js';\n" +
+        "import { addTradingDays } from '../lib/index.ts';\n" +
         'export const freezeExpiry = (from) => addTradingDays(from, 5);',
       errors: [{ messageId: 'calendarBinding' }],
     },

@@ -59,7 +59,7 @@
 // =============================================================================
 
 import type { Cents } from '@merit/rules-engine';
-import { type AsOf, type Reading, figure } from './figure.js';
+import { type AsOf, type Reading, figure } from './figure.ts';
 
 /** Thrown when a snapshot row cannot be rendered as the three numbers. */
 export class LiabilityError extends Error {

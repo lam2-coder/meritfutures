@@ -23,7 +23,7 @@
 // **pg-boss** emitted, captured verbatim, and every assertion below reads them
 // rather than anything `pg-boss-queue.ts` believes about them.
 
-import type { JobTransaction } from '../src/job-queue.js';
+import type { JobTransaction } from '../src/job-queue.ts';
 
 /** One statement, as the connection saw it. */
 export interface Statement {

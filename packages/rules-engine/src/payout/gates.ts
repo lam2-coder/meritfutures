@@ -35,8 +35,8 @@
 // tell a trader one thing they are missing out of three.
 // =============================================================================
 
-import { tradingDayAtSequence, tradingDaysBetween } from '../calendar.js';
-import { consistencyOk } from '../day/consistency.js';
+import { tradingDayAtSequence, tradingDaysBetween } from '../calendar.ts';
+import { consistencyOk } from '../day/consistency.ts';
 import type {
   AssertionFailure,
   BufferGate,
@@ -50,8 +50,8 @@ import type {
   ResolvedPlan,
   TradedDaysGate,
   WinDaysGate,
-} from '../types.js';
-import { capForOrdinal, ordinalForNextPayout } from './clamp.js';
+} from '../types.ts';
+import { capForOrdinal, ordinalForNextPayout } from './clamp.ts';
 
 /**
  * R-35. `withdrawable = max(0, balance_cents - size_cents - buffer_cents)`.

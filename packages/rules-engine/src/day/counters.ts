@@ -15,7 +15,7 @@
 // sides.
 // =============================================================================
 
-import type { CalendarDay, Cents, DailyMark } from '../types.js';
+import type { CalendarDay, Cents, DailyMark } from '../types.ts';
 
 /**
  * R-08. A traded day is `fill_count > 0`, STRICT.

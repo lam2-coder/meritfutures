@@ -3,8 +3,8 @@ import { expect, test } from 'vitest';
 import type {
   EconomicCalendarOccurrence,
   EconomicCalendarPanelResponse,
-} from '../src/api/types.js';
-import { toEconomicCalendarPanel } from '../src/view/economic-calendar.js';
+} from '../src/api/types.ts';
+import { toEconomicCalendarPanel } from '../src/view/economic-calendar.ts';
 
 // =============================================================================
 // GS-285 and M04 section 3.8: the economic calendar panel

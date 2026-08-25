@@ -1,10 +1,10 @@
 import { expect, test } from 'vitest';
 
-import type { ContentDocument } from '../src/content/documents.js';
-import { isLive } from '../src/content/documents.js';
-import { DisclosureError } from '../src/render/disclosure.js';
-import { contentPage, legalIndex } from '../src/routes/legal.js';
-import { BUILT_AT } from './fixtures.js';
+import type { ContentDocument } from '../src/content/documents.ts';
+import { isLive } from '../src/content/documents.ts';
+import { DisclosureError } from '../src/render/disclosure.ts';
+import { contentPage, legalIndex } from '../src/routes/legal.ts';
+import { BUILT_AT } from './fixtures.ts';
 
 // CI-02, the `unit` project. M9-V-nn: content versioning and permanent URLs.
 

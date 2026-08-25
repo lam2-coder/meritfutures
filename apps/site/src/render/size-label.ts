@@ -34,8 +34,8 @@
 
 import type { Cents, PlanVersionSizeRow, SizeCapScheduleStep } from '@merit/rules-engine';
 
-import type { SiteSizeView } from '../catalog/types.js';
-import { money } from './cents.js';
+import type { SiteSizeView } from '../catalog/types.ts';
+import { money } from './cents.ts';
 
 /**
  * What a surface calls this size. GS-309 and GS-310, in four lines.

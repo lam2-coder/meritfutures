@@ -31,15 +31,15 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay, initialState } from '../src/day/advance.js';
-import { applySettlement } from '../src/payout/settle.js';
+import { advanceDay, initialState } from '../src/day/advance.ts';
+import { applySettlement } from '../src/payout/settle.ts';
 import type {
   DayOutput,
   EngineEvent,
   EngineEventType,
   ResolvedPlan,
   RuleState,
-} from '../src/types.js';
+} from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -49,7 +49,7 @@ import {
   evalPrior,
   fundedPrior,
   mark,
-} from './fixtures-in-code.js';
+} from './fixtures-in-code.ts';
 
 /** One day, folded. The same helper shape the other rule suites use. */
 function fold(

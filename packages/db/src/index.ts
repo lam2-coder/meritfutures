@@ -46,7 +46,7 @@ export {
   type ScopedDb,
   type SystemDb,
   type SystemReason,
-} from './scoped-db.js';
+} from './scoped-db.ts';
 
 export {
   SCOPE_RULES,
@@ -61,11 +61,11 @@ export {
   type ScopeRule,
   type ScopedTableKey,
   type TableKey,
-} from './scope.js';
+} from './scope.ts';
 
-export * as schema from './schema.js';
+export * as schema from './schema.ts';
 
 // The pool's lifecycle, for a process that means to exit and for an integration
 // suite that would otherwise hold the event loop open. `client()` itself stays
 // unexported.
-export { closeClient } from './client.js';
+export { closeClient } from './client.ts';

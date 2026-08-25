@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 
-import type { ImpersonationSession } from '../src/api/types.js';
-import type { ContentState } from '../src/shell/app-shell.js';
-import { toPortalErrorKind, toShellView } from '../src/shell/app-shell.js';
-import { toImpersonationBanner } from '../src/shell/impersonation-banner.js';
+import type { ImpersonationSession } from '../src/api/types.ts';
+import type { ContentState } from '../src/shell/app-shell.ts';
+import { toPortalErrorKind, toShellView } from '../src/shell/app-shell.ts';
+import { toImpersonationBanner } from '../src/shell/impersonation-banner.ts';
 
 // =============================================================================
 // ADR-068 requirement 4, INV-M4-07 and INV-M4-09: the shell

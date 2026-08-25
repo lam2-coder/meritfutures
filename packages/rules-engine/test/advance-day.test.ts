@@ -13,9 +13,9 @@
 
 import { expect, test } from 'vitest';
 
-import { buildCalendarSlice } from '../src/calendar.js';
-import { advanceDay, initialState } from '../src/day/advance.js';
-import type { DayClosedEvent, SettlementFact } from '../src/types.js';
+import { buildCalendarSlice } from '../src/calendar.ts';
+import { advanceDay, initialState } from '../src/day/advance.ts';
+import type { DayClosedEvent, SettlementFact } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -24,7 +24,7 @@ import {
   day,
   fundedPrior,
   mark,
-} from './fixtures-in-code.js';
+} from './fixtures-in-code.ts';
 
 const A_DAY = {
   tradingDay: day('2026-11-03'),

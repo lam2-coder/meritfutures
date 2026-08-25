@@ -56,9 +56,9 @@
 // three files away. It is the same idiom as ../format/money.ts refusing a
 // non-integer: make the boundary somewhere a person looks.
 
-import type { MarkListItem } from '../api/types.js';
-import { formatCents } from '../format/money.js';
-import type { AccountState } from './as-of.js';
+import type { MarkListItem } from '../api/types.ts';
+import { formatCents } from '../format/money.ts';
+import type { AccountState } from './as-of.ts';
 
 /** The magnitudes a scale turns into coordinates. Never displayed. See the header. */
 export type EquityPlotValues = {

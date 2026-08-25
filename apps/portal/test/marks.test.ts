@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
-import type { MarkListItem } from '../src/api/types.js';
-import { toEquitySeries } from '../src/view/marks.js';
+import type { MarkListItem } from '../src/api/types.ts';
+import { toEquitySeries } from '../src/view/marks.ts';
 
 // =============================================================================
 // M4-R: the equity chart

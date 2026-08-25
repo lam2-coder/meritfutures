@@ -63,7 +63,7 @@ function cleanTree(): string {
   // because the check throws when it walks fewer than two -- a graph walk that
   // reached only the entry point means the specifier scan stopped matching, and
   // a fixture with one file could not tell those apart.
-  write(root, 'packages/rules-engine/src/index.ts', "export { floorAt } from './floor.js';\n");
+  write(root, 'packages/rules-engine/src/index.ts', "export { floorAt } from './floor.ts';\n");
   write(
     root,
     'packages/rules-engine/src/floor.ts',
@@ -272,7 +272,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     write(
       root,
       'packages/rules-engine/src/index.ts',
-      "export { floorAt } from './floor.js';\nexport { x } from '../impure/io.js';\n",
+      "export { floorAt } from './floor.ts';\nexport { x } from '../impure/io.ts';\n",
     );
     const out = findings('RI-07', root).join('\n');
     expect(out).toContain('OUTSIDE');
@@ -315,7 +315,7 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     write(
       root,
       'packages/rules-engine/src/index.ts',
-      "export { floorAt } from './floor.js';\nexport { gone } from './not-here.js';\n",
+      "export { floorAt } from './floor.ts';\nexport { gone } from './not-here.ts';\n",
     );
     expect(findings('RI-07', root).join('\n')).toContain('resolves to no file on disk');
   });

@@ -43,17 +43,17 @@
 // =============================================================================
 
 import type { Cents } from '@merit/rules-engine';
-import { type DataTrust, type TrustSignal, assessDataTrust } from './data-trust.js';
-import { type AsOf, type Reading, absent, figure, readingIsPresent, render } from './figure.js';
-import { type LiabilitySnapshot, theThreeNumbers } from './liability.js';
+import { type DataTrust, type TrustSignal, assessDataTrust } from './data-trust.ts';
+import { type AsOf, type Reading, absent, figure, readingIsPresent, render } from './figure.ts';
+import { type LiabilitySnapshot, theThreeNumbers } from './liability.ts';
 import {
   type IndicativeMovement,
   type LiveOpenLiability,
   type SameDayAdjustments,
   liveOpenLiability,
-} from './live-liability.js';
-import { type AdminOrigin, type Environment, resolveAdminOrigin } from './origin.js';
-import { type AdminRole, mayReadLiabilityHome, requireAdminRole } from './roles.js';
+} from './live-liability.ts';
+import { type AdminOrigin, type Environment, resolveAdminOrigin } from './origin.ts';
+import { type AdminRole, mayReadLiabilityHome, requireAdminRole } from './roles.ts';
 
 /** Thrown when the page cannot be assembled, or when it would break an invariant. */
 export class PageError extends Error {

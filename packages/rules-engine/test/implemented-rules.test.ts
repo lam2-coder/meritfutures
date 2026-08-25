@@ -16,8 +16,8 @@
 
 import { expect, test } from 'vitest';
 
-import { IMPLEMENTED_RULES } from '../src/rules.js';
-import { COVERED_RULES, DISCHARGED_ELSEWHERE, RULE_ASSERTIONS } from './rule-coverage.js';
+import { IMPLEMENTED_RULES } from '../src/rules.ts';
+import { COVERED_RULES, DISCHARGED_ELSEWHERE, RULE_ASSERTIONS } from './rule-coverage.ts';
 
 test('every rule the engine declares has a named unit test, and the reverse', () => {
   expect([...IMPLEMENTED_RULES].sort()).toEqual([...COVERED_RULES].sort());

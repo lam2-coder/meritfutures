@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { basisPoints, CentsFormatError, money } from '../src/render/cents.js';
+import { basisPoints, CentsFormatError, money } from '../src/render/cents.ts';
 
 // CI-02, the `unit` project. M9-C-nn's smallest half: the helper every figure on
 // a public page goes through.

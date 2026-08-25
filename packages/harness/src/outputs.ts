@@ -48,7 +48,7 @@
 // resolved by a build session picking one. The note travels on the output.
 // =============================================================================
 
-import type { OutputKey, OutputUnit, ProposedRegistryId, RegistryId } from './types.js';
+import type { OutputKey, OutputUnit, ProposedRegistryId, RegistryId } from './types.ts';
 
 /** What an output IS, independent of any run. Data, so it can be listed and audited. */
 export interface OutputDefinition {

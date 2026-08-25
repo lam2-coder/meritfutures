@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 
-import { basisPoints, money } from '../src/render/cents.js';
-import { DisclosureError } from '../src/render/disclosure.js';
-import type { PublishedStatistic, StatsPublication } from '../src/stats/published.js';
+import { basisPoints, money } from '../src/render/cents.ts';
+import { DisclosureError } from '../src/render/disclosure.ts';
+import type { PublishedStatistic, StatsPublication } from '../src/stats/published.ts';
 import {
   StatsRenderError,
   assertWindowAttached,
@@ -10,8 +10,8 @@ import {
   statisticText,
   statsPage,
   statsStaleness,
-} from '../src/routes/stats.js';
-import { BUILT_AT } from './fixtures.js';
+} from '../src/routes/stats.ts';
+import { BUILT_AT } from './fixtures.ts';
 
 // CI-02, the `unit` project. AS-M9-03, GS-144, FM-M9-03.
 

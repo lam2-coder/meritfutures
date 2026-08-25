@@ -46,8 +46,8 @@
 // FM-05 and AS-14 both exist to refuse.
 // =============================================================================
 
-import { lookupCalendarDay } from '../calendar.js';
-import { EngineInvariantError } from '../errors.js';
+import { lookupCalendarDay } from '../calendar.ts';
+import { EngineInvariantError } from '../errors.ts';
 import type {
   AssertionFailure,
   BreachDetectedEvent,
@@ -65,13 +65,13 @@ import type {
   RuleState,
   SoftDailyLossLimitEvent,
   TradingDay,
-} from '../types.js';
-import { evaluateEngineGates, gatesAfterBreach, withdrawableCents } from '../payout/gates.js';
-import { applySettlement } from '../payout/settle.js';
-import { checkBreach } from './breach.js';
-import { advanceConsistency, isTradedDay, isWinDay } from './counters.js';
-import { advanceFloor, initialFloorCents } from './floor.js';
-import { advanceEvalProgression } from './progression.js';
+} from '../types.ts';
+import { evaluateEngineGates, gatesAfterBreach, withdrawableCents } from '../payout/gates.ts';
+import { applySettlement } from '../payout/settle.ts';
+import { checkBreach } from './breach.ts';
+import { advanceConsistency, isTradedDay, isWinDay } from './counters.ts';
+import { advanceFloor, initialFloorCents } from './floor.ts';
+import { advanceEvalProgression } from './progression.ts';
 
 /**
  * The state an account has the instant it opens, before any mark exists.

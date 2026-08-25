@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 
-import type { AccountDetail, AccountListItem } from '../src/api/types.js';
-import { MissingCopyBlockError } from '../src/copy/copy-block.js';
-import type { PinnedPlanCopy } from '../src/copy/copy-block.js';
-import { toAccountCard, toAccountDetail, toAccountList } from '../src/view/accounts.js';
+import type { AccountDetail, AccountListItem } from '../src/api/types.ts';
+import { MissingCopyBlockError } from '../src/copy/copy-block.ts';
+import type { PinnedPlanCopy } from '../src/copy/copy-block.ts';
+import { toAccountCard, toAccountDetail, toAccountList } from '../src/view/accounts.ts';
 
 // =============================================================================
 // M4-R: SC-M4-02 and SC-M4-03

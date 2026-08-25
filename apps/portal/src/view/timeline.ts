@@ -44,9 +44,9 @@
 // through ../format/money.ts like money everywhere else, and everything else is
 // carried untouched.
 
-import type { TimelineItem } from '../api/types.js';
-import { formatBasisPoints, formatCents } from '../format/money.js';
-import type { AccountState } from './as-of.js';
+import type { TimelineItem } from '../api/types.ts';
+import { formatBasisPoints, formatCents } from '../format/money.ts';
+import type { AccountState } from './as-of.ts';
 
 /** One detail scalar, after money keys have been formatted. */
 export type TimelineDetail = {

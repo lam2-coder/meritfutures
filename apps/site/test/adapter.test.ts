@@ -31,16 +31,16 @@ import {
   SiteAdapterError,
   UnservedEndpointError,
   createSitePorts,
-} from '../src/catalog/adapter.js';
-import type { BuiltAt } from '../src/catalog/types.js';
-import type { SitePorts } from '../src/catalog/ports.js';
-import { money } from '../src/render/cents.js';
-import type { SimulatedEnvironmentDisclosure } from '../src/render/disclosure.js';
-import { DisclosureError } from '../src/render/disclosure.js';
-import { contentPage } from '../src/routes/legal.js';
-import { plansPage } from '../src/routes/plans.js';
-import { assertRuleTextIsPublished, rulesPage } from '../src/routes/rules.js';
-import { statsPage } from '../src/routes/stats.js';
+} from '../src/catalog/adapter.ts';
+import type { BuiltAt } from '../src/catalog/types.ts';
+import type { SitePorts } from '../src/catalog/ports.ts';
+import { money } from '../src/render/cents.ts';
+import type { SimulatedEnvironmentDisclosure } from '../src/render/disclosure.ts';
+import { DisclosureError } from '../src/render/disclosure.ts';
+import { contentPage } from '../src/routes/legal.ts';
+import { plansPage } from '../src/routes/plans.ts';
+import { assertRuleTextIsPublished, rulesPage } from '../src/routes/rules.ts';
+import { statsPage } from '../src/routes/stats.ts';
 
 // -----------------------------------------------------------------------------
 // The rows this API serves

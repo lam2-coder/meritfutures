@@ -85,8 +85,8 @@ import { pathToFileURL } from 'node:url';
 
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { BASE_PATH, classifyPath, surfaceServes } from './surface.js';
-import type { ApiSurface } from './surface.js';
+import { BASE_PATH, classifyPath, surfaceServes } from './surface.ts';
+import type { ApiSurface } from './surface.ts';
 
 /** Thrown when a module, or the composed set, is not well formed. */
 export class RouteRegistryError extends Error {
