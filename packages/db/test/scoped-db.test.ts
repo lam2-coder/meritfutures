@@ -262,7 +262,7 @@ describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
   // rounded up: the other 52 are unreachable through either accessor.
   //
-  // `identity_links` IS ONE OF THE 58 AND ITS ABSENCE IS DELIBERATE. It carries
+  // `identity_links` IS ONE OF THE 52 AND ITS ABSENCE IS DELIBERATE. It carries
   // TWO identity columns against an `owned` rule that names one, ADR-092 section
   // 9 names it as a per-table ruling and takes neither, and a transcription
   // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
