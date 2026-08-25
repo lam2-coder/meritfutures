@@ -4,7 +4,7 @@
 // THE INTERFACE EVERY PAYMENT PROVIDER IS USED THROUGH.
 //
 // M03 section 2.1 is the specification and this file is its transcription plus
-// the three deviations section 3 of ADR-103 records. The three rules that
+// the three deviations section 3 of ADR-104 records. The three rules that
 // section states, each because of a documented failure, are the three this file
 // is built to make structural rather than reviewable:
 //
@@ -302,6 +302,6 @@ export interface PspAdapter {
  * (which is what M03 section 2.1 sketches) would have required every caller to
  * convert, and a conversion that picks `[0]` out of a repeated signature header
  * is the header-smuggling hole this package refuses by name
- * (`signature_header_repeated`). See ADR-103 section 3.
+ * (`signature_header_repeated`). See ADR-104 section 3.
  */
 export type WebhookHeaders = Readonly<Record<string, string | readonly string[] | undefined>>;

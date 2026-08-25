@@ -270,7 +270,7 @@ export class PspAFake implements PspAdapter {
    *
    * The body is serialised ONCE, here, and the bytes are what get signed. A
    * caller that re-serialises them before calling `verifyWebhook` gets a
-   * refusal, which is the property the approval clause on ADR-103 names.
+   * refusal, which is the property the approval clause on ADR-104 names.
    */
   signWebhook(request: PspASignRequest): PspASignedWebhook {
     const t = request.timestampEpochSeconds ?? Math.floor(this.#clock().getTime() / 1000);

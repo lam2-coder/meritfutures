@@ -3667,7 +3667,7 @@ Every seed was reverted and `git status --porcelain` reported clean before the f
 
 ## `packages/psp` exists: the `PspAdapter` port and two fakes (2026-08-25, session 217)
 
-**[ADR-103](decisions/ADR-103.md) is proposed, `status: proposed`, approval line UNSIGNED, MONEY PATH by subject.** [P3 wave 3](plans/P3-wave3-modules.md)'s `P3-m` slice is written: one package, five methods, two fakes, 69 tests over 4 files. **No route, no network, no vendor SDK, no dependency, no migration and no row written.**
+**[ADR-104](decisions/ADR-104.md) is proposed, `status: proposed`, approval line UNSIGNED, MONEY PATH by subject.** [P3 wave 3](plans/P3-wave3-modules.md)'s `P3-m` slice is written: one package, five methods, two fakes, 69 tests over 4 files. **No route, no network, no vendor SDK, no dependency, no migration and no row written.**
 
 **THE RULING IN ONE LINE IS THAT THE PORT OWNS THE ORDER AND THE ADAPTER OWNS THE MECHANICS.** `verifyHmacWebhook` runs digest, then freshness window, then parse, once, for every provider; an `HmacWebhookScheme` supplies the vendor half. **The parse is inside the verifier and there is no other parse**, so [`API_CONTRACT:629`](architecture/API_CONTRACT.md)'s *"HMAC signature verified before parsing"* is a module boundary rather than a convention a handler could get wrong.
 
