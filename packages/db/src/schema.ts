@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// SIXTY-NINE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 42 are not reachable through either accessor: `SCOPE_RULES` is total
+// SEVENTY-THREE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 38 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE SIXTY-NINE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE SEVENTY-THREE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -30,12 +30,12 @@
 // which is ADR-094. That entry rules the replay's vocabulary CLOSED at one
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
-// one lands the check fails rather than silently reading a stale CREATE. EIGHT
-// of the sixty-nine below carry later columns -- `sessions`, `plan_versions`,
+// one lands the check fails rather than silently reading a stale CREATE. NINE
+// of the seventy-three below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
-// `phone_change_requests` and `admin_actions` -- and none of them could be
-// registered at all before ADR-094, which is why the ruling came before the
-// transcription rather than after it.
+// `phone_change_requests`, `admin_actions` and `promotional_credit_grants` --
+// and none of them could be registered at all before ADR-094, which is why the
+// ruling came before the transcription rather than after it.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -2790,4 +2790,182 @@ export const planSizeUnlocks = pgTable('plan_size_unlocks', {
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
   revokedReason: text('revoked_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// offer_experiments -- 0024_offers.sql. FIRM.
+// -----------------------------------------------------------------------------
+// AN EXPERIMENT IS A THING MERIT RUNS, NOT A THING ANYBODY OWNS. There is no
+// identity column and there is no correct one: an arm is assigned to a
+// population and its hypothesis is about the population, so a per-identity slice
+// of an experiment is not a smaller version of it. The row a person holds is the
+// `offers` row that names `experiment_id`, and that table carries the identity.
+//
+// `varies` IS THE RULE IN DDL, checked to `price`, `presentation` and
+// `bundle_contents` with NO fourth value, so an experiment that varies a rule, a
+// gate or a plan parameter cannot be written down at all (AS-M17-07). Adding a
+// member is an ADR, which is 0024's own header.
+//
+// `winner_arm` and `arms` NAME NOBODY. `arms jsonb` holds arm definitions rather
+// than enrolments, and there is no enrolment table in this tree, so nothing here
+// reaches an identity even one hop out.
+export const offerExperiments = pgTable('offer_experiments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  hypothesis: text('hypothesis').notNull(),
+  arms: jsonb('arms').notNull(),
+  varies: text('varies').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  winnerArm: text('winner_arm'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// price_floors -- 0024_offers.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE HARD STOP UNDER STACKING ARITHMETIC, AND IT IS THE FIRM'S NUMBER. The row
+// says what a product may never be sold below; it declares no foreign key at
+// all, carries no identity column, and there is no correct one, because a floor
+// that differed per trader would not be a floor. `approved_by text NOT NULL` is
+// an approver rather than a `users` row, which is 0002's `actor` idiom.
+//
+// THE GRAIN IS `(product_ref, effective_from)` AND IT IS THE WHOLE PRIMARY KEY,
+// so the table has no `uuid` of its own. Session 166 read the consequence and it
+// is a FINDING rather than anything this transcription may act on:
+// `dual_control_approvals.subject_id` is `uuid NOT NULL` (0016:227), so the dual
+// control M17:150, EC-119 and `data-model/price_floors.md:2` all assert over this
+// table cannot name its subject. A repair is a migration and a transcription
+// holds none.
+//
+// `product_ref` IS BARE TEXT ON BOTH SIDES OF THE CLAMP. `offers.product_ref` is
+// bare text too, with no FK, no domain and no shared CHECK, so the floor lookup
+// is a text join. Transcribed as it is written.
+export const priceFloors = pgTable(
+  'price_floors',
+  {
+    productRef: text('product_ref').notNull(),
+    // Integer cents, per the constitution and DATA_MODEL section 1.
+    floorCents: bigint('floor_cents', { mode: 'bigint' }).notNull(),
+    // NOT NULL. For a Direct plan the floor is a LIABILITY decision, and one
+    // with no written rationale is one nobody can defend at the next review.
+    reason: text('reason').notNull(),
+    effectiveFrom: timestamp('effective_from', { withTimezone: true }).notNull(),
+    approvedBy: text('approved_by').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.productRef, table.effectiveFrom] })],
+);
+
+// -----------------------------------------------------------------------------
+// offers -- 0024_offers.sql. OWNED: `identity_id`, NULLABLE. MONEY.
+// -----------------------------------------------------------------------------
+// AN OFFER CHANGES THE PRICE OF A KNOWN THING AND MAY NEVER CHANGE THE THING
+// (INV-M17-02, INV-M17-03).
+//
+// NULLABLE ON PURPOSE, AND THE DDL MAKES IT BICONDITIONAL.
+// `offers_identity_scope_matches` CHECKs `(scope = 'identity' AND identity_id IS
+// NOT NULL) OR (scope <> 'identity' AND identity_id IS NULL)`, so filtering
+// `identity_id = $1` returns EXACTLY the rows the schema says are that person's
+// and excludes every `public` and `segment` row without a second predicate,
+// because SQL NULL never equals anything. That is `ledger_accounts`' shape, not
+// `coupons`': a coupon has no identity column and no correct one, and this table
+// has one the DDL declares against `identities(id)`.
+//
+// `experiment_id` IS THE TRAP AND IT IS THE ONE THIS MODULE MAKES PLAUSIBLE. It
+// is a foreign key to `offer_experiments`, which is FIRM, so a `derived` rule
+// through it would compile at every call site -- `DerivedRule.via` is `TableKey`
+// and includes every firm key -- and throw the first time anybody read it.
+// `loyalty_grant_id` is the same shape one table further out and is not even
+// registrable: `loyalty_benefit_grants` is not one of this file's tables, so the
+// column carries no `.references()`.
+//
+// `criteria_version` IS A BARE `integer` THAT CANNOT ADDRESS THE ROW IT NAMES.
+// `loyalty_criteria`'s primary key is `(benefit_code, version)`, so a version
+// number alone selects nothing. Transcribed as written; it is 0024's shape and
+// not this file's to repair.
+export const offers = pgTable('offers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // Bare `text` with NO CHECK. The six OF-M17-nn values are unrepresented in
+  // DDL, in the same file whose header argues that a CHECK is the schema
+  // enforcing the rule. The argument was applied to `varies` and not here.
+  offerType: text('offer_type').notNull(),
+  scope: text('scope').notNull(),
+  identityId: uuid('identity_id').references(() => identities.id),
+  productRef: text('product_ref').notNull(),
+  // STATED CONTENTS BEFORE PAYMENT (ADR-019a). Explicit, never derived at
+  // redemption: a bundle whose contents are computed when it is redeemed is a
+  // bundle whose contents were not stated.
+  contents: jsonb('contents').notNull(),
+  priceCents: bigint('price_cents', { mode: 'bigint' }).notNull(),
+  // Stored beside `price_cents` so the discount is a FACT rather than a
+  // comparison against a list price that may since have moved.
+  listPriceCents: bigint('list_price_cents', { mode: 'bigint' }).notNull(),
+  currency: char('currency', { length: 3 }).notNull().default('USD'),
+  maxRedemptions: integer('max_redemptions'),
+  redemptionsUsed: integer('redemptions_used').notNull().default(0),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  criteriaVersion: integer('criteria_version'),
+  // NO `.references()`: `loyalty_benefit_grants` is not one of this file's
+  // tables.
+  loyaltyGrantId: uuid('loyalty_grant_id'),
+  experimentArm: text('experiment_arm'),
+  experimentId: uuid('experiment_id').references(() => offerExperiments.id),
+  createdBy: text('created_by').notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// promotional_credit_grants -- 0024_offers.sql, later columns from
+// 0044_fee_back_and_ladder_unlock.sql. OWNED: `identity_id`, NOT NULL. MONEY.
+// -----------------------------------------------------------------------------
+// THIS IS THE TABLE THAT MINTS VALUE, and `identity_id uuid NOT NULL REFERENCES
+// identities(id) ON DELETE RESTRICT` is on the row. A grant is a named person's
+// entitlement from the moment it exists; there is no unowned grant and the DDL
+// has no way to write one.
+//
+// NEVER WITHDRAWABLE (OQ-FREEZE-01). Promotional credit is rendered inside the
+// wallet screen and is NOT wallet value: it has its own ledger class
+// (`promotional_credit`, 0009) and no `wallet_entries.provenance` value (0011).
+//
+// `funding_purchase_id` IS THE DELTA'S REAL CONTENT AND IT IS NOT THE SCOPE. A
+// credit needs to know what funded it or a chargeback cannot claw back the
+// credit it paid for (AS-M17-06). It is NULLABLE -- a loyalty-issued or
+// fee-back-issued grant has no funding purchase -- so a derivation through
+// `purchases` would return only the grants somebody bought, and the rows it
+// would drop are exactly the ones no purchase funded.
+//
+// `source_offer_id` IS THE OTHER TRAP AND IT IS THIS MODULE'S CHARACTERISTIC
+// ONE. A redemption pointing at its catalogue row reads like a legitimate hop,
+// and here the hop would be to `offers`, whose own rule is `owned` with a
+// NULLABLE column: a grant issued from a `public` offer would reach nobody at
+// all. The column is nullable besides. The identity is on the row and nothing
+// else is needed.
+//
+// `source_payout_request_id` IS 0044's LATER COLUMN, folded by ADR-094's
+// one-member vocabulary. It carries no `.references()`: the FK was added by
+// `ALTER TABLE ... ADD COLUMN` rather than declared in the `CREATE TABLE` body,
+// and `payout_requests` is not one of this file's tables either.
+export const promotionalCreditGrants = pgTable('promotional_credit_grants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  sourceOfferId: uuid('source_offer_id').references(() => offers.id),
+  fundingPurchaseId: uuid('funding_purchase_id').references(() => purchases.id),
+  // NOT NULL. Promotional credit expires; that is what distinguishes it from a
+  // payable. An unexpiring promotional balance is a liability wearing a
+  // marketing label.
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  consumedCents: bigint('consumed_cents', { mode: 'bigint' }).notNull().default(0n),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  revokedReason: text('revoked_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M20-05, 0044. The settled payout that triggered a fee-back credit, NULL
+  // on every offer-issued grant.
+  sourcePayoutRequestId: uuid('source_payout_request_id'),
 });
