@@ -220,6 +220,30 @@ describe('header handling, where a tolerant parser is the vulnerability', () => 
     ).toBe('signature_header_repeated');
   });
 
+  test('a repeated header is refused EVEN WHEN the first value is the valid one', async () => {
+    // WRITTEN BECAUSE A MUTATION SURVIVED IN THE OTHER DIRECTION. The case
+    // above seeds [good, bad]; a `found[0]` implementation refuses that one for
+    // the wrong reason only if the refusal is checked, so this seeds [bad, good]
+    // too. Either resolution order is a proxy and an origin disagreeing about
+    // what was checked.
+    const adapter = pspA();
+    const { raw, headers } = adapter.signWebhook({
+      eventId: 'evt_a_8',
+      eventType: 'purchase.paid',
+      data: {},
+    });
+    const good = headers[PSP_A_SIGNATURE_HEADER] ?? '';
+    const bad = `t=0,v1=${'ff'.repeat(32)}`;
+    for (const pair of [
+      [good, bad],
+      [bad, good],
+    ]) {
+      expect(await refusalOf(adapter.verifyWebhook(raw, { [PSP_A_SIGNATURE_HEADER]: pair }))).toBe(
+        'signature_header_repeated',
+      );
+    }
+  });
+
   test('a missing signature header is its own refusal', async () => {
     const adapter = pspA();
     expect(await refusalOf(adapter.verifyWebhook(utf8('{}'), {}))).toBe('signature_header_missing');
@@ -256,6 +280,24 @@ describe('header handling, where a tolerant parser is the vulnerability', () => 
     }
   });
 
+  test('a VALID-HEX MAC of the wrong length is a mismatch, not a raw TypeError', async () => {
+    // WRITTEN BECAUSE A MUTATION SURVIVED. Dropping the length guard in
+    // `verifyHmacWebhook` left every case in this file green, because none of
+    // them presented a well-formed MAC of the wrong size. `timingSafeEqual`
+    // THROWS on a length mismatch rather than returning false, so without the
+    // guard this path raises a bare TypeError: the route's catch block sees
+    // something that is not a WebhookVerificationError, cannot tell it is a
+    // signature refusal, and returns 500 where API_CONTRACT section 10 requires
+    // 401 and a security event.
+    const adapter = pspA();
+    const refusal = await refusalOf(
+      adapter.verifyWebhook(utf8('{"id":"x","type":"y"}'), {
+        [PSP_A_SIGNATURE_HEADER]: 't=1,v1=aabb',
+      }),
+    );
+    expect(refusal).toBe('signature_mismatch');
+  });
+
   test('a non-hex v1 does not become a short MAC that gets compared', async () => {
     // `Buffer.from('zz', 'hex')` returns an EMPTY buffer rather than throwing,
     // so without the shape check this would have reached timingSafeEqual.
@@ -289,6 +331,41 @@ describe('what a verified body must still carry', () => {
     const t = Math.floor(T0.getTime() / 1000);
     const { headers } = signRawWithPspA(raw, t);
     expect(await refusalOf(adapter.verifyWebhook(raw, headers))).toBe('payload_not_json_object');
+  });
+
+  test('a body that is INVALID UTF-8 is refused, even when replacement would parse', async () => {
+    // WRITTEN BECAUSE A MUTATION SURVIVED. Flipping the decoder to
+    // `fatal: false` left every case green, because the obvious invalid-UTF-8
+    // body also fails `JSON.parse` and so refuses for the second reason
+    // instead. The case that separates them is a body whose bytes are invalid
+    // UTF-8 and which STILL PARSES once the replacement character is
+    // substituted: under a tolerant decoder that event verifies, and
+    // `event.payload` then holds a U+FFFD where `event.raw` holds 0xFF. Two
+    // representations of one signed event disagreeing is the shape a dispute
+    // is argued from, and the raw bytes are the ones the schema stores.
+    const adapter = pspA();
+    const prefix = utf8('{"id":"');
+    const suffix = utf8('","type":"purchase.paid"}');
+    const raw = new Uint8Array(prefix.length + 1 + suffix.length);
+    raw.set(prefix, 0);
+    raw[prefix.length] = 0xff; // a lone continuation byte: never valid UTF-8
+    raw.set(suffix, prefix.length + 1);
+
+    // The premise, stated rather than assumed: replacement WOULD yield valid JSON.
+    const replaced = new TextDecoder('utf-8', { fatal: false }).decode(raw);
+    expect(replaced).toContain('\uFFFD');
+    expect(() => JSON.parse(replaced)).not.toThrow();
+
+    const t = Math.floor(T0.getTime() / 1000);
+    const { headers } = signRawWithPspA(raw, t);
+    try {
+      await adapter.verifyWebhook(raw, headers);
+      expect.unreachable('a body that is not valid UTF-8 must be refused');
+    } catch (error) {
+      const e = error as WebhookVerificationError;
+      expect(e.refusal).toBe('payload_not_json_object');
+      expect(e.message).toContain('not valid UTF-8');
+    }
   });
 
   test("a verified body naming no event id is refused, through the fake's OWN signer", () => {
