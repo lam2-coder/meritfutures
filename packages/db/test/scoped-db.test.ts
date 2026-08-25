@@ -149,6 +149,11 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   ingestFiles: 'ingest_files',
   rawIngestRows: 'raw_ingest_rows',
   reconciliations: 'reconciliations',
+  loyaltyCriteria: 'loyalty_criteria',
+  loyaltyStates: 'loyalty_states',
+  loyaltyBenefitGrants: 'loyalty_benefit_grants',
+  discordLinks: 'discord_links',
+  discordAnnouncements: 'discord_announcements',
 };
 
 /**
@@ -288,15 +293,15 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 24 are unreachable through either accessor.
+  // rounded up: the other 19 are unreachable through either accessor.
   //
-  // `identity_links` IS ONE OF THE 24 AND ITS ABSENCE IS DELIBERATE. It carries
+  // `identity_links` IS ONE OF THE 19 AND ITS ABSENCE IS DELIBERATE. It carries
   // TWO identity columns against an `owned` rule that names one, ADR-092 section
   // 9 names it as a per-table ruling and takes neither, and a transcription
   // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
   // column would be a scoped read returning a strict subset of a person's own
   // edges, selected by UUID ordering, with no error anywhere.
-  // `events` IS ANOTHER OF THE 24 AND ITS ABSENCE IS ALSO DELIBERATE. It reaches
+  // `events` IS ANOTHER OF THE 19 AND ITS ABSENCE IS ALSO DELIBERATE. It reaches
   // an identity TWO ways -- `identity_id uuid NULL` and `account_id uuid NULL`,
   // neither required and no CHECK tying them -- so an `owned` rule on the first
   // drops every account-level row and a `derived` hop through the second drops
@@ -319,13 +324,13 @@ describe('the registry is total', () => {
   // rather than a second judgment: its only path to an identity is
   // `attribution_id`, `DerivedRule.via` is `TableKey`, and an unregistered
   // table has no key to name.
-  test('87 declared tables, 87 scope rules, 0 reachable without one', () => {
+  test('92 declared tables, 92 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(87);
-    expect(rules).toBe(87);
+    expect(declared).toBe(92);
+    expect(rules).toBe(92);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
