@@ -50,6 +50,8 @@ import {
   identitySignals,
   impersonationPageViews,
   impersonationSessions,
+  integrationContracts,
+  integrationDispatches,
   kycFunnelEvents,
   kycVerifications,
   ledgerAccounts,
@@ -78,6 +80,7 @@ import {
   sanctionsScreenings,
   sessions,
   statisticDefinitions,
+  supportContextViews,
   treasuryBalances,
   users,
 } from './schema.js';
@@ -85,7 +88,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FIFTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FIFTY-SIX OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -154,6 +157,9 @@ export const TABLES = {
   planBreakerState,
   reportDeliveries,
   reportSchedules,
+  integrationContracts,
+  integrationDispatches,
+  supportContextViews,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -542,6 +548,24 @@ export const SCOPE_RULES = {
   reportSchedules: {
     class: 'firm',
     why: "WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. `recipients text[] NOT NULL` holds Merit's own staff addresses or a configured SFTP destination, never a trader's, and the row exists to give the C8 weekly risk ritual an input other than a human remembering to look. There is no identity column and there is no correct one. NO CREDENTIAL IS STORED HERE and there is deliberately no column that could hold one, so this table is not a fifth credential surface arriving without a ruling.",
+  },
+  integrationContracts: {
+    class: 'firm',
+    why: "WHAT MERIT IS ALLOWED TO SEND A VENDOR, one row per integration per event per version (0018_integrations.sql). There is no identity column and there is no correct one: the SAME contract governs every dispatch to that vendor for every identity, and `field_allowlist text[] NOT NULL` holds field NAMES rather than anybody's values, so the row discloses nothing about a person even to a reader who has it. `approved_by text NOT NULL` is 0002's actor idiom and not a `users` row, so unlike `treasury_balances.recorded_by` there is not even a reference to walk wrongly; it records WHO AUTHORISED THE DISCLOSURE, which is a fact about Merit's own approval procedure. The link runs the other way: a dispatch names the vendor and the event it went under, and the contract names no dispatch.",
+  },
+
+  integrationDispatches: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: true,
+    why: "NULLABLE ON PURPOSE, WHICH IS `ledger_accounts`' SHAPE. `identity_id uuid NULL REFERENCES identities(id) ON DELETE RESTRICT` (0018_integrations.sql), and the DDL states the requirement in the direction that decides the rule: not every dispatch is about a person, and the ones that are not MUST NOT be findable by an identity search that returns them anyway. Filtering `identity_id = $1` excludes them without a second predicate, because SQL NULL never equals anything. THE ROW IS ABOUT THE PERSON DISCLOSED AND NOT ABOUT WHOEVER'S ACTION PRODUCED THE EVENT: `GET /admin/identities/:identityId/disclosures` is every field ever sent about this identity, per vendor, read from this table, and a privacy deletion request and a vendor breach ask that identical question. THIS IS WHERE THE TABLE PARTS FROM `psp_webhook_events`, whose nullable `purchase_id` is bound by the handler DURING processing so that a rule through it would answer 'whose row is this' differently before and after a re-drive; `identity_id` here is decided when the dispatch row is written, and none of `queued`, `sent`, `failed` or `dropped_by_guard` moves it. `event_id` reaches `events`, which is Merit's own fact rather than the disclosure of it, and it is unregistered besides.",
+  },
+
+  supportContextViews: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` (0018_integrations.sql). ONE ROW PER TIME A SUPPORT AGENT READ A TRADER'S IDENTITY GRAPH, and the row is about THE TRADER WHO WAS READ rather than the agent who read: that is `impersonation_sessions`' question one surface out and it has the same answer. THERE IS NO SECOND IDENTITY COLUMN TO CHOOSE BETWEEN AND THAT IS STRUCTURAL: `agent_ref text NOT NULL` is an actor string declaring no foreign key, so the agent side is not a path to anybody, where `impersonation_sessions.admin_user_id` does reference `users` and is this file's own named trap. A support read happens OUTSIDE the admin origin's IP allowlist and hardware-key SSO, so an unaudited one is an unmonitored back door into the crown jewel (AS-M10-01, dossier item 9); `fields_returned` records what was RETURNED rather than what was requested, because a log of the request cannot answer what the agent actually saw. REGISTERING THIS TABLE MAKES IT READABLE AND NOTHING ELSE: per-agent breadth monitoring is a property of the read path and no scope rule enforces it.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
