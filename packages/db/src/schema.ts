@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// FIFTY-THREE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 58 are not reachable through either accessor: `SCOPE_RULES` is total
+// FIFTY-NINE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 52 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE FIFTY-THREE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE FIFTY-NINE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -30,12 +30,12 @@
 // which is ADR-094. That entry rules the replay's vocabulary CLOSED at one
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
-// one lands the check fails rather than silently reading a stale CREATE. EIGHT
-// of the fifty-three below carry later columns -- `sessions`, `plan_versions`,
+// one lands the check fails rather than silently reading a stale CREATE. NINE
+// of the fifty-nine below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
-// `phone_change_requests` and `admin_actions` -- and none of them could be
-// registered at all before ADR-094, which is why the ruling came before the
-// transcription rather than after it.
+// `phone_change_requests`, `admin_actions` and `payout_requests` -- and none of
+// them could be registered at all before ADR-094, which is why the ruling came
+// before the transcription rather than after it.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -162,6 +162,36 @@ export const riskFlagStatus = pgEnum('risk_flag_status', [
   'investigating',
   'dismissed',
   'enforced',
+]);
+
+// ADR-028. THE RULED PAYOUT ENUM, AND WHAT IS ABSENT FROM IT IS THE RULING.
+// There is no `denied` member and there never may be one (INV-M5-01), and there
+// is no `settled_to_wallet`: settlement to the wallet is the only settlement the
+// internal leg has, and a status naming its destination invites a second one.
+// `transferring` is NOT here either -- it belongs to `wallet_withdrawals`, which
+// is the external leg's own object, because two tables tracking one transfer is
+// how they disagree. `held_pending_review` is 0030's addition, ADR-040's bounded
+// review state, and it sits BEFORE approval rather than between approval and
+// settlement, so nothing was inserted into the space INV-M5-01 protects.
+export const payoutStatus = pgEnum('payout_status', [
+  'approved',
+  'settled',
+  'failed',
+  'frozen',
+  'held_pending_review',
+]);
+// ADR-019's external leg. `wallet_withdrawals` owns the states `payout_requests`
+// gave up, plus the two the external rail actually needs. `cooling` is a status
+// with no clock of its own on the row, which session 159 recorded and which a
+// transcription does not repair.
+export const walletWithdrawalStatus = pgEnum('wallet_withdrawal_status', [
+  'requested',
+  'cooling',
+  'approved',
+  'transferring',
+  'settled',
+  'failed',
+  'cancelled',
 ]);
 
 // -----------------------------------------------------------------------------
@@ -2107,4 +2137,302 @@ export const impersonationPageViews = pgTable('impersonation_page_views', {
     .references(() => impersonationSessions.id),
   route: text('route').notNull(),
   viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// payout_requests -- 0010_payouts.sql, PLUS FIVE COLUMNS FROM 0031. ADR-094's
+// shape. OWNED: `identity_id` is on the row, NOT NULL.
+// -----------------------------------------------------------------------------
+// THE COLUMN SET BELOW IS THE TABLE AS OF THE LAST MIGRATION AND NOT AS OF ITS
+// `CREATE TABLE`. `0031_payout_hold_and_identity_restriction.sql` adds `held_at`,
+// `hold_flag_id`, `hold_expires_at`, `hold_tos_clause` and `hold_reason`, all
+// five in one `ADD COLUMN` statement; the suite folds them forward and compares
+// the whole effective set, which is why this table could not be registered at
+// all before ADR-094.
+//
+// TWO COLUMNS REACH THE SAME IDENTITY AND THE DIRECT ONE IS THE RULE.
+// `account_id` reaches it one hop out through `accounts`; `identity_id` is
+// declared `REFERENCES identities(id)` on this row and 0010's own comment says
+// it is DENORMALIZED DELIBERATELY, because the aggregate-exposure question
+// "how much is this human extracting right now" cannot be a join if it is being
+// asked inside the race it is protecting against. That is `certificates`'
+// reading on the money table, and getting it wrong here returns another
+// identity's payout history.
+//
+// `status` IS THE `payout_status` TYPE AND `balance_reflection_status` IS `text`
+// WITH A CHECK. The transcription follows the DDL in both cases rather than
+// promoting the second to an enum it does not have.
+//
+// `hold_flag_id` CARRIES NO `.references()` AND THAT IS THIS FILE'S RULE RATHER
+// THAN AN OMISSION: the header states that a column carries one only when its
+// `CREATE TABLE` body declares the FK inline. This one is declared inside
+// 0031's `ADD COLUMN`, which the fold reads for its column NAME alone, so a
+// constraint claimed here would be a claim nothing in this package checks.
+// `freeze_flag_id`, whose FK is in the `CREATE TABLE` body, does carry one.
+export const payoutRequests = pgTable('payout_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  requestedCents: bigint('requested_cents', { mode: 'bigint' }).notNull(),
+  // After the clamp: min(requested, withdrawable, cap). The clamp can only
+  // reduce, by `payout_requests_approved_within_requested`.
+  approvedCents: bigint('approved_cents', { mode: 'bigint' }).notNull(),
+  // The split legs. `trader_cents` becomes the WALLET payable and `firm_cents`
+  // becomes revenue, and `trader_cents + firm_cents = approved_cents` is a CHECK
+  // on the row rather than an arithmetic fact anybody has to remember.
+  traderCents: bigint('trader_cents', { mode: 'bigint' }).notNull(),
+  firmCents: bigint('firm_cents', { mode: 'bigint' }).notNull(),
+  // The LAST CLOSED DAY the decision used. Not a wall clock.
+  basisTradingDay: date('basis_trading_day').notNull(),
+  // The contract in force, COPIED for provability.
+  planVersionId: uuid('plan_version_id')
+    .notNull()
+    .references(() => planVersions.id),
+  // Written exactly once, always read with its parent. A join here would add a
+  // way for THE PROOF AND THE DECISION to disagree.
+  eligibilitySnapshot: jsonb('eligibility_snapshot').notNull(),
+  status: payoutStatus('status').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  // 1-based per account, DERIVED FROM SETTLEMENTS RATHER THAN FROM ATTEMPTS.
+  payoutOrdinal: integer('payout_ordinal').notNull(),
+  approvedAt: timestamp('approved_at', { withTimezone: true }).notNull().defaultNow(),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+  // SD-03. Two different dates, and the difference is load bearing.
+  settledTradingDay: date('settled_trading_day'),
+  effectiveTradingDay: date('effective_trading_day'),
+  // SD-M5-01. The freeze, with a cited flag and a clock. All three together or
+  // none, by `payout_requests_freeze_is_complete`.
+  frozenAt: timestamp('frozen_at', { withTimezone: true }),
+  freezeFlagId: uuid('freeze_flag_id').references(() => riskFlags.id),
+  freezeExpiresAt: timestamp('freeze_expires_at', { withTimezone: true }),
+  // SD-M5-04. 'missing' is a real state and not an error: the money left our
+  // ledger and did not arrive in theirs, and somebody has to be told.
+  balanceReflectionStatus: text('balance_reflection_status').notNull().default('pending'),
+  reflectedOnTradingDay: date('reflected_on_trading_day'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // 0031_payout_hold_and_identity_restriction.sql, SD-M5-08. FIVE COLUMNS AND
+  // NOT ONE: `payout_requests_hold_is_complete` makes a clockless hold
+  // unwritable, which is what stops a bounded review becoming an indefinite one.
+  heldAt: timestamp('held_at', { withTimezone: true }),
+  holdFlagId: uuid('hold_flag_id'),
+  holdExpiresAt: timestamp('hold_expires_at', { withTimezone: true }),
+  holdTosClause: text('hold_tos_clause'),
+  holdReason: text('hold_reason'),
+});
+
+// -----------------------------------------------------------------------------
+// payout_transfers -- 0010_payouts.sql. DERIVED: `payout_request_id` ->
+// payout_requests, one hop.
+// -----------------------------------------------------------------------------
+// THE TABLE CARRIES NO IDENTITY COLUMN AT ALL. It reaches one through
+// `payout_requests`, which is `owned`, so the chain terminates at an identity
+// rather than at a firm table. `payout_request_id uuid NOT NULL REFERENCES
+// payout_requests(id)` is single-valued and points at that table's PRIMARY KEY,
+// so the join cannot multiply rows and the traversal is a `hop`.
+//
+// `destination_ref` IS A PROVIDER-SIDE DESTINATION ID AND NEVER BANK DETAILS.
+// Merit does not hold them, which is the point, and there is deliberately no
+// column here that could.
+//
+// `status` IS `text` WITH A CHECK AND NOT `payout_status`. The rail's states are
+// its own -- queued, sent, settled, failed, retrying -- and the DDL is the
+// source: where the DDL and a neighbouring type disagree, the DDL wins.
+export const payoutTransfers = pgTable('payout_transfers', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  payoutRequestId: uuid('payout_request_id')
+    .notNull()
+    .references(() => payoutRequests.id),
+  provider: text('provider').notNull().default('rise'),
+  providerTransferId: text('provider_transfer_id'),
+  idempotencyKey: text('idempotency_key').notNull().unique(),
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  destinationRef: text('destination_ref').notNull(),
+  // Rise identity versus KYC identity. False freezes and flags.
+  destinationNameMatch: boolean('destination_name_match'),
+  status: text('status').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+  // SD-M5-02. REAL NAME MATCHING IS NOT BOOLEAN: transliteration, married names
+  // and common names make a strict comparison produce false freezes on
+  // legitimate traders, and a score with no method is a number nobody can
+  // re-derive when the matcher is replaced.
+  nameMatchScore: integer('name_match_score'),
+  nameMatchMethod: text('name_match_method'),
+  nameMatchReviewedBy: text('name_match_reviewed_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// wallet_entries -- 0011_wallet.sql. OWNED: `identity_id` is on the row, NOT
+// NULL.
+// -----------------------------------------------------------------------------
+// APPEND-ONLY, AND THE LEDGER IS NOT A SUBSTITUTE FOR IT. The ledger records
+// that money moved into `trader_wallet`; only this table records that it arrived
+// as a payout rather than as a refund of a wallet-funded purchase, and without
+// that distinction every provenance rule in M20 is unenforceable because the
+// system cannot tell the two apart once both are in the same integer.
+//
+// THE TRAP IS `ledger_transaction_id`, WHICH IS NOT NULL AND POINTS AT A
+// REGISTERED TABLE, so a `derived` rule through it reads exactly like a
+// legitimate hop. It is not the scope: `ledger_transactions` carries no identity
+// column and reaches one only through its entries by a semi-join, so deriving
+// through it would replace a direct NOT NULL identity column with a two-step
+// chain that answers the same question more expensively and can only be wrong.
+//
+// `provenance` IS A CLOSED LIST WITH NO DEPOSIT MEMBER AND NONE MAY BE ADDED
+// (INV-WALLET-NO-DEPOSITS). `promotional_credit` is not in it either and must
+// not be: the loyalty perk lives in its own ledger class and in
+// `promotional_credit_grants`, and is never withdrawable.
+export const walletEntries = pgTable('wallet_entries', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  direction: text('direction').notNull(),
+  // Magnitude. Always positive; `direction` carries the sign. Deliberately NOT
+  // the ledger's signed convention, because reusing one convention for two
+  // different questions is the shape of error ADR-027 was reversed over.
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  provenance: text('provenance').notNull(),
+  cause: text('cause').notNull(),
+  // Polymorphic: a payout request, a purchase, or the corrected entry. It
+  // declares no foreign key, so there is nothing a derived rule could traverse.
+  referenceId: uuid('reference_id').notNull(),
+  ledgerTransactionId: uuid('ledger_transaction_id')
+    .notNull()
+    .references(() => ledgerTransactions.id),
+  // The running balance AFTER this entry, stored so a divergence between it and
+  // the recomputed one is a detectable tamper indication rather than an
+  // invisible one.
+  balanceAfterCents: bigint('balance_after_cents', { mode: 'bigint' }).notNull(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// wallet_withdrawals -- 0011_wallet.sql. OWNED: `identity_id` is on the row, NOT
+// NULL.
+// -----------------------------------------------------------------------------
+// THE EXTERNAL LEG IS A DIFFERENT OBJECT FROM A PAYOUT REQUEST (SD-M5-06). A
+// payout request is a CLAIM AGAINST AN ACCOUNT evaluated by the engine; a
+// withdrawal is a MOVEMENT OF AN ALREADY-SETTLED BALANCE evaluated against KYC
+// and destination rules. That is why the row is `owned` by `identity_id`
+// directly and carries no `account_id` to be tempted by: the money is the
+// person's by the time it is here, and no account is party to the movement.
+//
+// `status` IS `wallet_withdrawal_status` AND THE HALT IS NOT IN IT. 0031 makes
+// a live freeze refuse settlement with a CHECK rather than with a status value,
+// deliberately, because the halt is orthogonal to the rail state and collapsing
+// an orthogonal hold into the rail's status column is SD-M5-06's own named
+// mistake. Before 0031 the halt was representable and unenforced.
+export const walletWithdrawals = pgTable('wallet_withdrawals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  // Provider-side destination id, never bank details.
+  destinationRef: text('destination_ref').notNull(),
+  status: walletWithdrawalStatus('status').notNull().default('requested'),
+  idempotencyKey: text('idempotency_key').notNull(),
+  requestedAt: timestamp('requested_at', { withTimezone: true }).notNull().defaultNow(),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+  // SD-M5-06 carries SD-M5-01's freeze columns, for the same reason and with the
+  // same clock: the zero-denial policy must not permit itself an indefinite hold
+  // on either leg.
+  frozenAt: timestamp('frozen_at', { withTimezone: true }),
+  freezeFlagId: uuid('freeze_flag_id').references(() => riskFlags.id),
+  freezeExpiresAt: timestamp('freeze_expires_at', { withTimezone: true }),
+  // SD-M5-06 carries SD-M5-02's name-match columns too. THIS is the leg with a
+  // destination, so this is where the destination name actually gets compared.
+  destinationNameMatch: boolean('destination_name_match'),
+  nameMatchScore: integer('name_match_score'),
+  nameMatchMethod: text('name_match_method'),
+  nameMatchReviewedBy: text('name_match_reviewed_by'),
+  // SD-M20-03. WHAT IS THIS WITHDRAWAL MADE OF, AND HOW LONG HAS THAT VALUE
+  // BEEN HERE. The provenance rule cannot be evaluated against a balance, only
+  // against a composition, and `earliest_credit_at` is the chargeback-window
+  // hold's input: paying out a refund credit that is still inside the window in
+  // which its funding purchase can be charged back is how a wallet becomes a
+  // cash-out rail for a stolen card.
+  sourceProvenanceSummary: jsonb('source_provenance_summary').notNull().default({}),
+  earliestCreditAt: timestamp('earliest_credit_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// wallet_spend_limits -- 0011_wallet.sql. OWNED: `identity_id` is on the row,
+// NOT NULL and half of the primary key.
+// -----------------------------------------------------------------------------
+// PER IDENTITY RATHER THAN GLOBAL, AND THE REASON IS THE WHOLE DESIGN: the limit
+// that matters is the one on THE COMPROMISED SESSION, and a global limit either
+// throttles legitimate traders or is set so high it does nothing. In practice it
+// is set so high it does nothing.
+//
+// THE GRAIN IS (identity, effective_from) AND SUPERSESSION IS A NEW ROW. A
+// scoped read therefore returns the whole history of limits set on a person,
+// which is what makes a contested throttle explicable months later; the current
+// one is the greatest `effective_from` that has arrived, not the only row.
+export const walletSpendLimits = pgTable(
+  'wallet_spend_limits',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    dailyCents: bigint('daily_cents', { mode: 'bigint' }).notNull(),
+    // A rolling weekly limit below the daily limit is a daily limit with a
+    // confusing name, refused by `wallet_spend_limits_weekly_exceeds_daily`.
+    rolling7dCents: bigint('rolling_7d_cents', { mode: 'bigint' }).notNull(),
+    reason: text('reason').notNull(),
+    // An operator name, 0002's `actor` idiom. Not a `users` row.
+    setBy: text('set_by').notNull(),
+    effectiveFrom: timestamp('effective_from', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.identityId, table.effectiveFrom] })],
+);
+
+// -----------------------------------------------------------------------------
+// wallet_dormancy -- 0011_wallet.sql. OWNED: `identity_id` is on the row, and it
+// is the whole primary key.
+// -----------------------------------------------------------------------------
+// UNCLAIMED-PROPERTY OBLIGATIONS ARE JURISDICTIONAL AND REAL, and the
+// alternative to a state machine is DISCOVERING THE OBLIGATION DURING AN AUDIT.
+// One row per identity, so the scoped read returns a person exactly their own
+// dormancy state.
+//
+// OWNED AND NOT `root`, ALTHOUGH THE COLUMN IS THE PRIMARY KEY. `root` means the
+// row IS the identity and its column is `id`; this row is a fact ABOUT an
+// identity that happens to be keyed by it, and `identities` is the only table
+// this vocabulary's `root` may name.
+//
+// `notified_at` IS AN ARRAY BECAUSE THE SCHEDULE IS A SEQUENCE. "Did we notify
+// them" is answered by the whole sequence rather than by the last one, and a
+// single timestamp would make the second notice overwrite the proof of the
+// first. 0028 supersedes the completeness CHECK -- `cardinality` for
+// `array_length`, so an empty array can no longer reach `escheat_review` -- and
+// that is constraint work the fold reads and discards, leaving the column set
+// unchanged.
+export const walletDormancy = pgTable('wallet_dormancy', {
+  identityId: uuid('identity_id')
+    .primaryKey()
+    .references(() => identities.id),
+  lastActivityAt: timestamp('last_activity_at', { withTimezone: true }).notNull(),
+  notifiedAt: timestamp('notified_at', { withTimezone: true }).array().notNull().default([]),
+  state: text('state').notNull().default('active'),
+  // A HINT, not a determination. The jurisdiction that governs an unclaimed
+  // balance is a legal question and this column records our best guess so
+  // counsel has something to correct rather than nothing to look at.
+  jurisdictionHint: text('jurisdiction_hint'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
