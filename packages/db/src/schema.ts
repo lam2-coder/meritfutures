@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// SIXTY-TWO TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 49 are not reachable through either accessor: `SCOPE_RULES` is total
+// SIXTY-FOUR TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 47 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE SIXTY-TWO ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE SIXTY-FOUR ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. NINE
-// of the sixty-two below carry later columns -- `sessions`, `plan_versions`,
+// of the sixty-four below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions` and `payout_requests` -- and none of
 // them could be registered at all before ADR-094, which is why the ruling came
@@ -300,7 +300,11 @@ export const sessions = pgTable('sessions', {
 // in application code and there is none here.
 export const planVersions = pgTable('plan_versions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  planId: uuid('plan_id').notNull(),
+  // 0004:59 declares this FK inline and `plans` is one of this file's tables as
+  // of session 195, so the reference is claimed here rather than left bare.
+  planId: uuid('plan_id')
+    .notNull()
+    .references((): AnyPgColumn => plans.id),
   version: integer('version').notNull(),
   status: planVersionStatus('status').notNull().default('draft'),
   rules: jsonb('rules').notNull(),
@@ -1823,8 +1827,12 @@ export const identityRestrictionEpisodes = pgTable('identity_restriction_episode
 // correct one: a per-identity slice of a plan's loss ratio is not a smaller
 // version of it, which is `published_statistics`' reason on an internal surface.
 //
-// `plan_id` CARRIES NO `.references()` because `plans` is not one of this file's
-// tables.
+// `plan_id` NOW CARRIES `.references()`, and it did not before session 195.
+// This file's rule is that a column carries one only when its `CREATE TABLE`
+// body declares the FK inline AND the target is one of this file's tables;
+// 0016:127 always declared it inline, and `plans` became one of this file's
+// tables when M04's slice registered it. The second half of the condition
+// changed, not the first.
 //
 // `sample_size` BESIDE `min_sample` IS SD-M6-02 AND INV-M6-07: below its own
 // minimum the only honest state is `insufficient_data`, and
@@ -1833,7 +1841,9 @@ export const identityRestrictionEpisodes = pgTable('identity_restriction_episode
 export const planBreakerState = pgTable(
   'plan_breaker_state',
   {
-    planId: uuid('plan_id').notNull(),
+    planId: uuid('plan_id')
+      .notNull()
+      .references((): AnyPgColumn => plans.id),
     evaluatedOn: date('evaluated_on').notNull(),
     metric: text('metric').notNull(),
     numeratorCents: bigint('numerator_cents', { mode: 'bigint' }).notNull(),
@@ -2565,4 +2575,66 @@ export const walletDormancy = pgTable('wallet_dormancy', {
   jurisdictionHint: text('jurisdiction_hint'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// plans -- 0004_catalog.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE CATALOGUE'S ROOT, and it is firm for `plan_versions`' reason one level up:
+// every identity is offered the SAME plan, and the link runs the other way -- a
+// version names its plan and an account names its version -- so ownership flows
+// FROM the catalogue rather than to it. The public plan pages read it unscoped
+// and that is not a leak: a listed plan is what the firm offers in public.
+//
+// `is_active` DELISTS AND NEVER DELETES, and 0004's own comment gives a records
+// reason rather than a UI one: a plan nobody can buy still has to explain the
+// accounts sold under it. A delisted row stays readable and stays firm.
+//
+// `code` IS THE M1-GATE VOCABULARY AND `rapid_daily` IS NOT IN IT. ADR-013
+// renamed it to `direct` with no row to migrate, and the retired alias is not
+// carried forward here either, because a retired alias is a second name for one
+// thing.
+export const plans = pgTable('plans', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: text('code').notNull().unique(),
+  name: text('name').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// passkeys -- 0002_identity.sql. DERIVED: `user_id` -> users, one hop.
+// -----------------------------------------------------------------------------
+// A CREDENTIAL BELONGS TO A LOGIN AND NOT TO A PERSON, so the row reaches an
+// identity through `users` and there is no second candidate column on it to get
+// wrong. ADR-041 is why the login and the person are two things: an identity
+// holding two logins holds passkeys under both, and a scoped read returns both,
+// which is the same answer `sessions` gives for the same reason.
+//
+// `credential_id` AND `public_key` ARE `bytea` AND ARE DECLARED AS THE CUSTOM
+// TYPE. Either one as `text()` would compile and would satisfy the column-name
+// comparison the suite runs, and it would be a wrong statement about the one
+// axis this suite does not check (ADR-094 section 3).
+//
+// `sign_count` IS CLONE DETECTION AND NOT BOOKKEEPING: a signature counter that
+// goes BACKWARDS means the credential exists in two places. 0002 declares it
+// `bigint`, so it is transcribed as one.
+//
+// `transports` IS A `text[]` AND IS TRANSCRIBED AS AN ARRAY. The authenticator
+// reports several, the column stores several, and a scalar here would be the
+// same class of wrong statement as `text` for `bytea`.
+export const passkeys = pgTable('passkeys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id),
+  credentialId: bytea('credential_id').notNull().unique(),
+  publicKey: bytea('public_key').notNull(),
+  signCount: bigint('sign_count', { mode: 'bigint' }).notNull().default(0n),
+  transports: text('transports').array(),
+  label: text('label'),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
