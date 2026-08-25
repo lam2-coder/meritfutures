@@ -118,10 +118,17 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   affiliates: 'affiliates',
   affiliateCreatives: 'affiliate_creatives',
   affiliateClicks: 'affiliate_clicks',
+  payoutRequests: 'payout_requests',
+  payoutTransfers: 'payout_transfers',
+  walletEntries: 'wallet_entries',
+  walletWithdrawals: 'wallet_withdrawals',
+  walletSpendLimits: 'wallet_spend_limits',
+  walletDormancy: 'wallet_dormancy',
+  plans: 'plans',
+  passkeys: 'passkeys',
   integrationContracts: 'integration_contracts',
   integrationDispatches: 'integration_dispatches',
   supportContextViews: 'support_context_views',
-  plans: 'plans',
   simulationRuns: 'simulation_runs',
   contractSpecs: 'contract_specs',
   fills: 'fills',
@@ -274,14 +281,23 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 38 are unreachable through either accessor.
+  // rounded up: the other 31 are unreachable through either accessor.
   //
-  // `identity_links` IS ONE OF THE 38 AND ITS ABSENCE IS DELIBERATE. It carries
+  // `identity_links` IS ONE OF THE 31 AND ITS ABSENCE IS DELIBERATE. It carries
   // TWO identity columns against an `owned` rule that names one, ADR-092 section
   // 9 names it as a per-table ruling and takes neither, and a transcription
   // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
   // column would be a scoped read returning a strict subset of a person's own
   // edges, selected by UUID ordering, with no error anywhere.
+  // `events` IS ANOTHER OF THE 47 AND ITS ABSENCE IS ALSO DELIBERATE. It reaches
+  // an identity TWO ways -- `identity_id uuid NULL` and `account_id uuid NULL`,
+  // neither required and no CHECK tying them -- so an `owned` rule on the first
+  // drops every account-level row and a `derived` hop through the second drops
+  // every identity-level row, while the portal's timeline (EVENTS.md section 2,
+  // consumer TL) reads both. Its `jsonb` payload is the second reason and it is
+  // the one no scope rule reaches: `kyc.dedupe_hit` carries
+  // `matched_identity_id`, so a row whose own tenancy column is right still
+  // names a DIFFERENT identity inside the payload.
   //
   // `attributions` IS THE SIBLING ADR-092 SECTION 9 NAMES BESIDE IT AND IT IS
   // ABSENT FOR THE SAME REASON. `buyer_identity_id` and `affiliate_identity_id`
@@ -296,13 +312,13 @@ describe('the registry is total', () => {
   // rather than a second judgment: its only path to an identity is
   // `attribution_id`, `DerivedRule.via` is `TableKey`, and an unregistered
   // table has no key to name.
-  test('73 declared tables, 73 scope rules, 0 reachable without one', () => {
+  test('80 declared tables, 80 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(73);
-    expect(rules).toBe(73);
+    expect(declared).toBe(80);
+    expect(rules).toBe(80);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;

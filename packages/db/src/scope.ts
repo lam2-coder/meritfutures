@@ -75,6 +75,9 @@ import {
   offers,
   otpSendBudget,
   pageRevalidations,
+  passkeys,
+  payoutRequests,
+  payoutTransfers,
   phoneChangeRequests,
   planBreakerState,
   plans,
@@ -100,12 +103,16 @@ import {
   supportContextViews,
   treasuryBalances,
   users,
+  walletDormancy,
+  walletEntries,
+  walletSpendLimits,
+  walletWithdrawals,
 } from './schema.js';
 
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * SEVENTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * EIGHTY OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -142,6 +149,19 @@ import {
  * `attributions` is unregistered. This is ADR-092's "a session cannot know its
  * own slice size before it runs" in the direction ADR-094 section 6 did not
  * name: totality forced a table OUT of a slice rather than into one.
+ * `events` IS ABSENT FOR THE SAME CLASS OF REASON, RECORDED HERE BY THE SESSION
+ * THAT WANTED IT. It carries `identity_id uuid NULL REFERENCES identities(id)`
+ * AND `account_id uuid NULL REFERENCES accounts(id)`, with NO CHECK tying them
+ * and neither one required, so a rule naming `identity_id` drops every
+ * account-level row written without one and a rule hopping `account_id` drops
+ * every identity-level row -- and EVENTS.md section 2 rows the portal's timeline
+ * as PER-ACCOUNT while M04 section 5 consumes identity-level events on the same
+ * screen, so both halves are read and neither column covers them. The payload is
+ * the second reason: `kyc.dedupe_hit` carries `matched_identity_id` and
+ * `identity.merged` carries `merged_identity_id`, so a row whose own tenancy
+ * column is correct still names a DIFFERENT identity inside `jsonb`, which no
+ * scope rule can express and which INV-M4-06 forbids the portal to receive.
+ * A transcription rules nothing, so this is reported and not allocated.
  */
 export const TABLES = {
   identities,
@@ -200,10 +220,17 @@ export const TABLES = {
   affiliates,
   affiliateCreatives,
   affiliateClicks,
+  payoutRequests,
+  payoutTransfers,
+  walletEntries,
+  walletWithdrawals,
+  walletSpendLimits,
+  walletDormancy,
+  plans,
+  passkeys,
   integrationContracts,
   integrationDispatches,
   supportContextViews,
-  plans,
   simulationRuns,
   contractSpecs,
   fills,
@@ -631,27 +658,78 @@ export const SCOPE_RULES = {
     traversal: 'hop',
     why: "`affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` (0005_affiliate_program.sql), and `affiliates` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. A CLICK BELONGS TO THE AFFILIATE AND NOT TO THE PERSON WHO CLICKED, and the DDL is what decides that: the table has no identity column, no `user_id` and no `purchase_id`, because a click happens before anybody has signed in. The three columns that look like a clicker are the trap and none of them is a tenancy -- `ip` reaches whoever shares a network, `user_agent` reaches whoever shares a browser build, and `click_fingerprint` is `sessions.device_fingerprint_id`'s named trap arriving on a different table.",
   },
+  payoutRequests: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0010_payouts.sql), and the DDL says in its own comment why the column is there at all: it is DENORMALIZED DELIBERATELY, because the aggregate-exposure question -- how much is this human extracting right now -- cannot be a join if it is being asked inside the race it is protecting against. `account_id` is also present, is also NOT NULL, and is NOT the scope: it reaches the same identity one hop out through `accounts`, and a derived rule through it would make THE PAYOUT TABLE'S tenancy depend on a join rather than on a column the database itself declares against `identities(id)`. That is `certificates`' reading on the money path, where a wrong answer returns another identity's payout history and, through `hold_flag_id` and `eligibility_snapshot`, the reasons Merit paid or held them.",
+  },
+
+  payoutTransfers: {
+    class: 'derived',
+    via: 'payoutRequests',
+    localColumn: 'payout_request_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "THE TABLE CARRIES NO IDENTITY COLUMN AT ALL and reaches one only through the request it is executing. `payout_request_id uuid NOT NULL REFERENCES payout_requests(id) ON DELETE RESTRICT` (0010_payouts.sql) is single-valued and names that table's PRIMARY KEY, so the join cannot multiply rows and the traversal is a hop rather than a semi-join. The chain terminates at `payout_requests`, which is `owned`, so it ends at an identity rather than at a firm table. `destination_ref` is a PROVIDER-SIDE id and never bank details, and `name_match_reviewed_by` is an operator name rather than a `users` row, so neither is a second path to anybody.",
+  },
+
+  walletEntries: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql). THE TRAP IS `ledger_transaction_id`, which is NOT NULL and references a REGISTERED table, so a derived rule through it reads exactly like the legitimate hop `ledger_entries` makes -- and it is wrong twice over: `ledger_transactions` carries no identity column and reaches one by a SEMI-JOIN through its entries, so the chain would be longer, would traverse the firm leg of a double-entry posting, and could only ever answer the question this row's own NOT NULL column already answers. The table is APPEND-ONLY and a correction is a new entry rather than an update, so a scoped read returns the corrected row beside the correction, which is what makes a disputed balance explicable.",
+  },
+
+  walletWithdrawals: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: '`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql). THE EXTERNAL LEG IS A DIFFERENT OBJECT FROM A PAYOUT REQUEST (SD-M5-06): a payout request is a claim against an ACCOUNT evaluated by the engine, and a withdrawal is a movement of an ALREADY-SETTLED balance, so the row carries no `account_id` and there is no account for a derived rule to reach through. `freeze_flag_id` references `risk_flags`, which is `owned` by the same identity, and is still not the scope: it records WHY the rail was halted and would return nothing at all on the rows where it is NULL, which is nearly all of them.',
+  },
+
+  walletSpendLimits: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql), where it is also half of the primary key `(identity_id, effective_from)`. PER IDENTITY RATHER THAN GLOBAL IS THE WHOLE DESIGN (INV-M20-07): the limit that matters is the one on the compromised session, and a global limit is either set low enough to throttle legitimate traders or high enough to do nothing. A new limit is a NEW ROW at a later `effective_from` rather than an update, so a scoped read returns the person's whole history of limits and the current one is the greatest `effective_from` that has arrived. `set_by text NOT NULL` is an operator name in 0002's `actor` idiom and not a `users` row, so it is not a second path to an identity.",
+  },
+
+  walletDormancy: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid PRIMARY KEY REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql), so it is NOT NULL by the key and there is exactly one row per identity. OWNED AND NOT `root`, ALTHOUGH THE COLUMN IS THE WHOLE PRIMARY KEY: `root` means the row IS the identity and its column is `id`, and `identities` is the only table this vocabulary's root may name; this row is a fact ABOUT an identity that happens to be keyed by it. UNCLAIMED-PROPERTY OBLIGATIONS ARE JURISDICTIONAL AND REAL (INV-M20-09), and `notified_at timestamptz[]` is the proof Merit told the person before the balance became escheatable -- which is evidence a trader is entitled to read about themselves and about nobody else.",
+  },
+
+  plans: {
+    class: 'firm',
+    why: "The product catalogue's root row. There is no identity column and there is no correct one: EVERY identity is offered the same plan, and the link runs the other way -- a plan version names its plan and an account names its version -- so ownership flows FROM the catalogue rather than to it, which is `plan_versions`' reason one level up. `is_active` DELISTS AND NEVER DELETES (0004_catalog.sql), for a records reason rather than a UI one: a plan nobody can buy still has to explain the accounts sold under it, so a delisted row stays readable and stays firm. The public plan pages read it unscoped and that is not a leak, because a listed plan is what the firm offers in public.",
+  },
+
+  passkeys: {
+    class: 'derived',
+    via: 'users',
+    localColumn: 'user_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "A CREDENTIAL BELONGS TO A LOGIN AND NOT TO A PERSON, so the row reaches an identity through `users` and there is no second candidate column on it to choose wrongly. `user_id uuid NOT NULL REFERENCES users(id)` (0002_identity.sql) is single-valued, so the hop cannot multiply rows. ADR-041 is why a login and a person are two things: an identity holding two logins holds passkeys under both and a scoped read returns both, which is the same answer `sessions` gives through the same hop, and it is what SC-M4-01 and SC-M4-11 render. `credential_id` is UNIQUE across the whole table rather than per user, which is WebAuthn's own rule and not a scope: uniqueness does not make the row firm and does not make it reachable without the hop.",
+  },
   integrationContracts: {
     class: 'firm',
     why: "WHAT MERIT IS ALLOWED TO SEND A VENDOR, one row per integration per event per version (0018_integrations.sql). There is no identity column and there is no correct one: the SAME contract governs every dispatch to that vendor for every identity, and `field_allowlist text[] NOT NULL` holds field NAMES rather than anybody's values, so the row discloses nothing about a person even to a reader who has it. `approved_by text NOT NULL` is 0002's actor idiom and not a `users` row, so unlike `treasury_balances.recorded_by` there is not even a reference to walk wrongly; it records WHO AUTHORISED THE DISCLOSURE, which is a fact about Merit's own approval procedure. The link runs the other way: a dispatch names the vendor and the event it went under, and the contract names no dispatch.",
   },
-
   integrationDispatches: {
     class: 'owned',
     column: 'identity_id',
     nullable: true,
     why: "NULLABLE ON PURPOSE, WHICH IS `ledger_accounts`' SHAPE. `identity_id uuid NULL REFERENCES identities(id) ON DELETE RESTRICT` (0018_integrations.sql), and the DDL states the requirement in the direction that decides the rule: not every dispatch is about a person, and the ones that are not MUST NOT be findable by an identity search that returns them anyway. Filtering `identity_id = $1` excludes them without a second predicate, because SQL NULL never equals anything. THE ROW IS ABOUT THE PERSON DISCLOSED AND NOT ABOUT WHOEVER'S ACTION PRODUCED THE EVENT: `GET /admin/identities/:identityId/disclosures` is every field ever sent about this identity, per vendor, read from this table, and a privacy deletion request and a vendor breach ask that identical question. THIS IS WHERE THE TABLE PARTS FROM `psp_webhook_events`, whose nullable `purchase_id` is bound by the handler DURING processing so that a rule through it would answer 'whose row is this' differently before and after a re-drive; `identity_id` here is decided when the dispatch row is written, and none of `queued`, `sent`, `failed` or `dropped_by_guard` moves it. `event_id` reaches `events`, which is Merit's own fact rather than the disclosure of it, and it is unregistered besides.",
   },
-
   supportContextViews: {
     class: 'owned',
     column: 'identity_id',
     nullable: false,
     why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` (0018_integrations.sql). ONE ROW PER TIME A SUPPORT AGENT READ A TRADER'S IDENTITY GRAPH, and the row is about THE TRADER WHO WAS READ rather than the agent who read: that is `impersonation_sessions`' question one surface out and it has the same answer. THERE IS NO SECOND IDENTITY COLUMN TO CHOOSE BETWEEN AND THAT IS STRUCTURAL: `agent_ref text NOT NULL` is an actor string declaring no foreign key, so the agent side is not a path to anybody, where `impersonation_sessions.admin_user_id` does reference `users` and is this file's own named trap. A support read happens OUTSIDE the admin origin's IP allowlist and hardware-key SSO, so an unaudited one is an unmonitored back door into the crown jewel (AS-M10-01, dossier item 9); `fields_returned` records what was RETURNED rather than what was requested, because a log of the request cannot answer what the agent actually saw. REGISTERING THIS TABLE MAKES IT READABLE AND NOTHING ELSE: per-agent breadth monitoring is a property of the read path and no scope rule enforces it.",
-  },
-  plans: {
-    class: 'firm',
-    why: "THE PRODUCT CATALOGUE'S ROOT: three rows, `core_eod`, `merit_rapid` and `direct`. There is no identity column and there is no correct one, and it is `plan_versions`' reason one hop further up -- EVERY identity is offered the same three plans, and the link runs the other way: a version names its plan and an account names its version, so ownership flows FROM the catalogue and never into it. `is_active` DELISTS AND NEVER DELETES, on the table's own DDL reasoning that a plan nobody can buy still has to explain the accounts sold under it, so a retired row is firm for exactly as long as the live one. A `derived` rule through `plan_versions` would be the refused shape twice over, since that parent is firm as well.",
   },
   simulationRuns: {
     class: 'firm',
