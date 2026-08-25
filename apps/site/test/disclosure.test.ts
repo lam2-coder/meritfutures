@@ -1,12 +1,12 @@
 import { expect, test } from 'vitest';
 
-import type { SimulatedEnvironmentDisclosure } from '../src/render/disclosure.js';
+import type { SimulatedEnvironmentDisclosure } from '../src/render/disclosure.ts';
 import {
   CANONICAL_PAYOUT_COPY,
   DisclosureError,
   assertSimulatedDisclosurePresent,
   payoutCopyOmitsALeg,
-} from '../src/render/disclosure.js';
+} from '../src/render/disclosure.ts';
 
 // CI-02, the `unit` project. M9-D-nn: disclosure presence.
 

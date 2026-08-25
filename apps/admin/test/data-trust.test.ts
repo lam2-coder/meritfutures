@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
-import { FigureError } from '../src/figure.js';
+import { FigureError } from '../src/figure.ts';
 import {
   DataTrustError,
   TRUST_KEYS,
   type TrustSignal,
   assessDataTrust,
-} from '../src/data-trust.js';
+} from '../src/data-trust.ts';
 
 // =============================================================================
 // M6-A: P-M6-09, the panel that gates the other nine

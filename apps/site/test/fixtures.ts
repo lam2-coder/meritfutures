@@ -30,8 +30,8 @@ import type {
   MarketedSizeLabel,
   SitePlanVersionView,
   SiteSizeView,
-} from '../src/catalog/types.js';
-import { marketedSizeLabel } from '../src/catalog/types.js';
+} from '../src/catalog/types.ts';
+import { marketedSizeLabel } from '../src/catalog/types.ts';
 
 const VERSION_ID = '00000000-0000-4000-8000-000000000001' as PlanVersionId;
 

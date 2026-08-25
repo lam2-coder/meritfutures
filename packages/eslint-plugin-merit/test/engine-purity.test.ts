@@ -26,7 +26,7 @@ const ruleTester = new RuleTester({
 ruleTester.run('engine-purity', enginePurity, {
   valid: [
     // The engine's own modules are relative, and it has them.
-    "import { applyDayMark } from './day-mark.js';",
+    "import { applyDayMark } from './day-mark.ts';",
     // Integer cents and basis points, which is what the money rule permits.
     'export const MIN_PAYOUT_CENTS = 10_000;',
     'export const asBasisPoints = (n) => n * 10000;',

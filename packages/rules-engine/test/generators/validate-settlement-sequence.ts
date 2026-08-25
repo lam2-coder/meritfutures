@@ -51,8 +51,8 @@
 // `0010_payouts.sql` and lands on the line.
 // =============================================================================
 
-import type { DaySequence, TradingDay } from './day-input.js';
-import type { MaterializedPlan } from './plan-config.js';
+import type { DaySequence, TradingDay } from './day-input.ts';
+import type { MaterializedPlan } from './plan-config.ts';
 
 /**
  * One settled payout, as the fold reads it at DO-2.

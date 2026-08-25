@@ -25,7 +25,7 @@ import type {
   PlanVersionSizeRow,
   PublishedEvalPhase,
   PublishedFundedPhase,
-} from '../src/types.js';
+} from '../src/types.ts';
 
 // -----------------------------------------------------------------------------
 // Appendix A.1: Core EOD at 50K

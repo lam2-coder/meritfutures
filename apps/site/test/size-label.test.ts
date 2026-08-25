@@ -2,15 +2,15 @@ import { expect, test } from 'vitest';
 
 import type { Cents } from '@merit/rules-engine';
 
-import { MarketedSizeLabelError, marketedSizeLabel } from '../src/catalog/types.js';
-import { money } from '../src/render/cents.js';
+import { MarketedSizeLabelError, marketedSizeLabel } from '../src/catalog/types.ts';
+import { money } from '../src/render/cents.ts';
 import {
   hasMarketedLabel,
   renderSizeFigures,
   renderSizeLabel,
   sizeSegment,
-} from '../src/render/size-label.js';
-import { label, sizeRow, sizeView } from './fixtures.js';
+} from '../src/render/size-label.ts';
+import { label, sizeRow, sizeView } from './fixtures.ts';
 
 // CI-02, the `unit` project. GS-309 and GS-310 as this module can hold them; the
 // golden-file form is owed and has no home yet, per session 107's finding that

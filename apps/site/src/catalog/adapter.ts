@@ -107,16 +107,16 @@ import type {
   SizeCapScheduleStep,
 } from '@merit/rules-engine';
 
-import type { ContentDocument, ContentKind } from '../content/documents.js';
-import type { PublishedStatistic, StatisticMeasure, StatisticUnit } from '../stats/published.js';
-import type { StatsPublication } from '../stats/published.js';
+import type { ContentDocument, ContentKind } from '../content/documents.ts';
+import type { PublishedStatistic, StatisticMeasure, StatisticUnit } from '../stats/published.ts';
+import type { StatsPublication } from '../stats/published.ts';
 import type {
   CatalogReadPort,
   ContentReadPort,
   GeoLookupPort,
   SitePorts,
   StatsReadPort,
-} from './ports.js';
+} from './ports.ts';
 import type {
   BuiltAt,
   CopyBlocks,
@@ -124,8 +124,8 @@ import type {
   SitePlanVersionView,
   SiteSizeView,
   SupersededBy,
-} from './types.js';
-import { marketedSizeLabel } from './types.js';
+} from './types.ts';
+import { marketedSizeLabel } from './types.ts';
 
 // -----------------------------------------------------------------------------
 // The transport

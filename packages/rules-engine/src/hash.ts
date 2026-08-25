@@ -54,8 +54,8 @@
 // divergence that did not happen, on every row of every account at once. No
 // migration repairs that. Only the audited rewrite in M01 Appendix B.4 does.
 
-import type { EngineGateResults, RuleState, TradingDay } from './types.js';
-import { EngineInvariantError } from './errors.js';
+import type { EngineGateResults, RuleState, TradingDay } from './types.ts';
+import { EngineInvariantError } from './errors.ts';
 
 // -----------------------------------------------------------------------------
 // UTF-8, WRITTEN OUT BECAUSE `Buffer.byteLength` DOES NOT EXIST HERE

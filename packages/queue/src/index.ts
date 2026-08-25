@@ -34,7 +34,7 @@
 // the enqueue joins the transaction it is given. The wiring waits on one export
 // from a package this session's fence does not hold.
 
-export { JOB_QUEUE_METHODS } from './job-queue.js';
+export { JOB_QUEUE_METHODS } from './job-queue.ts';
 export type {
   DeliveredJob,
   EveryJobQueueMethodIsListed,
@@ -44,7 +44,7 @@ export type {
   JobQueue,
   JobRequest,
   JobTransaction,
-} from './job-queue.js';
+} from './job-queue.ts';
 
-export { pgBossQueue, QUEUE_SCHEMA } from './pg-boss-queue.js';
-export type { PgBossQueueOptions } from './pg-boss-queue.js';
+export { pgBossQueue, QUEUE_SCHEMA } from './pg-boss-queue.ts';
+export type { PgBossQueueOptions } from './pg-boss-queue.ts';

@@ -32,8 +32,8 @@ import {
   StateHashError,
   stateHash,
   type StateHashSubject,
-} from '../src/hash.js';
-import type { EngineGateResults, TradingDay } from '../src/types.js';
+} from '../src/hash.ts';
+import type { EngineGateResults, TradingDay } from '../src/types.ts';
 
 const td = (s: string): TradingDay => s as TradingDay;
 

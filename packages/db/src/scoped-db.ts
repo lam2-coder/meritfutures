@@ -30,8 +30,8 @@
 import { and, eq, exists, sql, type SQL } from 'drizzle-orm';
 import { QueryBuilder, type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
 
-import { client } from './client.js';
-import { SCOPE_RULES, TABLES, type ScopedTableKey, type TableKey } from './scope.js';
+import { client } from './client.ts';
+import { SCOPE_RULES, TABLES, type ScopedTableKey, type TableKey } from './scope.ts';
 
 /** The identity every scoped query is bound to. */
 export type IdentityId = string & { readonly __brand: 'IdentityId' };

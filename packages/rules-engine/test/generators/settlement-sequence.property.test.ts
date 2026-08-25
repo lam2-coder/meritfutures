@@ -35,15 +35,15 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import { settlementSequenceArbitrary } from './settlement-sequence.js';
-import { validateDaySequence } from './validate-day-sequence.js';
+import { settlementSequenceArbitrary } from './settlement-sequence.ts';
+import { validateDaySequence } from './validate-day-sequence.ts';
 import {
   SS_RULE_IDS,
   SS_RULE_SOURCES,
   isValidSettlementSequence,
   validateSettlementSequence,
-} from './validate-settlement-sequence.js';
-import type { SettlementSequence, SsRuleId } from './validate-settlement-sequence.js';
+} from './validate-settlement-sequence.ts';
+import type { SettlementSequence, SsRuleId } from './validate-settlement-sequence.ts';
 
 const RUNS = 300;
 

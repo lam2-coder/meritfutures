@@ -28,9 +28,9 @@
 // =============================================================================
 
 import type { Cents, ResolvedPlan } from '@merit/rules-engine';
-import { floorDiv } from './ratio.js';
-import type { CalibrationBand, CalibrationSource } from './provenance.js';
-import type { BandResult, LifetimeBoundResult, OutputRecord, Trial } from './types.js';
+import { floorDiv } from './ratio.ts';
+import type { CalibrationBand, CalibrationSource } from './provenance.ts';
+import type { BandResult, LifetimeBoundResult, OutputRecord, Trial } from './types.ts';
 
 /** Thrown when a check cannot be evaluated as stated. It never guesses a verdict. */
 export class AssertionInputError extends Error {

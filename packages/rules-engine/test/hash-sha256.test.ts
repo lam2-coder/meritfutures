@@ -40,7 +40,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { sha256, utf8Bytes } from '../src/hash.js';
+import { sha256, utf8Bytes } from '../src/hash.ts';
 
 const hex = (bytes: Uint8Array): string =>
   [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');

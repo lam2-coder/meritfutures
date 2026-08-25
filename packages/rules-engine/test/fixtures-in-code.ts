@@ -16,8 +16,8 @@
 // asserting the engine agrees with itself.
 // =============================================================================
 
-import { buildCalendarSlice } from '../src/calendar.js';
-import { initialState } from '../src/day/advance.js';
+import { buildCalendarSlice } from '../src/calendar.ts';
+import { initialState } from '../src/day/advance.ts';
 import type {
   BasisPoints,
   CalendarSlice,
@@ -27,7 +27,7 @@ import type {
   ResolvedPlan,
   RuleState,
   TradingDay,
-} from '../src/types.js';
+} from '../src/types.ts';
 
 export const day = (iso: string): TradingDay => iso as TradingDay;
 

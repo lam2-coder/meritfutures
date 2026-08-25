@@ -44,7 +44,7 @@
 // it bites.
 // =============================================================================
 
-import type { Cents, ConsistencyRules } from '../types.js';
+import type { Cents, ConsistencyRules } from '../types.ts';
 
 /**
  * What the consistency gate decided, and the two numbers a reader is owed.

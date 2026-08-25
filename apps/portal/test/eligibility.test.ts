@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
-import type { EligibilityResponse } from '../src/api/types.js';
-import { toEligibilityView } from '../src/view/eligibility.js';
+import type { EligibilityResponse } from '../src/api/types.ts';
+import { toEligibilityView } from '../src/view/eligibility.ts';
 
 // =============================================================================
 // M4-R: the eligibility screen, which is the module's differentiator

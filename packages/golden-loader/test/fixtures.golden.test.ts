@@ -16,7 +16,7 @@ import {
   runFixture,
   stageCoverage,
   type GoldenFixture,
-} from '../src/index.js';
+} from '../src/index.ts';
 
 // =============================================================================
 // CI-03. THE GOLDEN STAGE.

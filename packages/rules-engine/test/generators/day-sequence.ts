@@ -68,10 +68,10 @@
 
 import fc from 'fast-check';
 
-import type { CalendarDay, CalendarSource, DailyMark, DaySequence } from './day-input.js';
-import { planArbitrary } from './plan.js';
-import type { MaterializedPlan } from './plan-config.js';
-import type { DsRuleId } from './validate-day-sequence.js';
+import type { CalendarDay, CalendarSource, DailyMark, DaySequence } from './day-input.ts';
+import { planArbitrary } from './plan.ts';
+import type { MaterializedPlan } from './plan-config.ts';
+import type { DsRuleId } from './validate-day-sequence.ts';
 
 export interface DaySequenceArbitraryOptions {
   /**

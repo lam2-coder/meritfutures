@@ -35,6 +35,6 @@
 // serve, which is the run recorded in session 209's log.
 // =============================================================================
 
-import { main } from './index.js';
+import { main } from './index.ts';
 
 await main();

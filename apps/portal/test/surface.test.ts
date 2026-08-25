@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
-import * as portal from '../src/index.js';
+import * as portal from '../src/index.ts';
 
 // =============================================================================
 // The module's public surface, and the absences that are this session's fence

@@ -45,7 +45,7 @@
 // is a typed refusal rather than a null or a throw.
 // =============================================================================
 
-import { nextTradingDayAfter } from '../calendar.js';
+import { nextTradingDayAfter } from '../calendar.ts';
 import type {
   AccountGraduatedEvent,
   AssertionFailure,
@@ -56,8 +56,8 @@ import type {
   RuleState,
   SettlementFact,
   WinDaysResetEvent,
-} from '../types.js';
-import { evaluateEngineGates, withdrawableCents } from './gates.js';
+} from '../types.ts';
+import { evaluateEngineGates, withdrawableCents } from './gates.ts';
 
 /**
  * What one settlement produced.

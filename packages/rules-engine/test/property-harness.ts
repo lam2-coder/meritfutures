@@ -32,10 +32,10 @@
 // stated over one.
 // =============================================================================
 
-import { advanceDay } from '../src/index.js';
-import type { DailyMark, DayOutput, ResolvedPlan, RuleState, TradingDay } from '../src/index.js';
-import type { DaySequence } from './generators/day-input.js';
-import { sliceOf, toEngineMark } from './generator-bridge.js';
+import { advanceDay } from '../src/index.ts';
+import type { DailyMark, DayOutput, ResolvedPlan, RuleState, TradingDay } from '../src/index.ts';
+import type { DaySequence } from './generators/day-input.ts';
+import { sliceOf, toEngineMark } from './generator-bridge.ts';
 
 /** One folded day, carrying what both properties read. */
 export interface FoldStep {

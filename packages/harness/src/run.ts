@@ -49,13 +49,13 @@
 // =============================================================================
 
 import { buildPopulation } from '@merit/rithmic';
-import { toCalendarSlice } from './bridge.js';
-import { checkCalibrationSource, provenanceFor } from './provenance.js';
-import { aggregate, checkCommercial } from './aggregate.js';
-import { checkBands } from './assertions.js';
-import { checkBehaviour, runTrial } from './trial.js';
-import { equals } from './ratio.js';
-import type { HarnessRun, HarnessRunInput, OutputKey, Trial } from './types.js';
+import { toCalendarSlice } from './bridge.ts';
+import { checkCalibrationSource, provenanceFor } from './provenance.ts';
+import { aggregate, checkCommercial } from './aggregate.ts';
+import { checkBands } from './assertions.ts';
+import { checkBehaviour, runTrial } from './trial.ts';
+import { equals } from './ratio.ts';
+import type { HarnessRun, HarnessRunInput, OutputKey, Trial } from './types.ts';
 
 /** Thrown when a run cannot be assembled as specified. */
 export class RunError extends Error {

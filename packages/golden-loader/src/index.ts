@@ -25,7 +25,7 @@ export {
   m01RuleGroups,
   registryIds,
   unusedAwaitingEntries,
-} from './loader.js';
+} from './loader.ts';
 export type {
   FixtureExpectation,
   FixtureFailure,
@@ -33,22 +33,22 @@ export type {
   GoldenFixture,
   LoadOptions,
   LoadResult,
-} from './loader.js';
+} from './loader.ts';
 
 // THE TWO STAND-INS FOR P2-1, EXPORTED SO THEY CAN BE TESTED AND SO THE ONE
 // THAT MUST BE DELETED IS VISIBLE FROM THE PACKAGE'S FRONT DOOR. `plan.ts`
 // stands in for `resolvePlan` and goes when it lands; `calendar.ts` assembles
 // rows for ADR-049's constructor and stays.
-export { PlanRecordError, resolvePlanRecord } from './plan.js';
+export { PlanRecordError, resolvePlanRecord } from './plan.ts';
 export {
   CalendarRecordError,
   SYNTHESIZED_SEQUENCE_BASE,
   calendarRowsFromRecord,
-} from './calendar.js';
-export type { CalendarRecord, CalendarRows } from './calendar.js';
+} from './calendar.ts';
+export type { CalendarRecord, CalendarRows } from './calendar.ts';
 
-export { describeDiff, diffEndState, diffEvents, snakeToCamel } from './compare.js';
-export type { Diff } from './compare.js';
+export { describeDiff, diffEndState, diffEvents, snakeToCamel } from './compare.ts';
+export type { Diff } from './compare.ts';
 
 export {
   DECLARED_RULES,
@@ -56,14 +56,14 @@ export {
   renderStageCoverage,
   stageAssertionHolds,
   stageCoverage,
-} from './coverage.js';
-export type { FixturePolarity, GroupPolarity, StageCoverage } from './coverage.js';
+} from './coverage.ts';
+export type { FixturePolarity, GroupPolarity, StageCoverage } from './coverage.ts';
 
-export { checkDeclarationAgainstFold, citedRuleIds, derivePolarity } from './polarity.js';
-export type { DeclarationCheck, Derivation, Polarity } from './polarity.js';
+export { checkDeclarationAgainstFold, citedRuleIds, derivePolarity } from './polarity.ts';
+export type { DeclarationCheck, Derivation, Polarity } from './polarity.ts';
 
-export { GOLDEN_ENGINE_VERSION, engineIsIdentityStub, runFixture } from './run.js';
-export type { FixtureOutcome } from './run.js';
+export { GOLDEN_ENGINE_VERSION, engineIsIdentityStub, runFixture } from './run.ts';
+export type { FixtureOutcome } from './run.ts';
 
-export { YamlSubsetError, parseYamlSubset } from './yaml.js';
-export type { YamlValue } from './yaml.js';
+export { YamlSubsetError, parseYamlSubset } from './yaml.ts';
+export type { YamlValue } from './yaml.ts';

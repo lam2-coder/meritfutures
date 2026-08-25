@@ -33,7 +33,7 @@
 // and the disagreement goes in the session log.
 // =============================================================================
 
-import { EngineInvariantError } from '../errors.js';
+import { EngineInvariantError } from '../errors.ts';
 import type {
   BasisPoints,
   Cents,
@@ -41,7 +41,7 @@ import type {
   FundedPhaseRules,
   GateInputState,
   ResolvedPlan,
-} from '../types.js';
+} from '../types.ts';
 
 /**
  * R-43's four values. `none` is an EXACT TIE, not an absence.
@@ -57,7 +57,7 @@ import type {
  * `PayoutEvaluation`, and re-exported here so a reader of the clamp finds it
  * beside the arithmetic that produces it.
  */
-export type { ClampReason } from '../types.js';
+export type { ClampReason } from '../types.ts';
 
 /** Everything R-42 to R-45 decide about one payout request. */
 export interface PayoutClamp {

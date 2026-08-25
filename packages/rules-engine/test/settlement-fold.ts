@@ -56,16 +56,16 @@ import {
   type RuleState,
   type SettlementFact,
   type TradingDay,
-} from '../src/index.js';
-import { ENGINE_VERSION, fundedPrior } from './fixtures-in-code.js';
-import { daySequenceArbitrary } from './generators/day-sequence.js';
-import { settlementSequenceArbitrary } from './generators/settlement-sequence.js';
+} from '../src/index.ts';
+import { ENGINE_VERSION, fundedPrior } from './fixtures-in-code.ts';
+import { daySequenceArbitrary } from './generators/day-sequence.ts';
+import { settlementSequenceArbitrary } from './generators/settlement-sequence.ts';
 import type {
   SettlementFact as GeneratedSettlement,
   SettlementSequence,
   SsRuleId,
-} from './generators/validate-settlement-sequence.js';
-import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.js';
+} from './generators/validate-settlement-sequence.ts';
+import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.ts';
 
 /**
  * The oracle's settlement, projected onto the five fields `src/types.ts`'s

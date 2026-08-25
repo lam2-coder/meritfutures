@@ -7,8 +7,8 @@
 
 import { expect, test } from 'vitest';
 
-import { buildCalendarSlice, CalendarSliceError, lookupCalendarDay } from '../src/calendar.js';
-import { CME_WINDOW, day } from './fixtures-in-code.js';
+import { buildCalendarSlice, CalendarSliceError, lookupCalendarDay } from '../src/calendar.ts';
+import { CME_WINDOW, day } from './fixtures-in-code.ts';
 
 test('the slice is data: a hit carries the row, and `sequence` is the calendar’s own index', () => {
   const hit = lookupCalendarDay(CME_WINDOW, day('2026-11-04'));

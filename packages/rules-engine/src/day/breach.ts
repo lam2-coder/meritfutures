@@ -29,7 +29,7 @@
 // not be re-read.
 // =============================================================================
 
-import type { BreachKind, Cents, DailyLossLimitRules, DailyMark, DrawdownRules } from '../types.js';
+import type { BreachKind, Cents, DailyLossLimitRules, DailyMark, DrawdownRules } from '../types.ts';
 
 export interface BreachInput {
   readonly mark: DailyMark;

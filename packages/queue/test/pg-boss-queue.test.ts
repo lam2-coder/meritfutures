@@ -23,8 +23,8 @@
 
 import { describe, expect, test, vi } from 'vitest';
 
-import { pgBossQueue, QUEUE_SCHEMA } from '../src/pg-boss-queue.js';
-import type { DeliveredJob, JobId } from '../src/job-queue.js';
+import { pgBossQueue, QUEUE_SCHEMA } from '../src/pg-boss-queue.ts';
+import type { DeliveredJob, JobId } from '../src/job-queue.ts';
 import {
   fakeDatabase,
   insertAccepted,
@@ -33,7 +33,7 @@ import {
   queueMetadata,
   type Responder,
   type Statement,
-} from './fake-database.js';
+} from './fake-database.ts';
 
 const QUEUE = 'provisioning';
 
