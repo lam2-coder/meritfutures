@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// FIFTY-THREE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 58 are not reachable through either accessor: `SCOPE_RULES` is total
+// FIFTY-SIX TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 55 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE FIFTY-THREE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE FIFTY-SIX ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. EIGHT
-// of the fifty-three below carry later columns -- `sessions`, `plan_versions`,
+// of the fifty-six below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests` and `admin_actions` -- and none of them could be
 // registered at all before ADR-094, which is why the ruling came before the
@@ -2107,4 +2107,130 @@ export const impersonationPageViews = pgTable('impersonation_page_views', {
     .references(() => impersonationSessions.id),
   route: text('route').notNull(),
   viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// integration_contracts -- 0018_integrations.sql. FIRM.
+// -----------------------------------------------------------------------------
+// WHAT MERIT IS ALLOWED TO SEND A VENDOR, one row per integration per event per
+// version. The row is about a CONTRACT WITH A THIRD PARTY and never about a
+// trader: it carries no identity column and there is no correct one, because
+// the same contract governs every dispatch to that vendor for every identity.
+//
+// `field_allowlist` HOLDS FIELD NAMES AND NEVER VALUES, which is why a contract
+// is reviewable by someone who does not read the repository. It is an ALLOWLIST
+// rather than a denylist because a denylist defaults to sending: a field added
+// to an event next year reaches no vendor until somebody adds it here.
+//
+// `approved_by text NOT NULL` IS 0002'S ACTOR IDIOM AND NOT A `users` ROW, so
+// there is no reference to walk and `treasury_balances.recorded_by`'s trap does
+// not arise. It records WHO AUTHORISED THE DISCLOSURE, which is a fact about
+// Merit's own approval procedure.
+//
+// `integration_contracts_enabled_has_fields` WAS DROPPED AND RE-ADDED UNDER ITS
+// OWN NAME BY 0028, `cardinality` for `array_length`, and that is constraint
+// work rather than a column change: ADR-094's fold reads the statement, finds no
+// column shape in it, and discards it.
+export const integrationContracts = pgTable('integration_contracts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  integration: text('integration').notNull(),
+  eventName: text('event_name').notNull(),
+  fieldAllowlist: text('field_allowlist').array().notNull(),
+  // Defaults to OFF. A contract that arrived enabled would be a disclosure that
+  // began the moment the row was inserted.
+  enabled: boolean('enabled').notNull().default(false),
+  // Evaluated over the allowlisted fields only, and at SEND time (INV-M10-08).
+  guardExpression: text('guard_expression'),
+  version: integer('version').notNull().default(1),
+  approvedBy: text('approved_by').notNull(),
+  approvedAt: timestamp('approved_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// integration_dispatches -- 0018_integrations.sql. OWNED: `identity_id`,
+// NULLABLE.
+// -----------------------------------------------------------------------------
+// WHAT MERIT TOLD A VENDOR ABOUT A PERSON. The row is ABOUT the identity named
+// on it rather than about whoever's action produced the event, and the endpoint
+// M10 section 4 owns says so in its own name: `GET
+// /admin/identities/:identityId/disclosures` is every field ever sent about
+// this identity, per vendor, read from this table.
+//
+// `identity_id` IS NULLABLE AND THAT IS `ledger_accounts`' SHAPE RATHER THAN A
+// GAP. Not every dispatch is about a person -- a MID health change and an
+// uptime alert are about the firm -- and filtering `identity_id = $1` excludes
+// those rows WITHOUT a second predicate, because SQL NULL never equals
+// anything. The DDL's own comment states the requirement in that direction: the
+// dispatches that are not about a person must not be findable by an identity
+// search that returns them anyway.
+//
+// THE NULLABILITY HERE IS A PERMANENT PROPERTY OF THE DISPATCH AND NOT A LATE
+// BINDING, WHICH IS WHERE THIS TABLE PARTS FROM `psp_webhook_events`. That
+// table's `purchase_id` is bound by the handler DURING processing, so a derived
+// rule would make a row's tenancy a function of whether a job has run yet;
+// `identity_id` here is decided when the dispatch row is written and no status
+// transition moves it. `status` runs over `queued`, `sent`, `failed` and
+// `dropped_by_guard`, and none of the four changes whose disclosure it is.
+//
+// `event_id` REFERENCES `events(id)`, WHICH IS NOT REGISTERED, so the column is
+// transcribed alone and carries no `.references()`. It is also not a scope: the
+// event is Merit's own fact and this row is the DISCLOSURE of it, so a chain
+// through `events` would answer a different question from the one the breach
+// and privacy requests ask.
+//
+// `fields_sent` IS WHAT ACTUALLY WENT rather than what the contract permitted,
+// and it is field NAMES rather than values (INV-M10-12), so the audit trail of
+// a telephone number's disclosure never becomes a second copy of the number.
+export const integrationDispatches = pgTable('integration_dispatches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  integration: text('integration').notNull(),
+  eventId: bigint('event_id', { mode: 'bigint' }),
+  identityId: uuid('identity_id').references(() => identities.id),
+  fieldsSent: text('fields_sent').array().notNull(),
+  status: text('status').notNull(),
+  // A retry re-uses the idempotency key rather than writing a second row, so
+  // the count lives on the row it belongs to.
+  attempts: integer('attempts').notNull().default(0),
+  responseCode: integer('response_code'),
+  dispatchedAt: timestamp('dispatched_at', { withTimezone: true }),
+  idempotencyKey: text('idempotency_key').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// support_context_views -- 0018_integrations.sql. OWNED: `identity_id`, NOT
+// NULL.
+// -----------------------------------------------------------------------------
+// ONE ROW PER TIME A SUPPORT AGENT READ A TRADER'S IDENTITY GRAPH, and the row
+// is about THE TRADER WHO WAS READ. That is `impersonation_sessions`' question
+// asked one surface out, and it has the same answer: the identity a row is
+// ABOUT is the subject of the read, never the actor who caused it.
+//
+// THERE IS NO SECOND IDENTITY COLUMN TO CHOOSE BETWEEN, WHICH IS STRUCTURAL.
+// `agent_ref text NOT NULL` is an actor string and not a `users` row, so the
+// agent side declares no foreign key and there is nothing a predicate could
+// walk -- unlike `impersonation_sessions.admin_user_id`, which does reference
+// `users` and is this package's own named trap. `identity_id uuid NOT NULL
+// REFERENCES identities(id) ON DELETE RESTRICT` is the one identity column the
+// database declares here.
+//
+// `fields_returned` IS WHAT WAS RETURNED AND NOT WHAT WAS REQUESTED. A view
+// that logged the request cannot answer what the agent actually saw, which is
+// the question a social-engineering incident asks (AS-M10-01, dossier item 9).
+//
+// `ip_hash bytea NULL` IS A DIGEST AND NEVER AN ADDRESS. This is an audit of
+// Merit's own staff and the audit must not itself become a second store of
+// personal data about them.
+export const supportContextViews = pgTable('support_context_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agentRef: text('agent_ref').notNull(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  fieldsReturned: text('fields_returned').array().notNull(),
+  conversationRef: text('conversation_ref'),
+  viewedAt: timestamp('viewed_at', { withTimezone: true }).notNull().defaultNow(),
+  ipHash: bytea('ip_hash'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
