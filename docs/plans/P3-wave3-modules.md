@@ -29,17 +29,19 @@ last_updated: 2026-08-25
 **[P3's build plan](P3-ledger-billing-identity.md) section 6 deliberately did not dispatch its wave 3, on the
 ground that *"every module session's fence is a path inside a deployable `ADR-083` has not yet named"*. That
 blocker has expired**: [ADR-083](../decisions/ADR-083.md) is signed, [`apps/api`](../../apps/api/src/index.ts)
-exists with a manifest, an entry point and a surface partition, and session 209 is writing the route registry
-under [`P4-d`](P4-portal-and-site.md).
+exists with a manifest, an entry point and a surface partition, and **session 209 has since MERGED `P4-d` at
+`4fd4a8a`**, so the route registry exists too. Section 5.4.
 
 **This document is the second planning session P3 section 10 named.** It inherits wave 3's ordering table as
 input rather than re-deriving it, and its output is what [P4 section 8](P4-portal-and-site.md)'s is: a slice
 table with a fence of real paths, a money-path column and a dependency column, plus one prompt per slice.
 
-**Measured at `3c44a5d` on 2026-08-25, then RE-DERIVED at `7f8215f` after [session 205](../sessions/2026-08-25-session-205.md)
+**Measured at `3c44a5d` on 2026-08-25, then RE-DERIVED at `7f8215f` and again at `4fd4a8a`, because
+[session 205](../sessions/2026-08-25-session-205.md) and then [session 209](../sessions/2026-08-25-session-209.md)
 merged while this branch was open.** Every figure below was re-derived by running the command named beside it,
-twice, and **two of them moved between the two runs**: section 1's registry count and `P3-l`'s fence. Both are
-corrected here rather than left as of the first measurement, and section 5.3 is what moved and why it matters. **Two of the dispatching brief's claims did not survive that**, and both are in section 5.
+three times, and **the second and third runs each moved something**: section 1's registry count and `P3-l`'s
+fence, then **the whole of section 6.2, which was written as a CONDITIONAL and is now a FACT**. All are corrected
+here rather than left as of the first measurement. Sections 5.3 and 5.4 are what moved and why it matters. **Two of the dispatching brief's claims did not survive that**, and both are in section 5.
 
 **This document carries no ruling of its own.** Every decision below is cited to the entry or the file that
 took it, and every ruling it needs is scheduled as a slice or handed to the founder.
@@ -56,9 +58,9 @@ took it, and every ruling it needs is scheduled as a slice or handed to the foun
 | The accessor's surface | [`scoped-db.ts:131-140`](../../packages/db/src/scoped-db.ts) | `__brand`, `identityId`, **`rows()`**. Nothing else |
 | `packages/db`'s exports | [`index.ts:41-71`](../../packages/db/src/index.ts) | `scopedDb`, `systemDb`, `scopePredicate`, `SCOPE_RULES`, `TABLES`, `TABLE_KEYS`, `schema`, `closeClient`. **No write, no transaction** |
 | The queue | [`packages/queue/src/job-queue.ts`](../../packages/queue/src/job-queue.ts) | Five methods, `enqueue`'s **first argument is the caller's open transaction** and there is no overload that omits it |
-| Routes registered anywhere | `ls apps/api/src` | `index.ts`, `surface.ts`. **No `routes/` directory, no handler, no server** |
-| Session 209's branch | `git ls-remote --heads origin \| grep s209` | **nothing**, and no open pull request. `P4-d` is dispatched and has pushed nothing |
-| Lowest free ADR | [ALLOCATION](../decisions/ALLOCATION.md)'s table, read to its end | **`100`**, and section 8 is why this plan does not take it |
+| Routes registered anywhere | `ls apps/api/src apps/api/src/routes` | `index.ts`, `surface.ts`, **`registry.ts`, `server.ts`, `start.ts`, and `routes/health.ts`**. [Session 209](../sessions/2026-08-25-session-209.md) landed all four at `4fd4a8a`. **One route exists and it is the liveness probe** |
+| Session 209 | `git log 7f8215f..origin/main` | **MERGED at `4fd4a8a`**, carrying [ADR-100](../decisions/ADR-100.md), Fastify `5.12.1` into the catalog and the route registry. It had pushed nothing when this plan was first written. Section 5.4 |
+| Lowest free ADR | [ALLOCATION](../decisions/ALLOCATION.md)'s table, read to its end | **`101`**. It was `100` when this plan was written and **session 209 took `100`**, which is section 8's reason arriving as an outcome rather than as an argument |
 | Lowest free session | [sessions/README](../sessions/README.md)'s claim table | **`213`**. `209` to `212` are claimed and dispatched |
 
 ---
@@ -190,7 +192,7 @@ tables, which is [ADR-092](../decisions/ADR-092.md)'s own method applied to the 
 
 ## 5. Two claims checked against their sources, and neither survived as written
 
-### 5.1 The dispatching brief says `P4-d` "is writing the route registry right now". It has written nothing yet
+### 5.1 The dispatching brief said `P4-d` "is writing the route registry right now". It had written nothing, and it has since merged
 
 `git ls-remote --heads origin | grep -c 's209'` returns **0**, and
 `list_pull_requests(state: open)` returns four pull requests, **none of them session 209's**. The four are
@@ -201,7 +203,8 @@ is named by path in [P4 section 8](P4-portal-and-site.md)'s `P4-f` fence and aga
 table as *"new in `P4-d`"*, and `P4-d` is CLAIMED and dispatched at
 [sessions/README](../sessions/README.md)'s row 209. **A path a dispatched slice's own fence names is a path
 `P4-d` is demonstrably about to create**, which is the standard P3 section 6 refused to fence below. The
-route-bearing slices below therefore name it, and **every one of them carries `P4-d` in its depends-on**.
+route-bearing slices below therefore named it. **`P4-d` has since merged at `4fd4a8a` and section 5.4 records
+what that changed**, so no slice below carries it in a depends-on any more.
 
 **What it DOES change is section 8.** A planning session that claimed ADR numbers over an in-flight session
 holding an unclaimed ALLOCATION row would recreate [session 120](../sessions/2026-08-21-session-120.md)'s
@@ -244,6 +247,33 @@ not as a defect, and the correction direction is the good one: a slice got small
 lands on every registered transcription, so **every merge between now and its dispatch makes it larger**, and
 three transcription branches are open. Section 11 item 1 is why that goes to the founder.
 
+### 5.4 The conditional this plan wrote was answered while the branch was open, and the answer beat the question
+
+**[Session 209](../sessions/2026-08-25-session-209.md) merged at `4fd4a8a` carrying
+[ADR-100](../decisions/ADR-100.md), Fastify `5.12.1` into the catalog and the route registry.** Section 6.2 was
+written as a conditional with two dispatchable branches. **It resolves to the good branch by a mechanism this
+plan did not propose**, and the difference is worth recording rather than quietly absorbing.
+
+| | What section 6.2 asked for | What `ADR-100` landed |
+|---|---|---|
+| The device | A registry **total over a closed endpoint union**, with a per-endpoint disposition and a count assertion | **No registry file at all.** `discoverRouteModules` reads `apps/api/src/routes/` and imports every `.ts` file in sorted order |
+| What a slice edits | Its own route file **plus one line of the shared registry** | **Its own route file. Nothing shared** |
+| What catches a lossy merge | A count assertion over the disposition map | **Nothing needs to**, because there is no shared file to merge lossily |
+| What catches two slices claiming one endpoint | Not addressed | `compose` **refuses a duplicate `METHOD /path`** across the whole module set, at startup |
+
+**A total registry still has one shared file, and this removes it.** That is strictly stronger, and it is the
+same refusal [`repo-invariants.mjs`](../../packages/tooling/checks/repo-invariants.mjs) makes when it seeds
+itself from the migration directory rather than from a hand list.
+
+**Two consequences for this plan, both applied above rather than noted.** The `apps/api/src/routes/index.ts`
+row in section 6.3 is **struck**, and four slice fences lost the registry edit they carried. **A slice that
+creates that file re-creates the collision `ADR-100` removed**, for every slice behind it, so the prompts say
+so in terms.
+
+**And the allocation refusal in section 8 is now an outcome rather than an argument.** This plan measured `100`
+as the lowest free ADR and deliberately did not take it, because session 209 was dispatched holding
+`ALLOCATION`'s row and had claimed nothing. **Session 209 took `100`.** The lowest free number is `101`.
+
 ---
 
 ## 6. DECISION ONE: how many can run concurrently, and on what axis they collide
@@ -264,49 +294,56 @@ is `packages/db/src/scoped-db.ts`, `packages/db/src/index.ts` and a NEW test fil
 concurrent with sessions **206, 207 and 208**, which hold the transcription trio and not `scoped-db.ts`, so
 **`P3-f` has nothing ahead of it and may open today.**
 
-### 6.2 After the barriers, the axis is the ENDPOINT for routes and the PACKAGE for libraries, and the two sets do not intersect
+### 6.2 After the barriers, the axis is the ROUTE FILE for routes and the PACKAGE for libraries, and neither has a shared file at all
+
+**This section was written as a CONDITIONAL on 2026-08-25 and [session 209](../sessions/2026-08-25-session-209.md)
+resolved it at `4fd4a8a` while this branch was open. It is a fact now, and the answer is stronger than the
+property this plan asked for.** Section 5.4 records what the conditional said, so the ruling can be read against
+the question it was asked.
 
 **[ADR-092](../decisions/ADR-092.md)'s ruling has three parts and only the third is mechanical.** The owner is
 a unit finer than the module; the first writer wins; **and the queue is the TYPE CHECKER**, because
 `SCOPE_RULES` is total over `TableKey` by a `satisfies` clause, so a merge that keeps one side of a per-table
-list does not compile. The finer unit for a route is the **contract path plus method**, and the first-writer
-rule transfers unchanged. **The third part does not transfer by itself, and whether it can is session 209's
-decision and not this plan's.**
+list does not compile. **All three transfer, and the third transfers by a mechanism this plan did not propose:
+[ADR-100](../decisions/ADR-100.md) removes the shared file rather than making it total.**
 
-**The property that would make it transfer, stated so `P4-d` can take it or refuse it in the open:** a
-registry declared **total over a closed endpoint union with a per-endpoint disposition**, the same shape
-`SCOPE_RULES` has over `TableKey` and `API_SURFACES` already has in
-[`surface.ts:57`](../../apps/api/src/surface.ts), plus a **count assertion** of the kind
-[`scoped-db.test.ts`](../../packages/db/test/scoped-db.test.ts) carries. Under that shape two slices flipping
-disjoint endpoints from unimplemented to a handler merge, and a keep-both that drops one side leaves an
-endpoint at `unimplemented` with a count that did not move, which the assertion reports.
-
-**So the concurrency claim is conditional and both branches are dispatchable:**
-
-| If `P4-d` lands | Then |
+| Part of ADR-092 | How it transfers to routes, as [`registry.ts`](../../apps/api/src/registry.ts) implements it |
 |---|---|
-| A registry total over a closed endpoint union, with a count assertion | **`P3-j`, `P3-k`, `P3-n` and `P3-o` are concurrent on the route axis**, each holding its own `apps/api/src/routes/<name>.ts` and one line of the registry. Four route-bearing slices, four branches |
-| One array of route objects, or any registry with no totality device | **Those four SERIALIZE on `apps/api/src/routes/index.ts`**, in the order section 14 gives, and the library slices stay concurrent beside them |
+| **The owner is a unit finer than the module** | The owner is the **ROUTE MODULE FILE**, one file under `apps/api/src/routes/`, and `defineRoutes` types its whole contribution at the definition site |
+| **First writer wins** | `compose` refuses a duplicate `METHOD /path` **across the whole module set**, and a duplicate module name with it. **Two concurrent slices declaring the same endpoint is a startup failure rather than a silent second registration** |
+| **The queue is the type checker** | **There is no queue, because there is no shared file.** `discoverRouteModules` reads the directory and imports every `.ts` file in it in sorted order, so *"the module list is the directory listing and is never written down"*. A slice that adds a route **adds ONE NEW FILE and edits nothing any other slice edits** |
 
-**[Session 168](../sessions/2026-08-24-session-168.md) stated the same consequence from inside M19 and could
-not act on it**: *"`M19-1` must create a registry that is per-module rather than one array, or these seven
-serialize."* **That sentence is now measurable rather than predictive**, and it reaches further than M19: it
-reaches every route slice in P3, P5 and M06's eighteen admin endpoints.
+**So `P3-j`, `P3-k`, `P3-n` and `P3-o` are FOUR BRANCHES on four disjoint paths, unconditionally**, and the
+serialization this plan was written to price does not exist. The registry's own header states the count it was
+protecting: thirteen branches, *"each merges cleanly alone and none of them together"*, which is
+[P3 wave 1](P3-ledger-billing-identity.md)'s `pnpm-lock.yaml` lesson refused rather than repeated.
 
-**The library slices need no such condition.** `P3-i` writes `packages/ledger`, `P3-l` writes
+**What the directory listing gives away and buys back, because a plan that reports only the win is the one a
+later session inherits wrongly.** An array is checked by `tsc` and a directory is not, so `defineRoutes`
+validates the shape at run time as well as at the type level, and `discoverRouteModules` **THROWS** on any
+`.ts` file under `routes/` that does not default-export a valid module or whose `name` is not its filename
+stem. **A half-written route file fails the process at startup rather than quietly not existing**, which is the
+failure mode an import list has and a directory cannot.
+
+**[Session 168](../sessions/2026-08-24-session-168.md) stated the consequence from inside M19 and could not act
+on it**: *"`M19-1` must create a registry that is per-module rather than one array, or these seven serialize."*
+**It is answered**, and the answer reaches further than M19: every route slice in P3, P5 and M06's eighteen
+admin endpoints inherits it.
+
+**The library slices never needed the condition.** `P3-i` writes `packages/ledger`, `P3-l` writes
 `apps/worker/src/**`, `P3-m` writes `packages/psp`, and `P3-n`'s attribution half writes
 `packages/affiliate`. **Four packages, disjoint by construction**, concurrent with each other and with the
 route slices, exactly as `packages/queue` was concurrent with everything when session 147 wrote it.
 
-### 6.3 What serializes regardless of anything `P4-d` decides, named BY FILE
+### 6.3 What serializes anyway, named BY FILE
 
 | File | Held by | Resolution |
 |---|---|---|
-| [`pnpm-lock.yaml`](../../pnpm-lock.yaml) and [`pnpm-workspace.yaml`](../../pnpm-workspace.yaml) | `P3-j` (a WebAuthn library), `P3-m` (a PSP SDK, if the port needs one), and **cross-phase `P4-d` and `P4-i`** | **SERIAL, and the serialization now spans two phases.** [P3 wave 1](P3-ledger-billing-identity.md)'s lesson verbatim: a lockfile cannot be appended to per row. `P4-d` first because it is dispatched |
+| [`pnpm-lock.yaml`](../../pnpm-lock.yaml) and [`pnpm-workspace.yaml`](../../pnpm-workspace.yaml) | `P3-j` (a WebAuthn library), `P3-m` (a PSP SDK, if the port needs one), and **cross-phase `P4-i`** | **SERIAL, and the serialization spans two phases.** [P3 wave 1](P3-ledger-billing-identity.md)'s lesson verbatim: a lockfile cannot be appended to per row. **`P4-d` is out of it: it MERGED at `4fd4a8a` and Fastify `5.12.1` is in the catalog**, so the two P3 slices order against `P4-i` and each other |
 | [`docs/architecture/API_CONTRACT.md`](../architecture/API_CONTRACT.md) | `P3-n` (`POST /affiliate/creatives` is in [M08](M08-affiliate-system.md) section 4 and in no contract), `P3-o`, and **cross-phase `P4-f`, `P4-h` and six module measurements** | **[P4 section 9](P4-portal-and-site.md) calls it the hottest cross-phase file in the corpus and leaves it unresolved.** This plan does not resolve it either; section 11 item 2 carries it |
 | `packages/db/src/schema.ts`, `scope.ts`, `test/scoped-db.test.ts` | `P3-g`, `P3-h`, and **sessions 206, 207 and 208, all with open pull requests. 205 MERGED at `7f8215f` while this branch was open** | **[ADR-092](../decisions/ADR-092.md) section 2 governs**: the owner is the TABLE and the first writer wins. Within this plan `P3-g` then `P3-h`; both behind 205 to 208 |
 | [`docs/decisions/ALLOCATION.md`](../decisions/ALLOCATION.md), [`docs/INDEX.md`](../INDEX.md), [`docs/sessions/README.md`](../sessions/README.md) | every slice that mints a document | Append-only tables where the resolution is **ordering rather than merging**. Section 8 |
-| `apps/api/src/routes/index.ts` | `P3-j`, `P3-k`, `P3-n`, `P3-o`, and cross-phase `P4-f` | Section 6.2. **The one file whose contention `P4-d` can design away and no later slice can** |
+| ~~`apps/api/src/routes/index.ts`~~ | **nobody. THE FILE DOES NOT EXIST AND MUST NOT** | **Struck, and the strike is the finding.** [ADR-100](../decisions/ADR-100.md) made the module list a directory listing, so the contention this row was written for was designed away rather than ordered. **A slice that creates this file re-creates the collision for every slice behind it.** Section 6.2 |
 
 ---
 
@@ -335,7 +372,7 @@ unregistered and refused by a signed entry, and the pre-identity writer has no r
 closed vocabulary. **Auth's front door is the one endpoint in the contract that runs before an identity
 exists**, so it needs both preconditions and needs them before any of its seven headings can be written.
 
-**Auth is therefore `P3-j`: after `P3-f`, after `P3-h`, after `P4-d`, and before `P3-n` and `P3-o`.** It is
+**Auth is therefore `P3-j`: after `P3-f`, after `P3-h`, and before `P3-n` and `P3-o`.** It is
 money path, `E2`, `ADR-003` strict, and it is the slice whose blocking radius is largest: **three of the six
 stated contents wait on it and two preconditions wait in front of it.**
 
@@ -346,7 +383,7 @@ stated contents wait on it and two preconditions wait in front of it.**
 | Registry | Spent here | Why |
 |---|---|---|
 | **Session numbers `213` to `223`** | **Claimed in this plan's own commit**, one per slice, in [sessions/README](../sessions/README.md) | Nothing in flight claims a session number, and a slice with no number is a slice nobody can dispatch |
-| **ADR numbers** | **NONE**, and every slice below names its entry **by position** | Section 5.1. **Session 209 is dispatched, its fence holds `ALLOCATION` (its row), and it has claimed nothing.** A planning session that took `100` would hand 209 a collision it cannot see from inside its own fence. **Measured for whoever dispatches: the lowest free number is `100`.** A session dispatched from this document **allocates first, in one commit, before it runs**, which is [P4 section 7](P4-portal-and-site.md)'s sentence and its reason |
+| **ADR numbers** | **NONE**, and every slice below names its entry **by position** | Section 5.1. **Session 209 was dispatched holding `ALLOCATION` (its row) and had claimed nothing.** A planning session that took `100` would have handed it a collision it could not see from inside its own fence. **It then took `100`**, at `4fd4a8a`, so the refusal is an outcome rather than an argument. **Measured for whoever dispatches: the lowest free number is now `101`.** A session dispatched from this document **allocates first, in one commit, before it runs**, which is [P4 section 7](P4-portal-and-site.md)'s sentence and its reason |
 | **Migration numbers** | **NONE.** The lowest free is `0048` | No slice below is dispatched with one. **`P3-n` is the one most likely to need one** ([session 157](../sessions/2026-08-24-session-157.md)'s `M3-e`, `purchases.plan_version_id` write-once), and a migration number spent speculatively on the money path is worse than a slice that stops and asks. **If a slice needs a migration it STOPS and reports it in the pull-request body** |
 
 ---
@@ -371,16 +408,16 @@ flight.** Section 6.3 is the per-file collision table and it is the one to read.
 | # | Slice | Fence, by file | Money | Depends on, by file |
 |---|---|---|---|---|
 | **216** | **`P3-i` the ledger posting path, and `PT-03`.** Double-entry posting as a library both `apps/api` and `apps/worker` call. `ledger_halts` enters the registry with it, which closes one of [ADR-092](../decisions/ADR-092.md) section 9's four orphans | `packages/ledger/**` (new), `packages/ledger/package.json`, `packages/db/src/schema.ts` and `scope.ts` (**`ledger_halts` only**), `packages/db/test/scoped-db.test.ts` (its row only), `docs/architecture/OVERVIEW.md` (section 3's container table, its row only), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES, `E2`.** It is P3's first content and every other money content posts through it | **`P3-f`** via `scoped-db.ts`; **`P3-h`** via `schema.ts`, `scope.ts` and `scoped-db.test.ts` |
-| **217** | **`P3-m` the `PspAdapter` port and two fakes. No routes, no network, no vendor.** [Session 157](../sessions/2026-08-24-session-157.md)'s `M3-h` verbatim. The contract already closes the provider set at `"psp_a" \| "psp_b"` ([API_CONTRACT:281](../architecture/API_CONTRACT.md)) | `packages/psp/**` (new), `packages/psp/package.json`, `pnpm-workspace.yaml` (`catalog:` only, **only if the port needs a dependency**), `pnpm-lock.yaml` (same condition), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES.** It is the money rail's interface | **nothing**, if it takes no dependency. **`P4-d` via `pnpm-lock.yaml` if it does** |
+| **217** | **`P3-m` the `PspAdapter` port and two fakes. No routes, no network, no vendor.** [Session 157](../sessions/2026-08-24-session-157.md)'s `M3-h` verbatim. The contract already closes the provider set at `"psp_a" \| "psp_b"` ([API_CONTRACT:281](../architecture/API_CONTRACT.md)) | `packages/psp/**` (new), `packages/psp/package.json`, `pnpm-workspace.yaml` (`catalog:` only, **only if the port needs a dependency**), `pnpm-lock.yaml` (same condition), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES.** It is the money rail's interface | **nothing**, if it takes no dependency. **If it does, it joins `pnpm-lock.yaml`'s serialization with `P3-j` and `P4-i`; `P4-d` is out of it, having merged** |
 
 ### Wave 3.2: the surface. Four sessions, and section 6.2 decides whether they are four branches or one queue
 
 | # | Slice | Fence, by file | Money | Depends on, by file |
 |---|---|---|---|---|
-| **218** | **`P3-j` the authentication surface.** Seven contract headings, `GET /me`, `C-27` elevation, and **section 12's rows written BEFORE the endpoints ship** rather than after | `apps/api/src/routes/auth.ts` (new), `apps/api/src/routes/me.ts` (new), `apps/api/src/routes/index.ts` (**its registrations only**), `apps/api/test/auth.test.ts` (new), `apps/api/package.json`, `pnpm-workspace.yaml` (`catalog:` only), `pnpm-lock.yaml`, `STATE` (append), `sessions/` | **YES, AUTH, `E2`** | **`P3-f`**; **`P3-h`** for `otp_challenges`; **`P4-d`** via `apps/api/src/**` and `pnpm-lock.yaml` |
-| **219** | **`P3-k` the idempotency layer and `POST /webhooks/psp/:provider`.** Verify before parsing, persist raw, dedupe on `(psp, provider_event_id)`, `200` for duplicates, defer out-of-order. **`idempotency_keys` and `psp_webhook_events` are both first-writer-wins registrations, neither refused** | `apps/api/src/routes/webhooks-psp.ts` (new), `apps/api/src/idempotency.ts` (new), `apps/api/src/routes/index.ts` (its registrations only), `apps/api/test/**` (its files only), `packages/db/src/schema.ts` and `scope.ts` (**`idempotency_keys` only**), `packages/db/test/scoped-db.test.ts` (its row only), `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-f`**; **`P3-h`** via the registry trio; **`P3-m`** for the signature verifier; **`P4-d`**. **NOT `P3-j`**: a webhook carries no session |
-| **220** | **`P3-n` checkout and attribution, ONE slice.** `POST /checkout` and `POST /accounts/:accountId/reset`, the server-authoritative price, the recomputed coupon, and attribution resolved **inside the same transaction** ([M08](M08-affiliate-system.md) section 3.1), which is why P3's ordering table refuses to separate them | `apps/api/src/routes/checkout.ts` (new), `apps/api/src/routes/index.ts` (its registrations only), `apps/api/test/checkout.test.ts` (new), `packages/affiliate/**` (new), `packages/affiliate/package.json`, `docs/architecture/API_CONTRACT.md` (**`POST /affiliate/creatives`'s row only**), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-i`**, **`P3-j`**, **`P3-k`**, **`P3-m`**, **`P4-d`** |
-| **221** | **`P3-o` M19 KYC, the composite trigger set.** The vendor-agnostic provider port, `POST /kyc/session`, `GET /kyc/status`, `POST /webhooks/kyc/:provider`, and `{second_distinct_account_purchase, pre_funded}` firing on the earliest ([M19](M19-kyc-identity.md) section 1.2.1). **Merit never proxies documents** | `packages/kyc-provider/**` (new), `apps/api/src/routes/kyc.ts` (new), `apps/api/src/routes/webhooks-kyc.ts` (new), `apps/api/src/routes/index.ts` (its registrations only), `apps/api/test/**` (its files only), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-j`**, **`P3-k`** via the idempotency layer, **`P3-n`** because `G-PLACEMENT-REACHED` fires at checkout under two of the triggers, **`P4-d`** |
+| **218** | **`P3-j` the authentication surface.** Seven contract headings, `GET /me`, `C-27` elevation, and **section 12's rows written BEFORE the endpoints ship** rather than after | `apps/api/src/routes/auth.ts` (new), `apps/api/src/routes/me.ts` (new), `apps/api/test/auth.test.ts` (new), `apps/api/package.json`, `pnpm-workspace.yaml` (`catalog:` only), `pnpm-lock.yaml`, `STATE` (append), `sessions/`. **It edits NO registry file**: [ADR-100](../decisions/ADR-100.md) discovers the directory | **YES, AUTH, `E2`** | **`P3-f`**; **`P3-h`** for `otp_challenges`. **NOT `P4-d`, which merged at `4fd4a8a`**, and not any sibling route slice: `ADR-100` leaves no shared file |
+| **219** | **`P3-k` the idempotency layer and `POST /webhooks/psp/:provider`.** Verify before parsing, persist raw, dedupe on `(psp, provider_event_id)`, `200` for duplicates, defer out-of-order. **`idempotency_keys` and `psp_webhook_events` are both first-writer-wins registrations, neither refused** | `apps/api/src/routes/webhooks-psp.ts` (new), `apps/api/src/idempotency.ts` (new), `apps/api/test/**` (its files only), `packages/db/src/schema.ts` and `scope.ts` (**`idempotency_keys` only**), `packages/db/test/scoped-db.test.ts` (its row only), `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-f`**; **`P3-h`** via the registry trio; **`P3-m`** for the signature verifier. **NOT `P3-j`**: a webhook carries no session. **NOT `P4-d`**, merged |
+| **220** | **`P3-n` checkout and attribution, ONE slice.** `POST /checkout` and `POST /accounts/:accountId/reset`, the server-authoritative price, the recomputed coupon, and attribution resolved **inside the same transaction** ([M08](M08-affiliate-system.md) section 3.1), which is why P3's ordering table refuses to separate them | `apps/api/src/routes/checkout.ts` (new), `apps/api/test/checkout.test.ts` (new), `packages/affiliate/**` (new), `packages/affiliate/package.json`, `docs/architecture/API_CONTRACT.md` (**`POST /affiliate/creatives`'s row only**), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-i`**, **`P3-j`**, **`P3-k`**, **`P3-m`**. **NOT `P4-d`**, merged |
+| **221** | **`P3-o` M19 KYC, the composite trigger set.** The vendor-agnostic provider port, `POST /kyc/session`, `GET /kyc/status`, `POST /webhooks/kyc/:provider`, and `{second_distinct_account_purchase, pre_funded}` firing on the earliest ([M19](M19-kyc-identity.md) section 1.2.1). **Merit never proxies documents** | `packages/kyc-provider/**` (new), `apps/api/src/routes/kyc.ts` (new), `apps/api/src/routes/webhooks-kyc.ts` (new), `apps/api/test/**` (its files only), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-j`**, **`P3-k`** via the idempotency layer, **`P3-n`** because `G-PLACEMENT-REACHED` fires at checkout under two of the triggers. **NOT `P4-d`**, merged |
 
 ### Wave 3.3: the two that need no surface at all. CONCURRENT with wave 3.2
 
@@ -414,7 +451,7 @@ not carry, and none of the seven can open until four preconditions land.**
 | 1 | The write path, the transaction and the pre-identity reader | `P3-f` | **Dispatchable today. Nothing is ahead of it** |
 | 2 | The nullability and type comparison, so `otp_challenges` is registrable | `P3-g` | Dispatchable behind sessions 206, 207 and 208. **Its specification is [ADR-094](../decisions/ADR-094.md) section 3 and its cost is unmeasured by construction** |
 | 3 | The two-identity scope class | `P3-h` | Dispatchable behind `P3-g` |
-| 4 | The route registry | **`P4-d`, session 209** | **Not this plan's, in flight, nothing pushed.** Its SHAPE decides whether four route slices are four branches or one queue |
+| 4 | The route registry | **`P4-d`, session 209** | **DISCHARGED at `4fd4a8a`**, carrying [ADR-100](../decisions/ADR-100.md). The module list is a DIRECTORY LISTING, so the four route slices are four branches on four disjoint paths and the serialization this plan priced does not exist |
 
 **So the honest form is not "six of six" and it is not "four of six".** It is: **eight slices fenced, eleven
 sessions to dispatch, and the phase's first line of application code is three sessions away rather than
@@ -439,7 +476,7 @@ one.** A reader who takes only the eight-of-eight row away from this document ha
 
 | Item | Disposition |
 |---|---|
-| **`P4-d`'s registry shape** | **Refused on ownership, not on difficulty.** Section 6.2 states the property this plan needs and does not rule it. Session 209 is dispatched with that decision in its own fence, and a planning session ruling it from outside would be the reverse of [session 136](../sessions/2026-08-22-session-136.md)'s precedent |
+| **`P4-d`'s registry shape** | **Refused on ownership, not on difficulty, and the refusal was right.** Section 6.2 stated the property and did not rule it; [session 209](../sessions/2026-08-25-session-209.md) ruled it at `4fd4a8a` and **took a better mechanism than the one this plan proposed**, removing the shared file rather than making it total. Section 5.4 |
 | **M08's settlement, statements and clawback** | [Session 162](../sessions/2026-08-24-session-162.md)'s `M08-4`, `M08-6` and `M08-7`. **P3's content is *"coupons and affiliate attribution"* and attribution is where it stops**; the commission clock and the payout leg are P5's with the rest of the payout rail. `P3-n` writes the attribution and no commission |
 | **M19's dedupe, sanctions and reverification slices** | [Session 168](../sessions/2026-08-24-session-168.md)'s `M19-7` to `M19-11`. **P3's content is *"M19 KYC with the composite trigger set"***, which is the verification path and its triggers. `P3-h` makes `dedupe_matches` registrable and no slice here writes to it |
 | **`PT-03`'s golden pair `GS-231`** | `blocked / no-fixture-format` in [section 39](../testing/golden-scenarios/39-fixture-status-and-blockers.md), owned to M20. **`PT-03` is a property and not a fixture**, so `P3-i` writes it against generated transactions and the blocked row stays blocked. Named so the two are not confused |
@@ -497,7 +534,8 @@ These are [P4 section 11](P4-portal-and-site.md)'s, unchanged where they held.
 Already in flight, and all of them order AHEAD of something here:
   206, 207, 208       schema.ts / scope.ts / scoped-db.test.ts   ->  blocks P3-g, P3-h
                       (205 MERGED at 7f8215f, taking the registry to 87 and provisioning_queue with it)
-  209  P4-d, the route registry + pnpm-lock.yaml                 ->  blocks P3-j, P3-k, P3-n, P3-o
+  209  MERGED at 4fd4a8a: ADR-100, fastify 5.12.1, the route registry
+       -> nothing behind it is blocked, and no route slice shares a file with another
 
 Wave 3.0, and the first is concurrent with the other two:
   P3-f  the write accessor        MONEY  <- NOTHING BLOCKS IT. It opens today
@@ -507,11 +545,13 @@ Wave 3.1, concurrent with each other and with wave 3.2:
   P3-i  the ledger posting path   MONEY  (needs P3-f, P3-h)
   P3-m  the PspAdapter port       MONEY  (needs nothing, if it takes no dependency)
 
-Wave 3.2, four branches if P4-d lands a total registry, one queue in this order if it does not:
-  P3-j  auth                      MONEY  (needs P3-f, P3-h, P4-d)
-  P3-k  idempotency + PSP webhook MONEY  (needs P3-f, P3-h, P3-m, P4-d)
-  P3-n  checkout + attribution    MONEY  (needs P3-i, P3-j, P3-k, P3-m, P4-d)
-  P3-o  M19 KYC                   MONEY  (needs P3-j, P3-k, P3-n, P4-d)
+Wave 3.2, FOUR BRANCHES on four disjoint route files. ADR-100 settled it:
+  P3-j  auth                      MONEY  (needs P3-f, P3-h)
+  P3-k  idempotency + PSP webhook MONEY  (needs P3-f, P3-h, P3-m)
+  P3-n  checkout + attribution    MONEY  (needs P3-i, P3-j, P3-k, P3-m)
+  P3-o  M19 KYC                   MONEY  (needs P3-j, P3-k, P3-n)
+        ^ the ORDER above is the dependency order, not a serialization: no two
+          of these four write the same file
 
 Wave 3.3, no surface, concurrent with wave 3.2:
   P3-l  the provisioning saga     MONEY  (needs P3-f, P3-h)
@@ -867,14 +907,16 @@ verify exit 0.
 ### `P3-j`: the authentication surface (session 218, MONEY PATH, AUTH, `E2`)
 
 ```
-Branch: claude/p3j-auth-surface   (from origin/main AFTER 213, 215 and 209 merge)
+Branch: claude/p3j-auth-surface   (from origin/main AFTER 213 and 215 merge)
 Fence:  apps/api/src/routes/auth.ts (new), apps/api/src/routes/me.ts (new),
-        apps/api/src/routes/index.ts (YOUR REGISTRATIONS ONLY),
         apps/api/test/auth.test.ts (new), apps/api/package.json,
         pnpm-workspace.yaml (`catalog:` only), pnpm-lock.yaml,
         docs/STATE.md (append), docs/sessions/ (your log + its row).
         TOUCH NOTHING ELSE. NOT packages/db, NOT API_CONTRACT: every endpoint
         you write is ALREADY SPECIFIED and this session adds no contract row.
+        DO NOT CREATE apps/api/src/routes/index.ts. ADR-100 made the module list
+        a DIRECTORY LISTING; a registry file re-creates the collision it removed
+        for every slice behind you.
 Regime: MONEY PATH. AUTH. PLAN MODE. Fresh context. One objective. ADR-003
         strict. E2. Your session-log number is 218. NO ADR is expected: the
         contract specifies this surface and sessions 213 and 215 took the two
@@ -906,6 +948,15 @@ registered it. Run `grep -c "otpChallenges" packages/db/src/scope.ts` on the tre
 you open. IF IT IS ZERO, STOP: your front door has no table and no amount of
 route code changes that.
 
+HOW A ROUTE FILE IS WRITTEN, AND IT IS NOT AN IMPORT LIST. ADR-100 and
+`apps/api/src/registry.ts`: each file under `apps/api/src/routes/` default-exports
+`defineRoutes({ name, routes })`, `name` MUST equal the file's stem, `path` is the
+contract path with NO base path, and `discoverRouteModules` THROWS on any file in
+that directory that does not comply. `compose` refuses a duplicate METHOD /path
+across the whole module set, so a collision with a concurrent slice is a startup
+failure rather than a silent second registration. READ `routes/health.ts` FIRST:
+it is nine lines and it is the model.
+
 RATE LIMITS ARE DATA AND NOT PROSE. API_CONTRACT section 11 puts the SMS branch's
 velocity in `otp_send_budget` rows with `send_limit` and `budget_cents`, "so the
 values are config the way every other plan parameter is", and
@@ -929,10 +980,9 @@ verify exit 0. DO NOT MERGE. E2 read pending.
 ### `P3-k`: the idempotency layer and the PSP webhook receiver (session 219, MONEY PATH, `E2`)
 
 ```
-Branch: claude/p3k-idempotency-webhooks  (from origin/main AFTER 213, 215, 217, 209)
+Branch: claude/p3k-idempotency-webhooks  (from origin/main AFTER 213, 215 and 217)
 Fence:  apps/api/src/routes/webhooks-psp.ts (new), apps/api/src/idempotency.ts
-        (new), apps/api/src/routes/index.ts (YOUR REGISTRATIONS ONLY),
-        apps/api/test/webhooks-psp.test.ts and apps/api/test/idempotency.test.ts
+        (new), apps/api/test/webhooks-psp.test.ts and apps/api/test/idempotency.test.ts
         (new), packages/db/src/schema.ts and scope.ts (`idempotency_keys` ONLY),
         packages/db/test/scoped-db.test.ts (its row ONLY),
         docs/STATE.md (append), docs/sessions/ (your log + its row).
@@ -946,14 +996,16 @@ The idempotency layer every mutating endpoint uses, and the PSP webhook receiver
 
 THIS SLICE DOES NOT DEPEND ON AUTH AND THAT IS DELIBERATE. A PSP webhook carries
 no session; it carries an HMAC. API_CONTRACT section 10 is the whole
-specification and section 12 has no row for it. So this may run CONCURRENTLY with
-session 218 if the route registry admits it, and section 6.2 of the plan says
-what "admits" means.
+specification and section 12 has no row for it. So it RUNS CONCURRENTLY with
+session 218: ADR-100 made the module list a directory listing, so your route file
+and 218's share no file at all.
 
 THE ORDERING IN SECTION 10 IS THE CONTROL AND IT IS STATED IN CAPITALS THERE:
 "HMAC signature verified BEFORE parsing". Session 217's port owns the verifier.
 Call it on the raw bytes. A framework that has already parsed the body for you
-has already lost this, so check what session 209 landed rather than assuming.
+has already lost this, so check what Fastify does with the body BEFORE your
+handler runs rather than assuming: session 209 landed fastify 5.12.1, and a
+content-type parser is where this is won or lost.
 
 `idempotency_keys` IS UNREGISTERED AND NOT REFUSED, so it is a first-writer-wins
 registration under ADR-092 and needs no ruling. `psp_webhook_events` is ALREADY
@@ -984,9 +1036,9 @@ verify exit 0. DO NOT MERGE. E2 read pending.
 ### `P3-n`: checkout and attribution (session 220, MONEY PATH, `E2`)
 
 ```
-Branch: claude/p3n-checkout-attribution  (from origin/main AFTER 216, 218, 219, 217)
-Fence:  apps/api/src/routes/checkout.ts (new), apps/api/src/routes/index.ts
-        (YOUR REGISTRATIONS ONLY), apps/api/test/checkout.test.ts (new),
+Branch: claude/p3n-checkout-attribution  (from origin/main AFTER 216, 217, 218 and 219)
+Fence:  apps/api/src/routes/checkout.ts (new),
+        apps/api/test/checkout.test.ts (new),
         packages/affiliate/** (new), packages/affiliate/package.json,
         docs/architecture/API_CONTRACT.md (`POST /affiliate/creatives`'s ROW
         ONLY), docs/decisions/ADR-1NN.md (new, REQUIRED: API_CONTRACT is
@@ -1052,10 +1104,9 @@ row, 30 of 30, verify exit 0. DO NOT MERGE. E2 read pending.
 ### `P3-o`: M19 KYC, the composite trigger set (session 221, MONEY PATH, `E2`)
 
 ```
-Branch: claude/p3o-kyc  (from origin/main AFTER 218, 219, 220 merge)
+Branch: claude/p3o-kyc  (from origin/main AFTER 218, 219 and 220 merge)
 Fence:  packages/kyc-provider/** (new), apps/api/src/routes/kyc.ts (new),
-        apps/api/src/routes/webhooks-kyc.ts (new), apps/api/src/routes/index.ts
-        (YOUR REGISTRATIONS ONLY), apps/api/test/kyc.test.ts and
+        apps/api/src/routes/webhooks-kyc.ts (new), apps/api/test/kyc.test.ts and
         apps/api/test/webhooks-kyc.test.ts (new), docs/decisions/ADR-1NN.md
         (new), ALLOCATION (your row), docs/INDEX.md (your row),
         docs/STATE.md (append), docs/sessions/. TOUCH NOTHING ELSE.
