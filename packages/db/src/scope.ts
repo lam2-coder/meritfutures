@@ -582,7 +582,7 @@ export const SCOPE_RULES = {
     class: 'owned',
     column: 'identity_id',
     nullable: false,
-    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql). THE EXTERNAL LEG IS A DIFFERENT OBJECT FROM A PAYOUT REQUEST (SD-M5-06): a payout request is a claim against an ACCOUNT evaluated by the engine, and a withdrawal is a movement of an ALREADY-SETTLED balance, so the row carries no `account_id` and there is no account for a derived rule to reach through. `freeze_flag_id` references `risk_flags`, which is `owned` by the same identity, and is still not the scope: it records WHY the rail was halted and would return nothing at all on the rows where it is NULL, which is nearly all of them.",
+    why: '`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql). THE EXTERNAL LEG IS A DIFFERENT OBJECT FROM A PAYOUT REQUEST (SD-M5-06): a payout request is a claim against an ACCOUNT evaluated by the engine, and a withdrawal is a movement of an ALREADY-SETTLED balance, so the row carries no `account_id` and there is no account for a derived rule to reach through. `freeze_flag_id` references `risk_flags`, which is `owned` by the same identity, and is still not the scope: it records WHY the rail was halted and would return nothing at all on the rows where it is NULL, which is nearly all of them.',
   },
 
   walletSpendLimits: {
@@ -598,7 +598,6 @@ export const SCOPE_RULES = {
     nullable: false,
     why: "`identity_id uuid PRIMARY KEY REFERENCES identities(id) ON DELETE RESTRICT` on the row (0011_wallet.sql), so it is NOT NULL by the key and there is exactly one row per identity. OWNED AND NOT `root`, ALTHOUGH THE COLUMN IS THE WHOLE PRIMARY KEY: `root` means the row IS the identity and its column is `id`, and `identities` is the only table this vocabulary's root may name; this row is a fact ABOUT an identity that happens to be keyed by it. UNCLAIMED-PROPERTY OBLIGATIONS ARE JURISDICTIONAL AND REAL (INV-M20-09), and `notified_at timestamptz[]` is the proof Merit told the person before the balance became escheatable -- which is evidence a trader is entitled to read about themselves and about nobody else.",
   },
-
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
 /** Tables that belong to no identity. The scoped accessor REFUSES these. */
