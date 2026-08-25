@@ -8,15 +8,23 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "build": "next build",
+    "dev": "next dev",
     "typecheck": "tsc --noEmit",
-    "start": "node --experimental-strip-types src/index.ts"
+    "start": "next start"
   },
   "//": "IT DEPENDS ON THE ENGINE FOR ITS TYPES AND FOR NOTHING ELSE, and the reason is INV-M9-01. M9 section 1.2: `M9 reads plan_versions. It contains no threshold, no price, and no rule text of its own`. A site that re-declared `PlanRulesJson` and `PlanVersionSizeRow` would be a SECOND TRANSCRIPTION of the stored shapes, and the marketing-versus-implementation gap constitution 0.5 names is exactly what a second transcription is. Importing the engine's own transcription means the shape marketing renders and the shape the engine executes cannot diverge without a compile error. It is `apps/worker`'s arrow, for a narrower reason: the worker folds through the engine, this app only reads its types. RI-01 is unaffected, because the arrow still points one way.",
+  "//next": "THE FRAMEWORK IS ADR-095's, on the same catalog line as the portal's. M09 section 1.1 calls this app \"a fast statically generated Next.js application, served from the edge, holding no session and reading no trader data\". THE `build` SCRIPT IS A PROBED ARTIFACT, ADR-095 section 6: it reopened `CI-07`, whose cell is re-ruled in this same commit, and `next build` in this directory was RUN and exits 1 on \"Couldn't find any `pages` or `app` directory\", which is why the row takes a new dated condition rather than an implementation. ONE ROUTE IS CARVED OUT AND IT IS THE ONLY ONE. INV-M9-04 makes revalidation part of the publish transaction's definition of done and M9 section 3.2 has the API call THIS app; a framework cache can only be invalidated from inside the process that holds it. It is permitted as a CACHE-CONTROL HOOK and never as an API surface, on M9's own four conditions: admin origin, service credential, path allowlist, no trader data read. ADR-095 ruling 4. Anything wider is ruling 3's, which refuses it. AND THAT CONTRACT IS ONLY SOUND AT ONE REPLICA. Under `next start` the regeneration cache is per process, so `revalidatePath` reaches one instance; INFRA rules Railway and states no instance count. ADR-095 F3 and section 9 item 4 carry it as a finding rather than a repair. THE `start` SCRIPT CHANGES TOO, AND THAT IS NOT INCIDENTAL. It read `node --experimental-strip-types src/index.ts`, which starts a module that serves nothing; the four non-UI apps keep that shape and this one cannot. A Railway service whose start command runs an export surface is a manifest that is wrong in the direction that looks like it works. `next start` is wrong in the honest direction until a page exists. A `dev` script lands here for the same fence reason the React types do: P4-e and P4-h write the pages and hold no manifest that could add one.",
   "dependencies": {
-    "@merit/rules-engine": "workspace:*"
+    "@merit/rules-engine": "workspace:*",
+    "next": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -1186,33 +1186,36 @@ const SEEDS = {
   // somebody was right to land, which is the entire difference between an
   // activation condition and the word "deferred".
   //
-  // A `build` script rather than a Playwright install, because it is the smaller
-  // edit and because CI-07 is the row that sat unnoticed since P1 was declared
-  // closed -- ADR-073's own account of why the ruling exists.
+  // AN APP ROUTER FILE RATHER THAN A `build` SCRIPT SINCE 2026-08-24, and the
+  // reason this seed moved is the reason the seed exists. CI-07's artifact WAS a
+  // `build` script in an app manifest; ADR-095 admitted Next.js, the script
+  // landed, this gate failed on good news exactly as designed, and the row was
+  // re-ruled to the artifact one step down the chain: something for the build to
+  // build. A seed left pointing at the old artifact would have gone vacuous in
+  // the direction that reads as coverage, which is the defect the two `0029`
+  // seeds recorded.
   //
-  // DERIVED FROM THE TREE AT SEED TIME. No app manifest is named here, so the
-  // seed follows a rename or a fourth app rather than going vacuous the way the
-  // two `0029` seeds did. The selector is stable under its own seed: adding a
-  // script does not change which manifest sorts first.
+  // DERIVED FROM THE TREE AT SEED TIME. No app is named here, so the seed follows
+  // a rename or a fifth app. The selector is stable under its own seed: creating
+  // `src/app/page.tsx` does not change which app sorts first.
   'CI-06/gate-inventory': {
-    what: "an activation condition's artifact ARRIVING: a `build` script in an app manifest reopens CI-07",
+    what: "an activation condition's artifact ARRIVING: an App Router file under apps/*/src/app/ reopens CI-07",
     real:
       'CI-07 has been open since P1 was declared closed and nothing could read its state, ' +
       'which ADR-073 gives as the reason a "deferred" marker no gate reads is the same ' +
-      'marker. Its condition is a manifest key precisely so that the commit adding a ' +
-      'bundler reopens the row on the day it lands rather than whenever somebody rereads ' +
-      'the table',
-    expect: (d) => `HAS ARRIVED (${firstAppManifest(d)} carries`,
+      'marker. Its condition is a path precisely so that the commit adding the first ' +
+      'renderable document reopens the row on the day it lands rather than whenever ' +
+      'somebody rereads the table. THE ROW HAS ALREADY BEEN WATCHED FIRING FOR REAL: ' +
+      'ADR-095 section 6 is the re-ruling that followed',
+    expect: (d) => `HAS ARRIVED (${firstAppDir(d)}/src/app/page.tsx is an App Router file`,
     seed: (d) => {
-      const manifest = firstAppManifest(d);
-      edit(d, manifest, (b) => {
-        const m = JSON.parse(b);
-        if (m.scripts?.build) {
-          throw new Error(`seed anchor not found: ${manifest} already carries a build script`);
-        }
-        m.scripts = { ...(m.scripts ?? {}), build: 'echo seeded by falsify.mjs' };
-        return `${JSON.stringify(m, null, 2)}\n`;
-      });
+      const app = firstAppDir(d);
+      const dir = join(d, app, 'src/app');
+      if (existsSync(join(dir, 'page.tsx'))) {
+        throw new Error(`seed anchor not found: ${app}/src/app/page.tsx already exists`);
+      }
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'page.tsx'), '// seeded by falsify.mjs\n');
     },
   },
 
@@ -1898,12 +1901,18 @@ const firstArtifactRow = (d) => {
   return row;
 };
 
-const firstAppManifest = (d) => {
+// CI-07's artifact is a PATH since ADR-095 re-ruled it from a manifest key, so
+// this selector returns the app DIRECTORY where it used to return the manifest.
+// Derived rather than spelled: a seed naming `apps/admin` goes vacuous the day
+// that directory is renamed, and reads as coverage while asserting nothing. The
+// selector is stable under its own seed, which is why it is the first app by name
+// and not the first app carrying some property the seed then adds.
+const firstAppDir = (d) => {
   const app = readdirSync(join(d, 'apps'))
     .sort()
     .find((a) => existsSync(join(d, 'apps', a, 'package.json')));
   if (!app) throw new Error('seed anchor not found: no apps/*/package.json');
-  return `apps/${app}/package.json`;
+  return `apps/${app}`;
 };
 
 // ---------------------------------------------------------------------------
@@ -2204,12 +2213,13 @@ const SCOPE_CASES = [
   },
 
   // -------------------------------------------------------------------------
-  // CI-06/gate-inventory. Five cases, because ONE SEED WATCHES ONE ASSERTION and
+  // CI-06/gate-inventory. Six cases, because ONE SEED WATCHES ONE ASSERTION and
   // this gate makes four: the (a) job resolution in two halves, the (b) form
   // inside a row that is ALSO implemented, and the register's stale direction.
   // CI-06o's row states the rule these follow: a gate asserting several
   // unrelated things and watched failing on one of them is taken on trust for
-  // the rest.
+  // the rest. The sixth is a SCOPE case rather than an assertion: it bounds the
+  // probe that fires, which is the half a near-miss is for.
   // -------------------------------------------------------------------------
   {
     name: 'CI-06/gate-inventory/no-disposition-at-all',
@@ -2277,6 +2287,50 @@ const SCOPE_CASES = [
     },
   },
   {
+    name: 'CI-06/gate-inventory/playwright-peer-declaration-is-not-an-install',
+    gate: 'CI-06/gate-inventory',
+    what: "a package DECLARING @playwright/test as a peer must NOT reopen CI-08; only an entry KEY is an install",
+    // MUST NOT FIRE, AND THIS ONE WAS PAID FOR RATHER THAN IMAGINED. The probe
+    // was anchored on the NAME so `@vitest/browser-playwright` could not trip it
+    // (ADR-073) and was not anchored on the CONTEXT, so anything MENTIONING the
+    // package tripped it. ADR-095 installed `next@16.3.2`, which declares
+    // `@playwright/test` as an OPTIONAL PEER; pnpm writes a package's peer block
+    // into the lockfile verbatim, and CI-08 failed at 29 of 30 on a row whose
+    // artifact is genuinely absent. Playwright is still not in this tree.
+    //
+    // THE SEED IS A REQUIRED PEER AND NOT AN OPTIONAL ONE, ON PURPOSE. The real
+    // occurrence is optional, so a case that seeded an optional peer could pass
+    // against a probe that discriminated on `peerDependenciesMeta` rather than on
+    // what an entry key is. The discriminator under test is INSTALLED versus
+    // MENTIONED, and the seed is chosen so that nothing else can be doing the
+    // work.
+    expect: () => 'PASS',
+    // The control is the same package name at the one place that means installed:
+    // a lockfile v9 entry key, `name@version:` at exactly two spaces.
+    control: {
+      expect: () => 'HAS ARRIVED',
+      seed: (d) => {
+        edit(d, LOCKFILE, (b) => {
+          if (/^ {2}'?@playwright\/test'?@[^\s:]+:$/m.test(b)) {
+            throw new Error('seed anchor not found: the lockfile already holds a @playwright/test entry');
+          }
+          return `${b}\n  '@playwright/test@1.56.0':\n    resolution: {integrity: sha512-seededByFalsify}\n`;
+        });
+      },
+    },
+    seed: (d) => {
+      edit(d, LOCKFILE, (b) => {
+        if (/^ {2}'?@playwright'?@[^\s:]+:$/m.test(b)) {
+          throw new Error('seed anchor not found: seeded-by-falsify already present');
+        }
+        return (
+          `${b}\n  seeded-by-falsify@1.0.0:\n    resolution: {integrity: sha512-seededByFalsify}\n` +
+          `    peerDependencies:\n      '@playwright/test': ^1.51.1\n`
+        );
+      });
+    },
+  },
+  {
     name: 'CI-06/gate-inventory/register-shrinks-when-an-artifact-is-re-ruled',
     gate: 'CI-06/gate-inventory',
     what: 'a register entry naming a condition the table no longer carries, which must be a finding',
@@ -2310,16 +2364,33 @@ const SCOPE_CASES = [
     // would report CI-08's artifact arrived and reopen a merge-blocking row on a
     // package nobody installed, which is CI-06s's mention-against-step boundary
     // one registry over. The control is the genuine install on the far side.
+    //
+    // BOTH SEEDS WERE REWRITTEN ON 2026-08-24 AND ONE OF THEM WAS ALREADY VACUOUS
+    // IN THE DIRECTION THAT READS AS COVERAGE. They wrote `  'name': version`,
+    // which is not a shape pnpm's lockfile v9 has anywhere: an entry key is
+    // `name@version:` and a catalog line carries a `specifier:` beneath it. Under
+    // the repaired probe (ADR-095 section 8, an entry KEY rather than an
+    // occurrence) the control stopped firing, which is how it was found; and the
+    // near-miss seed would then have passed because it wrote no entry key at all,
+    // rather than because the NAME anchor held. Both are entry keys now, so the
+    // name anchor is the only thing left doing the work.
     expect: 'PASS',
     control: {
-      seed: (d) => edit(d, 'pnpm-lock.yaml', (b) => `${b}\n  '@playwright/test': 1.56.0\n`),
+      seed: (d) =>
+        edit(
+          d,
+          'pnpm-lock.yaml',
+          (b) => `${b}\n  '@playwright/test@1.56.0':\n    resolution: {integrity: sha512-seededByFalsify}\n`,
+        ),
       expect: 'HAS ARRIVED',
     },
     seed: (d) =>
       edit(
         d,
         'pnpm-lock.yaml',
-        (b) => `${b}\n  # a playwright test runner peer, seeded by falsify.mjs\n  '@vitest/browser-playwright': 4.1.10\n`,
+        (b) =>
+          `${b}\n  # a playwright test runner peer, seeded by falsify.mjs\n` +
+          `  '@vitest/browser-playwright@4.1.10':\n    resolution: {integrity: sha512-seededByFalsify}\n`,
       ),
   },
   {
