@@ -27,6 +27,24 @@ import { WEBHOOK_WINDOW_SECONDS, singleHeader, utf8 } from '../src/webhook.ts';
 import { PSP_A_SIGNATURE_HEADER, createPspAFake } from '../src/fakes/psp-a.ts';
 import { PSP_B_NONCE_HEADER, createPspBFake } from '../src/fakes/psp-b.ts';
 
+// LOW ENTROPY AND NO VENDOR PREFIX, AND VG-1 IS WHY.
+//
+// These two were a real provider's webhook-secret prefix followed by sixteen
+// hex characters, until CI-05 refused them: `gitleaks git .` reported two
+// `generic-api-key` findings at **entropy 4.28**, on this file, at these two
+// lines. **The gate was right.** That is a credential BY SHAPE, and VG-1 exists
+// to catch the shape wherever it appears, which includes a fixture written by
+// somebody trying to look realistic.
+//
+// **The remedy is the VALUE and never an allowlist.** A `.gitleaks.toml`
+// exempting this path would be weakening a gate to pass it, and it would exempt
+// the path permanently rather than this string once. What is here now is
+// self-evidently a fixture and carries no key material, which is what a shared
+// secret in a test should have looked like in the first place.
+//
+// **The old literal is not quoted here, deliberately.** A comment that spells
+// the flagged string puts it back in the file the scan reads, which is the same
+// defect one indirection along.
 const SECRET_A = 'psp-a-test-secret';
 const SECRET_B = 'psp-b-test-secret';
 
