@@ -58,10 +58,21 @@
 // rendering rule and GS-310's single absent case are real the day it lands, and
 // DEP-M9-07's `API_CONTRACT` amendment is owed with it.
 //
-// NO ADAPTER EXISTS. `catalog/ports.ts` declares the read boundary and opens no
-// connection, which is `apps/worker`'s idiom and `packages/db`'s own: what is
-// real is the rendering and the rules, what is not is the wiring, and the
-// difference is visible in the type rather than left to a reader.
+// THE ADAPTER EXISTS NOW AND IT IS AN HTTP CLIENT, WHICH IS A RULING RATHER THAN
+// A CHOICE THIS PACKAGE MADE. [ADR-096](docs/decisions/ADR-096.md) ruling 1:
+// `apps/site` "reads over HTTP, against the public API, and holds no database
+// connection of any kind... It opens no pool, holds no credential, and imports
+// nothing from `packages/db`." `catalog/adapter.ts` is that client and
+// `catalog/ports.ts` is unchanged by it: the boundary was declared before the
+// implementation existed, which is what let the ruling land after the ports and
+// change nothing above them.
+//
+// WHAT THE ADAPTER STILL CANNOT REACH IS NAMED IN ITS OWN HEADER AND IS NOT
+// PAPERED OVER. Three of M9's five endpoints are in no contract, the archive
+// half of `CatalogReadPort` has no collection address, and
+// `readRestrictedCountries` has no endpoint anywhere (ADR-096 section 7). Each
+// of those refuses loudly at the call site rather than returning a value this
+// package invented.
 // =============================================================================
 
 import { SITE_SURFACES } from './routes/paths.js';
@@ -94,6 +105,22 @@ export type {
   SitePorts,
   StatsReadPort,
 } from './catalog/ports.js';
+
+// -----------------------------------------------------------------------------
+// What a build reads THROUGH: the ports, resolved over HTTP (ADR-096)
+// -----------------------------------------------------------------------------
+export type { FetchLike, HttpResponse, SiteAdapterConfig } from './catalog/adapter.js';
+export {
+  CONTENT_LOCALE_PARAM,
+  CONTENT_VERSION_PARAM,
+  PLANS_PATH,
+  PUBLIC_STATS_PATH,
+  SiteAdapterError,
+  UnservedEndpointError,
+  contentEndpoint,
+  createSitePorts,
+  planVersionEndpoint,
+} from './catalog/adapter.js';
 
 export type { ContentDocument, ContentKind } from './content/documents.js';
 export { isLive } from './content/documents.js';
@@ -194,11 +221,21 @@ export { geoNotice } from './routes/geo.js';
 /**
  * Not a server yet. It is a deployable that starts.
  *
- * The rendering is real and the hosting is not: there is no adapter behind
- * `SitePorts` and no framework compiling these models into markup. Printing the
- * surface inventory is the honest thing for this entry point to do, because it
- * reports what exists rather than implying a server that does not.
+ * THE WIRING IS REAL AND THE HOSTING IS STILL NOT. `createSitePorts` resolves
+ * the four read ports over HTTP, and no framework compiles these models into
+ * markup: `next build` in this directory exits 1 on "Couldn't find any `pages`
+ * or `app` directory", which is `CI-07`'s dated condition and `P4-i`'s and
+ * `P4-j`'s subject rather than this entry point's. Printing the surface
+ * inventory is the honest thing for it to do, because it reports what exists
+ * rather than implying a server that does not.
+ *
+ * It builds NO PORTS. Constructing them here would need a base URL, and a
+ * default one is a production origin written into a package that must not have
+ * an opinion about which deployment it is (`assertBaseUrl` refuses the empty
+ * case for the same reason `resolveSurface` refuses a default surface).
  */
 export function main(): void {
-  console.log(`merit ${SERVICE}: ${SITE_SURFACES.length} static surfaces, no adapter yet`);
+  console.log(
+    `merit ${SERVICE}: ${SITE_SURFACES.length} static surfaces, ports read over HTTP, no pages yet`,
+  );
 }
