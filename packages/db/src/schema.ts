@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// NINETY-TWO TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 19 are not reachable through either accessor: `SCOPE_RULES` is total
+// NINETY-SIX TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 15 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE NINETY-TWO ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE NINETY-SIX ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. TEN
-// of the ninety-two below carry later columns -- `sessions`, `plan_versions`,
+// of the ninety-six below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests` and
 // `promotional_credit_grants` -- and none of them could be registered at all
@@ -3869,5 +3869,149 @@ export const discordAnnouncements = pgTable('discord_announcements', {
   renderedBody: text('rendered_body').notNull(),
   postedAt: timestamp('posted_at', { withTimezone: true }),
   providerMessageRef: text('provider_message_ref'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// geo_restrictions -- 0004_catalog.sql. FIRM.
+// -----------------------------------------------------------------------------
+// COUNSEL'S EXCLUSION LIST, ONE ROW PER COUNTRY. There is no identity column
+// and there is no correct one: a restriction is a statement about a
+// JURISDICTION and it is identical for every person in it, which is the
+// property DEP-M9-04 depends on when it makes this table the single source for
+// checkout enforcement, campaign targeting and the site notice at once. A
+// per-identity slice of a country's rule is not a smaller version of it.
+//
+// THE PRIMARY KEY IS `country_code` AND THE TABLE HAS NO `uuid` OF ITS OWN, so
+// there is no surrogate id for anything to point at, and no foreign key in the
+// tree points here. Nothing reaches an identity even one hop out.
+//
+// `reason` IS COUNSEL'S RATIONALE AND `effective_from` IS A DATE RATHER THAN A
+// TIMESTAMP, both in 0004's own words: "why is this country blocked" is a
+// question with a legal answer, versioned by row history in `events`. That
+// history lives in another table and is not a second path to a person here.
+export const geoRestrictions = pgTable('geo_restrictions', {
+  countryCode: char('country_code', { length: 2 }).primaryKey(),
+  // Bare `text` with a CHECK to ('block_purchase', 'block_all', 'warn'). The
+  // three values are in the DDL and there is no enum type for them.
+  rule: text('rule').notNull(),
+  reason: text('reason').notNull(),
+  effectiveFrom: date('effective_from').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// tos_versions -- 0004_catalog.sql. FIRM.
+// -----------------------------------------------------------------------------
+// WHAT THE FIRM PUBLISHED. One row per (document, version) of the ToS, the
+// privacy policy, the risk disclosure and the affiliate terms. There is no
+// identity column and there is no correct one: EVERY identity is shown the same
+// version, and the link runs the other way -- `tos_acceptances.tos_version_id`
+// names the version a person accepted -- so ownership flows FROM the published
+// document rather than to it. That is `plan_versions`' reason exactly, on the
+// legal catalogue instead of the commercial one.
+//
+// THIS TABLE AND `tos_acceptances` ARRIVE IN THE SAME MIGRATION AND TAKE
+// DIFFERENT CLASSES, WHICH IS THE POINT RATHER THAN AN INCONSISTENCY. A version
+// row is a thing Merit published to the world; an acceptance row is a thing one
+// named person did, on a date, from an address. M09 section 1.2 draws the line
+// in the corpus's own words: the site "renders versioned legal documents and
+// records nothing about acceptance". A shared class here would either hide a
+// public document behind an identity that does not exist, or hand a person's
+// signature to everyone the document was shown to.
+//
+// A PUBLIC READ OF THIS TABLE IS NOT A LEAK. `body_md` is the text Merit
+// publishes, and a superseded version stays readable forever because the
+// version a trader accepted has to remain quotable (FM-M9-06, INV-M9-11).
+export const tosVersions = pgTable('tos_versions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // Bare `text` with a CHECK to ('tos', 'privacy', 'risk_disclosure',
+  // 'affiliate_tos'). Four values, no enum type.
+  document: text('document').notNull(),
+  // CHECKed `> 0`. A version is an ordinal and never an id.
+  version: integer('version').notNull(),
+  bodyMd: text('body_md').notNull(),
+  // NOT NULL and NOT defaulted: a version has an effective moment that is
+  // decided rather than observed, so it is never `now()` by accident.
+  effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// tos_acceptances -- 0004_catalog.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// WHAT A PERSON DID. `identity_id uuid NOT NULL REFERENCES identities(id) ON
+// DELETE RESTRICT` is on the row, and `ON DELETE RESTRICT` is the DDL saying an
+// acceptance outlives every convenience: the identity cannot be deleted out
+// from under the signature. There is no unowned acceptance and the table has no
+// way to write one.
+//
+// `tos_version_id` IS THE TRAP AND IT IS THE ONE THIS PAIR MAKES PLAUSIBLE. It
+// is `uuid NOT NULL REFERENCES tos_versions(id)`, single-valued, declared
+// inline -- it reads exactly like `daily_marks`' hop to `accounts` and it is not
+// one, because `tos_versions` is FIRM. `DerivedRule.via` is `TableKey` and
+// includes every firm key, so a `derived` rule through it compiles at every
+// call site and throws the first time anybody reads this table. The identity is
+// on the row and no hop is needed.
+//
+// `ip` AND `user_agent` ARE THE EVIDENCE AND NEITHER IS A SECOND PATH TO A
+// PERSON. `ip inet NOT NULL` is stored in the clear here, unlike
+// `certificate_verifications.ip_hash`, because this row is a party's own record
+// of their own act rather than telemetry about strangers; it references
+// nothing. `user_agent` is the only nullable column on the table.
+//
+// A SCOPED READ RETURNS EVERY VERSION THIS PERSON EVER ACCEPTED, not the
+// current one: DEP-M16-06 keeps acceptance a positive act with a history, and
+// the history is what FM-M9-06's pinned-version argument is settled from.
+export const tosAcceptances = pgTable('tos_acceptances', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  tosVersionId: uuid('tos_version_id')
+    .notNull()
+    .references(() => tosVersions.id),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull().defaultNow(),
+  ip: inet('ip').notNull(),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// certificate_verifications -- 0025_reserved_sequence.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE VERIFY ENDPOINT'S ACCESS LOG, AND THE ROWS ARE THE VERIFIERS' RATHER THAN
+// THE HOLDER'S. `GET /verify/:code` is public, unauthenticated and rate limited
+// (M11 section 6), so whoever produced a row here is an outsider Merit has no
+// identity for and never will. There is no identity column, and the table
+// declares NO FOREIGN KEY AT ALL.
+//
+// THE HOP TO `certificates` DOES NOT EXIST, AND THAT IS WORTH SAYING BECAUSE
+// `certificates` IS REGISTERED AND WOULD MAKE A PLAUSIBLE `via`. The column is
+// `code_hash bytea`, a DIGEST OF THE ATTEMPTED CODE, and 0025 says why in the
+// column's own comment: storing the codes in the clear would make this table a
+// list of valid tokens for anyone who reached it. A hash addresses no row, most
+// attempts resolve to no certificate at all -- `unknown` is one of the four
+// results -- and a rule cannot be written through a join the schema refuses to
+// declare.
+//
+// AND THE CLASS WOULD BE WRONG EVEN IF THE JOIN EXISTED. The signal this table
+// carries is the RATE of `unknown` across all verifiers, which is an
+// enumeration campaign in progress (AS-M11-04, FM-M11-04). That is estate-wide
+// security telemetry; a per-certificate slice of it is not a smaller version of
+// it, and handing a holder the list of who looked their card up would publish
+// the verifiers instead of the certificate.
+//
+// `ip_hash` IS NULLABLE AND `user_agent_class` IS A CLASS AND NEVER THE STRING,
+// both in 0025's words. Hashed inputs only, 90 day retention.
+export const certificateVerifications = pgTable('certificate_verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  codeHash: bytea('code_hash').notNull(),
+  // Bare `text` with a CHECK to ('valid', 'unknown', 'revoked', 'deferred').
+  result: text('result').notNull(),
+  ipHash: bytea('ip_hash'),
+  userAgentClass: text('user_agent_class'),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
