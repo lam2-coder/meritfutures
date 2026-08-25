@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// SIXTY-SIX TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 45 are not reachable through either accessor: `SCOPE_RULES` is total
+// SIXTY-NINE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 42 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE SIXTY-SIX ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE SIXTY-NINE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. EIGHT
-// of the sixty-six below carry later columns -- `sessions`, `plan_versions`,
+// of the sixty-nine below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests` and `admin_actions` -- and none of them could be
 // registered at all before ADR-094, which is why the ruling came before the
@@ -2662,3 +2662,132 @@ export const analyticsSnapshots = pgTable(
   },
   (t) => [primaryKey({ columns: [t.accountId, t.asOfTradingDay] })],
 );
+
+// -----------------------------------------------------------------------------
+// graduation_benefits -- 0023_loyalty_and_graduation.sql. OWNED: `identity_id`,
+// NOT NULL. SD-M18-02.
+// -----------------------------------------------------------------------------
+// THE ROW REACHES AN IDENTITY TWICE AND THE DIRECT COLUMN IS THE RULE, which is
+// `certificates`' shape and its unrepaired finding in a third place (after
+// `contact_channels.superseded_by` and `phone_change_requests.old_phone_id`).
+// `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` and
+// `account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` both
+// reach an identity, `accounts` is itself `owned` on `identity_id`, and NO
+// CONSTRAINT TIES THE TWO: nothing in the DDL says this row's `identity_id` is
+// the same identity that owns its `account_id`. The direct column is the rule
+// because a derived rule would make the tenancy depend on a join rather than on
+// a column the database declares against `identities(id)`.
+//
+// `accrued_cents` IS THE VAULT NUMBER AND `basis` IS WHY IT IS NOT A PROJECTION.
+// Both are NOT NULL together (INV-M18-06): a number on a screen with no stated
+// derivation is read as a promise. `basis` is `text` and `accrued_cents` is
+// `bigint`, integer cents, never a float.
+//
+// `conferred_at` AND `withheld_reason` ARE BOTH NULLABLE AND BOTH DECIDED. The
+// table's own `graduation_benefits_not_both_conferred_and_withheld` CHECK is
+// what makes them exclusive, and it is the database's rather than this file's:
+// a CHECK constraint is not a column, so nothing in `packages/db` compares it.
+// A withheld benefit HOLDS rather than disappears, which is INV-M18-10.
+export const graduationBenefits = pgTable('graduation_benefits', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  benefitCode: text('benefit_code').notNull(),
+  accruedCents: bigint('accrued_cents', { mode: 'bigint' }).notNull(),
+  basis: text('basis').notNull(),
+  conferredAt: timestamp('conferred_at', { withTimezone: true }),
+  withheldReason: text('withheld_reason'),
+  criteriaVersion: integer('criteria_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// graduation_invitations -- 0025_reserved_sequence.sql. OWNED: `identity_id`,
+// NOT NULL. SD-M18-03.
+// -----------------------------------------------------------------------------
+// RESERVED AND EMPTY AT LAUNCH, AND THAT IS A FACT ABOUT THE ROWS RATHER THAN
+// ABOUT THE RULE. `0025`'s own `COMMENT ON TABLE` says no live program exists
+// (OQ-M18-01), and a scope rule states how a row WOULD reach an identity, so an
+// empty table gets the same rule a full one would. Registering it does not ship
+// a program and confers no read on anybody: ADR-092 section 9 is explicit that
+// registration makes a table readable through the scoped accessor and nothing
+// else.
+//
+// ONE IDENTITY COLUMN AND NO SECOND PATH. Unlike `graduation_benefits` one
+// table up, this row names no account: an invitation is issued to the PERSON
+// rather than earned by one of their accounts, which is why `identity_id` is
+// the only reference in the body.
+//
+// NO `updated_at`, AND IT IS STRUCTURAL. `accepted_at` and `declined_at` are the
+// row's clocks and `graduation_invitations_one_response` makes them exclusive,
+// so a response is a column that fills rather than a row that is edited.
+export const graduationInvitations = pgTable('graduation_invitations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  programRef: text('program_ref').notNull(),
+  issuedAt: timestamp('issued_at', { withTimezone: true }).notNull().defaultNow(),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+  declinedAt: timestamp('declined_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  termsVersion: integer('terms_version').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// plan_size_unlocks -- 0044_fee_back_and_ladder_unlock.sql. OWNED:
+// `identity_id`, NOT NULL. SD-M18-04.
+// -----------------------------------------------------------------------------
+// THE ROW CARRIES THIS PACKAGE'S NAMED TRAP AND IS NOT DERIVED THROUGH IT.
+// `plan_version_id uuid NOT NULL REFERENCES plan_versions(id) ON DELETE
+// RESTRICT` reads exactly like the `hop` `daily_marks` and `rule_states` make to
+// `accounts`, and it is not one: `plan_versions` is FIRM, so a derivation
+// through it constructs no predicate and throws the first time anybody reads
+// this table. A LADDER'S RUNGS ARE THE SAME FOR EVERYONE AND A TRADER'S POSITION
+// ON IT IS THEIR OWN, and the FK to the rung definition is what makes the two
+// look alike in a column list.
+//
+// `identity_id` IS ADR-070 SECTION 3'S RULING IN DDL RATHER THAN A FIELD THE
+// RULING CONSTRAINS. `identities.id` is the hard-merged grain -- a merge
+// repoints ownership into that row -- and nothing in this table reaches
+// `identity_links`, so a soft-linked pair sharing an unlock is UNREPRESENTABLE
+// rather than forbidden (INV-M18-11).
+//
+// `earned_account_id` IS THE SECOND PATH AND IS NOT THE RULE, for
+// `graduation_benefits`' reason exactly: it is `NOT NULL REFERENCES
+// accounts(id)`, `accounts` is `owned`, and no constraint ties the account's
+// identity to this row's. It records WHICH LADDER COMPLETED, which is what a
+// dispute is argued from, and says nothing about who holds the entitlement.
+//
+// `unlocked_size_cents` NAMES A `plan_version_sizes.size_cents` AND IS
+// DELIBERATELY NOT A FOREIGN KEY TO THAT ROW. The entitlement is to the SIZE, so
+// a later version publishing the same size honours an unlock earned against it.
+// `bigint`, integer cents.
+//
+// THE ROW IS THE ENTITLEMENT AND THERE IS NO STATE MACHINE. `revoked_at` and
+// `revoked_reason` are nullable together and tied by
+// `plan_size_unlocks_revocation_is_explained`, a CHECK this file does not
+// transcribe and nothing in `packages/db` compares.
+export const planSizeUnlocks = pgTable('plan_size_unlocks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  planVersionId: uuid('plan_version_id')
+    .notNull()
+    .references(() => planVersions.id),
+  unlockedSizeCents: bigint('unlocked_size_cents', { mode: 'bigint' }).notNull(),
+  earnedAccountId: uuid('earned_account_id')
+    .notNull()
+    .references(() => accounts.id),
+  earnedAt: timestamp('earned_at', { withTimezone: true }).notNull().defaultNow(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  revokedReason: text('revoked_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

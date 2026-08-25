@@ -50,6 +50,8 @@ import {
   economicCalendarLoads,
   evidencePacks,
   fills,
+  graduationBenefits,
+  graduationInvitations,
   identities,
   identityPhones,
   identityRestrictionEpisodes,
@@ -74,6 +76,7 @@ import {
   phoneChangeRequests,
   planBreakerState,
   plans,
+  planSizeUnlocks,
   planVersions,
   planVersionSizes,
   proofLinks,
@@ -98,7 +101,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * SIXTY-SIX OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * SIXTY-NINE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -203,6 +206,9 @@ export const TABLES = {
   roundTrips,
   journalEntries,
   analyticsSnapshots,
+  graduationBenefits,
+  graduationInvitations,
+  planSizeUnlocks,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -676,6 +682,24 @@ export const SCOPE_RULES = {
     foreignColumn: 'id',
     traversal: 'hop',
     why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0022_analytics_journal.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. The grain is the PRIMARY KEY, `(account_id, as_of_trading_day)`: ONE SNAPSHOT PER ACCOUNT PER CLOSED DAY, so this is `daily_marks`' and `rule_states`' rule again and the day contributes nothing to who may read it. `payload jsonb` HOLDS COMPUTED STATISTICS ABOUT ONE ACCOUNT and reaches no other identity; `inputs_digest` is a hash of the input rows and not a reference to them.",
+  },
+  graduationBenefits: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0023_loyalty_and_graduation.sql). THE ROW REACHES AN IDENTITY TWICE AND THE DIRECT COLUMN IS THE RULE, which is `certificates`' rule taken as it stands: `account_id` is also NOT NULL and also reaches an identity, one hop out through `accounts`, and NO CONSTRAINT TIES THE TWO -- nothing in the DDL says this row's `identity_id` is the identity that owns its `account_id`. A derived rule through `accounts` would make this table's tenancy depend on a join rather than on a column the database itself declares against `identities(id)`, and it would silently disagree with the direct column the day the two differ. A BENEFIT IS THE TRADER'S OWN RECORD EVEN WHILE IT IS UNDECIDED: `conferred_at` and `withheld_reason` are nullable and exclusive by CHECK, so a benefit held for review is a row of theirs that says so rather than a row that is absent, which is INV-M18-10's whole point and the reason revocation here is a column and never a deletion.",
+  },
+  graduationInvitations: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0025_reserved_sequence.sql), and it is the table's ONLY reference, because an invitation is issued to the PERSON rather than earned by one of their accounts. RESERVED AND EMPTY AT LAUNCH IS A FACT ABOUT THE ROWS AND NOT ABOUT THE RULE: 0025's own COMMENT ON TABLE records that no live program exists (OQ-M18-01), and a rule states how a row WOULD reach an identity, so the empty table takes the rule the full one would. Registering it ships no program and confers no read on anybody -- ADR-092 section 9 is explicit that registration makes a table reachable through the scoped accessor and nothing else -- and `terms_version` is here from the first invitation rather than after the first dispute, so the terms a trader accepted stay readable as their own row.",
+  },
+  planSizeUnlocks: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0044_fee_back_and_ladder_unlock.sql), and ADR-070 section 3 rules that column IS the entitlement's grain rather than a field the ruling constrains: `identities.id` is the hard-merged grain because a merge repoints ownership into that row, nothing here reaches `identity_links`, so a soft-linked pair sharing an unlock is UNREPRESENTABLE rather than forbidden (INV-M18-11). TWO OTHER COLUMNS LOOK LIKE HOPS AND NEITHER IS ONE. `plan_version_id uuid NOT NULL REFERENCES plan_versions(id)` is this file's named trap in its most plausible dress -- A LADDER'S RUNGS ARE THE SAME FOR EVERYONE AND A TRADER'S POSITION ON IT IS THEIR OWN -- and `plan_versions` is FIRM, so a derivation through it constructs no predicate and throws the first time anybody reads this table. `earned_account_id uuid NOT NULL REFERENCES accounts(id)` is `graduation_benefits`' second path exactly: it records WHICH LADDER COMPLETED, which is what a dispute is argued from, and no constraint ties that account's identity to this row's. A REVOKED UNLOCK IS STILL THIS IDENTITY'S ROW, tied to a reason by `plan_size_unlocks_revocation_is_explained`, because a revocation without one is a disappearance.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
