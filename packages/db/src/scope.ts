@@ -36,6 +36,7 @@ import {
   alarmSuppressions,
   analyticsSnapshots,
   certificates,
+  certificateVerifications,
   contactChannels,
   contentDocuments,
   contractSpecs,
@@ -50,6 +51,7 @@ import {
   economicCalendarLoads,
   evidencePacks,
   fills,
+  geoRestrictions,
   graduationBenefits,
   graduationInvitations,
   identities,
@@ -101,6 +103,8 @@ import {
   simulationRuns,
   statisticDefinitions,
   supportContextViews,
+  tosAcceptances,
+  tosVersions,
   treasuryBalances,
   users,
   walletDormancy,
@@ -112,7 +116,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * EIGHTY OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * EIGHTY-FOUR OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -244,6 +248,10 @@ export const TABLES = {
   priceFloors,
   offers,
   promotionalCreditGrants,
+  geoRestrictions,
+  tosVersions,
+  tosAcceptances,
+  certificateVerifications,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -806,6 +814,27 @@ export const SCOPE_RULES = {
     column: 'identity_id',
     nullable: false,
     why: "THE TABLE THAT MINTS VALUE, and `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on the row (0024_offers.sql). A grant is a named person's entitlement from the moment it exists and the DDL has no way to write an unowned one. NEVER WITHDRAWABLE (OQ-FREEZE-01): its own ledger class `promotional_credit` at 0009, and no `wallet_entries.provenance` value at 0011. `funding_purchase_id` IS THE DELTA'S CONTENT AND IS NOT THE SCOPE: it is NULLABLE, because a loyalty-issued or fee-back-issued grant has no funding purchase, so a derivation through `purchases` would return only the grants somebody bought and would drop exactly the ones no purchase funded. `source_offer_id` IS THE OTHER TRAP AND IT IS THIS MODULE'S CHARACTERISTIC ONE -- a redemption pointing at its catalogue row reads like a legitimate hop -- and it is nullable besides, so a grant issued from a `public` offer would reach nobody at all through it. `source_payout_request_id` is 0044's later column, folded by ADR-094, and is a settlement rather than a person.",
+  },
+  geoRestrictions: {
+    class: 'firm',
+    why: "COUNSEL'S EXCLUSION LIST, ONE ROW PER COUNTRY (0004_catalog.sql). There is no identity column and there is no correct one: a restriction is a statement about a JURISDICTION and it is identical for every person in it, which is exactly the property DEP-M9-04 depends on when it makes this one table the source for checkout enforcement, campaign targeting and the public notice at once. A per-identity slice of a country's rule is not a smaller version of it. THE PRIMARY KEY IS `country_code char(2)` AND THE TABLE HAS NO `uuid` OF ITS OWN, so there is no surrogate id for anything to reference and no foreign key in the tree points here; nothing reaches a person even one hop out. `reason` is counsel's rationale in the DDL's own words and `effective_from` is a date, so the row's history is a legal record rather than a tenancy.",
+  },
+
+  tosVersions: {
+    class: 'firm',
+    why: "WHAT THE FIRM PUBLISHED, one row per (document, version) of the ToS, the privacy policy, the risk disclosure and the affiliate terms (0004_catalog.sql). There is no identity column and there is no correct one: EVERY identity is shown the same version, and the link runs the other way -- `tos_acceptances.tos_version_id` names the version a person accepted -- so ownership flows FROM the published document rather than to it, which is `plan_versions`' reason applied to the legal catalogue instead of the commercial one. THIS TABLE AND `tos_acceptances` ARE DECLARED IN THE SAME MIGRATION AND TAKE DIFFERENT CLASSES ON PURPOSE: a version row is a thing Merit published to the world and an acceptance row is a thing one named person did, and M09 section 1.2 draws that line in the corpus's own words -- the site renders versioned legal documents and records nothing about acceptance. A public read of `body_md` is not a leak, and a superseded version stays readable forever because the version a trader accepted has to remain quotable (FM-M9-06, INV-M9-11).",
+  },
+
+  tosAcceptances: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "WHAT A PERSON DID. `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on the row (0004_catalog.sql), and the RESTRICT is the DDL saying an acceptance outlives every convenience: the identity cannot be deleted out from under the signature, and there is no way to write an unowned acceptance. `tos_version_id` IS THE TRAP AND THIS PAIR IS WHAT MAKES IT PLAUSIBLE: it is `uuid NOT NULL REFERENCES tos_versions(id)`, single-valued and declared inline, so it reads exactly like `daily_marks`' hop to `accounts` and is not one, because `tos_versions` is FIRM -- `DerivedRule.via` is `TableKey` and includes every firm key, so a derivation through it compiles at every call site and throws the first time anybody reads this table. `ip inet NOT NULL` is stored in the clear here, unlike `certificate_verifications.ip_hash`, because this row is a party's own record of their own act rather than telemetry about strangers, and it references nothing. A SCOPED READ RETURNS EVERY VERSION THIS PERSON EVER ACCEPTED and not the current one: DEP-M16-06 keeps acceptance a positive act with a history, and the history is what FM-M9-06's pinned-version argument is settled from.",
+  },
+
+  certificateVerifications: {
+    class: 'firm',
+    why: "THE VERIFY ENDPOINT'S ACCESS LOG, AND THE ROWS ARE THE VERIFIERS' RATHER THAN THE HOLDER'S (0025_reserved_sequence.sql). `GET /verify/:code` is public, unauthenticated and rate limited (M11 section 6), so whoever produced a row here is an outsider Merit has no identity for; the table declares NO FOREIGN KEY AT ALL and carries no identity column. THE HOP TO `certificates` DOES NOT EXIST, which is worth saying because `certificates` is registered and would make a plausible `via`: the column is `code_hash bytea`, a DIGEST of the attempted code, and 0025's own comment says why -- storing the codes in the clear would make this table a list of valid tokens for anyone who reached it. A hash addresses no row, `unknown` is one of the four results so most attempts resolve to no certificate at all, and a rule cannot be written through a join the schema refuses to declare. THE CLASS WOULD STILL BE WRONG IF THE JOIN EXISTED: the signal this table carries is the RATE of `unknown` across all verifiers, which is an enumeration campaign in progress (AS-M11-04, FM-M11-04), and handing a holder the list of who looked their card up would publish the verifiers instead of the certificate.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
