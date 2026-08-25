@@ -1222,29 +1222,47 @@ const SEEDS = {
   // The same shape one table down, and the same reason: ADR-073 section 8 calls
   // the absence assertion "the one an implementer is most likely to leave out,
   // because it is the only one that fails on good news", and ADR-080 inherits
-  // it. VG-3 and VG-6 wait on `fastify` in the lockfile, so the commit that
-  // installs it reopens both rows on the day it lands.
+  // it.
   //
-  // THE KEY IS ANCHORED AND THE NEAR-MISS IS A SCOPE CASE. `fastify-plugin`
-  // contains `fastify`; a substring probe would fire here and pass in exactly
-  // the same way as one that works, which is the @vitest/browser-playwright
-  // lesson. The pair is deliberate: this seed proves the probe FIRES, and
-  // `fastify-near-miss` proves it does not fire on the wrong package.
+  // THIS SEED MOVED WITH THE ARTIFACT ON 2026-08-25 AND IT MOVED BECAUSE IT
+  // BROKE, WHICH IS THE DESIGN WORKING. It seeded a `fastify` key into the
+  // lockfile while VG-3 and VG-6 waited on one. ADR-100 put a real one there,
+  // so the seed anchor stopped existing and this case THREW rather than
+  // reporting a pass: `pnpm run falsify` went to 1 problem on the commit that
+  // delivered the artifact, one gate after `CI-06/vg-inventory` itself went to
+  // 29 of 30. A harness that had matched loosely would have seeded a second key
+  // and passed.
+  //
+  // THE ARTIFACT IS NOW `scopedDb` NAMED UNDER `apps/api/src`, which is
+  // API_CONTRACT section 1's own mechanism for what both rows are about:
+  // "Every authenticated handler resolves the caller to an identity and reads
+  // through `scopedDb(identity)`". The seed is that name arriving in the
+  // deployable.
+  //
+  // THE KEY IS ANCHORED AND THE NEAR-MISS IS A SCOPE CASE, unchanged in shape.
+  // `scopedDbFixture` contains `scopedDb`; a substring probe would fire on it
+  // and pass in exactly the same way as one that works, which is the
+  // @vitest/browser-playwright lesson. The pair is deliberate: this seed proves
+  // the probe FIRES, and `scoped-db-near-miss` proves it does not fire on a
+  // longer name.
   'CI-06/vg-inventory': {
-    what: "an activation condition's artifact ARRIVING: a real `fastify` key in the lockfile reopens VG-3 and VG-6",
+    what: "an activation condition's artifact ARRIVING: `scopedDb` named inside apps/api reopens VG-3 and VG-6",
     real:
       'VG-3 and VG-6 chained on CI-04 until 2026-08-24 and the chain EXPIRED when CI-04 got ' +
-      'an implemented leg (ADR-085). Their condition is a lockfile key precisely so that the ' +
-      'commit installing the framework reopens both rows on the day it lands rather than ' +
-      'whenever somebody rereads the table',
+      'an implemented leg (ADR-085). Their condition is a fact about the tree precisely so that ' +
+      'the commit making server-side authz writable reopens both rows on the day it lands ' +
+      'rather than whenever somebody rereads the table. It was a lockfile key until ADR-100 ' +
+      'delivered that key; it is now the accessor the contract names',
     expect: () => 'HAS ARRIVED',
     seed: (d) => {
-      edit(d, LOCKFILE, (b) => {
-        if (/(^|\s)'?fastify'?[@:]/m.test(b)) {
-          throw new Error('seed anchor not found: the lockfile already carries a fastify key');
-        }
-        return `${b}\n  fastify@5.12.1:\n    resolution: {integrity: sha512-seededByFalsify}\n`;
-      });
+      const rel = 'apps/api/src/falsify_seeded_handler.ts';
+      if (existsSync(join(d, rel))) {
+        throw new Error(`seed anchor not found: ${rel} already exists`);
+      }
+      writeFileSync(
+        join(d, rel),
+        '// seeded by falsify.mjs\nexport const read = () => scopedDb(identity);\n',
+      );
     },
   },
 
@@ -2201,14 +2219,45 @@ const SCOPE_CASES = [
     name: 'CI-06/vg-inventory/fastify-near-miss',
     gate: 'CI-06/vg-inventory',
     what: 'fastify-plugin in the lockfile must NOT reopen a row waiting on fastify (the substring lesson)',
-    // MUST NOT FIRE. `fastify-plugin` contains `fastify`, so a probe matching on
-    // substring reports the artifact ARRIVED on a package that is not it, and
-    // passes in exactly the same way as one that works. This is the
-    // @vitest/browser-playwright case. Its control is the SEEDS entry for this
-    // gate, which seeds a REAL fastify key and requires HAS ARRIVED.
+    // RETAINED VERBATIM ON 2026-08-25 AND NO LONGER BOUNDING A LIVE PROBE, and
+    // that is stated rather than left for a reader to work out. ADR-100 re-ruled
+    // VG-3 and VG-6 off the lockfile, so `VG_PROBES` no longer holds a fastify
+    // entry and this seed can no longer reopen anything. It still PASSES, and it
+    // is neither deleted nor repointed for one reason: ADR-085's SIGNED approval
+    // clause cites this case BY NAME -- "while `fastify-plugin` seeded into the
+    // lockfile does NOT reopen the row" -- and a signed entry moves by a
+    // superseding ADR and never by a session. Deleting it would leave that
+    // citation resolving to nothing; repointing its seed would make its name and
+    // ADR-085's sentence describe something it does not do.
+    //
+    // THE LIVE ANCHORING CASE IS `scoped-db-near-miss` BELOW, and ADR-085's
+    // clause having gone stale is recorded in ADR-100 section 7 as a finding for
+    // a superseding entry rather than repaired here.
     expect: () => 'PASS',
     seed: (d) => {
       edit(d, LOCKFILE, (b) => `${b}\n  fastify-plugin@5.0.1:\n    resolution: {integrity: sha512-seeded}\n`);
+    },
+  },
+  {
+    name: 'CI-06/vg-inventory/scoped-db-near-miss',
+    gate: 'CI-06/vg-inventory',
+    what: 'scopedDbFixture inside apps/api must NOT reopen a row waiting on scopedDb (the substring lesson)',
+    // MUST NOT FIRE. `scopedDbFixture` contains `scopedDb`, so a probe matching
+    // on substring reports the artifact ARRIVED on a name that is not it, and
+    // passes in exactly the same way as one that works. This is the
+    // @vitest/browser-playwright case carried onto the artifact ADR-100 re-ruled
+    // these rows onto. Its control is the SEEDS entry for this gate, which seeds
+    // a real `scopedDb` call and requires HAS ARRIVED.
+    expect: () => 'PASS',
+    seed: (d) => {
+      const rel = 'apps/api/src/falsify_near_miss.ts';
+      if (existsSync(join(d, rel))) {
+        throw new Error(`seed anchor not found: ${rel} already exists`);
+      }
+      writeFileSync(
+        join(d, rel),
+        '// seeded by falsify.mjs\nexport const a = scopedDbFixture;\nexport const b = unscopedDbThing;\n',
+      );
     },
   },
 
