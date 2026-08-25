@@ -1,0 +1,19 @@
+{
+  "name": "@merit/psp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The PspAdapter port: the one interface every payment provider is used through, plus two fakes. M03 section 2.1 is the specification. No network, no vendor SDK, no route.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT DECLARES NO RUNTIME DEPENDENCY AND NO WORKSPACE DEPENDENCY, AND BOTH ABSENCES ARE THE DESIGN. The port opens no socket: `createSession`, `refund` and `health` are the vendor's I/O and the two things in this package that implement them are FAKES, which is packages/rithmic's precedent under M02 section 3.5 point 4 rather than a new argument. The HMAC is `node:crypto`, a Node builtin and not a package, so VG-12 is asked to admit NOTHING: the catalog is untouched, the closure is unchanged, and the only line pnpm-lock.yaml gains is this package's own `importers` block. It declares no @merit/db either: the port never reads a row and never writes one, which is what keeps `merit/no-raw-db-client` satisfiable here without an `ignores` line.",
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
