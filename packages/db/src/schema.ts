@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// THIRTY-FIVE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 76 are not reachable through either accessor: `SCOPE_RULES` is total
+// FORTY TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 71 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE THIRTY-FIVE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE FORTY ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -30,11 +30,12 @@
 // which is ADR-094. That entry rules the replay's vocabulary CLOSED at one
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
-// one lands the check fails rather than silently reading a stale CREATE. FIVE
-// of the thirty-five below carry later columns -- `sessions`, `plan_versions`,
-// `rule_states`, `contact_channels` and `notification_kinds` -- and none of
-// them could be registered at all before ADR-094, which is why the ruling came
-// before the transcription rather than after it.
+// one lands the check fails rather than silently reading a stale CREATE. SEVEN
+// of the forty below carry later columns -- `sessions`, `plan_versions`,
+// `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`
+// and `phone_change_requests` -- and none of them could be registered at all
+// before ADR-094, which is why the ruling came before the transcription rather
+// than after it.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -132,6 +133,18 @@ export const statisticMeasure = pgEnum('statistic_measure', [
   'p50',
   'p95',
   'count',
+]);
+// 0001_extensions_and_enums.sql. THE FIVE-VALUE KYC VOCABULARY, and it is the
+// one `kyc_verifications.state` is declared against. `pending` is a member here
+// and `kyc.pending` is NOT an event name in the approved catalogue, which is a
+// divergence session 168 recorded as D1 and which nothing in this file resolves:
+// this is the ENUM and the enum says `pending`.
+export const kycStatus = pgEnum('kyc_status', [
+  'kyc_required',
+  'pending',
+  'verified',
+  'rejected',
+  'expired',
 ]);
 // 0001_extensions_and_enums.sql. `risk_flags.status` is the ONE column in this
 // file's risk set that is an enum rather than `text` plus a CHECK, and the
@@ -1447,3 +1460,219 @@ export const otpSendBudget = pgTable(
   },
   (table) => [primaryKey({ columns: [table.scopeKind, table.scopeKey, table.evaluatedOn] })],
 );
+
+// -----------------------------------------------------------------------------
+// kyc_verifications -- 0003_kyc.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// A REFERENCE TO A VERIFICATION AND NEVER THE VERIFICATION'S CONTENTS. Merit
+// never proxies identity documents: the client goes to the provider's hosted
+// flow, and `0003`'s own header states what this table therefore holds --
+// "STATUS AND REFERENCES ONLY. Documents, images and biometric templates never
+// touch Merit storage (VG-10). Every jsonb column below holds provider decision
+// metadata and never document data." `provider_applicant_id` is the pointer and
+// `raw_result` is the decision metadata; neither is a document.
+//
+// WHAT IS DELIBERATELY ABSENT IS PART OF THE TRANSCRIPTION. There is no
+// `dedupe_matched_identity_id` column here, and its absence is ADR-029's ruling
+// rather than an oversight: a face matching three identities is not expressible
+// in one column, so `dedupe_matches` is authoritative and this table keeps only
+// the fast boolean `biometric_dedupe_hit`, which can be stale and can never
+// contradict the set.
+//
+// `state` IS THE `kyc_status` ENUM AND `placement`, `verification_purpose` AND
+// `liveness_method` ARE `text`. 0003 constrains the latter three with CHECKs
+// rather than `CREATE TYPE`, and the transcription follows the DDL. 0029 later
+// DROPs and re-ADDs the `verification_purpose` CHECK to admit
+// `reverify_phone_change` (SD-M19-07): that is a CONSTRAINT change and not a
+// column change, so the fold reads it and discards it, and no column set moves.
+export const kycVerifications = pgTable('kyc_verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  provider: text('provider').notNull(),
+  providerApplicantId: text('provider_applicant_id').notNull(),
+  state: kycStatus('state').notNull(),
+  // U-05. ADR-021's ruled trigger set as a stored value. `pre_eval` is NOT a
+  // member: 0003 retires it into `first_purchase` and the CHECK refuses it.
+  placement: text('placement').notNull(),
+  // The geo-consistency triangle, recorded separately so the disagreement is
+  // visible rather than resolved silently. INV-M19-10 is signal-only.
+  documentCountry: char('document_country', { length: 2 }),
+  ipCountry: char('ip_country', { length: 2 }),
+  paymentCountry: char('payment_country', { length: 2 }),
+  biometricDedupeHit: boolean('biometric_dedupe_hit').notNull().default(false),
+  rejectionReason: text('rejection_reason'),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  rawResult: jsonb('raw_result').notNull(),
+  // SD-M19-01. A re-verification is a NEW ROW linked to the one it supersedes.
+  verificationPurpose: text('verification_purpose').notNull(),
+  supersedes: uuid('supersedes').references((): AnyPgColumn => kycVerifications.id),
+  livenessPassed: boolean('liveness_passed'),
+  livenessMethod: text('liveness_method'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// sanctions_screenings -- 0003_kyc.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// THE ONE OUTCOME MERIT MUST ACT ON, AND THE ONE MOST LIKELY TO BE A NAME
+// COLLISION. It has its own table rather than living in
+// `kyc_verifications.rejection_reason` because folding it in would put a legally
+// mandatory refusal in the same field as a blurry-photo rejection.
+//
+// `list_refs` IS `text[]` AND IS TRANSCRIBED AS AN ARRAY. It names which lists
+// were screened and holds no name of any person, which is INV-M19-05's own
+// posture: no name in any payload.
+export const sanctionsScreenings = pgTable('sanctions_screenings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  provider: text('provider').notNull(),
+  listRefs: text('list_refs').array().notNull(),
+  // Basis points, 0 to 10000. Integer, like every other threshold in the corpus.
+  matchStrength: integer('match_strength'),
+  // 'cleared_on_review' is a DISTINCT terminal state from 'clear': "we looked
+  // and it was not them" is a different fact from "nothing matched", and only
+  // the first needs a reviewer's name attached.
+  status: text('status').notNull(),
+  reviewedBy: text('reviewed_by'),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  reviewNote: text('review_note'),
+  screenedAt: timestamp('screened_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// kyc_funnel_events -- 0003_kyc.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// THE ABANDONMENT IS THE MEASUREMENT (AS-M19-08). Drop-off per placement cannot
+// be reconstructed from `kyc_verifications`, because the traders who matter most
+// are the ones who never created a verification row at all -- so `step` carries
+// 'abandoned' as a first-class member and `0026_roles_and_grants.sql` REVOKES
+// UPDATE and DELETE on this table, which is what makes the record append-only.
+//
+// `placement` HERE RECORDS WHICH TRIGGER FIRED and never which set was
+// configured (ADR-026 widening SD-M19-03). Under ADR-021 the placement is a set
+// and the triggers race; storing the configured set would answer a question
+// nobody asked and lose the one that decides the post-beta adjudication.
+export const kycFunnelEvents = pgTable('kyc_funnel_events', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  placement: text('placement').notNull(),
+  planCode: text('plan_code').notNull(),
+  step: text('step').notNull(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  attemptNumber: integer('attempt_number').notNull().default(1),
+  // INTEGER CENTS, like every other money column. This is what turns "a $2
+  // identity check in front of a $79 impulse purchase" into a measured figure.
+  costCents: bigint('cost_cents', { mode: 'bigint' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// identity_phones -- 0029_phone_identity_and_auth.sql, PLUS THREE COLUMNS FROM
+// 0034_reversible_contact_addresses.sql. ADR-094's shape. OWNED: `identity_id`.
+// -----------------------------------------------------------------------------
+// THE COLUMN SET BELOW IS THE TABLE AS OF THE LAST MIGRATION AND NOT AS OF ITS
+// `CREATE TABLE`. `0034` adds `phone_ciphertext`, `phone_key_id` and
+// `phone_encrypted_at` (ADR-046); the suite folds those forward and compares the
+// whole effective set.
+//
+// A VERIFIED PHONE IS AN IDENTITY SIGNAL AND NOT A CONTACT FIELD, which is why
+// this table is here and not beside `contact_channels`: the delivery address is
+// a preference and this is an identity node, and collapsing the two is how a
+// contact-preference edit becomes an identity change (M19 section 2, ADR-039).
+//
+// `phone_hash` IS `bytea` AND IS DECLARED AS ONE. Approximating it as `text`
+// would compile and would satisfy the column-name comparison, and it would be a
+// wrong transcription of the column the whole hashing discipline turns on.
+// `phone_ciphertext` is `bytea` for the same reason and is a SEPARATE fact: the
+// hash is what matches, the ciphertext is what can be read back to send to.
+//
+// SUPERSESSION AND RELEASE ARE DIFFERENT ENDINGS AND A ROW HAS AT MOST ONE.
+// Superseded means the trader replaced it; released means the carrier took the
+// number back. `ported`, `footprint_present` and `liveness`-style booleans here
+// are NULLABLE ON PURPOSE and the NULL is not a `false`: null is "we do not
+// know" and false is "the vendor looked and there is none".
+export const identityPhones = pgTable('identity_phones', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  phoneHash: bytea('phone_hash').notNull(),
+  phonePreview: text('phone_preview'),
+  countryCode: char('country_code', { length: 2 }).notNull(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  supersededBy: uuid('superseded_by').references((): AnyPgColumn => identityPhones.id),
+  releasedAt: timestamp('released_at', { withTimezone: true }),
+  releaseEvidence: jsonb('release_evidence').notNull(),
+  lineType: text('line_type').notNull().default('unknown'),
+  carrierName: text('carrier_name'),
+  carrierCountry: char('carrier_country', { length: 2 }),
+  ported: boolean('ported'),
+  lastPortedAt: timestamp('last_ported_at', { withTimezone: true }),
+  footprintPresent: boolean('footprint_present'),
+  lookupProvider: text('lookup_provider'),
+  lookupAt: timestamp('lookup_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // 0034_reversible_contact_addresses.sql, ADR-046. SUPERSEDED AND RELEASED
+  // ROWS KEEP THEIRS, because ADR-039 (c) requires notifying the PRIOR number.
+  phoneCiphertext: bytea('phone_ciphertext'),
+  phoneKeyId: text('phone_key_id'),
+  phoneEncryptedAt: timestamp('phone_encrypted_at', { withTimezone: true }),
+});
+
+// -----------------------------------------------------------------------------
+// phone_change_requests -- 0029_phone_identity_and_auth.sql, PLUS FIVE COLUMNS
+// FROM 0034_reversible_contact_addresses.sql. OWNED: `identity_id`, NOT NULL.
+// -----------------------------------------------------------------------------
+// THE COLUMN SET BELOW IS THE TABLE AS OF THE LAST MIGRATION. `0034` adds
+// `new_phone_ciphertext`, `new_phone_key_id`, `new_phone_encrypted_at`,
+// `prior_notified_sms_dispatch_id` and `prior_notified_email_notification_id`.
+//
+// THE CEREMONY AS STATE, so ADR-039 (c)'s three controls are a precondition of
+// the write rather than steps a handler is trusted to take:
+// `phone_change_requests_applied_is_complete` requires dual-channel
+// verification, prior-number notification and a still-running withdrawal hold
+// before `state` may reach 'applied'.
+//
+// THE TWO NOTIFICATION CITATIONS CARRY NO `.references()` HERE AND THAT IS THE
+// FILE'S RULE RATHER THAN AN OMISSION. Both columns are added by `ALTER TABLE
+// ... ADD COLUMN` in 0034 and their foreign keys by `ADD CONSTRAINT`, which the
+// fold reads and discards, and `integration_dispatches` and `notifications` are
+// not tables this file declares. `old_phone_id` DOES carry one: 0029 declares it
+// inline and `identity_phones` is above.
+export const phoneChangeRequests = pgTable('phone_change_requests', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  state: text('state').notNull().default('pending'),
+  // NOT NULL. A change request with no prior phone is not a change, it is a
+  // registration, and registration writes `identity_phones` directly.
+  oldPhoneId: uuid('old_phone_id')
+    .notNull()
+    .references(() => identityPhones.id),
+  newPhoneHash: bytea('new_phone_hash').notNull(),
+  dualChannelVerifiedAt: timestamp('dual_channel_verified_at', { withTimezone: true }),
+  priorNotifiedAt: timestamp('prior_notified_at', { withTimezone: true }),
+  withdrawalHoldUntil: timestamp('withdrawal_hold_until', { withTimezone: true }),
+  appliedAt: timestamp('applied_at', { withTimezone: true }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  cancelledReason: text('cancelled_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // 0034_reversible_contact_addresses.sql, ADR-046.
+  newPhoneCiphertext: bytea('new_phone_ciphertext'),
+  newPhoneKeyId: text('new_phone_key_id'),
+  newPhoneEncryptedAt: timestamp('new_phone_encrypted_at', { withTimezone: true }),
+  priorNotifiedSmsDispatchId: uuid('prior_notified_sms_dispatch_id'),
+  priorNotifiedEmailNotificationId: uuid('prior_notified_email_notification_id'),
+});

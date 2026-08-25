@@ -38,7 +38,10 @@ import {
   detectorDefinitions,
   detectorRuns,
   identities,
+  identityPhones,
   identitySignals,
+  kycFunnelEvents,
+  kycVerifications,
   ledgerAccounts,
   ledgerEntries,
   ledgerTransactions,
@@ -49,6 +52,7 @@ import {
   notifications,
   otpSendBudget,
   pageRevalidations,
+  phoneChangeRequests,
   planVersions,
   planVersionSizes,
   proofLinks,
@@ -58,6 +62,7 @@ import {
   reviewRequests,
   riskFlags,
   ruleStates,
+  sanctionsScreenings,
   sessions,
   statisticDefinitions,
   treasuryBalances,
@@ -67,7 +72,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * THIRTY-FIVE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FORTY OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -118,6 +123,11 @@ export const TABLES = {
   notifications,
   notificationPreferences,
   otpSendBudget,
+  identityPhones,
+  kycFunnelEvents,
+  kycVerifications,
+  phoneChangeRequests,
+  sanctionsScreenings,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -394,6 +404,40 @@ export const SCOPE_RULES = {
   otpSendBudget: {
     class: 'firm',
     why: "PRE-IDENTITY BY CONSTRUCTION, which is a stronger statement than 'no identity column'. INV-M16-12 splits INV-M16-11: a message to an authenticated recipient at an address Merit already holds is exempt from rate limiting, and a message to an ATTACKER-SUPPLIED DESTINATION BEFORE ANY IDENTITY EXISTS is not. This table is the second one's control, so there is nobody to own a row and there could not be -- the whole premise of the rows is that nobody has proved who they are yet. THE COLUMN A DERIVATION WOULD REACH FOR IS `scope_key` AND IT IS NOT AN IDENTITY: for 'phone' it holds `encode(phone_hash,'hex')` and never the number, for 'ip' the address, for 'country' the alpha-2 and for 'global' the literal 'global'. It declares no foreign key, so there is nothing to traverse even if the rows belonged to somebody, and a per-identity slice of a global cost circuit breaker is not a smaller version of it.",
+  },
+  identityPhones: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0029_phone_identity_and_auth.sql). A VERIFIED PHONE IS AN IDENTITY NODE AND NOT A CONTACT FIELD, which is ADR-039 (a) and (b) and is why this table is not `contact_channels`: the delivery address is a preference and this is an identity signal, and collapsing the two is how a contact-preference edit becomes an identity change. SUPERSESSION AND RELEASE RATHER THAN UPDATE, so a prior number remains a row -- ADR-039 (c) requires notifying it -- and a scoped read returns the superseded and released rows as well as the live one, which is correct: the history is the person's own evidence, and `superseded_by` reaches only other rows of this same table. THE PHONE -> IDENTITY DIRECTION IS DELIBERATELY NOT UNIQUE (`identity_phones_live_number_idx`), so one number may be live on more than one identity and a rule scoping by `phone_hash` would return STRANGERS' ROWS; the identity column is the only correct one and the non-uniqueness is what makes that a real distinction rather than a pedantic one.",
+  },
+
+  kycFunnelEvents: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0003_kyc.sql). Telemetry ABOUT ONE PERSON'S PASSAGE THROUGH THE GATE, one row per step, and the step vocabulary carries 'abandoned' as a first-class member because THE ABANDONMENT IS THE MEASUREMENT (AS-M19-08): the traders who matter most to the adjudication are the ones who never created a verification row at all, so drop-off cannot be reconstructed from `kyc_verifications` and this table exists to hold what that one cannot. `0026_roles_and_grants.sql` revokes UPDATE and DELETE on it, so the record is append-only; that makes the rows immutable and does not make them firm -- an aggregate over every identity would be a different table, and the grain here is one identity's own funnel.",
+  },
+
+  kycVerifications: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0003_kyc.sql). THE ROW IS A REFERENCE TO A VERIFICATION AND NEVER THE VERIFICATION ITSELF: Merit never proxies identity documents, the client goes to the provider's hosted flow, and 0003's header states what is therefore stored -- status and references only, with every jsonb column holding provider decision metadata and never document data (VG-10). That is what makes the tenancy simple and it is also why the tenancy matters most here: these are the most sensitive rows in the estate and the only thing standing between one identity's verification history and another's is this column. A RE-VERIFICATION IS A NEW ROW AND NOT A RE-READ (SD-M19-01, INV-M19-06), so `supersedes` reaches only other rows of this same table and the supersession chain never leaves the identity it belongs to -- a scoped read returns the whole chain, which is correct, because what Merit believed at each check is the person's own record.",
+  },
+
+  phoneChangeRequests: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0029_phone_identity_and_auth.sql). THE ROW CARRIES TWO PATHS TO AN IDENTITY AND THE DIRECT COLUMN IS THE RULE: `old_phone_id` is `NOT NULL REFERENCES identity_phones(id)` and reaches the same identity one hop out, and a derived rule through it would make this table's tenancy depend on a join rather than on a column the database itself declares against `identities(id)`. That is `certificates`' shape and it carries `certificates`' unclosed gap with it -- nothing in the schema forces `old_phone_id`'s identity to equal `identity_id`, so a row whose prior phone belongs to A while its `identity_id` says B is representable, and under this rule it is B's request. Naming that here rather than repairing it, because a repair is a migration. The ceremony is state and not steps (ADR-039 (c) and (d)): dual-channel verification, prior-number notification and a still-running withdrawal hold are preconditions of reaching 'applied', asserted by `phone_change_requests_applied_is_complete`.",
+  },
+
+  sanctionsScreenings: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0003_kyc.sql). ONE ROW PER TIME MERIT SCREENED A PERSON, and the row is ABOUT THAT PERSON. It is a separate table from `kyc_verifications` rather than a field on it because folding it in would put a legally mandatory refusal in the same column as a blurry-photo rejection (INV-M19-05), and the separation is a tenancy fact as well as a review-path one: `reviewed_by` names a MERIT REVIEWER and is deliberately NOT a second path to an identity, for `treasury_balances.recorded_by`'s reason exactly -- it records who asserted the outcome and says nothing about whose screening it is. `list_refs` names which lists were screened and carries no person's name at all.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
