@@ -83,6 +83,15 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   publishedStatistics: 'published_statistics',
   proofLinks: 'proof_links',
   reviewRequests: 'review_requests',
+  identitySignals: 'identity_signals',
+  detectorDefinitions: 'detector_definitions',
+  detectorRuns: 'detector_runs',
+  riskFlags: 'risk_flags',
+  correlationGroups: 'correlation_groups',
+  coupons: 'coupons',
+  couponRedemptions: 'coupon_redemptions',
+  pspWebhookEvents: 'psp_webhook_events',
+  midHealth: 'mid_health',
   notificationKinds: 'notification_kinds',
   notifications: 'notifications',
   notificationPreferences: 'notification_preferences',
@@ -227,14 +236,26 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 85 are unreachable through either accessor.
-  test('26 declared tables, 26 scope rules, 0 reachable without one', () => {
+  // rounded up: the other 76 are unreachable through either accessor.
+  //
+  // `identity_links` IS ONE OF THE 76 AND ITS ABSENCE IS DELIBERATE. It carries
+  // TWO identity columns against an `owned` rule that names one, ADR-092 section
+  // 9 names it as a per-table ruling and takes neither, and a transcription
+  // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
+  // column would be a scoped read returning a strict subset of a person's own
+  // edges, selected by UUID ordering, with no error anywhere.
+  //
+  // `otp_challenges` IS ALSO ONE OF THE 76 AND IS REFUSED FOR A DIFFERENT
+  // REASON. 0029 relaxes `email_normalized` to nullable, and ADR-094 closes the
+  // fold's vocabulary at `ADD COLUMN` with a default of FAIL, so registering it
+  // turns the refusal assertion below RED rather than turning it green.
+  test('35 declared tables, 35 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(26);
-    expect(rules).toBe(26);
+    expect(declared).toBe(35);
+    expect(rules).toBe(35);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
