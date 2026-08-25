@@ -802,3 +802,257 @@ describe('the TypeScript schema has not drifted from the DDL', () => {
     }
   });
 });
+
+// =============================================================================
+// ADR-101. WHICH CLASS IS AVAILABLE, AND WHAT A NULLABLE HOP MEANS.
+// =============================================================================
+// The vocabulary answers HOW a row reaches an identity. Nothing in it asked
+// WHETHER `derived` was allowed to be the answer on a row that already carries
+// its own identity column, and nothing asked whether the hop it names is even
+// PRESENT on every row.
+//
+// Three rules were seeded through those two gaps, on this tree, and every
+// mechanical check in this repository agreed with all three: `pnpm run
+// typecheck` at exit 0 with zero `error TS`, and this file green at 101 of 101.
+//
+//   wallet_entries      derived via ledger_transactions on ledger_transaction_id
+//                       answers WHOSE LEDGER ACCOUNTS APPEAR ON THIS TRANSACTION
+//                       rather than whose wallet holds this entry. The two agree
+//                       only while no transaction touches two identities'
+//                       accounts, which nothing enforces and which double entry
+//                       makes the ordinary case rather than the exception. The
+//                       row's own `identity_id` is NOT NULL and answers it.
+//   wallet_withdrawals  derived via risk_flags on freeze_flag_id reaches the
+//                       CORRECT identity and still returns the FROZEN SUBSET,
+//                       because the column is NULL on every withdrawal nobody
+//                       froze. A nullable FK to a correctly scoped table is not
+//                       a milder error than a nullable FK to a firm one.
+//   sessions            derived via identity_signals on device_fingerprint_id is
+//                       THIS FILE'S OWN NAMED TRAP written as a rule -- scope.ts
+//                       names it in its first twenty lines -- and it reaches
+//                       whoever SHARES A DEVICE, on the rows where the column is
+//                       not null.
+//
+// All three terminate at an identity, so session 188's bounded-chain assertion
+// is satisfied. All three name a foreign key the DDL declares, so the existing
+// derived assertion is satisfied. All three are the BOLA failure ADR-008 scoped
+// the accessor to bound, arriving through the accessor itself, and the direction
+// all three fail in is SILENCE.
+//
+// THE READER IS THE FOLD AND NEVER THE `CREATE TABLE`, on ADR-094: a table is
+// read AS OF THE LAST MIGRATION. Every identity-column reader above this line
+// stops at the CREATE, and `admin_actions.on_behalf_of_identity_id` -- added by
+// `ALTER TABLE` in 0043 -- is invisible to all of them. ADR-101 section 8
+// records that as a finding against the `firm` assertion and does not repair it
+// there, because `admin_actions` is correctly `firm` and the repair is a ruling
+// about what the `firm` class promises rather than about this one.
+
+/**
+ * ONE TABLE'S COLUMN DEFINITIONS, REPLAYED. ADR-101, on ADR-094's fold.
+ *
+ * `foldTable` folds NAMES and that is all its own assertions need. A scope rule
+ * is checked against the `REFERENCES` clause and against `NOT NULL`, which live
+ * in the DEFINITION, so this folds the definition text on the same walk.
+ *
+ * THE TWO FOLDS ARE BOUND BY AN ASSERTION RATHER THAN BY CARE. A second reader
+ * of the same migrations that could disagree with the first is the hazard
+ * ADR-092 section 5 names on `SQL_NAME` and `DDL_NAMES`: two hand-kept
+ * statements of one fact, where deleting from one leaves the suite green. The
+ * first test below compares the two key sets on every registered table, so a
+ * divergence is red rather than silent.
+ */
+function foldTableDefs(table: string): Map<string, string> {
+  const files = migrationFiles();
+  const read = (file: string): string => readFileSync(join(MIGRATIONS, file), 'utf8');
+  const createdIn = files.findIndex((file) =>
+    new RegExp(`CREATE TABLE ${table} \\(`, 'i').test(read(file)),
+  );
+  if (createdIn < 0) throw new Error(`no CREATE TABLE for ${table}`);
+
+  const defs = ddlColumnDefs(read(files[createdIn] ?? ''), table);
+  for (const file of files.slice(createdIn)) {
+    for (const statement of alterStatementsFor(read(file), table)) {
+      if (!/\bADD\s+COLUMN\b/i.test(statement)) continue;
+      // REFUSED SHAPES ARE SKIPPED HERE AND REFUSED THERE. `foldTable` records
+      // every `DROP COLUMN`, `ALTER COLUMN` and `RENAME` into `refused`, and
+      // the assertion above holds that list empty over every registered table,
+      // so skipping them here absorbs nothing that is not already red.
+      if (/\b(DROP|ALTER)\s+COLUMN\b|\bRENAME\b/i.test(statement)) continue;
+
+      const body = statement
+        .replace(/^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?/i, '')
+        .replace(/;\s*$/, '');
+      for (const clause of topLevelParts(body)) {
+        const name = /^ADD\s+COLUMN\s+"?([a-z_][a-z0-9_]*)"?/i.exec(clause)?.[1];
+        if (name === undefined) continue;
+        defs.set(
+          name,
+          clause
+            .replace(/^ADD\s+COLUMN\s+/i, '')
+            .replace(/\s+/g, ' ')
+            .trim(),
+        );
+      }
+    }
+  }
+  return defs;
+}
+
+/** Every column on `table`'s folded row that the DDL declares against `identities(id)`. */
+const identityColumnsOf = (table: string): string[] =>
+  [...foldTableDefs(table).entries()]
+    .filter(([, def]) => /REFERENCES\s+identities\s*\(\s*id\s*\)/i.test(def))
+    .map(([name]) => name)
+    .sort();
+
+/**
+ * Whether the DDL declares this column NOT NULL.
+ *
+ * `PRIMARY KEY` IMPLIES IT AND THE WORDS ARE OFTEN ABSENT. `wallet_dormancy`
+ * is `identity_id uuid PRIMARY KEY REFERENCES identities(id)` with no `NOT
+ * NULL` text at all, and session 202 recorded reading its flag off the key
+ * rather than off the words. A reader that matched only the words would call
+ * that column nullable and refuse a correct rule.
+ */
+const declaredNotNull = (def: string | undefined): boolean =>
+  /\bNOT NULL\b/i.test(def ?? '') || /\bPRIMARY KEY\b/i.test(def ?? '');
+
+/**
+ * THE COLUMN THAT CARRIES THE EDGE, which is not always this row's.
+ *
+ * A forward edge declares `REFERENCES` on `localColumn`, and a NULL there is a
+ * row of THIS table that reaches nobody. A reverse edge -- `ledger_transactions`
+ * is the one on this tree -- declares it on `via.foreignColumn`, and a NULL
+ * there is a child that vouches for nobody, which drops this row from its own
+ * owner's read just as surely. The nullability that matters is the FK-bearing
+ * column's in both directions, so the direction is resolved the same way the
+ * existing derived assertion resolves it.
+ */
+function derivedEdge(key: TableKey): { where: string; def: string | undefined } {
+  const rule = SCOPE_RULES[key];
+  if (rule.class !== 'derived') throw new Error(`${key} is not derived`);
+  const here = foldTableDefs(SQL_NAME[key]).get(rule.localColumn);
+  const there = foldTableDefs(SQL_NAME[rule.via]).get(rule.foreignColumn);
+  const forward = new RegExp(`REFERENCES\\s+${SQL_NAME[rule.via]}\\s*\\(`, 'i').test(here ?? '');
+  return forward
+    ? { where: `${SQL_NAME[key]}.${rule.localColumn}`, def: here }
+    : { where: `${SQL_NAME[rule.via]}.${rule.foreignColumn}`, def: there };
+}
+
+// WHAT THESE ASSERTIONS DO NOT REFUSE, STATED HERE RATHER THAN LEFT TO BE
+// DISCOVERED. ADR-101 section 7.
+//
+// A `semi-join` traverses the REVERSE edge: the foreign key is declared on the
+// via table, pointing back at this one. Clause 2 below checks that column's
+// nullability, which is the right check and is not the whole property.
+// `NOT NULL` constrains the CHILD -- every child names a parent -- and the
+// traversal needs the reverse: that every PARENT has a child. SQL declares the
+// first and has no way to declare the second, so no assertion over these
+// migrations can verify it.
+//
+//   raw_ingest_rows  derived via fills on the reverse edge
+//                    `fills.raw_row_id bigint NOT NULL REFERENCES
+//                    raw_ingest_rows(id)` resolves, terminates at an owned
+//                    table, and PASSES EVERYTHING BELOW. It is wrong because an
+//                    EOD balance row, an unparsed row, and every row of a
+//                    quarantined file become no fill at all, so the read drops
+//                    exactly the rows a dispute is argued from. Seeded and
+//                    watched passing at 113 of 113 with these clauses running.
+//
+// `ledger_transactions` IS THE REGISTRY'S ONLY `semi-join` RULE AND IT RESTS ON
+// THE SAME UNSTATED PROPERTY. 0009_ledger.sql declares no trigger and no
+// constraint requiring a transaction to have entries. What separates it from the
+// seed is semantic: there the entries ARE the tenancy, and a transaction with no
+// entries correctly belongs to nobody, whereas a raw ingest row HAS an owner --
+// inside `raw jsonb`, where no scope rule reaches it. A parser cannot tell a
+// relation that is CONSTITUTIVE of tenancy from one merely CORRELATED with it.
+//
+// The remedy ADR-101 section 7 prices is an ATTESTATION on reverse-edge rules,
+// and it is the exact inverse of clause 3 below: `nullable` gets no field
+// because the DDL declares it, and reverse-edge totality gets one because the
+// DDL cannot. A field earns its place exactly when the fact is absent from the
+// primary source. It is not written here because it edits a table's row.
+
+describe('a class is REFUSED as well as declared', () => {
+  test('a folded definition set names exactly the folded column set, so the two folds cannot disagree', () => {
+    for (const [, sqlName] of DDL_NAMES) {
+      expect([...foldTableDefs(sqlName).keys()].sort(), sqlName).toEqual(
+        foldTable(sqlName).columns,
+      );
+    }
+  });
+
+  // ADR-101 CLAUSE 1. Measured against all eighty rules before it was ruled:
+  // it refuses ZERO of the fourteen registered `derived` rules, so no green row
+  // turns red and there is no exemption to write down.
+  test('no derived rule stands on a row that carries its own identity column', () => {
+    for (const key of TABLE_KEYS) {
+      if (SCOPE_RULES[key].class !== 'derived') continue;
+      expect(
+        identityColumnsOf(SQL_NAME[key]),
+        `${SQL_NAME[key]} is registered derived and its own row declares an identity ` +
+          'column. A derivation can then only answer a DIFFERENT question from the one ' +
+          'that column already answers, and it answers it by returning rows rather than ' +
+          'by raising. Register it owned on that column, or leave the table ' +
+          'unregistered: unregistered is unreachable and unreachable is safe.',
+      ).toEqual([]);
+    }
+  });
+
+  // THE REFUSAL ABOVE IS NOT VACUOUS AND THIS IS WHAT SAYS SO. It passes today
+  // by finding nothing on fourteen tables, and a reader that had stopped
+  // matching -- a DDL style change, a regex edited in passing -- would find
+  // nothing on all eighty and stay just as green. Every owned rule names a
+  // column this same reader must see.
+  test('the identity-column reader finds the column every owned rule names, so the refusal is not vacuous', () => {
+    const owned = TABLE_KEYS.filter((key) => SCOPE_RULES[key].class === 'owned');
+    expect(owned.length).toBeGreaterThan(0);
+    for (const key of owned) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'owned') continue;
+      expect(identityColumnsOf(SQL_NAME[key]), SQL_NAME[key]).toContain(rule.column);
+    }
+  });
+
+  // ADR-101 CLAUSE 2, and it is the half clause 1 does not cover: a row with no
+  // identity column of its own, hopping a column that is NULL on most of them.
+  // Refuses ZERO of the fourteen, measured before it was ruled.
+  test('no derived rule traverses a nullable edge, because the null rows are a subset it returns in silence', () => {
+    for (const key of TABLE_KEYS) {
+      if (SCOPE_RULES[key].class !== 'derived') continue;
+      const edge = derivedEdge(key);
+      expect(edge.def, `${key} derives through ${edge.where}, which is not a column`).toBeDefined();
+      expect(
+        declaredNotNull(edge.def),
+        `${key} derives through ${edge.where}, which the DDL does not declare NOT NULL. ` +
+          'Every row where it is null reaches no identity, so the rule returns a strict ' +
+          "subset of that person's rows and raises nothing on the rest. There is no " +
+          'admissible derived reading of a nullable edge: the DDL says the relationship ' +
+          `is optional and a scope rule may not answer "whose row is this" with silence. ` +
+          `Its DDL is: ${edge.def ?? ''}`,
+      ).toBe(true);
+    }
+  });
+
+  // ADR-101 CLAUSE 3, AND IT CHECKS A FIELD THIRTY-FOUR RULES HAVE STATED SINCE
+  // THE REGISTRY EXISTED. `OwnedRule.nullable` is read by NOTHING: `scopePredicate`
+  // says in its own comment that a nullable identity column needs no second
+  // predicate, and no assertion in this file compared the flag to the DDL. That
+  // is why ADR-101 adds no `nullable` to `DerivedRule` -- a second field nothing
+  // reads and nothing checks is a second thing asserting itself, which is
+  // session 145's failure, and the nullability that matters is read from the
+  // migrations by the clause above.
+  test('every owned rule states the nullability the DDL declares, which nothing checked before ADR-101', () => {
+    for (const key of TABLE_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'owned') continue;
+      const def = foldTableDefs(SQL_NAME[key]).get(rule.column);
+      expect(def, `${SQL_NAME[key]}.${rule.column} is not a column`).toBeDefined();
+      expect(
+        rule.nullable,
+        `${SQL_NAME[key]}.${rule.column} is declared "${def ?? ''}" and the rule states ` +
+          `nullable: ${String(rule.nullable)}`,
+      ).toBe(!declaredNotNull(def));
+    }
+  });
+});
