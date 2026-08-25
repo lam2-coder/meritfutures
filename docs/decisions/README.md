@@ -127,6 +127,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-097](ADR-097.md) | OUTCOME 1 OF THE THREE. The vocabulary ALREADY HAS the term, it is `outside-loader-boundary`, and `GS-143` and `GS-144` are MIS-FILED. No seventh term, no row leaves section 39, and the closed six stay closed  (2026-08-24, status: accepted) |
 | [ADR-098](ADR-098.md) | the operator path's absence from every UI deployable is a PROPERTY of this repository, and `RI-09` is that property  (2026-08-25, status: accepted) |
 | [ADR-099](ADR-099.md) | `ADR-083`'s build-script clause is superseded, and the VG-12 admission for the UI framework is recorded  (2026-08-25, status: accepted) |
+| [ADR-100](ADR-100.md) | `derived` is REFUSED where the row carries its own identity column and refused again on a nullable edge, and the refusal is an assertion rather than a sentence  (2026-08-25, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
