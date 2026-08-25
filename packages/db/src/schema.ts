@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// EIGHTY-FIVE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 26 are not reachable through either accessor: `SCOPE_RULES` is total
+// NINETY-TWO TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 19 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE EIGHTY-FIVE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE NINETY-TWO ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. TEN
-// of the eighty-five below carry later columns -- `sessions`, `plan_versions`,
+// of the ninety-two below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests` and
 // `promotional_credit_grants` -- and none of them could be registered at all
@@ -193,6 +193,34 @@ export const walletWithdrawalStatus = pgEnum('wallet_withdrawal_status', [
   'settled',
   'failed',
   'cancelled',
+]);
+
+// 0001_extensions_and_enums.sql. THE PROVISIONING SAGA'S SIX STATES, and
+// `confirmed_inferred` is a DISTINCT state rather than a synonym for
+// `confirmed` (U-06, M02 section 3.2). An inferred confirmation means Merit
+// believes the account exists because the vendor reported on it, which is
+// strong evidence for `create_account` and WORTHLESS for `set_risk`: you
+// cannot infer that a risk setting applied from an account appearing in a
+// report. `provisioning_queue_set_risk_never_inferred` in 0007 is where that
+// is enforced, and this type is why the enforcement can be written at all.
+export const provisioningStatus = pgEnum('provisioning_status', [
+  'queued',
+  'written',
+  'delivered',
+  'confirmed',
+  'confirmed_inferred',
+  'failed',
+]);
+// 0001_extensions_and_enums.sql. THE QUARANTINE MACHINE'S VOCABULARY (B4 #4).
+// `quarantined` is a terminal state a whole FILE reaches, never a row: 0013
+// processes a file in one transaction so that a quarantined file has committed
+// no downstream rows at all.
+export const ingestFileStatus = pgEnum('ingest_file_status', [
+  'received',
+  'parsing',
+  'parsed',
+  'quarantined',
+  'applied',
 ]);
 
 // -----------------------------------------------------------------------------
@@ -3342,6 +3370,289 @@ export const promotionalCreditGrants = pgTable('promotional_credit_grants', {
   // SD-M20-05, 0044. The settled payout that triggered a fee-back credit, NULL
   // on every offer-issued grant.
   sourcePayoutRequestId: uuid('source_payout_request_id'),
+});
+
+// -----------------------------------------------------------------------------
+// account_status_history -- 0007_accounts.sql. DERIVED: `account_id` -> accounts.
+// -----------------------------------------------------------------------------
+// THE ACCOUNT'S OWN STATE LOG AND NOTHING ELSE'S. `account_id uuid NOT NULL
+// REFERENCES accounts(id) ON DELETE RESTRICT` is the row's only reference, and
+// `accounts` carries the identity, so the row reaches a person through its
+// account in one hop and through no other path.
+//
+// EVERY OTHER COLUMN IS A STATE NAME RATHER THAN AN ACTOR. `from_status`,
+// `to_status`, `from_phase` and `to_phase` are bare `text` with no CHECK and no
+// enum, though `account_status` and `account_phase` both exist as types in 0001
+// and `accounts` itself is declared against them. That is 0007's shape and not
+// this file's to repair; the transcription follows the DDL, which is the same
+// rule `fills.side` is transcribed under.
+//
+// `reason` IS THE ONLY FREE TEXT AND IT NAMES NOBODY. There is no `changed_by`
+// on this table, so the log records WHAT MOVED and never WHO MOVED IT --
+// `admin_actions` is where the actor lives -- and no column here reads like the
+// `recorded_by` trap `scope.ts`'s header names.
+export const accountStatusHistory = pgTable('account_status_history', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  fromStatus: text('from_status'),
+  toStatus: text('to_status').notNull(),
+  fromPhase: text('from_phase'),
+  toPhase: text('to_phase'),
+  reason: text('reason'),
+  // The transition's own clock, distinct from `created_at`'s write clock.
+  changedAt: timestamp('changed_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// platform_account_refs -- 0007_accounts.sql, SD-M2-02. DERIVED: `account_id`.
+// -----------------------------------------------------------------------------
+// THE BURN LIST. INV-M2-10: a platform ref is never reused across accounts, for
+// any reason, and the PRIMARY KEY IS THE BURN -- `(platform,
+// platform_account_ref)` -- so a reassignment fails at insert rather than being
+// detected later. FM-M2-05 is the worst outcome in M02 and this table is what
+// forecloses it: a recycled ref silently routes one trader's fills onto another
+// trader's account.
+//
+// THE TABLE HAS NO `id` OF ITS OWN, which is `price_floors`' and
+// `contract_specs`' shape: the grain IS the composite key. `account_id uuid NOT
+// NULL REFERENCES accounts(id) ON DELETE RESTRICT` is the tenancy and the ref
+// pair is the identifier, so the hop is to `accounts` and the primary key
+// contributes nothing to who may read the row.
+//
+// A RETIRED ROW IS STILL THAT ACCOUNT'S ROW. `retired_at` and `retired_reason`
+// are nullable and tied by `platform_account_refs_retirement_is_explained`;
+// retirement is what makes the ref permanently unusable, not what detaches it
+// from the account it burned it.
+//
+// `platform` IS `text` WITH A THREE-VALUE CHECK (`rithmic`, `tradovate`, `cqg`)
+// AND NOT AN ENUM, transcribed as the DDL writes it.
+export const platformAccountRefs = pgTable(
+  'platform_account_refs',
+  {
+    platform: text('platform').notNull(),
+    platformAccountRef: text('platform_account_ref').notNull(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }).notNull().defaultNow(),
+    retiredAt: timestamp('retired_at', { withTimezone: true }),
+    retiredReason: text('retired_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.platform, t.platformAccountRef] })],
+);
+
+// -----------------------------------------------------------------------------
+// provisioning_queue -- 0007_accounts.sql, SD-M2-01. DERIVED: `account_id`.
+// -----------------------------------------------------------------------------
+// ONE ROW PER INTENT, so partial success is legible: a batch that half-applied
+// is M02's normal failure and it has to be readable operation by operation.
+// `account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT`, and
+// M02 section 3.6 states the consequence out loud -- the queue is per account
+// and a restriction is per human, so there is no identity-level row to enqueue
+// and there should not be.
+//
+// `payload_hash` IS `bytea` AND IS DECLARED AS A CUSTOM TYPE FOR THAT REASON.
+// drizzle-orm 0.45.2's pg-core has no builtin, and `text()` would compile,
+// would satisfy the column-name comparison, and would be a wrong transcription
+// of a digest column. It is also deliberately NOT a generated column in the
+// DDL: a generated one would need an immutable cast of `jsonb`, whose
+// immutability is a Postgres version question, and SD-M2-01's duplicate-intent
+// guard must not rest on that.
+//
+// `status` IS THE `provisioning_status` ENUM AND `operation` IS BARE `text`
+// WITH A SEVEN-VALUE CHECK. The asymmetry is 0007's and is transcribed as
+// found. The binding rule over the pair -- `set_risk` may never reach
+// `confirmed_inferred` (AS-M2-03, INV-M2-13) -- is a table CHECK, so it is the
+// database's and not this file's; nothing here restates it as a type.
+export const provisioningQueue = pgTable('provisioning_queue', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  operation: text('operation').notNull(),
+  // The exact field values rendered into CSV.
+  payload: jsonb('payload').notNull(),
+  // SD-M2-01. Written by the enqueue path over a canonical serialization.
+  payloadHash: bytea('payload_hash').notNull(),
+  // The idempotent name, assigned at batch build.
+  fileName: text('file_name'),
+  status: provisioningStatus('status').notNull().default('queued'),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  queuedAt: timestamp('queued_at', { withTimezone: true }).notNull().defaultNow(),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// platform_entitlements -- 0007_accounts.sql, SD-M2-05. DERIVED: `account_id`.
+// -----------------------------------------------------------------------------
+// THE HYGIENE LEDGER BEHIND REAL MONTHLY COST. `monthly_cost_cents` exists to
+// make THE COST OF FORGETTING VISIBLE IN A QUERY, which is the only reason an
+// entitlement leak ever gets closed (FM-M2-11).
+//
+// `account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` IS THE
+// TENANCY AND `platform_user_ref` IS NOT A SECOND PATH TO ONE. The latter is
+// `text NULL` with no foreign key: it is the VENDOR's identifier for a login,
+// used to group the invoice the way the vendor bills rather than the way Merit
+// models, and it names no row in this database at all. SD-M2-05 adds it
+// precisely because Rithmic bills per login-month per user while the row stays
+// per account, so the two units sit side by side and only one of them is a
+// reference.
+//
+// A DEACTIVATED ENTITLEMENT IS STILL THAT ACCOUNT'S ROW.
+// `platform_entitlements_active_matches_dates` makes `active` and
+// `deactivated_on` biconditional, so the history stays readable and the alarm's
+// question -- any entitlement still active on a closed account -- stays
+// answerable.
+export const platformEntitlements = pgTable('platform_entitlements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  entitlement: text('entitlement').notNull(),
+  active: boolean('active').notNull().default(true),
+  activatedOn: date('activated_on').notNull(),
+  deactivatedOn: date('deactivated_on'),
+  monthlyCostCents: bigint('monthly_cost_cents', { mode: 'bigint' }).notNull().default(0n),
+  // SD-M2-05. THE VENDOR'S login identifier, not a `users` row and not a FK.
+  platformUserRef: text('platform_user_ref'),
+  billingUnit: text('billing_unit'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// ingest_files -- 0013_ingest.sql, SD-M2-03. FIRM: no identity, and no correct
+// one.
+// -----------------------------------------------------------------------------
+// THE QUARANTINE MACHINE for B4 #4. A file in `quarantined` has committed NO
+// downstream rows, enforced by processing the whole file in one transaction.
+//
+// A FILE IS A DELIVERY AND A DELIVERY IS NOT A PERSON'S. The table declares
+// exactly one foreign key, `replaces_ingest_file_id`, and it points at ITSELF;
+// no column reaches an account, an identity or a user, and there is no correct
+// one, because one vendor file carries rows for every account that traded that
+// session. The tenancy runs the other way: `fills.ingest_file_id`,
+// `raw_ingest_rows.ingest_file_id` and `reconciliations.source_ingest_file_id`
+// all point IN, and each of those tables carries its own `account_id`.
+//
+// `sha256` IS `bytea` AND IS THE IDEMPOTENCE GUARANTEE, not a helper for one:
+// `ingest_files_sha256_uq` is what makes INV-M2-02's byte-identical redelivery
+// a no-op. It is a custom type for the same reason `payload_hash` is.
+//
+// `disposition` IS SD-M2-03 AND IT IS THE MOST DANGEROUS BRANCH IN M02. A
+// redelivery that is not byte-identical is otherwise indistinguishable from a
+// new file, and a corrected redelivery treated as new DOUBLE-APPLIES A DAY.
+// `ingest_files_applied_has_disposition` is what makes the decision explicit
+// rather than default. **PROVISIONAL (ADR-005)**: the `kind` set and the
+// correction arrival semantics are V-M2-01, V-M2-03 and V-M2-04, and 0013's own
+// header says so. NOTHING THE VENDOR CALL CAN CHANGE ABOUT EITHER GIVES THIS
+// TABLE AN OWNER, which is why the class is written now rather than deferred.
+export const ingestFiles = pgTable('ingest_files', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  fileName: text('file_name').notNull(),
+  sha256: bytea('sha256').notNull(),
+  // PROVISIONAL: the real set depends on what the vendor delivers.
+  kind: text('kind').notNull(),
+  // Parsed from content, null until known.
+  tradingDay: date('trading_day'),
+  byteSize: bigint('byte_size', { mode: 'bigint' }).notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  status: ingestFileStatus('status').notNull().default('received'),
+  rowCount: integer('row_count'),
+  quarantineReason: text('quarantine_reason'),
+  appliedAt: timestamp('applied_at', { withTimezone: true }),
+  // SD-M2-03. Points at THIS table: a replacement supersedes rather than
+  // deletes, so the replaced file stays readable and the audit chain has no
+  // holes.
+  replacesIngestFileId: uuid('replaces_ingest_file_id').references(
+    (): AnyPgColumn => ingestFiles.id,
+  ),
+  disposition: text('disposition'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// raw_ingest_rows -- 0013_ingest.sql. FIRM, and it is a CONSEQUENCE of
+// `ingest_files` being firm rather than a second judgment.
+// -----------------------------------------------------------------------------
+// IMMUTABLE LANDING ZONE. Merit keeps the vendor's bytes because OUR
+// NORMALIZATION CAN BE WRONG AND THEIR FILE IS THE EVIDENCE. Append-only;
+// 24 months hot, then archived with the file digest.
+//
+// ITS ONLY REFERENCE IS `ingest_file_id uuid NOT NULL REFERENCES
+// ingest_files(id)`, AND `ingest_files` IS FIRM. A `derived` rule through it is
+// the trap `DerivedRule.via` cannot refuse -- the via type is `TableKey` and
+// includes every firm key -- so it would compile at every call site and throw
+// the first time anybody read the table.
+//
+// THE REVERSE EDGE IS THE PLAUSIBLE MISTAKE AND IT IS WORSE THAN THE FORWARD
+// ONE. `fills.raw_row_id bigint NOT NULL REFERENCES raw_ingest_rows(id)` is a
+// declared foreign key in the direction the derived-rule assertion accepts, so
+// a rule deriving this table through `fills` resolves, terminates at an owned
+// table, and passes every mechanical check in the package. It is still wrong:
+// only SOME raw rows become fills -- an EOD balance row becomes a `daily_marks`
+// input, an unparsed row becomes nothing, and a quarantined file's rows become
+// nothing BY DESIGN -- so the reading would silently drop exactly the rows a
+// dispute is argued from. `raw` is `jsonb` holding the vendor's verbatim
+// columns for whichever account the line concerns, and no column on this row
+// says which.
+export const rawIngestRows = pgTable('raw_ingest_rows', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  ingestFileId: uuid('ingest_file_id')
+    .notNull()
+    .references(() => ingestFiles.id),
+  lineNumber: integer('line_number').notNull(),
+  // Parsed columns, verbatim values.
+  raw: jsonb('raw').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// reconciliations -- 0014_marks.sql, SD-M2-06. DERIVED: `account_id`.
+// -----------------------------------------------------------------------------
+// ONE ACCOUNT'S BALANCE, OURS BESIDE THEIRS, FOR ONE TRADING DAY. `account_id
+// uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT`, so this is
+// `daily_marks`' hop exactly and the day contributes nothing to who may read
+// the row.
+//
+// `source_ingest_file_id` IS THE TRAP AND IT IS THIS MODULE'S CHARACTERISTIC
+// ONE. It is a foreign key to `ingest_files`, which is FIRM, and it reads
+// exactly like a legitimate hop; a rule through it would compile everywhere and
+// throw on first read. It is NULLABLE besides, so even a firm-free version of
+// the reading would drop every row reconciled before SD-M2-06 landed.
+//
+// `delta_cents` IS GENERATED, so the two sides and their difference can never
+// disagree, and `reconciliations_status_matches_delta` makes `match` mean a
+// zero delta BY CONSTRUCTION rather than by the writer's care.
+export const reconciliations = pgTable('reconciliations', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  tradingDay: date('trading_day').notNull(),
+  ourBalanceCents: bigint('our_balance_cents', { mode: 'bigint' }).notNull(),
+  platformBalanceCents: bigint('platform_balance_cents', { mode: 'bigint' }).notNull(),
+  deltaCents: bigint('delta_cents', { mode: 'bigint' }).generatedAlwaysAs(
+    sql`our_balance_cents - platform_balance_cents`,
+  ),
+  status: text('status').notNull(),
+  resolvedBy: text('resolved_by'),
+  resolutionNote: text('resolution_note'),
+  // SD-M2-06. WHICH FILE CARRIED THE VENDOR'S NUMBER. Nullable, and firm.
+  sourceIngestFileId: uuid('source_ingest_file_id').references(() => ingestFiles.id),
+  // SD-M2-06. Which of Merit's two internal derivations was compared.
+  ourSource: text('our_source'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 // -----------------------------------------------------------------------------
