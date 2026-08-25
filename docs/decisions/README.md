@@ -130,6 +130,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-100](ADR-100.md) | a route module contributes its routes as a unit and the directory listing is the module list  (2026-08-25, status: accepted) |
 | [ADR-101](ADR-101.md) | `derived` is REFUSED where the row carries its own identity column and refused again on a nullable edge, and the refusal is an assertion rather than a sentence  (2026-08-25, status: proposed) |
 | [ADR-102](ADR-102.md) | the accessor learns to WRITE inside a transaction it also produces, and a third door serves the rows that belong to nobody  (2026-08-25, status: proposed) |
+| [ADR-103](ADR-103.md) | the imbalance is unrepresentable, the posting path is a library both deployables call, and a halt is only a halt because this code path honours it  (2026-08-25, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
