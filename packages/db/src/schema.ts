@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// EIGHTY TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 31 are not reachable through either accessor: `SCOPE_RULES` is total
+// EIGHTY-FIVE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 26 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE EIGHTY ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE EIGHTY-FIVE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. TEN
-// of the eighty below carry later columns -- `sessions`, `plan_versions`,
+// of the eighty-five below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests` and
 // `promotional_credit_grants` -- and none of them could be registered at all
@@ -3342,4 +3342,221 @@ export const promotionalCreditGrants = pgTable('promotional_credit_grants', {
   // SD-M20-05, 0044. The settled payout that triggered a fee-back credit, NULL
   // on every offer-issued grant.
   sourcePayoutRequestId: uuid('source_payout_request_id'),
+});
+
+// -----------------------------------------------------------------------------
+// loyalty_criteria -- 0023_loyalty_and_graduation.sql. FIRM. SD-M14-03.
+// -----------------------------------------------------------------------------
+// VERSIONED PROMISES, AND A PROMISE BELONGS TO NOBODY UNTIL IT IS EARNED. The
+// table holds the PUBLISHED DEFINITION of a benefit and not an instance of one:
+// `loyalty_benefit_grants` is where a named person appears, and it cites this
+// table by `(benefit_code, criteria_version)` rather than being reached from it.
+// There is no identity column here and no correct one, because criteria that
+// differed per trader would not be published criteria.
+//
+// THE GRAIN IS `(benefit_code, version)` AND IT IS THE WHOLE PRIMARY KEY, so
+// the table has no `uuid` of its own. That is `price_floors`' shape and it has
+// the same consequence, stated rather than repaired: a version number alone
+// cannot address a row here, which is why `offers.criteria_version` is a bare
+// `integer` that selects nothing on its own.
+//
+// `superseded_by` IS A `benefit_code` AND NOT A ROW REFERENCE. The DDL declares
+// it `text NULL` with no foreign key at all -- it names the successor CODE when
+// a benefit is renamed, so it cannot address the `(code, version)` pair -- and it
+// is transcribed as the bare `text` it is.
+//
+// `breaks_on` IS ENUMERATED RATHER THAN IMPLIED (INV-M14-07). "What breaks my
+// streak" is the question a trader asks after it breaks, and answering it then
+// is too late (AS-M14-07), so the array is `NOT NULL DEFAULT '{}'` and an empty
+// promise says nothing breaks it rather than saying nothing.
+export const loyaltyCriteria = pgTable(
+  'loyalty_criteria',
+  {
+    benefitCode: text('benefit_code').notNull(),
+    version: integer('version').notNull(),
+    title: text('title').notNull(),
+    criteriaSpec: jsonb('criteria_spec').notNull(),
+    termsBodyMdx: text('terms_body_mdx').notNull(),
+    expiryRule: text('expiry_rule').notNull(),
+    breaksOn: text('breaks_on').array().notNull().default([]),
+    effectiveFrom: date('effective_from').notNull(),
+    // NO `.references()`: it is a `benefit_code` rather than a row, and the DDL
+    // declares no foreign key on it.
+    supersededBy: text('superseded_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.benefitCode, t.version] })],
+);
+
+// -----------------------------------------------------------------------------
+// loyalty_states -- 0023_loyalty_and_graduation.sql. OWNED: `identity_id`,
+// NOT NULL. SD-M14-01.
+// -----------------------------------------------------------------------------
+// DERIVED PER DAY, NEVER A MUTABLE BALANCE (INV-M14-03). A mutable counter
+// cannot be explained to a trader and cannot be audited: it says what it says.
+// A derived state reproduces from the event stream, so a tier change is
+// explicable and a hand edit is visible as a divergence.
+//
+// `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on
+// the row and it is the ONLY column that reaches a person. Every other column is
+// a counter, and INV-M14-12 is why the grain is the identity rather than the
+// account: cross-account loyalty is computed at the identity grain, from
+// completed ladders.
+//
+// THE GRAIN IS `(identity_id, as_of_trading_day)` AND THE DAY CONTRIBUTES
+// NOTHING TO WHO MAY READ IT, which is `analytics_snapshots`' and `daily_marks`'
+// shape one table over: ONE STATE PER IDENTITY PER DAY, so the composite key is
+// a history rather than a second owner.
+//
+// `inputs_digest` IS THE TAMPER INDICATION AND IT IS `bytea`. Recompute, compare,
+// and a mismatch is a finding. Transcribed as a custom `bytea` rather than
+// approximated as `text`, on this file's own header rule.
+//
+// `ladders_completed_lifetime` IS NOT A SEPARATE DELTA. It is inside SD-M14-01's
+// own column list, and 0023 says so in the column's own comment because the
+// corpus once recorded it as an addition (DELTA_MANIFEST section 7).
+export const loyaltyStates = pgTable(
+  'loyalty_states',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    asOfTradingDay: date('as_of_trading_day').notNull(),
+    payoutsLifetime: integer('payouts_lifetime').notNull(),
+    consecutivePayoutCycles: integer('consecutive_payout_cycles').notNull(),
+    accountsFundedLifetime: integer('accounts_funded_lifetime').notNull(),
+    laddersCompletedLifetime: integer('ladders_completed_lifetime').notNull().default(0),
+    resetsLifetime: integer('resets_lifetime').notNull(),
+    tenureDays: integer('tenure_days').notNull(),
+    derivationVersion: integer('derivation_version').notNull(),
+    inputsDigest: bytea('inputs_digest').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.identityId, t.asOfTradingDay] })],
+);
+
+// -----------------------------------------------------------------------------
+// loyalty_benefit_grants -- 0023_loyalty_and_graduation.sql. OWNED:
+// `identity_id`, NOT NULL. SD-M14-02.
+// -----------------------------------------------------------------------------
+// `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on
+// the row. A grant is a named person's entitlement from the moment it exists,
+// which is `promotional_credit_grants`' shape and its reason.
+//
+// `benefit_code` AND `criteria_version` CARRY NO `.references()` AND THAT IS THE
+// FILE'S RULE RATHER THAN AN OMISSION. Their foreign key is real -- 0023 declares
+// `loyalty_benefit_grants_criteria_fk` against `loyalty_criteria (benefit_code,
+// version)` -- but it is a table-level CONSTRAINT rather than an inline column
+// reference, and the header limits `.references()` to inline declarations. The
+// fold reads `ADD COLUMN` and deliberately ignores `ADD CONSTRAINT`, so a
+// constraint claimed here would be a claim nothing in this package checks.
+//
+// `consumed_ref` IS POLYMORPHIC AND IS NOT A SCOPE. It holds an M17 offer id or
+// an M03 purchase id, it is deliberately NOT a foreign key because it is two
+// kinds, and the single-spend guarantee is the partial unique index
+// `loyalty_benefit_grants_consumed_ref_uq` rather than a reference. A bare `uuid`
+// naming two possible parents reaches neither of them, so nothing here is
+// derivable through it.
+//
+// A REVOKED GRANT IS STILL THIS IDENTITY'S ROW. `revoked_at` and `revoked_reason`
+// are tied by `loyalty_benefit_grants_revocation_is_explained`, and
+// `loyalty_benefit_grants_not_both_consumed_and_revoked` refuses the row that
+// was both spent and withdrawn, which is INV-M14-09 in both directions.
+export const loyaltyBenefitGrants = pgTable('loyalty_benefit_grants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  benefitCode: text('benefit_code').notNull(),
+  criteriaVersion: integer('criteria_version').notNull(),
+  earnedOnTradingDay: date('earned_on_trading_day').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  // NOT a foreign key: an offer id or a purchase id, per 0023's own comment.
+  consumedRef: uuid('consumed_ref'),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  revokedReason: text('revoked_reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// discord_links -- 0019_notifications_and_community.sql. OWNED: `identity_id`,
+// NOT NULL. SD-M15-01.
+// -----------------------------------------------------------------------------
+// `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on
+// the row and it is the table's only reference. A LINK IS A CONSENT AND CONSENT
+// IS THE PERSON'S, so the identity is the grain even though the primary key is
+// the pair `(identity_id, discord_user_id)`: the second half is the FOREIGN
+// account's id, which is Discord's key and not Merit's, and it names no row here.
+//
+// THE LINK IS NEVER AN AUTHENTICATION FACTOR (INV-M15-03). Registering this table
+// makes it READABLE through the scoped accessor and nothing else -- ADR-092
+// section 9 draws that boundary -- and INV-M15-03's actual enforcement is
+// structural, by grant, outside this package entirely.
+//
+// `role_opt_ins` IS AN ARRAY BECAUSE CONSENT IS PER ROLE (INV-M15-01). A trader
+// may be happy to be publicly "Funded" and not at all happy to be publicly
+// "Recently Paid", and a single boolean would force one answer onto both.
+//
+// `link_nonce_hash` IS `bytea` AND IS TRANSCRIBED AS ONE. The nonce is stored
+// HASHED so a stolen database yields no live link tokens; declaring it `text`
+// would compile, would satisfy the column-name comparison, and would be a wrong
+// transcription of the column's type.
+//
+// `revoked_at` IS THE END STATE AND THE ROW SURVIVES IT. A revoked link is still
+// this identity's record that the link existed, and `discord_links_live_discord_user_uq`
+// is partial on `revoked_at IS NULL`, so revocation frees the Discord account
+// rather than deleting the history.
+export const discordLinks = pgTable(
+  'discord_links',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    discordUserId: text('discord_user_id').notNull(),
+    linkedAt: timestamp('linked_at', { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    roleOptIns: text('role_opt_ins').array().notNull().default([]),
+    linkNonceHash: bytea('link_nonce_hash').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.identityId, t.discordUserId] })],
+);
+
+// -----------------------------------------------------------------------------
+// discord_announcements -- 0019_notifications_and_community.sql. FIRM.
+// SD-M15-02.
+// -----------------------------------------------------------------------------
+// EVERY MESSAGE MERIT HAS EVER POSTED IN ITS OWN COMMUNITY, REPRODUCIBLE, WITH
+// THE EVENT THAT CAUSED IT (INV-M15-04, INV-M15-05). THE ROW IS MERIT SPEAKING,
+// so there is no identity column and there is no correct one: a post to a public
+// channel is addressed to the room, and a per-identity slice of it is not a
+// smaller version of it.
+//
+// `event_id` IS THE ONE COLUMN THAT LOOKS LIKE A PATH AND IT IS NOT ONE. It is
+// `bigint NULL REFERENCES events(id) ON DELETE RESTRICT`, it carries no
+// `.references()` because `events` is not one of this file's tables, and it is
+// NULLABLE besides -- a status post has no causing event. `integration_dispatches.event_id`
+// is the same column with the same treatment, one migration earlier.
+//
+// ANNOUNCEMENTS ARE TEMPLATE-ONLY. `template_code` is NOT NULL, so there is no
+// path by which a free-text post reaches the channel through this system, which
+// is what INV-M15-04 buys: a compromised bot token cannot speak a rule change
+// into existence in Merit's own voice.
+//
+// `rendered_body` IS STORED RATHER THAN RE-RENDERED, which is what makes the
+// table evidence: what was said is a fact about the past and a template that has
+// since changed cannot restate it. `discord_announcements_posted_has_ref` makes
+// `posted_at` imply `provider_message_ref`, so a row claiming to have been posted
+// names the message it claims to be.
+export const discordAnnouncements = pgTable('discord_announcements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // NO `.references()`: `events` is not one of this file's tables.
+  eventId: bigint('event_id', { mode: 'bigint' }),
+  templateCode: text('template_code').notNull(),
+  channelId: text('channel_id').notNull(),
+  renderedBody: text('rendered_body').notNull(),
+  postedAt: timestamp('posted_at', { withTimezone: true }),
+  providerMessageRef: text('provider_message_ref'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
