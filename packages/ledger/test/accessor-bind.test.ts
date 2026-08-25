@@ -70,7 +70,7 @@ describe("ADR-102's writer still has the shape this package restates", () => {
   // THE FINDING, WATCHED RATHER THAN ONLY WRITTEN DOWN. A posting touches two
   // parties' accounts, so only `SystemTx` can write it, and `SystemReason` has
   // exactly two members -- neither of which a request handler is. The day a
-  // third member lands, this test says so and the finding in ADR-103 is closed
+  // third member lands, this test says so and the finding in ADR-104 is closed
   // by whoever added it rather than rediscovered.
   test('SystemReason is still exactly two members, so a request handler is still neither', () => {
     const declared = /export type SystemReason =([^;]+);/.exec(scopedDb)?.[1] ?? '';

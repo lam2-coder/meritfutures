@@ -11,7 +11,7 @@
 // order, with the values each one carried.
 //
 // THAT IS NOT A SUBSTITUTE FOR THE ROUND TRIP AND THE ENTRY SAYS SO. What this
-// cannot see is whether Postgres accepts the rows, which is why ADR-103 section
+// cannot see is whether Postgres accepts the rows, which is why ADR-104 section
 // on the executed round trip exists and why it is reported as evidence rather
 // than claimed as a control.
 

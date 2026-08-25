@@ -3037,7 +3037,7 @@ const MODEL_ENDPOINT_HOSTS = [
  * The paths assertion 1 scans. ADR-044 names four money paths and TWO of them
  * now exist; the other two are listed as the names assertion 2 watches for.
  *
- * `packages/ledger` JOINED THIS LIST BECAUSE ASSERTION 2 DEMANDED IT. ADR-103
+ * `packages/ledger` JOINED THIS LIST BECAUSE ASSERTION 2 DEMANDED IT. ADR-104
  * landed the posting path and this gate failed on the good news, naming the
  * package and quoting its own rule back: a directory whose name carries one of
  * `MONEY_PATH_WORDS` and is absent from this list means ADR-044 prohibition 1 is

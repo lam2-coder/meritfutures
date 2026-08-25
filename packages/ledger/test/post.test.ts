@@ -4,7 +4,7 @@
 // THE WRITE, ASSERTED AS THE SEQUENCE OF CALLS IT MAKES THROUGH ADR-102's
 // ACCESSOR. Nothing here executes SQL and the header of `recording-tx.ts` says
 // why: there is no Postgres in CI, and a test that skips is worse than one that
-// does not exist. The round trip is executed by hand and reported in ADR-103.
+// does not exist. The round trip is executed by hand and reported in ADR-104.
 
 import { describe, expect, test } from 'vitest';
 
@@ -174,7 +174,7 @@ describe('THE SEEDED WRITE THAT MUST BE REFUSED, and it is refused before the da
   // So the guard `postTransaction` runs is driven DIRECTLY, with a credit that
   // has no debit, which is the same function on the same path with the fold
   // taken out of the way. The end-to-end direction is watched by MUTATION and
-  // reported in ADR-103 section 9 rather than committed, because a committed
+  // reported in ADR-104 section 9 rather than committed, because a committed
   // test for it would have to break `entriesOf` to reach it.
 
   test('a Posting assembled past BOTH brands still folds to zero, which is the claim', () => {
