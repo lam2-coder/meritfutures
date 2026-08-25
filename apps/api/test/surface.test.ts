@@ -129,7 +129,18 @@ test('the surface set is closed', () => {
   expect(resolveSurface({ [SURFACE_VAR]: ' operator ' })).toBe('operator');
 });
 
-test('the deployable starts once its surface is configured, and not before', () => {
-  expect(() => main({ [SURFACE_VAR]: 'public' })).not.toThrow();
-  expect(() => main({})).toThrow(SurfaceError);
+// AMENDED BY SESSION 209, AND THE HALF THAT WAS DELETED IS SAID RATHER THAN
+// QUIETLY DROPPED. When this test was written `main` resolved the surface and
+// logged; it now discovers modules, composes them and LISTENS, so calling it
+// with a valid surface binds a socket, which is not a thing a unit test may do
+// on a fixed port. The positive half moved to a real process: `pnpm start` under
+// `MERIT_API_SURFACE=public` is run in session 209's log with the status codes
+// it answered, which is stronger evidence than this assertion ever was.
+//
+// THE HALF THAT STAYS IS THE ONE THAT MATTERS: the refusal happens BEFORE
+// anything is read off disk and before anything listens, so a deployment that
+// has not been configured never reaches a port at all.
+test('an unconfigured deployable refuses before it discovers or listens', async () => {
+  await expect(main({})).rejects.toThrow(SurfaceError);
+  await expect(main({ [SURFACE_VAR]: 'admin' })).rejects.toThrow(SurfaceError);
 });

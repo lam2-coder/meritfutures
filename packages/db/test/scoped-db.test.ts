@@ -791,7 +791,7 @@ describe('the TypeScript schema has not drifted from the DDL', () => {
 });
 
 // =============================================================================
-// ADR-100. WHICH CLASS IS AVAILABLE, AND WHAT A NULLABLE HOP MEANS.
+// ADR-101. WHICH CLASS IS AVAILABLE, AND WHAT A NULLABLE HOP MEANS.
 // =============================================================================
 // The vocabulary answers HOW a row reaches an identity. Nothing in it asked
 // WHETHER `derived` was allowed to be the answer on a row that already carries
@@ -829,13 +829,13 @@ describe('the TypeScript schema has not drifted from the DDL', () => {
 // THE READER IS THE FOLD AND NEVER THE `CREATE TABLE`, on ADR-094: a table is
 // read AS OF THE LAST MIGRATION. Every identity-column reader above this line
 // stops at the CREATE, and `admin_actions.on_behalf_of_identity_id` -- added by
-// `ALTER TABLE` in 0043 -- is invisible to all of them. ADR-100 section 6
+// `ALTER TABLE` in 0043 -- is invisible to all of them. ADR-101 section 8
 // records that as a finding against the `firm` assertion and does not repair it
 // there, because `admin_actions` is correctly `firm` and the repair is a ruling
 // about what the `firm` class promises rather than about this one.
 
 /**
- * ONE TABLE'S COLUMN DEFINITIONS, REPLAYED. ADR-100, on ADR-094's fold.
+ * ONE TABLE'S COLUMN DEFINITIONS, REPLAYED. ADR-101, on ADR-094's fold.
  *
  * `foldTable` folds NAMES and that is all its own assertions need. A scope rule
  * is checked against the `REFERENCES` clause and against `NOT NULL`, which live
@@ -926,6 +926,40 @@ function derivedEdge(key: TableKey): { where: string; def: string | undefined } 
     : { where: `${SQL_NAME[rule.via]}.${rule.foreignColumn}`, def: there };
 }
 
+// WHAT THESE ASSERTIONS DO NOT REFUSE, STATED HERE RATHER THAN LEFT TO BE
+// DISCOVERED. ADR-101 section 7.
+//
+// A `semi-join` traverses the REVERSE edge: the foreign key is declared on the
+// via table, pointing back at this one. Clause 2 below checks that column's
+// nullability, which is the right check and is not the whole property.
+// `NOT NULL` constrains the CHILD -- every child names a parent -- and the
+// traversal needs the reverse: that every PARENT has a child. SQL declares the
+// first and has no way to declare the second, so no assertion over these
+// migrations can verify it.
+//
+//   raw_ingest_rows  derived via fills on the reverse edge
+//                    `fills.raw_row_id bigint NOT NULL REFERENCES
+//                    raw_ingest_rows(id)` resolves, terminates at an owned
+//                    table, and PASSES EVERYTHING BELOW. It is wrong because an
+//                    EOD balance row, an unparsed row, and every row of a
+//                    quarantined file become no fill at all, so the read drops
+//                    exactly the rows a dispute is argued from. Seeded and
+//                    watched passing at 113 of 113 with these clauses running.
+//
+// `ledger_transactions` IS THE REGISTRY'S ONLY `semi-join` RULE AND IT RESTS ON
+// THE SAME UNSTATED PROPERTY. 0009_ledger.sql declares no trigger and no
+// constraint requiring a transaction to have entries. What separates it from the
+// seed is semantic: there the entries ARE the tenancy, and a transaction with no
+// entries correctly belongs to nobody, whereas a raw ingest row HAS an owner --
+// inside `raw jsonb`, where no scope rule reaches it. A parser cannot tell a
+// relation that is CONSTITUTIVE of tenancy from one merely CORRELATED with it.
+//
+// The remedy ADR-101 section 7 prices is an ATTESTATION on reverse-edge rules,
+// and it is the exact inverse of clause 3 below: `nullable` gets no field
+// because the DDL declares it, and reverse-edge totality gets one because the
+// DDL cannot. A field earns its place exactly when the fact is absent from the
+// primary source. It is not written here because it edits a table's row.
+
 describe('a class is REFUSED as well as declared', () => {
   test('a folded definition set names exactly the folded column set, so the two folds cannot disagree', () => {
     for (const [, sqlName] of DDL_NAMES) {
@@ -935,7 +969,7 @@ describe('a class is REFUSED as well as declared', () => {
     }
   });
 
-  // ADR-100 CLAUSE 1. Measured against all eighty rules before it was ruled:
+  // ADR-101 CLAUSE 1. Measured against all eighty rules before it was ruled:
   // it refuses ZERO of the fourteen registered `derived` rules, so no green row
   // turns red and there is no exemption to write down.
   test('no derived rule stands on a row that carries its own identity column', () => {
@@ -967,7 +1001,7 @@ describe('a class is REFUSED as well as declared', () => {
     }
   });
 
-  // ADR-100 CLAUSE 2, and it is the half clause 1 does not cover: a row with no
+  // ADR-101 CLAUSE 2, and it is the half clause 1 does not cover: a row with no
   // identity column of its own, hopping a column that is NULL on most of them.
   // Refuses ZERO of the fourteen, measured before it was ruled.
   test('no derived rule traverses a nullable edge, because the null rows are a subset it returns in silence', () => {
@@ -987,15 +1021,15 @@ describe('a class is REFUSED as well as declared', () => {
     }
   });
 
-  // ADR-100 CLAUSE 3, AND IT CHECKS A FIELD THIRTY-FOUR RULES HAVE STATED SINCE
+  // ADR-101 CLAUSE 3, AND IT CHECKS A FIELD THIRTY-FOUR RULES HAVE STATED SINCE
   // THE REGISTRY EXISTED. `OwnedRule.nullable` is read by NOTHING: `scopePredicate`
   // says in its own comment that a nullable identity column needs no second
   // predicate, and no assertion in this file compared the flag to the DDL. That
-  // is why ADR-100 adds no `nullable` to `DerivedRule` -- a second field nothing
+  // is why ADR-101 adds no `nullable` to `DerivedRule` -- a second field nothing
   // reads and nothing checks is a second thing asserting itself, which is
   // session 145's failure, and the nullability that matters is read from the
   // migrations by the clause above.
-  test('every owned rule states the nullability the DDL declares, which nothing checked before ADR-100', () => {
+  test('every owned rule states the nullability the DDL declares, which nothing checked before ADR-101', () => {
     for (const key of TABLE_KEYS) {
       const rule = SCOPE_RULES[key];
       if (rule.class !== 'owned') continue;
