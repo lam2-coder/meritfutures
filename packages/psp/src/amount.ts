@@ -28,7 +28,10 @@
 // -----------------------------------------------------------------------------
 // THE AMOUNT THE CARD IS CHARGED IS NOT `amount_paid_cents`.
 //
-// `0006_commerce.sql`'s `purchases_wallet_debit_bounds` reads, verbatim:
+// `0006_commerce.sql:189`'s `purchases_wallet_leg_matches_method` reads,
+// verbatim, and the constraint's NAME was checked against the file rather than
+// remembered: the first draft of this comment called it
+// `purchases_wallet_debit_bounds`, which is not a constraint in this schema.
 //
 //     (payment_method = 'psp'    AND wallet_debit_cents = 0)
 //     OR
@@ -74,7 +77,7 @@ export interface PurchaseRowMoney {
 /** Why a row has no card leg to charge. Closed, and each member is a refusal. */
 export type CardLegRefusal =
   | 'wallet_funded_purchase_has_no_card_leg'
-  | 'row_violates_wallet_debit_bounds'
+  | 'row_violates_wallet_leg_bounds'
   | 'amount_is_not_integer_cents';
 
 /**
@@ -124,16 +127,16 @@ export function cardLegOf(row: PurchaseRowMoney): CardAmountCents {
   }
   if (amountPaidCents < 0n || walletDebitCents < 0n) {
     throw new CardLegError(
-      'row_violates_wallet_debit_bounds',
+      'row_violates_wallet_leg_bounds',
       `amount_paid_cents=${amountPaidCents} wallet_debit_cents=${walletDebitCents}, both are CHECKed >= 0`,
     );
   }
 
-  // The three branches are `purchases_wallet_debit_bounds`, in its own order.
+  // The three branches are `purchases_wallet_leg_matches_method`, in its own order.
   if (paymentMethod === 'psp') {
     if (walletDebitCents !== 0n) {
       throw new CardLegError(
-        'row_violates_wallet_debit_bounds',
+        'row_violates_wallet_leg_bounds',
         `payment_method='psp' requires wallet_debit_cents = 0, got ${walletDebitCents}`,
       );
     }
@@ -143,7 +146,7 @@ export function cardLegOf(row: PurchaseRowMoney): CardAmountCents {
   if (paymentMethod === 'wallet') {
     if (walletDebitCents !== amountPaidCents || amountPaidCents <= 0n) {
       throw new CardLegError(
-        'row_violates_wallet_debit_bounds',
+        'row_violates_wallet_leg_bounds',
         `payment_method='wallet' requires wallet_debit_cents = amount_paid_cents > 0, got ${walletDebitCents} against ${amountPaidCents}`,
       );
     }
@@ -155,7 +158,7 @@ export function cardLegOf(row: PurchaseRowMoney): CardAmountCents {
 
   if (walletDebitCents <= 0n || walletDebitCents >= amountPaidCents) {
     throw new CardLegError(
-      'row_violates_wallet_debit_bounds',
+      'row_violates_wallet_leg_bounds',
       `payment_method='mixed' requires 0 < wallet_debit_cents < amount_paid_cents, got ${walletDebitCents} against ${amountPaidCents}`,
     );
   }

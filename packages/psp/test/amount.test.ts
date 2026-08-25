@@ -5,7 +5,7 @@
 // `amount.ts`. ADR-084 section 7 is why: that session's first suite passed all
 // 22 assertions against a seeded violation because the expected value had been
 // taken from the code under test. The three branches below are
-// `purchases_wallet_debit_bounds`, transcribed, and the mixed case's arithmetic
+// `purchases_wallet_leg_matches_method`, transcribed, and the mixed case's arithmetic
 // is ADR-019's own worked example ("a trader with $60 in the wallet buying a
 // $99 evaluation").
 // =============================================================================
@@ -85,9 +85,9 @@ describe('cardLegOf re-checks the DDL bounds, because a row can arrive unwritten
       expect(() => cardLegOf(row)).toThrow(CardLegError);
       try {
         cardLegOf(row);
-        expect.unreachable('the row violates purchases_wallet_debit_bounds');
+        expect.unreachable('the row violates purchases_wallet_leg_matches_method');
       } catch (error) {
-        expect((error as CardLegError).refusal).toBe('row_violates_wallet_debit_bounds');
+        expect((error as CardLegError).refusal).toBe('row_violates_wallet_leg_bounds');
       }
     });
   }
