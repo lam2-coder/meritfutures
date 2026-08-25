@@ -42,7 +42,7 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import { advanceDay, buildCalendarSlice, evaluatePayout } from '../src/index.js';
+import { advanceDay, buildCalendarSlice, evaluatePayout } from '../src/index.ts';
 import type {
   AccountStatus,
   CalendarSlice,
@@ -51,7 +51,7 @@ import type {
   PayoutContext,
   ResolvedPlan,
   RuleState,
-} from '../src/index.js';
+} from '../src/index.ts';
 import {
   ACCOUNT_OPENED_ON,
   ENGINE_VERSION,
@@ -60,10 +60,10 @@ import {
   day,
   fundedPrior,
   mark,
-} from './fixtures-in-code.js';
-import { daySequenceArbitrary } from './generators/day-sequence.js';
-import type { DaySequence } from './generators/day-input.js';
-import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.js';
+} from './fixtures-in-code.ts';
+import { daySequenceArbitrary } from './generators/day-sequence.ts';
+import type { DaySequence } from './generators/day-input.ts';
+import { materializedFrom, sliceOf, toEngineMark } from './generator-bridge.ts';
 
 // -----------------------------------------------------------------------------
 // R-42, RE-DERIVED FROM PLAN DATA RATHER THAN FROM `capForOrdinal`

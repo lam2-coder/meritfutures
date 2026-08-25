@@ -30,9 +30,9 @@
 // one.
 // =============================================================================
 
-import type { ContentDocument, ContentKind } from '../content/documents.js';
-import type { StatsPublication } from '../stats/published.js';
-import type { BuiltAt, SiteCatalog } from './types.js';
+import type { ContentDocument, ContentKind } from '../content/documents.ts';
+import type { StatsPublication } from '../stats/published.ts';
+import type { BuiltAt, SiteCatalog } from './types.ts';
 
 /**
  * `GET /plans` and `GET /plans/:planId/versions/:version`.

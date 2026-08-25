@@ -41,9 +41,9 @@
 import Fastify from 'fastify';
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
-import { compose } from './registry.js';
-import type { CompositionReport, RouteModule } from './registry.js';
-import type { ApiSurface } from './surface.js';
+import { compose } from './registry.ts';
+import type { CompositionReport, RouteModule } from './registry.ts';
+import type { ApiSurface } from './surface.ts';
 
 /**
  * The problem-document type URI prefix, API_CONTRACT section 2.

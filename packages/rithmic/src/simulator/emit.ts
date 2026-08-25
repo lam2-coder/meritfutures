@@ -37,11 +37,11 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { renderCsv, DECLARED_CSV_QUIRKS, type CsvQuirks, type CsvTable } from './csv.js';
-import { eodReportTable, DECLARED_EOD_OPTIONS, type EodReportOptions } from './eod-report.js';
-import { fillsReportTable } from './fills-report.js';
-import { compactTradingDay } from './time.js';
-import type { SimRun, TradingDay } from './types.js';
+import { renderCsv, DECLARED_CSV_QUIRKS, type CsvQuirks, type CsvTable } from './csv.ts';
+import { eodReportTable, DECLARED_EOD_OPTIONS, type EodReportOptions } from './eod-report.ts';
+import { fillsReportTable } from './fills-report.ts';
+import { compactTradingDay } from './time.ts';
+import type { SimRun, TradingDay } from './types.ts';
 
 /** `ingest_files.kind` (0013). The values are the schema's, not this package's. */
 export type IngestFileKind = 'eod_report' | 'fills';

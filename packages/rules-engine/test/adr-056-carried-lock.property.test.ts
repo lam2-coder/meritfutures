@@ -38,8 +38,8 @@
 import fc from 'fast-check';
 import { beforeAll, describe, expect, test } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import { buildCalendarSlice } from '../src/calendar.js';
+import { advanceDay } from '../src/day/advance.ts';
+import { buildCalendarSlice } from '../src/calendar.ts';
 import type {
   CalendarSlice,
   Cents,
@@ -47,7 +47,7 @@ import type {
   ResolvedPlan,
   RuleState,
   TradingDay,
-} from '../src/types.js';
+} from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -57,7 +57,7 @@ import {
   day,
   evalPrior,
   mark,
-} from './fixtures-in-code.js';
+} from './fixtures-in-code.ts';
 
 const RUNS = 300;
 const REACHABILITY = 1_000;

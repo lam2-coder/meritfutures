@@ -35,8 +35,8 @@ import type {
   ReconClearGate,
   ResolvedPlan,
   RuleState,
-} from '../types.js';
-import { clampPayout } from './clamp.js';
+} from '../types.ts';
+import { clampPayout } from './clamp.ts';
 
 /** What the caller supplies beyond the state and the plan. */
 export interface PayoutContext {

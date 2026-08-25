@@ -25,7 +25,7 @@
 // nothing, and that is checkable from outside.
 // =============================================================================
 
-import type { RuleId } from '../src/rules.js';
+import type { RuleId } from '../src/rules.ts';
 
 /**
  * Rule id to the sentence its `RE-U-nn` test asserts, in the spelling M01

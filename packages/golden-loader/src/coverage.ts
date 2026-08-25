@@ -53,16 +53,16 @@ import {
   registryIds,
   REPO_ROOT,
   type GoldenFixture,
-} from './loader.js';
+} from './loader.ts';
 import {
   checkDeclarationAgainstFold,
   derivePolarity,
   type DeclarationCheck,
   type Derivation,
   type Polarity,
-} from './polarity.js';
-import { describeDiff } from './compare.js';
-import { engineIsIdentityStub, runFixture } from './run.js';
+} from './polarity.ts';
+import { describeDiff } from './compare.ts';
+import { engineIsIdentityStub, runFixture } from './run.ts';
 
 /**
  * The engine's declaration, read once and passed down.

@@ -51,8 +51,8 @@ ruleTester.run('no-raw-db-client', noRawDbClient, {
 
     // Ordinary intra-package imports, including relative paths that go up
     // without landing in packages/db/src.
-    "import { SERVICE } from './service.js';",
-    "import { format } from '../shared/format.js';",
+    "import { SERVICE } from './service.ts';",
+    "import { format } from '../shared/format.ts';",
     "import { evaluate } from '@merit/rules-engine';",
 
     // A string that happens to name a client but is not a specifier.
@@ -128,7 +128,7 @@ ruleTester.run('no-raw-db-client', noRawDbClient, {
     },
     {
       name: 'the relative form of the same walk, which no exports map can stop',
-      code: "import { client } from '../../db/src/client.js';",
+      code: "import { client } from '../../db/src/client.ts';",
       errors: [{ messageId: 'deepImport' }],
     },
   ],

@@ -91,17 +91,17 @@
 
 import fc from 'fast-check';
 
-import type { DailyMark, DaySequence, TradingDay } from './day-input.js';
-import { daySequenceArbitrary } from './day-sequence.js';
-import type { MaterializedPlan } from './plan-config.js';
-import { planArbitrary } from './plan.js';
+import type { DailyMark, DaySequence, TradingDay } from './day-input.ts';
+import { daySequenceArbitrary } from './day-sequence.ts';
+import type { MaterializedPlan } from './plan-config.ts';
+import { planArbitrary } from './plan.ts';
 import {
   capForOrdinal,
   traderLeg,
   type SettlementFact,
   type SettlementSequence,
   type SsRuleId,
-} from './validate-settlement-sequence.js';
+} from './validate-settlement-sequence.ts';
 
 export interface SettlementSequenceArbitraryOptions {
   /**

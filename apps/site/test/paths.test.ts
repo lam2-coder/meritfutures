@@ -10,8 +10,8 @@ import {
   planVersionRulesPath,
   planVersionSizePath,
   versionPageMeta,
-} from '../src/routes/paths.js';
-import { label, sizeRow, sizeView, versionView } from './fixtures.js';
+} from '../src/routes/paths.ts';
+import { label, sizeRow, sizeView, versionView } from './fixtures.ts';
 
 // CI-02, the `unit` project. M9-V-nn: content versioning and permanent URLs.
 

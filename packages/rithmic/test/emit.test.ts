@@ -4,13 +4,13 @@ import { join } from 'node:path';
 
 import { expect, test } from 'vitest';
 
-import { canonicalInput, CANONICAL_POPULATION_SPEC, CANONICAL_SESSIONS } from './canonical.js';
-import { DECLARED_CSV_QUIRKS } from '../src/simulator/csv.js';
-import { renderRun, writeFiles, EmitError } from '../src/simulator/emit.js';
-import { EOD_REPORT_COLUMNS } from '../src/simulator/eod-report.js';
-import { FILLS_REPORT_COLUMNS } from '../src/simulator/fills-report.js';
-import { buildPopulation } from '../src/simulator/population.js';
-import { simulate } from '../src/simulator/session.js';
+import { canonicalInput, CANONICAL_POPULATION_SPEC, CANONICAL_SESSIONS } from './canonical.ts';
+import { DECLARED_CSV_QUIRKS } from '../src/simulator/csv.ts';
+import { renderRun, writeFiles, EmitError } from '../src/simulator/emit.ts';
+import { EOD_REPORT_COLUMNS } from '../src/simulator/eod-report.ts';
+import { FILLS_REPORT_COLUMNS } from '../src/simulator/fills-report.ts';
+import { buildPopulation } from '../src/simulator/population.ts';
+import { simulate } from '../src/simulator/session.ts';
 
 // CI-02, the `unit` project.
 //

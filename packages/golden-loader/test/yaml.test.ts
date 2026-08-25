@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { YamlSubsetError, parseYamlSubset } from '../src/yaml.js';
+import { YamlSubsetError, parseYamlSubset } from '../src/yaml.ts';
 
 // =============================================================================
 // The parser's refusals are the feature, so they are what is tested

@@ -4,8 +4,8 @@ import {
   cadenceClaim,
   cadenceCopyPublishesADominatedGap,
   renderCadenceCopy,
-} from '../src/render/cadence.js';
-import { rules } from './fixtures.js';
+} from '../src/render/cadence.ts';
+import { rules } from './fixtures.ts';
 
 // CI-02, the `unit` project. M9-D-nn: INV-M9-08's half of disclosure presence.
 

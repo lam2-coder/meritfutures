@@ -46,7 +46,7 @@
 // later migration reintroduces the adjustment into the closing identity.
 // =============================================================================
 
-import type { CalendarDay, DailyMark, DaySequence } from './day-input.js';
+import type { CalendarDay, DailyMark, DaySequence } from './day-input.ts';
 
 export type DsRuleId =
   // ADR-049: the coverage interval the slice declares.

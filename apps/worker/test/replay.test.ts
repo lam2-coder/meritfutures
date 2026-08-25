@@ -38,8 +38,8 @@ import {
   type SettlementFact,
 } from '@merit/rules-engine';
 
-import { foldAccountDay } from '../src/batch/nightly.js';
-import type { AccountDay, RuleStateRow } from '../src/batch/ports.js';
+import { foldAccountDay } from '../src/batch/nightly.ts';
+import type { AccountDay, RuleStateRow } from '../src/batch/ports.ts';
 import {
   auditAccount,
   diffStoredAgainstRecomputed,
@@ -47,9 +47,9 @@ import {
   ReplayAuditRefusal,
   type AccountDayInput,
   type ReplayAuditConfig,
-} from '../src/batch/replay.js';
-import { ENGINE_GATE_LEAVES, stateHash, type StateHashSubject } from '../src/batch/state-hash.js';
-import { ACCOUNT_A, ACCOUNT_B, CALENDAR, CLEAR, ENGINE_VERSION, PLAN, td } from './fixtures.js';
+} from '../src/batch/replay.ts';
+import { ENGINE_GATE_LEAVES, stateHash, type StateHashSubject } from '../src/batch/state-hash.ts';
+import { ACCOUNT_A, ACCOUNT_B, CALENDAR, CLEAR, ENGINE_VERSION, PLAN, td } from './fixtures.ts';
 
 const WATERMARK = 11;
 

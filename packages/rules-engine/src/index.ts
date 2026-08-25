@@ -23,7 +23,7 @@ export type {
   PlanConfigVersion,
   PlanVersionId,
   TradingDay,
-} from './types.js';
+} from './types.ts';
 
 // -----------------------------------------------------------------------------
 // M01's surface, as far as it is built
@@ -144,23 +144,23 @@ export type {
   ValidationResult,
   WinDaysGate,
   WinDaysResetEvent,
-} from './types.js';
+} from './types.ts';
 
 export {
   buildCalendarSlice,
   CalendarSliceError,
   lookupCalendarDay,
   nextTradingDayAfter,
-} from './calendar.js';
-export type { CalendarLookup, CalendarSource } from './calendar.js';
+} from './calendar.ts';
+export type { CalendarLookup, CalendarSource } from './calendar.ts';
 
-export { EngineInvariantError } from './errors.js';
+export { EngineInvariantError } from './errors.ts';
 
-export { IMPLEMENTED_RULES } from './rules.js';
-export type { RuleId } from './rules.js';
+export { IMPLEMENTED_RULES } from './rules.ts';
+export type { RuleId } from './rules.ts';
 
-export { resolvePlan } from './plan/resolve.js';
-export { validatePlan } from './plan/validate.js';
+export { resolvePlan } from './plan/resolve.ts';
+export { validatePlan } from './plan/validate.ts';
 
 // `hash.ts` IS ADR-081, AND IT IS ADR-078's TEST APPLIED A SECOND TIME. Section
 // 1.3's layout lists `hash.ts` exactly as it lists `payout/clamp.ts` and
@@ -192,10 +192,10 @@ export { validatePlan } from './plan/validate.js';
 //   it is that, and not when it is a coverage exercise. This is not a licence
 //   to export a frozen table nothing reads.
 
-export { advanceDay, initialState } from './day/advance.js';
-export { applySettlement } from './payout/settle.js';
-export { evaluatePayout } from './payout/evaluate.js';
-export { replay, ReplayAssertionError } from './replay.js';
+export { advanceDay, initialState } from './day/advance.ts';
+export { applySettlement } from './payout/settle.ts';
+export { evaluatePayout } from './payout/evaluate.ts';
+export { replay, ReplayAssertionError } from './replay.ts';
 export {
   canonicalStateSerialization,
   ENGINE_GATE_LEAVES,
@@ -203,13 +203,13 @@ export {
   HASHED_COLUMNS,
   StateHashError,
   stateHash,
-} from './hash.js';
-export type { PayoutContext } from './payout/evaluate.js';
-export type { SettlementOutput } from './payout/settle.js';
+} from './hash.ts';
+export type { PayoutContext } from './payout/evaluate.ts';
+export type { SettlementOutput } from './payout/settle.ts';
 export type {
   ExcludedColumn,
   GateLeaf,
   HashedColumn,
   HashedState,
   StateHashSubject,
-} from './hash.js';
+} from './hash.ts';

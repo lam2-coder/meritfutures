@@ -13,9 +13,9 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay, initialState } from '../src/day/advance.js';
-import { withdrawableCents } from '../src/payout/gates.js';
-import type { DayOutput, ResolvedPlan, RuleState } from '../src/types.js';
+import { advanceDay, initialState } from '../src/day/advance.ts';
+import { withdrawableCents } from '../src/payout/gates.ts';
+import type { DayOutput, ResolvedPlan, RuleState } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -27,8 +27,8 @@ import {
   fundedPrior,
   mark,
   withFundedMinTradingDays,
-} from './fixtures-in-code.js';
-import { reU } from './rule-coverage.js';
+} from './fixtures-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 /** One day, folded. */
 function fold(

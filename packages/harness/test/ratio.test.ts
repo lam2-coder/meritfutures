@@ -20,7 +20,7 @@ import {
   RatioError,
   subtract,
   toBasisPoints,
-} from '../src/ratio.js';
+} from '../src/ratio.ts';
 
 describe('a ratio', () => {
   it('reduces, so two spellings of one value compare and serialize the same', () => {

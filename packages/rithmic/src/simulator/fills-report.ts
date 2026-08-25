@@ -28,8 +28,8 @@
 // honest residual), and getting one is a founder action.
 // =============================================================================
 
-import { formatPrice, type CsvTable } from './csv.js';
-import type { ContractSpec, SimRun } from './types.js';
+import { formatPrice, type CsvTable } from './csv.ts';
+import type { ContractSpec, SimRun } from './types.ts';
 
 /** The published column order. Positions are not a contract; see GS-085. */
 export const FILLS_REPORT_COLUMNS = [

@@ -66,8 +66,8 @@
 // upstream of it: `simulate` is untouched and the file mode is untouched.
 // =============================================================================
 
-import type { Cents, SimDay, SimRun, SimWaypoint, TradingDay } from './types.js';
-import { parseInstantUtc } from './time.js';
+import type { Cents, SimDay, SimRun, SimWaypoint, TradingDay } from './types.ts';
+import { parseInstantUtc } from './time.ts';
 
 /** Thrown when a run cannot be streamed as asked. */
 export class StreamError extends Error {

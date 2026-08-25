@@ -26,9 +26,9 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import { consistencyOk } from '../src/day/consistency.js';
-import { advanceFloor } from '../src/day/floor.js';
+import { advanceDay } from '../src/day/advance.ts';
+import { consistencyOk } from '../src/day/consistency.ts';
+import { advanceFloor } from '../src/day/floor.ts';
 import type {
   DayOutput,
   FloorLockedEvent,
@@ -37,7 +37,7 @@ import type {
   ResolvedPlan,
   RuleState,
   TradingDay,
-} from '../src/types.js';
+} from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -51,8 +51,8 @@ import {
   mark,
   withEvalMaxDays,
   withEvalMinTradingDays,
-} from './fixtures-in-code.js';
-import { reU } from './rule-coverage.js';
+} from './fixtures-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 /** One eval day, folded. Every test in this file is one or a few of these. */
 function fold(

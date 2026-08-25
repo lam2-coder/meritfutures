@@ -28,9 +28,9 @@
 // and the amount shown is the server's `max_payout_cents`." This file makes both
 // values available and computes neither. The button is owed.
 
-import type { EligibilityGates, EligibilityResponse } from '../api/types.js';
-import { formatCents, formatOptionalBasisPoints, formatOptionalCents } from '../format/money.js';
-import type { AccountState } from './as-of.js';
+import type { EligibilityGates, EligibilityResponse } from '../api/types.ts';
+import { formatCents, formatOptionalBasisPoints, formatOptionalCents } from '../format/money.ts';
+import type { AccountState } from './as-of.ts';
 
 /** The ten gates, in the order the contract declares them. */
 export type GateId = keyof EligibilityGates;

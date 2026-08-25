@@ -126,7 +126,7 @@ import {
   walletEntries,
   walletSpendLimits,
   walletWithdrawals,
-} from './schema.js';
+} from './schema.ts';
 
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.

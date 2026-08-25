@@ -46,7 +46,7 @@
 // onto, which is the same "absence of the field is the control" idiom the
 // banner uses for its dismiss control.
 
-import type { ImpersonationBannerView } from './impersonation-banner.js';
+import type { ImpersonationBannerView } from './impersonation-banner.ts';
 
 /**
  * What a read surface can be showing.

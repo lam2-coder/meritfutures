@@ -83,14 +83,14 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import { evaluateEngineGates } from '../src/payout/gates.js';
+import { evaluateEngineGates } from '../src/payout/gates.ts';
 import type {
   Cents,
   EngineGateResults,
   ResolvedPlan,
   RuleState,
   TradingDay,
-} from '../src/index.js';
+} from '../src/index.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -100,10 +100,10 @@ import {
   day,
   fundedPrior,
   withFundedMinTradingDays,
-} from './fixtures-in-code.js';
-import { daySequenceArbitrary } from './generators/day-sequence.js';
-import { materializedFrom } from './generator-bridge.js';
-import { foldSequence } from './property-harness.js';
+} from './fixtures-in-code.ts';
+import { daySequenceArbitrary } from './generators/day-sequence.ts';
+import { materializedFrom } from './generator-bridge.ts';
+import { foldSequence } from './property-harness.ts';
 
 const RUNS = 200;
 const REACHABILITY = 1500;
@@ -194,7 +194,7 @@ const priorFor = (plan: ResolvedPlan, shape: Shape): RuleState | null => {
 interface Case {
   readonly plan: ResolvedPlan;
   readonly shape: Shape;
-  readonly seq: import('./generators/day-input.js').DaySequence;
+  readonly seq: import('./generators/day-input.ts').DaySequence;
 }
 
 const caseArbitrary = (): fc.Arbitrary<Case> =>

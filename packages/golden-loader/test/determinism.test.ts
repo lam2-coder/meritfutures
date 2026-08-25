@@ -50,8 +50,8 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, test } from 'vitest';
 
-import { REPO_ROOT, engineIsIdentityStub, loadFixtureDirectory, runFixture } from '../src/index.js';
-import { DEFAULT_OPTIONS, runDemo } from '../../../scripts/demo/main.js';
+import { REPO_ROOT, engineIsIdentityStub, loadFixtureDirectory, runFixture } from '../src/index.ts';
+import { DEFAULT_OPTIONS, runDemo } from '../../../scripts/demo/main.ts';
 
 const { fixtures, failures } = loadFixtureDirectory();
 const stubbed = engineIsIdentityStub();

@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 
-import { canonicalInput, CANONICAL_ADJUSTMENTS, CANONICAL_SESSIONS } from './canonical.js';
-import { simulate, SimulationError } from '../src/simulator/session.js';
-import { parseInstantUtc } from '../src/simulator/time.js';
-import type { SimDay } from '../src/simulator/types.js';
+import { canonicalInput, CANONICAL_ADJUSTMENTS, CANONICAL_SESSIONS } from './canonical.ts';
+import { simulate, SimulationError } from '../src/simulator/session.ts';
+import { parseInstantUtc } from '../src/simulator/time.ts';
+import type { SimDay } from '../src/simulator/types.ts';
 
 // CI-02, the `unit` project.
 //

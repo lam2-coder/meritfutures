@@ -60,7 +60,7 @@ export {
   formatCents,
   readingIsPresent,
   render,
-} from './figure.js';
+} from './figure.ts';
 
 export {
   type DataTrust,
@@ -71,7 +71,7 @@ export {
   type TrustSignal,
   type TrustState,
   assessDataTrust,
-} from './data-trust.js';
+} from './data-trust.ts';
 
 export {
   LiabilityError,
@@ -79,14 +79,14 @@ export {
   type ThreeNumbers,
   inAdversarialOrder,
   theThreeNumbers,
-} from './liability.js';
+} from './liability.ts';
 
 export {
   type IndicativeMovement,
   type LiveOpenLiability,
   type SameDayAdjustments,
   liveOpenLiability,
-} from './live-liability.js';
+} from './live-liability.ts';
 
 export {
   ADMIN_ORIGIN_VAR,
@@ -96,7 +96,7 @@ export {
   PUBLIC_ORIGIN_VARS,
   type SeparationCheck,
   resolveAdminOrigin,
-} from './origin.js';
+} from './origin.ts';
 
 export {
   ADMIN_ROLES,
@@ -104,7 +104,7 @@ export {
   RoleError,
   mayReadLiabilityHome,
   requireAdminRole,
-} from './roles.js';
+} from './roles.ts';
 
 export {
   type EligibleNextSevenDays,
@@ -117,7 +117,7 @@ export {
   assertNamesNoSubject,
   buildLiabilityHome,
   renderLiabilityHome,
-} from './page.js';
+} from './page.ts';
 
 /**
  * The deployable starts, and says what it is rather than what it will be.

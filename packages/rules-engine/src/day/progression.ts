@@ -38,7 +38,7 @@
 // staler answer to a question the arithmetic already answers on every day.
 // =============================================================================
 
-import { nextTradingDayAfter, tradingDaysBetween } from '../calendar.js';
+import { nextTradingDayAfter, tradingDaysBetween } from '../calendar.ts';
 import type {
   AccountExpiredEvent,
   AssertionFailure,
@@ -50,9 +50,9 @@ import type {
   ResolvedPlan,
   RuleState,
   TradingDay,
-} from '../types.js';
-import { consistencyOk } from './consistency.js';
-import { initialFloorCents } from './floor.js';
+} from '../types.ts';
+import { consistencyOk } from './consistency.ts';
+import { initialFloorCents } from './floor.ts';
 
 /**
  * What DO-8 did with an eval-phase day. Five outcomes and they are genuinely

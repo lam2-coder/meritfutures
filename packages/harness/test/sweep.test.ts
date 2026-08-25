@@ -12,8 +12,8 @@
 // =============================================================================
 
 import { describe, expect, it } from 'vitest';
-import { runSweep, RunError } from '../src/index.js';
-import type { HarnessRunInput, SweepArm } from '../src/index.js';
+import { runSweep, RunError } from '../src/index.ts';
+import type { HarnessRunInput, SweepArm } from '../src/index.ts';
 import {
   CANONICAL_BEHAVIOUR,
   CANONICAL_CALIBRATION,
@@ -26,7 +26,7 @@ import {
   CANONICAL_SESSIONS,
   CANONICAL_SPECS,
   SIM_PLAN,
-} from './canonical.js';
+} from './canonical.ts';
 
 const RUN: HarnessRunInput = {
   seed: CANONICAL_SEED,

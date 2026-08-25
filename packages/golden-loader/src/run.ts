@@ -43,8 +43,8 @@ import type {
 } from '@merit/rules-engine';
 import { buildCalendarSlice } from '@merit/rules-engine';
 
-import { diffEndState, diffEvents, type Diff } from './compare.js';
-import type { GoldenFixture } from './loader.js';
+import { diffEndState, diffEvents, type Diff } from './compare.ts';
+import type { GoldenFixture } from './loader.ts';
 
 /**
  * The `engine_version` every fixture folds under.
