@@ -874,12 +874,18 @@ export const reviewRequests = pgTable('review_requests', {
 // compares column NAMES and never types, so a `text` here would be a wrong
 // transcription that every assertion in the suite would pass.
 //
-// `kind` IS `text` WITH A CHECK AND THE CHECK IS WIDER THAN 0002's. 0029 drops
-// `identity_signals_kind_check` and adds `identity_signals_kind_allowed` over
-// TEN values, adding 'phone' and 'phone_carrier' for ADR-039. That is a
-// CONSTRAINT change and not a column change, so ADR-094's fold reads it and
-// discards it; it is written here because the table is read AS OF THE LAST
-// MIGRATION and a reader taking the 0002 list as current would be eight of ten.
+// `kind` IS `text` WITH A CHECK AND THE LIVE CHECK IS WIDER THAN 0002's. 0029
+// supersedes it with `identity_signals_kind_allowed` over TEN values, adding
+// 'phone' and 'phone_carrier' for ADR-039. That is a CONSTRAINT change and not
+// a column change, so ADR-094's fold reads it and discards it; it is written
+// here because the table is read AS OF THE LAST MIGRATION and a reader taking
+// the 0002 list as current would be eight of ten.
+//
+// THE SUPERSEDED CONSTRAINT IS DELIBERATELY NOT NAMED. `CI-06/retired-constraints`
+// found the first draft of this comment naming it, correctly: a retired name may
+// appear only where the appearance retires it or records it, and this file
+// describes the LIVE schema. Registering `schema.ts` as a recording site to keep
+// the name would be widening a register to fit a comment.
 export const identitySignals = pgTable('identity_signals', {
   id: uuid('id').primaryKey().defaultRandom(),
   identityId: uuid('identity_id')
