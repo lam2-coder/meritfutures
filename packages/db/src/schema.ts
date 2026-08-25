@@ -2190,9 +2190,7 @@ export const fills = pgTable('fills', {
   executedAt: timestamp('executed_at', { withTimezone: true }).notNull(),
   // RESOLVED THROUGH THE CALENDAR, never from the timestamp's UTC date.
   tradingDay: date('trading_day').notNull(),
-  correctionOf: bigint('correction_of', { mode: 'bigint' }).references(
-    (): AnyPgColumn => fills.id,
-  ),
+  correctionOf: bigint('correction_of', { mode: 'bigint' }).references((): AnyPgColumn => fills.id),
   isCorrected: boolean('is_corrected').notNull().default(false),
   // References `ingest_files`, which is not one of this file's tables.
   ingestFileId: uuid('ingest_file_id').notNull(),
