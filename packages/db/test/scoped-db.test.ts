@@ -115,6 +115,9 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   planBreakerState: 'plan_breaker_state',
   reportDeliveries: 'report_deliveries',
   reportSchedules: 'report_schedules',
+  affiliates: 'affiliates',
+  affiliateCreatives: 'affiliate_creatives',
+  affiliateClicks: 'affiliate_clicks',
   graduationBenefits: 'graduation_benefits',
   graduationInvitations: 'graduation_invitations',
   planSizeUnlocks: 'plan_size_unlocks',
@@ -257,7 +260,7 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 55 are unreachable through either accessor.
+  // rounded up: the other 52 are unreachable through either accessor.
   //
   // `identity_links` IS ONE OF THE 58 AND ITS ABSENCE IS DELIBERATE. It carries
   // TWO identity columns against an `owned` rule that names one, ADR-092 section
@@ -265,13 +268,27 @@ describe('the registry is total', () => {
   // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
   // column would be a scoped read returning a strict subset of a person's own
   // edges, selected by UUID ordering, with no error anywhere.
-  test('56 declared tables, 56 scope rules, 0 reachable without one', () => {
+  //
+  // `attributions` IS THE SIBLING ADR-092 SECTION 9 NAMES BESIDE IT AND IT IS
+  // ABSENT FOR THE SAME REASON. `buyer_identity_id` and `affiliate_identity_id`
+  // are both `uuid NOT NULL REFERENCES identities(id)` and they are TWO
+  // DIFFERENT PEOPLE by construction -- `attributions_literal_self_deal_is_void`
+  // exists to refuse the row where they are one -- so an `owned` rule naming
+  // either returns a row to a person the other column names. Naming the
+  // affiliate hands a buyer's purchase attribution to their referrer, which
+  // returns rows, raises nothing, and is ADR-008's BOLA failure.
+  //
+  // `affiliate_commissions` FOLLOWS IT OUT, and that is the registry's totality
+  // rather than a second judgment: its only path to an identity is
+  // `attribution_id`, `DerivedRule.via` is `TableKey`, and an unregistered
+  // table has no key to name.
+  test('59 declared tables, 59 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(56);
-    expect(rules).toBe(56);
+    expect(declared).toBe(59);
+    expect(rules).toBe(59);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
