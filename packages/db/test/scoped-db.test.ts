@@ -598,7 +598,8 @@ describe('the accessors', () => {
 });
 
 /**
- * ADR-094'S FOLD. The result of replaying one table's migration history.
+ * ADR-094'S FOLD, WITH ADR-103'S SECOND MEMBER. The result of replaying one
+ * table's migration history.
  *
  * `columns`  the column-name set AS OF THE LAST MIGRATION.
  * `added`    the names the replay applied, in migration order. Empty for an
@@ -606,13 +607,103 @@ describe('the accessors', () => {
  *            a fold that quietly did nothing would leave every per-table
  *            comparison green for any table whose transcription was ALSO
  *            missing the later columns, which is ADR-084 section 7's failure.
- * `refused`  statements outside the fold's one-member vocabulary. Any of these
- *            turns the suite red, exactly as all four shapes do today.
+ * `relaxed`  the names an `ALTER COLUMN ... DROP NOT NULL` made nullable.
+ *            ADR-103. It changes no NAME, so this fold only RECORDS it and
+ *            `foldTableDefs` is where the nullability actually moves.
+ * `refused`  statements outside the fold's two-member vocabulary. Any of these
+ *            turns the suite red, exactly as the other shapes do today.
  */
 interface ColumnFold {
   readonly columns: readonly string[];
   readonly added: readonly string[];
+  readonly relaxed: readonly string[];
   readonly refused: readonly string[];
+}
+
+/**
+ * ADR-103. THE `ALTER COLUMN` SUB-VOCABULARY, CLOSED AT ONE SHAPE, DEFAULT FAIL.
+ *
+ * Returns the columns one statement makes nullable, or `null` when the statement
+ * is outside the shape this fold reads -- in which case its caller REFUSES it,
+ * exactly as ADR-094 refuses `DROP COLUMN` and `RENAME`.
+ *
+ * EVERY TOP-LEVEL CLAUSE MUST MATCH, so a statement mixing `ADD COLUMN` or
+ * `SET DATA TYPE` into an `ALTER COLUMN` is refused whole rather than
+ * part-folded. `SET NOT NULL`, `SET DATA TYPE`, `SET DEFAULT` and `DROP DEFAULT`
+ * have ZERO instances in this migration set, so a rule for them would be written
+ * against nothing, which is the defect ADR-094 item 3 forecloses by name.
+ *
+ * READ BY BOTH FOLDS, WHICH IS THE POINT. Two readers of one statement that
+ * could disagree is ADR-092 section 5's measured hazard; `foldTable` records
+ * what this returns and `foldTableDefs` applies it, off one function.
+ */
+function droppedNotNulls(statement: string): readonly string[] | null {
+  const body = statement
+    .replace(/^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?/i, '')
+    .replace(/;\s*$/, '');
+  const names: string[] = [];
+  for (const clause of topLevelParts(body)) {
+    const named = /^ALTER\s+COLUMN\s+"?([a-z_][a-z0-9_]*)"?\s+DROP\s+NOT\s+NULL$/i.exec(
+      clause.replace(/\s+/g, ' ').trim(),
+    );
+    if (named?.[1] === undefined) return null;
+    names.push(named[1]);
+  }
+  return names.length > 0 ? names : null;
+}
+
+/**
+ * One folded definition with its top-level `NOT NULL` removed. ADR-103.
+ *
+ * TWO WAYS OF APPLYING NOTHING ARE REFUSED RATHER THAN ABSORBED, because a
+ * relaxation that quietly did not happen leaves the comparison asserting the
+ * PRE-`ALTER` nullability, which is the stale-`CREATE` reading ADR-094 exists to
+ * end, arriving one statement later.
+ *
+ * `PRIMARY KEY` IS THE FIRST. PostgreSQL refuses `DROP NOT NULL` on a primary
+ * key column, so a fold that applied it would be replaying a history that
+ * cannot have run. `declaredNotNull` reads the key as well as the words, so
+ * absorbing it would also have produced a column still NOT NULL after a
+ * statement whose whole purpose was to relax it.
+ *
+ * A DEFINITION THAT DOES NOT SAY `NOT NULL` IS THE SECOND, and `CHECK (x IS NOT
+ * NULL)` is why the scan is at top level: a textual `NOT NULL` inside a
+ * constraint is not the column's nullability and removing it would be a
+ * mis-parse that reads as a successful fold.
+ */
+function withoutNotNull(def: string, where: string): string {
+  if (/\bPRIMARY\s+KEY\b/i.test(def)) {
+    throw new Error(
+      `ALTER COLUMN ${where} DROP NOT NULL, against a definition that declares PRIMARY KEY. ` +
+        `PostgreSQL refuses that statement, so the fold is replaying a history that cannot ` +
+        `have happened. Its DDL is: ${def}`,
+    );
+  }
+  let depth = 0;
+  let out = '';
+  let removed = 0;
+  for (let i = 0; i < def.length; i++) {
+    const ch = def[i] as string;
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    if (depth === 0 && (i === 0 || /\s/.test(def[i - 1] as string))) {
+      const hit = /^NOT\s+NULL\b/i.exec(def.slice(i));
+      if (hit !== null) {
+        removed++;
+        i += hit[0].length - 1;
+        continue;
+      }
+    }
+    out += ch;
+  }
+  if (removed !== 1) {
+    throw new Error(
+      `ALTER COLUMN ${where} DROP NOT NULL, and the definition it applies to declares NOT NULL ` +
+        `${removed} time(s) at the top level. A fold that applies nothing agrees with a ` +
+        `transcription it never checked. Its DDL is: ${def}`,
+    );
+  }
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 /** Split on commas that are NOT inside parentheses. */
@@ -669,21 +760,26 @@ function alterStatementsFor(fileSql: string, table: string): string[] {
 }
 
 /**
- * ONE TABLE, REPLAYED. ADR-094.
+ * ONE TABLE, REPLAYED. ADR-094, WIDENED ONCE BY ADR-103.
  *
  * A transcription reads a table AS OF THE LAST MIGRATION and never as of its
  * `CREATE TABLE`. This walks the migration set in order, starts from the
  * `CREATE TABLE` column set, and folds every later `ADD COLUMN` onto it.
  *
- * THE VOCABULARY IS CLOSED AT ONE MEMBER AND THE DEFAULT IS FAIL. `DROP
- * COLUMN`, `ALTER COLUMN` and `RENAME` are REFUSED and never skipped, so the
- * refusal `schema.ts`'s header describes is narrowed rather than deleted: a
- * table whose history contains one of them still cannot be registered.
+ * THE VOCABULARY IS CLOSED AT TWO MEMBERS AND THE DEFAULT IS STILL FAIL. `DROP
+ * COLUMN` and `RENAME` are REFUSED and never skipped, so the refusal
+ * `schema.ts`'s header describes is narrowed rather than deleted: a table whose
+ * history contains one of them still cannot be registered. Both have ZERO
+ * instances in this migration set and ADR-094 item 3 forecloses ruling on them
+ * until one arrives.
  *
- * `ALTER COLUMN` is refused even though it CANNOT change a column-name set, and
- * ADR-094 section 3 is why: the axis it does move -- type and nullability -- is
- * one this suite has never compared, on any registered table, so exempting it
- * would register a table verified on every axis except the one that changed.
+ * `ALTER COLUMN ... DROP NOT NULL` IS THE SECOND MEMBER AND IT ARRIVED WITH A
+ * COMPARISON RATHER THAN INSTEAD OF ONE. ADR-094 section 3 refused it as a
+ * STATED PROXY: it cannot change a column-name set, so the fold would have
+ * nothing to do, and the axis it does move -- nullability -- was one this suite
+ * had never compared. ADR-103 wrote that comparison first and widens the
+ * vocabulary second, in that order, so the refusal is replaced by the thing it
+ * stood for rather than deleted. Every other `ALTER COLUMN` shape stays refused.
  */
 function foldTable(table: string): ColumnFold {
   const files = migrationFiles();
@@ -708,6 +804,7 @@ function foldTable(table: string): ColumnFold {
 
   const columns = new Set(ddlColumns(read(files[createdIn] ?? ''), table));
   const added: string[] = [];
+  const relaxed: string[] = [];
   const refused: string[] = [];
 
   for (const file of files.slice(createdIn)) {
@@ -716,9 +813,34 @@ function foldTable(table: string): ColumnFold {
       // shape in this tree -- changes nothing the transcription states.
       if (!/\b(ADD|DROP|ALTER)\s+COLUMN\b|\bRENAME\b/i.test(statement)) continue;
 
-      // THE DEFAULT IS FAIL. Everything but `ADD COLUMN` is refused, including a
+      // ADR-103'S MEMBER, AND ITS SUB-VOCABULARY HAS THE SAME DEFAULT OF FAIL.
+      // A statement that is not entirely `ALTER COLUMN <name> DROP NOT NULL` is
+      // refused whole, which covers `SET DATA TYPE`, `SET NOT NULL`, either
+      // `DEFAULT` shape, and any statement mixing an `ADD COLUMN` in.
+      if (/\bALTER\s+COLUMN\b/i.test(statement)) {
+        const dropped = droppedNotNulls(statement);
+        if (dropped === null) {
+          refused.push(`${file}: ${statement.slice(0, 90).replace(/\s+/g, ' ')}`);
+          continue;
+        }
+        for (const name of dropped) {
+          // A MIS-PARSE IS LOUD RATHER THAN ABSORBED, on ADD COLUMN's own rule:
+          // relaxing a column the fold has never seen means the clause reader
+          // and the column set disagree, and it would otherwise change nothing.
+          if (!columns.has(name)) {
+            throw new Error(
+              `${file}: ALTER COLUMN ${table}.${name} DROP NOT NULL, and ${name} is not in ` +
+                `the folded column set of ${table}`,
+            );
+          }
+          relaxed.push(name);
+        }
+        continue;
+      }
+
+      // THE DEFAULT IS FAIL. `DROP COLUMN` and `RENAME` are refused, including a
       // statement that mixes one in.
-      if (/\b(DROP|ALTER)\s+COLUMN\b|\bRENAME\b/i.test(statement)) {
+      if (/\bDROP\s+COLUMN\b|\bRENAME\b/i.test(statement)) {
         refused.push(`${file}: ${statement.slice(0, 90).replace(/\s+/g, ' ')}`);
         continue;
       }
@@ -748,7 +870,7 @@ function foldTable(table: string): ColumnFold {
     }
   }
 
-  return { columns: [...columns].sort(), added, refused };
+  return { columns: [...columns].sort(), added, relaxed, refused };
 }
 
 describe('the TypeScript schema has not drifted from the DDL', () => {
@@ -769,12 +891,14 @@ describe('the TypeScript schema has not drifted from the DDL', () => {
     });
   }
 
-  // THE REFUSAL, NARROWED RATHER THAN DELETED. It used to read "no later
+  // THE REFUSAL, NARROWED TWICE RATHER THAN DELETED. It used to read "no later
   // migration changes a column on any of the seven" and it was what made the
-  // `CREATE TABLE` body a sound proxy for the table. The proxy is gone -- the
-  // fold reads the whole history -- and what remains is the part that is still
-  // true: a shape the fold does not read is a shape nothing here verifies.
-  test('no later migration changes a column in a shape ADR-094 does not fold', () => {
+  // `CREATE TABLE` body a sound proxy for the table. ADR-094 replaced that proxy
+  // with the fold, and ADR-103 removed the second one: `ALTER COLUMN` stood in
+  // for a comparison that did not exist and now does. What remains is the part
+  // that is still true: a shape the fold does not read is a shape nothing here
+  // verifies, and `DROP COLUMN` and `RENAME` are still red.
+  test('no later migration changes a column in a shape ADR-103 does not fold', () => {
     const refused = DDL_NAMES.flatMap(([, sqlName]) => foldTable(sqlName).refused);
     expect(refused).toEqual([]);
   });
@@ -871,12 +995,29 @@ function foldTableDefs(table: string): Map<string, string> {
   const defs = ddlColumnDefs(read(files[createdIn] ?? ''), table);
   for (const file of files.slice(createdIn)) {
     for (const statement of alterStatementsFor(read(file), table)) {
+      // ADR-103. THIS IS WHERE THE NULLABILITY ACTUALLY MOVES. `foldTable`
+      // records the relaxation and changes no name; the definition is what
+      // carries `NOT NULL`, so the statement is APPLIED here off the same
+      // reader, never re-parsed by a second one.
+      if (/\bALTER\s+COLUMN\b/i.test(statement)) {
+        for (const name of droppedNotNulls(statement) ?? []) {
+          const def = defs.get(name);
+          if (def === undefined) {
+            throw new Error(
+              `${file}: ALTER COLUMN ${table}.${name} DROP NOT NULL, and ${name} has no ` +
+                `folded definition on ${table}`,
+            );
+          }
+          defs.set(name, withoutNotNull(def, `${table}.${name}`));
+        }
+        continue;
+      }
       if (!/\bADD\s+COLUMN\b/i.test(statement)) continue;
       // REFUSED SHAPES ARE SKIPPED HERE AND REFUSED THERE. `foldTable` records
-      // every `DROP COLUMN`, `ALTER COLUMN` and `RENAME` into `refused`, and
-      // the assertion above holds that list empty over every registered table,
-      // so skipping them here absorbs nothing that is not already red.
-      if (/\b(DROP|ALTER)\s+COLUMN\b|\bRENAME\b/i.test(statement)) continue;
+      // every `DROP COLUMN`, `RENAME` and unreadable `ALTER COLUMN` into
+      // `refused`, and the assertion above holds that list empty over every
+      // registered table, so skipping them here absorbs nothing already red.
+      if (/\bDROP\s+COLUMN\b|\bRENAME\b/i.test(statement)) continue;
 
       const body = statement
         .replace(/^\s*ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?/i, '')
@@ -1270,6 +1411,83 @@ describe('the transcription states the DDL type and nullability, not only the co
       expect(ddlType(def ?? ''), `${SQL_NAME[key]}.${name} in the migrations`).toBe(type);
       expect(declaredNotNull(def), `${SQL_NAME[key]}.${name} in the migrations`).toBe(notNull);
     }
+  });
+
+  // ---------------------------------------------------------------------------
+  // ADR-103'S SECOND HALF: `ALTER COLUMN` STOPS BEING A PROXY REFUSAL.
+  // ---------------------------------------------------------------------------
+  // NEITHER TABLE BELOW IS REGISTERED, AND THAT IS EXACTLY WHY THESE ASSERTIONS
+  // EXIST. `otp_challenges` and `trading_calendar` are the only two tables in 47
+  // migrations carrying an `ALTER COLUMN`, so nothing in `DDL_NAMES` exercises
+  // the fold's new member and `foldTable(...).relaxed` is EMPTY on all 99. A
+  // vocabulary member no assertion runs is a vocabulary member nobody has
+  // checked, which is ADR-094's own seed-B argument about a fold that folds
+  // nothing. These fold the two tables BY NAME, register neither, and watch the
+  // relaxation happen. Session 215 registers `otp_challenges` under this fold
+  // and inherits a member already watched working on its own table.
+
+  const ALTER_COLUMN_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
+    // 0029_phone_identity_and_auth.sql, SD-M16-05. An SMS challenge has no
+    // email address, and 0002 made the column NOT NULL when no other kind of
+    // challenge existed.
+    ['otp_challenges', ['email_normalized']],
+    // 0032_trading_calendar_holidays_coverage_revisions.sql. A holiday has no
+    // session to contain fills in, and R-01 is a containment lookup, so the
+    // fabricated interval 0004 forced was not inert.
+    ['trading_calendar', ['session_open_at', 'session_close_at']],
+  ];
+
+  test('ALTER COLUMN DROP NOT NULL is FOLDED, and the column it names comes out nullable', () => {
+    for (const [table, relaxedColumns] of ALTER_COLUMN_TABLES) {
+      const fold = foldTable(table);
+      expect(fold.refused, `${table} still carries a refused statement`).toEqual([]);
+      expect([...fold.relaxed].sort(), `${table} relaxed`).toEqual([...relaxedColumns].sort());
+
+      const folded = foldTableDefs(table);
+      const created = ddlColumnDefs(allMigrationSql(), table);
+      for (const name of relaxedColumns) {
+        // IT WAS NOT NULL AT ITS CREATE, WHICH IS WHAT MAKES THIS A CHANGE. A
+        // fold applying nothing to a column that was already nullable would
+        // satisfy the line below and prove nothing.
+        expect(declaredNotNull(created.get(name)), `${table}.${name} at its CREATE`).toBe(true);
+        expect(declaredNotNull(folded.get(name)), `${table}.${name} after the fold`).toBe(false);
+        // AND ONLY THE NULLABILITY MOVED. The type is the other axis this entry
+        // compares and `DROP NOT NULL` does not touch it.
+        expect(ddlType(folded.get(name) ?? ''), `${table}.${name} type`).toBe(
+          ddlType(created.get(name) ?? ''),
+        );
+      }
+    }
+  });
+
+  // THE VOCABULARY IS CLOSED AND THIS IS WHAT KEEPS IT MEASURED RATHER THAN
+  // BELIEVED. ADR-094 counted the `ALTER COLUMN` statements in this tree and
+  // ruled against what it found; ADR-103 widened the fold on the same
+  // measurement. The day a fourth one lands -- a `SET DATA TYPE`, a `SET NOT
+  // NULL`, or a `DROP NOT NULL` on a third table -- this is RED and the next
+  // session reads the ruling before writing a regex. It covers UNREGISTERED
+  // tables too, which the refusal assertion above cannot.
+  test('the migration set carries exactly the ALTER COLUMN statements this fold was ruled against', () => {
+    const carriers = new Set<string>();
+    let statements = 0;
+    for (const file of migrationFiles()) {
+      const sqlText = readFileSync(join(MIGRATIONS, file), 'utf8').replace(/--[^\n]*/g, '');
+      for (const statement of sqlText.match(
+        /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?[a-z_]+"?[\s\S]*?;/gi,
+      ) ?? []) {
+        if (!/\bALTER\s+COLUMN\b/i.test(statement)) continue;
+        statements++;
+        const named = /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?"?([a-z_]+)"?/i.exec(statement)?.[1];
+        expect(named, `an ALTER COLUMN statement names no table: ${statement}`).toBeDefined();
+        expect(
+          droppedNotNulls(statement),
+          `a shape ADR-103 does not fold: ${statement.replace(/\s+/g, ' ')}`,
+        ).not.toBeNull();
+        if (named !== undefined) carriers.add(named);
+      }
+    }
+    expect([...carriers].sort()).toEqual(ALTER_COLUMN_TABLES.map(([t]) => t).sort());
+    expect(statements, 'the ALTER COLUMN statement count this fold was ruled against').toBe(3);
   });
 
   // A READER THAT COLLAPSED ONTO ONE SPELLING WOULD PASS EVERY COMPARISON ABOVE
