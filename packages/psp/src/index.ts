@@ -3,7 +3,7 @@
 // =============================================================================
 // THE PSP PORT. One interface, two fakes, and no vendor.
 //
-// M03 section 2.1 is the specification and ADR-104 is the ruling. The three
+// M03 section 2.1 is the specification and ADR-105 is the ruling. The three
 // consumers that do not exist yet -- `POST /webhooks/psp/:provider` (session
 // 219), `POST /checkout` (session 220) and the dispute path -- all program
 // against this file, which is the entire reason it was written before any of

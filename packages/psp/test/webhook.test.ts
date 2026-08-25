@@ -6,7 +6,7 @@
 // the direction that rule fails from rather than the direction it succeeds in.
 //
 // THE CASE THAT MATTERS MOST IS `a re-serialised body is refused`. It is the
-// clause ADR-104 asks the founder to execute, and it is the one a reader is
+// clause ADR-105 asks the founder to execute, and it is the one a reader is
 // most likely to assume is impossible: the JSON is EQUAL, `deepEqual` passes on
 // it, and the digest still refuses, because a MAC is over bytes and not over
 // meaning. A handler that parsed first and re-encoded would have destroyed the
