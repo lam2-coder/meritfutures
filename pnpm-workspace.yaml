@@ -60,6 +60,25 @@ catalog:
   'drizzle-orm': 0.45.2
   eslint: 10.8.1
   fast-check: 4.9.0
+  # THE API's HTTP FRAMEWORK, ADR-083 ruling 3, admitted here by ADR-100.
+  # `apps/api` and NO other package: the three UI surfaces are Next.js under
+  # ADR-095 and `apps/worker` serves nothing.
+  #
+  # 5.12.1 IS THE VERSION ADR-083 SECTION 5 MEASURED, and taking a different one
+  # would discard the measurement rather than update it. That section ran two
+  # scratch programs against `fastify@5.12.1` on Node `v22.22.2` and recorded
+  # four observed outputs: a `.ts` entry point served 200 under
+  # `node --experimental-strip-types` with no build step, an unregistered route
+  # answered 404 from the router, `addContentTypeParser(..., { parseAs: 'buffer' })`
+  # delivered the raw bytes and the parsed object from one request, and the tree
+  # declared zero install scripts. `npm view fastify version` returns 5.12.1, so
+  # the measured version is also the current one and nothing is being pinned back.
+  #
+  # WHAT THIS ADMISSION COSTS, DIFFED FROM THE LOCKFILE THIS COMMIT WRITES.
+  # See ADR-100 section 3 for the package list, the `pnpm audit` result and the
+  # integrity check. `onlyBuiltDependencies: []` above is unchanged and still
+  # means what it says: `pnpm install` reports no ignored build script.
+  fastify: 5.12.1
   globals: 17.11.0
   # THE UI FRAMEWORK, ADR-095. App Router, in `apps/portal` and `apps/site` and
   # in NO other package: `apps/api` is ADR-083's Fastify deployable and takes
