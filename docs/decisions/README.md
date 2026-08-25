@@ -124,6 +124,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-094](ADR-094.md) | a transcription reads a table AS OF THE LAST MIGRATION, and the drift assertion becomes a REPLAY whose vocabulary is one member wide and whose default is FAIL  (2026-08-24, status: accepted) |
 | [ADR-096](ADR-096.md) | an unauthenticated public read goes over HTTP to the public API, and `apps/site` never links `packages/db` at all  (2026-08-24, status: accepted) |
 | [ADR-097](ADR-097.md) | OUTCOME 1 OF THE THREE. The vocabulary ALREADY HAS the term, it is `outside-loader-boundary`, and `GS-143` and `GS-144` are MIS-FILED. No seventh term, no row leaves section 39, and the closed six stay closed  (2026-08-24, status: accepted) |
+| [ADR-098](ADR-098.md) | the operator path's absence from every UI deployable is a PROPERTY of this repository, and `RI-09` is that property  (2026-08-25, status: accepted) |
 <!--/gen-->
 
 ## Gate closures
