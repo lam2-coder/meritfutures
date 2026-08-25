@@ -1055,3 +1055,232 @@ describe('a class is REFUSED as well as declared', () => {
     }
   });
 });
+
+// =============================================================================
+// ADR-103. THE TYPE AND THE NULLABILITY, WHICH THE NAME SET NEVER SAW.
+// =============================================================================
+// EVERYTHING ABOVE THIS LINE COMPARES NAMES. `foldTable` replays a table's
+// migration history and the per-table assertion holds `sqlNames(key)` equal to
+// the folded column-NAME set; `foldTableDefs` folds the whole definition text
+// and ADR-101's clauses read exactly two things out of it, `REFERENCES
+// identities(id)` and `NOT NULL`, and only on the ONE column a scope rule
+// names. So a column transcribed `text()` where the DDL says `bytea`, or
+// `.notNull()` where the DDL says nullable, agrees on names, is invisible to
+// every rule assertion, and is GREEN.
+//
+// ADR-094 SECTION 3 NAMED THIS GAP, PRICED CLOSING IT AS ITS OWN SESSION, AND
+// LEFT `ALTER COLUMN` REFUSING TWO TABLES AS A STATED PROXY IN ITS PLACE:
+// "Column TYPE and NULLABILITY are transcribed into `schema.ts` and asserted
+// nowhere ... Until it exists, `ALTER COLUMN` refusing a table is the only
+// thing standing where that comparison should be." This is that comparison, and
+// the refusal stops being a proxy in the same entry that writes it.
+//
+// WHY IT IS NOT COSMETIC. `bytea` versus `text` is ADR-046's seal:
+// `contact_channels.value_hash` is a DIGEST and `value_ciphertext` is envelope
+// encrypted under a key that is not in this database, and a digest transcribed
+// as a string is a digest an application can read as one. Money is integer
+// cents, so a wrong integer width is a wrong balance. `identity_status` read as
+// `text` is a closed vocabulary read as an open one.
+//
+// THE READER IS THE FOLD AND NEVER THE `CREATE TABLE`, on ADR-094:
+// `contact_channels.value_ciphertext` is `ALTER`-added in `0034` and a reader
+// that stopped at the CREATE would not see the column this entry is most for.
+
+/**
+ * WHERE A COLUMN'S TYPE ENDS. Everything from the first constraint keyword on
+ * is not the type, and the list is the one the DDL in this tree actually uses.
+ *
+ * A MISSED KEYWORD FAILS LOUD RATHER THAN QUIET. If the split does not cut, the
+ * reader returns `text NOT NULL DEFAULT ...` and no `getSQLType()` in
+ * drizzle-orm returns that, so the comparison goes RED. The silent direction is
+ * a reader that returns the EMPTY STRING for everything, and the assertion at
+ * `the type reader is not degenerate` is what stands there.
+ */
+const TYPE_ENDS_AT =
+  /\s+(?=NOT\s+NULL\b|NULL\b|PRIMARY\s+KEY\b|REFERENCES\b|DEFAULT\b|UNIQUE\b|CHECK\b|CONSTRAINT\b|GENERATED\b|COLLATE\b|DEFERRABLE\b)/i;
+
+/**
+ * The two spellings PostgreSQL itself treats as one type.
+ *
+ * THE TABLE IS CLOSED AND EVERY ENTRY IS A POSTGRES ALIAS RATHER THAN A
+ * JUDGEMENT, and that is the whole discipline: an entry here makes two
+ * DIFFERENT spellings compare EQUAL, so a wrong entry is the one edit that can
+ * make this comparison agree with a wrong transcription. `timestamptz` is what
+ * the migrations write and `timestamp with time zone` is what drizzle-orm's
+ * `timestamp(_, { withTimezone: true })` renders; they are one type in the
+ * catalog. NOTHING ELSE IN THIS TREE NEEDS ONE -- `bytea`, `citext`, `jsonb`,
+ * `char(n)`, `numeric`, `inet`, every enum and every array spell identically on
+ * both sides, measured rather than assumed.
+ */
+const TYPE_ALIASES: Readonly<Record<string, string>> = {
+  timestamptz: 'timestamp with time zone',
+  'timestamptz[]': 'timestamp with time zone[]',
+};
+
+/** One spelling, so whitespace and case cannot make two equal types disagree. */
+const canonicalType = (raw: string): string => {
+  const spelled = raw
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\s*\(\s*/g, '(')
+    .replace(/\s*\)\s*/g, ')')
+    .replace(/\s*,\s*/g, ', ');
+  return TYPE_ALIASES[spelled] ?? spelled;
+};
+
+/** The SQL type one folded column definition declares, with its name removed. */
+const ddlType = (def: string): string =>
+  canonicalType(
+    def.trim().replace(/\s+/g, ' ').split(' ').slice(1).join(' ').split(TYPE_ENDS_AT)[0] ?? '',
+  );
+
+/** The SQL type the TRANSCRIPTION declares, which drizzle-orm renders itself. */
+const tsType = (column: PgColumn): string => canonicalType(column.getSQLType());
+
+/**
+ * COLUMNS WHOSE TYPE IS THE POINT, STATED BY HAND AND CHECKED AGAINST BOTH
+ * READERS.
+ *
+ * THIS IS THE NON-VACUITY GUARD AND IT IS A THIRD INDEPENDENT STATEMENT. The
+ * per-table comparison below reads the DDL with `ddlType` and the transcription
+ * with `getSQLType()`, and if BOTH degraded in the same direction -- a reader
+ * that returned the empty string, a splitter that stopped matching -- the
+ * comparison would agree with itself and stay green, which is ADR-084 section
+ * 7's failure and ADR-094's seed B. These rows are written out in full, so a
+ * degraded reader disagrees with a LITERAL rather than with its twin.
+ *
+ * The set is chosen for what a wrong transcription would COST, not for
+ * coverage: two ADR-046 digests, two money columns, a closed enum, and one of
+ * each remaining spelling so no branch of the reader is unexercised.
+ * `contact_channels.value_ciphertext` is `ALTER`-added in `0034`, so it also
+ * proves these rows are read out of the FOLD and not out of the `CREATE`.
+ */
+const TYPE_SENTINELS: ReadonlyArray<readonly [TableKey, string, string, boolean]> = [
+  // ADR-046. A digest and an envelope ciphertext, neither of them a string.
+  ['contactChannels', 'value_hash', 'bytea', true],
+  ['contactChannels', 'value_ciphertext', 'bytea', false],
+  // Money is integer cents, so the WIDTH is the balance.
+  ['purchases', 'list_price_cents', 'bigint', true],
+  ['walletEntries', 'amount_cents', 'bigint', true],
+  // A closed vocabulary read as an open one is ADR-041's three members lost.
+  ['identities', 'status', 'identity_status', true],
+  // ADR-041 again: casing never creates a duplicate human, and `text` would.
+  ['users', 'email', 'citext', true],
+  // The remaining spellings, one each.
+  ['contactChannels', 'created_at', 'timestamp with time zone', true],
+  ['passkeys', 'transports', 'text[]', false],
+  ['sessions', 'created_ip', 'inet', false],
+  ['detectorDefinitions', 'parameters', 'jsonb', true],
+  ['detectorDefinitions', 'effective_from', 'date', true],
+  ['riskFlags', 'severity', 'smallint', true],
+  ['correlationGroups', 'statistic', 'numeric', true],
+  ['purchases', 'currency', 'char(3)', true],
+];
+
+/** Every type spelling the reader must still be able to produce. */
+const TYPE_VOCABULARY: readonly string[] = [
+  'bigint',
+  'boolean',
+  'bytea',
+  'char(2)',
+  'char(3)',
+  'citext',
+  'date',
+  'inet',
+  'integer',
+  'jsonb',
+  'numeric',
+  'smallint',
+  'text',
+  'text[]',
+  'timestamp with time zone',
+  'uuid',
+];
+
+describe('the transcription states the DDL type and nullability, not only the column names', () => {
+  for (const [key, sqlName] of DDL_NAMES) {
+    test(`${sqlName}: every column's TYPE and NULLABILITY equal the DDL as of the LAST migration`, () => {
+      const defs = foldTableDefs(sqlName);
+      for (const column of Object.values(columnsOf(key))) {
+        const def = defs.get(column.name);
+        expect(def, `${sqlName}.${column.name} is not a column of the folded table`).toBeDefined();
+        expect(
+          tsType(column),
+          `${sqlName}.${column.name} is transcribed as a different TYPE from the one the ` +
+            `migration set declares. Its DDL is: ${def ?? ''}`,
+        ).toBe(ddlType(def ?? ''));
+        expect(
+          column.notNull,
+          `${sqlName}.${column.name} is transcribed as ` +
+            `${column.notNull ? 'NOT NULL' : 'nullable'} and the migration set declares it ` +
+            `${declaredNotNull(def) ? 'NOT NULL' : 'nullable'}. Its DDL is: ${def ?? ''}`,
+        ).toBe(declaredNotNull(def));
+      }
+    });
+  }
+
+  // THE SILENT DIRECTION, AND THE ONLY ONE THIS COMPARISON HAS. A reader that
+  // returned the empty string for every column would compare '' with a rendered
+  // type and go red; a reader that returned the empty string on BOTH sides
+  // could not, and nothing else in this file would notice. So the reader is
+  // asserted to produce a type for every column of every registered table, and
+  // asserted not to have swallowed the constraint text with it.
+  test('the type reader is not degenerate: it reads a real type for every registered column', () => {
+    let read = 0;
+    for (const [, sqlName] of DDL_NAMES) {
+      for (const [name, def] of foldTableDefs(sqlName)) {
+        const declared = ddlType(def);
+        expect(
+          declared,
+          `${sqlName}.${name} has DDL "${def}" and the reader returned nothing`,
+        ).not.toBe('');
+        expect(
+          declared,
+          `${sqlName}.${name}: the type reader swallowed constraint text, so it did not cut ` +
+            `where a type ends. Its DDL is: ${def}`,
+        ).not.toMatch(
+          /\b(NOT NULL|PRIMARY KEY|REFERENCES|DEFAULT|CHECK|UNIQUE|GENERATED|COLLATE)\b/i,
+        );
+        read++;
+      }
+    }
+    const declared = TABLE_KEYS.reduce((n, key) => n + Object.keys(columnsOf(key)).length, 0);
+    expect(read, 'the comparison did not visit every column the transcription declares').toBe(
+      declared,
+    );
+    expect(read).toBeGreaterThan(TABLE_KEYS.length);
+  });
+
+  // THE COMPARISON IS WATCHED DISCRIMINATING RATHER THAN ASSUMED TO. Both sides
+  // of every assertion above are READERS, and two readers that degrade together
+  // agree. These rows are literals: a degraded reader disagrees with one.
+  test('the columns whose type is the point hold exactly the type and nullability written here', () => {
+    for (const [key, name, type, notNull] of TYPE_SENTINELS) {
+      const column = Object.values(columnsOf(key)).find((c) => c.name === name);
+      expect(column, `${SQL_NAME[key]}.${name} is not a transcribed column`).toBeDefined();
+      expect(
+        column === undefined ? '' : tsType(column),
+        `${SQL_NAME[key]}.${name} in schema.ts`,
+      ).toBe(type);
+      expect(column?.notNull, `${SQL_NAME[key]}.${name} in schema.ts`).toBe(notNull);
+
+      const def = foldTableDefs(SQL_NAME[key]).get(name);
+      expect(def, `${SQL_NAME[key]}.${name} is not a folded column`).toBeDefined();
+      expect(ddlType(def ?? ''), `${SQL_NAME[key]}.${name} in the migrations`).toBe(type);
+      expect(declaredNotNull(def), `${SQL_NAME[key]}.${name} in the migrations`).toBe(notNull);
+    }
+  });
+
+  // A READER THAT COLLAPSED ONTO ONE SPELLING WOULD PASS EVERY COMPARISON ABOVE
+  // FOR EVERY COLUMN OF THAT TYPE AND FAIL HERE. The list is a command: each of
+  // these must still come out of the reader somewhere in the registry.
+  test('the type reader still spans every spelling the registered tables declare', () => {
+    const produced = new Set(
+      DDL_NAMES.flatMap(([, sqlName]) => [...foldTableDefs(sqlName).values()].map(ddlType)),
+    );
+    for (const spelling of TYPE_VOCABULARY) {
+      expect([...produced], `no registered column reads as ${spelling}`).toContain(spelling);
+    }
+  });
+});
