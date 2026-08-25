@@ -6904,13 +6904,40 @@ const VG_INVENTORY = '### 4.2 The `VG` gates';
 // `gates.mjs`'s `@vitest/browser-playwright` lesson, and it is why the pattern
 // requires `@` or `:` immediately after the name.
 const VG_PROBES = {
-  'fastify present in the lockfile': () => {
-    const key = /(^|\s)'?fastify'?[@:]/m;
-    for (const f of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
-      if (!existsSync(join(ROOT, f))) continue;
-      if (key.test(read(f))) return true;
-    }
-    return false;
+  // THIS ENTRY REPLACED `fastify present in the lockfile`, WHICH ARRIVED.
+  // ADR-100 delivered that artifact and this gate was watched failing on the
+  // good news at 29 of 30 before `VG-3` and `VG-6` moved, which is the whole
+  // design. The register SHRINKS in the stale direction, so the fastify probe
+  // is removed rather than left beside a row that no longer waits on it.
+  //
+  // WHAT THE NEW ARTIFACT IS AND WHY IT IS CLOSER TO BOTH SUBJECTS. `VG-3` is
+  // server-side authz and `VG-6` is entitlement tested through the API, and
+  // both need a handler that resolves a caller. API_CONTRACT section 1 names
+  // that mechanism in the contract's own words: "Every authenticated handler
+  // resolves the caller to an identity and reads through `scopedDb(identity)`".
+  // A lockfile key could only ever say that a server was possible.
+  //
+  // ANCHORED ON A WORD BOUNDARY, on this register's own `fastify-plugin`
+  // lesson: a substring probe would report the artifact ARRIVED on a
+  // `scopedDbFixture` or a `scopedDbs`, and it would pass in exactly the same
+  // way as one that works.
+  '`scopedDb` named under `apps/api/src`': () => {
+    const dir = join(ROOT, 'apps/api/src');
+    if (!existsSync(dir)) return false;
+    const key = /\bscopedDb\b/;
+    const walk = (d) => {
+      for (const entry of readdirSync(d, { withFileTypes: true })) {
+        const full = join(d, entry.name);
+        if (entry.isDirectory()) {
+          if (walk(full)) return true;
+          continue;
+        }
+        if (!entry.name.endsWith('.ts')) continue;
+        if (key.test(readFileSync(full, 'utf8'))) return true;
+      }
+      return false;
+    };
+    return walk(dir);
   },
 };
 
