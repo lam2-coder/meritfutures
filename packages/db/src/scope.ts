@@ -29,6 +29,7 @@
 import {
   accountAdjustments,
   accounts,
+  accountStatusHistory,
   adminActions,
   affiliateClicks,
   affiliateCreatives,
@@ -59,6 +60,7 @@ import {
   identitySignals,
   impersonationPageViews,
   impersonationSessions,
+  ingestFiles,
   integrationContracts,
   integrationDispatches,
   journalEntries,
@@ -85,12 +87,17 @@ import {
   planSizeUnlocks,
   planVersions,
   planVersionSizes,
+  platformAccountRefs,
+  platformEntitlements,
   priceFloors,
   promotionalCreditGrants,
   proofLinks,
+  provisioningQueue,
   pspWebhookEvents,
   publishedStatistics,
   purchases,
+  rawIngestRows,
+  reconciliations,
   reportDeliveries,
   reportSchedules,
   reviewRequests,
@@ -115,7 +122,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * EIGHTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * NINETY OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -277,6 +284,13 @@ export const TABLES = {
   priceFloors,
   offers,
   promotionalCreditGrants,
+  accountStatusHistory,
+  platformAccountRefs,
+  provisioningQueue,
+  platformEntitlements,
+  ingestFiles,
+  rawIngestRows,
+  reconciliations,
   idempotencyKeys,
   tradingCalendarLoads,
   tradingCalendarRevisions,
@@ -842,6 +856,54 @@ export const SCOPE_RULES = {
     column: 'identity_id',
     nullable: false,
     why: "THE TABLE THAT MINTS VALUE, and `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` is on the row (0024_offers.sql). A grant is a named person's entitlement from the moment it exists and the DDL has no way to write an unowned one. NEVER WITHDRAWABLE (OQ-FREEZE-01): its own ledger class `promotional_credit` at 0009, and no `wallet_entries.provenance` value at 0011. `funding_purchase_id` IS THE DELTA'S CONTENT AND IS NOT THE SCOPE: it is NULLABLE, because a loyalty-issued or fee-back-issued grant has no funding purchase, so a derivation through `purchases` would return only the grants somebody bought and would drop exactly the ones no purchase funded. `source_offer_id` IS THE OTHER TRAP AND IT IS THIS MODULE'S CHARACTERISTIC ONE -- a redemption pointing at its catalogue row reads like a legitimate hop -- and it is nullable besides, so a grant issued from a `public` offer would reach nobody at all through it. `source_payout_request_id` is 0044's later column, folded by ADR-094, and is a settlement rather than a person.",
+  },
+  accountStatusHistory: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0007_accounts.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THE ROW IS ONE TRANSITION OF ONE ACCOUNT and it is the account's only reference: `from_status`, `to_status`, `from_phase` and `to_phase` are bare `text` state names, `reason` is free text, and THERE IS NO `changed_by` COLUMN AT ALL -- this table records WHAT MOVED and never WHO MOVED IT, so nothing here reads like the `treasury_balances.recorded_by` trap this file's header names. `accounts` splits phase from status on purpose (0007) and this log carries both halves of a transition, which changes nothing about who may read it.",
+  },
+  platformAccountRefs: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0007_accounts.sql, SD-M2-02), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THE PRIMARY KEY IS `(platform, platform_account_ref)` AND IT IS THE BURN RATHER THAN THE TENANCY: INV-M2-10 says a platform ref is never reused across accounts, and a second row for the same pair cannot exist, so reassignment fails at insert. That is `price_floors`' and `contract_specs`' shape -- the grain is the composite key and the table has no `uuid` of its own -- and it contributes nothing to who may read the row. A RETIRED ROW IS STILL THAT ACCOUNT'S ROW: `retired_at` and `retired_reason` are nullable and tied by `platform_account_refs_retirement_is_explained`, and retirement is what makes the ref permanently unusable rather than what detaches it from the account that burned it.",
+  },
+  provisioningQueue: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0007_accounts.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. ONE ROW PER INTENT, so partial success is legible, and M02 section 3.6 states the grain out loud: THE QUEUE IS PER ACCOUNT AND A RESTRICTION IS PER HUMAN, so one identity-level restriction episode fans out to one operation pair per account the identity holds and there is no identity-level row to enqueue. `payload jsonb` HOLDS THE FIELD VALUES RENDERED INTO CSV FOR THIS ACCOUNT and reaches no second person; `payload_hash bytea NOT NULL` is SD-M2-01's duplicate-intent guard over that payload and is a digest rather than a reference. REGISTERING THIS TABLE MAKES IT READABLE AND NOTHING ELSE: the binding rule over `operation` and `status` -- `set_risk` may never reach `confirmed_inferred` (AS-M2-03, INV-M2-13) -- is `provisioning_queue_set_risk_never_inferred` in the database, and no scope rule enforces or weakens it.",
+  },
+  platformEntitlements: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0007_accounts.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. `platform_user_ref` IS THE AVAILABLE MISTAKE AND IT IS NOT A SECOND PATH TO AN IDENTITY: SD-M2-05 adds it because Rithmic bills per login-month per USER while the row stays per account, and it is `text NULL` with NO foreign key -- the VENDOR's identifier for a login, which names no row in this database at all. It is `simulation_runs.requested_by`'s shape rather than `sessions.user_id`'s. A DEACTIVATED ENTITLEMENT IS STILL THAT ACCOUNT'S ROW, `platform_entitlements_active_matches_dates` making `active` and `deactivated_on` biconditional, so the leak alarm's question -- any entitlement still active on a closed account -- stays answerable from the account's own rows.",
+  },
+  ingestFiles: {
+    class: 'firm',
+    why: 'A FILE IS A DELIVERY AND A DELIVERY BELONGS TO NO IDENTITY (0013_ingest.sql). One vendor file carries rows for every account that traded the session, so there is no identity column and no correct one: the table declares exactly ONE foreign key, `replaces_ingest_file_id`, and it points at ITSELF. The tenancy runs the other way -- `fills.ingest_file_id`, `raw_ingest_rows.ingest_file_id` and `reconciliations.source_ingest_file_id` all point IN, and two of those three carry their own `account_id`. THE QUARANTINE MACHINE IS WHY THE GRAIN IS THE FILE (B4 #4): a file in `quarantined` has committed NO downstream rows, so at the moment this row matters most there is no account row anywhere to reach it through. PROVISIONAL UNDER ADR-005 IN ITS CONTENT AND NOT IN ITS CLASS: the `kind` set, the disposition semantics and the delivery cadence are V-M2-01, V-M2-03 and V-M2-04, and none of the three can give a delivery an owner.',
+  },
+  rawIngestRows: {
+    class: 'firm',
+    why: "THE IMMUTABLE LANDING ZONE, and it is firm as a CONSEQUENCE rather than as a second judgment (0013_ingest.sql). Its only reference is `ingest_file_id uuid NOT NULL REFERENCES ingest_files(id) ON DELETE RESTRICT`, and `ingest_files` is firm, so a `derived` rule through it compiles at every call site -- `DerivedRule.via` is `TableKey` and includes every firm key -- and throws the first time anybody reads the table. THE REVERSE EDGE IS THE PLAUSIBLE MISTAKE AND IT PASSES EVERY MECHANICAL CHECK HERE: `fills.raw_row_id bigint NOT NULL REFERENCES raw_ingest_rows(id)` is a declared foreign key in a direction the derived-rule assertion accepts, so a rule through `fills` resolves, terminates at an owned table, and is still WRONG -- only some raw rows become fills, an EOD balance row becomes a `daily_marks` input, an unparsed row becomes nothing, and a quarantined file's rows become nothing by design, so the reading would drop exactly the rows a dispute is argued from. `raw jsonb` holds the vendor's verbatim columns for whichever account the line concerns and NO COLUMN ON THIS ROW SAYS WHICH.",
+  },
+  reconciliations: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0014_marks.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THE GRAIN IS ONE ACCOUNT'S BALANCE, OURS BESIDE THEIRS, FOR ONE TRADING DAY, which is `daily_marks`' rule exactly and the day contributes nothing to who may read the row. `source_ingest_file_id` IS THE TRAP AND IT IS THIS MODULE'S CHARACTERISTIC ONE: it is a foreign key to `ingest_files`, which is FIRM, so a derivation through it constructs no predicate and throws, and it is NULLABLE besides, so even a firm-free version of the reading would drop every row reconciled before SD-M2-06 landed. `delta_cents` is GENERATED from the two balances and `resolved_by` is an operator name on 0002's `actor` idiom rather than a `users` row.",
   },
   idempotencyKeys: {
     class: 'owned',
