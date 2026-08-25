@@ -83,6 +83,10 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   publishedStatistics: 'published_statistics',
   proofLinks: 'proof_links',
   reviewRequests: 'review_requests',
+  coupons: 'coupons',
+  couponRedemptions: 'coupon_redemptions',
+  pspWebhookEvents: 'psp_webhook_events',
+  midHealth: 'mid_health',
 };
 
 /**
@@ -223,13 +227,13 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
   // rounded up: the other 90 are unreachable through either accessor.
-  test('21 declared tables, 21 scope rules, 0 reachable without one', () => {
+  test('25 declared tables, 25 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(21);
-    expect(rules).toBe(21);
+    expect(declared).toBe(25);
+    expect(rules).toBe(25);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
