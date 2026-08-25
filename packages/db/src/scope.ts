@@ -64,6 +64,7 @@ import {
   pageRevalidations,
   phoneChangeRequests,
   planBreakerState,
+  plans,
   planVersions,
   planVersionSizes,
   proofLinks,
@@ -77,6 +78,7 @@ import {
   ruleStates,
   sanctionsScreenings,
   sessions,
+  simulationRuns,
   statisticDefinitions,
   treasuryBalances,
   users,
@@ -85,7 +87,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FIFTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FIFTY-FIVE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -154,6 +156,8 @@ export const TABLES = {
   planBreakerState,
   reportDeliveries,
   reportSchedules,
+  plans,
+  simulationRuns,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -542,6 +546,15 @@ export const SCOPE_RULES = {
   reportSchedules: {
     class: 'firm',
     why: "WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. `recipients text[] NOT NULL` holds Merit's own staff addresses or a configured SFTP destination, never a trader's, and the row exists to give the C8 weekly risk ritual an input other than a human remembering to look. There is no identity column and there is no correct one. NO CREDENTIAL IS STORED HERE and there is deliberately no column that could hold one, so this table is not a fifth credential surface arriving without a ruling.",
+  },
+  plans: {
+    class: 'firm',
+    why: "THE PRODUCT CATALOGUE'S ROOT: three rows, `core_eod`, `merit_rapid` and `direct`. There is no identity column and there is no correct one, and it is `plan_versions`' reason one hop further up -- EVERY identity is offered the same three plans, and the link runs the other way: a version names its plan and an account names its version, so ownership flows FROM the catalogue and never into it. `is_active` DELISTS AND NEVER DELETES, on the table's own DDL reasoning that a plan nobody can buy still has to explain the accounts sold under it, so a retired row is firm for exactly as long as the live one. A `derived` rule through `plan_versions` would be the refused shape twice over, since that parent is firm as well.",
+  },
+
+  simulationRuns: {
+    class: 'firm',
+    why: "A MONTE CARLO RUN OVER A PROPOSED PLAN CONFIG, kept so a published version resolves to the projection it was decided on (M21 INV-M21-05). There is no identity column and there is no correct one: the subject of a run is a PARAMETER SET, its population is synthetic, and no person's rows are read to produce it. THE TRAP IS `requested_by`, and it is weaker than `treasury_balances.recorded_by` rather than stronger -- it is bare `text NOT NULL` with no foreign key at all, so it names no `users` row to derive through, and had it been one, scoping by it would return the firm's plan economics to whichever operator pressed the button. `plan_version_id` IS THE OTHER AVAILABLE MISTAKE and a `derived` rule through it THROWS rather than misleads: `scopePredicate` recurses into the via table, `plan_versions` is firm, and a chain terminates at `owned` or at `root` or it does not terminate. It is NULLABLE besides, because the run is over a DRAFT that may not yet be a row, which is what the two digests beside it exist to pin.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
