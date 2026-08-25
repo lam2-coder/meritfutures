@@ -29,6 +29,7 @@
 import {
   accounts,
   certificates,
+  contactChannels,
   contentDocuments,
   correlationGroups,
   couponRedemptions,
@@ -43,9 +44,13 @@ import {
   ledgerTransactions,
   liabilitySnapshots,
   midHealth,
+  notificationKinds,
+  notificationPreferences,
+  notifications,
+  otpSendBudget,
   pageRevalidations,
-  planVersionSizes,
   planVersions,
+  planVersionSizes,
   proofLinks,
   pspWebhookEvents,
   publishedStatistics,
@@ -62,7 +67,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * THIRTY OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * THIRTY-FIVE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -108,6 +113,11 @@ export const TABLES = {
   couponRedemptions,
   pspWebhookEvents,
   midHealth,
+  contactChannels,
+  notificationKinds,
+  notifications,
+  notificationPreferences,
+  otpSendBudget,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -354,6 +364,36 @@ export const SCOPE_RULES = {
   midHealth: {
     class: 'firm',
     why: "SD-M3-03. One row per PSP per window: attempts, declines, chargebacks, and the two basis-point rates the failover decision is made from. There is no identity column and there is no correct one -- the row is about a PROCESSOR, and its counters are aggregates over every identity's card volume, so a per-identity slice of a decline rate is not a smaller version of it. The denominator rule the column names carry (both rates against CARD volume, never total volume, because wallet purchases carry no chargeback exposure) is a property of the published row rather than of any reader.",
+  },
+  contactChannels: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0019_notifications_and_community.sql). THE ADDRESSES ONE PERSON HAS USED, INCLUDING THE ONES THEY NO LONGER USE, and the superseded rows are the point rather than residue: INV-M16-03's account-takeover countermeasure notifies the PRIOR contact for a window after a change, which is impossible against a value somebody overwrote. So a scoped read returns the live row and every superseded one, and all of them are this identity's. WHAT THE READ RETURNS IS SEALED RATHER THAN LEGIBLE, per ADR-046: `value_hash` is a digest and `value_ciphertext` is envelope-encrypted under a key named by `value_key_id` AND NOT PRESENT IN THIS DATABASE, so scoping this table grants the rows and not the addresses. `complained_at` is a fact about the DESTINATION rather than a preference (INV-M16-13) and moves nothing here either.",
+  },
+
+  notificationKinds: {
+    class: 'firm',
+    why: "THE POLICY CATALOGUE, one row per kind of message Merit sends. There is no identity column and there is no correct one: a kind is the SAME kind for every trader, `class` decides what a preference may silence and decides it once for the estate, and the link runs the other way -- `notifications.kind` names the kind a message was sent under -- so ownership flows FROM the catalogue exactly as it does from `plan_versions`. THIS TABLE IS THE PLAUSIBLE VERSION OF `plan_version_sizes`' MISTAKE: `notifications.kind` and `notification_preferences.kind` are both `NOT NULL REFERENCES notification_kinds(kind)` (0019_notifications_and_community.sql), which reads exactly like the `hop` `daily_marks` makes to `accounts` and is not one, because a derivation chain terminates at `owned` or at `root` and a firm parent makes the whole chain firm. Both of those tables carry `identity_id` on the row and are scoped by it.",
+  },
+
+  notifications: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0019_notifications_and_community.sql). ONE ROW PER MESSAGE MERIT SENT ONE PERSON, and the row is about that person. `kind` IS THE OTHER CANDIDATE COLUMN AND IT IS A TRAP: it is a NOT NULL foreign key to `notification_kinds`, which is FIRM, so a derived rule through it compiles at every call site, is a member of `ScopedTableKey`, and throws the first time anybody reads the table. `class` and `template_version` are denormalized here at send time because the class a message was SENT under is a historical fact and the kind's class today is a current policy; reclassifying a kind must not rewrite what was already sent, and neither column moves the tenancy. `read_at` is a convenience and never evidence of notice (INV-M16-09), so a scoped read returns unread, undelivered and suppressed rows alike: they are all this identity's record of what Merit tried to tell them.",
+  },
+
+  notificationPreferences: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0019_notifications_and_community.sql), and it is the first column of the composite primary key `(identity_id, kind, channel)`. THE ROW IS A PERSON'S ANSWER ABOUT ONE KIND ON ONE CHANNEL. `kind` is `notifications`' trap repeated and is again not the scope, for the same reason: `notification_kinds` is firm. WHAT A PREFERENCE MAY DO IS DECIDED ONE TABLE OVER AND NOT HERE -- a row against an immutable kind is permitted to exist and is ignored by the send path, because refusing to store it produces a settings screen that lies about what it saved -- so this table's tenancy says nothing about whether the preference binds.",
+  },
+
+  otpSendBudget: {
+    class: 'firm',
+    why: "PRE-IDENTITY BY CONSTRUCTION, which is a stronger statement than 'no identity column'. INV-M16-12 splits INV-M16-11: a message to an authenticated recipient at an address Merit already holds is exempt from rate limiting, and a message to an ATTACKER-SUPPLIED DESTINATION BEFORE ANY IDENTITY EXISTS is not. This table is the second one's control, so there is nobody to own a row and there could not be -- the whole premise of the rows is that nobody has proved who they are yet. THE COLUMN A DERIVATION WOULD REACH FOR IS `scope_key` AND IT IS NOT AN IDENTITY: for 'phone' it holds `encode(phone_hash,'hex')` and never the number, for 'ip' the address, for 'country' the alpha-2 and for 'global' the literal 'global'. It declares no foreign key, so there is nothing to traverse even if the rows belonged to somebody, and a per-identity slice of a global cost circuit breaker is not a smaller version of it.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 

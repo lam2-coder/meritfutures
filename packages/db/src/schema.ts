@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// THIRTY TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 81 are not reachable through either accessor: `SCOPE_RULES` is total
+// THIRTY-FIVE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 76 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE THIRTY ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE THIRTY-FIVE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -30,10 +30,11 @@
 // which is ADR-094. That entry rules the replay's vocabulary CLOSED at one
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
-// one lands the check fails rather than silently reading a stale CREATE. THREE
-// of the thirty below carry later columns -- `sessions`, `plan_versions` and
-// `rule_states` -- and none of them could be registered at all before ADR-094,
-// which is why the ruling came before the transcription rather than after it.
+// one lands the check fails rather than silently reading a stale CREATE. FIVE
+// of the thirty-five below carry later columns -- `sessions`, `plan_versions`,
+// `rule_states`, `contact_channels` and `notification_kinds` -- and none of
+// them could be registered at all before ADR-094, which is why the ruling came
+// before the transcription rather than after it.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -49,6 +50,7 @@
 // inverse of the flow drizzle-kit exists to run. Migrations are sacred: once
 // merged, never edited, only superseded (constitution E2).
 
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
@@ -1202,4 +1204,246 @@ export const midHealth = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.psp, t.windowStart] })],
+);
+
+// -----------------------------------------------------------------------------
+// notification_kinds -- 0019_notifications_and_community.sql, PLUS ONE COLUMN
+// FROM 0029. FIRM.
+// -----------------------------------------------------------------------------
+// THE POLICY CATALOGUE, AND THERE IS NO IDENTITY COLUMN BECAUSE THERE IS NO
+// CORRECT ONE. A kind is the same kind for every trader: `class` decides what a
+// preference may silence, and it decides it once for the estate rather than per
+// person. The link runs the other way, `notifications.kind` naming the kind a
+// message was sent under, so ownership flows FROM the catalogue exactly as it
+// does from `plan_versions`.
+//
+// IT IS THE PLAUSIBLE VERSION OF `plan_version_sizes`' MISTAKE AND IT IS WORTH
+// SAYING HERE AS WELL AS IN `scope.ts`. `notifications.kind` and
+// `notification_preferences.kind` are both `NOT NULL REFERENCES
+// notification_kinds(kind)`, which reads exactly like the `hop` `daily_marks`
+// makes to `accounts` and is not one: this table is firm, `scopePredicate`
+// raises on a firm via, and both tables carry `identity_id` on the row anyway.
+//
+// TWO GENERATED COLUMNS, AND BOTH ARE THE MODULE'S POLICY IN DDL. `mutable` is
+// `class IN ('account_state','marketing')` (SD-M16-01) and `rate_limit_exempt`
+// is `class IN ('security','money')` (SD-M16-07, 0029). As ordinary booleans one
+// careless row could mark a money notification silenceable or the registration
+// OTP kind exempt, and nothing would object; generated, the two facts cannot
+// disagree at all. They are transcribed as generated for the same reason `bytea`
+// is not transcribed as `text`: a writable boolean here would be a false
+// statement about a column nothing else in this package checks.
+//
+// `class` GAINED `pre_identity_auth` IN 0029 and `rate_limit_exempt` is the
+// column that came with it. The value is a CHECK rather than a `CREATE TYPE`, so
+// the transcription follows the DDL and the column is `text`.
+export const notificationKinds = pgTable('notification_kinds', {
+  kind: text('kind').primaryKey(),
+  class: text('class').notNull(),
+  title: text('title').notNull(),
+  templateCode: text('template_code').notNull(),
+  templateVersion: integer('template_version').notNull().default(1),
+  defaultChannels: text('default_channels').array().notNull().default(['in_app']),
+  // SD-M16-01. GENERATED ALWAYS, never written independently.
+  mutable: boolean('mutable').generatedAlwaysAs(sql`class IN ('account_state', 'marketing')`),
+  coalesceKeySpec: text('coalesce_key_spec'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  // 0029_phone_identity_and_auth.sql, SD-M16-07. GENERATED ALWAYS, and INV-M16-11
+  // written as a column: the security and money classes are exempt from rate
+  // limiting, and NC-M16-05's pre-identity class is not, by construction.
+  rateLimitExempt: boolean('rate_limit_exempt').generatedAlwaysAs(
+    sql`class IN ('security', 'money')`,
+  ),
+});
+
+// -----------------------------------------------------------------------------
+// notifications -- 0019_notifications_and_community.sql. OWNED: `identity_id`
+// is on the row, NOT NULL.
+// -----------------------------------------------------------------------------
+// EVERY MESSAGE MERIT HAS SENT ONE PERSON, one row each. `identity_id uuid NOT
+// NULL REFERENCES identities(id) ON DELETE RESTRICT` is the tenancy and the row
+// is about that person.
+//
+// `kind` IS THE TRAP AND IT IS NOT THE SCOPE. It is `NOT NULL REFERENCES
+// notification_kinds(kind)`, and `notification_kinds` is FIRM: a `derived` rule
+// through it compiles at every call site, is a member of `ScopedTableKey`, and
+// throws the first time anybody reads the table. The direct column is the rule.
+//
+// `class` AND `template_version` ARE DENORMALIZED AT SEND TIME AND THAT IS THE
+// POINT. The class a message was sent under is a historical fact; the kind's
+// class today is a current policy, and reclassifying a kind must not rewrite
+// what was already sent under the old one. `rendered_body` is what makes a
+// message reproducible years later (INV-M16-05), and `sent_at`,
+// `delivery_status`/`delivered_at` and `read_at` are THREE DIFFERENT FACTS,
+// which is what makes INV-M16-09's distinction between dispatch, delivery and
+// reading expressible at all.
+//
+// `dispatch_ref` CARRIES NO `references()` AND IT IS NOT AN OMISSION: it points
+// at `integration_dispatches`, which nobody has registered, so the COLUMN is
+// transcribed and the constraint stays the database's.
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  kind: text('kind')
+    .notNull()
+    .references(() => notificationKinds.kind),
+  channel: text('channel').notNull(),
+  payload: jsonb('payload').notNull().default({}),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  // SD-M16-02.
+  class: text('class').notNull(),
+  templateVersion: integer('template_version').notNull(),
+  renderedBody: text('rendered_body'),
+  coalesceKey: text('coalesce_key'),
+  dispatchRef: uuid('dispatch_ref'),
+  deliveryStatus: text('delivery_status').notNull().default('pending'),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// notification_preferences -- 0019_notifications_and_community.sql. OWNED:
+// `identity_id` is on the row, NOT NULL.
+// -----------------------------------------------------------------------------
+// ONE ROW PER IDENTITY PER KIND PER CHANNEL, and the row is that person's
+// answer. `identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE
+// RESTRICT` is the tenancy; `kind` is `notifications`' trap again and is again
+// not the scope.
+//
+// THE COMPOSITE PRIMARY KEY IS THE GRAIN AND IT IS TRANSCRIBED. `PRIMARY KEY
+// (identity_id, kind, channel)` is a table-level clause in the DDL, so the
+// column comparison the suite runs would be satisfied without it and the
+// declaration would still be saying this table has no key.
+//
+// WHAT A PREFERENCE MAY DO IS NOT DECIDED HERE. A row against an immutable kind
+// is PERMITTED TO EXIST and is ignored by the send path, because refusing to
+// store it produces a settings screen that lies about what it saved. The
+// deciding column is `notification_kinds.mutable`, one table over and generated.
+export const notificationPreferences = pgTable(
+  'notification_preferences',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    kind: text('kind')
+      .notNull()
+      .references(() => notificationKinds.kind),
+    channel: text('channel').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.identityId, table.kind, table.channel] })],
+);
+
+// -----------------------------------------------------------------------------
+// contact_channels -- 0019_notifications_and_community.sql, PLUS FOUR COLUMNS
+// FROM 0034 AND 0041. OWNED: `identity_id` is on the row, NOT NULL.
+// -----------------------------------------------------------------------------
+// THE PREVIOUS CONTACT EXISTS AS A ROW, which is the entire reason this table is
+// not a column on `users`. INV-M16-03's account-takeover countermeasure is to
+// notify the PRIOR contacts for a window after a change, and that is impossible
+// against a value somebody overwrote. Supersession rather than update, for
+// `daily_marks`' reason on a different surface, so a scoped read returns the
+// superseded rows as well as the live one and that is correct: they are the same
+// person's addresses.
+//
+// FOUR LATER COLUMNS, AND THE FOLD IS WHY THEY ARE HERE. `0034` adds
+// `value_ciphertext`, `value_key_id` and `value_encrypted_at`; `0041` adds
+// `complained_at`. ADR-094 is what makes the set below comparable at all.
+//
+// ADR-046 IS THE ONE TO READ BEFORE BELIEVING `value_hash` IS THE WHOLE STORY.
+// The address is held REVERSIBLY: `value_ciphertext` is envelope-encrypted under
+// a key named by `value_key_id` AND NOT PRESENT IN THIS DATABASE, the hash stays
+// for matching and uniqueness, and a dump yields the same nothing it yielded
+// before. `merit_app` can read the ciphertext and cannot decrypt one, so a
+// scoped read of this table returns a sealed blob rather than an address.
+// All three columns are NULLABLE and the null is load bearing in two directions:
+// a row written before `0034` has a hash and no ciphertext, and ERASURE IS A
+// NULL that leaves the hash, the lineage and the evidence standing.
+//
+// `complained_at` IS A FACT ABOUT THE DESTINATION AND NOT A PREFERENCE
+// (INV-M16-13). It suppresses the marketing class and nothing else; a send path
+// consulting it before a security-class message locks a trader out of OTP login
+// for having once reported a newsletter.
+//
+// `superseded_by` IS A SELF-REFERENCE and carries drizzle's explicit
+// `(): AnyPgColumn =>` return type, without which the inference is circular and
+// `tsc` refuses the file.
+export const contactChannels = pgTable('contact_channels', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityId: uuid('identity_id')
+    .notNull()
+    .references(() => identities.id),
+  kind: text('kind').notNull(),
+  // `bytea` rather than `text`, on this file's own rule: the digest is what
+  // makes matching possible without a second plaintext copy of every address.
+  valueHash: bytea('value_hash').notNull(),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  supersededAt: timestamp('superseded_at', { withTimezone: true }),
+  supersededBy: uuid('superseded_by').references((): AnyPgColumn => contactChannels.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // 0034_reversible_contact_addresses.sql, ADR-046.
+  valueCiphertext: bytea('value_ciphertext'),
+  valueKeyId: text('value_key_id'),
+  valueEncryptedAt: timestamp('value_encrypted_at', { withTimezone: true }),
+  // 0041_contact_channel_complaints.sql, SD-M16-08.
+  complainedAt: timestamp('complained_at', { withTimezone: true }),
+});
+
+// -----------------------------------------------------------------------------
+// otp_send_budget -- 0029_phone_identity_and_auth.sql. FIRM.
+// -----------------------------------------------------------------------------
+// PRE-IDENTITY BY CONSTRUCTION, WHICH IS A STRONGER STATEMENT THAN "no identity
+// column". INV-M16-12 splits INV-M16-11: a message to an authenticated recipient
+// at an address Merit already holds is exempt from rate limiting, and a message
+// to an ATTACKER-SUPPLIED DESTINATION BEFORE ANY IDENTITY EXISTS is not. This
+// table is the second one's control, so there is no identity to own a row and
+// there could not be: the whole point of the rows is that nobody has proved who
+// they are yet.
+//
+// `scope_key` IS THE COLUMN A DERIVATION WOULD REACH FOR AND IT IS NOT AN
+// IDENTITY. For `phone` it is `encode(phone_hash,'hex')` and never the number,
+// for `ip` the address, for `country` the alpha-2, for `global` the literal
+// 'global'. It declares no foreign key and there is nothing to traverse.
+//
+// THE COMPOSITE PRIMARY KEY IS THE GRAIN: one row per scope per evaluation day,
+// on `plan_breaker_state`'s pattern from 0016 rather than a new idiom. Daily
+// granularity is deliberate; sub-minute velocity belongs at the edge, where a
+// send can be refused before it is paid for.
+//
+// `state` HAS THREE MEMBERS AND THE MISSING FOURTH IS THE FOUNDER'S RULING.
+// There is no stopping value: a tripped breaker DEGRADES, registration still
+// completes with verification deferred, and `deferred_registrations` is the
+// figure that has to be reported because a queue nobody drains is a fail-open
+// with extra steps.
+export const otpSendBudget = pgTable(
+  'otp_send_budget',
+  {
+    scopeKind: text('scope_kind').notNull(),
+    scopeKey: text('scope_key').notNull(),
+    evaluatedOn: date('evaluated_on').notNull(),
+    sends: integer('sends').notNull().default(0),
+    sendLimit: integer('send_limit').notNull(),
+    // Integer cents, per the constitution and DATA_MODEL section 1.
+    spendCents: bigint('spend_cents', { mode: 'bigint' }).notNull().default(0n),
+    budgetCents: bigint('budget_cents', { mode: 'bigint' }).notNull(),
+    state: text('state').notNull().default('armed'),
+    trippedAt: timestamp('tripped_at', { withTimezone: true }),
+    // THE ALARM IS NOT OPTIONAL. `otp_send_budget_degraded_is_alarmed` refuses to
+    // store a silent trip, because a degraded mode nobody is watching becomes the
+    // normal mode.
+    alarmRaisedAt: timestamp('alarm_raised_at', { withTimezone: true }),
+    recoveredAt: timestamp('recovered_at', { withTimezone: true }),
+    deferredRegistrations: integer('deferred_registrations').notNull().default(0),
+    overrideReason: text('override_reason'),
+    overrideExpiresAt: timestamp('override_expires_at', { withTimezone: true }),
+    changedBy: text('changed_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.scopeKind, table.scopeKey, table.evaluatedOn] })],
 );
