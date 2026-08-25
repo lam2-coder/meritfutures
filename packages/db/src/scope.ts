@@ -31,6 +31,8 @@ import {
   certificates,
   contentDocuments,
   correlationGroups,
+  couponRedemptions,
+  coupons,
   dailyMarks,
   detectorDefinitions,
   detectorRuns,
@@ -40,10 +42,12 @@ import {
   ledgerEntries,
   ledgerTransactions,
   liabilitySnapshots,
+  midHealth,
   pageRevalidations,
   planVersionSizes,
   planVersions,
   proofLinks,
+  pspWebhookEvents,
   publishedStatistics,
   purchases,
   reviewRequests,
@@ -58,7 +62,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * TWENTY-SIX OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * THIRTY OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -100,6 +104,10 @@ export const TABLES = {
   detectorRuns,
   riskFlags,
   correlationGroups,
+  coupons,
+  couponRedemptions,
+  pspWebhookEvents,
+  midHealth,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -324,6 +332,28 @@ export const SCOPE_RULES = {
   correlationGroups: {
     class: 'firm',
     why: 'A GROUP-LEVEL FINDING SPANNING THREE OR MORE ACCOUNTS, AND THE `firm` CLASS HERE IS A REFUSAL RATHER THAN A DEFAULT. `correlation_groups_is_a_group` starts the table at three members and M07 section 3.4 filters same-identity clustering AT THE DETECTOR, so a row that exists is a finding about MORE THAN ONE identity by construction and no single identity owns it. `member_account_ids` is `uuid[]`, which this vocabulary cannot traverse in any case -- `DerivedRule` names one `localColumn` against one `foreignColumn`, and an array is neither a `hop` nor a `semi-join` -- but the reason it MUST NOT be traversed is stronger than the reason it cannot: returning the row to each member would tell every member which OTHER accounts the detector grouped them with, which is a cross-identity read and the BOLA failure ADR-008 scoped the accessor to bound. `systemDb` reads it and `scopePredicate` says so by throwing rather than by returning nothing.',
+  },
+
+  coupons: {
+    class: 'firm',
+    why: "The firm's discount codes. There is no identity column and there is no correct one: a coupon is an OFFER MERIT MAKES, and the thing a buyer holds is the REDEMPTION, which is `coupon_redemptions` and carries `identity_id NOT NULL`. THE TRAP IS `affiliate_id`: it references `affiliates`, so a derived rule through it would scope a launch code to whoever is CREDITED for it, which says who gets paid when the code is used and nothing about whose row it is -- and the column is NULLABLE, so most codes name no affiliate and would reach nobody at all. `redemption_count` and `max_redemptions` are counters over every identity, so a per-identity slice of this row is not a smaller version of it.",
+  },
+
+  couponRedemptions: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: '`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0006_commerce.sql), and the DDL states why the column is the identity rather than the email: LIMITS ARE PER IDENTITY, because an email limit is a limit on typing and not on people. `purchase_id` is also present and is NOT the scope: it is NULLABLE, null while the claim is HELD and the payment is in flight, so a derivation through `purchases` would return only the redemptions that were paid for -- and the rows it would drop are exactly the claim-and-abandon ones this table keeps on purpose, since a release writes `released_at` rather than deleting the row.',
+  },
+
+  pspWebhookEvents: {
+    class: 'firm',
+    why: "Raw inbound payment events, kept SEPARATELY from `events` because these are THIRD-PARTY ASSERTIONS rather than facts Merit generated (0006_commerce.sql), and the distinction matters the day one of them turns out to be wrong. No identity owns a processor's statement about a payment; the buyer's row is `purchases`. THE TRAP IS `purchase_id`, AND IT IS NULLABLE AND WRITTEN LATE: the handler binds it during processing, so a derived rule would make a row's tenancy a function of whether a job has run yet, the same event belonging to nobody while it is `out_of_order_deferred` and to somebody once it is `applied`. A `rejected_signature` row is stored precisely because its signature did NOT verify, so it belongs to nobody permanently. A class that answers 'whose row is this' differently before and after a re-drive is not an answer.",
+  },
+
+  midHealth: {
+    class: 'firm',
+    why: "SD-M3-03. One row per PSP per window: attempts, declines, chargebacks, and the two basis-point rates the failover decision is made from. There is no identity column and there is no correct one -- the row is about a PROCESSOR, and its counters are aggregates over every identity's card volume, so a per-identity slice of a decline rate is not a smaller version of it. The denominator rule the column names carry (both rates against CARD volume, never total volume, because wallet purchases carry no chargeback exposure) is a property of the published row rather than of any reader.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
