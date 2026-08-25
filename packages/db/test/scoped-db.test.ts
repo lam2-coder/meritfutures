@@ -40,8 +40,8 @@ const IDENTITY = 'i-1' as IdentityId;
  * THE TABLE-TO-SQL-NAME MAP, STATED ONCE, TOTAL, AND AT MODULE SCOPE.
  *
  * ADR-092 SECTION 5 IS WHY IT IS ONE STATEMENT AND NOT TWO. This file used to
- * carry the same seven pairs twice: this map, total by `Record<TableKey, _>`,
- * and a `DDL_NAMES` array beside the drift assertions that was not. Deleting a
+ * carry the same pairs twice: this map, total by `Record<TableKey, _>`, and a
+ * `DDL_NAMES` array beside the drift assertions that was not. Deleting a
  * pair from the array left `tsc --noEmit` at exit 0 and the suite GREEN at 25
  * tests against a baseline of 26 -- a registered, scoped table silently lost
  * its per-table drift assertion and the test count went DOWN. That was the one
@@ -56,23 +56,33 @@ const IDENTITY = 'i-1' as IdentityId;
  *
  * IT IS STILL WRITTEN BY HAND AND THAT IS DELIBERATE. Deriving it from
  * `getTableName(TABLES[key])` would remove the last hand-maintained copy and
- * would make the assertion at `the seven map to the SQL names the DDL uses`
- * compare `getTableName` with itself -- the schema asserted against the schema,
- * which is ADR-084 section 7's failure exactly. The independent statement IS
- * the check.
+ * would make the assertion at `every registered table maps to the SQL name the
+ * DDL uses` compare `getTableName` with itself -- the schema asserted against
+ * the schema, which is ADR-084 section 7's failure exactly. The independent
+ * statement IS the check.
  */
 const SQL_NAME: Readonly<Record<TableKey, string>> = {
   identities: 'identities',
   users: 'users',
   sessions: 'sessions',
   planVersions: 'plan_versions',
+  planVersionSizes: 'plan_version_sizes',
+  purchases: 'purchases',
   accounts: 'accounts',
   ledgerAccounts: 'ledger_accounts',
   ledgerEntries: 'ledger_entries',
   ledgerTransactions: 'ledger_transactions',
   treasuryBalances: 'treasury_balances',
   liabilitySnapshots: 'liability_snapshots',
+  dailyMarks: 'daily_marks',
   ruleStates: 'rule_states',
+  contentDocuments: 'content_documents',
+  pageRevalidations: 'page_revalidations',
+  certificates: 'certificates',
+  statisticDefinitions: 'statistic_definitions',
+  publishedStatistics: 'published_statistics',
+  proofLinks: 'proof_links',
+  reviewRequests: 'review_requests',
 };
 
 /**
@@ -212,14 +222,14 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 100 are unreachable through either accessor.
-  test('11 declared tables, 11 scope rules, 0 reachable without one', () => {
+  // rounded up: the other 90 are unreachable through either accessor.
+  test('21 declared tables, 21 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(11);
-    expect(rules).toBe(11);
+    expect(declared).toBe(21);
+    expect(rules).toBe(21);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;

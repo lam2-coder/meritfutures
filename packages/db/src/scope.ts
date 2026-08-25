@@ -28,14 +28,24 @@
 
 import {
   accounts,
+  certificates,
+  contentDocuments,
+  dailyMarks,
   identities,
   ledgerAccounts,
   ledgerEntries,
   ledgerTransactions,
   liabilitySnapshots,
+  pageRevalidations,
+  planVersionSizes,
   planVersions,
+  proofLinks,
+  publishedStatistics,
+  purchases,
+  reviewRequests,
   ruleStates,
   sessions,
+  statisticDefinitions,
   treasuryBalances,
   users,
 } from './schema.js';
@@ -43,7 +53,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * ELEVEN OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * TWENTY-ONE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -53,13 +63,23 @@ export const TABLES = {
   users,
   sessions,
   planVersions,
+  planVersionSizes,
+  purchases,
   accounts,
   ledgerAccounts,
   ledgerEntries,
   ledgerTransactions,
   treasuryBalances,
   liabilitySnapshots,
+  dailyMarks,
   ruleStates,
+  contentDocuments,
+  pageRevalidations,
+  certificates,
+  statisticDefinitions,
+  publishedStatistics,
+  proofLinks,
+  reviewRequests,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -146,6 +166,18 @@ export const SCOPE_RULES = {
     why: 'The published product catalogue. There is no identity column and there is no correct one: EVERY identity is sold the same plan version, and the link runs the other way -- `accounts.plan_version_id` names the version an account was bought under -- so ownership flows FROM the catalogue rather than to it. The public rules pages read it unscoped and that is not a leak: a published plan version is the contract the firm offers in public.',
   },
 
+  planVersionSizes: {
+    class: 'firm',
+    why: "The price and risk grid of a published plan version, one row per size. There is no identity column and there is no correct one, for `plan_versions`' reason exactly one hop out: EVERY identity is sold the same grid, and an account names the version it was bought under rather than the grid naming a buyer. A `derived` rule through `plan_versions` is not a milder mistake, it THROWS: `scopePredicate` recurses into the via table, the via table is `firm`, and a derivation chain terminates at `owned` or at `root` or it does not terminate. A firm parent makes the whole chain firm rather than making the child derivable.",
+  },
+
+  purchases: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0006_commerce.sql). `user_id` is also present, is also NOT NULL, and is NOT the scope: a user is a login and an identity is the person (ADR-041), and this table's own DDL says the two are recorded separately because THEY CAN DIFFER AFTER A MERGE and the difference is evidence. Scoping by the login would therefore return a strict subset of a merged person's purchase history, silently, which is exactly the reading `accounts` refuses for the same pair of columns.",
+  },
+
   accounts: {
     class: 'owned',
     column: 'identity_id',
@@ -188,6 +220,15 @@ export const SCOPE_RULES = {
     why: "EC-095's three named numbers, aggregated across every identity. There is no identity column and there is no correct one: a per-identity slice of a firm-wide liability total is not a smaller version of it.",
   },
 
+  dailyMarks: {
+    class: 'derived',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0014_marks.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. The grain is ONE ROW PER ACCOUNT PER TRADING DAY and a correction is a NEW row pointing the old one at it rather than an UPDATE, so a scoped read returns the superseded rows as well as the current one -- which is correct: what Merit believed on the day is the trader's own evidence, and `superseded_by` reaches only other rows of this same table, so the supersession chain never leaves the account it belongs to.",
+  },
+
   ruleStates: {
     class: 'derived',
     via: 'accounts',
@@ -195,6 +236,45 @@ export const SCOPE_RULES = {
     foreignColumn: 'id',
     traversal: 'hop',
     why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0015_rule_states.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. The grain is ONE ROW PER ACCOUNT PER TRADING DAY: the day is the grain and the tenancy is the account's, so this is `accounts`' rule exactly one hop out and the day contributes nothing to who may read it.",
+  },
+
+  contentDocuments: {
+    class: 'firm',
+    why: 'The published pages, posts, FAQs and legal texts. There is no identity column and there is no correct one: a legal document is the SAME document for every reader, and an identity that ACCEPTED one is recorded on the acceptance rather than on the text. Supersession rather than update is the discipline here, so the row a trader accepted is still readable after it stops being current, and `checksum` is what makes that a provable artifact (SD-M9-02).',
+  },
+
+  pageRevalidations: {
+    class: 'firm',
+    why: 'A cache-invalidation log for the public surface: one row per request to re-render a set of public paths. No identity owns a re-render of a page every reader sees. `reference_id` is deliberately untyped in the DDL -- it names whatever the `trigger` was about, a plan version or a content document -- so it declares no foreign key and there is nothing a derived rule could traverse even if the rows belonged to somebody.',
+  },
+
+  certificates: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0020_public_surface.sql). THE ROW CARRIES TWO PATHS TO AN IDENTITY AND THE DIRECT COLUMN IS THE RULE: `account_id` reaches the same identity one hop out through `accounts`, and a derived rule through it would make this table's tenancy depend on a join rather than on a column the database itself declares against `identities(id)`. `code` is the public verification token and is DISTINCT from `id` so it can be rotated after an incident (SD-M11-01); a revoked or deferred certificate is still this identity's row, which is why revocation is a column here and never a deletion.",
+  },
+
+  statisticDefinitions: {
+    class: 'firm',
+    why: 'WHAT A PUBLISHED STATISTIC IS: the two specs, the window, the exclusions, the declared measure set and the methodology page. There is no identity column and there is no correct one -- a definition is the method rather than a number about anybody, and it is the same method for every reader. Rows are versioned and superseded, never edited in place, so the definition a figure was published under stays readable after it stops being current.',
+  },
+
+  publishedStatistics: {
+    class: 'firm',
+    why: "An aggregate over EVERY identity, published on a public page. There is no identity column and there is no correct one, which is `liability_snapshots`' reason on a different surface: a per-identity slice of a firm-wide pass rate is not a smaller version of it, it is a different statistic with a sample size of one. A suppressed row EXISTS rather than being omitted, so the suppression is visible rather than a gap in a series, and a correction is a new row pointing at what it restates.",
+  },
+
+  proofLinks: {
+    class: 'firm',
+    why: 'The published list of things a reader can verify for themselves: chain addresses, third-party trackers, the certificate verification page. No identity owns a link Merit publishes about itself. `scope_note` is NOT NULL because a proof link with no stated scope is a claim the reader gets to interpret (SD-M12-04), and that is a property of the published row rather than of any reader.',
+  },
+
+  reviewRequests: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0021_transparency.sql). One row per time Merit asked a person for a public review, and the row is ABOUT THAT PERSON. `trigger_class` carries 'unfavorable' as a first-class member and a row that was never sent still exists carrying `suppressed_reason` (SD-M12-03), so the rows a review-farming design would omit are the ones this table is shaped to keep -- and they are the asked person's rows exactly as the sent ones are.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
