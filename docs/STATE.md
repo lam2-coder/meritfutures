@@ -3214,3 +3214,79 @@ at line 68.
 **`CI-06u` CAUGHT THE KEEP-BOTH HAZARD IN THE DOCUMENTS RATHER THAN THE CODE, TWICE.** Keep-both is right for an APPENDED section and wrong for a KEYED registry row, and both kinds live in [`sessions/README`](sessions/README.md). Sessions 198 to 201 each struck their own claim row in place, so the two sides of the hunk held one key in two states and keeping both made the register answer *has 198 been written* with yes and no at once; the tranche A merge did the same for 202. **The struck `WRITTEN` row was kept in every case and the stale `CLAIMED` duplicate dropped**, and no row's text was edited. All of 194 to 203 now read struck, once each, in numeric order.
 
 **The position:** `pnpm run typecheck` exit 0 with **zero `error TS`**; [`scoped-db.test.ts`](../packages/db/test/scoped-db.test.ts) **101**; `pnpm run gates` <!--gen:gate_count-->30<!--/gen--> of <!--gen:gate_count-->30<!--/gen-->; `pnpm run verify` exit 0. **No session's STATE section or log was edited**, all nine carried through the six merges untouched, and nothing needed a file outside the fence. **`E2` READ REMAINS PENDING on the sixteen money-path tables this branch adds** and on the sixty-four before them, which this session neither discharges nor narrows.
+
+---
+
+## M18's, M06's, M10's and M01's remaining tables: three of four registrable, the fourth is a two-identity-column refusal, and a neighbour's fold refusal is derived rather than inherited (2026-08-25, session 208)
+
+**THREE OF FOUR, AND THE FOURTH IS THE FINDING.** `idempotency_keys` (M10), `trading_calendar_loads` (M06) and `trading_calendar_revisions` (M01) are in [`schema.ts`](../packages/db/src/schema.ts), [`scope.ts`](../packages/db/src/scope.ts) and `SQL_NAME`. **`identity_merges` (M18) is left unregistered and, on [session 192](sessions/2026-08-25-session-192.md)'s stronger model, NOT DECLARED IN [`schema.ts`](../packages/db/src/schema.ts) AT ALL**, because a declared-but-unregistered `pgTable` is one no drift assertion compares. **80 of 111 becomes 83 of 111**, at **1 root, 35 owned, 14 derived and 33 firm** counted off `SCOPE_RULES`, so **50 of the 83 are reachable through the scoped accessor** and 33 are refused at compile time. **No ADR, no migration, no new document, and `docs/plans/**` was read and not edited.** A transcription rules nothing.
+
+### The slice was computed and not received, and it came out at four rather than five
+
+**There is no roster** ([ADR-092](decisions/ADR-092.md) section 9), so the set was derived on the tree this session opened at `4fa5b33`: all 111 `CREATE TABLE` names matched whole-word against each of the four plans, minus the 80 already in `TABLE_KEYS`. That returns **eleven candidates across the four plans**, of which seven are the standing refusals and one belongs to a sibling session:
+
+| Module | Candidates in the plan | Registered here | Why the rest are not |
+|---|---|---|---|
+| **M18** ([graduation-track](plans/M18-graduation-track.md)) | `identity_links`, `identity_merges`, `loyalty_benefit_grants` | **none** | `identity_links` is a standing refusal; `loyalty_benefit_grants` is [M14](plans/M14-loyalty-retention.md)'s and session 206's; **`identity_merges` is this session's refusal, below** |
+| **M06** ([admin-ops-console](plans/M06-admin-ops-console.md)) | `account_status_history`, `events`, `identity_links`, `tos_acceptances`, `trading_calendar_loads` | **`trading_calendar_loads`** | `events` and `identity_links` are standing refusals; `account_status_history` is also [M02](plans/M02-rithmic-bridge.md)'s and is session 205's; `tos_acceptances` is [M16](plans/M16-notification-center.md)'s and is session 207's |
+| **M10** ([integrations](plans/M10-integrations.md)) | `events`, `idempotency_keys`, `otp_challenges` | **`idempotency_keys`** | both others are standing refusals |
+| **M01** ([rules-engine](plans/M01-rules-engine.md)) | `events`, `trading_calendar`, `trading_calendar_revisions` | **`trading_calendar_revisions`** | both others are standing refusals |
+
+**`M01`'s slice is ONE table and not two, and the reason is the corpus's heaviest reader losing its table.** M01 names `events` **twenty times**, more than any other plan, and its refusal already stood at [`scope.ts`](../packages/db/src/scope.ts) written by [session 195](sessions/2026-08-25-session-195.md). It was not re-argued and it was not re-litigated.
+
+**FIRST-WRITER-WINS COST THIS SESSION NOTHING AND THAT IS AN ACCIDENT OF ORDER RATHER THAN A PROPERTY.** `main` did not move between the fetch that computed the slice and the commit: `4fa5b33` at both, re-fetched rather than assumed. **Two of the eleven candidates are genuinely another live session's** and were left rather than raced, which is [session 202](sessions/2026-08-25-session-202.md)'s outcome arriving as a decision instead of as a rebase.
+
+### The refusal: `identity_merges` is the fourth member of a class three sessions have already declined to rule
+
+It carries **`surviving_identity_id` AND `merged_identity_id`, both `uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT`** ([`0002_identity.sql`](../packages/db/migrations/0002_identity.sql)), **one index on each** (`identity_merges_surviving_idx`, `identity_merges_merged_idx`), and **`identity_merges_distinct CHECK (surviving_identity_id <> merged_identity_id)`**, which guarantees that every row of the table is a statement about **two different people**. `OwnedRule.column` is ONE column and [`scopePredicate`](../packages/db/src/scoped-db.ts) renders one `eq`.
+
+- **Naming the survivor** drops the row from the merged identity, and [`INV-M7-06`](plans/M07-risk-abuse.md) plus `0002`'s own comment keep that identity alive on purpose: *"the pre-merge history is what a dispute about a grandfathered cap is argued from"*, and the dispute is argued about the merged side's `accounts_at_merge`.
+- **Naming the merged identity** drops the row from the survivor, whom the grandfathered cap now binds (B4 #17, `GS-046`).
+- **`firm` is refused by the suite's own assertion** that no firm table carries a column referencing `identities`, and it would be a lie about a table with two.
+
+**THE ARGUMENT FOR TAKING `surviving_identity_id` IS RECORDED RATHER THAN LEFT FOR THE NEXT SESSION TO RE-DERIVE, BECAUSE IT IS THE STRONGEST ONE ANY OF THE FOUR REFUSALS HAS FACED.** A hard merge **repoints ownership into the surviving `identities` row**, `identities.id` is the hard-merged grain (already the `why` of the `root` rule), and [`users.md`](architecture/data-model/users.md) says *"one identity may own several users only through a merge"* -- so the merged identity arguably never holds a scoped session and the survivor's column would cover every read that can actually happen. **That is an inference about application behaviour from prose, and the DDL says the opposite twice**: two `NOT NULL` identity columns and an index on each. The second reason is [`events`](../packages/db/migrations/0017_events_and_audit.sql)' second reason arriving as a **COLUMN** rather than as `jsonb`: the `distinct` CHECK guarantees that whichever side is chosen, the row hands the reader **another identity's uuid**, beside `evidence jsonb` written by a detector, which is what `INV-M4-06` forbids the portal to receive. [ADR-092](decisions/ADR-092.md) section 3 names this class as a per-TABLE ruling and takes neither column. **Wanting a number for it was taken as the stop signal, and no ADR was allocated.**
+
+### The fold status of a table beside a refused one was DERIVED, and the answer is that a refusal does not travel
+
+Both `trading_calendar_loads` and `trading_calendar_revisions` are created by [`0032`](../packages/db/migrations/0032_trading_calendar_holidays_coverage_revisions.sql), **the same migration that carries `trading_calendar`'s two `ALTER TABLE ... ALTER COLUMN ... DROP NOT NULL` statements**, which [ADR-094](decisions/ADR-094.md)'s one-member vocabulary REFUSES.
+
+**Replayed here across all 47 migrations with the suite's own multiline `ALTER TABLE ... ;` match rather than a per-line grep: neither table carries an `ALTER TABLE` of ANY shape** -- not `ADD COLUMN`, not `ADD CONSTRAINT`, not a refused verb -- **and each is created exactly once**. So each one's `CREATE TABLE` body **is** its column set as of the last migration, and a neighbour's refusal is a fact about that neighbour's history.
+
+**IT WAS WATCHED RATHER THAN ASSERTED.** `trading_calendar` was seeded into all three files as a `firm` registration: `no later migration changes a column in a shape ADR-094 does not fold` turned **RED with both `ALTER COLUMN` statements quoted back by filename**, while the two sibling tables from the same migration stayed green in the same run. The seed was reverted and `git status --porcelain` reported clean.
+
+### The three rules, and the one that is a shape rather than a column
+
+**`idempotency_keys` is `owned` on a NULLABLE `identity_id`, and it is `ledger_accounts`' shape and NOT `offers`'.** `identity_id uuid NULL REFERENCES identities(id) ON DELETE RESTRICT` is the only column in the body that reaches a person; the rest are a client token, a route, a digest and a stored response. **`offers` has `offers_identity_scope_matches` making its null biconditional and this table has no CHECK of any kind**, so `identity_id IS NULL` means *no identity was recorded* and never *the firm owns it* -- which is why the rule is `owned` on the column the DDL declares against `identities(id)` rather than `firm`. **The DDL already treats the two populations separately in its own index**: `idempotency_keys_identity_idx (identity_id)` is declared `WHERE NOT NULL`.
+
+**`trading_calendar_loads` and `trading_calendar_revisions` are both `firm`, and both `actor` columns are the reason it is a reading rather than a default.** Neither table declares an identity or account column. `actor text NOT NULL` on each is a free-text operator string on `0002`'s idiom, written by the loader and by an operator, **neither of which is a `users` row** -- which is the same shape [`scope.ts`](../packages/db/src/scope.ts)'s own header refuses `treasury_balances.recorded_by` for being.
+
+**`dependent_row_count` IS THE COLUMN MOST LIKELY TO BE MISREAD AS TENANCY AND IT IS A COUNT.** It counts rows in [`fills`](architecture/data-model/fills.md), [`daily_marks`](architecture/data-model/daily_marks.md) and [`rule_states`](architecture/data-model/rule_states.md) that depend on the trading day, asserted a second time by [`0033`](../packages/db/migrations/0033_trading_calendar_revision_required.sql)'s trigger under [ADR-045](decisions/ADR-045.md). **Those three tables are each scoped to an identity and this number is not**, because a count across every account is a property of the DAY.
+
+### Four controls watched firing, and the silent one first because it compiles
+
+| Seeded | Command | Result |
+|---|---|---|
+| **the trap**: `tradingCalendarRevisions` declared `derived` `via: 'tradingCalendarLoads'`, which is FIRM | `pnpm run typecheck` | **exit 0, zero `error TS`.** It compiles at every call site, exactly as [ADR-092](decisions/ADR-092.md) predicts |
+| the same seed | `vitest run packages/db/test/scoped-db.test.ts` | **3 failed, 101 passed.** `every derivation chain ends at an identity, so none of them ends at a firm table` names the firm table; the bounded assertion caught it and was not worked around |
+| `dependent_row_count` deleted from the transcription | the same | **1 failed, 103 passed**, `trading_calendar_revisions: the TS column set equals the set as of the LAST migration` |
+| `trading_calendar_loads` declared `owned` on `actor` | the same | **1 failed.** The DDL check quotes the column back: *"`actor text NOT NULL`: expected to match `/REFERENCES\s+identities\s*\(\s*id\s*\)/i`"* |
+| `trading_calendar` registered `firm` | the same | **2 failed.** `no later migration changes a column in a shape ADR-094 does not fold`, with both `ALTER COLUMN` statements quoted |
+| nothing yet written, all three keys added to `TABLES` only | `pnpm run typecheck` | **`TS2739`** naming `idempotencyKeys`, `tradingCalendarLoads` and `tradingCalendarRevisions` against the total `Readonly<Record<TableKey, string>>` |
+
+Every seed was reverted and `git status --porcelain` reported clean before the figures below were taken.
+
+### The six size literals, recomputed from `TABLE_KEYS.length` and never incremented
+
+`schema.ts`'s header (`EIGHTY-THREE TABLES OF 111`, plus its `the other 28` remainder), `scope.ts`'s `TABLES` docblock (`EIGHTY-THREE OF 111`), the test NAME, and its two `expect(...).toBe(83)` assertions with the comment above them. **The seventh literal, the drifted-table sentence, was DERIVED and it did not move.** Replaying every `ALTER TABLE` across all 47 migrations over the registered set returns **TEN** carrying a later `ADD COLUMN` -- `sessions`, `plan_versions`, `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`, `phone_change_requests`, `admin_actions`, `payout_requests`, `promotional_credit_grants` -- and **none of this session's three is among them**, so the sentence stays TEN of the eighty-three. [Session 204](sessions/2026-08-25-session-204.md) is why that was derived rather than left alone: two branches raised it to NINE for different tables and either copy would have read NINE and been wrong by one.
+
+### The position, measured on this tree
+
+**`scoped-db.test.ts` is 101 on `main` and 104 here, and 104 is 101 plus three**; the whole suite is **1,611 passed / 1 skipped on `main` and 1,614 passed / 1 skipped here**, +3 in both, **one new per-table drift assertion per newly registered table and no fourth**. Both baselines were MEASURED by checking out `origin/main`'s three files into this tree, running, and restoring, rather than quoted from the brief. `pnpm run typecheck` exit 0 with **zero `error TS`**; `pnpm run verify` exit 0; <!--gen:gate_count-->30<!--/gen--> of <!--gen:gate_count-->30<!--/gen--> gates; `lint` and `format:check` clean.
+
+**ALL SEVEN STANDING REFUSALS SURVIVE, CHECKED BY NAME RATHER THAN ASSUMED**: `identity_links`, `attributions`, `affiliate_commissions`, `dedupe_matches`, `otp_challenges`, `trading_calendar` and `events` each appear at **zero** occurrences in `TABLES` and **zero** in `SCOPE_RULES`. **`identity_merges` joins them as an eighth**, and like `identity_links` it carries no `pgTable` declaration at all.
+
+**TWO GAPS ARE NAMED AND NEITHER IS CLOSED, AND NOTHING HERE IMPLIES OTHERWISE.** **Column TYPE and NULLABILITY are still asserted nowhere**, now across 83 registered tables, which is why `request_hash` and both `source_digest` columns are the `bytea` custom type rather than approximated as `text`. **`ddlColumnDefs` still reads the `CREATE TABLE` body alone** ([session 191](sessions/2026-08-25-session-191.md)'s finding); no rule here names an `ALTER`-added column, so the defect is inherited and untriggered.
+
+**ONE STALE FIGURE IS REPORTED AND DELIBERATELY NOT REPAIRED.** [`scoped-db.test.ts`](../packages/db/test/scoped-db.test.ts)'s comment above the totality test reads `` `events` IS ANOTHER OF THE 47 `` where every neighbouring sentence derives 111 minus the registry size. **It is not this session's line and it is not one of the six size literals**, so touching it would put a hunk in a file three concurrent sessions are appending to for a reason unrelated to any table. Named here so it is a record rather than a discovery.
+
+**`E2` READ REMAINS PENDING** on the three money-path registrations this branch adds and on the eighty before them. Nothing here discharges or narrows it.
