@@ -10,9 +10,9 @@
 // =============================================================================
 
 import { describe, expect, it } from 'vitest';
-import { aggregate, AggregateError, checkBands, provenanceFor, runHarness } from '../src/index.js';
-import type { CalibrationSource, HarnessRunInput, OutputRecord } from '../src/index.js';
-import { toBasisPoints } from '../src/ratio.js';
+import { aggregate, AggregateError, checkBands, provenanceFor, runHarness } from '../src/index.ts';
+import type { CalibrationSource, HarnessRunInput, OutputRecord } from '../src/index.ts';
+import { toBasisPoints } from '../src/ratio.ts';
 import {
   CANONICAL_BEHAVIOUR,
   CANONICAL_CALIBRATION,
@@ -26,7 +26,7 @@ import {
   CANONICAL_SPECS,
   SIM_PLAN,
   SIM_PLAN_NO_EVAL,
-} from './canonical.js';
+} from './canonical.ts';
 
 const RUN: HarnessRunInput = {
   seed: CANONICAL_SEED,

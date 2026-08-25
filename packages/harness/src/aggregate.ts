@@ -43,11 +43,11 @@
 // =============================================================================
 
 import type { Cents, ResolvedPlan } from '@merit/rules-engine';
-import type { Provenance } from './provenance.js';
-import { outputDefinition } from './outputs.js';
-import type { Ratio } from './ratio.js';
-import { compare, fromInteger, multiply, ratio, subtract } from './ratio.js';
-import { checkLifetimeBound } from './assertions.js';
+import type { Provenance } from './provenance.ts';
+import { outputDefinition } from './outputs.ts';
+import type { Ratio } from './ratio.ts';
+import { compare, fromInteger, multiply, ratio, subtract } from './ratio.ts';
+import { checkLifetimeBound } from './assertions.ts';
 import type {
   Aggregate,
   CommercialInputs,
@@ -55,7 +55,7 @@ import type {
   OutputKey,
   OutputRecord,
   Trial,
-} from './types.js';
+} from './types.ts';
 
 /** Thrown when an aggregate cannot be computed as specified. */
 export class AggregateError extends Error {

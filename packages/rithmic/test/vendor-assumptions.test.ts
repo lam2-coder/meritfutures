@@ -8,7 +8,7 @@ import {
   FILE_MODE_VENDOR_ASSUMPTIONS,
   OUT_OF_SCOPE_FOR_FILE_MODE,
   STREAM_MODE_VENDOR_ASSUMPTIONS,
-} from '../src/simulator/assumptions.js';
+} from '../src/simulator/assumptions.ts';
 
 // CI-02, the `unit` project.
 //

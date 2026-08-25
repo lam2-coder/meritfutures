@@ -52,7 +52,7 @@
 // financial path.
 // =============================================================================
 
-import type { MaterializedPlan } from './plan-config.js';
+import type { MaterializedPlan } from './plan-config.ts';
 
 /**
  * "YYYY-MM-DD", an exchange trading day, never a UTC date (M01 section 2.1,

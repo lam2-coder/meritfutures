@@ -25,10 +25,10 @@
 // address to travel as one value.
 // =============================================================================
 
-import type { BuiltAt, SitePlanVersionView } from '../catalog/types.js';
-import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.js';
-import { assertSimulatedDisclosurePresent } from '../render/disclosure.js';
-import { versionPageMeta } from './paths.js';
+import type { BuiltAt, SitePlanVersionView } from '../catalog/types.ts';
+import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.ts';
+import { assertSimulatedDisclosurePresent } from '../render/disclosure.ts';
+import { versionPageMeta } from './paths.ts';
 
 /**
  * INV-M9-03's version stamp: what this page describes, in both the form a human

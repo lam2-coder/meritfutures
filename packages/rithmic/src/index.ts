@@ -92,7 +92,7 @@ export {
   STREAM_MODE_VENDOR_ASSUMPTIONS,
   type OutOfScopeAssumption,
   type VendorAssumption,
-} from './simulator/assumptions.js';
+} from './simulator/assumptions.ts';
 export {
   csvField,
   formatMoney,
@@ -102,7 +102,7 @@ export {
   DECLARED_CSV_QUIRKS,
   type CsvQuirks,
   type CsvTable,
-} from './simulator/csv.js';
+} from './simulator/csv.ts';
 export {
   renderRun,
   writeFiles,
@@ -111,17 +111,17 @@ export {
   type EmitOptions,
   type EmittedFile,
   type IngestFileKind,
-} from './simulator/emit.js';
+} from './simulator/emit.ts';
 export {
   eodReportTable,
   DECLARED_EOD_OPTIONS,
   EOD_REPORT_COLUMNS,
   type EodReportOptions,
-} from './simulator/eod-report.js';
-export { fillsReportTable, FILLS_REPORT_COLUMNS } from './simulator/fills-report.js';
-export { buildPopulation, PopulationSpecError } from './simulator/population.js';
-export { drawKey, draws, DrawError, type Draws, type Range } from './simulator/rng.js';
-export { contractsTraded, simulate, SimulationError } from './simulator/session.js';
+} from './simulator/eod-report.ts';
+export { fillsReportTable, FILLS_REPORT_COLUMNS } from './simulator/fills-report.ts';
+export { buildPopulation, PopulationSpecError } from './simulator/population.ts';
+export { drawKey, draws, DrawError, type Draws, type Range } from './simulator/rng.ts';
+export { contractsTraded, simulate, SimulationError } from './simulator/session.ts';
 export {
   foldStream,
   sampleTicks,
@@ -131,7 +131,7 @@ export {
   type LiveAccountTick,
   type StreamFold,
   type StreamOptions,
-} from './simulator/stream.js';
+} from './simulator/stream.ts';
 export {
   civilFromDays,
   compactTradingDay,
@@ -140,7 +140,7 @@ export {
   parseInstantUtc,
   parseTradingDay,
   InstantFormatError,
-} from './simulator/time.js';
+} from './simulator/time.ts';
 export type {
   AccountSizeBand,
   BalanceAdjustment,
@@ -158,4 +158,4 @@ export type {
   SimWaypoint,
   SimulationInput,
   TradingDay,
-} from './simulator/types.js';
+} from './simulator/types.ts';

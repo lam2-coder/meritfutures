@@ -8,7 +8,7 @@ import {
   parseInstantUtc,
   parseTradingDay,
   InstantFormatError,
-} from '../src/simulator/time.js';
+} from '../src/simulator/time.ts';
 
 // CI-02, the `unit` project.
 //

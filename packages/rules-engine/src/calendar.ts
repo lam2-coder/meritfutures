@@ -40,7 +40,7 @@
 // 4021 precisely so a test cannot confuse a window offset for a calendar index.
 // =============================================================================
 
-import type { CalendarDay, CalendarSlice, TradingDay } from './types.js';
+import type { CalendarDay, CalendarSlice, TradingDay } from './types.ts';
 
 /** The input to the constructor: what a caller loaded, and what it may answer for. */
 export interface CalendarSource {

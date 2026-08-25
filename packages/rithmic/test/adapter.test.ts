@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { PlatformAdapter } from '../src/index.js';
+import type { PlatformAdapter } from '../src/index.ts';
 
 // CI-02, the `unit` project.
 //

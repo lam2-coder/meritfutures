@@ -31,7 +31,7 @@ import {
   systemDb,
   type IdentityId,
   type TableKey,
-} from '../src/index.js';
+} from '../src/index.ts';
 
 const MIGRATIONS = fileURLToPath(new URL('../migrations/', import.meta.url));
 const IDENTITY = 'i-1' as IdentityId;

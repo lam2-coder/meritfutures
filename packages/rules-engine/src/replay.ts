@@ -51,8 +51,8 @@ import type {
   RuleState,
   SettlementFact,
   TradingDay,
-} from './types.js';
-import { advanceDay } from './day/advance.js';
+} from './types.ts';
+import { advanceDay } from './day/advance.ts';
 
 /**
  * A replay stopped because a day refused.

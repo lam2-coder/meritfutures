@@ -37,14 +37,14 @@
 // existed cannot contain a sentence about it.
 // =============================================================================
 
-import type { SitePlanVersionView, SiteSizeView } from '../catalog/types.js';
-import { renderCadenceCopy } from '../render/cadence.js';
-import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.js';
-import type { SizeFigures } from '../render/size-label.js';
-import { hasMarketedLabel, renderSizeFigures, renderSizeLabel } from '../render/size-label.js';
-import type { PageEnvelope } from './page.js';
-import { planPage } from './page.js';
-import { planVersionSizePath } from './paths.js';
+import type { SitePlanVersionView, SiteSizeView } from '../catalog/types.ts';
+import { renderCadenceCopy } from '../render/cadence.ts';
+import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.ts';
+import type { SizeFigures } from '../render/size-label.ts';
+import { hasMarketedLabel, renderSizeFigures, renderSizeLabel } from '../render/size-label.ts';
+import type { PageEnvelope } from './page.ts';
+import { planPage } from './page.ts';
+import { planVersionSizePath } from './paths.ts';
 
 /** One published rule block, keyed by the rule path it explains. */
 export interface RuleBlock {

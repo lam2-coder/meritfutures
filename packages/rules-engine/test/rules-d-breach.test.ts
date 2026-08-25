@@ -7,8 +7,8 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import type { BreachDetectedEvent, DayOutput, ResolvedPlan, RuleState } from '../src/types.js';
+import { advanceDay } from '../src/day/advance.ts';
+import type { BreachDetectedEvent, DayOutput, ResolvedPlan, RuleState } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -19,8 +19,8 @@ import {
   mark,
   withDailyLossLimit,
   withStaticDrawdown,
-} from './fixtures-in-code.js';
-import { reU } from './rule-coverage.js';
+} from './fixtures-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 function fold(
   plan: ResolvedPlan,

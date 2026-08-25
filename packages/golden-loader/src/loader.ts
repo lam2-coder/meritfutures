@@ -32,10 +32,10 @@ import type {
   TradingDay,
 } from '@merit/rules-engine';
 
-import { calendarRowsFromRecord, CalendarRecordError, type CalendarRows } from './calendar.js';
-import { snakeToCamel } from './compare.js';
-import { PlanRecordError, resolvePlanRecord } from './plan.js';
-import { parseYamlSubset, type YamlValue } from './yaml.js';
+import { calendarRowsFromRecord, CalendarRecordError, type CalendarRows } from './calendar.ts';
+import { snakeToCamel } from './compare.ts';
+import { PlanRecordError, resolvePlanRecord } from './plan.ts';
+import { parseYamlSubset, type YamlValue } from './yaml.ts';
 
 // -----------------------------------------------------------------------------
 // Compile-time assertions, in the shape packages/rules-engine/src/types.ts uses

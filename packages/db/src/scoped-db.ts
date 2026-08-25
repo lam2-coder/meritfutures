@@ -38,15 +38,15 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { Pool, PoolClient } from 'pg';
 
-import { client } from './client.js';
-import * as schema from './schema.js';
+import { client } from './client.ts';
+import * as schema from './schema.ts';
 import {
   SCOPE_RULES,
   TABLES,
   type FirmTableKey,
   type ScopedTableKey,
   type TableKey,
-} from './scope.js';
+} from './scope.ts';
 
 /** The identity every scoped query is bound to. */
 export type IdentityId = string & { readonly __brand: 'IdentityId' };

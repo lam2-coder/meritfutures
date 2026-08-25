@@ -17,6 +17,21 @@
     // source by Vitest. CI-01 runs `tsc --noEmit` and that is the whole job.
     "noEmit": true,
 
+    // A RELATIVE IMPORT NAMES THE FILE IT ACTUALLY IS, because two resolvers
+    // read this tree and only one of them rewrites extensions. `tsc` under
+    // `moduleResolution: NodeNext` wants `./x.js` for a file that is `x.ts`;
+    // `node --experimental-strip-types`, which ADR-083 rules is how every
+    // deployable runs, resolves an import specifier to THE FILE IT NAMES and
+    // maps nothing. So `./x.js` type-checked and could not run: every app died
+    // on its own first relative import with ERR_MODULE_NOT_FOUND, measured in
+    // session 209 across `apps/api`, `apps/admin` and `apps/worker`.
+    //
+    // This flag is what lets the specifier say `./x.ts` and satisfy both. It
+    // requires `noEmit`, which is set above and is not a coincidence: nothing
+    // here is built by `tsc`, so there is no emitted output whose specifiers
+    // could be wrong. Without it `tsc` reports TS5097 on every rewritten line.
+    "allowImportingTsExtensions": true,
+
     "strict": true,
 
     // The five that `strict` does not turn on, each of which has bitten a money

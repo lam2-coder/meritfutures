@@ -13,7 +13,7 @@ import {
   main,
   resolveSurface,
   surfaceServes,
-} from '../src/index.js';
+} from '../src/index.ts';
 
 // CI-02, the `unit` project.
 //

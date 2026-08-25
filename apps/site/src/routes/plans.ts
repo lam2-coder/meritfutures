@@ -29,14 +29,14 @@
 // first and does not do its work.
 // =============================================================================
 
-import type { BuiltAt, SiteCatalog, SitePlanVersionView, SiteSizeView } from '../catalog/types.js';
-import { renderCadenceCopy } from '../render/cadence.js';
-import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.js';
-import type { SizeFigures } from '../render/size-label.js';
-import { hasMarketedLabel, renderSizeFigures, renderSizeLabel } from '../render/size-label.js';
-import type { PageEnvelope } from './page.js';
-import { page } from './page.js';
-import { planVersionPath, planVersionRulesPath, planVersionSizePath } from './paths.js';
+import type { BuiltAt, SiteCatalog, SitePlanVersionView, SiteSizeView } from '../catalog/types.ts';
+import { renderCadenceCopy } from '../render/cadence.ts';
+import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.ts';
+import type { SizeFigures } from '../render/size-label.ts';
+import { hasMarketedLabel, renderSizeFigures, renderSizeLabel } from '../render/size-label.ts';
+import type { PageEnvelope } from './page.ts';
+import { page } from './page.ts';
+import { planVersionPath, planVersionRulesPath, planVersionSizePath } from './paths.ts';
 
 /**
  * The versions a pricing page may show.

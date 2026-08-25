@@ -25,13 +25,13 @@
 // every legal version nightly for the same reason it walks every `public_slug`.
 // =============================================================================
 
-import type { BuiltAt } from '../catalog/types.js';
-import type { ContentDocument } from '../content/documents.js';
-import { isLive } from '../content/documents.js';
-import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.js';
-import type { PageEnvelope } from './page.js';
-import { page } from './page.js';
-import { contentLivePath, contentVersionPath } from './paths.js';
+import type { BuiltAt } from '../catalog/types.ts';
+import type { ContentDocument } from '../content/documents.ts';
+import { isLive } from '../content/documents.ts';
+import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.ts';
+import type { PageEnvelope } from './page.ts';
+import { page } from './page.ts';
+import { contentLivePath, contentVersionPath } from './paths.ts';
 
 /** A versioned document, rendered. */
 export interface ContentPage {

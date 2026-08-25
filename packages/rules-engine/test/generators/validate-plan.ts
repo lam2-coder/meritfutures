@@ -17,7 +17,7 @@
 // because the reason is the part a later reader needs and the part a diff loses.
 // =============================================================================
 
-import type { Drawdown, MaterializedPlan } from './plan-config.js';
+import type { Drawdown, MaterializedPlan } from './plan-config.ts';
 
 export type CvId =
   | 'CV-01'

@@ -9,7 +9,7 @@ import {
   buildServer,
   defineRoutes,
   discoverRouteModules,
-} from '../src/index.js';
+} from '../src/index.ts';
 import type { FastifyInstance } from 'fastify';
 
 // CI-02, the `unit` project.

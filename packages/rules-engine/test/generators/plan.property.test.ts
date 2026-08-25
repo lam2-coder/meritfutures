@@ -24,10 +24,10 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import { planArbitrary, RULED_SIZES_CENTS } from './plan.js';
-import type { MaterializedPlan } from './plan-config.js';
-import { CV_IDS, validatePlan } from './validate-plan.js';
-import type { CvId } from './validate-plan.js';
+import { planArbitrary, RULED_SIZES_CENTS } from './plan.ts';
+import type { MaterializedPlan } from './plan-config.ts';
+import { CV_IDS, validatePlan } from './validate-plan.ts';
+import type { CvId } from './validate-plan.ts';
 
 // Enough runs that a rule reachable only through one branch of the lock is
 // exercised in both. 500 is not a magic number: with the lock chosen by a fair

@@ -61,16 +61,16 @@ export {
   HTTP_METHODS,
   ROUTE_MODULE_DIR,
   RouteRegistryError,
-} from './registry.js';
+} from './registry.ts';
 export type {
   CompositionReport,
   HttpMethod,
   RouteDefinition,
   RouteHandler,
   RouteModule,
-} from './registry.js';
-export { buildServer, problem, PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX } from './server.js';
-export type { BuiltServer, Problem, ServerOptions } from './server.js';
+} from './registry.ts';
+export { buildServer, problem, PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX } from './server.ts';
+export type { BuiltServer, Problem, ServerOptions } from './server.ts';
 export {
   API_SURFACES,
   BASE_PATH,
@@ -82,15 +82,15 @@ export {
   classifyPath,
   resolveSurface,
   surfaceServes,
-} from './surface.js';
-export type { ApiSurface, Environment, PathClass } from './surface.js';
+} from './surface.ts';
+export type { ApiSurface, Environment, PathClass } from './surface.ts';
 
 import type { FastifyInstance } from 'fastify';
 
-import { discoverRouteModules } from './registry.js';
-import { buildServer } from './server.js';
-import { SERVICE_BY_SURFACE, SurfaceError, resolveSurface } from './surface.js';
-import type { Environment } from './surface.js';
+import { discoverRouteModules } from './registry.ts';
+import { buildServer } from './server.ts';
+import { SERVICE_BY_SURFACE, SurfaceError, resolveSurface } from './surface.ts';
+import type { Environment } from './surface.ts';
 
 /**
  * The Railway services this app deploys as, one per surface.

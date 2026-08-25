@@ -22,7 +22,7 @@ import {
   type TradingDay,
 } from '@merit/rules-engine';
 
-import type { AccountDay } from '../src/batch/ports.js';
+import type { AccountDay } from '../src/batch/ports.ts';
 
 export const td = (s: string): TradingDay => s as TradingDay;
 /** INV-03. Ratios are integer basis points, and the brand is what says so. */

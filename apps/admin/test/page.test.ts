@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest';
 
-import { TRUST_KEYS, type TrustSignal } from '../src/data-trust.js';
-import { OriginError } from '../src/origin.js';
-import { RoleError } from '../src/roles.js';
+import { TRUST_KEYS, type TrustSignal } from '../src/data-trust.ts';
+import { OriginError } from '../src/origin.ts';
+import { RoleError } from '../src/roles.ts';
 import {
   PageError,
   ageAtRender,
@@ -10,7 +10,7 @@ import {
   buildLiabilityHome,
   type LiabilityHomeInput,
   renderLiabilityHome,
-} from '../src/page.js';
+} from '../src/page.ts';
 
 // =============================================================================
 // M6-A: the liability home page, assembled

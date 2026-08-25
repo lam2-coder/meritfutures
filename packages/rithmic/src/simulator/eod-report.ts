@@ -52,10 +52,10 @@
 // pinned at the origin.
 // =============================================================================
 
-import { formatMoney, type CsvTable } from './csv.js';
-import { contractsTraded } from './session.js';
-import { formatInstantUtc, parseInstantUtc } from './time.js';
-import type { SimDay, SimRun, SimSession } from './types.js';
+import { formatMoney, type CsvTable } from './csv.ts';
+import { contractsTraded } from './session.ts';
+import { formatInstantUtc, parseInstantUtc } from './time.ts';
+import type { SimDay, SimRun, SimSession } from './types.ts';
 
 /**
  * The published column order.

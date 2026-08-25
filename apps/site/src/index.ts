@@ -75,7 +75,7 @@
 // package invented.
 // =============================================================================
 
-import { SITE_SURFACES } from './routes/paths.js';
+import { SITE_SURFACES } from './routes/paths.ts';
 
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'site' as const;
@@ -91,8 +91,8 @@ export type {
   SitePlanVersionView,
   SiteSizeView,
   SupersededBy,
-} from './catalog/types.js';
-export { MarketedSizeLabelError, marketedSizeLabel } from './catalog/types.js';
+} from './catalog/types.ts';
+export { MarketedSizeLabelError, marketedSizeLabel } from './catalog/types.ts';
 
 export type {
   CatalogReadPort,
@@ -104,12 +104,12 @@ export type {
   RevalidationStatus,
   SitePorts,
   StatsReadPort,
-} from './catalog/ports.js';
+} from './catalog/ports.ts';
 
 // -----------------------------------------------------------------------------
 // What a build reads THROUGH: the ports, resolved over HTTP (ADR-096)
 // -----------------------------------------------------------------------------
-export type { FetchLike, HttpResponse, SiteAdapterConfig } from './catalog/adapter.js';
+export type { FetchLike, HttpResponse, SiteAdapterConfig } from './catalog/adapter.ts';
 export {
   CONTENT_LOCALE_PARAM,
   CONTENT_VERSION_PARAM,
@@ -120,10 +120,10 @@ export {
   contentEndpoint,
   createSitePorts,
   planVersionEndpoint,
-} from './catalog/adapter.js';
+} from './catalog/adapter.ts';
 
-export type { ContentDocument, ContentKind } from './content/documents.js';
-export { isLive } from './content/documents.js';
+export type { ContentDocument, ContentKind } from './content/documents.ts';
+export { isLive } from './content/documents.ts';
 
 export type {
   PublishedStatistic,
@@ -131,42 +131,42 @@ export type {
   StatisticUnit,
   StatsPublication,
   StatsStaleEvent,
-} from './stats/published.js';
+} from './stats/published.ts';
 
 // -----------------------------------------------------------------------------
 // How a figure becomes a string
 // -----------------------------------------------------------------------------
-export { CentsFormatError, basisPoints, money } from './render/cents.js';
-export type { RenderedCapStep, SizeFigures } from './render/size-label.js';
+export { CentsFormatError, basisPoints, money } from './render/cents.ts';
+export type { RenderedCapStep, SizeFigures } from './render/size-label.ts';
 export {
   hasMarketedLabel,
   renderSizeFigures,
   renderSizeLabel,
   sizeSegment,
-} from './render/size-label.js';
+} from './render/size-label.ts';
 
 // -----------------------------------------------------------------------------
 // The disclosures a page may not be missing
 // -----------------------------------------------------------------------------
-export type { DisclosureForm, SimulatedEnvironmentDisclosure } from './render/disclosure.js';
+export type { DisclosureForm, SimulatedEnvironmentDisclosure } from './render/disclosure.ts';
 export {
   CANONICAL_PAYOUT_COPY,
   DisclosureError,
   assertSimulatedDisclosurePresent,
   payoutCopyOmitsALeg,
-} from './render/disclosure.js';
+} from './render/disclosure.ts';
 
-export type { CadenceBinding, CadenceClaim } from './render/cadence.js';
+export type { CadenceBinding, CadenceClaim } from './render/cadence.ts';
 export {
   cadenceClaim,
   cadenceCopyPublishesADominatedGap,
   renderCadenceCopy,
-} from './render/cadence.js';
+} from './render/cadence.ts';
 
 // -----------------------------------------------------------------------------
 // The surfaces
 // -----------------------------------------------------------------------------
-export type { SiteSurface, VersionPageMeta } from './routes/paths.js';
+export type { SiteSurface, VersionPageMeta } from './routes/paths.ts';
 export {
   SITE_SURFACES,
   contentLivePath,
@@ -176,28 +176,28 @@ export {
   planVersionRulesPath,
   planVersionSizePath,
   versionPageMeta,
-} from './routes/paths.js';
+} from './routes/paths.ts';
 
 export type {
   PageEnvelope,
   PageInput,
   PlanPageInput,
   RenderedVersionStamp,
-} from './routes/page.js';
-export { page, planPage } from './routes/page.js';
+} from './routes/page.ts';
+export { page, planPage } from './routes/page.ts';
 
-export type { PlanCard, PlanSizeCard, PlansPage } from './routes/plans.js';
-export { builtAt, planCard, planSizeCard, plansPage, sellableVersions } from './routes/plans.js';
+export type { PlanCard, PlanSizeCard, PlansPage } from './routes/plans.ts';
+export { builtAt, planCard, planSizeCard, plansPage, sellableVersions } from './routes/plans.ts';
 
-export type { RuleBlock, RulesPage, RulesPageInput, SizeChoice } from './routes/rules.js';
+export type { RuleBlock, RulesPage, RulesPageInput, SizeChoice } from './routes/rules.ts';
 export {
   RulesPageError,
   assertRuleTextIsPublished,
   ruleBlocks,
   rulesPage,
-} from './routes/rules.js';
+} from './routes/rules.ts';
 
-export type { RenderedStatistic, StatsPage } from './routes/stats.js';
+export type { RenderedStatistic, StatsPage } from './routes/stats.ts';
 export {
   StatsRenderError,
   assertWindowAttached,
@@ -205,18 +205,18 @@ export {
   statisticText,
   statsPage,
   statsStaleness,
-} from './routes/stats.js';
+} from './routes/stats.ts';
 
 export type {
   ContentPage,
   ContentPageInput,
   LegalIndexEntry,
   LegalIndexPage,
-} from './routes/legal.js';
-export { contentPage, legalIndex } from './routes/legal.js';
+} from './routes/legal.ts';
+export { contentPage, legalIndex } from './routes/legal.ts';
 
-export type { GeoDisposition, GeoNotice } from './routes/geo.js';
-export { geoNotice } from './routes/geo.js';
+export type { GeoDisposition, GeoNotice } from './routes/geo.ts';
+export { geoNotice } from './routes/geo.ts';
 
 /**
  * Not a server yet. It is a deployable that starts.

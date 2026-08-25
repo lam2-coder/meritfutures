@@ -40,13 +40,13 @@
 // the hash; what is not is the wiring, and the difference is visible in the type
 // rather than left to a reader.
 
-export { foldAccountDay, runNightlyBatch } from './batch/nightly.js';
+export { foldAccountDay, runNightlyBatch } from './batch/nightly.ts';
 export type {
   AccountDayFold,
   AccountDayOutcome,
   NightlyBatchConfig,
   NightlyBatchReport,
-} from './batch/nightly.js';
+} from './batch/nightly.ts';
 
 export type {
   AccountDay,
@@ -58,7 +58,7 @@ export type {
   ReplayDivergenceFinding,
   RuleStateRow,
   StoredContextGates,
-} from './batch/ports.js';
+} from './batch/ports.ts';
 
 // SD-08. Exported because the replay self-audit is the other caller: it will
 // re-derive a state and hash it with THIS function, and a second implementation
@@ -70,14 +70,14 @@ export {
   StateHashError,
   EXCLUDED_COLUMNS,
   HASHED_COLUMNS,
-} from './batch/state-hash.js';
-export { ENGINE_GATE_LEAVES } from './batch/state-hash.js';
+} from './batch/state-hash.ts';
+export { ENGINE_GATE_LEAVES } from './batch/state-hash.ts';
 export type {
   ExcludedColumn,
   HashedColumn,
   HashedState,
   StateHashSubject,
-} from './batch/state-hash.js';
+} from './batch/state-hash.ts';
 
 // INV-04's comparison. `ENGINE_GATE_LEAVES` is exported above beside it because
 // a divergence names a gate by its dotted path, which is what the list carries
@@ -92,14 +92,14 @@ export {
   diffStoredAgainstRecomputed,
   runReplayAudit,
   ReplayAuditRefusal,
-} from './batch/replay.js';
+} from './batch/replay.ts';
 export type {
   AccountDayInput,
   ReplayAccountReport,
   ReplayAuditConfig,
   ReplayAuditReport,
   ReplayMode,
-} from './batch/replay.js';
+} from './batch/replay.ts';
 
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;

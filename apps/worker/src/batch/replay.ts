@@ -158,13 +158,13 @@ import type {
   ReplayDivergence,
   ReplayDivergenceFinding,
   RuleStateRow,
-} from './ports.js';
+} from './ports.ts';
 import {
   ENGINE_GATE_LEAVES,
   HASHED_COLUMNS,
   stateHash,
   type StateHashSubject,
-} from './state-hash.js';
+} from './state-hash.ts';
 
 /**
  * Thrown when the audit cannot honestly report.

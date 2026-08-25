@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'vitest';
 
-import { TRUST_KEYS, type TrustSignal, assessDataTrust } from '../src/data-trust.js';
+import { TRUST_KEYS, type TrustSignal, assessDataTrust } from '../src/data-trust.ts';
 import {
   FigureError,
   type Figure,
   authoritative,
   readingIsPresent,
   render,
-} from '../src/figure.js';
-import { liveOpenLiability } from '../src/live-liability.js';
-import { theThreeNumbers } from '../src/liability.js';
+} from '../src/figure.ts';
+import { liveOpenLiability } from '../src/live-liability.ts';
+import { theThreeNumbers } from '../src/liability.ts';
 
 // =============================================================================
 // M6-A: section 3.5, the live figure that decides nothing

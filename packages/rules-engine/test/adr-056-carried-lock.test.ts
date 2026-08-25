@@ -74,10 +74,10 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay, initialState } from '../src/day/advance.js';
-import { advanceFloor } from '../src/day/floor.js';
-import { resolvePlan } from '../src/plan/resolve.js';
-import type { Cents, DayOutput, FloorLockedEvent, ResolvedPlan, RuleState } from '../src/types.js';
+import { advanceDay, initialState } from '../src/day/advance.ts';
+import { advanceFloor } from '../src/day/floor.ts';
+import { resolvePlan } from '../src/plan/resolve.ts';
+import type { Cents, DayOutput, FloorLockedEvent, ResolvedPlan, RuleState } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -87,7 +87,7 @@ import {
   day,
   evalPrior,
   mark,
-} from './fixtures-in-code.js';
+} from './fixtures-in-code.ts';
 import {
   CORE_50K_SIZE,
   DIRECT_50K_SIZE,
@@ -95,7 +95,7 @@ import {
   RAPID_50K_SIZE,
   RAPID_RULES,
   coreRules,
-} from './published-plans-in-code.js';
+} from './published-plans-in-code.ts';
 
 /** One day for one account, through the real fold and nothing else. */
 function fold(plan: ResolvedPlan, prior: RuleState, fields: Parameters<typeof mark>[0]): DayOutput {

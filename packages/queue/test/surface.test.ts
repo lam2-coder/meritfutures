@@ -30,9 +30,9 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, test } from 'vitest';
 
-import { JOB_QUEUE_METHODS } from '../src/job-queue.js';
-import * as queuePackage from '../src/index.js';
-import { pgBossQueue } from '../src/pg-boss-queue.js';
+import { JOB_QUEUE_METHODS } from '../src/job-queue.ts';
+import * as queuePackage from '../src/index.ts';
+import { pgBossQueue } from '../src/pg-boss-queue.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 

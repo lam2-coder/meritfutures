@@ -36,12 +36,12 @@
 // failure side, which is why one accessor serves both.
 // =============================================================================
 
-import type { BuiltAt } from '../catalog/types.js';
-import { basisPoints, money } from '../render/cents.js';
-import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.js';
-import type { PublishedStatistic, StatsPublication, StatsStaleEvent } from '../stats/published.js';
-import type { PageEnvelope } from './page.js';
-import { page } from './page.js';
+import type { BuiltAt } from '../catalog/types.ts';
+import { basisPoints, money } from '../render/cents.ts';
+import type { SimulatedEnvironmentDisclosure } from '../render/disclosure.ts';
+import type { PublishedStatistic, StatsPublication, StatsStaleEvent } from '../stats/published.ts';
+import type { PageEnvelope } from './page.ts';
+import { page } from './page.ts';
 
 /**
  * One statistic, rendered.

@@ -9,9 +9,9 @@
 
 import { expect, test } from 'vitest';
 
-import { advanceDay } from '../src/day/advance.js';
-import { evaluatePayout } from '../src/payout/evaluate.js';
-import type { ExternalGates, RuleState } from '../src/types.js';
+import { advanceDay } from '../src/day/advance.ts';
+import { evaluatePayout } from '../src/payout/evaluate.ts';
+import type { ExternalGates, RuleState } from '../src/types.ts';
 import {
   ACCOUNT_OPENED_ON,
   CME_WINDOW,
@@ -20,8 +20,8 @@ import {
   day,
   fundedPrior,
   mark,
-} from './fixtures-in-code.js';
-import { reU } from './rule-coverage.js';
+} from './fixtures-in-code.ts';
+import { reU } from './rule-coverage.ts';
 
 /** Every context gate satisfied, so one at a time can be moved. */
 const CLEAR: ExternalGates = {

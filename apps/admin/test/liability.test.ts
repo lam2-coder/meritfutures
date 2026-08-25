@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
-import { readingIsPresent, render } from '../src/figure.js';
+import { readingIsPresent, render } from '../src/figure.ts';
 import {
   LiabilityError,
   type LiabilitySnapshot,
   inAdversarialOrder,
   theThreeNumbers,
-} from '../src/liability.js';
+} from '../src/liability.ts';
 
 // =============================================================================
 // M6-A: the three numbers

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import * as engine from '../src/index.js';
+import * as engine from '../src/index.ts';
 
 // CI-03, the `golden` project, and it exists as a STAGE rather than as a subset
 // of CI-02: `pnpm vitest run --project golden` must work by itself, or the

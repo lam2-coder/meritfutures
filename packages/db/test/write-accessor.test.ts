@@ -49,7 +49,7 @@ import {
   type IdentityId,
   type ScopedTableKey,
   type TableKey,
-} from '../src/index.js';
+} from '../src/index.ts';
 import {
   firmDb,
   firmTx,
@@ -58,7 +58,7 @@ import {
   tenancyColumn,
   type OwnedTableKey,
   type StatementSource,
-} from '../src/scoped-db.js';
+} from '../src/scoped-db.ts';
 
 const IDENTITY = 'i-1' as IdentityId;
 const OTHER = 'i-2' as IdentityId;
@@ -604,7 +604,7 @@ describe('the pool the transaction needs is reachable and is a pool', () => {
   // first transaction in production.
   test('`client()` exposes a pg Pool, without opening a socket', async () => {
     process.env['DATABASE_URL'] = 'postgres://unused@127.0.0.1:1/unused';
-    const { client, closeClient } = await import('../src/client.js');
+    const { client, closeClient } = await import('../src/client.ts');
     const handle = client() as unknown as { $client?: { connect?: unknown; totalCount?: unknown } };
     expect(typeof handle.$client?.connect).toBe('function');
     expect(typeof handle.$client?.totalCount).toBe('number');
