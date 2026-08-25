@@ -30,6 +30,9 @@ import {
   accountAdjustments,
   accounts,
   adminActions,
+  affiliateClicks,
+  affiliateCreatives,
+  affiliates,
   alarmSuppressions,
   certificates,
   contactChannels,
@@ -85,7 +88,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FIFTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FIFTY-SIX OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -99,6 +102,29 @@ import {
  * ADR-092 section 9 names this as a PER-TABLE ruling and takes neither column,
  * and a transcription rules nothing, so the table is left unregistered:
  * unregistered is unreachable, and unreachable is safe.
+ *
+ * `attributions` IS ABSENT FOR THE SAME REASON AND IT IS THE SIBLING ADR-092
+ * SECTION 9 NAMES BESIDE `identity_links`. It carries `buyer_identity_id` AND
+ * `affiliate_identity_id`, both `uuid NOT NULL REFERENCES identities(id) ON
+ * DELETE RESTRICT` (0012_disputes_and_affiliate_settlement.sql, SD-M8-05), and
+ * both are stored rather than joined precisely BECAUSE they are two different
+ * people: the row is a statement about the pair at the moment of purchase, and
+ * `attributions_literal_self_deal_is_void` exists to refuse the case where they
+ * are one. An `owned` rule names ONE column. Naming the buyer hides the
+ * referral from the affiliate who earned it; naming the affiliate returns a
+ * buyer's own purchase attribution to somebody else. Neither is an error, both
+ * return rows, and the second is the BOLA failure ADR-008 scoped the accessor
+ * to bound. ADR-092 takes neither and a transcription rules nothing.
+ *
+ * `affiliate_commissions` IS ABSENT AS A CONSEQUENCE RATHER THAN AS A JUDGMENT,
+ * and the type checker is what says so. Its only path to an identity is
+ * `attribution_id uuid NOT NULL REFERENCES attributions(id)`; `paid_in_statement_id`
+ * reaches `affiliate_statements`, which ADR-092 section 9 records as belonging
+ * to no module plan, and no other column reaches a person at all. `DerivedRule.via`
+ * is `TableKey`, so a rule through `attributions` cannot be written while
+ * `attributions` is unregistered. This is ADR-092's "a session cannot know its
+ * own slice size before it runs" in the direction ADR-094 section 6 did not
+ * name: totality forced a table OUT of a slice rather than into one.
  */
 export const TABLES = {
   identities,
@@ -154,6 +180,9 @@ export const TABLES = {
   planBreakerState,
   reportDeliveries,
   reportSchedules,
+  affiliates,
+  affiliateCreatives,
+  affiliateClicks,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -542,6 +571,31 @@ export const SCOPE_RULES = {
   reportSchedules: {
     class: 'firm',
     why: "WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. `recipients text[] NOT NULL` holds Merit's own staff addresses or a configured SFTP destination, never a trader's, and the row exists to give the C8 weekly risk ritual an input other than a human remembering to look. There is no identity column and there is no correct one. NO CREDENTIAL IS STORED HERE and there is deliberately no column that could hold one, so this table is not a fifth credential surface arriving without a ruling.",
+  },
+
+  affiliates: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0005_affiliate_program.sql), and AN AFFILIATE IS AN IDENTITY is the table's own DDL comment rather than an inference from the column: it is what makes the self-deal check possible at all (B4 #16) and what makes INV-M8-12's 'the affiliate is a human Merit has restricted' a query. THE TRAP IS `parent_id`, which references THIS TABLE for the sub-IB trees that are unused in v1: a derived rule through it would scope a person's own affiliate row to their RECRUITER, and on a null parent it would scope it to nobody. `balance_cents` is SIGNED money and negative is owed to Merit, so a wrong rule here is a debt shown to the wrong human.",
+  },
+
+  affiliateCreatives: {
+    class: 'derived',
+    via: 'affiliates',
+    localColumn: 'affiliate_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` (0005_affiliate_program.sql), and `affiliates` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. `reviewed_by` IS NOT THE TENANCY AND COULD NOT BE: the DDL declares it `text NULL` with no foreign key, so there is nothing to traverse, and a creative belongs to the affiliate who submitted it rather than to the operator who read it -- a rejected or withdrawn creative is still that affiliate's row, which is the compliance evidence INV-M8-08 is about.",
+  },
+
+  affiliateClicks: {
+    class: 'derived',
+    via: 'affiliates',
+    localColumn: 'affiliate_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "`affiliate_id uuid NOT NULL REFERENCES affiliates(id) ON DELETE RESTRICT` (0005_affiliate_program.sql), and `affiliates` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. A CLICK BELONGS TO THE AFFILIATE AND NOT TO THE PERSON WHO CLICKED, and the DDL is what decides that: the table has no identity column, no `user_id` and no `purchase_id`, because a click happens before anybody has signed in. The three columns that look like a clicker are the trap and none of them is a tenancy -- `ip` reaches whoever shares a network, `user_agent` reaches whoever shares a browser build, and `click_fingerprint` is `sessions.device_fingerprint_id`'s named trap arriving on a different table.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
