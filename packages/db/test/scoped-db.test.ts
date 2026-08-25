@@ -115,6 +115,8 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   planBreakerState: 'plan_breaker_state',
   reportDeliveries: 'report_deliveries',
   reportSchedules: 'report_schedules',
+  plans: 'plans',
+  passkeys: 'passkeys',
 };
 
 /**
@@ -254,7 +256,7 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 58 are unreachable through either accessor.
+  // rounded up: the other 56 are unreachable through either accessor.
   //
   // `identity_links` IS ONE OF THE 58 AND ITS ABSENCE IS DELIBERATE. It carries
   // TWO identity columns against an `owned` rule that names one, ADR-092 section
@@ -262,13 +264,23 @@ describe('the registry is total', () => {
   // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
   // column would be a scoped read returning a strict subset of a person's own
   // edges, selected by UUID ordering, with no error anywhere.
-  test('53 declared tables, 53 scope rules, 0 reachable without one', () => {
+  //
+  // `events` IS ANOTHER OF THE 56 AND ITS ABSENCE IS ALSO DELIBERATE. It reaches
+  // an identity TWO ways -- `identity_id uuid NULL` and `account_id uuid NULL`,
+  // neither required and no CHECK tying them -- so an `owned` rule on the first
+  // drops every account-level row and a `derived` hop through the second drops
+  // every identity-level row, while the portal's timeline (EVENTS.md section 2,
+  // consumer TL) reads both. Its `jsonb` payload is the second reason and it is
+  // the one no scope rule reaches: `kyc.dedupe_hit` carries
+  // `matched_identity_id`, so a row whose own tenancy column is right still
+  // names a DIFFERENT identity inside the payload.
+  test('55 declared tables, 55 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(53);
-    expect(rules).toBe(53);
+    expect(declared).toBe(55);
+    expect(rules).toBe(55);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;

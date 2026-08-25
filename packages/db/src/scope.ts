@@ -62,10 +62,12 @@ import {
   notifications,
   otpSendBudget,
   pageRevalidations,
+  passkeys,
   phoneChangeRequests,
   planBreakerState,
   planVersions,
   planVersionSizes,
+  plans,
   proofLinks,
   pspWebhookEvents,
   publishedStatistics,
@@ -85,7 +87,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * FIFTY-THREE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
+ * FIFTY-FIVE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
  * TABLE: a table is registered ONCE by the first session that needs it, the
  * registration is never re-argued, and a session computes its own slice from
  * `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -99,6 +101,20 @@ import {
  * ADR-092 section 9 names this as a PER-TABLE ruling and takes neither column,
  * and a transcription rules nothing, so the table is left unregistered:
  * unregistered is unreachable, and unreachable is safe.
+ *
+ * `events` IS ABSENT FOR THE SAME CLASS OF REASON, RECORDED HERE BY THE SESSION
+ * THAT WANTED IT. It carries `identity_id uuid NULL REFERENCES identities(id)`
+ * AND `account_id uuid NULL REFERENCES accounts(id)`, with NO CHECK tying them
+ * and neither one required, so a rule naming `identity_id` drops every
+ * account-level row written without one and a rule hopping `account_id` drops
+ * every identity-level row -- and EVENTS.md section 2 rows the portal's timeline
+ * as PER-ACCOUNT while M04 section 5 consumes identity-level events on the same
+ * screen, so both halves are read and neither column covers them. The payload is
+ * the second reason: `kyc.dedupe_hit` carries `matched_identity_id` and
+ * `identity.merged` carries `merged_identity_id`, so a row whose own tenancy
+ * column is correct still names a DIFFERENT identity inside `jsonb`, which no
+ * scope rule can express and which INV-M4-06 forbids the portal to receive.
+ * A transcription rules nothing, so this is reported and not allocated.
  */
 export const TABLES = {
   identities,
@@ -154,6 +170,8 @@ export const TABLES = {
   planBreakerState,
   reportDeliveries,
   reportSchedules,
+  plans,
+  passkeys,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -542,6 +560,20 @@ export const SCOPE_RULES = {
   reportSchedules: {
     class: 'firm',
     why: "WHAT MERIT SENDS ITSELF, ON WHAT CADENCE, TO WHICH OPERATOR MAILBOX. `recipients text[] NOT NULL` holds Merit's own staff addresses or a configured SFTP destination, never a trader's, and the row exists to give the C8 weekly risk ritual an input other than a human remembering to look. There is no identity column and there is no correct one. NO CREDENTIAL IS STORED HERE and there is deliberately no column that could hold one, so this table is not a fifth credential surface arriving without a ruling.",
+  },
+
+  plans: {
+    class: 'firm',
+    why: "The product catalogue's root row. There is no identity column and there is no correct one: EVERY identity is offered the same plan, and the link runs the other way -- a plan version names its plan and an account names its version -- so ownership flows FROM the catalogue rather than to it, which is `plan_versions`' reason one level up. `is_active` DELISTS AND NEVER DELETES (0004_catalog.sql), for a records reason rather than a UI one: a plan nobody can buy still has to explain the accounts sold under it, so a delisted row stays readable and stays firm. The public plan pages read it unscoped and that is not a leak, because a listed plan is what the firm offers in public.",
+  },
+
+  passkeys: {
+    class: 'derived',
+    via: 'users',
+    localColumn: 'user_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "A CREDENTIAL BELONGS TO A LOGIN AND NOT TO A PERSON, so the row reaches an identity through `users` and there is no second candidate column on it to choose wrongly. `user_id uuid NOT NULL REFERENCES users(id)` (0002_identity.sql) is single-valued, so the hop cannot multiply rows. ADR-041 is why a login and a person are two things: an identity holding two logins holds passkeys under both and a scoped read returns both, which is the same answer `sessions` gives through the same hop, and it is what SC-M4-01 and SC-M4-11 render. `credential_id` is UNIQUE across the whole table rather than per user, which is WebAuthn's own rule and not a scope: uniqueness does not make the row firm and does not make it reachable without the hop.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
