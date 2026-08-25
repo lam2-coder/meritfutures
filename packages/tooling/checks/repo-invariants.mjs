@@ -39,7 +39,7 @@
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { builtinModules } from 'node:module';
-import { join, dirname, resolve, extname, basename } from 'node:path';
+import { join, dirname, resolve, relative, extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -1005,7 +1005,77 @@ const ri09 = {
   },
 };
 
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri09];
+/**
+ * A relative import must name the file it ACTUALLY IS, because the resolver that
+ * runs this code does not rewrite extensions.
+ *
+ * THIS IS THE STRICT HALF OF `resolveRelative`, AND THE DIFFERENCE IS THE WHOLE
+ * REASON THIS CHECK EXISTS. That helper deliberately maps `./x.js` onto `x.ts`,
+ * because that is what `tsc` under `moduleResolution: NodeNext` and Vitest both
+ * do. `node --experimental-strip-types`, which ADR-083 rules is how every
+ * deployable runs, resolves a specifier to THE FILE IT NAMES and maps nothing.
+ *
+ * SO THE DEFECT THIS CATCHES PASSES EVERY OTHER CHECK IN THIS REPOSITORY.
+ * `pnpm run typecheck`, `pnpm run lint`, `pnpm run gates` and the whole Vitest
+ * suite all go green on a file the runtime cannot load, and the only symptom is
+ * ERR_MODULE_NOT_FOUND at startup. It was live here until 2026-08-25: 686
+ * specifiers wrote `./x.js` for files that are `x.ts`, every app died on its own
+ * first relative import, and RI-07 walked the same graph and passed, because it
+ * resolves the tolerant way.
+ *
+ * IT CATCHES THE OPPOSITE DIRECTION TOO, WHICH IS NOT HYPOTHETICAL. The blanket
+ * repair of those 686 sites rewrote three specifiers that meant a REAL `.js`
+ * file, `packages/eslint-plugin-merit/index.js` being genuine JavaScript. Only
+ * running the suite found it. This check finds both directions statically.
+ *
+ * @type {Invariant}
+ */
+const ri10 = {
+  id: 'RI-10',
+  title: 'Every relative import in shipped source names a file that exists',
+  covers:
+    'every `.ts`, `.tsx` and `.mts` file under a `src/` directory in apps/ or ' +
+    'packages/, which is exactly the code `node --experimental-strip-types` ' +
+    'loads. TEST files are deliberately OUT OF SCOPE and that is a ruling ' +
+    'rather than an omission: Vitest resolves specifiers the tolerant way, so a ' +
+    '`.js` specifier in a test is not a runtime defect, and rule-test fixtures ' +
+    'carry synthetic specifiers as DATA that no regex can tell from a ' +
+    'statement. It reads STATIC specifiers and literal `import(...)` only, from ' +
+    'source with comments stripped, so a specifier BUILT AT RUNTIME is invisible ' +
+    'to it. It resolves LITERALLY: no extension is added, substituted or ' +
+    'dropped, which is the one thing that separates it from RI-07 and from ' +
+    '`resolveRelative`. A BARE specifier is out of scope entirely, because those ' +
+    'resolve through package exports and were never affected. A green result ' +
+    'says the module graph LOADS, and says nothing about whether it behaves.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    for (const area of ['apps', 'packages']) {
+      const areaRoot = join(root, area);
+      if (!existsSync(areaRoot)) continue;
+      for (const rel of walk(areaRoot)) {
+        if (!/\.(ts|tsx|mts)$/.test(rel)) continue;
+        // Only `src/` is loaded by the runtime. See `covers`.
+        if (!rel.split('/').includes('src')) continue;
+        const file = join(areaRoot, rel);
+        for (const spec of specifiersIn(readFileSync(file, 'utf8'))) {
+          if (!spec.startsWith('.')) continue;
+          const target = resolve(dirname(file), spec);
+          if (existsSync(target) && statSync(target).isFile()) continue;
+          const tolerant = resolveRelative(file, spec);
+          const because =
+            tolerant === null
+              ? 'and nothing on disk answers it'
+              : `but ${relative(root, tolerant)} is what is there`;
+          findings.push(`${area}/${rel}: \`${spec}\` names no file, ${because}`);
+        }
+      }
+    }
+    return findings;
+  },
+};
+
+export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri09, ri10];
 
 function main() {
   const [arg] = process.argv.slice(2);
