@@ -293,6 +293,55 @@ describe('every rule resolves against the schema', () => {
       }
     }
   });
+
+  // A DERIVATION CHAIN TERMINATES AT `owned` OR AT `root`, AND A `firm` PARENT
+  // IS WHERE IT DOES NOT.
+  //
+  // `scopePredicate` recurses into `rule.via` and the `firm` branch of that
+  // switch THROWS, so a derived rule whose chain reaches a firm table is a
+  // table that is a member of `ScopedTableKey`, compiles at every call site,
+  // and raises the first time anybody reads it. The type checker cannot refuse
+  // it: `DerivedRule.via` is `TableKey`, which includes every firm key by
+  // construction, and narrowing it would make a rule unable to name a table
+  // before that table's own class is known.
+  //
+  // THIS WAS UNASSERTED UNTIL `plan_version_sizes` MADE IT A PLAUSIBLE MISTAKE
+  // RATHER THAN A PERVERSE ONE. Every derived rule before it hops to an owned
+  // table, so the shape never came up; `plan_version_sizes.plan_version_id` is
+  // a NOT NULL foreign key to `plan_versions`, which reads exactly like the
+  // `hop` that `daily_marks` and `rule_states` make to `accounts` and is not
+  // one, because `plan_versions` is firm. Declaring it `derived` leaves this
+  // whole file GREEN, watched happening rather than predicted, which is why the
+  // reason is a check here and not only a sentence in `scope.ts`.
+  //
+  // The walk is BOUNDED. A cycle among derived rules would otherwise recurse
+  // until the stack ran out, in the suite and in `scopePredicate` alike.
+  test('every derivation chain ends at an identity, so none of them ends at a firm table', () => {
+    for (const key of TABLE_KEYS) {
+      if (SCOPE_RULES[key].class !== 'derived') continue;
+      const seen: TableKey[] = [key];
+      let at: TableKey = key;
+      for (let step = 0; step <= TABLE_KEYS.length; step++) {
+        const rule = SCOPE_RULES[at];
+        if (rule.class === 'owned' || rule.class === 'root') break;
+        expect(
+          rule.class,
+          `${key} derives through ${seen.join(' -> ')}, and ${at} is firm, so a scoped ` +
+            'read of it constructs no predicate and throws',
+        ).toBe('derived');
+        if (rule.class !== 'derived') break;
+        at = rule.via;
+        expect(seen, `${key}'s chain revisits ${at}: ${[...seen, at].join(' -> ')}`).not.toContain(
+          at,
+        );
+        seen.push(at);
+      }
+      expect(
+        ['owned', 'root'],
+        `${key}'s chain did not terminate within ${TABLE_KEYS.length} hops: ${seen.join(' -> ')}`,
+      ).toContain(SCOPE_RULES[at].class);
+    }
+  });
 });
 
 describe('a scope rule is checked against the DDL, not against itself', () => {
