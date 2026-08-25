@@ -132,6 +132,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-102](ADR-102.md) | the accessor learns to WRITE inside a transaction it also produces, and a third door serves the rows that belong to nobody  (2026-08-25, status: proposed) |
 | [ADR-103](ADR-103.md) | column TYPE and NULLABILITY are COMPARED, so `ALTER COLUMN` stops standing in for a comparison that did not exist  (2026-08-25, status: proposed) |
 | [ADR-104](ADR-104.md) | the imbalance is unrepresentable, the posting path is a library both deployables call, and a halt is only a halt because this code path honours it  (2026-08-25, status: proposed) |
+| [ADR-105](ADR-105.md) | the PSP port is the ORDER and the vendor is the mechanics, and two fakes are what told them apart  (2026-08-25, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
