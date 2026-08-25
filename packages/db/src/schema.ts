@@ -875,9 +875,7 @@ export const notificationKinds = pgTable('notification_kinds', {
   templateVersion: integer('template_version').notNull().default(1),
   defaultChannels: text('default_channels').array().notNull().default(['in_app']),
   // SD-M16-01. GENERATED ALWAYS, never written independently.
-  mutable: boolean('mutable').generatedAlwaysAs(
-    sql`class IN ('account_state', 'marketing')`,
-  ),
+  mutable: boolean('mutable').generatedAlwaysAs(sql`class IN ('account_state', 'marketing')`),
   coalesceKeySpec: text('coalesce_key_spec'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
