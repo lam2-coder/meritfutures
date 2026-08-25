@@ -1,12 +1,12 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// NINETY-SIX TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 15 are not reachable through either accessor: `SCOPE_RULES` is total
+// NINETY-NINE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
+// other 12 are not reachable through either accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE NINETY-SIX ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE NINETY-NINE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -31,7 +31,7 @@
 // member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
 // `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
 // one lands the check fails rather than silently reading a stale CREATE. TEN
-// of the ninety-six below carry later columns -- `sessions`, `plan_versions`,
+// of the ninety-nine below carry later columns -- `sessions`, `plan_versions`,
 // `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests` and
 // `promotional_credit_grants` -- and none of them could be registered at all
@@ -4013,5 +4013,152 @@ export const certificateVerifications = pgTable('certificate_verifications', {
   ipHash: bytea('ip_hash'),
   userAgentClass: text('user_agent_class'),
   verifiedAt: timestamp('verified_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// idempotency_keys -- 0017_events_and_audit.sql. OWNED: `identity_id`, NULLABLE.
+// -----------------------------------------------------------------------------
+// THE IDENTITY IS ON THE ROW AND IT IS NULLABLE, WHICH IS THE `ledger_accounts`
+// AND `offers` SHAPE RATHER THAN A GAP. `identity_id uuid NULL REFERENCES
+// identities(id) ON DELETE RESTRICT` is the only column in the body that reaches
+// a person: `key` is the client's own token, `endpoint` is a route and
+// `request_hash` is a digest. A key replayed by an unauthenticated caller -- a
+// PSP webhook is the shape 0017 exists for -- carries no identity and no correct
+// one, so filtering `identity_id = $1` excludes it without a second predicate,
+// because SQL NULL never equals anything. The DDL agrees in its own index:
+// `idempotency_keys_identity_idx (identity_id)` is declared WHERE NOT NULL, so
+// the database itself treats the null rows as a different population.
+//
+// THERE IS NO CHECK MAKING THE NULLABILITY BICONDITIONAL, AND THAT IS STATED
+// RATHER THAN GLOSSED. `offers` has `offers_identity_scope_matches` tying its
+// null to `scope`; this table has nothing of the kind, so `identity_id IS NULL`
+// means "no identity was recorded" and never "the firm owns it". A scoped read
+// therefore returns a person's own replays and nothing else, which is the right
+// answer, and the unowned rows stay reachable only through `systemDb`.
+//
+// `response_body` HOLDS A STORED RESPONSE VERBATIM AND A SCOPE RULE SAYS
+// NOTHING ABOUT WHAT IS INSIDE ONE. 0017's own comment is "replaying a key
+// returns the stored response VERBATIM", so the projection is what bounds what
+// a replay hands back; registering the table decides which ROWS reach an
+// identity and decides nothing else.
+//
+// `request_hash` IS THE `bytea` CUSTOM TYPE AND NOT `text`. A digest declared as
+// `text` would compile and would satisfy the column-name comparison, which is
+// exactly the axis ADR-094 section 3 records this suite does not check.
+//
+// NO `updated_at`. The body declares `created_at` alone, and the row is written
+// once and read back; a 30-day retention is the whole of its lifecycle.
+export const idempotencyKeys = pgTable('idempotency_keys', {
+  // Scoped by endpoint prefix, which is why the key alone is the primary key
+  // and `endpoint` is stored beside it rather than composed into one.
+  key: text('key').primaryKey(),
+  identityId: uuid('identity_id').references(() => identities.id),
+  endpoint: text('endpoint').notNull(),
+  // THE SAME KEY WITH A DIFFERENT BODY IS A CLIENT BUG AND RETURNS 409. Not a
+  // new request, and not a silent overwrite of the first one: those are the two
+  // ways an idempotency layer becomes a duplicate-payment machine.
+  requestHash: bytea('request_hash').notNull(),
+  responseStatus: integer('response_status'),
+  responseBody: jsonb('response_body'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// trading_calendar_loads -- 0032_trading_calendar_holidays_coverage_revisions.sql.
+// FIRM.
+// -----------------------------------------------------------------------------
+// THE EXCHANGE'S CALENDAR BELONGS TO NO TRADER, AND THIS ROW IS THE PROVENANCE
+// OF ONE LOAD OF IT. There is no identity column, no account column and nothing
+// that reaches either: `source_id` names a source publication, the two coverage
+// bounds are dates, `source_digest` is a SHA-256 of the file, and `actor` is a
+// free-text operator string on 0002's `actor` idiom rather than a `users`
+// reference. `firm` here is the reading of the DDL and not a default.
+//
+// ITS NEIGHBOUR `trading_calendar` IS REFUSED AND THIS TABLE IS NOT, AND THE
+// FOLD STATUS WAS DERIVED PER TABLE RATHER THAN INHERITED. 0032 carries
+// `ALTER TABLE trading_calendar ALTER COLUMN session_open_at DROP NOT NULL` and
+// the same for `session_close_at`, which ADR-094's one-member vocabulary
+// REFUSES, so `trading_calendar` cannot be registered. Replayed across all 47
+// migrations with the suite's own multiline match, `trading_calendar_loads`
+// carries NO `ALTER TABLE` of any shape at all -- not `ADD COLUMN`, not
+// `ADD CONSTRAINT` -- so its `CREATE TABLE` body IS its column set as of the
+// last migration. A refusal is a fact about a table's own history.
+//
+// THE COVERAGE BOUNDS ARE TRADING DAYS AND NOT UTC CALENDAR DATES, which is why
+// they are `date` in the same domain as `trading_calendar.trading_day`. A day
+// inside these bounds with no calendar row is a bug in the load; a day OUTSIDE
+// them is UNKNOWN, and unknown is not a holiday. That distinction is what makes
+// an exhausted calendar an answer rather than an unbroken silent holiday.
+//
+// NO `loaded_at`, AND ITS ABSENCE IS RULED. DATA_MODEL section 1 permits three
+// exceptions to every-table-carries-`created_at`, each carrying a MORE SPECIFIC
+// timestamp instead. Here the row's creation IS the load, so a second timestamp
+// would be a second answer to one question.
+export const tradingCalendarLoads = pgTable('trading_calendar_loads', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  // `text` rather than an enum: the set grows about once a year, which is the
+  // case DATA_MODEL section 1 sends to `text` with a check.
+  sourceId: text('source_id').notNull(),
+  coverageStartDay: date('coverage_start_day').notNull(),
+  coverageEndDay: date('coverage_end_day').notNull(),
+  // SHA-256 of the source file as committed, `length = 32` in the DDL. The
+  // loader re-reads the rows it wrote, re-canonicalizes and asserts the digests
+  // match, which is what catches a truncated load and a partial transaction.
+  sourceDigest: bytea('source_digest').notNull(),
+  actor: text('actor').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// trading_calendar_revisions -- 0032_trading_calendar_holidays_coverage_revisions.sql.
+// FIRM.
+// -----------------------------------------------------------------------------
+// A CORRECTION TO THE EXCHANGE CALENDAR IS A STATEMENT ABOUT A DAY, AND A DAY
+// BELONGS TO NOBODY. No column reaches an identity or an account: `trading_day`
+// is a date, `prior_row` is `to_jsonb(OLD)` of a `trading_calendar` row,
+// `source_digest` is a digest, `incident_ref` is an incident label, and `actor`
+// is the same free-text operator string its sibling carries, written by the
+// loader and by an operator, neither of which is a `users` row.
+//
+// `dependent_row_count` IS THE COLUMN MOST LIKELY TO BE MISREAD AS TENANCY AND
+// IT IS A COUNT. It is the number of rows in `fills`, `daily_marks` and
+// `rule_states` that depend on this trading day, counted by the loader BEFORE
+// the write and asserted a second time by `0033`'s trigger under ADR-045. Those
+// three tables are each scoped to an identity; this number is not, because a
+// count across every account is a property of the DAY. Zero is an ordinary data
+// change and non-zero is an incident, which is what the `incident_ref` CHECK
+// reads.
+//
+// `trading_day` CARRIES NO `.references()` AND THE REASON IS THIS FILE'S OWN
+// RULE. The FK is declared inline -- `date NOT NULL REFERENCES
+// trading_calendar(trading_day) ON DELETE RESTRICT` -- but `trading_calendar` is
+// not one of this file's tables and cannot become one: 0032's two
+// `ALTER COLUMN ... DROP NOT NULL` statements are refused by ADR-094's fold. The
+// COLUMN alone is transcribed and the constraint is left to the database.
+//
+// REPLAYED ACROSS ALL 47 MIGRATIONS, THIS TABLE CARRIES NO `ALTER TABLE` OF ANY
+// SHAPE, so its `CREATE TABLE` body is its column set as of the last migration.
+// It sits in the same file as the refusal above and does not inherit it.
+export const tradingCalendarRevisions = pgTable('trading_calendar_revisions', {
+  id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
+  // NO `.references()`: `trading_calendar` is not one of this file's tables.
+  tradingDay: date('trading_day').notNull(),
+  // THE PRIOR IMAGE IS DERIVED, NOT LISTED. `to_jsonb(OLD)` of the whole row, so
+  // a column a future migration adds to `trading_calendar` is captured
+  // automatically. The image must be built by the database: an image assembled
+  // in application code renders timestamps differently and does not equal it.
+  priorRow: jsonb('prior_row').notNull(),
+  actor: text('actor').notNull(),
+  // Required, because a prior image with no reason records that the calendar
+  // moved and not that anybody decided it should.
+  reason: text('reason').notNull(),
+  // SHA-256 of the source file that produced the NEW value, `length = 32` in the
+  // DDL, so a revision traces to the transcription that caused it.
+  sourceDigest: bytea('source_digest').notNull(),
+  dependentRowCount: integer('dependent_row_count').notNull(),
+  // NULL is legal only when nothing depended on the day, which
+  // `trading_calendar_revisions_incident_named_when_dependent` is what enforces.
+  incidentRef: text('incident_ref'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
