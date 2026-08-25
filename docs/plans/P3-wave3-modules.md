@@ -36,8 +36,10 @@ under [`P4-d`](P4-portal-and-site.md).
 input rather than re-deriving it, and its output is what [P4 section 8](P4-portal-and-site.md)'s is: a slice
 table with a fence of real paths, a money-path column and a dependency column, plus one prompt per slice.
 
-**Measured at `3c44a5d` on 2026-08-25.** Every figure below was re-derived by running the command named
-beside it. **Two of the dispatching brief's claims did not survive that**, and both are in section 5.
+**Measured at `3c44a5d` on 2026-08-25, then RE-DERIVED at `7f8215f` after [session 205](../sessions/2026-08-25-session-205.md)
+merged while this branch was open.** Every figure below was re-derived by running the command named beside it,
+twice, and **two of them moved between the two runs**: section 1's registry count and `P3-l`'s fence. Both are
+corrected here rather than left as of the first measurement, and section 5.3 is what moved and why it matters. **Two of the dispatching brief's claims did not survive that**, and both are in section 5.
 
 **This document carries no ruling of its own.** Every decision below is cited to the entry or the file that
 took it, and every ruling it needs is scheduled as a slice or handed to the founder.
@@ -50,7 +52,7 @@ took it, and every ruling it needs is scheduled as a slice or handed to the foun
 |---|---|---|
 | Gates | `node scripts/corpus/gates.mjs check` | **30 of 30 pass** |
 | Deployables | `ls apps` | **five**: `admin`, `api`, `portal`, `site`, `worker` |
-| Registered tables | `grep -c "pgTable(" packages/db/src/schema.ts` | **80 of 111** |
+| Registered tables | `grep -c "pgTable(" packages/db/src/schema.ts` | **87 of 111**, and it was **80** eight minutes earlier. Section 5.3 |
 | The accessor's surface | [`scoped-db.ts:131-140`](../../packages/db/src/scoped-db.ts) | `__brand`, `identityId`, **`rows()`**. Nothing else |
 | `packages/db`'s exports | [`index.ts:41-71`](../../packages/db/src/index.ts) | `scopedDb`, `systemDb`, `scopePredicate`, `SCOPE_RULES`, `TABLES`, `TABLE_KEYS`, `schema`, `closeClient`. **No write, no transaction** |
 | The queue | [`packages/queue/src/job-queue.ts`](../../packages/queue/src/job-queue.ts) | Five methods, `enqueue`'s **first argument is the caller's open transaction** and there is no overload that omits it |
@@ -159,8 +161,10 @@ ADR-094's own: it turns the suite red on whatever it finds across already-merged
 and what it finds is not knowable before it runs.
 
 **The count has moved since ADR-094 wrote "seven"**: `grep -c 'pgTable(' packages/db/src/schema.ts` returns
-**80**, so the comparison lands on 80 transcriptions rather than 7. That is a fact about the cost and it is
-recorded here rather than left for the session to discover.
+**87**, so the comparison lands on 87 transcriptions rather than 7. **That number is still moving**: it was 80
+when this plan was first written and [session 205](../sessions/2026-08-25-session-205.md) merged seven while the
+branch was open, with 206, 207 and 208 still open. That is a fact about the cost and it is recorded here rather
+than left for the session to discover.
 
 ### 4.1 The third precondition: three tables that belong to two identities, and it is ONE ruling and not three
 
@@ -213,6 +217,33 @@ that it **cannot run yet**, because its `enqueue` needs a transaction nothing ca
 saga is not blocked on a queue. It is blocked on section 3's accessor**, which is the same blocker as the
 other six and not a seventh one.
 
+### 5.3 A figure measured in this session moved WHILE THE BRANCH WAS OPEN, and it moved a slice
+
+**[Session 205](../sessions/2026-08-25-session-205.md) merged at `7f8215f` between this plan's first commit and
+its merge of `main`, registering M02's seven tables.** Every figure below was re-derived on the merged tree
+rather than carried:
+
+| Figure | At `3c44a5d` | At `7f8215f` |
+|---|---|---|
+| Registered tables | **80 of 111** | **87 of 111** |
+| `provisioning_queue` in [`schema.ts`](../../packages/db/src/schema.ts) | **absent** | **present**, `derived` through `account_id` |
+| `P3-g`'s comparison lands on | 80 transcriptions | **87**, and 206, 207 and 208 are still open |
+| Sessions ahead of `P3-g` and `P3-h` | 205, 206, 207, 208 | **206, 207, 208** |
+
+**`P3-l`'s fence lost three files because of it.** The slice was written holding `schema.ts`, `scope.ts` and
+`scoped-db.test.ts` to register `provisioning_queue`; that registration is done, so **`P3-l` now holds no
+`packages/db` file at all**, depends on `P3-f` alone, and is the least blocked slice in the wave.
+
+**This is [ADR-092](../decisions/ADR-092.md)'s own stated cost arriving on the plan rather than on a session**:
+*"A session cannot know its own slice size before it runs, because a sibling may register a shared table
+first."* [P4 section 11](P4-portal-and-site.md) rule 3 records twelve of fourteen measurements hitting the same
+thing and each recording it as its own. **It is recorded here as the ordinary consequence of a ruling working**,
+not as a defect, and the correction direction is the good one: a slice got smaller.
+
+**`P3-g`'s cost moved in the other direction and that is the half worth watching.** The comparison it writes
+lands on every registered transcription, so **every merge between now and its dispatch makes it larger**, and
+three transcription branches are open. Section 11 item 1 is why that goes to the founder.
+
 ---
 
 ## 6. DECISION ONE: how many can run concurrently, and on what axis they collide
@@ -230,7 +261,7 @@ changes the rule `P3-h`'s registrations are then compared under. **So `P3-g` bef
 **`P3-f` is CONCURRENT with `P3-g` and `P3-h`, and that is a measurement rather than a preference.** Its fence
 is `packages/db/src/scoped-db.ts`, `packages/db/src/index.ts` and a NEW test file; `P3-g` and `P3-h` hold
 `schema.ts`, `scope.ts` and `scoped-db.test.ts`. **No file is in both.** The same measurement makes `P3-f`
-concurrent with sessions **205 to 208**, which hold the transcription trio and not `scoped-db.ts`, so
+concurrent with sessions **206, 207 and 208**, which hold the transcription trio and not `scoped-db.ts`, so
 **`P3-f` has nothing ahead of it and may open today.**
 
 ### 6.2 After the barriers, the axis is the ENDPOINT for routes and the PACKAGE for libraries, and the two sets do not intersect
@@ -273,7 +304,7 @@ route slices, exactly as `packages/queue` was concurrent with everything when se
 |---|---|---|
 | [`pnpm-lock.yaml`](../../pnpm-lock.yaml) and [`pnpm-workspace.yaml`](../../pnpm-workspace.yaml) | `P3-j` (a WebAuthn library), `P3-m` (a PSP SDK, if the port needs one), and **cross-phase `P4-d` and `P4-i`** | **SERIAL, and the serialization now spans two phases.** [P3 wave 1](P3-ledger-billing-identity.md)'s lesson verbatim: a lockfile cannot be appended to per row. `P4-d` first because it is dispatched |
 | [`docs/architecture/API_CONTRACT.md`](../architecture/API_CONTRACT.md) | `P3-n` (`POST /affiliate/creatives` is in [M08](M08-affiliate-system.md) section 4 and in no contract), `P3-o`, and **cross-phase `P4-f`, `P4-h` and six module measurements** | **[P4 section 9](P4-portal-and-site.md) calls it the hottest cross-phase file in the corpus and leaves it unresolved.** This plan does not resolve it either; section 11 item 2 carries it |
-| `packages/db/src/schema.ts`, `scope.ts`, `test/scoped-db.test.ts` | `P3-g`, `P3-h`, and **sessions 205 to 208, all CLAIMED and three with open pull requests** | **[ADR-092](../decisions/ADR-092.md) section 2 governs**: the owner is the TABLE and the first writer wins. Within this plan `P3-g` then `P3-h`; both behind 205 to 208 |
+| `packages/db/src/schema.ts`, `scope.ts`, `test/scoped-db.test.ts` | `P3-g`, `P3-h`, and **sessions 206, 207 and 208, all with open pull requests. 205 MERGED at `7f8215f` while this branch was open** | **[ADR-092](../decisions/ADR-092.md) section 2 governs**: the owner is the TABLE and the first writer wins. Within this plan `P3-g` then `P3-h`; both behind 205 to 208 |
 | [`docs/decisions/ALLOCATION.md`](../decisions/ALLOCATION.md), [`docs/INDEX.md`](../INDEX.md), [`docs/sessions/README.md`](../sessions/README.md) | every slice that mints a document | Append-only tables where the resolution is **ordering rather than merging**. Section 8 |
 | `apps/api/src/routes/index.ts` | `P3-j`, `P3-k`, `P3-n`, `P3-o`, and cross-phase `P4-f` | Section 6.2. **The one file whose contention `P4-d` can design away and no later slice can** |
 
@@ -332,8 +363,8 @@ flight.** Section 6.3 is the per-file collision table and it is the one to read.
 | # | Slice | Fence, by file | Money | Depends on, by file |
 |---|---|---|---|---|
 | **213** | **`P3-f` the accessor learns to WRITE, to run a TRANSACTION, and to say who is asking when nobody is.** Three clauses in one entry: the write path and how it scopes, the transaction primitive and the `JobTransaction` producer [`packages/queue`](../../packages/queue/src/job-queue.ts) has been waiting for, and what a request handler with no identity reads a `firm` table through | `packages/db/src/scoped-db.ts`, `packages/db/src/index.ts`, `packages/db/test/write-accessor.test.ts` (**new, and NOT `scoped-db.test.ts`, which is the whole reason this slice is concurrent**), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | **YES, `E2`** | **nothing. It opens today** |
-| **214** | **`P3-g` column TYPE and NULLABILITY are compared, and `ALTER COLUMN` stops being a proxy refusal.** [ADR-094](../decisions/ADR-094.md) section 3 is the specification and this session does not write a new one | `packages/db/test/scoped-db.test.ts`, `packages/db/src/schema.ts` (**only rows the comparison finds wrong**), `docs/decisions/ADR-1NN.md` (new, superseding ADR-094's `ALTER COLUMN` clause), `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | **YES, `E2`** | **205, 206, 207, 208** via `schema.ts` and `scoped-db.test.ts` |
-| **215** | **`P3-h` the four tables the registry cannot hold.** `identity_links`, `attributions`, `dedupe_matches` under ONE two-identity ruling, and `otp_challenges` under `P3-g`'s widened fold. `affiliate_commissions` follows `attributions` with no ruling of its own | `packages/db/src/schema.ts`, `packages/db/src/scope.ts`, `packages/db/test/scoped-db.test.ts`, `docs/decisions/ADR-1NN.md` (new), `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-g`** via all three files; **205 to 208** via the same |
+| **214** | **`P3-g` column TYPE and NULLABILITY are compared, and `ALTER COLUMN` stops being a proxy refusal.** [ADR-094](../decisions/ADR-094.md) section 3 is the specification and this session does not write a new one | `packages/db/test/scoped-db.test.ts`, `packages/db/src/schema.ts` (**only rows the comparison finds wrong**), `docs/decisions/ADR-1NN.md` (new, superseding ADR-094's `ALTER COLUMN` clause), `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | **YES, `E2`** | **206, 207, 208** via `schema.ts` and `scoped-db.test.ts`. **205 has merged** |
+| **215** | **`P3-h` the four tables the registry cannot hold.** `identity_links`, `attributions`, `dedupe_matches` under ONE two-identity ruling, and `otp_challenges` under `P3-g`'s widened fold. `affiliate_commissions` follows `attributions` with no ruling of its own | `packages/db/src/schema.ts`, `packages/db/src/scope.ts`, `packages/db/test/scoped-db.test.ts`, `docs/decisions/ADR-1NN.md` (new), `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-g`** via all three files; **206, 207 and 208** via the same |
 
 ### Wave 3.1: the two slices that need no session, no route and no vendor. CONCURRENT
 
@@ -355,7 +386,7 @@ flight.** Section 6.3 is the per-file collision table and it is the one to read.
 
 | # | Slice | Fence, by file | Money | Depends on, by file |
 |---|---|---|---|---|
-| **222** | **`P3-l` the provisioning saga against the simulator.** The `provisioning_queue` driver, the `ProvisioningOp` pipeline, `provision` and `entitle` implemented against [`packages/rithmic`](../../packages/rithmic/src/index.ts), compensation, and `INV-M2-13`'s fail-closed exit. **The queue exists and could not run**: its `enqueue` needs the transaction `P3-f` produces | `apps/worker/src/provisioning/**` (new), `apps/worker/src/index.ts`, `apps/worker/test/provisioning.test.ts` (new), `packages/db/src/schema.ts` and `scope.ts` (**`provisioning_queue` only**), `packages/db/test/scoped-db.test.ts` (its row only), `STATE` (append), `sessions/` | **YES, `E2`** | **`P3-f`** for the transaction; **`P3-h`** via the registry trio. **No route, so NOT `P4-d`** |
+| **222** | **`P3-l` the provisioning saga against the simulator.** The `provisioning_queue` driver, the `ProvisioningOp` pipeline, `provision` and `entitle` implemented against [`packages/rithmic`](../../packages/rithmic/src/index.ts), compensation, and `INV-M2-13`'s fail-closed exit. **The queue exists and could not run**: its `enqueue` needs the transaction `P3-f` produces | `apps/worker/src/provisioning/**` (new), `apps/worker/src/index.ts`, `apps/worker/test/provisioning.test.ts` (new), `STATE` (append), `sessions/`. **It holds NO `packages/db` file**, because [session 205](../sessions/2026-08-25-session-205.md) registered `provisioning_queue` `derived` while this branch was open | **YES, `E2`** | **`P3-f`** for the transaction. **No `packages/db` file and no route, so NOT `P3-h`, NOT `P4-d`. It is the least blocked slice in the wave** |
 | **223** | **`P3-p` [ADR-023](../decisions/ADR-023.md) enrichment, observe mode.** The vendor-agnostic adapter, its `integration_contracts` row, signals recorded and scored and **nothing blocked**. Last and smallest, and **non-blocking by ruling**, so nothing waits on it | `packages/enrichment/**` (new), `packages/enrichment/package.json`, `apps/api/src/routes/checkout.ts` (**its call site only**), `docs/decisions/ADR-1NN.md` (new), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES.** It runs inside checkout's transaction | **`P3-f`** for the `firm` reader; **`P3-n`** via `checkout.ts` |
 
 ---
@@ -381,7 +412,7 @@ not carry, and none of the seven can open until four preconditions land.**
 | # | Precondition | Slice | State |
 |---|---|---|---|
 | 1 | The write path, the transaction and the pre-identity reader | `P3-f` | **Dispatchable today. Nothing is ahead of it** |
-| 2 | The nullability and type comparison, so `otp_challenges` is registrable | `P3-g` | Dispatchable behind sessions 205 to 208. **Its specification is [ADR-094](../decisions/ADR-094.md) section 3 and its cost is unmeasured by construction** |
+| 2 | The nullability and type comparison, so `otp_challenges` is registrable | `P3-g` | Dispatchable behind sessions 206, 207 and 208. **Its specification is [ADR-094](../decisions/ADR-094.md) section 3 and its cost is unmeasured by construction** |
 | 3 | The two-identity scope class | `P3-h` | Dispatchable behind `P3-g` |
 | 4 | The route registry | **`P4-d`, session 209** | **Not this plan's, in flight, nothing pushed.** Its SHAPE decides whether four route slices are four branches or one queue |
 
@@ -464,7 +495,8 @@ These are [P4 section 11](P4-portal-and-site.md)'s, unchanged where they held.
 
 ```
 Already in flight, and all of them order AHEAD of something here:
-  205, 206, 207, 208  schema.ts / scope.ts / scoped-db.test.ts   ->  blocks P3-g, P3-h
+  206, 207, 208       schema.ts / scope.ts / scoped-db.test.ts   ->  blocks P3-g, P3-h
+                      (205 MERGED at 7f8215f, taking the registry to 87 and provisioning_queue with it)
   209  P4-d, the route registry + pnpm-lock.yaml                 ->  blocks P3-j, P3-k, P3-n, P3-o
 
 Wave 3.0, and the first is concurrent with the other two:
@@ -508,8 +540,8 @@ Fence:  packages/db/src/scoped-db.ts, packages/db/src/index.ts,
         only), docs/INDEX.md (your row only), docs/STATE.md (append only),
         docs/sessions/ (your log + its row).
         TOUCH NOTHING ELSE. In particular: NOT packages/db/src/schema.ts, NOT
-        scope.ts, NOT packages/db/test/scoped-db.test.ts. Sessions 205 to 208 and
-        214 and 215 hold those three, and staying off them is the only reason
+        scope.ts, NOT packages/db/test/scoped-db.test.ts. Sessions 206, 207, 208
+        and 214 and 215 hold those three, and staying off them is the only reason
         this session can run concurrently with five others.
 Regime: MONEY PATH. PLAN MODE. Fresh context. One objective. ADR-003 strict.
         E2: this branch waits on the founder's line-by-line read and must not be
@@ -590,10 +622,10 @@ suite, 30 of 30 gates, `pnpm run verify` exit 0. DO NOT MERGE. E2 read pending.
 
 ---
 
-### `P3-g`: nullability and type are compared (session 214, MONEY PATH, `E2`, after 205 to 208)
+### `P3-g`: nullability and type are compared (session 214, MONEY PATH, `E2`, after 206 to 208)
 
 ```
-Branch: claude/p3g-nullability-comparison   (from origin/main AFTER 205 to 208 merge)
+Branch: claude/p3g-nullability-comparison   (from origin/main AFTER 206 to 208 merge)
 Fence:  packages/db/test/scoped-db.test.ts, packages/db/src/schema.ts (ONLY the
         rows your comparison finds wrong), docs/decisions/ADR-1NN.md (new),
         docs/decisions/ALLOCATION.md (your row), docs/INDEX.md (your row),
@@ -1079,7 +1111,6 @@ DO NOT MERGE. E2 read pending.
 Branch: claude/p3l-provisioning-saga   (from origin/main AFTER 213 and 215 merge)
 Fence:  apps/worker/src/provisioning/** (new), apps/worker/src/index.ts,
         apps/worker/test/provisioning.test.ts (new),
-        packages/db/src/schema.ts and scope.ts (`provisioning_queue` ONLY),
         packages/db/test/scoped-db.test.ts (its row ONLY),
         docs/STATE.md (append), docs/sessions/ (your log + its row).
         TOUCH NOTHING ELSE. NOT apps/api: this slice writes no route, which is
@@ -1112,8 +1143,13 @@ out of trading", DELIVERY_PLAN's clause verbatim, and `GS-138` is
 ANYWAY, against the simulator, and REPORT in the pull-request body that whether
 it discharges `GS-138` is a ruling nobody has taken. Do not touch section 39.
 
-`provisioning_queue` IS UNREGISTERED AND NOT REFUSED, so it is a first-writer-wins
-registration and needs no ruling.
+`provisioning_queue` WAS UNREGISTERED WHEN THIS PLAN WAS FIRST WRITTEN AND IT IS
+REGISTERED NOW. Session 205 landed it `derived` through `account_id` while this
+branch was open, so THAT PART OF YOUR SLICE IS ALREADY DONE and your fence holds
+no `packages/db` file at all. Verify it on the tree you open rather than trusting
+this paragraph: `grep -c "pgTable('provisioning_queue'" packages/db/src/schema.ts`.
+This is ADR-092's own stated cost, "a session cannot know its own slice size
+before it runs", and reporting "it was already there" is the honest form.
 
 APPROVAL LINE. Unsigned, one checkable clause. Candidate: "a setpoint whose
 confirmation has not arrived holds the account OUT of trading, watched by seeding
