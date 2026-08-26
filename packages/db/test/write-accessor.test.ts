@@ -32,7 +32,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { getTableColumns, getTableName } from 'drizzle-orm';
+import { and, eq, getTableColumns, getTableName, type SQL } from 'drizzle-orm';
 import { PgDialect, type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
 import { drizzle } from 'drizzle-orm/pg-proxy';
 import type { PoolClient } from 'pg';
@@ -57,6 +57,7 @@ import {
   systemTx,
   tenancyColumn,
   tenancyColumns,
+  uniqueKeys,
   type OwnedTableKey,
   type StatementSource,
 } from '../src/scoped-db.ts';
@@ -85,6 +86,13 @@ const PAIR_KEYS: TableKey[] = TABLE_KEYS.filter((k) => SCOPE_RULES[k].class === 
 const FIRM_KEYS: FirmTableKey[] = TABLE_KEYS.filter(
   (k): k is FirmTableKey => SCOPE_RULES[k].class === 'firm',
 );
+/**
+ * Tables `schema.ts` declares no unique key for, so ADR-112 gives them no
+ * addressed write. DERIVED rather than listed, and the assertion at the end of
+ * this file pins the set to exactly `treasury_balances`.
+ */
+const UNADDRESSABLE: TableKey[] = TABLE_KEYS.filter((k) => uniqueKeys(k).length === 0);
+
 const OWNED_KEYS: OwnedTableKey[] = TABLE_KEYS.filter(
   (k): k is OwnedTableKey => SCOPE_RULES[k].class === 'owned',
 );
@@ -170,6 +178,112 @@ function someOtherColumn(key: TableKey): string {
   throw new Error(`${key} has no column that is not its tenancy column`);
 }
 
+/**
+ * The columns a SCOPED handle pins itself, which a caller may not name and
+ * which count toward the unique key an address has to contain (ADR-112).
+ *
+ * RESTATED HERE FROM THE RULE rather than imported, because it is one line of
+ * the registry read back and the accessor's copy is what is under test. A
+ * `derived` rule pins nothing: its narrowing is an `EXISTS` over another table.
+ */
+function pinnedFor(key: TableKey): readonly string[] {
+  const rule = SCOPE_RULES[key];
+  return rule.class === 'root' || rule.class === 'owned' ? [rule.column] : [];
+}
+
+/**
+ * An address for one table, built from the FIRST unique key its schema declares.
+ *
+ * THE FALLBACK ARM IS `identities` AND IT IS A PROPERTY OF THE RULING RATHER
+ * THAN A CONVENIENCE. The `root` rule's column IS the primary key, so on that
+ * one table the handle's own `id = $1` already names the row and the caller has
+ * nothing left to add -- while an address is still required to be non-empty,
+ * because `{}` is the unaddressed write under another name and the type refuses
+ * it. So the caller names any column at all and the composition is still one
+ * row. Naming a column the row does not match updates nothing, which is a
+ * caller's optimistic guard and not an accessor's problem.
+ */
+function sampleValue(column: PgColumn, seed: string): unknown {
+  // TYPED PER COLUMN because drizzle maps a bound value through the column's own
+  // driver mapper before the statement renders, so a string in a `timestamptz`
+  // throws inside drizzle rather than reaching an assertion. The VALUE is never
+  // what these tests are about; the rendered predicate is.
+  switch (column.dataType) {
+    case 'date':
+      return new Date(0);
+    case 'number':
+      return 1;
+    case 'bigint':
+      return 1n;
+    case 'boolean':
+      return true;
+    case 'json':
+      return {};
+    case 'buffer':
+      return Buffer.from(seed, 'utf8');
+    default:
+      return seed;
+  }
+}
+
+function addressFor(key: TableKey, pinned: readonly string[]): Record<string, unknown> {
+  const columns = getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
+  for (const candidate of uniqueKeys(key)) {
+    const address: Record<string, unknown> = {};
+    let resolved = true;
+    let pinnedCovers = true;
+    for (const sqlName of candidate) {
+      if (pinned.includes(sqlName)) continue;
+      pinnedCovers = false;
+      const property = Object.entries(columns).find(([, c]) => c.name === sqlName)?.[0];
+      if (property === undefined) {
+        resolved = false;
+        break;
+      }
+      address[property] = sampleValue(columns[property] as PgColumn, `addr-${sqlName}`);
+    }
+    if (!resolved) continue;
+    if (Object.keys(address).length > 0) return address;
+    if (pinnedCovers) {
+      const property = someOtherColumn(key);
+      return { [property]: sampleValue(columns[property] as PgColumn, 'addr-any') };
+    }
+  }
+  throw new Error(`${key} has no address a caller could write`);
+}
+
+/** An address a SCOPED handle accepts: the handle's pinned columns are left out. */
+const scopedAddress = (key: TableKey): Record<string, unknown> => addressFor(key, pinnedFor(key));
+
+/** An address an UNSCOPED handle accepts: nothing is pinned, so every column is the caller's. */
+const unscopedAddress = (key: TableKey): Record<string, unknown> => addressFor(key, []);
+
+/** The SQL column names one address names, for asserting the rendered conjuncts. */
+function addressColumns(key: TableKey, address: Record<string, unknown>): string[] {
+  const columns = getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
+  return Object.keys(address).map((property) => (columns[property] as PgColumn).name);
+}
+
+/**
+ * The `WHERE` a scoped keyed write MUST carry, rendered independently.
+ *
+ * BUILT FROM THE SPECIFICATION AND NOT FROM THE ACCESSOR. The tenancy half is
+ * `scopePredicate`, which is the READ's own predicate and is the whole point of
+ * this pair; the address half is "equality over the named columns, sorted,
+ * ANDed", which is ADR-112's ruling written out rather than the accessor's code
+ * called back. So a scoped write that drops the tenancy conjunct, reorders the
+ * composition, or renders an address any other way fails here.
+ */
+function expectedWhere(key: ScopedTableKey, at: Record<string, unknown>): string {
+  const columns = getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
+  const conjuncts = Object.keys(at)
+    .sort()
+    .map((property) => eq(columns[property] as PgColumn, at[property]));
+  const address = (conjuncts.length === 1 ? conjuncts[0] : and(...conjuncts)) as SQL;
+  const whole = and(scopePredicate(key, IDENTITY), address) as SQL;
+  return (dialect.sqlToQuery(whole) as { sql: string }).sql;
+}
+
 // =============================================================================
 // CLAUSE 1: THE WRITE PATH AND HOW IT SCOPES
 // =============================================================================
@@ -180,32 +294,48 @@ describe('an UPDATE and a DELETE carry the read predicate', () => {
   // `scoped-db.test.ts` is where correctness lives, against the DDL. What it
   // proves is that the write path has not grown a predicate builder of its own,
   // which is the way one place quietly becomes two.
+  //
+  // ADR-112 MOVED THE SHAPE AND NOT THE PROPERTY. There is no unaddressed write
+  // any more, so each of these carries an address as well -- and the tenancy
+  // half is asserted to be the read's predicate VERBATIM and to come FIRST, so
+  // a keyed write that dropped it fails here rather than passing on the address
+  // alone.
   test('every scoped UPDATE carries exactly the predicate the matching read does', async () => {
     for (const key of SCOPED_KEYS) {
       const values = { [someOtherColumn(key)]: null };
+      const at = scopedAddress(key);
       const sent = await sentBy((source, conn) =>
-        scopedTx(source, conn, IDENTITY).update(key, values),
+        scopedTx(source, conn, IDENTITY).updateAt(key, at, values),
       );
       const predicate = renderedPredicate(key);
       expect(sent.sql, key).toContain(' where ');
       const where = sent.sql
         .slice(sent.sql.indexOf(' where ') + ' where '.length)
         .split(' returning ')[0] as string;
-      expect(anonymise(where), key).toBe(anonymise(predicate.sql));
-      expect(sent.params.at(-1), key).toBe(IDENTITY);
+      expect(anonymise(where), key).toBe(anonymise(expectedWhere(key, at)));
+      expect(anonymise(where), `${key} still carries the READ's predicate verbatim`).toContain(
+        anonymise(predicate.sql),
+      );
+      expect(sent.params, key).toContain(IDENTITY);
     }
   });
 
   test('every scoped DELETE carries exactly the predicate the matching read does', async () => {
     for (const key of SCOPED_KEYS) {
-      const sent = await sentBy((source, conn) => scopedTx(source, conn, IDENTITY).delete(key));
+      const at = scopedAddress(key);
+      const sent = await sentBy((source, conn) =>
+        scopedTx(source, conn, IDENTITY).deleteAt(key, at),
+      );
       const predicate = renderedPredicate(key);
       expect(sent.sql, key).toContain(' where ');
       const where =
         sent.sql.slice(sent.sql.indexOf(' where ') + ' where '.length).split(' returning ')[0] ??
         '';
-      expect(anonymise(where), key).toBe(anonymise(predicate.sql));
-      expect(sent.params, key).toEqual([IDENTITY]);
+      expect(anonymise(where), key).toBe(anonymise(expectedWhere(key, at)));
+      expect(anonymise(where), `${key} still carries the READ's predicate verbatim`).toContain(
+        anonymise(predicate.sql),
+      );
+      expect(sent.params, key).toContain(IDENTITY);
     }
   });
 
@@ -214,10 +344,12 @@ describe('an UPDATE and a DELETE carry the read predicate', () => {
   // sides at once. These do not.
   test('no scoped write is ever a bare table scan', async () => {
     for (const key of SCOPED_KEYS) {
-      const del = await sentBy((source, conn) => scopedTx(source, conn, IDENTITY).delete(key));
+      const del = await sentBy((source, conn) =>
+        scopedTx(source, conn, IDENTITY).deleteAt(key, scopedAddress(key)),
+      );
       expect(del.sql, key).toMatch(/\swhere\s/);
       expect(del.sql, key).not.toMatch(/\swhere\s+(true|1\s*=\s*1)\b/i);
-      expect(del.params, key).toEqual([IDENTITY]);
+      expect(del.params, key).toContain(IDENTITY);
     }
   });
 
@@ -225,7 +357,9 @@ describe('an UPDATE and a DELETE carry the read predicate', () => {
     for (const key of SCOPED_KEYS) {
       const rule = SCOPE_RULES[key];
       if (rule.class !== 'root' && rule.class !== 'owned') continue;
-      const del = await sentBy((source, conn) => scopedTx(source, conn, IDENTITY).delete(key));
+      const del = await sentBy((source, conn) =>
+        scopedTx(source, conn, IDENTITY).deleteAt(key, scopedAddress(key)),
+      );
       expect(del.sql, key).toContain(`"${rule.column}"`);
       expect(del.sql, key).toMatch(/=\s*\$1/);
     }
@@ -234,7 +368,9 @@ describe('an UPDATE and a DELETE carry the read predicate', () => {
   test('a derived write reaches the identity through an EXISTS, never a join', async () => {
     for (const key of SCOPED_KEYS) {
       if (SCOPE_RULES[key].class !== 'derived') continue;
-      const del = await sentBy((source, conn) => scopedTx(source, conn, IDENTITY).delete(key));
+      const del = await sentBy((source, conn) =>
+        scopedTx(source, conn, IDENTITY).deleteAt(key, scopedAddress(key)),
+      );
       expect(del.sql, key).toMatch(/exists/i);
       expect(del.sql, key).not.toMatch(/\bjoin\b/i);
     }
@@ -314,7 +450,9 @@ describe('a caller never names the tenancy column', () => {
       expect(sqlName, `${key} is not firm, so it has a tenancy column`).toBeDefined();
       const { source, conn } = { ...recording(), ...recordingConn() };
       await expect(
-        scopedTx(source, conn, IDENTITY).update(key, { [sqlName as string]: OTHER }),
+        scopedTx(source, conn, IDENTITY).updateAt(key, scopedAddress(key), {
+          [sqlName as string]: OTHER,
+        }),
         key,
       ).rejects.toThrow(/tenancy column/);
     }
@@ -326,7 +464,9 @@ describe('a caller never names the tenancy column', () => {
     for (const key of SCOPED_KEYS) {
       const { source, conn } = { ...recording(), ...recordingConn() };
       await expect(
-        scopedTx(source, conn, IDENTITY).update(key, { [someOtherColumn(key)]: null }),
+        scopedTx(source, conn, IDENTITY).updateAt(key, scopedAddress(key), {
+          [someOtherColumn(key)]: null,
+        }),
       ).resolves.toBeDefined();
     }
   });
@@ -610,7 +750,9 @@ describe('the tables a request handler needs are the ones that belong to nobody'
       for (const column of [rule.columnA, rule.columnB]) {
         const { source, conn } = { ...recording(), ...recordingConn() };
         await expect(
-          systemTx(source, conn, 'operator-console').update(key, { [column]: OTHER }),
+          systemTx(source, conn, 'operator-console').updateAt(key, unscopedAddress(key), {
+            [column]: OTHER,
+          }),
           `${key}.${column}`,
         ).rejects.toThrow(/tenancy column/);
       }
@@ -637,19 +779,52 @@ describe('the firm, pair and scoped partitions cover the registry exactly', () =
     expect(pair.length).toBeGreaterThan(0);
   });
 
-  test('the unscoped writers carry no predicate, because there is no identity to carry', async () => {
+  // THIS TEST USED TO ASSERT THE DEFECT AS A PROPERTY, and ADR-112 is why it now
+  // asserts its opposite. It read "the unscoped writers carry no predicate,
+  // because there is no identity to carry", which was TRUE of the code and was
+  // the wrong conclusion drawn from a correct premise: no identity to carry is
+  // a reason to carry no TENANCY predicate, and it was taken as a reason to
+  // carry no predicate at all. An `UPDATE` through those handles wrote every row
+  // in the table. There is no such write any more, at any authority.
+  test('the unscoped writers carry an ADDRESS, because there is no unaddressed write', async () => {
     for (const key of FIRM_KEYS) {
+      if (UNADDRESSABLE.includes(key)) continue;
+      const at = unscopedAddress(key);
       const sent = await sentBy((source, conn) =>
-        firmTx(source, conn).update(key, { [someOtherColumn(key)]: null }),
+        firmTx(source, conn).updateAt(key, at, { [someOtherColumn(key)]: null }),
       );
       expect(sent.sql, key).toMatch(/^update /);
-      expect(sent.sql, key).not.toMatch(/\swhere\s/);
+      expect(sent.sql, key).toMatch(/\swhere\s/);
+      for (const column of addressColumns(key, at)) expect(sent.sql, key).toContain(`"${column}"`);
     }
+    const at = unscopedAddress('accounts');
     const sent = await sentBy((source, conn) =>
-      systemTx(source, conn, 'nightly-batch').delete('accounts'),
+      systemTx(source, conn, 'nightly-batch').deleteAt('accounts', at),
     );
     expect(sent.sql).toMatch(/^delete from "accounts"/);
-    expect(sent.sql).not.toMatch(/\swhere\s/);
+    expect(sent.sql).toMatch(/\swhere\s/);
+    for (const column of addressColumns('accounts', at)) expect(sent.sql).toContain(`"${column}"`);
+  });
+
+  // THE ONE TABLE WITH NO ADDRESSED WRITE AT ALL, WATCHED RATHER THAN WRITTEN
+  // DOWN. `0009_ledger.sql` gives `treasury_balances` `PRIMARY KEY
+  // (account_code, as_of)` and `schema.ts` transcribes no key for it, so
+  // ADR-112's addressability check -- which reads the TRANSCRIPTION, because
+  // that is what a runtime can read -- finds nothing to accept. THE REFUSAL IS
+  // THE SAFE DIRECTION: a write the database would have bounded is refused
+  // rather than a write it would not have bounded being allowed. `schema.ts` is
+  // outside session 227's fence, so the gap is asserted here and the repair is
+  // one line in that file, at which point this test names the next one or none.
+  test('a table whose schema declares no unique key has no addressed write, and it is treasury_balances', async () => {
+    expect(
+      TABLE_KEYS.filter((key) => uniqueKeys(key).length === 0),
+      'the set of tables schema.ts declares no unique key for',
+    ).toEqual(['treasuryBalances']);
+
+    const { source, conn } = { ...recording(), ...recordingConn() };
+    await expect(
+      firmTx(source, conn).updateAt('treasuryBalances', { balanceCents: 1n }, { source: 'x' }),
+    ).rejects.toThrow(/declares no PRIMARY KEY or UNIQUE in schema\.ts/);
   });
 });
 
