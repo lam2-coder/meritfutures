@@ -140,7 +140,9 @@ export class KycConfigError extends Error {
 }
 
 function isTrigger(value: unknown): value is KycTrigger {
-  return typeof value === 'string' && (KYC_TRIGGERS_AS_CHECKED as readonly string[]).includes(value);
+  return (
+    typeof value === 'string' && (KYC_TRIGGERS_AS_CHECKED as readonly string[]).includes(value)
+  );
 }
 
 /**
@@ -181,7 +183,7 @@ export function readTriggerConfig(value: unknown): readonly KycTrigger[] {
       throw new KycConfigError(
         `carries \`${JSON.stringify(member)}\`, which is not one of ` +
           `${KYC_TRIGGERS_AS_CHECKED.join(', ')}. \`pre_eval\` is retired into ` +
-          '`first_purchase` and `0003_kyc.sql`\'s CHECK refuses it',
+          "`first_purchase` and `0003_kyc.sql`'s CHECK refuses it",
       );
     }
     if (seen.has(member)) {
@@ -197,7 +199,7 @@ export function readTriggerConfig(value: unknown): readonly KycTrigger[] {
     throw new KycConfigError(
       'names `direct_purchase`, which is NOT CONFIGURABLE. INV-M19-02: Direct and ' +
         'any instant-funded plan verify at purchase because funding is immediate and ' +
-        'there is no later gate to move to. It fires from the plan\'s SHAPE and a ' +
+        "there is no later gate to move to. It fires from the plan's SHAPE and a " +
         'configuration that appears to grant it also appears to be able to withhold it',
     );
   }
