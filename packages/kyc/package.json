@@ -1,0 +1,20 @@
+{
+  "name": "@merit/kyc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The vendor-agnostic identity-verification port and ADR-021's composite trigger set. Merit never proxies documents: nothing in this package returns one, accepts one, or has a field one could be assigned to.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT IS A PACKAGE AND NOT TWO ROUTE FILES BECAUSE THE WORKER NEEDS IT. `pre_funded` fires at `phase.passed`, which is apps/worker's moment, and ADR-100 ruling 2 forbids anything outside apps/api/src/routes/ from importing anything inside it. A trigger evaluator the worker cannot reach is half a deliverable, which is packages/ledger's own justification one slice over. IT DECLARES NO RUNTIME DEPENDENCY AND NO WORKSPACE DEPENDENCY. It opens no socket, names no vendor SDK, registers no route and reads no row: `POST /kyc/session`, `GET /kyc/status` and `POST /webhooks/kyc/:provider` are apps/api's and all three program against this package. THE ONE THING IT COULD HAVE IMPORTED AND MAY NOT IS @merit/psp's VERIFIER. `HmacWebhookScheme` declares `readonly psp: PspId` and `PspId` is closed at 'psp_a' | 'psp_b' by a CHECK on purchases.psp, so calling it from a KYC path would write a payment provider id into an identity path. The ordering is therefore implemented twice and BOUND by test/webhook-bind.test.ts, which READS packages/psp/src/webhook.ts rather than restating it. ADR-114 section 4.",
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

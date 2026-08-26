@@ -1,0 +1,19 @@
+{
+  "name": "@merit/affiliate",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Attribution as a pure fold: code override, then last touch within 30 days, then none, with the literal self-deal voided. M08 section 3.1 is the specification. No database, no clock, no route.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT DECLARES NO RUNTIME DEPENDENCY AND NO WORKSPACE DEPENDENCY, on packages/ledger's and packages/psp's precedent rather than as a new argument. INV-M8-01 makes attribution resolve ONCE, at checkout, inside the checkout transaction, so a library able to reach a pool is a library that can open its own transaction and lose that consequence at every call site that forgets. This package never sees a connection: `resolveAttribution` is a total function over values the caller already read, and the row it returns is written by the caller on the caller's own open transaction. It declares no `pg` and no `drizzle-orm` either, so `merit/no-raw-db-client` (VG-4) is satisfiable here with no `ignores` line, and it declares no clock: the fold takes `at` as an argument, because a 30 day window computed from `Date.now()` inside the fold is a window no test can move.",
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

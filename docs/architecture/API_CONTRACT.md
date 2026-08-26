@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, STATE_MACHINES.md, SECURITY.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md, ../../research/SECURITY_LANDSCAPE.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-26
 ---
 
 # API Contract (Constitution B2)
@@ -587,6 +587,29 @@ type AffiliateStats = {
 
 ### GET /affiliate/statements
 Cursor list of monthly statements with `statement_id`, period, `total_cents`, `status`, and a signed download URL.
+
+### POST /affiliate/creatives
+Submit a creative for approval ([ADR-113](../decisions/ADR-113.md), [M8](../plans/M08-affiliate-system.md) section 4, `SD-M8-03`).
+```ts
+type CreateCreativeRequest = {
+  kind: "landing" | "video" | "post" | "email" | "other";
+  url_or_ref: string;
+  notes?: string;
+};
+type CreateCreativeResponse = {
+  creative: {
+    creative_id: string; kind: string; url_or_ref: string;
+    status: "pending"; submitted_at: string;
+  };
+  required_disclosure: { tos_version_id: string; version: string; text: string };
+};
+```
+Auth: session. Idempotency: accepted. Rate limit: 20 per day per identity.
+Errors: `validation_failed`, `forbidden` (the caller is not an affiliate), `conflict` (this affiliate already has an open submission for the same `url_or_ref`).
+
+`required_disclosure` is **the disclosure the review will require**, not one this row already carries. `affiliate_creatives.disclosure_version_id` is nullable and `affiliate_creatives_approved_has_disclosure` binds it to **approval**, so a submission pins nothing and the two are separate fields for that reason ([ADR-113](../decisions/ADR-113.md) section 3). `INV-M8-08`, NFA I-26-12.
+
+Approval, rejection and the automatic withdrawal that follows a superseded disclosure are **operator** acts on the admin origin and have no row here yet ([ADR-113](../decisions/ADR-113.md) section 5).
 
 ### POST /affiliate/links
 ```ts
