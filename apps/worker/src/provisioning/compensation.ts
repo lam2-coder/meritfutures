@@ -163,15 +163,27 @@ export const REVOCATION_ORDER: readonly ProvisioningOperation[] = [
   'disable_account',
 ];
 
-/** Sort a set of compensating operations into M02 section 3.6's order. */
+/**
+ * Where one compensating operation sits in M02 section 3.6's order.
+ *
+ * An operation the revocation order does not name ranks LAST rather than
+ * first. It is not a revocation, so it must not preempt one.
+ */
+export function revocationRank(operation: ProvisioningOperation): number {
+  const i = REVOCATION_ORDER.indexOf(operation);
+  return i === -1 ? REVOCATION_ORDER.length : i;
+}
+
+/**
+ * Sort a set of compensating operations into M02 section 3.6's order.
+ *
+ * `Array.prototype.sort` IS STABLE in every engine this runs on, so two
+ * compensations of equal rank keep the order their steps ran in. That matters
+ * when one account contributes two `set_entitlement` steps: they compensate in
+ * the order they were applied rather than in an order the sort invented.
+ */
 export function inRevocationOrder(
   operations: readonly ProvisioningOperation[],
 ): readonly ProvisioningOperation[] {
-  const rank = (o: ProvisioningOperation): number => {
-    const i = REVOCATION_ORDER.indexOf(o);
-    // An operation the revocation order does not name goes LAST rather than
-    // first. It is not a revocation, so it must not preempt one.
-    return i === -1 ? REVOCATION_ORDER.length : i;
-  };
-  return [...operations].sort((a, b) => rank(a) - rank(b));
+  return [...operations].sort((a, b) => revocationRank(a) - revocationRank(b));
 }
