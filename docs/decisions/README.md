@@ -140,6 +140,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-111](ADR-111.md) | two of the three homeless shapes get a contract row and the third gets a home it cannot be given here, because a banner that describes a session must arrive on the response that resolved it (2026-08-26, status: accepted) |
 | [ADR-112](ADR-112.md) | the accessor learns to name ONE ROW, and the six writes that could not are removed rather than documented  (2026-08-26, status: proposed) |
 | [ADR-117](ADR-117.md) | `RI-08` guards every package against an EMPTY admission list, because the two ADR-096 named were five before this session opened  (2026-08-26, status: proposed) |
+| [ADR-118](ADR-118.md) | a section headed by a date or a session number is a RECORD, and ADR-034's count rule does not reach it  (2026-08-26, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
