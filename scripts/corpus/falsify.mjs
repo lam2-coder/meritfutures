@@ -617,6 +617,179 @@ function firstCoverageColumnLoose(dir) {
 const opener = (name) => `<!--${'gen'}:${name}-->`;
 const closer = () => `<!--/${'gen'}-->`;
 
+// ---------------------------------------------------------------------------
+// CI-06/table-row-width. THE SEED IS PR #299 REPLAYED, NOT A FRAGMENT INVENTED
+// TO RESEMBLE IT.
+// ---------------------------------------------------------------------------
+// #299 repaired `docs/sessions/README.md` after a row insertion landed past the
+// reservation table's terminating blank line and a prettier run absorbed the
+// paragraph below it INTO THE TABLE AS ROWS: the blank line and the paragraph's
+// first sentence vanished, and nine prose lines became rows with first cells
+// like `lands, its entry joins the list below`. All 30 gates passed over it.
+//
+// THE SEED PERFORMS THAT EDIT RATHER THAN QUOTING ITS OUTPUT, and the difference
+// is the one `OI-21` names. A frozen copy of #299's nine corrupted lines would
+// go stale the day that paragraph is reworded, and would go stale SILENTLY,
+// because a literal block appended to a file needs no anchor and always seeds
+// something. Locating the live paragraph and rewriting it the way prettier did
+// cannot: the anchor check below throws, the harness prints SEED IS STALE, and
+// the run reports a harness problem rather than a gate problem.
+//
+// The paragraph is still the one #299 lost. The anchor assertion pins that: the
+// line about to become the first absorbed row must still carry the phrase the
+// pull request quoted, so a rewording announces itself here rather than in a
+// case that has quietly stopped reproducing anything.
+const SESSIONS_README = 'docs/sessions/README.md';
+const ABSORBED_299_OPENER =
+  '**A row moves out of this table by being written, not by being edited.**';
+const ABSORBED_299_PHRASE = 'lands, its entry joins the list below';
+
+/**
+ * Pull the paragraph that follows the session reservation table INTO the table,
+ * exactly as PR #299's prettier run did.
+ *
+ * The blank line between the table and the paragraph goes, the paragraph's first
+ * line goes with it (that is the sentence #299 records as vanished), and every
+ * remaining line of the paragraph is rewritten as a one-cell table row.
+ */
+const absorb299 = (body) => {
+  const at = body.indexOf(ABSORBED_299_OPENER);
+  if (at === -1) throw new Error(`seed anchor not found: ${ABSORBED_299_OPENER}`);
+  const start = body.lastIndexOf('\n\n', at);
+  const end = body.indexOf('\n\n', at);
+  if (start === -1 || end === -1) {
+    throw new Error('seed anchor not found: the blank lines bracketing the paragraph');
+  }
+  const lines = body.slice(start + 2, end).split('\n');
+  if (lines.length < 3) {
+    throw new Error('seed anchor not found: that paragraph is now shorter than three lines');
+  }
+  if (!lines[1].includes(ABSORBED_299_PHRASE)) {
+    throw new Error(
+      `seed anchor not found: the second line of that paragraph no longer reads ` +
+        `"${ABSORBED_299_PHRASE}", so this seed no longer replays #299`,
+    );
+  }
+  const absorbed = lines.slice(1).map((l) => `| ${l} |`);
+  return `${body.slice(0, start)}\n${absorbed.join('\n')}${body.slice(end)}`;
+};
+
+// ---------------------------------------------------------------------------
+// CI-06/derivable-counts. NO SEED HERE MAY WRITE A COUNT AS A LITERAL, which is
+// the founder rider of 2026-08-15 applied to the one gate whose whole subject is
+// hand-written counts. A seed reading `30 gates` would go silent the moment a
+// gate was added -- which is to say the moment the corpus does the ordinary
+// thing this gate exists to track -- and it would go silent while asserting
+// nothing, in a harness built to catch exactly that. The same defect the
+// `ec_count` seed one file up already paid for once.
+//
+// So every seed below DERIVES the number from the tree copy at seed time, out of
+// a span the corpus already carries, and the derived value is what the gate will
+// re-derive when it runs against that same copy.
+const DERIVABLE_DOC = 'docs/GLOSSARY.md';
+
+// THE DERIVED COUNTS OF THE TREE COPY, READ OUT OF THE RUNNER'S OWN RUN NOTE.
+//
+// `CI-06/derivable-counts` prints its whole vocabulary and each query's value on
+// every run, for the reason `CI-06u` prints its register size: a number restated
+// in a comment beside the thing that computes it is ADR-034's own subject. That
+// note is therefore the one place a seed can read a derived count from WITHOUT
+// writing a second implementation of the query into this harness, which would be
+// the drift class the gate exists to end, inside the harness proving the gate.
+//
+// NOT READ FROM A `gen:` SPAN, and the difference bit on the first run. A span
+// makes every seed below depend on CI-06g being green in the copy: on a branch
+// that has added a gate and not yet run `generate`, the span says one number and
+// the query says another, the seed writes a sentence the gate correctly declines
+// to match, and the harness reports DID NOT FAIL -- which reads as a gate problem
+// -- for what is a stale span.
+//
+// The gate is allowed to EXIT NON-ZERO here. `expect` resolves against the
+// SEEDED tree, where the gate is failing by construction, so a runner that only
+// accepted exit 0 would throw on every case that works.
+const vocabularyIn = (d) => {
+  let out;
+  try {
+    out = execFileSync(
+      'node',
+      [join(d, 'scripts/corpus/gates.mjs'), 'check', 'CI-06/derivable-counts'],
+      { encoding: 'utf8' },
+    );
+  } catch (err) {
+    out = (err.stdout ?? '') + (err.stderr ?? '');
+  }
+  const note = /vocabulary ([^;]+);/.exec(out);
+  if (!note) {
+    throw new Error('seed anchor not found: CI-06/derivable-counts no longer prints a vocabulary');
+  }
+  const values = new Map();
+  for (const m of note[1].matchAll(/([A-Za-z ]+?)=(\d+)/g)) values.set(m[1].trim(), Number(m[2]));
+  if (values.size === 0) throw new Error('seed anchor not found: the vocabulary note parsed empty');
+  return values;
+};
+
+// One population's derived count in the tree copy. Throws on a label the
+// vocabulary no longer carries, so a renamed noun is a stale seed and not a case
+// that quietly seeds a number nothing derives.
+const derivedIn = (d, label) => {
+  const value = vocabularyIn(d).get(label);
+  if (value === undefined) {
+    throw new Error(`seed anchor not found: no "${label}" entry in the gate's vocabulary note`);
+  }
+  return value;
+};
+
+const gateCountIn = (d) => derivedIn(d, 'gates');
+
+// A cardinal in words, for the one case that watches the word branch of
+// `cardinalValue`. Covers what this corpus writes and throws on anything else,
+// because a silent fallback to digits would make that case assert the branch it
+// was written to leave alone.
+const CARDINAL_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+];
+const CARDINAL_TENS_WORDS = [
+  '',
+  '',
+  'twenty',
+  'thirty',
+  'forty',
+  'fifty',
+  'sixty',
+  'seventy',
+  'eighty',
+  'ninety',
+];
+const inWords = (n) => {
+  if (n < 20) return CARDINAL_WORDS[n];
+  if (n < 100) {
+    const tens = CARDINAL_TENS_WORDS[Math.floor(n / 10)];
+    return n % 10 === 0 ? tens : `${tens}-${CARDINAL_WORDS[n % 10]}`;
+  }
+  if (n < 1000 && n % 100 === 0) return `${CARDINAL_WORDS[n / 100]} hundred`;
+  if (n < 1000) return `${CARDINAL_WORDS[Math.floor(n / 100)]} hundred and ${inWords(n % 100)}`;
+  throw new Error(`seed cannot write ${n} in words; extend inWords or pick another query`);
+};
+
 const SEEDS = {
   'CI-06a': {
     what: 'a link to a heading that does not exist',
@@ -1058,6 +1231,59 @@ const SEEDS = {
           `| Term | Meaning |\n|---|---|\n\n` +
           `| seeded-b | this row is below the blank and no table gate reads it |\n` +
           `| seeded-c | nor this one |\n`,
+      ),
+  },
+  // THE ONE SEED IN THIS FILE THAT REPLAYS A DATED PULL REQUEST'S EDIT RATHER
+  // THAN CONSTRUCTING A VIOLATION. #299 is nine days younger than this gate and
+  // its corruption is still reproducible from the live document, so the seed
+  // performs it instead of describing it. See `absorb299` for why the edit is
+  // computed rather than pasted.
+  'CI-06/table-row-width': {
+    what: "PR #299's corruption replayed: the paragraph after the session reservation table pulled into it as rows",
+    real:
+      'PR #299 (2026-08-26). Inserting the session 227 reservation row landed PAST the ' +
+      "table's terminating blank line, and the prettier run that followed absorbed the " +
+      'paragraph below into the table: the blank line and the paragraph\'s first sentence ' +
+      'vanished and NINE PROSE LINES BECAME TABLE ROWS, with first cells like "lands, its ' +
+      'entry joins the list below". The paragraph it ate was the one explaining the ' +
+      'strikethrough rule. ALL 30 GATES STAYED GREEN: CI-06u looks for duplicate first ' +
+      'cells and nine prose lines are all distinct, CI-06v looks for orphan runs and these ' +
+      'sat inside a well formed table, and neither asks whether a row BELONGS',
+    // THE RECEIPT'S OWN QUOTED STRING. #299 named these first cells in its body,
+    // so a finding that does not contain this phrase is not the finding this
+    // gate was commissioned for, whatever else it may have found.
+    expect: ABSORBED_299_PHRASE,
+    seed: (d) => edit(d, SESSIONS_README, absorb299),
+  },
+  // THE SWEEP CI-06g HAS DECLARED OWED ON EVERY RUN SINCE IT WAS WRITTEN, and
+  // the violation is the one ADR-034 ruled against: a sentence stating a
+  // quantity a script can derive, outside a generated span.
+  //
+  // THE NUMBER IS READ OUT OF THE TREE COPY AND NEVER WRITTEN AS A LITERAL. A
+  // seed carrying `30 gates` would stop being a violation on the day a gate was
+  // added, which is the one day anybody is looking, and it would stop silently.
+  // `gateCountIn` reads what the runner itself derives, so the seed is a real
+  // violation for as long as the query exists and is a STALE SEED, loudly, if it
+  // does not.
+  'CI-06/derivable-counts': {
+    what: 'a prose sentence stating the gate count outside a generated span',
+    real:
+      "schema.ts's header sentence states how many registered tables carry a later column. " +
+      'TRANCHE A RAISED IT TO NINE for payout_requests; TRANCHE B RAISED IT TO NINE for ' +
+      'promotional_credit_grants. Two branches reached the SAME NUMBER FOR DIFFERENT REASONS, ' +
+      'so git saw no conflict: each copy read NINE, named nine tables, was internally ' +
+      'consistent, and was wrong by one. The answer was TEN and it was DERIVED by replaying ' +
+      'ALTER TABLE. ADR-042 had already ruled that prose is not a control and ADR-034 that no ' +
+      'document states a derivable count; CI-06g has reported this sweep as owed since it was ' +
+      'written',
+    expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## seeded by falsify\n\nThe corpus now carries ${gateCountIn(d)} ` +
+          'gates, written here as prose rather than as a span.\n',
       ),
   },
   'CI-06w': {
@@ -3577,6 +3803,313 @@ const SCOPE_CASES = [
         (b) =>
           `${b}\n<!-- seeded -->\n\n| | |\n|---|---|\n` +
           `| | first |\n| | second |\n| | third |\n`,
+      ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/table-row-width. FIVE CASES. The SEEDS entry replays #299, which is the
+  // SHORT direction in a real document; these carry the LONG direction, both
+  // edges of the escaped-pipe boundary, the header assertion the seed never
+  // touches, the CI-06v boundary, and the register's shrink-only property.
+  // CI-06o's rule is why: a gate asserting several unrelated things and watched
+  // failing on ONE of them is taken on trust for the rest.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06/table-row-width/a-long-row-loses-its-tail',
+    gate: 'CI-06/table-row-width',
+    what: 'a row with MORE cells than its delimiter declares, whose excess GitHub silently discards',
+    // FIFTEEN OF THE SEVENTEEN REGISTERED ROWS ARE THIS DIRECTION and none of
+    // them is reachable from the SEEDS entry, which replays a SHORT row. Six sit
+    // in ALLOCATION's own ADR table, where the discarded cell is a whole
+    // disposition paragraph in the registry a sibling branch reads to decide
+    // whether a number is free.
+    expect: 'cell(s) where its table\'s delimiter declares 2',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded: a pipe nobody escaped -->\n\n| Term | Meaning |\n|---|---|\n` +
+          `| seeded-long | a cell carrying | an unescaped pipe, whose tail is dropped |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/table-row-width/an-escaped-pipe-is-content',
+    gate: 'CI-06/table-row-width',
+    what: 'a cell whose pipe is escaped as \\|, which is content and must NOT be a finding',
+    expect: 'PASS',
+    // THE BOUNDARY IS `rowCells`, WHICH IS CI-06u's SPLITTER AND NOT A SECOND
+    // COPY OF ONE. This corpus writes regexes and SQL alternations into table
+    // cells, so a gate that counted cells with a naive split would report every
+    // one of them. The control is the IDENTICAL row with the backslash removed,
+    // which is the single character separating content from a cell boundary: one
+    // passes, the other fires.
+    control: {
+      expect: 'cell(s) where its table\'s delimiter declares 2',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\n\n| Term | Meaning |\n|---|---|\n` +
+            `| ctl-bare | matches a|b, and the pipe is bare |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| Term | Meaning |\n|---|---|\n` +
+          `| scope-escaped | matches a\\|b, and the pipe is escaped |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/table-row-width/a-header-that-disagrees-with-its-delimiter',
+    gate: 'CI-06/table-row-width',
+    what: 'a header row and a delimiter row of different widths, which GitHub refuses to draw as a table at all',
+    // ASSERTION 1, WHICH FINDS NOTHING ON A CLEAN TREE AND IS THEREFORE ONLY
+    // EVER WATCHED HERE. Measured when the gate was written: all 1,604 tables
+    // under docs/ carry exactly one delimiter, exactly one header above it, and
+    // matching widths. GFM refuses to recognise a table whose header and
+    // delimiter disagree, so the block renders as a paragraph of pipes while
+    // every table gate in this runner goes on reading it as a table -- which is
+    // the worst of both, and is invisible to CI-06u and CI-06v alike.
+    expect: 'the delimiter row below it declares',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded: a column added to the header and not to the delimiter -->\n\n` +
+          `| Term | Meaning | Added |\n|---|---|\n| scope-hdr | two cells below a three-cell header | x |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/table-row-width/a-run-with-no-delimiter-is-CI-06v-s',
+    gate: 'CI-06/table-row-width',
+    what: 'an orphan run carrying no delimiter row, which is CI-06v\'s finding and must NOT be this gate\'s',
+    expect: 'PASS',
+    // THE TWO GATES DIVIDE ONE POPULATION AND NEITHER MAY CLAIM THE OTHER'S
+    // HALF. A run with no delimiter declares no width, so there is nothing here
+    // to compare a row against, and a gate that guessed a width from the longest
+    // row would report the same fragment twice under two names. `markdownTables`
+    // discards those runs and `markdownRuns` keeps them, which is exactly the
+    // split CI-06v was given the discarded half for.
+    //
+    // The control adds a delimiter of a DIFFERENT width to the same rows: the
+    // single edit that turns CI-06v's finding into this gate's.
+    control: {
+      expect: 'cell(s) where its table\'s delimiter declares 3',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\n\n| A | B | C |\n|---|---|---|\n` +
+            `| ctl-p | no delimiter above these two |\n| ctl-q | nor above this one |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| scope-p | no delimiter above these two |\n` +
+          `| scope-q | nor above this one |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/table-row-width/a-register-entry-that-names-nothing',
+    gate: 'CI-06/table-row-width',
+    what: 'a register entry for a row that is not ragged, which is the shrink-only property CI-06u and CI-06l both state',
+    // THE REGISTER HOLDS SEVENTEEN REPAIRS THIS SESSION'S FENCE DID NOT REACH,
+    // and an allowlist that may be added to and never shrinks is furniture
+    // within a month. The seed adds an entry naming a row that is perfectly well
+    // formed, which is what an entry left behind by a landed repair looks like.
+    // Seeding the GATE rather than the DOCUMENT is deliberate: it needs no
+    // judgement about which line in a live registry may be deleted, and it is
+    // the same construction CI-06/retired-constraints uses one register over.
+    expect: 'exempts nothing and hides the next one',
+    seed: (d) =>
+      edit(d, GATES_PATH, (b) =>
+        once(
+          b,
+          'const CI06_WIDTH_REGISTER = new Map([',
+          "const CI06_WIDTH_REGISTER = new Map([\n  ['docs/GLOSSARY.md', ['seeded-by-falsify']],",
+        ),
+      ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/derivable-counts. FIVE CASES. The SEEDS entry watches ONE assertion in
+  // ONE position; every exclusion this gate declares is a place it must go quiet,
+  // and a place a gate may go quiet is worth exactly as much as the control that
+  // proves it did not go quiet everywhere. CI-06o's rule again.
+  //
+  // EVERY CASE DERIVES ITS NUMBER, for the reason the SEEDS entry gives. A `PASS`
+  // case with a stale literal in it is a case that passes because it seeded
+  // nothing, and that is indistinguishable from the boundary holding.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06/derivable-counts/a-count-under-a-dated-heading-is-a-record',
+    gate: 'CI-06/derivable-counts',
+    what: 'the same sentence under a heading naming a date, which is a RECORD and must NOT be a finding',
+    expect: 'PASS',
+    // THE EXCLUSION THAT MAKES THE GATE POSSIBLE, and the one worth arguing over.
+    // 131 of the 142 sites the recogniser sees live under a dated or session
+    // heading. "All 47 migrations applied in order" was TRUE ON THE DAY IT WAS
+    // WRITTEN, and generating a span over it would rewrite the record to say
+    // something it did not say -- a worse defect than the one being repaired.
+    //
+    // The control is the IDENTICAL sentence under an UNDATED heading, which is
+    // the single edit separating a record from a claim about the tree.
+    control: {
+      expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+      seed: (d) =>
+        edit(
+          d,
+          DERIVABLE_DOC,
+          (b) =>
+            `${b}\n## control, no date in this heading\n\nThe corpus carries ` +
+            `${gateCountIn(d)} gates.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case (2026-08-26)\n\nThe corpus carried ` +
+          `${gateCountIn(d)} gates when this was measured.\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/a-number-inside-a-generated-span-is-the-remedy',
+    gate: 'CI-06/derivable-counts',
+    what: 'the same number inside a gen: span, which is what the gate ASKS FOR and must NOT be a finding',
+    expect: 'PASS',
+    // A GATE THAT REPORTED ITS OWN REMEDY WOULD BE UNSATISFIABLE. The mask is
+    // spansIn's own expression rather than a second copy of one, so "generated"
+    // means the same thing here as it does in CI-06g; the control is the
+    // identical number with the span removed.
+    control: {
+      expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+      seed: (d) =>
+        edit(
+          d,
+          DERIVABLE_DOC,
+          (b) => `${b}\n## control, bare\n\nThe corpus carries ${gateCountIn(d)} gates.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case, spanned\n\nThe corpus carries ` +
+          `${opener('gate_count')}${gateCountIn(d)}${closer()} gates.\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/a-subset-count-is-not-a-population-count',
+    gate: 'CI-06/derivable-counts',
+    what: 'a cardinal governing a registry noun at a value the tree does NOT derive, which must NOT be a finding',
+    expect: 'PASS',
+    // THIS IS WHERE VALUE-ANCHORING IS ASSERTED RATHER THAN STATED. Measured
+    // with the shipped reader: dropping the value clause takes the gate from
+    // zero findings in live prose to 198, and almost every one of the 198 is a
+    // sentence like this -- a local set that happens to be counted next to its
+    // own noun. The control is the same sentence with the DERIVED number in it,
+    // so the pair brackets the rule exactly: one number passes, one fires, and
+    // nothing else about the sentence changes.
+    control: {
+      expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+      seed: (d) =>
+        edit(
+          d,
+          DERIVABLE_DOC,
+          (b) =>
+            `${b}\n## control, the whole population\n\nThis section adds ` +
+            `${gateCountIn(d)} gates to the runner.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) => `${b}\n## scope case, a subset\n\nThis section adds two gates to the runner.\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/a-count-in-a-table-row-is-a-row-datum',
+    gate: 'CI-06/derivable-counts',
+    what: 'the same count inside a table row, which is a per-row datum and must NOT be a finding',
+    expect: 'PASS',
+    // ADR-034's subject is a PROSE SENTENCE. A registry row's number belongs to
+    // that row and the remedy for it is a table-valued span (ADR-088 built two),
+    // which is a different repair from wrapping a numeral. Eleven sites on this
+    // ref. The control is the identical text lifted out of the table.
+    control: {
+      expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+      seed: (d) =>
+        edit(
+          d,
+          DERIVABLE_DOC,
+          (b) =>
+            `${b}\n## control, out of the table\n\nthe runner ` +
+            `${gateCountIn(d)} gates today\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case, in a table\n\n| Thing | Count |\n|---|---|\n` +
+          `| the runner | ${gateCountIn(d)} gates today |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/an-english-number-word-is-a-cardinal-too',
+    gate: 'CI-06/derivable-counts',
+    what: 'the count written in WORDS, which the receipt itself is written in and which MUST be a finding',
+    // THE RECEIPT IS SHOUTED WORDS AND NOT DIGITS: `NINE`, `TEN`, `NINETY-FIVE`,
+    // `ONE HUNDRED AND FOUR`. A reader that saw only digits would miss the entire
+    // class the gate was commissioned for, and nothing else in this harness
+    // exercises `cardinalValue`'s word branch. The word is COMPUTED from the
+    // derived number rather than typed, so it moves with the tree.
+    expect: (d) => `"${inWords(gateCountIn(d))} gates" states a count`,
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case, in words\n\nThe corpus now carries ` +
+          `${inWords(gateCountIn(d))} gates.\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/a-two-word-noun-is-one-noun',
+    gate: 'CI-06/derivable-counts',
+    what: 'a count governing a MULTI-WORD registry noun, which three of the eight vocabulary entries are',
+    // THE CASE THAT EXISTS BECAUSE THE BUG IT WATCHES SHIPPED FOR AN HOUR AND
+    // NOTHING HERE COULD SEE IT. The first reader captured the noun with a lazy
+    // `[A-Za-z ]*?` and a word-boundary lookahead, which stops at the FIRST
+    // word: `edge cases` was read as `edge`, so `ec_count`, `gs_count` and
+    // `manifest_changes` could never match anything at all. The gate reported
+    // PASS on a clean tree and asserted five eighths of what its vocabulary
+    // claimed, and every case above passed too, because every one of them uses
+    // the single word `gates`.
+    //
+    // A vocabulary of eight entries is NOT one code path watched eight times,
+    // and this case is the line between those two readings.
+    expect: 'golden scenarios" states a count',
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case, a two-word noun\n\nThe registry holds ` +
+          `${derivedIn(d, 'golden scenarios')} golden scenarios.\n`,
       ),
   },
   // ---------------------------------------------------------------------------
