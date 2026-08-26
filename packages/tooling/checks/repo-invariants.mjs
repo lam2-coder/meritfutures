@@ -765,6 +765,275 @@ const ri07 = {
 };
 
 // -----------------------------------------------------------------------------
+// RI-08  No package declares the database accessor unless it has been admitted
+// -----------------------------------------------------------------------------
+// ADR-096 SECTION 9 NAMED THIS CHECK, MEASURED THE HOLE IT CLOSES, AND ASSIGNED
+// IT TO `P4-e`. `P4-e` LANDED WITHOUT IT. Three entries have now cited the same
+// hole and none closed it: ADR-096 section 9, ADR-095 `F4`, and ADR-095 section
+// 9 item 5b, which is the two of them noticing each other.
+//
+// THE HOLE, IN ADR-096's OWN WORDS. "A marketing page can acquire a
+// write-capable connection to the trader database in a one-line manifest diff",
+// and the entry watched it happen rather than predicting it: `"@merit/db":
+// "workspace:*"` added to `apps/site/package.json` plus one
+// `systemDb('nightly-batch').rows('accounts')` call under `apps/site/src` -- a
+// firm-wide unscoped read of the account table, on the marketing origin -- left
+// `tsc --noEmit` at 0, `eslint apps packages` at 0, `check:invariants` at 7 of 7
+// and `gates.mjs check` at 30 of 30. Section 8 is why that line is the whole
+// defect: `0026_roles_and_grants.sql` declares three roles and `merit_app`, the
+// only one that could serve the site, holds INSERT and full DML.
+//
+// WHY NOTHING ELSE SEES IT.
+//
+//   merit/no-raw-db-client  bans a RAW client -- `pg`, `drizzle-orm`, a second
+//                           ORM -- and `@merit/db` is deliberately not on that
+//                           list, because reaching the database THROUGH the
+//                           accessor is the idiom it funnels everything into.
+//                           It is working as designed and has nothing to say
+//                           here (ADR-096 section 9)
+//   RI-01                   reads a manifest, and reads exactly one:
+//                           `packages/rules-engine`'s
+//   RI-04                   asks whether one deployable depends on ANOTHER
+//                           DEPLOYABLE. `@merit/db` is a package, so a
+//                           dependency on it is not a finding of RI-04's and
+//                           never was
+//   RI-09                   reads PATHS, and says so about this exact row: "it
+//                           is also NOT the mechanism ADR-095 section 9 item 5
+//                           owes for a server component importing packages/db:
+//                           that defect is an import and this one is a path"
+//
+// THE MANIFEST LINE IS THE ACQUISITION POINT IN BOTH DIRECTIONS, AND THAT WAS
+// MEASURED RATHER THAN ASSUMED. `.npmrc` sets `node-linker=isolated` "because
+// the default is load-bearing here rather than incidental", so an undeclared
+// specifier does not resolve at run time. It does not resolve at BUILD time
+// either: seeded into `apps/site/src` and again into `apps/api/src`, with no
+// manifest line and no `paths` mapping anywhere in the tree,
+// `import { systemDb } from '@merit/db'` reports
+//
+//   error TS2307: Cannot find module '@merit/db' or its corresponding type
+//   declarations.
+//
+// in BOTH packages. So the manifest field is not merely where the dependency is
+// recorded; it is the only place the capability can be acquired, which is what
+// makes a manifest check the whole control rather than half of one. (It also
+// makes `apps/api/package.json`'s claim that "`tsc` resolves it happily through
+// the workspace" wrong on this tree. That file is out of this session's fence
+// and the finding is reported rather than taken.)
+//
+// -----------------------------------------------------------------------------
+// WHY AN EMPTY ADMISSION LIST OVER EVERY PACKAGE, AND NOT TWO NAMES
+// -----------------------------------------------------------------------------
+// ADR-096 section 9 scopes it to `apps/site` and then widens itself in the next
+// sentence: "`packages/queue` has held the same shape since ADR-086 with the
+// same absence of a check, so this is a second instance rather than a new class,
+// and an `RI-08` written to cover both is the better version of it."
+//
+// ADR-095 SECTION 9 ITEM 5b NAMES THE UNDER-SCOPING FROM THE OTHER SIDE:
+// "`RI-08` as ADR-096 scopes it does NOT close `F4` ... it reads `apps/site`
+// where `F4`'s subject is M04:25, which is `apps/portal`."
+//
+// AND THE TREE HAS MOVED PAST BOTH READINGS. Counted here rather than inherited:
+// FIVE manifests now state the accessor's absence as a design property in their
+// own `//` key -- `packages/queue` (ADR-086), `packages/ledger`, `packages/psp`,
+// `apps/api` (ADR-109) -- plus `apps/site` by ADR-096 ruling 2, and
+// `apps/worker/src/provisioning/ports.ts` says it in a header. ZERO packages in
+// this workspace declare `@merit/db` in any dependency field. A check listing
+// two of those five by name would have been silent about the other three on the
+// day it was written.
+//
+// RI-10 IS THE CAUTIONARY TALE AND IT IS ONE DIRECTORY UP THIS FILE: its first
+// draft excluded a package BY NAME, and the principled fix was to scope it to
+// `src/` rather than to grow the exclusion. A check that needs a name-based
+// exception is usually scoped wrong. So the scope here is EVERY WORKSPACE
+// PACKAGE and the exception is a list that is EMPTY.
+//
+// AN EMPTY LIST IS THIS WORKSPACE'S OWN IDIOM FOR EXACTLY THIS, IN THREE PLACES.
+// `pnpm-workspace.yaml`'s `onlyBuiltDependencies: []`: "an empty list means every
+// one of them is an explicit admission decision rather than a default".
+// `.npmrc`: "every one of these settings exists to make a dependency arrive as a
+// decision rather than as a side effect". And ADR-084 section 5, which is the
+// accessor's own design: "the legitimate unscoped readers are a list somebody
+// has to join", closed at two members on the argument that "forgot to scope"
+// becomes "wrote the word system".
+//
+// THIS IS THAT ARGUMENT POINTED AT THE MANIFEST. ADR-096 section 4 states the
+// cost it could not repair: the ruling "turns it into 'added one line to a
+// package.json', which is also a diff a reviewer reads and is SHORTER, less
+// obviously about the database, and reviewed by whoever reviews manifests rather
+// than by whoever reviews queries." With an empty `DB_ADMITTED`, that one line
+// turns CI-01 red, and making it green again costs a SECOND diff, in this file,
+// whose entire subject is which packages may reach the trader database. The
+// quiet line becomes a loud one.
+//
+// `apps/api` IS THE FIRST NAME THAT WILL JOIN, AND IT IS NOT PRE-ADMITTED.
+// ADR-109 and `apps/api/src/idempotency.ts` record that its absence is "session
+// 219's finding rather than its oversight", so the day the API needs the
+// accessor is the day somebody writes it here with a reason. Admitting it now,
+// against a need nobody has yet stated, is the list joining itself.
+
+/**
+ * The packages permitted to declare the database accessor, by package name.
+ *
+ * EMPTY, AND THE EMPTINESS IS THE CONTROL. Adding a name here is the admission
+ * decision: a diff in the file whose subject is which packages may reach the
+ * trader database, reviewed by whoever reviews controls, rather than one line in
+ * a manifest reviewed by whoever reviews manifests.
+ *
+ * EXPORTED SO THE TEST READS THIS LIST rather than a second copy of it, which is
+ * DEPLOYABLES' relationship to its fixture. RI-04's header states what the
+ * second copy cost when it drifted: "Two lists is the defect; one list read
+ * twice is the fix."
+ *
+ * A name that is not a workspace package makes the check THROW rather than
+ * quietly exempt nothing, and a list that covers every package makes it throw
+ * too. The second guard is "never weaken a gate to pass it" made mechanical:
+ * green cannot be bought by admitting everybody.
+ *
+ * @type {string[]}
+ */
+export const DB_ADMITTED = [];
+
+/**
+ * The three ways one dependency entry acquires a named package, and the reason
+ * this is not `spec.includes(name)`.
+ *
+ * A substring test reports `"@merit/dbtools": "workspace:*"` as the accessor and
+ * misses `"db": "link:../../packages/db"` entirely, which is the one form where
+ * NEITHER the key nor the specifier writes the name down. Each reading is named
+ * so a finding says which one fired.
+ *
+ * @param {string} root
+ * @param {string} fromDir       repo-relative directory of the declaring package
+ * @param {string} name          the dependency key
+ * @param {string} spec          the dependency specifier
+ * @param {string} targetName    the package being guarded
+ * @param {string} targetDir     repo-relative directory of that package
+ * @returns {string | null}      why it resolves there, or null
+ */
+function acquires(root, fromDir, name, spec, targetName, targetDir) {
+  if (name === targetName) return 'names it directly';
+
+  // pnpm's alias forms, `"db": "workspace:@merit/db@*"` and `"db":
+  // "npm:@merit/db@0.0.0"`. The name is parsed out rather than searched for, so
+  // a scoped name is matched whole.
+  const alias = /^(?:workspace|npm):((?:@[^/@\s]+\/)?[^@\s]+)@/.exec(spec);
+  if (alias?.[1] === targetName) return `aliases it as \`${name}\``;
+
+  // The path forms, which write no package name at all.
+  const linked = /^(?:link|file|portal):(.+)$/.exec(spec);
+  if (linked?.[1] !== undefined) {
+    if (resolve(join(root, fromDir), linked[1].trim()) === join(root, targetDir))
+      return `links its directory as \`${name}\``;
+  }
+  return null;
+}
+
+/** @type {Invariant} */
+const ri08 = {
+  id: 'RI-08',
+  // COMPUTED FROM THE LIST, for the reason RI-04's title is computed and RI-05's
+  // `covers` states: a count written beside a list is a hand-maintained count in
+  // a different costume, and it drifts the same way.
+  title:
+    DB_ADMITTED.length === 0
+      ? 'No package in this workspace declares the database accessor, in any dependency field'
+      : `Only ${DB_ADMITTED.length} admitted package(s) declare the database accessor, ` +
+        'in any dependency field',
+  covers:
+    "every workspace package except the accessor's own, in all four dependency " +
+    'fields, against an admission list that is EMPTY. It reads three ways a ' +
+    'specifier resolves to the accessor -- the key, a `workspace:`/`npm:` alias ' +
+    'whose target is parsed out rather than searched for, and a ' +
+    '`link:`/`file:`/`portal:` path that resolves to the accessor directory -- ' +
+    "and it names which one fired. It is the MANIFEST half only, and RI-01's " +
+    'division is the one it follows. FOUR THINGS A GREEN RESULT DOES NOT COVER. ' +
+    '(1) It does not read SOURCE. `merit/no-raw-db-client` reads source and bans ' +
+    'a RAW client, which the accessor deliberately is not; the accessor-import ' +
+    'half exists for `apps/site` alone, in apps/site/test/manifest.test.ts, and ' +
+    'nowhere else. (2) It does not follow TRANSITIVE edges, and that is a ' +
+    'boundary rather than an omission: `.npmrc` sets `node-linker=isolated`, so ' +
+    'an undeclared specifier resolves neither at run time nor at build time ' +
+    '(TS2307, measured from apps/site and apps/api both, with no `paths` mapping ' +
+    'in the tree), which makes the DIRECT field the acquisition point. The day ' +
+    'DB_ADMITTED stops being empty, a package depending on an admitted one is ' +
+    'not a finding here. (3) It says nothing about what an admitted package DOES ' +
+    'with the accessor; ADR-084 branding and ADR-008 scoping are that, at the ' +
+    'type level. (4) It does not read a raw driver in a dependency field: a ' +
+    'declared-but-unimported `pg` is refused by nothing until the import, which ' +
+    'is reported rather than taken here. It IS the manifest mechanism ADR-095 ' +
+    "`F4`'s import half was owed, over every package rather than over apps/site " +
+    'alone, and it is not the lint rule `F4` names.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+
+    const accessorRel = 'packages/db/package.json';
+    if (!existsSync(join(root, accessorRel)))
+      throw new Error(
+        `${accessorRel} does not exist; RI-08 has no accessor to guard and cannot run`,
+      );
+    const accessorName = readJson(root, accessorRel).name;
+    if (typeof accessorName !== 'string' || accessorName === '')
+      throw new Error(`${accessorRel} declares no name; RI-08 cannot run`);
+
+    const packages = workspacePackages(root);
+    if (packages.length === 0) throw new Error('no workspace packages resolved; RI-08 cannot run');
+
+    // THE ACCESSOR IS READ OUT OF THE WORKSPACE, NOT WRITTEN HERE. RI-09's
+    // relationship to surface.ts, one register over: parse the source of truth
+    // and implement the comparison.
+    const accessor = packages.find((p) => p.name === accessorName);
+    if (accessor === undefined)
+      throw new Error(
+        `${accessorRel} names \`${accessorName}\`, which resolves to no package in this ` +
+          'workspace, so RI-08 would be guarding a name nothing can declare; it cannot run',
+      );
+
+    const known = new Set(packages.map((p) => p.name));
+    for (const admitted of DB_ADMITTED) {
+      if (!known.has(admitted))
+        throw new Error(
+          `DB_ADMITTED holds \`${admitted}\`, which is not a package in this workspace. A stale ` +
+            'admission reads as though the accessor is permitted somewhere it is not; RI-08 ' +
+            'cannot run',
+        );
+    }
+
+    const guarded = packages.filter(
+      (p) => p.name !== accessorName && !DB_ADMITTED.includes(p.name),
+    );
+    // A CHECK THAT GUARDED NOTHING IS NOT A CHECK THAT PASSED, and this is the
+    // direction the check gets weakened in: not by deleting it, but by admitting
+    // one more package each time one is inconvenient, until the list is
+    // everybody and RI-08 reports PASS about a workspace it exempted entirely.
+    if (guarded.length === 0)
+      throw new Error(
+        `DB_ADMITTED admits every package but ${accessorName} itself, so RI-08 is asserting ` +
+          'nothing; it cannot run',
+      );
+
+    for (const pkg of guarded) {
+      const rel = `${pkg.dir}/package.json`;
+      for (const field of DEP_FIELDS) {
+        for (const [dep, spec] of Object.entries(pkg.manifest[field] ?? {})) {
+          const why = acquires(root, pkg.dir, dep, String(spec), accessorName, accessor.dir);
+          if (why === null) continue;
+          findings.push(
+            `${rel}: ${field}.${dep} is \`${String(spec)}\`, which ${why}. ${pkg.name} is not ` +
+              `in DB_ADMITTED, and under \`node-linker=isolated\` this line is the whole ` +
+              `difference between a package that cannot name \`${accessorName}\` at all and one ` +
+              'holding an unscoped, write-capable connection to the trader database. ADR-096 ' +
+              'section 8: the only role such a reader could hold is `merit_app`, which carries ' +
+              'INSERT and full DML. Admit it in DB_ADMITTED with a reason, or drop the line',
+          );
+        }
+      }
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // RI-09  Only apps/api spells a path on the API surface
 // -----------------------------------------------------------------------------
 // ADR-083 CLOSES THE OPERATOR PATH WITH TWO STATUS CODES ONE ROW APART, AND
@@ -1075,7 +1344,7 @@ const ri10 = {
   },
 };
 
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri09, ri10];
+export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri08, ri09, ri10];
 
 function main() {
   const [arg] = process.argv.slice(2);

@@ -23,3 +23,10 @@ coverage/
 # by the next one. It exists only while a case is in flight and must never be
 # committed: it is a copy of tracked source, and a stale copy at that.
 .falsify-pending.json
+
+# `CI-08`'s runner output. Playwright writes `test-results/` on a failure (a
+# trace, a screenshot, the error context) and `playwright-report/` when an HTML
+# reporter is selected. Both are artifacts OF a run rather than inputs to one,
+# and a committed trace is a stale copy of a rendering nobody can reproduce.
+test-results/
+playwright-report/
