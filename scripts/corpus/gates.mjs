@@ -8019,6 +8019,386 @@ const retiredConstraintsGate = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// CI-06/derivable-counts  No prose sentence states a count this runner derives
+// -----------------------------------------------------------------------------
+// THE GATE `CI-06g` HAS DECLARED OWED ON EVERY RUN SINCE IT WAS WRITTEN, in its
+// own covers line: "the corpus-wide sweep for bare numerals adjacent to a
+// registry noun needs the generator and is NOT run here." `ADR-034` ruled the
+// property -- "no document states a quantity a script can derive, unless the
+// number sits in a generated span the script rewrites" -- and recorded that the
+// sweep "is the gate's first run and is not done here". The generator exists now.
+// This is the sweep.
+//
+// THE RECEIPT, AND IT IS A SHAPE NO MERGE CAN SEE. `schema.ts`'s header sentence
+// states how many registered tables carry a later column. Tranche A raised it to
+// NINE for `payout_requests`; tranche B raised it to NINE for
+// `promotional_credit_grants`. Two branches reached the SAME NUMBER FOR DIFFERENT
+// REASONS. Either copy reads NINE, names nine tables, is internally consistent,
+// and is wrong by one; git sees no conflict because both sides wrote the same
+// character. The answer was TEN and it was derived by replaying `ALTER TABLE`.
+// `ADR-042` had already ruled that prose is not a control.
+//
+// HOW A DERIVABLE COUNT IS RECOGNISED WITHOUT FLAGGING EVERY NUMBER IN THE
+// CORPUS. Three candidate rules were measured over every markdown file under
+// `docs/` with the SAME reader that shipped below -- the cardinal must GOVERN the
+// noun, one run of whitespace and no window -- so the comparison is between rules
+// and not between parsers. The numbers are the argument:
+//
+//   * ANY VALUE. A cardinal governing a registry noun, whatever it counts: 1,569
+//     sites, of which 198 are in live prose. Almost every one of the 198 is a
+//     LOCAL SUBSET and not a population: `1 gate`, `2 gate`, `Six deltas`, `three
+//     tables`. A gate reporting 198 findings on a clean tree is switched off in a
+//     week, and it would be right to switch it off.
+//   * A TOTALITY WORD BEFORE THE CARDINAL (`all 47 migrations`), at a value the
+//     tree does not derive: four findings in live prose, and ALL FOUR ARE FALSE.
+//     "All three tables are the approved design" is a local set with a totality
+//     word in front of it, and so are the other three.
+//   * VALUE-ANCHORED: the cardinal must equal what its bound query returns ON
+//     THIS TREE. Zero findings in live prose on a clean tree, 131 sites under a
+//     dated or session heading and 11 in a table row, both excluded by shape and
+//     both counted on every run.
+//
+// A number that equals the size of the population its own sentence names is
+// overwhelmingly that population's size, and nothing looser survives contact with
+// a corpus that argues in numbers.
+//
+// THE FALSE NEGATIVE THAT BUYS, STATED PLAINLY BECAUSE IT IS THE PRICE. A COUNT
+// THAT HAS ALREADY DRIFTED IS INVISIBLE HERE. On the merged tree the receipt's
+// sentence read NINE against a truth of TEN, and this gate would have been silent
+// on it. That is not a hole in the argument, it is where the argument lives: ON
+// EITHER BRANCH ALONE the sentence read NINE against a derivation of NINE, and
+// the gate names it there -- while it is still RIGHT, which is the only moment a
+// span can be installed without anyone having to decide what the truth is. A gate
+// that fired on the drifted number would be asking a reader to adjudicate; this
+// one asks only that a derivable number stop being typed.
+//
+// FOUR EXCLUSIONS, ALL BY SHAPE, ALL COUNTED ON EVERY RUN so the population they
+// hold is visible rather than asserted.
+//
+//   1. INSIDE A GENERATED SPAN. That is the remedy and not the defect. Masked
+//      with `spansIn`'s own expression, so "generated" means one thing here and
+//      in `CI-06g`.
+//   2. INSIDE A FENCED BLOCK. A worked example of this gate's own finding is
+//      exactly what the document explaining it would quote. `CI-06t` masks fences
+//      for the same reason and `CI-06v` skips them for the same reason.
+//   3. UNDER A HEADING THAT NAMES A DATE OR A SESSION NUMBER. This is the
+//      exclusion that makes the gate possible and it is the one worth arguing.
+//      An entry headed `## ... (2026-08-24)` or `## Session 207: ...` IS A RECORD
+//      OF A MEASUREMENT MADE THAT DAY. "All 47 migrations applied in order" was
+//      true when it was written and a generated span there would REWRITE THE
+//      RECORD TO SAY SOMETHING IT DID NOT SAY, which is a worse defect than the
+//      one being repaired. `ADR-064` is what lets a session number stand beside a
+//      date: a session number IS a day-and-slot allocation. 131 candidate sites
+//      live under such headings against 11 in table rows and none in live prose,
+//      and they are declared out of scope rather than missed. Only levels 1 and 2
+//      set the flag: an ADR's `### 3.` subsection inherits its file's dated `##`
+//      heading, which is what makes a whole dated ruling a record rather than
+//      only its first paragraph.
+//   4. INSIDE A TABLE ROW. `ADR-034`'s subject is a PROSE SENTENCE, and a
+//      registry row is a per-row datum whose number belongs to that row rather
+//      than to the document. 11 sites.
+//
+// FOUR MORE THINGS IT DOES NOT DO.
+//   1. IT READS MARKDOWN ONLY, and the receipt's own file is therefore out of
+//      reach. `generate()` rewrites `markdownFiles()` and nothing else, so a
+//      finding in a `.ts` header would be a finding with no remedy, and a finding
+//      with no remedy is how a gate gets switched off. Measured rather than
+//      waved at: the same recogniser over every `.ts`, `.tsx`, `.mjs` and `.sql`
+//      in the tree finds 14 sites, four of them in `schema.ts` and three in
+//      `scope.ts`. Closing them needs the generator taught to write a comment
+//      span, which is a change under `packages/` this session's fence forbids. It
+//      is named here as owed rather than left for somebody to rediscover.
+//   2. THE RECEIPT'S OWN NUMBER IS NOT IN THE VOCABULARY AND CANNOT BE. "How many
+//      registered tables carry a later `ADD COLUMN`" is derived by
+//      `packages/db/test/scoped-db.test.ts`'s replay and by nothing in this
+//      runner. The gate reaches the CLASS the receipt belongs to; closing that
+//      INSTANCE needs a query for it, in `SPAN_QUERIES`, reading the migrations.
+//   3. THE VOCABULARY IS A RECORDED READING AND NOT A DERIVATION. Eight nouns
+//      over eight scalar queries, each argued below. A derivable population with
+//      no entry is unpoliced, and the remedy is another argued entry rather than
+//      a looser match.
+//   4. TWO QUERIES MAY RETURN THE SAME VALUE -- `adr_count` and `tables` are both
+//      111 on this ref -- so the NOUN disambiguates and never the number. The
+//      vocabulary is scanned in declaration order and the first noun that matches
+//      wins, which is stated rather than left to a reader to infer.
+const DERIVABLE_DOCS = 'docs/';
+
+// A cardinal this corpus writes. Digits, or the English number words it actually
+// uses. A DIGIT RUN WITH A LEADING ZERO IS NOT A COUNT: `0047` is a migration
+// identifier and `047` is nothing anybody writes for forty-seven, and admitting
+// them would make every identifier adjacent to its own noun a finding.
+const CARDINAL_ONES = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+];
+const CARDINAL_TENS = {
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  ninety: 90,
+};
+
+// The value of a written cardinal, or null if it is not one. Handles the three
+// forms this corpus writes: `nine`, `ninety-five` (and `ninety five`), and `one
+// hundred and four`.
+function cardinalValue(text) {
+  const t = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  const hundred = /^([a-z]+) hundred(?: and (.+))?$/.exec(t);
+  if (hundred) {
+    const h = CARDINAL_ONES.indexOf(hundred[1]);
+    if (h < 1) return null;
+    if (!hundred[2]) return h * 100;
+    const rest = cardinalValue(hundred[2]);
+    return rest === null ? null : h * 100 + rest;
+  }
+  const compound = /^([a-z]+)[- ]([a-z]+)$/.exec(t);
+  if (compound) {
+    const tens = CARDINAL_TENS[compound[1]];
+    const ones = CARDINAL_ONES.indexOf(compound[2]);
+    return tens !== undefined && ones > 0 ? tens + ones : null;
+  }
+  if (CARDINAL_TENS[t] !== undefined) return CARDINAL_TENS[t];
+  const ones = CARDINAL_ONES.indexOf(t);
+  return ones >= 0 ? ones : null;
+}
+
+const CARDINAL_WORD = new RegExp(
+  `\\b(?:(?:${CARDINAL_ONES.slice(1, 10).join('|')}) hundred(?: and [a-z]+(?:-[a-z]+)?)?` +
+    `|(?:${Object.keys(CARDINAL_TENS).join('|')})(?:[- ](?:${CARDINAL_ONES.slice(1, 10).join('|')}))?` +
+    `|${CARDINAL_ONES.join('|')})\\b`,
+  'gi',
+);
+// No leading zero, no thousands separator, no decimal point, and not glued to a
+// word: `1,604`, `0047`, `16.13` and `M13` all fail this deliberately.
+const CARDINAL_DIGITS = /(?<![\w.,-])[1-9]\d{0,3}(?![\w.,-])/g;
+
+// THE VOCABULARY. One entry per population, each bound to a SCALAR query in
+// SPAN_QUERIES, each with the reason it is a population somebody restates rather
+// than a word that happens to follow a number. Scanned in order; the first noun
+// that matches a site wins, which is how `adr_count` and `tables` stay apart on a
+// ref where both return 111.
+const DERIVABLE_NOUNS = [
+  // The count ADR-034 was ruled over. INDEX stated it, drifted twice, and the
+  // second drift landed on `main` on the day the ruling was written.
+  { query: 'adr_count', noun: /ADRs?/, label: 'ADRs' },
+  // ADR-034's own evidence table: "342 / 5 in STATE, 345 / 5 in DATA_MODEL,
+  // actual 347 / 6". Two documents describing one migration set disagreed with
+  // each other and both disagreed with the database.
+  { query: 'sql_triggers', noun: /triggers?/i, label: 'triggers' },
+  // The receipt's population, by the parser that can see it from here. The
+  // migration set grows by one whenever a money-path change lands, which is
+  // exactly when nobody is thinking about a sentence in a plan document.
+  { query: 'migration_files', noun: /migrations?/i, label: 'migrations' },
+  // `sql_tables` is the same number by a second parser and deliberately NOT
+  // rowed here: two vocabulary entries for one noun would make the first
+  // shadow the second forever.
+  { query: 'tables', noun: /tables?/i, label: 'tables' },
+  { query: 'gate_count', noun: /gates?/i, label: 'gates' },
+  // STRATEGY names the trap in its own words: counting `## EC-nnn` headings
+  // gives one number and counting identifiers gives another, so a hand-written
+  // total here is wrong in a way that looks careful.
+  { query: 'ec_count', noun: /edge cases?/i, label: 'edge cases' },
+  { query: 'gs_count', noun: /golden scenarios?/i, label: 'golden scenarios' },
+  // ADR-026's manifest. ADR-034's first row of evidence: stated 75, actual 88
+  // numbered and 93 total, "wrong ON THE DAY IT WAS RECORDED, then quoted by
+  // four documents, then given a correct increment on a wrong base".
+  { query: 'manifest_changes', noun: /(?:schema )?deltas?/i, label: 'schema deltas' },
+];
+
+// A record of a measurement rather than a claim about the tree: a heading naming
+// a DATE, or a SESSION, which ADR-064 rules is a day-and-slot allocation.
+const RECORD_HEADING = /\b20\d{2}-[01]\d-[0-3]\d\b|\bsessions?\s+\d{1,4}\b/i;
+
+const ci06DerivableCounts = {
+  id: 'CI-06/derivable-counts',
+  title: 'No prose sentence under docs/ states a count this runner can derive',
+  covers:
+    "THE SWEEP CI-06g DECLARES OWED IN ITS OWN COVERS LINE: 'the corpus-wide sweep for bare " +
+    "numerals adjacent to a registry noun needs the generator and is NOT run here'. ADR-034 " +
+    'ruled the property and recorded that the sweep is its first run and was not done there. ' +
+    'THE RECEIPT IS A SHAPE NO MERGE CAN SEE: two tranches independently raised the same ' +
+    "prose number to NINE for DIFFERENT tables, each copy internally consistent and each " +
+    'wrong by one, and git saw no conflict because both sides wrote the same character. ' +
+    'THE RECOGNISER IS VALUE-ANCHORED AND THE ALTERNATIVES WERE MEASURED WITH THE SAME ' +
+    'READER, so the comparison is between rules and not between parsers. A cardinal GOVERNING ' +
+    'a registry noun at ANY value is 1,569 sites under docs/, 198 of them in live prose and ' +
+    'almost every one a local subset (1 gate, Six deltas, three tables). A TOTALITY WORD ' +
+    'before the cardinal at a value the tree does not derive gives four findings in live ' +
+    'prose and ALL FOUR ARE FALSE. VALUE-ANCHORED gives zero in live prose, 131 sites under a ' +
+    'dated or session heading and 11 in a table row. So the cardinal must EQUAL what its ' +
+    'bound query returns on this tree. ' +
+    'THE FALSE NEGATIVE THAT BUYS IS STATED RATHER THAN HIDDEN: A COUNT THAT HAS ALREADY ' +
+    'DRIFTED IS INVISIBLE. The merged receipt read NINE against a truth of TEN and this gate ' +
+    'would have been silent on it. On EITHER BRANCH ALONE it read NINE against a derivation ' +
+    'of NINE and is named there, while it is still right, which is the only moment a span can ' +
+    'be installed without anyone adjudicating the truth. ' +
+    'FOUR EXCLUSIONS, ALL BY SHAPE AND ALL COUNTED ON EVERY RUN. A generated span is the ' +
+    'remedy, not the defect. A fenced block is a worked example. A HEADING NAMING A DATE OR A ' +
+    'SESSION NUMBER makes its section a RECORD of a measurement made that day, and a span ' +
+    'there would rewrite the record to say what it did not say; 131 candidate sites live ' +
+    'under such headings, declared out of scope rather than missed. And a TABLE ROW is a ' +
+    "per-row datum where ADR-034's subject is a prose sentence; 11 sites. " +
+    'FOUR MORE THINGS IT DOES NOT DO. It reads MARKDOWN ONLY, because generate() rewrites ' +
+    'markdown and a finding with no remedy is how a gate gets switched off; the same ' +
+    'recogniser over every .ts, .tsx, .mjs and .sql finds 14 further sites, four of them in ' +
+    "schema.ts and three in scope.ts, and closing them needs a comment-span generator under " +
+    'packages/. THE ' +
+    "RECEIPT'S OWN NUMBER IS NOT IN THE VOCABULARY AND CANNOT BE: how many registered tables " +
+    "carry a later ADD COLUMN is derived by scoped-db.test.ts's replay and by nothing in this " +
+    'runner, so the gate reaches the CLASS and not that INSTANCE. The vocabulary is a ' +
+    'recorded reading of eight populations, not a derivation, so an underivable one is ' +
+    'unpoliced and the remedy is another argued entry. And two queries may return the same ' +
+    'value, so the NOUN disambiguates and never the number, first match in declaration order.',
+  run() {
+    const findings = [];
+    const files = markdownFiles().filter((p) => p.startsWith(DERIVABLE_DOCS));
+    // Rule 2 on a glob-shaped input, the guard CI-06u, CI-06v and
+    // CI-06/table-row-width all carry.
+    if (files.length === 0) {
+      throw new Error(`no markdown files under ${DERIVABLE_DOCS}; the gate cannot run`);
+    }
+
+    // THE VOCABULARY IS RESOLVED BEFORE ANYTHING IS READ, and a query that has
+    // gone missing or stopped returning a number is an ERROR rather than an
+    // entry that silently matches nothing. That is Rule 2 applied to the half of
+    // this gate that is a reading of another table in this file: `SPAN_QUERIES`
+    // is edited by every session that adds a derivation, and a vocabulary entry
+    // pointing at a key somebody renamed would take this gate to zero findings
+    // and read exactly like a clean tree.
+    const vocabulary = [];
+    for (const entry of DERIVABLE_NOUNS) {
+      const query = SPAN_QUERIES[entry.query];
+      if (!query) {
+        throw new Error(
+          `CI-06/derivable-counts: no SPAN_QUERIES entry named "${entry.query}" for the noun ` +
+            `"${entry.label}". The vocabulary points at a query this runner no longer has`,
+        );
+      }
+      const value = query();
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+        throw new Error(
+          `CI-06/derivable-counts: the query "${entry.query}" returns ${JSON.stringify(value)}, ` +
+            'which is not a count. Only scalar queries belong in this vocabulary',
+        );
+      }
+      vocabulary.push({ ...entry, value });
+    }
+
+    let sites = 0;
+    let cardinals = 0;
+    const skipped = { record: 0, table: 0 };
+
+    for (const file of files.sort()) {
+      // Masked whole-body and in this order: a span may run over many lines
+      // (ADR-088's two table spans do), so a per-line mask would miss it.
+      // `spansIn`'s expression is reused rather than restated for the reason
+      // `spanTokens` gives one gate over: sharing the mask is what makes
+      // "generated" and "quoted" mean one thing across this runner.
+      const blank = (m) => m.replace(/[^\n]/g, ' ');
+      const body = read(file)
+        .replace(new RegExp(`<!--${'gen'}:[a-z0-9_]+-->.*?<!--/${'gen'}-->`, 'gs'), blank)
+        .replace(/^(```+|~~~+)[\s\S]*?^\1.*$/gm, blank);
+
+      let inRecord = false;
+      const lines = body.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const heading = /^(#{1,6})\s/.exec(line);
+        if (heading) {
+          // Levels 1 and 2 only. An ADR's `### 3.` inherits the dated `##` its
+          // file opens with, which is what makes a whole dated ruling a record
+          // rather than only its opening paragraph.
+          if (heading[1].length <= 2) inRecord = RECORD_HEADING.test(line);
+          continue;
+        }
+        const isTableRow = line.trimStart().startsWith('|');
+
+        const found = [];
+        for (const m of line.matchAll(CARDINAL_DIGITS)) found.push([Number(m[0]), m.index, m[0]]);
+        for (const m of line.matchAll(CARDINAL_WORD)) {
+          const value = cardinalValue(m[0]);
+          if (value !== null) found.push([value, m.index, m[0]]);
+        }
+
+        for (const [value, at, text] of found) {
+          cardinals++;
+          // The noun must GOVERN the cardinal: one run of whitespace, then the
+          // noun, allowing the emphasis this corpus wraps nouns in. A window
+          // would admit "47 of the 111 tables", where the 47 counts something
+          // else entirely.
+          const after = line.slice(at + text.length);
+          const governed = /^\s+[`*_]{0,3}([A-Za-z][A-Za-z ]*?)[`*_]{0,3}(?![\w-])/.exec(after);
+          if (!governed) continue;
+          const entry = vocabulary.find(
+            (v) => v.value === value && new RegExp(`^(?:${v.noun.source})$`, 'i').test(governed[1]),
+          );
+          if (!entry) continue;
+          if (inRecord) {
+            skipped.record++;
+            continue;
+          }
+          if (isTableRow) {
+            skipped.table++;
+            continue;
+          }
+          sites++;
+          findings.push(
+            `${file}:${i + 1}: "${text} ${governed[1]}" states a count this runner derives: ` +
+              `the query "${entry.query}" returns ${entry.value} on this ref. ADR-034 rules ` +
+              'that no document states a derivable quantity unless it sits in a generated ' +
+              'span. Two branches that each move this number to the same value for different ' +
+              'reasons merge green and wrong. Either put it in a generated span (add ' +
+              `<!--${'gen'}:${entry.query}--> around the number and run: node ` +
+              'scripts/corpus/gates.mjs generate) or delete the number and point at the script',
+          );
+        }
+      }
+    }
+
+    // Rule 2 on the reader. This corpus argues in numbers; a scan that examined
+    // no cardinal at all has lost its input, and it would report a clean tree
+    // for the one reason that means it read nothing.
+    if (cardinals === 0) {
+      throw new Error(
+        `CI-06/derivable-counts examined zero cardinals over ${files.length} file(s) under ` +
+          `${DERIVABLE_DOCS}. This corpus argues in numbers, so zero means the cardinal ` +
+          'reader has stopped matching and every derivable count in the tree would pass',
+      );
+    }
+
+    console.log(
+      `       CI-06/derivable-counts note: ${cardinals} cardinal(s) read over ${files.length} ` +
+        `file(s); vocabulary ${vocabulary.map((v) => `${v.label}=${v.value}`).join(' ')}; ` +
+        `${skipped.record} site(s) under a dated or session heading and ${skipped.table} in a ` +
+        `table row, both out of scope by shape; ${sites} in scope`,
+    );
+    return findings;
+  },
+};
+
 const GATES = [
   ci06a,
   ci06b,
@@ -8051,6 +8431,7 @@ const GATES = [
   gateInventory,
   vgInventory,
   retiredConstraintsGate,
+  ci06DerivableCounts,
 ];
 
 function main() {

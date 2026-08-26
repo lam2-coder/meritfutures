@@ -674,6 +674,89 @@ const absorb299 = (body) => {
   return `${body.slice(0, start)}\n${absorbed.join('\n')}${body.slice(end)}`;
 };
 
+// ---------------------------------------------------------------------------
+// CI-06/derivable-counts. NO SEED HERE MAY WRITE A COUNT AS A LITERAL, which is
+// the founder rider of 2026-08-15 applied to the one gate whose whole subject is
+// hand-written counts. A seed reading `30 gates` would go silent the moment a
+// gate was added -- which is to say the moment the corpus does the ordinary
+// thing this gate exists to track -- and it would go silent while asserting
+// nothing, in a harness built to catch exactly that. The same defect the
+// `ec_count` seed one file up already paid for once.
+//
+// So every seed below DERIVES the number from the tree copy at seed time, out of
+// a span the corpus already carries, and the derived value is what the gate will
+// re-derive when it runs against that same copy.
+const DERIVABLE_DOC = 'docs/GLOSSARY.md';
+
+// The gate count OF THE TREE COPY, derived the way `gate_count` derives it: from
+// the runner's own list of gates.
+//
+// READ FROM THE RUNNER AND NOT FROM A SPAN, and the difference bit on the first
+// run. Reading a `gen:gate_count` span would make every seed below depend on
+// CI-06g being green in the copy: on a branch that has added a gate and not yet
+// run `generate`, the span says one number, the query says another, and the seed
+// writes a sentence the gate correctly declines to match. The harness then
+// reports DID NOT FAIL -- which reads as a gate problem -- for what is a stale
+// span. Deriving from `list` uses the same artifact `GATES.length` does and
+// cannot disagree with it.
+const gateCountIn = (d) => {
+  const out = execFileSync('node', [join(d, 'scripts/corpus/gates.mjs'), 'list'], {
+    encoding: 'utf8',
+  });
+  const n = [...out.matchAll(/^\S+\s\s/gm)].length;
+  if (n === 0) throw new Error('seed anchor not found: the runner in the tree copy lists no gates');
+  return n;
+};
+
+// A cardinal in words, for the one case that watches the word branch of
+// `cardinalValue`. Covers what this corpus writes and throws on anything else,
+// because a silent fallback to digits would make that case assert the branch it
+// was written to leave alone.
+const CARDINAL_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen',
+];
+const CARDINAL_TENS_WORDS = [
+  '',
+  '',
+  'twenty',
+  'thirty',
+  'forty',
+  'fifty',
+  'sixty',
+  'seventy',
+  'eighty',
+  'ninety',
+];
+const inWords = (n) => {
+  if (n < 20) return CARDINAL_WORDS[n];
+  if (n < 100) {
+    const tens = CARDINAL_TENS_WORDS[Math.floor(n / 10)];
+    return n % 10 === 0 ? tens : `${tens}-${CARDINAL_WORDS[n % 10]}`;
+  }
+  if (n < 1000 && n % 100 === 0) return `${CARDINAL_WORDS[n / 100]} hundred`;
+  if (n < 1000) return `${CARDINAL_WORDS[Math.floor(n / 100)]} hundred and ${inWords(n % 100)}`;
+  throw new Error(`seed cannot write ${n} in words; extend inWords or pick another query`);
+};
+
 const SEEDS = {
   'CI-06a': {
     what: 'a link to a heading that does not exist',
@@ -1138,6 +1221,37 @@ const SEEDS = {
     // gate was commissioned for, whatever else it may have found.
     expect: ABSORBED_299_PHRASE,
     seed: (d) => edit(d, SESSIONS_README, absorb299),
+  },
+  // THE SWEEP CI-06g HAS DECLARED OWED ON EVERY RUN SINCE IT WAS WRITTEN, and
+  // the violation is the one ADR-034 ruled against: a sentence stating a
+  // quantity a script can derive, outside a generated span.
+  //
+  // THE NUMBER IS READ OUT OF THE TREE COPY AND NEVER WRITTEN AS A LITERAL. A
+  // seed carrying `30 gates` would stop being a violation on the day a gate was
+  // added, which is the one day anybody is looking, and it would stop silently.
+  // `gateCountIn` reads what the runner itself derives, so the seed is a real
+  // violation for as long as the query exists and is a STALE SEED, loudly, if it
+  // does not.
+  'CI-06/derivable-counts': {
+    what: 'a prose sentence stating the gate count outside a generated span',
+    real:
+      "schema.ts's header sentence states how many registered tables carry a later column. " +
+      'TRANCHE A RAISED IT TO NINE for payout_requests; TRANCHE B RAISED IT TO NINE for ' +
+      'promotional_credit_grants. Two branches reached the SAME NUMBER FOR DIFFERENT REASONS, ' +
+      'so git saw no conflict: each copy read NINE, named nine tables, was internally ' +
+      'consistent, and was wrong by one. The answer was TEN and it was DERIVED by replaying ' +
+      'ALTER TABLE. ADR-042 had already ruled that prose is not a control and ADR-034 that no ' +
+      'document states a derivable count; CI-06g has reported this sweep as owed since it was ' +
+      'written',
+    expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## seeded by falsify\n\nThe corpus now carries ${gateCountIn(d)} ` +
+          'gates, written here as prose rather than as a span.\n',
+      ),
   },
   'CI-06w': {
     what: 'a second allocation row claiming a number the table already claims',
@@ -3850,6 +3964,154 @@ const SCOPE_CASES = [
           'const CI06_WIDTH_REGISTER = new Map([',
           "const CI06_WIDTH_REGISTER = new Map([\n  ['docs/GLOSSARY.md', ['seeded-by-falsify']],",
         ),
+      ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/derivable-counts. FIVE CASES. The SEEDS entry watches ONE assertion in
+  // ONE position; every exclusion this gate declares is a place it must go quiet,
+  // and a place a gate may go quiet is worth exactly as much as the control that
+  // proves it did not go quiet everywhere. CI-06o's rule again.
+  //
+  // EVERY CASE DERIVES ITS NUMBER, for the reason the SEEDS entry gives. A `PASS`
+  // case with a stale literal in it is a case that passes because it seeded
+  // nothing, and that is indistinguishable from the boundary holding.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06/derivable-counts/a-count-under-a-dated-heading-is-a-record',
+    gate: 'CI-06/derivable-counts',
+    what: 'the same sentence under a heading naming a date, which is a RECORD and must NOT be a finding',
+    expect: 'PASS',
+    // THE EXCLUSION THAT MAKES THE GATE POSSIBLE, and the one worth arguing over.
+    // 131 of the 142 sites the recogniser sees live under a dated or session
+    // heading. "All 47 migrations applied in order" was TRUE ON THE DAY IT WAS
+    // WRITTEN, and generating a span over it would rewrite the record to say
+    // something it did not say -- a worse defect than the one being repaired.
+    //
+    // The control is the IDENTICAL sentence under an UNDATED heading, which is
+    // the single edit separating a record from a claim about the tree.
+    control: {
+      expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+      seed: (d) =>
+        edit(
+          d,
+          DERIVABLE_DOC,
+          (b) =>
+            `${b}\n## control, no date in this heading\n\nThe corpus carries ` +
+            `${gateCountIn(d)} gates.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case (2026-08-26)\n\nThe corpus carried ` +
+          `${gateCountIn(d)} gates when this was measured.\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/a-number-inside-a-generated-span-is-the-remedy',
+    gate: 'CI-06/derivable-counts',
+    what: 'the same number inside a gen: span, which is what the gate ASKS FOR and must NOT be a finding',
+    expect: 'PASS',
+    // A GATE THAT REPORTED ITS OWN REMEDY WOULD BE UNSATISFIABLE. The mask is
+    // spansIn's own expression rather than a second copy of one, so "generated"
+    // means the same thing here as it does in CI-06g; the control is the
+    // identical number with the span removed.
+    control: {
+      expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+      seed: (d) =>
+        edit(
+          d,
+          DERIVABLE_DOC,
+          (b) => `${b}\n## control, bare\n\nThe corpus carries ${gateCountIn(d)} gates.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case, spanned\n\nThe corpus carries ` +
+          `${opener('gate_count')}${gateCountIn(d)}${closer()} gates.\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/a-subset-count-is-not-a-population-count',
+    gate: 'CI-06/derivable-counts',
+    what: 'a cardinal governing a registry noun at a value the tree does NOT derive, which must NOT be a finding',
+    expect: 'PASS',
+    // THIS IS WHERE VALUE-ANCHORING IS ASSERTED RATHER THAN STATED. Measured
+    // with the shipped reader: dropping the value clause takes the gate from
+    // zero findings in live prose to 198, and almost every one of the 198 is a
+    // sentence like this -- a local set that happens to be counted next to its
+    // own noun. The control is the same sentence with the DERIVED number in it,
+    // so the pair brackets the rule exactly: one number passes, one fires, and
+    // nothing else about the sentence changes.
+    control: {
+      expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+      seed: (d) =>
+        edit(
+          d,
+          DERIVABLE_DOC,
+          (b) =>
+            `${b}\n## control, the whole population\n\nThis section adds ` +
+            `${gateCountIn(d)} gates to the runner.\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) => `${b}\n## scope case, a subset\n\nThis section adds two gates to the runner.\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/a-count-in-a-table-row-is-a-row-datum',
+    gate: 'CI-06/derivable-counts',
+    what: 'the same count inside a table row, which is a per-row datum and must NOT be a finding',
+    expect: 'PASS',
+    // ADR-034's subject is a PROSE SENTENCE. A registry row's number belongs to
+    // that row and the remedy for it is a table-valued span (ADR-088 built two),
+    // which is a different repair from wrapping a numeral. Eleven sites on this
+    // ref. The control is the identical text lifted out of the table.
+    control: {
+      expect: (d) => `"${gateCountIn(d)} gates" states a count this runner derives`,
+      seed: (d) =>
+        edit(
+          d,
+          DERIVABLE_DOC,
+          (b) =>
+            `${b}\n## control, out of the table\n\nthe runner ` +
+            `${gateCountIn(d)} gates today\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case, in a table\n\n| Thing | Count |\n|---|---|\n` +
+          `| the runner | ${gateCountIn(d)} gates today |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/an-english-number-word-is-a-cardinal-too',
+    gate: 'CI-06/derivable-counts',
+    what: 'the count written in WORDS, which the receipt itself is written in and which MUST be a finding',
+    // THE RECEIPT IS SHOUTED WORDS AND NOT DIGITS: `NINE`, `TEN`, `NINETY-FIVE`,
+    // `ONE HUNDRED AND FOUR`. A reader that saw only digits would miss the entire
+    // class the gate was commissioned for, and nothing else in this harness
+    // exercises `cardinalValue`'s word branch. The word is COMPUTED from the
+    // derived number rather than typed, so it moves with the tree.
+    expect: (d) => `"${inWords(gateCountIn(d))} gates" states a count`,
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case, in words\n\nThe corpus now carries ` +
+          `${inWords(gateCountIn(d))} gates.\n`,
       ),
   },
   // ---------------------------------------------------------------------------
