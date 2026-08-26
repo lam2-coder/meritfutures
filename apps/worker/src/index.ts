@@ -40,6 +40,110 @@
 // the hash; what is not is the wiring, and the difference is visible in the type
 // rather than left to a reader.
 
+// -----------------------------------------------------------------------------
+// M02's PROVISIONING SAGA (session 222, P3-l)
+// -----------------------------------------------------------------------------
+// THE FIRST CALLER ADR-006's TRANSACTIONAL-ENQUEUE CRITERION HAS EVER BEEN
+// GRADED AGAINST. That entry closed with "enqueue participates in the same
+// transaction as the state change that caused it, which removes a whole class
+// of saga bugs (committed the purchase, lost the provisioning job)", and
+// `job-queue.ts` recorded that nothing in this workspace could produce the
+// `JobTransaction` its `enqueue` requires. ADR-102 produced one and
+// `enqueueProvisioningOp` calls it.
+//
+// **THE MANIFEST LINE THIS HEADER HAS ASKED FOR SINCE SESSION 147 IS STILL
+// OWED, AND IT IS OWED BY A DIFFERENT SESSION THAN THIS ONE.** The paragraph
+// above still stands: `apps/worker/package.json` declares `@merit/rules-engine`
+// and nothing else, `node-linker=isolated` makes an undeclared import
+// unresolvable, and P3 wave 3's `P3-l` fence holds `src/provisioning/**`,
+// this file and `test/provisioning.test.ts` and holds neither the manifest nor
+// `pnpm-lock.yaml`. So the saga is written against PORTS, exactly as
+// `runNightlyBatch` is, and `src/provisioning/ports.ts` says what each port's
+// implementation is and what blocks two of them.
+//
+// **WHAT IS REAL IS THE PIPELINE, THE DIGEST, THE MACHINE, THE COMPENSATION AND
+// THE EXIT; WHAT IS NOT IS THE WIRING**, and the difference is visible in the
+// type rather than left to a reader. That is this file's own standard for the
+// batch above and it is applied to the saga unchanged.
+
+export {
+  PROVISIONING_OPERATIONS,
+  PROVISIONING_STATUSES,
+  isProvisioningOperation,
+  isProvisioningStatus,
+} from './provisioning/index.ts';
+export type { ProvisioningOperation, ProvisioningStatus } from './provisioning/index.ts';
+
+export {
+  BATCH_ID_SHORT_LENGTH,
+  ProvisioningPayloadError,
+  batchId,
+  canonicalPayload,
+  payloadHash,
+  provisioningFileName,
+  renderPayload,
+} from './provisioning/index.ts';
+export type { ProvisioningPayload, ProvisioningValue } from './provisioning/index.ts';
+
+export {
+  LIVE_STATUSES,
+  PERMITTED_TRANSITIONS,
+  TRANSITION_REFUSALS,
+  advance,
+} from './provisioning/index.ts';
+export type { Transition, TransitionRefusal } from './provisioning/index.ts';
+
+// INV-M2-13. `setpointConfirmation` is the ONLY producer of a
+// `SetpointConfirmation`, and the brand's symbol is module-local, so the type
+// cannot be constructed anywhere else without a cast.
+export {
+  ADMISSION_REFUSALS,
+  RISK_FLOOR_CENTS_FIELD,
+  admitToTrading,
+  readProvisioningRow,
+  setpointConfirmation,
+} from './provisioning/index.ts';
+export type {
+  AdmissionRefusal,
+  AdmissionSubject,
+  ProvisioningRow,
+  SetpointConfirmation,
+  TradingAdmission,
+} from './provisioning/index.ts';
+
+export {
+  COMPENSATING_OPERATION,
+  REVOCATION_ORDER,
+  compensationFor,
+  inRevocationOrder,
+  revocationRank,
+} from './provisioning/index.ts';
+export type { CompensationOutcome } from './provisioning/index.ts';
+
+export {
+  PROVISIONING_QUEUE_NAME,
+  buildBatch,
+  enqueueProvisioningOp,
+  entitleAfterSetpoint,
+  runProvisioningSaga,
+} from './provisioning/index.ts';
+export type {
+  EnqueuedIntent,
+  EntitlementChange,
+  PlatformProvisioningPort,
+  ProvisioningAdvancePort,
+  ProvisioningBatch,
+  ProvisioningIntent,
+  ProvisioningJobQueue,
+  ProvisioningJobRequest,
+  ProvisioningOp,
+  ProvisioningReadPort,
+  ProvisioningSqlExecutor,
+  ProvisioningTx,
+  SagaIo,
+  SagaOutcome,
+} from './provisioning/index.ts';
+
 export { foldAccountDay, runNightlyBatch } from './batch/nightly.ts';
 export type {
   AccountDayFold,

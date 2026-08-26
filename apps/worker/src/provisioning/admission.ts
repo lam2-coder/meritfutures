@@ -120,7 +120,25 @@ export function readProvisioningRow(row: unknown): ProvisioningRow | null {
   };
 }
 
-declare const SETPOINT_CONFIRMATION: unique symbol;
+/**
+ * The brand's key.
+ *
+ * A REAL `const` RATHER THAN A `declare const`, AND THE SUITE IS WHY THIS LINE
+ * READS THE WAY IT DOES. `declare const SETPOINT_CONFIRMATION: unique symbol`
+ * type-checks, satisfies every use below, and ERASES: under
+ * `node --experimental-strip-types` the computed key in `setpointConfirmation`
+ * is then a reference to a binding that does not exist, and the only producer
+ * of an admission throws `ReferenceError` at runtime. `tsc --noEmit` reports
+ * nothing, because the declaration is a promise that something else supplies
+ * the value and nothing else does.
+ *
+ * It is NOT exported and cannot be reached from outside this module, so the
+ * property is unspellable in an object literal anywhere else. That is the whole
+ * of the brand; a cast still forges one, which is true of every brand in this
+ * repository and is the point rather than a gap -- a cast is a diff a reviewer
+ * reads.
+ */
+const SETPOINT_CONFIRMATION: unique symbol = Symbol('merit.setpoint-confirmation');
 
 /**
  * Evidence that ONE account's CURRENT risk floor was confirmed by the platform.
@@ -128,7 +146,7 @@ declare const SETPOINT_CONFIRMATION: unique symbol;
  * THE BRAND IS `unique symbol` AND NOT A STRING LITERAL, so it cannot be
  * written by an object literal at all: there is no spelling of
  * `{ [SETPOINT_CONFIRMATION]: true, ... }` available outside this module,
- * because the symbol is `declare const` and is never exported. A cast still
+ * because the symbol is module-local and is never exported. A cast still
  * forges one, which is true of every brand in this repository and is stated
  * here rather than left implied -- a cast is a diff a reviewer reads, and that
  * is the whole of what a brand buys.
