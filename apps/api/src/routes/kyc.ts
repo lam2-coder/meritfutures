@@ -75,6 +75,7 @@ import {
   requiredFactorTable,
   toRoutes,
   withSessionContext,
+  type AuthedContext,
   type AuthSession,
   type EndpointSpec,
 } from './auth.ts';
@@ -327,6 +328,30 @@ function sendUnavailable(reply: FastifyReply, requestId: string): FastifyReply {
   });
 }
 
+/**
+ * Turn the fail-closed backend's refusal into a 503, once, for every endpoint.
+ *
+ * `endpointHandler` in `auth.ts` does this for `AuthBackendUnwired` and knows
+ * nothing about this module's backend, and it should not: a route module that
+ * declares its own port declares its own unwired answer. Without this the
+ * framework's handler reports 500, which says "this process is broken" about a
+ * deployment that is merely not finished, and 503 is section 2's code for a
+ * dependency that is not there.
+ */
+function unavailableWhenUnwired(
+  handle: (ctx: AuthedContext) => Promise<unknown>,
+): (ctx: AuthedContext) => Promise<unknown> {
+  return async (ctx: AuthedContext) => {
+    try {
+      return await handle(ctx);
+    } catch (cause) {
+      if (!(cause instanceof KycBackendUnwired)) throw cause;
+      ctx.request.log.error({ err: cause }, 'kyc backend is not wired');
+      return sendUnavailable(ctx.reply, ctx.request.id);
+    }
+  };
+}
+
 // -----------------------------------------------------------------------------
 // The gate, over the facts the backend measured
 // -----------------------------------------------------------------------------
@@ -460,63 +485,65 @@ export const KYC_ENDPOINTS: readonly EndpointSpec[] = [
     // begin one would put a passkey in front of the gate that exists to
     // establish who the person is in the first place.
     required: 'session',
-    handle: withSessionContext(async ({ request, reply, session }) => {
-      const { provider, backend, returnUrl } = currentKycDeps();
-      // NO VENDOR AND NO RETURN URL MEANS NO SESSION. A deployment that cannot
-      // hand the trader to a provider must not write a row saying it did.
-      if (provider === null || returnUrl === null) return sendUnavailable(reply, request.id);
+    handle: unavailableWhenUnwired(
+      withSessionContext(async ({ request, reply, session }) => {
+        const { provider, backend, returnUrl } = currentKycDeps();
+        // NO VENDOR AND NO RETURN URL MEANS NO SESSION. A deployment that cannot
+        // hand the trader to a provider must not write a row saying it did.
+        if (provider === null || returnUrl === null) return sendUnavailable(reply, request.id);
 
-      const facts = await backend.gateFacts(session);
-      // `readTriggerConfig` throws `KycConfigError` on a plan this route may not
-      // guess about. It is NOT caught: the framework's handler answers 500 and
-      // logs it, which is what a data defect on the money path deserves.
-      const gate = gateFactsFrom(facts);
+        const facts = await backend.gateFacts(session);
+        // `readTriggerConfig` throws `KycConfigError` on a plan this route may not
+        // guess about. It is NOT caught: the framework's handler answers 500 and
+        // logs it, which is what a data defect on the money path deserves.
+        const gate = gateFactsFrom(facts);
 
-      const current = await backend.currentVerification(session);
-      if (current !== null) {
-        const refusal = openVerificationRefusal(current, facts.retriesExhausted);
-        if (refusal !== null) return sendConflict(reply, request.id, refusal);
-      }
+        const current = await backend.currentVerification(session);
+        if (current !== null) {
+          const refusal = openVerificationRefusal(current, facts.retriesExhausted);
+          if (refusal !== null) return sendConflict(reply, request.id, refusal);
+        }
 
-      const evaluation = evaluateGate(gate);
-      if (evaluation.kind !== 'reached') {
-        return sendConflict(
-          reply,
-          request.id,
-          'No configured verification trigger has been reached for this identity. ' +
-            'Verification is requested when a trigger fires, and this plan version ' +
-            `watches ${gate.triggers.join(' and ')}.`,
-        );
-      }
+        const evaluation = evaluateGate(gate);
+        if (evaluation.kind !== 'reached') {
+          return sendConflict(
+            reply,
+            request.id,
+            'No configured verification trigger has been reached for this identity. ' +
+              'Verification is requested when a trigger fires, and this plan version ' +
+              `watches ${gate.triggers.join(' and ')}.`,
+          );
+        }
 
-      const hosted = await provider.createSession({
-        identityId: session.identityId,
-        returnUrl,
-        idempotencyKey:
-          suppliedKey(request.headers) ?? attemptKey(session.identityId, facts.attemptNumber),
-      });
+        const hosted = await provider.createSession({
+          identityId: session.identityId,
+          returnUrl,
+          idempotencyKey:
+            suppliedKey(request.headers) ?? attemptKey(session.identityId, facts.attemptNumber),
+        });
 
-      // THE ROW IS WRITTEN AFTER THE PROVIDER ANSWERED AND NOT BEFORE. A
-      // verification row naming an applicant the vendor never minted would be a
-      // pending check nobody can complete, and `provider_applicant_id` is
-      // `NOT NULL` precisely because the row without it is meaningless.
-      await backend.openVerification(session, {
-        provider: hosted.provider,
-        providerApplicantId: hosted.providerApplicantId,
-        placement: evaluation.trigger,
-        planCode: facts.planCode,
-        attemptNumber: facts.attemptNumber,
-        hostedExpiresAt: hosted.expiresAt,
-      });
+        // THE ROW IS WRITTEN AFTER THE PROVIDER ANSWERED AND NOT BEFORE. A
+        // verification row naming an applicant the vendor never minted would be a
+        // pending check nobody can complete, and `provider_applicant_id` is
+        // `NOT NULL` precisely because the row without it is meaningless.
+        await backend.openVerification(session, {
+          provider: hosted.provider,
+          providerApplicantId: hosted.providerApplicantId,
+          placement: evaluation.trigger,
+          planCode: facts.planCode,
+          attemptNumber: facts.attemptNumber,
+          hostedExpiresAt: hosted.expiresAt,
+        });
 
-      const body: KycSessionResponse = {
-        provider: hosted.provider,
-        hosted_url: hosted.hostedUrl,
-        expires_at: hosted.expiresAt,
-        applicant_ref: hosted.providerApplicantId,
-      };
-      return body;
-    }),
+        const body: KycSessionResponse = {
+          provider: hosted.provider,
+          hosted_url: hosted.hostedUrl,
+          expires_at: hosted.expiresAt,
+          applicant_ref: hosted.providerApplicantId,
+        };
+        return body;
+      }),
+    ),
   },
   {
     method: 'GET',
@@ -525,26 +552,28 @@ export const KYC_ENDPOINTS: readonly EndpointSpec[] = [
     // they are blocked, and requiring elevation to read it would be the boundary
     // learned by hitting it that M04 section 3.7 is written against.
     required: 'session',
-    handle: withSessionContext(async ({ session }) => {
-      const { backend } = currentKycDeps();
-      const facts = await backend.gateFacts(session);
-      const gate = gateFactsFrom(facts);
-      const current = await backend.currentVerification(session);
-      const evaluation = evaluateGate(gate);
-      const gateReached = evaluation.kind === 'reached';
+    handle: unavailableWhenUnwired(
+      withSessionContext(async ({ session }) => {
+        const { backend } = currentKycDeps();
+        const facts = await backend.gateFacts(session);
+        const gate = gateFactsFrom(facts);
+        const current = await backend.currentVerification(session);
+        const evaluation = evaluateGate(gate);
+        const gateReached = evaluation.kind === 'reached';
 
-      const status: KycStatus = {
-        state: current?.state ?? 'kyc_required',
-        // The trigger that FIRED if one has, the one that WILL fire otherwise.
-        placement:
-          current?.placement ??
-          (evaluation.kind === 'reached' ? evaluation.trigger : pendingTrigger(gate)),
-        verified_at: current?.verifiedAt ?? null,
-        expires_at: current?.expiresAt ?? null,
-        action_required: actionFor(current, gateReached, facts.retriesExhausted),
-      };
-      return projectStatus(status);
-    }),
+        const status: KycStatus = {
+          state: current?.state ?? 'kyc_required',
+          // The trigger that FIRED if one has, the one that WILL fire otherwise.
+          placement:
+            current?.placement ??
+            (evaluation.kind === 'reached' ? evaluation.trigger : pendingTrigger(gate)),
+          verified_at: current?.verifiedAt ?? null,
+          expires_at: current?.expiresAt ?? null,
+          action_required: actionFor(current, gateReached, facts.retriesExhausted),
+        };
+        return projectStatus(status);
+      }),
+    ),
   },
 ];
 

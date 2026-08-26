@@ -43,11 +43,16 @@
 //      of which a request handler is neither. That is ADR-109's finding 2
 //      reached from a second direction, one day later.
 //
-// SO `productionDeps` RESOLVES NOTHING AND A LIVE DEPLOYMENT ANSWERS 503. The
-// route is REGISTERED, because the contract row exists and a missing route
-// would answer 404 and look like a contract Merit never wrote. ADR-114 section
-// 5 is the ruling and the migration that would close it is a later session's:
-// `0048` stays free.
+// SO `productionDeps` RESOLVES NOTHING, AND WHAT A LIVE DEPLOYMENT ANSWERS
+// TODAY IS 404 RATHER THAN 503, WHICH IS MEASURED AND NOT ASSUMED. The resolver
+// runs before the store check, no vendor has been selected, and an unselected
+// vendor genuinely names no resource, so every `:provider` is `not_found`. The
+// 503 is the OTHER leg and it is reachable the day a vendor exists and the
+// table does not. The route is REGISTERED either way, because the contract row
+// exists and an unregistered route answers a 404 that is the ROUTER's and looks
+// identical to a contract Merit never wrote. ADR-114 section 5 is the ruling,
+// and the migration that would close it is a later session's: `0048` stays
+// free.
 //
 // -----------------------------------------------------------------------------
 // THE DOCUMENT SCREEN IS THIS ROUTE'S OWN CONTROL
@@ -429,7 +434,8 @@ export async function receiveKycWebhook(args: ReceiveKycWebhookArgs): Promise<Ky
  * `@merit/kyc` ships a port and one FAKE, and a fake must never serve a real
  * provider. No vendor has been selected, which ADR-021 makes a DISCLOSURE
  * decision rather than only a procurement one, so this resolves `null` and the
- * route answers 503.
+ * route answers 404 for every provider name until one is chosen. See this
+ * file's header for why that is the resolver's answer and not the router's.
  */
 export const productionDeps: KycWebhookDeps = {
   providers: () => null,
