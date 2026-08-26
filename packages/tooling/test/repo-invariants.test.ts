@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test } from 'vitest';
 import {
   CHECKS,
   COVERAGE_NEEDLES,
+  DB_ADMITTED,
   DEPLOYABLES,
   REPO_ROOT,
   SURFACE_OWNER,
@@ -337,6 +338,123 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // RI-08, AND THE SEED IS ADR-096's OWN, WATCHED FAILING HERE AND ON THE TREE
+  // ---------------------------------------------------------------------------
+  // The entry measured the hole with a line it wrote into `apps/site/package.json`
+  // and four commands that stayed green over it. The first case is that line.
+  //
+  // The three after it are the three readings of "resolves to the accessor",
+  // because `spec.includes('@merit/db')` was the shape to beat: it reports
+  // `@merit/dbtools` and it cannot see `link:../../packages/db`, where neither
+  // the key nor the specifier writes the name down at all.
+  //
+  // THE `packages/queue` CASE IS THE WIDENED SCOPE, PROVEN RATHER THAN CLAIMED.
+  // ADR-096 section 9 calls it "the second instance" and says an RI-08 covering
+  // both is the better version; ADR-095 section 9 item 5b says the apps/site-only
+  // scope does not reach `apps/portal` either. A check scoped to two names would
+  // pass this case, which is what makes it worth a test rather than a sentence.
+  const siteWith = (root: string, deps: Record<string, string>): void =>
+    write(
+      root,
+      'apps/site/package.json',
+      JSON.stringify({ name: '@merit/site', dependencies: deps }),
+    );
+
+  test("RI-08 catches ADR-096's own seed, the accessor declared by the marketing site", () => {
+    const root = cleanTree();
+    siteWith(root, { '@merit/db': 'workspace:*' });
+    const out = findings('RI-08', root).join('\n');
+    expect(out).toContain('apps/site/package.json: dependencies.@merit/db');
+    expect(out).toContain('names it directly');
+  });
+
+  test('RI-08 catches the accessor aliased under another key', () => {
+    const root = cleanTree();
+    siteWith(root, { db: 'workspace:@merit/db@*' });
+    expect(findings('RI-08', root).join('\n')).toContain('aliases it as `db`');
+  });
+
+  test('RI-08 catches the accessor linked by PATH, which writes no package name', () => {
+    // The one form where neither the key nor the specifier spells `@merit/db`,
+    // so a name test of any kind is blind to it and only resolution finds it.
+    const root = cleanTree();
+    siteWith(root, { db: 'link:../../packages/db' });
+    expect(findings('RI-08', root).join('\n')).toContain('links its directory as `db`');
+  });
+
+  test('RI-08 reads all four dependency fields, not just `dependencies`', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/site/package.json',
+      JSON.stringify({
+        name: '@merit/site',
+        devDependencies: { '@merit/db': 'workspace:*' },
+        optionalDependencies: { db: 'npm:@merit/db@0.0.0' },
+      }),
+    );
+    const out = findings('RI-08', root);
+    expect(out).toHaveLength(2);
+    expect(out.join('\n')).toContain('devDependencies.@merit/db');
+    expect(out.join('\n')).toContain('optionalDependencies.db');
+  });
+
+  test('RI-08 catches packages/queue, which an apps/site-scoped check would not', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'packages/queue/package.json',
+      JSON.stringify({ name: '@merit/queue', dependencies: { '@merit/db': 'workspace:*' } }),
+    );
+    expect(findings('RI-08', root).join('\n')).toContain('packages/queue/package.json');
+  });
+
+  test('RI-08 does NOT refuse a package whose name merely starts with the accessor name', () => {
+    // The substring trap, and the reason the alias target is PARSED rather than
+    // searched for. `@merit/dbtools` is a different package by every reading.
+    const root = cleanTree();
+    write(root, 'packages/dbtools/package.json', JSON.stringify({ name: '@merit/dbtools' }));
+    siteWith(root, { '@merit/dbtools': 'workspace:*', '@merit/rules-engine': 'workspace:*' });
+    expect(findings('RI-08', root)).toEqual([]);
+  });
+
+  test('RI-08 does NOT read the accessor package against itself', () => {
+    // RI-09's `if (app === SURFACE_OWNER) continue`, one register over. The
+    // owner of a thing is not a consumer of it, and the exemption is derived
+    // from the name on disk rather than written down here.
+    const root = cleanTree();
+    write(
+      root,
+      'packages/db/package.json',
+      JSON.stringify({ name: '@merit/db', devDependencies: { '@merit/db': 'workspace:*' } }),
+    );
+    expect(findings('RI-08', root)).toEqual([]);
+  });
+
+  test('RI-08 admits a package that is named in DB_ADMITTED, and only that one', () => {
+    // THE BRANCH THE EMPTY LIST NEVER EXERCISES. `apps/api` is the name expected
+    // to join first (ADR-109: "whether apps/api gets @merit/db ... does not
+    // here"), so the day it does, this is the behaviour it gets. The list is
+    // restored in `finally` because it is module state shared with every other
+    // case in this file.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/package.json',
+      JSON.stringify({ name: '@merit/api', dependencies: { '@merit/db': 'workspace:*' } }),
+    );
+    siteWith(root, { '@merit/db': 'workspace:*' });
+    DB_ADMITTED.push('@merit/api');
+    try {
+      const out = findings('RI-08', root);
+      expect(out).toHaveLength(1);
+      expect(out.join('\n')).toContain('apps/site/package.json');
+    } finally {
+      DB_ADMITTED.length = 0;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
   // RI-10, AND BOTH DIRECTIONS ARE SEEDED BECAUSE BOTH HAPPENED ON 2026-08-25
   // ---------------------------------------------------------------------------
   // The first case is the defect as it lived here: 686 specifiers wrote `./x.js`
@@ -495,6 +613,7 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     ['RI-03', 'vitest.config.ts'],
     ['RI-05', '.nvmrc'],
     ['RI-07', 'packages/rules-engine/src/index.ts'],
+    ['RI-08', 'packages/db/package.json'],
     ['RI-09', `apps/${SURFACE_OWNER}/src/surface.ts`],
   ])('%s throws when %s is gone', (id, input) => {
     const root = cleanTree();
@@ -516,6 +635,36 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     const root = cleanTree();
     write(root, `apps/${SURFACE_OWNER}/src/surface.ts`, "export const BASE_PATH = '/api/v1';\n");
     expect(() => findings('RI-09', root)).toThrow(/cannot run/);
+  });
+
+  // RI-08's TWO GUARDS ARE ABOUT THE ADMISSION LIST AND NOT ABOUT A MISSING
+  // FILE, because that list is the direction the check gets weakened in. Nobody
+  // deletes an invariant; somebody admits one more package each time one is
+  // inconvenient, and the check keeps reporting PASS about a workspace it has
+  // exempted. Both cases restore the list in `finally`: it is module state.
+  test('RI-08 throws on an admission naming a package that does not exist', () => {
+    const root = cleanTree();
+    DB_ADMITTED.push('@merit/gone');
+    try {
+      expect(() => findings('RI-08', root)).toThrow(/cannot run/);
+    } finally {
+      DB_ADMITTED.length = 0;
+    }
+  });
+
+  test('RI-08 throws when the admission list covers every package', () => {
+    // The end state of one admission at a time. A green result here would mean
+    // "no package outside the list declares the accessor" over an empty
+    // remainder, which is RI-04 reporting PASS about a deployable its literal
+    // did not name, and RI-09 reporting PASS with no operator prefixes.
+    const root = cleanTree();
+    for (const app of DEPLOYABLES) DB_ADMITTED.push(`@merit/${app}`);
+    DB_ADMITTED.push('@merit/rules-engine');
+    try {
+      expect(() => findings('RI-08', root)).toThrow(/asserting nothing/);
+    } finally {
+      DB_ADMITTED.length = 0;
+    }
   });
 
   test('RI-07 throws when the graph walk reaches only the entry point', () => {
