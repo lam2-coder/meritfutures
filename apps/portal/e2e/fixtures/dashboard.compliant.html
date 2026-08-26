@@ -1,0 +1,248 @@
+<!doctype html>
+<!--
+  apps/portal/e2e/fixtures/dashboard.compliant.html
+
+  THE FUNDED DASHBOARD, COMPLIANT. Dark first, because OQ-DS-03's proposal is
+  "light-first for the site, dark-first for the portal and admin", and the
+  reason it is a deliberate seam rather than an inconsistency is when each
+  surface is actually read: a trader is looking at this one during a session,
+  next to a chart.
+
+  IT CARRIES THE SHELL'S TWO OBLIGATIONS, because `apps/portal/src/shell/app-shell.ts`
+  makes both properties of the SHELL rather than of any screen:
+    - ADR-068 requirement 4, through M04 section 3.9: the impersonation banner
+      is chrome, present on every screen and on every error, empty and loading
+      state.
+    - INV-M4-09: the simulated-environment disclosure is in the footer, and it
+      is a compliance obligation rather than a design preference.
+  Neither is what SS-01 to SS-08 assert. They are here because a fixture that
+  dropped them would be a fixture of a screen this portal cannot render.
+
+  DG-17 IS OBEYED ON EVERY FIGURE: INV-M4-02 and INV-M12-04 both require the
+  as-of trading day, the window and the sample, and DESIGN_SYSTEM adds that it
+  is a design failure as much as a data one because the label's placement
+  decides whether anybody reads it.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Merit portal</title>
+    <style>
+      :root {
+        --ink-950: #070c0a;
+        --ink-900: #0c1512;
+        --ink-800: #13211d;
+        --ink-700: #1c2e28;
+        --ink-600: #2a413a;
+        --ink-500: #3d5a50;
+        --ink-400: #5c7d72;
+        --ink-300: #89a79c;
+        --ink-200: #b9cec6;
+        --ink-100: #dce7e2;
+        --ink-050: #f0f5f3;
+        --brass-400: #be862c;
+        --brass-300: #d6a657;
+        --brass-600: #7a5314;
+        --moss-500: #2f6f4f;
+        --oxide-500: #96322b;
+
+        /* Dark FIRST. The portal's default. */
+        --surface: var(--ink-950);
+        --raised: var(--ink-900);
+        --body: var(--ink-100);
+        --heading: var(--ink-100);
+        --secondary: var(--ink-300);
+        --rule: rgba(137, 167, 156, 0.3);
+        --accent: var(--brass-300);
+        --banner-surface: var(--ink-800);
+      }
+
+      @media (prefers-color-scheme: light) {
+        :root {
+          --surface: var(--ink-050);
+          --raised: var(--ink-100);
+          --body: var(--ink-600);
+          --heading: var(--ink-700);
+          --secondary: var(--ink-500);
+          --rule: var(--ink-200);
+          --accent: var(--brass-600);
+          --banner-surface: var(--ink-100);
+        }
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        border-radius: 0;
+      }
+
+      html {
+        background-color: var(--surface);
+        color: var(--body);
+        font-family: 'Public Sans', system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 26px;
+      }
+
+      body {
+        margin: 0;
+        background-color: var(--surface);
+        color: var(--body);
+      }
+
+      /* M04 section 3.9. Chrome, not a screen element. It is a full-width ruled
+         band rather than a card: DG-07 has no way in, because a band has no
+         edge color and no border. */
+      .impersonation {
+        padding: 8px 16px;
+        background-color: var(--banner-surface);
+        color: var(--secondary);
+        border-bottom: 1px solid var(--rule);
+        font-size: 14px;
+        line-height: 22px;
+        font-weight: 500;
+      }
+
+      main {
+        padding: 24px 16px;
+        max-width: 68ch;
+      }
+
+      h1,
+      h2 {
+        font-family: Newsreader, Georgia, serif;
+        color: var(--heading);
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 38px;
+      }
+
+      h2 {
+        font-size: 24px;
+        line-height: 30px;
+        margin-top: 32px;
+      }
+
+      .row {
+        display: flex;
+        gap: 16px;
+        align-items: baseline;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .row > .label {
+        flex: 0 0 220px;
+        color: var(--secondary);
+        font-size: 14px;
+        line-height: 22px;
+        font-weight: 500;
+      }
+
+      .row > .value {
+        flex: 1 1 auto;
+        font-family: 'IBM Plex Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        color: var(--heading);
+      }
+
+      .positive {
+        color: var(--moss-500);
+      }
+
+      .negative {
+        color: var(--oxide-500);
+      }
+
+      /* Section 2.3: neither semantic color is ever the only carrier of meaning,
+         so each state carries a word beside its hue. */
+      .state-word {
+        font-family: 'Public Sans', system-ui, sans-serif;
+        color: var(--secondary);
+        font-size: 14px;
+        line-height: 22px;
+      }
+
+      .as-of {
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--secondary);
+        margin: 8px 0 0;
+      }
+
+      .disclosure {
+        margin-top: 32px;
+        padding: 16px;
+        border-top: 1px solid var(--rule);
+        color: var(--secondary);
+        font-size: 12px;
+        line-height: 18px;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration-line: underline;
+        text-underline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="impersonation">
+      Operator session. You are viewing this account as support, and every action is recorded.
+    </div>
+
+    <main>
+      <h1>Funded account 50K</h1>
+
+      <div class="row">
+        <div class="label">Wallet balance</div>
+        <div class="value">$4,182.00</div>
+      </div>
+      <div class="row">
+        <div class="label">Consistency</div>
+        <div class="value positive">
+          38.4% <span class="state-word">within the cap</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="label">Win days recorded</div>
+        <div class="value">3 of 5</div>
+      </div>
+      <div class="row">
+        <div class="label">Trailing drawdown headroom</div>
+        <div class="value negative">
+          $412.00 <span class="state-word">tightening</span>
+        </div>
+      </div>
+      <p class="as-of">
+        Every figure above is as of the close of trading day 2026&#8209;08&#8209;25, computed over
+        that account's full funded history of 42 trading days.
+      </p>
+
+      <h2>Payout ladder</h2>
+      <div class="row">
+        <div class="label">Step</div>
+        <div class="value">2 of 5</div>
+      </div>
+      <div class="row">
+        <div class="label">Next request opens</div>
+        <div class="value">2026&#8209;09&#8209;02</div>
+      </div>
+      <p class="as-of">
+        Ladder position is read from the plan version this account is pinned to, version 4 of
+        Merit Rapid, and the <a href="/rules/merit-rapid/4">rules page</a> states every step.
+      </p>
+
+      <p class="disclosure">
+        This account trades a simulated environment. No order reaches a live exchange and no
+        figure on this screen represents a position in a real market.
+      </p>
+    </main>
+  </body>
+</html>

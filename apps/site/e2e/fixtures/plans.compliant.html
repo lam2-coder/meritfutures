@@ -1,0 +1,313 @@
+<!doctype html>
+<!--
+  apps/site/e2e/fixtures/plans.compliant.html
+
+  A COMPLIANT MARKETING SURFACE, WHICH IS THE DIRECTION THAT PROVES THE PASS
+  DOES NOT SIMPLY FAIL ON EVERYTHING.
+
+  It is the plan comparison, built to DESIGN_SYSTEM: one layout primitive (the
+  ruled row, section 1.3), forest ink and brass (section 1.1), the page opening
+  with a number and its window rather than with a hero (section 5), no centered
+  hero and no pill badge, no middle-plan elevation, and every figure carrying
+  its as-of trading day and its sample (DG-17).
+
+  WHY THIS IS A FIXTURE AND NOT A PAGE. `apps/site/src/app/` does not exist at
+  this commit and `CI-07` is still waiting on the first `page`, `layout` or
+  `route` file under it. There is no page to render. What this file is is the
+  DOM a compliant page produces, which is what SS-01 to SS-08 read. ADR-116
+  section 6 carries the limit.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Merit plans</title>
+    <style>
+      /* DT-01 section 2. Every value below is a token and nothing else is. */
+      :root {
+        --ink-950: #070c0a;
+        --ink-900: #0c1512;
+        --ink-800: #13211d;
+        --ink-700: #1c2e28;
+        --ink-600: #2a413a;
+        --ink-500: #3d5a50;
+        --ink-400: #5c7d72;
+        --ink-300: #89a79c;
+        --ink-200: #b9cec6;
+        --ink-100: #dce7e2;
+        --ink-050: #f0f5f3;
+        --brass-600: #7a5314;
+        --brass-400: #be862c;
+        --brass-300: #d6a657;
+        --moss-500: #2f6f4f;
+
+        /* Light is the site's default, OQ-DS-03's proposal. */
+        --surface: var(--ink-050);
+        --body: var(--ink-600);
+        --heading: var(--ink-700);
+        --secondary: var(--ink-500);
+        --rule: var(--ink-200);
+        --accent: var(--brass-600);
+        --on-accent: var(--ink-050);
+        --accent-surface: var(--brass-400);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --surface: var(--ink-950);
+          --body: var(--ink-100);
+          --heading: var(--ink-100);
+          --secondary: var(--ink-300);
+          /* DT-03 section 4.2: the hairline on dark is ink-300 at 30 percent. */
+          --rule: rgba(137, 167, 156, 0.3);
+          --accent: var(--brass-300);
+          --on-accent: var(--ink-950);
+          --accent-surface: var(--brass-300);
+        }
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        /* DT-03 section 4.1: radius-none is THE DEFAULT. */
+        border-radius: 0;
+      }
+
+      html {
+        background-color: var(--surface);
+        color: var(--body);
+        /* DT-02 section 3. Public Sans for body, UI and labels. */
+        font-family: 'Public Sans', system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 26px;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background-color: var(--surface);
+        color: var(--body);
+      }
+
+      /* Section 5: left-aligned and asymmetric. Measure capped at 68 characters. */
+      .measure {
+        max-width: 68ch;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: Newsreader, Georgia, serif;
+        color: var(--heading);
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 38px;
+      }
+
+      h2 {
+        font-size: 24px;
+        line-height: 30px;
+      }
+
+      h3 {
+        font-size: 18px;
+        line-height: 26px;
+      }
+
+      p {
+        margin: 0 0 16px;
+      }
+
+      /* Section 1.3, THE ONE LAYOUT PRIMITIVE: a full-width row separated by a
+         hairline rule, with a fixed-measure label column on the left. It has no
+         border on its edge and no color on it, which is what makes DG-07
+         structurally unavailable rather than merely forbidden. */
+      .row {
+        display: flex;
+        gap: 16px;
+        align-items: baseline;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .row > .label {
+        flex: 0 0 220px;
+        color: var(--secondary);
+        font-size: 14px;
+        line-height: 22px;
+        font-weight: 500;
+      }
+
+      .row > .value {
+        flex: 1 1 auto;
+      }
+
+      /* DT-02 section 3: IBM Plex Mono, NUMERALS ONLY, where digit alignment is
+         functional. Never for prose and never for headings. */
+      .figure {
+        font-family: 'IBM Plex Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        color: var(--heading);
+      }
+
+      .display {
+        font-family: 'IBM Plex Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        font-size: 44px;
+        line-height: 48px;
+        color: var(--heading);
+        margin: 0;
+      }
+
+      /* DG-17: a trader-facing number is never rendered without its as-of
+         trading day, its window and its sample. The label's placement decides
+         whether anybody reads it, so it sits directly beneath the figure. */
+      .as-of {
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--secondary);
+        margin: 4px 0 24px;
+      }
+
+      .positive {
+        color: var(--moss-500);
+        font-weight: 500;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration-line: underline;
+        text-decoration-thickness: 1px;
+        text-underline-offset: 2px;
+      }
+
+      /* DT-03 section 4.1: radius-md, 4px, THE PRIMARY ACTION ONLY. It is the
+         single element on this surface above radius-none, and it carries no
+         shadow, because section 4.2 has exactly one shadow and it is for
+         overlays. */
+      .action {
+        display: inline-block;
+        margin-top: 8px;
+        padding: 8px 16px;
+        border: 0;
+        border-radius: 4px;
+        background-color: var(--accent-surface);
+        color: var(--on-accent);
+        font-family: 'Public Sans', system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 26px;
+        font-weight: 500;
+      }
+
+      .icon {
+        display: inline-block;
+        vertical-align: -2px;
+        width: 16px;
+        height: 16px;
+        color: var(--secondary);
+      }
+
+      .footnote {
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--secondary);
+        border-top: 1px solid var(--rule);
+        padding-top: 16px;
+        margin-top: 32px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="measure">
+      <!-- Section 5: the page opens with a number and its window. No hero, no
+           pill badge above the H1, no centered anything. -->
+      <p class="display">48.11%</p>
+      <p class="as-of">
+        Funded accounts reaching a first payout on Merit Rapid. Window: the 18 months to
+        2026&#8209;08&#8209;26. Sample: 4,196 funded accounts. As of trading day 2026&#8209;08&#8209;26.
+      </p>
+
+      <h1>Three plans, three cadences</h1>
+      <p>
+        Merit publishes what each plan actually does, read from the pinned plan version rather
+        than typed into this page. The comparison below is a ruled table with no recommended
+        plan, because the firm does not have one.
+      </p>
+
+      <h2>Merit Rapid</h2>
+      <div class="row">
+        <div class="label">Evaluation pass rate</div>
+        <div class="value"><span class="figure">16.55%</span></div>
+      </div>
+      <div class="row">
+        <div class="label">Funded to first payout</div>
+        <div class="value"><span class="figure positive">48.11%</span></div>
+      </div>
+      <div class="row">
+        <div class="label">Payout ladder steps</div>
+        <div class="value"><span class="figure">5</span></div>
+      </div>
+      <div class="row">
+        <div class="label">Consistency window</div>
+        <div class="value"><span class="figure">3</span> trading days</div>
+      </div>
+
+      <h2>Core EOD</h2>
+      <div class="row">
+        <div class="label">Evaluation pass rate</div>
+        <div class="value"><span class="figure">26.53%</span></div>
+      </div>
+      <div class="row">
+        <div class="label">Funded to first payout</div>
+        <div class="value"><span class="figure">33.46%</span></div>
+      </div>
+      <div class="row">
+        <div class="label">Payout ladder steps</div>
+        <div class="value"><span class="figure">5</span></div>
+      </div>
+
+      <h2>Direct</h2>
+      <div class="row">
+        <div class="label">Evaluation pass rate</div>
+        <div class="value">No evaluation. <span class="figure">100%</span></div>
+      </div>
+      <div class="row">
+        <div class="label">Funded to first payout</div>
+        <div class="value"><span class="figure">12.07%</span></div>
+      </div>
+      <div class="row">
+        <div class="label">Payout ladder steps</div>
+        <div class="value"><span class="figure">4</span></div>
+      </div>
+
+      <h3>
+        <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path
+            d="M2 8h12M8 2v12"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="square"
+          />
+        </svg>
+        Read the rules before you buy
+      </h3>
+      <p>
+        Every rule that decides a payout is on the
+        <a href="/rules/merit-rapid">rules page</a> for the plan version your account is pinned
+        to, with the version number and the moment it was built.
+      </p>
+      <button class="action" type="button">Compare plan versions</button>
+
+      <p class="footnote">
+        Merit accounts trade a simulated environment. Figures above are published statistics with
+        the window and sample stated beside each one, and they describe past cohorts rather than
+        any individual result.
+      </p>
+    </main>
+  </body>
+</html>
