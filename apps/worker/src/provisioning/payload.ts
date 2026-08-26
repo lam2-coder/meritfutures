@@ -160,14 +160,14 @@ export function payloadHash(payload: ProvisioningPayload): Buffer {
  * the TAGGED value rather than over this rendering, so `'100'` and `100n` stay
  * different intents even though both reach `jsonb` as `"100"`.
  */
-export function renderPayload(payload: ProvisioningPayload): Record<string, string | boolean | null> {
+export function renderPayload(
+  payload: ProvisioningPayload,
+): Record<string, string | boolean | null> {
   const out: Record<string, string | boolean | null> = {};
   for (const key of Object.keys(payload).sort()) {
     const value = payload[key];
     if (value === undefined) {
-      throw new ProvisioningPayloadError(
-        `payload field ${JSON.stringify(key)} is undefined.`,
-      );
+      throw new ProvisioningPayloadError(`payload field ${JSON.stringify(key)} is undefined.`);
     }
     out[key] = typeof value === 'bigint' ? value.toString(10) : value;
   }

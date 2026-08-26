@@ -47,11 +47,7 @@ import {
   type SetpointConfirmation,
   type TradingAdmission,
 } from './admission.ts';
-import {
-  compensationFor,
-  revocationRank,
-  type CompensationOutcome,
-} from './compensation.ts';
+import { compensationFor, revocationRank, type CompensationOutcome } from './compensation.ts';
 import { payloadHash, provisioningFileName, renderPayload } from './payload.ts';
 import type { ProvisioningPayload } from './payload.ts';
 import type {
@@ -388,5 +384,5 @@ export async function entitleAfterSetpoint(
 /** An unknown thrown value, as a string. Never `[object Object]`. */
 function describe(cause: unknown): string {
   if (cause instanceof Error) return `${cause.name}: ${cause.message}`;
-  return typeof cause === 'string' ? cause : JSON.stringify(cause) ?? String(cause);
+  return typeof cause === 'string' ? cause : (JSON.stringify(cause) ?? String(cause));
 }

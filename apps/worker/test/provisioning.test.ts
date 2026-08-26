@@ -162,7 +162,10 @@ function fakeDatabase(): FakeDatabase {
 function fakeQueue(behaviour: { readonly failOn?: string } = {}): ProvisioningJobQueue {
   return {
     async enqueue(tx, request): Promise<string | null> {
-      if (behaviour.failOn !== undefined && String(request.payload['operation']) === behaviour.failOn) {
+      if (
+        behaviour.failOn !== undefined &&
+        String(request.payload['operation']) === behaviour.failOn
+      ) {
         throw new Error(`the queue refused ${behaviour.failOn}`);
       }
       await tx.executeSql(`insert into j (name, data) values ($1, $2)`, [
@@ -215,7 +218,8 @@ function queueRow(over: {
     operation: over.operation ?? 'set_risk',
     status: over.status ?? 'confirmed',
     payload: floor === null ? {} : { [RISK_FLOOR_CENTS_FIELD]: floor },
-    confirmed_at: over.confirmedAt === undefined ? new Date('2026-08-26T00:00:00.000Z') : over.confirmedAt,
+    confirmed_at:
+      over.confirmedAt === undefined ? new Date('2026-08-26T00:00:00.000Z') : over.confirmedAt,
   };
 }
 
@@ -385,9 +389,9 @@ describe("SD-M2-01's digest", () => {
   });
 
   test('an explicitly undefined field is a throw and not a skip', () => {
-    expect(() =>
-      canonicalPayload({ x: undefined } as unknown as ProvisioningPayload),
-    ).toThrow(ProvisioningPayloadError);
+    expect(() => canonicalPayload({ x: undefined } as unknown as ProvisioningPayload)).toThrow(
+      ProvisioningPayloadError,
+    );
   });
 
   test('a float reaches the payload only past the type, and is refused', () => {
@@ -543,7 +547,9 @@ describe("INV-M2-13's exit fails CLOSED", () => {
   });
 
   test('a confirmed setpoint at ANOTHER floor refuses, which is INV-M2-08', () => {
-    const admission = admitToTrading(SUBJECT, [queueRow({ floorCents: (FLOOR + 1n).toString(10) })]);
+    const admission = admitToTrading(SUBJECT, [
+      queueRow({ floorCents: (FLOOR + 1n).toString(10) }),
+    ]);
     expect(admission.admitted).toBe(false);
     expect(admission.admitted === false && admission.refusal).toBe('no_set_risk_for_current_floor');
   });
@@ -669,7 +675,11 @@ describe('the saga, with a failure seeded mid-flight', () => {
     expect(outcome.failure).toContain('SFTP connection reset');
     expect(outcome.batches).toEqual([]);
     expect(outcome.compensation).toEqual([
-      { kind: 'compensating_enqueued', operation: 'create_account', compensating: 'disable_account' },
+      {
+        kind: 'compensating_enqueued',
+        operation: 'create_account',
+        compensating: 'disable_account',
+      },
     ]);
     expect(outcome.admission.admitted).toBe(false);
   });

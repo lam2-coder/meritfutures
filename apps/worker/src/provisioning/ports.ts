@@ -113,10 +113,7 @@ export interface ProvisioningTx {
    * budget again for nothing. The narrowing is this file's and costs the
    * caller nothing, because a `SystemTx` is assignable to a narrower shape.
    */
-  insert(
-    key: 'provisioningQueue',
-    values: Readonly<Record<string, unknown>>,
-  ): Promise<unknown[]>;
+  insert(key: 'provisioningQueue', values: Readonly<Record<string, unknown>>): Promise<unknown[]>;
 
   /** The raw executor, for the enqueue and for nothing else. One reason, closed. */
   sqlExecutor(reason: 'job-enqueue'): ProvisioningSqlExecutor;
@@ -145,10 +142,7 @@ export interface ProvisioningJobRequest {
  * `saga.ts` treats it as the success it is.
  */
 export interface ProvisioningJobQueue {
-  enqueue(
-    tx: ProvisioningSqlExecutor,
-    request: ProvisioningJobRequest,
-  ): Promise<string | null>;
+  enqueue(tx: ProvisioningSqlExecutor, request: ProvisioningJobRequest): Promise<string | null>;
 }
 
 /**
@@ -225,11 +219,7 @@ export interface ProvisioningBatch {
  */
 export interface ProvisioningAdvancePort {
   /** Move one row, named by its primary key, to `to`. Returns the rows it moved. */
-  advance(
-    tx: ProvisioningTx,
-    rowId: string,
-    to: ProvisioningStatus,
-  ): Promise<readonly unknown[]>;
+  advance(tx: ProvisioningTx, rowId: string, to: ProvisioningStatus): Promise<readonly unknown[]>;
 }
 
 /**

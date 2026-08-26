@@ -69,8 +69,7 @@ export type ProvisioningStatus = (typeof PROVISIONING_STATUSES)[number];
  */
 export function isProvisioningOperation(value: unknown): value is ProvisioningOperation {
   return (
-    typeof value === 'string' &&
-    (PROVISIONING_OPERATIONS as readonly string[]).includes(value)
+    typeof value === 'string' && (PROVISIONING_OPERATIONS as readonly string[]).includes(value)
   );
 }
 
@@ -84,7 +83,5 @@ export function isProvisioningOperation(value: unknown): value is ProvisioningOp
  * which is the fail-closed direction.
  */
 export function isProvisioningStatus(value: unknown): value is ProvisioningStatus {
-  return (
-    typeof value === 'string' && (PROVISIONING_STATUSES as readonly string[]).includes(value)
-  );
+  return typeof value === 'string' && (PROVISIONING_STATUSES as readonly string[]).includes(value);
 }
