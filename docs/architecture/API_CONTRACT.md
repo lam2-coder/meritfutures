@@ -262,6 +262,33 @@ type PlanVersionResponse = {
 ```
 Auth: none. Errors: `not_found`.
 
+### GET /public/methods/:statCode
+The method page for one published statistic: **every version of its definition**, with the ruling that fixed each one. [M12](../plans/M12-transparency-platform.md) owns the endpoint; [ADR-110](../decisions/ADR-110.md) is the ruling that put this row into an `approved` document and states every choice below.
+```ts
+type MethodPageResponse = {
+  stat_code: string;
+  live_version: number;              // the unsuperseded definition, not "the effective one"
+  versions: Array<{                  // ascending by version, superseded ones included
+    version: number;
+    title: string;
+    numerator_spec: string;          // the two specs ARE the statistic
+    denominator_spec: string;
+    exclusions: string[];
+    window_spec: string;
+    grain: string;
+    min_sample: number;              // a publication policy (SD-M12-01), not an implementation detail
+    measures: Array<"rate" | "total" | "mean" | "median" | "p50" | "p95" | "count">;
+    method_body_mdx: string;
+    adr_ref: string | null;
+    effective_from: string;          // YYYY-MM-DD, always future at write time (INV-M12-07)
+    superseded_by_version: number | null;
+  }>;
+};
+```
+Auth: none. Cacheable; no rate limit beyond edge protection, as [M12 section 4](../plans/M12-transparency-platform.md) states it for the sibling public read. No TTL is stated, because M12 states none and a method page quotes no purchasable term (contrast `GET /plans`, whose 60s bounds a stale price). Errors: `not_found`, and it means **no statistic is published under this code**, never "not yours": this table carries no identity column and there is no correct one.
+
+**`:statCode` alone is half an address and the response is why that is enough.** `(stat_code, version)` is unique in `statistic_definitions`, `published_statistics.definition_version` names the version a figure was computed under, and the whole set comes back here, so a caller resolves a version out of a response it already holds rather than through a second address. `live_version` is the row with no successor, which the schema makes unique; it is not "the definition in force today", because a version is written before it takes effect ([M12 section 3.2](../plans/M12-transparency-platform.md)). Historical values are never recomputed under a new definition, so the page shows every version and a chart drawn across a boundary renders the discontinuity.
+
 ## 5. Commerce
 
 ### POST /checkout
