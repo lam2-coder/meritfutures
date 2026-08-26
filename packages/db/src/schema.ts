@@ -1,12 +1,20 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// NINETY-NINE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED UP. The
-// other 12 are not reachable through either accessor: `SCOPE_RULES` is total
+// ONE HUNDRED AND FOUR TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED
+// UP. The other 7 are not reachable through ANY accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// THE NINETY-NINE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// NOT ALL 104 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS NOW TWO
+// CLASSES RATHER THAN ONE. 41 are `firm` and 3 are `pair` (ADR-106), so 60 of
+// the 104 are served by `scopedDb`. A `pair` table belongs to TWO identities and
+// is scoped to neither: it is excluded from `ScopedTableKey` because returning
+// the row to either party hands them the other party's identity uuid, and from
+// `FirmTableKey` because `firmDb()` takes no reason on the ground that no
+// identity is at risk. `systemDb(reason)` is its only door.
+//
+// THE ONE HUNDRED AND FOUR ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -27,16 +35,23 @@
 // below.
 //
 // A TABLE IS READ AS OF THE LAST MIGRATION AND NEVER AS OF ITS `CREATE TABLE`,
-// which is ADR-094. That entry rules the replay's vocabulary CLOSED at one
-// member with a default of FAIL: `ADD COLUMN` is folded, and `DROP COLUMN`,
-// `ALTER COLUMN` and `RENAME` stay offenders that turn the suite red, so the day
-// one lands the check fails rather than silently reading a stale CREATE. TEN
-// of the ninety-nine below carry later columns -- `sessions`, `plan_versions`,
-// `rule_states`, `contact_channels`, `notification_kinds`, `identity_phones`,
-// `phone_change_requests`, `admin_actions`, `payout_requests` and
-// `promotional_credit_grants` -- and none of them could be registered at all
-// before ADR-094, which is why the ruling came before the transcription rather
-// than after it.
+// which is ADR-094. That entry ruled the replay's vocabulary CLOSED at one
+// member with a default of FAIL, and ADR-103 WIDENED IT TO TWO: `ADD COLUMN` is
+// folded, `ALTER COLUMN ... DROP NOT NULL` is folded and moves the NULLABILITY,
+// and `DROP COLUMN` and `RENAME` stay offenders that turn the suite red -- so
+// the day one of those lands the check fails rather than silently reading a
+// stale CREATE. THIS SENTENCE READ "`ALTER COLUMN` STAYS AN OFFENDER" UNTIL
+// ADR-106, WHICH IS FALSE ABOUT THIS TREE AND WOULD HAVE TOLD A READER THAT
+// `otp_challenges` COULD NOT BE REGISTERED; ADR-094's clause was superseded by
+// ADR-103 and the sentence outlived it by one session. ELEVEN of the 104 below
+// carry later columns -- `sessions`, `plan_versions`, `rule_states`,
+// `contact_channels`, `notification_kinds`, `identity_phones`,
+// `phone_change_requests`, `admin_actions`, `payout_requests`,
+// `promotional_credit_grants` and `otp_challenges` -- and none of them could be
+// registered at all before ADR-094, which is why the ruling came before the
+// transcription rather than after it. `otp_challenges` IS THE ONLY ONE OF THE
+// ELEVEN THAT ALSO CARRIES AN `ALTER COLUMN`, and until it was registered the
+// fold's second member ran on no registered table at all.
 //
 // A COLUMN CARRIES `.references()` HERE ONLY WHEN ITS `CREATE TABLE` BODY
 // DECLARES THE FK INLINE AND THE TARGET IS ONE OF THIS FILE'S TABLES. Every
@@ -4196,4 +4211,185 @@ export const tradingCalendarRevisions = pgTable('trading_calendar_revisions', {
   // `trading_calendar_revisions_incident_named_when_dependent` is what enforces.
   incidentRef: text('incident_ref'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// identity_links -- 0002_identity.sql, PLUS FOUR COLUMNS FROM SD-M7-04
+// -----------------------------------------------------------------------------
+// `pair` (ADR-106). TWO identity columns and both are true. The `create` body
+// already carried the dispute columns when the schema-delta reconciliation
+// folded SD-M7-04 into it, so this table takes no `ALTER TABLE` of any shape;
+// replayed across all 47 migrations it carries none.
+//
+// `identity_links_canonical_order` CHECKs `identity_a < identity_b`, which is
+// why an `owned` rule on either column returns a strict subset of a person's own
+// edges SELECTED BY UUID ORDERING. The registry refuses the disjunction as well,
+// and `scope.ts` is where that ruling lives.
+export const identityLinks = pgTable('identity_links', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityA: uuid('identity_a')
+    .notNull()
+    .references(() => identities.id),
+  identityB: uuid('identity_b')
+    .notNull()
+    .references(() => identities.id),
+  // `text` with NO CHECK in the DDL: shared_device, shared_payment,
+  // biometric_match and behavioural_correlation are the values 0002 names in a
+  // comment, and FOLD-01 adds the phone edge as a vocabulary value rather than
+  // as a migration. A closed set here would be a claim the database does not
+  // make.
+  linkKind: text('link_kind').notNull(),
+  // ADR-022 made the graph SCORED and never boolean: hard links auto-enforce and
+  // soft clusters queue a pre-funding review, and a boolean edge cannot carry
+  // the distinction. Basis points, integer, CHECKed 0 to 10000.
+  confidenceBp: integer('confidence_bp').notNull(),
+  // The specific observations behind the edge. An edge without its evidence is
+  // an accusation without a reason, and it is detector output, which is half of
+  // why this table is not scoped.
+  evidence: jsonb('evidence').notNull(),
+  // A detector name, or 'admin'. 0002's `actor` idiom, not a `users` reference.
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M7-04, INV-M7-09. `suppressed` is the operative field: a suppressed edge
+  // stays visible as history and stops contributing to enforcement, and the edge
+  // is never deleted because "we decided this edge was wrong" is itself
+  // evidence.
+  disputedAt: timestamp('disputed_at', { withTimezone: true }),
+  disputeNote: text('dispute_note'),
+  suppressed: boolean('suppressed').notNull().default(false),
+  suppressedBy: text('suppressed_by'),
+});
+
+// -----------------------------------------------------------------------------
+// dedupe_matches -- 0003_kyc.sql, SD-M19-04
+// -----------------------------------------------------------------------------
+// `pair` (ADR-106), and `identity_links`' shape one module over. ADR-029 ruled
+// this table AUTHORITATIVE and ruled `kyc_verifications.dedupe_matched_identity_id`
+// never created, because a dedupe hit is an auto-enforcement input and two
+// sources for that decision eventually enforce on whichever is read first.
+//
+// Replayed across all 47 migrations this table carries no `ALTER TABLE` of any
+// shape.
+export const dedupeMatches = pgTable('dedupe_matches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityA: uuid('identity_a')
+    .notNull()
+    .references(() => identities.id),
+  identityB: uuid('identity_b')
+    .notNull()
+    .references(() => identities.id),
+  // Basis points on the same 0 to 10000 scale as `identity_links.confidence_bp`,
+  // CHECKed in the DDL. `integer` and not `smallint`: the DDL says integer.
+  matchStrength: integer('match_strength').notNull(),
+  providerRef: text('provider_ref').notNull(),
+  observedAt: timestamp('observed_at', { withTimezone: true }).notNull().defaultNow(),
+  // CHECKed in the DDL to open, confirmed_same_person, distinct_persons,
+  // inconclusive. `open` is FIRST because it is the default and because a
+  // disposition list whose first value is a conclusion invites defaulting to
+  // one. Not a pgEnum: 0003 declares a CHECK and this file transcribes the
+  // column's type, which is `text`.
+  disposition: text('disposition').notNull().default('open'),
+  dispositionNote: text('disposition_note'),
+  // The provider's decision metadata: scores, method, timestamps. NEVER images
+  // (AS-M19-07, VG-10). This is what makes an enforcement survive the provider
+  // relationship ending, which is the difference between evidence Merit holds
+  // and evidence Merit rents.
+  evidenceSnapshot: jsonb('evidence_snapshot').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// attributions -- 0012_disputes_and_affiliate_settlement.sql, PLUS SD-M8-05
+// -----------------------------------------------------------------------------
+// `pair` (ADR-106), and the two identities are the ONE thing SD-M8-05 added them
+// for: the self-deal check has to record WHAT IT FOUND and not only its verdict,
+// or an argument about a voided commission has no evidence on either side.
+//
+// THE PAIR MAY COLLAPSE HERE AND ON NO OTHER PAIR TABLE.
+// `attributions_literal_self_deal_is_void` is `buyer_identity_id <>
+// affiliate_identity_id OR voided = true`, so the two columns may name one
+// person on a voided row, and that row is the self-deal rather than an exception
+// to the class.
+//
+// Replayed across all 47 migrations this table carries no `ALTER TABLE` of any
+// shape: SD-M8-05's three columns were folded into the `CREATE TABLE` body by
+// the schema-delta reconciliation.
+export const attributions = pgTable('attributions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // UNIQUE in the DDL, and the unique is what stops two affiliates being paid
+  // for one sale (INV-M8-01). Attribution resolves once, at checkout.
+  purchaseId: uuid('purchase_id')
+    .notNull()
+    .unique()
+    .references(() => purchases.id),
+  affiliateId: uuid('affiliate_id')
+    .notNull()
+    .references(() => affiliates.id),
+  // CHECKed in the DDL to last_touch, code_override. INV-M8-02 records the
+  // resolution order on this column: code override first, then last touch.
+  model: text('model').notNull(),
+  // `affiliate_clicks.id` is `bigint GENERATED ALWAYS AS IDENTITY`, so this is a
+  // bigint and not a uuid. NULL when the attribution came from a typed code.
+  clickId: bigint('click_id', { mode: 'bigint' }).references(() => affiliateClicks.id),
+  // A self-purchase VOIDS attribution and raises a flag (B4 #16). Voiding rather
+  // than deleting, because the attempt is the signal.
+  voided: boolean('voided').notNull().default(false),
+  voidReason: text('void_reason'),
+  // SD-M8-05. Both identities are STORED rather than joined, because the row is
+  // a statement about the two of them AT THE MOMENT OF PURCHASE and an affiliate
+  // can be reassigned or an identity merged afterwards.
+  buyerIdentityId: uuid('buyer_identity_id')
+    .notNull()
+    .references(() => identities.id),
+  affiliateIdentityId: uuid('affiliate_identity_id')
+    .notNull()
+    .references(() => identities.id),
+  // The link-graph score (ADR-022) that produced the verdict. NULL when the two
+  // identities are literally the same row, because that case needs no score.
+  selfDealLinkConfidenceBp: integer('self_deal_link_confidence_bp'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
+// otp_challenges -- 0002_identity.sql, PLUS TWO COLUMNS AND ONE RELAXATION
+// FROM 0029_phone_identity_and_auth.sql (SD-M16-05)
+// -----------------------------------------------------------------------------
+// `firm`, and it is the first firm table whose reason is TIMING rather than
+// ownership: `POST /auth/otp` is the only endpoint in the contract at required
+// factor `none`, so the row is written before this database holds an identity
+// for the caller at all.
+//
+// THIS IS THE TABLE ADR-094's `ALTER COLUMN` REFUSAL STOOD IN FRONT OF, AND
+// ADR-103 IS WHY IT CAN BE TRANSCRIBED. `0029` writes `ALTER COLUMN
+// email_normalized DROP NOT NULL`, which was a proxy refusal for the fact that
+// nullability was compared nowhere; the comparison exists now and the fold
+// applies the relaxation, so `email_normalized` below is NULLABLE and the suite
+// checks that against the migration set rather than against this line.
+export const otpChallenges = pgTable('otp_challenges', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // NULLABLE AS OF 0029 AND NOT AS OF ITS CREATE. An SMS challenge has no email
+  // address; `otp_challenges_exactly_one_destination` is what keeps exactly one
+  // destination on every row. `citext` for `users.email`'s reason: casing never
+  // creates a duplicate human.
+  emailNormalized: citext('email_normalized'),
+  // NEVER the code itself.
+  codeHash: bytea('code_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  // Lockout WITHOUT enabling user enumeration: the counter is on the CHALLENGE
+  // and not on the account, so a locked-out attacker learns nothing about
+  // whether the address exists. CHECKed 0 to 5 in the DDL.
+  attempts: smallint('attempts').notNull().default(0),
+  requestIp: inet('request_ip'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // SD-M16-05. NO DEFAULT, deliberately: a `DEFAULT 'email'` would let a handler
+  // that forgot to set the channel write a well-formed email challenge, and the
+  // exactly-one-destination CHECK would be the only thing that noticed, which is
+  // a constraint doing a type's job. CHECKed to email, sms.
+  channel: text('channel').notNull(),
+  // SD-M16-05. The SMS destination, HASHED. Never the number: an OTP table is
+  // not a reason to keep a plaintext copy of every number ever entered,
+  // including every number entered by an attacker.
+  destinationHash: bytea('destination_hash'),
 });

@@ -128,6 +128,23 @@ export function scopePredicate(key: TableKey, identityId: IdentityId): SQL {
       );
     }
 
+    case 'pair':
+      // UNREACHABLE THROUGH THE SCOPED ACCESSOR, AND NOT FOR `firm`'s REASON
+      // (ADR-106). A predicate EXISTS here and is deliberately not built:
+      // `columnA = $1 OR columnB = $1` returns precisely the rows that are this
+      // person's, and every one of them carries the OTHER party's identity uuid
+      // out of a NOT NULL column. That is the cross-identity read
+      // `correlation_groups` is already refused for at arity three, and it is
+      // worse at arity two. `PairTableKey` is excluded from `ScopedTableKey`, so
+      // this throw is the runtime half of a type refusal, and it is ALSO excluded
+      // from `FirmTableKey`: `firmDb()` takes no reason because no identity is at
+      // risk, and here two are.
+      throw new Error(
+        `${key} belongs to TWO identities (${rule.why}) and has no scoped reading: ` +
+          'returning the row to either party hands them the other one. Use ' +
+          'systemDb(reason) and say which reason.',
+      );
+
     case 'firm':
       // UNREACHABLE THROUGH THE SCOPED ACCESSOR, because `ScopedTableKey`
       // excludes these keys and `rows()` accepts nothing else. The throw is the
@@ -277,27 +294,51 @@ export type OwnedTableKey = {
 }[TableKey];
 
 /**
- * The column ON THIS ROW that the scope rule reads. `undefined` for `firm`,
- * which is the class that reads no column because no identity owns the row.
+ * Every column ON THIS ROW that the scope rule reads. Empty for `firm`, which is
+ * the class that reads no column because no identity owns the row.
  *
  * DERIVED FROM THE RULE AND NEVER LISTED, for the reason ADR-101 section 6
  * gives about restating the DDL: a second statement of which column carries
  * tenancy is a second thing to keep true.
+ *
+ * IT RETURNS A LIST BECAUSE ADR-106's `pair` CLASS HAS TWO, and `tenancyColumn`
+ * below reads this one switch rather than restating it. A `pair` row is never
+ * reachable through `scopedTx`, but it IS reachable through `systemTx`, whose
+ * `update` runs through `refuseTenancyColumn` like every other -- and moving
+ * `identity_a` on an APPEND-ONLY edge table is the re-parenting ADR-102 clause 4
+ * refuses, arriving on the one class that has two columns to move.
  */
-export function tenancyColumn(key: TableKey): string | undefined {
+export function tenancyColumns(key: TableKey): readonly string[] {
   const rule = SCOPE_RULES[key];
   switch (rule.class) {
     case 'root':
     case 'owned':
-      return rule.column;
+      return [rule.column];
     case 'derived':
       // The row reaches its identity THROUGH this column. Re-pointing it moves
       // the row to another identity's subtree, which the scope predicate cannot
       // see because the predicate ran against the value the row had BEFORE.
-      return rule.localColumn;
+      return [rule.localColumn];
+    case 'pair':
+      // BOTH, and neither is more the tenancy than the other. ADR-106.
+      return [rule.columnA, rule.columnB];
     case 'firm':
-      return undefined;
+      return [];
   }
+}
+
+/**
+ * The SINGLE tenancy column, for the classes that have exactly one.
+ *
+ * `undefined` for `firm`, which has none, and `undefined` for `pair`, which has
+ * two -- so the one caller that STAMPS a column (`scopedInsertStatement`, whose
+ * key type is `OwnedTableKey`) cannot be handed a table it would have to guess
+ * about. It reads `tenancyColumns` rather than a second switch, so the two
+ * cannot disagree.
+ */
+export function tenancyColumn(key: TableKey): string | undefined {
+  const columns = tenancyColumns(key);
+  return columns.length === 1 ? columns[0] : undefined;
 }
 
 /** The Drizzle property name for a SQL column name, or `undefined`. */
@@ -325,17 +366,20 @@ function propertyForColumn(table: PgTable, sqlName: string): string | undefined 
  * all until the query runs.
  */
 function refuseTenancyColumn(key: TableKey, values: Readonly<Record<string, unknown>>): void {
-  const sqlName = tenancyColumn(key);
-  if (sqlName === undefined) return;
-  const property = propertyForColumn(TABLES[key] as PgTable, sqlName);
-  for (const named of Object.keys(values)) {
-    if (named !== sqlName && named !== property) continue;
-    throw new Error(
-      `"${named}" is ${key}'s tenancy column (${SCOPE_RULES[key].class} rule on "${sqlName}") ` +
-        'and a scoped write never takes it from the caller. The handle supplies it on insert, ' +
-        'and an update that moved it would hand the row to another identity behind a predicate ' +
-        'that already matched.',
-    );
+  // EVERY tenancy column and not the first one. ADR-106's `pair` class carries
+  // two, and a guard that checked one of them would refuse `identity_a` and let
+  // `identity_b` through on the same row.
+  for (const sqlName of tenancyColumns(key)) {
+    const property = propertyForColumn(TABLES[key] as PgTable, sqlName);
+    for (const named of Object.keys(values)) {
+      if (named !== sqlName && named !== property) continue;
+      throw new Error(
+        `"${named}" is ${key}'s tenancy column (${SCOPE_RULES[key].class} rule on "${sqlName}") ` +
+          'and a scoped write never takes it from the caller. The handle supplies it on insert, ' +
+          'and an update that moved it would hand the row to another identity behind a predicate ' +
+          'that already matched.',
+      );
+    }
   }
 }
 

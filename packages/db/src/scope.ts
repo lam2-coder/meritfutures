@@ -36,6 +36,7 @@ import {
   affiliates,
   alarmSuppressions,
   analyticsSnapshots,
+  attributions,
   certificates,
   certificateVerifications,
   contactChannels,
@@ -45,6 +46,7 @@ import {
   couponRedemptions,
   coupons,
   dailyMarks,
+  dedupeMatches,
   detectorDefinitions,
   detectorRuns,
   discordAnnouncements,
@@ -59,6 +61,7 @@ import {
   graduationInvitations,
   idempotencyKeys,
   identities,
+  identityLinks,
   identityPhones,
   identityRestrictionEpisodes,
   identitySignals,
@@ -84,6 +87,7 @@ import {
   notifications,
   offerExperiments,
   offers,
+  otpChallenges,
   otpSendBudget,
   pageRevalidations,
   passkeys,
@@ -132,86 +136,69 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * NINETY-NINE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the owner the
- * TABLE: a table is registered ONCE by the first session that needs it, the
- * registration is never re-argued, and a session computes its own slice from
- * `TABLE_KEYS` on the tree it opened rather than from a roster.
+ * ONE HUNDRED AND FOUR OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
+ * owner the TABLE: a table is registered ONCE by the first session that needs
+ * it, the registration is never re-argued, and a session computes its own slice
+ * from `TABLE_KEYS` on the tree it opened rather than from a roster.
  *
- * `identity_links` IS DELIBERATELY ABSENT AND ITS ABSENCE IS A RECORD RATHER
- * THAN A GAP. It carries TWO identity columns -- `identity_a` and `identity_b`,
- * both `uuid NOT NULL REFERENCES identities(id)`, under a canonical-order CHECK
- * `identity_a < identity_b` -- against an `owned` rule that names ONE column.
- * Either choice returns a strict subset of a person's own edges, selected by
- * UUID ordering, which is a wrong answer that returns rows rather than an error.
- * ADR-092 section 9 names this as a PER-TABLE ruling and takes neither column,
- * and a transcription rules nothing, so the table is left unregistered:
- * unregistered is unreachable, and unreachable is safe.
+ * THE VOCABULARY HAS FIVE MEMBERS AND THE FIFTH IS ADR-106's. This file used to
+ * say the question `HOW DOES A ROW REACH AN IDENTITY?` has "exactly these four
+ * answers on this schema", and that sentence was FALSE about migrations that
+ * have been in the tree since `0002`: four tables carry TWO columns declared
+ * `REFERENCES identities(id)`, and the fifth answer is BOTH OF THEM. `pair` is
+ * that answer, and the ruling attached to it is that a row belonging to two
+ * identities is scoped to NEITHER -- see the `PairRule` docblock below.
  *
- * `attributions` IS ABSENT FOR THE SAME REASON AND IT IS THE SIBLING ADR-092
- * SECTION 9 NAMES BESIDE `identity_links`. It carries `buyer_identity_id` AND
- * `affiliate_identity_id`, both `uuid NOT NULL REFERENCES identities(id) ON
- * DELETE RESTRICT` (0012_disputes_and_affiliate_settlement.sql, SD-M8-05), and
- * both are stored rather than joined precisely BECAUSE they are two different
- * people: the row is a statement about the pair at the moment of purchase, and
- * `attributions_literal_self_deal_is_void` exists to refuse the case where they
- * are one. An `owned` rule names ONE column. Naming the buyer hides the
- * referral from the affiliate who earned it; naming the affiliate returns a
- * buyer's own purchase attribution to somebody else. Neither is an error, both
- * return rows, and the second is the BOLA failure ADR-008 scoped the accessor
- * to bound. ADR-092 takes neither and a transcription rules nothing.
+ * `identity_links`, `dedupe_matches` AND `attributions` ARE REGISTERED `pair`
+ * AND ARE STILL UNREACHABLE THROUGH THE SCOPED ACCESSOR. Their absence from
+ * `ScopedTableKey` is now a CLASSIFICATION rather than a hole: they were
+ * unregistered for four sessions because an `owned` rule names ONE column and
+ * either choice returns a strict subset of a person's own rows, selected by
+ * UUID ordering. The disjunction that would return the right rows is not
+ * written, because returning the row to either party hands them the OTHER
+ * party's identity uuid out of a `NOT NULL` column -- which is exactly what
+ * `correlation_groups` below is already refused for at arity three, in its own
+ * words, and the disclosure is WORSE at arity two rather than milder: at three
+ * a member learns a set, at two they learn precisely who.
  *
- * `affiliate_commissions` IS ABSENT AS A CONSEQUENCE RATHER THAN AS A JUDGMENT,
- * and the type checker is what says so. Its only path to an identity is
- * `attribution_id uuid NOT NULL REFERENCES attributions(id)`; `paid_in_statement_id`
- * reaches `affiliate_statements`, which ADR-092 section 9 records as belonging
- * to no module plan, and no other column reaches a person at all. `DerivedRule.via`
- * is `TableKey`, so a rule through `attributions` cannot be written while
- * `attributions` is unregistered. This is ADR-092's "a session cannot know its
- * own slice size before it runs" in the direction ADR-094 section 6 did not
- * name: totality forced a table OUT of a slice rather than into one.
- * `events` IS ABSENT FOR THE SAME CLASS OF REASON, RECORDED HERE BY THE SESSION
- * THAT WANTED IT. It carries `identity_id uuid NULL REFERENCES identities(id)`
- * AND `account_id uuid NULL REFERENCES accounts(id)`, with NO CHECK tying them
- * and neither one required, so a rule naming `identity_id` drops every
- * account-level row written without one and a rule hopping `account_id` drops
- * every identity-level row -- and EVENTS.md section 2 rows the portal's timeline
- * as PER-ACCOUNT while M04 section 5 consumes identity-level events on the same
- * screen, so both halves are read and neither column covers them. The payload is
- * the second reason: `kyc.dedupe_hit` carries `matched_identity_id` and
- * `identity.merged` carries `merged_identity_id`, so a row whose own tenancy
- * column is correct still names a DIFFERENT identity inside `jsonb`, which no
- * scope rule can express and which INV-M4-06 forbids the portal to receive.
- * A transcription rules nothing, so this is reported and not allocated.
+ * `affiliate_commissions` IS STILL ABSENT AND ITS REASON MOVED ONE CLASS ALONG
+ * RATHER THAN GOING AWAY. Its only path to an identity is `attribution_id uuid
+ * NOT NULL REFERENCES attributions(id)`, and `attributions` is now a `TableKey`,
+ * so a `derived` rule through it COMPILES where before it could not be written
+ * at all. It would then throw the first time anybody read the table, for
+ * `raw_ingest_rows`' reason exactly: `scopePredicate` recurses into the via
+ * table and the `pair` branch of that switch refuses, so a derivation chain
+ * terminates at `owned` or at `root` or it does not terminate. The suite refuses
+ * it by name. Registering this table needs a ruling about what a row derived
+ * from a two-party row belongs to, and ADR-106 does not make it.
  *
- * `identity_merges` IS ABSENT AND IT IS THE FOURTH MEMBER OF `identity_links`'s
- * AND `dedupe_matches`'s CLASS RATHER THAN A NEW ONE. It carries
- * `surviving_identity_id` AND `merged_identity_id`, both `uuid NOT NULL
- * REFERENCES identities(id) ON DELETE RESTRICT` (0002_identity.sql), both
- * indexed -- `identity_merges_surviving_idx` and `identity_merges_merged_idx` --
- * and `identity_merges_distinct` CHECKs that they are DIFFERENT, so every row of
- * this table is a statement about two people by construction. `OwnedRule.column`
- * is ONE column: naming the survivor drops the row from the merged identity,
- * which INV-M7-06 and 0002's own comment keep alive precisely because "the
- * pre-merge history is what a dispute about a grandfathered cap is argued from";
- * naming the merged one drops it from the survivor, whom the grandfathered cap
- * now binds. Both return rows and neither raises. `firm` is refused by the
- * suite's own "no firm table carries a column referencing identities" assertion
- * and would be a lie besides.
+ * `identity_merges` IS ABSENT AND IT IS NO LONGER UNREGISTRABLE. It is the
+ * fourth table in this tree carrying two `REFERENCES identities(id)` columns --
+ * `surviving_identity_id` and `merged_identity_id`, both `uuid NOT NULL`
+ * (0002_identity.sql), with `identity_merges_distinct` CHECKing that they are
+ * different people -- so it is a `pair` table by the same derivation as the
+ * three above and could be registered today. It is NOT registered here, on
+ * ADR-092's own rule: a table is registered by the first session that NEEDS it,
+ * M18 is the plan that names it,
+ * and session 215's stop condition is four registrations. The refusal that stood
+ * here since session 208 is DISCHARGED and replaced by this sentence.
  *
- * THE ARGUMENT FOR TAKING `surviving_identity_id` WAS CONSIDERED AND IS RECORDED
- * RATHER THAN LEFT FOR THE NEXT SESSION TO RE-DERIVE. A hard merge repoints
- * ownership into the surviving `identities` row, `identities.id` is the
- * hard-merged grain, and `users.md` says one identity holds several users only
- * through a merge -- so the merged identity arguably never holds a scoped
- * session and the survivor's column would cover every real read. THAT IS AN
- * INFERENCE ABOUT APPLICATION BEHAVIOUR FROM PROSE, and the DDL says the
- * opposite twice: two NOT NULL identity columns and an index on each. The second
- * reason is `events`' second reason arriving as a COLUMN instead of as `jsonb`:
- * `identity_merges_distinct` GUARANTEES that whichever side is chosen, the row
- * hands the reader another identity's uuid, beside `evidence jsonb` written by a
- * detector -- which is what INV-M4-06 forbids the portal to receive. ADR-092
- * section 3 names this class as a per-TABLE ruling and takes neither column, and
- * a transcription rules nothing.
+ * `events` IS ABSENT AND ITS ABSENCE IS UNCHANGED BY ADR-106, which is worth
+ * saying because it is the near miss. It carries `identity_id uuid NULL
+ * REFERENCES identities(id)` AND `account_id uuid NULL REFERENCES accounts(id)`,
+ * with NO CHECK tying them and neither one required. That is not a `pair`: a
+ * pair is TWO IDENTITIES on one row, and this is one identity beside one
+ * ACCOUNT, so `pair` has no second identity column to name and both columns are
+ * nullable besides. A rule naming `identity_id` drops every account-level row
+ * and a rule hopping `account_id` drops every identity-level row -- and
+ * EVENTS.md section 2 rows the portal's timeline as PER-ACCOUNT while M04
+ * section 5 consumes identity-level events on the same screen, so both halves
+ * are read and neither column covers them. The payload is the second reason:
+ * `kyc.dedupe_hit` carries `matched_identity_id` and `identity.merged` carries
+ * `merged_identity_id`, so a row whose own tenancy column is correct still names
+ * a DIFFERENT identity inside `jsonb`, which no scope rule can express and which
+ * INV-M4-06 forbids the portal to receive. A transcription rules nothing, so
+ * this is reported and not allocated.
  */
 export const TABLES = {
   identities,
@@ -314,17 +301,30 @@ export const TABLES = {
   idempotencyKeys,
   tradingCalendarLoads,
   tradingCalendarRevisions,
+  // ADR-106. The four tables the registry could not hold. Three are `pair` and
+  // the fourth is `firm` for a reason no other firm table has.
+  identityLinks,
+  dedupeMatches,
+  attributions,
+  otpChallenges,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
 
 /**
- * The four classes, partitioning one question: HOW DOES A ROW REACH AN IDENTITY?
+ * The five classes, partitioning one question: HOW DOES A ROW REACH AN IDENTITY?
  *
- * The question has exactly these four answers on this schema, which is what
- * makes the vocabulary closed rather than merely short.
+ * THE VOCABULARY WAS FOUR AND THE CLAIM THAT FOUR WAS ALL OF THEM WAS FALSE.
+ * This declaration read "The question has exactly these four answers on this
+ * schema", and `0002_identity.sql` has carried a counter-example since the day
+ * the schema was written: a row whose subject is a PAIR of identities reaches
+ * an identity through EITHER of two columns on it, and through both at once.
+ * ADR-106 adds `pair` and states the arithmetic that closes the set at five --
+ * a column of this row, a column of another row, two columns of this row, the
+ * row itself, or nothing -- so the fifth member is the answer that was missing
+ * rather than the first of many.
  */
-export type ScopeClass = 'root' | 'owned' | 'derived' | 'firm';
+export type ScopeClass = 'root' | 'owned' | 'derived' | 'pair' | 'firm';
 
 export interface RootRule {
   readonly class: 'root';
@@ -359,13 +359,59 @@ export interface DerivedRule {
   readonly why: string;
 }
 
+/**
+ * A ROW WHOSE SUBJECT IS A PAIR OF IDENTITIES. ADR-106.
+ *
+ * TWO COLUMNS OF THIS ROW ARE DECLARED `REFERENCES identities(id)` AND BOTH ARE
+ * TRUE. `identity_links` and `dedupe_matches` carry `identity_a` and
+ * `identity_b` under a canonical-order CHECK, so which column a person lands in
+ * is decided by UUID ordering; `attributions` carries `buyer_identity_id` and
+ * `affiliate_identity_id`, stored rather than joined because they are two
+ * people at the moment of purchase. An `owned` rule names ONE column, and every
+ * choice of one returns a strict subset of a person's own rows with no error
+ * anywhere, which is the BOLA failure ADR-008 scoped the accessor to bound.
+ *
+ * THE RULING IS THAT SUCH A ROW IS SCOPED TO NEITHER PARTY, AND `pair` IS
+ * EXCLUDED FROM `ScopedTableKey` EXACTLY AS `firm` IS. The reason is not that no
+ * predicate exists -- `columnA = $1 OR columnB = $1` returns precisely the rows
+ * that are this person's and no others -- it is that every row it returns
+ * carries the OTHER party's identity uuid in a `NOT NULL` column. That is the
+ * cross-identity read `correlation_groups` is already refused for at arity
+ * three, in this file's own words, and it is worse at arity two: a member of a
+ * three-account group learns a set, and a party to a two-identity row learns
+ * precisely who.
+ *
+ * IT IS EXCLUDED FROM `FirmTableKey` TOO, AND THAT IS THE HALF WORTH CHECKING.
+ * `firmDb()` takes no reason on ADR-102 clause 5's ground that "no identity is
+ * at risk"; here TWO are. So a `pair` table is a `TableKey` that is a member of
+ * NEITHER `ScopedTableKey` NOR `FirmTableKey` -- the first key in this registry
+ * that is a member of neither -- and it is reachable only through
+ * `systemDb(reason)`, where somebody has to write down why. The two key sets no
+ * longer partition `TableKey`, and the suite asserts the three-way split rather
+ * than the old two-way one.
+ *
+ * REGISTERING THE TABLE IS WHAT MAKES IT READABLE AT ALL. Unregistered is
+ * unreachable through BOTH accessors, so M06's admin console and M07's
+ * detectors -- the only readers of `identity_links` the corpus names -- had no
+ * door. They have `systemDb('operator-console')` now, and traders still have
+ * none.
+ */
+export interface PairRule {
+  readonly class: 'pair';
+  /** One of the two identity columns. Order carries no meaning. */
+  readonly columnA: string;
+  /** The other. Asserted DISTINCT from `columnA`, and both against the DDL. */
+  readonly columnB: string;
+  readonly why: string;
+}
+
 export interface FirmRule {
   readonly class: 'firm';
   /** Why no identity owns these rows. A reason, never a placeholder. */
   readonly why: string;
 }
 
-export type ScopeRule = RootRule | OwnedRule | DerivedRule | FirmRule;
+export type ScopeRule = RootRule | OwnedRule | DerivedRule | PairRule | FirmRule;
 
 /**
  * THE REGISTRY. Total over `TableKey` by the `satisfies` clause below: omit a
@@ -999,11 +1045,55 @@ export const SCOPE_RULES = {
     class: 'firm',
     why: "A CORRECTION TO THE EXCHANGE CALENDAR IS A STATEMENT ABOUT A DAY, AND A DAY BELONGS TO NOBODY (0032_trading_calendar_holidays_coverage_revisions.sql). No column reaches an identity or an account: `trading_day` is a date, `prior_row` is `to_jsonb(OLD)` of a `trading_calendar` row, `source_digest` is a SHA-256, `incident_ref` is an incident label, and `actor` is the same free-text operator string its sibling carries. `dependent_row_count` IS THE COLUMN MOST LIKELY TO BE MISREAD AS TENANCY AND IT IS A COUNT: the number of rows in `fills`, `daily_marks` and `rule_states` that depend on this trading day, asserted a second time by 0033's trigger under ADR-045. Those three tables are each scoped to an identity and this number is not, because a count across every account is a property of the DAY -- zero is an ordinary data change and non-zero is an incident, which is what `trading_calendar_revisions_incident_named_when_dependent` reads. `trading_day` DECLARES AN INLINE FK TO `trading_calendar`, WHICH IS UNREGISTRABLE, so a `derived` rule through it cannot be written at all: `DerivedRule.via` is `TableKey` and `trading_calendar` is not a member, ADR-094's fold refusing it. Replayed across all 47 migrations this table carries no `ALTER TABLE` of any shape and does not inherit the file's refusal.",
   },
+
+  // ---------------------------------------------------------------------------
+  // ADR-106. THE FOUR TABLES THE REGISTRY COULD NOT HOLD.
+  // ---------------------------------------------------------------------------
+
+  identityLinks: {
+    class: 'pair',
+    columnA: 'identity_a',
+    columnB: 'identity_b',
+    why: "THE ENTITY GRAPH'S EDGES, AND AN EDGE IS A STATEMENT ABOUT TWO PEOPLE (0002_identity.sql). `identity_a` and `identity_b` are both `uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT`, both indexed, and `identity_links_canonical_order` CHECKs `identity_a < identity_b` -- so an edge is stored once and WHICH COLUMN A PERSON LANDS IN IS DECIDED BY UUID ORDERING. An `owned` rule on either column returns a strict subset of a person's own edges chosen by that ordering, which is a wrong answer that returns rows rather than an error. THE DISJUNCTION IS NOT WRITTEN AND THAT IS THE RULING RATHER THAN A LIMITATION: `evidence jsonb NOT NULL` is a detector's output and the counterparty column is another identity's uuid, and INV-M4-06 is that the portal `never receives detector internals or other identities' ids`. THE CORPUS NAMES NO TRADER-FACING READER: M06 section 3 renders the tier from `confidence_bp` on the ADMIN console, M07's D-03 and D-12 read it as detectors, and M07 section 6 writes the suppression pair `through the SECURITY DEFINER function that arrives with this module, never by the application role`. INV-M7-09 IS THE ONE THAT LOOKS LIKE A COUNTER-EXAMPLE AND IS NOT: it says a trader may CONTEST a link and that the contested link is visible TO THE ADMIN WHO ACTS ON IT, which is an admin surface and a support path rather than a scoped read. A SUPPRESSED EDGE IS STILL AN EDGE: `identity_links_live_idx` is partial on `NOT suppressed` and the row is never deleted, because SD-M7-04's own comment is that `we decided this edge was wrong` is itself evidence.",
+  },
+
+  dedupeMatches: {
+    class: 'pair',
+    columnA: 'identity_a',
+    columnB: 'identity_b',
+    why: "THE AUTHORITATIVE BIOMETRIC DEDUPE LINK (0003_kyc.sql, SD-M19-04, ADR-029), and 0003's own header states the shape this class exists for: `A match is a RELATIONSHIP BETWEEN TWO IDENTITIES, not a property of one`. `identity_a` and `identity_b` are both `uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` under `dedupe_matches_canonical_order`, which is `identity_links`' shape exactly, so the same ordering accident decides the same wrong answer. THE ENFORCEMENT WEIGHT IS WHY THE REFUSAL IS NOT MILDER HERE: ADR-022 makes a dedupe hit a HARD LINK THAT AUTO-ENFORCES, so the row bans an account before a human has looked, and `disposition` starts at `open` precisely because the review has not happened. Returning that row to either party would hand a person the uuid of whoever a provider thought they were, with `match_strength` and `evidence_snapshot jsonb` beside it, before anyone has decided whether the match is real. `evidence_snapshot` holds the provider's decision metadata and NEVER images (AS-M19-07, VG-10), which is what makes the enforcement survive the provider relationship ending and is not a reason a trader may read it.",
+  },
+
+  attributions: {
+    class: 'pair',
+    columnA: 'buyer_identity_id',
+    columnB: 'affiliate_identity_id',
+    why: "WHO REFERRED WHOM, AT THE MOMENT OF PURCHASE (0012_disputes_and_affiliate_settlement.sql, SD-M8-05). Both columns are `uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT`, and 0012's own comment says why both are STORED rather than joined: the row is a statement about the two of them at that moment, and an affiliate can be reassigned or an identity merged afterwards. Naming the buyer hides the referral from the affiliate who earned it; naming the affiliate returns a buyer's own purchase attribution to somebody else, which returns rows, raises nothing, and is ADR-008's BOLA failure. THE PAIR MAY COLLAPSE HERE AND IT DOES NOT ON THE OTHER TWO, WHICH IS THE ONE PER-TABLE DIFFERENCE THIS CLASS HAS: `attributions_literal_self_deal_is_void` is `buyer_identity_id <> affiliate_identity_id OR voided = true`, so the two columns MAY name one person on a voided row -- and that row is the self-deal the constraint exists to record rather than an exception to the class. THE CONTRACT ALREADY REFUSES THE ROW-LEVEL READ THIS CLASS REFUSES: `GET /affiliate/stats` returns counts and cents -- `clicks_30d`, `conversions_30d`, `earned_cents_lifetime`, `payable_cents` -- and no referral row and no buyer, so nothing in API_CONTRACT wants the disjunction. `affiliate_id` IS THE AVAILABLE MISTAKE AND ADR-101 CLAUSE 1 REFUSES IT MECHANICALLY: it is `uuid NOT NULL REFERENCES affiliates(id)` and `affiliates` carries the identity, so a `derived` hop through it resolves and terminates -- and it stands on a row that declares its own identity columns, which is the shape that clause was written for.",
+  },
+
+  otpChallenges: {
+    class: 'firm',
+    why: "A CHALLENGE ISSUED BEFORE ANYBODY IS ANYBODY (0002_identity.sql, 0029_phone_identity_and_auth.sql SD-M16-05). There is no identity column and there is no correct one: `POST /auth/otp` is the only endpoint in API_CONTRACT that runs at required factor `none`, so the row is written for a caller this database holds no identity for, and 0002's own comment says the table keys off the normalized address `rather than a user_id` because a user MAY NOT EXIST YET. IT IS THE FIRST `firm` ROW WHOSE REASON IS TIMING RATHER THAN OWNERSHIP, and the distinction is stated here rather than left to be re-derived: every other firm table holds a row no identity will EVER own, and this one holds a row whose identity does not exist YET. CONSUMING A CHALLENGE DOES NOT RETROACTIVELY MAKE THE ROW THAT PERSON'S: `consumed_at` is a timestamp and there is nowhere to write an identity, so a session tempted to scope this table is proposing a MIGRATION and not a re-classification. WHAT IT HOLDS IS IDENTITY-SHAPED AND NAMES NO IDENTITY, which is ADR-102 foreclosure 4 touched and not tripped: `email_normalized citext` is the address a person is reached at and `destination_hash bytea` is the SMS destination hashed, and neither addresses a row in this database. `email_normalized` IS NULLABLE AS OF 0029 and that is ADR-103's fold doing its job: 0002 made it NOT NULL when no other channel existed, `ALTER COLUMN email_normalized DROP NOT NULL` relaxed it for SMS, and `otp_challenges_exactly_one_destination` is what keeps exactly one destination on every row. `code_hash` IS `bytea` BECAUSE THE CODE IS NEVER STORED, and `attempts` is on the CHALLENGE rather than on the account so a locked-out attacker learns nothing about whether the address exists.",
+  },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
 /** Tables that belong to no identity. The scoped accessor REFUSES these. */
 export type FirmTableKey = {
   [K in TableKey]: (typeof SCOPE_RULES)[K]['class'] extends 'firm' ? K : never;
+}[TableKey];
+
+/**
+ * Tables that belong to TWO identities. ADR-106.
+ *
+ * REFUSED BY BOTH NARROW DOORS AND SERVED BY THE ONE THAT TAKES A REASON. These
+ * keys are excluded from `ScopedTableKey` because returning the row to either
+ * party discloses the other, and they are excluded from `FirmTableKey` because
+ * `firmDb()` takes no reason on the ground that no identity is at risk, which is
+ * false here twice over. `systemDb(reason)` is generic over `TableKey` and is
+ * the only door left.
+ */
+export type PairTableKey = {
+  [K in TableKey]: (typeof SCOPE_RULES)[K]['class'] extends 'pair' ? K : never;
 }[TableKey];
 
 /**
@@ -1013,8 +1103,15 @@ export type FirmTableKey = {
  * member of this type. That refusal is watched failing to compile in
  * `scripts/ci/falsify-ci.mjs` at stage CI-01: vitest cannot see a type error at
  * all, because it runs transpiled code and the error is gone by then.
+ *
+ * A `pair` table is excluded for a DIFFERENT reason and by the same mechanism
+ * (ADR-106). `firm` is excluded because no identity owns the row; `pair` is
+ * excluded because two do, and a scoped read is a filter rather than a
+ * projection, so the counterparty's identity uuid comes back with every row it
+ * would return. The two exclusions are not interchangeable and the classes are
+ * not merged: `firmDb()` serves the first and refuses the second.
  */
-export type ScopedTableKey = Exclude<TableKey, FirmTableKey>;
+export type ScopedTableKey = Exclude<TableKey, FirmTableKey | PairTableKey>;
 
 /** Every table in the registry. Used by the totality assertion in the suite. */
 export const TABLE_KEYS = Object.keys(TABLES) as readonly TableKey[];

@@ -56,6 +56,7 @@ import {
   scopedTx,
   systemTx,
   tenancyColumn,
+  tenancyColumns,
   type OwnedTableKey,
   type StatementSource,
 } from '../src/scoped-db.ts';
@@ -73,9 +74,14 @@ const QUEUE_SOURCE = fileURLToPath(new URL('../../queue/src/job-queue.ts', impor
 // because `Array.filter` cannot see through an index into `SCOPE_RULES`, and the
 // error it produced before these were added was itself the refusal working:
 // `TableKey` is not assignable to `FirmTableKey`.
+// ADR-106 SPLIT THIS SET AND THE FILTER IS WHERE THAT LANDS. `ScopedTableKey`
+// used to be everything that was not `firm`; a `pair` table is neither, so the
+// predicate has to name both exclusions or this array claims keys the type it is
+// annotated with does not contain.
 const SCOPED_KEYS: ScopedTableKey[] = TABLE_KEYS.filter(
-  (k): k is ScopedTableKey => SCOPE_RULES[k].class !== 'firm',
+  (k): k is ScopedTableKey => SCOPE_RULES[k].class !== 'firm' && SCOPE_RULES[k].class !== 'pair',
 );
+const PAIR_KEYS: TableKey[] = TABLE_KEYS.filter((k) => SCOPE_RULES[k].class === 'pair');
 const FIRM_KEYS: FirmTableKey[] = TABLE_KEYS.filter(
   (k): k is FirmTableKey => SCOPE_RULES[k].class === 'firm',
 );
@@ -331,13 +337,31 @@ describe('the tenancy reader reads something', () => {
   // above passes if `tenancyColumn` silently stops resolving: a guard that finds
   // nothing looks exactly like a guard with nothing to find. These two are what
   // fail, once per table, in that case.
-  test('every non-firm table has a tenancy column and every firm table has none', () => {
+  test('every table has the number of tenancy columns its class declares', () => {
+    // THREE ANSWERS AND NOT TWO, since ADR-106. `firm` has none, `pair` has TWO,
+    // and everything else has exactly one -- so the singular reader returns
+    // `undefined` for two DIFFERENT reasons and the plural is what tells them
+    // apart. A reader that silently stopped resolving would return an empty list
+    // for every table and fail here on the first non-firm one.
     for (const key of TABLE_KEYS) {
-      const column = tenancyColumn(key);
-      if (SCOPE_RULES[key].class === 'firm') expect(column, key).toBeUndefined();
-      else expect(column, key).toEqual(expect.any(String));
+      const columns = tenancyColumns(key);
+      const single = tenancyColumn(key);
+      if (SCOPE_RULES[key].class === 'firm') {
+        expect(columns, key).toEqual([]);
+        expect(single, key).toBeUndefined();
+      } else if (SCOPE_RULES[key].class === 'pair') {
+        expect(columns.length, key).toBe(2);
+        expect(columns[0], key).not.toBe(columns[1]);
+        expect(
+          single,
+          `${key} has two, so the singular reader must refuse to guess`,
+        ).toBeUndefined();
+      } else {
+        expect(columns.length, key).toBe(1);
+        expect(single, key).toEqual(expect.any(String));
+      }
     }
-    expect(SCOPED_KEYS.length + FIRM_KEYS.length).toBe(TABLE_KEYS.length);
+    expect(SCOPED_KEYS.length + PAIR_KEYS.length + FIRM_KEYS.length).toBe(TABLE_KEYS.length);
   });
 
   test('every tenancy column is declared by the migrations for its own table', () => {
@@ -564,11 +588,38 @@ describe('the tables a request handler needs are the ones that belong to nobody'
     for (const key of FIRM_KEYS) {
       expect(() => scopePredicate(key, IDENTITY), key).toThrow(/belongs to no identity/);
     }
+    // ADR-106. A `pair` key is in NEITHER door's type, so it is refused past a
+    // cast by both -- and the message is a different one, because the reason is
+    // a different one: two identities own the row rather than none.
+    for (const key of PAIR_KEYS) {
+      expect(() => scopePredicate(key, IDENTITY), key).toThrow(/belongs to TWO identities/);
+    }
+  });
+
+  test('a caller may not move EITHER identity column of a pair row, on the door that can reach one', async () => {
+    // THE ONE PLACE ADR-102's CLAUSE 4 MEETS ADR-106. A `pair` table is not in
+    // `ScopedTableKey`, so `scopedTx` cannot reach it at all; `systemTx` is
+    // generic over `TableKey` and CAN, and its `update` runs through the same
+    // `refuseTenancyColumn`. All three pair tables are append-only in the
+    // identity columns -- `identity_links` by 0002's own comment, `attributions`
+    // by INV-M8-01's one-attribution-per-purchase -- so moving one is the
+    // re-parenting clause 4 refuses, arriving on the class that has two to move.
+    for (const key of PAIR_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'pair') continue;
+      for (const column of [rule.columnA, rule.columnB]) {
+        const { source, conn } = { ...recording(), ...recordingConn() };
+        await expect(
+          systemTx(source, conn, 'operator-console').update(key, { [column]: OTHER }),
+          `${key}.${column}`,
+        ).rejects.toThrow(/tenancy column/);
+      }
+    }
   });
 });
 
-describe('the firm and scoped partitions cover the registry exactly', () => {
-  test('every registered table is in exactly one of the two doors', () => {
+describe('the firm, pair and scoped partitions cover the registry exactly', () => {
+  test('every registered table is in exactly one of the three doors', () => {
     // COMPARED AS STRINGS DELIBERATELY. `FIRM_KEYS.includes(scopedKey)` does not
     // COMPILE -- `ScopedTableKey` is not assignable to `FirmTableKey` -- which is
     // the disjointness already proved by the type. This is the runtime half, and
@@ -576,8 +627,14 @@ describe('the firm and scoped partitions cover the registry exactly', () => {
     // which no type states.
     const firm: string[] = FIRM_KEYS;
     const scoped: string[] = SCOPED_KEYS;
+    const pair: string[] = PAIR_KEYS;
     expect(scoped.filter((k) => firm.includes(k))).toEqual([]);
-    expect([...scoped, ...firm].sort()).toEqual([...TABLE_KEYS].sort());
+    expect(scoped.filter((k) => pair.includes(k))).toEqual([]);
+    expect(pair.filter((k) => firm.includes(k))).toEqual([]);
+    expect([...scoped, ...pair, ...firm].sort()).toEqual([...TABLE_KEYS].sort());
+    // AND THE PAIR SET IS NOT EMPTY, so the two assertions above are not three
+    // ways of saying the old two-way split. ADR-106.
+    expect(pair.length).toBeGreaterThan(0);
   });
 
   test('the unscoped writers carry no predicate, because there is no identity to carry', async () => {

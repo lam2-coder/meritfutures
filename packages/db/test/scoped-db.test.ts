@@ -162,6 +162,10 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   idempotencyKeys: 'idempotency_keys',
   tradingCalendarLoads: 'trading_calendar_loads',
   tradingCalendarRevisions: 'trading_calendar_revisions',
+  identityLinks: 'identity_links',
+  dedupeMatches: 'dedupe_matches',
+  attributions: 'attributions',
+  otpChallenges: 'otp_challenges',
 };
 
 /**
@@ -301,60 +305,74 @@ function ddlColumnDefs(rawSql: string, table: string): Map<string, string> {
 
 describe('the registry is total', () => {
   // THE APPROVAL CLAUSE'S FIGURE, COMPUTED. Reported as N of 111 rather than
-  // rounded up: the other 12 are unreachable through either accessor.
+  // rounded up: the other 7 are unreachable through every accessor.
   //
-  // `identity_links` IS ONE OF THE 12 AND ITS ABSENCE IS DELIBERATE. It carries
-  // TWO identity columns against an `owned` rule that names one, ADR-092 section
-  // 9 names it as a per-table ruling and takes neither, and a transcription
-  // rules nothing. Unregistered is unreachable and unreachable is safe; a chosen
-  // column would be a scoped read returning a strict subset of a person's own
-  // edges, selected by UUID ordering, with no error anywhere.
-  // `events` IS ANOTHER OF THE 12 AND ITS ABSENCE IS ALSO DELIBERATE. It reaches
-  // an identity TWO ways -- `identity_id uuid NULL` and `account_id uuid NULL`,
-  // neither required and no CHECK tying them -- so an `owned` rule on the first
-  // drops every account-level row and a `derived` hop through the second drops
-  // every identity-level row, while the portal's timeline (EVENTS.md section 2,
-  // consumer TL) reads both. Its `jsonb` payload is the second reason and it is
-  // the one no scope rule reaches: `kyc.dedupe_hit` carries
-  // `matched_identity_id`, so a row whose own tenancy column is right still
-  // names a DIFFERENT identity inside the payload.
+  // `identity_links`, `dedupe_matches` AND `attributions` WERE THREE OF THE
+  // TWELVE AND ARE NOW REGISTERED `pair` (ADR-106). Their absence had been a
+  // record rather than a gap since session 192: each carries TWO columns
+  // declared `REFERENCES identities(id)` against an `owned` rule that names one,
+  // and every choice of one returns a strict subset of a person's own rows,
+  // selected by UUID ordering on the two canonical-order tables. THE CLASS DOES
+  // NOT MAKE THEM SCOPED-READABLE AND THAT IS THE RULING: `PairTableKey` is
+  // excluded from `ScopedTableKey`, because a scoped read is a filter rather
+  // than a projection and every row it would return carries the OTHER party's
+  // identity uuid out of a NOT NULL column. It is excluded from `FirmTableKey`
+  // too -- `firmDb()` takes no reason on the ground that no identity is at risk,
+  // and here two are -- so `systemDb(reason)` is the only door and somebody has
+  // to write down why.
   //
   // `ledger_halts` WAS A FOURTH AND IT IS NO LONGER ONE. ADR-092 section 9 named
   // four tables "no session would reach" and this is the first of them to be
   // registered: `identity_id uuid NOT NULL REFERENCES identities(id)` at
   // 0016:55, so its class was never in doubt and what it lacked was a session
-  // whose fence contained it. ADR-104 is that session, and the table is now
-  // reachable through a scoped read for the first time.
+  // whose fence contained it. ADR-104 is that session.
   //
-  // `attributions` IS THE SIBLING ADR-092 SECTION 9 NAMES BESIDE IT AND IT IS
-  // ABSENT FOR THE SAME REASON. `buyer_identity_id` and `affiliate_identity_id`
-  // are both `uuid NOT NULL REFERENCES identities(id)` and they are TWO
-  // DIFFERENT PEOPLE by construction -- `attributions_literal_self_deal_is_void`
-  // exists to refuse the row where they are one -- so an `owned` rule naming
-  // either returns a row to a person the other column names. Naming the
-  // affiliate hands a buyer's purchase attribution to their referrer, which
-  // returns rows, raises nothing, and is ADR-008's BOLA failure.
+  // `affiliate_commissions` FOLLOWS `attributions` AND IT DOES NOT FOLLOW IT IN.
+  // Its only path to an identity is `attribution_id`, and now that
+  // `attributions` is a `TableKey` a `derived` rule through it COMPILES where
+  // before it could not be written at all -- and then throws the first time
+  // anybody reads the table, because a derivation chain terminates at `owned` or
+  // at `root` and `pair` is no more a terminal than `firm` is. The assertion at
+  // `every derivation chain ends at an identity` refuses it by name.
   //
-  // `affiliate_commissions` FOLLOWS IT OUT, and that is the registry's totality
-  // rather than a second judgment: its only path to an identity is
-  // `attribution_id`, `DerivedRule.via` is `TableKey`, and an unregistered
-  // table has no key to name.
-  test('100 declared tables, 100 scope rules, 0 reachable without one', () => {
+  // `identity_merges` IS THE FOURTH TABLE OF THIS SHAPE IN THE TREE AND IS
+  // DELIBERATELY NOT REGISTERED HERE. `surviving_identity_id` and
+  // `merged_identity_id` are both `uuid NOT NULL REFERENCES identities(id)` with
+  // `identity_merges_distinct` CHECKing them apart, so it is a `pair` table by
+  // the same derivation and could be registered today. ADR-092's rule is that
+  // the first session that NEEDS a table registers it; M18 names this one and
+  // session 215 does not need it.
+  //
+  // `events` IS STILL ABSENT AND IT IS THE NEAR MISS. It reaches an identity TWO
+  // ways -- `identity_id uuid NULL` and `account_id uuid NULL`, neither required
+  // and no CHECK tying them -- which is ONE identity column beside one ACCOUNT
+  // column and therefore not a pair at all. An `owned` rule on the first drops
+  // every account-level row and a `derived` hop through the second drops every
+  // identity-level row, while the portal's timeline (EVENTS.md section 2,
+  // consumer TL) reads both. Its `jsonb` payload is the second reason and it is
+  // the one no scope rule reaches: `kyc.dedupe_hit` carries
+  // `matched_identity_id`, so a row whose own tenancy column is right still
+  // names a DIFFERENT identity inside the payload.
+  test('104 declared tables, 104 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(100);
-    expect(rules).toBe(100);
+    expect(declared).toBe(104);
+    expect(rules).toBe(104);
     expect(withoutRule).toEqual([]);
 
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
     expect(createdTables).toBe(111);
   });
 
+  // FIVE MEMBERS SINCE ADR-106, AND THE ASSERTION IS THE REASON THE FIFTH COULD
+  // NOT BE ADDED QUIETLY. It compares the classes IN USE against the whole
+  // vocabulary, so a member declared in `ScopeClass` and used by no table fails
+  // here rather than sitting in the type as an option nobody has justified.
   test('every class in the vocabulary has at least one member, so none is vacuous', () => {
     const classes = new Set(TABLE_KEYS.map((k) => SCOPE_RULES[k].class));
-    expect([...classes].sort()).toEqual(['derived', 'firm', 'owned', 'root']);
+    expect([...classes].sort()).toEqual(['derived', 'firm', 'owned', 'pair', 'root']);
   });
 
   test('every rule carries a reason and none is a placeholder', () => {
@@ -375,6 +393,9 @@ describe('every rule resolves against the schema', () => {
       const here = sqlNames(key);
       if (rule.class === 'root' || rule.class === 'owned') {
         expect(here, `${key}.${rule.column}`).toContain(rule.column);
+      } else if (rule.class === 'pair') {
+        expect(here, `${key}.${rule.columnA}`).toContain(rule.columnA);
+        expect(here, `${key}.${rule.columnB}`).toContain(rule.columnB);
       } else if (rule.class === 'derived') {
         expect(here, `${key}.${rule.localColumn}`).toContain(rule.localColumn);
         expect(sqlNames(rule.via), `${rule.via}.${rule.foreignColumn}`).toContain(
@@ -411,7 +432,10 @@ describe('every rule resolves against the schema', () => {
   });
 
   // A DERIVATION CHAIN TERMINATES AT `owned` OR AT `root`, AND A `firm` PARENT
-  // IS WHERE IT DOES NOT.
+  // IS WHERE IT DOES NOT. SINCE ADR-106 A `pair` PARENT IS A SECOND PLACE, and
+  // it is the one with a caller waiting: `affiliate_commissions.attribution_id`
+  // is a NOT NULL foreign key to `attributions`, which is now a `TableKey`, so
+  // `DerivedRule.via` can name it and the rule compiles at every call site.
   //
   // `scopePredicate` recurses into `rule.via` and the `firm` branch of that
   // switch THROWS, so a derived rule whose chain reaches a firm table is a
@@ -442,8 +466,10 @@ describe('every rule resolves against the schema', () => {
         if (rule.class === 'owned' || rule.class === 'root') break;
         expect(
           rule.class,
-          `${key} derives through ${seen.join(' -> ')}, and ${at} is firm, so a scoped ` +
-            'read of it constructs no predicate and throws',
+          `${key} derives through ${seen.join(' -> ')}, and ${at} is ${rule.class}, so a ` +
+            'scoped read of it constructs no predicate and throws. A chain terminates at ' +
+            '`owned` or at `root`: `firm` has no identity to terminate at and `pair` has two, ' +
+            'and ADR-106 refuses the second for the same reason ADR-084 refuses the first.',
         ).toBe('derived');
         if (rule.class !== 'derived') break;
         at = rule.via;
@@ -1206,6 +1232,175 @@ describe('a class is REFUSED as well as declared', () => {
 });
 
 // =============================================================================
+// ADR-106. A ROW THAT BELONGS TO TWO IDENTITIES, AND THE CLASS THAT SAYS SO.
+// =============================================================================
+// EVERY ASSERTION ABOVE THIS LINE ASKS ABOUT THE ONE COLUMN A RULE NAMES.
+// ADR-101 clause 1 refuses `derived` on a row that carries its own identity
+// column and clause 3 checks the nullability of the single column an `owned`
+// rule names; neither asks how MANY identity columns the row has, and four
+// tables in this tree have two.
+//
+// THE FOUR ARE MEASURED AND NOT LISTED. `identity_links`, `dedupe_matches` and
+// `attributions` are registered `pair` by ADR-106; `identity_merges` is the
+// fourth and is left to the session that needs it. Nothing below names any of
+// them: the reader finds them.
+//
+// WHAT `pair` DECIDES IS NOT ONLY THE PREDICATE. `columnA = $1 OR columnB = $1`
+// would return precisely the rows that are one person's, so the refusal is not a
+// limitation of the vocabulary. It is that every row such a read returns carries
+// the OTHER party's identity uuid out of a NOT NULL column, which is the
+// cross-identity read `correlation_groups`' own `why` already refuses at arity
+// three -- "returning the row to each member would tell every member which OTHER
+// accounts the detector grouped them with" -- and it is worse at arity two,
+// where the party learns precisely who rather than a set. So `PairTableKey` is
+// excluded from `ScopedTableKey`, excluded from `FirmTableKey`, and served only
+// by `systemDb(reason)`, where a word has to be written.
+
+describe('a row that belongs to two identities is scoped to neither', () => {
+  const sqlText = allMigrationSql();
+
+  // THE REFUSAL THAT WOULD HAVE CAUGHT THE WRONG ANSWER, and the wrong answer is
+  // the one four sessions declined to write: an `owned` rule naming ONE of the
+  // two columns. IT ASSERTS EXACTLY ONE RATHER THAN NOT-MORE-THAN-ONE, which is
+  // the direction it can fail in: a reader that stopped matching would find zero
+  // on every table and a not-more-than-one assertion would stay green on all
+  // forty of them. Every existing assertion accepts it -- the column IS declared
+  // `REFERENCES identities(id)`, it IS `NOT NULL`, the rendered predicate DOES
+  // compare it and DOES bind the identity -- so the suite was green on a rule
+  // that returns a strict subset of a person's own rows, selected by UUID
+  // ordering, with no error anywhere.
+  //
+  // MEASURED AGAINST ALL FORTY `owned` RULES BEFORE IT WAS ADOPTED, on ADR-101
+  // clause 1's method: it refuses ZERO of them, so no green row turns red and
+  // there is no exemption to write down. Exactly four tables in 111 declare more
+  // than one identity column and none of the four was ever registered `owned`.
+  test('every owned rule stands on a row that declares EXACTLY ONE identity column', () => {
+    for (const key of TABLE_KEYS) {
+      if (SCOPE_RULES[key].class !== 'owned') continue;
+      expect(
+        identityColumnsOf(SQL_NAME[key]),
+        `${SQL_NAME[key]} is registered owned and its own row declares more than one column ` +
+          'REFERENCES identities(id). An owned rule names ONE, so it answers "whose row is ' +
+          'this" with one of two true answers and returns a strict subset of that person\'s ' +
+          'rows -- on a canonical-order table, the subset chosen by UUID ordering. Register ' +
+          'it `pair`, or leave the table unregistered.',
+      ).toHaveLength(1);
+    }
+  });
+
+  // THE REFUSAL ABOVE IS NOT VACUOUS AND THIS IS WHAT SAYS SO. It passes today by
+  // finding exactly one column on forty tables, and a reader that had stopped
+  // matching would find zero on all of them and pass just as quietly -- which is
+  // why it asserts a LENGTH OF ONE rather than "not more than one". This is the
+  // other half: the same reader must find TWO on every table the registry calls
+  // a pair, so the two directions cannot both degrade into agreement.
+  test('the identity-column reader finds exactly two on every pair table, so the refusal can fire', () => {
+    const pairs = TABLE_KEYS.filter((key) => SCOPE_RULES[key].class === 'pair');
+    expect(
+      pairs.length,
+      'the pair class has no members, so nothing below asserts anything',
+    ).toBeGreaterThan(0);
+    for (const key of pairs) {
+      expect(identityColumnsOf(SQL_NAME[key]), SQL_NAME[key]).toHaveLength(2);
+    }
+  });
+
+  // THE TWO COLUMNS ARE THE ONES THE DDL DECLARES, CHECKED AGAINST THE
+  // MIGRATIONS AND NOT AGAINST THE RULE. This is session 145's lesson on the new
+  // class: a rule asserted against itself asserts nothing, so the expectation
+  // comes from the folded `REFERENCES` clause. It also refuses a rule that named
+  // two of three, and a rule that named the same column twice -- which would be
+  // an `owned` rule wearing the new class's name.
+  test('every pair rule names the two distinct columns the DDL declares against identities(id)', () => {
+    for (const key of TABLE_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'pair') continue;
+      expect(rule.columnA, `${SQL_NAME[key]} names one column twice`).not.toBe(rule.columnB);
+      expect([rule.columnA, rule.columnB].sort(), SQL_NAME[key]).toEqual(
+        identityColumnsOf(SQL_NAME[key]),
+      );
+    }
+  });
+
+  // ADR-101 CLAUSE 2 IN THE PAIR DIRECTION. A nullable identity column on a pair
+  // row is a row that reaches ONE person through one side and nobody through the
+  // other, so the disjunction would be answering "whose row is this" with
+  // silence on half of it -- and the disclosure argument would be weaker on
+  // exactly the rows where the tenancy is weakest. All three tables declare both
+  // columns NOT NULL and the DDL is what says so.
+  test('every pair rule stands on two columns the DDL declares NOT NULL', () => {
+    for (const key of TABLE_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'pair') continue;
+      const defs = foldTableDefs(SQL_NAME[key]);
+      for (const column of [rule.columnA, rule.columnB]) {
+        const def = defs.get(column);
+        expect(def, `${SQL_NAME[key]}.${column} is not a column`).toBeDefined();
+        expect(
+          declaredNotNull(def),
+          `${SQL_NAME[key]}.${column} is one of two tenancy columns and the DDL does not ` +
+            `declare it NOT NULL. Its DDL is: ${def ?? ''}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  // THE DOOR, AND THE MESSAGE THAT NAMES IT. `firm` and `pair` both refuse a
+  // scoped read and they refuse it for opposite reasons, so a caller that
+  // reaches either through a cast is told which one it hit. The type is the real
+  // refusal and vitest cannot see a type error at all; this is the runtime half.
+  test('a pair table has no scoped reading, and says two identities own it rather than none', () => {
+    const pairs = TABLE_KEYS.filter((key) => SCOPE_RULES[key].class === 'pair');
+    expect(pairs.length).toBeGreaterThan(0);
+    for (const key of pairs) {
+      expect(() => scopePredicate(key, IDENTITY), key).toThrow(/belongs to TWO identities/);
+      expect(() => scopePredicate(key, IDENTITY), key).toThrow(/systemDb/);
+      expect(() => scopePredicate(key, IDENTITY), key).not.toThrow(/belongs to no identity/);
+    }
+  });
+
+  // THE DISCLOSURE IS A FACT ABOUT THE DDL AND NOT A JUDGEMENT, and this is
+  // where it is read out of the migrations rather than argued in a comment. Two
+  // of the three declare a CHECK that the pair is DISTINCT, so on those tables
+  // every row hands a reader somebody else's uuid by construction. `attributions`
+  // is the one that does not, and the exception is itself constrained: the pair
+  // may collapse only on a VOIDED row, which is the self-deal the constraint
+  // exists to record.
+  test('the pair is distinct by CHECK, or its collapse is itself constrained', () => {
+    // THE CONSTRAINT NAME IS PART OF EVERY PATTERN AND THAT IS DELIBERATE. The
+    // two canonical-order tables declare the SAME predicate, so a pattern
+    // matching only the predicate would pass for both while one of them had
+    // lost it. Every name here is table-qualified in the DDL.
+    const distinctness = new Map<string, RegExp>([
+      [
+        'identity_links',
+        /CONSTRAINT identity_links_canonical_order CHECK \(identity_a < identity_b\)/i,
+      ],
+      [
+        'dedupe_matches',
+        /CONSTRAINT dedupe_matches_canonical_order CHECK \(identity_a < identity_b\)/i,
+      ],
+      [
+        'attributions',
+        /CONSTRAINT attributions_literal_self_deal_is_void CHECK \( buyer_identity_id <> affiliate_identity_id OR voided = true \)/i,
+      ],
+    ]);
+    const pairs = TABLE_KEYS.filter((key) => SCOPE_RULES[key].class === 'pair').map(
+      (key) => SQL_NAME[key],
+    );
+    // THE MAP IS HELD TO THE REGISTRY IN BOTH DIRECTIONS, so a fourth pair table
+    // registered without a line here is red rather than silently uncovered.
+    expect([...distinctness.keys()].sort()).toEqual([...pairs].sort());
+    for (const [table, pattern] of distinctness) {
+      expect(
+        sqlText.replace(/--[^\n]*/g, '').replace(/\s+/g, ' '),
+        `${table}'s pair-distinctness constraint`,
+      ).toMatch(pattern);
+    }
+  });
+});
+
+// =============================================================================
 // ADR-103. THE TYPE AND THE NULLABILITY, WHICH THE NAME SET NEVER SAW.
 // =============================================================================
 // EVERYTHING ABOVE THIS LINE COMPARES NAMES. `foldTable` replays a table's
@@ -1424,15 +1619,18 @@ describe('the transcription states the DDL type and nullability, not only the co
   // ---------------------------------------------------------------------------
   // ADR-103'S SECOND HALF: `ALTER COLUMN` STOPS BEING A PROXY REFUSAL.
   // ---------------------------------------------------------------------------
-  // NEITHER TABLE BELOW IS REGISTERED, AND THAT IS EXACTLY WHY THESE ASSERTIONS
-  // EXIST. `otp_challenges` and `trading_calendar` are the only two tables in 47
-  // migrations carrying an `ALTER COLUMN`, so nothing in `DDL_NAMES` exercises
-  // the fold's new member and `foldTable(...).relaxed` is EMPTY on all 99. A
+  // ONE OF THE TWO TABLES BELOW IS NOW REGISTERED AND THESE ASSERTIONS ARE KEPT,
+  // WHICH IS THE PART WORTH READING. `otp_challenges` and `trading_calendar` are
+  // the only two tables in 47 migrations carrying an `ALTER COLUMN`. Under
+  // ADR-103 neither was registered, so nothing in `DDL_NAMES` exercised the
+  // fold's new member and `foldTable(...).relaxed` was EMPTY on all 99 -- a
   // vocabulary member no assertion runs is a vocabulary member nobody has
   // checked, which is ADR-094's own seed-B argument about a fold that folds
-  // nothing. These fold the two tables BY NAME, register neither, and watch the
-  // relaxation happen. Session 215 registers `otp_challenges` under this fold
-  // and inherits a member already watched working on its own table.
+  // nothing. ADR-106 registers `otp_challenges` and the assertion above is where
+  // the member now runs on the registered path. THESE TWO STAY BECAUSE
+  // `trading_calendar` IS STILL UNREGISTERED and because a by-name fold is the
+  // only thing that can see an UNREGISTERED carrier at all, which is what the
+  // closure assertion below depends on.
 
   const ALTER_COLUMN_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
     // 0029_phone_identity_and_auth.sql, SD-M16-05. An SMS challenge has no
@@ -1464,6 +1662,39 @@ describe('the transcription states the DDL type and nullability, not only the co
         expect(ddlType(folded.get(name) ?? ''), `${table}.${name} type`).toBe(
           ddlType(created.get(name) ?? ''),
         );
+      }
+    }
+  });
+
+  // SESSION 214's NAMED GAP, CLOSED BY ADR-106 RATHER THAN BY A NEW MECHANISM.
+  // ADR-103 shipped the fold's second member with NO registered table
+  // exercising it: `otp_challenges` and `trading_calendar` were the only two
+  // carriers in 47 migrations and neither was registered, so
+  // `foldTable(...).relaxed` was empty on all 99 and the only thing running the
+  // member was the pair of assertions that fold those two BY NAME. Registering
+  // `otp_challenges` moves it onto the registered path, where the per-table
+  // TYPE-and-NULLABILITY comparison reads the relaxed column against the
+  // transcription. THE ASSERTION IS A COMMAND: at least one REGISTERED table
+  // must replay a relaxation, and its transcription must agree.
+  test('the fold second member now runs on a REGISTERED table, which it did not under ADR-103', () => {
+    const relaxedTables = DDL_NAMES.filter(([, sqlName]) => foldTable(sqlName).relaxed.length > 0);
+    expect(
+      relaxedTables.length,
+      'no registered table replays an ALTER COLUMN ... DROP NOT NULL, so the fold member ' +
+        'is exercised only by the two tables the suite folds by name',
+    ).toBeGreaterThan(0);
+    for (const [key, sqlName] of relaxedTables) {
+      const folded = foldTableDefs(sqlName);
+      const created = ddlColumnDefs(allMigrationSql(), sqlName);
+      for (const name of foldTable(sqlName).relaxed) {
+        expect(declaredNotNull(created.get(name)), `${sqlName}.${name} at its CREATE`).toBe(true);
+        expect(declaredNotNull(folded.get(name)), `${sqlName}.${name} after the fold`).toBe(false);
+        // AND THE TRANSCRIPTION AGREES WITH THE FOLD AND NOT WITH THE CREATE,
+        // which is the whole point of registering a drifted table: a reader who
+        // transcribed this column from `0002` would have written `.notNull()`.
+        const column = Object.values(columnsOf(key)).find((c) => c.name === name);
+        expect(column, `${sqlName}.${name} is transcribed`).toBeDefined();
+        expect(column?.notNull, `${sqlName}.${name} in schema.ts`).toBe(false);
       }
     }
   });
