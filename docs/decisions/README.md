@@ -137,6 +137,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-107](ADR-107.md) | the provisioning saga admits nobody it cannot produce evidence for, and five of seven operations have no inverse  (2026-08-26, status: proposed) |
 | [ADR-109](ADR-109.md) | the accessor cannot name a row, so the idempotency store is a port and the raw body is a parser (2026-08-26, status: accepted) |
 | [ADR-110](ADR-110.md) | the method page is a public read of a versioned definition, and the address of a definition is a pair whose second half the path does not carry (2026-08-26, status: accepted) |
+| [ADR-111](ADR-111.md) | two of the three homeless shapes get a contract row and the third gets a home it cannot be given here, because a banner that describes a session must arrive on the response that resolved it  (2026-08-26, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

@@ -29,11 +29,11 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->109<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->109<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->110<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->110<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->109<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->109<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->110<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->110<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -4005,3 +4005,29 @@ which is [ALLOCATION](decisions/ALLOCATION.md)'s own warning that *"a vacated nu
 
 **Session 220 inherits [ADR-109](decisions/ADR-109.md) clause 2 as a third caller.** `POST /checkout` presents an `Idempotency-Key` that API_CONTRACT section 1 makes REQUIRED, and the layer it presents it to cannot store the response. **NOT MERGED. The `E2` read is owed on every line.**
 
+
+---
+
+## Session 226: the portal's last read screens, and a banner that cannot be given the endpoint it needs
+
+**[`P4-h`](plans/P4-portal-and-site.md) is done and [ADR-111](decisions/ADR-111.md) is minted, `status: proposed`, UNSIGNED.** Not a money path: no migration, no `SD-nn`, no `packages/db` import, no write path. Five read screens and the three shapes [session 158](sessions/2026-08-24-session-158.md) found with no contract row at all.
+
+**THE ADR RULES 2 OF 3 BY CONTRACT ROW AND 3 OF 3 BY DISPOSITION, AND THE SPLIT IS THE RULING RATHER THAN A SHORTFALL.**
+
+`EconomicCalendarPanelResponse` enters [API_CONTRACT](architecture/API_CONTRACT.md) as a new **section 6.1**, `GET /economic-calendar`, `Auth: session`. Its shape is the portal type unchanged in a single field, because that type was built column by column off [`0039`](../packages/db/migrations/0039_economic_calendar.sql) against `DEP-M4-09`. **A subsection rather than a new top-level section**: section 12 is addressed BY NUMBER by `CI-06k`, by `DEP-M4-07` and by [ADR-039](decisions/ADR-039.md) amendment 4, so inserting a section ahead of it breaks all three silently, which is [ADR-034](decisions/ADR-034.md)'s drift reached through a heading instead of through a count.
+
+`required_factor` enters **section 2** as `Problem`'s optional extension member over section 12's six-token vocabulary, on a `403` and nowhere else. **Session 218's open pull request already sends exactly that field and does not declare it**: it edits six files and none of them is API_CONTRACT, so the field is shipped and undeclared against an `approved` document. The row makes it legal rather than ruling against a branch in flight, and nothing of that branch was edited.
+
+**AND THE HALF IT DOES NOT DISCHARGE IS STATED RATHER THAN COUNTED AS DONE.** The `403` member discharges section 12 and discharges **neither `DEP-M4-07` nor `INV-M4-14`**, because a field that arrives on a refusal cannot render a control disabled BEFORE the refusal. [M04 section 3.7](plans/M04-trader-portal.md) is written against exactly that: _"A boundary that is only ever discovered by hitting it is indistinguishable from a bug, and users route around bugs."_ The read-surface half belongs to `GET /me`, which is the auth surface's, and [P4](plans/P4-portal-and-site.md) section 6 puts auth in no phase's contents at all.
+
+`ImpersonationSession` is **declared as section 3.2 with no endpoint**, and the section says so in its own text. Its carrier is `Me.impersonation` on `GET /me`, because the banner _"renders from the session the server resolved"_ and a dedicated read is a second session resolution: two resolutions on one page can disagree by the width of a request, which is `GS-301` exactly. `ADMIN_ORIGIN` stays a placeholder ([ADR-012](decisions/ADR-012.md)) and the shape has no field an origin could go in.
+
+**Seven of [M04](plans/M04-trader-portal.md) section 3.1's eleven screens now exist**, against three at [session 158](sessions/2026-08-24-session-158.md). `SC-M4-01`, `SC-M4-04`, `SC-M4-10` and `SC-M4-11` were deliberately not taken and the seams are reported instead.
+
+**Two design rules that came out of the screens and are worth carrying.** The rule diff **renders both sides and no difference**, because every delta is a money value computed client side at the one place the subtraction looks harmless, which is where `INV-M4-01` says the danger is; and the walk is **structural over opaque JSON**, because a typed walk can only compare keys the type knows and would report _"nothing changed"_ about a contract that gained a key, on the screen whose whole job is to be the record of what a trader agreed to.
+
+**One finding for the founder, recorded and not ruled.** [M04:86](plans/M04-trader-portal.md) says `SC-M4-07` shows _"four honest states"_ and `kyc_status` at [`0001:29`](../packages/db/migrations/0001_extensions_and_enums.sql) declares **five**; [API_CONTRACT:517](architecture/API_CONTRACT.md) types the field as an open `string` and settles nothing. The screen is built against the five, because the enum is what will actually arrive and a view handling four of five renders the fifth as nothing.
+
+**`surface.test.ts`'s `purchase` entry was NARROWED and not deleted**, to `checkout`, `reset` and `acknowledg`. That is [session 158](sessions/2026-08-24-session-158.md)'s own test of a good amendment (_"a session that deletes an entry instead of narrowing it has removed the control while appearing to satisfy it"_), and the narrowed list is strictly stronger on the write path: `purchase` would never have caught `submitCheckout`.
+
+**Measured on this branch against a base of `9244c2c`, and `main` did not move under it.** Suite **125 files / 2,075 passed / 1 skipped** to **130 files / 2,125 passed / 1 skipped**; `apps/portal` **12 files / 82 passed** to **17 / 132**; gates **30 of 30**; invariants **9 of 9**; `verify` exit 0; `typecheck`, `lint` and `format:check` clean; `falsify` clean-and-dirty over all 30 gates, 70 scope cases and 10 loader cases.

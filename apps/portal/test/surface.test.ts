@@ -30,6 +30,15 @@ test('every read surface is reachable from the package entry point', () => {
     'copyBlock',
     'formatCents',
     'formatBasisPoints',
+
+    // P4-h, SC-M4-05 to SC-M4-09.
+    'toRulesView',
+    'toPurchaseHistory',
+    'toRuleDiff',
+    'toKycStatusView',
+    'toCertificateView',
+    'toReferralPanel',
+    'disclosureBlock',
   ]) {
     expect(portal, `${name} is exported`).toHaveProperty(name);
   }
@@ -48,6 +57,24 @@ test('nothing that changes a trader account exists in this app', () => {
   // later read-surface session drifting one function into that territory
   // without noticing, and its failure is the prompt to open the right session
   // rather than to delete the assertion.
+  //
+  // `purchase` WAS AN ENTRY AND IS NARROWED RATHER THAN DELETED, WHICH IS THE
+  // WHOLE OF THE AMENDMENT. Session 158 named this file's list as the fence
+  // three money-path slices must each amend, and said what a bad amendment
+  // looks like: "a session that deletes an entry instead of narrowing it has
+  // removed the control while appearing to satisfy it."
+  //
+  // `GET /purchases` is a READ and SC-M4-06 renders it, so `toPurchaseHistory`
+  // is on the right side of the line and the old entry banned it. What the
+  // entry was actually protecting is the WRITE half of API_CONTRACT section 5:
+  // `POST /checkout` and `POST /accounts/:accountId/reset`. So `purchase`
+  // becomes `checkout` and `reset`, which name those two routes, plus
+  // `acknowledg` for SD-M4-02's `rule_diff_acknowledged_at`: the rule diff is
+  // rendered here and the acknowledgement that settles a dispute later is
+  // M03's ceremony and a write.
+  //
+  // THE NARROWED LIST IS STRICTLY STRONGER ON THE WRITE PATH THAN THE OLD ONE.
+  // `purchase` would not have caught a function called `submitCheckout`.
   const exported = Object.keys(portal);
   const forbidden = [
     'payout',
@@ -59,7 +86,9 @@ test('nothing that changes a trader account exists in this app', () => {
     'login',
     'logout',
     'session_token',
-    'purchase',
+    'checkout',
+    'reset',
+    'acknowledg',
     'kycSubmit',
   ];
 

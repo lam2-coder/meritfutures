@@ -26,11 +26,17 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 /**
  * The types in `api/types.ts` that ARE transcriptions of API_CONTRACT.
  *
- * The economic-calendar and impersonation types are deliberately absent:
- * neither has a contract row yet, and the source file says so at the point of
- * declaration. `grep economic_calendar docs/architecture/API_CONTRACT.md`
- * returns nothing, so asserting them against the contract would assert against
- * an absence and pass for the wrong reason.
+ * THE ECONOMIC-CALENDAR AND IMPERSONATION TYPES WERE DELIBERATELY ABSENT AND
+ * ARE NOW IN. Neither had a contract row, and this list said so: "asserting
+ * them against the contract would assert against an absence and pass for the
+ * wrong reason." ADR-111 wrote both rows (API_CONTRACT section 6.1 and section
+ * 3.2), so the assertion now has something to assert against and the exemption
+ * has expired. That is the direction an exemption is supposed to move.
+ *
+ * `PlanRules` IS ABSENT AND STAYS ABSENT, on the opposite reasoning. The
+ * contract declares it as opaque JSON ("exact JSON from DATA_MODEL §11") and
+ * the portal type is `Readonly<Record<string, JsonValue>>` with no field names
+ * of its own, so there is nothing to check and no absence being papered over.
  */
 const TRANSCRIBED = [
   'AccountListItem',
@@ -39,6 +45,20 @@ const TRANSCRIBED = [
   'TimelineItem',
   'EligibilityGates',
   'EligibilityResponse',
+
+  // ADR-111's rows.
+  'EconomicCalendarOccurrence',
+  'EconomicCalendarFreshness',
+  'EconomicCalendarPanelResponse',
+  'ImpersonationSession',
+
+  // P4-h's five screens.
+  'PlanSize',
+  'PlanVersionResponse',
+  'PurchaseListItem',
+  'CertificateResponse',
+  'KycStatus',
+  'AffiliateStats',
 ];
 
 /** Every `readonly <name>:` in a block, at any nesting depth. */
@@ -76,7 +96,14 @@ test('every transcribed wire field is a field API_CONTRACT declares', () => {
   // stops matching (a formatter that breaks `readonly` onto its own line would
   // do it), the loop above compares nothing and reports success, which is the
   // one outcome this file must not be able to produce quietly.
-  expect(checked, 'wire fields found to check').toBeGreaterThan(40);
+  //
+  // THE FLOOR RISES WITH THE TRANSCRIPTION AND THAT IS THE POINT OF RAISING IT.
+  // It read 40 against six types and 113 fields; P4-h adds ten more types, so a
+  // floor left at 40 would keep passing after the regex stopped matching two
+  // thirds of the file. Session 158 named this list as a slice-collision site
+  // for exactly this reason: "the `checked > 40` floor that must rise as types
+  // are added."
+  expect(checked, 'wire fields found to check').toBeGreaterThan(150);
   expect(invented, 'fields the portal reads that API_CONTRACT does not declare').toEqual([]);
 });
 
