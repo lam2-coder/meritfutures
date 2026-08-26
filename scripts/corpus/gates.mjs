@@ -4593,6 +4593,283 @@ const ci06v = {
 };
 
 // -----------------------------------------------------------------------------
+// CI-06/table-row-width  Every table row carries the cell count its table declares
+// -----------------------------------------------------------------------------
+// THE RECEIPT IS PR #299 AND ALL 30 GATES PASSED OVER IT. A row inserted into the
+// session reservation table of `docs/sessions/README.md` landed PAST the blank
+// line that terminated the table, and the prettier run that followed absorbed the
+// paragraph below into the table: the blank line and the paragraph's first
+// sentence vanished, and NINE CONTINUATION LINES BECAME TABLE ROWS with first
+// cells like `lands, its entry joins the list below`. The paragraph it ate was the
+// one explaining the strikethrough rule.
+//
+// WHY THE TWO TABLE GATES BOTH STAYED GREEN, WHICH IS THE PART WORTH REPRODUCING
+// BEFORE ANYTHING IS DESIGNED. `CI-06u` looks for DUPLICATE first cells and nine
+// prose lines are all distinct. `CI-06v` looks for ORPHAN runs carrying no
+// delimiter and these sat inside a well formed table. NEITHER GATE ASKS WHETHER A
+// ROW BELONGS.
+//
+// THE HYPOTHESIS THAT PULL REQUEST NAMED, AND THE MEASUREMENT THAT REPLACED IT.
+// #299 proposed the cheap check as "a table row whose first cell is not shaped
+// like the table's key column". That was surveyed against every table under
+// `docs/` before this gate was written, and the numbers are the argument:
+//
+//   * FIRST-CELL SHAPE, at a homogeneity threshold of 80%: 593 of 1,593 multi-row
+//     tables are in scope at all (37%), 1,000 have no first column matching any
+//     identifier shape, and 25 rows in 14 tables would need registering. AND IT
+//     MISSES #299: eight absorbed rows drag the reservation table to 27 of 35
+//     conforming, which is 0.77, so the table falls out of scope and the gate
+//     goes quiet on the exact defect it was proposed for.
+//   * FIRST-CELL SHAPE, at a threshold of 50% so that #299 IS caught: 155 rows in
+//     67 tables to register on a clean tree. An allowlist that size is furniture
+//     within a month.
+//   * CELL COUNT: 1,604 of 1,604 tables in scope, ZERO shape exemptions needed,
+//     17 rows to register, and it names all eight of #299's absorbed rows.
+//
+// So the discriminator is the CELL COUNT and not the first cell, and the survey is
+// recorded here rather than the conclusion alone. `RI-10`'s lesson is what decided
+// it: a check that needs a name-based exception is usually scoped wrong, and this
+// one needs no exception of any kind. `DIMENSION_HEADERS` exists one gate up
+// because `CI-06u` genuinely cannot be written without it; nothing of the sort is
+// needed here.
+//
+// THE DELIMITER ROW IS THE AUTHORITY AND NOT THE HEADER, which is GitHub-flavoured
+// markdown's own rule: the delimiter declares the column count, the header must
+// match it or no table is rendered at all, and a body row with FEWER cells is
+// padded with empty ones while a body row with MORE has the excess SILENTLY
+// DISCARDED. Both directions are asserted and they are different defects:
+//
+//   FEWER is #299's shape. Prose that has been pulled inside the table renders as
+//   a row of empty cells, and the sentence is now data.
+//   MORE is a cell split by a pipe nobody escaped, and the tail of the row is
+//   dropped on render. Fifteen of the seventeen registered rows are this, six of
+//   them in `ALLOCATION`'s own ADR table, where a whole disposition paragraph is
+//   invisible to every reader who reads the rendered file.
+//
+// MEASURED ON THIS REF RATHER THAN ASSUMED: every one of the 1,604 tables under
+// `docs/` carries EXACTLY ONE delimiter row, EXACTLY ONE header row above it, and
+// a header whose cell count already equals its delimiter's. So the header
+// assertion below finds nothing today and is written for the day a column is
+// added to one row of the pair and not the other, which is the edit that makes
+// GitHub stop drawing the table entirely.
+//
+// FOUR THINGS IT DOES NOT DO, written here rather than left to be discovered.
+//   1. IT COUNTS CELLS AND READS NONE OF THEM. A row of the right width whose
+//      content is absorbed prose passes, and a row that contradicts the one above
+//      it passes. What belongs in a cell is `CI-06u`'s question and a founder's.
+//   2. A ONE-COLUMN TABLE IS BEYOND IT. Absorbed prose in a table whose delimiter
+//      declares one cell has the right width by construction. There are none in
+//      `docs/` today (the narrowest is two, 479 of them), so the gap is real and
+//      unoccupied.
+//   3. IT INHERITS THE ONE-REF GAP `CI-06f`, `CI-06h`, `CI-06p`, `CI-06u` and
+//      `CI-06v` each declare. A pull request whose merge produces the ragged row
+//      is caught at the merge and not at the pull request.
+//   4. A ROW INDENTED PAST A LIST MARKER PARSES AS PROSE AND IS CLAIMED AS
+//      NOTHING, exactly as it is for `CI-06u`, because both gates read the same
+//      run splitter and a shared parser is the point of sharing it.
+//
+// THE REGISTER IS `CI-06u`'S, KEYED THE SAME WAY AND SHRINKING THE SAME WAY. Every
+// (file, first-cell key) pair whose row is ragged on `main` as of 2026-08-26 is
+// named below; not one is accepted as correct, and an entry that no longer names a
+// ragged row is itself a finding, so a repair forces the register down by one
+// rather than leaving an exemption behind it. It is keyed by first cell and NOT by
+// line number for the reason `CI-06u` gives: four of the entries live in a
+// GENERATED table whose rows move on every regeneration.
+const CI06_WIDTH_REGISTER = new Map([
+  [
+    // One quoted table row inside a cell, its two inner pipes unescaped, so the
+    // quotation splits into cells 3 and 4 and cell 4 is dropped on render.
+    'docs/decisions/ADR-073.md',
+    ['the implementation is stated identically in three documents and it is not a build check'],
+  ],
+  [
+    // SIX ROWS OF THE ADR ALLOCATION TABLE, AND THIS IS THE WORST ENTRY HERE. The
+    // table declares three columns; these rows carry four, so the FOURTH cell --
+    // a whole disposition paragraph, in the registry a sibling branch reads to
+    // decide whether a number is free -- is discarded by every markdown renderer
+    // that draws this file. The repair is one escaped pipe per row and it belongs
+    // to whoever next holds ALLOCATION; this session holds ONE ROW of that file
+    // and takes only that row.
+    'docs/decisions/ALLOCATION.md',
+    ['079', '088', '095', '104', '112', '0046'],
+  ],
+  // A row that is SHORT rather than long: three columns declared, two supplied.
+  ['docs/plans/M10-integrations.md', ['replica lag']],
+  // An unescaped pipe inside `{ benefit_id, consumed_ref | reason }`.
+  ['docs/plans/M14-loyalty-retention.md', ['loyalty.benefit_consumed / .expired / .revoked new']],
+  // Three short rows in a four-column table, in a session log, which is a record
+  // and is repaired by editing a record. Named rather than exempted for that
+  // reason: the register is where a repair somebody has to decide on waits.
+  [
+    'docs/sessions/2026-08-18-session-59.md',
+    ['r-02 counter advance', 'r-03 half day', 'r-06 last closed day'],
+  ],
+  [
+    // FOUR, AND THREE OF THEM ARE IN A GENERATED TABLE. The `session_entries` span
+    // builds each row from a session log's own `<!--index:` line, and three of
+    // those lines carry a pipe inside an inline code span -- `INV-M19|SD-M19|...`
+    // and `'next\.js|react'` -- which splits the generated row and drops its tail.
+    // THE REPAIR IS THE GENERATOR AND NOT THESE ROWS: escaping the pipe as the
+    // cell is built fixes all three and every one after them. It is not done here
+    // because it rewrites the table five concurrent sessions are appending to
+    // tonight, and a merge conflict in the row somebody else is landing is a worse
+    // trade than a register entry that names the fix. The fourth, `217`, is a
+    // hand-written reservation row carrying an unescaped pipe.
+    'docs/sessions/README.md',
+    ['217', '2026-08-24 - session 168', '2026-08-24 - session 183', '2026-08-24 - session 186'],
+  ],
+  // The `CI-06/conflict-markers` row spells the three markers, and the SEPARATOR
+  // is seven `=` inside a code span, which splits nothing -- but the row also
+  // carries an unescaped pipe further along. Session 231 holds STRATEGY's CI-09
+  // row tonight and this session holds nothing in that file, so it is registered.
+  ['docs/testing/STRATEGY.md', ['ci-06/conflict-markers']],
+]);
+
+const ci06TableRowWidth = {
+  id: 'CI-06/table-row-width',
+  title: 'Every markdown table row under docs/ carries the cell count its delimiter declares',
+  covers:
+    'THE DEFECT PR #299 LANDED AND ALL 30 GATES PASSED OVER. A row insertion landed past the ' +
+    "table's terminating blank line and a prettier run absorbed NINE PROSE LINES INTO THE " +
+    'TABLE AS ROWS, with first cells like "lands, its entry joins the list below". CI-06u ' +
+    'looks for duplicate first cells and nine prose lines are all distinct; CI-06v looks for ' +
+    'orphan runs and these sat inside a well formed table. NEITHER GATE ASKS WHETHER A ROW ' +
+    'BELONGS, and this one asks it by CELL COUNT. ' +
+    'THE DISCRIMINATOR WAS MEASURED, NOT ASSUMED, AND IT IS NOT THE ONE #299 PROPOSED. That ' +
+    'pull request suggested "a first cell not shaped like the key column". Surveyed over ' +
+    'every table under docs/: first-cell shape at an 80% homogeneity threshold covers 593 of ' +
+    '1,593 multi-row tables, needs 25 registered rows, AND MISSES #299 (the reservation table ' +
+    'falls to 27 of 35 conforming, below any usable threshold); at 50%, it catches #299 and ' +
+    'costs 155 registered rows in 67 tables. CELL COUNT covers 1,604 of 1,604 tables, needs ' +
+    'NO shape exemption of any kind, costs 17 registered rows, and names all eight of #299\'s ' +
+    'absorbed rows. RI-10\'s lesson decided it: a check needing a name-based exception is ' +
+    'scoped wrong, and this one needs no exception. ' +
+    'THE DELIMITER ROW IS THE AUTHORITY, which is GFM\'s own rule: it declares the column ' +
+    'count, the header must match it or nothing renders as a table, a short row is padded ' +
+    'with empty cells and a long row has its excess SILENTLY DISCARDED. Both directions are ' +
+    'findings and they are different defects: SHORT is #299\'s absorbed prose, LONG is a cell ' +
+    'split by an unescaped pipe with its tail dropped on render -- fifteen of the seventeen ' +
+    "registered rows, six in ALLOCATION's own ADR table where a whole disposition paragraph " +
+    'is invisible to every reader of the rendered file. ' +
+    'FOUR THINGS IT DOES NOT DO. It counts cells and reads none of them, so a row of the ' +
+    'right width holding absorbed prose passes and that is CI-06u\'s question. A ONE-COLUMN ' +
+    'table is beyond it by construction and docs/ has none (the narrowest is two, 479 of ' +
+    'them). It inherits the one-ref gap CI-06f, CI-06h, CI-06p, CI-06u and CI-06v each ' +
+    'declare. And a row indented past a list marker parses as prose and is claimed as ' +
+    'nothing, exactly as it is for CI-06u, because both read the same run splitter. ' +
+    'THE REGISTER IS CI-06u\'S, KEYED BY (file, first cell) AND SHRINKING ONLY: an entry that ' +
+    'no longer names a ragged row is a finding, so a repair forces it down by one. Its size ' +
+    'is printed on every run rather than stated here, because a repair moves it and this ' +
+    'text does not.',
+  run() {
+    const findings = [];
+    const files = markdownFiles().filter((p) => p.startsWith(CI06U_DOCS));
+    // Rule 2 on a glob-shaped input, the same guard CI-06u and CI-06v carry. A
+    // prefix that stopped matching would make every ragged row in the corpus pass.
+    if (files.length === 0) {
+      throw new Error(`no markdown files under ${CI06U_DOCS}; the gate cannot run`);
+    }
+
+    const found = new Map(); // file -> Set(key)
+    let tables = 0;
+    let rows = 0;
+
+    for (const file of files.sort()) {
+      for (const table of markdownTables(read(file))) {
+        tables++;
+        const delimiterAt = table.findIndex((r) => isDelimiterRow(r.raw));
+        // The delimiter declares the width. `markdownTables` only keeps runs that
+        // carry one, so this index is never -1.
+        const width = rowCells(table[delimiterAt].raw).length;
+
+        // ASSERTION 1: the header agrees with the delimiter. GFM refuses to draw
+        // a table at all when they disagree, so the whole block silently becomes
+        // a paragraph of pipes. Zero tables under docs/ violate this today; it is
+        // written for the edit that adds a column to one of the pair.
+        if (delimiterAt > 0) {
+          const headerWidth = rowCells(table[delimiterAt - 1].raw).length;
+          if (headerWidth !== width) {
+            findings.push(
+              `${file}:${table[delimiterAt - 1].n}: the header row has ${headerWidth} cell(s) ` +
+                `and the delimiter row below it declares ${width}. GitHub draws no table at ` +
+                'all when those disagree: the whole block renders as a paragraph of pipes, ' +
+                'and every table gate in this runner goes on reading it as a table',
+            );
+          }
+        }
+
+        // ASSERTION 2: every body row carries the declared width.
+        let past = false;
+        for (const row of table) {
+          if (isDelimiterRow(row.raw)) {
+            past = true;
+            continue;
+          }
+          if (!past) continue;
+          rows++;
+          const cells = rowCells(row.raw);
+          if (cells.length === width) continue;
+          const key = firstCellKey(cells[0] ?? '');
+          if (!found.has(file)) found.set(file, new Set());
+          found.get(file).add(key);
+          if (CI06_WIDTH_REGISTER.get(file)?.includes(key)) continue;
+          findings.push(
+            cells.length < width
+              ? `${file}:${row.n}: this row has ${cells.length} cell(s) where its table's ` +
+                `delimiter declares ${width} (table opens at line ${table[0].n}). First cell: ` +
+                `"${key.slice(0, 60)}". A SHORT row renders as empty cells, and the shape ` +
+                'that produces one is prose absorbed past the blank line that ended the ' +
+                'table, which is PR #299 exactly. Either the row belongs and is missing ' +
+                'cells, or it is a sentence and belongs outside the table'
+              : `${file}:${row.n}: this row has ${cells.length} cell(s) where its table's ` +
+                `delimiter declares ${width} (table opens at line ${table[0].n}). First cell: ` +
+                `"${key.slice(0, 60)}". A LONG row has its excess cells SILENTLY DISCARDED on ` +
+                'render, so the tail of this row is invisible to every reader of the ' +
+                'rendered file. The usual cause is a pipe inside a cell: escape it as \\|',
+          );
+        }
+      }
+    }
+
+    // Rule 2 on the parser rather than on the input, which is CI-06u's guard
+    // verbatim. This corpus is written in tables; zero means the table parser has
+    // stopped matching and every ragged row in the tree would pass.
+    if (tables === 0) {
+      throw new Error(
+        `CI-06/table-row-width parsed zero markdown tables under ${CI06U_DOCS}. This corpus ` +
+          'is written in tables, so zero means the table parser has stopped matching and ' +
+          'every ragged row in the tree would pass for the wrong reason',
+      );
+    }
+
+    // THE REGISTER SHRINKS ONLY, which is CI-06u's property and CI-06l's before
+    // it. An entry naming a row that is no longer ragged is a repair the register
+    // did not follow, and a register nobody has to maintain is an exemption list
+    // that outlives its reason.
+    let registered = 0;
+    for (const [file, keys] of CI06_WIDTH_REGISTER) {
+      for (const key of keys) {
+        registered++;
+        if (found.get(file)?.has(key)) continue;
+        findings.push(
+          `${file}: the register claims the row headed "${key}" is a known ragged row and it ` +
+            'is not one on this ref. Either the repair landed and this line goes, or the row ' +
+            'moved and the register moves with it. A register entry that names nothing ' +
+            'exempts nothing and hides the next one',
+        );
+      }
+    }
+
+    console.log(
+      `       CI-06/table-row-width note: ${rows} body row(s) over ${tables} table(s) under ` +
+        `${CI06U_DOCS}; ${registered} ragged row(s) registered across ` +
+        `${CI06_WIDTH_REGISTER.size} file(s), each one a repair this gate is waiting for`,
+    );
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
 // CI-06w  Every allocation claim is read as a MULTISET, not a set
 // -----------------------------------------------------------------------------
 // THE REGISTRY THAT EXISTS TO MAKE A DOUBLE CLAIM VISIBLE COULD NOT SEE ONE.
@@ -7766,6 +8043,7 @@ const GATES = [
   ci06t,
   ci06u,
   ci06v,
+  ci06TableRowWidth,
   ci06w,
   conflictMarkers,
   fixtureInventory,

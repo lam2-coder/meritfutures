@@ -617,6 +617,63 @@ function firstCoverageColumnLoose(dir) {
 const opener = (name) => `<!--${'gen'}:${name}-->`;
 const closer = () => `<!--/${'gen'}-->`;
 
+// ---------------------------------------------------------------------------
+// CI-06/table-row-width. THE SEED IS PR #299 REPLAYED, NOT A FRAGMENT INVENTED
+// TO RESEMBLE IT.
+// ---------------------------------------------------------------------------
+// #299 repaired `docs/sessions/README.md` after a row insertion landed past the
+// reservation table's terminating blank line and a prettier run absorbed the
+// paragraph below it INTO THE TABLE AS ROWS: the blank line and the paragraph's
+// first sentence vanished, and nine prose lines became rows with first cells
+// like `lands, its entry joins the list below`. All 30 gates passed over it.
+//
+// THE SEED PERFORMS THAT EDIT RATHER THAN QUOTING ITS OUTPUT, and the difference
+// is the one `OI-21` names. A frozen copy of #299's nine corrupted lines would
+// go stale the day that paragraph is reworded, and would go stale SILENTLY,
+// because a literal block appended to a file needs no anchor and always seeds
+// something. Locating the live paragraph and rewriting it the way prettier did
+// cannot: the anchor check below throws, the harness prints SEED IS STALE, and
+// the run reports a harness problem rather than a gate problem.
+//
+// The paragraph is still the one #299 lost. The anchor assertion pins that: the
+// line about to become the first absorbed row must still carry the phrase the
+// pull request quoted, so a rewording announces itself here rather than in a
+// case that has quietly stopped reproducing anything.
+const SESSIONS_README = 'docs/sessions/README.md';
+const ABSORBED_299_OPENER =
+  '**A row moves out of this table by being written, not by being edited.**';
+const ABSORBED_299_PHRASE = 'lands, its entry joins the list below';
+
+/**
+ * Pull the paragraph that follows the session reservation table INTO the table,
+ * exactly as PR #299's prettier run did.
+ *
+ * The blank line between the table and the paragraph goes, the paragraph's first
+ * line goes with it (that is the sentence #299 records as vanished), and every
+ * remaining line of the paragraph is rewritten as a one-cell table row.
+ */
+const absorb299 = (body) => {
+  const at = body.indexOf(ABSORBED_299_OPENER);
+  if (at === -1) throw new Error(`seed anchor not found: ${ABSORBED_299_OPENER}`);
+  const start = body.lastIndexOf('\n\n', at);
+  const end = body.indexOf('\n\n', at);
+  if (start === -1 || end === -1) {
+    throw new Error('seed anchor not found: the blank lines bracketing the paragraph');
+  }
+  const lines = body.slice(start + 2, end).split('\n');
+  if (lines.length < 3) {
+    throw new Error('seed anchor not found: that paragraph is now shorter than three lines');
+  }
+  if (!lines[1].includes(ABSORBED_299_PHRASE)) {
+    throw new Error(
+      `seed anchor not found: the second line of that paragraph no longer reads ` +
+        `"${ABSORBED_299_PHRASE}", so this seed no longer replays #299`,
+    );
+  }
+  const absorbed = lines.slice(1).map((l) => `| ${l} |`);
+  return `${body.slice(0, start)}\n${absorbed.join('\n')}${body.slice(end)}`;
+};
+
 const SEEDS = {
   'CI-06a': {
     what: 'a link to a heading that does not exist',
@@ -1059,6 +1116,28 @@ const SEEDS = {
           `| seeded-b | this row is below the blank and no table gate reads it |\n` +
           `| seeded-c | nor this one |\n`,
       ),
+  },
+  // THE ONE SEED IN THIS FILE THAT REPLAYS A DATED PULL REQUEST'S EDIT RATHER
+  // THAN CONSTRUCTING A VIOLATION. #299 is nine days younger than this gate and
+  // its corruption is still reproducible from the live document, so the seed
+  // performs it instead of describing it. See `absorb299` for why the edit is
+  // computed rather than pasted.
+  'CI-06/table-row-width': {
+    what: "PR #299's corruption replayed: the paragraph after the session reservation table pulled into it as rows",
+    real:
+      'PR #299 (2026-08-26). Inserting the session 227 reservation row landed PAST the ' +
+      "table's terminating blank line, and the prettier run that followed absorbed the " +
+      'paragraph below into the table: the blank line and the paragraph\'s first sentence ' +
+      'vanished and NINE PROSE LINES BECAME TABLE ROWS, with first cells like "lands, its ' +
+      'entry joins the list below". The paragraph it ate was the one explaining the ' +
+      'strikethrough rule. ALL 30 GATES STAYED GREEN: CI-06u looks for duplicate first ' +
+      'cells and nine prose lines are all distinct, CI-06v looks for orphan runs and these ' +
+      'sat inside a well formed table, and neither asks whether a row BELONGS',
+    // THE RECEIPT'S OWN QUOTED STRING. #299 named these first cells in its body,
+    // so a finding that does not contain this phrase is not the finding this
+    // gate was commissioned for, whatever else it may have found.
+    expect: ABSORBED_299_PHRASE,
+    seed: (d) => edit(d, SESSIONS_README, absorb299),
   },
   'CI-06w': {
     what: 'a second allocation row claiming a number the table already claims',
@@ -3637,6 +3716,140 @@ const SCOPE_CASES = [
         (b) =>
           `${b}\n<!-- seeded -->\n\n| | |\n|---|---|\n` +
           `| | first |\n| | second |\n| | third |\n`,
+      ),
+  },
+  // ---------------------------------------------------------------------------
+  // CI-06/table-row-width. FIVE CASES. The SEEDS entry replays #299, which is the
+  // SHORT direction in a real document; these carry the LONG direction, both
+  // edges of the escaped-pipe boundary, the header assertion the seed never
+  // touches, the CI-06v boundary, and the register's shrink-only property.
+  // CI-06o's rule is why: a gate asserting several unrelated things and watched
+  // failing on ONE of them is taken on trust for the rest.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'CI-06/table-row-width/a-long-row-loses-its-tail',
+    gate: 'CI-06/table-row-width',
+    what: 'a row with MORE cells than its delimiter declares, whose excess GitHub silently discards',
+    // FIFTEEN OF THE SEVENTEEN REGISTERED ROWS ARE THIS DIRECTION and none of
+    // them is reachable from the SEEDS entry, which replays a SHORT row. Six sit
+    // in ALLOCATION's own ADR table, where the discarded cell is a whole
+    // disposition paragraph in the registry a sibling branch reads to decide
+    // whether a number is free.
+    expect: 'cell(s) where its table\'s delimiter declares 2',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded: a pipe nobody escaped -->\n\n| Term | Meaning |\n|---|---|\n` +
+          `| seeded-long | a cell carrying | an unescaped pipe, whose tail is dropped |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/table-row-width/an-escaped-pipe-is-content',
+    gate: 'CI-06/table-row-width',
+    what: 'a cell whose pipe is escaped as \\|, which is content and must NOT be a finding',
+    expect: 'PASS',
+    // THE BOUNDARY IS `rowCells`, WHICH IS CI-06u's SPLITTER AND NOT A SECOND
+    // COPY OF ONE. This corpus writes regexes and SQL alternations into table
+    // cells, so a gate that counted cells with a naive split would report every
+    // one of them. The control is the IDENTICAL row with the backslash removed,
+    // which is the single character separating content from a cell boundary: one
+    // passes, the other fires.
+    control: {
+      expect: 'cell(s) where its table\'s delimiter declares 2',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\n\n| Term | Meaning |\n|---|---|\n` +
+            `| ctl-bare | matches a|b, and the pipe is bare |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| Term | Meaning |\n|---|---|\n` +
+          `| scope-escaped | matches a\\|b, and the pipe is escaped |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/table-row-width/a-header-that-disagrees-with-its-delimiter',
+    gate: 'CI-06/table-row-width',
+    what: 'a header row and a delimiter row of different widths, which GitHub refuses to draw as a table at all',
+    // ASSERTION 1, WHICH FINDS NOTHING ON A CLEAN TREE AND IS THEREFORE ONLY
+    // EVER WATCHED HERE. Measured when the gate was written: all 1,604 tables
+    // under docs/ carry exactly one delimiter, exactly one header above it, and
+    // matching widths. GFM refuses to recognise a table whose header and
+    // delimiter disagree, so the block renders as a paragraph of pipes while
+    // every table gate in this runner goes on reading it as a table -- which is
+    // the worst of both, and is invisible to CI-06u and CI-06v alike.
+    expect: 'the delimiter row below it declares',
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded: a column added to the header and not to the delimiter -->\n\n` +
+          `| Term | Meaning | Added |\n|---|---|\n| scope-hdr | two cells below a three-cell header | x |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/table-row-width/a-run-with-no-delimiter-is-CI-06v-s',
+    gate: 'CI-06/table-row-width',
+    what: 'an orphan run carrying no delimiter row, which is CI-06v\'s finding and must NOT be this gate\'s',
+    expect: 'PASS',
+    // THE TWO GATES DIVIDE ONE POPULATION AND NEITHER MAY CLAIM THE OTHER'S
+    // HALF. A run with no delimiter declares no width, so there is nothing here
+    // to compare a row against, and a gate that guessed a width from the longest
+    // row would report the same fragment twice under two names. `markdownTables`
+    // discards those runs and `markdownRuns` keeps them, which is exactly the
+    // split CI-06v was given the discarded half for.
+    //
+    // The control adds a delimiter of a DIFFERENT width to the same rows: the
+    // single edit that turns CI-06v's finding into this gate's.
+    control: {
+      expect: 'cell(s) where its table\'s delimiter declares 3',
+      seed: (d) =>
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) =>
+            `${b}\n<!-- control -->\n\n| A | B | C |\n|---|---|---|\n` +
+            `| ctl-p | no delimiter above these two |\n| ctl-q | nor above this one |\n`,
+        ),
+    },
+    seed: (d) =>
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) =>
+          `${b}\n<!-- seeded -->\n\n| scope-p | no delimiter above these two |\n` +
+          `| scope-q | nor above this one |\n`,
+      ),
+  },
+  {
+    name: 'CI-06/table-row-width/a-register-entry-that-names-nothing',
+    gate: 'CI-06/table-row-width',
+    what: 'a register entry for a row that is not ragged, which is the shrink-only property CI-06u and CI-06l both state',
+    // THE REGISTER HOLDS SEVENTEEN REPAIRS THIS SESSION'S FENCE DID NOT REACH,
+    // and an allowlist that may be added to and never shrinks is furniture
+    // within a month. The seed adds an entry naming a row that is perfectly well
+    // formed, which is what an entry left behind by a landed repair looks like.
+    // Seeding the GATE rather than the DOCUMENT is deliberate: it needs no
+    // judgement about which line in a live registry may be deleted, and it is
+    // the same construction CI-06/retired-constraints uses one register over.
+    expect: 'exempts nothing and hides the next one',
+    seed: (d) =>
+      edit(d, GATES_PATH, (b) =>
+        once(
+          b,
+          'const CI06_WIDTH_REGISTER = new Map([',
+          "const CI06_WIDTH_REGISTER = new Map([\n  ['docs/GLOSSARY.md', ['seeded-by-falsify']],",
+        ),
       ),
   },
   // ---------------------------------------------------------------------------
