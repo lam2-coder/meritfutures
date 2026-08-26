@@ -173,6 +173,45 @@ function figureNeedles(): readonly { readonly kind: string; readonly re: RegExp 
   ];
 }
 
+/**
+ * A statistic that ALREADY CARRIES ITS TAIL, which is the shape GS-144 permits.
+ *
+ * THIS EXISTS BECAUSE THE TWO HALVES OF THE CONTROL WOULD OTHERWISE CONTRADICT
+ * EACH OTHER, and the contradiction was found by asserting it rather than by
+ * reasoning about it. `statisticText` in [`stats.ts`](./../routes/stats.ts)
+ * emits `14.70% (2026-04-14 to 2026-08-20, as of 2026-08-20, n=2803)`: the
+ * value, the window, the as-of trading day and the sample as ONE string, which
+ * is precisely AS-M9-03's "in the same visual unit as the number". A lint that
+ * refused that string would refuse the only sanctioned output of the only
+ * sanctioned accessor, and a lint that is wrong about the correct case is a
+ * lint somebody disables in its first week, correctly.
+ *
+ * GS-144's sentence is "a published statistic rendered WITHOUT its trailing
+ * window". A figure carrying its window is the passing case and has to read as
+ * one here.
+ *
+ * NONE OF THE FIGURE ALTERNATIVES BELOW CAN CONTAIN A SECOND BARE FIGURE, which
+ * is what keeps this from being a hole: the numeric shapes stop at their own
+ * token and the word shape matches no digit, so "the cap is $1,500 and the rate
+ * is 14.70% (window, as of day, n=N)" blanks the rate and leaves the cap to be
+ * refused.
+ *
+ * IT IS PINNED AGAINST `statisticText` BY AN ASSERTION AND NOT BY A COMMENT.
+ * The suite feeds real `statisticText` output through this expression, so a
+ * change to that format breaks a test rather than silently widening a carve-out.
+ * That is this repository's own rule: prefer a mechanical assertion over a
+ * second reading of the source.
+ */
+const RENDERED_TAIL = String.raw`\(\d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}, as of \d{4}-\d{2}-\d{2}, n=[\d,]+\)`;
+
+/** `money`, `basisPoints`, `count`, `duration`, or INV-M12-05's reason. */
+const RENDERED_FIGURE = String.raw`(?:-?\$?[\d,]+(?:\.\d+)?%?|-?[\d,]+h \d+m|-?\d+m \d+s|-?\d+s|[A-Za-z][A-Za-z -]*)`;
+
+/** The whole sanctioned shape: a figure and the tail that makes it statable. */
+export function statisticWithTail(): RegExp {
+  return new RegExp(`${RENDERED_FIGURE} ${RENDERED_TAIL}`, 'g');
+}
+
 /** `<PlanValue ... />` and `<Statistic ... />`, self-closing or paired. */
 const SANCTIONED_ELEMENT = /<(PlanValue|Statistic)\b([^>]*)\/?>/g;
 
@@ -253,9 +292,11 @@ function lintSurface(surface: AuthoredSurface): readonly ContentFinding[] {
     return blank(whole);
   });
 
-  const scannable = masked
-    .split(SETTLEMENT_WINDOW_CARVE_OUT)
-    .join(blank(SETTLEMENT_WINDOW_CARVE_OUT));
+  const carved = masked.split(SETTLEMENT_WINDOW_CARVE_OUT).join(blank(SETTLEMENT_WINDOW_CARVE_OUT));
+
+  // A statistic that already carries its window is the PASSING case of GS-144,
+  // so it is blanked before the figure scan rather than refused by it.
+  const scannable = carved.replace(statisticWithTail(), blank);
 
   for (const needle of figureNeedles()) {
     for (const hit of scannable.matchAll(needle.re)) {
