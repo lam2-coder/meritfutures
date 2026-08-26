@@ -8045,19 +8045,22 @@ const retiredConstraintsGate = {
 // noun, one run of whitespace and no window -- so the comparison is between rules
 // and not between parsers. The numbers are the argument:
 //
-//   * ANY VALUE. A cardinal governing a registry noun, whatever it counts: 1,569
-//     sites, of which 198 are in live prose. Almost every one of the 198 is a
+//   * ANY VALUE. A cardinal governing a registry noun, whatever it counts: 1,677
+//     sites, of which 206 are in live prose. Almost every one of the 206 is a
 //     LOCAL SUBSET and not a population: `1 gate`, `2 gate`, `Six deltas`, `three
-//     tables`. A gate reporting 198 findings on a clean tree is switched off in a
+//     tables`. A gate reporting 206 findings on a clean tree is switched off in a
 //     week, and it would be right to switch it off.
 //   * A TOTALITY WORD BEFORE THE CARDINAL (`all 47 migrations`), at a value the
-//     tree does not derive: four findings in live prose, and ALL FOUR ARE FALSE.
+//     tree does not derive: five findings in live prose, and ALL FIVE ARE FALSE.
 //     "All three tables are the approved design" is a local set with a totality
-//     word in front of it, and so are the other three.
+//     word in front of it, and so are the other four.
 //   * VALUE-ANCHORED: the cardinal must equal what its bound query returns ON
-//     THIS TREE. Zero findings in live prose on a clean tree, 131 sites under a
+//     THIS TREE. Zero findings in live prose on a clean tree, 137 sites under a
 //     dated or session heading and 11 in a table row, both excluded by shape and
 //     both counted on every run.
+//
+// The three figures move as the tree moves, which is why the RUN NOTE prints the
+// live ones and this block is dated: measured on this branch, 2026-08-26.
 //
 // A number that equals the size of the population its own sentence names is
 // overwhelmingly that population's size, and nothing looser survives contact with
@@ -8089,7 +8092,7 @@ const retiredConstraintsGate = {
 //      true when it was written and a generated span there would REWRITE THE
 //      RECORD TO SAY SOMETHING IT DID NOT SAY, which is a worse defect than the
 //      one being repaired. `ADR-064` is what lets a session number stand beside a
-//      date: a session number IS a day-and-slot allocation. 131 candidate sites
+//      date: a session number IS a day-and-slot allocation. 137 candidate sites
 //      live under such headings against 11 in table rows and none in live prose,
 //      and they are declared out of scope rather than missed. Only levels 1 and 2
 //      set the flag: an ADR's `### 3.` subsection inherits its file's dated `##`
@@ -8105,8 +8108,9 @@ const retiredConstraintsGate = {
 //      finding in a `.ts` header would be a finding with no remedy, and a finding
 //      with no remedy is how a gate gets switched off. Measured rather than
 //      waved at: the same recogniser over every `.ts`, `.tsx`, `.mjs` and `.sql`
-//      in the tree finds 14 sites, four of them in `schema.ts` and three in
-//      `scope.ts`. Closing them needs the generator taught to write a comment
+//      in the tree finds 17 sites, eleven under `packages/` -- four of them in
+//      `schema.ts` and three in `scope.ts` -- and six in this runner and its
+//      harness. Closing them needs the generator taught to write a comment
 //      span, which is a change under `packages/` this session's fence forbids. It
 //      is named here as owed rather than left for somebody to rediscover.
 //   2. THE RECEIPT'S OWN NUMBER IS NOT IN THE VOCABULARY AND CANNOT BE. "How many
@@ -8244,12 +8248,13 @@ const ci06DerivableCounts = {
     'wrong by one, and git saw no conflict because both sides wrote the same character. ' +
     'THE RECOGNISER IS VALUE-ANCHORED AND THE ALTERNATIVES WERE MEASURED WITH THE SAME ' +
     'READER, so the comparison is between rules and not between parsers. A cardinal GOVERNING ' +
-    'a registry noun at ANY value is 1,569 sites under docs/, 198 of them in live prose and ' +
+    'a registry noun at ANY value is 1,677 sites under docs/, 206 of them in live prose and ' +
     'almost every one a local subset (1 gate, Six deltas, three tables). A TOTALITY WORD ' +
-    'before the cardinal at a value the tree does not derive gives four findings in live ' +
-    'prose and ALL FOUR ARE FALSE. VALUE-ANCHORED gives zero in live prose, 131 sites under a ' +
-    'dated or session heading and 11 in a table row. So the cardinal must EQUAL what its ' +
-    'bound query returns on this tree. ' +
+    'before the cardinal at a value the tree does not derive gives five findings in live ' +
+    'prose and ALL FIVE ARE FALSE. VALUE-ANCHORED gives zero in live prose, 137 sites under a ' +
+    'dated or session heading and 11 in a table row (measured on this branch, 2026-08-26; the ' +
+    'live figures are in the run note). So the cardinal must EQUAL what its bound query ' +
+    'returns on this tree. ' +
     'THE FALSE NEGATIVE THAT BUYS IS STATED RATHER THAN HIDDEN: A COUNT THAT HAS ALREADY ' +
     'DRIFTED IS INVISIBLE. The merged receipt read NINE against a truth of TEN and this gate ' +
     'would have been silent on it. On EITHER BRANCH ALONE it read NINE against a derivation ' +
@@ -8258,14 +8263,14 @@ const ci06DerivableCounts = {
     'FOUR EXCLUSIONS, ALL BY SHAPE AND ALL COUNTED ON EVERY RUN. A generated span is the ' +
     'remedy, not the defect. A fenced block is a worked example. A HEADING NAMING A DATE OR A ' +
     'SESSION NUMBER makes its section a RECORD of a measurement made that day, and a span ' +
-    'there would rewrite the record to say what it did not say; 131 candidate sites live ' +
+    'there would rewrite the record to say what it did not say; 137 candidate sites live ' +
     'under such headings, declared out of scope rather than missed. And a TABLE ROW is a ' +
     "per-row datum where ADR-034's subject is a prose sentence; 11 sites. " +
     'FOUR MORE THINGS IT DOES NOT DO. It reads MARKDOWN ONLY, because generate() rewrites ' +
     'markdown and a finding with no remedy is how a gate gets switched off; the same ' +
-    'recogniser over every .ts, .tsx, .mjs and .sql finds 14 further sites, four of them in ' +
-    "schema.ts and three in scope.ts, and closing them needs a comment-span generator under " +
-    'packages/. THE ' +
+    'recogniser over every .ts, .tsx, .mjs and .sql finds 17 further sites, eleven under ' +
+    'packages/ (four in schema.ts, three in scope.ts) and six in this runner and its ' +
+    'harness, and closing them needs a comment-span generator. THE ' +
     "RECEIPT'S OWN NUMBER IS NOT IN THE VOCABULARY AND CANNOT BE: how many registered tables " +
     "carry a later ADD COLUMN is derived by scoped-db.test.ts's replay and by nothing in this " +
     'runner, so the gate reaches the CLASS and not that INSTANCE. The vocabulary is a ' +
@@ -8346,15 +8351,40 @@ const ci06DerivableCounts = {
         for (const [value, at, text] of found) {
           cardinals++;
           // The noun must GOVERN the cardinal: one run of whitespace, then the
-          // noun, allowing the emphasis this corpus wraps nouns in. A window
-          // would admit "47 of the 111 tables", where the 47 counts something
-          // else entirely.
+          // noun, allowing the emphasis this corpus wraps both in. A window would
+          // admit "47 of the 111 tables", where the 47 counts something else
+          // entirely.
+          //
+          // EMPHASIS IS ALLOWED ON EITHER SIDE OF THAT WHITESPACE, and the
+          // trailing side was missed on the first reading. `**32 gates**` matched
+          // and `**32** gates` did not, because the second closes its emphasis
+          // BEFORE the space, which is a form this corpus writes constantly.
+          //
+          // EACH VOCABULARY PATTERN IS ANCHORED AGAINST THE TEXT RATHER THAN A
+          // NOUN BEING CAPTURED FIRST AND COMPARED AFTER, and the difference was
+          // three dead entries. Capturing with a lazy `[A-Za-z ]*?` and a
+          // word-boundary lookahead stops at the FIRST word: `edge cases` was
+          // read as `edge`, so `ec_count`, `gs_count` and `manifest_changes`
+          // could never match anything and the gate was asserting five eighths
+          // of what its vocabulary claimed, silently, on a clean tree. Anchoring
+          // the entry's own pattern lets a multi-word noun match as one noun.
+          //
+          // THE ENTRY'S OWN FLAGS ARE CARRIED and no `i` is added here: `ADRs`
+          // is case-sensitive on purpose and the rest are not, which is a
+          // per-entry judgement recorded in the vocabulary rather than a blanket
+          // rule applied at the comparison.
           const after = line.slice(at + text.length);
-          const governed = /^\s+[`*_]{0,3}([A-Za-z][A-Za-z ]*?)[`*_]{0,3}(?![\w-])/.exec(after);
-          if (!governed) continue;
-          const entry = vocabulary.find(
-            (v) => v.value === value && new RegExp(`^(?:${v.noun.source})$`, 'i').test(governed[1]),
-          );
+          let governed = null;
+          const entry = vocabulary.find((v) => {
+            if (v.value !== value) return false;
+            const m = new RegExp(
+              `^[\`*_]{0,3}\\s+[\`*_]{0,3}(${v.noun.source})[\`*_]{0,3}(?![\\w-])`,
+              v.noun.flags,
+            ).exec(after);
+            if (!m) return false;
+            governed = m[1];
+            return true;
+          });
           if (!entry) continue;
           if (inRecord) {
             skipped.record++;
@@ -8366,7 +8396,7 @@ const ci06DerivableCounts = {
           }
           sites++;
           findings.push(
-            `${file}:${i + 1}: "${text} ${governed[1]}" states a count this runner derives: ` +
+            `${file}:${i + 1}: "${text} ${governed}" states a count this runner derives: ` +
               `the query "${entry.query}" returns ${entry.value} on this ref. ADR-034 rules ` +
               'that no document states a derivable quantity unless it sits in a generated ' +
               'span. Two branches that each move this number to the same value for different ' +

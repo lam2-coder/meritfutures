@@ -688,25 +688,58 @@ const absorb299 = (body) => {
 // re-derive when it runs against that same copy.
 const DERIVABLE_DOC = 'docs/GLOSSARY.md';
 
-// The gate count OF THE TREE COPY, derived the way `gate_count` derives it: from
-// the runner's own list of gates.
+// THE DERIVED COUNTS OF THE TREE COPY, READ OUT OF THE RUNNER'S OWN RUN NOTE.
 //
-// READ FROM THE RUNNER AND NOT FROM A SPAN, and the difference bit on the first
-// run. Reading a `gen:gate_count` span would make every seed below depend on
-// CI-06g being green in the copy: on a branch that has added a gate and not yet
-// run `generate`, the span says one number, the query says another, and the seed
-// writes a sentence the gate correctly declines to match. The harness then
-// reports DID NOT FAIL -- which reads as a gate problem -- for what is a stale
-// span. Deriving from `list` uses the same artifact `GATES.length` does and
-// cannot disagree with it.
-const gateCountIn = (d) => {
-  const out = execFileSync('node', [join(d, 'scripts/corpus/gates.mjs'), 'list'], {
-    encoding: 'utf8',
-  });
-  const n = [...out.matchAll(/^\S+\s\s/gm)].length;
-  if (n === 0) throw new Error('seed anchor not found: the runner in the tree copy lists no gates');
-  return n;
+// `CI-06/derivable-counts` prints its whole vocabulary and each query's value on
+// every run, for the reason `CI-06u` prints its register size: a number restated
+// in a comment beside the thing that computes it is ADR-034's own subject. That
+// note is therefore the one place a seed can read a derived count from WITHOUT
+// writing a second implementation of the query into this harness, which would be
+// the drift class the gate exists to end, inside the harness proving the gate.
+//
+// NOT READ FROM A `gen:` SPAN, and the difference bit on the first run. A span
+// makes every seed below depend on CI-06g being green in the copy: on a branch
+// that has added a gate and not yet run `generate`, the span says one number and
+// the query says another, the seed writes a sentence the gate correctly declines
+// to match, and the harness reports DID NOT FAIL -- which reads as a gate problem
+// -- for what is a stale span.
+//
+// The gate is allowed to EXIT NON-ZERO here. `expect` resolves against the
+// SEEDED tree, where the gate is failing by construction, so a runner that only
+// accepted exit 0 would throw on every case that works.
+const vocabularyIn = (d) => {
+  let out;
+  try {
+    out = execFileSync(
+      'node',
+      [join(d, 'scripts/corpus/gates.mjs'), 'check', 'CI-06/derivable-counts'],
+      { encoding: 'utf8' },
+    );
+  } catch (err) {
+    out = (err.stdout ?? '') + (err.stderr ?? '');
+  }
+  const note = /vocabulary ([^;]+);/.exec(out);
+  if (!note) {
+    throw new Error('seed anchor not found: CI-06/derivable-counts no longer prints a vocabulary');
+  }
+  const values = new Map();
+  for (const m of note[1].matchAll(/([A-Za-z ]+?)=(\d+)/g)) values.set(m[1].trim(), Number(m[2]));
+  if (values.size === 0) throw new Error('seed anchor not found: the vocabulary note parsed empty');
+  return values;
 };
+
+// One population's derived count in the tree copy. Throws on a label the
+// vocabulary no longer carries, so a renamed noun is a stale seed and not a case
+// that quietly seeds a number nothing derives.
+const derivedIn = (d, label) => {
+  const value = vocabularyIn(d).get(label);
+  if (value === undefined) {
+    throw new Error(`seed anchor not found: no "${label}" entry in the gate's vocabulary note`);
+  }
+  return value;
+};
+
+const gateCountIn = (d) => derivedIn(d, 'gates');
 
 // A cardinal in words, for the one case that watches the word branch of
 // `cardinalValue`. Covers what this corpus writes and throws on anything else,
@@ -4112,6 +4145,31 @@ const SCOPE_CASES = [
         (b) =>
           `${b}\n## scope case, in words\n\nThe corpus now carries ` +
           `${inWords(gateCountIn(d))} gates.\n`,
+      ),
+  },
+  {
+    name: 'CI-06/derivable-counts/a-two-word-noun-is-one-noun',
+    gate: 'CI-06/derivable-counts',
+    what: 'a count governing a MULTI-WORD registry noun, which three of the eight vocabulary entries are',
+    // THE CASE THAT EXISTS BECAUSE THE BUG IT WATCHES SHIPPED FOR AN HOUR AND
+    // NOTHING HERE COULD SEE IT. The first reader captured the noun with a lazy
+    // `[A-Za-z ]*?` and a word-boundary lookahead, which stops at the FIRST
+    // word: `edge cases` was read as `edge`, so `ec_count`, `gs_count` and
+    // `manifest_changes` could never match anything at all. The gate reported
+    // PASS on a clean tree and asserted five eighths of what its vocabulary
+    // claimed, and every case above passed too, because every one of them uses
+    // the single word `gates`.
+    //
+    // A vocabulary of eight entries is NOT one code path watched eight times,
+    // and this case is the line between those two readings.
+    expect: 'golden scenarios" states a count',
+    seed: (d) =>
+      edit(
+        d,
+        DERIVABLE_DOC,
+        (b) =>
+          `${b}\n## scope case, a two-word noun\n\nThe registry holds ` +
+          `${derivedIn(d, 'golden scenarios')} golden scenarios.\n`,
       ),
   },
   // ---------------------------------------------------------------------------
