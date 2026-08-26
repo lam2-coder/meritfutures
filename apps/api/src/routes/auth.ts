@@ -79,7 +79,7 @@
 //   stamp `elevated_at`         as the first.
 //
 // and the wide doors are worse: `systemTx.update` (`scoped-db.ts:701`) and
-// `firmTx.update` (`:718`) pass `undefined` for the WHERE clause and take no
+// `firmTx.update` (`:720`) pass `undefined` for the WHERE clause and take no
 // parameter that could supply one, so EITHER ONE WRITES EVERY ROW IN THE TABLE.
 // A revoke through them logs out every trader on the platform; a challenge
 // consume through them consumes every outstanding challenge. `sqlExecutor` is

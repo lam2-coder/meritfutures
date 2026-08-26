@@ -3822,3 +3822,60 @@ Every seed was reverted and `git status --porcelain` reported clean before the f
 **Ten mutations seeded and one survived.** Dropping `frame(key)` from the canonical serialization -- keys out of `payload_hash` entirely -- left **all sixty tests green**, because the pair the suite tested is disambiguated by the value framing alone. The pair that needs it carries the **same values under different field names**, and its money form is a payload naming `risk_floor_cents` and one naming `account_ref` with the same number: under `provisioning_queue_intent_uq` those are one intent, so the second is silently not enqueued and an account is left at a floor nobody pushed. Two cases were added and the seed now fails 2.
 
 **Whether the fail-closed assertion discharges `GS-138` is a ruling nobody has taken**, which is [P3 wave 3](plans/P3-wave3-modules.md) section 11 item 3's own position. All fourteen M2 fixture rows are `blocked / vendor-call`; the assertion is written against the simulator anyway and [section 39](testing/golden-scenarios/39-fixture-status-and-blockers.md) is untouched.
+
+## `P3-j` has landed: the authentication surface, and the three writes nothing in this repository can express (2026-08-26, session 218)
+
+**Fifteen endpoints across two files, 43 tests, no dependency and no ADR.** [API_CONTRACT](architecture/API_CONTRACT.md) section 3's seven headings, section 3.1's six endpoints and `GET /me` are written in [`apps/api/src/routes/auth.ts`](../apps/api/src/routes/auth.ts) and [`apps/api/src/routes/me.ts`](../apps/api/src/routes/me.ts). Sixteen routes register on the public surface with [`health`](../apps/api/src/routes/health.ts), **zero are withheld**, and the figures are read out of `buildServer`'s own composition report rather than counted by hand.
+
+**The plan was committed and pushed before the first source file existed.** [ADR-003](decisions/ADR-003.md) asks for plan mode on a money path; a remote autonomous session that enters the harness's plan mode blocks on an approval prompt nobody is watching, so the discipline is discharged in writing. That commit is the gate and it is the first on the branch.
+
+### `C-27` is a type, and the seed is a compiler directive
+
+`ElevationFactor` admits `passkey` and `dual_channel` and nothing else, which is `sessions.elevated_by_factor`'s CHECK list at `0029:581` written as a union. So an SMS-offered elevation is **not a value of `ElevateRequest`**, which is section 12's *"there is no such value to send"* made true rather than restated.
+
+**Both directions of that claim were executed rather than asserted.** A seeded handler comparing the parsed factor against `sms_otp` is **`TS2367`**, *"types `"passkey" | "dual_channel"` and `"sms_otp"` have no overlap"*; and widening the union turns all three `@ts-expect-error` directives in the suite into **`TS2578`** unused-directive errors. `apps/api/tsconfig.json` includes `test/**/*.ts`, so the refusal is checked by `pnpm run typecheck` and not by a test somebody could delete.
+
+### The required factor is declared once per endpoint and it is load bearing
+
+The route list and the declaration table are **derived from the same array**, so a route cannot be registered without stating its factor and the two cannot drift. `endpointHandler` applies the declared factor before any handler body runs, and **no handler in either file contains an authorization check of its own**. Section 12's second assertion is asserted as a biconditional: a `C-27:` tag and a non-single factor are the same rows, in both directions.
+
+**`RouteDefinition` has nowhere to put this**, so it lives in a module-level export. A later gate that reads declarations out of the code rather than out of the document has to know that, and every route slice behind this one will place it somewhere of its own choosing unless [ADR-100](decisions/ADR-100.md)'s registry grows the field.
+
+### Section 12's six rows, in both directions, and ten mutations
+
+The two quiet rows are the ones worth naming: `GET /sessions` and `GET /phone/change` return **200** from a single-factor session, and the read that showed the destination is watched succeeding **from the same session** whose write is refused, because two tests using two sessions would not show it is the same caller.
+
+**Ten mutations were seeded one at a time and every one was caught** at 4, 2, 2, 3, 5, 5, 3, 1, 1 and 1 failures: the two `C-27` rows losing their factor, the two quiet rows gaining one, `authorize` ceasing to read elevation, `authorize` answering 403 to an anonymous caller, the 403 ceasing to name the factor, `Retry-After` dropped, the degraded 202 losing `deferred`, and `GET /me` becoming a pass-through. Every seed was removed with `git status --porcelain` empty.
+
+**No number in either file is a rate limit.** Both the SMS and the EMAIL branch go through one port method, and the suite drives the velocity by counting to a `send_limit` read off a seeded `otp_send_budget` row, so the limit is data in the test as well as in the handler.
+
+### The finding: three writes, and nothing in this repository can express any of them
+
+| Write | Why |
+|---|---|
+| revoke ONE session | `ScopedTx.update` renders `scopePredicate(key, identityId)` and **takes no second predicate**, so it writes every session that identity holds |
+| consume ONE otp challenge | `otp_challenges` is `firm`, so `scopedTx` refuses it at compile time and the firm door is the defect below |
+| stamp `elevated_at` on ONE session | as the first |
+
+`systemTx.update` ([`scoped-db.ts:701`](../packages/db/src/scoped-db.ts)) and `firmTx.update` (`:720`) render **no `WHERE` clause at all**, which is [session 222](sessions/2026-08-26-session-222.md)'s finding, confirmed from the API side. **What is new here is `scopedTx.update`**, which looks like the safe door and is not: its blast radius is one trader logged out of every device instead of one, with every type in the workspace green, and that is the size that survives review.
+
+**And the remedy the dispatch offered is not available.** `SqlExecutorReason` is closed at `'job-enqueue'` ([`scoped-db.ts:567`](../packages/db/src/scoped-db.ts)) and `sqlExecutorOn` throws on any other word, so reaching raw SQL from a route handler means editing that file. So `AuthBackend` is **declared and blocked on its own declaration**, its default throws on all sixteen methods, and every route answers **503 `service_unavailable`** until a store is wired. Nothing is routed around.
+
+**Three of the dispatch's six cited line numbers do not resolve**: `systemTx.rows` is 695, `firmTx.update` is 720 and `firmTx.delete` is 723, not 694, 718 and 721. The defect is entirely real and what drifted is the coordinate, which is why the header in [`auth.ts`](../apps/api/src/routes/auth.ts) names the method first and the line second.
+
+### Two things recorded rather than ruled
+
+| # | Item | Disposition |
+|---|---|---|
+| **1** | **`POST /phone/change/:id/cancel` has no required factor anywhere in the corpus.** Section 3.1 declares one for opening a change and one for reading one and says nothing about cancelling | Declared `session` on the contract's **own** argument, that requiring elevation to STOP an attacker's ceremony would lock the real owner out of the control that helps them. **A debt against section 12**, which is outside this fence |
+| **2** | **`POST /auth/elevate`'s declared cell reads `session` where section 12's reads `passkey or dual_channel`** | Not an error. That cell names the factor the **elevation admits**; section 3 says *"Auth: session"* and *"it never issues a new one"*, so a caller with no session has nothing to elevate. `CI-06k` reads the document and never this array |
+
+**A third is a contradiction inside API_CONTRACT itself and it is reported, not resolved.** Section 3 says *"the response is unchanged and `deferred` is set"* and, one sentence later, that distinguishing the degraded response *"would tell an attacker exactly when their own traffic tripped the breaker"*. A response carrying `deferred` **is** distinguishable, and `OtpResponse202` declares the field. The declared type is implemented and the status-is-unchanged reading is taken; the resolution is a ruling on a frozen document.
+
+### Nothing is admitted, and no number is reserved
+
+[`pnpm-workspace.yaml`](../pnpm-workspace.yaml), [`pnpm-lock.yaml`](../pnpm-lock.yaml) and [`apps/api/package.json`](../apps/api/package.json) are **all untouched**, which the fence permitted and the work did not need: a WebAuthn verifier admitted here would sit behind a port that throws, because a passkey assertion cannot be verified without the credential store and `passkeys` lives in `packages/db`. The lockfile is rowed **SERIAL** across `P3-j`, `P3-m` and `P4-i`, so not taking it is a scheduling result and not only a tidiness one. **`ADR-108`'s conditional reservation stands exactly as dispatched** and is deleted by whoever lands next.
+
+**Measured on this branch, not inherited.** Suite **122 files / 2,028 passed / 1 skipped** to **123 files / 2,071 passed / 1 skipped**; `apps/api` **4 files / 37 tests** to **5 / 80**; `typecheck` exit 0; `eslint apps/api` exit 0; gates **30 of 30**; `verify` exit 0.
+
+**NOT MERGED. The `E2` read is owed on every line of it and it is AUTH.**
