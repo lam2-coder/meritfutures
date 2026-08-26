@@ -1,0 +1,206 @@
+<!doctype html>
+<!--
+  apps/site/e2e/fixtures/plans.seeded.html
+
+  THE SEEDED VIOLATION. This file is deliberately every tell Appendix F names,
+  and the pass asserts that ALL EIGHT checks fire against it on every rendering.
+
+  IT IS THE FALSIFICATION HALF OF THE GATE AND IT IS IN-BAND ON PURPOSE. P1
+  section 6: "Every gate any of these sessions wires ships with a seeded
+  violation, and must fail on that finding rather than merely exit non-zero."
+  Every other gate in this corpus satisfies that through `scripts/corpus/falsify.mjs`,
+  which mutates the working tree and therefore runs separately. This pass carries
+  its seed as a fixture, so the clean direction and the seeded direction run in
+  the same job on the same commit, and a check that has stopped reading turns
+  the run red immediately rather than at whatever point somebody next runs a
+  separate harness.
+
+  DO NOT REPAIR THIS FILE. A "fix" here disables the half of the pass that
+  proves the other half is alive. If a check stops firing against it, the check
+  is what moved.
+
+  WHAT IS SEEDED, BY CHECK:
+    SS-01  a 135deg indigo-to-violet gradient on the hero and on the figure
+    SS-02  a 4px colored left border on a card and on a blockquote (DG-07)
+    SS-03  Inter as the body face, and the untouched shadcn stack on the cards
+    SS-04  Tailwind blue, lavender, pure #fff and pure #000 as surfaces
+    SS-05  four rounded cards with shadows, which is DG-08 cardocalypse
+    SS-06  "Unlock" and "Empower" opening sentences
+    SS-07  a rocket in a declared icon slot and a chart standing alone
+    SS-08  an em-dash in the testimonial
+  And the banned SECTION ORDER from section 5, for the reviewer gates DG-13
+  through DG-16 that no script can take.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Merit plans, the templated version</title>
+    <style>
+      html {
+        /* DG-06: pure white as a surface, and pure black as text. */
+        background-color: #ffffff;
+        color: #000000;
+        /* DG-10: Inter as the default face. */
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        font-size: 16px;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #ffffff;
+        color: #111827;
+      }
+
+      /* DG-13: a centered hero with a pill badge above the H1.
+         DG-01: an indigo-to-purple gradient. */
+      .hero {
+        text-align: center;
+        padding: 64px 24px;
+        background-image: linear-gradient(135deg, #4f46e5 0%, #a855f7 100%);
+        color: #ffffff;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 9999px;
+        background-color: #ede9fe;
+        color: #6d28d9;
+        font-size: 12px;
+      }
+
+      /* DG-04: a gradient applied to a large number "for impact". */
+      .impact {
+        font-size: 56px;
+        font-weight: 800;
+        background-image: linear-gradient(90deg, #3b82f6, #c084fc);
+        background-clip: text;
+        color: #7c3aed;
+      }
+
+      /* DG-08 and DG-09: every block a bordered rounded card with a shadow. */
+      .cards {
+        display: flex;
+        gap: 16px;
+        padding: 32px 24px;
+        flex-wrap: wrap;
+      }
+
+      .card {
+        flex: 1 1 200px;
+        padding: 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        background-color: #ffffff;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+
+      /* DG-07: the colored left border, at the width Appendix F names. */
+      .card.featured {
+        border-left: 4px solid #6366f1;
+      }
+
+      blockquote {
+        margin: 24px;
+        padding: 16px 20px;
+        border-left: 4px solid #8b5cf6;
+        background-color: #f5f3ff;
+        color: #4c1d95;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+
+      .pricing {
+        display: flex;
+        gap: 16px;
+        padding: 24px;
+        align-items: stretch;
+      }
+
+      /* Section 5: middle-plan elevation, refused by name. */
+      .plan {
+        flex: 1;
+        padding: 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        background-color: #ffffff;
+      }
+
+      .plan.recommended {
+        transform: scale(1.05);
+        border-color: #6366f1;
+        box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.3);
+      }
+
+      .cta {
+        display: block;
+        margin: 24px;
+        padding: 12px 24px;
+        border: 0;
+        border-radius: 12px;
+        background-image: linear-gradient(90deg, #4f46e5, #9333ea);
+        color: #ffffff;
+        font-family: Poppins, Inter, sans-serif;
+        font-size: 16px;
+        box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.4);
+      }
+    </style>
+  </head>
+  <body>
+    <section class="hero">
+      <span class="badge">Now in beta</span>
+      <h1>Unlock the potential of your trading</h1>
+      <p>Empower your strategy with a platform built for serious traders.</p>
+      <p class="impact">48%</p>
+    </section>
+
+    <div class="cards">
+      <div class="card featured">
+        <p><span data-icon="rocket">&#128640;</span></p>
+        <h3>Seamless Integration</h3>
+        <p>Transform your workflow with powerful analytics and real time insights.</p>
+      </div>
+      <div class="card">
+        <p>&#128200;</p>
+        <h3>Powerful Analytics</h3>
+        <p>Elevate your edge with next generation tooling.</p>
+      </div>
+      <div class="card">
+        <p><span class="icon">&#9889;</span></p>
+        <h3>Instant Payouts</h3>
+        <p>Revolutionize the way you get paid.</p>
+      </div>
+      <div class="card">
+        <p>&#128176;</p>
+        <h3>Trusted Platform</h3>
+        <p>Discover why thousands of traders choose us every single day.</p>
+      </div>
+    </div>
+
+    <blockquote>
+      This platform changed everything for me &#8212; I passed on my first attempt and got paid in
+      under a day.
+    </blockquote>
+
+    <div class="pricing">
+      <div class="plan">
+        <h3>Starter</h3>
+        <p>$99</p>
+      </div>
+      <div class="plan recommended">
+        <h3>Pro</h3>
+        <p>$199</p>
+      </div>
+      <div class="plan">
+        <h3>Elite</h3>
+        <p>$399</p>
+      </div>
+    </div>
+
+    <button class="cta" type="button">Get started today</button>
+  </body>
+</html>
