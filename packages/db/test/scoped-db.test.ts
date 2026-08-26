@@ -1261,7 +1261,10 @@ describe('a row that belongs to two identities is scoped to neither', () => {
 
   // THE REFUSAL THAT WOULD HAVE CAUGHT THE WRONG ANSWER, and the wrong answer is
   // the one four sessions declined to write: an `owned` rule naming ONE of the
-  // two columns. Every existing assertion accepts it -- the column IS declared
+  // two columns. IT ASSERTS EXACTLY ONE RATHER THAN NOT-MORE-THAN-ONE, which is
+  // the direction it can fail in: a reader that stopped matching would find zero
+  // on every table and a not-more-than-one assertion would stay green on all
+  // forty of them. Every existing assertion accepts it -- the column IS declared
   // `REFERENCES identities(id)`, it IS `NOT NULL`, the rendered predicate DOES
   // compare it and DOES bind the identity -- so the suite was green on a rule
   // that returns a strict subset of a person's own rows, selected by UUID
@@ -1271,7 +1274,7 @@ describe('a row that belongs to two identities is scoped to neither', () => {
   // clause 1's method: it refuses ZERO of them, so no green row turns red and
   // there is no exemption to write down. Exactly four tables in 111 declare more
   // than one identity column and none of the four was ever registered `owned`.
-  test('no owned rule stands on a row that declares more than one identity column', () => {
+  test('every owned rule stands on a row that declares EXACTLY ONE identity column', () => {
     for (const key of TABLE_KEYS) {
       if (SCOPE_RULES[key].class !== 'owned') continue;
       expect(
