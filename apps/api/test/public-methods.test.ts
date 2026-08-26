@@ -9,6 +9,7 @@ import {
 } from '../src/routes/public-methods.ts';
 import type {
   MethodDefinitionSource,
+  MethodPageResponse,
   StatisticDefinitionRow,
 } from '../src/routes/public-methods.ts';
 
@@ -114,11 +115,7 @@ test('every version is served, ascending, with the ADR reference for every chang
 
   const res = await app.inject({ method: 'GET', url: url('ST-01') });
   expect(res.statusCode).toBe(200);
-  const body = res.json() as {
-    stat_code: string;
-    live_version: number;
-    versions: Array<Record<string, unknown>>;
-  };
+  const body = res.json() as MethodPageResponse;
 
   // M12 section 4: "The method page, all versions, with the ADR reference for
   // every change". The source handed them over newest first on purpose.
@@ -139,7 +136,7 @@ test('live_version is the unsuperseded row even when it has not taken effect yet
   const { app } = buildServer({ surface: 'public', modules: onDisk });
 
   const res = await app.inject({ method: 'GET', url: url('ST-01') });
-  const body = res.json() as { live_version: number; versions: Array<{ effective_from: string }> };
+  const body = res.json() as MethodPageResponse;
 
   // INV-M12-07: `effective_from` is always in the future at write time, so the
   // unsuperseded row is regularly one that is not yet in force. The response
@@ -162,7 +159,7 @@ test('neither surrogate key reaches the response, which is section 1s allowlist'
   expect(raw).not.toContain('22222222-2222-4222-8222-222222222222');
   expect(raw).not.toContain('superseded_by"');
 
-  const body = res.json() as { versions: Array<Record<string, unknown>> };
+  const body = res.json() as MethodPageResponse;
   expect(Object.keys(body.versions[0] ?? {}).sort()).toStrictEqual([
     'adr_ref',
     'denominator_spec',
