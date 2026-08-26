@@ -178,6 +178,21 @@ jobs:
       - name: Format
         run: pnpm run format:check
 
+      # VG-M9-2, INV-M9-07's content lint, which GS-143 and GS-144 assert
+      # against. It runs in CI-01 because it is a lint and this is the lint
+      # stage, and it is a step of its own rather than a rule inside
+      # `pnpm run lint` because ESLint reads TypeScript and this reads MDX.
+      #
+      # IT ASSERTS IN BOTH DIRECTIONS ON EVERY RUN, which is DELIVERY_PLAN
+      # section 4's own done-condition for this slice: "GS-143 and GS-144
+      # failing the build on a seeded violation". Nine seeded inputs must be
+      # refused BY THE RULE EACH ONE NAMES and seven clean inputs must build, so
+      # a needle that stops matching turns this step red instead of quiet. The
+      # authored corpus under `apps/site/content/` is empty today and the step
+      # prints that count rather than implying coverage it does not have.
+      - name: VG-M9-2 content lint, both directions (GS-143, GS-144)
+        run: node --experimental-strip-types apps/site/src/content/lint-cli.ts
+
       - name: Gates are falsifiable
         run: node scripts/ci/falsify-ci.mjs CI-01
 
