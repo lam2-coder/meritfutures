@@ -47,8 +47,18 @@ type Problem = {
   detail?: string;     // human detail, never leaks internals or other users' data
   instance?: string;   // request id for support correlation
   errors?: Array<{ path: string; message: string }>;  // validation failures only
+  required_factor?: RequiredFactor;  // 403 only; section 12's vocabulary. ADR-111
 };
+
+// Section 12's required-factor vocabulary, closed at six tokens, spelled as that
+// table spells them. The space in "passkey or dual_channel" is part of the token.
+type RequiredFactor =
+  | "none" | "session" | "passkey" | "dual_channel" | "passkey or dual_channel" | "admin_sso";
 ```
+
+**`required_factor` is an RFC 9457 extension member and never a code** ([ADR-111](../decisions/ADR-111.md) clause 4). Section 12 requires that the `403` on a sensitive action *"names the factor required so the client can offer it"*, and the canonical code table below is closed, so the code stays `forbidden` and the factor rides beside it. It appears on a `403` and on no other status: a `401` has no session to describe and a `200` is not a refusal.
+
+**It does not discharge `DEP-M4-07` and it does not discharge `INV-M4-14`** ([ADR-111](../decisions/ADR-111.md) clause 5). Those two need the declaration on a **read**, so that a control the session cannot use renders disabled **before** the trader acts; a field that arrives on a refusal is by construction too late for that, and [M04 section 3.7](../plans/M04-trader-portal.md) is written against exactly the failure of learning a boundary by hitting it. The read-surface half belongs to `GET /me` and is **not written yet**.
 
 Canonical codes:
 
@@ -227,6 +237,24 @@ type SessionRow = {
 };
 ```
 `GET` is a read and takes any single factor, deliberately: **a session you cannot see is one you cannot revoke**, and requiring elevation to look would lock a compromised account's real owner out of the one screen that helps them. Revoking another session is a **contact-class sensitive action** and requires elevation. Errors: `unauthenticated`, `forbidden`, `not_found`.
+
+### 3.2 The impersonation session ([ADR-068](../decisions/ADR-068.md), [ADR-111](../decisions/ADR-111.md))
+
+**A SHAPE WITH NO ENDPOINT YET, AND THIS PARAGRAPH IS THAT STATEMENT RATHER THAN AN OMISSION.** [M04 section 3.9](../plans/M04-trader-portal.md)'s banner renders from *"the session the server resolved, never from client state"*, and its carrier is **`Me.impersonation` on `GET /me`**: the portal's first call on every page load, so the banner and the session it describes arrive on one response and cannot disagree by the width of a request. **That member is not declared above**, because the auth surface that would serve it is in flight and is not this row's to write ([ADR-111](../decisions/ADR-111.md) clause 6). The shape is declared here so the slice that lands the member transcribes it rather than designing it.
+
+```ts
+type ImpersonationSession = {
+  admin_user_id: string;         // impersonation_sessions.admin_user_id
+  subject_identity_id: string;   // impersonation_sessions.subject_identity_id
+  reason_code: string;           // closed vocabulary, NOT NULL. ADR-068 requirement 5
+  reason_detail: string;         // NOT NULL and non-blank, so there is always something true
+  expires_at: string;            // the box, displayed and never authoritative
+};
+```
+
+Every field is a column on [`impersonation_sessions`](../../packages/db/migrations/0042_impersonation_sessions.sql) rather than a string the server composes, and **the absences are the specification**: no dismiss affordance, no admin origin ([ADR-012](../decisions/ADR-012.md) keeps `ADMIN_ORIGIN` a placeholder), no exit URL, and no field a third divergence from the trader's screen could be written into (`INV-M4-17`). **`null` means this is not an impersonation session**, which is the ordinary case and is what a trader's own session reads; requirement 7's non-disclosure is a consequence of `IMPERSONATION-C1` refusing an impersonation token on `sessions` in both directions, not of anything a client chooses to render.
+
+**A dedicated endpoint for this shape is refused rather than merely not chosen.** A second read is a second session resolution, and a banner rendered from a resolution other than the one that authorised the page is `GS-301`: a session that reaches expiry mid-view, on a page that still looks live.
 
 ## 4. Catalog (public)
 
@@ -505,6 +533,34 @@ type CertificateResponse = {
 };
 ```
 Certificates carry the simulated-environment disclosure by construction.
+
+### 6.1 Dashboard panels
+
+**A subsection rather than a new top-level section, on purpose.** Section 12 is cited by NUMBER ([`CI-06k`](../testing/STRATEGY.md) reads it, [M04](../plans/M04-trader-portal.md) `DEP-M4-07` cites it, [ADR-039](../decisions/ADR-039.md) amendment 4 is written against it), so inserting a section ahead of it would renumber it and break every one of those citations silently ([ADR-111](../decisions/ADR-111.md) clause 2).
+
+#### GET /economic-calendar
+The dashboard's Tier-1 economic calendar panel ([M04 section 3.8](../plans/M04-trader-portal.md), [ADR-066](../decisions/ADR-066.md) section 5.1, `DEP-M4-09`, `GS-285`).
+```ts
+type EconomicCalendarOccurrence = {
+  event_key: string; occurrence_key: string;
+  tier: number;                       // 1 to 3. A column, not an import filter (0039 header item 3)
+  scheduled_release_at: string;       // the one stored UTC instant
+  release_trading_day: string;        // stored, never derived (0039 header item 5)
+  revision: number;                   // a revision is a ROW, not an update. `> 0` means the time moved
+  revision_reason: string | null;
+};
+type EconomicCalendarPanelResponse = {
+  freshness: { stale: boolean; covered_through_day: string | null };
+  occurrences: EconomicCalendarOccurrence[];
+};
+```
+Auth: **session**. Nothing in the response is per-trader and a public row would work; it is authenticated anyway, because widening later is a decision and narrowing later is a break ([ADR-111](../decisions/ADR-111.md) clause 3). Errors: `unauthenticated`.
+
+**There is no timezone field and there must never be one.** One row, one UTC instant, converted per viewer at the point of display. `GS-285` is exactly the assertion that the same row renders correctly on two dashboards in two timezones, so a stored zone would be a second answer to "when was the news", which is the failure `FM-M7-08` guards, reached from inside the building instead of from an embed.
+
+**`freshness` is the whole reason the panel is safe to render, and `DEP-M4-09` says why in one line: *"the dangerous failure is not the empty panel, it is the confident one."*** Without it an uncovered week and a quiet week produce the same empty list and mean opposite things. `covered_through_day` is the last day any `economic_calendar_loads` row covers, or `null` when nothing has ever been loaded. **`stale` is the server's own answer against its own threshold**; the portal reads it and evaluates nothing.
+
+**The source is `economic_calendar_current` and no external origin** (`INV-M4-16`). There is no URL on any type above and nothing for one to be assigned to: an embed cannot carry a revision, cannot be staleness-monitored, and cannot be joined to `fills`, so one rendered beside this panel would satisfy the display and satisfy none of `DEP-M7-06`, `D-04` or `FM-M7-08`.
 
 ## 7. KYC and affiliate
 
