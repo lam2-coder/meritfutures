@@ -827,7 +827,12 @@ describe('the KYC webhook, on the receiver directly', () => {
 });
 
 describe('INV-M19-07: a document in a VERIFIED payload never reaches a store', () => {
-  const withDocument: JsonObject = { ...DECIDED, document_image: 'iVBORw0KGgoAAAANSUhEUg' };
+  // NOT A REAL BASE64 IMAGE HEADER. `CI-05`'s `generic-api-key` rule read the
+  // first draft's copy of one as a credential, and a fixture standing in for a
+  // document does not need to be a convincing document to a scanner. It needs
+  // to be a value the assertion can prove did not travel.
+  const documentBytes = 'FAKE-PNG-BYTES-NOT-A-CREDENTIAL';
+  const withDocument: JsonObject = { ...DECIDED, document_image: documentBytes };
 
   test('the event is refused with 400 and the applier is never called', async () => {
     const store = new FakeKycWebhookStore();
@@ -869,7 +874,7 @@ describe('INV-M19-07: a document in a VERIFIED payload never reaches a store', (
     });
     expect(refusal?.evidence).toEqual({ document_bearing_paths: ['document_image'] });
     // The image is nowhere in what was written down.
-    expect(JSON.stringify(refusal)).not.toContain('iVBORw0KGgo');
+    expect(JSON.stringify(refusal)).not.toContain(documentBytes);
   });
 
   test('a clean decision with scores is NOT refused, which is INV-M19-12', async () => {
