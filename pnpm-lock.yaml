@@ -111,6 +111,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@merit/kyc':
+        specifier: workspace:*
+        version: link:../../packages/kyc
       '@merit/psp':
         specifier: workspace:*
         version: link:../../packages/psp
@@ -274,6 +277,21 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@22.20.1)(vite@8.2.1(@types/node@22.20.1))
+
+  packages/kyc:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.1
+      fast-check:
+        specifier: 'catalog:'
+        version: 4.9.0
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
