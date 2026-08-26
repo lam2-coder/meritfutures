@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-25
+last_updated: 2026-08-26
 ---
 
 # STATE
@@ -3822,3 +3822,31 @@ Every seed was reverted and `git status --porcelain` reported clean before the f
 **Ten mutations seeded and one survived.** Dropping `frame(key)` from the canonical serialization -- keys out of `payload_hash` entirely -- left **all sixty tests green**, because the pair the suite tested is disambiguated by the value framing alone. The pair that needs it carries the **same values under different field names**, and its money form is a payload naming `risk_floor_cents` and one naming `account_ref` with the same number: under `provisioning_queue_intent_uq` those are one intent, so the second is silently not enqueued and an account is left at a floor nobody pushed. Two cases were added and the seed now fails 2.
 
 **Whether the fail-closed assertion discharges `GS-138` is a ruling nobody has taken**, which is [P3 wave 3](plans/P3-wave3-modules.md) section 11 item 3's own position. All fourteen M2 fixture rows are `blocked / vendor-call`; the assertion is written against the simulator anyway and [section 39](testing/golden-scenarios/39-fixture-status-and-blockers.md) is untouched.
+
+---
+
+## Session 225: the parameter lint, and the row that stopped being blocked twice in one branch
+
+**[`P4-j`](plans/P4-portal-and-site.md) is done and NO ADR WAS MINTED**, so `111`'s reservation in [ALLOCATION](decisions/ALLOCATION.md) is unused and the row is left exactly as it stands. [P4 section 5.3](plans/P4-portal-and-site.md) reached, and [ADR-097](decisions/ADR-097.md) had already discharged the term. Not a money path.
+
+**VG-M9-2 exists.** [`apps/site/src/content/lint.ts`](../apps/site/src/content/lint.ts) is INV-M9-07's control: a currency amount, a percentage or a day count stated in prose fails unless it is emitted by `<PlanValue plan= size= field=/>`, and a published statistic must come through `<Statistic code=/>` with its trailing window attached. **The OG image path exists too**, as [`apps/site/src/routes/og.ts`](../apps/site/src/routes/og.ts), against the four comments and no implementation [session 186](sessions/2026-08-24-session-186.md) measured.
+
+**THE BUILD QUESTION WAS SETTLED BY EXECUTING IT.** The dispatch left open whether this slice creates the minimum page that makes `next build` do something, or lints the MDX source independently of it. Seeding `apps/site/src/app/page.tsx` turns `CI-06/gate-inventory` red at **29 of 30**, because it is `CI-07`'s dated ARRIVAL condition in [STRATEGY](testing/STRATEGY.md) section 4.1 and [ADR-095](decisions/ADR-095.md) section 6 gives that stage to `P4-i`. **So the lint reads the authored source and the page models built from it**, which is where "the build fails" is expressible in a tree whose content is `content_documents.body_mdx` over HTTP ([ADR-096](decisions/ADR-096.md)). The seed was removed and the tree verified clean.
+
+**`GS-143` AND `GS-144` ARE NOW `covered-elsewhere`, AND THEY MOVED TWICE ON PURPOSE.** [Section 39](testing/golden-scenarios/39-fixture-status-and-blockers.md) first takes [ADR-097](decisions/ADR-097.md)'s transcription (`blocked / outside-loader-boundary`, `no-fixture-format` 229 to 227, `outside-loader-boundary` 4 to 6), because skipping to the exit would have left that ruling applied nowhere. It then takes **ADR-097's own stated exit** once the lint and the OG leg existed: *"Exits to `covered-elsewhere` when `P4-j` lands the lint"* and *"stays `blocked` until the OG leg runs"*. **So the summary cells that finally move are NOT the pair ADR-097 named**: `blocked` 266 to 264, `covered-elsewhere` 7 to 9, `outside-loader-boundary` back to 4, `no-fixture-format` holding at 227. `CI-06/fixture-inventory` now reads **9 covered-elsewhere rows FOR EXECUTION with 0 naming their row only from inside a disabled block**.
+
+**Three findings that later work inherits.**
+
+| # | Finding | Who it lands on |
+|---|---|---|
+| **1** | **[ADR-097](decisions/ADR-097.md)'s verbatim transcription block carries a stale clause and an unusable character.** *"`apps/site/package.json` declares no `build` script"* is false at this ref: [ADR-095](decisions/ADR-095.md) landed that script at `a890a3b`, which is **not an ancestor of ADR-097's signing commit `092004e`**, so the clause was true on its own branch and stale once both merged. And the `GS-144` cell's `grep` needle carries a **literal pipe**, which is text inside a code fence and a cell separator inside a table row: `CI-06/fixture-inventory` refused the row at five cells against four. Both repaired in transcription and recorded | Whoever writes a row inside a fenced block for another session to transcribe |
+| **2** | **The authoring lint and the renderer contradicted each other, and a test found it.** `statisticText` emits `14.70% (2026-04-14 to 2026-08-20, as of 2026-08-20, n=2803)`, which the lint refused as a bare percentage: it would have rejected the only sanctioned output of the only sanctioned accessor. A figure carrying its window is `GS-144`'s PASSING case and now reads as one, **pinned to `statisticText` by an assertion over real output** across all four units [ADR-031](decisions/ADR-031.md) enumerates plus INV-M12-05's suppressed shape | Anybody adding a value unit to `published_statistics`: the pin turns red rather than the carve-out widening |
+| **3** | **[P4](plans/P4-portal-and-site.md)'s `P4-j` fence cell is still two cells too narrow**, still reading *"`GS-143` and `GS-144`'s rows only"*. It was widened in the dispatch and not in the plan, so the plan still cannot execute its own edit. This is the second entry to record it after [session 186](sessions/2026-08-24-session-186.md) | Whoever holds [P4](plans/P4-portal-and-site.md) next |
+
+**The step watches itself fail before it reports a pass**, which is [DELIVERY_PLAN section 4](DELIVERY_PLAN.md)'s own done-condition for this slice, *"GS-143 and GS-144 failing the build on a seeded violation"*. One step in [`ci.yml`](../.github/workflows/ci.yml)'s `CI-01` job runs 16 specimens: **9 seeded that must be refused BY THE RULE EACH ONE NAMES** and **7 clean that must build**, three of them on the OG path with a clean body. It was watched red with one figure needle removed, then restored and re-run clean.
+
+**The ceiling is printed rather than left to be inferred.** `apps/site/content/` holds **no `.mdx` at all**, and the step prints that count on every run: what the lint guards today is its own specimens and the page models `og.ts` builds. **And the lint is tier 3 of three, not the strongest tier**: [P1 section 2.3](plans/P1-monorepo-scaffold.md) already wrote that a numeric-literal lint is evadable by arithmetic and by naming, and gives the stronger check, a property asserting every config parameter changes some output, to P2.
+
+**Nothing else moved.** [STRATEGY](testing/STRATEGY.md) is untouched, `CI-07` and `CI-08` being `P4-i`'s cells; [`ci.yml`](../.github/workflows/ci.yml) gains one step and is not restructured; [P4](plans/P4-portal-and-site.md) is read and not edited; `GS-147`, `GS-175` and `GS-195` keep their rows; and no migration, no `packages/db` file, no route, no dependency, no `CI-06` letter, no gate register row and no `VG` row is claimed.
+
+**Measured on this branch.** Suite **122 files / 2,028 passed / 1 skipped** to **124 files / 2,062 passed / 1 skipped**, `apps/site` **15 files / 177 passed**; gates **30 of 30**; `verify` exit 0; `eslint` and `format:check` clean; `gates.mjs generate` reports every span already matching its query.
