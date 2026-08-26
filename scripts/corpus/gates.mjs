@@ -6836,55 +6836,36 @@ function appRouterFiles() {
   return found.length === 0 ? null : `${found.join(', ')} is an App Router file`;
 }
 
-function playwrightInLockfile() {
-  const lock = 'pnpm-lock.yaml';
-  if (!existsSync(join(ROOT, lock))) {
-    throw new Error(
-      `CI-06/gate-inventory found no ${lock}, so CI-08's probe reads nothing and would ` +
-        'report the artifact absent for the wrong reason',
-    );
-  }
-  const body = read(lock);
-  // Rule 2 on the parse: a lockfile with no `packages:` block is a file this
-  // probe cannot read, and reporting ABSENT off a failed parse is reporting the
-  // right answer for the wrong reason.
-  if (!/^packages:$/m.test(body)) {
-    throw new Error(
-      `CI-06/gate-inventory found no \`packages:\` block in ${lock}, so CI-08's probe has ` +
-        'nothing to read and would report the artifact absent for the wrong reason',
-    );
-  }
-  // AN ENTRY KEY, NEVER AN OCCURRENCE, and this is the second half of a lesson
-  // this file already carries once. The needle was anchored on the NAME so that
-  // `@vitest/browser-playwright` could not trip it (ADR-073), and it was not
-  // anchored on the CONTEXT, so anything that MENTIONED the package tripped it.
-  //
-  // ADR-095 IS WHERE THAT STOPPED BEING HYPOTHETICAL. `next@16.3.2` declares
-  // `@playwright/test` as an OPTIONAL PEER, pnpm writes a package's peer block
-  // into the lockfile verbatim, and installing Next.js therefore wrote
-  //
-  //       '@playwright/test': ^1.51.1
-  //
-  // into pnpm-lock.yaml at six spaces of indent, under `next@16.3.2:`. The old
-  // needle read that as an install and failed CI-08 at 29 of 30 on a row whose
-  // artifact is genuinely ABSENT: Playwright is not in this tree.
-  //
-  // A LOCKFILE v9 ENTRY KEY IS `name@version:` AT EXACTLY TWO SPACES, in the
-  // `packages:` and `snapshots:` blocks. A peer declaration is deeper AND carries
-  // no `@version`, so both halves of the anchor exclude it, and a catalog entry
-  // (four spaces, no `@version`) is excluded on both as well. That is the reading
-  // of "present in the lockfile" that means INSTALLED, which is what CI-08's row
-  // has always meant: the artifact is the dependency, not a mention of it.
-  //
-  // WHAT THIS DOES NOT DO: it does not relax what CI-08 asserts, and CI-08's row
-  // in STRATEGY section 4.1 is untouched, because nothing about it was wrong.
-  const hit = /^ {2}'?@playwright\/test'?@[^\s:]+:$/m.exec(body);
-  return hit === null ? null : `${lock} holds the entry ${hit[0].trim()}`;
-}
+// -----------------------------------------------------------------------------
+// `playwrightInLockfile` IS RETIRED, AND THE REGISTER'S OWN RULE IS WHY
+// -----------------------------------------------------------------------------
+// It probed CI-08's activation condition, "@playwright/test present in the
+// lockfile". THE ARTIFACT ARRIVED (ADR-116) and CI-08's row is now implemented,
+// so no condition in STRATEGY section 4.1 names that artifact any more. The
+// stale-direction loop at the bottom of this gate then reports the probe as a
+// finding in its own words: "a register entry that no longer names a real
+// condition is a finding, which is what keeps this register from becoming
+// furniture". Removing it is that rule applied to this file rather than an
+// exception taken from it.
+//
+// WHAT WENT WITH IT, RECORDED SO IT IS NOT RE-DERIVED WRONG. The needle read a
+// lockfile v9 ENTRY KEY, `name@version:` at exactly two spaces, and not an
+// occurrence of the name. It was repaired to that shape by ADR-095 section 8
+// after `next@16.3.2` was admitted: that version declares `@playwright/test` as
+// an OPTIONAL PEER, pnpm writes a package's peer block into the lockfile
+// verbatim at six spaces, and the previous needle read the declaration as an
+// install and failed this gate at 29 of 30 on an artifact that was genuinely
+// absent. THE REPAIR WAS PROVED BY THE ARRIVAL IT WAS REPAIRED FOR: on the
+// install ADR-116 admits, the probe fired naming `'@playwright/test@1.56.1':`
+// and not the peer line, which is the first and last time it fired for real.
+// falsify.mjs's two cases aimed at it retire in the same commit and say so.
+//
+// A FUTURE ROW THAT NEEDS THIS SHAPE STARTS FROM THE PARAGRAPH ABOVE rather
+// than from a grep, and the distinction it encodes is the general one: the
+// artifact is the dependency, never a mention of it.
 
 const INVENTORY_PROBES = new Map([
   ['a page, layout or route file under apps/*/src/app/', appRouterFiles],
-  ['@playwright/test present in the lockfile', playwrightInLockfile],
 ]);
 
 // THE UNPROBEABLE REGISTER, and it is a register rather than an exemption list

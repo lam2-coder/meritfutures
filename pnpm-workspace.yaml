@@ -29,6 +29,38 @@ onlyBuiltDependencies: []
 # nobody chose.
 catalog:
   '@eslint/js': 10.0.1
+  # PLAYWRIGHT, THE SLOP-SCORE PASS'S RUNNER, ADMITTED BY ADR-116 UNDER A
+  # DELEGATED VG-12 GRANT. STRATEGY:192 says of a VG-12 admission that it is one
+  # "a session cannot grant itself", and this one was not self-granted: the
+  # founder delegated the grant for P4-i explicitly, and ADR-116 records the
+  # delegation rather than proceeding as though the gate did not apply. An
+  # admission that skipped that sentence would be the exact failure mode VG-12
+  # exists to catch, and the difference is written down rather than assumed.
+  #
+  # 1.56.1 RATHER THAN 1.62.1, AND THE REASON IS MEASURED RATHER THAN
+  # CONSERVATIVE. `@playwright/test` pins its browser builds in
+  # `playwright-core`'s `browsers.json`, and the pin is a REVISION rather than a
+  # range: a mismatched runner reports "Executable doesn't exist" and the pass
+  # cannot run at all. Read out of each candidate tarball:
+  #
+  #     1.55.0 -> chromium 1187 (140.0.7339.16)
+  #     1.56.0 -> chromium 1194 (141.0.7390.37)
+  #     1.56.1 -> chromium 1194 (141.0.7390.37)
+  #     1.57.0 -> chromium 1200 (143.0.7499.4)
+  #     1.58.0 -> chromium 1208 (145.0.7632.6)
+  #
+  # 1.56.1 is the NEWEST version whose chromium pin is 1194, which is the build
+  # every Merit build container already carries at
+  # `/opt/pw-browsers/chromium-1194`. Taking `latest` would have pinned a
+  # revision no container holds, and the gate would then be one a session cannot
+  # run, which STRATEGY's own standard refuses: a check that cannot run is not a
+  # check that passed. This is a version CHOSEN on a measurement, and moving it
+  # is a diff to this block that re-runs the same measurement. ADR-116 section 4.
+  #
+  # WHAT THIS ADMISSION COSTS, DIFFED FROM THE LOCKFILE THIS COMMIT WRITES.
+  # See ADR-116 section 5 for the arithmetic, the `pnpm audit` result and the
+  # install-script check. `onlyBuiltDependencies: []` above is unchanged.
+  '@playwright/test': 1.56.1
   '@types/node': 22.20.1
   # `@types/pg` is a DEV type package and `pg` is a runtime dependency, so they
   # are versioned independently and are not expected to match. ADR-084.

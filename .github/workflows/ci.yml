@@ -3,7 +3,7 @@ name: ci
 # =============================================================================
 # CI-01, CI-02 and CI-05 (STRATEGY section 4.1), session S-C of P1 section 6.
 # =============================================================================
-# Four stages. Each runs on every push, each blocks on its own, and NONE OF
+# Five stages. Each runs on every push, each blocks on its own, and NONE OF
 # THEM `needs:` ANOTHER. That is the ruling rather than a preference:
 # STRATEGY section 4.1 makes them separate rows because a lint failure must not
 # hide a security finding behind a skipped job. `corpus.yml` is CI-06 and is a
@@ -14,6 +14,7 @@ name: ci
 #   CI-04  Integration         Vitest, the `integration` project. ADR-085
 #   CI-05  Security static     gitleaks (VG-1), semgrep, pnpm audit,
 #                              syft SBOM + grype scan, --frozen-lockfile (VG-12)
+#   CI-08  E2E                 Playwright, the SS-01 to SS-08 slop-score pass
 #
 # -----------------------------------------------------------------------------
 # WHAT CI-04 IS GREEN ABOUT TODAY, AND WHAT IT IS NOT (ADR-085)
@@ -78,6 +79,12 @@ on:
   push:
     branches: ['**']
   pull_request:
+  # `CI-08`'s `Runs on` cell reads "every push to `main`, AND ON DEMAND", and
+  # until this line there was no on-demand trigger on this workflow at all. It
+  # is added with the stage rather than beside it, because a cell naming a
+  # trigger the workflow does not have is the class of claim
+  # `CI-06/gate-inventory` exists to refuse.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -520,3 +527,81 @@ jobs:
 
       - name: Gates are falsifiable
         run: node scripts/ci/falsify-ci.mjs CI-04
+
+  # ===========================================================================
+  # CI-08  E2E
+  # ===========================================================================
+  # THE SLOP-SCORE PASS, `SS-01` TO `SS-08`, WHOSE IDENTIFIER IS `M4-F-01`.
+  # DESIGN_SYSTEM section 8 specifies it and its first sentence is "A Playwright
+  # pass"; STRATEGY section 4.5 rows it as blocking "merge on UI changes".
+  #
+  # IT RUNS ON EVERY PUSH AND EVERY PULL REQUEST, WHICH IS MORE THAN THE ROW'S
+  # MINIMUM AND IS WHAT MAKES THE ROW'S OTHER HALF TRUE. Section 4.1 gives the
+  # stage "every push to `main`, and on demand"; section 4.5 makes the same pass
+  # a MERGE blocker. A job gated to `main` runs after the merge it was supposed
+  # to block, so this one carries no `if:` at all. Every push to `main` is a
+  # subset of every push, so the narrower cell is satisfied rather than
+  # contradicted, and `workflow_dispatch` above supplies the "on demand".
+  #
+  # THE BROWSER IS INSTALLED AND NOT ASSUMED, AND ITS BUILD IS PINNED BY THE
+  # LOCKFILE. `@playwright/test@1.56.1` resolves chromium revision 1194, which is
+  # a revision rather than a range: the runner downloads the exact build the
+  # catalog entry was measured against (ADR-116 section 4). `--with-deps` brings
+  # the shared libraries a headless Chromium needs on a bare ubuntu image, and
+  # `chromium` alone is named because `playwright.config.ts` declares one browser
+  # and installing three would triple a merge blocker's setup to launch none of
+  # them.
+  #
+  # THERE IS NO `falsify-ci.mjs CI-08` STEP AND THAT IS NOT AN OMISSION. Every
+  # other stage proves it can fail by seeding a violation from a separate
+  # harness. THIS STAGE CARRIES ITS SEED IN BAND: each surface ships a compliant
+  # fixture and a deliberately non-compliant one, and the pass asserts that the
+  # first produces no finding AND that the second produces a finding for every
+  # one of the eight. Both directions run in this job, on this commit, in the
+  # same command. A check that silently stopped reading turns this step red
+  # immediately rather than whenever somebody next runs a second harness, which
+  # is strictly earlier than what a `falsify-ci.mjs` case would buy.
+  #
+  # A BLOCKING GATE THAT HANGS IS WORSE THAN ONE THAT FAILS, which is CI-05's
+  # rule three jobs up. A browser download is a network fetch on a merge
+  # blocker, so the job carries a bound rather than the default six hours.
+  e2e:
+    name: CI-08 e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      - name: Install the pinned Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # NO `--pass-with-no-tests` AND NO GREP. The equivalent flag on CI-02's
+      # line is refused there for the same reason: a selector that matched
+      # nothing would report this stage green for having rendered nothing, and
+      # `e2e/pass.ts` additionally throws when a surface list arrives empty.
+      - name: Slop-score pass, SS-01 to SS-08
+        run: pnpm exec playwright test
+
+      # A SLOP-SCORE FAILURE IS VISUAL AND THE FINDING NAMES A SELECTOR, so the
+      # trace is how a reviewer reads what the browser actually computed.
+      # `retain-on-failure` in the config means a green run uploads nothing.
+      - name: Traces, on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-08-traces
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
