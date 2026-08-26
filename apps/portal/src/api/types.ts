@@ -10,13 +10,23 @@
 // server does not send.
 //
 // ONLY THE READ ENDPOINTS ARE HERE, AND THE ABSENCES ARE THE SESSION FENCE.
-// This session builds M04's read surfaces: the account views, the marks, the
-// timeline, the eligibility display and the economic-calendar panel. There is
+// The account views, the marks, the timeline, the eligibility display, the
+// economic-calendar panel, and (P4-h) the pinned plan version, the purchase
+// list, the certificate, the KYC status and the affiliate stats. There is
 // deliberately no `Me`, no auth type, no payout request body and no
 // sensitive-action declaration, because C-27's authority boundary is auth and
 // therefore money path (CLAUDE.md's regime table, ADR-003), and it gets its own
 // session. A read-only app that transcribed the auth types anyway would look
 // like it had started on them.
+//
+// EVERY TYPE IN THIS FILE IS NOW A TRANSCRIPTION AGAIN, WHICH IT WAS NOT.
+// `EconomicCalendarPanelResponse` and `ImpersonationSession` were shaped from
+// the migrations they read because no contract row existed for either, and both
+// said so at the point of declaration. ADR-111 wrote the rows: the panel is
+// API_CONTRACT section 6.1 and the impersonation session is section 3.2. The
+// reconciliation those headers asked for was run and came back a NO-OP, field
+// for field, which is the outcome a shape derived from the same columns should
+// produce and is worth stating because it is not the outcome anybody was owed.
 //
 // WHY THE MONEY FIELDS SAY `number` HERE AND `bigint` IN THE ENGINE.
 // M01 INV-02 is "all money is `bigint` integer cents at every boundary", and
@@ -216,20 +226,21 @@ export type EligibilityResponse = {
 // -----------------------------------------------------------------------------
 // The economic-calendar panel (M04 section 3.8, ADR-066, GS-285)
 // -----------------------------------------------------------------------------
-// THIS ONE IS NOT A TRANSCRIPTION AND SAYING SO IS THE POINT. `grep
-// economic_calendar docs/architecture/API_CONTRACT.md` returns nothing: the
-// panel's contract row has not been written. M04 section 4 records that the
-// rows for surfaces added by a fold "land with API_CONTRACT in the registries
-// session, not here", and DEP-M4-09 states the obligation the row must carry:
-// "the portal is served the current revision plus the calendar's freshness".
-//
-// So the shape below is the MINIMUM that discharges DEP-M4-09, named after the
-// columns it reads rather than invented: every field is a column on
+// THIS ONE WAS NOT A TRANSCRIPTION AND NOW IT IS. `grep economic_calendar
+// docs/architecture/API_CONTRACT.md` returned nothing when this type was
+// written, so the shape below was the MINIMUM that discharges DEP-M4-09, named
+// after the columns it reads rather than invented: every field is a column on
 // `economic_calendar` as declared in packages/db/migrations/0039_economic_
 // calendar.sql, read through the `economic_calendar_current` view, plus the
-// coverage fact from `economic_calendar_loads`. When the contract row lands,
-// this type is the thing to reconcile against it, and the reconciliation is a
-// diff on one file rather than a search.
+// coverage fact from `economic_calendar_loads`.
+//
+// ADR-111 WROTE THE ROW AS API_CONTRACT SECTION 6.1, `GET /economic-calendar`,
+// `Auth: session`, and this file's own instruction was followed: "when the
+// contract row lands, this type is the thing to reconcile against it". It was
+// reconciled and NOTHING MOVED. The contract row took this shape rather than
+// the other way round, which is only defensible because the shape was derived
+// from the DDL the endpoint will read, and the ADR says so rather than
+// presenting the agreement as independent corroboration.
 
 /**
  * One occurrence at its current revision, from `economic_calendar_current`.
@@ -291,6 +302,15 @@ export type EconomicCalendarPanelResponse = {
 // portal composes". This type is the server's resolution of the session that
 // served the request, so a hard refresh and a deep link both produce it and
 // neither depends on client state.
+//
+// ADR-111 DECLARED IT AS API_CONTRACT SECTION 3.2 AND DID NOT GIVE IT AN
+// ENDPOINT, WHICH IS THE ONE THING TO KNOW BEFORE READING THIS TYPE AS SETTLED.
+// The carrier is `Me.impersonation` on `GET /me`, so the banner and the session
+// it describes arrive on one response and cannot disagree by the width of a
+// request; a dedicated read would be a second session resolution and would
+// reintroduce GS-301. `GET /me` is the auth surface's and P4 section 6 puts
+// auth in no phase's contents, so the member is NOT declared yet and this type
+// is a shape waiting for its field.
 
 /** The impersonation session the server resolved, or its absence. */
 export type ImpersonationSession = {
@@ -312,4 +332,179 @@ export type ImpersonationSession = {
    * served late fails when it tries to record itself. M04 section 3.9.
    */
   readonly expires_at: string;
+};
+
+// -----------------------------------------------------------------------------
+// Section 4. Catalog. The PINNED plan version a rules page and a rule diff read
+// -----------------------------------------------------------------------------
+// `GET /plans/:planId/versions/:version` is public and returns "the full rules
+// object plus published copy, INCLUDING FOR RETIRED VERSIONS, so a trader can
+// always retrieve the contract they bought". That last clause is why the rules
+// page reads this endpoint and not `GET /plans`: M04 section 4's obligation is
+// "the rules page for an account reads the pinned version, not the current one",
+// and the current one is a different contract with the same plan's name on it.
+
+/** One JSON value, for the one field the contract declares as opaque JSON. */
+export type JsonValue =
+  string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+
+/**
+ * `plan_versions.rules`. OPAQUE ON PURPOSE, AND THE OPACITY IS THE CONTROL.
+ *
+ * API_CONTRACT declares this field as `PlanRules`, "exact JSON from DATA_MODEL
+ * §11", and §11 is a jsonc example rather than a TypeScript declaration. So a
+ * portal type enumerating its keys would be a SECOND COPY OF THE RULE SCHEMA,
+ * maintained here, against a zod validator that lives at the write boundary.
+ *
+ * THE FAILURE THAT COPY PRODUCES IS THE WORST ONE AVAILABLE ON THIS SURFACE.
+ * The rule diff (SC-M4-06) walks two of these and reports where they differ. A
+ * typed walk can only compare keys the type knows, so the day a rule gains a
+ * key, the diff renders "nothing changed" about a contract that changed. An
+ * omission that reads as a positive claim is exactly what INV-M4-05 refuses one
+ * level down, and here it would be a positive claim about a repurchase.
+ *
+ * So the portal treats the rule contract as data it renders and never as a
+ * shape it knows, which is also M04 section 1.2's boundary line: "the portal
+ * does not know a plan's rules at all".
+ */
+export type PlanRules = Readonly<Record<string, JsonValue>>;
+
+/** One size row of a plan version. API_CONTRACT section 4, `GET /plans`. */
+export type PlanSize = {
+  readonly size_cents: number;
+  readonly price_cents: number;
+  readonly reset_price_cents: number;
+  readonly drawdown_cents: number;
+  readonly profit_target_cents: number | null;
+  readonly buffer_cents: number;
+  readonly win_day_floor_cents: number;
+  readonly payout_cap_cents: number;
+  readonly min_payout_cents: number;
+};
+
+/** `GET /plans/:planId/versions/:version`. API_CONTRACT section 4. */
+export type PlanVersionResponse = {
+  readonly plan_version_id: string;
+  readonly plan_id: string;
+  readonly version: number;
+
+  /** A retired version is still served, which is the whole point of the row. */
+  readonly status: 'published' | 'retired';
+  readonly published_at: string;
+  readonly retired_at: string | null;
+
+  /** The full config. Opaque here; see {@link PlanRules}. */
+  readonly rules: PlanRules;
+
+  /** Published rule text keyed by rule path. INV-M4-08's only legal source. */
+  readonly copy_blocks: Readonly<Record<string, string>>;
+  readonly sizes: readonly PlanSize[];
+};
+
+// -----------------------------------------------------------------------------
+// Section 5. Commerce, READ ONLY
+// -----------------------------------------------------------------------------
+// `GET /purchases` and nothing else from this section. `POST /checkout` and
+// `POST /accounts/:accountId/reset` are writes and are not here, and neither is
+// `rule_diff_acknowledged_at`: SD-M4-02 put the column on `purchases` at
+// 0006:173 and no contract row exposes it, so the portal renders the diff and
+// captures nothing. ADR-111 section 5 records that seam rather than closing it.
+
+/** `GET /purchases`. Cursor list of the caller's purchases. */
+export type PurchaseListItem = {
+  readonly purchase_id: string;
+  readonly created_at: string;
+
+  /** A reset is a repurchase onto a breached or expired account. */
+  readonly kind: 'new' | 'reset';
+  readonly plan: {
+    readonly plan_id: string;
+    readonly code: string;
+    readonly version: number;
+  };
+  readonly size_cents: number;
+  readonly amount_paid_cents: number;
+  readonly discount_cents: number;
+  readonly status: 'pending' | 'paid' | 'failed' | 'refunded' | 'charged_back';
+
+  /** Null until the purchase provisions an account. */
+  readonly account_id: string | null;
+};
+
+// -----------------------------------------------------------------------------
+// Section 6. The certificate
+// -----------------------------------------------------------------------------
+
+/** `GET /accounts/:accountId/certificate`, `kind=pass|payout`. Section 6. */
+export type CertificateResponse = {
+  readonly certificate_id: string;
+  readonly kind: 'pass' | 'payout';
+
+  /** Signed and time limited. A RENDERING, and never the authority (AS-M4-03). */
+  readonly image_url: string;
+
+  /** The public verification page. THE AUTHORITY, and the reason a card is worth anything. */
+  readonly verify_url: string;
+  readonly issued_at: string;
+
+  /**
+   * "Claims are minimal by construction: no identity, no email, no cumulative
+   * totals" (AS-M4-03). The smaller the claim, the less there is to forge
+   * usefully, so the absence of a field here is a control and not an oversight.
+   */
+  readonly claims: {
+    readonly plan_code: string;
+    readonly size_cents: number;
+
+    /** Payout cards only. A pass card claims no amount. */
+    readonly amount_cents?: number;
+    readonly trading_day: string;
+  };
+};
+
+// -----------------------------------------------------------------------------
+// Section 7. KYC and affiliate, READ ONLY
+// -----------------------------------------------------------------------------
+// `POST /kyc/session` and `POST /affiliate/links` are writes and are not here.
+
+/** `GET /kyc/status`. Section 7. Every field is declared as the contract declares it. */
+export type KycStatus = {
+  /**
+   * DECLARED AS AN OPEN `string` BY THE CONTRACT, AND THE VOCABULARY IS
+   * `kyc_status` AT 0001:29: `kyc_required`, `pending`, `verified`, `rejected`,
+   * `expired`. FIVE, where M04:86 says SC-M4-07 shows "four honest states".
+   * The view handles all five and refuses an unknown one loudly rather than
+   * rendering a blank; ADR-111 section 7 records the discrepancy and does not
+   * rule it, because amending an approved plan needs its own ADR.
+   */
+  readonly state: string;
+
+  /** Which trigger this verification was raised by. ADR-021's set, not a scalar. */
+  readonly placement: string;
+  readonly verified_at: string | null;
+  readonly expires_at: string | null;
+
+  /**
+   * What the trader does next, IN THE SERVER'S WORDS. M04 section 7.9 binds the
+   * vocabulary of this string and the view enforces it: no trader-facing
+   * verification string contains "fraud", "suspicious", "risk", "flagged" or
+   * "review", and "decisions are final" may not appear in any string this
+   * module renders.
+   */
+  readonly action_required: string | null;
+};
+
+/** `GET /affiliate/stats`. Section 7. M08's trader-facing surface. */
+export type AffiliateStats = {
+  readonly code: string;
+  readonly commission_bp: number;
+  readonly status: string;
+  readonly clicks_30d: number;
+  readonly conversions_30d: number;
+  readonly earned_cents_lifetime: number;
+
+  /** Earned, not yet paid, and past its clawback window. M08's only outflow on a promise. */
+  readonly payable_cents: number;
+  readonly paid_cents_lifetime: number;
+  readonly chargeback_rate_bp: number;
 };
