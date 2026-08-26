@@ -2335,50 +2335,30 @@ const SCOPE_CASES = [
       );
     },
   },
-  {
-    name: 'CI-06/gate-inventory/playwright-peer-declaration-is-not-an-install',
-    gate: 'CI-06/gate-inventory',
-    what: "a package DECLARING @playwright/test as a peer must NOT reopen CI-08; only an entry KEY is an install",
-    // MUST NOT FIRE, AND THIS ONE WAS PAID FOR RATHER THAN IMAGINED. The probe
-    // was anchored on the NAME so `@vitest/browser-playwright` could not trip it
-    // (ADR-073) and was not anchored on the CONTEXT, so anything MENTIONING the
-    // package tripped it. ADR-095 installed `next@16.3.2`, which declares
-    // `@playwright/test` as an OPTIONAL PEER; pnpm writes a package's peer block
-    // into the lockfile verbatim, and CI-08 failed at 29 of 30 on a row whose
-    // artifact is genuinely absent. Playwright is still not in this tree.
-    //
-    // THE SEED IS A REQUIRED PEER AND NOT AN OPTIONAL ONE, ON PURPOSE. The real
-    // occurrence is optional, so a case that seeded an optional peer could pass
-    // against a probe that discriminated on `peerDependenciesMeta` rather than on
-    // what an entry key is. The discriminator under test is INSTALLED versus
-    // MENTIONED, and the seed is chosen so that nothing else can be doing the
-    // work.
-    expect: () => 'PASS',
-    // The control is the same package name at the one place that means installed:
-    // a lockfile v9 entry key, `name@version:` at exactly two spaces.
-    control: {
-      expect: () => 'HAS ARRIVED',
-      seed: (d) => {
-        edit(d, LOCKFILE, (b) => {
-          if (/^ {2}'?@playwright\/test'?@[^\s:]+:$/m.test(b)) {
-            throw new Error('seed anchor not found: the lockfile already holds a @playwright/test entry');
-          }
-          return `${b}\n  '@playwright/test@1.56.0':\n    resolution: {integrity: sha512-seededByFalsify}\n`;
-        });
-      },
-    },
-    seed: (d) => {
-      edit(d, LOCKFILE, (b) => {
-        if (/^ {2}'?@playwright'?@[^\s:]+:$/m.test(b)) {
-          throw new Error('seed anchor not found: seeded-by-falsify already present');
-        }
-        return (
-          `${b}\n  seeded-by-falsify@1.0.0:\n    resolution: {integrity: sha512-seededByFalsify}\n` +
-          `    peerDependencies:\n      '@playwright/test': ^1.51.1\n`
-        );
-      });
-    },
-  },
+  // ---------------------------------------------------------------------------
+  // THE TWO PLAYWRIGHT CASES ARE RETIRED, WITH THE PROBE THEY AIMED AT
+  // ---------------------------------------------------------------------------
+  // `CI-06/gate-inventory/playwright-peer-declaration-is-not-an-install` and
+  // `CI-06/gate-inventory/playwright-near-miss` both seeded a lockfile and
+  // demanded that CI-08's needle read INSTALLED versus MENTIONED correctly.
+  // THE ARTIFACT ARRIVED (ADR-116): `@playwright/test@1.56.1` is an entry key in
+  // pnpm-lock.yaml, CI-08's row is implemented, and gates.mjs retired
+  // `playwrightInLockfile` in the same commit because the register's own rule
+  // makes a probe naming no live condition a finding. A falsification case
+  // aimed at a probe that no longer exists is that same shape one level up.
+  //
+  // WHAT THEIR REMOVAL COSTS, STATED RATHER THAN ABSORBED. Both controls had
+  // already stopped being seedable on the arrival commit: the first threw
+  // "the lockfile already holds a @playwright/test entry" because its seed
+  // asserts the absence it was written against, and the second could no longer
+  // produce "HAS ARRIVED" because no row waits on that artifact. Measured, not
+  // reasoned: `node scripts/corpus/falsify.mjs` reported both as CONTROL DID
+  // NOT FIRE before this edit. What goes with them is the ONLY executable
+  // statement in this repository that a peer declaration is not an install; the
+  // statement survives as prose at gates.mjs's retirement note and in the
+  // pnpm-workspace.yaml catalog comment, and as prose it is weaker. That is the
+  // honest cost of the artifact arriving, and it is recorded in ADR-116
+  // section 7 rather than left for a reader to notice the file got shorter.
   {
     name: 'CI-06/gate-inventory/register-shrinks-when-an-artifact-is-re-ruled',
     gate: 'CI-06/gate-inventory',
@@ -2401,46 +2381,6 @@ const SCOPE_CASES = [
         ),
       );
     },
-  },
-  {
-    name: 'CI-06/gate-inventory/playwright-near-miss',
-    gate: 'CI-06/gate-inventory',
-    what: 'a lockfile naming a DIFFERENT package containing the word playwright, which must NOT reopen CI-08',
-    // THE NEAR-MISS IS LIVE IN THE TREE RATHER THAN INVENTED. ADR-073 measured
-    // the only occurrence of the word in pnpm-lock.yaml as
-    // `@vitest/browser-playwright`, an unmet optional peer of Vitest, and CI-08's
-    // condition is deliberately the DEPENDENCY. A probe grepping for the word
-    // would report CI-08's artifact arrived and reopen a merge-blocking row on a
-    // package nobody installed, which is CI-06s's mention-against-step boundary
-    // one registry over. The control is the genuine install on the far side.
-    //
-    // BOTH SEEDS WERE REWRITTEN ON 2026-08-24 AND ONE OF THEM WAS ALREADY VACUOUS
-    // IN THE DIRECTION THAT READS AS COVERAGE. They wrote `  'name': version`,
-    // which is not a shape pnpm's lockfile v9 has anywhere: an entry key is
-    // `name@version:` and a catalog line carries a `specifier:` beneath it. Under
-    // the repaired probe (ADR-095 section 8, an entry KEY rather than an
-    // occurrence) the control stopped firing, which is how it was found; and the
-    // near-miss seed would then have passed because it wrote no entry key at all,
-    // rather than because the NAME anchor held. Both are entry keys now, so the
-    // name anchor is the only thing left doing the work.
-    expect: 'PASS',
-    control: {
-      seed: (d) =>
-        edit(
-          d,
-          'pnpm-lock.yaml',
-          (b) => `${b}\n  '@playwright/test@1.56.0':\n    resolution: {integrity: sha512-seededByFalsify}\n`,
-        ),
-      expect: 'HAS ARRIVED',
-    },
-    seed: (d) =>
-      edit(
-        d,
-        'pnpm-lock.yaml',
-        (b) =>
-          `${b}\n  # a playwright test runner peer, seeded by falsify.mjs\n` +
-          `  '@vitest/browser-playwright@4.1.10':\n    resolution: {integrity: sha512-seededByFalsify}\n`,
-      ),
   },
   {
     name: 'CI-06f/t3-stale-reservation',

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+
+  "//": "THE PASS IS NOT A WORKSPACE PACKAGE AND MUST STILL BE TYPECHECKED, which is scripts/demo's argument verbatim: `pnpm -r run typecheck` walks the workspace and would never reach this directory, so the root `typecheck` script names this project explicitly. A TypeScript directory no `tsc` invocation reaches is a directory that rots.",
+
+  "//lib": "`DOM` IS ADDED HERE AND NOWHERE ELSE. `extract.ts` runs inside the browser and names `document`, `getComputedStyle` and `NodeFilter`; tsconfig.base.json's lib is ES2023 with no DOM, deliberately, because every deployable in this repository runs under Node. Widening the base would let a Node path reference `window` and typecheck. This project is the only one whose code executes in a page, so it is the only one that gets the browser's vocabulary.",
+
+  "//include": "IT REACHES INTO BOTH APPS' e2e DIRECTORIES ON PURPOSE. Their spec files import this directory and would otherwise be typechecked by their own app project, whose lib has no DOM and which would then fail on `extract.ts` following the import. One project owns the pass end to end; the app tsconfigs are untouched.",
+
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "include": ["**/*.ts", "../apps/site/e2e/**/*.ts", "../apps/portal/e2e/**/*.ts"]
+}
