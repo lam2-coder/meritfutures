@@ -31,6 +31,7 @@ import { and, eq, exists, getTableColumns, sql, type SQL } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import {
   QueryBuilder,
+  getTableConfig,
   type PgColumn,
   type PgDatabase,
   type PgQueryResultHKT,
@@ -438,35 +439,474 @@ export function unscopedInsertStatement(
   return source.insert(TABLES[key] as PgTable).values(values);
 }
 
+// =============================================================================
+// ADDRESSING ONE ROW (ADR-112)
+// =============================================================================
+// ADR-102 GAVE THIS FILE A WRITE AND NOT A PLACE TO POINT IT. Every method it
+// landed narrows by tenancy or by nothing at all, so a caller that has to name
+// ONE ROW is refused identically at all three authorities: ADR-109 clause 2
+// found that from the idempotency layer, session 222 found it from the
+// provisioning saga, session 218 found it from the auth surface, and clause 2
+// says in its own words that it does not design the repair. This is the repair.
+//
+// -----------------------------------------------------------------------------
+// A PREDICATE IS AN EQUALITY CONJUNCTION OVER DECLARED COLUMNS, NEVER A `SQL`
+// -----------------------------------------------------------------------------
+// The obvious shape is "let the caller pass a `SQL` fragment" and it is the
+// wrong one. It hands every call site the ability to write ANY predicate, which
+// is the BOLA surface ADR-008 scoped this wrapper to bound and the same
+// admission ADR-102 refused to make about `executeSql` -- and it is worse here
+// than there, because a raw-SQL call site is a diff a reviewer notices and a
+// predicate passed to `updateAt` reads like ordinary accessor use.
+//
+// `byId(id)` was the other candidate and it is refused ON EVIDENCE. It does not
+// serve the table ADR-109 exists for: `idempotency_keys`' primary key is `key`
+// (`0017_events_and_audit.sql`), `treasury_balances`' is `(account_code,
+// as_of)`, and THIRTEEN registered tables carry a composite primary key. An
+// accessor whose addressing idiom fails on the first table that needs it is not
+// an addressing idiom.
+//
+// -----------------------------------------------------------------------------
+// A WRITE TAKES AN ADDRESS, A READ MAY TAKE A FILTER, AND THAT ASYMMETRY IS THE
+// RULING RATHER THAN A CONVENIENCE
+// -----------------------------------------------------------------------------
+// An ADDRESS is a filter whose named columns CONTAIN a unique key the schema
+// declares, so an addressed write names AT MOST ONE ROW BY CONSTRUCTION rather
+// than by the caller's care. A FILTER carries no such requirement and may only
+// READ, because a filtered read is a NARROWING of a read that already exists at
+// the same authority -- `scopedTx.rows` already returns every row this identity
+// owns and `systemTx.rows` already returns every row in the table, and a
+// conjunct can only remove rows from either. A filtered WRITE at non-unique
+// columns is different in kind: the unaddressed write is REMOVED below, so
+// there is no wider method for it to narrow, and admitting one would put back a
+// smaller copy of the defect this section exists to close.
+
+/** The Drizzle property names of one table's columns, as a type. */
+type ColumnsOf<K extends TableKey> = (typeof TABLES)[K]['_']['columns'];
+
 /**
- * UPDATE carrying a predicate, or none.
+ * A column of one table, by its Drizzle property name.
  *
- * `where` is REQUIRED IN THE ARGUMENT LIST and `undefined` is spelled out, on
- * `job-queue.ts`'s reasoning about its own transaction argument: an optional
- * predicate is one a caller reaches the unsafe form of by leaving something out.
+ * DERIVED FROM `TABLES` AND NEVER LISTED. A caller naming a column this table
+ * does not have is `TS2353` at the call site rather than a run-time surprise,
+ * and the list cannot go stale because there is no list.
  */
-export function updateStatement(
+export type AddressableColumn<K extends TableKey> = Extract<keyof ColumnsOf<K>, string>;
+
+/**
+ * A narrowing over declared columns. Equality, ANDed, and nothing else.
+ *
+ * There is no `OR`, no `IN`, no range and no `IS NULL`, and each absence is the
+ * same decision: a shape a caller can compose freely is a shape a caller can
+ * compose wrongly, and every one of them is a diff on this file with an
+ * argument attached when a caller needs it.
+ */
+export type RowFilter<K extends TableKey> = Readonly<
+  Partial<Record<AddressableColumn<K>, unknown>>
+>;
+
+/**
+ * A filter that names AT MOST ONE ROW.
+ *
+ * THE SAME TYPE AS `RowFilter` AND A DIFFERENT PROMISE, and the promise is
+ * CHECKED AT RUN TIME rather than encoded. Uniqueness is a fact about the
+ * DATABASE -- which column sets carry a `PRIMARY KEY` or a `UNIQUE` -- and
+ * `tsc` cannot read a migration, which is ADR-101 section 6's own reason for
+ * the same shape. `refuseUnaddressed` reads it from `schema.ts` through
+ * Drizzle's own table config, so the check is derived from the transcription of
+ * the DDL rather than from a second list somebody maintains.
+ */
+export type RowAddress<K extends TableKey> = RowFilter<K>;
+
+/**
+ * A filter that names at least one column. An empty one does not compile.
+ *
+ * `{}` as a literal resolves `keyof F` to `never` and the parameter type to
+ * `never`, so `TS2345` refuses it. A caller casting past that still meets the
+ * throw in `addressPredicate`, because an empty address is the whole-table
+ * write under another name.
+ */
+export type NamesAColumn<K extends TableKey, F extends RowFilter<K>> = keyof F extends never
+  ? never
+  : F;
+
+/** Memoised per table: building this reads Drizzle's table config. */
+const UNIQUE_KEYS = new Map<TableKey, readonly (readonly string[])[]>();
+
+/**
+ * Every column set this table declares UNIQUE, in SQL names, each one sorted.
+ *
+ * READ FROM THE SCHEMA AND NEVER LISTED HERE, on `scopePredicate`'s own
+ * precedent: a hand-written roster of unique keys would be a second statement
+ * of the DDL, which is the drift class this package exists to keep to one.
+ *
+ * FOUR SOURCES, BECAUSE DRIZZLE SPELLS A KEY FOUR WAYS: an inline
+ * `.primaryKey()`, a table-level `primaryKey({ columns })`, an inline
+ * `.unique()` and a table-level unique constraint. THIRTEEN of the registered
+ * tables use the second spelling, so reading only the first would have refused
+ * every address on all thirteen.
+ *
+ * WHAT IT DOES NOT READ IS A PARTIAL UNIQUE INDEX, and that is deliberate:
+ * `idempotency_keys_identity_idx` is `UNIQUE ... WHERE identity_id IS NOT NULL`
+ * and bounds the row count only for the rows it covers, so treating it as a key
+ * would admit an address that matches two rows on the population it excludes.
+ */
+export function uniqueKeys(key: TableKey): readonly (readonly string[])[] {
+  const cached = UNIQUE_KEYS.get(key);
+  if (cached !== undefined) return cached;
+
+  const config = getTableConfig(TABLES[key] as PgTable);
+  const found: string[][] = [];
+  const inlinePrimary = config.columns.filter((c) => c.primary).map((c) => c.name);
+  if (inlinePrimary.length > 0) found.push(inlinePrimary);
+  for (const primary of config.primaryKeys) found.push(primary.columns.map((c) => c.name));
+  for (const column of config.columns) if (column.isUnique) found.push([column.name]);
+  for (const unique of config.uniqueConstraints) found.push(unique.columns.map((c) => c.name));
+
+  const frozen: readonly (readonly string[])[] = found.map((columns) =>
+    Object.freeze([...columns].sort()),
+  );
+  UNIQUE_KEYS.set(key, frozen);
+  return frozen;
+}
+
+/** The Drizzle column object for a property name, or `undefined`. */
+function columnByProperty(table: PgTable, property: string): PgColumn | undefined {
+  return (getTableColumns(table) as Record<string, PgColumn>)[property];
+}
+
+/**
+ * The equality conjunction one filter renders.
+ *
+ * THE COLUMNS ARE SORTED, so the rendered SQL of one filter is the same text
+ * whatever order the caller wrote its keys in. That is what lets the suite
+ * assert the text rather than parse it.
+ *
+ * A `null` OR `undefined` VALUE IS REFUSED and the reason is not tidiness.
+ * Rendered as `col = NULL` it matches nothing, so the write is silently a
+ * no-op; rendered as `col IS NULL` it stops bounding the row count, because a
+ * unique key over a nullable column admits many NULL rows in Postgres. Neither
+ * reading is a row this accessor should write, so neither is offered.
+ */
+function addressPredicate(key: TableKey, at: Readonly<Record<string, unknown>>): SQL {
+  const table = TABLES[key] as PgTable;
+  const named = Object.keys(at).sort();
+  if (named.length === 0) {
+    throw new Error(
+      `an empty filter names every row of ${key}, which is the unaddressed write under ` +
+        'another name. Name at least one column.',
+    );
+  }
+
+  const conjuncts: SQL[] = [];
+  for (const property of named) {
+    const column = columnByProperty(table, property);
+    if (column === undefined) {
+      throw new Error(
+        `"${property}" is not a column of ${key}. A filter names columns by their Drizzle ` +
+          'property name, which is what the type accepts.',
+      );
+    }
+    const value = at[property];
+    if (value === null || value === undefined) {
+      throw new Error(
+        `"${property}" is ${value === null ? 'null' : 'undefined'} in a filter on ${key}. ` +
+          'Equality against NULL matches nothing and `IS NULL` does not name one row, so a ' +
+          'null is refused rather than guessed at.',
+      );
+    }
+    conjuncts.push(eq(column, value));
+  }
+
+  const composed = conjuncts.length === 1 ? conjuncts[0] : and(...conjuncts);
+  if (composed === undefined) {
+    throw new Error(`the filter on ${key} rendered nothing, which cannot happen with one column.`);
+  }
+  return composed;
+}
+
+/**
+ * Refuse a filter that does not contain a unique key of its table.
+ *
+ * THE CHECK IS OVER SQL NAMES because the registry and the DDL speak them, and
+ * the filter speaks Drizzle property names, so the two are resolved here rather
+ * than in either caller.
+ *
+ * IT FAILS CLOSED IN THE ONE DIRECTION THAT MATTERS AND THAT IS MEASURED. Folded
+ * over all 47 migrations, ZERO column sets `schema.ts` declares unique are
+ * absent from the DDL, so nothing this admits is unique only in the
+ * transcription's imagination. The other direction is live: 34 keys the
+ * migrations declare are absent from `schema.ts`, and every one of them is an
+ * address this refuses that the database would have honoured. A refused write
+ * is not a wrong one. `treasury_balances` is the extreme case and the only
+ * registered table with no addressable key at all, because `0009` gives it
+ * `PRIMARY KEY (account_code, as_of)` and `schema.ts` declares none.
+ */
+function refuseUnaddressed(
+  key: TableKey,
+  at: Readonly<Record<string, unknown>>,
+  supplied: readonly string[] = [],
+): void {
+  const table = TABLES[key] as PgTable;
+  const named = new Set<string>(supplied);
+  for (const property of Object.keys(at)) {
+    const column = columnByProperty(table, property);
+    if (column !== undefined) named.add(column.name);
+  }
+
+  for (const candidate of uniqueKeys(key)) {
+    if (candidate.every((column) => named.has(column))) return;
+  }
+
+  const declared = uniqueKeys(key)
+    .map((columns) => `(${columns.join(', ')})`)
+    .join(', ');
+  throw new Error(
+    `a write to ${key} must name a row. [${[...named].sort().join(', ')}] contains no unique ` +
+      `key ${key} declares, so this predicate can match more than one row. ` +
+      (declared === ''
+        ? 'That table declares no PRIMARY KEY or UNIQUE in schema.ts, so it has no addressed ' +
+          'write at all until the transcription carries the one its migration already has.'
+        : `Declared: ${declared}.`),
+  );
+}
+
+/**
+ * The columns the SCOPED HANDLE itself pins to one value.
+ *
+ * THE CALLER MAY NOT NAME THEM AND THEY COUNT TOWARD THE UNIQUE KEY an address
+ * has to contain. Those are two consequences of one fact and this is the one
+ * fact.
+ *
+ * THIS IS THE ONE PLACE THE FIRST DRAFT OF ADR-112 WAS WRONG AND THE TREE SAID
+ * SO. Requiring the CALLER's half of the predicate to contain a unique key made
+ * `notification_preferences` unaddressable through `scopedTx`, because its
+ * primary key is `(identity_id, kind, channel)` and the caller is refused
+ * `identity_id` by `refusePinnedColumn`. Four registered tables have that
+ * shape. The predicate that reaches the database is the COMPOSITION, so the
+ * composition is what must name a row, and the handle's `identity_id = $1` is
+ * as much a part of it as the caller's `kind = $2`.
+ *
+ * `derived` CONTRIBUTES NOTHING and that is not an oversight. Its tenancy
+ * narrowing is an `EXISTS` over ANOTHER table; it bounds which rows of this one
+ * qualify and pins no column of this row to a value, so it cannot complete a
+ * unique key. `pair` is unreachable through `scopedTx` at all.
+ */
+function handlePinnedColumns(key: ScopedTableKey): readonly string[] {
+  const rule = SCOPE_RULES[key];
+  return rule.class === 'root' || rule.class === 'owned' ? [rule.column] : [];
+}
+
+/**
+ * Refuse a SCOPED filter that names a column the HANDLE HAS ALREADY PINNED.
+ *
+ * ONE SET, TWO USES, AND THE SECOND DRAFT OF THIS RULING IS WHY THEY ARE ONE.
+ * The columns the caller may not name and the columns that count toward the
+ * unique key are the SAME columns: the ones the handle's own predicate fixes to
+ * a single value. `handlePinnedColumns` is that set and both this guard and
+ * `refuseUnaddressed` read it, so the two cannot drift apart.
+ *
+ * `derived` IS NOT IN IT AND THE FIRST DRAFT HAD IT WRONG. Naming `account_id`
+ * in an address on a `derived` table is not the re-parenting ADR-102 clause 4
+ * refuses -- that is a `SET`, and it stays refused there. An address NARROWS,
+ * the handle's `EXISTS` still proves the parent is this identity's, and
+ * refusing it left `analytics_snapshots` with no addressed write at all,
+ * because its primary key is `(account_id, as_of_trading_day)` and an `EXISTS`
+ * over `accounts` pins neither: one identity owns many accounts, so the
+ * caller's half really does have to name which.
+ */
+function refusePinnedColumn(key: ScopedTableKey, at: Readonly<Record<string, unknown>>): void {
+  for (const sqlName of handlePinnedColumns(key)) {
+    const property = propertyForColumn(TABLES[key] as PgTable, sqlName);
+    for (const named of Object.keys(at)) {
+      if (named !== sqlName && named !== property) continue;
+      throw new Error(
+        `"${named}" is ${key}'s tenancy column (${SCOPE_RULES[key].class} rule on "${sqlName}") ` +
+          'and a scoped filter never takes it from the caller. The handle already pins it, so a ' +
+          'caller naming it is asserting a scope the handle has already decided -- and it counts ' +
+          'toward the unique key an address must contain whether the caller writes it or not.',
+      );
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// THE PREDICATE A WRITE MAY CARRY IS BRANDED, SO THE WRONG SHAPE DOES NOT
+// COMPILE RATHER THAN MERELY FAILING A TEST
+// -----------------------------------------------------------------------------
+// `where` used to be `SQL | undefined` and `undefined` was how every one of the
+// six removed methods reached the whole table. It is now two DISJOINT branded
+// types with one producer each, which buys three refusals at compile time:
+//
+//   1. `undefined` in the where position           -- there is no such value.
+//   2. A bare `SQL`, including `scopePredicate(...)` on its own -- the tenancy
+//      predicate alone is what `scopedTx.update` carried, and it is now not a
+//      write predicate at all.
+//   3. An UNSCOPED predicate handed to the SCOPED builder -- which is the
+//      shape a keyed write that drops tenancy would have to take, and it is
+//      `TS2345` rather than a test somebody has to keep.
+//
+// THE BRAND IS A TYPE-ONLY INTERSECTION AND NOT A `unique symbol`. Session 222
+// measured that `declare const X: unique symbol` type-checks, satisfies every
+// use and ERASES under `node --experimental-strip-types`, so a brand written
+// that way is a control that is present in the review and absent at run time.
+// Nothing here exists after erasure and nothing here needs to.
+
+/** A write predicate carrying BOTH a tenancy narrowing and an address. */
+export type ScopedWritePredicate = SQL & { readonly __writePredicate: 'tenancy-and-address' };
+
+/** A write predicate carrying an address and no tenancy, for the two unscoped authorities. */
+export type UnscopedWritePredicate = SQL & { readonly __writePredicate: 'address' };
+
+/**
+ * The single row an addressed read returned, or `undefined`.
+ *
+ * IT THROWS ON TWO RATHER THAN RETURNING THE FIRST, and that is the one place
+ * in this file where the uniqueness claim is checked against the DATABASE
+ * instead of against the transcription of it. `refuseUnaddressed` reads
+ * `schema.ts`, which is a transcription somebody keeps true by hand; this reads
+ * what Postgres actually returned. A second row means the key the address named
+ * is not unique in the database, and returning the first would make that
+ * invisible on exactly the path an idempotency store reads.
+ */
+function oneOrNone(key: TableKey, found: readonly unknown[]): unknown {
+  if (found.length > 1) {
+    throw new Error(
+      `an addressed read of ${key} returned ${found.length} rows. The address named a column ` +
+        'set schema.ts declares UNIQUE and the database disagreed, which is a drift between ' +
+        'the migrations and the transcription rather than a caller error.',
+    );
+  }
+  return found[0];
+}
+
+/** `and` over two predicates that are both present, without the optional arm. */
+function bothOf(left: SQL, right: SQL): SQL {
+  const composed = and(left, right);
+  if (composed === undefined) {
+    throw new Error('two present predicates composed to nothing, which drizzle-orm cannot do.');
+  }
+  return composed;
+}
+
+/**
+ * THE ONLY PRODUCER OF A SCOPED WRITE PREDICATE, and it ANDs the tenancy
+ * narrowing the matching read carries with the caller's address.
+ *
+ * THE COMPOSITION IS HERE AND NOT AT A CALL SITE, so there is no seam at which
+ * a caller could supply the first half. `scopePredicate(key, identityId)` is
+ * the same function the read calls, over the whole of `ScopedTableKey`
+ * including `derived`, whose `EXISTS` is as correct ANDed as it is alone.
+ */
+export function scopedWritePredicate<K extends ScopedTableKey>(
+  key: K,
+  identityId: IdentityId,
+  at: RowAddress<K>,
+): ScopedWritePredicate {
+  refusePinnedColumn(key, at);
+  refuseUnaddressed(key, at, handlePinnedColumns(key));
+  return bothOf(scopePredicate(key, identityId), addressPredicate(key, at)) as ScopedWritePredicate;
+}
+
+/**
+ * The only producer of an unscoped write predicate.
+ *
+ * NO TENANCY CONJUNCT, because `systemTx` and `firmTx` carry no identity. The
+ * address is the WHOLE predicate, which is why it is the one authority where
+ * `refuseUnaddressed` is the only thing between a caller and the table.
+ */
+export function unscopedWritePredicate<K extends TableKey>(
+  key: K,
+  at: RowAddress<K>,
+): UnscopedWritePredicate {
+  refuseUnaddressed(key, at);
+  return addressPredicate(key, at) as UnscopedWritePredicate;
+}
+
+/** The read predicate for a filter, with the tenancy narrowing ANDed. */
+export function scopedFilterPredicate<K extends ScopedTableKey>(
+  key: K,
+  identityId: IdentityId,
+  where: RowFilter<K>,
+): SQL {
+  refusePinnedColumn(key, where);
+  return bothOf(scopePredicate(key, identityId), addressPredicate(key, where));
+}
+
+/** The read predicate for a filter at an authority that carries no identity. */
+export function unscopedFilterPredicate<K extends TableKey>(key: K, where: RowFilter<K>): SQL {
+  return addressPredicate(key, where);
+}
+
+/** UPDATE. The `WHERE` clause is not optional and there is no builder without one. */
+function updateStatementOn(
   source: StatementSource,
   key: TableKey,
   values: WriteValues,
-  where: SQL | undefined,
+  where: SQL,
 ): unknown {
   refuseTenancyColumn(key, values);
-  const builder = source.update(TABLES[key] as PgTable).set(values);
-  return where === undefined ? builder.returning() : builder.where(where).returning();
+  return source
+    .update(TABLES[key] as PgTable)
+    .set(values)
+    .where(where)
+    .returning();
 }
 
-/** DELETE carrying a predicate, or none. */
-export function deleteStatement(
+/** DELETE, with the same rule about its `WHERE`. */
+function deleteStatementOn(source: StatementSource, key: TableKey, where: SQL): unknown {
+  return source
+    .delete(TABLES[key] as PgTable)
+    .where(where)
+    .returning();
+}
+
+/** UPDATE through a scoped handle. Accepts NOTHING but a tenancy-and-address predicate. */
+export function scopedUpdateStatement(
+  source: StatementSource,
+  key: ScopedTableKey,
+  values: WriteValues,
+  where: ScopedWritePredicate,
+): unknown {
+  return updateStatementOn(source, key, values, where);
+}
+
+/** DELETE through a scoped handle. */
+export function scopedDeleteStatement(
+  source: StatementSource,
+  key: ScopedTableKey,
+  where: ScopedWritePredicate,
+): unknown {
+  return deleteStatementOn(source, key, where);
+}
+
+/** UPDATE at an authority that carries no identity. */
+export function unscopedUpdateStatement(
   source: StatementSource,
   key: TableKey,
-  where: SQL | undefined,
+  values: WriteValues,
+  where: UnscopedWritePredicate,
 ): unknown {
-  const builder = source.delete(TABLES[key] as PgTable);
-  return where === undefined ? builder.returning() : builder.where(where).returning();
+  return updateStatementOn(source, key, values, where);
 }
 
-/** SELECT carrying a predicate, or none. */
+/** DELETE at an authority that carries no identity. */
+export function unscopedDeleteStatement(
+  source: StatementSource,
+  key: TableKey,
+  where: UnscopedWritePredicate,
+): unknown {
+  return deleteStatementOn(source, key, where);
+}
+
+/**
+ * SELECT carrying a predicate, or none.
+ *
+ * THIS ONE STILL TAKES `undefined` AND THAT IS NOT AN OVERSIGHT. An unfiltered
+ * SELECT is what `systemDb(reason).rows` and `firmDb().rows` have always
+ * granted at those authorities, and it has the only two real callers in the
+ * tree. The defect ADR-112 closes is on the side that DESTROYS.
+ */
 export function selectStatement(
   source: StatementSource,
   key: TableKey,
@@ -609,8 +1049,27 @@ export interface ScopedTx extends TxCommon {
   readonly identityId: IdentityId;
   rows<K extends ScopedTableKey>(key: K): Promise<unknown[]>;
   insert<K extends OwnedTableKey>(key: K, values: WriteValues): Promise<unknown[]>;
-  update<K extends ScopedTableKey>(key: K, values: WriteValues): Promise<unknown[]>;
-  delete<K extends ScopedTableKey>(key: K): Promise<unknown[]>;
+  /** Rows matching a filter, ANDed with this identity's scope. Many rows. */
+  rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
+    key: K,
+    where: NamesAColumn<K, F>,
+  ): Promise<unknown[]>;
+  /** ONE row, or `undefined`. The address must name a unique key. */
+  rowAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown>;
+  /** Write ONE row of this identity's. Tenancy and address are BOTH in the `WHERE`. */
+  updateAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+    values: WriteValues,
+  ): Promise<unknown[]>;
+  /** Remove ONE row of this identity's. */
+  deleteAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown[]>;
 }
 
 /**
@@ -627,8 +1086,23 @@ export interface SystemTx extends TxCommon {
   readonly reason: SystemReason;
   rows<K extends TableKey>(key: K): Promise<unknown[]>;
   insert<K extends TableKey>(key: K, values: WriteValues): Promise<unknown[]>;
-  update<K extends TableKey>(key: K, values: WriteValues): Promise<unknown[]>;
-  delete<K extends TableKey>(key: K): Promise<unknown[]>;
+  rowsWhere<K extends TableKey, F extends RowFilter<K>>(
+    key: K,
+    where: NamesAColumn<K, F>,
+  ): Promise<unknown[]>;
+  rowAt<K extends TableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown>;
+  updateAt<K extends TableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+    values: WriteValues,
+  ): Promise<unknown[]>;
+  deleteAt<K extends TableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown[]>;
 }
 
 /** A transaction over rows that belong to nobody. `FirmTableKey` and nothing else. */
@@ -636,8 +1110,23 @@ export interface FirmTx extends TxCommon {
   readonly __brand: 'FirmTx';
   rows<K extends FirmTableKey>(key: K): Promise<unknown[]>;
   insert<K extends FirmTableKey>(key: K, values: WriteValues): Promise<unknown[]>;
-  update<K extends FirmTableKey>(key: K, values: WriteValues): Promise<unknown[]>;
-  delete<K extends FirmTableKey>(key: K): Promise<unknown[]>;
+  rowsWhere<K extends FirmTableKey, F extends RowFilter<K>>(
+    key: K,
+    where: NamesAColumn<K, F>,
+  ): Promise<unknown[]>;
+  rowAt<K extends FirmTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown>;
+  updateAt<K extends FirmTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+    values: WriteValues,
+  ): Promise<unknown[]>;
+  deleteAt<K extends FirmTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown[]>;
 }
 
 /**
@@ -668,16 +1157,49 @@ export function scopedTx(
         values,
       ).returning()) as unknown[];
     },
-    async update<K extends ScopedTableKey>(key: K, values: WriteValues): Promise<unknown[]> {
-      return (await updateStatement(
+    async rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
+      key: K,
+      where: NamesAColumn<K, F>,
+    ): Promise<unknown[]> {
+      return (await selectStatement(
+        source,
+        key,
+        scopedFilterPredicate(key, identityId, where),
+      )) as unknown[];
+    },
+    async rowAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown> {
+      refuseUnaddressed(key, at, handlePinnedColumns(key));
+      const found = (await selectStatement(
+        source,
+        key,
+        scopedFilterPredicate(key, identityId, at),
+      )) as unknown[];
+      return oneOrNone(key, found);
+    },
+    async updateAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+      values: WriteValues,
+    ): Promise<unknown[]> {
+      return (await scopedUpdateStatement(
         source,
         key,
         values,
-        scopePredicate(key, identityId),
+        scopedWritePredicate(key, identityId, at),
       )) as unknown[];
     },
-    async delete<K extends ScopedTableKey>(key: K): Promise<unknown[]> {
-      return (await deleteStatement(source, key, scopePredicate(key, identityId))) as unknown[];
+    async deleteAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown[]> {
+      return (await scopedDeleteStatement(
+        source,
+        key,
+        scopedWritePredicate(key, identityId, at),
+      )) as unknown[];
     },
   };
 }
@@ -697,11 +1219,45 @@ export function systemTx(
     async insert<K extends TableKey>(key: K, values: WriteValues): Promise<unknown[]> {
       return (await unscopedInsertStatement(source, key, values).returning()) as unknown[];
     },
-    async update<K extends TableKey>(key: K, values: WriteValues): Promise<unknown[]> {
-      return (await updateStatement(source, key, values, undefined)) as unknown[];
+    async rowsWhere<K extends TableKey, F extends RowFilter<K>>(
+      key: K,
+      where: NamesAColumn<K, F>,
+    ): Promise<unknown[]> {
+      return (await selectStatement(source, key, unscopedFilterPredicate(key, where))) as unknown[];
     },
-    async delete<K extends TableKey>(key: K): Promise<unknown[]> {
-      return (await deleteStatement(source, key, undefined)) as unknown[];
+    async rowAt<K extends TableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown> {
+      refuseUnaddressed(key, at);
+      const found = (await selectStatement(
+        source,
+        key,
+        unscopedFilterPredicate(key, at),
+      )) as unknown[];
+      return oneOrNone(key, found);
+    },
+    async updateAt<K extends TableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+      values: WriteValues,
+    ): Promise<unknown[]> {
+      return (await unscopedUpdateStatement(
+        source,
+        key,
+        values,
+        unscopedWritePredicate(key, at),
+      )) as unknown[];
+    },
+    async deleteAt<K extends TableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown[]> {
+      return (await unscopedDeleteStatement(
+        source,
+        key,
+        unscopedWritePredicate(key, at),
+      )) as unknown[];
     },
   };
 }
@@ -716,11 +1272,45 @@ export function firmTx(source: StatementSource, conn: PoolClient): FirmTx {
     async insert<K extends FirmTableKey>(key: K, values: WriteValues): Promise<unknown[]> {
       return (await unscopedInsertStatement(source, key, values).returning()) as unknown[];
     },
-    async update<K extends FirmTableKey>(key: K, values: WriteValues): Promise<unknown[]> {
-      return (await updateStatement(source, key, values, undefined)) as unknown[];
+    async rowsWhere<K extends FirmTableKey, F extends RowFilter<K>>(
+      key: K,
+      where: NamesAColumn<K, F>,
+    ): Promise<unknown[]> {
+      return (await selectStatement(source, key, unscopedFilterPredicate(key, where))) as unknown[];
     },
-    async delete<K extends FirmTableKey>(key: K): Promise<unknown[]> {
-      return (await deleteStatement(source, key, undefined)) as unknown[];
+    async rowAt<K extends FirmTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown> {
+      refuseUnaddressed(key, at);
+      const found = (await selectStatement(
+        source,
+        key,
+        unscopedFilterPredicate(key, at),
+      )) as unknown[];
+      return oneOrNone(key, found);
+    },
+    async updateAt<K extends FirmTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+      values: WriteValues,
+    ): Promise<unknown[]> {
+      return (await unscopedUpdateStatement(
+        source,
+        key,
+        values,
+        unscopedWritePredicate(key, at),
+      )) as unknown[];
+    },
+    async deleteAt<K extends FirmTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown[]> {
+      return (await unscopedDeleteStatement(
+        source,
+        key,
+        unscopedWritePredicate(key, at),
+      )) as unknown[];
     },
   };
 }
