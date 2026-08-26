@@ -868,11 +868,31 @@ test('the auth and me modules are discovered from the directory and register on 
   const { report } = buildServer({ surface: 'public', modules: onDisk });
   expect(report.modules).toContain('auth');
   expect(report.modules).toContain('me');
-  for (const spec of ALL_ENDPOINTS)
-    expect(report.registered).toContain(`${spec.method} ${spec.path}`);
-  // Nothing this session declares is an operator path, so nothing is withheld
-  // from the trader origin.
-  expect(report.withheld).toStrictEqual([]);
+  // THE SUBJECT IS THIS MODULE'S ENDPOINTS AND NOT THE WHOLE COMPOSED SET.
+  // `report` covers every module on disk, so an assertion like
+  // `expect(report.withheld).toStrictEqual([])` would be an assertion about
+  // other slices' files: the day one of them declares an operator route, this
+  // suite goes red for a reason that has nothing to do with auth. Session 224
+  // landed `public-methods` beside this file while this branch was open, which
+  // is the warning rather than the failure, because its path is public too.
+  for (const spec of ALL_ENDPOINTS) {
+    const endpoint = `${spec.method} ${spec.path}`;
+    expect(report.registered).toContain(endpoint);
+    expect(report.withheld).not.toContain(endpoint);
+  }
+});
+
+test('every endpoint this session declares is WITHHELD from the operator surface', () => {
+  // The other direction, and it is what makes the assertion above mean
+  // something: `surfaceServes` is not a no-op on these paths. None of them is
+  // under `/admin` or `/internal`, so `api-admin` registers none of them and
+  // answers 404 by having nothing there rather than by refusing.
+  const { report } = buildServer({ surface: 'operator', modules: onDisk });
+  for (const spec of ALL_ENDPOINTS) {
+    const endpoint = `${spec.method} ${spec.path}`;
+    expect(report.withheld).toContain(endpoint);
+    expect(report.registered).not.toContain(endpoint);
+  }
 });
 
 test('no route in this session carries the base path in its declaration', () => {
