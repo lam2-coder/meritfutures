@@ -139,6 +139,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-110](ADR-110.md) | the method page is a public read of a versioned definition, and the address of a definition is a pair whose second half the path does not carry (2026-08-26, status: accepted) |
 | [ADR-111](ADR-111.md) | two of the three homeless shapes get a contract row and the third gets a home it cannot be given here, because a banner that describes a session must arrive on the response that resolved it (2026-08-26, status: accepted) |
 | [ADR-112](ADR-112.md) | the accessor learns to name ONE ROW, and the six writes that could not are removed rather than documented  (2026-08-26, status: proposed) |
+| [ADR-119](ADR-119.md) | the demo world is a VALUE at `scripts/demo/world.ts`, not a Postgres seed, and naming it reopens `CI-09` on purpose  (2026-08-26, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
