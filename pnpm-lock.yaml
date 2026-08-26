@@ -117,6 +117,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@merit/affiliate':
+        specifier: workspace:*
+        version: link:../../packages/affiliate
       '@merit/psp':
         specifier: workspace:*
         version: link:../../packages/psp
@@ -204,6 +207,18 @@ importers:
       '@merit/rules-engine':
         specifier: workspace:*
         version: link:../../packages/rules-engine
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@22.20.1)(vite@8.2.1(@types/node@22.20.1))
+
+  packages/affiliate:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
