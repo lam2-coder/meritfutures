@@ -348,6 +348,30 @@ describe("SD-M2-01's digest", () => {
     expect(payloadHash({ ab: 'c' }).equals(payloadHash({ a: 'bc' }))).toBe(false);
   });
 
+  test('THE KEYS ARE IN THE DIGEST. Two intents with the same values do not collide', () => {
+    // THIS CASE EXISTS BECAUSE A SEEDED MUTATION SURVIVED WITHOUT IT. Dropping
+    // `frame(key)` from `canonicalPayload` -- keys out of the digest entirely --
+    // left all sixty tests green, because the pair above is disambiguated by
+    // the VALUE framing alone. The pair below is not: same values in the same
+    // sorted order, different fields.
+    //
+    // The money form of the collision is the second assertion. A payload naming
+    // a risk floor and a payload naming an account reference that happen to
+    // carry the same number would be ONE intent under
+    // `provisioning_queue_intent_uq`, so the second one is silently not
+    // enqueued and an account is left at a floor nobody pushed.
+    expect(payloadHash({ a: 'x', b: 'y' }).equals(payloadHash({ c: 'x', d: 'y' }))).toBe(false);
+    expect(
+      payloadHash({ [RISK_FLOOR_CENTS_FIELD]: 100n }).equals(payloadHash({ account_ref: 100n })),
+    ).toBe(false);
+  });
+
+  test('the key is framed, so a key/value boundary cannot be moved', () => {
+    // `{ab: 'c'}` and `{a: 'bc'}` framed without lengths are both `abc`.
+    expect(payloadHash({ ab: 'c' }).equals(payloadHash({ a: 'bc' }))).toBe(false);
+    expect(canonicalPayload({ a: 'b' })).toBe('1:a2:sb');
+  });
+
   test("a string '100' and 100 cents are different intents", () => {
     expect(payloadHash({ x: '100' }).equals(payloadHash({ x: 100n }))).toBe(false);
   });
