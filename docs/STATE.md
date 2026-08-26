@@ -3952,6 +3952,19 @@ The two quiet rows are the ones worth naming: `GET /sessions` and `GET /phone/ch
 
 **A third is a contradiction inside API_CONTRACT itself and it is reported, not resolved.** Section 3 says *"the response is unchanged and `deferred` is set"* and, one sentence later, that distinguishing the degraded response *"would tell an attacker exactly when their own traffic tripped the breaker"*. A response carrying `deferred` **is** distinguishable, and `OtpResponse202` declares the field. The declared type is implemented and the status-is-unchanged reading is taken; the resolution is a ruling on a frozen document.
 
+### `ADR-108`'s row is NOT deleted, and the gate is the reason
+
+The disposition [ADR-034](decisions/ADR-034.md) requires of an unused reservation is deletion, and it was asked for here in the same breath as `ADR-111`'s, which was deleted on `main` at `d2e12c5`. **It is not executable for `108`, and the difference is arithmetic rather than judgement.** `111` was the HIGHEST claimed number, so removing it left the range intact; `108` sits under `109`, still reserved for session 219, and under `110`, now `accepted`. Deleting it was attempted and `CI-06f` refused it by name:
+
+```
+FAIL   CI-06f  ADR numbers are unique and gapless over allocated plus reserved  (1)
+       ADR-108 is neither present nor reserved (a hole)
+```
+
+which is [ALLOCATION](decisions/ALLOCATION.md)'s own warning that *"a vacated number reserves nothing and an early renumber fails the gate"*, met head on. **The row is restored and left exactly as dispatched.** It becomes deletable when nothing claims a number above it, which is a compaction somebody performs deliberately once session 219's `109` resolves, and never a side effect of this branch landing. Never weaken a gate to pass it.
+
+**A third instance of the coordinate drift this session already reported.** The dispatch that independently confirmed the `scopedTx` finding cited `scoped-db.ts:566`, `:741` and `:671`; against a `scoped-db.ts` byte-identical to `main`'s they are **`:567`, `:742` and `:676`**. This session's own three, `:567`, `:701` and `:720`, were re-run on the merged tree and all three resolve. **The defect is exact every time and the coordinate is wrong most times**, which is the argument for naming the METHOD before the line, and `:676` is now pinned in [`auth.ts`](../apps/api/src/routes/auth.ts)'s header for the `scopedTx.update` row.
+
 ### Nothing is admitted, and no number is reserved
 
 [`pnpm-workspace.yaml`](../pnpm-workspace.yaml), [`pnpm-lock.yaml`](../pnpm-lock.yaml) and [`apps/api/package.json`](../apps/api/package.json) are **all untouched**, which the fence permitted and the work did not need: a WebAuthn verifier admitted here would sit behind a port that throws, because a passkey assertion cannot be verified without the credential store and `passkeys` lives in `packages/db`. The lockfile is rowed **SERIAL** across `P3-j`, `P3-m` and `P4-i`, so not taking it is a scheduling result and not only a tidiness one. **`ADR-108`'s conditional reservation stands exactly as dispatched** and is deleted by whoever lands next.

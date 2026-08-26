@@ -71,9 +71,11 @@
 // session's. Any implementer reading this: the note is here so it is a grep
 // target when the fix lands, per session 222's finding.
 //
-//   revoke ONE session          `ScopedTx.update` renders `scopePredicate` and
-//                               takes no second predicate, so it writes EVERY
-//                               session that identity holds.
+//   revoke ONE session          `ScopedTx.update` (`scoped-db.ts:676`) renders
+//                               `scopePredicate(key, identityId)` and takes no
+//                               second predicate, so it writes EVERY session
+//                               that identity holds. Confirmed independently
+//                               on `main` by the dispatch that reported it.
 //   consume ONE otp challenge   `otp_challenges` is `firm`, so `scopedTx`
 //                               refuses it at compile time.
 //   stamp `elevated_at`         as the first.
