@@ -39,12 +39,16 @@
 // -----------------------------------------------------------------------------
 // WHAT IS DELIBERATELY NOT HERE
 // -----------------------------------------------------------------------------
-// GS-143's `<PlanValue>` COMPONENT AND VG-M9-2's CONTENT LINT ARE P4's WORK,
-// not this session's (P1 section 2.3, tier 3). INV-M9-07 calls that lint "the
-// single most important control in the module and the one most likely to be
-// argued with", and it is a build-time lint over MDX rather than a function, so
-// it lands with the framework that compiles the MDX. Nothing here weakens it and
-// nothing here substitutes for it.
+// VG-M9-2's CONTENT LINT LANDED IN P4-j AND IS NOW `content/lint.ts`. It was
+// P1's to leave out (P1 section 2.3, tier 3) and this note recorded the reason;
+// what that reason got wrong is worth keeping rather than deleting. It said the
+// lint "lands with the framework that compiles the MDX", and no framework
+// compiles anything here: `next build` still exits 1 on "Couldn't find any
+// `pages` or `app` directory", and an App Router file under `apps/*/src/app/` is
+// CI-07's dated arrival condition, which is `P4-i`'s cell rather than `P4-j`'s.
+// So the lint is a check over the AUTHORED SOURCE and over the page models built
+// from it, which is where "the build fails" is expressible today. GS-143 and
+// GS-144 assert against that.
 //
 // GS-146's OPERATOR CHECK IS THE PUBLISH PATH'S. A `copy_block` whose wording
 // contradicts its rule's operator fails validation ([M01](M01) section 2.4)
@@ -124,6 +128,26 @@ export {
 
 export type { ContentDocument, ContentKind } from './content/documents.ts';
 export { isLive } from './content/documents.ts';
+
+// -----------------------------------------------------------------------------
+// VG-M9-2, the control INV-M9-07 calls the most important one in the module
+// -----------------------------------------------------------------------------
+export type {
+  AuthoredSurface,
+  ContentFinding,
+  ContentRule,
+  ContentSurface,
+} from './content/lint.ts';
+export {
+  ContentLintError,
+  PLAN_VALUE_ATTRIBUTES,
+  SETTLEMENT_WINDOW_CARVE_OUT,
+  STATISTIC_TAIL_STRIPPING_ATTRIBUTES,
+  assertAuthoredContentIsClean,
+  authoredSurfaces,
+  lintAuthoredContent,
+  statisticWithTail,
+} from './content/lint.ts';
 
 export type {
   PublishedStatistic,
@@ -217,6 +241,12 @@ export { contentPage, legalIndex } from './routes/legal.ts';
 
 export type { GeoDisposition, GeoNotice } from './routes/geo.ts';
 export { geoNotice } from './routes/geo.ts';
+
+// -----------------------------------------------------------------------------
+// The OG image path, which GS-144 names and which was four comments until now
+// -----------------------------------------------------------------------------
+export type { OgCard, OgCardInput } from './routes/og.ts';
+export { OgCardError, ogCard, ogCardText, ogImagePath } from './routes/og.ts';
 
 /**
  * Not a server yet. It is a deployable that starts.
