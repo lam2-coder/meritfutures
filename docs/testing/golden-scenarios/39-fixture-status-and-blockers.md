@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [README.md, ../../decisions/ADR-072.md, ../../decisions/ADR-076.md]
-last_updated: 2026-08-22
+last_updated: 2026-08-26
 ---
 
 ## 39. Fixture status and blockers
@@ -36,10 +36,10 @@ A row in this status carries **no blocker**, because nothing is blocked. It is a
 
 | Blocker | Rows | The condition that fails |
 |---|---|---|
-| `no-fixture-format` | **229** | W2. No fixture format exists for the owning module at all |
+| `no-fixture-format` | **227** | W2. No fixture format exists for the owning module at all |
 | `format-cannot-express` | **16** | W2. The format exists and cannot state this input or this expectation |
 | `vendor-call` | **14** | W3. `M02` is at `status: review`, the one module plan of twenty-one that is not approved |
-| `outside-loader-boundary` | **4** | W1. The code exists and lives outside `@merit/rules-engine` |
+| `outside-loader-boundary` | **6** | W1. The code exists and lives outside `@merit/rules-engine` |
 | `open-question` | **2** | W3. `OI-16`, on `GS-004` and `GS-031` |
 | `no-plan-record-value` | **1** | W2. `GS-079`, a value no plan document states |
 
@@ -205,8 +205,8 @@ A row in this status carries **no blocker**, because nothing is blocked. It is a
 | GS-140 | blocked | no-fixture-format | [33.1](33-ownership-index-and-coverage-reconciliation.md) owns the row to **M8**, and the only fixture format in the tree is M1's day stream folded through `advanceDay` ([`fixtures/README`](../../../packages/rules-engine/fixtures/README.md)) |
 | GS-141 | covered-elsewhere |  | EXECUTED by the three-plan `it.each` at [`plan-validate.test.ts:169`](../../../packages/rules-engine/test/plan-validate.test.ts), three cases, all passing: an EXACT-SET equality of the diff ids each v1 plan emits, `PW-02a` on Core EOD and Direct and `PW-02b` on Merit Rapid, with nothing else emitted. This row is named at `:157`. **THE RESIDUAL THIS CELL RECORDED IS LANDED AND THE CELL SAYS SO RATHER THAN STILL CLAIMING IT**: the row's last sentence, *"asserts the two are never rendered identically"*, is the `info` against `warning` severity and the distinct text, which `diffIds` cannot reach because it compares ids, and WAVE-05 `X3` wrote it as the `it` at `:190`, which pins both severities and `textsDiffer` in ONE `expect` because no two of the three clauses are the row's claim. Line numbers re-derived by grep 2026-08-22 after [session 128](../../sessions/2026-08-22-session-128.md) moved them ([ADR-076 section 2](../../decisions/ADR-076.md)) |
 | GS-142 | blocked | no-fixture-format | [33.1](33-ownership-index-and-coverage-reconciliation.md) owns the row to **M9**, and the only fixture format in the tree is M1's day stream folded through `advanceDay` ([`fixtures/README`](../../../packages/rules-engine/fixtures/README.md)) |
-| GS-143 | blocked | no-fixture-format | [33.1](33-ownership-index-and-coverage-reconciliation.md) owns the row to **M9**, and the only fixture format in the tree is M1's day stream folded through `advanceDay` ([`fixtures/README`](../../../packages/rules-engine/fixtures/README.md)) |
-| GS-144 | blocked | no-fixture-format | [33.1](33-ownership-index-and-coverage-reconciliation.md) owns the row to **M9**, and the only fixture format in the tree is M1's day stream folded through `advanceDay` ([`fixtures/README`](../../../packages/rules-engine/fixtures/README.md)) |
+| GS-143 | blocked | outside-loader-boundary | the assertion is a BUILD FAILURE and not an end state, so no fixture format for M9 would discharge it (ADR-097 B2), and an MDX pipeline in `apps/site` is unreachable from the golden loader, which imports `@merit/rules-engine` and nothing else ([ADR-072](../../decisions/ADR-072.md) W1, "whether or not it is implemented"). `grep -rniE "parameter.?lint" apps packages scripts` returns 0 and `<PlanValue>` exists only as a comment at [`apps/site/src/index.ts:42`](../../../apps/site/src/index.ts). Exits to `covered-elsewhere` when `P4-j` lands the lint, never to `written` |
+| GS-144 | blocked | outside-loader-boundary | same condition as GS-143 and PARTLY COVERED ALREADY: `assertWindowAttached` at [`apps/site/src/routes/stats.ts:145`](../../../apps/site/src/routes/stats.ts) is the row's first leg executable, and two tests naming this row at [`stats-page.test.ts:101`](../../../apps/site/test/stats-page.test.ts) and `:110` PASS in `pnpm exec vitest run` (21 passed, 2026-08-24). **The row's second leg is uncovered**: [section 16](16-gs-142-to-gs-148-marketing-site-m9.md) says "including on the OG image path", and a case-insensitive grep for "og image" and for "opengraph" over `apps` and `packages` returns four sites between them, all comments. A status is not partial, so this stays `blocked` until the OG leg runs (ADR-097 section 6) |
 | GS-145 | blocked | no-fixture-format | [33.1](33-ownership-index-and-coverage-reconciliation.md) owns the row to **M9**, and the only fixture format in the tree is M1's day stream folded through `advanceDay` ([`fixtures/README`](../../../packages/rules-engine/fixtures/README.md)) |
 | GS-146 | blocked | no-fixture-format | [33.1](33-ownership-index-and-coverage-reconciliation.md) owns the row to **M9**, and the only fixture format in the tree is M1's day stream folded through `advanceDay` ([`fixtures/README`](../../../packages/rules-engine/fixtures/README.md)) |
 | GS-147 | blocked | no-fixture-format | [33.1](33-ownership-index-and-coverage-reconciliation.md) owns the row to **M9**, and the only fixture format in the tree is M1's day stream folded through `advanceDay` ([`fixtures/README`](../../../packages/rules-engine/fixtures/README.md)) |
