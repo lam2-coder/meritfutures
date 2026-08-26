@@ -64,10 +64,14 @@ export {
 // a job before it existed. NEITHER PACKAGE DEPENDS ON THE OTHER and the two
 // shapes are bound by an assertion in `test/write-accessor.test.ts` that reads
 // `job-queue.ts` rather than restating it.
+// `tenancyColumns` is the plural and `tenancyColumn` reads it (ADR-106). The
+// list exists because a `pair` row has TWO tenancy columns, and the guard that
+// refuses a caller naming one has to refuse the caller naming the other.
 export {
   firmDb,
   transaction,
   tenancyColumn,
+  tenancyColumns,
   type FirmDb,
   type FirmTx,
   type OwnedTableKey,

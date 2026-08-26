@@ -133,6 +133,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-103](ADR-103.md) | column TYPE and NULLABILITY are COMPARED, so `ALTER COLUMN` stops standing in for a comparison that did not exist  (2026-08-25, status: proposed) |
 | [ADR-104](ADR-104.md) | the imbalance is unrepresentable, the posting path is a library both deployables call, and a halt is only a halt because this code path honours it  (2026-08-25, status: proposed) |
 | [ADR-105](ADR-105.md) | the PSP port is the ORDER and the vendor is the mechanics, and two fakes are what told them apart  (2026-08-25, status: proposed) |
+| [ADR-106](ADR-106.md) | a row whose subject is a PAIR of identities belongs to both and is scoped to neither  (2026-08-25, status: proposed) |
 | [ADR-107](ADR-107.md) | the provisioning saga admits nobody it cannot produce evidence for, and five of seven operations have no inverse  (2026-08-26, status: proposed) |
 <!--/gen-->
 
