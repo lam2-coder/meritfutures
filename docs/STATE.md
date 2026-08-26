@@ -29,11 +29,11 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->107<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->107<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->108<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->108<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->107<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->107<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->108<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->108<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3822,3 +3822,35 @@ Every seed was reverted and `git status --porcelain` reported clean before the f
 **Ten mutations seeded and one survived.** Dropping `frame(key)` from the canonical serialization -- keys out of `payload_hash` entirely -- left **all sixty tests green**, because the pair the suite tested is disambiguated by the value framing alone. The pair that needs it carries the **same values under different field names**, and its money form is a payload naming `risk_floor_cents` and one naming `account_ref` with the same number: under `provisioning_queue_intent_uq` those are one intent, so the second is silently not enqueued and an account is left at a floor nobody pushed. Two cases were added and the seed now fails 2.
 
 **Whether the fail-closed assertion discharges `GS-138` is a ruling nobody has taken**, which is [P3 wave 3](plans/P3-wave3-modules.md) section 11 item 3's own position. All fourteen M2 fixture rows are `blocked / vendor-call`; the assertion is written against the simulator anyway and [section 39](testing/golden-scenarios/39-fixture-status-and-blockers.md) is untouched.
+
+---
+
+## Session 219: the idempotency layer, the PSP webhook receiver, and an accessor that cannot name a row
+
+**[ADR-109](decisions/ADR-109.md) lands, `status: proposed`, approval line UNSIGNED, MONEY PATH and the `E2` read is owed.** [P3 wave 3](plans/P3-wave3-modules.md)'s `P3-k` is written: [`apps/api/src/idempotency.ts`](../apps/api/src/idempotency.ts), [`apps/api/src/routes/webhooks-psp.ts`](../apps/api/src/routes/webhooks-psp.ts) and **51 tests over two files**, with no migration, no `packages/db` file, no catalog entry and no `routes/index.ts`.
+
+**The slice's dispatch predicted one hole and asked for it to be verified rather than believed. Verifying it found a wider one.** `idempotency_keys` was registered by [session 215](sessions/2026-08-25-session-215.md) as `owned` on a NULLABLE `identity_id`, and **registering it is what created the problem**: `owned` excludes it from `firmDb()`, the nullable column is precisely how the unowned replay is kept out of `scopedDb(identityId)`, and `SystemReason` has two members of which a request handler is neither.
+
+**THE RULING IN ONE LINE IS THAT THE MISSING CONSTRUCTION IS A PREDICATE AND NOT AN AUTHORITY.** `systemDb` gains no third member, because `systemTx.update` passes `undefined` to `updateStatement`'s required `where` position and would write **every row in the table** whatever reason it was handed; `ScopedTx` is blocked identically, narrowing by tenancy and by nothing else. Four of the five available doors fail on the same column of the same table.
+
+| Door | Reaches `idempotency_keys`? | Can name one row? |
+|---|---|---|
+| `scopedDb(id)` / `scopedTx` | Yes, it is `owned` | **No.** Tenancy predicate only |
+| `firmDb()` / `firmTx` | No, `FirmTableKey` excludes `owned` | **No.** No predicate at all |
+| `systemDb(reason)` / `systemTx` | Yes, generic over `TableKey` | **No.** No predicate at all |
+| A hypothetical `'request-handler'` reason | Yes | **No.** Identical to the row above |
+| `sqlExecutor(reason)` | Yes, it is raw SQL | Yes, and its vocabulary is one member and it is not this |
+
+**The remedy the dispatch itself prescribed is unavailable inside the fence.** `sqlExecutor` takes `SqlExecutorReason`, whose type is the single member `'job-enqueue'`, and [`scoped-db.ts:742`](../packages/db/src/scoped-db.ts) **checks it at run time and throws**. Widening it is a `packages/db` edit, which the same dispatch says to report rather than take. **[Session 222](sessions/2026-08-26-session-222.md) hit this wall one day earlier from `apps/worker` and reported it**; this is the second caller, so the ruling is written rather than reported a second time.
+
+**A SECOND RULING ARRIVES FROM THE FRAMEWORK AND IT IS MEASURED RATHER THAN REASONED.** API_CONTRACT section 10 states *"HMAC signature verified BEFORE parsing"* in capitals, and fastify 5.12.1's default `application/json` parser hands a handler a parsed `Object` with `request.raw` already drained, so the ordering is lost before any code of Merit's runs. `{ parseAs: 'buffer' }` recovers the exact bytes and **applies even when registered after the route**, which is what makes the seam small; `RouteDefinition` carries none, and `registry.ts` is outside this fence. **A handler may never recover the bytes by re-encoding `request.body`**: two JSON texts that parse equal serialise differently, so the MAC fails and every legitimate webhook answers `401` with no line of code looking wrong. The suite watches that round trip being refused.
+
+**THERE IS NO UPDATE STATEMENT IN THE RECEIVER AND THAT IS THE DEDUPE WORKING.** The order is apply, then INSERT the row carrying the result the application produced, then ROLL BACK if `psp_webhook_events_provider_event_uq` refused the claim. A duplicate therefore undoes the application and returns `200`, so **one provider event delivered twice produces exactly one business effect and two 200s**. The two responses are byte-identical, which is a control rather than laziness: a response that said "duplicate" would answer which event ids Merit has already seen.
+
+**A landmine is named and not repaired.** `idempotency_keys.key` is the PRIMARY KEY and carries no identity, so one caller's token can block another's on the same endpoint. It is a **denial and not a disclosure**, because the scope predicate keeps the first caller's stored response out of the second's hands, and `beginIdempotent` reports it as its own outcome rather than guessing which of the two cases it is. The repair is a migration and this session is forbidden one.
+
+**What is deliberately not here.** No `@merit/db` dependency in `apps/api`, so the absence is a fact somebody can grep. No production adapter for either provider, because [`packages/psp`](../packages/psp/src/index.ts) ships two fakes and shipping a real one is a procurement decision nobody has taken, so a live deployment answers `503 service_unavailable` and the route is still registered. No re-drive of a deferred event: `defer_attempts` is written `0` and never incremented, because the receiver is the first arrival and the re-driver is the batch's.
+
+**Measured on this branch, not inherited.** Suite **122 files / 2,028 passed / 1 skipped** to **124 files / 2,079 passed / 1 skipped**; `typecheck` exit 0; `eslint apps/api` exit 0; invariants **9 of 9**; gates **30 of 30**; `verify` exit 0. **Seven mutations seeded and all seven caught**, every seed removed with `git status --porcelain` clean of them. **`0048` stays free and no file under [`packages/db`](../packages/db/src/scoped-db.ts) is touched.**
+
+**Session 220 inherits [ADR-109](decisions/ADR-109.md) clause 2 as a third caller.** `POST /checkout` presents an `Idempotency-Key` that API_CONTRACT section 1 makes REQUIRED, and the layer it presents it to cannot store the response. **NOT MERGED. The `E2` read is owed on every line.**

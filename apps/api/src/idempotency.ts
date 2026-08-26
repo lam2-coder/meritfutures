@@ -17,14 +17,23 @@
 // An idempotency layer's whole job is to find ONE ROW BY ITS KEY and to stamp
 // THAT ROW with a response. Nothing in `packages/db` can do either.
 //
-//   `scopedDb(identityId)`  needs an identity, and the unowned replay has none.
-//   `firmDb()`              is `FirmTableKey`, and `idempotency_keys` is `owned`.
-//   `systemDb(reason)`      is `'nightly-batch' | 'operator-console'`, and a
-//                           request handler is neither.
+//   the scoped accessor   needs an identity, and the unowned replay has none.
+//   `firmDb()`            is `FirmTableKey`, and `idempotency_keys` is `owned`.
+//   `systemDb(reason)`    is `'nightly-batch' | 'operator-console'`, and a
+//                         request handler is neither.
+//
+// THE FIRST DOOR IS DESCRIBED AND NOT NAMED, WHICH IS DELIBERATE AND IS ITSELF
+// A FINDING. `CI-06/vg-inventory` probes `\bscopedDb\b` over every `.ts` under
+// `apps/api/src` as VG-3's and VG-6's arrival artifact, and STRATEGY's own cell
+// says the accessor's name appearing here "is the first commit on which the
+// subject exists". A COMMENT EXPLAINING THAT THE ACCESSOR CANNOT BE USED IS NOT
+// THAT COMMIT, and spelling the identifier would flip both rows to ARRIVED on
+// prose. The probe cannot tell a use from a mention; the gate is not edited and
+// the identifier is not written. ADR-109 section 7 reports it.
 //
 // THAT LIST IS THE HALF EVERYBODY NOTICES AND IT IS NOT THE HALF THAT DECIDES
 // THIS FILE. Admitting a third `SystemReason` member would not help, because
-// `scoped-db.ts:694-704` and `714-721` pass `undefined` where the statement
+// `scoped-db.ts:694-704` and `713-723` pass `undefined` where the statement
 // builders take a `WHERE` clause, and the transaction handles expose no
 // parameter that could supply one. `systemTx.update('idempotencyKeys', ...)`
 // renders no predicate and WRITES EVERY ROW IN THE TABLE. On this table that is
@@ -178,7 +187,7 @@ export interface IdempotencyRecord {
  * ruling that unblocks one.
  *
  * WHEN THAT IMPLEMENTATION IS WRITTEN, THIS IS THE COMMENT IT HAS TO ANSWER:
- * `packages/db/src/scoped-db.ts:694,701,704` (`systemTx`) and `714,718,721`
+ * `packages/db/src/scoped-db.ts:694,701,704` (`systemTx`) and `714,720,723`
  * (`firmTx`) hardcode `undefined` for the `WHERE` clause, and the handles take
  * no parameter that could supply one. `complete` below is an UPDATE of exactly
  * one row. Through either of those it is an update of the whole table.

@@ -63,7 +63,7 @@
 // event delivered twice produces exactly one business effect and two 200s. The
 // alternative -- insert first, apply, then stamp the result -- needs an UPDATE
 // of one row, and no accessor in `packages/db` can name a row: `firmTx.update`
-// (`scoped-db.ts:718`) hardcodes `undefined` for its `WHERE` clause and would
+// (`scoped-db.ts:720`) hardcodes `undefined` for its `WHERE` clause and would
 // write EVERY row in the table. See `src/idempotency.ts`'s header and ADR-109.
 //
 // THE TWO 200s ARE BYTE-IDENTICAL, WHICH IS A CONTROL RATHER THAN LAZINESS. A
