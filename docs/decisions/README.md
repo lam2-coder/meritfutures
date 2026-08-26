@@ -136,6 +136,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-106](ADR-106.md) | a row whose subject is a PAIR of identities belongs to both and is scoped to neither  (2026-08-25, status: proposed) |
 | [ADR-107](ADR-107.md) | the provisioning saga admits nobody it cannot produce evidence for, and five of seven operations have no inverse  (2026-08-26, status: proposed) |
 | [ADR-109](ADR-109.md) | the accessor cannot name a row, so the idempotency store is a port and the raw body is a parser  (2026-08-26, status: proposed) |
+| [ADR-110](ADR-110.md) | the method page is a public read of a versioned definition, and the address of a definition is a pair whose second half the path does not carry  (2026-08-26, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

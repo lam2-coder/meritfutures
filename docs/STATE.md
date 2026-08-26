@@ -29,11 +29,11 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->108<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->108<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->109<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->109<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->108<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->108<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->109<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->109<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -3825,6 +3825,29 @@ Every seed was reverted and `git status --porcelain` reported clean before the f
 
 ---
 
+## Session 224: M12's method pages, and the half of an address the path does not carry
+
+**[ADR-110](decisions/ADR-110.md) is proposed, `status: proposed`, approval line UNSIGNED. Not money.** [P4](plans/P4-portal-and-site.md) section 8's `P4-f` is written: `GET /public/methods/:statCode` is in [API_CONTRACT](architecture/API_CONTRACT.md) section 4 and [`apps/api`](../apps/api/src/routes/public-methods.ts) serves it. **One new route file, one new test file, one contract subsection and one ADR. No migration, no `packages/db` file, no dependency, no `pnpm-lock.yaml` change and no shared source file.**
+
+**THE RULING IN ONE LINE IS THAT THE ADDRESS OF A DEFINITION IS `(stat_code, version)` AND THE PATH CARRIES THE FIRST HALF.** [`0021:124`](../packages/db/migrations/0021_transparency.sql)'s `statistic_definitions_code_version_uq` makes the pair unique, and the published aggregate already spells it (`method_path: '/methods/ST-01/2'`). So the response is **every version, ascending, with the `adr_ref` for every change**, which is [M12:218](plans/M12-transparency-platform.md)'s own cell, and **no version parameter is invented**: a selector on this path would be a second address for a row that has one.
+
+**`live_version` IS A DATABASE GUARANTEE PROJECTED AND IS NOT "THE DEFINITION IN FORCE TODAY".** [`0021:127`](../packages/db/migrations/0021_transparency.sql)'s partial unique index over `superseded_by IS NULL` makes it unique, so naming it costs no arithmetic; `INV-M12-07` puts `effective_from` in the future at write time, so the unsuperseded row is regularly one that has not taken effect. **No clock is read anywhere in the handler**, which is what keeps one cached response true for every caller who shares it, and the clock-based implementation is the mutation that cost the most when it was seeded: **4 failed of 13**.
+
+**Two findings this slice hands on.**
+
+| # | Finding | Who it lands on |
+|---|---|---|
+| **1** | **No revalidation contract in this corpus fires when a definition version becomes effective.** `INV-M9-04`'s trigger is a plan-version publish and its record is `page_revalidations`, so it does not reach a method page; [M12:236](plans/M12-transparency-platform.md) gives `stats.definition_changed` the consumers **FEED and EVID**, and M9's revalidation is named only on `stats.published`. A statically rendered method page can therefore be stale for as long as nothing else republishes it | **Whichever slice renders those pages.** It is the sibling of [ADR-095](decisions/ADR-095.md) section 9 item 4's unstated replica-count precondition, and it is recorded rather than resolved because resolving it is a different fence |
+| **2** | **`apps/api` still holds no database handle, so the endpoint ships with its source UNWIRED.** The manifest declares `fastify` and nothing else. `MethodDefinitionSource` is the seam, an unwired source is a **500 and never a 404 or a 503**, and the door the wiring slice must take is `firmDb()` ([`scoped-db.ts:535`](../packages/db/src/scoped-db.ts)), whose own header names a request handler reading a `firm` table as the case it exists for | **The slice that wires `packages/db` into `apps/api`**, which is a manifest change and nobody's yet. **It should expect `CI-06/vg-inventory` to fail at 29 of 30 on arrival**: `VG-3` and `VG-6` wait on the per-identity accessor being named under `apps/api/src`, so the gate firing is good news and the rows move with it |
+
+**[P4](plans/P4-portal-and-site.md) section 8's `P4-f` fence cell naming `apps/api/src/routes/index.ts` is STALE and no such file was created**, [ADR-100](decisions/ADR-100.md) having made the module list a directory listing. This slice's whole code contribution is one file no other slice edits, which is what that ruling was for: sessions 218 and 219 are adding route files concurrently and share nothing with this one.
+
+**The surface filter is not a no-op on this path and the suite watches the withheld direction.** `classifyPath` answers `public`, so the route registers on `api` and is **withheld from `api-admin`**, which answers 404 by having nothing there. Public is the path's classification and never a section heading's.
+
+**Measured on this branch, not inherited.** `apps/api` **37 to 50 passed** over 5 files; suite **123 files / 2,041 passed / 1 skipped**, which is 13 cases and one file more than this branch's base; `typecheck` exit 0; `lint` and `format:check` clean; invariants **9 of 9**; gates **30 of 30**; `falsify` clean-and-dirty over all 30 with 70 scope and 10 loader cases; `verify` exit 0. **Six mutations seeded into the route and every one failed at least one case.** **NOT MERGED.**
+
+---
+
 ## Session 219: the idempotency layer, the PSP webhook receiver, and an accessor that cannot name a row
 
 **[ADR-109](decisions/ADR-109.md) lands, `status: proposed`, approval line UNSIGNED, MONEY PATH and the `E2` read is owed.** [P3 wave 3](plans/P3-wave3-modules.md)'s `P3-k` is written: [`apps/api/src/idempotency.ts`](../apps/api/src/idempotency.ts), [`apps/api/src/routes/webhooks-psp.ts`](../apps/api/src/routes/webhooks-psp.ts) and **51 tests over two files**, with no migration, no `packages/db` file, no catalog entry and no `routes/index.ts`.
@@ -3851,6 +3874,7 @@ Every seed was reverted and `git status --porcelain` reported clean before the f
 
 **What is deliberately not here.** No `@merit/db` dependency in `apps/api`, so the absence is a fact somebody can grep. No production adapter for either provider, because [`packages/psp`](../packages/psp/src/index.ts) ships two fakes and shipping a real one is a procurement decision nobody has taken, so a live deployment answers `503 service_unavailable` and the route is still registered. No re-drive of a deferred event: `defer_attempts` is written `0` and never incremented, because the receiver is the first arrival and the re-driver is the batch's.
 
-**Measured on this branch, not inherited.** Suite **122 files / 2,028 passed / 1 skipped** to **124 files / 2,079 passed / 1 skipped**; `typecheck` exit 0; `eslint apps/api` exit 0; invariants **9 of 9**; gates **30 of 30**; `verify` exit 0. **Seven mutations seeded and all seven caught**, every seed removed with `git status --porcelain` clean of them. **`0048` stays free and no file under [`packages/db`](../packages/db/src/scoped-db.ts) is touched.**
+**Measured on this branch, not inherited.** Suite **122 files / 2,028 passed / 1 skipped** to **124 files / 2,079 passed / 1 skipped** at base, and **125 files / 2,092 passed / 1 skipped** re-measured on the merge with [session 224](sessions/2026-08-26-session-224.md), whose route module and this one share no file: [ADR-100](decisions/ADR-100.md)'s directory listing composed three modules with no collision and neither branch coordinated with the other; `typecheck` exit 0; `eslint apps/api` exit 0; invariants **9 of 9**; gates **30 of 30**; `verify` exit 0. **Seven mutations seeded and all seven caught**, every seed removed with `git status --porcelain` clean of them. **`0048` stays free and no file under [`packages/db`](../packages/db/src/scoped-db.ts) is touched.**
 
 **Session 220 inherits [ADR-109](decisions/ADR-109.md) clause 2 as a third caller.** `POST /checkout` presents an `Idempotency-Key` that API_CONTRACT section 1 makes REQUIRED, and the layer it presents it to cannot store the response. **NOT MERGED. The `E2` read is owed on every line.**
+
