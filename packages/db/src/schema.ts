@@ -1,14 +1,14 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// ONE HUNDRED AND FOUR TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED
-// UP. The other 7 are not reachable through ANY accessor: `SCOPE_RULES` is total
+// ONE HUNDRED AND FIVE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED
+// UP. The other 6 are not reachable through ANY accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// NOT ALL 104 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS NOW TWO
-// CLASSES RATHER THAN ONE. 41 are `firm` and 3 are `pair` (ADR-106), so 60 of
-// the 104 are served by `scopedDb`. A `pair` table belongs to TWO identities and
+// NOT ALL 105 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS NOW TWO
+// CLASSES RATHER THAN ONE. 41 are `firm` and 3 are `pair` (ADR-106), so 61 of
+// the 105 are served by `scopedDb`. A `pair` table belongs to TWO identities and
 // is scoped to neither: it is excluded from `ScopedTableKey` because returning
 // the row to either party hands them the other party's identity uuid, and from
 // `FirmTableKey` because `firmDb()` takes no reason on the ground that no
@@ -43,7 +43,7 @@
 // stale CREATE. THIS SENTENCE READ "`ALTER COLUMN` STAYS AN OFFENDER" UNTIL
 // ADR-106, WHICH IS FALSE ABOUT THIS TREE AND WOULD HAVE TOLD A READER THAT
 // `otp_challenges` COULD NOT BE REGISTERED; ADR-094's clause was superseded by
-// ADR-103 and the sentence outlived it by one session. ELEVEN of the 104 below
+// ADR-103 and the sentence outlived it by one session. ELEVEN of the 105 below
 // carry later columns -- `sessions`, `plan_versions`, `rule_states`,
 // `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests`,
@@ -1922,6 +1922,29 @@ export const ledgerHalts = pgTable('ledger_halts', {
 // minimum the only honest state is `insufficient_data`, and
 // `plan_breaker_state_respects_min_sample` makes that structural rather than
 // procedural. An `insufficient_data` breaker is never a breach.
+//
+// THE PRIMARY KEY DOES NOT WIDEN AND THE PASS-RATE CUSUM DOES NOT LIVE HERE
+// (ADR-167). `metric text NOT NULL` sits OUTSIDE `(plan_id, evaluated_on)` in
+// 0016 and stays outside it: one plan-day is one row and one row is one metric.
+// API_CONTRACT's `per_plan` carries a `cusum: { statistic, threshold, alarm }`
+// object beside the four fields this table does hold, 0049 dispositioned the
+// whole field as needing nothing, and it checked four of the five. ADR-167 rules
+// that `S_t` is FOLDED AT READ TIME from the account series and is never stored,
+// so NO CUSUM VALUE IS EVER WRITTEN INTO `ratio_bp`, `threshold_bp`,
+// `numerator_cents`, `denominator_cents` OR `sample_size` -- those are the loss
+// ratio's columns and their names are load-bearing.
+//
+// THE FORECLOSURE IS WRITTEN HERE BECAUSE THIS IS WHERE ITS VIOLATOR WOULD BE
+// STANDING. A session adding a CUSUM column to this declaration, or adding
+// `metric` to the `primaryKey` below, is superseding ADR-167 rather than
+// extending a table, and what it has to answer is that `state`'s `'paused'`
+// value would then govern the added rows: `per_plan.sales_paused` derives from
+// `state = 'paused'`, so a second metric sharing this key gets a column that
+// spells a REVENUE PAUSE for a statistic whose own panel gloss is "inspect".
+//
+// `scope.ts` carries none of this on purpose: that file's rule is that every
+// `why` states the TABLE's tenancy and never the reader's use, and a CUSUM is a
+// use.
 export const planBreakerState = pgTable(
   'plan_breaker_state',
   {
@@ -4397,4 +4420,49 @@ export const otpChallenges = pgTable('otp_challenges', {
   // not a reason to keep a plaintext copy of every number ever entered,
   // including every number entered by an attacker.
   destinationHash: bytea('destination_hash'),
+});
+
+// -----------------------------------------------------------------------------
+// payment_disputes -- 0012_disputes_and_affiliate_settlement.sql. DERIVED: the
+// row carries NO identity column and reaches one through `purchases` alone.
+// -----------------------------------------------------------------------------
+// P-3'S CHARGEBACK-WINDOW INPUT. A dispute is a statement about a PURCHASE, and
+// the purchase is what carries the person: `purchase_id uuid NOT NULL REFERENCES
+// purchases(id) ON DELETE RESTRICT` is the only column here that reaches
+// anybody, and it is NOT NULL, so there is no row that reaches no identity.
+//
+// `ledger_transaction_id` IS THE AVAILABLE MISTAKE AND IT IS NAMED HERE RATHER
+// THAN LEFT TO BE RE-DERIVED. It is `uuid NULL REFERENCES
+// ledger_transactions(id)`, and `ledger_transactions` is registered `derived`
+// rather than `firm`, so a rule through it TERMINATES and COMPILES -- which is
+// session 202's `wallet_entries` trap in a second dress. It is wrong twice: the
+// column is NULLABLE, so it would return a person only the disputes that
+// already moved money and drop every OPEN one in silence, and it answers a
+// different question besides -- whose ledger accounts appear on the compensating
+// reversal, rather than whose purchase was disputed.
+//
+// THE COMPENSATING REVERSAL IS A POINTER AND NEVER AN UPDATE (SD-M5-05), which
+// is why `ledger_transaction_id` exists at all and why
+// `payment_disputes_loss_is_posted` CHECKs that a lost or refunded dispute names
+// the transaction that recorded it while a won one names nothing.
+//
+// MONEY IS INTEGER CENTS: `amount_cents bigint NOT NULL CHECK (amount_cents > 0)`
+// is transcribed `mode: 'bigint'`, which is post.ts's own rule.
+export const paymentDisputes = pgTable('payment_disputes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  purchaseId: uuid('purchase_id')
+    .notNull()
+    .references(() => purchases.id),
+  // CHECKed to chargeback, refund in the DDL.
+  kind: text('kind').notNull(),
+  amountCents: bigint('amount_cents', { mode: 'bigint' }).notNull(),
+  reasonCode: text('reason_code'),
+  openedAt: timestamp('opened_at', { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  // CHECKed to lost, won, refunded, and tied to `resolved_at` in both directions
+  // by `payment_disputes_resolved_has_outcome`.
+  outcome: text('outcome'),
+  ledgerTransactionId: uuid('ledger_transaction_id').references(() => ledgerTransactions.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
