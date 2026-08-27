@@ -61,6 +61,34 @@ catalog:
   # See ADR-116 section 5 for the arithmetic, the `pnpm audit` result and the
   # install-script check. `onlyBuiltDependencies: []` above is unchanged.
   '@playwright/test': 1.56.1
+  # STRYKER, CI-09's MUTATION-TESTING LEG, ADMITTED BY ADR-127 UNDER A DELEGATED
+  # VG-12 GRANT. STRATEGY:192 says of a VG-12 admission that it is one "a session
+  # cannot grant itself", and this one was not self-granted: the founder
+  # delegated the grant for CI-09's Stryker leg explicitly, and ADR-127 RECORDS
+  # the delegation rather than proceeding as though the gate did not apply. That
+  # is ADR-116's shape, taken deliberately: an admission recorded as though the
+  # gate did not apply and an admission recorded as delegated are
+  # indistinguishable in the lockfile and are opposite in the record.
+  #
+  # TWO PACKAGES AND NOT THREE. `@stryker-mutator/typescript-checker` is the
+  # obvious third and is REFUSED: it type-checks every mutant against the
+  # project's `tsconfig`, which on this tree means `tsc` per mutant on a
+  # 6,661-line package, and what it buys is the elimination of mutants that
+  # would not compile. Vitest runs `.ts` through esbuild, which STRIPS types
+  # rather than checking them, so a non-compiling mutant here fails its tests
+  # like any other and is scored as killed rather than as an error. The checker
+  # would make the score more precise and the run an order of magnitude longer,
+  # and STRATEGY section 2 asks for a TREND. Revisit if the trend ever becomes a
+  # threshold, which is OQ-TS-02's own condition.
+  #
+  # 10.0.0 IS THE CURRENT RELEASE AND NOTHING IS PINNED BACK. Both packages
+  # declare `engines.node: >=22.0.0` against `.nvmrc`'s 22, and
+  # `@stryker-mutator/vitest-runner` declares `peerDependencies.vitest: >=2.0.0`
+  # against this catalog's 4.1.10. The runner also peers `@stryker-mutator/core`
+  # at EXACTLY `10.0.0`, so these two versions move together or not at all.
+  # ADR-127 section 4.
+  '@stryker-mutator/core': 10.0.0
+  '@stryker-mutator/vitest-runner': 10.0.0
   '@types/node': 22.20.1
   # `@types/pg` is a DEV type package and `pg` is a runtime dependency, so they
   # are versioned independently and are not expected to match. ADR-084.
