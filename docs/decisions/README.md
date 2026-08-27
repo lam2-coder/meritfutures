@@ -165,6 +165,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-145](ADR-145.md) | `admin_actions.reason` is a PRECONDITION, so the audit row is written first and the route never supplies one (2026-08-27, status: proposed) |
 | [ADR-146](ADR-146.md) | two date vocabularies meet on one object, so the contract's suffix rule stops being a convention and becomes a refusal (2026-08-27, status: proposed) |
 | [ADR-147](ADR-147.md) | `M04` section 3.3's consistency meter names five figures, three of them reach no client, and two of those three are `R-29`'s own operands  (2026-08-27, status: proposed) |
+| [ADR-148](ADR-148.md) | `G-ELIGIBLE` conjoins two terms the eligibility response declares no gate for, so the differentiator screen can render ten passing gates beside a refusal  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
