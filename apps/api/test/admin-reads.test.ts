@@ -689,9 +689,7 @@ test('an evidence export without an audience is refused and no default is chosen
 test('every audience the merged CHECK admits is accepted, and the response echoes it', async () => {
   setAdminSessionSource(sessionOf(operator('owner')));
   for (const audience of EVIDENCE_PACK_AUDIENCES) {
-    setAdminReadSource(
-      sourceOf({ exportEvidence: () => Promise.resolve({ ...PACK, audience }) }),
-    );
+    setAdminReadSource(sourceOf({ exportEvidence: () => Promise.resolve({ ...PACK, audience }) }));
     const response = await get(
       'operator',
       `/admin/evidence/acc-1?reason=dispute&audience=${audience}`,
