@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: []
-last_updated: 2026-08-26
+last_updated: 2026-08-27
 ---
 
 # STATE
@@ -4959,3 +4959,27 @@ The prompt said *"the route REGISTRY entry is an APPEND -- add your row, order b
 **ADR-095 `F3` is carried unrepaired, as dispatched.** Under `next start` the regeneration cache is per process, so `revalidatePath` reaches one replica and `INV-M9-04` has a replica-count precondition no document states.
 
 **Measured on this branch, each command run separately: `pnpm --filter @merit/site build` exit 0 (exit 1 on the dispatch SHA), 33 of 33 gates, 11 of 11 invariants, typecheck 0, lint 0, 171 test files / 3,136 passed / 6 skipped, `falsify.mjs` exit 0.** The dispatch baseline of 33 / 11 / 0 / 0 / 170 / 3,115 / 6 reproduced exactly before anything changed. **`apps/portal`, `apps/api`, `packages/db` and `packages/rules-engine` are untouched.**
+
+## Session 289: the calendar segment wired, the list envelope transcribed, and registered measured against served
+
+**[ADR-162](decisions/ADR-162.md) executed for `apps/portal/src/app/calendar/`.** No ADR number, no migration, no `SD-nn`, no `apps/api` change, no `packages/db` change, and [`http/client.ts`](../apps/portal/src/http/client.ts) untouched. All three screens are wired end to end.
+
+**THE DECISION SESSION 285 LEFT OPEN WAS TAKEN.** That session refused to wire `GET /accounts/:accountId/marks` for two reasons: the portal declared no list envelope, and nobody had ruled what a screen does with a cursor. [`api/types.ts`](../apps/portal/src/api/types.ts) now carries API_CONTRACT section 1's `CursorPage<T>` -- generic, because section 1 is a convention and `WalletEntriesResponse` and `CertificateListResponse` are instances of one rule -- and the paging rule is three parts: **one page**, at the contract's **maximum limit sent rather than inherited**, with the screen **saying which it got and unable to compile without saying**. `TimelinePaging` is a required prop with no default, which is `AsOfFreshness`'s mechanism beside it, and the answer comes from `next_cursor` rather than from a row count against the limit.
+
+**THE SEGMENT READS FOUR ENDPOINTS AND THE DISPATCH NAMED THREE.** `TimelineItem` carries no `as_of_trading_day` (INV-M4-02 requires one on the view model) and `PlanVersionResponse` carries no pin (M04 section 4: the rules page reads the PINNED version, not the current one). Both facts live only on `GET /accounts/:accountId`, so both account screens read it FIRST and compose the second URL from its body; neither can be parallelised. `app/accounts/source.ts` reached the same shape an hour earlier.
+
+**AND REGISTERED IS NOT SERVED, WHICH IS THIS SESSION'S OTHER MEASUREMENT.** All four paths are in `CompositionReport.registered`, matched exactly. **Three of the four raise before they answer, in every deployment including one that has run `apps/api/src/start.ts`**: `start.ts` never calls `setEconomicCalendarSource`, so the handler throws and answers 500; `GET /accounts/:accountId` reaches `readProgress`, which raises `AccountsBackendUnwired`, 503; `readTimeline` raises `AccountReadsBackendUnwired` because *"`events` IS NOT A REGISTERED TABLE"* in `packages/db/src/scope.ts`, 503. So a composition report is necessary and not sufficient, and the route module's own backend is the second half of the measurement.
+
+**EVERY SCREEN IN THIS SEGMENT THEREFORE RENDERS ITS `error` ARM TODAY, AND THAT IS THE ARM WORKING.** A 5xx from a registered endpoint is `server_error` through `toPortalErrorKind`, and the trader is told Merit could not load it and that the failure is Merit's. `unavailable` would say the timeline is not written yet, on a deployment where it is registered, serving and broken.
+
+**`PANEL_TIMEZONE` IS `'UTC'` AND IT IS A CHOICE RATHER THAN A DEFAULT.** The viewer's zone is unreachable: ADR-162 clause 2 makes every read a server render and foreclosure 3 forecloses a browser-side client, so nothing in this application observes the browser. The server's own zone is a claim about a machine printed as a claim about a person. UTC is the one zone the render cannot be wrong about, because `scheduled_release_at` is already a UTC instant, `localise` puts `timezone_label` on every row and the panel echoes `timezone` *"so a mis-set zone is visible"*. **GS-285's property -- one row, two dashboards, two timezones, both correct -- is NOT satisfied and is not claimed to be.**
+
+**`assertOk` AND `ApiReadError` ARE REMOVED RATHER THAN LEFT STANDING.** ADR-162 clause 3 puts the status mapping in one place and says the client *"ADDS NO MEMBER TO THAT UNION"*; a second refusal beside it is how a second vocabulary gets written. Neither was a control: no test walked the tree for them and nothing failed if a caller skipped one. `surface.test.ts`'s four needles are untouched in both directions.
+
+**`/calendar` MOVED FROM `○ (Static)` TO `ƒ`.** A statically rendered authenticated screen is ADR-162 clause 4's cross-identity leak arriving through a build step, so all three routes declare `force-dynamic`.
+
+**Reported rather than repaired.** The timeline's ORDER is undetermined -- API_CONTRACT says *"Chronological"* and no direction, unlike `/marks` -- so no sentence on the screen names an end of the list. There is no paging CONTROL, because a next page needs a route carrying a cursor and this segment's URLs are provisional. `CalendarFailure.status` is `null` on a guard rejection, which is session 285's still-open limit of `ApiSuccess`. The error copy is now written three times and belongs under `src/shell/`. And `.tsx` is outside every `merit/*` lint glob and the formatter's ([ADR-138](decisions/ADR-138.md) section 6 item 1), which `P6-h` owns and this session did not close.
+
+**Verified in pieces. 33 of 33 gates, 12 of 12 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 177 test files / 3,275 passed / 6 skipped, `pnpm --filter @merit/portal build` clean from a removed `.next` at 12 routes, and `falsify.mjs` clean. The dispatch baseline of 33 / 12 / 0 / 0 / clean / 176 / 3,253 / 6 and 12 routes reproduced exactly before anything changed.**
+
+**RE-MEASURED AFTER MERGING `origin/main` AT `0cd843a`, which landed sessions 274, 275, 277, 280, 281 and 282 while this branch was open.** The only conflict was `STATE.md`'s append point and it was resolved by keeping both, main's six sections in their order and this one appended at the END; `docs/sessions/README.md` merged cleanly and generated spans were regenerated by `gates.mjs generate` rather than by hand. On the merged head: **33 of 33 gates, 12 of 12 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 179 test files / 3,422 passed / 6 skipped, and the portal build clean from a removed `.next` at 12 routes with `/calendar` still `ƒ`.** The counts above are this session's own tree and the counts here are the head that merges; nothing in this segment changed between them.
