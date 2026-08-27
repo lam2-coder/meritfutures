@@ -188,6 +188,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-167](ADR-167.md) | the pass-rate CUSUM is RECOMPUTED and never stored, `plan_breaker_state` keeps its one-row-per-plan-day key, and the migration number reserved for a table returns to the pool  (2026-08-27, status: proposed) |
 | [ADR-168](ADR-168.md) | three reads `apps/portal` names and `API_CONTRACT` does not define, and they do not have the same answer (2026-08-27, status: proposed) |
 | [ADR-169](ADR-169.md) | the payout-destination cooling window gets a registry, and `cooling_until` is `NOT NULL` because a nullable one fails OPEN  (2026-08-27, status: proposed) |
+| [ADR-170](ADR-170.md) | the verification page enters the contract, and the field that addressed it for two weeks now resolves (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
