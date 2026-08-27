@@ -226,6 +226,7 @@ Created by [`0009_ledger`](../../../packages/db/migrations/0009_ledger.sql), [`0
 | [`reserve_coverage_snapshots`](reserve_coverage_snapshots.md) | `0049` |
 | [`payout_requests`](payout_requests.md) | |
 | [`payout_transfers`](payout_transfers.md) | |
+| [`payout_destinations`](payout_destinations.md) | `0051` |
 | [`wallet_entries`](wallet_entries.md) | |
 | [`wallet_withdrawals`](wallet_withdrawals.md) | |
 | [`wallet_spend_limits`](wallet_spend_limits.md) | |
