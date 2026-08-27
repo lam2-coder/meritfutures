@@ -162,10 +162,13 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-138](ADR-138.md) | a Server Action has no path, so the refusal is TOTAL, and the first rendered document is what makes it reachable  (2026-08-27, status: proposed) |
 | [ADR-139](ADR-139.md) | the dispatch named four endpoints, `API_CONTRACT` has two of them free, and `AccountDetail.progress` is refused by the contract's own nullability  (2026-08-27, status: proposed) |
 | [ADR-140](ADR-140.md) | the identity-status term of `G-ELIGIBLE` is a named refusal and never a gate result, and the contradiction this session was dispatched to rule was CLOSED six days earlier  (2026-08-27, status: proposed) |
+| [ADR-141](ADR-141.md) | a trader-scoped response that names a catalogue row is TWO reads in one direction, and the compiler already refuses the version of that mistake everybody looks for  (2026-08-27, status: proposed) |
 | [ADR-144](ADR-144.md) | an admin route is an ordinary route module, and the surface that serves it is selected by the partition that already exists  (2026-08-27, status: proposed) |
 | [ADR-145](ADR-145.md) | `admin_actions.reason` is a PRECONDITION, so the audit row is written first and the route never supplies one (2026-08-27, status: proposed) |
 | [ADR-146](ADR-146.md) | two date vocabularies meet on one object, so the contract's suffix rule stops being a convention and becomes a refusal (2026-08-27, status: proposed) |
 | [ADR-147](ADR-147.md) | `M04` section 3.3's consistency meter names five figures, three of them reach no client, and two of those three are `R-29`'s own operands  (2026-08-27, status: proposed) |
+| [ADR-148](ADR-148.md) | `G-ELIGIBLE` conjoins two terms the eligibility response declares no gate for, so the differentiator screen can render ten passing gates beside a refusal  (2026-08-27, status: proposed) |
+| [ADR-152](ADR-152.md) | an as-of stamp's staleness is a claim the SERVER makes and the portal ORDERS, never one the portal computes, and no account-state contract publishes the fact today  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
