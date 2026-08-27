@@ -4689,8 +4689,6 @@ This section first said the choice was *"250 first, or 250's commit carries `CI-
 
 **Verified in pieces on this branch. 33 of 33 gates, 12 of 12 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 173 test files / 3,153 passed / 6 skipped, `pnpm --filter @merit/portal build` clean from a removed `.next` with `/accounts` and `/accounts/[account]` both dynamic, and `falsify.mjs` clean.** The dispatch baseline of 33 / 12 / 172 / 3,137 / 6 reproduced exactly before anything changed.
 
----
-
 ## The `kyc` segment reads through that client, and the write it could have made is refused with an argument (2026-08-27, session 286)
 
 **[ADR-162](decisions/ADR-162.md) executed rather than amended. No new ADR, no migration, no `SD-nn`, no `apps/api` change, no `packages/db` change, and [`apps/portal/src/http/client.ts`](../apps/portal/src/http/client.ts) is untouched.** `apps/portal/src/app/kyc/` performs `GET /kyc/status` through the one transport file. **`POST /kyc/session` is not called**, and the reason is a fence rather than an absence.
