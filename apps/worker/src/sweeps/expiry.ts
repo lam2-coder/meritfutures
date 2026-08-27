@@ -170,10 +170,13 @@
 // posting whichever door reaches it and the second is refused by the DATABASE
 // rather than by application memory, which forgets on a restart.
 //
-// THIS FILE IS THE THIRD DOOR AND BUILDS THE SAME STRING. It cannot import it:
-// `apps/worker/package.json` declares `@merit/rules-engine` and nothing else and
-// `node-linker=isolated` makes an undeclared import unresolvable, and that
-// manifest is outside this fence. So the constant is declared below and **the
+// THIS FILE IS THE THIRD DOOR AND BUILDS THE SAME STRING. It cannot import it,
+// and the reason is a FENCE rather than a manifest: `apps/api`'s route modules
+// are a different deployable and nothing in `apps/worker` may reach across into
+// them. (This paragraph said the manifest declared `@merit/rules-engine` and
+// nothing else; ADR-165 admitted `@merit/db` on 2026-08-27 and that sentence is
+// repaired rather than left standing, though it was never the binding reason
+// here.) So the constant is declared below and **the
 // suite BINDS it by reading `apps/api/src/routes/payouts.ts` and
 // `admin-payouts.ts` AS TEXT**, which is `packages/db`'s own idiom for binding
 // `SqlExecutor` to `packages/queue`'s `JobTransaction` with no import in either
