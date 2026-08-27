@@ -271,11 +271,15 @@ export function assertFloatIsNotReserve(input: {
   /** The ratio actually rendered, read from `0049`'s generated column. */
   readonly ratioBp: bigint;
 }): void {
+  // The label AND its colon, which is what `render` puts between a label and
+  // its amount. Matching the bare label would be satisfied by a panel heading
+  // or by a mention inside another figure's definition, and the claim here is
+  // that each of the two was actually PRINTED AS A FIGURE.
   const reserveLabelled = input.coverageLines.some((line) =>
-    line.includes('Reserve, the RCR numerator'),
+    line.includes('Reserve, the RCR numerator: '),
   );
   const floatLabelled = input.coverageLines.some((line) =>
-    line.includes('Wallet float, reported separately'),
+    line.includes('Wallet float, reported separately: '),
   );
   if (!reserveLabelled || !floatLabelled)
     throw new PageError(
