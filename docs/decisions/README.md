@@ -180,6 +180,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-158](ADR-158.md) | the wallet surface enters the contract, and every row that disagreed with a plan was written from the CHECK  (2026-08-27, status: proposed) |
 | [ADR-159](ADR-159.md) | an event NAME becomes a catalogue ROW only where every field is a column or a named mirror, and the reservation that funded this entry named a different catalogue  (2026-08-27, status: proposed) |
 | [ADR-161](ADR-161.md) | the live tier enters `API_CONTRACT` as a PAYLOAD rather than as an endpoint, its degradation is one object rather than two messages, and `feed.*` is produced by the sweep and never by the feed  (2026-08-27, status: proposed) |
+| [ADR-167](ADR-167.md) | the pass-rate CUSUM is RECOMPUTED and never stored, `plan_breaker_state` keeps its one-row-per-plan-day key, and the migration number reserved for a table returns to the pool  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
