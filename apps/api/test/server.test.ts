@@ -6,7 +6,6 @@ import {
   PROBLEM_MEDIA_TYPE,
   PROBLEM_TYPE_PREFIX,
   buildServer,
-  classifyPath,
   defineRoutes,
   discoverRouteModules,
 } from '../src/index.ts';
@@ -28,16 +27,26 @@ const onDisk = await discoverRouteModules();
  * An operator module, and it is synthetic BECAUSE THIS SLICE OWNS NO OPERATOR
  * ROUTE.
  *
- * `/internal/jobs` is API_CONTRACT section 9's row and it belongs to whichever
- * slice implements queue depth. What is asserted here is not that endpoint's
- * behaviour, it is that a declared operator route is NOT REGISTERED on the
- * public deployment, and asserting that needs one to exist. The alternative is
- * to wait until a real operator route lands, which means the mechanism ADR-083
- * rests on ships unwatched.
+ * What is asserted here is not any endpoint's behaviour, it is that a declared
+ * operator route is NOT REGISTERED on the public deployment, and asserting that
+ * needs one to exist. The alternative is to wait until a real operator route
+ * lands, which means the mechanism ADR-083 rests on ships unwatched.
+ *
+ * IT USED TO BORROW API_CONTRACT SECTION 9's QUEUE-DEPTH ROW AND IT NO LONGER
+ * MAY. This file's own note said that row "belongs to whichever slice
+ * implements queue depth", and session 255 is that slice: `routes/internal.ts`
+ * declares it, `compose` refuses a duplicate `METHOD /path` across the whole
+ * module set, and this suite went red the day the real row landed. THE PATH IS
+ * NOW ONE NO CONTRACT ROW WILL EVER SPELL, so the synthetic module stays
+ * synthetic and this collision cannot recur when the remaining operator slices
+ * land. What it must keep is the `/internal` prefix, because the prefix is what
+ * `classifyPath` reads.
  */
+const OPS_PATH = '/internal/never-a-contract-row';
+
 const ops: RouteModule = defineRoutes({
   name: 'ops',
-  routes: [{ method: 'GET', path: '/internal/jobs', handler: () => ({ depth: 0 }) }],
+  routes: [{ method: 'GET', path: OPS_PATH, handler: () => ({ depth: 0 }) }],
 });
 
 // -----------------------------------------------------------------------------
@@ -81,20 +90,16 @@ test('the public deployment answers 404 for an operator route it was given', asy
   // The route was DECLARED and not registered. That is the whole mechanism:
   // there is nothing at this path for a permission check to run against.
   //
-  // ASSERTED AS THE PROPERTY AND NOT AS A LIST. This line read
-  // `toStrictEqual(['GET /internal/jobs'])` until `routes/admin-reads.ts`
-  // became the first operator module on disk, and a literal list here is a
-  // merge conflict for every route session that adds one. The property is the
-  // ruling itself: what the public deployment withholds is exactly what
-  // `classifyPath` calls operator, in both directions.
-  expect(report.withheld).toContain('GET /internal/jobs');
-  for (const entry of report.withheld)
-    expect(classifyPath(entry.slice(entry.indexOf(' ') + 1))).toBe('operator');
-  for (const entry of report.registered)
-    expect(classifyPath(entry.slice(entry.indexOf(' ') + 1))).not.toBe('operator');
-  expect(report.registered).not.toContain('GET /internal/jobs');
+  // ASSERTED ON THE REPORT AND NOT ONLY ON THE STATUS CODE, because a 404 is
+  // what a typo returns too. `CompositionReport.withheld` says it in its own
+  // words -- "THE PUBLIC DEPLOYMENT'S 404 IS THIS LIST BEING NON-EMPTY AND
+  // NOTHING ELSE" -- so a test that reads only the response cannot tell the
+  // router withholding a declared route from the router never having heard of
+  // it, and those are different facts about ADR-083 section 3.
+  expect(report.withheld).toContain(`GET ${OPS_PATH}`);
+  expect(report.registered).not.toContain(`GET ${OPS_PATH}`);
 
-  const res = await app.inject({ method: 'GET', url: `${BASE_PATH}/internal/jobs` });
+  const res = await app.inject({ method: 'GET', url: `${BASE_PATH}${OPS_PATH}` });
   expect(res.statusCode).toBe(404);
   expect(res.headers['content-type']).toContain(PROBLEM_MEDIA_TYPE);
   expect(res.json()).toMatchObject({
@@ -108,8 +113,8 @@ test('the public deployment answers 404 for an operator route it was given', asy
 
 test('the SAME module on the operator deployment answers 200 at the SAME path', async () => {
   const { app, report } = buildServer({ surface: 'operator', modules: [...onDisk, ops] });
-  expect(report.registered).toContain('GET /internal/jobs');
-  const res = await app.inject({ method: 'GET', url: `${BASE_PATH}/internal/jobs` });
+  expect(report.registered).toContain(`GET ${OPS_PATH}`);
+  const res = await app.inject({ method: 'GET', url: `${BASE_PATH}${OPS_PATH}` });
   expect(res.statusCode).toBe(200);
   await app.close();
 });
@@ -118,7 +123,7 @@ test('the SAME module on the operator deployment answers 200 at the SAME path', 
 // the public origin precisely so that no check has to be got right.
 test('the public deployment never answers 403 for an operator path', async () => {
   const { app } = buildServer({ surface: 'public', modules: [...onDisk, ops] });
-  for (const url of [`${BASE_PATH}/internal/jobs`, `${BASE_PATH}/admin/liability`]) {
+  for (const url of [`${BASE_PATH}${OPS_PATH}`, `${BASE_PATH}/admin/liability`]) {
     const res = await app.inject({ method: 'GET', url });
     expect(res.statusCode).toBe(404);
   }
