@@ -325,3 +325,480 @@ export interface BatchPorts {
   readonly read: BatchReadPort;
   readonly write: BatchWritePort;
 }
+
+// =============================================================================
+// M12: THE NIGHTLY STATISTICS RUN'S I/O BOUNDARY
+// =============================================================================
+// P4-g. THE SAME IDIOM AS EVERYTHING ABOVE, FOR THE SAME REASON: the machine is
+// written against ports rather than against a connection, so the whole of its
+// decision-making is testable without a database and the indicative tier has no
+// door to arrive through.
+//
+// THAT SECOND HALF IS AN INVARIANT AND NOT A CONVENIENCE. `INV-M12-01` is "every
+// published number is computed from CLOSED-SESSION AUTHORITATIVE DATA ONLY,
+// never from the indicative tier", and `FM-M12-08`'s recovery column states the
+// control as "the stats worker holds no read grant on the live cache ...
+// structurally prevented". Every read below names a closed-session fact. There
+// is no port here through which a live cache could reach the arithmetic, so the
+// invariant holds by the shape of this file rather than by a check somebody
+// could delete.
+//
+// EVERYTHING IN THIS SECTION IS TYPE-ONLY, which is what the whole file has
+// always been. The runtime vocabulary -- the measure table, the unit per
+// statistic, the computations -- lives in `statistics.ts`, which asserts its
+// tables total over the unions declared here.
+
+// -----------------------------------------------------------------------------
+// The vocabulary, as the database spells it
+// -----------------------------------------------------------------------------
+
+/**
+ * The seven ruled statistics ([M12](docs/plans/M12-statistic-definitions.md)).
+ *
+ * `published_statistics.stat_code` is `text` with no `CHECK` (`0021`), so the
+ * database accepts any string and the closed set lives here. That is the
+ * fail-closed direction: a code this union does not carry has no computation,
+ * and the machine HALTS rather than publishing a figure whose arithmetic
+ * nobody wrote.
+ */
+export type StatCode = 'ST-01' | 'ST-02' | 'ST-03' | 'ST-04' | 'ST-05' | 'ST-06' | 'ST-07';
+
+/** `statistic_measure` (`0001:145`). ADR-032. Which figure a row carries. */
+export type StatisticMeasure = 'rate' | 'total' | 'mean' | 'median' | 'p50' | 'p95' | 'count';
+
+/** `statistic_unit` (`0001:130`). ADR-031. Every member is an INTEGER unit. */
+export type StatisticUnit = 'count' | 'bp' | 'cents' | 'duration_seconds';
+
+/**
+ * The cell partition a definition publishes over.
+ *
+ * `statistic_definitions.grain` is `text NOT NULL` with no `CHECK` (`0021`), so
+ * this union is the machine's reading of that column and not the column's own
+ * vocabulary. Two members, and `G-4`'s per-identity figure is deliberately not
+ * one of them: see `StatisticsHaltReason`'s `grain_not_ruled`.
+ */
+export type StatisticGrain = 'lineup' | 'plan';
+
+// -----------------------------------------------------------------------------
+// The definition, as a value
+// -----------------------------------------------------------------------------
+
+/**
+ * One `statistic_definitions` row, effective for the day being published.
+ *
+ * THE PROSE SPECS ARE CARRIED EVEN THOUGH NOTHING EXECUTES THEM, and that is
+ * the point rather than an oversight. `numerator_spec` and `denominator_spec`
+ * are `text`: they are what the METHOD PAGE publishes and what a reader checks
+ * the number against. They are in the digest (`statistics.ts`), so a definition
+ * edited in place without a version bump changes every digest it produces,
+ * which is `INV-M12-07` -- "definitions are frozen before the data exists" --
+ * made detectable rather than merely stated.
+ *
+ * `id`, `method_body_mdx`, `adr_ref`, `superseded_by` and `created_at` are
+ * absent because the machine does not read them. `superseded_by` in particular
+ * is the READER's business: `effectiveDefinitions` returns the version that was
+ * effective, and which row later superseded it changes no arithmetic.
+ */
+export interface StatisticDefinitionRow {
+  readonly statCode: string;
+  /** `definition_version` on every row this definition produces. */
+  readonly version: number;
+  /** `SD-M12-01`. A PUBLICATION POLICY, applied per published cell. */
+  readonly minSample: number;
+  /** ADR-032. The declared set. `STAT-C1` refuses a run that emits a subset. */
+  readonly measures: readonly StatisticMeasure[];
+  /** Read as a `StatisticGrain`. An unreadable value halts the run. */
+  readonly grain: string;
+  /** `window_spec`. Read as a `StatisticWindowSpec`. An unreadable value halts. */
+  readonly windowSpec: string;
+  readonly numeratorSpec: string;
+  readonly denominatorSpec: string;
+  readonly exclusions: readonly string[];
+  /** `INV-M12-07`. Always in the future at write time; read here, never checked. */
+  readonly effectiveFrom: string;
+}
+
+// -----------------------------------------------------------------------------
+// The five closed-session facts
+// -----------------------------------------------------------------------------
+// EVERY FIELD IS A COLUMN, AND THE COLUMN IS NAMED. These are projections of
+// authoritative tables, not a schema of their own, and a field with no column
+// behind it would be a number Merit published from a source that does not
+// exist.
+//
+// MONEY IS `bigint` AND SO ARE THE EPOCH SECONDS. ADR-031 retired this surface's
+// no-floats exemption because for `ST-03` and `ST-04` the published column holds
+// MONEY ON A PUBLIC SURFACE. A `number` here would admit a value that had
+// already lost digits by the time this file saw it, and `payload.ts:63` makes
+// the same exclusion one directory over for the same reason.
+
+/**
+ * One evaluation account whose OUTCOME OCCURRED in the window. `ST-01`.
+ *
+ * `G-5`: the window is anchored on the OUTCOME DATE, so an account is in a
+ * window because its outcome landed in it and never because it was sold in it.
+ *
+ * `G-3` NEEDS NO FIELD AND THAT IS A PROPERTY OF THE SCHEMA. "A reset is a new
+ * attempt": `accounts.purchase_id` is `NOT NULL UNIQUE` (`0007`), so one
+ * purchase is one account row and a reset is a SECOND row. Counting accounts is
+ * counting attempts, with nothing added and nothing to get wrong.
+ *
+ * `G-2`'s still-open accounts are absent by construction: an account still in
+ * evaluation has no outcome, so it produces no fact. `G-1`'s never-traded
+ * accounts ARE here, because they have outcomes like any other.
+ */
+export interface EvaluationOutcomeFact {
+  /** `accounts.id`. */
+  readonly accountId: string;
+  /** `accounts.identity_id`. Carried for `G-4`, which this machine does not publish. */
+  readonly identityId: string;
+  /** `plans.code`, through `accounts.plan_version_id`. The `plan` grain's key. */
+  readonly planCode: string;
+  /** `accounts.funded_on` when passed, `accounts.closed_on` otherwise. */
+  readonly outcomeDay: TradingDay;
+  /**
+   * `passed` is the account reaching `phase = 'funded'`; the other two are
+   * `accounts.status` (`0001:47`), which carries `breached` and `expired` as
+   * distinct members.
+   */
+  readonly outcome: 'passed' | 'breached' | 'expired';
+}
+
+/**
+ * One funded account in `ST-02`'s denominator.
+ *
+ * `ST-02`'s ruled denominator has TWO PARTS and both are here: "funded accounts
+ * whose funded life ENDED in the window (first payout, breach, or closure),
+ * PLUS THOSE STILL FUNDED PAST THE PLAN'S MAXIMUM PLAUSIBLE TIME-TO-FIRST-
+ * PAYOUT". The numerator is the subset that ended by being PAID.
+ *
+ * THE SECOND PART IS THE ADAPTER'S TO DECIDE AND THAT IS FORCED RATHER THAN
+ * DELEGATED FOR CONVENIENCE. "The plan's maximum plausible time to first
+ * payout" is a PLAN PARAMETER, read from the account's pinned
+ * `plan_versions.rules`; the machine holds no plan and resolves none, so a
+ * machine deciding it would be re-deriving a plan rule inside a worker, which
+ * is the thing `INV-16` and `M12` section 1.3 both put outside this module.
+ * Omitting the set instead would publish a rate under a denominator its own
+ * method page does not describe, on a surface whose entire product is that the
+ * denominator is checkable.
+ */
+export interface FundedLifeFact {
+  readonly accountId: string;
+  readonly identityId: string;
+  readonly planCode: string;
+  /**
+   * The day that places this fact in the window, on `G-5`'s outcome anchor.
+   *
+   * For the three ENDED members it is the day the funded life ended. For
+   * `past_first_cycle` it is the WINDOW END DAY, because that set is evaluated
+   * as of window close rather than on a day of its own: an account past its
+   * first plausible cycle is in every subsequent window's denominator and not
+   * only in the one it crossed in.
+   */
+  readonly windowDay: TradingDay;
+  /** `past_first_cycle` is the denominator's second part, above. */
+  readonly ending: 'first_payout' | 'breach' | 'closure' | 'past_first_cycle';
+}
+
+/**
+ * One SETTLED payout, recognized at WALLET CREDIT. `ST-03`, `ST-04`, `ST-05`.
+ *
+ * THE RECOGNITION POINT IS THE WALLET CREDIT AND NOT THE EXTERNAL SETTLEMENT,
+ * which `S-09` signed off: "that is when the trader has the money under
+ * ADR-019, and publishing the later moment would understate a real thing". The
+ * external leg is `ST-06`'s subject and has its own fact below.
+ */
+export interface SettledPayoutFact {
+  /** `payout_requests.id`. The total order the digest sorts on. */
+  readonly payoutRequestId: string;
+  readonly accountId: string;
+  readonly identityId: string;
+  readonly planCode: string;
+  /**
+   * `payout_requests.effective_trading_day` (`SD-03`, `0010`).
+   *
+   * `settled_trading_day` is when the settlement was RECORDED and
+   * `effective_trading_day` is the day it counts FOR, which is the one a
+   * trailing window of trading days must anchor on. Using the other would make
+   * a late-recorded settlement land in the wrong window with nothing reporting
+   * it.
+   */
+  readonly creditedTradingDay: TradingDay;
+  /**
+   * `payout_requests.trader_cents` (`0010:60`), which is what ARRIVES in the
+   * wallet. NOT `approved_cents`: the split is `trader_cents + firm_cents =
+   * approved_cents`, and `S-09` publishes what the trader was paid.
+   */
+  readonly traderCents: bigint;
+  /**
+   * `accounts.terminal_settlement_id IS NOT NULL` (`SD-M18-01`, `0007`).
+   *
+   * THE TWO STATISTICS TREAT THIS FLAG IN OPPOSITE DIRECTIONS AND THAT IS
+   * DELIBERATE. `ST-03` INCLUDES terminal settlements and labels them, because
+   * a total should include every dollar paid; `ST-04` EXCLUDES them, because an
+   * average of payouts should average payouts and a close-out of a remaining
+   * balance is not one. Both surfaces state which treatment they use.
+   */
+  readonly terminalSettlement: boolean;
+  /** `payout_requests.created_at`, whole epoch seconds. `ST-05`'s left edge. */
+  readonly requestedAtEpochSeconds: bigint;
+  /** The wallet-credit posting, whole epoch seconds. `ST-05`'s right edge. */
+  readonly creditedAtEpochSeconds: bigint;
+  /**
+   * `payout_requests.frozen_at IS NOT NULL` (`SD-M5-01`, `0010`).
+   *
+   * `ST-05`'s exclusion, and the definition says these are "published
+   * separately with count and median duration RATHER THAN DROPPED". The
+   * separate publication needs its own `stat_code` and no definition row exists
+   * for it, so this machine excludes them from `ST-05` and publishes no
+   * decomposition. Named in `statistics.ts` rather than silently dropped.
+   */
+  readonly frozen: boolean;
+}
+
+/**
+ * One withdrawal that reached the external rail. `ST-06`.
+ *
+ * `ST-06` EXISTS BECAUSE `ST-05` WITHOUT IT IS A LIE BY OMISSION. Publishing
+ * the near-zero leg without the multi-day one is `M09`'s `GS-147` in
+ * statistical form, and the two are published as a pair on one surface.
+ */
+export interface WithdrawalSettlementFact {
+  /** `wallet_withdrawals.id`. */
+  readonly withdrawalId: string;
+  readonly identityId: string;
+  /** The trading day the settlement counts for. `G-5`'s outcome anchor. */
+  readonly settledTradingDay: TradingDay;
+  /** `wallet_withdrawals.requested_at`, whole epoch seconds. */
+  readonly requestedAtEpochSeconds: bigint;
+  /** `wallet_withdrawals.settled_at`, whole epoch seconds. */
+  readonly settledAtEpochSeconds: bigint;
+  /**
+   * A `P-1`/`P-3` provenance hold or the 48 hour destination cooling window:
+   * `wallet_withdrawals.frozen_at IS NOT NULL`, or a `cooling` status the
+   * withdrawal passed through (`0001:95`).
+   *
+   * The same shape and the same gap as `SettledPayoutFact.frozen`: the
+   * definition publishes the held set separately with its reason class, and no
+   * definition row exists for that publication.
+   */
+  readonly held: boolean;
+}
+
+/**
+ * One payout request MEETING THE PUBLISHED GATES. `ST-07`.
+ *
+ * THE DENOMINATOR IS THE ELIGIBLE SET AND THE SURFACE SAYS SO IN THOSE WORDS.
+ * A request failing a gate was never eligible and is not in it, which is
+ * `ST-07`'s stated exclusion of "None".
+ *
+ * `approved` IS STRUCTURALLY TRUE AND THE ARITHMETIC DOES NOT KNOW THAT.
+ * `payout_status` is `ENUM ('approved', 'settled', 'failed', 'frozen')`
+ * (`0001:91`) and has no `denied` member, because `M05`'s `INV-M5-01` has no
+ * denial path. So this statistic publishes 100 percent structurally, which
+ * `AS-M12-05` calls simultaneously the best and the most suspicious claim
+ * available. The field exists anyway: a machine that hard-coded the constant
+ * would stop being able to report the day the constant stopped holding.
+ */
+export interface EligibleRequestFact {
+  readonly payoutRequestId: string;
+  readonly accountId: string;
+  readonly planCode: string;
+  /** The trading day the request resolved on. `G-5`'s outcome anchor. */
+  readonly resolvedTradingDay: TradingDay;
+  readonly approved: boolean;
+}
+
+// -----------------------------------------------------------------------------
+// The row
+// -----------------------------------------------------------------------------
+
+/**
+ * One `published_statistics` row, as values.
+ *
+ * `id`, `computed_at` and `created_at` are absent for the reason `RuleStateRow`
+ * gives above: `id` is `DEFAULT gen_random_uuid()` and both timestamps default
+ * to `now()`. THE MACHINE THEREFORE READS NO CLOCK, which matters more here
+ * than it does there: a clock inside the computation would be an input the
+ * digest cannot cover and cannot exclude.
+ *
+ * `restatement_of` IS ABSENT, AND ITS ABSENCE IS THE SCOPE OF THIS SESSION.
+ * A restatement is `M12` section 3.3's own machine, triggered by
+ * `ingest.correction_received` rather than by the schedule, and it recomputes
+ * an affected window UNDER ITS ORIGINAL DEFINITION VERSION. This is the nightly
+ * publication, so every row it writes has `restatement_of IS NULL` -- which is
+ * also the scope of `published_statistics_window_uq` and of `STAT-C1`.
+ */
+export interface PublishedStatisticRow {
+  readonly statCode: string;
+  readonly definitionVersion: number;
+  readonly windowStartDay: TradingDay;
+  readonly windowEndDay: TradingDay;
+  readonly asOfTradingDay: TradingDay;
+  /** ADR-032. In the window unique key. */
+  readonly measure: StatisticMeasure;
+  /** ADR-031. `bigint`, never `numeric`, never a float. `null` iff suppressed. */
+  readonly value: bigint | null;
+  readonly valueUnit: StatisticUnit | null;
+  /** `null` iff suppressed. `published_statistics_value_or_suppression`. */
+  readonly numerator: bigint | null;
+  readonly numeratorUnit: StatisticUnit | null;
+  /**
+   * PRESENT EXACTLY WHEN THE MEASURE IS A RATIO, which is `0021`'s own rule
+   * rather than a relaxation of it: "the denominator is NOT required ... ST-03
+   * has NO DENOMINATOR by ruling, because it is a total and the surface says so
+   * RATHER THAN IMPLYING A RATE." An order statistic implies a rate exactly as
+   * hard as a total does, so `median`, `p50` and `p95` carry none either and
+   * `sample_size` carries the count they were selected from.
+   */
+  readonly denominator: bigint | null;
+  /** `integer` in the DDL. The observation count behind the cell. */
+  readonly sampleSize: number;
+  /** The cell key. `null` for the lineup total, `plans.code` for a plan cell. */
+  readonly grainKey: string | null;
+  /** `INV-M12-05`. Non-null iff the value is withheld. A suppressed row EXISTS. */
+  readonly suppressedReason: string | null;
+  /** `SD-M12-02`. Thirty-two bytes. `statistics.ts` is its producer. */
+  readonly inputDigest: Buffer;
+}
+
+// -----------------------------------------------------------------------------
+// The halt
+// -----------------------------------------------------------------------------
+// `FM-M12-02`: "a halt publishes NOTHING and pages. It never publishes a
+// partial set, BECAUSE A PARTIAL SET IS A SELECTED SET, and selection is the
+// failure this module exists to prevent."
+//
+// A DELIBERATE SIBLING OF `ReconciliationFinding` ABOVE, AND NOT THE SAME
+// CHANNEL, on the same reasoning that separates reconciliation from divergence:
+// this one is run-scoped rather than account-scoped, and it means nothing was
+// published at all.
+
+export type StatisticsHaltReason =
+  /**
+   * `effectiveDefinitions` returned NOTHING, and a run over nothing is a halt.
+   *
+   * NOT "there was nothing to publish, so nothing was published". [ADR-119]
+   * measured exactly this failure one file over: a nightly built on an audit
+   * with no world "would report `accountsAudited: 0, diverged: 0`, GREEN, EVERY
+   * NIGHT, OVER NOTHING". A statistics run that publishes zero rows because the
+   * definition read came back empty is indistinguishable from one whose read is
+   * broken, and only one of the two is a reason to sleep.
+   */
+  | 'no_effective_definitions'
+  /** A definition names a `stat_code` with no computation in this build. */
+  | 'unknown_stat_code'
+  /** `statistic_definitions.grain` carries a value this machine cannot read. */
+  | 'grain_not_ruled'
+  /** `statistic_definitions.window_spec` carries a value this machine cannot read. */
+  | 'window_spec_not_ruled'
+  /** The declared measure set and the computation's disagree. `STAT-C1` in TypeScript. */
+  | 'measures_disagree'
+  /** The window reaches outside the calendar slice the caller loaded. */
+  | 'calendar_coverage_miss'
+  /** A ratio would divide by zero. Not a zero, and not a suppression. */
+  | 'undefined_ratio'
+  /**
+   * An elapsed time is negative: the credit is stamped before the request.
+   *
+   * A halt rather than a clamp. `ST-05` and `ST-06` publish DURATIONS, and a
+   * negative one is a wrong number on a public surface rather than a small one.
+   */
+  | 'impossible_duration'
+  /** `M12` section 3.1: the day is not closed, or the self-audit did not vouch for it. */
+  | 'inputs_not_vouched';
+
+export interface StatisticsHalt {
+  readonly asOfTradingDay: TradingDay;
+  readonly reason: StatisticsHaltReason;
+  /** `M12` section 5's `stats.run_halted` payload carries the stage. */
+  readonly stage: 'waiting' | 'computing' | 'validating';
+  /** The `stat_code` the halt is about, where there is one. */
+  readonly statCode: string | null;
+  /** Human-readable, and it names what was read rather than what was expected. */
+  readonly detail: string;
+}
+
+// -----------------------------------------------------------------------------
+// The ports
+// -----------------------------------------------------------------------------
+
+/** The window a read is scoped to. Trading days, inclusive at both ends. */
+export interface StatisticWindow {
+  readonly startDay: TradingDay;
+  readonly endDay: TradingDay;
+  /** `M12` `INV-M12-04`. Published beside every figure. */
+  readonly asOfTradingDay: TradingDay;
+}
+
+export interface StatisticsReadPort {
+  /**
+   * Every definition EFFECTIVE for the day being published, one row per
+   * `stat_code`.
+   *
+   * "Effective" is `effective_from <= asOfTradingDay` and not superseded by a
+   * row that is also effective. THE ADAPTER OWES THAT PREDICATE AND THE MACHINE
+   * DOES NOT RE-DERIVE IT, because `INV-M12-07`'s forward-only rule is a
+   * property of which row is returned rather than of what is done with it: a
+   * machine that filtered by date after the fact could be handed a superseded
+   * row and would publish under it.
+   */
+  effectiveDefinitions(asOfTradingDay: TradingDay): Promise<readonly StatisticDefinitionRow[]>;
+
+  /** `ST-01`. Evaluation accounts whose outcome occurred in the window. */
+  evaluationOutcomes(window: StatisticWindow): Promise<readonly EvaluationOutcomeFact[]>;
+
+  /** `ST-02`. Funded accounts whose funded life ended in the window. */
+  fundedLives(window: StatisticWindow): Promise<readonly FundedLifeFact[]>;
+
+  /** `ST-03`, `ST-04`, `ST-05`. Payouts credited to a wallet in the window. */
+  settledPayouts(window: StatisticWindow): Promise<readonly SettledPayoutFact[]>;
+
+  /** `ST-06`. Withdrawals settled on the external rail in the window. */
+  withdrawalSettlements(window: StatisticWindow): Promise<readonly WithdrawalSettlementFact[]>;
+
+  /** `ST-07`. Payout requests meeting the published gates, resolved in the window. */
+  eligibleRequests(window: StatisticWindow): Promise<readonly EligibleRequestFact[]>;
+}
+
+export interface StatisticsWritePort {
+  /**
+   * THE WHOLE RUN, IN ONE CALL, IN ONE TRANSACTION.
+   *
+   * NOT ONE ROW AT A TIME, AND THE REASON IS IN `0027` RATHER THAN IN A
+   * PREFERENCE. `STAT-C1` is a `CONSTRAINT TRIGGER ... DEFERRABLE INITIALLY
+   * DEFERRED`, so "a publish run emitting one measure emits every measure its
+   * definition declares" is only decidable once the run's transaction has
+   * written all its rows. A per-row port would make `FM-M12-02`'s partial set
+   * -- which is a SELECTED set -- expressible by a caller who simply stopped
+   * calling, and the deferred check would never see the difference.
+   *
+   * THERE IS NO UPDATE VERB AND NO DELETE VERB ON THIS PORT, and their absence
+   * is not this interface being careful. `0026` REVOKES `UPDATE, DELETE` on
+   * `published_statistics` from `merit_app` AND from `PUBLIC`, and ADR-112
+   * clause 5 removed `update` and `delete` from every transaction handle in the
+   * workspace. `INV-M12-03`'s immutability is the database's, and this port is
+   * shaped like what the database will accept rather than like a promise about
+   * what the code intends.
+   *
+   * A SECOND RUN OVER A PUBLISHED WINDOW IS REFUSED BY
+   * `published_statistics_window_uq` AND NOT BY A CHECK IN FRONT OF IT. The
+   * machine does not read the published series to decide whether to write; the
+   * unique index decides, and the adapter surfaces the refusal.
+   */
+  publishRun(rows: readonly PublishedStatisticRow[]): Promise<void>;
+
+  /**
+   * `FM-M12-02`. Nothing was published and someone must look.
+   *
+   * `M12` section 5 gives this `stats.run_halted` with `{ as_of_trading_day,
+   * reason, stage }`, and the event PAGES. As with `raiseDivergence` above, the
+   * emission is the adapter's and no adapter implements this port yet.
+   */
+  raiseStatisticsHalt(halt: StatisticsHalt): Promise<void>;
+}
+
+export interface StatisticsPorts {
+  readonly read: StatisticsReadPort;
+  readonly write: StatisticsWritePort;
+}
