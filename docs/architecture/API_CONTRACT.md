@@ -880,8 +880,44 @@ Auth: **`admin_sso`**, admin origin only, RBAC per this section's header. Errors
 
 **`freshness` is section 6.1's type and not a second one.** The operator's live figure goes stale for the same reason the trader's does, and a second shape here would be a second answer to one question.
 
-### GET /admin/eligible-forecast, /admin/loss-ratios, /admin/cusum
-Focused projections of the same underlying data for charting, all cursor-free and cached for 60 seconds.
+#### The three focused projections
+
+`GET /admin/eligible-forecast`, `GET /admin/loss-ratios` and `GET /admin/cusum` are focused projections of
+`GET /admin/liability`'s underlying data for charting, all cursor-free and cached for 60 seconds. Auth,
+RBAC and errors are this section's, and all three carry the `/admin` prefix, so
+[`surface.ts`](../../apps/api/src/surface.ts) withholds each from the public deployment by the same rule
+([ADR-161](../decisions/ADR-161.md) clause 2).
+
+**They are three headings below rather than one, and [ADR-166](../decisions/ADR-166.md) is why.** One
+heading over three paths reads as one endpoint to anything parsing this document, and the two that follow
+`eligible-forecast` are **registered by nothing**: `CompositionReport.registered` lists them on neither
+surface, so today they answer 404 on the admin origin as well as on the public one. That is a route
+**nobody has built yet**, not a path the contract names in error, and the two failures look identical from
+outside the tree.
+
+### GET /admin/eligible-forecast
+The eligible-payout forecast, projecting `LiabilityResponse.eligible_next_7d`. **Registered.**
+
+### GET /admin/loss-ratios
+Per-plan loss ratios, projecting the `loss_ratio_bp`, `threshold_bp` and `sales_paused` fields of
+`LiabilityResponse.per_plan`.
+
+**The response body is deliberately NOT fixed here** ([ADR-166](../decisions/ADR-166.md) clause 3).
+`P7-k` builds this endpoint together with the breaker evaluator that produces the numbers, and that slice
+writes `sample_size` beside `min_sample` and an `insufficient_data` state that no field on
+`LiabilityResponse.per_plan` carries today. A shape written before that evaluator exists would be one
+`P7-k` has to break.
+
+### GET /admin/cusum
+The per-plan CUSUM, projecting `LiabilityResponse.per_plan[].cusum`. `statistic` and `threshold` are
+**neither cents nor basis points**: a CUSUM statistic is a standardised deviation and rounding it to
+either is a calibration defect (`FM-M6-07`) rather than a fix.
+
+**The response body is deliberately NOT fixed here** ([ADR-166](../decisions/ADR-166.md) clause 3), and
+this endpoint has a second reason the loss-ratio projection does not: **the CUSUM has no storage at all.**
+[P7 section 5.3](../plans/P7-risk-and-abuse.md) found `0049`'s `per_plan` disposition checked four of five
+fields, leaving the running statistic with no column it fits, and where it lives is `ADR-167`'s open
+ruling. A projection cannot be specified over a table nobody has chosen.
 
 ### GET /admin/accounts?query=
 Search by anything: account id, platform ref, email, identity id, name fragment, coupon, or payout id.
@@ -946,9 +982,31 @@ type IdentityGraph = {
 ### GET /admin/evidence/:accountId
 Generates and returns the [evidence pack](../GLOSSARY.md#evidence-pack).
 ```ts
-type EvidencePackResponse = { evidence_pack_id: string; download_url: string; content_sha256: string; expires_at: string; generated_at: string };
+// The four audiences are `evidence_packs.audience`'s CHECK in `0008_risk.sql`,
+// which is merged. This is a transcription of that vocabulary and not a second
+// one: a fifth name here would be a row the database refuses to store.
+type EvidencePackAudience = "internal" | "trader" | "counsel" | "regulator";
+
+type EvidencePackResponse = {
+  evidence_pack_id: string;
+  download_url: string;
+  content_sha256: string;
+  expires_at: string;
+  generated_at: string;
+  // ECHOED, so the caller can tell from the response what the bytes behind
+  // `download_url` were built as. `redaction_profile` is NOT echoed: it is
+  // recorded on the pack and its vocabulary is unruled (ADR-166 F3).
+  audience: EvidencePackAudience;
+};
 ```
-Query `?reason=` is required. Generation itself is audited and emits `evidence.pack_exported`.
+Query `?reason=` **and** `?audience=` are both required ([ADR-166](../decisions/ADR-166.md), `SD-M6-04`,
+[M06 section 4](../plans/M06-admin-ops-console.md)). An absent or unrecognised `audience` is
+`validation_failed`, and there is **no default**: the audience decides what leaves the building
+(`AS-M6-01`), so a generator that supplied one the caller never named would be making the disclosure
+decision on the caller's behalf. **The redaction profile follows from the audience and is recorded on the
+pack, never chosen per export.**
+
+Generation itself is audited and emits `evidence.pack_exported`.
 
 ### POST /admin/plans/:planId/versions
 ```ts

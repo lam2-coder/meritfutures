@@ -183,6 +183,8 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-162](ADR-162.md) | the portal's HTTP client is one server-side file that forwards one cookie, stores nothing, and asserts no wire shape  (2026-08-27, status: proposed) |
 | [ADR-163](ADR-163.md) | the live tier's address is `apps/api` on both existing surfaces, so the estate gains no sixth deployable and no seventh service, and the container diagram gains three arrows and no live-cache node  (2026-08-27, status: proposed) |
 | [ADR-165](ADR-165.md) | `apps/worker` is admitted to the trader database, the reason it runs at existed before the door did, and the deployable takes ONE door because a scheduled job has nobody to resolve  (2026-08-27, status: proposed) |
+| [ADR-166](ADR-166.md) | the evidence export's audience is a required parameter with no default, and section 8's three-path heading becomes three rows because one of the three is built and two are not  (2026-08-27, status: proposed) |
+| [ADR-167](ADR-167.md) | the pass-rate CUSUM is RECOMPUTED and never stored, `plan_breaker_state` keeps its one-row-per-plan-day key, and the migration number reserved for a table returns to the pool  (2026-08-27, status: proposed) |
 | [ADR-168](ADR-168.md) | three reads `apps/portal` names and `API_CONTRACT` does not define, and they do not have the same answer (2026-08-27, status: proposed) |
 <!--/gen-->
 
