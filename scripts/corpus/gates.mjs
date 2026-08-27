@@ -8210,6 +8210,38 @@ const CARDINAL_DIGITS = /(?<![\w.,-])[1-9]\d{0,3}(?![\w.,-])/g;
 // that matches a site wins, which is how `adr_count` and `tables` stay apart on a
 // ref where both return 111.
 const DERIVABLE_NOUNS = [
+  // SCOPED, AND IT IS THE FIRST ENTRY THAT IS. ADR-130.
+  //
+  // `deltas` is bound below to `manifest_changes`, the corpus-wide 117. M06
+  // section 2 states the size of ITS OWN delta table, which is a PER-DOCUMENT
+  // population under a noun the corpus-wide entry already owns, and the gate was
+  // silent on it at EVERY value that sentence can hold: it read "Seven deltas"
+  // against a truth of ten, and retyping it at ten with the span removed left the
+  // gate silent too, because neither seven nor ten is 117.
+  //
+  // THE REMEDY THIS GATE NAMES COULD NOT BE APPLIED TO IT. "A derivable
+  // population with no entry is unpoliced, and the remedy is another argued
+  // entry" -- but the vocabulary is scanned in declaration order and the first
+  // noun that matches wins, and this file already records what that costs:
+  // "two vocabulary entries for one noun would make the first shadow the second
+  // forever". So an argued entry for M06's deltas, added the only way the
+  // vocabulary allowed, would have been unreachable. `OI-24` had been open on
+  // that sentence since session 95 with its remedy named, and the sentence is the
+  // one this gate's own rationale quotes -- "almost every one a local subset (1
+  // gate, Six deltas, three tables)" -- as a specimen of the noise the
+  // ANY-VALUE rule would produce. That reading was right about the RULE and wrong
+  // about the SITE.
+  //
+  // A `file` predicate is what makes a per-document population expressible. A
+  // scoped entry is declared BEFORE the global entry it shares a noun with, so
+  // the global cannot shadow it, and it narrows rather than widens: it matches
+  // fewer documents than the unscoped form, never more.
+  {
+    query: 'm06_delta_count',
+    noun: /(?:schema )?deltas?/i,
+    label: 'M06 schema deltas',
+    file: /^docs\/plans\/M06-admin-ops-console\.md$/,
+  },
   // The count ADR-034 was ruled over. INDEX stated it, drifted twice, and the
   // second drift landed on `main` on the day the ruling was written.
   { query: 'adr_count', noun: /ADRs?/, label: 'ADRs' },
@@ -8381,6 +8413,9 @@ const ci06DerivableCounts = {
           const after = line.slice(at + text.length);
           let governed = null;
           const entry = vocabulary.find((v) => {
+            // ADR-130. An entry with no `file` is corpus-wide, which is every
+            // entry the vocabulary carried before scoping existed.
+            if (v.file && !v.file.test(file)) return false;
             if (v.value !== value) return false;
             const m = new RegExp(
               `^[\`*_]{0,3}\\s+[\`*_]{0,3}(${v.noun.source})[\`*_]{0,3}(?![\\w-])`,
