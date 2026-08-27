@@ -46,10 +46,25 @@
 // THE CALENDAR IS NOT COMPUTED HERE AND IT IS NOT COMPUTED IN A PAGE
 // -----------------------------------------------------------------------------
 // `GET /economic-calendar` is the source of the panel, `release_trading_day`
-// and the freshness fact included, and it is being written concurrently by
-// session 258. It is cited unlinked because it has not landed (CI-06a). No
-// trading day is derived anywhere in this segment: see `trading-day.tsx` for
-// why the types make that impossible rather than merely discouraged.
+// and the freshness fact included. It LANDED while this branch was open, as
+// [`apps/api/src/routes/economic-calendar.ts`](../../../../../api/src/routes/economic-calendar.ts),
+// so it is linked here rather than named: this comment read "cited unlinked
+// because it has not landed" and that sentence stopped being true.
+//
+// THAT SESSION REACHED THE SAME FINDING FROM THE SERVER SIDE, which is worth
+// recording because two sessions arriving at one rule independently is the
+// strongest evidence the rule is real. `ADR-146` makes API_CONTRACT section 1's
+// suffix rule a REFUSAL at the point of projection: `*_at` is a UTC instant and
+// `*_day` is an exchange trading day, never a UTC date, and this response is the
+// first in the corpus to carry both on one object. Its own clause is asserted on
+// `2026-03-03T23:30:00Z`, UTC date `2026-03-03` and trading day `2026-03-04`.
+// This segment asserts the same property one layer out, on
+// `2026-03-12T22:30:00Z`, and `trading-day.tsx` is where the types make a
+// derived day impossible rather than merely discouraged.
+//
+// So the two halves of "the trading day is not the calendar day" are now held at
+// BOTH ends of the wire: the projection refuses to emit a derived day and the
+// renderer has no input a derived one could come from.
 
 import type {
   EconomicCalendarPanelResponse,
