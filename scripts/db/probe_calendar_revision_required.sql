@@ -389,8 +389,29 @@ END $$;
 -- calendar. This is the positional-assertion lesson (OI-08) in a new costume: a
 -- hand-maintained list does not fail when it goes stale, it keeps passing
 -- against less, and here it did not even do that.
+--
+-- AND `0048` BROKE IT A SECOND TIME, FOR A DIFFERENT REASON, WHICH IS WHY THE
+-- FLUSH BELOW EXISTS. ADR-128 supersedes
+-- `trading_calendar_revisions_trading_day_fkey` as DEFERRABLE INITIALLY
+-- DEFERRED, so that a backfill can record the absence of a day BEFORE adding it
+-- and CALENDAR-C3 can be checked at the moment of insert rather than at commit.
+-- Every revision row this file writes therefore leaves a pending foreign-key
+-- event, and PostgreSQL refuses to TRUNCATE a table that has pending trigger
+-- events AT ALL: `cannot TRUNCATE "trading_calendar_revisions" because it has
+-- pending trigger events`, raised before any statement trigger fires. The probe
+-- met an error from the executor instead of the finding it was written to
+-- observe, AND THE WRONG-FINDING CHECK BELOW SAID SO LOUDLY FOR THE SECOND TIME.
+--
+-- CALENDAR-C2 IS INTACT AND THE OPERATIONAL FACT IS WORTH MORE THAN THE REPAIR.
+-- An operator truncating in a fresh transaction still meets CALENDAR-C2. What
+-- changed is that inside a transaction which has already written a revision row,
+-- the refusal now arrives from PostgreSQL with a message that explains nothing
+-- about why this calendar may not be emptied. Flushing the pending events first
+-- is what makes this assertion test CALENDAR-C2 rather than that interaction.
 DO $$
 BEGIN
+  SET CONSTRAINTS ALL IMMEDIATE;
+  SET CONSTRAINTS ALL DEFERRED;
   BEGIN
     TRUNCATE trading_calendar CASCADE;
     RAISE EXCEPTION 'PROBE FAILED: the calendar was truncated together with everything referencing it';

@@ -28,14 +28,69 @@
 -- "Reject this half if the founder reads the ruling narrowly". Rejecting any one
 -- part below leaves the other three standing.
 --
---   1. OI-04a  supersede_daily_mark, the mark-correction path.
---   2. OI-04b  suppress_identity_link, the SD-M7-04 dispute path.
---   3. OI-13   rewrite_rule_state, B.4 step 4's audited rewrite.
---   4. OI-12   CALENDAR-C3, refusing a retroactive trading_calendar INSERT.
+--   1. OI-04a  daily_marks_live_per_account_day_uq becomes DEFERRABLE, because
+--              without it the ruled correction CANNOT BE PERFORMED AT ALL.
+--   2. OI-04a  supersede_daily_mark, the mark-correction path.
+--   3. OI-04b  suppress_identity_link, the SD-M7-04 dispute path.
+--   4. OI-13   rewrite_rule_state, B.4 step 4's audited rewrite.
+--   5. OI-12   CALENDAR-C3, refusing a retroactive trading_calendar INSERT.
 --
 -- -----------------------------------------------------------------------------
--- SEVEN THINGS NEED THE FOUNDER'S LINE-BY-LINE READ
+-- NINE THINGS NEED THE FOUNDER'S LINE-BY-LINE READ, AND THE FIRST OF THEM IS A
+-- DEFECT IN A MERGED MONEY-PATH MIGRATION RATHER THAN A DESIGN CHOICE
 -- -----------------------------------------------------------------------------
+--
+--   0. THE RULED MARK CORRECTION IS NOT PERFORMABLE AGAINST THE MERGED SCHEMA,
+--      AND OI-04 IS UNCLOSEABLE UNTIL THAT IS FIXED. FOUND BY WRITING THE
+--      FIXTURE FOR SUCCESS 4 OF THE PROBE, NOT BY READING.
+--
+--      0014's comment and 0026's comment both state the order: "A CORRECTION
+--      PRODUCES A NEW MARK ROW AND POINTS THE OLD ONE HERE", "a correction to a
+--      mark inserts a new row and sets superseded_by on the old one". Both
+--      halves of that order are refused by the database as it stands:
+--
+--        INSERT the replacement first  ->  duplicate key value violates unique
+--                                          constraint daily_marks_live_per_
+--                                          account_day_uq. The partial unique
+--                                          index is on `superseded_by IS NULL`,
+--                                          so for the instant before the old row
+--                                          is pointed away there are TWO live
+--                                          marks for the account-day.
+--
+--        POINT the old row first       ->  insert or update violates foreign key
+--                                          constraint. superseded_by references
+--                                          daily_marks(id), which is not
+--                                          deferrable, so it cannot name a row
+--                                          that does not exist yet.
+--
+--      There is no third order. `daily_marks_no_self_supersede` closes the
+--      self-reference, and pointing the old mark at some unrelated row to free
+--      the index is the exact thing SUCCESS 4 and REJECTION 5 exist to forbid.
+--      SO THE MECHANISM BEHIND THE NEVER-CLAW-BACK PROMISE (DATA_MODEL section
+--      16 ruling 2, B4 #5) HAS NEVER BEEN EXECUTABLE. It was never noticed
+--      because daily_marks has zero rows and no correction has ever been
+--      attempted.
+--
+--      THE FIX IS TO DEFER THE UNIQUENESS, NOT TO WEAKEN IT. A partial UNIQUE
+--      INDEX cannot be deferred, because only a CONSTRAINT can be deferred and a
+--      UNIQUE CONSTRAINT cannot be partial. An EXCLUDE constraint can be both,
+--      so the index is replaced by
+--      `EXCLUDE USING btree (account_id WITH =, trading_day WITH =)
+--       WHERE (superseded_by IS NULL) DEFERRABLE INITIALLY DEFERRED`, which is
+--      the identical predicate over the identical btree. WHAT CHANGES IS WHEN IT
+--      IS CHECKED, and that is 0027, 0033 and CALENDAR-C1's argument arriving on
+--      a third guard: a correction is one TRANSACTION, and requiring an order
+--      inside it is a contract written in an index and nowhere else.
+--
+--      THE COST IS STATED RATHER THAN DISCOVERED. Between the INSERT and the
+--      UPDATE, inside that one transaction and visible to nothing outside it,
+--      the account-day carries two live marks. A query issued by that same
+--      transaction in between would see both. The alternative is that the ruled
+--      correction cannot happen.
+--
+--      Reject this part if the founder would rather rule the correction order
+--      itself. Parts 2 to 5 stand without it and SUCCESS 4 and 5 of the probe
+--      are what would then fail.
 --
 --   1. THE THREE FUNCTIONS ARE SECURITY DEFINER AND merit_migrator OWNS THEM,
 --      WHICH IS 0026's OWN SENTENCE AND HAS A PREREQUISITE 0026 NEVER WROTE.
@@ -99,6 +154,34 @@
 --      UPDATE to an append-only table with an approval stapled to it. Reject
 --      this clause if the founder reads B.4 narrowly. The other five assertions
 --      stand without it.
+--
+--   8. CALENDAR-C3 IS IMMEDIATE, AND 0032's FOREIGN KEY BECOMES DEFERRABLE SO
+--      THAT IT CAN BE. This pairing is the whole shape of part 5 and it was
+--      arrived at by watching the alternative fail.
+--
+--      The guard has to evaluate the fold extent AT THE MOMENT THE DAY IS
+--      INSERTED, because that is the question: had anything been folded through
+--      this day when it was added. A DEFERRED trigger asks it at COMMIT instead,
+--      and then ONE TRANSACTION THAT SEEDS A CALENDAR AND THEN WRITES MARKS
+--      AGAINST IT REFUSES ITSELF. That is not hypothetical: it is what
+--      probe_calendar_revision_required.sql's own fixture does, and running every
+--      existing probe against this schema (DELTA_MANIFEST section 18's rule) is
+--      what found it.
+--
+--      An immediate trigger needs the revision row to exist when the calendar row
+--      lands, and 0032 declared trading_calendar_revisions.trading_day a plain
+--      foreign key to trading_calendar, so the revision row could not be written
+--      first. That foreign key is superseded here as DEFERRABLE INITIALLY
+--      DEFERRED, keeping ON DELETE RESTRICT and its name. A revision naming a day
+--      that never arrives still fails, at commit rather than at the statement,
+--      and it fails; nothing becomes writable that was not.
+--
+--      THE COST IS AN ORDER, AND IT IS STATED RATHER THAN SILENT, which is the
+--      distinction 0033 header item 5 draws when it objects to "a second contract
+--      nobody wrote down". A backfill writes the absence record and then adds the
+--      day, and CALENDAR-C3's message says so in the sentence a reader meets when
+--      they get it wrong. That order also reads correctly: you record that the
+--      calendar said nothing about a day BEFORE you make it say something.
 --
 --   7. CALENDAR-C3's RETROACTIVITY TEST IS THE FOLD EXTENT AND NOT THE COVERAGE
 --      WINDOW, AND THE OBVIOUS TEST IS WRONG. OI-12 names the harm as "a day
@@ -166,7 +249,46 @@ GRANT UPDATE (disputed_at, dispute_note, suppressed, suppressed_by)
 GRANT UPDATE ON rule_states TO merit_migrator;
 
 -- -----------------------------------------------------------------------------
--- 1. OI-04a. supersede_daily_mark: a correction that cannot rewrite a mark
+-- 1. OI-04a. The uniqueness that made the ruled correction impossible
+-- -----------------------------------------------------------------------------
+-- Header item 0. This is a DEFECT IN A MERGED MONEY-PATH MIGRATION, proven by
+-- execution against PostgreSQL 16 in both directions, and it is corrected here
+-- rather than in 0014. 0014 is untouched on disk: migrations are sacred once
+-- merged (constitution E2), which is a rule about editing them and not a rule
+-- against correcting them. 0028, 0032, 0036, 0037 and 0046 are the precedent,
+-- and this is the sixth time.
+--
+-- THE NAME IS PRESERVED so every document, runbook and generator citing
+-- `daily_marks_live_per_account_day_uq` still resolves: DATA_MODEL section 13's
+-- invariant table names it, daily_marks.md names it, and
+-- packages/rules-engine/test/generators/validate-day-sequence.ts quotes it in a
+-- failure message. 0032's precedent on trading_calendar_session_ordered.
+--
+-- THE PREDICATE IS UNCHANGED AND THE INDEX IS STILL A BTREE. `EXCLUDE USING
+-- btree (... WITH =)` builds the same btree over the same two columns with the
+-- same partial predicate, so every read that used the index still uses it. The
+-- ONE difference is that it can now be deferred, and the error class a violation
+-- raises moves from unique_violation to exclusion_violation, which is why the
+-- probe checks it by class as well as by name.
+-- DROP INDEX and not DROP CONSTRAINT: 0014 created a bare index, so there is no
+-- constraint row to drop and `DROP CONSTRAINT IF EXISTS` would emit a NOTICE
+-- saying so on every install.
+DROP INDEX daily_marks_live_per_account_day_uq;
+
+ALTER TABLE daily_marks ADD CONSTRAINT daily_marks_live_per_account_day_uq
+  EXCLUDE USING btree (account_id WITH =, trading_day WITH =)
+  WHERE (superseded_by IS NULL)
+  DEFERRABLE INITIALLY DEFERRED;
+
+COMMENT ON CONSTRAINT daily_marks_live_per_account_day_uq ON daily_marks IS
+  'DATA_MODEL section 13: exactly one live mark per account per trading day. '
+  'Was a partial UNIQUE INDEX in 0014 and is an EXCLUDE constraint here for one '
+  'reason: the ruled correction order (insert the replacement, then point the '
+  'old row at it) is refused by an immediate check in BOTH directions, so the '
+  'never-claw-back mechanism was unexecutable. ADR-128, OI-04.';
+
+-- -----------------------------------------------------------------------------
+-- 2. OI-04a. supersede_daily_mark: a correction that cannot rewrite a mark
 -- -----------------------------------------------------------------------------
 -- DATA_MODEL section 16 ruling 2, confirmed at the Wave 2 gate: "Marks and
 -- corrections use supersession, never update." 0014 built the column and the
@@ -264,7 +386,7 @@ COMMENT ON FUNCTION supersede_daily_mark(bigint, bigint) IS
   'correct failure and looked like a bug.';
 
 -- -----------------------------------------------------------------------------
--- 2. OI-04b. suppress_identity_link: the SD-M7-04 dispute path
+-- 3. OI-04b. suppress_identity_link: the SD-M7-04 dispute path
 -- -----------------------------------------------------------------------------
 -- INV-M7-09. Two housemates, a married couple sharing a card and a father
 -- funding a son's evaluation all produce GENUINE edges between GENUINELY
@@ -353,7 +475,7 @@ COMMENT ON FUNCTION suppress_identity_link(uuid, text, text) IS
   'SD-M7-04 rules the suppression and rules nothing about reversing it.';
 
 -- -----------------------------------------------------------------------------
--- 3. OI-13. rewrite_rule_state: B.4 step 4's audited rewrite
+-- 4. OI-13. rewrite_rule_state: B.4 step 4's audited rewrite
 -- -----------------------------------------------------------------------------
 -- M01 appendix B.4 step 4: "An audited rewrite job restores historical
 -- rule_states under the new version". 0026 revoked UPDATE on rule_states from
@@ -474,7 +596,7 @@ COMMENT ON FUNCTION rewrite_rule_state(bigint, bigint, rule_states) IS
   'created_at are excluded and therefore unwritable.';
 
 -- -----------------------------------------------------------------------------
--- 4. OI-12. CALENDAR-C3: a retroactive calendar INSERT leaves a record
+-- 5. OI-12. CALENDAR-C3: a retroactive calendar INSERT leaves a record
 -- -----------------------------------------------------------------------------
 -- 0035's own words: "It does not guard calendar INSERT, and that is a stated
 -- exposure. 0033 covers every way a day can CHANGE; an INSERT writes no revision
@@ -504,6 +626,19 @@ COMMENT ON FUNCTION rewrite_rule_state(bigint, bigint, rule_states) IS
 -- cannot invent an actor, a reason or an incident reference, and
 -- trading_calendar_revisions.reason is NOT NULL precisely so that a correction
 -- nobody owns is refused rather than recorded.
+-- Header item 8. 0032 is untouched on disk and this changes what it installed.
+-- The NAME IS PRESERVED and ON DELETE RESTRICT is preserved: what changes is
+-- WHEN the referenced day has to exist, which is what lets a backfill record the
+-- absence before it adds the day and therefore what lets CALENDAR-C3 be
+-- immediate. A revision row naming a day that never arrives still fails.
+ALTER TABLE trading_calendar_revisions
+  DROP CONSTRAINT trading_calendar_revisions_trading_day_fkey;
+ALTER TABLE trading_calendar_revisions
+  ADD CONSTRAINT trading_calendar_revisions_trading_day_fkey
+  FOREIGN KEY (trading_day) REFERENCES trading_calendar (trading_day)
+  ON DELETE RESTRICT
+  DEFERRABLE INITIALLY DEFERRED;
+
 CREATE FUNCTION assert_retroactive_calendar_insert_is_recorded() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -515,6 +650,12 @@ BEGIN
   -- ingest_files also carry a trading_day and are deliberately NOT read here,
   -- on ADR-045's standing sentence: widening the partition is a founder's call
   -- rather than a migration's.
+  --
+  -- READ AT INSERT TIME, WHICH IS HEADER ITEM 8's WHOLE POINT. Rows this
+  -- transaction has already written are counted, because they were computed
+  -- against a calendar that did not have this day in it and are therefore
+  -- exactly the state that goes stale. Rows it writes AFTER this point are not,
+  -- because they will be folded over the day sequence including this day.
   --
   -- GREATEST ignores NULL arguments and returns NULL only when every argument
   -- is NULL, so an empty book yields NULL and the branch below lets every
@@ -585,15 +726,13 @@ BEGIN
 END
 $$;
 
--- DEFERRABLE INITIALLY DEFERRED, on CALENDAR-C1's precedent and for its reason:
--- the calendar row and its revision row arrive in one transaction, and a
--- non-deferred AFTER INSERT trigger would require an order between them that no
--- document states. The foreign key on trading_calendar_revisions.trading_day
--- already forces the calendar row to be written first; that is the database's
--- own contract and not a second one written in a trigger.
-CREATE CONSTRAINT TRIGGER trading_calendar_retroactive_insert_recorded
+-- IMMEDIATE, and header item 8 is why. CALENDAR-C1 is deferred because the
+-- question it asks ("was a prior image written") is a statement about the
+-- TRANSACTION. The question here ("had anything been folded through this day
+-- when it was added") is a statement about the MOMENT, and deferring it makes a
+-- transaction that seeds a calendar and then folds over it refuse itself.
+CREATE TRIGGER trading_calendar_retroactive_insert_recorded
   AFTER INSERT ON trading_calendar
-  DEFERRABLE INITIALLY DEFERRED
   FOR EACH ROW EXECUTE FUNCTION assert_retroactive_calendar_insert_is_recorded();
 
 COMMENT ON FUNCTION assert_retroactive_calendar_insert_is_recorded() IS
