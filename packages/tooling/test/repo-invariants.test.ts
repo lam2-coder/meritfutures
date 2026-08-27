@@ -715,6 +715,154 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
     expect(findings('RI-09', root).join('\n')).toContain('`/ops` is an OPERATOR_PREFIXES entry');
   });
+
+  // ---------------------------------------------------------------------------
+  // RI-13, and the seeds run in BOTH directions on the same entry
+  // ---------------------------------------------------------------------------
+  // The block is what an unsigned entry owes its reader, so the cases that matter
+  // are the two transitions: an entry that lacks it must be a finding, and the
+  // same entry with it added must be silent. A case that only ever plants a
+  // violation cannot tell a check that recognises the block from a check that
+  // returns a finding for every unsigned entry it sees.
+  const UNSIGNED_ADR = [
+    '## ADR-900: a ruling (2026-08-27, status: proposed)',
+    '',
+    '- **Decision:** the reading that costs a caller a narrowing is taken.',
+    '',
+    '### 4. Approval',
+    '',
+    '**Approval line: PENDING, UNSIGNED.** Not money path.',
+    '',
+  ].join('\n');
+
+  const FOUNDER_BLOCK =
+    '**What a founder read adds and this entry cannot.** The ruling picks one of ' +
+    'two coherent readings and the other one is not absurd: it costs every caller ' +
+    'a narrowing it would otherwise not write, and the cost lands forever on a ' +
+    'path nobody revisits. Whether that price is right is the judgement.\n';
+
+  test('RI-13 catches an unsigned ADR that never says what the founder must decide', () => {
+    const root = cleanTree();
+    write(root, 'docs/decisions/ADR-900.md', UNSIGNED_ADR);
+    expect(findings('RI-13', root).join('\n')).toContain(
+      'ADR-900.md: approval withheld at :7 and the entry carries no `What a founder read adds` block',
+    );
+  });
+
+  test('RI-13 goes quiet on the SAME entry once the block is added', () => {
+    const root = cleanTree();
+    write(root, 'docs/decisions/ADR-900.md', `${UNSIGNED_ADR}\n${FOUNDER_BLOCK}`);
+    expect(findings('RI-13', root)).toEqual([]);
+  });
+
+  test('RI-13 accepts "nothing here is a judgement" as the answer', () => {
+    // THE DIRECTION THE CHECK MUST NOT PUSH. An entry that is pure transcription
+    // against an approved document owes the founder no decision, and one forced to
+    // fabricate a question is worse than one that had none: it spends a read on a
+    // decision nobody has to make. The check reads the block's LENGTH, never its
+    // meaning, which is exactly what makes this pass on the same terms as a
+    // three-judgement answer.
+    const root = cleanTree();
+    const nothing =
+      '**What a founder read adds and this entry cannot: nothing, and here is why.** ' +
+      'Every clause is transcribed from an approved plan and the entry cites the line ' +
+      'each came from. No reading was chosen, nothing was refused, and there is no ' +
+      'alternative whose cost anybody had to weigh.\n';
+    write(root, 'docs/decisions/ADR-900.md', `${UNSIGNED_ADR}\n${nothing}`);
+    expect(findings('RI-13', root)).toEqual([]);
+  });
+
+  test('RI-13 catches the block used as a LABEL with nothing behind it', () => {
+    // A grep for the marker alone would pass this, and it is the cheapest way to
+    // make the check quiet: write the heading, answer nothing.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      `${UNSIGNED_ADR}\n**What a founder read adds and this entry cannot.** Nothing much.\n`,
+    );
+    expect(findings('RI-13', root).join('\n')).toContain('and then says nothing');
+  });
+
+  test('RI-13 leaves an entry whose approval is GRANTED out of scope', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      UNSIGNED_ADR.replace('PENDING, UNSIGNED.', 'GRANTED 2026-08-27.'),
+    );
+    expect(findings('RI-13', root)).toEqual([]);
+  });
+
+  test('RI-13 reads a grant written DEEPER in the approval section than its first line', () => {
+    // ADR-111 IS THE CASE, AND THE CHECK FAILED IT BEFORE THIS SEED EXISTED. Its
+    // approval section opens by recording that the entry landed with no approval
+    // line, runs a shell block whose comments start with `#`, and signs at the
+    // bottom. Reading the section as ending at the first `#` inside the fence lost
+    // the signature and reported a SIGNED entry as unsigned.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      [
+        '## ADR-900: a ruling (2026-08-27, status: accepted)',
+        '',
+        '### 4. The approval line, ADDED BY THE LOOP',
+        '',
+        '**This entry landed with no approval line and the log says UNSIGNED.**',
+        '',
+        '```',
+        '# 1. what was verified at merge',
+        'pnpm run verify   -> exit 0',
+        '```',
+        '',
+        '**SIGNED ON DELEGATED AUTHORITY, 2026-08-27. Not money path.**',
+        '',
+      ].join('\n'),
+    );
+    expect(findings('RI-13', root)).toEqual([]);
+  });
+
+  test('RI-13 does NOT read a disposition out of prose about somebody else"s grant', () => {
+    // THE OPPOSITE DIRECTION, AND IT IS THE ONE THAT FAILS SILENTLY. ADR-119 has
+    // `**REFUSED**` in a table cell about an empty world and ADR-137 cites a
+    // recommendation another entry GRANTED. Both are unsigned. A disposition read
+    // from anywhere in the section drops them out of scope with nothing reported,
+    // so a disposition is read only at the FRONT of a line, where a signature goes.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      [
+        '## ADR-900: a ruling (2026-08-27, status: proposed)',
+        '',
+        '### 4. Approval',
+        '',
+        '| 5 | An empty world | **REFUSED**, which is another entry"s sentence |',
+        '',
+        '- **The clause to read before signing is clause 1.** It says an item that',
+        '  ADR-059 recommendation 3 GRANTED does not hold what its register says.',
+        '',
+        '- **Approval line: PENDING, UNSIGNED.** Not money path.',
+        '',
+      ].join('\n'),
+    );
+    expect(findings('RI-13', root).join('\n')).toContain('ADR-900.md: approval withheld at :10');
+  });
+
+  test('RI-13 leaves an entry carrying NO approval statement out of scope', () => {
+    // THE DELIBERATE HOLE, AND IT IS IN `covers`. Thirty-one pre-FREEZE entries
+    // record no approval at all. Reading their silence as "unsigned" would fail
+    // them for a convention that did not exist when they were written, so an
+    // unreadable status puts an entry out of scope rather than into a finding.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      '## ADR-900: a ruling (2026-08-14, status: accepted)\n\n- **Decision:** a thing.\n',
+    );
+    expect(findings('RI-13', root)).toEqual([]);
+  });
 });
 
 // -----------------------------------------------------------------------------
