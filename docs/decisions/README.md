@@ -156,6 +156,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-132](ADR-132.md) | a registry README indexes by ROW, and `CI-06n` stops accepting a sentence  (2026-08-27, status: proposed) |
 | [ADR-133](ADR-133.md) | the fixture backlog is DERIVED and not SUBTRACTED, and a summary table row is inside ADR-034's scope even though the gate excludes it  (2026-08-27, status: proposed) |
 | [ADR-134](ADR-134.md) | a design record names exactly the columns its table carries, and the check that says so lands unregistered  (2026-08-27, status: proposed) |
+| [ADR-135](ADR-135.md) | `OQ-F3-01` and `OQ-F3-02` were ruled on 2026-08-20 and the wallet exit was shut on 2026-08-21, so a credit to a `closed` identity is an obligation Merit records and currently cannot pay  (2026-08-27, status: proposed) |
 | [ADR-137](ADR-137.md) | `OI-16` never held `GS-004` and `GS-031`'s expected end state, and the blocker on both is the calendar record's missing `halted` key  (2026-08-27, status: proposed) |
 | [ADR-138](ADR-138.md) | a Server Action has no path, so the refusal is TOTAL, and the first rendered document is what makes it reachable  (2026-08-27, status: proposed) |
 <!--/gen-->
