@@ -150,6 +150,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-121](ADR-121.md) | "shipped source" for `RI-10` means the directories the node loader loads, and `scripts/` is one of them  (2026-08-27, status: proposed) |
 | [ADR-122](ADR-122.md) | `input_digest` is taken over the computation's own argument, and it EXCLUDES the answer  (2026-08-27, status: proposed) |
 | [ADR-123](ADR-123.md) | the refusal on `accountsAudited === 0` moves into `runReplayAudit`, and an empty book now REFUSES instead of reporting clean  (2026-08-27, status: proposed) |
+| [ADR-141](ADR-141.md) | a trader-scoped response that names a catalogue row is TWO reads in one direction, and the compiler already refuses the version of that mistake everybody looks for  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
