@@ -42,6 +42,11 @@ import {
 } from '../world.ts';
 import { runSeedWorld } from '../seed-world.ts';
 
+// THE AUDIT'S OWN REFUSAL, IMPORTED FROM THE AUDIT. ADR-123 moved
+// `accountsAudited === 0` out of `auditDemoWorld` and into `runReplayAudit`, so
+// the empty-world case now asserts the class the AUDIT throws.
+import { ReplayAuditRefusal } from '../../../apps/worker/src/index.ts';
+
 /** Built once. The fold is pure, so every case below reads the same world. */
 const world: DemoWorld = buildDemoWorld(DEFAULT_WORLD);
 
@@ -171,8 +176,15 @@ describe('the audit can fail, which is what makes it green meaningfully', () => 
     // ADR-073 SECTION 5, VERBATIM: "when it is built it refuses on
     // `accountsAudited === 0`". `runReplayAudit`'s own OI-14 guard fires on
     // `storedRows > 0 && inScope === 0` and cannot see this case at all.
+    //
+    // THE CLASS CHANGED IN ADR-123 AND THAT IS THE POINT OF THE ENTRY. Until it,
+    // the guard was HERE, in the caller, and threw a `DemoWorldRefusal` after
+    // `runReplayAudit` had already returned a green report. It is in the audit
+    // now, so this world inherits the refusal instead of restating it and every
+    // future caller inherits it too, which is ADR-119 clause 7's whole sentence.
     const empty: DemoWorld = { ...world, accounts: [] };
-    await expect(auditDemoWorld(empty)).rejects.toThrow(DemoWorldRefusal);
+    await expect(auditDemoWorld(empty)).rejects.toThrow(ReplayAuditRefusal);
+    await expect(auditDemoWorld(empty)).rejects.toThrow(/found no account with stored state/);
   });
 
   it('refuses a perturbation that has no row to perturb', async () => {

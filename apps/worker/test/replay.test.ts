@@ -39,7 +39,7 @@ import {
 } from '@merit/rules-engine';
 
 import { foldAccountDay } from '../src/batch/nightly.ts';
-import type { AccountDay, RuleStateRow } from '../src/batch/ports.ts';
+import type { AccountDay, BatchPorts, RuleStateRow } from '../src/batch/ports.ts';
 import {
   auditAccount,
   diffStoredAgainstRecomputed,
@@ -410,6 +410,30 @@ describe('every engine_gates leaf names itself when it moves', () => {
 // 4. Scope is B.4 step 1, read twice, and an empty scope refuses
 // =============================================================================
 
+/**
+ * A book that holds nothing: no account with stored state, no rows, no days.
+ *
+ * The shape a nightly meets on a database the batch has never written to, and
+ * the shape `OI-14`'s guard is structurally unable to see, because that guard
+ * reads STORED STATE and this book has none.
+ */
+const EMPTY_BOOK: BatchPorts = {
+  read: {
+    calendarWatermark: async () => WATERMARK,
+    calendarSlice: async () => CALENDAR,
+    accountsWithLiveMark: async () => [],
+    loadAccountDay: async () => null,
+    accountsWithStoredState: async () => [],
+    storedRuleStates: async () => [],
+    accountDaysFrom: async () => [],
+  },
+  write: {
+    writeRuleState: async () => undefined,
+    raiseReconciliation: async () => undefined,
+    raiseDivergence: async () => undefined,
+  },
+};
+
 describe('scope is B.4 step 1 and an empty scope is a refusal', () => {
   it('skips a row from an older engine version rather than reporting it', () => {
     const stored = storedFor(ACCOUNT_A).map((row, i) =>
@@ -488,7 +512,30 @@ describe('scope is B.4 step 1 and an empty scope is a refusal', () => {
     ).rejects.toThrow(ReplayAuditRefusal);
   });
 
-  it('does not refuse when there is genuinely nothing stored', async () => {
+  it('REFUSES a run over a book with no stored state at all (ADR-073 section 5)', async () => {
+    // THIS ASSERTION IS THE INVERSE OF THE ONE IT REPLACES, AND THE INVERSION IS
+    // ADR-123. Until that entry this case asserted `report.storedRows === 0` and
+    // a RETURNED report, which is `accountsAudited: 0, diverged: 0`: green, every
+    // night, over nothing. ADR-073 section 5 refused to build CI-09's replay leg
+    // on that shape and named the refusal that would unblock it, and ADR-119
+    // clause 7 recorded it as owed HERE rather than in a caller, "because the
+    // next caller inherits nothing".
+    //
+    // THE MESSAGE IS ASSERTED AND NOT ONLY THE CLASS. `ReplayAuditRefusal` is
+    // thrown by three different guards in this file, and OI-14's needs
+    // `storedRows > 0` and cannot reach this case at all, so a class-only
+    // assertion would pass against a version that never grew this guard.
+    await expect(runReplayAudit(EMPTY_BOOK, CONFIG)).rejects.toThrow(ReplayAuditRefusal);
+    await expect(runReplayAudit(EMPTY_BOOK, CONFIG)).rejects.toThrow(
+      /found no account with stored state/,
+    );
+  });
+
+  it('still reports an account that holds rows, so the guard is not "refuse always"', async () => {
+    // THE NEGATIVE CONTROL FOR THE NEW GUARD. A refusal that fired on every run
+    // would pass both cases above and every other refusal test in this file,
+    // which is DELTA_MANIFEST section 13's own lesson: "EVERY ONE OF THEM PASSES
+    // AGAINST A GUARD THAT REJECTS EVERYTHING."
     const report = await runReplayAudit(
       {
         read: {
@@ -496,9 +543,9 @@ describe('scope is B.4 step 1 and an empty scope is a refusal', () => {
           calendarSlice: async () => CALENDAR,
           accountsWithLiveMark: async () => [],
           loadAccountDay: async () => null,
-          accountsWithStoredState: async () => [],
-          storedRuleStates: async () => [],
-          accountDaysFrom: async () => [],
+          accountsWithStoredState: async () => [ACCOUNT_A],
+          storedRuleStates: async () => storedFor(ACCOUNT_A),
+          accountDaysFrom: async () => historyOf(ACCOUNT_A),
         },
         write: {
           writeRuleState: async () => undefined,
@@ -509,8 +556,10 @@ describe('scope is B.4 step 1 and an empty scope is a refusal', () => {
       CONFIG,
     );
 
-    expect(report.storedRows).toBe(0);
-    expect(report.inScope).toBe(0);
+    expect(report.accountsAudited).toBe(1);
+    expect(report.storedRows).toBe(MARKS.length);
+    expect(report.matched).toBe(MARKS.length);
+    expect(report.diverged).toBe(0);
   });
 });
 

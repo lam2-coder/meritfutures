@@ -201,7 +201,7 @@ export interface DemoAccount {
  * report against it field by field.
  */
 export interface DemoWorldExpectation {
-  /** `accountsWithStoredState().length`. ADR-073's refusal fires when this is 0. */
+  /** `accountsWithStoredState().length`. `runReplayAudit` refuses when this is 0 (ADR-123). */
   readonly accountsAudited: number;
   readonly storedRows: number;
   /** Every stored row is in scope: one engine version, one calendar revision. */
@@ -631,14 +631,15 @@ export interface DemoWorldAudit {
 /**
  * Replay the world and check the report against what the seed said it would be.
  *
- * THE REFUSAL ON ZERO IS ADR-073'S, CARRIED OUT WHERE IT CAN BE. That ruling
+ * THE REFUSAL ON ZERO IS ADR-073'S AND IT IS NO LONGER THIS FILE'S. That ruling
  * closed the replay leg with "when it is built it refuses on `accountsAudited
- * === 0`", and `runReplayAudit`'s own `OI-14` guard does not cover it: that
- * guard fires on `storedRows > 0 && inScope === 0`, so a world with no rows at
- * all returns `accountsAudited: 0, diverged: 0` and reads exactly like a clean
- * audit. The refusal belongs in `replay.ts` eventually and `apps/worker` is
- * outside this session's fence, so it lives here and ADR-119 records that it is
- * owed one directory over.
+ * === 0`", and until ADR-123 the guard sat HERE, after `runReplayAudit` had
+ * already returned green, because `apps/worker` was outside session 231's fence.
+ * ADR-119 clause 7 rowed it as owed in one sentence: "A refusal in the caller is
+ * weaker than a refusal in the audit", because the next caller inherits nothing.
+ * **`runReplayAudit` refuses on the empty book itself now**, so this function
+ * calls it and inherits the refusal rather than restating one, and a `.mjs`
+ * runner, a nightly job and a suite all get the same answer from the same place.
  *
  * EVERY FIELD IS COMPARED AND NOT ONLY `diverged`. A report can be clean because
  * nothing was compared, which is `FM-17` and is the whole reason `OI-14` exists;
@@ -651,15 +652,6 @@ export async function auditDemoWorld(world: DemoWorld): Promise<DemoWorldAudit> 
     engineVersion: world.engineVersion,
     mode: 'detect',
   });
-
-  if (report.accountsAudited === 0) {
-    throw new DemoWorldRefusal(
-      'the replay audit ran over zero accounts. ADR-073 section 5 closed this leg on exactly ' +
-        'that outcome: "a nightly built today reports accountsAudited: 0, diverged: 0, green, ' +
-        'every night, over nothing", and `runReplayAudit`\'s OI-14 guard cannot catch it ' +
-        'because it fires on storedRows > 0 && inScope === 0',
-    );
-  }
 
   return { report, divergences, expectation: world.expectation };
 }
