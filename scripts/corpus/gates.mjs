@@ -980,6 +980,29 @@ const SPAN_QUERIES = {
       ) || []
     ).length,
 
+  // OI-24, open since session 95, whose register row names its own remedy: "M06's
+  // hand-maintained delta count. Open, and the remedy is a `<!--gen:-->` span".
+  // M06 section 2's opening sentence read "Five deltas", was corrected once by
+  // session 89 to "Six deltas", and `SD-M6-10` made it wrong again three sessions
+  // later with four concurrent sessions about to move it. That is the argument
+  // that the number cannot be hand-maintained rather than an argument to maintain
+  // it harder, and it is why session 95 left the sentence wrong ON PURPOSE and
+  // filed the item instead.
+  //
+  // THE ROWS OF THE TABLE, BY FIRST CELL, which is `manifest_changes`' own form
+  // one entry up rather than a second way of reading a delta table. It counts a
+  // pipe-leading line whose first cell is an `SD-M6-nn` and asserts nothing about
+  // where that line sits; `CI-06v` is the gate that says the rows are inside a
+  // table. That division matters here: `SD-M6-11` was sitting PAST the table's
+  // terminating blank line when this query was written, one pipe run of length
+  // one, under `CI-06v`'s minimum orphan length of two and therefore invisible to
+  // it. The row is moved back into the table in the same commit as this query.
+  m06_delta_count: () =>
+    (
+      read('docs/plans/M06-admin-ops-console.md').match(/^\|\s*\*{0,2}SD-M6-\d+\*{0,2}\s*\|/gm) ||
+      []
+    ).length,
+
   index_entries: () => (read('docs/INDEX.md').match(/^\| \[/gm) || []).length,
 
   // HOW MANY CHECKS THIS RUNNER RUNS, which STRATEGY 4.4 stated by hand and got
