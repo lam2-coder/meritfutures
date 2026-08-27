@@ -44,15 +44,28 @@
 // have, so the day one exists this signature does not move.
 //
 // -----------------------------------------------------------------------------
-// ONE SHAPE THE CONTRACT DOES NOT HAVE, SAID PLAINLY
+// THE LIST ENDPOINT NOW EXISTS ON PAPER AND STILL EXISTS NOWHERE ELSE
 // -----------------------------------------------------------------------------
-// `readCertificate` IS SINGULAR BECAUSE THE CONTRACT ROW IS SINGULAR. It returns
-// one certificate for one account and one kind. M11 section 4 names
-// `GET /certificates` NEW, "the trader's own list, including `deferred` entries
-// with their reason", and that row is M11's and is in no API_CONTRACT section
-// today. So this screen assembles its list by asking per account and per kind,
-// which is the shape the approved contract can actually answer, and the list
-// endpoint is named as owed rather than assumed.
+// `readCertificate` IS SINGULAR BECAUSE THE CONTRACT ROW IT CALLS IS SINGULAR.
+// It returns one certificate for one account and one kind.
+//
+// THE SENTENCE THAT USED TO SIT HERE IS NO LONGER TRUE AND IS REPLACED RATHER
+// THAN DELETED. It read: M11 section 4 names `GET /certificates` NEW, "the
+// trader's own list, including `deferred` entries with their reason", "and that
+// row is M11's and is in no API_CONTRACT section today". ADR-168 ruled that a
+// commitment made by an approved module plan and absent from the interface
+// contract is a MISSING ROW rather than a segment reaching for scope, and the
+// row landed: API_CONTRACT section 6.3, `GET /certificates`, session scoped,
+// with the deferred entries typed and the paging envelope stated.
+//
+// NOTHING IN THIS FILE MOVES ON THAT, AND THAT IS THE POINT OF SAYING IT.
+// Admitting a row to an approved contract is an entry; REGISTERING it is a
+// later slice, and `discoverRouteModules()` composed against this tree still
+// serves no `/certificates` path on either surface. So this screen goes on
+// assembling its list per account and per kind, which is the shape something
+// actually answers, and the list endpoint is named as OWED-AND-DEFINED rather
+// than owed-and-undefined. The day a handler exists, this port gains a method
+// and the assembly above is what it replaces.
 
 import type {
   CertificateResponse,
