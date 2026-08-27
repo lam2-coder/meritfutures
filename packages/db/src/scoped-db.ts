@@ -26,8 +26,28 @@
 // reads. `systemDb` takes a REASON from a closed two-member vocabulary rather
 // than a boolean or a comment, so the legitimate unscoped readers are a list
 // somebody has to join.
+//
+// THIS FILE HAS BEEN WIDENED THREE TIMES AND NARROWED ONCE, AND ADR-157 IS THE
+// THIRD WIDENING. ADR-084 built the two read doors; ADR-102 added the write
+// path; ADR-112 NARROWED it, deleting six writes that could not name a row;
+// ADR-126 added the resolution door and `insertUnder`. ADR-157 adds a filter
+// TERM (a range and an `IS NULL`, on reads only), and a ROW LOCK. What it does
+// NOT add is an aggregate, a join, a `SqlExecutorReason` member or a
+// `SystemReason` member, and P7 section 10 item 1 asked for the first of those
+// by name: that entry's section 5 is the argument and it is a refusal on
+// evidence rather than on scope.
 
-import { and, eq, exists, getTableColumns, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  eq,
+  exists,
+  getTableColumns,
+  gte,
+  isNull as isNullColumn,
+  lte,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import {
   QueryBuilder,
@@ -418,6 +438,7 @@ export function scopedInsertStatement(
   values: WriteValues,
 ): ReturnType<ReturnType<StatementSource['insert']>['values']> {
   refuseTenancyColumn(key, values);
+  refuseTermInValues(key, values);
   const table = TABLES[key] as PgTable;
   const sqlName = tenancyColumn(key);
   if (sqlName === undefined) throw new Error(`${key} has no tenancy column and cannot be stamped.`);
@@ -437,6 +458,7 @@ export function unscopedInsertStatement(
   key: TableKey,
   values: WriteValues,
 ): ReturnType<ReturnType<StatementSource['insert']>['values']> {
+  refuseTermInValues(key, values);
   return source.insert(TABLES[key] as PgTable).values(values);
 }
 
@@ -495,12 +517,26 @@ type ColumnsOf<K extends TableKey> = (typeof TABLES)[K]['_']['columns'];
 export type AddressableColumn<K extends TableKey> = Extract<keyof ColumnsOf<K>, string>;
 
 /**
- * A narrowing over declared columns. Equality, ANDed, and nothing else.
+ * A narrowing over declared columns. Equality or a TERM, ANDed, and nothing else.
  *
- * There is no `OR`, no `IN`, no range and no `IS NULL`, and each absence is the
- * same decision: a shape a caller can compose freely is a shape a caller can
- * compose wrongly, and every one of them is a diff on this file with an
- * argument attached when a caller needs it.
+ * THIS SENTENCE MOVED ONCE AND ADR-157 IS THE ARGUMENT THAT MOVED IT. It read
+ * "Equality, ANDed, and nothing else. There is no `OR`, no `IN`, no range and no
+ * `IS NULL`, and each absence is the same decision", and it named its own way
+ * out in the next clause: "every one of them is a diff on this file with an
+ * argument attached when a caller needs it". P5 is the phase whose work is jobs
+ * and money, a job is a range query over a clock, and `readLiveHalts` in
+ * `packages/ledger` has been paying for the missing null term on every posting
+ * since it was written.
+ *
+ * TWO OF THE FOUR ABSENCES ARE NOW ADMISSIONS AND TWO ARE STILL ABSENCES. A
+ * range and an `IS NULL` are `FilterTerm`s below. `OR` and `IN` are not, and the
+ * reason is unchanged: a conjunction can only REMOVE rows from the read the
+ * caller already holds at this authority, and a disjunction can add them back.
+ * That is the whole of why a term is safe here and a `SQL` fragment is not.
+ *
+ * A TERM READS AND NEVER WRITES. `RowAddress` is the same TypeScript type and a
+ * different promise, and `addressPredicate` refuses a term at run time on every
+ * write path and on every addressed read, because a term cannot name one row.
  */
 export type RowFilter<K extends TableKey> = Readonly<
   Partial<Record<AddressableColumn<K>, unknown>>
@@ -516,6 +552,14 @@ export type RowFilter<K extends TableKey> = Readonly<
  * the same shape. `refuseUnaddressed` reads it from `schema.ts` through
  * Drizzle's own table config, so the check is derived from the transcription of
  * the DDL rather than from a second list somebody maintains.
+ *
+ * A `FilterTerm` IN AN ADDRESS IS REFUSED AT RUN TIME AND NOT BY `tsc`, and
+ * ADR-157 states which half is which rather than letting a reader assume the
+ * type carries it. The value position is `unknown` because a column may hold a
+ * `Date`, a `bigint`, a `Buffer` or a row of JSON, and narrowing it to exclude a
+ * term would refuse legitimate values on every table in the registry. So the
+ * refusal is a throw, in `addressPredicate`, on the one path every write and
+ * every addressed read already share.
  */
 export type RowAddress<K extends TableKey> = RowFilter<K>;
 
@@ -530,6 +574,148 @@ export type RowAddress<K extends TableKey> = RowFilter<K>;
 export type NamesAColumn<K extends TableKey, F extends RowFilter<K>> = keyof F extends never
   ? never
   : F;
+
+// -----------------------------------------------------------------------------
+// A FILTER TERM: THE TWO ABSENCES THAT BECAME ADMISSIONS (ADR-157)
+// -----------------------------------------------------------------------------
+// ADR-112 refused a range and an `IS NULL` on ONE argument -- "a shape a caller
+// can compose freely is a shape a caller can compose wrongly" -- and named the
+// price of lifting it: a diff on this file with an argument attached. P5 is that
+// argument arriving. `P5-j` sweeps three expiry clocks on two tables and its
+// whole query is `freeze_expires_at <= now()`; `readLiveHalts` cannot say
+// `released_at IS NULL` and so reads every halt row ever released, on every
+// posting, and says so in its own header.
+//
+// A TERM IS A CLOSED VOCABULARY OF SHAPES, WHICH IS ADR-126 CLAUSE 3's MOVE ON A
+// PREDICATE RATHER THAN ON A DOOR. `SystemReason` and `SqlExecutorReason` are
+// closed vocabularies of WHY and every member of either grants every table; this
+// is a closed vocabulary of HOW ONE COLUMN NARROWS, and every member of it
+// removes rows from a read the caller already holds. Joining it is a diff on
+// this file, which is the same control at a strictly smaller radius.
+//
+// THREE CONSTRUCTORS AND NO OTHER PRODUCER. `atMost`, `atLeast` and `isNull` are
+// the only functions in this workspace that mint a term, and a term is
+// recognised by IDENTITY rather than by shape: `TERMS` is a `WeakSet` holding
+// every object those three returned. That is not fastidiousness. `RowFilter`'s
+// value position is `unknown` because a column may hold a row of JSON, so a
+// shape check would read `{ term: 'at-most', value: 1 }` sitting in a `jsonb`
+// column as a term and silently turn an equality into a range. A caller cannot
+// hand-roll one, cannot smuggle a `SQL` through one, and cannot receive one
+// across a process boundary, because nothing that crossed a boundary is in the
+// set.
+//
+// WHAT IS STILL REFUSED, and each is one line here with an argument attached the
+// day a caller has one: `OR`, `IN`, a STRICT inequality, `IS NOT NULL`, `LIKE`,
+// and any term at all on the write path. The first two are refused on the
+// argument this section opens with and it is unchanged. The third is refused
+// because no P5 caller has one: a cursor over `wallet_entries` is `P5-g`'s and
+// an inclusive bound re-reads its boundary row, so if that is unacceptable it is
+// an argument `P5-g` makes rather than one this entry makes for it.
+
+/**
+ * One column's narrowing when it is not an equality. A closed vocabulary.
+ *
+ * `at-most` and `at-least` are INCLUSIVE, which is the only reading of "a range
+ * term" that a clock sweep and a backfill both want, and `<=` is what
+ * `freeze_expires_at <= now()` says.
+ *
+ * `is-null` CARRIES NO VALUE, and that is the shape refusing the wrong question:
+ * `col = NULL` matches nothing and `col IS NULL` is not an equality at all,
+ * which is why `addressPredicate` refused a null value outright before this
+ * existed and still does.
+ */
+export type FilterTerm =
+  | { readonly term: 'at-most'; readonly value: unknown }
+  | { readonly term: 'at-least'; readonly value: unknown }
+  | { readonly term: 'is-null' };
+
+/**
+ * Every term this module has minted.
+ *
+ * IDENTITY AND NOT SHAPE, for the reason the section header states: a `jsonb`
+ * column holding an object that looks like a term is a VALUE, and a shape check
+ * would read it as a range. A `WeakSet` is used rather than a `Set` so a term a
+ * caller built and dropped is collectable.
+ */
+const TERMS = new WeakSet<object>();
+
+/** Freeze it, record it, return it. The three constructors below are its only callers. */
+function mintTerm<T extends FilterTerm>(shape: T): T {
+  Object.freeze(shape);
+  TERMS.add(shape);
+  return shape;
+}
+
+/**
+ * `column <= value`. The bound is INCLUSIVE and the value is the CALLER'S.
+ *
+ * THE CLOCK IS THE PROCESS'S AND NEVER THE DATABASE'S, and that is a design
+ * decision rather than an accident of the shape. A term renders `col <= $1` with
+ * a bound parameter, so a sweep passes the time it decided to sweep at and a
+ * fixture passes a fixed one. Rendering `now()` would put the database's clock
+ * in a money path that MERIT_BUILD_MASTER_PROMPT keeps as data, and would make
+ * every expiry test unwritable.
+ *
+ * `NonNullable<unknown>` REFUSES A NULL BOUND AT THE CALL SITE, and the throw
+ * below catches the cast that gets past it. A bound of null matches nothing.
+ */
+export function atMost(value: NonNullable<unknown>): FilterTerm {
+  return mintTerm({ term: 'at-most', value: refuseNullBound(value, 'atMost') });
+}
+
+/** `column >= value`. Inclusive, and `atMost`'s argument in the other direction. */
+export function atLeast(value: NonNullable<unknown>): FilterTerm {
+  return mintTerm({ term: 'at-least', value: refuseNullBound(value, 'atLeast') });
+}
+
+/**
+ * `column IS NULL`.
+ *
+ * A FRESH OBJECT PER CALL rather than a shared constant, because membership of
+ * `TERMS` is what makes a term a term and a frozen singleton would work equally
+ * well right up until somebody exported it.
+ */
+export function isNull(): FilterTerm {
+  return mintTerm({ term: 'is-null' });
+}
+
+/** Whether a filter value is a term this module minted. The only reader of `TERMS`. */
+export function isFilterTerm(candidate: unknown): candidate is FilterTerm {
+  return typeof candidate === 'object' && candidate !== null && TERMS.has(candidate);
+}
+
+/** The run-time half of `NonNullable<unknown>`, for the caller that cast past it. */
+function refuseNullBound(value: unknown, constructor: string): unknown {
+  if (value === null || value === undefined) {
+    throw new Error(
+      `${constructor}(${value === null ? 'null' : 'undefined'}) is not a bound. A comparison ` +
+        'against NULL matches nothing, so a null bound is a filter that silently returns no ' +
+        'rows rather than the filter somebody meant to write.',
+    );
+  }
+  return value;
+}
+
+/** The SQL one term renders against one resolved column. */
+function termConjunct(key: TableKey, property: string, column: PgColumn, of: FilterTerm): SQL {
+  switch (of.term) {
+    case 'at-most':
+      return lte(column, of.value);
+    case 'at-least':
+      return gte(column, of.value);
+    case 'is-null':
+      return isNullColumn(column);
+    default: {
+      // A member added to `FilterTerm` without a case here is `TS2322` on this
+      // line, so the vocabulary and its renderer cannot drift apart.
+      const unreachable: never = of;
+      throw new Error(
+        `"${String((unreachable as { term?: unknown }).term)}" is not a term shape on ` +
+          `${key}.${property}.`,
+      );
+    }
+  }
+}
 
 /** Memoised per table: building this reads Drizzle's table config. */
 const UNIQUE_KEYS = new Map<TableKey, readonly (readonly string[])[]>();
@@ -577,7 +763,13 @@ function columnByProperty(table: PgTable, property: string): PgColumn | undefine
 }
 
 /**
- * The equality conjunction one filter renders.
+ * The conjunction one filter renders, with terms admitted or refused.
+ *
+ * ONE FUNCTION AND ONE `admitTerms` FLAG RATHER THAN TWO WALKS OF THE SAME
+ * OBJECT, on `handlePinnedColumns`' own precedent in ADR-112 section 5: the
+ * column resolution, the sort, the empty check and the null refusal are the same
+ * facts for a filter and for an address, and two copies of them is the drift
+ * this package exists to keep to one.
  *
  * THE COLUMNS ARE SORTED, so the rendered SQL of one filter is the same text
  * whatever order the caller wrote its keys in. That is what lets the suite
@@ -586,10 +778,14 @@ function columnByProperty(table: PgTable, property: string): PgColumn | undefine
  * A `null` OR `undefined` VALUE IS REFUSED and the reason is not tidiness.
  * Rendered as `col = NULL` it matches nothing, so the write is silently a
  * no-op; rendered as `col IS NULL` it stops bounding the row count, because a
- * unique key over a nullable column admits many NULL rows in Postgres. Neither
- * reading is a row this accessor should write, so neither is offered.
+ * unique key over a nullable column admits many NULL rows in Postgres. A caller
+ * that MEANS `IS NULL` writes `isNull()`, which is a term and reads only.
  */
-function addressPredicate(key: TableKey, at: Readonly<Record<string, unknown>>): SQL {
+function conjunctionOver(
+  key: TableKey,
+  at: Readonly<Record<string, unknown>>,
+  admitTerms: boolean,
+): SQL {
   const table = TABLES[key] as PgTable;
   const named = Object.keys(at).sort();
   if (named.length === 0) {
@@ -609,11 +805,22 @@ function addressPredicate(key: TableKey, at: Readonly<Record<string, unknown>>):
       );
     }
     const value = at[property];
+    if (isFilterTerm(value)) {
+      if (!admitTerms) {
+        throw new Error(
+          `"${property}" carries a ${value.term} term in an ADDRESS on ${key}. An address names ` +
+            'AT MOST ONE ROW and a term names a set, so a term is a read narrowing and never ' +
+            'part of an address. Use rowsWhere, or name the row.',
+        );
+      }
+      conjuncts.push(termConjunct(key, property, column, value));
+      continue;
+    }
     if (value === null || value === undefined) {
       throw new Error(
         `"${property}" is ${value === null ? 'null' : 'undefined'} in a filter on ${key}. ` +
           'Equality against NULL matches nothing and `IS NULL` does not name one row, so a ' +
-          'null is refused rather than guessed at.',
+          'null is refused rather than guessed at. `isNull()` is the term that means it.',
       );
     }
     conjuncts.push(eq(column, value));
@@ -624,6 +831,44 @@ function addressPredicate(key: TableKey, at: Readonly<Record<string, unknown>>):
     throw new Error(`the filter on ${key} rendered nothing, which cannot happen with one column.`);
   }
   return composed;
+}
+
+/**
+ * The EQUALITY conjunction an address renders. A term here is a throw.
+ *
+ * THIS IS THE ONE PATH EVERY WRITE AND EVERY ADDRESSED READ SHARES, which is
+ * why the term refusal lives here rather than at six call sites. ADR-112's
+ * foreclosure "an address is equality only" is unmoved by ADR-157 and this
+ * function is where it is enforced.
+ */
+function addressPredicate(key: TableKey, at: Readonly<Record<string, unknown>>): SQL {
+  return conjunctionOver(key, at, false);
+}
+
+/** The conjunction a FILTER renders. Equality, `atMost`, `atLeast` and `isNull`. */
+function filterPredicate(key: TableKey, where: Readonly<Record<string, unknown>>): SQL {
+  return conjunctionOver(key, where, true);
+}
+
+/**
+ * Refuse a term in an INSERT's values or an UPDATE's `SET`.
+ *
+ * A HAZARD THIS ENTRY CREATES AND THEREFORE CLOSES. Before ADR-157 no caller
+ * held an object a filter would treat specially; now one does, and a term
+ * handed to `updateAt`'s third argument or to `insert`'s second would be
+ * serialised into the column as ordinary JSON. `{ releasedAt: isNull() }` in a
+ * `SET` is a caller meaning "clear this column" and getting a row of JSON
+ * written into a `timestamptz`, or a silent success on a `jsonb` one.
+ */
+function refuseTermInValues(key: TableKey, values: Readonly<Record<string, unknown>>): void {
+  for (const [property, value] of Object.entries(values)) {
+    if (!isFilterTerm(value)) continue;
+    throw new Error(
+      `"${property}" carries a ${value.term} term in a write to ${key}. A term is a READ ` +
+        'narrowing and a values object is a row, so a term here would be written into the ' +
+        'column rather than compared against it. To clear a column, write null.',
+    );
+  }
 }
 
 /**
@@ -824,19 +1069,50 @@ export function unscopedWritePredicate<K extends TableKey>(
   return addressPredicate(key, at) as UnscopedWritePredicate;
 }
 
-/** The read predicate for a filter, with the tenancy narrowing ANDed. */
+/**
+ * The read predicate for a filter, with the tenancy narrowing ANDed.
+ *
+ * TERMS ARE ADMITTED HERE AND NOWHERE THAT WRITES, which is the whole of
+ * ADR-157's read-versus-write asymmetry. The tenancy conjunct is the same
+ * `scopePredicate` the unfiltered read carries, so a term can only remove rows
+ * from what this identity could already see.
+ */
 export function scopedFilterPredicate<K extends ScopedTableKey>(
   key: K,
   identityId: IdentityId,
   where: RowFilter<K>,
 ): SQL {
   refusePinnedColumn(key, where);
-  return bothOf(scopePredicate(key, identityId), addressPredicate(key, where));
+  return bothOf(scopePredicate(key, identityId), filterPredicate(key, where));
 }
 
 /** The read predicate for a filter at an authority that carries no identity. */
 export function unscopedFilterPredicate<K extends TableKey>(key: K, where: RowFilter<K>): SQL {
-  return addressPredicate(key, where);
+  return filterPredicate(key, where);
+}
+
+/**
+ * The read predicate for an ADDRESS through a scoped handle. Equality only.
+ *
+ * SEPARATE FROM `scopedFilterPredicate` BECAUSE A TERM MUST NOT REACH AN
+ * ADDRESSED READ. `rowAt` promises one row or none and throws on two; a term
+ * makes that promise unkeepable, so the two paths take different builders
+ * rather than one builder with a flag a caller could get wrong. It renders
+ * exactly what `scopedWritePredicate` renders, which is what makes "the read
+ * and the write carry the same predicate" assertable.
+ */
+export function scopedAddressPredicate<K extends ScopedTableKey>(
+  key: K,
+  identityId: IdentityId,
+  at: RowAddress<K>,
+): SQL {
+  refusePinnedColumn(key, at);
+  return bothOf(scopePredicate(key, identityId), addressPredicate(key, at));
+}
+
+/** The read predicate for an address at an authority that carries no identity. */
+export function unscopedAddressPredicate<K extends TableKey>(key: K, at: RowAddress<K>): SQL {
+  return addressPredicate(key, at);
 }
 
 /** UPDATE. The `WHERE` clause is not optional and there is no builder without one. */
@@ -847,6 +1123,7 @@ function updateStatementOn(
   where: SQL,
 ): unknown {
   refuseTenancyColumn(key, values);
+  refuseTermInValues(key, values);
   return source
     .update(TABLES[key] as PgTable)
     .set(values)
@@ -915,6 +1192,56 @@ export function selectStatement(
 ): unknown {
   const builder = source.select().from(TABLES[key] as PgTable);
   return where === undefined ? builder : builder.where(where);
+}
+
+// -----------------------------------------------------------------------------
+// THE ROW LOCK (ADR-157)
+// -----------------------------------------------------------------------------
+// ADR-112's foreclosure 3 named four constructions with no shape in this
+// accessor -- `ON CONFLICT`, `ORDER BY`, `LIMIT` and `FOR UPDATE` -- and said a
+// claim that needs `SELECT ... FOR UPDATE` has no way to ask. `INV-M20-01` is
+// that claim: "every debit is checked against the live position inside the same
+// transaction ... plus a per-identity advisory lock". `INV-M5-07` is the same
+// claim per account and shared with the nightly batch. `GS-230` is the scenario,
+// "exactly one succeeds where the balance covers only one", and it is a claim
+// about two concurrent transactions that NOTHING in this tree could make one of
+// lose.
+//
+// A ROW LOCK AND NOT AN ADVISORY LOCK, AND THE DIFFERENCE IS WHICH DOOR IT GOES
+// THROUGH. `pg_advisory_xact_lock(bigint)` is what the invariants' prose names,
+// and there is no way to send it that is not `sqlExecutor` -- which would mean
+// widening a one-member raw-SQL vocabulary to smuggle in a primitive, which is
+// the exact reach-around P5 section 11 rule 10 exists to foreclose and the one
+// P7 section 11 rule 10 repeats. A row lock says the same thing THROUGH THE
+// ACCESSOR: it takes the tenancy predicate the matching read takes, so a caller
+// scoped to A locking B's row locks nothing and is told nothing, which an
+// advisory lock keyed on a uuid the caller supplies would not have given.
+//
+// IT IS ON THE TRANSACTION HANDLES ONLY, and that is Postgres rather than
+// taste: a row lock is released at COMMIT, so a lock taken outside a
+// transaction is released before the next statement runs and is a lock that
+// reads like one and is not one. `ScopedDb`, `SystemDb` and `FirmDb` stay read
+// only and unchanged, which is also what keeps ADR-084's two watched compile
+// refusals proving what they were written to prove.
+//
+// `FirmTx` DOES NOT GET ONE. A `firm` row belongs to nobody and no invariant in
+// the corpus names a lock on one; the two that name a lock name an identity and
+// an account, which are `ScopedTx`'s and -- because `INV-M5-07`'s lock is
+// SHARED WITH THE NIGHTLY BATCH, and a lock only one of two parties takes is not
+// a lock -- `SystemTx`'s.
+//
+// ONE STRENGTH AND NO OPTIONS. `FOR UPDATE` only: `FOR SHARE` and `FOR NO KEY
+// UPDATE` have no caller, and `NOWAIT` and `SKIP LOCKED` each change what a
+// contending transaction DOES rather than what it sees, which is a decision a
+// money path makes with an argument rather than a parameter somebody passes.
+
+/** SELECT ... FOR UPDATE. The predicate is required and there is no builder without one. */
+function lockingSelectStatement(source: StatementSource, key: TableKey, where: SQL): unknown {
+  return source
+    .select()
+    .from(TABLES[key] as PgTable)
+    .where(where)
+    .for('update');
 }
 
 // -----------------------------------------------------------------------------
@@ -1022,11 +1349,18 @@ export function firmDb(): FirmDb {
 // -----------------------------------------------------------------------------
 // `SystemReason` and `SqlExecutorReason` are closed vocabularies of WHY, and
 // every member of either grants EVERY TABLE. A third `SystemReason` member would
-// hand a request handler all 104 registered tables at six verbs in exchange for
-// one table at one verb. A closed vocabulary of WHICH grants exactly what it
-// names. So both constructions below take a TABLE vocabulary, `SystemReason`
-// stays at two members for the third time (ADR-096 clause 3, ADR-102 clause 3,
-// and here), and `SqlExecutorReason` stays at one.
+// hand a request handler EVERY REGISTERED TABLE AT EVERY VERB `SystemTx`
+// DECLARES, in exchange for one table at one verb. A closed vocabulary of WHICH
+// grants exactly what it names. So both constructions below take a TABLE
+// vocabulary, `SystemReason` stays at two members for the third time (ADR-096
+// clause 3, ADR-102 clause 3, and here), and `SqlExecutorReason` stays at one.
+//
+// THIS SENTENCE USED TO STATE THE TWO FIGURES AND ADR-157 MOVED ONE OF THEM.
+// It read "all 104 registered tables at six verbs", and the verb count went to
+// seven the moment `lockAt` landed on `SystemTx`. The arithmetic was never the
+// argument -- the argument is that one side is bounded by a table name and the
+// other is not -- so the figures are gone and the property is stated instead,
+// which is ADR-034's rule applied to a comment.
 //
 // THAT IS A RULING RATHER THAN A PREFERENCE, AND `ledger_entries` IS WHY.
 // It is `derived` with `traversal: 'hop'` via `ledger_accounts`, so an
@@ -1422,6 +1756,23 @@ export interface ScopedTx extends TxCommon {
     key: K,
     at: NamesAColumn<K, A>,
   ): Promise<unknown>;
+  /**
+   * ONE row of this identity's, LOCKED until this transaction ends (ADR-157).
+   *
+   * `rowAt` plus `FOR UPDATE`, on the same predicate, so a caller scoped to one
+   * identity naming another's row locks nothing and reads `undefined`.
+   */
+  lockAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown>;
+  /**
+   * Lock THIS HANDLE'S OWN identity row until this transaction ends (ADR-157).
+   *
+   * `INV-M20-01`'s per-identity lock, and it takes NO argument at all, so there
+   * is no address a caller could point at somebody else.
+   */
+  lockScope(): Promise<unknown>;
   /** Write ONE row of this identity's. Tenancy and address are BOTH in the `WHERE`. */
   updateAt<K extends ScopedTableKey, A extends RowAddress<K>>(
     key: K,
@@ -1454,6 +1805,17 @@ export interface SystemTx extends TxCommon {
     where: NamesAColumn<K, F>,
   ): Promise<unknown[]>;
   rowAt<K extends TableKey, A extends RowAddress<K>>(
+    key: K,
+    at: NamesAColumn<K, A>,
+  ): Promise<unknown>;
+  /**
+   * ONE row, LOCKED until this transaction ends (ADR-157).
+   *
+   * HERE BECAUSE `INV-M5-07`'s LOCK IS SHARED WITH THE NIGHTLY BATCH. A lock
+   * only the request handler takes is not a lock, so the authority the batch
+   * runs at has to be able to take the same one.
+   */
+  lockAt<K extends TableKey, A extends RowAddress<K>>(
     key: K,
     at: NamesAColumn<K, A>,
   ): Promise<unknown>;
@@ -1544,9 +1906,36 @@ export function scopedTx(
       const found = (await selectStatement(
         source,
         key,
-        scopedFilterPredicate(key, identityId, at),
+        scopedAddressPredicate(key, identityId, at),
       )) as unknown[];
       return oneOrNone(key, found);
+    },
+    async lockAt<K extends ScopedTableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown> {
+      // EVERY GUARD `rowAt` RUNS, IN THE SAME ORDER, and then the lock. The two
+      // read the same predicate from the same builder, so "a lock reaches
+      // exactly what the read reaches" is a property of the code rather than of
+      // two call sites agreeing.
+      refuseUnaddressed(key, at, handlePinnedColumns(key));
+      const found = (await lockingSelectStatement(
+        source,
+        key,
+        scopedAddressPredicate(key, identityId, at),
+      )) as unknown[];
+      return oneOrNone(key, found);
+    },
+    async lockScope(): Promise<unknown> {
+      // `identities` is the registry's only `root` and its rule is `id`, so
+      // `scopePredicate` renders `identities.id = $1` and the caller supplies
+      // nothing. There is no address here to point at another identity.
+      const found = (await lockingSelectStatement(
+        source,
+        'identities',
+        scopePredicate('identities', identityId),
+      )) as unknown[];
+      return oneOrNone('identities', found);
     },
     async updateAt<K extends ScopedTableKey, A extends RowAddress<K>>(
       key: K,
@@ -1602,7 +1991,19 @@ export function systemTx(
       const found = (await selectStatement(
         source,
         key,
-        unscopedFilterPredicate(key, at),
+        unscopedAddressPredicate(key, at),
+      )) as unknown[];
+      return oneOrNone(key, found);
+    },
+    async lockAt<K extends TableKey, A extends RowAddress<K>>(
+      key: K,
+      at: NamesAColumn<K, A>,
+    ): Promise<unknown> {
+      refuseUnaddressed(key, at);
+      const found = (await lockingSelectStatement(
+        source,
+        key,
+        unscopedAddressPredicate(key, at),
       )) as unknown[];
       return oneOrNone(key, found);
     },
@@ -1655,7 +2056,7 @@ export function firmTx(source: StatementSource, conn: PoolClient): FirmTx {
       const found = (await selectStatement(
         source,
         key,
-        unscopedFilterPredicate(key, at),
+        unscopedAddressPredicate(key, at),
       )) as unknown[];
       return oneOrNone(key, found);
     },
