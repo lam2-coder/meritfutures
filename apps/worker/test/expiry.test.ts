@@ -670,12 +670,22 @@ describe('THE PAYOUT FREEZE LEG IS SWEPT AND REPORTED AND NOT WRITTEN', () => {
     );
   });
 
-  // THE FINDING'S OWN TEXT NAMES WHAT IS ABSENT. A later session that makes the
-  // release writable deletes this constant rather than editing around it.
-  it('the finding names the settlement columns and the function that do not exist', () => {
+  // THE FINDING'S OWN TEXT NAMES WHAT BLOCKS THE RELEASE. A later session that
+  // makes it writable deletes this constant rather than editing around it.
+  //
+  // THE FOURTH NEEDLE IS A CORRECTION AND IT MAKES THIS ASSERTION STRONGER.
+  // This session's first draft said `applySettlement` did not exist. It does,
+  // at packages/rules-engine/src/payout/settle.ts, and it takes a
+  // `calendar: CalendarSlice` -- so the leg is blocked by
+  // `merit/no-calendar-in-expiry-path` banning that import here under ADR-042,
+  // which is a CHECKABLE control rather than an absence somebody could close by
+  // writing a function. Pinning the rule's name is what stops the finding
+  // drifting back into the weaker claim.
+  it('the finding names the settlement columns and the rule that blocks the import', () => {
     expect(FREEZE_UNRELEASABLE).toContain('settled_trading_day');
     expect(FREEZE_UNRELEASABLE).toContain('effective_trading_day');
     expect(FREEZE_UNRELEASABLE).toContain('INV-M5-07');
+    expect(FREEZE_UNRELEASABLE).toContain('merit/no-calendar-in-expiry-path');
   });
 
   it('an unreleasable row makes the run not clean', async () => {

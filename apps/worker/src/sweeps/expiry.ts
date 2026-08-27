@@ -98,12 +98,21 @@
 //      `settled_trading_day` AND `effective_trading_day`, all three NOT NULL.
 //   b. `effective_trading_day` is "the FIRST TRADING DAY WHOSE OPENING BALANCE
 //      REFLECTS THE WITHDRAWAL" (`0010:96`). That is the exchange session
-//      calendar applied to an instant, and NO TRADING CALENDAR EXISTS IN THIS
-//      WORKSPACE.
+//      calendar applied to an instant, and THIS FILE MAY NOT IMPORT ONE:
+//      `merit/no-calendar-in-expiry-path` bans it here by glob, under ADR-042,
+//      and that rule's own header names THIS SWEEP as the failure it exists
+//      for -- "whoever implements the sweep reaches for the only calendar in
+//      the database, which is the TRADING calendar ... wrong on roughly 104
+//      days a year and it looks exactly right in review".
 //   c. "Win-day reset and floor recompute happen on settlement"
-//      (STATE_MACHINES section 2). That is `applySettlement`, `INV-M5-07`, and
-//      no such function exists outside the golden-scenario loader's prose and
-//      the simulation harness.
+//      (STATE_MACHINES section 2). That is `applySettlement`, `INV-M5-07`.
+//      **IT EXISTS**, at `packages/rules-engine/src/payout/settle.ts`, and an
+//      earlier draft of this header said it did not. THE CORRECTION MAKES THE
+//      ARGUMENT STRONGER RATHER THAN WEAKER: its signature is
+//      `applySettlement(state, plan, fact, calendar: CalendarSlice)`, so
+//      calling it needs exactly the import (b) forbids. The third leg is not
+//      blocked by an absent function; it is blocked by a lint rule written for
+//      this precise mistake, which is a better reason and a checkable one.
 //   d. NOTHING WRITES `frozen` AT ALL. `payouts.ts` writes `approved` or
 //      `held_pending_review` and no third value; `'frozen'` appears in
 //      `packages/db/src/schema.ts` as an enum member and nowhere else in source.
@@ -747,12 +756,15 @@ async function releaseWithdrawalHalt(
  * delete this line rather than edit around it.
  */
 export const FREEZE_UNRELEASABLE =
-  'payout_requests.freeze_expires_at is past and the release is not writable by any code in ' +
-  'this tree. STATE_MACHINES draws `frozen --> settled` under G-FREEZE-CLEARED and ADR-040 ' +
-  'states it; `payout_requests_settled_has_days` requires settled_at, settled_trading_day and ' +
-  'effective_trading_day; effective_trading_day needs the exchange session calendar, which does ' +
-  'not exist here; and settlement additionally means the win-day reset and floor recompute of ' +
-  'INV-M5-07, which does not exist here either. Reported rather than guessed.';
+  'payout_requests.freeze_expires_at is past and the release is not writable from this path. ' +
+  'STATE_MACHINES draws `frozen --> settled` under G-FREEZE-CLEARED and ADR-040 states it; ' +
+  'payout_requests_settled_has_days requires settled_at, settled_trading_day and ' +
+  'effective_trading_day; effective_trading_day needs the exchange session calendar, and ' +
+  'merit/no-calendar-in-expiry-path bans that import here under ADR-042, naming this sweep as ' +
+  'the failure it exists for; and settlement additionally means the win-day reset and floor ' +
+  'recompute of INV-M5-07, whose applySettlement EXISTS in packages/rules-engine but takes a ' +
+  'CalendarSlice, so calling it needs the very import that rule forbids. Reported rather than ' +
+  'guessed.';
 
 /**
  * `payout.freeze_expiring`, EVENTS section 6, field for field.
