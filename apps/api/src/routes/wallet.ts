@@ -493,7 +493,10 @@ export function toWalletEntryRow(value: unknown): WalletEntryRow {
  * so nothing below is a tenancy control and nothing below can become one by
  * accident.
  */
-export function databaseWalletBackend(db: ApiDb, now: () => Date = () => new Date()): WalletBackend {
+export function databaseWalletBackend(
+  db: ApiDb,
+  now: () => Date = () => new Date(),
+): WalletBackend {
   return {
     now,
     readEntries: (session) =>
