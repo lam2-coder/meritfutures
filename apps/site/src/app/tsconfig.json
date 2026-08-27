@@ -1,0 +1,9 @@
+{
+  "//": "VITE RESOLVES A TSCONFIG PER FILE AND THE NEAREST ONE WINS, WHICH IS THE WHOLE MECHANISM. apps/site/tsconfig.json sets `jsx: preserve` under ADR-095 F7, and that is correct for the application: tsconfig.base.json's rule is that nothing here is built by `tsc`, so Next emits and `tsc --noEmit` only reads. VITEST HAS NO BUNDLER BEHIND IT: it hands a module to Node, so preserved JSX reaches the import analyser as invalid syntax and the suite fails to load before one assertion runs. Vite names the cause itself: \"Failed to parse source for import analysis because the content contains invalid JS syntax. If you use tsconfig.json, make sure to not set jsx to preserve.\" This file overrides `jsx` for THIS DIRECTORY ONLY, so the app keeps the setting its build needs and the suite gets JavaScript. It is deliberately NOT a root-level `esbuild` block in vitest.config.ts: apps/portal/src/app/calendar/tsconfig.json measured that alternative one session earlier and recorded that Vite reads the per-file tsconfig in preference, so a block there is configuration that looks like it works and does not. `tsc` never reads this file, because it compiles the project it is pointed at; Next never reads it either, and this session re-ran `next build` after adding it to check exactly that.",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "react"
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
+}

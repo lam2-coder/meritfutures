@@ -393,8 +393,23 @@ describe('the registry is total', () => {
     // is unbuilt). It is also FIRM by construction for `liability_snapshots`'
     // reason on a different surface: a per-identity slice of the firm's reserve
     // coverage is not a smaller version of it.
+    //
+    // 113 SINCE ADR-164: `0050` creates `live_account_state`, ADR-020 tier 2's
+    // live cache, and it is NOT registered here either, on the SAME rule and
+    // not on a second one. `P6-c` writes the store, the role and the grant and
+    // NO READER: the ingest is `P6-f`'s and the two live surfaces are `P6-g`'s
+    // and `P6-j`'s, so the first session that needs it is not this one.
+    //
+    // ITS EVENTUAL RULE IS `derived` VIA `accounts` AND THAT IS NOT A GUESS.
+    // `account_id uuid PRIMARY KEY REFERENCES accounts(id) ON DELETE RESTRICT`
+    // is single-valued and NOT NULL, and API_CONTRACT section 6.1 already says
+    // every live frame is scoped "through `scopedDb(identity)` exactly as the
+    // account reads are". What that session ALSO has to know is that the scope
+    // rule and the grant answer different questions: `0050` revokes all four
+    // verbs from `merit_app`, so a correctly scoped read still fails unless the
+    // process connects as `merit_live`.
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
-    expect(createdTables).toBe(112);
+    expect(createdTables).toBe(113);
   });
 
   // FIVE MEMBERS SINCE ADR-106, AND THE ASSERTION IS THE REASON THE FIFTH COULD
