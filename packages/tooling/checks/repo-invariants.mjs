@@ -923,18 +923,97 @@ const ri07 = {
 // weakening and is the assertion that matters most now that the list is no
 // longer empty.
 
+// -----------------------------------------------------------------------------
+// THE LIST REACHED TWO NAMES LATER THE SAME DAY AND THE PARAGRAPH ABOVE IS LEFT
+// STANDING FOR THE REASON THE ONE ABOVE IT WAS: IT IS THE RECORD OF WHAT THE
+// LIST PROMISED WHILE IT HELD ONE
+// -----------------------------------------------------------------------------
+// EXACTLY ONE OF ITS TWO SENTENCES STOPPED BEING TRUE, and it is the first.
+// "THE LIST STAYS AT ONE NAME" does not survive this entry. "THE GUARDS BELOW
+// ARE UNTOUCHED" does, and it is the one that was load bearing: the
+// `guarded.length === 0` throw stands, the stale-name throw stands, `acquires`
+// is unchanged, and nothing in `run()` was edited to make a second name fit.
+// The whole of the diff ADR-165 lands in this file is one array element, its
+// comment, and this block.
+//
+// `@merit/worker` IS ADMITTED BY ADR-165, AND THE QUESTION THAT ENTRY ANSWERS
+// IS "MAY A SCHEDULED JOB READ THE TRADER DATABASE". It is a different question
+// from the one ADR-120 answered, and the difference is not size. `apps/api`
+// reaches a row ON BEHALF OF A CALLER IT RESOLVED, which is why
+// `scopedDb(identity)` is the shape of that whole deployable and why
+// `apps/api/src/db.ts` declares two doors and refuses a third. A SCHEDULED JOB
+// HAS NOBODY TO RESOLVE. It runs at 06:00 CT because a clock said so, it
+// partitions across every account that has ever existed, and a per-identity
+// scope is not a smaller version of that job.
+//
+// THE WORD EXISTED BEFORE THE DOOR DID, WHICH IS THE STRONGEST FACT HERE.
+// `SystemReason`'s first member is `'nightly-batch'` and `systemDb`'s own
+// docstring in `packages/db/src/scoped-db.ts` justifies it by citing THIS
+// deployable's `apps/worker/src/batch/ports.ts` and its
+// `accountsWithStoredState()` "for EVERY account that has ever existed". So
+// since ADR-084 the accessor has carried a reason whose only legitimate holder
+// is a package that could not name the accessor at all. This line closes that
+// gap and widens nothing: `SystemReason` still has two members, and
+// `'nightly-batch'` is what a detector run, a fold, a sweep and an assertion
+// each already are.
+//
+// IT IS THE SUBJECT AND NOT A MEANS, AND THREE FILES IN THIS DEPLOYABLE HAVE
+// DECLINED IT ALREADY FOR PRECISELY THAT REASON. ADR-117 ruling 4's test is
+// kept exactly as sessions 218 and 220 met it, and `apps/worker` has met it
+// three more times: `src/index.ts` (session 147) wrote "the wiring is one
+// manifest line and one call, in the session that brings the first job with
+// it"; `src/batch/ports.ts` wrote "WHEN THE CLIENT LANDS, the adapter is
+// written against `packages/db`'s accessor" and built the batch against ports
+// instead; `src/provisioning/ports.ts` (session 222) wrote "THIS SESSION IS
+// THAT SESSION AND THE MANIFEST IS OUTSIDE ITS FENCE" and reported the wiring
+// rather than reaching for it. Five declines across two deployables is what a
+// control that works looks like from the inside, and every one of them named
+// the same remedy: a session whose OBJECT is the admission. ADR-165 is that
+// session and `ALLOCATION` row `165` reserved the number before it ran.
+//
+// WHAT ADMITTING `@merit/worker` DOES NOT GRANT. The paragraph above about
+// `@merit/api` applies unchanged and is not restated: this list grants the
+// ability to NAME `@merit/db` and says nothing about what may be done with it.
+// What is specific to this deployable is that it takes ONE door rather than
+// two. `apps/worker/src/db.ts` opens `batch(fn)` over
+// `systemDb('nightly-batch')` and declares no `scoped`, no `firm` and no
+// reason parameter, so `'operator-console'` is unreachable from this deployable
+// by construction rather than by convention: there is no argument position a
+// caller could put it in. `SystemTx` is a superset of `FirmTx` over reads and
+// inserts, which is why a second door would have bought nothing and cost a word
+// somebody could use.
+//
+// WHAT THIS FORECLOSES, WHICH IS THE HALF A LATER READER ACTUALLY NEEDS.
+// THREE DEPLOYABLES REMAIN OUTSIDE AND EACH IS REFUSED BY SOMETHING THAT IS NOT
+// THIS LIST. `apps/site` is refused by ADR-096 ruling 2 and watched by its own
+// `test/manifest.test.ts`; `apps/portal` and `apps/admin` are browser surfaces
+// that reach data through `apps/api` over HTTP (ADR-162 landed the portal's one
+// transport file), so an admission for either would be a second data path to
+// the same rows rather than a first path to new ones. FIVE PACKAGES STATE THE
+// ACCESSOR'S ABSENCE AS A DESIGN PROPERTY IN THEIR OWN MANIFESTS and all five
+// stay stated. So the rule for the next slice is the rule this one followed and
+// it is not "argue harder": a slice that finds it needs one of those eight
+// names STOPS, reports it, and the admission is taken by a session whose whole
+// subject is the authority change. A SECOND NAME ADDED QUIETLY BESIDE A
+// FEATURE IS THE FAILURE MODE, and it is cheaper to spot in a two-name list
+// than it was in a one-name list only because somebody wrote this paragraph.
+
 /**
  * The packages permitted to declare the database accessor, by package name.
  *
- * ONE NAME, AND THE ADMISSION IS THE CONTROL. It was EMPTY from ADR-117 until
- * ADR-120, and the emptiness was the control then for the same reason the single
- * entry is now: adding a name here is the admission decision, a diff in the file
- * whose subject is which packages may reach the trader database, reviewed by
- * whoever reviews controls, rather than one line in a manifest reviewed by
- * whoever reviews manifests.
+ * THE ADMISSION IS THE CONTROL, AT EVERY LENGTH THIS LIST HAS EVER HAD. It was
+ * EMPTY from ADR-117 until ADR-120 and held ONE NAME from ADR-120 until ADR-165,
+ * and the emptiness was the control then for the same reason each entry is now:
+ * adding a name here is the admission decision, a diff in the file whose subject
+ * is which packages may reach the trader database, reviewed by whoever reviews
+ * controls, rather than one line in a manifest reviewed by whoever reviews
+ * manifests. THE LENGTH IS NOT WRITTEN HERE, on the rule `ri08.title` follows
+ * one screen down: a count beside a list is a hand-maintained count in a
+ * different costume.
  *
- * `@merit/api` is admitted by ADR-120 because it is that entry's SUBJECT. The
- * argument for the name and against every other one is in the header above.
+ * `@merit/api` is admitted by ADR-120 and `@merit/worker` by ADR-165, each
+ * because it is that entry's SUBJECT. The argument for both names, and against
+ * every other one, is in the header above.
  *
  * EXPORTED SO THE TEST READS THIS LIST rather than a second copy of it, which is
  * DEPLOYABLES' relationship to its fixture. RI-04's header states what the
@@ -955,6 +1034,18 @@ export const DB_ADMITTED = [
   // 218 and 220 each reached this line from a slice whose subject was something
   // else and each correctly declined; ADR-120's subject IS the admission.
   '@merit/api',
+
+  // ADR-165. `apps/worker` runs every row of CRON_INVENTORY's scheduled-work
+  // table -- the nightly batch, the replay self-audit, provisioning delivery,
+  // the ledger assertions, the statistics run, the detector runs, the expiry
+  // sweeps -- and not one of them has a caller to resolve. It takes ONE door,
+  // `systemDb('nightly-batch')` through `apps/worker/src/db.ts`, and that
+  // reason has named this deployable's own `batch/ports.ts` since ADR-084, so
+  // the word was here before the package could name the accessor the word lives
+  // in. Sessions 147 and 222 each reached this line from a slice whose subject
+  // was something else and each correctly declined; ADR-165's subject IS the
+  // admission.
+  '@merit/worker',
 ];
 
 /**
