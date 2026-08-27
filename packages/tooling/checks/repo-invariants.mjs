@@ -870,14 +870,57 @@ const ri07 = {
 // 219's finding rather than its oversight", so the day the API needs the
 // accessor is the day somebody writes it here with a reason. Admitting it now,
 // against a need nobody has yet stated, is the list joining itself.
+//
+// -----------------------------------------------------------------------------
+// THAT DAY WAS 2026-08-27 AND THE PARAGRAPH ABOVE IS LEFT STANDING RATHER THAN
+// REWRITTEN, BECAUSE IT IS THE RECORD OF WHAT THE LIST PROMISED BEFORE IT WAS
+// JOINED
+// -----------------------------------------------------------------------------
+// `@merit/api` IS THE FIRST AND ONLY ENTRY THIS LIST HAS EVER CARRIED, AND
+// ADR-120 IS THE RULING RATHER THAN THIS LINE. Session 218 declared `AuthBackend`
+// blocked on its own declaration rather than reaching for the manifest, and
+// session 220 declined `IdempotencyStore` for the same reason and wrote the
+// argument into ADR-113 section 6: the admission is "an authority change on the
+// deployable that serves the whole public surface rather than a side effect of a
+// checkout slice". BOTH WERE RIGHT AND NEITHER IS OVERTURNED. What changed is
+// not the argument, it is whose session the admission is: ADR-120's SUBJECT is
+// this list gaining a member, and a slice whose subject is the authority change
+// is the only kind of slice that may take one.
+//
+// THE PARAGRAPH ABOVE ALSO SET THE PRICE AND IT WAS PAID IN FULL, WATCHED.
+// With the manifest line added and this list still empty, `node
+// packages/tooling/checks/repo-invariants.mjs` exits 1 at 9 of 10 with
+// `FAIL RI-08` naming `apps/api/package.json: dependencies.@merit/db`. ADR-096
+// section 4's quiet line became the loud one, and making it green again cost
+// exactly the second diff ADR-117 section 4 said it would: this one, in the file
+// whose whole subject is which packages may reach the trader database.
+//
+// WHAT ADMITTING `@merit/api` DOES NOT GRANT, stated at the site because a
+// reader of this list will ask. It grants the ability to NAME `@merit/db`, and
+// nothing about what may be done with it: `scopedDb` still needs an identity,
+// `systemDb` still needs one of two reasons, `firmDb` still refuses every
+// `owned` key, and ADR-112's addressed write still refuses an address that names
+// no unique key. ADR-084's brands and ADR-008's scoping are the controls on the
+// USE, at the type level, and they are unmoved by this line.
+//
+// THE LIST STAYS AT ONE NAME AND THE GUARDS BELOW ARE UNTOUCHED. In particular
+// the `guarded.length === 0` throw stands: a list that covers every package
+// still makes this check refuse to run, which is the gate defending its own
+// weakening and is the assertion that matters most now that the list is no
+// longer empty.
 
 /**
  * The packages permitted to declare the database accessor, by package name.
  *
- * EMPTY, AND THE EMPTINESS IS THE CONTROL. Adding a name here is the admission
- * decision: a diff in the file whose subject is which packages may reach the
- * trader database, reviewed by whoever reviews controls, rather than one line in
- * a manifest reviewed by whoever reviews manifests.
+ * ONE NAME, AND THE ADMISSION IS THE CONTROL. It was EMPTY from ADR-117 until
+ * ADR-120, and the emptiness was the control then for the same reason the single
+ * entry is now: adding a name here is the admission decision, a diff in the file
+ * whose subject is which packages may reach the trader database, reviewed by
+ * whoever reviews controls, rather than one line in a manifest reviewed by
+ * whoever reviews manifests.
+ *
+ * `@merit/api` is admitted by ADR-120 because it is that entry's SUBJECT. The
+ * argument for the name and against every other one is in the header above.
  *
  * EXPORTED SO THE TEST READS THIS LIST rather than a second copy of it, which is
  * DEPLOYABLES' relationship to its fixture. RI-04's header states what the
@@ -891,7 +934,14 @@ const ri07 = {
  *
  * @type {string[]}
  */
-export const DB_ADMITTED = [];
+export const DB_ADMITTED = [
+  // ADR-120. `apps/api` serves the whole public surface API_CONTRACT specifies,
+  // and every authenticated handler in it "resolves the caller to an identity
+  // and reads through `scopedDb(identity)`" (API_CONTRACT section 1). Sessions
+  // 218 and 220 each reached this line from a slice whose subject was something
+  // else and each correctly declined; ADR-120's subject IS the admission.
+  '@merit/api',
+];
 
 /**
  * The three ways one dependency entry acquires a named package, and the reason
