@@ -64,37 +64,35 @@
 // `Retry-After` the budget row implies.
 //
 // -----------------------------------------------------------------------------
-// THE BACKEND IS A PORT, IT IS UNWIRED, AND IT IS BLOCKED ON A DEFECT
+// THE BACKEND IS A PORT, AND AS OF ADR-120 IT HAS AN IMPLEMENTATION FOR FOUR OF
+// ITS SIXTEEN METHODS
 // -----------------------------------------------------------------------------
-// THREE WRITES THIS SURFACE NEEDS CANNOT BE EXPRESSED THROUGH `packages/db` AS
-// IT STANDS, so the port is declared and its implementation is not this
-// session's. Any implementer reading this: the note is here so it is a grep
-// target when the fix lands, per session 222's finding.
+// THE PARAGRAPH THAT STOOD HERE NAMED THREE WRITES `packages/db` COULD NOT
+// EXPRESS, and ADR-112 built the construction for all three: `updateAt` names
+// ONE row through the scoped door, `deleteAt` removes one, and `ScopedTx.update`
+// and the five methods beside it were REMOVED rather than documented. The three
+// citations that paragraph carried -- `scoped-db.ts:676`, `:701`, `:720` -- now
+// name methods that do not exist, so the paragraph is replaced rather than left
+// beside a tree that refutes it. `sqlExecutor`'s vocabulary is unmoved at
+// `'job-enqueue'` and was never spent.
 //
-//   revoke ONE session          `ScopedTx.update` (`scoped-db.ts:676`) renders
-//                               `scopePredicate(key, identityId)` and takes no
-//                               second predicate, so it writes EVERY session
-//                               that identity holds. Confirmed independently
-//                               on `main` by the dispatch that reported it.
-//   consume ONE otp challenge   `otp_challenges` is `firm`, so `scopedTx`
-//                               refuses it at compile time.
-//   stamp `elevated_at`         as the first.
+// WHAT WIRING IT FOUND IS ONE SENTENCE AND IT IS IN `auth-backend.ts`'s HEADER:
+// **ADR-112 unblocked everything a session can DO and nothing that makes one.**
+// Reading a session, revoking one and listing them are an ADDRESS through the
+// scoped door and all three land. MINTING one does not: `ScopedTx.insert` takes
+// `OwnedTableKey` and `sessions` is `derived`. Resolving a person from the
+// address they typed does not either: `users` is `owned`, so a pre-identity read
+// needs the identity it exists to find. Neither is a predicate problem and
+// neither is this file's to repair. DO NOT ROUTE AROUND THEM.
 //
-// and the wide doors are worse: `systemTx.update` (`scoped-db.ts:701`) and
-// `firmTx.update` (`:720`) pass `undefined` for the WHERE clause and take no
-// parameter that could supply one, so EITHER ONE WRITES EVERY ROW IN THE TABLE.
-// A revoke through them logs out every trader on the platform; a challenge
-// consume through them consumes every outstanding challenge. `sqlExecutor` is
-// the deliberate door and its reason vocabulary is closed to `'job-enqueue'`
-// (`scoped-db.ts:567`), so it is not available to an auth handler without
-// editing `scoped-db.ts`. DO NOT ROUTE AROUND THIS. The fix is the founder's
-// pending ruling.
-//
-// Until then the default backend throws on every method and every route answers
-// 503 `service_unavailable`, which is fail closed and honest: this deployment
-// does not serve auth yet. The suite substitutes an in-memory backend, so
-// section 12's 200s are real 200s through Fastify's own router and its 403s are
-// authority refusals rather than an unwired port failing by accident.
+// So `POST /auth/logout`, `GET /sessions` and `POST /sessions/:id/revoke` answer
+// real codes on a tree where `POST /auth/verify` still answers 503, and every
+// 503 now carries its own reason into the log rather than one shared sentence.
+// The default backend still throws on every method, which is fail closed and
+// honest for a deployment that installed no backend at all. The suite
+// substitutes an in-memory backend, so section 12's 200s are real 200s through
+// Fastify's own router and its 403s are authority refusals rather than an
+// unwired port failing by accident.
 // =============================================================================
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -416,9 +414,10 @@ export interface Me {
  * Everything this surface needs from outside the process. One method per
  * endpoint, and no method takes or returns a Fastify type.
  *
- * IT IS BLOCKED. See this file's header: three of these writes cannot be
- * expressed through `packages/db` today, and the implementation is not this
- * session's to write.
+ * `databaseAuthBackend` in `../auth-backend.ts` implements four of these against
+ * the real accessor and raises {@link AuthBackendUnwired} from the other twelve,
+ * each carrying its own blocker. See this file's header for which four and why,
+ * and that file's header for the two constructions the other twelve wait on.
  */
 export interface AuthBackend {
   /** Resolve the session cookie's value. `null` for an unknown or dead token. */
@@ -456,20 +455,40 @@ export interface AuthBackend {
   readMe(session: AuthSession): Promise<Me | null>;
 }
 
-/** Thrown by the default backend. Answered as 503 rather than 500. */
+/**
+ * Thrown by a backend that cannot serve one method. Answered as 503, not 500.
+ *
+ * IT CARRIES A REASON AS OF ADR-120, AND THE WORD `Unwired` NOW COVERS TWO
+ * DIFFERENT ABSENCES. One is a deployment that installed no backend at all,
+ * which is what {@link UNWIRED_AUTH_BACKEND} is. The other is a backend that IS
+ * wired and cannot express this particular method, which is what
+ * `databaseAuthBackend` raises from twelve of the sixteen. Both are `503
+ * service_unavailable` to a client and they are different facts to an operator,
+ * so the reason travels with the error.
+ *
+ * THE REASON NEVER REACHES THE RESPONSE. API_CONTRACT section 2 keeps internals
+ * out of a problem document, and every reason here names a table, a scope class
+ * or a construction in `packages/db`. `endpointHandler` logs the error and sends
+ * a bare 503.
+ */
 export class AuthBackendUnwired extends Error {
-  constructor(method: string) {
-    super(
-      `AuthBackend.${method} is not wired. The auth surface is declared and its persistence is ` +
-        'not implemented: three of its writes cannot be expressed through packages/db today. ' +
-        'See routes/auth.ts, and scoped-db.ts lines 567, 701 and 718',
-    );
+  /** What this deployment cannot do, in the operator's terms. Never sent. */
+  readonly reason: string;
+
+  constructor(method: string, reason: string) {
+    super(`AuthBackend.${method} cannot be served by this deployment: ${reason}`);
     this.name = 'AuthBackendUnwired';
+    this.reason = reason;
   }
 }
 
+const NO_BACKEND_AT_ALL =
+  'no backend is installed. `useAuthBackend` was never called, so this process holds the ' +
+  'fail-closed default rather than an implementation. A deployment reaching this line has not ' +
+  'run its wiring, which is `start.ts`';
+
 function unwired(method: string): () => Promise<never> {
-  return () => Promise.reject(new AuthBackendUnwired(method));
+  return () => Promise.reject(new AuthBackendUnwired(method, NO_BACKEND_AT_ALL));
 }
 
 /**
