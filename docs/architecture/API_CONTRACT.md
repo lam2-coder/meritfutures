@@ -562,6 +562,50 @@ Auth: **session**. Nothing in the response is per-trader and a public row would 
 
 **The source is `economic_calendar_current` and no external origin** (`INV-M4-16`). There is no URL on any type above and nothing for one to be assigned to: an embed cannot carry a revision, cannot be staleness-monitored, and cannot be joined to `fills`, so one rendered beside this panel would satisfy the display and satisfy none of `DEP-M7-06`, `D-04` or `FM-M7-08`.
 
+#### The live dashboard channel ([ADR-020](../decisions/ADR-020.md) tier 2, [ADR-161](../decisions/ADR-161.md))
+
+**This subsection specifies a PAYLOAD and deliberately carries no `METHOD /path` heading.** Every other surface in this document is a request and a response, and section 1's conventions each presume a client that asked: a base path, a content type, an `Idempotency-Key`, a cursor, and a rate limit stated per endpoint. **Tier 2 is server-initiated delivery of a value nobody requested**, [`registry.ts`](../../apps/api/src/registry.ts) closes the verb list at the five this contract uses and keys on `METHOD /path`, and a socket upgrade is none of them. **Where the channel lives and how it is framed are two rulings [P6](../plans/P6-live-tier.md) gives to other slices**, and neither changes what is below: the payload, the labeling and the degradation are what [ADR-020](../decisions/ADR-020.md)'s hard rule, `INV-M4-11` and `INV-M4-12` are about.
+
+**This is section 6, and the section is what classifies the surface.** [`surface.ts`](../../apps/api/src/surface.ts) says `public` *"serves API_CONTRACT sections 3 to 7 and 10"* and `operator` *"serves sections 8 and 9"*, and it enforces that by PREFIX rather than by an endpoint list: `OPERATOR_PREFIXES` is `['/admin', '/internal']`. So the trader's live channel belongs here and the operator's live figure belongs in section 8, and **an operator live path that carries neither prefix is withheld from the public deployment by nothing at all** ([ADR-083](../decisions/ADR-083.md) section 4).
+
+```ts
+type LiveFreshness = {
+  stale: boolean;                            // the SERVER's own answer against its own threshold
+  feed: string;                              // which feed the value came from
+  as_of_instant: string;                     // when that feed was last read
+};
+
+type LiveDashboardFrame =
+  | {
+      tier: "indicative";
+      account_id: string;
+      sequence: number;                      // 1-based per account per trading day, in delivery order
+      freshness: LiveFreshness;
+      live_pnl_cents: number;                // signed
+      projected_floor_distance_cents: number;// signed; negative is through the floor
+    }
+  | {
+      tier: "authoritative";
+      account_id: string;
+      reason: string;                        // why there is no live value. Names the supplier, never "unavailable"
+      as_of_trading_day: string;             // this account's last closed day
+      closed_through_day: string;            // the day the firm has closed through
+      pnl_cents: number;
+      floor_distance_cents: number;
+    };
+```
+
+Auth: **session**. Every frame is scoped to the caller's own accounts through `scopedDb(identity)` exactly as the account reads are, and `account_id` names which one. Errors: `unauthenticated`.
+
+**The two values of `tier` are the portal's `Tier` union, one to one**, and the two arms carry different field names for the same quantity on purpose. `INV-M4-12` requires that on feed loss a live surface falls back to last-closed values **and changes its label in the same render**: a frame carries the tier and the numbers in one object, so a component cannot render either number without narrowing past the label, and cannot read `live_pnl_cents` off a fallback frame because the field is not there. This is [`figure.ts`](../../apps/admin/src/figure.ts)'s idiom on the trader's side, where an absent figure *"carries no `cents` field, which is the point ... a caller that wants the amount must narrow the union first, and narrowing forces it past the reason"*. **A second message carrying the label is refused**: two messages are two renders, which is what `GS-133` exists to fail.
+
+**The first frame on any subscription is an `authoritative` frame**, because it is the value the surface falls back TO. A client sent only live frames that then loses its transport holds no last-closed values and either renders nothing or holds the last live number, which is `INV-M4-12`'s named failure. **The one thing a client may act on by itself is its own transport closing**, which is an observation; a timeout is a computation over a clock and there is none in this contract to hold.
+
+**Freshness is the server's claim and the client evaluates nothing** ([ADR-152](../decisions/ADR-152.md) clause 1), in the same idiom as `EconomicCalendarPanelResponse.freshness` above. **`sequence` is for ordering and de-duplication and is never a staleness input**: a consumer may discard a frame older than one it holds and may conclude nothing about freshness from the ordinal, because a quiet market and a dead feed produce the same absent successor. `closed_through_day` is the firm's day and `as_of_trading_day` is this account's, which is the pair [ADR-152](../decisions/ADR-152.md) clause 2 orders as strings; **it is published on this surface and on no other**, so clause 5's gap survives everywhere else in this document.
+
+**Live win-day and consistency tracking is not in this payload.** [M04 section 3.6](../plans/M04-trader-portal.md) rows it as indicative and no document says what it is a projection OF ([P6](../plans/P6-live-tier.md) section 10 item 3). When it is ruled it arrives as a field on the indicative arm rather than as a third arm.
+
+**Nothing here is ever an input to a request the portal sends** (`INV-M4-13`). The payout centre re-fetches authoritative eligibility as section 6 already specifies, and the channel being entirely down changes nothing about it. **The channel's connection limit is owed and is not in section 11**, which states limits per endpoint and this subsection defines none.
 ### 6.2 The wallet, where [ADR-019](../decisions/ADR-019.md)'s internal leg settles
 
 **A subsection rather than a new top-level section, for 6.1's own recorded reason.** Sections 12 and 13 are cited by NUMBER, so a section inserted ahead of them renumbers both and breaks every citation silently ([ADR-111](../decisions/ADR-111.md) clause 2). It sits under section 6 because [ADR-019](../decisions/ADR-019.md) made `POST /accounts/:accountId/payout` credit this balance: `GET /payouts` one heading up and `GET /wallet` here are the two halves of one movement.
@@ -755,6 +799,34 @@ type LiabilityResponse = {
   integrations: { mid_health: Array<{ psp: string; decline_rate_bp: number; chargeback_rate_bp: number; healthy: boolean }>; recon: { last_run_at: string; mismatches_open: number }; batch: { last_success_at: string; last_duration_ms: number } };
 };
 ```
+
+#### The live Open Liability ([ADR-020](../decisions/ADR-020.md) tier 2, [ADR-161](../decisions/ADR-161.md))
+
+Section 3.5's live figure ([M06 section 3.5](../plans/M06-admin-ops-console.md)). **A payload rather than a `METHOD /path` heading, for section 6.1's reason and applied to both surfaces rather than to one**: whether the operator's live figure arrives on a route or on the same channel the trader's frames do is the transport ruling [P6](../plans/P6-live-tier.md) gives to another slice, and a path fixed here would take it. **What this section does fix is that the path carries an operator prefix**, because [`surface.ts`](../../apps/api/src/surface.ts) withholds by prefix and a live operator path outside `['/admin', '/internal']` is withheld from the public deployment by nothing at all.
+
+```ts
+type AdminLiveLiability =
+  | { kind: "suppressed"; reason: string }
+  | {
+      kind: "indicative";
+      live_open_liability_cents: number;              // the sum. One indicative term makes the total indicative
+      terms: {
+        last_closed_open_liability_cents: number;     // authoritative, P-M6-01
+        same_day_adjustments_cents: number;           // authoritative, signed. Same-day postings at par
+        intraday_movement_cents: number;              // indicative, signed
+      };
+      freshness: LiveFreshness;                       // section 6.1's type
+    };
+```
+Auth: **`admin_sso`**, admin origin only, RBAC per this section's header. Errors: `unauthenticated`, `forbidden`.
+
+**It is never a field on `GET /admin/liability` above.** That response is the one an operator opens during an incident, and a live field on it makes the number Merit is most often disputed about depend on a feed that is down. `INV-M6-12` says no breaker, alarm, or task threshold reads the live figure; a response that cannot be served without it is the same coupling in a different shape.
+
+**`suppressed` is a value and not an empty response.** When data trust is red the figure is refused and the reason is printed where the number would have been (`P-M6-09`), because *"a live number derived from a feed we already distrust is worse than no number"*. A figure that silently vanishes on a red day is one the reader assumes is still being computed.
+
+**The three terms are carried separately because two of them are authoritative**, and hiding which one was the feed would make the whole figure look like a vendor feed when most of it is not. **It sits beside the as-of figure and never replaces it**: [M06 section 3.5](../plans/M06-admin-ops-console.md), *"Two numbers, both labeled, is the entire design."* No liability snapshot is written from it.
+
+**`freshness` is section 6.1's type and not a second one.** The operator's live figure goes stale for the same reason the trader's does, and a second shape here would be a second answer to one question.
 
 ### GET /admin/eligible-forecast, /admin/loss-ratios, /admin/cusum
 Focused projections of the same underlying data for charting, all cursor-free and cached for 60 seconds.
