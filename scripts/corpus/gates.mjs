@@ -7163,42 +7163,50 @@ const VG_INVENTORY = '### 4.2 The `VG` gates';
 // `gates.mjs`'s `@vitest/browser-playwright` lesson, and it is why the pattern
 // requires `@` or `:` immediately after the name.
 const VG_PROBES = {
-  // THIS ENTRY REPLACED `fastify present in the lockfile`, WHICH ARRIVED.
-  // ADR-100 delivered that artifact and this gate was watched failing on the
-  // good news at 29 of 30 before `VG-3` and `VG-6` moved, which is the whole
-  // design. The register SHRINKS in the stale direction, so the fastify probe
-  // is removed rather than left beside a row that no longer waits on it.
+  // THIS ENTRY REPLACED "`scopedDb` named under `apps/api/src`", WHICH ARRIVED,
+  // WHICH IN TURN HAD REPLACED "fastify present in the lockfile", WHICH ARRIVED.
+  // Twice now this gate has gone red on good news and twice the answer has been
+  // to re-rule the row and shrink the register rather than to relax the gate.
+  // ADR-100 was the first and ADR-120 is the second, and the shape is identical
+  // both times: the register SHRINKS in the stale direction, so the arrived probe
+  // is REMOVED rather than left beside a row that no longer waits on it.
   //
-  // WHAT THE NEW ARTIFACT IS AND WHY IT IS CLOSER TO BOTH SUBJECTS. `VG-3` is
-  // server-side authz and `VG-6` is entitlement tested through the API, and
-  // both need a handler that resolves a caller. API_CONTRACT section 1 names
-  // that mechanism in the contract's own words: "Every authenticated handler
-  // resolves the caller to an identity and reads through `scopedDb(identity)`".
-  // A lockfile key could only ever say that a server was possible.
+  // WHAT ARRIVED. ADR-120 wires `AuthBackend` and `IdempotencyStore` against the
+  // accessor and admits `apps/api` to `DB_ADMITTED`, so `apps/api/src/db.ts`
+  // names `scopedDb` and API_CONTRACT section 1's sentence -- "Every
+  // authenticated handler resolves the caller to an identity and reads through
+  // `scopedDb(identity)`" -- is a thing this deployable does rather than a thing
+  // it could do. `POST /auth/logout`, `GET /sessions` and
+  // `POST /sessions/:id/revoke` answer real codes through a real predicate.
   //
-  // ANCHORED ON A WORD BOUNDARY, on this register's own `fastify-plugin`
-  // lesson: a substring probe would report the artifact ARRIVED on a
-  // `scopedDbFixture` or a `scopedDbs`, and it would pass in exactly the same
-  // way as one that works.
-  '`scopedDb` named under `apps/api/src`': () => {
-    const dir = join(ROOT, 'apps/api/src');
-    if (!existsSync(dir)) return false;
-    const key = /\bscopedDb\b/;
-    const walk = (d) => {
-      for (const entry of readdirSync(d, { withFileTypes: true })) {
-        const full = join(d, entry.name);
-        if (entry.isDirectory()) {
-          if (walk(full)) return true;
-          continue;
-        }
-        if (!entry.name.endsWith('.ts')) continue;
-        if (key.test(readFileSync(full, 'utf8'))) return true;
-      }
-      return false;
-    };
-    return walk(dir);
+  // WHY THE NEW ARTIFACT IS A DATABASE IN CI AND NOT SOMETHING NEARER. `VG-3` is
+  // server-side authz and `VG-6` is entitlement TESTED THROUGH THE API, and
+  // `VG-6`'s implementation column is "integration suite calling endpoints with
+  // no UI in the path". That suite is now writable and it is not RUNNABLE: every
+  // entitlement it would assert is a row in a database, `ci.yml`'s `integration`
+  // job runs on bare `ubuntu-latest` with no `services:` block, and a committed
+  // suite that needs Postgres reports nothing there. THREE ENTRIES HAVE NOW NAMED
+  // THIS AS OWED -- ADR-102 section 16, ADR-112 section 9 ("`CI-04` exists, its
+  // project exists, and what it has never had is a database") and ADR-120 -- so
+  // it is the honest next condition rather than an invented one.
+  //
+  // IT READS THE JOB AND NOT THE FILE, because `services:` appears nowhere in
+  // that workflow today and a bare substring probe over the whole file would
+  // report ARRIVED the first time any other job acquired one. The `integration`
+  // job is the one `VG-6` names.
+  "a `services:` block on `ci.yml`'s `integration` job": () => {
+    const body = read(`${WORKFLOW_DIR}/ci.yml`);
+    const start = body.indexOf('\n  integration:\n');
+    if (start === -1) return false;
+    const after = body.slice(start + 1);
+    // The job ends at the next top-level job key, which is the next line
+    // indented by exactly two spaces and ending in a colon.
+    const end = after.slice(1).search(/\n {2}[a-z0-9-]+:\n/);
+    const job = end === -1 ? after : after.slice(0, end + 1);
+    return /\n {4}services:/.test(job);
   },
 };
+
 
 // Artifacts no repository file can report. Each carries ADR-080's own reason.
 const VG_UNPROBEABLE = {
