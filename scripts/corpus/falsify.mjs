@@ -1433,7 +1433,21 @@ const SEEDS = {
       'renderable document reopens the row on the day it lands rather than whenever ' +
       'somebody rereads the table. THE ROW HAS ALREADY BEEN WATCHED FIRING FOR REAL: ' +
       'ADR-095 section 6 is the re-ruling that followed',
-    expect: (d) => `HAS ARRIVED (${firstAppDir(d)}/src/app/page.tsx is an App Router file`,
+    // THE EXPECTATION STOPPED ASSUMING THE SEED IS ALONE ON 2026-08-27, AND THE
+    // REASON IS THE ONE STRATEGY SECTION 4.5 ALREADY RECORDS: "the gate was
+    // right and the seed's description of its own target was wrong". It read
+    // `... page.tsx is an App Router file`, which is the probe's own suffix and
+    // therefore only reachable while the seeded file is the LAST name in the
+    // list, which is only true while it is the ONLY one. Session 250 landed the
+    // first real App Router files under `apps/portal/src/app/`, the gate fired
+    // correctly and named all three, and this case scored FAILED OFF-TARGET.
+    //
+    // NOTHING IS RELAXED. `HAS ARRIVED (` still has to be there and the seeded
+    // path still has to be the FIRST name after it, which holds because the
+    // probe sorts its roots and `firstAppDir` is the first app in the same
+    // order. What is gone is the assumption that no real page exists, which was
+    // load-bearing for one day and can never hold again.
+    expect: (d) => `HAS ARRIVED (${firstAppDir(d)}/src/app/page.tsx`,
     seed: (d) => {
       const app = firstAppDir(d);
       const dir = join(d, app, 'src/app');
