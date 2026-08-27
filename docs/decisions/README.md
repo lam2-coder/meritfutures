@@ -181,6 +181,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-159](ADR-159.md) | an event NAME becomes a catalogue ROW only where every field is a column or a named mirror, and the reservation that funded this entry named a different catalogue  (2026-08-27, status: proposed) |
 | [ADR-161](ADR-161.md) | the live tier enters `API_CONTRACT` as a PAYLOAD rather than as an endpoint, its degradation is one object rather than two messages, and `feed.*` is produced by the sweep and never by the feed  (2026-08-27, status: proposed) |
 | [ADR-162](ADR-162.md) | the portal's HTTP client is one server-side file that forwards one cookie, stores nothing, and asserts no wire shape  (2026-08-27, status: proposed) |
+| [ADR-163](ADR-163.md) | the live tier's address is `apps/api` on both existing surfaces, so the estate gains no sixth deployable and no seventh service, and the container diagram gains three arrows and no live-cache node  (2026-08-27, status: proposed) |
 | [ADR-168](ADR-168.md) | three reads `apps/portal` names and `API_CONTRACT` does not define, and they do not have the same answer (2026-08-27, status: proposed) |
 <!--/gen-->
 
