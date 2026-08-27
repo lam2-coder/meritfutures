@@ -4511,3 +4511,16 @@ which is [ALLOCATION](decisions/ALLOCATION.md)'s own warning that *"a vacated nu
 **Session 237 has not landed.** The same three questions apply on its merge, and no figure is written here on purpose.
 
 **`pnpm run verify` exit 0 on the merge with `ca2b168`: 10 of 10 invariants, 150 files / 2,658 passed / 1 skipped, 32 of 32 gates, `falsify` exit 0.**
+
+
+---
+
+## `OI-25` is fully discharged: all three fixture sessions ran through the derivation and all three passed (2026-08-27, session 245)
+
+**[Session 237](sessions/2026-08-27-session-237.md) landed at `1e4f82b8`**, ruling `no-fixture-format` in [ADR-125](decisions/ADR-125.md) and moving seven rows already asserted and passing, with citations rewritten across the whole population. Predicted from that session's own rows before the generator ran: one term down by seven, one up by seven, `blocked` down by seven, the row total unmoved. **The generator moved exactly those three spans and no others, and both partitions close.**
+
+**THE THREE SESSIONS TESTED THREE DIFFERENT DIRECTIONS AND THAT IS WHY IT MATTERS THAT ALL THREE RAN.** [248](sessions/2026-08-27-session-248.md) moved rows OUT of `blocked`, where every count it touched moved together and a reader confusing a status bucket with a blocker bucket would have moved plausibly. [249](sessions/2026-08-27-session-249.md) moved rows WITHIN `blocked`, so the STATUS total had to hold still while two BLOCKER totals moved, which is where that confusion fails. [237](sessions/2026-08-27-session-237.md) moved the largest population and rewrote 227 rows, which is where a derivation that silently dropped a row it could not parse would fail. **The check that was impossible while the number was maintained is the one that confirmed each of them.**
+
+**WHAT THE FIX IS WORTH, MEASURED BY WHAT IT COST.** All three landed before this branch, so all three RETYPED the summary, and section 39 conflicted as a REVISION three times over. **Every one of those conflicts was in the summary cells and not one carried a single scenario row**, including 237's, which rewrote citations across 227 rows and still produced a conflict containing zero of them. Three sessions each spent an edit on a number none of them should have had to touch, and each of those edits is a place a reader could not tell *"moved by the right amount"* from *"typed until green"*.
+
+**`pnpm run verify` exit 0 on the merge with `1e4f82b8`: 11 of 11 invariants, 150 files / 2,665 passed / 1 skipped, 33 of 33 gates, `falsify` exit 0.**
