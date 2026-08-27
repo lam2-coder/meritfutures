@@ -5061,3 +5061,66 @@ The prompt said *"the route REGISTRY entry is an APPEND -- add your row, order b
 **Measured on this branch with `pnpm install` run first, each command separately, and re-measured after every `origin/main` merge: 33 of 33 gates, 12 of 12 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 183 test files / 3,521 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The dispatch baseline of 33, 12 of 12, and 176 files / 3,253 passed / 6 skipped reproduced exactly before anything was edited. **THE SUITE FIGURE IS MOSTLY NOT THIS SESSION'S, IT MOVES WITH EVERY MERGE, AND THE ATTRIBUTION IS THE PART WORTH RECORDING.** `origin/main` was merged into this branch FIVE times while it was open, bringing `P6-b`, `P5-g`, `P7-b`, `P7-c`, `P7-d`, the site render, three portal segments and `P5-j`, so the head figure above is a fact about a moment. **What is this session's is measured and does not move**: against the first merged base, with this session's one new test file removed, the tree reported 176 files / 3,260 passed, so **this session contributes exactly one file and six cases** and every other case in every difference arrived on `main`. **`pnpm-lock.yaml` gains three lines, one importer entry and no package**, which is the whole of what a `workspace:` dependency costs the lockfile.
 
 **Measured on this branch with `pnpm install` run first, each command separately, and re-measured after every `origin/main` merge: 33 of 33 gates, 12 of 12 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 182 test files / 3,464 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The dispatch baseline of 33, 12 of 12, and 176 files / 3,253 passed / 6 skipped reproduced exactly before anything was edited. **THE SUITE FIGURE IS MOSTLY NOT THIS SESSION'S, IT MOVES WITH EVERY MERGE, AND THE ATTRIBUTION IS THE PART WORTH RECORDING.** `origin/main` was merged into this branch FOUR times while it was open, bringing `P6-b`, `P5-g`, `P7-b`, `P7-c`, `P7-d`, the site render and two portal segments, so the head figure above is a fact about a moment. **What is this session's is measured and does not move**: against the first merged base, with this session's one new test file removed, the tree reported 176 files / 3,260 passed, so **this session contributes exactly one file and six cases** and every other case in every difference arrived on `main`. **`pnpm-lock.yaml` gains three lines, one importer entry and no package**, which is the whole of what a `workspace:` dependency costs the lockfile.
+
+## `P5-n` lands SIX OF SEVEN HALVES: the event producer is built and the one door under it is shut (session 294)
+
+**[P5 section 8](plans/P5-payouts-and-wallet.md)'s `P5-n` row says the producer *"is the harder half and it
+is this slice's subject"*, and it is, but not for the reason the row anticipated.** The hard half is that
+**`events` IS NOT A `TableKey`**. [Session 274](sessions/2026-08-27-session-274.md) was dispatched to
+register it, tried all five members of the scope vocabulary against it, and stopped -- *"`P5-n` IS NOT
+UNBLOCKED"* -- because `owned` on `identity_id` drops every account-level row, `derived` through
+`account_id` is refused by [ADR-101](decisions/ADR-101.md) clauses 1 and 2, `pair` needs a second IDENTITY
+column where this row's second is an ACCOUNT, `firm` is refused because the row declares a column against
+`identities(id)`, and `root` is `identities`' alone. **What the table needs is a SIXTH CLASS and an ADR,
+and no ADR number was allocated to this session.**
+
+**So `EventWriter.insert` is a port.** [`apps/api/src/events.ts`](../apps/api/src/events.ts) builds
+everything above it -- the vocabulary, the envelope, the derivation, the refusals, the sink -- and the
+live adapter is **not written, not faked and not reached around**, which is
+[P5](plans/P5-payouts-and-wallet.md) section 11 rule 10. `UNWIRED_EVENT_SINK` refuses and its message
+names the sixth class.
+
+**`payout.freeze_expiring` is that blocker in one catalogue row.** Its payload as
+[ADR-159](decisions/ADR-159.md) folded it is `{ payout_request_id, flag_id, expires_at, lead_hours }`: an
+event about one trader's frozen payout carrying **neither tenancy column**, so a rule naming either drops
+it. **It is a counterexample any sixth class has to answer**, and it is a catalogue row rather than this
+session's example.
+
+**`apps/worker/src/sweeps/ports.ts`' `ExpiryEventPort` IS SATISFIED RATHER THAN DUPLICATED**, asserted by
+an assignment that does not compile if either parameter was narrowed. The declared shape was found
+**correct** and thin in two named places -- `ExpiryEvent` carries no `occurredAt` and no `correlationId`,
+so a sweep's events take the recording instant as their occurrence instant and are unthreadable on a table
+retained forever. **Both are one optional field on a file this fence excludes and both are reported.**
+
+**`EVENT_CATALOGUE`'s eight names are BOUND to [EVENTS](architecture/EVENTS.md) by reading it as text**:
+every name a table row, every field the producer reads a field of that row, every producer string the
+catalogue's own cell. That is [ADR-159](decisions/ADR-159.md) **F-2's shape one level down** -- F-2 asks
+for a runner binding a DRAWING to the registry and this binds a PRODUCER to it -- and **it claims no
+`CI-06` letter**, because it covers one file's eight rows and no drawing in the corpus. `ACTOR_KINDS` is
+read out of [`0017`](../packages/db/migrations/0017_events_and_audit.sql)'s CHECK and every `subject_kind`
+is asserted to be the singular of a table [`schema.ts`](../packages/db/src/schema.ts) registers, which is
+the rule this tree's four existing `admin_actions` spellings already follow and which nothing had written
+down.
+
+**[M06](plans/M06-admin-ops-console.md)'s fifth surface is ruled by `INV-M6-10`.** An unfiltered page of
+`events` **is** the bulk identity screen that invariant says does not exist, and it is `AS-M6-05`'s
+read-side risk. So [`apps/admin/src/feed.ts`](../apps/admin/src/feed.ts) has two modes, and **the
+withholding is a rule on the SHAPE OF THE KEY** rather than a column list -- which covers
+`matched_identity_id` and `merged_identity_id` by construction. That is the thing
+[`scope.ts`](../packages/db/src/scope.ts) records as **inexpressible by any scope rule**, expressed at the
+one layer that can express it. **The aggregate is refused on evidence** ([ADR-157](decisions/ADR-157.md)):
+`shown` counts the rows it read, there is no `total`, and `complete` is what keeps `shown` honest.
+
+**Twelve mutations seeded and twelve caught, two of them invisible to `vitest` and caught at typecheck.**
+**A thirteenth attempt silently did not apply and is recorded rather than counted**, because a seed that
+no-ops is the exact shape of a control this estate would otherwise believe it had.
+
+**33 of 33 gates, 12 of 12 invariants, typecheck 0, lint 0, format clean, 185 files / 3,657 passed /
+6 skipped**, against a `main` baseline of 183 / 3,521 / 6 that reproduced exactly first. **No ADR, no
+migration number, no `packages/db` change, no `EVENTS.md` change, no route change, and `page.ts`
+untouched.**
+
+**Two things are owed and neither is in any fence today.** `events` owes a sixth scope class, without
+which nothing in this estate can write an event and `EVENTS`' universal rule 1 stays unmet in code.
+[`apps/admin/src/index.ts`](../apps/admin/src/index.ts) owes the feed a one-line re-export; session 296
+holds `page.ts`, `liability.ts` and `live-liability.ts` and no session holds that file.
