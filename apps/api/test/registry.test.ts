@@ -179,10 +179,20 @@ describe('the path decides which deployment registers a route, and the module ne
 
 describe('discoverRouteModules reads the directory and validates what it finds', () => {
   test('it finds every `.ts` file in src/routes and nothing else', async () => {
+    // THE SORT IS ON THE FILENAME AND THE STRIP COMES AFTER IT, which is the
+    // order `discoverRouteModules` produces: it sorts `readdir`'s output and
+    // strips `.ts` per file as it imports. Stripping first sorts a DIFFERENT
+    // set of strings, and the two agree only while no module's stem is a prefix
+    // of another's -- `'-'` is 0x2D and `'.'` is 0x2E, so `wallet-withdrawals`
+    // sorts BEFORE `wallet` by filename and AFTER it by stem. Session 303 found
+    // that by adding `wallet-withdrawals.ts` beside `wallet.ts`, and repaired
+    // the derivation rather than renaming a module the contract's own path
+    // names. The assertion itself is unchanged: this is still an equality
+    // against the directory, and the directory is still the module list.
     const onDisk = readdirSync(ROUTE_MODULE_DIR)
       .filter((f) => f.endsWith('.ts'))
-      .map((f) => f.slice(0, -'.ts'.length))
-      .sort();
+      .sort()
+      .map((f) => f.slice(0, -'.ts'.length));
     const modules = await discoverRouteModules();
     // THE ASSERTION IS AN EQUALITY AND NOT A COUNT, and it is the whole reason
     // this registry can be a directory listing: a module added by any future
