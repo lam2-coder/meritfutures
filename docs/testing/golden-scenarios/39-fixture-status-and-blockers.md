@@ -1,12 +1,12 @@
 ---
 status: approved
 depends_on: [README.md, ../../decisions/ADR-072.md, ../../decisions/ADR-076.md]
-last_updated: 2026-08-26
+last_updated: 2026-08-27
 ---
 
 ## 39. Fixture status and blockers
 
-**One row per registered scenario, and the reason lives in a column rather than in prose.** [ADR-072](../../decisions/ADR-072.md) is the ruling: a fixture is writable when three checkable conditions hold, and **every row without a fixture carries a stated blocker from a closed vocabulary with a citation that supports it**. [Section 33.4](33-ownership-index-and-coverage-reconciliation.md) is the same idea at three rows; this is it at 276.
+**One row per registered scenario, and the reason lives in a column rather than in prose.** [ADR-072](../../decisions/ADR-072.md) is the ruling: a fixture is writable when three checkable conditions hold, and **every row without a fixture carries a stated blocker from a closed vocabulary with a citation that supports it**. [Section 33.4](33-ownership-index-and-coverage-reconciliation.md) is the same idea at three rows; this is it at <!--gen:fixture_backlog_rows-->316<!--/gen-->.
 
 **`status` is derived from the directory and not from this file.** `written` means a `GS-NNN-*.yaml` and its `.expected.json` sibling are on disk in [`packages/rules-engine/fixtures`](../../../packages/rules-engine/fixtures/README.md). `writable` means the assertion can be written today, and since [ADR-076](../../decisions/ADR-076.md) it names WHERE. `covered-elsewhere` means it is already written and RUNS, in a suite the citation names. `blocked` means at least one of `ADR-072`'s conditions fails, and the `blocker` names **the one that would still hold if every other were cleared**.
 
@@ -29,23 +29,27 @@ A row in this status carries **no blocker**, because nothing is blocked. It is a
 
 | Status | Rows | |
 |---|---|---|
-| **written** | **43** | Every one M1-owned. Not one fixture on disk belongs to any other module |
-| **writable** | **0** | **The term stays in the vocabulary and holds no row.** `GS-071` was the last one and it left for `covered-elsewhere` when its assertion landed |
-| **covered-elsewhere** | **9** | `GS-071`, `GS-073`, `GS-076`, `GS-077`, `GS-078`, `GS-083`, `GS-141`, `GS-143`, `GS-144`, each cited to the suite that executes it |
-| **blocked** | **264** | By vocabulary term below |
+| **written** | **<!--gen:fixture_status_written-->43<!--/gen-->** | Every one M1-owned. Not one fixture on disk belongs to any other module |
+| **writable** | **<!--gen:fixture_status_writable-->0<!--/gen-->** | **The term stays in the vocabulary and holds no row.** `GS-071` was the last one and it left for `covered-elsewhere` when its assertion landed |
+| **covered-elsewhere** | **<!--gen:fixture_status_covered_elsewhere-->9<!--/gen-->** | `GS-071`, `GS-073`, `GS-076`, `GS-077`, `GS-078`, `GS-083`, `GS-141`, `GS-143`, `GS-144`, each cited to the suite that executes it |
+| **blocked** | **<!--gen:fixture_status_blocked-->264<!--/gen-->** | By vocabulary term below |
 
 | Blocker | Rows | The condition that fails |
 |---|---|---|
-| `no-fixture-format` | **227** | W2. No fixture format exists for the owning module at all |
-| `format-cannot-express` | **16** | W2. The format exists and cannot state this input or this expectation |
-| `vendor-call` | **14** | W3. `M02` is at `status: review`, the one module plan of twenty-one that is not approved |
-| `outside-loader-boundary` | **4** | W1. The code exists and lives outside `@merit/rules-engine` |
-| `open-question` | **2** | W3. `OI-16`, on `GS-004` and `GS-031` |
-| `no-plan-record-value` | **1** | W2. `GS-079`, a value no plan document states |
+| `no-fixture-format` | **<!--gen:fixture_blocker_no_fixture_format-->227<!--/gen-->** | W2. No fixture format exists for the owning module at all |
+| `format-cannot-express` | **<!--gen:fixture_blocker_format_cannot_express-->16<!--/gen-->** | W2. The format exists and cannot state this input or this expectation |
+| `vendor-call` | **<!--gen:fixture_blocker_vendor_call-->14<!--/gen-->** | W3. `M02` is at `status: review`, the one module plan of twenty-one that is not approved |
+| `outside-loader-boundary` | **<!--gen:fixture_blocker_outside_loader_boundary-->4<!--/gen-->** | W1. The code exists and lives outside `@merit/rules-engine` |
+| `open-question` | **<!--gen:fixture_blocker_open_question-->2<!--/gen-->** | W3. `OI-16`, on `GS-004` and `GS-031` |
+| `no-plan-record-value` | **<!--gen:fixture_blocker_no_plan_record_value-->1<!--/gen-->** | W2. `GS-079`, a value no plan document states |
 
 **EVERY COUNT ABOVE WAS RECOMPUTED BY READING THE TREE AND NOT BY ADJUSTING THE PREVIOUS ONE.** The 43 is a directory listing: [`packages/rules-engine/fixtures`](../../../packages/rules-engine/fixtures/README.md) holds **43 `GS-nnn-*.yaml` and 43 `.expected.json`, over 43 distinct scenario ids**, and it held 43 against 40 `written` rows before this edit, which is the three-row gap `CI-06/fixture-inventory` was carrying in a register. The four status counts and the six blocker counts are counts of the rows below, taken from the rows below after they were edited.
 
-**`writable` NOW HOLDS NO ROW, AND THE WAY THE LAST ONE LEFT IS WORTH SAYING OUT LOUD.** It means *"all three of [ADR-072](../../decisions/ADR-072.md)'s conditions hold"*, and `W1` is loader reachability: *"a symbol in `apps/worker` or `packages/rithmic` fails W1 whether or not it is implemented"*. **`GS-071` fails `W1` read that way and always will**, because replay runs in [`apps/worker`](../../../apps/worker/src/batch/replay.ts). It sat `writable` for one edit, naming the suite where its assertion could be written rather than the directory that cannot hold it; [session 129](../../sessions/2026-08-22-session-129.md) then wrote that assertion at the scale the row names, and [ADR-076 section 1](../../decisions/ADR-076.md)'s governing rule finished the move: **a row is discharged when its assertion is EXECUTED, wherever it runs**, so `W1` is a condition on the fixture directory rather than on the scenario. **`writable` is a term in the vocabulary with a count of zero**, which is what it should read when every row that could name a suite has one that runs. It is not retired and the vocabulary does not move: the next scenario whose assertion is writable and unwritten reads `writable` again.
+**AND SINCE `ADR-133` NO COUNT ABOVE IS RECOMPUTED AT ALL, BECAUSE NONE OF THEM IS STATED.** The paragraph above is left standing rather than rewritten, because it is the record of how these numbers used to move: a session read the tree, wrote the counts into two tables, and every session that moved a row afterwards owed them an edit. That is `OI-25`, and [WAVE-04 section 6](../../plans/WAVE-04-fixture-backlog-and-gate-inventory.md) is where the shape was first named. Every count in the two tables above, and the row total in the first sentence of this document, is now a **generated span** whose query is [`fixture-backlog.mjs`](../../../scripts/corpus/fixture-backlog.mjs) reading the rows below. `node scripts/corpus/gates.mjs generate` writes them and nothing else may: a hand edit to one of those cells is a `CI-06g` finding on the next run, so the number can be read and can no longer be typed.
+
+**`CI-06/fixture-inventory` assertion 5 is not retired by that, and what it asserts CHANGES.** It compared a hand-maintained summary against the rows, which is what made the summary trustworthy while it was still typed. It no longer catches a typist, because nobody types the number now. It cross-checks **two independent readers of the same rows**, [`fixture-backlog.mjs`](../../../scripts/corpus/fixture-backlog.mjs) and the runner's own loop, which is the arrangement `sql_tables` and `tables` have carried since the reconciliation and is exactly what a span alone does not buy: [ADR-034](../../decisions/ADR-034.md) says in its own terms that *"a generated span can still be generated from the wrong query, and CI-06g cannot tell a right query from a wrong one"*.
+
+**`writable` NOW HOLDS NO ROW, AND THE WAY THE LAST ONE LEFT IS WORTH SAYING OUT LOUD.** It means *"all three of [ADR-072](../../decisions/ADR-072.md)'s conditions hold"*, and `W1` is loader reachability: *"a symbol in `apps/worker` or `packages/rithmic` fails W1 whether or not it is implemented"*. **`GS-071` fails `W1` read that way and always will**, because replay runs in [`apps/worker`](../../../apps/worker/src/batch/replay.ts). It sat `writable` for one edit, naming the suite where its assertion could be written rather than the directory that cannot hold it; [session 129](../../sessions/2026-08-22-session-129.md) then wrote that assertion at the scale the row names, and [ADR-076 section 1](../../decisions/ADR-076.md)'s governing rule finished the move: **a row is discharged when its assertion is EXECUTED, wherever it runs**, so `W1` is a condition on the fixture directory rather than on the scenario. **`writable` is a term in the vocabulary with a count of <!--gen:fixture_status_writable-->0<!--/gen-->**, which is what it should read when every row that could name a suite has one that runs. It is not retired and the vocabulary does not move: the next scenario whose assertion is writable and unwritten reads `writable` again.
 
 **These counts are derived from the table below and they disagree with [WAVE-04 section 2](../../plans/WAVE-04-fixture-backlog-and-gate-inventory.md) on three of five.** The plan claims 16 writable against 0, 14 needing a ruling against 23 M1 rows blocked, and 3 held against 2. It agrees at 243 with no code, and it no longer agrees at 40 written, which is 43. **[ADR-072 section 3](../../decisions/ADR-072.md) is why**: the plan partitions on whether the code exists, which is W1, and the condition that binds M1 is W2. **The table is the answer and the plan is the error.**
 
