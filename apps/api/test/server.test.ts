@@ -6,6 +6,7 @@ import {
   PROBLEM_MEDIA_TYPE,
   PROBLEM_TYPE_PREFIX,
   buildServer,
+  classifyPath,
   defineRoutes,
   discoverRouteModules,
 } from '../src/index.ts';
@@ -79,7 +80,18 @@ test('the public deployment answers 404 for an operator route it was given', asy
   const { app, report } = buildServer({ surface: 'public', modules: [...onDisk, ops] });
   // The route was DECLARED and not registered. That is the whole mechanism:
   // there is nothing at this path for a permission check to run against.
-  expect(report.withheld).toStrictEqual(['GET /internal/jobs']);
+  //
+  // ASSERTED AS THE PROPERTY AND NOT AS A LIST. This line read
+  // `toStrictEqual(['GET /internal/jobs'])` until `routes/admin-reads.ts`
+  // became the first operator module on disk, and a literal list here is a
+  // merge conflict for every route session that adds one. The property is the
+  // ruling itself: what the public deployment withholds is exactly what
+  // `classifyPath` calls operator, in both directions.
+  expect(report.withheld).toContain('GET /internal/jobs');
+  for (const entry of report.withheld)
+    expect(classifyPath(entry.slice(entry.indexOf(' ') + 1))).toBe('operator');
+  for (const entry of report.registered)
+    expect(classifyPath(entry.slice(entry.indexOf(' ') + 1))).not.toBe('operator');
   expect(report.registered).not.toContain('GET /internal/jobs');
 
   const res = await app.inject({ method: 'GET', url: `${BASE_PATH}/internal/jobs` });

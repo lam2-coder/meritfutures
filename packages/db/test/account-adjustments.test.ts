@@ -48,6 +48,9 @@ const read = (p: string): string => readFileSync(join(ROOT, p), 'utf8');
 const MIGRATION = 'packages/db/migrations/0038_account_adjustments.sql';
 const ADR = 'docs/decisions/ADR-067.md';
 const M06 = 'docs/plans/M06-admin-ops-console.md';
+const M20 = 'docs/plans/M20-wallet.md';
+const STATE_MACHINES = 'docs/architecture/STATE_MACHINES.md';
+const ADR_135 = 'docs/decisions/ADR-135.md';
 
 /**
  * The migration minus its `--` comments, so prose in the header cannot satisfy
@@ -308,5 +311,92 @@ describe('ADR-067 and SD-M6-09 still say what 0038 was built from', () => {
     expect(row, 'M06 has no SD-M6-09 row').toBeDefined();
     expect(row).toContain('account_adjustments');
     expect(row).toContain('0038_account_adjustments.sql');
+  });
+});
+describe('ADR-135: the three extraction doors, which decide what a closed adjustment is worth', () => {
+  // WHY THIS BLOCK EXISTS, because a test whose reason is three files away is a
+  // test the next session deletes.
+  //
+  // ADR-067 section 3 rules that an adjustment credit is EXCLUDED from the
+  // payout computation and withdrawable ANYWAY, on the second of the wallet's
+  // two exits (M20:41, "the only balance in the system with two exits"). That
+  // is the whole reason ADR-067:103 can call the fold plan's "excluded and
+  // therefore unwithdrawable" horn FALSE.
+  //
+  // ADR-075 LANDED ONE DAY LATER and moved INV-M20-06 and G-WITHDRAWAL-CLEARED
+  // to `identities.status = 'active'`. For a `closed` identity that shuts the
+  // second exit, so the refuted horn is true again there and 0038:107's stated
+  // reason for permitting the credit ("payable on demand FOREVER") stopped
+  // being true of the door set. NOTHING CAUGHT IT FOR SIX DAYS.
+  //
+  // ADR-135 clause 2 accepts that cost deliberately. The SIZE of the cost is a
+  // property of the four sites below rather than of the ruling, so an accepted
+  // cost that nothing watches is exactly the defect that produced this entry.
+  // CLAUDE.md's remedy for this class is a mechanical assertion rather than a
+  // bigger model, and this is it. These are ADR-135's approval clause, rows 1
+  // to 4, executed.
+
+  const doorRow = (file: string, key: string): string => {
+    const row = read(file)
+      .split('\n')
+      .find((line) => line.includes(key) && line.startsWith('|'));
+    expect(row, `${file} has no ${key} row`).toBeDefined();
+    return row as string;
+  };
+
+  test('row 1: G-ELIGIBLE reads identities.status = active', () => {
+    expect(doorRow(STATE_MACHINES, '**G-ELIGIBLE**')).toContain("identities.status = 'active'");
+  });
+
+  test('row 2: G-WITHDRAWAL-CLEARED reads identities.status = active', () => {
+    expect(doorRow(STATE_MACHINES, '**G-WITHDRAWAL-CLEARED**')).toContain(
+      "identities.status = 'active'",
+    );
+  });
+
+  test('row 3: INV-M20-06 reads identities.status = active', () => {
+    // If this ever returns to `<> 'restricted'`, the strand disappears and
+    // ADR-135 clause 2 is accepting a cost that no longer exists. Either way
+    // the ruling is REOPENED rather than reinterpreted, which is what its
+    // approval clause says in those words.
+    expect(doorRow(M20, 'INV-M20-06')).toContain("identities.status = 'active'");
+  });
+
+  test('row 4: 0038 still gates on no identity status, so the credit reaches a closed identity at all', () => {
+    // The same property account-adjustments already asserts for GS-298, stated
+    // again here for a different reason: ADR-135 clause 2 is only reachable
+    // while this holds. If a later session gates 0038 on `identities.status`,
+    // it has taken Direction A of ADR-135 section 3 and owes that ruling.
+    expect(ddl()).not.toContain('identities.status');
+  });
+
+  test('ADR-135 records the residue rather than leaving 0038:107 reading as current', () => {
+    // 0038 is MERGED and money path, so it is superseded and never edited
+    // (constitution E2), and its header still gives INV-M20-09 as the reason
+    // `closed` is permitted. This entry is the record that the reason moved.
+    const adr = read(ADR_135);
+    expect(adr.split('\n')[0]).toContain('status: proposed');
+    expect(adr).toContain('**Founder approval: PENDING, UNSIGNED.**');
+    expect(adr).toContain('THE CREDIT IS POSTED');
+  });
+
+  test('the migration header still carries the reason ADR-135 says has moved', () => {
+    // A negative control on the assertion above: if this sentence ever leaves
+    // 0038, ADR-135 section 2 is describing a file that no longer says it, and
+    // the entry needs re-reading rather than trusting.
+    //
+    // THE COMMENT PREFIX AND THE LINE WRAP ARE STRIPPED FIRST, and that is not
+    // tidiness. The first draft of this assertion searched the raw file for
+    // `payable on demand FOREVER` and FAILED, because 0038 wraps the sentence
+    // across lines 107 and 108. A quote checked against a hard-wrapped source
+    // has to be unwrapped or it is checking the wrapping.
+    const prose = read(MIGRATION)
+      .split('\n')
+      .map((line) => line.replace(/^\s*--\s?/, ''))
+      .join(' ')
+      .replace(/\s+/g, ' ');
+    expect(prose).toContain(
+      "`closed` is permitted for INV-M20-09's reason: a wallet balance is payable on demand FOREVER.",
+    );
   });
 });

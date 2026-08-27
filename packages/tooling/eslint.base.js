@@ -26,6 +26,12 @@ import tseslint from 'typescript-eslint';
 export const ignores = [
   '**/node_modules/**',
   '**/dist/**',
+  // `.next/` JOINED THIS LIST ON THE DAY THE FIRST PAGE LANDED (session 250,
+  // ADR-138). It is the same class as `dist/`: bundler output, thousands of
+  // generated files, and `eslint .` walks the tree rather than a package list,
+  // so a single `next build` took CI-01's lint half from 0 problems to 3,249
+  // without one line of authored source changing. Measured, not predicted.
+  '**/.next/**',
   '**/coverage/**',
   'docs/**',
   'research/**',
