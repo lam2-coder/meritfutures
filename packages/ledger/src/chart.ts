@@ -8,12 +8,21 @@
 // -----------------------------------------------------------------------------
 // A FINDING, STATED WHERE IT COSTS RATHER THAN ONLY IN THE ENTRY
 // -----------------------------------------------------------------------------
-// ADR-102's accessor offers `rows(key)` and nothing else: there is no read that
-// carries a caller's predicate. `systemTx.rows('ledgerAccounts')` renders
-// `SELECT * FROM ledger_accounts` with no `WHERE` at all, so resolving one
-// posting's four account references reads THE WHOLE CHART OF ACCOUNTS -- four
-// firm rows plus up to three per identity, which grows with the trader
-// population and not with the posting.
+// `LedgerTx` offers `rows(key)` and nothing else: there is no read on THIS
+// package's handle that carries a caller's predicate. `systemTx.rows(
+// 'ledgerAccounts')` renders `SELECT * FROM ledger_accounts` with no `WHERE` at
+// all, so resolving one posting's four account references reads THE WHOLE CHART
+// OF ACCOUNTS -- four firm rows plus up to three per identity, which grows with
+// the trader population and not with the posting.
+//
+// THIS PARAGRAPH USED TO SAY "ADR-102's ACCESSOR" AND THAT STOPPED BEING TRUE
+// WITHOUT THE COST MOVING (ADR-157, and P5 section 5.4 is the instruction).
+// ADR-112 landed `rowsWhere(key, filter)` on all three transaction handles and
+// ADR-157 gave it a range term and a null term, so the accessor now carries a
+// caller's predicate. What does not is `LedgerTx`, which `tx.ts` restates on
+// purpose so this library cannot open its own transaction. The limit is this
+// package's own boundary rather than `packages/db`'s, and naming the wrong one
+// would send the next reader to widen the wrong file.
 //
 // THIS PACKAGE DOES NOT REACH AROUND IT. A second door -- a raw `SELECT`
 // through `sqlExecutor`, a `pg` import, a scoped read cast past its key type --
@@ -24,9 +33,11 @@
 // posts thousands of transactions against it, and a request handler reads it
 // inside the same transaction it is about to write in.
 //
-// THE REMEDY IS NAMED AND NOT BUILT: a predicate-carrying read on ADR-102's
-// handles, which is a diff on `packages/db/src/scoped-db.ts` and outside this
-// session's fence.
+// THE REMEDY IS BUILT AND IS NOT REACHABLE FROM HERE. `rowsWhere` exists on
+// `ScopedTx`, `SystemTx` and `FirmTx`; the diff that would let THIS file use it
+// is on `tx.ts`, not on `packages/db/src/scoped-db.ts`, and `readChart`'s
+// caller-chosen window is still the right design either way. What changed is
+// only the reason: it is no longer "no such read exists".
 //
 // -----------------------------------------------------------------------------
 // A STALE CHART IS A WRONG POSTING, AND THE WINDOW IS THE CALLER'S TO CHOOSE
