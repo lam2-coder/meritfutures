@@ -174,6 +174,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-152](ADR-152.md) | an as-of stamp's staleness is a claim the SERVER makes and the portal ORDERS, never one the portal computes, and no account-state contract publishes the fact today  (2026-08-27, status: proposed) |
 | [ADR-153](ADR-153.md) | `API_CONTRACT` section 12 names `GET /auth/otp`, the contract defines no such endpoint, and the row means `POST` (2026-08-27, status: proposed) |
 | [ADR-154](ADR-154.md) | tier 1's boundary is an ARTIFACT and tier 2 has none, so the simulator implements `streamLive` and the shared thing becomes the TYPE  (2026-08-27, status: proposed) |
+| [ADR-156](ADR-156.md) | `OI-28` was closed by a ruling and dispatched as open, and `0047` proves the publish decision sound AT THE WRITE and nothing preserves it after  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
