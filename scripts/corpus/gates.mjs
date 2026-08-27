@@ -980,6 +980,29 @@ const SPAN_QUERIES = {
       ) || []
     ).length,
 
+  // OI-24, open since session 95, whose register row names its own remedy: "M06's
+  // hand-maintained delta count. Open, and the remedy is a `<!--gen:-->` span".
+  // M06 section 2's opening sentence read "Five deltas", was corrected once by
+  // session 89 to "Six deltas", and `SD-M6-10` made it wrong again three sessions
+  // later with four concurrent sessions about to move it. That is the argument
+  // that the number cannot be hand-maintained rather than an argument to maintain
+  // it harder, and it is why session 95 left the sentence wrong ON PURPOSE and
+  // filed the item instead.
+  //
+  // THE ROWS OF THE TABLE, BY FIRST CELL, which is `manifest_changes`' own form
+  // one entry up rather than a second way of reading a delta table. It counts a
+  // pipe-leading line whose first cell is an `SD-M6-nn` and asserts nothing about
+  // where that line sits; `CI-06v` is the gate that says the rows are inside a
+  // table. That division matters here: `SD-M6-11` was sitting PAST the table's
+  // terminating blank line when this query was written, one pipe run of length
+  // one, under `CI-06v`'s minimum orphan length of two and therefore invisible to
+  // it. The row is moved back into the table in the same commit as this query.
+  m06_delta_count: () =>
+    (
+      read('docs/plans/M06-admin-ops-console.md').match(/^\|\s*\*{0,2}SD-M6-\d+\*{0,2}\s*\|/gm) ||
+      []
+    ).length,
+
   index_entries: () => (read('docs/INDEX.md').match(/^\| \[/gm) || []).length,
 
   // HOW MANY CHECKS THIS RUNNER RUNS, which STRATEGY 4.4 stated by hand and got
@@ -8282,6 +8305,38 @@ const CARDINAL_DIGITS = /(?<![\w.,-])[1-9]\d{0,3}(?![\w.,-])/g;
 // that matches a site wins, which is how `adr_count` and `tables` stay apart on a
 // ref where both return 111.
 const DERIVABLE_NOUNS = [
+  // SCOPED, AND IT IS THE FIRST ENTRY THAT IS. ADR-130.
+  //
+  // `deltas` is bound below to `manifest_changes`, the corpus-wide 117. M06
+  // section 2 states the size of ITS OWN delta table, which is a PER-DOCUMENT
+  // population under a noun the corpus-wide entry already owns, and the gate was
+  // silent on it at EVERY value that sentence can hold: it read "Seven deltas"
+  // against a truth of ten, and retyping it at ten with the span removed left the
+  // gate silent too, because neither seven nor ten is 117.
+  //
+  // THE REMEDY THIS GATE NAMES COULD NOT BE APPLIED TO IT. "A derivable
+  // population with no entry is unpoliced, and the remedy is another argued
+  // entry" -- but the vocabulary is scanned in declaration order and the first
+  // noun that matches wins, and this file already records what that costs:
+  // "two vocabulary entries for one noun would make the first shadow the second
+  // forever". So an argued entry for M06's deltas, added the only way the
+  // vocabulary allowed, would have been unreachable. `OI-24` had been open on
+  // that sentence since session 95 with its remedy named, and the sentence is the
+  // one this gate's own rationale quotes -- "almost every one a local subset (1
+  // gate, Six deltas, three tables)" -- as a specimen of the noise the
+  // ANY-VALUE rule would produce. That reading was right about the RULE and wrong
+  // about the SITE.
+  //
+  // A `file` predicate is what makes a per-document population expressible. A
+  // scoped entry is declared BEFORE the global entry it shares a noun with, so
+  // the global cannot shadow it, and it narrows rather than widens: it matches
+  // fewer documents than the unscoped form, never more.
+  {
+    query: 'm06_delta_count',
+    noun: /(?:schema )?deltas?/i,
+    label: 'M06 schema deltas',
+    file: /^docs\/plans\/M06-admin-ops-console\.md$/,
+  },
   // The count ADR-034 was ruled over. INDEX stated it, drifted twice, and the
   // second drift landed on `main` on the day the ruling was written.
   { query: 'adr_count', noun: /ADRs?/, label: 'ADRs' },
@@ -8453,6 +8508,9 @@ const ci06DerivableCounts = {
           const after = line.slice(at + text.length);
           let governed = null;
           const entry = vocabulary.find((v) => {
+            // ADR-130. An entry with no `file` is corpus-wide, which is every
+            // entry the vocabulary carried before scoping existed.
+            if (v.file && !v.file.test(file)) return false;
             if (v.value !== value) return false;
             const m = new RegExp(
               `^[\`*_]{0,3}\\s+[\`*_]{0,3}(${v.noun.source})[\`*_]{0,3}(?![\\w-])`,
