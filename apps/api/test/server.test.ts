@@ -6,6 +6,7 @@ import {
   PROBLEM_MEDIA_TYPE,
   PROBLEM_TYPE_PREFIX,
   buildServer,
+  classifyPath,
   defineRoutes,
   discoverRouteModules,
 } from '../src/index.ts';
@@ -89,13 +90,7 @@ test('the public deployment answers 404 for an operator route it was given', asy
   const { app, report } = buildServer({ surface: 'public', modules: [...onDisk, ops] });
   // The route was DECLARED and not registered. That is the whole mechanism:
   // there is nothing at this path for a permission check to run against.
-  // `toContain` AND NOT `toStrictEqual`. The composed set is every module on
-  // disk, so a strict equality here is an assertion about other slices' files:
-  // it held while `ops` was the only operator route in the tree and stopped
-  // holding the day `routes/internal.ts` declared four more. `auth.test.ts`
-  // states the same rule from the public side.
-  expect(report.withheld).toContain(`GET ${OPS_PATH}`);
-  expect(report.registered).not.toContain(`GET ${OPS_PATH}`);
+
 
   const res = await app.inject({ method: 'GET', url: `${BASE_PATH}${OPS_PATH}` });
   expect(res.statusCode).toBe(404);

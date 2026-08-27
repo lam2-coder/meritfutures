@@ -19,6 +19,12 @@
     "falsify:ci": "node scripts/ci/falsify-ci.mjs",
     "verify": "pnpm run check:invariants && pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run gates && pnpm run falsify"
   },
+  "//pnpm.overrides": "ONE OVERRIDE, AND IT EXISTS BECAUSE THE STRYKER ADMISSION FAILED `CI-05` BEFORE IT PASSED ANYTHING. `@stryker-mutator/core@10.0.0` depends on `typed-rest-client@2.3.1`, which pins `qs` EXACTLY at `6.15.1`, and GHSA-q8mj-m7cp-5q26 rates `>=6.11.1 <=6.15.1` MODERATE. `ci.yml`'s security-static job runs `pnpm audit --audit-level=moderate`, so the admission turned a merge blocker red on every push. THE OVERRIDE REMOVES THE VULNERABLE PACKAGE RATHER THAN SILENCING THE CHECK, which is the difference between this and raising the audit level: `--audit-level=high` would be weakening a gate to pass it and is refused by the same rule that refused a `.gitleaksignore` fingerprint. It is PATH-SCOPED (`typed-rest-client>qs`) and not global, so a future direct dependant of `qs` gets the version its own manifest asks for and this line does not silently decide for it. `6.15.3` is the advisory's own patched range (`>=6.15.2`) at its latest patch, same major and same minor as the pin it replaces. ADR-127 section 6.",
+  "pnpm": {
+    "overrides": {
+      "typed-rest-client>qs": "6.15.3"
+    }
+  },
   "//fast-check": "AT THE ROOT FOR scripts/demo's SAKE, and for the same reason `vitest` is here: the demo is deliberately not a workspace package (see its tsconfig), so it has no node_modules of its own and resolves its test-time imports from the root. PT-06 lives in scripts/demo/test because `runDemo` is the only multi-account fold through the real engine in this tree. No package is added that VG-12 has not already admitted: fast-check is in the catalog and is already installed for @merit/rules-engine. NOTE FOR THE NEXT SESSION: this comment sits at the TOP LEVEL and not inside `devDependencies`, where pnpm read a `//`-prefixed key as a real package name and installed it.",
   "devDependencies": {
     "@merit/tooling": "workspace:*",
