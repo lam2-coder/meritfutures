@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, data-model/README.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-27
 ---
 
 # Events (Constitution §2 "everything is an event")
@@ -233,6 +233,8 @@ Breach uses strict `<` against the floor: touching the floor exactly is not a br
 | `payout.hold_released` **NEW** | Worker (the expiry sweep), Admin | `{ payout_request_id, account_id, identity_id, released_by: "expiry"\|"actor", actor?, hold_flag_id, held_at, hold_expires_at }` | FEED, TL, MAIL, NOTIF, BI, EVID |
 | `payout.hold_enforced` **NEW** | Admin | `{ payout_request_id, account_id, identity_id, hold_flag_id, tos_clause, evidence_pack_id, reason, freed_ordinal }` | FEED, TL, MAIL, NOTIF, BI, EVID, ALERT |
 | `payout.expiry_overdue` **NEW** | Worker (the nightly assertion) | `{ subject_kind: "payout_hold"\|"payout_freeze"\|"withdrawal_freeze", subject_id, account_id?, identity_id, expires_at, overdue_seconds }` | ALERT, FEED, EVID |
+| `payout.balance_reflection_missing` **NEW** | Worker (the observation window) | `{ payout_request_id, account_id, approved_cents, settled_trading_day, trading_days_elapsed }` | ALERT (page), RISK, FEED, EVID |
+| `payout.freeze_expiring` **NEW** | Worker (the hourly sweep) | `{ payout_request_id, flag_id, expires_at, lead_hours }` | ALERT, FEED |
 | `wallet.withdrawal_halted` **NEW** | Admin, detector | `{ withdrawal_id, identity_id, freeze_flag_id, tos_clause, freeze_expires_at, rail_status }` | FEED, TL, NOTIF, EVID, ALERT |
 | `wallet.withdrawal_halt_released` **NEW** | Worker (the expiry sweep), Admin | `{ withdrawal_id, identity_id, released_by: "expiry"\|"actor", actor?, rail_status }` | FEED, TL, NOTIF, EVID |
 | `payout.floor_recomputed` | **retired, no producer** | `{ account_id, mode, previous_floor_cents, new_floor_cents }` | none |
@@ -251,7 +253,72 @@ There is no `payout.denied` event in this catalogue, and that absence is deliber
 
 **`payout.expiry_overdue` is the only event here produced by an assertion rather than by a state change**, which is a deliberate exception to this document's own delivery rule. Every other event is written in the same transaction as the fact it records, so the event exists if and only if the fact does. **This one records that a fact did NOT happen**, and there is no transaction for an absence. It is the alarm that fires on the query rather than on the job ([EC-151](../edge-cases/EC-151.md)), it is the fourth unsuppressible alarm, and its `subject_kind` is what lets one assertion cover all three clocks the hourly sweep carries.
 
-**The wallet halt gets events and does not get a status**, because on `wallet_withdrawals` the halt is orthogonal to the rail state. `rail_status` is carried in the payload for exactly that reason: a halted withdrawal is still `approved` or `transferring` as far as the rail is concerned, and a consumer that infers the halt from the status will infer wrong. **These are the first `wallet.*` rows in this catalogue**, and the three the [STATE_MACHINES section 3.2](STATE_MACHINES.md) transition table already names (`wallet.withdrawal_sent`, `wallet.withdrawal_settled`, `wallet.withdrawal_failed`) are **still missing from it**. That gap is [M20](../plans/M20-wallet.md)'s to close and is recorded here rather than quietly filled, because inventing three event shapes for a machine this fold did not draw is how a catalogue acquires rows nobody ruled on.
+**`payout.freeze_expiring`'s LEAD IS SET HERE AT TWELVE WALL-CLOCK HOURS, and setting it is this row's whole cost.** [M05](../plans/M05-payout-system.md) `OQ-M5-07` says in terms that the value is set where the event is written, and this is that file. The old lead was two business days, which [ADR-040](../decisions/ADR-040.md) left degenerate by closing the window at 48 hours and [ADR-042](../decisions/ADR-042.md) left uncomputable by ruling that Merit quotes business days and never derives them: a lead that long inside a window that short fires at or before the moment the hold opens, so the warning and the thing it warns about arrive together. Twelve hours leaves three quarters of the window elapsed before anyone is asked to decide. **The counter-argument is real and is not answered by a longer lead**: a hold opened at 21:00 warns at 09:00 and expires at 21:00, so a single-operator firm gets one working day and no more, and the remedy for that is the alarm being unsuppressible rather than earlier. **`lead_hours` is in the payload because the lead is a launch parameter and not a constant**, and a 2031 audit reading a 2027 row has no other way to know which lead produced it. `payout.balance_reflection_missing` is beside it as the other alarm [M05 section 5](../plans/M05-payout-system.md) names and this catalogue lacked; it pages, it sets `recon_blocked`, and **the payout it reports is never reversed** ([EC-066](../edge-cases/EC-066.md)).
+
+**The wallet halt gets events and does not get a status**, because on `wallet_withdrawals` the halt is orthogonal to the rail state. `rail_status` is carried in the payload for exactly that reason: a halted withdrawal is still `approved` or `transferring` as far as the rail is concerned, and a consumer that infers the halt from the status will infer wrong. **These were the first `wallet.*` rows in this catalogue and they are no longer the only ones.** The gap this paragraph recorded, the three names [STATE_MACHINES section 3.2](STATE_MACHINES.md)'s transition table already carried and this catalogue did not, is closed in 6.2 below together with the rest of the family. **The refusal that left it open still governs what was folded**: every payload in 6.1 to 6.3 is a mirror a plan names or a column a migration declares, and the one transition in that drawing with no event at all is reported in 6.2 rather than given a name here.
+
+### 6.1 The wallet, which is where the internal leg lands
+
+**[ADR-019](../decisions/ADR-019.md) split the payout into two legs and the first one ends here**, so `wallet.credited` is the event a trader experiences as being paid and [M11](../plans/M11-certificates-social-proof.md) issues the payout certificate on it rather than on `payout.settled`. Both rows are named in [M05 section 5](../plans/M05-payout-system.md) and both are stored by [`wallet_entries`](../../packages/db/migrations/0011_wallet.sql), whose columns are what the payloads carry.
+
+| Event | Producer | Payload | Consumers |
+|---|---|---|---|
+| `wallet.credited` **NEW** | API (the internal leg), worker (a refund or a correction) | `{ identity_id, provenance: "payout"\|"refund_wallet_funded"\|"correction", amount_cents, cause, reference_id, balance_after_cents, ledger_transaction_id, account_id?, payout_request_id?, basis_trading_day? }` | FEED, TL, NOTIF, BI, EVID |
+| `wallet.debited` **NEW** | API at checkout, API at withdrawal approval | `{ identity_id, amount_cents, cause, reference_id, balance_after_cents, ledger_transaction_id }` | FEED, RISK, BI |
+
+**`wallet.credited` gains `provenance` and three of M05's fields become conditional on it, and that is an amendment made at the fold rather than a transcription.** [`0011`](../../packages/db/migrations/0011_wallet.sql) declares `wallet_entries.provenance` `NOT NULL` over a closed list of three, of which only `payout` has a payout request, an account or a basis trading day; M05's payload names all three unconditionally, so **two of the three storable credits could not produce it**. Carrying the discriminator is section 1's own rule that a payload is ids and numbers, applied to a row whose kind is a column. `wallet_entries` carries no `account_id` of its own, so `account_id` on a payout credit is resolved through `reference_id` at write time and is carried because TL in section 2's legend is a per-account view and would otherwise have to join to find one.
+
+**`balance_after_cents` is not the identity's balance and a consumer must not read it as one.** It is [`0011`](../../packages/db/migrations/0011_wallet.sql)'s stored running balance **after this entry**, written so a statement renders without a window function and so a divergence from the recomputed value is detectable. A consumer that treats it as the current balance will be wrong the moment a second entry posts, which is section 1's `occurred_at` and `recorded_at` distinction arriving in a money field: a stored value about a moment read as a value about now.
+
+**`wallet.debited` has no `provenance` and that asymmetry is correct.** Provenance is what value is MADE of, and it is a property of a credit; a debit consumes a composition rather than having one. `cause` and `reference_id` are polymorphic on the debit side by [`0011`](../../packages/db/migrations/0011_wallet.sql)'s own comment, *"payout_request, purchase, or the corrected entry"*, and the withdrawal composition a debit does destroy is reported by `wallet.withdrawal_approved` in 6.2, on the row that has the summary.
+
+### 6.2 The withdrawal lifecycle, which is the external leg of the wallet
+
+**[STATE_MACHINES section 3.2](STATE_MACHINES.md) draws this machine and names its events; this is where those names become real.** [M05 section 5](../plans/M05-payout-system.md) rules the shape of the family in one sentence, *"mirrors the `payout.transfer_*` family for the wallet-to-rail path"*, and every payload below is either that mirror or a column of [`wallet_withdrawals`](../../packages/db/migrations/0011_wallet.sql).
+
+| Event | Producer | Payload | Consumers |
+|---|---|---|---|
+| `wallet.withdrawal_requested` **NEW** | API | `{ withdrawal_id, identity_id, amount_cents, destination_ref, idempotency_key, requested_at }` | FEED, TL, NOTIF, BI |
+| `wallet.withdrawal_cooling` **NEW** | API | `{ withdrawal_id, identity_id, destination_ref, cooling_until }` | FEED, TL, NOTIF |
+| `wallet.withdrawal_approved` **NEW** | API | `{ withdrawal_id, identity_id, amount_cents, destination_name_match, name_match_score, name_match_method, source_provenance_summary, earliest_credit_at }` | FEED, TL, NOTIF, EVID |
+| `wallet.withdrawal_held` **NEW** | API (the composition) | `{ withdrawal_id, identity_id, rule: "P-1"\|"P-3", source_provenance_summary, earliest_credit_at, expected_release_at }` | ALERT, NOTIF, FEED, EVID |
+| `wallet.withdrawal_sent` **NEW** | Worker | `{ withdrawal_id, identity_id, amount_cents, idempotency_key, ledger_transaction_id }` | FEED |
+| `wallet.withdrawal_settled` **NEW** | Rail webhook | `{ withdrawal_id, identity_id, amount_cents, provider_transfer_id, settled_at, ledger_transaction_id }` | FEED, TL, MAIL, NOTIF, BI, STATS, EVID |
+| `wallet.withdrawal_failed` **NEW** | Rail webhook, worker | `{ withdrawal_id, identity_id, error_code, attempts, will_retry }` | ALERT, FEED, NOTIF |
+
+**`destination_ref` is admissible under section 1 and the reason is written in the column itself.** [`0011`](../../packages/db/migrations/0011_wallet.sql) declares it *"Provider-side destination id, never bank details"*, which puts it in the same class as `provider_applicant_id` on `kyc.submitted` and `provider_transfer_id` on `payout.settled`: an opaque reference this catalogue already carries. It is carried rather than omitted because **one destination reference appearing under two identities is a signal no other event in this family can express**, and RISK is the consumer that needs it.
+
+**`wallet.withdrawal_held` is not `wallet.withdrawal_halted` under a second name, and the pair is the wallet's version of the distinction section 6 already draws between `payout.held` and `payout.blocked`.** The hold is [M20](../plans/M20-wallet.md)'s provenance rule, `P-1` or `P-3`, evaluated **before** the rail is reached and resolving on a date arithmetic can produce; the halt is an investigation opened against a withdrawal **already past approval**, resolving on `freeze_expires_at` or on a dismissal, and it changes no rail status at all. Two events, two clocks, two authorities. Collapsing them would make the trader-facing copy unable to say which one is running, and [M05](../plans/M05-payout-system.md) section 3.4's rule is that a review the trader cannot see the end of is indistinguishable from a refusal.
+
+**`expected_release_at` is [M20](../plans/M20-wallet.md)'s `expected_release` with the timestamp said out loud**, which matters in a table read in 2031 by a consumer that has only the field name.
+
+**`cooling_until` is the one field below that is not a column today**, and it is named unlinked because the destination registry that will carry it is `payout_destinations`, which `P5-e` writes. Until it exists the value is [ADR-017](../decisions/ADR-017.md)'s window applied to the destination change, and the field is here because a cooling event that does not say when cooling ends is a status with no clock.
+
+**`wallet.withdrawal_sent` fires on the edge `G-TRANSFER-QUEUED` guards, so it fires when the transfer is QUEUED and not when the rail acknowledges it.** The name is [STATE_MACHINES section 3.2](STATE_MACHINES.md)'s and this catalogue does not rename a drawn transition; the payload is what keeps the difference legible, because it carries the idempotency key and the posted ledger transaction and it carries no provider transfer id. There is none yet. On the payout leg that same distinction is two events, `payout.transfer_queued` and `payout.transfer_sent`, because that machine draws two edges and this one draws one.
+
+**One transition in [STATE_MACHINES section 3.2](STATE_MACHINES.md) has no event and it is not folded here.** `cancelled` is a live `wallet_withdrawal_status` value in [`0001`](../../packages/db/migrations/0001_extensions_and_enums.sql), the drawing's own diagram takes two edges into it under `G-TRADER-CANCELS`, and that guard is defined in section 10; the transition **table** below the diagram carries no row for either edge, so universal rule 1 is unmet and no name exists for this catalogue to register. The gap is recorded rather than filled, for the reason this section's own halt note gave: a name invented here would be a row nobody ruled on, and the row that is missing is a transition row in a table this fold does not hold.
+
+### 6.3 The wallet's own guards, its assertion, and dormancy
+
+**[M20 section 5](../plans/M20-wallet.md) names these and each one is a control reporting on itself.** `wallet.withdrawal_held` belongs to this set by content and is rowed in 6.2 instead, beside the machine it stops.
+
+| Event | Producer | Payload | Consumers |
+|---|---|---|---|
+| `wallet.spend_delayed` **NEW** | API at checkout | `{ identity_id, amount_cents, limit_kind, retry_at }` | RISK, NOTIF, FEED |
+| `wallet.spend_refused` **NEW** | API at checkout | `{ identity_id, reason: "frozen"\|"cross_identity"\|"insufficient" }` | RISK, FEED |
+| `wallet.provenance_anomaly` **NEW** | Detector | `{ identity_id, pattern, window_days }` | ALERT, RISK, EVID |
+| `wallet.reconciliation_failed` **NEW** | Worker (the nightly per-identity assertion) | `{ identity_id, expected_cents, actual_cents }` | ALERT (page), FEED, EVID |
+| `wallet.dormancy_changed` **NEW** | Worker | `{ identity_id, state: "active"\|"dormant"\|"escheat_review" }` | NOTIF, FEED |
+
+**`wallet.spend_delayed` and `wallet.spend_refused` are two events because `C-23` makes the velocity limit DELAY rather than refuse.** A limit that refused would be indistinguishable from an insufficient balance to every consumer, and the burst of delays on one identity is [M20](../plans/M20-wallet.md)'s stated account-takeover signature, which only exists as a signal if the delayed case has its own name. `retry_at` is carried for the same reason every hold event in section 6 carries its expiry: a delay with no visible end is a refusal to the person waiting.
+
+**A cross-identity spend attempt is evidence rather than a validation error**, which is why `cross_identity` is a first-class value of `reason` rather than a case of `insufficient`. [M20](../plans/M20-wallet.md) `AS-M20-06`'s argument is that a trader cannot construct that request through the interface by accident, so an attempt is a high-severity signal and RISK is the first consumer listed.
+
+**`expected_cents` and `actual_cents` are section 1's money convention applied to a payload that reached this fold spelled `expected` and `actual`.** They are integer cents on a per-identity wallet position and the catalogue's own rule is that money in a payload lives in a `_cents` field. `window_days` on `wallet.provenance_anomaly` is the same repair against the same rule, and it matches `cusum.alarm` and `affiliate.chargeback_rate_updated` in sections 8 and 9, which both already spell it that way.
+
+**`wallet.reconciliation_failed` pages and it is the wallet's version of `ledger.invariant_violated`, one scope down.** The global zero-sum assertion in section 7 balances while a per-identity position is wrong, which is [M20](../plans/M20-wallet.md) `FM-M20-10`'s whole point: a wallet-shaped hole is invisible in a global sum that still adds up. It is an [ADR-016](../decisions/ADR-016.md) scoped-halt input rather than a global halt, and the difference between the two is the difference between stopping one identity's withdrawals and stopping everyone's.
+
+**`wallet.dormancy_changed` has a third consumer this catalogue has no code for, and that is stated rather than dropped.** [M20](../plans/M20-wallet.md) lists NOTIF, FEED *"and the legal calendar"*: an escheatment obligation is jurisdictional, dated, and owed to a party outside this system, and `INV-M20-09` makes forfeiture unavailable, so the transition into `escheat_review` is the input to a process section 2's legend cannot name. The state values are [`SD-M20-04`](../plans/M20-wallet.md)'s own `check`, transcribed rather than chosen.
 
 ## 7. Ledger
 
@@ -275,6 +342,11 @@ There is no `payout.denied` event in this catalogue, and that absence is deliber
 | `circuit_breaker.reset` | Admin, worker | `{ scope, plan_id?, metric, value_bp }` | ALERT, FEED |
 | `cusum.alarm` | Worker | `{ plan_id, statistic, threshold, window_days }` | ALERT, FEED |
 | `liability.snapshot_taken` | Worker | `{ snapshot_on, open_liability_cents, eligible_next_7d_cents, reserve_cents, rcr_bp }` | BI, FEED |
+| `treasury.coverage_changed` **NEW** | Worker on an RCR threshold crossing, worker on a recorded rail balance | `{ rcr_bp, reserve_cents, cvar99_cents, eligible_next_7d_cents, source, as_of }` | ALERT, FEED, BI |
+
+**`treasury.coverage_changed` sits beside `liability.snapshot_taken` because the two carry three of the same figures and are not the same fact.** The snapshot is the nightly job recording where the book stood; the coverage event fires when the ratio CROSSES a threshold or when a live rail balance is recorded, and [ADR-011](../decisions/ADR-011.md)'s same-day top-up trigger reads it. The two exist separately because a top-up trigger that only fired once a night would be a dashboard somebody remembers to open, which is the failure [M05](../plans/M05-payout-system.md) section 7 names. `source` is what distinguishes them at the consumer: the reserve figure is computed against a **live rail balance** under `SD-M5-03`, because a ratio derived from Merit's own ledger is one that agrees with itself.
+
+**The payload carries `rcr_bp` and carries no float figure, and a consumer therefore cannot recompute the ratio from it.** That is faithful to [M05 section 5](../plans/M05-payout-system.md) and it is worth naming, because the ratio's two sides are answered in different documents: wallet float enters the DENOMINATOR as exposure ([M06](../plans/M06-admin-ops-console.md) `P-M6-07`) and never the NUMERATOR as reserve ([M20](../plans/M20-wallet.md) `INV-M20-08`), and [P5 section 5.3](../plans/P5-payouts-and-wallet.md) is where the three sources were read together. An alert that renders float inside reserve flatters the ratio, which is `AS-M20-08`'s whole scenario, and this payload gives a consumer no field with which to make that mistake or to check it.
 
 Every enforcement carries an `evidence_pack_id`. That is not a nicety: the [dossier](../../research/ADVERSARY_DOSSIER.md) documents rings that pressure firms publicly after being caught, and the firm that cannot show its work loses the argument regardless of being right.
 
