@@ -44,8 +44,21 @@
 
 import type { Cents } from '@merit/rules-engine';
 import { type DataTrust, type TrustSignal, assessDataTrust } from './data-trust.ts';
-import { type AsOf, type Reading, absent, figure, readingIsPresent, render } from './figure.ts';
-import { type LiabilitySnapshot, theThreeNumbers } from './liability.ts';
+import {
+  type AsOf,
+  type Reading,
+  absent,
+  figure,
+  formatCents,
+  readingIsPresent,
+  render,
+} from './figure.ts';
+import {
+  type LiabilitySnapshot,
+  type ReserveCoverageSnapshot,
+  reserveCoverage,
+  theThreeNumbers,
+} from './liability.ts';
 import {
   type IndicativeMovement,
   type LiveOpenLiability,
@@ -106,6 +119,16 @@ export interface LiabilityHomeInput {
   readonly trustSignals: readonly TrustSignal[];
   /** P-M6-03. Absent when nobody supplied the forecast (DEP-M6-01). */
   readonly eligibleNextSevenDays?: EligibleNextSevenDays;
+  /**
+   * P-M6-07's row, from `reserve_coverage_snapshots` (`0049`, ADR-128).
+   *
+   * A DIFFERENT TABLE ON A DIFFERENT CLOCK, which is why it is its own field
+   * and not four more members of `snapshot`. Coverage is the rail's clock
+   * (`SD-M5-03`) against ours, so one `as_of` over both would date two figures
+   * that do not move together. Absent when nothing supplied it, and the panel
+   * then stays in `pending` with the reason.
+   */
+  readonly reserveCoverage?: ReserveCoverageSnapshot;
   /** Section 3.5's inputs. Absent when there is no feed reading to work from. */
   readonly live?: {
     readonly movement: IndicativeMovement;
@@ -163,10 +186,19 @@ const PENDING: readonly PendingPanel[] = [
   {
     origin: 'P-M6-07',
     title: 'Reserve coverage',
+    // THE COLUMNS EXIST NOW AND THIS ROW SAID THEY DID NOT. `OI-01` closed
+    // when `0049_reserve_coverage_snapshots.sql` landed under ADR-128, so what
+    // blocks this panel is no longer a schema gap; it is that no producer
+    // writes the table, which 0049's own header states as a deliberate
+    // omission ("no producer, no rows"). A blockedBy that names a closed item
+    // is worse than none: a reader chasing it finds the item closed and
+    // concludes the panel is unblocked.
     blockedBy:
-      'OI-01 in DELTA_MANIFEST: `liability_snapshots` exists in two shapes and the reserve, ' +
-      'CVaR and RCR fields of the earlier one "have no home in the folded shape and need one ' +
-      'before M06 is built". DEP-M6-02 and DEP-M6-05 name the inputs; the columns do not exist',
+      'no producer, and not a missing column. `reserve_coverage_snapshots` landed in ' +
+      '`0049_reserve_coverage_snapshots.sql` under ADR-128, which closed OI-01 and carries ' +
+      'reserve_cents, cvar99_cents and a GENERATED rcr_bp. Nothing writes it: 0049 says so ' +
+      'itself, and DEP-M6-02 (a live rail balance) and DEP-M6-05 (CVaR99 at rho = 0.30) name ' +
+      'the two suppliers. Pass `reserveCoverage` to this page and the panel renders',
   },
   {
     origin: 'P-M6-08',
@@ -193,6 +225,97 @@ export function assertNamesNoSubject(lines: readonly string[]): void {
           'and this page names none. The id belongs on the link, not in the figure',
       );
   }
+}
+
+/**
+ * SECTION 5.3, ASSERTED IN THE NEGATIVE, OVER THE BYTES THE PAGE ACTUALLY
+ * PRINTS.
+ *
+ * `reserveCoverage` already refuses an incoherent ROW, and that is a check on
+ * the input. This is a check on the OUTPUT, and the two catch different
+ * defects: an arithmetic guard cannot see a renderer that computes the sum
+ * itself on its way to a line, and a value reaches a page through a label, a
+ * definition, a provenance clause or an error string without ever being a
+ * `Figure`. So the forbidden numbers are searched for in the rendered text.
+ *
+ * TWO SCOPES, DELIBERATELY, AND THE REASON IS FALSE POSITIVES RATHER THAN
+ * THOROUGHNESS:
+ *
+ *   the forbidden CENTS       searched in the P-M6-07 panels only. `reserve +
+ *   `reserve + float`         float` is an amount of money, and an amount of
+ *                             money can legitimately equal an unrelated figure
+ *                             on another panel. A page that threw on that
+ *                             coincidence would be a control nobody could keep
+ *
+ *   the forbidden RATIO       searched over the WHOLE page. A basis-point token
+ *   `(reserve + float) /      is not an amount of money and collides with
+ *   cvar99`, in bp            nothing else this page prints, so the wider scope
+ *                             costs nothing and catches the leak wherever it
+ *                             surfaced
+ *
+ * BOTH SEARCHES ARE SKIPPED WHEN THE FLOAT IS ZERO, and that is stated rather
+ * than silently handled: with no float, `reserve + float` IS `reserve` and
+ * there is nothing for the assertion to tell apart. A suite that proved this
+ * control works on a book with an empty wallet would have proved nothing, which
+ * is why `GS-229` is "reserve coverage computed while the wallet float is
+ * LARGE".
+ */
+export function assertFloatIsNotReserve(input: {
+  /** Every line the page prints, in page order. */
+  readonly allLines: readonly string[];
+  /** The lines of the two P-M6-07 panels only. */
+  readonly coverageLines: readonly string[];
+  readonly reserveCents: Cents;
+  readonly floatCents: Cents;
+  readonly cvar99Cents: Cents;
+  /** The ratio actually rendered, read from `0049`'s generated column. */
+  readonly ratioBp: bigint;
+}): void {
+  // The label AND its colon, which is what `render` puts between a label and
+  // its amount. Matching the bare label would be satisfied by a panel heading
+  // or by a mention inside another figure's definition, and the claim here is
+  // that each of the two was actually PRINTED AS A FIGURE.
+  const reserveLabelled = input.coverageLines.some((line) =>
+    line.includes('Reserve, the RCR numerator: '),
+  );
+  const floatLabelled = input.coverageLines.some((line) =>
+    line.includes('Wallet float, reported separately: '),
+  );
+  if (!reserveLabelled || !floatLabelled)
+    throw new PageError(
+      'the reserve coverage panels do not print the reserve and the wallet float as two ' +
+        'separately labelled figures. DEP-M20-06 requires M6 to render float and reserve as ' +
+        'VISIBLY SEPARATE figures, and a panel that prints one of them is the panel AS-M20-08 ' +
+        'describes with a step already taken',
+    );
+
+  if (input.floatCents === 0n) return;
+
+  const forbiddenCents = formatCents(input.reserveCents + input.floatCents);
+  const centsToken = new RegExp(`(?<![\\d.])${forbiddenCents.replace('.', '\\.')}(?![\\d])`);
+  const offendingLine = input.coverageLines.find((line) => centsToken.test(line));
+  if (offendingLine !== undefined)
+    throw new PageError(
+      `a reserve coverage line prints ${forbiddenCents}, which is the reserve ` +
+        `(${formatCents(input.reserveCents)}) with the wallet float ` +
+        `(${formatCents(input.floatCents)}) folded into it: "${offendingLine}". Wallet balances ` +
+        'are NEVER counted toward reserve (INV-M20-08), the float is segregated in reporting as ' +
+        'well as in fact, and this is the line AS-M20-08 is about',
+    );
+
+  const forbiddenRatioBp = ((input.reserveCents + input.floatCents) * 10_000n) / input.cvar99Cents;
+  if (forbiddenRatioBp === input.ratioBp) return;
+  const bpToken = new RegExp(`(?<!\\d)${forbiddenRatioBp} bp(?!\\d)`);
+  const offendingRatio = input.allLines.find((line) => bpToken.test(line));
+  if (offendingRatio !== undefined)
+    throw new PageError(
+      `a rendered line prints ${forbiddenRatioBp} bp, which is the coverage ratio computed from ` +
+        `float PLUS reserve rather than from reserve alone (${input.ratioBp} bp): ` +
+        `"${offendingRatio}". The RCR is computed from RESERVE ALONE (P-M6-07, INV-M20-08, ` +
+        'GS-229). A ratio that flatters itself with the same money on both sides is the ' +
+        'breaker at 1.0 becoming fictional, on the one screen an operator opens during an ' +
+        'incident',
+    );
 }
 
 function requireUtc(instant: string, field: string): Date {
@@ -225,19 +348,35 @@ function lineFor(reading: Reading, renderedAt: string, suspect: boolean): string
   return `${prefix}${render(reading)} (${ageAtRender(reading.figure.asOf, renderedAt)})`;
 }
 
+/**
+ * @param notes Lines that are not `Reading`s and cannot become ones.
+ *
+ * THE RCR IS THE REASON THIS PARAMETER EXISTS. A `Figure` carries `cents` and
+ * renders through `formatCents`, and the reserve coverage ratio is INTEGER
+ * BASIS POINTS: pushing it through the money renderer would print 12,500 basis
+ * points as `125.00`, which reads as an amount of money on the one panel whose
+ * whole subject is a ratio. So the ratio arrives already rendered, with its
+ * unit in the text, and `formatRatioBp` divides by `bigint` for the same reason
+ * `formatCents` does.
+ */
 function panel(
   origin: string,
   title: string,
   readings: readonly Reading[],
   renderedAt: string,
   suspect: boolean,
+  notes: readonly string[] = [],
 ): PanelRendering {
+  const prefix = suspect ? 'SUSPECT, data trust is red: ' : '';
   return {
     origin,
     title,
     readings,
     suspect,
-    lines: readings.map((reading) => lineFor(reading, renderedAt, suspect)),
+    lines: [
+      ...readings.map((reading) => lineFor(reading, renderedAt, suspect)),
+      ...notes.map((note) => `${prefix}${note}`),
+    ],
   };
 }
 
@@ -327,6 +466,58 @@ export function buildLiabilityHome(input: LiabilityHomeInput): LiabilityHomePage
         }),
   ];
 
+  // P-M6-07. TWO PANELS AND NOT ONE, WHICH IS THE RENDERING DECISION SECTION
+  // 5.3 TURNS ON. DEP-M20-06 requires float and reserve rendered as "visibly
+  // separate figures", and two panels under two titles is the strongest
+  // available reading of visibly separate: a reader skimming headings sees two
+  // things, and a reader who folds them has to fold two blocks rather than
+  // misread one list. M20 section 8 calls the second one "the float panel" and
+  // asks M6 to render it.
+  //
+  // BOTH CARRY ORIGIN `P-M6-07` because that is the panel M06 section 3.1
+  // defines and `figure.ts` closes the roster at M06's own list. The float has
+  // no `P-M6-nn` of its own: M20 supplies it TO this panel (DEP-M20-06), and
+  // minting an origin for it here would widen a roster this file does not own.
+  const coverage =
+    input.reserveCoverage === undefined
+      ? undefined
+      : reserveCoverage({
+          coverage: input.reserveCoverage,
+          // The SAME column P-M6-01's wallet component reads. One quantity from
+          // one column cannot drift between two panels on one screen.
+          floatCents: input.snapshot.walletBalancesCents,
+          floatAsOfInstant: input.snapshot.asOfInstant,
+        });
+
+  const coveragePanels: PanelRendering[] =
+    coverage === undefined
+      ? []
+      : [
+          panel(
+            'P-M6-07',
+            'Reserve coverage',
+            [coverage.reserve, coverage.cvar99],
+            input.renderedAt,
+            suspect,
+            [coverage.ratioLine, coverage.attestationLine],
+          ),
+          panel(
+            'P-M6-07',
+            'Wallet float, reported separately',
+            [coverage.walletFloat, coverage.floatCoverage],
+            input.renderedAt,
+            suspect,
+            [
+              'The float is reported SEPARATELY and is never counted toward reserve ' +
+                '(INV-M20-08, DEP-M20-06). The same money is a LIABILITY component in P-M6-01 ' +
+                'and EXPOSURE inside the P-M6-07 denominator, and in neither is it the ' +
+                'numerator. FM-M20-09 is the failure this separation exists to refuse: float ' +
+                'treated as working capital, after which the firm spends money it owes and the ' +
+                'RCR stops meaning anything',
+            ],
+          ),
+        ];
+
   const panels: PanelRendering[] = [
     trustPanel,
     panel(
@@ -355,6 +546,7 @@ export function buildLiabilityHome(input: LiabilityHomeInput): LiabilityHomePage
       suspect,
     ),
     panel('P-M6-03', 'Eligible next 7 days', eligibleReadings, input.renderedAt, suspect),
+    ...coveragePanels,
     panel(
       'P-M6-10',
       'Absorbed corrections',
@@ -414,10 +606,23 @@ export function buildLiabilityHome(input: LiabilityHomeInput): LiabilityHomePage
     banner: dataTrust.statement,
     panels,
     live,
-    pending: PENDING,
+    // The P-M6-07 row leaves `pending` when, and only when, the panel renders.
+    // A page that listed a panel as NOT BUILT while printing it is worse than
+    // either half alone.
+    pending: PENDING.filter((entry) => !(entry.origin === 'P-M6-07' && coverage !== undefined)),
   };
 
-  assertNamesNoSubject(panels.flatMap((rendered) => rendered.lines));
+  const allLines = panels.flatMap((rendered) => rendered.lines);
+  assertNamesNoSubject(allLines);
+  if (coverage !== undefined && input.reserveCoverage !== undefined)
+    assertFloatIsNotReserve({
+      allLines: renderLiabilityHome(page),
+      coverageLines: coveragePanels.flatMap((rendered) => rendered.lines),
+      reserveCents: input.reserveCoverage.reserveCents,
+      floatCents: input.snapshot.walletBalancesCents,
+      cvar99Cents: input.reserveCoverage.cvar99Cents,
+      ratioBp: coverage.ratioBp,
+    });
   return page;
 }
 

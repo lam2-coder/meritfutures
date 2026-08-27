@@ -1,20 +1,28 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// ONE HUNDRED AND FIVE TABLES OF 111, AND THAT IS REPORTED RATHER THAN ROUNDED
-// UP. The other 6 are not reachable through ANY accessor: `SCOPE_RULES` is total
+// ONE HUNDRED AND SIX TABLES OF 114, AND THAT IS REPORTED RATHER THAN ROUNDED
+// UP. The other 8 are not reachable through ANY accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
-// NOT ALL 105 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS NOW TWO
-// CLASSES RATHER THAN ONE. 41 are `firm` and 3 are `pair` (ADR-106), so 61 of
-// the 105 are served by `scopedDb`. A `pair` table belongs to TWO identities and
+// THE DENOMINATOR WAS STALE BEFORE THIS EDIT AND IS CORRECTED HERE RATHER THAN
+// INCREMENTED. It read "111" while `0049`, `0050` and `0051` had taken the tree
+// to 114, so two earlier sessions moved the migration set and left this
+// sentence behind; both figures are now recomputed rather than adjusted --
+// `TABLE_KEYS.length` for the first and a count of `CREATE TABLE` across
+// `packages/db/migrations` for the second. `test/scoped-db.test.ts` asserts
+// both, which is why the staleness could survive here and not there.
+//
+// NOT ALL 106 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
+// RATHER THAN ONE. 41 are `firm` and 3 are `pair` (ADR-106), so 62 of
+// the 106 are served by `scopedDb`. A `pair` table belongs to TWO identities and
 // is scoped to neither: it is excluded from `ScopedTableKey` because returning
 // the row to either party hands them the other party's identity uuid, and from
 // `FirmTableKey` because `firmDb()` takes no reason on the ground that no
 // identity is at risk. `systemDb(reason)` is its only door.
 //
-// THE ONE HUNDRED AND FOUR ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE ONE HUNDRED AND SIX ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -43,7 +51,7 @@
 // stale CREATE. THIS SENTENCE READ "`ALTER COLUMN` STAYS AN OFFENDER" UNTIL
 // ADR-106, WHICH IS FALSE ABOUT THIS TREE AND WOULD HAVE TOLD A READER THAT
 // `otp_challenges` COULD NOT BE REGISTERED; ADR-094's clause was superseded by
-// ADR-103 and the sentence outlived it by one session. ELEVEN of the 105 below
+// ADR-103 and the sentence outlived it by one session. ELEVEN of the 106 below
 // carry later columns -- `sessions`, `plan_versions`, `rule_states`,
 // `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests`,
@@ -4466,3 +4474,61 @@ export const paymentDisputes = pgTable('payment_disputes', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// -----------------------------------------------------------------------------
+// payout_destinations -- 0051_payout_destinations.sql. OWNED: `identity_id` is
+// on the row, NOT NULL, and the first half of the primary key.
+// -----------------------------------------------------------------------------
+// ADR-169, OI-06. THE DESTINATION NAMESPACE, GIVEN A TABLE FOR THE FIRST TIME.
+// Before `0051`, `destination_ref` existed only as a column on
+// `payout_transfers` and `wallet_withdrawals`, where it is the destination OF A
+// TRANSFER: nothing recorded that a destination changed or when, and C-11,
+// C-24, SECURITY section 4 item 1, `WF-M20-02` and M04's destination-cooling
+// scenario all cited a control whose input did not exist.
+//
+// `coolingUntil` IS `.notNull()` AND THAT IS THE CONTROL RATHER THAN A STYLE.
+// DELTA_MANIFEST's recommendation named the column and said nothing about
+// nullability, and nullability is the whole of it: under a nullable column an
+// INSERT that omits the value writes a destination that is usable the instant
+// it exists, because the gate reads `cooling_until > now()` and a NULL compares
+// to nothing. That is a fail-OPEN on exactly the row an attacker who has just
+// added their own destination has caused to be written. A reader tempted to
+// relax this here should note that the DDL would then disagree with the
+// transcription and `scoped-db.test.ts`'s drift assertion is a NAME-SET check,
+// so it would NOT catch it -- which is this file's own header warning about
+// what replaces ADR-008's "drift is a compile error", operating on the one
+// axis nothing asserts.
+//
+// THE DURATION IS NOT HERE AND IS NOT MISSING. 48 hours is a launch candidate
+// that lives in config (ADR-037), so the database asserts the ORDERING and
+// never the length; `payout_destinations_cooling_follows_first_seen` is that
+// assertion and it is a CHECK, which this file deliberately does not transcribe
+// for the reason its header gives about `ADD CONSTRAINT`.
+//
+// NO `updatedAt`, and its absence is the DDL's. Nothing in the merged migration
+// set maintains one, so every such column is a value a handler is trusted to
+// write; `coolingUntil` moving forward under `PAYOUT-DEST-C1` is the record of
+// the re-arm, and the trigger is what protects it.
+export const payoutDestinations = pgTable(
+  'payout_destinations',
+  {
+    identityId: uuid('identity_id')
+      .notNull()
+      .references(() => identities.id),
+    // The provider-side destination id, NEVER bank details. Byte-exact `text`
+    // rather than `citext`: an opaque provider id may legitimately be
+    // case-sensitive, and folding case would collide two genuinely different
+    // destinations onto one row, handing the second a window it never earned.
+    destinationRef: text('destination_ref').notNull(),
+    // The DESTINATION's clock. `first_seen_at` is immutable after insert by
+    // PAYOUT-DEST-C1, which is a trigger and therefore not expressible here.
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull().defaultNow(),
+    // THE CONTROL. See the block above before making this optional.
+    coolingUntil: timestamp('cooling_until', { withTimezone: true }).notNull(),
+    // The ROW's clock, beside the destination's. Equal to `first_seen_at` on
+    // every row a live registration writes, and different on exactly the rows a
+    // backfill or a reconciliation writes.
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.identityId, table.destinationRef] })],
+);

@@ -92,6 +92,7 @@ import {
   pageRevalidations,
   passkeys,
   paymentDisputes,
+  payoutDestinations,
   payoutRequests,
   payoutTransfers,
   phoneChangeRequests,
@@ -137,7 +138,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * ONE HUNDRED AND FIVE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
+ * ONE HUNDRED AND SIX OF 114, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
  * owner the TABLE: a table is registered ONCE by the first session that needs
  * it, the registration is never re-argued, and a session computes its own slice
  * from `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -337,6 +338,12 @@ export const TABLES = {
   // "its own" and waited for the first session that needed it. P5 is that
   // session: it is P-3's chargeback-window input.
   paymentDisputes,
+  // P5-e. `payout_destinations` is the first table in this registry to be
+  // registered by the SESSION THAT CREATED IT, which is ADR-092 section 2's
+  // rule meeting its easiest case: the first session that needs a table is the
+  // one that wrote its DDL, so there is no waiting reader and nothing to
+  // re-argue.
+  payoutDestinations,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -1112,6 +1119,12 @@ export const SCOPE_RULES = {
     foreignColumn: 'id',
     traversal: 'hop',
     why: "A DISPUTE IS A STATEMENT ABOUT A PURCHASE AND THE PURCHASE IS WHAT CARRIES THE PERSON (0012_disputes_and_affiliate_settlement.sql, SD-M8-01). The row declares NO column against `identities(id)` at all, so ADR-101 clause 1 is satisfied by the DDL rather than by a judgement, and `purchase_id uuid NOT NULL REFERENCES purchases(id) ON DELETE RESTRICT` satisfies clause 2: the edge is NOT NULL, so there is no row that reaches no identity and none returned in silence. `hop` RATHER THAN `semi-join` BECAUSE THE REFERENCE IS SINGLE-VALUED IN THE DIRECTION TRAVERSED: a dispute names ONE purchase and `purchases.id` is that table's primary key, so the traversal cannot multiply this row -- a purchase may carry several disputes and that is the other direction, which this rule never walks. THE CHAIN TERMINATES ONE HOP OUT: `purchases` is `owned` on `identity_id`, `nullable: false`. `ledger_transaction_id` IS THE AVAILABLE MISTAKE AND IT IS REFUSED HERE RATHER THAN IN REVIEW, because it is session 202's `wallet_entries` trap in a second dress: it is `uuid NULL REFERENCES ledger_transactions(id)`, `ledger_transactions` is registered `derived` rather than `firm`, so a rule through it TERMINATES and every mechanical check passes -- and it is wrong twice. The column is NULLABLE, so it would return a person only the disputes that already moved money and drop every OPEN one, which is the population a chargeback window is about; and it answers a DIFFERENT QUESTION besides, whose ledger accounts appear on the compensating reversal rather than whose purchase was disputed, and those agree only while no transaction touches two identities' accounts, which nothing enforces and double entry makes ordinary. WHAT A SCOPED READ RETURNS IS THE PERSON'S OWN DISPUTE HISTORY INCLUDING THE ONES MERIT WON, and that is deliberate: `payment_disputes_resolved_has_outcome` keeps `resolved_at` and `outcome` NULL together, so an open dispute is readable while it is still open, which is what a chargeback window is computed over. THE ROW IS ABOUT THE BUYER AND NEVER ABOUT THE COUNTERPARTY: unlike `attributions`, declared in this same migration and registered `pair`, this table names exactly one person's purchase and hands the reader no second identity's uuid, which is why `derived` is available here and a disjunction is not needed.",
+  },
+  payoutDestinations: {
+    class: 'owned',
+    column: 'identity_id',
+    nullable: false,
+    why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0051_payout_destinations.sql), where it is also the FIRST HALF of the primary key `(identity_id, destination_ref)`. A DESTINATION BELONGS TO A HUMAN AND NEVER TO AN ACCOUNT, which is the reading `wallet_withdrawals` already carries under SD-M5-06: the external leg has no `account_id` because the money is the person's by the time it is there, and the destination it moves to is the person's for the same reason. THE ROW REACHES EXACTLY ONE IDENTITY AND CARRIES NO SECOND PATH TO ANYBODY: `destination_ref` is a PROVIDER-SIDE id and never bank details, so it names a row in a vendor's database rather than one in this one, and `first_seen_at`, `cooling_until` and `created_at` are timestamps. There is nothing here for ADR-101 clause 1 to refuse and nothing for a `derived` rule to reach through, which makes this the rare registration whose available mistake is not a second column but a second TABLE. THE AFFILIATE RAIL SHARES THIS TENANCY RATHER THAN NEEDING ITS OWN, and that is the table's own property rather than a reader's use: C-24 requires affiliate destination changes to carry the same 48 hour window as trader destinations, and `affiliates.identity_id uuid NOT NULL REFERENCES identities(id)` (0005_affiliate_program.sql) makes an affiliate an identity -- so ADR-017's one rail, one destination table is expressible here with no discriminator column and no disjunction. WHAT A SCOPED READ RETURNS IS THE PERSON'S WHOLE DESTINATION HISTORY INCLUDING THE WINDOWS THAT HAVE ELAPSED, and that is deliberate: the row is never deleted (0051 REVOKEs DELETE from merit_app and PUBLIC) and `cooling_until` moves only forward under PAYOUT-DEST-C1, so a contested refusal is explicable months later out of the rows themselves. THE SCOPE RULE AND THE GRANT ANSWER DIFFERENT QUESTIONS HERE, which is 0050's lesson on a table that is readable rather than one that is not: a correctly scoped DELETE through this rule still fails, because merit_app holds SELECT, INSERT and UPDATE on this table and nothing else.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
