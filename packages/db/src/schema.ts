@@ -1922,6 +1922,29 @@ export const ledgerHalts = pgTable('ledger_halts', {
 // minimum the only honest state is `insufficient_data`, and
 // `plan_breaker_state_respects_min_sample` makes that structural rather than
 // procedural. An `insufficient_data` breaker is never a breach.
+//
+// THE PRIMARY KEY DOES NOT WIDEN AND THE PASS-RATE CUSUM DOES NOT LIVE HERE
+// (ADR-167). `metric text NOT NULL` sits OUTSIDE `(plan_id, evaluated_on)` in
+// 0016 and stays outside it: one plan-day is one row and one row is one metric.
+// API_CONTRACT's `per_plan` carries a `cusum: { statistic, threshold, alarm }`
+// object beside the four fields this table does hold, 0049 dispositioned the
+// whole field as needing nothing, and it checked four of the five. ADR-167 rules
+// that `S_t` is FOLDED AT READ TIME from the account series and is never stored,
+// so NO CUSUM VALUE IS EVER WRITTEN INTO `ratio_bp`, `threshold_bp`,
+// `numerator_cents`, `denominator_cents` OR `sample_size` -- those are the loss
+// ratio's columns and their names are load-bearing.
+//
+// THE FORECLOSURE IS WRITTEN HERE BECAUSE THIS IS WHERE ITS VIOLATOR WOULD BE
+// STANDING. A session adding a CUSUM column to this declaration, or adding
+// `metric` to the `primaryKey` below, is superseding ADR-167 rather than
+// extending a table, and what it has to answer is that `state`'s `'paused'`
+// value would then govern the added rows: `per_plan.sales_paused` derives from
+// `state = 'paused'`, so a second metric sharing this key gets a column that
+// spells a REVENUE PAUSE for a statistic whose own panel gloss is "inspect".
+//
+// `scope.ts` carries none of this on purpose: that file's rule is that every
+// `why` states the TABLE's tenancy and never the reader's use, and a CUSUM is a
+// use.
 export const planBreakerState = pgTable(
   'plan_breaker_state',
   {
