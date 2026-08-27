@@ -45,6 +45,57 @@
 // session: see docs/sessions/2026-08-21-session-111.md.
 
 // -----------------------------------------------------------------------------
+// Section 1. Conventions. THE LIST ENVELOPE, WHICH THIS FILE DID NOT HAVE
+// -----------------------------------------------------------------------------
+// API_CONTRACT section 1, one sentence, and it governs every list on this
+// surface: "Cursor only, never offset: `?limit=50&cursor=<opaque>`. Responses
+// carry `{ data, next_cursor }`. `limit` maximum 100, default 25."
+//
+// THIS FILE DECLARED THE ITEMS AND NEVER THE ENVELOPE, AND TWO SEGMENTS HAVE
+// NOW PAID FOR IT. `apps/portal/src/app/accounts/source.ts` refused to wire
+// `GET /accounts/:accountId/marks` an hour before this was written and gave the
+// absence as one of its two reasons: "`../../api/types.ts` declares
+// `MarkListItem` and NO envelope type at all, and that file is the
+// transcription of the contract and is outside this segment." The calendar
+// segment reaches the same wall on `GET /accounts/:accountId/timeline`, whose
+// server type is `TimelinePage` in `apps/api/src/routes/account-reads.ts` and
+// whose portal type was an unenveloped `TimelineItem[]`.
+//
+// SO IT IS TRANSCRIBED HERE ONCE RATHER THAN INVENTED PER SEGMENT. It is a
+// convention rather than an endpoint, so it is generic: the contract writes the
+// pair out longhand per response (`WalletEntriesResponse`,
+// `CertificateListResponse`) and section 1 is the rule those two are instances
+// of. A per-endpoint alias for each would be six copies of one shape, and the
+// sixth is the one that disagrees.
+//
+// THE ITEM TYPE IS NOT CONSTRAINED AND `data` IS NOT OPTIONAL. Section 1 states
+// the envelope unconditionally, so a list response that omits `next_cursor` is
+// a server that answered wrongly rather than a shape this file should admit.
+// `GET /plans` is the one documented departure -- `PlansResponse` declares
+// `data` and no cursor, on the contract's own ground that "the catalogue is
+// three rows" -- and it is a different type rather than this one with an
+// optional field, because an optional cursor makes "there may be more" and "the
+// endpoint does not page" the same value.
+
+/**
+ * Section 1's list envelope. `{ data, next_cursor }`, cursor only, never offset.
+ *
+ * `next_cursor` IS `string | null` AND THE `null` IS THE END OF THE LIST. It is
+ * `<opaque>` in the contract's words, which binds the CLIENT: nothing in this
+ * application may construct one, parse one, or read a meaning out of one. The
+ * portal's only legitimate use of it is the boolean "is there more", and
+ * `app/calendar/load.ts` argues what a screen does with that answer.
+ */
+export type CursorPage<T> = {
+  readonly data: readonly T[];
+  readonly next_cursor: string | null;
+};
+
+/** Section 1's stated bounds, as the contract's own numbers. */
+export const PAGE_LIMIT_DEFAULT = 25;
+export const PAGE_LIMIT_MAX = 100;
+
+// -----------------------------------------------------------------------------
 // Section 6. Accounts
 // -----------------------------------------------------------------------------
 

@@ -22,13 +22,13 @@ import { toTimelineView } from '../src/view/timeline.ts';
 import { AsOfContradictionError, freshnessAgainst } from '../src/app/calendar/as-of-stamp.tsx';
 import { EconomicCalendarScreen } from '../src/app/calendar/economic-calendar-screen.tsx';
 import {
-  ApiReadError,
   ECONOMIC_CALENDAR_PATH,
-  assertOk,
+  accountPath,
   pinnedVersionPath,
   readEconomicCalendarPanel,
   readPinnedRules,
   readTimeline,
+  timelinePagePath,
   timelinePath,
 } from '../src/app/calendar/load.ts';
 import { RulesScreen } from '../src/app/calendar/rules-screen.tsx';
@@ -137,6 +137,12 @@ const timelineHtml = (as_of_trading_day: string, closed_through_day: string | nu
       shell: TRADER_SHELL,
       timeline: toTimelineView('acct_0191c2', as_of_trading_day, TIMELINE_ITEMS),
       freshness: freshnessAgainst(as_of_trading_day, closed_through_day),
+
+      // The as-of clause is about the STAMP, so these renders declare a
+      // complete read and the paging clause below is where the other arm is
+      // asserted. A default here would be the thing `timeline-screen.tsx`
+      // refuses to have.
+      paging: { kind: 'complete' },
     }),
   );
 
@@ -315,30 +321,134 @@ describe('the frame, inside the chrome the root layout owns', () => {
 });
 
 describe('the three routes', () => {
-  // THEY RENDER AN HONEST ERROR AND NOT A FIXTURE. There is no transport in this
-  // application and `surface.test.ts` still asserts there is none, so a route
-  // that rendered a release time or a contract clause would be showing a trader
-  // something Merit never sent it. `app/page.tsx` refuses the same thing in the
-  // same words one directory up.
-  it('each render the unauthenticated state, computed rather than typed', () => {
-    for (const [name, Page] of [
-      ['calendar', EconomicCalendarPage],
-      ['timeline', AccountTimelinePage],
-      ['rules', AccountRulesPage],
-    ] as const) {
-      const html = render(createElement(Page, {}));
-      expect(html, name).toContain('data-content-state="error"');
-      expect(html, name).toContain('data-error-kind="unauthenticated"');
-      expect(html.toLowerCase(), name).not.toContain('forbidden');
+  // THEY PERFORM REAL READS NOW, AND THIS SUITE EXERCISES THE ONE ARM IT CAN
+  // REACH WITHOUT A REQUEST SCOPE. `serverApiClient()` resolves the origin
+  // BEFORE it imports `next/headers.js`, so a process with no
+  // `MERIT_API_ORIGIN` reaches `ApiConfigError` without ever touching the
+  // framework, and that is the `unavailable` arm. The `ready` and `error` arms
+  // go through `createApiClient` over a stub transport in
+  // `apps/portal/test/calendar-source.test.ts`, which is where the seam is
+  // asserted rather than the routing.
+  const withoutOrigin = async (run: () => Promise<void>): Promise<void> => {
+    const held = process.env['MERIT_API_ORIGIN'];
+    delete process.env['MERIT_API_ORIGIN'];
+    try {
+      await run();
+    } finally {
+      if (held !== undefined) process.env['MERIT_API_ORIGIN'] = held;
     }
+  };
+
+  const params = Promise.resolve({ accountId: 'acct_0191c2' });
+
+  const routeHtml = async (): Promise<readonly (readonly [string, string])[]> => [
+    ['calendar', render(await EconomicCalendarPage())],
+    ['timeline', render(await AccountTimelinePage({ params }))],
+    ['rules', render(await AccountRulesPage({ params }))],
+  ];
+
+  it('each render an unconfigured deployment as unavailable and never as a failure', async () => {
+    await withoutOrigin(async () => {
+      for (const [name, html] of await routeHtml()) {
+        expect(html, name).toContain('data-content-state="unavailable"');
+
+        // NOTHING FAILED AND THE SCREEN SAYS SO. `unavailable` and `error` are
+        // two different facts and this is the one where no request was made.
+        expect(html, name).toContain('Nothing has failed');
+        expect(html, name).not.toContain('data-content-state="error"');
+        expect(html.toLowerCase(), name).not.toContain('forbidden');
+      }
+    });
   });
 
-  it('emit no chrome of their own, because the layout wraps them', () => {
-    for (const Page of [EconomicCalendarPage, AccountTimelinePage, AccountRulesPage]) {
-      const html = render(createElement(Page, {}));
-      expect(html).not.toContain('<footer');
-      expect(html).not.toContain('data-placement="shell-band"');
-    }
+  it('name the endpoints they were going to read, so an operator can act on it', async () => {
+    await withoutOrigin(async () => {
+      const html = new Map(await routeHtml());
+      const calendar = html.get('calendar') ?? '';
+      const timeline = html.get('timeline') ?? '';
+      const rules = html.get('rules') ?? '';
+      expect(calendar).toContain('GET /economic-calendar');
+
+      // THE FOURTH ENDPOINT. Both account screens read `GET /accounts/:accountId`
+      // first, because `as_of_trading_day` and the plan pin live only there.
+      expect(timeline).toContain('GET /accounts/:accountId');
+      expect(timeline).toContain('GET /accounts/:accountId/timeline');
+      expect(rules).toContain('GET /accounts/:accountId');
+      expect(rules).toContain('GET /plans/:planId/versions/:version');
+    });
+  });
+
+  it('do not echo the route parameter into their own markup', async () => {
+    await withoutOrigin(async () => {
+      // INV-M4-07's direction: on an arm that read nothing, the id in the URL
+      // is a string a stranger chose.
+      for (const [name, html] of (await routeHtml()).slice(1))
+        expect(html, name).not.toContain('acct_0191c2');
+    });
+  });
+
+  it('emit no chrome of their own, because the layout wraps them', async () => {
+    await withoutOrigin(async () => {
+      for (const [name, html] of await routeHtml()) {
+        expect(html, name).not.toContain('<footer');
+        expect(html, name).not.toContain('data-placement="shell-band"');
+      }
+    });
+  });
+});
+
+describe('the paging clause', () => {
+  // `./load.ts` reads ONE page of a cursor-paginated list. The screen may not
+  // render a truncated timeline as a whole one, and `paging` is a required prop
+  // with no default so that a caller cannot fail to say which it holds.
+  const paged = (paging: { kind: 'complete' } | { kind: 'partial' }): string =>
+    render(
+      createElement(TimelineScreen, {
+        shell: TRADER_SHELL,
+        timeline: toTimelineView('acct_0191c2', '2026-03-13', TIMELINE_ITEMS),
+        freshness: { kind: 'unstated' },
+        paging,
+      }),
+    );
+
+  it('says a complete timeline is complete', () => {
+    const html = paged({ kind: 'complete' });
+    expect(html).toContain('data-paging="complete"');
+    expect(html).toContain('This is the whole timeline');
+    expect(html).not.toContain('has not loaded');
+  });
+
+  it('says a truncated one is truncated, and claims no end of the list', () => {
+    const html = paged({ kind: 'partial' });
+    expect(html).toContain('data-paging="partial"');
+    expect(html).toContain('has not loaded');
+
+    // API_CONTRACT section 6 gives this endpoint the word "Chronological" and
+    // no direction, so the screen must not say which end it read.
+    //
+    // ASSERTED ON THE PAGING PARAGRAPH RATHER THAN ON THE PAGE. The as-of
+    // stamp's `unstated` note legitimately says "the most recent one" about a
+    // TRADING DAY, and a whole-document search cannot tell that sentence from a
+    // claim about which end of the list this is.
+    const start = html.indexOf('data-paging="partial"');
+    const statement = html.slice(start, html.indexOf('</p>', start)).toLowerCase();
+    expect(statement).toContain('has not loaded');
+    for (const end of ['most recent', 'oldest', 'newest', 'latest'])
+      expect(statement, end).not.toContain(end);
+  });
+
+  it('refuses to claim nothing has happened on a page that carried nothing', () => {
+    const empty = render(
+      createElement(TimelineScreen, {
+        shell: TRADER_SHELL,
+        timeline: toTimelineView('acct_0191c2', '2026-03-13', []),
+        freshness: { kind: 'unstated' },
+        paging: { kind: 'partial' },
+      }),
+    );
+    expect(empty).toContain('data-entries="none"');
+    expect(empty).not.toContain('Nothing has happened on this account yet');
+    expect(empty).toContain('not a claim that nothing has happened');
   });
 });
 
@@ -353,17 +463,13 @@ describe('the segment request plan', () => {
     expect(timelinePath('a/../b')).toBe('/accounts/a%2F..%2Fb/timeline');
   });
 
-  it('refuses a non-2xx with its status, and composes no sentence for it', () => {
-    expect(() => assertOk(404, ECONOMIC_CALENDAR_PATH)).toThrow(ApiReadError);
-    expect(() => assertOk(200, ECONOMIC_CALENDAR_PATH)).not.toThrow();
-    try {
-      assertOk(404, ECONOMIC_CALENDAR_PATH);
-    } catch (error) {
-      expect((error as ApiReadError).status).toBe(404);
-      // INV-M4-07: the wording is toPortalErrorKind's and never this file's.
-      expect((error as ApiReadError).message.toLowerCase()).not.toContain('forbidden');
-      expect((error as ApiReadError).message.toLowerCase()).not.toContain('not found');
-    }
+  it('names the account read both account screens force, and sends section 1`s limit', () => {
+    expect(accountPath('acct_0191c2')).toBe('/accounts/acct_0191c2');
+
+    // THE LIMIT IS IN THE REQUEST RATHER THAN INHERITED FROM THE SERVER'S
+    // DEFAULT, because the screen has to state what it read and a default in
+    // another deployable can move without a diff here.
+    expect(timelinePagePath('acct_0191c2', 100)).toBe('/accounts/acct_0191c2/timeline?limit=100');
   });
 
   it('reads each body into the view model its screen takes', () => {
