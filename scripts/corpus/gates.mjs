@@ -6882,12 +6882,24 @@ const UNPROBEABLE_ARTIFACTS = new Map([
       'changes when it is created, so no probe over the tree can report it. This is the ' +
       'condition the gate asserts and the artifact the gate cannot (ADR-073 section 4)',
   ],
-  [
-    'the VG-12 admission',
-    'the admission is .github/CODEOWNERS plus a branch-protection setting, and session 23 ' +
-      'records why no job can see it: "a job can see the dependency surface changed and ' +
-      'cannot see that a human agreed". A repository file cannot report it',
-  ],
+  // 'the VG-12 admission' IS RETIRED, AND THE REGISTER'S OWN RULE IS WHY.
+  // It registered CI-09's Stryker leg, which is BUILT as of 2026-08-27
+  // (ADR-127), so no condition in STRATEGY section 4.1 names it any more and
+  // the stale-direction loop below reported it as a finding on the commit that
+  // moved the row: "a register entry that no longer names a real condition is a
+  // finding, which is what keeps this register from becoming furniture".
+  //
+  // WHAT ITS ENTRY SAID, KEPT BECAUSE THE SENTENCE IS THE REASON THE LEG WAITED
+  // SEVEN DAYS: the admission is .github/CODEOWNERS plus a branch-protection
+  // setting, and session 23 records why no job can see it, "a job can see the
+  // dependency surface changed and cannot see that a human agreed".
+  //
+  // THIS ONE RETIRED DIFFERENTLY FROM ADR-116's `playwrightInLockfile`, and the
+  // difference is worth a line. That probe retired because its artifact ARRIVED
+  // and a probe reported it. This entry retires because its artifact arrived and
+  // NOTHING COULD REPORT IT: an unprobeable condition closes silently by
+  // construction, so the register shrinking is the only observable event there
+  // ever was. ADR-127 section 7.
   [
     "M07's detector code",
     'the condition names a module plan and not a path or a manifest key. ADR-073 section 5 ' +

@@ -270,3 +270,143 @@ jobs:
           name: ci-09-replay-self-audit
           path: test-results/
           if-no-files-found: error
+
+  # ===========================================================================
+  # CI-09  Nightly, the Stryker leg
+  # ===========================================================================
+  # BUILT 2026-08-27, ON THE ARTIFACT ADR-127 RECORDS. This leg waited from
+  # 2026-08-20 on ONE artifact and the artifact was not a file: "the VG-12
+  # admission, which a session cannot grant itself". `gates.mjs` registered it
+  # as unprobeable in session 23's words, "a job can see the dependency surface
+  # changed and cannot see that a human agreed", so no check in this repository
+  # could ever have reported its arrival. THE FOUNDER DELEGATED THE GRANT and
+  # ADR-127 RECORDS the delegation rather than proceeding as though the gate did
+  # not apply, which is ADR-116's shape one leg over. An admission taken
+  # silently and a gate ignored are the same diff and opposite records.
+  #
+  # IT IS A SEPARATE JOB, for the reason the replay leg's header gives: ADR-073
+  # rules each of CI-09's four legs separately, and a leg folded into another job
+  # can neither go red on its own nor be read on its own. The fourth leg, the
+  # detector canary, stays ABSENT rather than becoming an `if: false` step.
+  #
+  # ---------------------------------------------------------------------------
+  # WHAT THIS JOB FAILS ON, WHICH IS NOT THE SCORE
+  # ---------------------------------------------------------------------------
+  # `stryker.conf.mjs` sets `thresholds.break` to null, so NO mutation score
+  # fails this job. That is STRATEGY section 2 verbatim -- "reported as a trend
+  # rather than a threshold" -- and OQ-TS-02's answer: "A threshold on a young
+  # codebase produces tests written to kill mutants rather than to pin behavior,
+  # which is TR-01 inverted." A break threshold is the cheapest way to violate
+  # TR-01, because the cheapest way to move a mutation score is to write a test
+  # that pins whatever the implementation currently does.
+  #
+  # SO THE THREE THINGS IT DOES FAIL ON ARE WORTH NAMING. The initial test run
+  # failing. The runner crashing. And ZERO MUTANTS, which Stryker refuses itself
+  # ("No tests were executed. Stryker will exit prematurely") and which was
+  # watched firing before this job was written, with `--mutate` pointed at a path
+  # that does not exist. THAT THIRD ONE IS THIS FILE'S OWN LESSON in a different
+  # costume: the replay leg's runner note two jobs up is about a `.ts` entry that
+  # exits 0 writing zero bytes. A mutation run whose glob matches nothing has the
+  # same shape and would go green over nothing.
+  #
+  # ---------------------------------------------------------------------------
+  # THE TIMEOUT IS A MEASUREMENT AND NOT A ROUND NUMBER
+  # ---------------------------------------------------------------------------
+  # The other two legs are seconds of compute behind an install and carry 20
+  # minutes. THIS ONE IS NOT. Measured on this branch, on a 4-core host, which is
+  # the core count `ubuntu-latest` gives: 1,921 mutants over 19 source files.
+  # ADR-127 section 5 carries the wall clock and the score. The timeout below is
+  # that measurement with room for a cold runner and a slower shared host, and it
+  # is a bound on a job that hangs rather than a budget the run is expected to
+  # approach. A nightly that hangs is a nightly nobody cancels.
+  stryker-mutation:
+    name: CI-09 nightly Stryker on the rules engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # RIDER 3, OQ-P1-03, and RI-05 fails any workflow that pins inline.
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      # THE FILTER IS THE SCOPE AND IT IS NOT DECORATION. STRATEGY section 2
+      # rules mutation testing "on `packages/rules-engine` only", and this line
+      # plus the config living inside that package are the two halves of it. A
+      # root-level `stryker run` over this workspace is the wall-clock disaster
+      # the rejected alternative in that row names by hand.
+      - name: CI-09 Stryker on the rules engine
+        run: pnpm --filter @merit/rules-engine run mutation
+
+      # A TREND NOBODY CAN READ WITHOUT DOWNLOADING AN ARTIFACT IS NOT A TREND.
+      # STRATEGY asks for a number reported nightly, and the run page is where a
+      # nightly is read, so the score goes to the step summary. `always()`
+      # because the run that is most worth reading is the one that went red, and
+      # the report exists for a red run too.
+      - name: Report the score
+        if: always() && hashFiles('packages/rules-engine/test-results/stryker/mutation.json') != ''
+        run: |
+          cat > "$RUNNER_TEMP/ci-09-score.mjs" <<'EOF'
+          import { readFileSync } from 'node:fs';
+          const report = JSON.parse(
+            readFileSync('packages/rules-engine/test-results/stryker/mutation.json', 'utf8'),
+          );
+          // The mutation score counts DETECTED over VALID, which is the
+          // mutation-testing-elements definition: Ignored and CompileError
+          // mutants are not valid and are in neither half. Reproducing the
+          // arithmetic here rather than reading a field keeps the summary
+          // honest about which mutants it counted.
+          const tally = (mutants) => {
+            const t = { Killed: 0, Timeout: 0, Survived: 0, NoCoverage: 0, RuntimeError: 0, CompileError: 0, Ignored: 0 };
+            for (const m of mutants) t[m.status] = (t[m.status] ?? 0) + 1;
+            return t;
+          };
+          const rows = Object.entries(report.files).map(([path, f]) => [path, tally(f.mutants)]);
+          const total = tally(Object.values(report.files).flatMap((f) => f.mutants));
+          const score = (t) => {
+            const detected = t.Killed + t.Timeout;
+            const valid = detected + t.Survived + t.NoCoverage;
+            return valid === 0 ? 'n/a' : `${((detected / valid) * 100).toFixed(2)}%`;
+          };
+          console.log('## CI-09 Stryker, `packages/rules-engine`');
+          console.log('');
+          console.log('**A TREND AND NOT A THRESHOLD.** STRATEGY section 2 and OQ-TS-02: no score fails this job.');
+          console.log('');
+          console.log('| File | Score | Killed | Timeout | Survived | No coverage |');
+          console.log('|---|---|---|---|---|---|');
+          for (const [path, t] of rows.sort((a, b) => a[0].localeCompare(b[0]))) {
+            console.log(`| \`${path}\` | ${score(t)} | ${t.Killed} | ${t.Timeout} | ${t.Survived} | ${t.NoCoverage} |`);
+          }
+          console.log(`| **all files** | **${score(total)}** | **${total.Killed}** | **${total.Timeout}** | **${total.Survived}** | **${total.NoCoverage}** |`);
+          EOF
+          # THE SCRIPT IS A FILE AND NOT A HEREDOC INTO `node`. Node decides
+          # module kind from the extension, and a script arriving on stdin has
+          # none: an `import` statement there is a syntax error under CommonJS
+          # and the step would fail on the summary rather than on the run.
+          node "$RUNNER_TEMP/ci-09-score.mjs" >> "$GITHUB_STEP_SUMMARY"
+
+      # The harness leg's guard, for its reason: the report worth keeping is the
+      # one from the run that went red, and `always()` alone turns a crashed
+      # runner into a second red step about a file that could not exist. The
+      # path is the PACKAGE's `test-results/` and not the repository root's,
+      # because the run is scoped to the package and so is its output.
+      - name: Keep the report
+        if: always() && hashFiles('packages/rules-engine/test-results/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-09-stryker
+          path: packages/rules-engine/test-results/
+          if-no-files-found: error
+          # The harness leg's retention, for the harness leg's reason: long
+          # enough for the C8 monthly retro to reach the run that produced a
+          # figure it is reading.
+          retention-days: 45
