@@ -1471,24 +1471,82 @@ const SEEDS = {
   // DERIVED FROM THE TREE AT SEED TIME. No app is named here, so the seed follows
   // a rename or a fifth app. The selector is stable under its own seed: creating
   // `src/app/page.tsx` does not change which app sorts first.
+  // RETIRED 2026-08-27, ON THE COMMIT THAT MADE IT UNFIREABLE, AND THE RETIREMENT
+  // IS THE THIRD TIME THIS FILE HAS RECORDED THE SAME LESSON RATHER THAN THE
+  // FIRST. The `fastify` seed died when ADR-100 put a real key in the lockfile;
+  // the `scopedDb` seed died when ADR-120 wired the accessor; this one dies
+  // because CI-07 stopped WAITING at all.
+  //
+  // The case seeded an App Router file to prove CI-07's row reopens when its
+  // artifact arrives. That assertion needs a row with a waiting condition to
+  // reopen. Session 250 landed the first real App Router files, CI-07's stage
+  // was written in the same series, and the row now reads **Implemented.** --
+  // so there is no condition left for a seed to trip and the case scored
+  // `DID NOT FAIL` on the tree that closed it. A seed left in place would have
+  // gone vacuous in the direction that reads as coverage, which is the exact
+  // defect the two `0029` seeds were retired for.
+  //
+  // NOTHING REPLACES IT AND THAT IS A STATE RATHER THAN A GAP. Section 4.1's
+  // three remaining conditions -- a Neon branch, the VG-12 admission, and M07's
+  // detector code -- are each REGISTERED unprobeable with a reason, so none can
+  // be seeded from the tree. `CI-06/vg-inventory`'s own arrival case still
+  // covers this shape one table down, and `INVENTORY_PROBES` now says its
+  // emptiness out loud for the same reason this comment exists.
+  //
+  // A FUTURE CONDITION NAMING A READABLE ARTIFACT REOPENS THIS SLOT, and the
+  // gate makes that automatic: it fails on any condition whose artifact is
+  // neither probed nor registered, so the next one cannot land unnoticed.
   'CI-06/gate-inventory': {
-    what: "an activation condition's artifact ARRIVING: an App Router file under apps/*/src/app/ reopens CI-07",
+    what: 'a stage row losing its disposition, which is ADR-073 section 2\'s headline case',
     real:
-      'CI-07 has been open since P1 was declared closed and nothing could read its state, ' +
-      'which ADR-073 gives as the reason a "deferred" marker no gate reads is the same ' +
-      'marker. Its condition is a path precisely so that the commit adding the first ' +
-      'renderable document reopens the row on the day it lands rather than whenever ' +
-      'somebody rereads the table. THE ROW HAS ALREADY BEEN WATCHED FIRING FOR REAL: ' +
-      'ADR-095 section 6 is the re-ruling that followed',
-    expect: (d) => `HAS ARRIVED (${firstAppDir(d)}/src/app/page.tsx is an App Router file`,
+      'ADR-073 section 2 rules a row closed when it is implemented, when it carries a ' +
+      'dated activation condition naming one artifact, or when a register outside Actions ' +
+      'discharges it. A row that is none of the three is a stage nobody can say the state ' +
+      'of, which is the condition the whole inventory exists to refuse: "deferred" written ' +
+      'in a cell that no gate reads is the same as nothing written at all',
+    // THE SEED MOVED ON 2026-08-27 BECAUSE ITS TARGET STOPPED EXISTING, WHICH IS
+    // THE THIRD TIME THIS FILE HAS RECORDED THAT AND THE FIRST TIME IT WAS NOT A
+    // MISMATCH. The `fastify` seed died when ADR-100 put a real key in the
+    // lockfile and the `scopedDb` seed died when ADR-120 wired the accessor:
+    // both anchors were still MEANINGFUL and merely occupied. This one is
+    // different and the difference is the point.
+    //
+    // It seeded an App Router file to prove CI-07's row REOPENS when its
+    // artifact arrives. That assertion needs a row that is WAITING. Session 250
+    // landed the first real App Router files, CI-07's stage was written in the
+    // same series, and the row now reads **Implemented.** -- so no condition is
+    // left for any seed to trip, and the case scored `DID NOT FAIL` on the very
+    // commit that closed it. Left in place it would have gone vacuous in the
+    // direction that reads as coverage, which is the defect the two `0029` seeds
+    // were retired for.
+    //
+    // THE ARRIVAL SHAPE IS NOT SEEDABLE FOR THIS GATE ANY MORE AND THAT IS A
+    // STATE, NOT A GAP. Section 4.1's three remaining conditions -- a Neon
+    // branch, the VG-12 admission, and M07's detector code -- are each
+    // REGISTERED unprobeable with a reason, so none can be produced in a copy of
+    // the tree. `CI-06/vg-inventory` still carries an arrival case one table
+    // down, and the day a condition names a readable artifact the gate fails
+    // until somebody writes its probe, so the slot reopens by itself.
+    //
+    // SO THE SEED MOVES TO THE GATE'S HEADLINE ASSERTION, which is always
+    // seedable and is what ADR-073 section 2 actually rules: a row must carry
+    // one of three dispositions. `CI-01` is the anchor because it is implemented
+    // outright, has been since the inventory existed, and its cell is asserted
+    // rather than assumed below.
+    expect: () => 'CI-01 carries no disposition',
     seed: (d) => {
-      const app = firstAppDir(d);
-      const dir = join(d, app, 'src/app');
-      if (existsSync(join(dir, 'page.tsx'))) {
-        throw new Error(`seed anchor not found: ${app}/src/app/page.tsx already exists`);
+      const p = join(d, STRATEGY_PATH);
+      const lines = readFileSync(p, 'utf8').split('\n');
+      const i = lines.findIndex((l) => l.startsWith('| CI-01'));
+      if (i === -1) throw new Error('seed anchor not found: no CI-01 row in section 4.1');
+      const cells = lines[i].split('|');
+      const j = cells.findIndex((c) => c.includes('**Implemented.**'));
+      if (j === -1) {
+        throw new Error('seed anchor not found: CI-01 carries no **Implemented.** cell');
       }
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(join(dir, 'page.tsx'), '// seeded by falsify.mjs\n');
+      cells[j] = ' deferred ';
+      lines[i] = cells.join('|');
+      writeFileSync(p, lines.join('\n'));
     },
   },
 
@@ -2208,19 +2266,11 @@ const firstArtifactRow = (d) => {
   return row;
 };
 
-// CI-07's artifact is a PATH since ADR-095 re-ruled it from a manifest key, so
-// this selector returns the app DIRECTORY where it used to return the manifest.
-// Derived rather than spelled: a seed naming `apps/admin` goes vacuous the day
-// that directory is renamed, and reads as coverage while asserting nothing. The
-// selector is stable under its own seed, which is why it is the first app by name
-// and not the first app carrying some property the seed then adds.
-const firstAppDir = (d) => {
-  const app = readdirSync(join(d, 'apps'))
-    .sort()
-    .find((a) => existsSync(join(d, 'apps', a, 'package.json')));
-  if (!app) throw new Error('seed anchor not found: no apps/*/package.json');
-  return `apps/${app}`;
-};
+// `firstAppDir` lived here and was DELETED on 2026-08-27 with the seed that used
+// it. It resolved CI-07's artifact path for the App Router seed; CI-07 reached
+// **Implemented** that day, the seed moved to the gate's headline assertion, and
+// a selector with no caller is the furniture this file's registers exist to
+// refuse. Lint found it in the same run, which is the check working.
 
 // ---------------------------------------------------------------------------
 // CI-06/vg-inventory: readers for STRATEGY section 4.2
@@ -2248,11 +2298,12 @@ const vgRowsIn = (d) => {
 };
 
 /** The first row carrying a chained leg. Stable: no seed here removes a chain. */
-const chainedVgRow = (d) => {
-  const row = vgRowsIn(d).find((r) => /\*\*Chained,/.test(r.closure));
-  if (!row) throw new Error('no chained VG row; the chain-expiry seed has no anchor');
-  return row;
-};
+// `chainedVgRow` lived here and was DELETED on 2026-08-27. It found an existing
+// chained row for the chain-expiry seed to re-point. Section 4.2 reached ZERO
+// chained rows that day -- implementing CI-07 expired VG-2's chain, VG-2 was
+// wired and VG-10 fell back to its waiting leg -- so it threw
+// "no chained VG row; the chain-expiry seed has no anchor". The seed now
+// SYNTHESISES its chain from any waiting row and needs no such selector.
 
 /** The first row carrying a waiting leg with an artifact. */
 const waitingVgRow = (d) => {
@@ -2468,11 +2519,26 @@ const SCOPE_CASES = [
     // section 4.2 reads identically whether the rule discriminates or has
     // stopped. CI-01 is chosen because it is implemented outright and no seed
     // here touches it.
-    expect: (d) => `${chainedVgRow(d).id} is "Chained on CI-01"`,
+    //
+    // THE SEED STOPPED BORROWING AN EXISTING CHAIN ON 2026-08-27, AND THE EVENT
+    // THAT FORCED IT IS THE EVENT THIS CASE MODELS. It read the first row
+    // matching `**Chained,` and re-pointed it at CI-01. That anchor vanished the
+    // day the assertion came true for real: implementing CI-07 expired VG-2's
+    // chain, VG-2 was WIRED in the same commit and VG-10 fell back to its
+    // waiting leg, section 4.2 went to ZERO chained rows, and this case reported
+    // `SEED IS STALE -- no chained VG row`. The gate was right, the table was
+    // right, and the harness was the only thing that broke.
+    //
+    // SO IT SYNTHESISES ITS OWN CHAIN rather than depending on the corpus to
+    // keep one lying around, which is `soleWaiterVgRow`'s lesson generalised: a
+    // seed anchored on a row somebody may legitimately repair is a seed that
+    // goes vacuous on good news. Any waiting row will do as the carrier, because
+    // what is under test is the CHAIN's expiry and not the row it is written on.
+    expect: (d) => `${waitingVgRow(d).id} is "Chained on CI-01"`,
     seed: (d) => {
-      const row = chainedVgRow(d);
+      const row = waitingVgRow(d);
       edit(d, STRATEGY_PATH, (b) =>
-        once(b, row.closure, row.closure.replace(/on `CI-\d{2}`/, 'on `CI-01`')),
+        once(b, row.closure, '**Chained, 2026-08-27**, on `CI-01`. ' + row.closure),
       );
     },
   },
