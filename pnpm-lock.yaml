@@ -228,6 +228,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@merit/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@merit/rules-engine':
         specifier: workspace:*
         version: link:../../packages/rules-engine
