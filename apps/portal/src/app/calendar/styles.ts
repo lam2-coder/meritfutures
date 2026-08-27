@@ -70,6 +70,13 @@ export const SEGMENT_STYLES = `
 .merit-clause__path { display: block; font-size: .75rem; letter-spacing: .04em; text-transform: uppercase; opacity: .8; }
 
 .merit-empty, .merit-stale { border: 2px solid; padding: .75rem; margin: .75rem 0; }
+
+/* The paging statement and the two states that are not \`ready\`. BORDERED LIKE
+   \`.merit-empty\` RATHER THAN QUIET, because each of the three is a sentence
+   about what the screen could NOT show, and a caption-weight one is read as a
+   footnote to data that is not there. */
+.merit-paging, .merit-unavailable { border: 2px solid; padding: .75rem; margin: .75rem 0; }
+.merit-unavailable__endpoint { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8125rem; }
 .merit-footer { border-top: 1px solid; margin-top: 2rem; padding-top: .75rem; font-size: .8125rem; }
 
 @media (min-width: 40rem) {
