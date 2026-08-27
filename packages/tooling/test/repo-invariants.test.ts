@@ -794,6 +794,62 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     expect(findings('RI-13', root)).toEqual([]);
   });
 
+  test('RI-13 reads a grant written DEEPER in the approval section than its first line', () => {
+    // ADR-111 IS THE CASE, AND THE CHECK FAILED IT BEFORE THIS SEED EXISTED. Its
+    // approval section opens by recording that the entry landed with no approval
+    // line, runs a shell block whose comments start with `#`, and signs at the
+    // bottom. Reading the section as ending at the first `#` inside the fence lost
+    // the signature and reported a SIGNED entry as unsigned.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      [
+        '## ADR-900: a ruling (2026-08-27, status: accepted)',
+        '',
+        '### 4. The approval line, ADDED BY THE LOOP',
+        '',
+        '**This entry landed with no approval line and the log says UNSIGNED.**',
+        '',
+        '```',
+        '# 1. what was verified at merge',
+        'pnpm run verify   -> exit 0',
+        '```',
+        '',
+        '**SIGNED ON DELEGATED AUTHORITY, 2026-08-27. Not money path.**',
+        '',
+      ].join('\n'),
+    );
+    expect(findings('RI-13', root)).toEqual([]);
+  });
+
+  test('RI-13 does NOT read a disposition out of prose about somebody else"s grant', () => {
+    // THE OPPOSITE DIRECTION, AND IT IS THE ONE THAT FAILS SILENTLY. ADR-119 has
+    // `**REFUSED**` in a table cell about an empty world and ADR-137 cites a
+    // recommendation another entry GRANTED. Both are unsigned. A disposition read
+    // from anywhere in the section drops them out of scope with nothing reported,
+    // so a disposition is read only at the FRONT of a line, where a signature goes.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/decisions/ADR-900.md',
+      [
+        '## ADR-900: a ruling (2026-08-27, status: proposed)',
+        '',
+        '### 4. Approval',
+        '',
+        '| 5 | An empty world | **REFUSED**, which is another entry"s sentence |',
+        '',
+        '- **The clause to read before signing is clause 1.** It says an item that',
+        '  ADR-059 recommendation 3 GRANTED does not hold what its register says.',
+        '',
+        '- **Approval line: PENDING, UNSIGNED.** Not money path.',
+        '',
+      ].join('\n'),
+    );
+    expect(findings('RI-13', root).join('\n')).toContain('ADR-900.md: approval withheld at :10');
+  });
+
   test('RI-13 leaves an entry carrying NO approval statement out of scope', () => {
     // THE DELIBERATE HOLE, AND IT IS IN `covers`. Thirty-one pre-FREEZE entries
     // record no approval at all. Reading their silence as "unsigned" would fail
