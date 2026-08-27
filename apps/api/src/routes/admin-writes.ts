@@ -394,17 +394,36 @@ function handlerProblem(
   return { type: `${PROBLEM_TYPE_PREFIX}${code}`, title, status, code, instance };
 }
 
-/** A refusal decided inside a transaction and thrown out of it, so the write rolls back. */
+/** What a {@link Refusal} carries: a section 2 code and the parts of a problem document. */
+interface RefusalDocument {
+  readonly code: string;
+  readonly title: string;
+  readonly status: number;
+  readonly detail?: string;
+  readonly errors?: readonly FieldError[];
+}
+
+/**
+ * A refusal decided inside a transaction and thrown out of it, so the write rolls back.
+ *
+ * THE FIELD IS ASSIGNED IN THE BODY AND IS NOT A CONSTRUCTOR PARAMETER PROPERTY.
+ * `apps/api` runs under `node --experimental-strip-types` (`pnpm start`), which
+ * ERASES types rather than compiling them, and a parameter property is the one
+ * TypeScript construct that needs code emitted for it:
+ * `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX: TypeScript parameter property is not
+ * supported in strip-only mode`. It type-checks, Vitest transpiles it, the suite
+ * goes green, and **the process does not start** -- because `discoverRouteModules`
+ * imports every file in `routes/`, so one unsupported construct here takes the
+ * whole deployable down. Found by running this module under the real runtime
+ * rather than under the test transform.
+ */
 class Refusal extends Error {
-  constructor(
-    readonly document: Omit<ProblemDocument, keyof Problem> & {
-      readonly code: string;
-      readonly title: string;
-      readonly status: number;
-    },
-  ) {
+  readonly document: RefusalDocument;
+
+  constructor(document: RefusalDocument) {
     super(`${document.code}: ${document.detail ?? document.title}`);
     this.name = 'Refusal';
+    this.document = document;
   }
 }
 

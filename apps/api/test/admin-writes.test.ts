@@ -25,6 +25,10 @@
 // one test file, so the need is stated here rather than taken.
 // =============================================================================
 
+import { execFileSync } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { TABLE_KEYS, closeClient, systemDb, transaction } from '@merit/db';
@@ -73,6 +77,44 @@ describe('the tables the module names', () => {
   it('are all keys packages/db registers', () => {
     const keys: readonly TableKey[] = ADMIN_WRITE_TABLES;
     for (const key of keys) expect(TABLE_KEYS).toContain(key);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// 0b. THE MODULE LOADS UNDER THE RUNTIME THAT ACTUALLY SERVES IT
+// -----------------------------------------------------------------------------
+// **VITEST TRANSPILES AND THE DEPLOYABLE DOES NOT.** `apps/api`'s `start` script
+// is `node --experimental-strip-types src/start.ts`, which ERASES types rather
+// than compiling them, so a construct needing emitted code -- a constructor
+// parameter property, an `enum`, a namespace, a decorator -- type-checks, passes
+// under Vitest, and throws `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` when the process
+// starts. `discoverRouteModules` imports EVERY file in `routes/`, so one of them
+// takes the whole deployable down.
+//
+// This suite shipped with exactly that defect and every other assertion in it
+// was green. The check is here rather than left to a deploy.
+//
+// **IT COVERS THIS FILE AND NOT THE OTHERS.** The general form belongs in
+// `repo-invariants.mjs`, over every module in `routes/`, and that file is
+// outside this session's fence; the need is named in ADR-145's owed table.
+
+describe('the runtime that actually serves this module', () => {
+  it('imports it under `node --experimental-strip-types`, which does not transpile', () => {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const module = join(here, '..', 'src', 'routes', 'admin-writes.ts');
+    const out = execFileSync(
+      process.execPath,
+      [
+        '--experimental-strip-types',
+        '--input-type=module',
+        '-e',
+        `const m = await import(${JSON.stringify(module)});
+         if (typeof m.default?.name !== 'string') throw new Error('no route module');
+         process.stdout.write(m.default.name);`,
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    expect(out).toBe('admin-writes');
   });
 });
 

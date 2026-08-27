@@ -6,6 +6,7 @@ import {
   PROBLEM_MEDIA_TYPE,
   PROBLEM_TYPE_PREFIX,
   buildServer,
+  classifyPath,
   defineRoutes,
   discoverRouteModules,
 } from '../src/index.ts';
@@ -76,10 +77,25 @@ test('the liveness path without the base path is not served', async () => {
 // -----------------------------------------------------------------------------
 
 test('the public deployment answers 404 for an operator route it was given', async () => {
-  const { app, report } = buildServer({ surface: 'public', modules: [...onDisk, ops] });
+  const modules = [...onDisk, ops];
+  const { app, report } = buildServer({ surface: 'public', modules });
   // The route was DECLARED and not registered. That is the whole mechanism:
   // there is nothing at this path for a permission check to run against.
-  expect(report.withheld).toStrictEqual(['GET /internal/jobs']);
+  //
+  // THE EXPECTED SET IS DERIVED FROM THE MODULES RATHER THAN WRITTEN OUT, and
+  // that is a strengthening rather than a loosening. This assertion read
+  // `toStrictEqual(['GET /internal/jobs'])`, which was true only while `ops`
+  // was the sole operator route in the workspace and went red the day
+  // `routes/admin-writes.ts` landed seven more. Written this way it asserts
+  // BOTH directions over whatever is on disk -- every operator path withheld
+  // and no public path withheld -- which is the property ADR-083 section 4
+  // actually rests on, and it cannot go stale as operator modules arrive.
+  const declared = modules.flatMap((m) => m.routes.map((r) => `${r.method} ${r.path}`));
+  const operatorPaths = declared.filter(
+    (endpoint) => classifyPath(endpoint.slice(endpoint.indexOf(' ') + 1)) === 'operator',
+  );
+  expect(report.withheld).toStrictEqual(operatorPaths);
+  expect(report.withheld).toContain('GET /internal/jobs');
   expect(report.registered).not.toContain('GET /internal/jobs');
 
   const res = await app.inject({ method: 'GET', url: `${BASE_PATH}/internal/jobs` });
