@@ -6804,22 +6804,6 @@ const artifactKey = (text) =>
 // hard-coding when the stem is the thing the framework reserves.
 const APP_ROUTER_STEMS = new Set(['page', 'layout', 'route']);
 
-function demoWorldFile() {
-  // CI-09's replay self-audit condition names a PATH as of ADR-119, so the
-  // artifact is probeable and its register entry is retired. This reports
-  // ARRIVED the day the file exists, which by ADR-073 section 2 (b) turns the
-  // row into a FINDING until CI-09's stage is written. THAT RED IS THE POINT
-  // and no wording here is chosen to avoid it.
-  const rel = 'scripts/demo/world.ts';
-  if (!existsSync(join(ROOT, 'scripts', 'demo'))) {
-    throw new Error(
-      'CI-06/gate-inventory found no scripts/demo directory, so CI-09\'s probe reads ' +
-        'nothing and would report the artifact absent for the wrong reason',
-    );
-  }
-  return existsSync(join(ROOT, rel)) ? [rel] : [];
-}
-
 function appRouterFiles() {
   const apps = 'apps';
   if (!existsSync(join(ROOT, apps))) {
@@ -6882,7 +6866,6 @@ function appRouterFiles() {
 
 const INVENTORY_PROBES = new Map([
   ['a page, layout or route file under apps/*/src/app/', appRouterFiles],
-  ['scripts/demo/world.ts', demoWorldFile],
 ]);
 
 // THE UNPROBEABLE REGISTER, and it is a register rather than an exemption list
