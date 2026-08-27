@@ -73,13 +73,18 @@
 // convention a reviewer has to notice into a state the run cannot reach.
 //
 // -----------------------------------------------------------------------------
-// THIS FILE IMPORTS NOTHING
+// THIS FILE IMPORTS NOTHING, AND SINCE `ADR-165` THAT IS A RULE RATHER THAN A
+// RESOLVER
 // -----------------------------------------------------------------------------
-// `apps/worker/package.json` declares `@merit/rules-engine` and nothing else,
-// and `apps/worker/src/db.ts` is this deployable's ONE door onto `@merit/db`
-// (`ADR-165`), asserted by `test/db.test.ts` walking the tree. So the rows here
-// are structural records with the Drizzle property names the accessor returns,
-// read out of `packages/db/src/schema.ts` and cited at each shape.
+// `apps/worker/package.json` declares `@merit/rules-engine` AND `@merit/db`
+// since 2026-08-27, so the older reason -- that an undeclared import does not
+// resolve at all under `node-linker=isolated` -- no longer applies. What applies
+// instead is stronger: `ADR-165` rules ONE door and ONE acquisition point, and
+// states the check in terms, `grep -rlE "from '@merit/db'" apps/worker/src` must
+// print `apps/worker/src/db.ts` AND NOTHING ELSE. `test/db.test.ts` walks the
+// tree and asserts it. This file is not that file. So the rows here are
+// structural records with the Drizzle property names the accessor returns, read
+// out of `packages/db/src/schema.ts` and cited at each shape.
 // =============================================================================
 
 /**

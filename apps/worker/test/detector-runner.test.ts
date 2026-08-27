@@ -507,6 +507,25 @@ describe('the constants this deployable retypes are bound to their sources', () 
       expect(Object.keys(row.parameters).length).toBeGreaterThan(0);
     }
   });
+
+  it('eleven of the eighteen rows carry no stated number, which is what DetectorDeclined is for', () => {
+    // `ports.ts` states this count and it is DERIVED here rather than trusted,
+    // because a hand-maintained count in a docstring is the defect CLAUDE.md
+    // asks for a mechanical assertion in place of. It is also the measurement
+    // behind DetectorDeclined: most of wave 2's detectors have no threshold to
+    // run against yet, and OQ-M7-02 is the founder's on every one of them.
+    const withoutANumber = SEED_ROWS.rows.filter(
+      (row) =>
+        !Object.entries(row.parameters).some(([key, value]) => {
+          if (key === '_meta' || value === null || typeof value !== 'object') {
+            return false;
+          }
+          const parameter = value as { state?: unknown; value?: unknown };
+          return parameter.state === 'stated' && typeof parameter.value === 'number';
+        }),
+    );
+    expect(withoutANumber.length).toBe(11);
+  });
 });
 
 // =============================================================================

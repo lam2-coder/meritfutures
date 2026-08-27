@@ -5,15 +5,18 @@
 // EACH WRITE A DETECTOR AGAINST. DECLARED STRUCTURALLY, IMPORTING ONLY THE
 // CANARY TYPES BESIDE IT.
 //
-// `batch/ports.ts`, `provisioning/ports.ts` and `sweeps/ports.ts` are the idiom
-// and the reason is the one all three state: `apps/worker/package.json` declares
-// `@merit/rules-engine` and nothing else, `node-linker=isolated` makes an
-// undeclared import unresolvable, and the manifest is not in this slice's fence.
-// `apps/worker/src/db.ts` is additionally this deployable's ONE door onto
-// `@merit/db` (`ADR-165`), asserted by `test/db.test.ts` walking `src/`. So
-// every shape here is DECLARED and SATISFIED structurally by the accessor the
-// wiring supplies: `@merit/db`'s `SystemTx` is assignable to {@link DetectorTx}
-// with no import in either direction.
+// `batch/ports.ts`, `provisioning/ports.ts` and `sweeps/ports.ts` are the idiom,
+// and the reason the first two give has been superseded by a better one.
+// `apps/worker/package.json` declares `@merit/rules-engine` AND `@merit/db`
+// since 2026-08-27, so "an undeclared import does not resolve" is no longer the
+// argument. **`ADR-165` IS**: it rules ONE door and ONE acquisition point,
+// `src/db.ts`, and states the check in terms -- `grep -rlE "from '@merit/db'"
+// apps/worker/src` must print `apps/worker/src/db.ts` AND NOTHING ELSE, which
+// `test/db.test.ts` walks the tree to assert. So the structural declaration is
+// now REQUIRED rather than merely forced, and every shape here is DECLARED and
+// SATISFIED structurally by the accessor the wiring supplies: `@merit/db`'s
+// `SystemTx` is assignable to {@link DetectorTx} with no import in either
+// direction.
 //
 // NOTHING HERE ADDS A `SqlExecutorReason` MEMBER, ADDS A `SystemReason` MEMBER,
 // IMPORTS `pg`, OR CASTS PAST A KEY TYPE (`P7` section 11 rule 10, `ADR-157`
@@ -111,7 +114,7 @@ import type { CanaryMint, CanaryNonce, CanarySubject } from './canary.ts';
  *
  * A NARROW UNION RATHER THAN THE WHOLE KEY SPACE, on `sweeps/ports.ts`'s and
  * `provisioning/ports.ts`'s argument: `SystemTx.rowsWhere` is declared over
- * `TableKey` and reaches all 105 tables in the estate with one word, which
+ * `TableKey` and reaches every table in the estate with one word, which
  * `ADR-102` section 8 prices as a widening it accepts for the batch. A detector
  * accepting the same reach would spend that budget again for nothing, and the
  * narrowing costs the caller nothing because a wider handle is assignable to a
