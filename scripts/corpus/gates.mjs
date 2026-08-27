@@ -2359,17 +2359,71 @@ const ci06l = {
 // BOTH DIRECTIONS, and the second is the one that matters after a split. A README
 // row pointing at a file that was renamed or never written is a registry claiming
 // coverage it does not have, which reads identically to coverage.
+//
+// -----------------------------------------------------------------------------
+// IT MATCHES A ROW, NOT A MENTION, AND THAT IS `OI-09` CLOSED (ADR-132)
+// -----------------------------------------------------------------------------
+// FOR ITS FIRST YEAR THIS GATE READ THE README AS ONE STRING and accepted any
+// markdown link anywhere in it. Its title said ROW and its parser said MENTION,
+// and the two are different claims. ADR-043 section 3, the ruling that asked for
+// this gate, says "every entry file has a row in its registry README", so the
+// TITLE was the correct half and the parser was the loose one.
+//
+// THE DEFECT IS NOT HYPOTHETICAL AND IT IS HOW THE GAP WAS FOUND. On 2026-08-16
+// ADR-043 itself had no row in the ADR registry table. It was linked from a
+// sentence in that README's preamble, this gate accepted the sentence, and one
+// ADR of 43 sat outside the registry it belongs to with twelve gates green. The
+// ADR that was missing was the ADR that WROTE this gate to pay for its own
+// CI-06c exemption. The row was added that day and the parser was left alone,
+// carried as `OI-09`, because narrowing a parser without measuring what the
+// narrowing costs is the other half of the same mistake.
+//
+// THIS IS A NARROWING, NOT A WEAKENING, AND THE DIRECTION IS WHAT DECIDES IT.
+// Rule 1 forbids a gate that returns PASS for a check it did not perform. This
+// change makes the gate report MORE, not less: an entry indexed only by a
+// sentence was green and is now a finding. Nothing that failed before passes now.
+//
+// AND IT COST NOTHING TO MAKE TRUE, which is the number the ruling turns on:
+// 648 entry files across the five registries, 648 satisfied under the loose
+// reading, 648 satisfied under this one. No document goes RED. Every registry
+// README already indexes by table, so the corpus was already obeying the title;
+// only the check was not.
+//
+// A FENCED BLOCK IS A SAMPLE, NOT A ROW, which is CI-06a's own reading of a
+// fenced link one file over. docs/decisions/README.md carries the ADR entry
+// FORMAT in a fence, and a registry that documents its own row shape must not
+// have the documentation counted as coverage. That is the near-miss CI-06s
+// names in the workflow-comment direction, one registry along.
+//
+// WHAT THE NARROWING GIVES UP, STATED RATHER THAN LEFT TO BE DISCOVERED: a link
+// in a README's PROSE that points at nothing is no longer reported here, because
+// it is not a row and this gate no longer claims anything about mentions. It is
+// not unchecked. CI-06a resolves every relative markdown link in every markdown
+// file, registry READMEs included, so a broken prose link fails there and fails
+// under the gate whose title covers it.
 const ci06n = {
   id: 'CI-06n',
   title: 'Every registry entry has a README row, and every README row resolves',
   covers:
     'the transitive half of CI-06c for the registries ADR-043 split. Every entry ' +
-    'file in a registry directory is linked from that registry README, and every ' +
-    'entry link in the README resolves to a file that exists. It does NOT check the ' +
-    'entry contents; CI-06f checks that an ADR entry is named for its own heading.',
+    'file in a registry directory is linked from a TABLE ROW of that registry ' +
+    'README, and every entry link in a row resolves to a file that exists. ' +
+    'A ROW IS A LINE BEGINNING WITH `|`, OUTSIDE A CODE FENCE. A link in the ' +
+    "README's prose, or inside a fence, is claimed as NOTHING: it does not index " +
+    'an entry, and an entry carrying only such a link is reported with the line ' +
+    'it sits on and why it does not count, because that is the repair. ' +
+    'ADR-043 asked for a row and this gate ' +
+    'accepted a sentence until ADR-132; the entry that fell through was ADR-043 ' +
+    'itself. WHAT IT GIVES UP: a prose link that does not resolve is not reported ' +
+    'here, because a mention is not a row. CI-06a resolves every relative link in ' +
+    'every markdown file and catches it there. ' +
+    'It does NOT check the entry contents; CI-06f checks that an ADR entry is ' +
+    'named for its own heading.',
   run() {
     const findings = [];
     let checked = 0;
+    let rowLinks = 0;
+    let mentions = 0;
     for (const reg of REGISTRIES) {
       if (!existsSync(join(ROOT, reg.dir))) {
         findings.push(`${reg.dir}: registry directory does not exist`);
@@ -2390,24 +2444,65 @@ const ci06n = {
         );
         continue;
       }
-      const body = read(reg.readme);
+      const lines = read(reg.readme).split('\n');
       const linked = new Set();
-      for (const m of body.matchAll(/\[[^\]]*\]\(([^)\s#]+)[^)]*\)/g)) {
-        const target = relative(ROOT, resolve(join(ROOT, dirname(reg.readme)), m[1]));
-        if (!reg.entry(target)) continue; // rows pointing elsewhere are not entry rows
-        linked.add(target);
-        if (!existsSync(join(ROOT, target))) {
-          findings.push(`${reg.readme}: row does not resolve -> ${m[1]}`);
+      // Entry -> the first link to it that is NOT a row, and which kind it is.
+      // Kept only so a finding can say WHERE that link is and WHY it does not
+      // count: an entry indexed by a sentence is one row away from correct, and
+      // a finding that names the sentence is the difference between a repair
+      // and a search. This is why the fenced lines are still SCANNED rather
+      // than skipped -- a sample is not a row, and saying so beats silence.
+      const mentioned = new Map();
+      let fenced = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (/^\s*```/.test(line)) {
+          fenced = !fenced;
+          continue;
+        }
+        const isRow = line.startsWith('|') && !fenced;
+        for (const m of line.matchAll(/\[[^\]]*\]\(([^)\s#]+)[^)]*\)/g)) {
+          const target = relative(ROOT, resolve(join(ROOT, dirname(reg.readme)), m[1]));
+          if (!reg.entry(target)) continue; // links pointing elsewhere are not entry rows
+          if (!isRow) {
+            if (!mentioned.has(target)) {
+              mentioned.set(target, {
+                line: i + 1,
+                why: fenced ? 'inside a code fence, which is a sample' : 'prose',
+              });
+            }
+            continue;
+          }
+          rowLinks++;
+          linked.add(target);
+          if (!existsSync(join(ROOT, target))) {
+            findings.push(`${reg.readme}: row does not resolve -> ${m[1]}`);
+          }
         }
       }
       for (const f of onDisk) {
-        if (!linked.has(f)) findings.push(`${f}: entry file with no row in ${reg.readme}`);
+        if (linked.has(f)) continue;
+        const at = mentioned.get(f);
+        findings.push(
+          `${f}: entry file with no row in ${reg.readme}` +
+            (at ? `, and the link at ${reg.readme}:${at.line} is ${at.why} rather than a row` : ''),
+        );
       }
+      for (const t of mentioned.keys()) if (!linked.has(t)) mentions++;
       checked += onDisk.length;
     }
     if (REGISTRIES.length === 0 || checked === 0) {
       findings.push('no registry entries checked; CI-06n is asserting nothing');
     }
+    // THE MENTION COUNT IS PRINTED RATHER THAN INFERRED. Zero is the corpus
+    // saying every registry indexes by table; a number above zero is the exact
+    // population `OI-09` was opened about, visible on every run instead of on
+    // the day somebody re-reads the parser.
+    console.log(
+      `       CI-06n note: ${checked} entry file(s) over ${rowLinks} README row ` +
+        `link(s) across ${REGISTRIES.length} registry(ies); ` +
+        `${mentions} entry link(s) outside any row, prose or fenced, claimed as nothing`,
+    );
     return findings;
   },
 };
