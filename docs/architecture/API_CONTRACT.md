@@ -20,7 +20,7 @@ Schemas are written as TypeScript types because they map one to one onto the zod
 
 **Identity scoping.** Every authenticated handler resolves the caller to an [identity](../GLOSSARY.md#trader-identity) and reads through `scopedDb(identity)`. A path parameter naming a resource the caller does not own returns `404` (not `403`) on trader surfaces, so the API does not confirm the existence of other people's resources. Admin surfaces return `403` because existence is not a secret from an authorized operator.
 
-**Idempotency.** Every mutating endpoint accepts `Idempotency-Key` and it is **required** on `POST /checkout`, `POST /accounts/:id/payout`, and `POST /accounts/:id/reset`. Replaying a key with an identical body returns the original response verbatim; replaying with a different body returns `409 idempotency_key_reuse`.
+**Idempotency.** Every mutating endpoint accepts `Idempotency-Key` and it is **required** on `POST /checkout`, `POST /accounts/:id/payout`, `POST /accounts/:id/reset`, and `POST /wallet/withdrawals`. **The last of those is required by the schema rather than by this sentence**: `wallet_withdrawals.idempotency_key` is `text NOT NULL` under a unique `(identity_id, idempotency_key)`, so a withdrawal without a key cannot be written at all. Replaying a key with an identical body returns the original response verbatim; replaying with a different body returns `409 idempotency_key_reuse`.
 
 **Pagination.** Cursor only, never offset: `?limit=50&cursor=<opaque>`. Responses carry `{ data, next_cursor }`. `limit` maximum 100, default 25.
 
@@ -606,6 +606,126 @@ Auth: **session**. Every frame is scoped to the caller's own accounts through `s
 **Live win-day and consistency tracking is not in this payload.** [M04 section 3.6](../plans/M04-trader-portal.md) rows it as indicative and no document says what it is a projection OF ([P6](../plans/P6-live-tier.md) section 10 item 3). When it is ruled it arrives as a field on the indicative arm rather than as a third arm.
 
 **Nothing here is ever an input to a request the portal sends** (`INV-M4-13`). The payout centre re-fetches authoritative eligibility as section 6 already specifies, and the channel being entirely down changes nothing about it. **The channel's connection limit is owed and is not in section 11**, which states limits per endpoint and this subsection defines none.
+### 6.2 The wallet, where [ADR-019](../decisions/ADR-019.md)'s internal leg settles
+
+**A subsection rather than a new top-level section, for 6.1's own recorded reason.** Sections 12 and 13 are cited by NUMBER, so a section inserted ahead of them renumbers both and breaks every citation silently ([ADR-111](../decisions/ADR-111.md) clause 2). It sits under section 6 because [ADR-019](../decisions/ADR-019.md) made `POST /accounts/:accountId/payout` credit this balance: `GET /payouts` one heading up and `GET /wallet` here are the two halves of one movement.
+
+**A wallet balance is not an account balance and the two are never summed.** [M20](../plans/M20-wallet.md) section 1.2: it is money already earned, already through every gate, owed unconditionally, and spendable on Merit products or takeable as cash. `wallet_entries.balance_after_cents` is `bigint NOT NULL CHECK (balance_after_cents >= 0)` ([`0011`](../../packages/db/migrations/0011_wallet.sql)), so **no response below can carry a negative wallet figure and a client need not branch on one**.
+
+#### GET /wallet
+```ts
+// M20 P-3 is the only rule that holds a BALANCE. P-1 holds a WITHDRAWAL and
+// appears on POST /wallet/withdrawals, not here: it routes the withdrawal to
+// review and leaves the value spendable, so it subtracts nothing from the
+// figure below.
+type WalletHold = {
+  rule: "chargeback_window";          // P-3. A closed union with one member today
+  cents: number;
+  since: string;                      // the oldest held credit's occurred_at
+  available_at: string | null;        // see the paragraph below: null is the honest answer today
+};
+type WalletResponse = {
+  balance_cents: number;              // >= 0 by CHECK, never negative
+  withdrawable_cents: number;
+  held_cents: number;
+  holds: WalletHold[];                // empty when held_cents is 0
+  as_of: string;
+};
+```
+Auth: **session**, owner. Rate limit: authenticated reads. Errors: `unauthenticated`.
+
+`balance_cents` equals `withdrawable_cents + held_cents` and the sum is stated rather than left to a client, because the two components are computed from different inputs and a client that derived one by subtraction would render a stale figure whenever the other moved.
+
+**An identity with no `wallet_entries` row is `0` and not a `404`, and the asymmetry with [ADR-139](../decisions/ADR-139.md) clause 6 is deliberate.** There an account with no `rule_states` row is ABSENT, because a zero balance beside a zero floor renders as an account sitting on its breach line. Here absence means exactly zero: no credit and no debit has ever been written, `INV-M20-09` makes the balance payable on demand forever, and a `404` on a wallet would tell a trader they have none.
+
+**`available_at` is `null` under `chargeback_window` and it is not an omission.** P-3 holds payout credits whose funding purchase is still inside the card networks' dispute window, and **no landed column carries that window's end for a purchase**. `wallet_withdrawals.earliest_credit_at` is Merit's own clock on the credit rather than the networks' clock on the purchase; `affiliate_commissions.chargeback_window_ends_on` is `date NOT NULL` ([`0012`](../../packages/db/migrations/0012_disputes_and_affiliate_settlement.sql)) and is the shape the wallet lacks for the same rule one rail over; [M20](../plans/M20-wallet.md) `OQ-M20-02` asks how long the hold is and is open; `DEP-M20-03` asks `M3` for the chargeback-window state of every purchase and is unbuilt. **A date computed by adding a chosen number of days to `earliest_credit_at` would be a number this repository invented**, on [ADR-139](../decisions/ADR-139.md) clause 3's rule, so the field states absence instead.
+
+**Promotional credit is never a field on this response.** `wallet_entries.provenance` is a closed three-member CHECK and `promotional_credit` is deliberately not in it ([`0011`](../../packages/db/migrations/0011_wallet.sql) header item 3, `OQ-FREEZE-01`): the perk lives in `promotional_credit_grants` and is never withdrawable. A `promotional_credit_cents` field beside `balance_cents` is one client-side addition away from `AS-M20-01`, credit converted to cash, so the wallet screen composes two reads rather than one response mixing two kinds of money.
+
+**Dormancy is not on this response either.** `wallet_dormancy_review_was_noticed` requires at least one recorded notification before `escheat_review` is reachable, so the disclosure path is a notification channel that the database already refuses to let anyone skip, and it is not this read.
+
+#### GET /wallet/entries
+```ts
+// The itemized statement. DIRECTION CARRIES THE SIGN AND amount_cents IS A
+// MAGNITUDE: `wallet_entries.amount_cents` is `CHECK (amount_cents > 0)` and
+// 0011 states why it is deliberately NOT the ledger's signed convention.
+// A signed amount on the wire would collapse the two questions back together.
+type WalletEntryBase = {
+  entry_id: string;                   // DECIMAL STRING, see below. Also the cursor's anchor
+  amount_cents: number;               // magnitude, always > 0
+  cause: string;                      // the business event, human readable
+  reference_id: string;               // polymorphic: payout_request, purchase, or the corrected entry
+  ledger_transaction_id: string;      // every wallet movement is posted; there is no unposted entry
+  balance_after_cents: number;        // >= 0 by CHECK. The running balance AFTER this entry
+  occurred_at: string;
+};
+type WalletCredit = WalletEntryBase & {
+  direction: "credit";
+  // The CLOSED credit list. There is no deposit value and there may not be one
+  // (INV-WALLET-NO-DEPOSITS), and there is no promotional value on purpose.
+  provenance: "payout" | "refund_wallet_funded" | "correction";
+};
+type WalletDebit = WalletEntryBase & {
+  direction: "debit";
+  // NO `provenance`, and the omission is the schema reported honestly rather
+  // than a field forgotten. The column is NOT NULL on every row and its three
+  // members are the CREDIT list, so a debit is stored carrying a class that
+  // does not describe it. What a debit MEANS is `cause` and `reference_id`,
+  // whose own declaration enumerates `purchase` among its referents.
+};
+type WalletEntry = WalletCredit | WalletDebit;
+type WalletEntriesResponse = { data: WalletEntry[]; next_cursor: string | null };
+```
+Auth: **session**, owner. Pagination: cursor only, section 1's `limit` and `cursor`. Ordering: `occurred_at` descending, which is `wallet_entries_identity_idx`'s own order. Errors: `unauthenticated`, `validation_failed` (`limit` above 100).
+
+**`entry_id` is a STRING and it is the only identifier in this document that is not a uuid.** `wallet_entries.id` is `bigint GENERATED ALWAYS AS IDENTITY`, and a `bigint` on the wire as a JSON `number` is the defect [ADR-122](../decisions/ADR-122.md) refuses in the digest for the same reason: it admits a value above `Number.MAX_SAFE_INTEGER` that has already lost digits by the time anything reads it. It is a decimal string of digits, never an integer, and a client must not parse it.
+
+**The union is written out rather than typed `string`**, on [ADR-113](../decisions/ADR-113.md) clause 3's precedent: a closed CHECK list that reaches the wire as `string` is a contract admitting a value the database refuses.
+
+#### POST /wallet/withdrawals
+```ts
+// Idempotency-Key REQUIRED. `wallet_withdrawals.idempotency_key` is `text NOT
+// NULL` under a unique `(identity_id, idempotency_key)`, so a withdrawal
+// without a key is unwritable rather than merely undesirable.
+type WithdrawalRequestBody = {
+  amount_cents: number;               // integer cents, > 0, and >= the minimum below
+  destination_ref: string;            // the provider-side destination id. NEVER bank details
+};
+type WithdrawalResponse = {
+  withdrawal_id: string;
+  // The creation's reachable states, per STATE_MACHINES section 3.2. `cooling`
+  // is a 200 and not a refusal: a destination inside its window ENTERS the
+  // machine and waits, it does not fail.
+  status: "requested" | "cooling";
+  amount_cents: number;
+  destination_ref: string;
+  requested_at: string;
+  cooling_until: string | null;       // the destination registry's clock; see below
+  // `wallet_withdrawals_approved_has_provenance` permits an EMPTY summary at
+  // `requested` and `cooling` and forbids one from `approved` on. So this is
+  // null on the common creation, and a client typing it non-null renders an
+  // empty breakdown on the one screen where the breakdown is the point.
+  composition: Array<{ provenance: "payout" | "refund_wallet_funded" | "correction"; cents: number }> | null;
+  earliest_credit_at: string | null;
+  // P-1. A composition containing payout credits from accounts purchased with
+  // promotional credit routes the withdrawal to review ONCE. It is a hold on
+  // this withdrawal and never a hold on the balance, and the value stays
+  // spendable inside Merit throughout.
+  provenance_review: boolean;
+  halt: null;                         // a withdrawal cannot be created halted
+};
+```
+Auth: **session**, and **elevated**: `passkey or dual_channel`, `C-27: external withdrawal`, which section 12 already carries as a row. Idempotency: **required**. Errors: `validation_failed` (non-integer, zero, negative, or below the minimum), `kyc_required`, `payouts_frozen`, `identity_restricted` (`identities.status` is not `active`, [ADR-075](../decisions/ADR-075.md)), `insufficient_funds` (the request exceeds `withdrawable_cents`), `conflict` (a withdrawal is already open for this identity, or the key was replayed with a different body), `forbidden` (session not elevated, or a phone-change hold is running).
+
+**The minimum is `10000` integer cents** ([M05](../plans/M05-payout-system.md) section 4, stated there as `$100`), and **there is no fee**. Whether the minimum is a plan parameter or a firm-wide constant is stated by no approved document; it is written here as the constant M05 states.
+
+**`cooling_until` reads from a registry that does not exist yet.** `G-DESTINATION-COOLING` is a drawn transition and `wallet_withdrawals` carries a `cooling` status with nothing landed to compute it from: no table records that a destination changed or when. `OI-06` is open and `payout_destinations` is unlanded, so the field is `null` until that registry exists. **The field is declared now rather than added later** because widening a response later is a decision and narrowing one is a break ([ADR-111](../decisions/ADR-111.md) clause 3).
+
+**`conflict` on an open withdrawal is served by the handler alone on this leg, and that is asymmetric with the internal one.** `payout_requests_no_in_flight_uq` is a **unique** partial index, deliberately, because *"the engine is not the only writer"*. `wallet_withdrawals_open_idx` has the same predicate and is **not unique**: it is a scan index for the sweep. So `G-NO-IN-FLIGHT` is a database constraint on the leg that moves no cash and an application check on the leg that does. Stated here so an implementer does not read the two indexes as the same control.
+
+**The halt is not a status and never becomes one.** A halted withdrawal keeps its rail status and gains `frozen_at`, `freeze_flag_id` and `freeze_expires_at`, all three together or none (`wallet_withdrawals_freeze_is_complete`), and `wallet_withdrawals_live_freeze_blocks_settlement` refuses `settled` while the halt is live. Release **resumes the rail and never re-pays**, because `LT-06` already debited the wallet and the money is already the trader's (`INV-M20-14`). The trader-facing halt block on a subsequent read is `{ halted_at, resolves_by } | null` and carries **no ToS clause**: `payout_requests.hold_tos_clause` exists and **`wallet_withdrawals` has no equivalent column**, so a clause rendered here would be one the row cannot store.
+
+**There is no endpoint that cancels a withdrawal.** `G-TRADER-CANCELS` is drawn from both `requested` and `cooling` in [STATE_MACHINES section 3.2](STATE_MACHINES.md) and `cancelled` is in `wallet_withdrawal_status`, and no approved document states a route, a body or an error set for it. It is named here as owed rather than invented, on [ADR-113](../decisions/ADR-113.md) clause 5's precedent for the operator half it could not write.
 
 ## 7. KYC and affiliate
 
@@ -792,6 +912,153 @@ Creates a **draft**. Publishing is a separate call, and any edit touching cap, s
 type PublishRequest = { reason: string; second_approver?: string };
 ```
 Errors: `precondition_failed` (dual control not satisfied for a sensitive field change), `conflict` (already published). Materializes `plan_version_sizes` in the same transaction and emits `plan_version.published`.
+
+### POST /admin/payouts/:id/release
+```ts
+// SD-M5-08, ADR-040. The FIRST of the two operator paths out of
+// `held_pending_review`. It posts the STORED decision unchanged and
+// re-evaluates NOTHING (INV-M5-02: the number shown is the number sent).
+type PayoutReleaseRequest = { reason: string };
+type PayoutReleaseResponse = {
+  payout_request_id: string;
+  status: "approved";
+  // Every money field is the one the hold froze at request time. None is
+  // recomputed, and a release that produced a different number would mean the
+  // hold cost the trader money, which is what zero denial exists to prevent.
+  approved_cents: number; trader_cents: number; firm_cents: number;
+  payout_ordinal: number;
+  // THE HOLD THIS RELEASE JUST CLEARED, READ BEFORE THE WRITE. It is a separate
+  // object from the request because after the write the row cannot carry it:
+  // see the paragraph below.
+  released_hold: { held_at: string; resolves_by: string; tos_clause: string; flag_id: string };
+};
+```
+Auth: `admin_sso`, roles `owner` and `ops`. `reason` required and audited like every section 8 mutation. Errors: `validation_failed` (empty `reason`), `conflict` (the request is not `held_pending_review`), `forbidden` (`readonly` role), `not_found`.
+
+**The release ERASES the hold from the row, and `released_hold` exists because of that.** `payout_requests_hold_is_complete` ([`0031`](../../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql)) is a biconditional: at any status other than `held_pending_review` **all five** of `held_at`, `hold_flag_id`, `hold_expires_at`, `hold_tos_clause` and `hold_reason` must be `NULL`. So the moment this call succeeds the row stops being able to say it was ever held, and `GET /payouts` correctly returns `hold: null` for it. **The durable record is the [`admin_actions`](data-model/admin_actions.md) row's `before`**, which section 8 already requires of every mutating admin endpoint, and this response is the only place the caller sees it in the same breath as the act.
+
+**There is deliberately no `extend`.** [M05](../plans/M05-payout-system.md) section 4: the hold's clock is the control and an endpoint that moves it is the control's own off switch. **And there is no endpoint for the release that matters**, because the 48 hour auto-release is the hourly sweep rather than an operator action. An auto-release a human had to fire would be a hold with extra steps.
+
+### POST /admin/payouts/:id/enforce
+```ts
+// SD-M5-08, ADR-040. The SECOND path out, and the one that keeps zero denial
+// honest: a hold either pays inside 48 hours or produces a documented
+// enforcement action carrying a cited flag, a ToS clause and an evidence pack.
+type PayoutEnforceRequest = {
+  reason: string;
+  tos_clause: string;
+  evidence_pack_id: string;           // REQUIRED. An exported pack, not a promise of one
+};
+type PayoutEnforceResponse = {
+  payout_request_id: string;
+  status: "failed";
+  payout_ordinal: number;
+  ordinal_released: true;             // see below. Always true, and stated rather than implied
+  enforced_hold: { held_at: string; resolves_by: string; tos_clause: string; flag_id: string };
+};
+```
+Auth: `admin_sso`, roles `owner` and `ops`. Errors: `validation_failed` (empty `reason`, empty `tos_clause`, or missing `evidence_pack_id`), `conflict` (not `held_pending_review`), `forbidden` (`readonly` role), `not_found`.
+
+**`ordinal_released` is `true` because `payout_requests_account_ordinal_uq` is partial on `status <> 'failed'`.** Enforcement sends the request to `failed`, which drops it out of that predicate and frees the rung for a later request (`EC-037`, and [ADR-040](../decisions/ADR-040.md) reads the index as unchanged and correct for exactly this reason). **The field is in the response rather than left to be derived**, because the alternative is an operator believing an enforcement burned a rung off a finite ladder.
+
+`enforced_hold` is read before the write for the same reason `released_hold` is: the same biconditional NULLs all five columns on the way to `failed`.
+
+**The trader-readable failure note is not written by this endpoint and no column holds it.** `GET /payouts` types `failure_note: string | null` and `payout_requests` declares no such column; the note's storage is unresolved and is not this row's to decide.
+
+### POST /admin/wallet/:identityId/correct
+```ts
+// SD-M20-01. A COMPENSATING ENTRY, NEVER AN UPDATE. There is no update path and
+// no delete path, and that is a GRANT rather than a convention: 0026 executes
+// `REVOKE UPDATE, DELETE ON ... wallet_entries ... FROM merit_app, PUBLIC`, so
+// the application role cannot rewrite or remove a wallet entry at all.
+type WalletCorrectionRequest = {
+  direction: "credit" | "debit";
+  amount_cents: number;               // integer cents, > 0. The magnitude; direction carries the sign
+  cause: string;                      // the business event, human readable. NOT NULL in the row
+  corrects_entry_id: string;          // the entry being compensated. Becomes `reference_id`
+  reason: string;
+  second_approver: string;            // dual control, see below
+};
+type WalletCorrectionResponse = {
+  entry_id: string;                   // decimal string, as on GET /wallet/entries
+  provenance: "correction";           // the only value this endpoint may write
+  direction: "credit" | "debit";
+  amount_cents: number;
+  balance_after_cents: number;        // >= 0, and see below
+  ledger_transaction_id: string;      // every wallet movement is posted
+  occurred_at: string;
+};
+```
+Auth: `admin_sso`, role `owner`. `reason` required and audited. Errors: `validation_failed` (non-integer, zero or negative amount, empty `reason`, empty `cause`), `precondition_failed` (dual control not satisfied), `conflict` (`corrects_entry_id` does not belong to this identity), `insufficient_funds` (below), `forbidden`, `not_found`.
+
+**A correcting DEBIT that would take the running balance below zero is refused by the database.** `wallet_entries.balance_after_cents` is `CHECK (balance_after_cents >= 0)`, and because the table is append-only the correction lands at the END of the statement and is computed against the CURRENT balance rather than the balance at the time of the entry it corrects. So an operator correcting an old over-credit that has since been spent gets `insufficient_funds`, and the remedy is a debt rather than a negative wallet.
+
+**`second_approver` is required and it widens a set no ADR has widened.** [M20](../plans/M20-wallet.md) section 4 states this endpoint is **dual controlled**; `C-10` in [SECURITY](SECURITY.md) closes the dual-control set at cap, split, gap and treasury credentials and names one endpoint, and [ADR-010](../decisions/ADR-010.md)'s title closes it the same way. The row is written with dual control because that is the fail-closed direction on an admin write that moves a trader's money, and **reconciling `C-10`'s set with this row is owed to an ADR against [SECURITY](SECURITY.md) rather than settled here.**
+
+### POST /admin/wallet/:identityId/spend-limit
+```ts
+// SD-M20-02, INV-M20-07, SECURITY C-23. PER IDENTITY RATHER THAN GLOBAL: the
+// limit that matters is the one on the compromised session, and a global limit
+// is set so high it does nothing.
+//
+// THIS IS AN APPEND AND NOT AN UPDATE. `wallet_spend_limits` is keyed
+// `(identity_id, effective_from)`, so a new limit is a new effective-dated row
+// and the previous one survives as the record of what was in force when.
+type SpendLimitRequest = {
+  daily_cents: number;                // integer cents, >= 0
+  rolling_7d_cents: number;           // integer cents, >= daily_cents
+  effective_from: string;             // NOT NULL with no default in the row: the caller states it
+  reason: string;                     // NOT NULL in the row
+};
+type SpendLimitResponse = {
+  identity_id: string;
+  daily_cents: number;
+  rolling_7d_cents: number;
+  effective_from: string;
+  set_by: string;                     // the admin actor, from the session. NEVER from the body
+  created_at: string;
+};
+```
+Auth: `admin_sso`, roles `owner` and `ops`. `reason` required and audited. Errors: `validation_failed` (non-integer or negative figures, or `rolling_7d_cents` below `daily_cents`), `conflict` (a row already exists for this identity at this `effective_from`), `forbidden` (`readonly` role), `not_found`.
+
+**`rolling_7d_cents >= daily_cents` is a CHECK and not a nicety.** `wallet_spend_limits_weekly_exceeds_daily`: a rolling weekly limit below the daily limit is a daily limit with a confusing name.
+
+**`daily_cents: 0` is writable and means no wallet spend at all**, not "no limit". The schema admits it (`CHECK (daily_cents >= 0)`), so the contract admits it, and **there is no value that means unlimited**: the absence of any row for an identity is what unlimited looks like. An endpoint that deletes a limit is therefore a different thing from this one and does not exist.
+
+**The velocity limit DELAYS and does not refuse.** `INV-M20-07` and section 3.2 of [M20](../plans/M20-wallet.md): spend above the limit is delayed and the checks re-run when the window elapses, because the blast radius of a compromised session is contained and the cost of a false positive is a legitimate trader unable to buy a reset at the moment they most want one. That behaviour belongs to `POST /checkout` and is stated here so nobody implements this write as a refusal switch.
+
+### GET /admin/wallet/reconciliation
+```ts
+// INV-M20-10's per-identity assertion, and INV-M20-08's float position for M6.
+type WalletReconciliationRow = {
+  identity_id: string;
+  entries_position_cents: number;     // sum of credits minus sum of debits
+  ledger_position_cents: number;      // the same identity's wallet position in the ledger
+  divergence_cents: number;           // entries minus ledger. 0 on a healthy identity
+  // The SECOND comparison, which INV-M20-10 does not name and 0011 does.
+  // `balance_after_cents` is stored so that a divergence between the stored
+  // running balance and the recomputed one is a DETECTABLE TAMPER INDICATION
+  // rather than an invisible one. An endpoint reporting only the row above
+  // leaves that indicator unread.
+  stored_balance_cents: number;       // the latest entry's balance_after_cents
+  recomputed_balance_cents: number;
+  balance_divergence_cents: number;   // stored minus recomputed. 0 on an untampered statement
+};
+type WalletReconciliationResponse = {
+  as_of: string;
+  identities_checked: number;
+  // FLOAT ENTERS THE DENOMINATOR AS EXPOSURE AND NEVER THE NUMERATOR AS
+  // RESERVE. M6 P-M6-07 is the resolution; INV-M20-08 and AS-M20-08 are why.
+  // The RCR is computed from reserve alone, and float is reported BESIDE it.
+  float: { total_cents: number; identities_with_balance: number };
+  divergent: WalletReconciliationRow[];   // only the rows where either divergence is non-zero
+};
+```
+Auth: `admin_sso`, all roles including `readonly`. Read-only, no side effect. Errors: `forbidden` (non-admin origin), `unauthenticated`.
+
+**`float` is rendered as its own figure and is never added into a reserve number by any client of this endpoint.** `AS-M20-08` is exactly the misreading, *"the ratio flatters itself with the same money on both sides"*, and `INV-M20-08` requires wallet balances to be segregated in reporting and in fact. A response that returned a single combined coverage figure would make the alarm unwritable.
+
+**The response carries the divergent rows and not every identity**, because the healthy answer is an empty array and a per-identity dump grows without bound. `identities_checked` is the denominator that makes an empty `divergent` mean *checked and clean* rather than *nothing ran*, which is [`DEP-M4-09`](../plans/M04-trader-portal.md)'s rule applied one surface over: the dangerous failure is not the empty panel, it is the confident one.
 
 ## 9. Ops and internal (admin origin only)
 

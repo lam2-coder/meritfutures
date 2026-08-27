@@ -177,6 +177,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-155](ADR-155.md) | `ADR-022`'s v1 tier names a LINK CLASS, and "auto-enforce" is the edge being written without review rather than a transition on the flag machine  (2026-08-27, status: proposed) |
 | [ADR-156](ADR-156.md) | `OI-28` was closed by a ruling and dispatched as open, and `0047` proves the publish decision sound AT THE WRITE and nothing preserves it after  (2026-08-27, status: proposed) |
 | [ADR-157](ADR-157.md) | a read may narrow by a RANGE and by IS NULL and a write may not, the lock is a ROW lock rather than an advisory one, and the aggregate P7 asked for is refused on evidence  (2026-08-27, status: proposed) |
+| [ADR-158](ADR-158.md) | the wallet surface enters the contract, and every row that disagreed with a plan was written from the CHECK  (2026-08-27, status: proposed) |
 | [ADR-161](ADR-161.md) | the live tier enters `API_CONTRACT` as a PAYLOAD rather than as an endpoint, its degradation is one object rather than two messages, and `feed.*` is produced by the sweep and never by the feed  (2026-08-27, status: proposed) |
 <!--/gen-->
 
