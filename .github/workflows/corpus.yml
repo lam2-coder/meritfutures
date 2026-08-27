@@ -46,6 +46,31 @@ jobs:
   integrity:
     name: CI-06 corpus integrity
     runs-on: ubuntu-latest
+    # BOUNDED ON 2026-08-27 AFTER A MEASUREMENT, AND THE NUMBER IS WHY.
+    # `falsify.mjs` below runs every gate twice and copies the whole tree once
+    # per seed case. Measured on `main` that day: the runner takes 443 SECONDS
+    # end to end, of which a single tree copy is 5.4s and a single `gates.mjs
+    # check` inside that copy is 4.0s. So roughly forty percent of the runtime
+    # is re-copying the same 30MB to change one line, and BOTH HALVES GROW WITH
+    # THE TREE.
+    #
+    # WITHOUT THIS LINE THE JOB INHERITS GITHUB'S 360-MINUTE DEFAULT, which is
+    # not a bound in any useful sense: a runner wedged on a pathological seed
+    # would burn six hours before anyone heard about it, and the trend that got
+    # us from comfortable to 443s would arrive as a surprise rather than as a
+    # red check.
+    #
+    # 30 IS FOUR TIMES THE MEASUREMENT AND AN EIGHTH OF THE DEFAULT. It leaves
+    # room for the tree to keep growing and still fails loudly long before a
+    # wedged job costs an afternoon. IF THIS EVER TRIPS, THE FIX IS NOT A BIGGER
+    # NUMBER AND IT IS NOT SCOPING THE FALSIFIER: scoping it would make it fast
+    # and make it prove less, which is the trade `ADR-094`'s seed B and
+    # `ADR-103`'s seed 3 each exist to refuse. The fix is to stop re-copying the
+    # tree per case -- copy once, restore only the paths a seed wrote -- which
+    # preserves every assertion and removes the forty percent. That work is
+    # named here rather than done here because changing a control's isolation
+    # model is its own change with its own review.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -124,6 +149,10 @@ jobs:
   migrations:
     name: CI-06h migration install and object counts
     runs-on: ubuntu-latest
+    # Bounded for the same reason as `integrity` above: an unbounded job is not
+    # a control, it is a six-hour default nobody chose. This one installs a
+    # database and applies every migration forward-only from empty.
+    timeout-minutes: 20
 
     services:
       postgres:
