@@ -279,6 +279,45 @@ stated reason is no longer the accessor's limit. **`P5-a` owns saying so**, beca
 touches the file the header is about, and a plan that told a slice to work around a limit that has been
 lifted would be P4 section 5.4's error one phase over.
 
+### 5.5 THE PREMISE SECTION 5.1 REFUTED IS NOW LIVE IN A DISPATCHED MONEY-PATH SESSION
+
+**Measured on the merge with `origin/main` at `c947e39`, which landed while this plan was in review.**
+[#330](https://github.com/lam2-coder/meritfutures/pull/330) reserved sessions **250 to 264** and `ADR-138`
+to `ADR-152`, fifteen application-code sessions. **Three of them intersect this phase and one of them
+carries the refuted premise verbatim.**
+
+| Session | What it claims | What it does to this plan |
+|---|---|---|
+| **252**, `claude/routes-payouts`, `ADR-140` **REQUIRED** | `GET /payouts` and **`POST /accounts/:id/payout`** | **THIS IS `P5-f`.** The slice is claimed and this plan does not hold it. Section 8's row stands as the specification and its OWNER is session 252 |
+| **256**, `claude/routes-admin-reads`, `ADR-144` REQUIRED | seven `/admin/*` reads including **`GET /admin/liability`** | **`P5-l`'s API half is claimed.** What is left of `P5-l` is the `apps/admin` rendering half and section 5.3's numerator-versus-denominator reading |
+| **258**, `claude/routes-calendar-and-rise`, `ADR-146` | `GET /economic-calendar` and **`POST /webhooks/rise`** | **`P5-m`'s settlement webhook is claimed.** What is left of `P5-m` is the rail PORT and its sandbox adapter, which is the half `packages/psp` shows the shape of |
+
+> **[ALLOCATION](../decisions/ALLOCATION.md)'s row `140` and [sessions/README](../sessions/README.md)'s row
+> `252` both restate the contradiction section 5.1 refutes**, in these words: *"the payout gate reads
+> `identities.status = 'active'` after `ADR-062` while `M20`'s `INV-M20-06` blocks on `= 'restricted'`, so
+> a `closed` identity cannot request a payout but can still spend its wallet."*
+
+**`M20:62` reads `= 'active'` and has since 2026-08-21.** [ADR-075](../decisions/ADR-075.md) is
+`status: accepted`, moved that predicate and `G-WITHDRAWAL-CLEARED` together, and closes `OQ-062-01` and
+its `OQ-M20-07` restatement. **So session 252 is dispatched MONEY PATH with a REQUIRED ADR against a
+contradiction that does not exist**, and `ADR-140`'s stated reason for being required is that premise.
+
+**This plan does not edit either row**, because neither is in its fence and both belong to a merged wave.
+**What it does is name the two things session 252 will actually meet**, so the finding is in the document
+that session's own dispatch points at rather than discovered at the file:
+
+1. **[M20](M20-wallet.md)'s `OQ-M20-07` body is the stale text**, not `INV-M20-06`. A session that greps
+   `M20` for `restricted` finds the open question and two door-inventory cells, reads them as current, and
+   re-rules a closed question. **Section 10 item 4 is the repair and it is nobody's yet.**
+2. **What `POST /accounts/:id/payout` is genuinely missing is not a predicate.** It is `P5-a`'s lock,
+   `P5-c`'s contract rows for the surfaces beside it, and **[ADR-124](../decisions/ADR-124.md)'s answer to
+   what the route reads under a global halt.** `ADR-140` is reserved REQUIRED for the wrong reason and
+   there is a right one.
+
+**The general lesson is section 5.1's, arriving twice in one day.** A finding recorded four times and owned
+by nobody gets treated as handled; **a finding CLOSED once and restated in a reservation gets treated as
+open.** Both fail the same way, and the only defence is the grep this session ran.
+
 ---
 
 ## 6. What P5 is NOT
@@ -301,7 +340,7 @@ is in play.**
 
 | Registry | State | Why this plan does not claim |
 |---|---|---|
-| **ADR numbers** | `124` to `137` are spent by this wave. **The first free number is `138`** | `CI-06w` reads [ALLOCATION](../decisions/ALLOCATION.md) as a multiset and thirteen sessions are running beside this one. **Six P5 slices need one** (`P5-a`, `P5-c`, `P5-d`, `P5-e`, `P5-k`, and `P5-i` conditionally), and they are claimed in ONE commit before any slice runs |
+| **ADR numbers** | `124` to `137` are spent by this wave, **and `138` to `152` were spent by a FIFTEEN-session wave that merged as [#330](https://github.com/lam2-coder/meritfutures/pull/330) while this plan sat in review. The first free number is `153`**, and section 5.5 is what that wave does to this one | `CI-06w` reads [ALLOCATION](../decisions/ALLOCATION.md) as a multiset and thirteen sessions are running beside this one. **Six P5 slices need one** (`P5-a`, `P5-c`, `P5-d`, `P5-e`, `P5-k`, and `P5-i` conditionally), and they are claimed in ONE commit before any slice runs |
 | **Migration numbers** | **`0048` is [session 240](../sessions/README.md)'s**, stated in [STATE](../STATE.md) as *"`0048` stays free"* on the commit before it was reserved | `P5-e` and `P5-k` each need one. **Neither may read the directory and take the next number it can see**, which is [session 120](../sessions/2026-08-21-session-120.md)'s move and produced `OI-27` |
 | **`GS-nnn`** | **P5 claims none. All 16 already exist** and are blocked | This is P5's one registry advantage over P4 and it is worth stating: the scenarios were written when the modules were, so no P5 slice pre-claims a fixture number |
 | **`OI-nn`** | `OI-30` is the maximum | `P5-e` CLOSES `OI-06 (payout destinations)` and opens none |
@@ -338,7 +377,7 @@ no shared array.** `P5-i` is the exception and it is named as one.
 
 | # | Slice | Fence, by file | Money | Depends on, by file |
 |---|---|---|---|---|
-| **`P5-f`** | **The internal leg.** `POST /accounts/:accountId/payout`: `evaluatePayout`, `clampPayout`, the immutable snapshot, `G-HOLD-REQUIRED`, then `LT-01` and `applySettlement` **in one transaction**. `INV-M5-23`: the impersonation refusal is an authorization decision and never a gate result, so **no snapshot, no row, no `payout.blocked`** | `apps/api/src/routes/payouts.ts` (new), `apps/api/test/payouts.test.ts` (new), `STATE` (append), `sessions/` | **YES. E2 READ.** The single most audited path in the system | **`P5-a`**; **`P5-c`**, **`P5-d`**; **`ADR-126`** (session 238) for a resolved caller; **[ADR-124](../decisions/ADR-124.md)** for what it reads under a global halt |
+| **`P5-f`** | **CLAIMED BY SESSION 252 (`ADR-140`) ON THE `c947e39` MERGE, section 5.5. The row stands as the SPECIFICATION and this plan does not hold the slice.** **The internal leg.** `POST /accounts/:accountId/payout`: `evaluatePayout`, `clampPayout`, the immutable snapshot, `G-HOLD-REQUIRED`, then `LT-01` and `applySettlement` **in one transaction**. `INV-M5-23`: the impersonation refusal is an authorization decision and never a gate result, so **no snapshot, no row, no `payout.blocked`** | `apps/api/src/routes/payouts.ts` (new), `apps/api/test/payouts.test.ts` (new), `STATE` (append), `sessions/` | **YES. E2 READ.** The single most audited path in the system | **`P5-a`**; **`P5-c`**, **`P5-d`**; **`ADR-126`** (session 238) for a resolved caller; **[ADR-124](../decisions/ADR-124.md)** for what it reads under a global halt |
 | **`P5-g`** | **The wallet reads.** `GET /wallet` and `GET /wallet/entries`: balance, withdrawable-now versus held with the rule that holds it (`P-1`, `P-3`), and the itemized entry list with provenance and running balance, cursor paginated | `apps/api/src/routes/wallet.ts` (new), `apps/api/test/wallet.test.ts` (new), `STATE` (append), `sessions/` | **YES** by content. It renders a balance a trader acts on | **`P5-a`**, **`P5-c`**, **`ADR-126`** |
 | **`P5-h`** | **The external leg.** `POST /wallet/withdrawals`: `G-WITHDRAWAL-CLEARED` including `identities.status = 'active'` ([ADR-075](../decisions/ADR-075.md)), `G-DESTINATION-COOLING` against `P5-e`'s registry, the name-match score, the 10,000c minimum, one in flight, FIFO composition into `source_provenance_summary`, then `LT-06`. **`C-27` already refuses it from a non-elevated session and this slice adds NO second refusal**, which [M05](M05-payout-system.md) section 3.6 argues once | `apps/api/src/routes/wallet-withdrawals.ts` (new), `apps/api/test/wallet-withdrawals.test.ts` (new), `STATE` (append), `sessions/` | **YES. E2 READ.** It is where cash leaves | **`P5-a`**, **`P5-c`**, **`P5-e`**, **`ADR-126`**, **[ADR-124](../decisions/ADR-124.md)** |
 | **`P5-i`** | **The wallet leg of checkout.** `payment_method = wallet` posts `LT-08` in the purchase transaction: `INV-M20-02` own-accounts-only resolved server side in the debit transaction, `INV-M20-06`'s enumerated gate set, `INV-M20-07`'s velocity limit **delaying rather than refusing**, and `INV-M20-01`'s position check under `P5-a`'s lock. **[M20](M20-wallet.md) section 3.7: the refusal sits BEFORE the payment-method branch and is asserted against all three methods** | `apps/api/src/routes/checkout.ts`, `apps/api/test/checkout.test.ts`, `docs/decisions/ADR-1NN.md` (**only if `mixed` needs a ruling**), `STATE` (append), `sessions/` | **YES. E2 READ** | **`P5-a`**, **`P5-b`** for `wallet_spend_limits`, **`P5-c`**. **The only P5 slice that edits an existing route module** |
@@ -349,8 +388,8 @@ no shared array.** `P5-i` is the exception and it is named as one.
 |---|---|---|---|---|
 | **`P5-j`** | **The hourly expiry sweep. THREE CLOCKS, ONE JOB**, on [CRON_INVENTORY](../ops/runbooks/CRON_INVENTORY.md)'s own rule that a second sweep is a second thing to stall: `payout_requests.freeze_expires_at`, `payout_requests.hold_expires_at` and `wallet_withdrawals.freeze_expires_at`. **Expiry RELEASES and on a hold it PAYS** (`INV-M5-17`), and on a withdrawal it **resumes the rail and never re-pays** (`INV-M20-14`) | `apps/worker/src/sweeps/expiry.ts` (new), `apps/worker/src/sweeps/ports.ts` (new), `apps/worker/test/expiry.test.ts` (new), `apps/worker/src/index.ts`, `docs/ops/runbooks/CRON_INVENTORY.md` (**the sweep's row only**), `STATE` (append), `sessions/` | **YES.** Release posts `LT-01` | **`P5-a`** for the range and null terms; **`P5-d`** for the release events |
 | **`P5-k`** | **The three nightly assertions, and the global halt's mechanism.** `INV-M5-18` on the QUERY rather than on the job; `INV-M20-10`'s per-identity wallet reconciliation; the global zero-sum assertion and **[ADR-124](../decisions/ADR-124.md)'s firm-scoped switch**, whose storage, clock and authority that entry section 3 deliberately refuses to design | `apps/worker/src/batch/assertions.ts` (new), `apps/worker/src/batch/ports.ts`, `apps/worker/test/assertions.test.ts` (new), `packages/ledger/src/halts.ts`, `packages/ledger/src/post.ts`, `packages/db/migrations/00NN_*.sql` (new), `packages/db/DELTA_MANIFEST.md`, a `data-model/` record, `packages/db/src/schema.ts`, `packages/db/src/scope.ts`, `docs/decisions/ADR-1NN.md` (new, **REQUIRED**), `docs/ops/runbooks/CRON_INVENTORY.md` (**its two rows only**), `ALLOCATION`, `INDEX`, `STATE` (append), `sessions/` | **YES. E2 READ.** It decides what stops a payout | **`P5-a`**; **[ADR-124](../decisions/ADR-124.md)**; a **migration number**; **`P5-a`** via `halts.ts` |
-| **`P5-l`** | **The liability dashboard gains a data source and the float panel.** `GET /admin/liability` serves `P-M6-01` through `P-M6-07` and [`apps/admin`](../../apps/admin/src/liability.ts)'s arithmetic reads a real row. **Float and reserve render as visibly separate figures and the RCR is computed from reserve alone**, section 5.3 | `apps/api/src/routes/admin-liability.ts` (new), `apps/api/test/admin-liability.test.ts` (new), `apps/admin/src/liability.ts`, `apps/admin/src/live-liability.ts`, `apps/admin/src/page.ts`, `apps/admin/test/**`, `STATE` (append), `sessions/` | **YES** by content, no ledger write | **`P5-b`**; **`P5-c`**; **session 240's `OI-01` repair**, and it must NOT repair `liability_snapshots` itself |
-| **`P5-m`** | **The payout rail's port and its sandbox adapter**, on [`packages/psp`](../../packages/psp/src/port.ts)'s shape and NOT its type: `PspId` is closed at two members by a CHECK on `purchases.psp` and cannot be borrowed. Enqueue with an idempotency key generated at approval, the settlement webhook with signature, timestamp, nonce and replay window, `LT-07`, and the `S-1` to `S-7` step list. **A hand-written fake needs no catalog entry, so this is NOT a `VG-12` admission**, and the slice states that rather than assuming it | `packages/rail/**` (new), `apps/api/src/routes/webhooks-rail.ts` (new), `apps/api/test/webhooks-rail.test.ts` (new), `docs/architecture/OVERVIEW.md` (**section 3's container row only**), `STATE` (append), `sessions/` | **YES. E2 READ** | **`P5-h`** for a withdrawal to settle; **`P5-d`** |
+| **`P5-l`** | **ITS API HALF IS CLAIMED BY SESSION 256 (`ADR-144`), section 5.5; what remains is the rendering half.** **The liability dashboard gains a data source and the float panel.** `GET /admin/liability` serves `P-M6-01` through `P-M6-07` and [`apps/admin`](../../apps/admin/src/liability.ts)'s arithmetic reads a real row. **Float and reserve render as visibly separate figures and the RCR is computed from reserve alone**, section 5.3 | `apps/api/src/routes/admin-liability.ts` (new), `apps/api/test/admin-liability.test.ts` (new), `apps/admin/src/liability.ts`, `apps/admin/src/live-liability.ts`, `apps/admin/src/page.ts`, `apps/admin/test/**`, `STATE` (append), `sessions/` | **YES** by content, no ledger write | **`P5-b`**; **`P5-c`**; **session 240's `OI-01` repair**, and it must NOT repair `liability_snapshots` itself |
+| **`P5-m`** | **ITS SETTLEMENT WEBHOOK IS CLAIMED BY SESSION 258 (`ADR-146`), section 5.5; what remains is the PORT and the fake.** **The payout rail's port and its sandbox adapter**, on [`packages/psp`](../../packages/psp/src/port.ts)'s shape and NOT its type: `PspId` is closed at two members by a CHECK on `purchases.psp` and cannot be borrowed. Enqueue with an idempotency key generated at approval, the settlement webhook with signature, timestamp, nonce and replay window, `LT-07`, and the `S-1` to `S-7` step list. **A hand-written fake needs no catalog entry, so this is NOT a `VG-12` admission**, and the slice states that rather than assuming it | `packages/rail/**` (new), `apps/api/src/routes/webhooks-rail.ts` (new), `apps/api/test/webhooks-rail.test.ts` (new), `docs/architecture/OVERVIEW.md` (**section 3's container row only**), `STATE` (append), `sessions/` | **YES. E2 READ** | **`P5-h`** for a withdrawal to settle; **`P5-d`** |
 | **`P5-n`** | **The event feed, and the writer underneath it.** `events` gains a producer and [M06](M06-admin-ops-console.md)'s fifth surface renders it. **The producer is the harder half and it is this slice's subject**: every P5 route and job above emits, and `EVENTS`' universal rule admits no transition without an event | `apps/api/src/events.ts` (new), `apps/api/test/events.test.ts` (new), `apps/admin/src/feed.ts` (new), `apps/admin/test/feed.test.ts` (new), `STATE` (append), `sessions/` | no by file. It writes an append-only record of money movements | **`P5-b`** for the `events` table; **`P5-d`** for the names |
 
 ### Wave 4: NOT DISPATCHED, and each absence is a decision
@@ -378,7 +417,7 @@ or by a slice and a session already in flight.
 | **[`packages/db/test/scoped-db.test.ts`](../../packages/db/test/scoped-db.test.ts)** | **`P5-a`, `P5-b`** | **SERIAL, and it is the same trap [P4 section 9](P4-portal-and-site.md) rows**: a branch that adds a table here without its rule typechecks, and the merge of two such branches typechecks too. `P5-a` first, because `P5-b`'s new rules are asserted by machinery `P5-a` may move |
 | **[`packages/db/src/schema.ts`](../../packages/db/src/schema.ts)** and **[`scope.ts`](../../packages/db/src/scope.ts)** | **`P5-b`, `P5-e`, `P5-k`**, and every module measurement in the estate | **RULED, by [ADR-092](../decisions/ADR-092.md) section 2**: the owner is the TABLE, the registration is not re-argued, and the queue is the TYPE CHECKER. P5's three table sets are disjoint (`wallet_spend_limits`/`events`/`payment_disputes`, `payout_destinations`, `ADR-124`'s switch), **so the three are concurrent with each other and with any other session's disjoint set**. Order only by their other dependencies |
 | **[`packages/ledger/src/halts.ts`](../../packages/ledger/src/halts.ts)** | **`P5-a`** (its stale header), **`P5-k`** (the global check) | **SERIAL, `P5-a` then `P5-k`**, and the collision is small and easy to miss: `P5-a` rewrites a paragraph that explains a cost, `P5-k` adds a function beside it. A keep-both merge produces a file whose header explains the old cost of the new code |
-| **[`apps/api/src/routes/`](../../apps/api/src/routes/health.ts)** | **`P5-f`, `P5-g`, `P5-h`, `P5-m`, `P5-l`** each add ONE new file; **`P5-i`** edits `checkout.ts` | **NOT A COLLISION, and that is [ADR-100](../decisions/ADR-100.md)'s whole return.** The module list is the directory listing, so five branches add five disjoint paths and merge in any order. **`compose` refuses a duplicate `METHOD /path` across the whole module set**, so the one collision five concurrent route slices actually make is caught at startup rather than merged |
+| **[`apps/api/src/routes/`](../../apps/api/src/routes/health.ts)** | **`P5-g`, `P5-h`** each add ONE new file; **`P5-i`** edits `checkout.ts`; and **sessions 251 to 258 add fifteen more**, section 5.5 | **NOT A COLLISION, and that is [ADR-100](../decisions/ADR-100.md)'s whole return.** The module list is the directory listing, so every one of those branches adds a disjoint path and they merge in any order. **`compose` refuses a duplicate `METHOD /path` across the whole module set**, so the one collision that many concurrent route slices actually make is caught at startup rather than merged. **With sessions 251 to 258 dispatched beside P5's, this row is now carrying more than twenty concurrent branches and it is the single largest return `ADR-100` has produced** |
 | **[`apps/api/src/routes/checkout.ts`](../../apps/api/src/routes/checkout.ts)** | **`P5-i`**, and **[session 235](../sessions/2026-08-27-session-235.md)**, landed | The enrichment call site landed here on 2026-08-27. **No session in the current wave holds it**, so `P5-i` takes it cleanly, and its prompt says which two regions are already spoken for |
 | **[`apps/worker/src/batch/ports.ts`](../../apps/worker/src/batch/ports.ts)** | **`P5-k`**, and cross-phase **[M13's `M13-e`](../sessions/2026-08-24-session-164.md)** and **[ADR-122](../decisions/ADR-122.md)'s statistics port** | Three slices add a port to one interface. **`P5-j` deliberately declares its own `sweeps/ports.ts` instead**, because a sweep is not a batch step and folding it in would give the hourly job the nightly job's dependency graph |
 | **[`docs/architecture/API_CONTRACT.md`](../architecture/API_CONTRACT.md)** | **`P5-c`**, and cross-phase **[M05's `M5-9`](../sessions/2026-08-24-session-159.md)**, **[M16's three](../sessions/2026-08-24-session-165.md)**, **[M06's ADR-069 eighteen](../sessions/2026-08-24-session-160.md)** | **STILL THE HOTTEST CROSS-PHASE FILE IN THE CORPUS** and [P4 section 10](P4-portal-and-site.md) item 2 left it unresolved. **P5 does not resolve it either**; it holds the file for one slice and takes eight rows in one commit, which is the cheapest shape available to a phase |
@@ -480,7 +519,7 @@ measurement paid for an amendment.
     schema half only. **`P5` is the phase where money leaves the building.**
 
 **Money-path sessions, which is all of them except `P5-n`: plan mode, fresh context, one objective,
-[ADR-003](../decisions/ADR-003.md) strict.** `P5-e`, `P5-f`, `P5-h`, `P5-i`, `P5-k` and `P5-m` additionally
+[ADR-003](../decisions/ADR-003.md) strict.** `P5-e`, `P5-h`, `P5-i`, `P5-k` and `P5-m` additionally (and session 252 on `P5-f`'s behalf)
 carry the [E2](../../MERIT_BUILD_MASTER_PROMPT.md) line-by-line read, **incrementally as each file lands**
 rather than at the merge.
 
@@ -494,15 +533,19 @@ are answered.** Item 1 blocks `P5-k` alone; item 2 decides whether the phase can
 ```
 Already in flight, and three of them order AHEAD of P5:
   237  ADR-125, the fixture-format term   ->  P5's whole done-condition
-  238  ADR-126, the auth authority        ->  P5-f, P5-g, P5-h, P5-i
+  238  ADR-126, the auth authority        ->  P5-g, P5-h, P5-i
   240  ADR-128, migration 0048            ->  P5-e and P5-k take LATER numbers
+
+CLAIMED ELSEWHERE on the c947e39 merge, section 5.5. Not dispatched by this plan:
+  252  ADR-140  POST /accounts/:id/payout ->  IS P5-f. The row above is its specification
+  256  ADR-144  GET /admin/liability      ->  P5-l's API half
+  258  ADR-146  POST /webhooks/rise       ->  P5-m's settlement webhook
 
 Wave 1, two lanes, the lanes concurrent with each other:
   lane A   P5-a  the accessor  MONEY  ->  P5-b  three tables  MONEY  ->  P5-e  destinations  MONEY E2
   lane B   P5-c  the contract              ||   P5-d  the catalogue
 
-Wave 2, after P5-a, P5-c, P5-d and 238. FOUR CONCURRENT, and ADR-100 is why:
-  P5-f  the internal leg      MONEY E2   (also needs ADR-124)
+Wave 2, after P5-a, P5-c, P5-d and 238. THREE CONCURRENT, and ADR-100 is why:
   P5-g  the wallet reads      MONEY
   P5-h  the external leg      MONEY E2   (also needs P5-e)
   P5-i  checkout's wallet leg MONEY E2   (also needs P5-b)
@@ -510,8 +553,8 @@ Wave 2, after P5-a, P5-c, P5-d and 238. FOUR CONCURRENT, and ADR-100 is why:
 Wave 3, THREE CONCURRENT plus two behind wave 2:
   P5-j  the expiry sweep      MONEY      (needs P5-a, P5-d)
   P5-k  the assertions        MONEY E2   (needs P5-a, ADR-124, section 10 item 1)
-  P5-l  the liability panel   MONEY      (needs P5-b, P5-c, session 240)
-  P5-m  the rail in sandbox   MONEY E2   (needs P5-h)
+  P5-l  the liability RENDER  MONEY      (needs P5-b, session 240, and 256's route)
+  P5-m  the rail PORT + fake  MONEY E2   (needs P5-h; 258 holds the webhook)
   P5-n  the event feed                   (needs P5-b, P5-d)
 
 Wave 4, NOT DISPATCHED:
@@ -522,7 +565,7 @@ Wave 4, NOT DISPATCHED:
 other slice in the phase is behind it**, which is the sentence this whole document exists to be able to
 write.
 
-**Fourteen slices, and the honest count of what is buildable today is zero.** Four of the five stated
+**Fourteen slices, three of which are claimed elsewhere as of `c947e39` (section 5.5), and the honest count of what is buildable today is zero.** Four of the five stated
 contents are writes against an accessor that cannot lock, the fifth reads a table with no producer, and the
 done-condition's three named scenarios are blocked on a term another session is ruling this afternoon.
 **That is not a reason to wait. It is the reason `P5-a`, `P5-c` and `P5-d` are three separate sessions that
