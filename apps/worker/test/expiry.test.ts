@@ -29,10 +29,12 @@
 // values, in WHAT order, and whether the transaction that ran them committed.
 // `fakeIo` below makes nothing durable unless the transaction committed, which
 // is `packages/queue/test/fake-database.ts`'s design REBUILT rather than
-// imported, for the reason `src/sweeps/ports.ts` gives:
-// `apps/worker/package.json` declares `@merit/rules-engine` and nothing else,
-// `node-linker=isolated` makes an undeclared import unresolvable, and the
-// manifest is outside this session's fence.
+// imported, for the reason `src/sweeps/ports.ts` gives. That reason USED to be
+// the manifest; since ADR-165 (2026-08-27) it is the ONE-DOOR rule, which that
+// entry states as a checkable clause: `grep -rlE "from '@merit/db'"
+// apps/worker/src` must print `apps/worker/src/db.ts` and nothing else. The
+// sweep is not that file, so it declares its shapes and the suite asserts the
+// absence of the import.
 //
 // -----------------------------------------------------------------------------
 // WHAT THIS SUITE READS RATHER THAN RESTATES
@@ -688,6 +690,71 @@ describe('THE PAYOUT FREEZE LEG IS SWEPT AND REPORTED AND NOT WRITTEN', () => {
     expect(FREEZE_UNRELEASABLE).toContain('merit/no-calendar-in-expiry-path');
   });
 
+  // THE BLOCKER IS NOW LOAD BEARING, SO IT IS CHECKED RATHER THAN CITED.
+  //
+  // The finding above rests on two facts outside this app, and the session that
+  // wrote the first draft got one of them wrong by reading a truncated grep as
+  // an absence. Both are asserted here against their sources, so the claim
+  // cannot rot into prose again:
+  //
+  //   1. `applySettlement` EXISTS and takes a calendar. If somebody removes the
+  //      parameter, the finding's reason changes and this turns red.
+  //   2. `merit/no-calendar-in-expiry-path` is scoped by a GLOB in
+  //      `eslint.config.js`, and THIS FILE'S SOURCE PATH MUST MATCH ONE. That
+  //      config's own comment says the glob "MATCHES ZERO FILES TODAY" because
+  //      the sweep was P2 code that had not landed; `src/sweeps/expiry.ts` is
+  //      the first file to match it, and a refactor that moved the sweep out of
+  //      the glob would switch the control off silently.
+  it('the blocker is real: applySettlement takes a calendar, and the glob reaches this sweep', () => {
+    const settle = source('../../../packages/rules-engine/src/payout/settle.ts');
+    expect(settle).toContain('export function applySettlement(');
+    expect(settle).toMatch(/export function applySettlement\([^)]*calendar: CalendarSlice/s);
+
+    // THE GLOB LIST IS TAKEN FROM THE RULE'S OWN BLOCK AND NOT FROM THE WHOLE
+    // FILE. `eslint.config.js` carries several `files:` arrays, and scanning all
+    // of them would let another block's glob satisfy this assertion, which would
+    // report the control as live after the line scoping it had been deleted.
+    const config = source('../../../eslint.config.js');
+    const rule = config.indexOf("'merit/no-calendar-in-expiry-path': 'error'");
+    expect(rule).toBeGreaterThan(-1);
+    const filesAt = config.lastIndexOf('files: [', rule);
+    expect(filesAt).toBeGreaterThan(-1);
+    const globs = [
+      ...config.slice(filesAt, config.indexOf(']', filesAt)).matchAll(/'([^']+)'/g),
+    ].map((match) => match[1] as string);
+
+    const reaches = (glob: string, path: string): boolean => {
+      let out = '';
+      for (let i = 0; i < glob.length; i += 1) {
+        const character = glob[i] as string;
+        if (character === '*') {
+          if (glob[i + 1] === '*') {
+            // `**/` is zero or more whole path segments; a bare `**` is any run.
+            if (glob[i + 2] === '/') {
+              out += '(?:[^/]+/)*';
+              i += 2;
+            } else {
+              out += '.*';
+              i += 1;
+            }
+          } else out += '[^/]*';
+        } else out += character.replace(/[.+?^${}()|[\]\\]/, (found) => `\\${found}`);
+      }
+      return new RegExp(`^${out}$`).test(path);
+    };
+
+    // `apps/**/*sweep*.ts` and `apps/**/*expiry*.ts` each reach this sweep.
+    // Matching EITHER is enough; matching neither means the rule no longer
+    // covers the file whose header and whose `FREEZE_UNRELEASABLE` cite it.
+    expect(globs.filter((glob) => reaches(glob, 'apps/worker/src/sweeps/expiry.ts'))).not.toEqual(
+      [],
+    );
+    // THE NEGATIVE CONTROL, so the matcher cannot pass vacuously. A path outside
+    // the expiry family must match none of these globs; without this, a matcher
+    // that returned true for everything would read as the control being live.
+    expect(globs.filter((glob) => reaches(glob, 'apps/worker/src/batch/nightly.ts'))).toEqual([]);
+  });
+
   it('an unreleasable row makes the run not clean', async () => {
     const fake = fakeIo({ now: NOW, payoutRequests: [frozenRow()] });
     expect(expirySweepClean(await runExpirySweep(fake.io))).toBe(false);
@@ -862,6 +929,32 @@ describe('THE SWEEP IS THE THIRD DOOR AND THE ROW LOCK IS WHAT MAKES IT ONE RELE
       expect(text, file).not.toMatch(/SystemReason\s*=/);
       expect(text, file).not.toMatch(/SqlExecutorReason\s*=/);
     }
+  });
+
+  // ADR-165's ONE-DOOR CLAUSE, HELD FOR THIS SLICE'S FILES.
+  //
+  // Until 2026-08-27 the sweep declared its shapes structurally because
+  // `apps/worker/package.json` could not resolve `@merit/db` at all. ADR-165
+  // admitted the accessor to that manifest, so the old reason is gone and a
+  // STRONGER one replaces it: that entry rules ONE door and ONE acquisition
+  // point, and states the check in terms -- `grep -rlE "from '@merit/db'"
+  // apps/worker/src` must print `apps/worker/src/db.ts` AND NOTHING ELSE.
+  //
+  // WITH THE MANIFEST LINE PRESENT, AN IMPORT HERE WOULD NOW RESOLVE. That is
+  // exactly why this assertion is worth its line: the thing that used to make
+  // the reach impossible is gone, so what stops it has to be checked instead of
+  // assumed. `src/db.ts` is asserted to still be the acquisition point, so this
+  // passing cannot mean the door moved here.
+  // THE PATTERN MATCHES AN IMPORT STATEMENT AND NOT THE SPELLING, for the reason
+  // one case up: both sweep files QUOTE ADR-165's grep in their headers, so a
+  // bare string match reports the reach-around it was written to catch and makes
+  // the explanation unwritable. The first draft of this case did exactly that.
+  it('neither sweep file imports the accessor: ADR-165 rules ONE door and it is src/db.ts', () => {
+    const imports = /^\s*(?:import|export)\b[^\n]*from '@merit\/db'/m;
+    for (const file of ['../src/sweeps/ports.ts', '../src/sweeps/expiry.ts']) {
+      expect(source(file), file).not.toMatch(imports);
+    }
+    expect(source('../src/db.ts')).toMatch(imports);
   });
 });
 
