@@ -1,7 +1,30 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+
+    // `.tsx` ARRIVES WITH THE FIRST PAGE, WHICH IS ADR-095 `F7` VERBATIM: "each
+    // app's `tsconfig` gains `jsx` and a `dom` lib ... it belongs with the first
+    // page rather than here". This session writes the first rendered document
+    // in this app, so this is the edit that entry deferred rather than a
+    // widening taken here. `apps/portal/tsconfig.json` took the same three keys
+    // for the same reason one session earlier.
+    //
+    // `preserve` HANDS JSX TO THE FRAMEWORK, which is tsconfig.base.json's
+    // "nothing in this repository is built by `tsc`" applied one level down:
+    // the bundler emits, `tsc --noEmit` only reads.
+    "jsx": "preserve",
+
+    // REQUIRED BECAUSE `@types/react@19` DECLARES NO GLOBAL `JSX` NAMESPACE.
+    // React 18's types did, so `jsx: preserve` alone type-checked; 19 moved it
+    // to `React.JSX` and a config that relied on the global silently stops
+    // resolving intrinsic elements.
+    "jsxImportSource": "react",
+
+    // THE `dom` LIB IS THIS APP'S AND NOT THE BASE CONFIG'S. tsconfig.base.json
+    // withholds it from every Node deployable on purpose; a rendered document
+    // is the one place in this workspace where `document` is real.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"]
 }
