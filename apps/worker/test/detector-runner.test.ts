@@ -1025,6 +1025,37 @@ describe('INV-M7-02 and ADR-155: no detector writes a status other than open', (
     }
   });
 
+  it('a severity 5 finding is written at open too, which is where an auto-enforce would show', async () => {
+    // The band an automatic path to `enforced` would be written for. ADR-155,
+    // INV-M7-02, STATE_MACHINES section 7, P7 section 11 rule 11: no slice adds
+    // one, and this is the behavioural half of the assertion below.
+    const fake = fakeIo();
+    await runDetectors(
+      [
+        stub({
+          scan: () => ({
+            findings: [
+              {
+                subjects: ['acct-real-a'],
+                identityId: 'ident-real-a',
+                flagType: 'destination_concentration',
+                severity: 5,
+                slaDueAt: new Date('2026-01-06T02:00:00.000Z'),
+                evidence: { identities_sharing_destination: 2 },
+              },
+            ],
+          }),
+        }),
+      ],
+      config,
+      fake.io,
+    );
+    const flag = fake.writes.find((w) => w.table === 'riskFlags');
+    expect(flag?.values['severity']).toBe(5);
+    expect(flag?.values['status']).toBe(FLAG_STATUS_ON_RAISE);
+    expect(flag?.values['status']).toBe('open');
+  });
+
   it('the runner reads no status from the finding, because the finding has no status to read', () => {
     // A finding carrying `status` is a TYPE ERROR under
     // exactOptionalPropertyTypes, and the assertion below is the runtime half:
