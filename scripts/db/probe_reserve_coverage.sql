@@ -32,9 +32,11 @@
 -- exception class: four of the rejections below raise check_violation and a
 -- handler catching the class cannot tell any of them apart.
 --
--- Run this file against 0001-0048 and SUCCESS 1 fails first, because
--- reserve_coverage_snapshots does not exist there. That is the counterfactual
--- and it is recorded in DELTA_MANIFEST section 26.
+-- THE COUNTERFACTUAL, AS OBSERVED. Executed against 0001-0048 the file dies
+-- before SUCCESS 1's INSERT, at its DECLARE, with `type
+-- "reserve_coverage_snapshots" does not exist`: the probe binds the table's own
+-- composite type, so the absence is caught at PL/pgSQL compile time rather than
+-- at the write. Exit 3. Recorded in DELTA_MANIFEST section 26.
 -- =============================================================================
 
 \set ON_ERROR_STOP on

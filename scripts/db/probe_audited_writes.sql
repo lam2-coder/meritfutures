@@ -47,9 +47,18 @@
 -- absence record is written BEFORE the calendar row, which 0048's deferrable
 -- foreign key on trading_calendar_revisions.trading_day is what permits.
 --
--- Run this file against 0001-0047 and SUCCESS 4 fails first, because
--- supersede_daily_mark does not exist there. That is the counterfactual and it
--- is recorded in DELTA_MANIFEST section 26.
+-- THE COUNTERFACTUAL, AS OBSERVED RATHER THAN AS PREDICTED. This header first
+-- said SUCCESS 4 would fail first, because supersede_daily_mark does not exist
+-- before 0048. Executed against 0001-0047, SUCCESS 1 AND 2 BOTH PASS and the
+-- file dies at SUCCESS 3 with `insert or update on table
+-- "trading_calendar_revisions" violates foreign key constraint
+-- trading_calendar_revisions_trading_day_fkey`, because the absence record is
+-- written before the calendar row and 0032's foreign key is not deferrable
+-- there. Exit 3. Both facts are worth keeping: SUCCESS 1 and 2 pass without
+-- 0048 because a guard that does not exist refuses nothing, which is what makes
+-- them assertions about the guard's SHAPE rather than its existence, and the
+-- first thing that actually breaks is the deferrable foreign key rather than
+-- any function. Recorded in DELTA_MANIFEST section 26.
 -- =============================================================================
 
 \set ON_ERROR_STOP on
