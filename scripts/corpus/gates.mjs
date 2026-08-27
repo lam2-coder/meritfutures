@@ -939,6 +939,10 @@ const sessionLabel = (file) => {
 };
 
 const SPAN_QUERIES = {
+  // OI-25. Eleven keys built from FIXTURE_STATUSES and FIXTURE_BLOCKERS below,
+  // so a term added there gets its query on the same commit. The argument is in
+  // the script's own header and in ADR-133; this is the whole of the wiring.
+  ...(await import('./fixture-backlog.mjs')).FIXTURE_BACKLOG_QUERIES,
   // DISTINCT NUMBERED IDENTIFIERS, read from the entry headings rather than by
   // counting files (ADR-043). Counting files would count ADR-D1, which is outside
   // the numbered sequence, and would count a stray file with no heading.
@@ -5540,10 +5544,17 @@ const conflictMarkers = {
 //      loader cannot run and the registry calls done.
 //   4. EVERY `blocked` ROW NAMES A BLOCKER FROM THE CLOSED VOCABULARY AND A
 //      CITATION, and every row that is NOT blocked names NO blocker.
-//   5. THE TWO SUMMARY TABLES ARE DERIVED FROM THE ROWS. They are
-//      hand-maintained counts sitting above 316 hand-maintained rows, which is
-//      ADR-034's class, and CI-06g cannot reach them because they are not
-//      generated spans.
+//   5. THE TWO SUMMARY TABLES ARE DERIVED FROM THE ROWS. They WERE
+//      hand-maintained counts sitting above hand-maintained rows, which is
+//      ADR-034's class, and CI-06g could not reach them because they were not
+//      generated spans. `OI-25` and `ADR-133` put them in one, and that CHANGES
+//      WHAT THIS ASSERTION MEANS rather than retiring it: it no longer catches a
+//      typist, because nobody types the number now. It cross-checks TWO
+//      INDEPENDENT READERS of the same rows -- `fixture-backlog.mjs` writes the
+//      span, the loop below re-derives it here with its own parser -- which is
+//      the `sql_tables` against `tables` arrangement one screen up, and it is
+//      exactly what a span alone does not buy. ADR-034 says so in terms: "a
+//      generated span can still be generated from the wrong query".
 //   6. EVERY `covered-elsewhere` ROW'S CITED ASSERTION IS NOT DISABLED. The
 //      other three statuses are facts about a directory this gate lists. This
 //      one is a fact about a suite, and it is the only status whose evidence
@@ -5835,6 +5846,19 @@ function citedPaths(citation) {
   return out;
 }
 
+// A generated span's own markers, ASSEMBLED AND NEVER SPELLED, for the reason
+// CI-06/span-tokens' header gives at length: a file describing this mechanism is
+// a file carrying the defect unless it is careful, and an opener written out with
+// no closer after it pairs with the next span's closer and swallows everything
+// between.
+//
+// WHY A SUMMARY CELL IS STRIPPED OF THEM. ADR-034's remedy for a derivable count
+// is a generated span, and OI-25 put the eleven counts below into one. A reader
+// that cannot parse a generated cell is a reader that FORBIDS the remedy it
+// recommends: without this, assertion 5 would report every term as having no
+// summary row at all on the commit that repaired them.
+const SPAN_MARKERS = new RegExp(`<!--${'gen'}:[a-z0-9_]+-->|<!--/${'gen'}-->`, 'g');
+
 // The two summary tables above the rows. Read by a FLAT scan for a row whose
 // first cell is a declared term and whose second parses as an integer, which is
 // safe here rather than lax: a data row's first cell is always `GS-nnn`, and a
@@ -5844,7 +5868,10 @@ function fixtureSummaryCounts(vocabulary) {
   const declared = new Map();
   for (const line of read(FIXTURE_STATUS_DOC).split('\n')) {
     if (!line.startsWith('|')) continue;
-    const cells = line.split('|').slice(1, -1).map((c) => c.trim().replace(/[`*]/g, ''));
+    const cells = line
+      .split('|')
+      .slice(1, -1)
+      .map((c) => c.trim().replace(/[`*]/g, '').replace(SPAN_MARKERS, ''));
     if (cells.length < 2) continue;
     if (!vocabulary.includes(cells[0])) continue;
     if (!/^\d+$/.test(cells[1])) continue;
@@ -5857,7 +5884,7 @@ const fixtureInventory = {
   id: 'CI-06/fixture-inventory',
   title: 'The fixture registry and the fixture directory agree, in both directions',
   covers:
-    'The 316 rows of docs/testing/golden-scenarios/39-fixture-status-and-blockers.md against ' +
+    'The rows of docs/testing/golden-scenarios/39-fixture-status-and-blockers.md against ' +
     'the golden-scenario registry and against packages/rules-engine/fixtures. SIX ' +
     'ASSERTIONS. (1) Every registered GS-nnn has exactly one row and every row names a ' +
     'registered scenario, with the registry read from the OTHER section files so the scope ' +
@@ -6057,9 +6084,11 @@ const fixtureInventory = {
         if (declared.get(term) !== actual.get(term)) {
           findings.push(
             `${FIXTURE_STATUS_DOC}: the ${what} summary says ${declared.get(term)} row(s) are ` +
-              `"${term}" and the rows below give ${actual.get(term)}. This is a ` +
-              'hand-maintained count over hand-maintained rows (ADR-034) and CI-06g cannot ' +
-              'reach it, because it is not a generated span',
+              `"${term}" and the rows below give ${actual.get(term)}. Since OI-25 that cell is ` +
+              'a generated span, so either it was hand-edited without regenerating (run: node ' +
+              'scripts/corpus/gates.mjs generate) or fixture-backlog.mjs and this loop, which ' +
+              'are two independent readers of the same rows, disagree -- and that is a parser ' +
+              'defect in one of them rather than a stale number',
           );
         }
       }
