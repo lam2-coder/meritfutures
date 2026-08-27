@@ -236,14 +236,23 @@ jobs:
       - name: Install, frozen
         run: pnpm install --frozen-lockfile
 
-      # THE RUNNER IS THE `.mjs` ENTRY AND THAT IS DELIBERATE RATHER THAN
-      # INCIDENTAL. `scripts/demo/` carries 16 specifiers naming `.js` files that
-      # are `.ts`, so `node --experimental-strip-types scripts/demo/seed-world.ts`
-      # dies with ERR_MODULE_NOT_FOUND on this tree. That defect predates
-      # ADR-119, `RI-10` does not catch it because `RI-10` is scoped to `src/`
-      # and `scripts/` is not `src/`, and it is reported rather than repaired
-      # here because this file is a workflow and that one is a specifier sweep.
-      # WHEN THAT SWEEP LANDS, THIS LINE SHOULD MOVE TO THE `.ts` ENTRY.
+      # THE RUNNER IS THE `.mjs` ENTRY AND IT STAYS THERE. The earlier note here
+      # said this line should move to `seed-world.ts` once the specifier sweep
+      # landed. The sweep landed (ADR-121, session 233) and the line does not
+      # move, because the sweep was never the reason for the `.mjs` entry.
+      #
+      # MEASURED AFTER THE SWEEP: `node --experimental-strip-types
+      # scripts/demo/seed-world.ts` exits 0 and writes ZERO BYTES. That file
+      # exports `main` and never invokes it; `seed-world.mjs` is what registers
+      # the resolve hook, wires argv and stdio, calls `main` and returns its exit
+      # code. Moving this line would trade a self-audit that reports for a
+      # module-graph load that cannot, and it would go GREEN doing it. FM-17 is
+      # that exact shape: an audit that declines to report must never look like
+      # one that found nothing.
+      #
+      # WHAT THE SWEEP DID BUY IS COVERED WHERE IT BELONGS. `RI-10` now reaches
+      # `scripts/`, so a specifier naming a file that is not there turns CI-01
+      # red rather than waiting for this job to die at startup.
       #
       # The runner refuses on `accountsAudited === 0`, so an empty world fails
       # this job rather than passing it quietly. That is the whole reason the

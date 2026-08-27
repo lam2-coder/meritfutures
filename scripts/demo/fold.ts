@@ -55,17 +55,17 @@ import type {
   PayoutEvaluation,
   ResolvedPlan,
   RuleState,
-} from '../../packages/rules-engine/src/index.js';
-import { advanceDay, evaluatePayout } from '../../packages/rules-engine/src/index.js';
+} from '../../packages/rules-engine/src/index.ts';
+import { advanceDay, evaluatePayout } from '../../packages/rules-engine/src/index.ts';
 import type {
   ContractSpec,
   SimAccount,
   SimLiquidation,
   SimSession,
-} from '../../packages/rithmic/src/index.js';
-import { simulate } from '../../packages/rithmic/src/index.js';
-import { asTradingDay, toCalendarSlice, toDailyMark } from './bridge.js';
-import type { Cohort } from './config.js';
+} from '../../packages/rithmic/src/index.ts';
+import { simulate } from '../../packages/rithmic/src/index.ts';
+import { asTradingDay, toCalendarSlice, toDailyMark } from './bridge.ts';
+import type { Cohort } from './config.ts';
 
 /**
  * The engine version this demo folds under.

@@ -47,7 +47,7 @@
 import fc from 'fast-check';
 import { describe, expect, test } from 'vitest';
 
-import * as engine from '../../../packages/rules-engine/src/index.js';
+import * as engine from '../../../packages/rules-engine/src/index.ts';
 import {
   describeEnvironmentScope,
   environmentPairArbitrary,
@@ -55,11 +55,11 @@ import {
   timezoneIsProcessScoped,
   withEnvironment,
   type ProcessEnvironment,
-} from '../../../packages/golden-loader/test/harness/environment.js';
-import { DEFAULT_OPTIONS, runDemo } from '../main.js';
-import type { DailyMark, CalendarSlice, RuleState, TradingDay } from '../../../packages/rules-engine/src/index.js';
-import { buildPopulation, simulate } from '../../../packages/rithmic/src/index.js';
-import { asTradingDay, toCalendarSlice, toDailyMark } from '../bridge.js';
+} from '../../../packages/golden-loader/test/harness/environment.ts';
+import { DEFAULT_OPTIONS, runDemo } from '../main.ts';
+import type { DailyMark, CalendarSlice, RuleState, TradingDay } from '../../../packages/rules-engine/src/index.ts';
+import { buildPopulation, simulate } from '../../../packages/rithmic/src/index.ts';
+import { asTradingDay, toCalendarSlice, toDailyMark } from '../bridge.ts';
 import {
   COHORTS,
   CORE_EOD_50K,
@@ -68,8 +68,8 @@ import {
   SEQUENCE_BASE,
   populationSpec,
   sessions as demoSessions,
-} from '../config.js';
-import { DEMO_ENGINE_VERSION } from '../fold.js';
+} from '../config.ts';
+import { DEMO_ENGINE_VERSION } from '../fold.ts';
 
 /**
  * `JSON.stringify` cannot serialize a `bigint`, and every money field is one.
