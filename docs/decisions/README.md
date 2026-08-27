@@ -147,6 +147,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-118](ADR-118.md) | a section headed by a date or a session number is a RECORD, and ADR-034's count rule does not reach it  (2026-08-26, status: proposed) |
 | [ADR-119](ADR-119.md) | the demo world is a VALUE at `scripts/demo/world.ts`, not a Postgres seed, and naming it reopens `CI-09` on purpose  (2026-08-26, status: proposed) |
 | [ADR-120](ADR-120.md) | `apps/api` joins the admission list, and wiring the auth surface finds that ADR-112 unblocked everything a session can DO and nothing that makes one  (2026-08-27, status: proposed) |
+| [ADR-121](ADR-121.md) | "shipped source" for `RI-10` means the directories the node loader loads, and `scripts/` is one of them  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

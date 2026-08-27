@@ -30,9 +30,9 @@ import type {
   PayoutEvaluation,
   ResolvedPlan,
   RuleState,
-} from '../../packages/rules-engine/src/index.js';
-import type { AccountRun, DayRow } from './fold.js';
-import type { Cohort } from './config.js';
+} from '../../packages/rules-engine/src/index.ts';
+import type { AccountRun, DayRow } from './fold.ts';
+import type { Cohort } from './config.ts';
 
 /** `$50,000.00`, from integer cents, with no float anywhere on the path. */
 export function money(cents: Cents): string {
