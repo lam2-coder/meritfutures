@@ -91,6 +91,7 @@ import {
   otpSendBudget,
   pageRevalidations,
   passkeys,
+  paymentDisputes,
   payoutRequests,
   payoutTransfers,
   phoneChangeRequests,
@@ -136,7 +137,7 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * ONE HUNDRED AND FOUR OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
+ * ONE HUNDRED AND FIVE OF 111, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
  * owner the TABLE: a table is registered ONCE by the first session that needs
  * it, the registration is never re-argued, and a session computes its own slice
  * from `TABLE_KEYS` on the tree it opened rather than from a roster.
@@ -199,6 +200,30 @@ import {
  * a DIFFERENT identity inside `jsonb`, which no scope rule can express and which
  * INV-M4-06 forbids the portal to receive. A transcription rules nothing, so
  * this is reported and not allocated.
+ *
+ * P5-b LOOKED AT IT AGAIN WITH A FENCE THAT CONTAINED IT AND STOPPED AT THE SAME
+ * PLACE, WHICH IS WORTH ONE SENTENCE BECAUSE THE CIRCUMSTANCES CHANGED AND THE
+ * ANSWER DID NOT. That slice was dispatched to register this table by name, so
+ * the refusal is no longer "no session's fence held it"; it is that all five
+ * members of the vocabulary were tried against the shape and every one is either
+ * refused by a mechanical assertion or silently lossy. `owned` on `identity_id`
+ * compiles and drops every account-level row. `derived` through `account_id` is
+ * refused by ADR-101 clause 1, because the row carries its own identity column,
+ * and again by clause 2, because the edge is nullable. `pair` needs a SECOND
+ * IDENTITY column and this row's second column is an ACCOUNT. `firm` is refused
+ * by the suite's own assertion, because the row declares a column against
+ * `identities(id)`. `root` is `identities`' alone. WHAT THE TABLE NEEDS IS A
+ * SIXTH CLASS, and ADR-106 is the precedent for what adding one costs: a whole
+ * entry, whose ruling is that a row reaching an identity two ways is scoped by
+ * the answer to a question the DDL does not settle. P5-b was allocated no ADR
+ * number and was forbidden to take one, so it registered `payment_disputes` and
+ * left this. THE PAYLOAD REASON IS THE WEAKER OF THE TWO AND IS DEMOTED HERE
+ * RATHER THAN REPEATED: `idempotency_keys`, registered out of THIS SAME
+ * MIGRATION, says in its own `why` that "a scope rule states which ROWS reach an
+ * identity and nothing about what is inside one", so the corpus has already
+ * ruled the adjacent question the other way. What survives of it is that
+ * `response_body` holds THIS person's stored response and an `events` payload
+ * holds a THIRD PARTY's uuid -- and that distinction is a ruling too.
  */
 export const TABLES = {
   identities,
@@ -307,6 +332,11 @@ export const TABLES = {
   dedupeMatches,
   attributions,
   otpChallenges,
+  // P5-b. `payment_disputes` is one of the four tables ADR-092 section 3
+  // measured as named by NO module plan at all, so it had no module to be
+  // "its own" and waited for the first session that needed it. P5 is that
+  // session: it is P-3's chargeback-window input.
+  paymentDisputes,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
@@ -1074,6 +1104,14 @@ export const SCOPE_RULES = {
   otpChallenges: {
     class: 'firm',
     why: "A CHALLENGE ISSUED BEFORE ANYBODY IS ANYBODY (0002_identity.sql, 0029_phone_identity_and_auth.sql SD-M16-05). There is no identity column and there is no correct one: `POST /auth/otp` is the only endpoint in API_CONTRACT that runs at required factor `none`, so the row is written for a caller this database holds no identity for, and 0002's own comment says the table keys off the normalized address `rather than a user_id` because a user MAY NOT EXIST YET. IT IS THE FIRST `firm` ROW WHOSE REASON IS TIMING RATHER THAN OWNERSHIP, and the distinction is stated here rather than left to be re-derived: every other firm table holds a row no identity will EVER own, and this one holds a row whose identity does not exist YET. CONSUMING A CHALLENGE DOES NOT RETROACTIVELY MAKE THE ROW THAT PERSON'S: `consumed_at` is a timestamp and there is nowhere to write an identity, so a session tempted to scope this table is proposing a MIGRATION and not a re-classification. WHAT IT HOLDS IS IDENTITY-SHAPED AND NAMES NO IDENTITY, which is ADR-102 foreclosure 4 touched and not tripped: `email_normalized citext` is the address a person is reached at and `destination_hash bytea` is the SMS destination hashed, and neither addresses a row in this database. `email_normalized` IS NULLABLE AS OF 0029 and that is ADR-103's fold doing its job: 0002 made it NOT NULL when no other channel existed, `ALTER COLUMN email_normalized DROP NOT NULL` relaxed it for SMS, and `otp_challenges_exactly_one_destination` is what keeps exactly one destination on every row. `code_hash` IS `bytea` BECAUSE THE CODE IS NEVER STORED, and `attempts` is on the CHALLENGE rather than on the account so a locked-out attacker learns nothing about whether the address exists.",
+  },
+  paymentDisputes: {
+    class: 'derived',
+    via: 'purchases',
+    localColumn: 'purchase_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "A DISPUTE IS A STATEMENT ABOUT A PURCHASE AND THE PURCHASE IS WHAT CARRIES THE PERSON (0012_disputes_and_affiliate_settlement.sql, SD-M8-01). The row declares NO column against `identities(id)` at all, so ADR-101 clause 1 is satisfied by the DDL rather than by a judgement, and `purchase_id uuid NOT NULL REFERENCES purchases(id) ON DELETE RESTRICT` satisfies clause 2: the edge is NOT NULL, so there is no row that reaches no identity and none returned in silence. `hop` RATHER THAN `semi-join` BECAUSE THE REFERENCE IS SINGLE-VALUED IN THE DIRECTION TRAVERSED: a dispute names ONE purchase and `purchases.id` is that table's primary key, so the traversal cannot multiply this row -- a purchase may carry several disputes and that is the other direction, which this rule never walks. THE CHAIN TERMINATES ONE HOP OUT: `purchases` is `owned` on `identity_id`, `nullable: false`. `ledger_transaction_id` IS THE AVAILABLE MISTAKE AND IT IS REFUSED HERE RATHER THAN IN REVIEW, because it is session 202's `wallet_entries` trap in a second dress: it is `uuid NULL REFERENCES ledger_transactions(id)`, `ledger_transactions` is registered `derived` rather than `firm`, so a rule through it TERMINATES and every mechanical check passes -- and it is wrong twice. The column is NULLABLE, so it would return a person only the disputes that already moved money and drop every OPEN one, which is the population a chargeback window is about; and it answers a DIFFERENT QUESTION besides, whose ledger accounts appear on the compensating reversal rather than whose purchase was disputed, and those agree only while no transaction touches two identities' accounts, which nothing enforces and double entry makes ordinary. WHAT A SCOPED READ RETURNS IS THE PERSON'S OWN DISPUTE HISTORY INCLUDING THE ONES MERIT WON, and that is deliberate: `payment_disputes_resolved_has_outcome` keeps `resolved_at` and `outcome` NULL together, so an open dispute is readable while it is still open, which is what a chargeback window is computed over. THE ROW IS ABOUT THE BUYER AND NEVER ABOUT THE COUNTERPARTY: unlike `attributions`, declared in this same migration and registered `pair`, this table names exactly one person's purchase and hands the reader no second identity's uuid, which is why `derived` is available here and a disjunction is not needed.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
