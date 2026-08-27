@@ -939,6 +939,10 @@ const sessionLabel = (file) => {
 };
 
 const SPAN_QUERIES = {
+  // OI-25. Eleven keys built from FIXTURE_STATUSES and FIXTURE_BLOCKERS below,
+  // so a term added there gets its query on the same commit. The argument is in
+  // the script's own header and in ADR-133; this is the whole of the wiring.
+  ...(await import('./fixture-backlog.mjs')).FIXTURE_BACKLOG_QUERIES,
   // DISTINCT NUMBERED IDENTIFIERS, read from the entry headings rather than by
   // counting files (ADR-043). Counting files would count ADR-D1, which is outside
   // the numbered sequence, and would count a stray file with no heading.
