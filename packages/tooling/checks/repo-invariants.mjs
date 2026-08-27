@@ -1644,7 +1644,265 @@ const ri12 = {
   },
 };
 
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri08, ri09, ri10, ri11, ri12];
+// -----------------------------------------------------------------------------
+// RI-13  An unsigned ADR says what the founder must decide
+// -----------------------------------------------------------------------------
+//
+// THE BACKLOG IS NOT THE PROBLEM; ITS SHAPE IS. On 2026-08-27 fifty-four entries in
+// docs/decisions declared their own approval line withheld. "Read fifty-four
+// documents" is not an actionable ask and it had been growing all day. "Answer these
+// fifty-four questions" is, and the difference is entirely in what the entries
+// themselves say.
+//
+// THE ENTRIES ALREADY KNEW THIS. Twenty of the fifty-four carried a marked block
+// reading `**What a founder read adds and this entry cannot.**` and then named the
+// judgements: which reading was taken, why it is a judgement rather than a
+// derivation, and what goes wrong if it is the wrong one. ADR-157 is the best of
+// them and names three. THE OTHER THIRTY-FOUR CARRIED NOTHING OF THE KIND, and a
+// founder arriving at one of those has to reconstruct the question from the ruling
+// before they can answer it, on every entry, alone.
+//
+// SO THE PROPERTY IS ABOUT THE ENTRY AND NOT ABOUT THE SIGNATURE. It does not ask
+// that anything be signed -- that is the founder's and no check may stand in for it.
+// It asks that an entry which is WAITING on a signature state, in its own words,
+// what the signature is for.
+//
+// WHY A MARKED BLOCK AND NOT A PHRASE LIST. The tempting implementation is a list of
+// the ways an entry can gesture at a founder judgement -- "the clause a later session
+// will want to reverse", "the part that needs the founder", "that judgement is the
+// founder's and no grep reaches it" -- all of which are in the tree. A phrase list is
+// a SECOND COPY OF A CONVENTION, it drifts the first time somebody writes a
+// twenty-fourth phrasing, and it passes an entry that merely MENTIONS a founder.
+// One marked block is the convention itself: the corpus had already written it in
+// thirty-two entries before this check existed, so the check adopts what these
+// documents do rather than inventing a rule it will then have to police.
+//
+// "NOTHING HERE IS A JUDGEMENT" IS A VALID ANSWER AND THE CHECK MUST ACCEPT IT.
+// A pure transcription against an approved document owes the founder no decision,
+// and an entry FORCED TO FABRICATE A QUESTION is worse than one that had none: it
+// spends a founder read on a decision nobody has to make. So the marker is followed
+// by prose and the check reads its LENGTH rather than its meaning; an entry whose
+// prose says "nothing, and here is why" passes on exactly the same terms as one
+// naming three judgements.
+//
+// THE FILE BOUNDARY, WHICH IS A REAL ONE. This file's own header says these are
+// build-tooling invariants and that `scripts/corpus/` is where corpus checks live.
+// RI-12 landed here the same morning reading nothing but docs/, which is the
+// precedent this follows: the corpus RUNNER asserts things about corpus CONTENT
+// against its own registries, and this asserts a property of a document's structure
+// that needs no registry at all. It runs at CI-01 beside the checks that need
+// nothing but the tree.
+//
+/** An `##`-to-`######` heading whose title names an approval. */
+const ADR_APPROVAL_HEADING = /^#{2,6}\s+.*\bapprovals?\b/i;
+
+/** A line that names the approval line itself, wherever in the entry it sits. */
+const ADR_APPROVAL_LINE = /\b(?:approval line|founder approval|founder ruling)\b/i;
+
+/** The status vocabulary of an approval statement that is still waiting. */
+const ADR_WITHHELD = /\b(?:UNSIGNED|PENDING|NOT GIVEN)\b|_{5,}/i;
+
+/** The status vocabulary of an approval statement that records a disposition. */
+const ADR_GRANTED = /^(?:GRANTED|ACCEPTED|SIGNED|ADOPTED|REFUSED|SPLIT)\b/;
+
+/**
+ * The label a status is written after, so that `Approval line: GRANTED` and a bare
+ * `SIGNED on delegated authority` are one shape. A comma is a separator as well as a
+ * colon, because the headings write it that way: `### 5. The approval line, UNSIGNED`.
+ */
+const ADR_STATUS_LABEL =
+  /^(?:the\s+)?(?:founder\s+)?(?:approval(?:\s+line)?|ruling)\b[^:,\n]{0,40}[:,]\s*/i;
+
+/**
+ * A line with its markdown furniture and its approval label removed, so a status can
+ * be read off the FRONT of what is left.
+ *
+ * A DISPOSITION IS READ ONLY HERE, AND THAT ASYMMETRY IS THE POINT. ADR-119 has
+ * `**REFUSED**` in a table cell about an empty world and ADR-137 cites a
+ * recommendation another entry `GRANTED`; both are unsigned, and reading either
+ * mention as a signature drops the entry out of scope SILENTLY, which is this file's
+ * first rule broken in the direction nobody notices. A withholding token is read
+ * anywhere in the approval statement instead: a false read there puts an entry INTO
+ * scope, where it is a finding somebody has to argue with rather than a silence.
+ *
+ * @param {string} line
+ * @returns {string}
+ */
+function adrStatusText(line) {
+  const bare = line
+    .replace(/^\s*(?:#{1,6}\s+)?/, '')
+    .replace(/^\s*(?:[-*+]\s+)?/, '')
+    .replace(/^\s*(?:\d+[.)]\s+)?/, '')
+    .replace(/\*\*|__|\*|`/g, '')
+    .trim();
+  return bare.replace(ADR_STATUS_LABEL, '').trim();
+}
+
+/** How much prose the marked block must carry before it is an answer rather than a label. */
+const FOUNDER_QUESTION_FLOOR = 120;
+
+/**
+ * The lines of an ADR that state its approval status.
+ *
+ * TWO POSITIONS, because the corpus writes the status in two places and neither is
+ * going away: inline on a line that names the approval line, and as the first line
+ * of prose under a section heading that names the approval. A blockquote or table
+ * row is excluded -- both quote OTHER entries' approval lines, and ADR-135 quotes a
+ * migration's header comment about one.
+ *
+ * @param {string[]} lines
+ * @returns {{ n: number, text: string }[]}
+ */
+function adrApprovalStatements(lines) {
+  /** @type {{ n: number, text: string }[]} */
+  const out = [];
+  const plain = (/** @type {string} */ l) => l.replace(/\*\*|__|\*|`/g, '');
+  // A FENCE IS NOT A HEADING, and getting that wrong read ADR-111 as unsigned:
+  // its approval section runs a shell block whose comments start with `#`, the
+  // section looked like it ended at the first of them, and the grant three lines
+  // further down was never seen. The check would have failed a SIGNED entry.
+  const fenced = lines.map(() => false);
+  let open = false;
+  for (const [i, line] of lines.entries()) {
+    if (/^\s*```/.test(line)) open = !open;
+    fenced[i] = open;
+  }
+  for (const [i, line] of lines.entries()) {
+    if (fenced[i]) continue;
+    if (ADR_APPROVAL_HEADING.test(line)) {
+      out.push({ n: i + 1, text: plain(line) });
+      for (const [j, below] of lines.entries()) {
+        if (j <= i) continue;
+        if (!fenced[j] && /^#{1,6}\s/.test(below)) break;
+        if (below.trim() === '') continue;
+        out.push({ n: j + 1, text: plain(below) });
+      }
+      continue;
+    }
+    if (/^\s*[>|]/.test(line)) continue;
+    if (ADR_APPROVAL_LINE.test(line)) out.push({ n: i + 1, text: plain(line) });
+  }
+  return out;
+}
+
+/**
+ * The index of the marked block, or -1. A bolded lead-in and a section heading are
+ * both accepted because the corpus writes it both ways: 31 entries bold it, ADR-164
+ * makes it a section of its own, and the two say the same thing.
+ *
+ * @param {string[]} lines
+ * @returns {number}
+ */
+function founderQuestionAt(lines) {
+  for (const [i, line] of lines.entries()) {
+    const t = line
+      .replace(/^\s*[#>\-*+\d.)\s]*/, '')
+      .replace(/^\*+/, '')
+      .trim();
+    if (/^what a founder read adds/i.test(t)) return i;
+  }
+  return -1;
+}
+
+/**
+ * The prose the marked block carries, counted from the end of its own sentence to
+ * the next heading or rule. It is a LENGTH and never a meaning: this check catches
+ * an entry that is silent, not one that answers badly.
+ *
+ * @param {string[]} lines
+ * @param {number} at
+ * @returns {number}
+ */
+function founderQuestionProse(lines, at) {
+  const head = (lines[at] ?? '').replace(/^\s*[#>\-*+\d.)\s]*/, '');
+  let body = head.replace(/^[^.!?\n]*[.!?]?/, '');
+  for (const line of lines.slice(at + 1, at + 25)) {
+    if (/^#{1,6}\s/.test(line) || /^---\s*$/.test(line)) break;
+    body += ` ${line}`;
+  }
+  return body.replace(/\*\*|__|\*|`|\s+/g, ' ').trim().length;
+}
+
+/** @type {Invariant} */
+const ri13 = {
+  id: 'RI-13',
+  title: 'Every ADR whose approval line is unsigned states what the founder must decide',
+  covers:
+    'every `ADR-*.md` under docs/decisions. AN ENTRY IS IN SCOPE WHEN ITS ' +
+    'APPROVAL STATEMENT IS WITHHELD: a line naming the approval line, founder ' +
+    'approval or founder ruling, or any line inside a section whose heading ' +
+    'names an approval, carrying UNSIGNED, PENDING, NOT GIVEN or a blank ' +
+    'signature rule, and carrying no DISPOSITION. A disposition -- GRANTED, ' +
+    'ACCEPTED, SIGNED, ADOPTED, REFUSED, SPLIT -- is read only where a signature ' +
+    'is written: at the FRONT of a line, after its markdown furniture and an ' +
+    'optional `Approval line:`, `Founder approval:` or `The approval line,` ' +
+    'label. A withholding token is read anywhere in the approval statement ' +
+    'instead, and THE ASYMMETRY IS DELIBERATE: a disposition misread out of prose ' +
+    "about somebody ELSE'S grant drops an entry out of scope silently, which is " +
+    "this file's first rule broken where nobody sees it, while a withholding " +
+    'token misread only puts an entry INTO scope, where it is a finding somebody ' +
+    'can argue with. Such an entry must carry the marked block `What a founder ' +
+    'read adds` -- bolded or as a heading, the form the corpus was already using ' +
+    'before this check existed -- followed by at least ' +
+    `${FOUNDER_QUESTION_FLOOR} characters of prose. ` +
+    'WHAT IT DOES NOT CATCH, stated rather than left to be discovered. (1) It ' +
+    "reads the block's LENGTH and never its meaning, so it catches SILENCE and " +
+    'not a bad answer, and "nothing here is a judgement, and here is why" passes ' +
+    'on the same terms as three named judgements -- deliberately, because an ' +
+    'entry forced to fabricate a question is worse than one that had none. (2) It ' +
+    'does not read whether a SIGNATURE is owed or given, and it never asks for ' +
+    "one: that is the founder's alone. (3) An entry whose approval status this " +
+    'check cannot read AT ALL is OUT OF SCOPE rather than a finding, and every ' +
+    'pre-FREEZE ruling that records no approval statement is in that position. ' +
+    'THAT IS A SECOND DEFECT AND A DIFFERENT INVARIANT; this one never fails an ' +
+    'entry whose status it could not read, because guessing in that direction ' +
+    'would fail a shelf of documents for a convention that did not exist when ' +
+    'they were written.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const dir = join(root, 'docs/decisions');
+    if (!existsSync(dir)) return findings;
+    const entries = readdirSync(dir)
+      .filter((f) => /^ADR-.*\.md$/.test(f))
+      .sort();
+    for (const file of entries) {
+      const lines = readFileSync(join(dir, file), 'utf8').split('\n');
+      const statements = adrApprovalStatements(lines);
+      if (statements.some((s) => ADR_GRANTED.test(adrStatusText(s.text)))) continue;
+      const withheld = statements.filter((s) => ADR_WITHHELD.test(s.text)).pop();
+      if (!withheld) continue;
+      const at = founderQuestionAt(lines);
+      if (at >= 0 && founderQuestionProse(lines, at) >= FOUNDER_QUESTION_FLOOR) continue;
+      const why =
+        at < 0
+          ? 'carries no `What a founder read adds` block'
+          : `states the block at :${at + 1} and then says nothing: ` +
+            `${founderQuestionProse(lines, at)} characters, ${FOUNDER_QUESTION_FLOOR} required`;
+      findings.push(
+        `docs/decisions/${file}: approval withheld at :${withheld.n} and the entry ${why}. ` +
+          'An unsigned entry states what the founder must decide, or states that nothing here is a judgement and why.',
+      );
+    }
+    return findings;
+  },
+};
+
+export const CHECKS = [
+  ri01,
+  ri02,
+  ri03,
+  ri04,
+  ri05,
+  ri06,
+  ri07,
+  ri08,
+  ri09,
+  ri10,
+  ri11,
+  ri12,
+  ri13,
+];
 
 function main() {
   const [arg] = process.argv.slice(2);
