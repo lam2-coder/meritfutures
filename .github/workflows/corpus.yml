@@ -147,6 +147,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # OI-03's assertion is a .mjs, because the item's own word is "against the
+      # DOCUMENT" and a .sql file cannot read markdown. This job had no Node
+      # before that step existed.
+      #
+      # `.nvmrc` is the only place the Node version is written (RIDER 3,
+      # OQ-P1-03), and RI-05 in packages/tooling asserts that no workflow pins it
+      # inline. The integrity job above reads it the same way.
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
       # 1. Forward-only apply from empty, in order, zero errors.
       #    ON_ERROR_STOP is the whole point: psql's default is to continue past
       #    a failed statement and exit 0, which would report a green install of
@@ -519,3 +530,88 @@ jobs:
         run: |
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_publish_decision_is_sound.sql
+
+
+      # 0048, ADR-128. OI-04, OI-12 and OI-13. MONEY PATH.
+      #
+      # EIGHT SUCCESS CASES BEFORE THE FIRST REJECTION, because every one of the
+      # three functions this file probes is a PATH THAT DID NOT EXIST. The failure
+      # mode is not "the guard lets something through", it is "the guard lets
+      # NOTHING through", and 0034's CHECK passed thirty-two rejection assertions
+      # while refusing every row there is.
+      #
+      # SUCCESS 1, 2 AND 3 ARE THE THREE READINGS OF CALENDAR-C3 AND ONLY ONE IS
+      # OBVIOUS. What makes a calendar INSERT retroactive is that the engine has
+      # already folded past the day, not that the day sits inside a
+      # trading_calendar_loads coverage window. A real forward load writes a
+      # coverage row for a year and then inserts every day inside it, so the
+      # coverage reading would demand a revision row for all 250 of them, which is
+      # the one case OI-12 says is ALREADY CORRECT.
+      #
+      # SUCCESS 8 IS THE TIGHTENING NOBODY WOULD NOTICE. rewrite_rule_state
+      # requires a version-like input to have moved and there are TWO of them,
+      # engine_version and calendar_revision_id (ADR-047). Narrowed to
+      # engine_version alone it installs cleanly, satisfies every rejection, and
+      # refuses every calendar-correction rewrite, which is the case that made
+      # 0035 raise OI-13.
+      #
+      # REJECTION 6b CHECKS A CLASS THAT MOVED. 0048 replaces 0014's partial
+      # unique index with a DEFERRABLE EXCLUDE constraint, because the ruled mark
+      # correction was refused by the database in both directions and had never
+      # been executable. A violation now raises exclusion_violation where it used
+      # to raise unique_violation, so a handler written against the old class
+      # would score this as passing while catching nothing.
+      - name: Probe ADR-128's audited writes and CALENDAR-C3 (0048)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_audited_writes.sql
+
+      # 0049, ADR-128. OI-01. MONEY PATH: rcr_bp is the number that pauses SALES.
+      #
+      # SIX SUCCESSES FIRST, for the reason section 13 gives every time: this
+      # table exists to make a figure WRITABLE that had nowhere to live, so a
+      # guard refusing every row would satisfy every rejection and close OI-01
+      # with a table nobody can use.
+      #
+      # SUCCESS 4 IS THE BOUNDARY. The breaker is defined at exactly 1.0 and
+      # rcr_bp is integer arithmetic, so full coverage must render 10000 and not
+      # 9999. An expression that divided before it multiplied would pause sales on
+      # a fully covered balance sheet. SUCCESS 5 is its mirror: truncation is
+      # toward zero, so an ambiguous book falls toward ARMING the breaker.
+      #
+      # REJECTION 1 LOOKS LIKE DEFENSIVE PROGRAMMING AND IS NOT. A GENERATED
+      # column is computed BEFORE the row's CHECK constraints, proven by
+      # execution, so with a plain division a zero CVaR99 raises a bare
+      # `division by zero` and reserve_coverage_snapshots_cvar99_is_positive never
+      # runs. The NULLIF in 0049 is what routes the error to the constraint that
+      # explains it, and this assertion reads CONSTRAINT_NAME to prove it.
+      - name: Probe ADR-128's reserve coverage snapshot (0049)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_reserve_coverage.sql
+
+      # OI-03, ADR-128. THE APPEND-ONLY SET, ASSERTED AGAINST THE DOCUMENT.
+      #
+      # OI-03 is not a prediction and it had already happened three times when
+      # this first ran. DATA_MODEL section 1 carried THREE copies of its
+      # Mutability bullet, left by three keep-both merges, reading "twenty-three
+      # tables ... four migrations", "twenty-two ... three" and "twenty-two ...
+      # three", over three different lists of which migrations revoke. THE
+      # INSTALLED SET WAS TWENTY-FIVE. Every gate was green: CI-06u looks for
+      # duplicated passages and these three had diverged, CI-06i reads table names
+      # and not privileges, and nothing at all read the database's grants.
+      #
+      # IT IS A .mjs BECAUSE THE ITEM'S OWN WORD IS "AGAINST THE DOCUMENT", and a
+      # .sql file cannot read markdown. --falsify runs FIRST and is not
+      # decoration: this assertion has no natural failures to observe, and it
+      # would have reported PASS on the commit carrying the three contradictory
+      # paragraphs it exists to catch.
+      - name: The append-only assertion is falsifiable (OI-03)
+        run: |
+          set -euo pipefail
+          node scripts/db/assert_append_only_grants.mjs --falsify
+
+      - name: The append-only set agrees with DATA_MODEL (OI-03)
+        run: |
+          set -euo pipefail
+          node scripts/db/assert_append_only_grants.mjs

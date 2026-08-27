@@ -154,6 +154,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-125](ADR-125.md) | `no-fixture-format` is one sentence written 227 times, this document's own `GS-030` row refutes it, and seven of the 227 are asserted and passing today  (2026-08-27, status: proposed) |
 | [ADR-126](ADR-126.md) | the vocabulary that moves is the TABLE and never the REASON, and mint and resolve are not the same shape  (2026-08-27, status: proposed) |
 | [ADR-127](ADR-127.md) | Stryker is admitted under a DELEGATED `VG-12` grant, `CI-09`'s third leg is built, and the trend-only ruling is expressed by writing NO threshold at all  (2026-08-27, status: proposed) |
+| [ADR-128](ADR-128.md) | the audited write, and the table `OI-01` has been waiting on  (2026-08-27, status: proposed) |
 | [ADR-130](ADR-130.md) | A derivable count can belong to ONE DOCUMENT, and the count vocabulary could not say so  (2026-08-27, status: proposed) |
 | [ADR-131](ADR-131.md) | the `CI-06<letter>` series is CLOSED at `w`, the last letter is retired UNUSED, and the retirement is a gate rather than a convention  (2026-08-27, status: proposed) |
 | [ADR-132](ADR-132.md) | a registry README indexes by ROW, and `CI-06n` stops accepting a sentence  (2026-08-27, status: proposed) |

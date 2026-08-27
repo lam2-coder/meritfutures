@@ -120,7 +120,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 
 | Artifact | Purpose | Status | Owner |
 |---|---|---|---|
-| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->47<!--/gen--> files, all <!--gen:manifest_changes-->117<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->33<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
+| [migrations/](../packages/db/migrations) | The reviewed migration set. **<!--gen:migration_files-->49<!--/gen--> files, all <!--gen:manifest_changes-->117<!--/gen--> schema changes folded**, verified to apply in order against PostgreSQL 16. **<!--gen:e2_files-->35<!--/gen--> carry an `E2 READ: MONEY PATH` header and are the founder's read set.** This row read "27 files, all 93 schema deltas" and "Sixteen carry" until 2026-08-15, **stating the scope of the E2 read two files short**; all three are generated spans now | review | founder (E2 line-by-line read) |
 | [DELTA_MANIFEST.md](../packages/db/DELTA_MANIFEST.md) | Every `SD-nn` and `U-nn` with its disposition and target file, the migration sequence, the rejection table (empty, and explicitly so), the no-floats exemption list (**two columns, no money**, under [ADR-031](decisions/ADR-031.md)), and the per-constraint verification table. **[ADR-026](decisions/ADR-026.md)'s completeness gate reads this file** | review | founder |
 
 ## docs/testing/ (Wave 4)

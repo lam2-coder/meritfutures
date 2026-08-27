@@ -1623,6 +1623,41 @@ const ci06h = {
           "arrive by name, or that 0028's immutability guard still answers " +
           'first on a published row (OI-29)',
       ],
+      // 0048, ADR-128. THREE SECURITY DEFINER PATHS AND A CALENDAR GUARD, and
+      // the three functions are the only way anything writes daily_marks.
+      // superseded_by, identity_links' dispute columns or a rule_states row.
+      // Deleting this step would take the negative-authz test with it (VG-5,
+      // DATA_MODEL section 14): nothing else in this job asserts that merit_app
+      // still cannot UPDATE those three tables directly, and nothing else
+      // asserts that EXECUTE was revoked from PUBLIC, which PostgreSQL grants by
+      // default on every function it creates.
+      [
+        'probe_audited_writes.sql',
+        "ADR-128's audited writes are no longer probed, so nothing asserts that " +
+          'the three SECURITY DEFINER paths exist and work, that merit_app still ' +
+          'cannot UPDATE daily_marks, identity_links or rule_states directly, ' +
+          'that EXECUTE is not granted to PUBLIC, that the ruled mark correction ' +
+          'is performable at all (it was not, before 0048, in either order), that ' +
+          'one live mark per account-day still holds now the constraint is ' +
+          'deferred, that a rewrite requires B.4 step 3 approval and a moved ' +
+          'version-like input, or that CALENDAR-C3 refuses a retroactive calendar ' +
+          'INSERT while leaving a forward extension alone (OI-04, OI-12, OI-13)',
+      ],
+      // 0049, ADR-128. THE NUMBER THAT PAUSES SALES. rcr_bp is a GENERATED
+      // column and REJECTION 1 is the only place anything asserts that a zero
+      // CVaR99 reaches the NAMED constraint rather than raising a bare division
+      // by zero, which is what it does the moment the NULLIF is removed.
+      [
+        'probe_reserve_coverage.sql',
+        "ADR-128's reserve coverage snapshot is no longer probed, so nothing " +
+          'asserts that coverage of exactly 1.0 renders exactly 10000 bp rather ' +
+          'than arming the breaker on a fully covered book, that truncation runs ' +
+          'toward zero, that rcr_bp cannot be written by hand and therefore cannot ' +
+          'disagree with its own inputs, that RESERVE-C1 holds the reserve to the ' +
+          'attestation it cites (INV-M5-11), that a zero CVaR99 is refused BY NAME ' +
+          'rather than by arithmetic, or that the table is append-only and invisible ' +
+          'to merit_analytics (OI-01)',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
