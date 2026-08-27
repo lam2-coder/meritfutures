@@ -41,3 +41,19 @@ playwright-report/
 # passes without it (measured, session 250). It is an artifact OF a run and not
 # an input to one, which is this file's own test one entry up.
 next-env.d.ts
+
+# `CI-09`'s Stryker leg working directory. Stryker copies the package into
+# `.stryker-tmp/sandbox-*` and mutates the COPY, which is what keeps a mutation
+# run from being the tree-mutating operation `falsify:ci` has to be. It is
+# removed at the end of a run that finishes and SURVIVES A CRASH, which is
+# exactly when a `git add -A` would sweep a directory of half-mutated source
+# into a commit.
+#
+# AND THIS LINE DOES LESS THAN IT LOOKS LIKE IT DOES, WHICH IS WORTH KNOWING
+# BEFORE IT SURPRISES SOMEBODY. `gates.mjs`'s `walk` skips `node_modules` and
+# `.git` and nothing else, so an ignored directory is still READ by every CI-06
+# gate: a crashed mutation run leaves `pnpm run verify` red over copies of files
+# already in the tree, 427 CI-06a findings and 35 CI-06/retired-constraints
+# findings when it was measured. Deleting the directory is the whole repair.
+# ADR-127 finding 3; the fix is a gate edit nobody has taken.
+.stryker-tmp/

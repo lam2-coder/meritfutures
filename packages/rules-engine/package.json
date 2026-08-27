@@ -8,10 +8,14 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "mutation": "stryker run"
   },
   "//": "THERE ARE NO `dependencies` AND THERE MUST NEVER BE ONE THAT RESOLVES INTO THIS WORKSPACE. RI-01 in packages/tooling asserts it across all four dependency fields, and merit/engine-purity asserts the source half. The three commitments that rest on it are the replay self-audit, the PT-nn property suites, and Stryker running here and nowhere else.",
+  "//stryker": "STRYKER LIVES HERE AND NOWHERE ELSE, which is the sentence one line up already promised: STRATEGY section 2 rules mutation testing `on packages/rules-engine only`, because repo-wide mutation testing is runtime cost with no proportionate signal and the engine is the one package where a surviving mutant is genuinely alarming. It is a devDependency of THIS package rather than of the root for the reason `node-linker=isolated` makes load-bearing: a root declaration would let any package run it, and the restriction is what makes the number worth reading. Admitted by ADR-127 under a DELEGATED VG-12 grant.",
   "devDependencies": {
+    "@stryker-mutator/core": "catalog:",
+    "@stryker-mutator/vitest-runner": "catalog:",
     "fast-check": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
