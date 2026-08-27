@@ -299,7 +299,8 @@ function creativeCard(creative: CreativeSubmissionView): ReactElement {
 }
 
 /**
- * No creative submitted, stated rather than left blank.
+ * NO CREATIVE TO SHOW, STATED RATHER THAN LEFT BLANK, AND NOT STATED AS AN
+ * ABSENCE OF SUBMISSIONS.
  *
  * AND THE REQUIRED DISCLOSURE IS NOT SHOWN HERE, WHICH IS A GAP RATHER THAN A
  * CHOICE. M08 section 4 wants an affiliate to see the requirement "before
@@ -310,6 +311,24 @@ function creativeCard(creative: CreativeSubmissionView): ReactElement {
  * exists without inventing text, and inventing a required disclosure at the
  * point of render is the one thing `../../view/disclosure.ts` exists to make
  * impossible. The absence is reported rather than papered over.
+ *
+ * THE PARAGRAPH ABOVE IS UNCHANGED AND [ADR-168](../../../../../docs/decisions/ADR-168.md)
+ * IS WHY IT DID NOT NEED TO CHANGE. That entry re-read this comment against all
+ * three of its clauses and left it verbatim, on the ground that it "states an
+ * absence clause 3 confirms" and that "a comment edited to look responsive to a
+ * ruling that did not touch it is drift". Clause 3 REFUSED
+ * `GET /affiliate/creatives`, so the sentence is not merely still true, it is
+ * now permanent.
+ *
+ * WHAT DID CHANGE IS THE SENTENCE ON THE SCREEN, AND ONLY BECAUSE THE SEGMENT
+ * IS WIRED. "No creative has been submitted for review" is a claim about
+ * whether a submission exists, and this application can never observe that: the
+ * `null` branch is reached for every render, permanently, by the same ruling.
+ * An affiliate who submitted a creative yesterday would read a false statement
+ * from Merit, on the surface AS-M8-04 is about. So the copy says what is true
+ * -- that this screen is served no record of past submissions -- and explicitly
+ * declines the reading it would otherwise invite. The absence being reported is
+ * Merit's, not the affiliate's.
  */
 function noCreativeCard(): ReactElement {
   return card(
@@ -318,7 +337,9 @@ function noCreativeCard(): ReactElement {
     createElement(
       'p',
       { className: 'mf-referrals__empty' },
-      'No creative has been submitted for review.',
+      'Merit serves this screen no record of creatives already submitted: a creative ' +
+        'appears here only in the answer to its own submission. An empty space here does ' +
+        'not mean nothing has been submitted.',
     ),
   );
 }

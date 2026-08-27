@@ -8,9 +8,9 @@ import { expect, test } from 'vitest';
 import type { AffiliateStats } from '../src/api/types.ts';
 import { ReferralScreen } from '../src/app/referrals/screen.ts';
 import type { ReferralScreenView } from '../src/app/referrals/screen.ts';
-import { ReferralDataUnwiredError, loadReferralScreenData } from '../src/app/referrals/data.ts';
 import type { ReferralScreenData } from '../src/app/referrals/data.ts';
-import { toReferralScreen } from '../src/app/referrals/page.ts';
+import ReferralsPage, { toReferralScreen } from '../src/app/referrals/page.ts';
+import { API_ORIGIN_VAR } from '../src/http/client.ts';
 import { MissingRequiredDisclosureError, toCreativeSubmission } from '../src/view/referrals.ts';
 import type { CreateCreativeResponse } from '../src/view/referrals.ts';
 
@@ -290,7 +290,18 @@ test('no creative renders the absence and never a disclosure nobody sent', () =>
   // rather than inventing one at the point of render.
   const html = render(toReferralScreen(data({ creative: null })));
 
-  expect(html).toContain('No creative has been submitted for review.');
+  // AND THE ABSENCE IS MERIT'S, NOT THE AFFILIATE'S. ADR-168 clause 3 refused
+  // `GET /affiliate/creatives`, so this branch is reached on every render for
+  // as long as this application exists. The old copy read "No creative has been
+  // submitted for review", which is a claim about whether a submission exists
+  // that the portal can never observe, and it would be false for every
+  // affiliate who has submitted one.
+  expect(html).toContain('Merit serves this screen no record of creatives already submitted');
+  expect(html).toContain('does not mean nothing has been submitted');
+  expect(html.includes('No creative has been submitted'), 'the screen claims none was sent').toBe(
+    false,
+  );
+
   expect(html).not.toContain(REQUIRED_TEXT);
   expect(html).not.toContain('Disclosure required at approval');
 
@@ -323,7 +334,7 @@ test('the segment holds no route handler, no server action and no transport', ()
   // ADR-095 ruling 3, on ADR-083 section 3, asserted over the segment rather
   // than promised in a comment.
   const dir = join(SRC, 'app', 'referrals');
-  for (const file of ['page.ts', 'screen.ts', 'data.ts']) {
+  for (const file of ['page.ts', 'screen.ts', 'data.ts', 'states.ts']) {
     const code = readFileSync(join(dir, file), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, ' ')
       .replace(/\/\/[^\n]*/g, ' ');
@@ -333,7 +344,29 @@ test('the segment holds no route handler, no server action and no transport', ()
   }
 });
 
-test('the data port refuses rather than seeding figures Merit never computed', async () => {
-  await expect(loadReferralScreenData()).rejects.toThrow(ReferralDataUnwiredError);
-  await expect(loadReferralScreenData()).rejects.toThrow(/GET \/affiliate\/stats/);
+test('the segment seeds no figure on any arm that is not a response', async () => {
+  // THE OLD SHAPE OF THIS TEST WAS `loadReferralScreenData()` REJECTING, and
+  // its argument survives the wiring: "a referral screen showing invented
+  // commission figures is a screen that looks finished and states amounts Merit
+  // never computed, on the surface M08 AS-M8-04 is about." What changed is that
+  // there is a real read now, so the property is asserted where a figure could
+  // actually appear -- the rendered page, on the arm that has no response.
+  //
+  // `apps/portal/test/referrals-source.test.ts` asserts the same property from
+  // the other end: `ready` is reachable only from a body that satisfied the
+  // guard.
+  const saved = process.env[API_ORIGIN_VAR];
+  delete process.env[API_ORIGIN_VAR];
+  try {
+    const html = renderToStaticMarkup(await ReferralsPage());
+
+    expect(html).toContain('Nothing has failed');
+    const body = html.replace(/<style[^>]*>[\s\S]*?<\/style>/g, ' ');
+    expect(
+      [...body.matchAll(/[\d,]+\.\d+/g)].map((m) => m[0]),
+      'no figure is seeded',
+    ).toEqual([]);
+  } finally {
+    if (saved !== undefined) process.env[API_ORIGIN_VAR] = saved;
+  }
 });
