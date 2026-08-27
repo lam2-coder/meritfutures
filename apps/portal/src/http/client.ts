@@ -99,7 +99,16 @@ export class ApiConfigError extends Error {
  * in the deployment where being wrong costs money, and it fails QUIETLY there:
  * the screen renders its honest unavailable state, which is what it renders
  * when the API is merely down. A deployment that has not been told where its
- * API is has not been configured, and it fails here, at start, in one sentence.
+ * API is has not been configured, and this refuses rather than guesses.
+ *
+ * THE REFUSAL IS PER READ AND NOT AT START, WHICH IS WORTH STATING BECAUSE IT
+ * BOUNDS WHAT THE REFUSAL BUYS. Nothing in this application runs at start; the
+ * first `serverApiClient()` of a request is where this is reached, so an
+ * unconfigured deployment is discovered by a screen rather than by a process
+ * that failed to boot. What a caller does with it is the caller's ruling:
+ * `src/app/payouts/source.ts` converts THIS error and no other into the
+ * screen's existing "waiting on an endpoint" state, on the ground that a
+ * deployment with no API genuinely cannot reach either endpoint.
  *
  * THE VALUE IS AN ORIGIN AND IS CHECKED AS ONE. A trailing path is refused
  * rather than trimmed: an operator who set `https://api.example/api/v1` meant
