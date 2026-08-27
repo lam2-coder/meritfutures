@@ -980,6 +980,29 @@ const SPAN_QUERIES = {
       ) || []
     ).length,
 
+  // OI-24, open since session 95, whose register row names its own remedy: "M06's
+  // hand-maintained delta count. Open, and the remedy is a `<!--gen:-->` span".
+  // M06 section 2's opening sentence read "Five deltas", was corrected once by
+  // session 89 to "Six deltas", and `SD-M6-10` made it wrong again three sessions
+  // later with four concurrent sessions about to move it. That is the argument
+  // that the number cannot be hand-maintained rather than an argument to maintain
+  // it harder, and it is why session 95 left the sentence wrong ON PURPOSE and
+  // filed the item instead.
+  //
+  // THE ROWS OF THE TABLE, BY FIRST CELL, which is `manifest_changes`' own form
+  // one entry up rather than a second way of reading a delta table. It counts a
+  // pipe-leading line whose first cell is an `SD-M6-nn` and asserts nothing about
+  // where that line sits; `CI-06v` is the gate that says the rows are inside a
+  // table. That division matters here: `SD-M6-11` was sitting PAST the table's
+  // terminating blank line when this query was written, one pipe run of length
+  // one, under `CI-06v`'s minimum orphan length of two and therefore invisible to
+  // it. The row is moved back into the table in the same commit as this query.
+  m06_delta_count: () =>
+    (
+      read('docs/plans/M06-admin-ops-console.md').match(/^\|\s*\*{0,2}SD-M6-\d+\*{0,2}\s*\|/gm) ||
+      []
+    ).length,
+
   index_entries: () => (read('docs/INDEX.md').match(/^\| \[/gm) || []).length,
 
   // HOW MANY CHECKS THIS RUNNER RUNS, which STRATEGY 4.4 stated by hand and got
@@ -2359,17 +2382,71 @@ const ci06l = {
 // BOTH DIRECTIONS, and the second is the one that matters after a split. A README
 // row pointing at a file that was renamed or never written is a registry claiming
 // coverage it does not have, which reads identically to coverage.
+//
+// -----------------------------------------------------------------------------
+// IT MATCHES A ROW, NOT A MENTION, AND THAT IS `OI-09` CLOSED (ADR-132)
+// -----------------------------------------------------------------------------
+// FOR ITS FIRST YEAR THIS GATE READ THE README AS ONE STRING and accepted any
+// markdown link anywhere in it. Its title said ROW and its parser said MENTION,
+// and the two are different claims. ADR-043 section 3, the ruling that asked for
+// this gate, says "every entry file has a row in its registry README", so the
+// TITLE was the correct half and the parser was the loose one.
+//
+// THE DEFECT IS NOT HYPOTHETICAL AND IT IS HOW THE GAP WAS FOUND. On 2026-08-16
+// ADR-043 itself had no row in the ADR registry table. It was linked from a
+// sentence in that README's preamble, this gate accepted the sentence, and one
+// ADR of 43 sat outside the registry it belongs to with twelve gates green. The
+// ADR that was missing was the ADR that WROTE this gate to pay for its own
+// CI-06c exemption. The row was added that day and the parser was left alone,
+// carried as `OI-09`, because narrowing a parser without measuring what the
+// narrowing costs is the other half of the same mistake.
+//
+// THIS IS A NARROWING, NOT A WEAKENING, AND THE DIRECTION IS WHAT DECIDES IT.
+// Rule 1 forbids a gate that returns PASS for a check it did not perform. This
+// change makes the gate report MORE, not less: an entry indexed only by a
+// sentence was green and is now a finding. Nothing that failed before passes now.
+//
+// AND IT COST NOTHING TO MAKE TRUE, which is the number the ruling turns on:
+// 648 entry files across the five registries, 648 satisfied under the loose
+// reading, 648 satisfied under this one. No document goes RED. Every registry
+// README already indexes by table, so the corpus was already obeying the title;
+// only the check was not.
+//
+// A FENCED BLOCK IS A SAMPLE, NOT A ROW, which is CI-06a's own reading of a
+// fenced link one file over. docs/decisions/README.md carries the ADR entry
+// FORMAT in a fence, and a registry that documents its own row shape must not
+// have the documentation counted as coverage. That is the near-miss CI-06s
+// names in the workflow-comment direction, one registry along.
+//
+// WHAT THE NARROWING GIVES UP, STATED RATHER THAN LEFT TO BE DISCOVERED: a link
+// in a README's PROSE that points at nothing is no longer reported here, because
+// it is not a row and this gate no longer claims anything about mentions. It is
+// not unchecked. CI-06a resolves every relative markdown link in every markdown
+// file, registry READMEs included, so a broken prose link fails there and fails
+// under the gate whose title covers it.
 const ci06n = {
   id: 'CI-06n',
   title: 'Every registry entry has a README row, and every README row resolves',
   covers:
     'the transitive half of CI-06c for the registries ADR-043 split. Every entry ' +
-    'file in a registry directory is linked from that registry README, and every ' +
-    'entry link in the README resolves to a file that exists. It does NOT check the ' +
-    'entry contents; CI-06f checks that an ADR entry is named for its own heading.',
+    'file in a registry directory is linked from a TABLE ROW of that registry ' +
+    'README, and every entry link in a row resolves to a file that exists. ' +
+    'A ROW IS A LINE BEGINNING WITH `|`, OUTSIDE A CODE FENCE. A link in the ' +
+    "README's prose, or inside a fence, is claimed as NOTHING: it does not index " +
+    'an entry, and an entry carrying only such a link is reported with the line ' +
+    'it sits on and why it does not count, because that is the repair. ' +
+    'ADR-043 asked for a row and this gate ' +
+    'accepted a sentence until ADR-132; the entry that fell through was ADR-043 ' +
+    'itself. WHAT IT GIVES UP: a prose link that does not resolve is not reported ' +
+    'here, because a mention is not a row. CI-06a resolves every relative link in ' +
+    'every markdown file and catches it there. ' +
+    'It does NOT check the entry contents; CI-06f checks that an ADR entry is ' +
+    'named for its own heading.',
   run() {
     const findings = [];
     let checked = 0;
+    let rowLinks = 0;
+    let mentions = 0;
     for (const reg of REGISTRIES) {
       if (!existsSync(join(ROOT, reg.dir))) {
         findings.push(`${reg.dir}: registry directory does not exist`);
@@ -2390,24 +2467,65 @@ const ci06n = {
         );
         continue;
       }
-      const body = read(reg.readme);
+      const lines = read(reg.readme).split('\n');
       const linked = new Set();
-      for (const m of body.matchAll(/\[[^\]]*\]\(([^)\s#]+)[^)]*\)/g)) {
-        const target = relative(ROOT, resolve(join(ROOT, dirname(reg.readme)), m[1]));
-        if (!reg.entry(target)) continue; // rows pointing elsewhere are not entry rows
-        linked.add(target);
-        if (!existsSync(join(ROOT, target))) {
-          findings.push(`${reg.readme}: row does not resolve -> ${m[1]}`);
+      // Entry -> the first link to it that is NOT a row, and which kind it is.
+      // Kept only so a finding can say WHERE that link is and WHY it does not
+      // count: an entry indexed by a sentence is one row away from correct, and
+      // a finding that names the sentence is the difference between a repair
+      // and a search. This is why the fenced lines are still SCANNED rather
+      // than skipped -- a sample is not a row, and saying so beats silence.
+      const mentioned = new Map();
+      let fenced = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (/^\s*```/.test(line)) {
+          fenced = !fenced;
+          continue;
+        }
+        const isRow = line.startsWith('|') && !fenced;
+        for (const m of line.matchAll(/\[[^\]]*\]\(([^)\s#]+)[^)]*\)/g)) {
+          const target = relative(ROOT, resolve(join(ROOT, dirname(reg.readme)), m[1]));
+          if (!reg.entry(target)) continue; // links pointing elsewhere are not entry rows
+          if (!isRow) {
+            if (!mentioned.has(target)) {
+              mentioned.set(target, {
+                line: i + 1,
+                why: fenced ? 'inside a code fence, which is a sample' : 'prose',
+              });
+            }
+            continue;
+          }
+          rowLinks++;
+          linked.add(target);
+          if (!existsSync(join(ROOT, target))) {
+            findings.push(`${reg.readme}: row does not resolve -> ${m[1]}`);
+          }
         }
       }
       for (const f of onDisk) {
-        if (!linked.has(f)) findings.push(`${f}: entry file with no row in ${reg.readme}`);
+        if (linked.has(f)) continue;
+        const at = mentioned.get(f);
+        findings.push(
+          `${f}: entry file with no row in ${reg.readme}` +
+            (at ? `, and the link at ${reg.readme}:${at.line} is ${at.why} rather than a row` : ''),
+        );
       }
+      for (const t of mentioned.keys()) if (!linked.has(t)) mentions++;
       checked += onDisk.length;
     }
     if (REGISTRIES.length === 0 || checked === 0) {
       findings.push('no registry entries checked; CI-06n is asserting nothing');
     }
+    // THE MENTION COUNT IS PRINTED RATHER THAN INFERRED. Zero is the corpus
+    // saying every registry indexes by table; a number above zero is the exact
+    // population `OI-09` was opened about, visible on every run instead of on
+    // the day somebody re-reads the parser.
+    console.log(
+      `       CI-06n note: ${checked} entry file(s) over ${rowLinks} README row ` +
+        `link(s) across ${REGISTRIES.length} registry(ies); ` +
+        `${mentions} entry link(s) outside any row, prose or fenced, claimed as nothing`,
+    );
     return findings;
   },
 };
@@ -3379,6 +3497,158 @@ const ci06p = {
         );
       }
     }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// CI-06/closed-letter-series  THE `CI-06<letter>` SERIES IS CLOSED AT `w`
+// -----------------------------------------------------------------------------
+// ADR-065 SECTION 5 RULED THE SUCCESSOR IDENTIFIER A SLUG AND IT DID NOT CLOSE
+// THE SERIES. Nine slug gates have been written since and every one of them took
+// a slug by discipline alone, which is ADR-042's prose wearing a convention's
+// name: nothing in this runner would have reported a twenty-fourth letter.
+//
+// ADR-131 closes it. The members are `a` through `w`, they are historical names
+// that stay exactly as they are, and no new letter may be claimed by anybody.
+//
+// THE CLOSED SET IS WRITTEN AND NEVER COMPUTED, which is ADR-074 section 2's
+// rule applied to a registry rather than to a series. A gate deriving its closed
+// set from the letters the runner currently implements would admit every new
+// letter on the commit that added it and report the series closed at whatever
+// the tree happens to hold. That is a control that cannot fail.
+//
+// THREE INPUTS, BECAUSE THERE ARE THREE PLACES A LETTER CAN BE TAKEN: the
+// runner's own gate ids, the letter table in ALLOCATION, and STRATEGY section
+// 4.4's inventory. CI-06p already reads all three and asserts they agree with
+// each other; this gate asserts what they may say at all, which is the assertion
+// a registry needs once it is closed and no agreement can supply.
+//
+// ASSERTION 4 RUNS THE OTHER WAY AND IT IS WHAT KEEPS THE CONSTANT LOAD BEARING.
+// Every member of the closed series must still be claimed by a row of the letter
+// table. Without it the written constant is decorative, because three subset
+// assertions over sets that only shrink are all satisfied by an empty tree.
+//
+// WHAT THE CLOSURE BUYS THE HARNESS, and it is the reason the last letter is
+// RETIRED rather than spent. `falsify.mjs`'s `nextFreeLetter()` scans `a` to `x`
+// and throws `seed anchor exhausted` when all are claimed, and the CI-06p seed
+// writes a row TWO PAST the letter it returns. With the series closed at `w`,
+// `nextFreeLetter()` returns `x` on every future tree and the seed writes `z` on
+// every future tree. The CI-06p falsification case can no longer go stale, and
+// before this closure it was one claim away from dying.
+//
+// FOUR THINGS IT DOES NOT DO. It renames nothing: ADR-131 section 4 rules the
+// rename out on the record rather than on the cost, and a letter already spent
+// is a name in 145 session logs that were true when they were written. It reads
+// no gate BODY, so whether a gate still deserves its letter is a question for
+// the session that owns that gate. It inherits the one-ref gap CI-06f, CI-06h
+// and CI-06p each declare, so a sibling branch claiming `x` is invisible here
+// and is caught when the two branches meet. And it says nothing about slugs: a
+// slug cannot exhaust, so there is no slug series to close.
+
+/**
+ * The CI-06 letter series, CLOSED. Written, never derived, per ADR-074 section 2.
+ * The last member is read from this string rather than typed a second time.
+ */
+const CLOSED_LETTER_SERIES = 'abcdefghijklmnopqrstuvw';
+
+const ci06ClosedLetterSeries = {
+  id: 'CI-06/closed-letter-series',
+  title: 'The CI-06<letter> series is closed at w, and a new gate takes a slug',
+  covers:
+    'ADR-131, implemented as ruled. THE CLOSED SET IS A WRITTEN STRING and the gate is worth ' +
+    'nothing without that: a closed set computed from the tree admits every new letter on the ' +
+    'commit that adds it, which is ADR-074 section 2 exactly. FOUR ASSERTIONS. Three subset ' +
+    'checks over the three places a letter can be taken (the runner gate ids, the ALLOCATION ' +
+    'letter table, the STRATEGY 4.4 inventory) and a fourth running the other way, that every ' +
+    'closed member is still claimed by a row, which is what stops the three from passing ' +
+    'vacuously on a tree that has lost its inputs. ' +
+    'IT IS NOT CI-06p. That gate asks whether the three registries AGREE; this one asks what ' +
+    'they may say at all. Agreement cannot express a closure, because a letter claimed in all ' +
+    'three places agrees with itself. ' +
+    'FOUR THINGS IT DOES NOT DO. It renames nothing (ADR-131 section 4). It reads no gate ' +
+    'body, so whether a gate deserves its letter belongs to whoever owns that gate. It ' +
+    'inherits the one-ref gap CI-06f, CI-06h and CI-06p each declare, so a letter a sibling ' +
+    'branch claims is invisible until the branches meet. And it asserts nothing about slugs, ' +
+    'because a slug cannot exhaust and there is no slug series to close.',
+  run() {
+    const findings = [];
+    const closed = new Set(CLOSED_LETTER_SERIES);
+    const last = CLOSED_LETTER_SERIES[CLOSED_LETTER_SERIES.length - 1];
+
+    // Rule 2 on a derived input, and it is CI-06p's guard verbatim. A regex that
+    // stopped matching the gate ids would empty this set, and an empty set
+    // satisfies assertion 1 in silence.
+    const implemented = implementedLetters();
+    if (implemented.size === 0) {
+      throw new Error('no CI-06<letter> gates found in this runner; the gate cannot run');
+    }
+    // `allocatedLetterClaims` throws on a table that parses to no rows, so this
+    // input carries its own Rule 2 guard one function down.
+    const claimed = allocatedLetters(read(ALLOCATION_DOC));
+    const rowed = strategyGateLetters();
+    if (rowed.length === 0) {
+      throw new Error(
+        `${STRATEGY_DOC}: the ${GATE_INVENTORY} inventory parsed to zero CI-06 rows; ` +
+          'CI-06/closed-letter-series is asserting nothing about it',
+      );
+    }
+
+    // One sentence for all three subset assertions, because they are one rule
+    // read in three places and a reader who hits it in CI should not have to
+    // work out which registry made it different.
+    const beyond = (letter, where) =>
+      `CI-06${letter} ${where}, and the CI-06<letter> series is CLOSED at ${last} ` +
+      '(ADR-131). A new gate takes a SLUG, CI-06/<subject>, per ADR-065 section 5. ' +
+      `The letters past ${last} are retired rather than free: falsify.mjs's ` +
+      'nextFreeLetter() holds them as the headroom every CI-06p seed spends';
+
+    // Assertion 1: the runner.
+    for (const letter of [...implemented].sort()) {
+      if (!closed.has(letter)) findings.push(beyond(letter, 'is implemented in this runner'));
+    }
+
+    // Assertion 2: the registry. This is the one that fires on a RESERVATION,
+    // which is where a letter is taken first (ADR-034: the claim precedes the
+    // artifact), so it is the assertion that catches a new letter EARLIEST.
+    for (const letter of [...claimed].sort()) {
+      if (!closed.has(letter)) {
+        findings.push(
+          beyond(letter, `is claimed by a row of the letter table in ${ALLOCATION_DOC}`),
+        );
+      }
+    }
+
+    // Assertion 3: the description. A gate rowed in STRATEGY and claimed nowhere
+    // is a letter taken in the document a reader consults first.
+    for (const letter of [...new Set(rowed)].sort()) {
+      if (!closed.has(letter)) {
+        findings.push(
+          beyond(letter, `heads a row of ${STRATEGY_DOC}'s "${GATE_INVENTORY}" inventory`),
+        );
+      }
+    }
+
+    // Assertion 4, the other direction. A CLOSED series is a record, so a member
+    // does not leave it. Without this the three above are satisfied by a tree
+    // that has lost the table entirely, and the written constant asserts nothing.
+    for (const letter of closed) {
+      if (!claimed.has(letter)) {
+        findings.push(
+          `CI-06${letter} is a member of the CLOSED CI-06<letter> series and no row of the ` +
+            `letter table in ${ALLOCATION_DOC} claims it. A closed series is a record of ` +
+            'names already spent; a row that goes is a citation the corpus can no longer ' +
+            'decode, and 145 session logs cite these letters (ADR-131)',
+        );
+      }
+    }
+
+    console.log(
+      `       CI-06/closed-letter-series note: ${closed.size} closed member(s), a to ${last}; ` +
+        `${implemented.size} implemented in this runner, ${claimed.size} claimed by the letter ` +
+        `table, ${new Set(rowed).size} rowed in STRATEGY; ` +
+        `${26 - closed.size} letter(s) past ${last} retired unused and held as falsify headroom`,
+    );
     return findings;
   },
 };
@@ -6802,39 +7072,24 @@ const artifactKey = (text) =>
 // `page`, `layout` and `route` are App Router's own reserved file names; the
 // extension is `.tsx` today, `.ts` for a route handler, and neither is worth
 // hard-coding when the stem is the thing the framework reserves.
-const APP_ROUTER_STEMS = new Set(['page', 'layout', 'route']);
+// -----------------------------------------------------------------------------
+// `appRouterFiles` IS RETIRED, ON THE SAME RULE AS `playwrightInLockfile` BELOW
+// -----------------------------------------------------------------------------
+// It probed CI-07's activation condition, "a page, layout or route file under
+// apps/*/src/app/". THE ARTIFACT ARRIVED on 2026-08-27: session 250 wrote
+// `apps/portal/src/app/layout.tsx` and `page.tsx`, the first renderable document
+// this repository has ever had, and `next build` went from exiting 1 on
+// "Couldn't find any `pages` or `app` directory" to prerendering a route.
+//
+// CI-07's stage was WRITTEN in the same series rather than its row relaxed, so
+// the row now reads **Implemented.** and no condition in STRATEGY section 4.1
+// names that artifact any more. This gate said so itself, in the finding that
+// forced the deletion: "the row was written, the artifact was re-ruled, or the
+// wording moved; either way the probe asserts nothing. Remove it or repoint it."
+//
+// `APP_ROUTER_STEMS` went with it. It had one caller and a set nothing reads is
+// the same furniture as a probe nothing runs.
 
-function appRouterFiles() {
-  const apps = 'apps';
-  if (!existsSync(join(ROOT, apps))) {
-    throw new Error(
-      "CI-06/gate-inventory found no apps/ directory, so CI-07's probe reads nothing and " +
-        'would report the artifact absent for the wrong reason',
-    );
-  }
-  // Rule 2 again, one level down: the probe must be reading a real set of apps.
-  // Zero would report ABSENT for the reason a broken walk reports it.
-  const roots = readdirSync(join(ROOT, apps))
-    .sort()
-    .map((app) => `${apps}/${app}/src/app`)
-    .filter((p) => existsSync(join(ROOT, p)));
-  const found = [];
-  const walk = (rel) => {
-    for (const entry of readdirSync(join(ROOT, rel), { withFileTypes: true }).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    )) {
-      const child = `${rel}/${entry.name}`;
-      if (entry.isDirectory()) {
-        walk(child);
-        continue;
-      }
-      const stem = entry.name.replace(/\.[^.]+$/, '');
-      if (APP_ROUTER_STEMS.has(stem)) found.push(child);
-    }
-  };
-  for (const rel of roots) walk(rel);
-  return found.length === 0 ? null : `${found.join(', ')} is an App Router file`;
-}
 
 // -----------------------------------------------------------------------------
 // `playwrightInLockfile` IS RETIRED, AND THE REGISTER'S OWN RULE IS WHY
@@ -6865,7 +7120,6 @@ function appRouterFiles() {
 // artifact is the dependency, never a mention of it.
 
 const INVENTORY_PROBES = new Map([
-  ['a page, layout or route file under apps/*/src/app/', appRouterFiles],
 ]);
 
 // THE UNPROBEABLE REGISTER, and it is a register rather than an exemption list
@@ -6882,12 +7136,24 @@ const UNPROBEABLE_ARTIFACTS = new Map([
       'changes when it is created, so no probe over the tree can report it. This is the ' +
       'condition the gate asserts and the artifact the gate cannot (ADR-073 section 4)',
   ],
-  [
-    'the VG-12 admission',
-    'the admission is .github/CODEOWNERS plus a branch-protection setting, and session 23 ' +
-      'records why no job can see it: "a job can see the dependency surface changed and ' +
-      'cannot see that a human agreed". A repository file cannot report it',
-  ],
+  // 'the VG-12 admission' IS RETIRED, AND THE REGISTER'S OWN RULE IS WHY.
+  // It registered CI-09's Stryker leg, which is BUILT as of 2026-08-27
+  // (ADR-127), so no condition in STRATEGY section 4.1 names it any more and
+  // the stale-direction loop below reported it as a finding on the commit that
+  // moved the row: "a register entry that no longer names a real condition is a
+  // finding, which is what keeps this register from becoming furniture".
+  //
+  // WHAT ITS ENTRY SAID, KEPT BECAUSE THE SENTENCE IS THE REASON THE LEG WAITED
+  // SEVEN DAYS: the admission is .github/CODEOWNERS plus a branch-protection
+  // setting, and session 23 records why no job can see it, "a job can see the
+  // dependency surface changed and cannot see that a human agreed".
+  //
+  // THIS ONE RETIRED DIFFERENTLY FROM ADR-116's `playwrightInLockfile`, and the
+  // difference is worth a line. That probe retired because its artifact ARRIVED
+  // and a probe reported it. This entry retires because its artifact arrived and
+  // NOTHING COULD REPORT IT: an unprobeable condition closes silently by
+  // construction, so the register shrinking is the only observable event there
+  // ever was. ADR-127 section 7.
   [
     "M07's detector code",
     'the condition names a module plan and not a path or a manifest key. ADR-073 section 5 ' +
@@ -7103,7 +7369,42 @@ const gateInventory = {
     // Rule 2 on the registers themselves. Either one emptied would report every
     // artifact unregistered or every artifact registered, and both read as a gate
     // asserting something it is not.
-    if (INVENTORY_PROBES.size === 0) throw new Error('INVENTORY_PROBES is empty; no artifact is read');
+    // 2026-08-27: THE EMPTY PROBE MAP HAS TWO CAUSES AND ONLY ONE IS A DEFECT.
+    // The rule above was written when at least one condition was probeable, and
+    // it read emptiness as neglect. Implementing CI-07 removed the last probe --
+    // the app-router artifact ARRIVED, and this gate's own finding said of the
+    // stale entry "the row was written, the artifact was re-ruled, or the wording
+    // moved; either way the probe asserts nothing. Remove it or repoint it."
+    //
+    // What remains is three conditions that are each genuinely unreadable from
+    // the tree and each REGISTERED with its reason: a Neon branch is estate and
+    // not tree, the VG-12 admission is a human agreement no job can see, and
+    // M07's detector code names a module plan rather than a path. An empty map
+    // over exactly those is the world reported faithfully, not a register nobody
+    // maintains.
+    //
+    // SO THE ASSERTION NARROWS TO WHAT IT ALWAYS MEANT, and it narrows by DELETING
+    // a rule rather than by adding one, which is worth reading twice before anyone
+    // restores it. The emptiness throw was a proxy for "some artifact is now read
+    // by nothing", and THE PER-CONDITION LOOP ABOVE ALREADY ASSERTS EXACTLY THAT,
+    // one artifact at a time, naming the artifact: every condition must be probed
+    // or registered, and one that is neither is a finding there. So on every tree
+    // where a throw here would have fired, that loop has already pushed a better
+    // message -- and the throw's only remaining effect was to REPLACE it, which is
+    // how `CI-06/gate-inventory/register-shrinks-when-an-artifact-is-re-ruled`
+    // caught this: the scope case seeds a re-ruled artifact, expects the finding
+    // that names it, and got the emptiness error instead.
+    //
+    // A CHECK THAT MASKS A MORE PRECISE CHECK IS NOT A SECOND OPINION. What is
+    // left is the note below, which reports the honest state out loud so an empty
+    // registry can never pass in silence.
+    if (INVENTORY_PROBES.size === 0) {
+      console.log(
+        `       CI-06/gate-inventory note: INVENTORY_PROBES is empty and every one of the ` +
+          `${seenArtifacts.size} waiting artifact(s) is registered unprobeable with a reason. ` +
+          'The next condition naming a readable artifact fails here until a probe is written for it',
+      );
+    }
     if (UNPROBEABLE_ARTIFACTS.size === 0) {
       throw new Error('UNPROBEABLE_ARTIFACTS is empty; the register asserts nothing');
     }
@@ -8187,6 +8488,38 @@ const CARDINAL_DIGITS = /(?<![\w.,-])[1-9]\d{0,3}(?![\w.,-])/g;
 // that matches a site wins, which is how `adr_count` and `tables` stay apart on a
 // ref where both return 111.
 const DERIVABLE_NOUNS = [
+  // SCOPED, AND IT IS THE FIRST ENTRY THAT IS. ADR-130.
+  //
+  // `deltas` is bound below to `manifest_changes`, the corpus-wide 117. M06
+  // section 2 states the size of ITS OWN delta table, which is a PER-DOCUMENT
+  // population under a noun the corpus-wide entry already owns, and the gate was
+  // silent on it at EVERY value that sentence can hold: it read "Seven deltas"
+  // against a truth of ten, and retyping it at ten with the span removed left the
+  // gate silent too, because neither seven nor ten is 117.
+  //
+  // THE REMEDY THIS GATE NAMES COULD NOT BE APPLIED TO IT. "A derivable
+  // population with no entry is unpoliced, and the remedy is another argued
+  // entry" -- but the vocabulary is scanned in declaration order and the first
+  // noun that matches wins, and this file already records what that costs:
+  // "two vocabulary entries for one noun would make the first shadow the second
+  // forever". So an argued entry for M06's deltas, added the only way the
+  // vocabulary allowed, would have been unreachable. `OI-24` had been open on
+  // that sentence since session 95 with its remedy named, and the sentence is the
+  // one this gate's own rationale quotes -- "almost every one a local subset (1
+  // gate, Six deltas, three tables)" -- as a specimen of the noise the
+  // ANY-VALUE rule would produce. That reading was right about the RULE and wrong
+  // about the SITE.
+  //
+  // A `file` predicate is what makes a per-document population expressible. A
+  // scoped entry is declared BEFORE the global entry it shares a noun with, so
+  // the global cannot shadow it, and it narrows rather than widens: it matches
+  // fewer documents than the unscoped form, never more.
+  {
+    query: 'm06_delta_count',
+    noun: /(?:schema )?deltas?/i,
+    label: 'M06 schema deltas',
+    file: /^docs\/plans\/M06-admin-ops-console\.md$/,
+  },
   // The count ADR-034 was ruled over. INDEX stated it, drifted twice, and the
   // second drift landed on `main` on the day the ruling was written.
   { query: 'adr_count', noun: /ADRs?/, label: 'ADRs' },
@@ -8358,6 +8691,9 @@ const ci06DerivableCounts = {
           const after = line.slice(at + text.length);
           let governed = null;
           const entry = vocabulary.find((v) => {
+            // ADR-130. An entry with no `file` is corpus-wide, which is every
+            // entry the vocabulary carried before scoping existed.
+            if (v.file && !v.file.test(file)) return false;
             if (v.value !== value) return false;
             const m = new RegExp(
               `^[\`*_]{0,3}\\s+[\`*_]{0,3}(${v.noun.source})[\`*_]{0,3}(?![\\w-])`,
@@ -8428,6 +8764,7 @@ const GATES = [
   ci06n,
   ci06o,
   ci06p,
+  ci06ClosedLetterSeries,
   ci06q,
   ci06r,
   ci06s,
