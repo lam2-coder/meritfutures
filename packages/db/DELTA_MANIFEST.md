@@ -1671,3 +1671,45 @@ assert_append_only_grants: falsified in both directions, and the seed did not le
 **`treasury_balances` is NOT made append-only.** `RESERVE-C1` proves the copy was true when it was written, and a later correction to an attestation is outside what a trigger on the citing table can see. That limit is named in `0049`'s header rather than left to be discovered.
 
 **`CI-06w` is NOT extended to the `OI` table**, which ALLOCATION names as the check that would have caught session 120. `scripts/corpus/` was outside this session's fence apart from `CI-06h`'s needle list.
+
+---
+
+## 27. `0049`'s disposition of `per_plan` checked four fields of five, and the copy that says "column for column" is in THIS FILE (2026-08-27)
+
+**[ADR-167](../../docs/decisions/ADR-167.md), session 281, [`P7-c`](../../docs/plans/P7-risk-and-abuse.md). Nothing in [`0049`](migrations/0049_reserve_coverage_snapshots.sql) is edited and nothing is superseded**, because the defect is prose and there is no schema to supersede. This is section 22's disposition applied a second time: **a merged migration is never edited, so the correction is recorded where a reader looks.**
+
+### What was claimed, in two places, and the second is the stronger claim
+
+| Where | What it says |
+|---|---|
+| [`0049:47`](migrations/0049_reserve_coverage_snapshots.sql) | *"`per_plan` ALREADY HAS A HOME AND NEEDS NOTHING. API_CONTRACT's `per_plan` is loss ratio, threshold, `sales_paused` and CUSUM per plan, and that is `plan_breaker_state`, which `0016` built with `plan_id`, `evaluated_on`, `ratio_bp`, `threshold_bp` and a state enum whose values include `'paused'`."* |
+| **Section 26 of this file**, the `OI-01` register row | *"It has had one since `0016`. API_CONTRACT's `per_plan` is loss ratio, threshold, `sales_paused` and CUSUM per plan, and that is `plan_breaker_state` **column for column**. Thirty-three migrations of an orphan that was not orphaned."* |
+
+**The second is worse and it is the one a reader reaches first.** `0049`'s header **enumerates the columns it checked** -- `plan_id`, `evaluated_on`, `ratio_bp`, `threshold_bp`, `state` -- and a reader who counts them against `API_CONTRACT` can see that the `cusum` object is not among them. **This file's row enumerates nothing and asserts a total fit in three words.** It is in the register rather than in a migration header, so it is the copy the next session finds.
+
+### What is true
+
+[API_CONTRACT:798](../../docs/architecture/API_CONTRACT.md) asks for **five** things per plan:
+
+```ts
+per_plan: Array<{ plan_id: string; code: string; loss_ratio_bp: number; threshold_bp: number;
+                  sales_paused: boolean; cusum: { statistic: number; threshold: number; alarm: boolean } }>;
+```
+
+**Four of the five are `plan_breaker_state`'s and the disposition is right about all four.** `loss_ratio_bp` is `ratio_bp`, `threshold_bp` is `threshold_bp`, `sales_paused` is `state = 'paused'`, and `plan_id` is the first half of the key.
+
+**The fifth is the `cusum` object and there is no column it fits.** `plan_breaker_state`'s numeric columns are `numerator_cents` and `denominator_cents` (`bigint`, **cents**), `ratio_bp` and `threshold_bp` (`integer`, **basis points of a LOSS ratio**), and `sample_size` and `min_sample` (`integer`, **counts**). `P-M6-06`'s statistic is `S_t = max(0, S_(t-1) + (x_t - mu_0 - 0.5*sigma))`, a running sum of a **pass-rate** deviation, and it is none of those three quantities. **And the table's primary key is `(plan_id, evaluated_on)` at [`0016:150`](migrations/0016_treasury_controls.sql) with `metric text NOT NULL` at [`0016:130`](migrations/0016_treasury_controls.sql) OUTSIDE it**, so one plan-day is one row and one row is one metric: there is not even a second row for a second statistic to occupy.
+
+**So `OI-01` was right that four fields were not orphaned and wrong that five were not.** `0049`'s subject was reserve coverage, it read the columns its own subject needed, and until [P7 section 5.3](../../docs/plans/P7-risk-and-abuse.md) nobody asked whether the CUSUM fits. **That is a finding rather than an error, and it is stated that way in both directions**: the disposition that closed `OI-01` remains correct about the field it was closing `OI-01` for.
+
+### The unit trap, which is what made the wrong reading available
+
+**`ratio_bp` is a basis point and the CUSUM statistic is ALSO a basis point, and they are not the same quantity.** Every operand of the recurrence is a rate -- `x_t` a pass rate, `mu_0` its in-control mean, `sigma` its standard deviation, the threshold "4 to 5 sigma" of it -- so the statistic is exactly representable in basis points. **`ratio_bp` is a LOSS ratio.** A column carrying the right unit and the wrong quantity is what "column for column" mistook for a fit, and [ADR-167](../../docs/decisions/ADR-167.md) section 4 is where that is ruled.
+
+### What the correction does NOT do
+
+**It does not spend a migration number.** [ADR-167](../../docs/decisions/ADR-167.md) rules that `S_t` is folded at read time from a series [`0007`](migrations/0007_accounts.sql) already carries, that `plan_breaker_state`'s primary key does not widen, and that no CUSUM value ever reaches the loss-ratio breaker's columns. **`0051` was reserved conditionally and RETURNS TO THE POOL UNSPENT**; its [ALLOCATION](../../docs/decisions/ALLOCATION.md) row is amended in place to say so.
+
+**No table lands, so nothing here adds a `### <table>` design record, a `schema.ts` registration or a `scope.ts` rule**, and `CI-06i` reads the same table set in both directions after this change as before it.
+
+**And the underlying gap is NOT closed by this correction and is not closed by ADR-167 either.** `mu_0` and `sigma` are `DEP-M6-05`'s, the simulation harness, which is Wave 4; [`apps/admin/src/page.ts:156`](../../apps/admin/src/page.ts) already lists `P-M6-06` as pending on exactly that dependency. **The CUSUM has neither storage nor inputs, and this entry records that it now has a ruling about the first and still nothing about the second.**
