@@ -259,7 +259,7 @@ export function sampleTicks(
   // Per account per day: the last tick at or before each sample instant.
   const byKey = new Map<string, LiveAccountTick[]>();
   for (const tick of ticks) {
-    const key = `${tick.tradingDay} ${tick.platformAccountRef}`;
+    const key = `${tick.tradingDay}\0${tick.platformAccountRef}`;
     const list = byKey.get(key);
     if (list === undefined) byKey.set(key, [tick]);
     else list.push(tick);
@@ -315,7 +315,7 @@ export function foldStream(ticks: readonly LiveAccountTick[]): readonly StreamFo
   const order: string[] = [];
 
   for (const tick of ticks) {
-    const key = `${tick.tradingDay} ${tick.platformAccountRef}`;
+    const key = `${tick.tradingDay}\0${tick.platformAccountRef}`;
     const seen = byKey.get(key);
     if (seen === undefined) {
       order.push(key);
