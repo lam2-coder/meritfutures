@@ -150,6 +150,11 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-121](ADR-121.md) | "shipped source" for `RI-10` means the directories the node loader loads, and `scripts/` is one of them  (2026-08-27, status: proposed) |
 | [ADR-122](ADR-122.md) | `input_digest` is taken over the computation's own argument, and it EXCLUDES the answer  (2026-08-27, status: proposed) |
 | [ADR-123](ADR-123.md) | the refusal on `accountsAudited === 0` moves into `runReplayAudit`, and an empty book now REFUSES instead of reporting clean  (2026-08-27, status: proposed) |
+| [ADR-124](ADR-124.md) | the global ledger halt is a MECHANISM and it is not a `ledger_halts` row  (2026-08-27, status: proposed) |
+| [ADR-130](ADR-130.md) | A derivable count can belong to ONE DOCUMENT, and the count vocabulary could not say so  (2026-08-27, status: proposed) |
+| [ADR-132](ADR-132.md) | a registry README indexes by ROW, and `CI-06n` stops accepting a sentence  (2026-08-27, status: proposed) |
+| [ADR-134](ADR-134.md) | a design record names exactly the columns its table carries, and the check that says so lands unregistered  (2026-08-27, status: proposed) |
+| [ADR-137](ADR-137.md) | `OI-16` never held `GS-004` and `GS-031`'s expected end state, and the blocker on both is the calendar record's missing `halted` key  (2026-08-27, status: proposed) |
 | [ADR-138](ADR-138.md) | a Server Action has no path, so the refusal is TOTAL, and the first rendered document is what makes it reachable  (2026-08-27, status: proposed) |
 <!--/gen-->
 
