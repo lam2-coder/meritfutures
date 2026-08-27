@@ -487,29 +487,34 @@ describe('scope is B.4 step 1 and an empty scope is a refusal', () => {
   });
 
   it('REFUSES a run that compared nothing while rows exist (OI-14)', async () => {
+    // THE MESSAGE IS ASSERTED AND NOT ONLY THE CLASS, on the reason the case
+    // below it states in its own words: `ReplayAuditRefusal` is thrown by three
+    // guards in this file and a class-only assertion cannot say which one fired.
+    // It was pinned to this guard by execution rather than by reading: with
+    // `report.storedRows > 0 && report.inScope === 0` neutered and every other
+    // line of `replay.ts` untouched, this case goes red and the empty-book case
+    // below stays green; with the empty-book guard neutered instead, the two
+    // swap. Session 241 ran both directions.
     const stored = storedFor(ACCOUNT_A).map((row) => ({ ...row, engineVersion: 'engine-older' }));
+    const book: BatchPorts = {
+      read: {
+        calendarWatermark: async () => WATERMARK,
+        calendarSlice: async () => CALENDAR,
+        accountsWithLiveMark: async () => [],
+        loadAccountDay: async () => null,
+        accountsWithStoredState: async () => [ACCOUNT_A],
+        storedRuleStates: async () => stored,
+        accountDaysFrom: async () => historyOf(ACCOUNT_A),
+      },
+      write: {
+        writeRuleState: async () => undefined,
+        raiseReconciliation: async () => undefined,
+        raiseDivergence: async () => undefined,
+      },
+    };
 
-    await expect(
-      runReplayAudit(
-        {
-          read: {
-            calendarWatermark: async () => WATERMARK,
-            calendarSlice: async () => CALENDAR,
-            accountsWithLiveMark: async () => [],
-            loadAccountDay: async () => null,
-            accountsWithStoredState: async () => [ACCOUNT_A],
-            storedRuleStates: async () => stored,
-            accountDaysFrom: async () => historyOf(ACCOUNT_A),
-          },
-          write: {
-            writeRuleState: async () => undefined,
-            raiseReconciliation: async () => undefined,
-            raiseDivergence: async () => undefined,
-          },
-        },
-        CONFIG,
-      ),
-    ).rejects.toThrow(ReplayAuditRefusal);
+    await expect(runReplayAudit(book, CONFIG)).rejects.toThrow(ReplayAuditRefusal);
+    await expect(runReplayAudit(book, CONFIG)).rejects.toThrow(/the replay audit compared nothing/);
   });
 
   it('REFUSES a run over a book with no stored state at all (ADR-073 section 5)', async () => {
@@ -559,6 +564,110 @@ describe('scope is B.4 step 1 and an empty scope is a refusal', () => {
     expect(report.accountsAudited).toBe(1);
     expect(report.storedRows).toBe(MARKS.length);
     expect(report.matched).toBe(MARKS.length);
+    expect(report.diverged).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------------
+  // THE THIRD SCALE, WHICH NEITHER GUARD SEES
+  // ---------------------------------------------------------------------------
+  // ADR-123 section 7 considered refusing on `storedRows === 0` instead of on
+  // `accountsAudited === 0` and REJECTED it, in these words: "the two differ on
+  // one real input: a port that returns an account id and no rows for it. On
+  // that input `accountsAudited` is 1 and the audit has something to say about
+  // the account, which is that its stored set is empty."
+  //
+  // THAT INPUT IS TWO INPUTS AND THE ENTRY PRICED ONE OF THEM. The two cases
+  // below are both "an account id with no stored rows", and they are executed
+  // rather than reasoned because the entry's sentence is true of the first and
+  // false of the second.
+
+  it('is LOUD about an account named with no stored rows but a real history', async () => {
+    // ADR-123's rejection of `storedRows === 0`, EXECUTED. Every replayed day
+    // finds no stored row, so each is counted in scope and reported as a
+    // divergence: the audit does have something to say, exactly as the entry
+    // argued, and a `storedRows === 0` refusal would have thrown over a book
+    // whose real finding is four missing rows.
+    const report = await runReplayAudit(
+      {
+        read: {
+          calendarWatermark: async () => WATERMARK,
+          calendarSlice: async () => CALENDAR,
+          accountsWithLiveMark: async () => [],
+          loadAccountDay: async () => null,
+          accountsWithStoredState: async () => [ACCOUNT_A],
+          storedRuleStates: async () => [],
+          accountDaysFrom: async () => historyOf(ACCOUNT_A),
+        },
+        write: {
+          writeRuleState: async () => undefined,
+          raiseReconciliation: async () => undefined,
+          raiseDivergence: async () => undefined,
+        },
+      },
+      CONFIG,
+    );
+
+    expect(report.accountsAudited).toBe(1);
+    expect(report.storedRows).toBe(0);
+    expect(report.inScope).toBe(MARKS.length);
+    expect(report.diverged).toBe(MARKS.length);
+  });
+
+  it('PINS A HOLE: an account named with no rows AND no days returns a clean report', async () => {
+    // THIS ASSERTION PINS A DEFECT AND IS NOT A PROMISE. Read it as the register
+    // entry it is: the day it goes red is the day the hole closed, and the
+    // change that closes it should DELETE this case rather than satisfy it.
+    //
+    // WHAT IT RECORDS. `accountsWithStoredState()` names an account,
+    // `storedRuleStates()` hands back nothing for it and `accountDaysFrom()`
+    // hands back nothing either. `accountsAudited` is 1, so ADR-073 section 5's
+    // guard does not fire; `storedRows` is 0, so `OI-14`'s conjunct is false and
+    // its guard does not fire either. The audit compared nothing and returns
+    // `diverged: 0`, which is FM-17 whole: an audit that has stopped looking
+    // reports exactly like one that found nothing.
+    //
+    // IT IS NOT `OI-14`'s. That row says "refuse an empty IN-SCOPE SET", its
+    // guard needs `storedRows > 0`, and the two cases above show that guard
+    // firing and this one legitimately not. This is the empty-book failure at a
+    // THIRD scale, one account wide, and it belongs to ADR-123's clause rather
+    // than to the row session 241 closed.
+    //
+    // IT IS NOT FIXED HERE, and the reason is the fence rather than the cost.
+    // Closing it means reversing an alternative ADR-123 considered, argued and
+    // rejected in writing, on a file that is money path by position. That is a
+    // ruling, and `ADR-129` was reserved for a different condition. Session 241
+    // reports it and does not take it.
+    //
+    // A PORT BEHAVING THIS WAY IS BREAKING ITS OWN CONTRACT, and that lowers the
+    // likelihood without changing the shape: `accountsWithStoredState` promises
+    // accounts WITH stored state, so this book is a lying adapter or a race
+    // between two queries. `OI-14`'s own row is about a case no per-row
+    // constraint can see either, and the answer there was that it belongs to the
+    // job. The same argument reaches this one.
+    const report = await runReplayAudit(
+      {
+        read: {
+          calendarWatermark: async () => WATERMARK,
+          calendarSlice: async () => CALENDAR,
+          accountsWithLiveMark: async () => [],
+          loadAccountDay: async () => null,
+          accountsWithStoredState: async () => [ACCOUNT_A],
+          storedRuleStates: async () => [],
+          accountDaysFrom: async () => [],
+        },
+        write: {
+          writeRuleState: async () => undefined,
+          raiseReconciliation: async () => undefined,
+          raiseDivergence: async () => undefined,
+        },
+      },
+      CONFIG,
+    );
+
+    expect(report.accountsAudited).toBe(1);
+    expect(report.storedRows).toBe(0);
+    expect(report.inScope).toBe(0);
+    expect(report.matched).toBe(0);
     expect(report.diverged).toBe(0);
   });
 });
