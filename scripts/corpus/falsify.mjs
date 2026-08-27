@@ -424,6 +424,25 @@ function addLetterRow(body, letter, note) {
   return `${body.slice(0, end)}\n| **\`${letter}\`** | falsify probe | ${note} |${body.slice(end)}`;
 }
 
+// The first letter BEYOND the closed CI-06<letter> series, derived from the
+// runner's own gate ids rather than written, so this seed says the same thing on
+// the day the closure is proposed and on every day after it.
+//
+// IT READS `gates.mjs` AND NOT `ALLOCATION.md`, and that is the whole of why it
+// is not `nextFreeLetter` one helper up. `expect` is resolved against the SEEDED
+// tree, the seed writes a row into the letter TABLE, and a helper reading the
+// table would answer one letter further along after its own seed had run: the
+// case would then assert a finding about `y` while planting one about `x`. The
+// runner is the input the seed does not touch.
+function firstLetterBeyondSeries(dir) {
+  const src = readFileSync(join(dir, 'scripts/corpus/gates.mjs'), 'utf8');
+  const letters = [...src.matchAll(/id: 'CI-06([a-z])',/g)].map((m) => m[1]).sort();
+  if (letters.length === 0) throw new Error('seed anchor found no CI-06<letter> gate ids');
+  const beyond = String.fromCharCode(letters[letters.length - 1].charCodeAt(0) + 1);
+  if (beyond > 'z') throw new Error('seed anchor exhausted: no letter beyond the closed series');
+  return beyond;
+}
+
 // =============================================================================
 // CI-06k's seeds, and why every one of them is DERIVED
 // =============================================================================
@@ -1067,6 +1086,34 @@ const SEEDS = {
         addLetterRow(b, beyond, 'a letter claimed two past the last one, which opens the hole'),
       );
     },
+  },
+  // THE VIOLATION IS THE ACT THE CLOSURE FORBIDS: a row claiming a letter past the
+  // end of the series. It is the CHEAPEST way to take a new letter and the one a
+  // session actually performs, because ADR-034 rules the claim precedes the
+  // artifact, so a reservation row lands before any gate is written.
+  //
+  // BOTH HALVES ARE DERIVED FROM THE RUNNER and neither names a letter. A seed
+  // carrying `x` by literal would stop being a violation on the day the series
+  // moved, and it would stop SILENTLY, which is the failure mode every seed in
+  // this file is written against.
+  'CI-06/closed-letter-series': {
+    what: 'an allocation row claiming a CI-06 letter past the end of the closed series',
+    real:
+      'the CI-06<letter> registry ran out of alphabet in about one week and ADR-065 section 5 ' +
+      'ruled the successor identifier a slug, then closed nothing. Nine slug gates were ' +
+      'written after that ruling BY DISCIPLINE ALONE: no gate in this runner would have ' +
+      'reported a twenty-fourth letter, and the first one taken breaks the CI-06p seed below, ' +
+      'because nextFreeLetter() scans a to x and every seed spends two letters of headroom ' +
+      'past the one it returns',
+    expect: (d) => `CI-06${firstLetterBeyondSeries(d)} is claimed by a row of the letter table`,
+    seed: (d) =>
+      edit(d, 'docs/decisions/ALLOCATION.md', (b) =>
+        addLetterRow(
+          b,
+          firstLetterBeyondSeries(d),
+          'a letter claimed past the end of a series ADR-131 closed',
+        ),
+      ),
   },
   'CI-06k': {
     what: 'an endpoint in the negative-authz matrix with no required-factor cell',
