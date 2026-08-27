@@ -176,6 +176,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-154](ADR-154.md) | tier 1's boundary is an ARTIFACT and tier 2 has none, so the simulator implements `streamLive` and the shared thing becomes the TYPE  (2026-08-27, status: proposed) |
 | [ADR-155](ADR-155.md) | `ADR-022`'s v1 tier names a LINK CLASS, and "auto-enforce" is the edge being written without review rather than a transition on the flag machine  (2026-08-27, status: proposed) |
 | [ADR-156](ADR-156.md) | `OI-28` was closed by a ruling and dispatched as open, and `0047` proves the publish decision sound AT THE WRITE and nothing preserves it after  (2026-08-27, status: proposed) |
+| [ADR-159](ADR-159.md) | an event NAME becomes a catalogue ROW only where every field is a column or a named mirror, and the reservation that funded this entry named a different catalogue  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
