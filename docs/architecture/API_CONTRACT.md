@@ -527,7 +527,7 @@ Returns a signed, verifiable share card.
 type CertificateResponse = {
   certificate_id: string; kind: "pass" | "payout";
   image_url: string;                  // signed, time-limited
-  verify_url: string;                 // public verification page
+  verify_url: string;                 // the public verification page, `GET /verify/:code` in section 6.3
   issued_at: string;
   claims: { plan_code: string; size_cents: number; amount_cents?: number; trading_day: string };
 };
@@ -729,9 +729,9 @@ Auth: **session**, and **elevated**: `passkey or dual_channel`, `C-27: external 
 
 ### 6.3 Certificates, and the public surface that is inside an authenticated section
 
-**A subsection rather than a new top-level section, for 6.1's and 6.2's recorded reason.** Sections 12 and 13 are cited by NUMBER, so a section inserted ahead of them renumbers both and breaks every citation silently ([ADR-111](../decisions/ADR-111.md) clause 2). It sits under section 6 because `GET /accounts/:accountId/certificate?kind=pass|payout` is already here: that row and these two are one surface, and the certificate is issued against an account.
+**A subsection rather than a new top-level section, for 6.1's and 6.2's recorded reason.** Sections 12 and 13 are cited by NUMBER, so a section inserted ahead of them renumbers both and breaks every citation silently ([ADR-111](../decisions/ADR-111.md) clause 2). It sits under section 6 because `GET /accounts/:accountId/certificate?kind=pass|payout` is already here: that row and these three are one surface, and the certificate is issued against an account.
 
-**ONE OF THE TWO ROWS BELOW IS PUBLIC AND UNAUTHENTICATED, INSIDE THE SECTION WHOSE OTHER ROWS ALL REQUIRE A SESSION.** That is a placement forced by the renumbering rule above and not a claim about auth. Auth is stated per row here as it is everywhere else, and [`surface.ts`](../../apps/api/src/surface.ts) withholds by PREFIX rather than by section, so neither row is withheld from the public deployment by its address and both are reachable there. The authenticated one is protected by its session and by nothing about where it is written down.
+**TWO OF THE THREE ROWS BELOW ARE PUBLIC AND UNAUTHENTICATED, INSIDE THE SECTION WHOSE OTHER ROWS ALL REQUIRE A SESSION.** That is a placement forced by the renumbering rule above and not a claim about auth. Auth is stated per row here as it is everywhere else, and [`surface.ts`](../../apps/api/src/surface.ts) withholds by PREFIX rather than by section, so no row here is withheld from the public deployment by its address and all three are reachable there. The authenticated one is protected by its session and by nothing about where it is written down. **This paragraph read "ONE OF THE TWO ROWS BELOW IS PUBLIC ... so neither row is withheld" until [ADR-170](../decisions/ADR-170.md)**, and it is corrected rather than deleted because it was true of the section [ADR-168](../decisions/ADR-168.md) wrote and false the moment the verification page landed beside it.
 
 **The state a certificate is in is DERIVED and there is no status column.** [`certificates`](data-model/certificates.md) ([`0020`](../../packages/db/migrations/0020_public_surface.sql)) carries `deferred_until`, `revoked_at`, `revocation_class` and `deferred_reason` and no `status`, so `deferred_until IS NOT NULL` is deferred, `revoked_at IS NOT NULL` is revoked, and neither is issued. **[M11 section 3.1](../plans/M11-certificates-social-proof.md) draws a fourth state, `withheld`, and the table cannot hold it**: there is no column that distinguishes "Merit never made the claim" from a row that does not exist. **So `state` below is a three-member union and not a four-member one**, on [ADR-040](../decisions/ADR-040.md)'s rule applied to `PayoutListItem` in this same section: a union that advertises a value the table cannot hold gives a client a branch that never fires. `withheld` is named as owed to the slice that gives it a column, and is not typed here.
 
@@ -747,7 +747,7 @@ type CertificateListItem = {
 
   // WITHHELD WHILE DEFERRED, and the column is NOT NULL underneath.
   code: string | null;
-  verify_url: string | null;
+  verify_url: string | null;             // `GET /verify/:code` below
   image_url: string | null;                   // signed, time-limited, as section 6's singular row
 
   deferred: { reason: string; until: string | null } | null;
@@ -778,6 +778,59 @@ The public card, re-rendered on fetch from the live row ([M11 section 4](../plan
 **This endpoint is inside `INV-M11-05`'s rate-limit and non-enumerability clauses and OUTSIDE its constant-time clause.** `INV-M11-05` names the **verify** endpoint and says "no timing difference between known and unknown", and this surface cannot honour that half: a render is orders of magnitude slower than a 404, and `FM-M11-05`'s own remedy caches rendered bytes keyed by `(code, row_version)`, which puts a timing difference between two **valid** codes before an attacker asks about an invalid one. **So the enumeration control here is the entropy, the limit and the anomaly signal, and it is not the clock.** Stated rather than left implied, because an implementer reading `INV-M11-05` as covering every public certificate surface would either build a constant-time renderer that cannot exist or record its absence as a defect.
 
 **Every fetch writes [`certificate_verifications`](data-model/certificate_verifications.md)** (`SD-M11-04`) with `code_hash` and never `code`, `result` in that table's own four-member CHECK, and hashed inputs only. **A public read keyed on `code` is one oracle however it is dressed**, and an image endpoint outside that table would be an unmetered second door onto the book `AS-M11-04` and `FM-M11-04` exist to watch. Rate limit: section 11.
+
+#### GET /verify/:code
+The public verification page's data ([M11 section 4](../plans/M11-certificates-social-proof.md), **NEW, public**; `INV-M11-02`, `INV-M11-03`, `INV-M11-05`, `AS-M11-04`). **This is the page `verify_url` addresses**, in section 6's singular row and in `CertificateListItem` above. That field shipped against a row no section of this document defined until [ADR-170](../decisions/ADR-170.md); [ADR-153](../decisions/ADR-153.md) is the same defect's first instance and [ADR-168](../decisions/ADR-168.md) is where this one was found.
+
+**Auth: none.** Request: the path token only, no query, no body.
+```ts
+type VerifyResponse = {
+  // THREE members, and `certificate_verifications.result`'s CHECK has FOUR.
+  // A code whose row is DEFERRED answers `unknown`. See below.
+  result: "valid" | "revoked" | "unknown";
+
+  // The ONLY user-visible sentence this endpoint produces, rendered SERVER SIDE
+  // on every result. INV-M11-03 fixes the unknown wording; INV-M11-07 fixes
+  // that the class drives the revoked one.
+  statement: string;
+
+  // null exactly when `result` is "unknown".
+  certificate: {
+    code: string;                     // the token looked up, echoed. NEVER `certificates.id`
+    kind: "pass" | "payout";
+    issued_at: string;
+    claims: { plan_code: string; size_cents: number; amount_cents?: number; trading_day: string };
+    claims_schema_version: number;    // SD-M11-01. Which claim shape was signed
+    signature: string;                // base64url over the canonical claims
+    signing_key_id: string;           // INV-M11-06. Rotation never invalidates history
+    disclosure: string;               // INV-M11-04, rendered by template
+  } | null;
+
+  // Non-null exactly when `result` is "revoked". `certificates.revocation_class`'s
+  // CHECK, in the CHECK's order. The class is for BRANCHING, never for composing copy.
+  revoked: {
+    at: string;
+    class: "fact_untrue" | "account_enforced" | "issued_in_error" | "trader_request";
+  } | null;
+};
+```
+Errors: `rate_limited`, **and that is the whole error set**. Idempotency: not applicable. Rate limit: section 11.
+
+**A DEFERRED CODE ANSWERS `unknown`, WHICH IS WHY THIS UNION IS THREE MEMBERS AND THE LOG'S IS FOUR.** Nobody legitimately holds a deferred code: `code`, `verify_url` and `image_url` are `null` while deferred, one row up, so a lookup that hits a deferred row is somebody holding a token they were not issued. The trader's own need is already served authenticated, by `GET /certificates`' `deferred.reason`. And `INV-M11-09` defers exactly on **an open severity 4+ flag**, so a public `deferred` answer would tell whoever holds the token that the account behind it is under risk review, which [M07](../plans/M07-risk-abuse.md) does not publish. **The log keeps the fourth value precisely because the response does not**: a `deferred` row in [`certificate_verifications`](data-model/certificate_verifications.md) is a leaked token or a 128-bit guess that hit, and an `unknown` row is a typo or `FM-M11-04` in progress. Those are different incidents and only the table can tell them apart. **This is an allowlist decision under section 1 and NOT [ADR-040](../decisions/ADR-040.md)'s defect**, which is a union advertising a value the table cannot hold; here the table holds it and the response declines to carry it.
+
+**`withheld` is not typed here either**, for the reason stated at the head of this subsection, and on this surface the missing column costs nothing: a withheld certificate is one Merit never made, and the answer to a lookup on a claim never made is `INV-M11-03`'s exact wording, which is what the absent column produces anyway.
+
+**A REVOKED CERTIFICATE STILL RETURNS ITS CLAIMS, ON ALL FOUR CLASSES.** `AS-M11-05`: for `account_enforced` *"the claim stands and the account was later closed under a named ToS clause ... It does not say the certificate is invalid, because it is not"*. A page that withheld the claim on revocation would be the retroactive denial that scenario exists to prevent, and on `fact_untrue` it would leave a holder comparing a printed card against a blank page. **`statement` is what distinguishes the four classes and the shape does not**, so the response's shape never discloses more than `result` already does. **`statement`'s `account_enforced` wording is `OQ-M11-02` and is owed**: the field is typed here and the copy is a legal and brand question.
+
+**`Cache-Control: no-store`, and the revocation design requires that before the clock does.** `FM-M11-05`'s remedy caches **rendered bytes** keyed by `(code, row_version)` and is the image row's; this row renders no bytes and does not inherit it. The stronger reason is `FM-M11-02`: the verify code inside a circulating image **is** the recovery path when the image itself was screenshotted, so an intermediary serving a cached `valid` for a code revoked five minutes ago fails at the one surface that was supposed to be authoritative. `INV-M11-02`: the row is the authority, and a cached answer is not the row.
+
+**THIS ENDPOINT IS INSIDE `INV-M11-05`'s CONSTANT-TIME CLAUSE, WHICH NAMES IT, AND THE MECHANISM IS A FLOOR RATHER THAN EQUAL WORK.** Equalising the work cannot honour it: with no response cache and one indexed equality on `certificates_code_uq`, a hit on a warm row and a hit on a cold one still differ, because the database's own buffer cache reproduces `FM-M11-05`'s tension a layer below any application ruling. **So the response is emitted at a fixed time floor that dominates a warm hit, a cold hit, a miss and a malformed token alike**, set above the measured p99 of the slowest of those, held as config rather than as a number here. **A floor set from a p50 is worse than no floor**, because it advertises compliance and leaks on exactly the tail an attacker samples.
+
+**There is therefore no `validation_failed` on this row, and its absence is the control.** A token of the wrong length or alphabet answers `unknown`, identically and at the same floor. A shape check ahead of the lookup is a faster path, and it hands an attacker the token's alphabet and length for free, which is `INV-M11-05`'s non-enumerability half failing beside its timing half. **The response SIZE still differs between a hit and a miss and no padding of the clock closes that**; it is named rather than chased, because the size only separates a hit from a miss for a caller who already sent a code, and such a caller learns the same thing from the body. It is redundant with the answer.
+
+**WHAT A CODE LEAKS HERE, AND IT IS A LARGER SET THAN THE IMAGE ROW'S.** The claim is bounded by `INV-M11-01` exactly as one row up, and three things are added and each is forced: the **revocation half as structured data**, because `INV-M11-07` requires the two revocation kinds be distinguishable; the **signature half**, because `INV-M11-02` makes an offline check a convenience for third parties and this is the only row that serves it, and `INV-M11-06` requires the key id to travel with the certificate; and `issued_at` and `code` as fields rather than as printed text. **It withholds `INV-M11-01`'s set unchanged, and three more.** No `certificates.id`, because [`0020`](../../packages/db/migrations/0020_public_surface.sql) keeps it *"DISTINCT FROM `id` so the public token can be ROTATED AFTER AN INCIDENT"* and publishing the immutable key beside the rotatable one defeats the rotation. No `payout_request_id`, because it names a row in the book `AS-M11-04` is about. No `revoked_reason`, which [`certificates`](data-model/certificates.md) types **internal** free text. **A held code names a result and does not name a person.**
+
+**Every lookup writes [`certificate_verifications`](data-model/certificate_verifications.md)** (`SD-M11-04`) on every path including `unknown` and including a malformed token, whose `code_hash` is the hash of whatever arrived: `code_hash` and never `code`, hashed inputs only, `result` in that table's own four-member CHECK per the mapping above. **The write is inside the floor's budget**, so it costs nothing observable and the anomaly detector sees the whole population rather than the resolvable part of it. `certificate.verify_anomaly` fires on the distinct-code and unknown-rate signature.
 
 ## 7. KYC and affiliate
 
@@ -968,6 +1021,40 @@ Sorted by severity then age. Filterable by type, status, severity.
 type FlagStatusRequest = { to_status: "investigating" | "dismissed" | "enforced"; note: string; evidence_pack_id?: string };
 ```
 `enforced` requires `evidence_pack_id`. Moving to `investigating` sets `payouts_frozen` on the identity as a side effect, and the response says so explicitly.
+
+### POST /admin/certificates/:id/revoke
+Revokes a certificate and sets the class that drives the published sentence ([M11 section 4](../plans/M11-certificates-social-proof.md), **NEW**; `INV-M11-07`, `AS-M11-05`, [ADR-170](../decisions/ADR-170.md)). **The write side of section 6.3's `GET /verify/:code`**, and the only way `certificates.revocation_class`'s `trader_request` member is ever exercised.
+```ts
+type CertificateRevokeRequest = {
+  // `certificates.revocation_class`'s CHECK, in the CHECK's order. No default.
+  revocation_class: "fact_untrue" | "account_enforced" | "issued_in_error" | "trader_request";
+  // ONE string writes TWO columns, both `NOT NULL` and both INTERNAL:
+  // `admin_actions.reason` and `certificates.revoked_reason`.
+  reason: string;
+};
+// The response is the PUBLIC shape, with `result: "revoked"`. Section 6.3.
+type CertificateRevokeResponse = VerifyResponse;
+```
+Roles: `owner` or `ops`. Idempotency: accepts `Idempotency-Key`; not in section 1's required set. Errors: `validation_failed`, `not_found`, `forbidden`.
+
+**`:id` is `certificates.id`, the uuid, and NOT the public code, and a column decides that rather than a convention.** [`admin_actions`](data-model/admin_actions.md)`.subject_id` is `uuid NOT NULL`, so an audit row keyed on the public token could not be written at all; and [`0020`](../../packages/db/migrations/0020_public_surface.sql) keeps `code` rotatable after an incident, so an audit trail keyed on it loses its subject at the moment the subject matters.
+
+**`initiative` IS NOT A REQUEST FIELD. It is derived, because the schema will not let it be supplied.** `admin_actions.initiative` is `NOT NULL` with no default over `('enforcement','trader_request','operational')`, and `admin_actions_on_behalf_matches_initiative` is the biconditional `(on_behalf_of_identity_id IS NOT NULL) = (initiative = 'trader_request')`. The four revocation classes map onto that vocabulary totally:
+
+| `revocation_class` | `admin_actions.initiative` | `on_behalf_of_identity_id` |
+|---|---|---|
+| `fact_untrue` | `operational` | null. `FM-M11-01` is Merit correcting Merit, not an act against the trader |
+| `account_enforced` | `enforcement` | null. The one class that follows an act against the trader |
+| `issued_in_error` | `operational` | null. A system fault, reversible |
+| `trader_request` | `trader_request` | **`certificates.identity_id`**, which the biconditional then requires |
+
+**An endpoint that took `initiative` would let an operator record an enforcement as something the trader asked for, or a trader's own withdrawal as an enforcement**, and that is the exact misattribution `admin_actions_on_behalf_matches_initiative` was written to prevent, arriving through a request body instead of through a column. The class the operator states is the only thing they state.
+
+**A DEFERRED CERTIFICATE CANNOT BE REVOKED**, and the refusal is `validation_failed`. [M11 section 3.1](../plans/M11-certificates-social-proof.md) draws `issued --> revoked` and `deferred --> withheld` and draws no edge between deferred and revoked; `0020` permits the write, so the refusal is this endpoint's rather than the schema's and is stated here so it is not met as a bug. **Encoding `withheld` as deferred-plus-revoked with class `account_enforced` was checked and fails**: `AS-M11-05` fixes that class as *"the claim stands"*, and a withheld certificate is one Merit never made. **So there is today no endpoint and no column by which an enforcement reaches a deferred certificate**, which is `withheld`'s missing column costing on this surface what it does not cost on the public one, and it is owed to the slice that adds the column. **The reverse edge is owed too**: section 3.1 draws `revoked --> issued` for a corrected `issued_in_error`, `certificates_revocation_is_complete` permits it, and `M11` section 4 lists no route.
+
+**The response is the public shape and that is the control rather than a convenience.** It returns exactly what `GET /verify/:code` will return for that code. **An operator cannot revoke without being shown the sentence they caused**, which is `AS-M11-05`'s concern rendered at the moment of the act rather than discovered afterwards on a public page.
+
+**Re-revocation is permitted and is not a `conflict`.** `certificates_revocation_is_complete` permits overwriting the triple, correcting a misclassified revocation is a real operation, and `admin_actions`' `before` and `after` are what distinguish a correction from a replay. No code is minted for a state the table does not refuse.
 
 ### GET /admin/identities/:identityId/graph
 ```ts
@@ -1207,6 +1294,7 @@ Unverified signatures return `401` and are logged as security events; they never
 | `POST /accounts/:id/payout` | 10/day/account, 20/day/identity |
 | `POST /accounts/:id/reset` | 10/day/identity |
 | `GET /certificates/:code/image.png` | **Public and NOT the catalog class, and the limits are data rather than prose**, on the `POST /auth/otp` sms row's precedent two tables up. Per IP and **per `code`**, because an enumeration campaign and a single hot card look identical when only the IP is counted. `INV-M11-05`, `AS-M11-04`, `FM-M11-04`. Every fetch writes [`certificate_verifications`](data-model/certificate_verifications.md), so the rate is visible to the anomaly detector and not only to the edge. **The catalog's 600/minute/IP is an enumeration budget on a 128-bit token and is deliberately not inherited here** |
+| `GET /verify/:code` | **Public, and per IP and per ASN rather than per `code`**, which is where this row and the image row above deliberately differ: one hot card served to many viewers is legitimate, and one code verified by thousands of distinct sources is `AS-M11-04`'s enumeration signature. `AS-M11-04` counter 3 names the ASN dimension for this endpoint specifically. The limits are **data rather than prose**, on the `POST /auth/otp` sms row's precedent. Every lookup writes [`certificate_verifications`](data-model/certificate_verifications.md) including the unknown and malformed ones, so the rate is visible to the anomaly detector and not only to the edge. **The catalog's 600/minute/IP is an enumeration budget on a 128-bit token and is deliberately not inherited here** |
 | Authenticated reads | 120/minute/identity |
 | Public catalog | 600/minute/IP (cached) |
 | Admin | 600/minute/session |
