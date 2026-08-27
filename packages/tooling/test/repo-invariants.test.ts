@@ -27,6 +27,30 @@ import {
 // direction runs against the real repository, which is the tree these
 // invariants are actually about.
 
+/**
+ * Run `fn` with `DB_ADMITTED` temporarily holding `names`, then RESTORE WHAT
+ * SHIPPED rather than emptying it.
+ *
+ * THE `finally { DB_ADMITTED.length = 0 }` THESE CASES USED TO WRITE WAS
+ * CORRECT ONLY WHILE THE LIST WAS EMPTY, and ADR-120 made it a list with a
+ * member. Clearing to empty is not a restore: it is a mutation that happened to
+ * agree with the shipped value, and the day it stopped agreeing every case after
+ * it in this file would have run against an admission list the repository does
+ * not have. That is the same class as RI-04's second copy -- a fixture that goes
+ * stale in step with the thing it is testing -- arriving inside a `finally`.
+ */
+function withDbAdmitted<T>(names: readonly string[], fn: () => T): T {
+  const shipped = [...DB_ADMITTED];
+  DB_ADMITTED.length = 0;
+  DB_ADMITTED.push(...names);
+  try {
+    return fn();
+  } finally {
+    DB_ADMITTED.length = 0;
+    DB_ADMITTED.push(...shipped);
+  }
+}
+
 const seeded: string[] = [];
 afterEach(() => {
   for (const dir of seeded.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -432,11 +456,12 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   });
 
   test('RI-08 admits a package that is named in DB_ADMITTED, and only that one', () => {
-    // THE BRANCH THE EMPTY LIST NEVER EXERCISES. `apps/api` is the name expected
-    // to join first (ADR-109: "whether apps/api gets @merit/db ... does not
-    // here"), so the day it does, this is the behaviour it gets. The list is
-    // restored in `finally` because it is module state shared with every other
-    // case in this file.
+    // THE BRANCH THAT WAS UNREACHABLE ON THE REAL TREE UNTIL ADR-120. `apps/api`
+    // was the name ADR-109 expected to join first ("whether `apps/api` gets
+    // `@merit/db` ... it does not here"), and session 232 is the slice whose
+    // subject that admission is. The case is unchanged in substance: one
+    // admitted package is exempt and the one beside it is still a finding, which
+    // is the whole of what an admission buys.
     const root = cleanTree();
     write(
       root,
@@ -444,13 +469,48 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
       JSON.stringify({ name: '@merit/api', dependencies: { '@merit/db': 'workspace:*' } }),
     );
     siteWith(root, { '@merit/db': 'workspace:*' });
-    DB_ADMITTED.push('@merit/api');
-    try {
+    withDbAdmitted(['@merit/api'], () => {
       const out = findings('RI-08', root);
       expect(out).toHaveLength(1);
       expect(out.join('\n')).toContain('apps/site/package.json');
-    } finally {
-      DB_ADMITTED.length = 0;
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // THE SHIPPED LIST, WHICH EVERY CASE ABOVE IS BLIND TO
+  // ---------------------------------------------------------------------------
+  // Every seeded case runs against a synthetic tree, so all of them stay green if
+  // `DB_ADMITTED` is emptied, widened, or filled with names that declare nothing.
+  // The two below read the REPOSITORY, and they are the only assertions in this
+  // file about the list as it ships.
+  test('the shipped admission is doing work: the real tree is a finding without it', () => {
+    // THE DIRECTION AN ADMISSION LIST FAILS IN IS SILENCE. With the list as it
+    // ships RI-08 is clean over the whole workspace; with it emptied,
+    // `apps/api/package.json` is exactly the finding ADR-117 section 4 promised
+    // the manifest line would become, and ADR-120 is the second diff that
+    // answered it.
+    expect(findings('RI-08', REPO_ROOT)).toEqual([]);
+    const out = withDbAdmitted([], () => findings('RI-08', REPO_ROOT).join('\n'));
+    expect(out).toContain('apps/api/package.json: dependencies.@merit/db');
+  });
+
+  test('every admitted package really declares the accessor', () => {
+    // A STALE ADMISSION IS THE SAME DEFECT AS A STALE NAME, ONE STEP LATER. The
+    // check THROWS on an admission naming a package that does not exist, because
+    // that reads as though the accessor is permitted somewhere it is not. An
+    // admission naming a package that exists and declares nothing reads the same
+    // way and throws nothing, so it is asserted here: a name earns its place by
+    // being a package that actually reaches the trader database, and "we might
+    // need it later" is the list joining itself.
+    //
+    // ASSERTED AS A PROPERTY OVER THE LIST AND NEVER AS A COPY OF IT. A second
+    // spelling of `DB_ADMITTED` here would be RI-04's own defect (see
+    // `cleanTree`), and six approval clauses in this corpus have drifted on an
+    // enumeration while the ruling held every time.
+    expect(DB_ADMITTED.length).toBeGreaterThan(0);
+    const unadmitted = withDbAdmitted([], () => findings('RI-08', REPO_ROOT).join('\n'));
+    for (const name of DB_ADMITTED) {
+      expect(unadmitted).toContain(`${name} is not in DB_ADMITTED`);
     }
   });
 
@@ -694,15 +754,14 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
   // FILE, because that list is the direction the check gets weakened in. Nobody
   // deletes an invariant; somebody admits one more package each time one is
   // inconvenient, and the check keeps reporting PASS about a workspace it has
-  // exempted. Both cases restore the list in `finally`: it is module state.
+  // exempted. Both cases go through `withDbAdmitted`, which restores what
+  // SHIPPED rather than emptying the list: it is module state, and since
+  // ADR-120 it is module state with a member in it.
   test('RI-08 throws on an admission naming a package that does not exist', () => {
     const root = cleanTree();
-    DB_ADMITTED.push('@merit/gone');
-    try {
+    withDbAdmitted(['@merit/gone'], () => {
       expect(() => findings('RI-08', root)).toThrow(/cannot run/);
-    } finally {
-      DB_ADMITTED.length = 0;
-    }
+    });
   });
 
   test('RI-08 throws when the admission list covers every package', () => {
@@ -711,13 +770,10 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     // remainder, which is RI-04 reporting PASS about a deployable its literal
     // did not name, and RI-09 reporting PASS with no operator prefixes.
     const root = cleanTree();
-    for (const app of DEPLOYABLES) DB_ADMITTED.push(`@merit/${app}`);
-    DB_ADMITTED.push('@merit/rules-engine');
-    try {
+    const everybody = [...DEPLOYABLES.map((app) => `@merit/${app}`), '@merit/rules-engine'];
+    withDbAdmitted(everybody, () => {
       expect(() => findings('RI-08', root)).toThrow(/asserting nothing/);
-    } finally {
-      DB_ADMITTED.length = 0;
-    }
+    });
   });
 
   test('RI-07 throws when the graph walk reaches only the entry point', () => {

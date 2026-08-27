@@ -120,6 +120,9 @@ importers:
       '@merit/affiliate':
         specifier: workspace:*
         version: link:../../packages/affiliate
+      '@merit/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@merit/kyc':
         specifier: workspace:*
         version: link:../../packages/kyc

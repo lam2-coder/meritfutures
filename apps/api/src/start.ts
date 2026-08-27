@@ -14,27 +14,43 @@
 // file calls `main`, and `index.ts` stays a module that exports.
 //
 // -----------------------------------------------------------------------------
-// THIS SCRIPT CANNOT RUN TODAY AND THE REASON IS NOT IN THIS FILE
+// IT IS ALSO THE WIRING SLICE, AND THAT IS WHY THE BACKEND IS INSTALLED HERE
 // -----------------------------------------------------------------------------
-// `node --experimental-strip-types` resolves an import specifier to THE FILE IT
-// NAMES. It does not map `./index.js` onto `index.ts`, and every module under
-// `apps/api/src` writes the `.js` form because `tsc` under `moduleResolution:
-// NodeNext` requires it. So `pnpm --filter @merit/api start` dies on this file's
-// own import with ERR_MODULE_NOT_FOUND.
+// `useAuthBackend`'s own comment says "the wiring slice calls this; so does the
+// suite", and this file is the wiring slice for the same reason it exists at
+// all: `index.ts` is the package's `exports` target and importing it must have
+// no effect. Installing a database-backed backend inside `main()` would give
+// every test that calls `main` a backend whose first method call opens a socket,
+// and `listen.test.ts` calls it.
 //
-// IT IS NOT THIS DEPLOYABLE'S DEFECT AND IT DID NOT ARRIVE WITH THIS SESSION.
-// `apps/admin` and `apps/worker` declare the same start script and fail
-// identically on their own first relative import, measured in session 209. The
-// repair is two things together: `./x.js` becomes `./x.ts` throughout the
-// affected `src/`, and the tsconfig gains `allowImportingTsExtensions: true`,
-// without which `tsc` reports TS5097 on every rewritten line. `apps/api/tsconfig.json`
-// is outside session 209's fence, so the finding is reported rather than reached
-// for, and the whole repair was executed in a scratch copy outside this
-// repository to prove it sufficient: with the specifiers rewritten and nothing
-// else changed, both surfaces start under `node --experimental-strip-types` and
-// serve, which is the run recorded in session 209's log.
+// SO A DEPLOYMENT SERVES AUTH AND AN IMPORT DOES NOT, which is the same
+// separation the port's fail-closed default already draws: a process that never
+// ran this file holds `UNWIRED_AUTH_BACKEND` and answers 503 on every auth
+// route, saying so rather than pretending. ADR-120.
+//
+// THE INSTALL IS BEFORE `main()` AND NOT AFTER, because `main` binds the port at
+// the end of it. A window in which the process is listening and the backend is
+// still the fail-closed default would serve 503 to real traffic for as long as
+// the event loop took to come back around, which is a race nobody would ever
+// reproduce and everybody would eventually see.
+//
+// -----------------------------------------------------------------------------
+// THE PARAGRAPH THAT STOOD HERE SAID THIS SCRIPT COULD NOT RUN, AND IT CAN
+// -----------------------------------------------------------------------------
+// It recorded that every module under `apps/api/src` wrote `./x.js` specifiers
+// for files that are `x.ts`, so `node --experimental-strip-types` died on this
+// file's own import with `ERR_MODULE_NOT_FOUND`, and that the repair was two
+// things together: the specifiers rewritten, and `allowImportingTsExtensions`.
+// BOTH LANDED (`c8fc4d6`, and `tsconfig.base.json`), `RI-10` now asserts the
+// first over every deployable's shipped source, and the finding is replaced
+// rather than left beside a tree that refutes it.
 // =============================================================================
 
+import { databaseAuthBackend } from './auth-backend.ts';
+import { LIVE_DB } from './db.ts';
 import { main } from './index.ts';
+import { useAuthBackend } from './routes/auth.ts';
+
+useAuthBackend(databaseAuthBackend(LIVE_DB));
 
 await main();
