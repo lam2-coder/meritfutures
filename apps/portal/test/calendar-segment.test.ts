@@ -21,6 +21,16 @@ import { toRulesView } from '../src/view/rules.ts';
 import { toTimelineView } from '../src/view/timeline.ts';
 import { AsOfContradictionError, freshnessAgainst } from '../src/app/calendar/as-of-stamp.tsx';
 import { EconomicCalendarScreen } from '../src/app/calendar/economic-calendar-screen.tsx';
+import {
+  ApiReadError,
+  ECONOMIC_CALENDAR_PATH,
+  assertOk,
+  pinnedVersionPath,
+  readEconomicCalendarPanel,
+  readPinnedRules,
+  readTimeline,
+  timelinePath,
+} from '../src/app/calendar/load.ts';
 import { RulesScreen } from '../src/app/calendar/rules-screen.tsx';
 import { TimelineScreen } from '../src/app/calendar/timeline-screen.tsx';
 import {
@@ -306,5 +316,38 @@ describe('the chrome every screen renders inside', () => {
     );
     expect(html).not.toContain('dismiss');
     expect(html).not.toContain('<button');
+  });
+});
+
+describe('the segment request plan', () => {
+  it('names the three /api/v1 paths these screens read', () => {
+    expect(ECONOMIC_CALENDAR_PATH).toBe('/economic-calendar');
+    expect(timelinePath('acct_0191c2')).toBe('/accounts/acct_0191c2/timeline');
+    expect(pinnedVersionPath('merit_rapid', 3)).toBe('/plans/merit_rapid/versions/3');
+  });
+
+  it('encodes an identifier rather than interpolating it into a path', () => {
+    expect(timelinePath('a/../b')).toBe('/accounts/a%2F..%2Fb/timeline');
+  });
+
+  it('refuses a non-2xx with its status, and composes no sentence for it', () => {
+    expect(() => assertOk(404, ECONOMIC_CALENDAR_PATH)).toThrow(ApiReadError);
+    expect(() => assertOk(200, ECONOMIC_CALENDAR_PATH)).not.toThrow();
+    try {
+      assertOk(404, ECONOMIC_CALENDAR_PATH);
+    } catch (error) {
+      expect((error as ApiReadError).status).toBe(404);
+      // INV-M4-07: the wording is toPortalErrorKind's and never this file's.
+      expect((error as ApiReadError).message.toLowerCase()).not.toContain('forbidden');
+      expect((error as ApiReadError).message.toLowerCase()).not.toContain('not found');
+    }
+  });
+
+  it('reads each body into the view model its screen takes', () => {
+    expect(readEconomicCalendarPanel(COVERED_CALENDAR, VIEWER_TIMEZONE).state).toBe('covered');
+    expect(readTimeline(TIMELINE_ITEMS, 'acct_0191c2', '2026-03-13').entries).toHaveLength(
+      TIMELINE_ITEMS.length,
+    );
+    expect(readPinnedRules(PINNED_VERSION).superseded).toBe(true);
   });
 });

@@ -1,48 +1,55 @@
 // =============================================================================
 // apps/portal/src/app/calendar/load.ts
 // =============================================================================
-// THE SEGMENT'S READS. M04 section 1.1: `apps/portal` consumes `/api/v1` AND
-// NOTHING ELSE.
+// THE SEGMENT'S REQUEST PLAN: which `/api/v1` paths these screens read, and what
+// is done with each answer. M04 section 1.1: `apps/portal` consumes `/api/v1`
+// AND NOTHING ELSE.
 //
 // -----------------------------------------------------------------------------
-// CONSUMING `/api/v1` IS THE WHOLE OF WHAT THIS FILE DOES, AND SERVING IT IS
-// FORBIDDEN
+// THERE IS NO TRANSPORT IN THIS FILE AND ITS ABSENCE IS SOMEBODY ELSE'S CONTROL
+// -----------------------------------------------------------------------------
+// `test/surface.test.ts` asserts that no source file in this application
+// performs a network call, and states what the assertion is for: "the fetch
+// layer arrives WITH THE FRAMEWORK. Asserting it now means the first `fetch`
+// written here is A DECISION SOMEBODY MAKES ON PURPOSE rather than one that
+// appears in a diff."
+//
+// THIS SESSION WROTE ONE AND TOOK IT BACK OUT, WHICH IS THE GATE WORKING. A
+// first draft of this file took an injected `fetch` capability, the suite went
+// red naming this path, and the finding was correct on its own terms: the
+// framework's entry points are session 250's file set (`next.config`, the root
+// layout, the route files) and the transport belongs with them. Amending that
+// assertion is a decision for the session that lands the wiring, taken against
+// its own test, and NARROWED rather than deleted when it is: the same file
+// records what a bad amendment looks like, "a session that deletes an entry
+// instead of narrowing it has removed the control while appearing to satisfy
+// it."
+//
+// So what is here is everything about a read except the reading. A route file
+// with a transport calls the path builder, checks the status, and hands the
+// body to the matching reader.
+//
+// -----------------------------------------------------------------------------
+// CONSUMING `/api/v1` IS PERMITTED AND SERVING IT IS FORBIDDEN
 // -----------------------------------------------------------------------------
 // ADR-083 section 3 and ADR-095 ruling 3: no route handler and no server action
-// in this application may serve `/api/v1` or any operator path. This module is
-// the other side of that line and it is worth stating in the file rather than
-// only in the ADR, because the two are one character apart in an App Router
-// tree: a `route.ts` under `src/app/` SERVES a path, and a `fetch` in a module
-// like this one CALLS one. Nothing here exports a request handler, and the
-// segment holds no file with a `route` stem.
+// in this application may serve `/api/v1` or any operator path. The two are one
+// character apart in an App Router tree, where a `route.ts` under `src/app/`
+// SERVES a path and a module like this one only NAMES one. Nothing here exports
+// a request handler and this segment holds no file with a `route` stem.
 //
-// ADR-095's own approval clause records that NOTHING in this repository refuses
+// ADR-095's own approval clause records that nothing in this repository refuses
 // a violation today. That check is session 250's and this file does not claim
-// it: what it does is keep this segment on the correct side of it.
+// it; what it does is keep this segment on the correct side of it.
 //
 // -----------------------------------------------------------------------------
 // THE CALENDAR IS NOT COMPUTED HERE AND IT IS NOT COMPUTED IN A PAGE
 // -----------------------------------------------------------------------------
-// `GET /economic-calendar` is the source of the panel, including
-// `release_trading_day` and the freshness fact, and it is being written
-// concurrently by session 258. It is cited unlinked because it has not landed
-// (CI-06a). There is no derivation of a trading day anywhere in this segment:
-// see `trading-day.tsx` for why the type makes that impossible rather than
-// merely discouraged.
-//
-// -----------------------------------------------------------------------------
-// THE BASE URL IS AN ARGUMENT AND NOT AN IMPORT
-// -----------------------------------------------------------------------------
-// A module-level `process.env` read is a value fixed at import time, which is
-// the shape that makes a suite either mutate the environment or run against
-// whatever the developer's shell held. Each loader takes its origin, so the
-// route file that lands with session 250's layout supplies it once and the
-// suite supplies a stub, and neither reaches for a global.
-//
-// `fetch` IS AN ARGUMENT FOR THE SAME REASON, and it is typed as the narrow
-// thing this module actually uses rather than as the platform's `fetch`. A
-// loader that closed over the global could not be exercised without a network
-// or a global mutation, and both are worse than one parameter.
+// `GET /economic-calendar` is the source of the panel, `release_trading_day`
+// and the freshness fact included, and it is being written concurrently by
+// session 258. It is cited unlinked because it has not landed (CI-06a). No
+// trading day is derived anywhere in this segment: see `trading-day.tsx` for
+// why the types make that impossible rather than merely discouraged.
 
 import type {
   EconomicCalendarPanelResponse,
@@ -56,30 +63,43 @@ import type { RulesPageView } from '../../view/rules.ts';
 import { toTimelineView } from '../../view/timeline.ts';
 import type { TimelineView } from '../../view/timeline.ts';
 
-/** The `/api/v1` reply this module needs, and no more of `Response` than that. */
-export type ApiReply = {
-  readonly ok: boolean;
-  readonly status: number;
-  json(): Promise<unknown>;
-};
+/**
+ * The three paths, relative to the `/api/v1` origin the caller holds.
+ *
+ * THE ORIGIN IS NOT IN THIS FILE. A module-level environment read is a value
+ * fixed at import time, which is the shape that makes a suite either mutate the
+ * environment or run against whatever the developer's shell held. The route
+ * file supplies it once.
+ */
+export const ECONOMIC_CALENDAR_PATH = '/economic-calendar';
 
-/** The one capability a loader takes. Narrower than the platform's `fetch` on purpose. */
-export type ApiFetch = (url: string) => Promise<ApiReply>;
-
-export type ApiOrigin = {
-  /** The `/api/v1` origin, without a trailing slash. Supplied by the caller. */
-  readonly base_url: string;
-  readonly fetch: ApiFetch;
-};
+/** `GET /accounts/:accountId/timeline`. */
+export function timelinePath(account_id: string): string {
+  return `/accounts/${encodeURIComponent(account_id)}/timeline`;
+}
 
 /**
- * A non-2xx from `/api/v1`, carried with its status so the caller can map it.
+ * `GET /plans/:planId/versions/:version`, the account's PINNED version.
  *
- * IT CARRIES THE STATUS AND NEVER A SENTENCE. `shell/app-shell.ts`'s
- * `toPortalErrorKind` owns the mapping from a status to the portal's own
- * vocabulary, "so no component decides how to word a refusal", and a message
- * composed here would be a second one. INV-M4-07 is why that matters on this
- * surface specifically: a `404` is rendered as not found and never as forbidden.
+ * THE VERSION IS A PARAMETER AND IS NOT DISCOVERED. M04 section 4's obligation
+ * against this endpoint is that "the rules page for an account reads the PINNED
+ * version, not the current one", and a helper that took only a plan id and
+ * reached for its latest version would satisfy every signature in this file and
+ * break that obligation. The account holds the pin and this function cannot
+ * reach a version the account did not name.
+ */
+export function pinnedVersionPath(plan_id: string, version: number): string {
+  return `/plans/${encodeURIComponent(plan_id)}/versions/${version}`;
+}
+
+/**
+ * A non-2xx from `/api/v1`, carried with its status and never with a sentence.
+ *
+ * `shell/app-shell.ts`'s `toPortalErrorKind` owns the mapping from a status to
+ * the portal's own vocabulary, "so no component decides how to word a refusal",
+ * and a message composed here would be a second one. INV-M4-07 is why it
+ * matters on this surface: a `404` is rendered as not found and never as
+ * forbidden, and the vocabulary has no member for the second.
  */
 export class ApiReadError extends Error {
   constructor(
@@ -91,10 +111,9 @@ export class ApiReadError extends Error {
   }
 }
 
-async function read(origin: ApiOrigin, path: string): Promise<unknown> {
-  const reply = await origin.fetch(`${origin.base_url}${path}`);
-  if (!reply.ok) throw new ApiReadError(reply.status, path);
-  return reply.json();
+/** Refuse a non-2xx before a body is read. Called by whoever holds the transport. */
+export function assertOk(status: number, path: string): void {
+  if (status < 200 || status > 299) throw new ApiReadError(status, path);
 }
 
 /**
@@ -103,51 +122,34 @@ async function read(origin: ApiOrigin, path: string): Promise<unknown> {
  * THE TIMEZONE IS THE VIEWER'S AND IS NEVER SENT. It is a property of the
  * reader and not of the event (`view/economic-calendar.ts`, GS-285), so it goes
  * into the rendering and not into the query. A timezone in the request would be
- * the beginning of a per-timezone response, which is the second answer to "when
- * was the news" that FM-M7-08 guards.
+ * the first step toward a per-timezone response, which is the second answer to
+ * "when was the news" that FM-M7-08 guards.
  */
-export async function loadEconomicCalendarPanel(
-  origin: ApiOrigin,
+export function readEconomicCalendarPanel(
+  body: EconomicCalendarPanelResponse,
   timezone: string,
-): Promise<EconomicCalendarPanelView> {
-  const body = (await read(origin, '/economic-calendar')) as EconomicCalendarPanelResponse;
+): EconomicCalendarPanelView {
   return toEconomicCalendarPanel(body, timezone);
 }
 
 /**
  * The account timeline.
  *
- * `as_of_trading_day` IS AN ARGUMENT BECAUSE THE TIMELINE ENDPOINT DOES NOT
- * CARRY ONE. `TimelineItem` has no as-of field and `toTimelineView` takes the
- * day as a parameter for the same reason: the day belongs to the account, is
- * read from the account endpoint, and INV-M4-02 requires it on the view model
- * regardless. Threading it rather than defaulting it is what keeps the required
- * prop required.
+ * `as_of_trading_day` IS A PARAMETER BECAUSE THE TIMELINE ENDPOINT CARRIES NO
+ * SUCH FIELD. `TimelineItem` has none and `toTimelineView` takes the day for the
+ * same reason: it belongs to the account, it is read from the account endpoint,
+ * and INV-M4-02 requires it on the view model regardless. Threading it rather
+ * than defaulting it is what keeps a required prop required.
  */
-export async function loadTimeline(
-  origin: ApiOrigin,
+export function readTimeline(
+  body: readonly TimelineItem[],
   account_id: string,
   as_of_trading_day: string,
-): Promise<TimelineView> {
-  const body = (await read(origin, `/accounts/${account_id}/timeline`)) as readonly TimelineItem[];
+): TimelineView {
   return toTimelineView(account_id, as_of_trading_day, body);
 }
 
-/**
- * The account's PINNED plan version, which is the only one this screen may read.
- *
- * THE VERSION IS AN ARGUMENT AND IS NOT DISCOVERED HERE. M04 section 4's
- * obligation against this endpoint is that "the rules page for an account reads
- * the PINNED version, not the current one", and a loader that fetched the plan
- * and took its latest version would satisfy the signature and break the
- * obligation. The caller has the account, the account has the pin, and this
- * function cannot reach a version the account did not name.
- */
-export async function loadPinnedRules(
-  origin: ApiOrigin,
-  plan_id: string,
-  version: number,
-): Promise<RulesPageView> {
-  const body = (await read(origin, `/plans/${plan_id}/versions/${version}`)) as PlanVersionResponse;
+/** The account's pinned plan version. See {@link pinnedVersionPath}. */
+export function readPinnedRules(body: PlanVersionResponse): RulesPageView {
   return toRulesView(body);
 }
