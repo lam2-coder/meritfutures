@@ -138,9 +138,15 @@ importers:
       '@merit/kyc':
         specifier: workspace:*
         version: link:../../packages/kyc
+      '@merit/ledger':
+        specifier: workspace:*
+        version: link:../../packages/ledger
       '@merit/psp':
         specifier: workspace:*
         version: link:../../packages/psp
+      '@merit/rules-engine':
+        specifier: workspace:*
+        version: link:../../packages/rules-engine
       fastify:
         specifier: 'catalog:'
         version: 5.12.1
