@@ -161,6 +161,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-137](ADR-137.md) | `OI-16` never held `GS-004` and `GS-031`'s expected end state, and the blocker on both is the calendar record's missing `halted` key  (2026-08-27, status: proposed) |
 | [ADR-138](ADR-138.md) | a Server Action has no path, so the refusal is TOTAL, and the first rendered document is what makes it reachable  (2026-08-27, status: proposed) |
 | [ADR-139](ADR-139.md) | the dispatch named four endpoints, `API_CONTRACT` has two of them free, and `AccountDetail.progress` is refused by the contract's own nullability  (2026-08-27, status: proposed) |
+| [ADR-144](ADR-144.md) | an admin route is an ordinary route module, and the surface that serves it is selected by the partition that already exists  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
