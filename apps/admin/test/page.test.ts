@@ -6,6 +6,7 @@ import { RoleError } from '../src/roles.ts';
 import {
   PageError,
   ageAtRender,
+  assertFloatIsNotReserve,
   assertNamesNoSubject,
   buildLiabilityHome,
   type LiabilityHomeInput,
@@ -241,5 +242,206 @@ describe('M6-A-26: no live feed means no live figure, never the last close relab
     const lines = renderLiabilityHome(page);
     expect(lines.some((line) => line.includes('INDICATIVE'))).toBe(true);
     expect(lines.some((line) => line.includes('Open liability: 7500.00'))).toBe(true);
+  });
+});
+
+// =============================================================================
+// M6-A: P-M6-07 on the page, and section 5.3 asserted OVER THE RENDERED BYTES
+// =============================================================================
+// SESSION 261'S LESSON, WHICH P6 SECTION 8 RESTATES: a value reaches a page
+// through a label, a definition, a provenance clause or an error string without
+// ever appearing in a visible field. So these assertions read
+// `renderLiabilityHome`'s output, which is every byte the page prints, rather
+// than the structured figures the panels were built from.
+//
+// THE BOOK IS GS-229's, "reserve coverage computed while the wallet float is
+// LARGE", and the figures are the ones that flip the breaker:
+//
+//   reserve alone      2,000,000c / 2,500,000c =  8,000bp  ARMED
+//   float folded in    3,500,000c / 2,500,000c = 14,000bp  not armed
+//
+// `35000.00` and `14000 bp` are therefore the two tokens that must appear
+// nowhere, and `20000.00`, `15000.00` and `8000 bp` are the three that must.
+// =============================================================================
+
+const COVERAGE = {
+  asOfInstant: '2026-08-20T22:00:00.000Z',
+  reserveCents: 2_000_000n,
+  cvar99Cents: 2_500_000n,
+  rcrBp: 8_000n,
+  anchor: {
+    accountCode: 'payout_wallet',
+    asOfInstant: '2026-08-20T21:45:00.000Z',
+    source: 'provider_api',
+  },
+} as const;
+
+/** The same input as above, with a large float and P-M6-07's row supplied. */
+const WITH_COVERAGE: LiabilityHomeInput = {
+  ...INPUT,
+  snapshot: { ...INPUT.snapshot, walletBalancesCents: 1_500_000n },
+  reserveCoverage: COVERAGE,
+};
+
+describe('M6-A-35: P-M6-07 renders as two panels, and leaves the pending list', () => {
+  const page = buildLiabilityHome(WITH_COVERAGE);
+
+  test('the roster gains reserve coverage and the float, in M06 own panel order', () => {
+    expect(page.panels.map((panel) => panel.origin)).toEqual([
+      'P-M6-09',
+      'P-M6-01',
+      'P-M6-02',
+      'AS-M6-04',
+      'P-M6-03',
+      'P-M6-07',
+      'P-M6-07',
+      'P-M6-10',
+    ]);
+  });
+
+  test('two titles, which is what DEP-M20-06 visibly separate means here', () => {
+    const titles = page.panels.filter((panel) => panel.origin === 'P-M6-07').map((p) => p.title);
+    expect(titles).toEqual(['Reserve coverage', 'Wallet float, reported separately']);
+  });
+
+  test('the panel is no longer listed as NOT BUILT', () => {
+    expect(page.pending.map((entry) => entry.origin)).toEqual([
+      'P-M6-04',
+      'P-M6-05',
+      'P-M6-06',
+      'P-M6-08',
+    ]);
+  });
+
+  test('without the row it stays pending, and the reason is a producer and not a column', () => {
+    const bare = buildLiabilityHome(INPUT);
+    const pending = bare.pending.find((entry) => entry.origin === 'P-M6-07');
+    expect(pending?.blockedBy).toContain('no producer, and not a missing column');
+    expect(pending?.blockedBy).toContain('0049_reserve_coverage_snapshots.sql');
+    expect(pending?.blockedBy).not.toContain('the columns do not exist');
+  });
+});
+
+describe('M6-A-36: section 5.3 in the negative, over every byte the page prints', () => {
+  const lines = renderLiabilityHome(buildLiabilityHome(WITH_COVERAGE));
+  const bytes = lines.join('\n');
+
+  test('the reserve and the float are two separately labelled, separately valued lines', () => {
+    // The colon, because the panel HEADING carries the title too and a page
+    // that printed only headings would satisfy a bare-label search.
+    const reserveLine = lines.find((line) => line.includes('Reserve, the RCR numerator: '));
+    const floatLine = lines.find((line) => line.includes('Wallet float, reported separately: '));
+    expect(reserveLine).toContain('20000.00');
+    expect(floatLine).toContain('15000.00');
+    expect(reserveLine).not.toBe(floatLine);
+  });
+
+  test('the ratio the page prints is the one computed from reserve alone', () => {
+    expect(bytes).toContain('Reserve coverage ratio: 8000 bp (0.8000x)');
+    expect(bytes).toContain('breaker: ARMED');
+  });
+
+  test('reserve PLUS float appears nowhere, in any field, label or clause', () => {
+    expect(bytes).not.toMatch(/(?<![\d.])35000\.00(?![\d])/);
+  });
+
+  test('the ratio from float plus reserve appears nowhere', () => {
+    expect(bytes).not.toMatch(/(?<!\d)14000 bp(?!\d)/);
+    expect(bytes).not.toContain('1.4000x');
+  });
+
+  test('the page says in words which side of the ratio the float is on', () => {
+    expect(bytes).toContain('computed from RESERVE ALONE');
+    expect(bytes).toContain('exposure inside the denominator');
+    expect(bytes).toContain('never counted toward reserve');
+  });
+
+  test('the float still renders as a P-M6-01 liability component, which is INV-M6-11', () => {
+    // The same money, twice, deliberately: a liability component in one panel
+    // and exposure in the other. It is never reserve in either.
+    const walletComponent = lines.find((line) => line.includes('Open liability: wallet component'));
+    expect(walletComponent).toContain('15000.00');
+  });
+});
+
+describe('M6-A-37: the page refuses a rendering that folds the float into reserve', () => {
+  test('a page whose reserve line carried the sum would not be built', () => {
+    expect(() =>
+      assertFloatIsNotReserve({
+        allLines: ['Reserve coverage ratio: 8000 bp'],
+        coverageLines: [
+          'Reserve, the RCR numerator: 35000.00 [...] (as of ..., source ...)',
+          'Wallet float, reported separately: 15000.00 [...]',
+        ],
+        reserveCents: 2_000_000n,
+        floatCents: 1_500_000n,
+        cvar99Cents: 2_500_000n,
+        ratioBp: 8_000n,
+      }),
+    ).toThrow(/folded into it/);
+  });
+
+  test('a ratio from float plus reserve is caught anywhere on the page, not only here', () => {
+    expect(() =>
+      assertFloatIsNotReserve({
+        // The leak surfaces on a line that is not a coverage line at all,
+        // which is the case a panel-scoped scan would miss.
+        allLines: ['Open liability, live: coverage stands at 14000 bp'],
+        coverageLines: [
+          'Reserve, the RCR numerator: 20000.00',
+          'Wallet float, reported separately: 15000.00',
+        ],
+        reserveCents: 2_000_000n,
+        floatCents: 1_500_000n,
+        cvar99Cents: 2_500_000n,
+        ratioBp: 8_000n,
+      }),
+    ).toThrow(/flatters itself|float PLUS reserve/);
+  });
+
+  test('a page that printed only one of the two figures is refused', () => {
+    expect(() =>
+      assertFloatIsNotReserve({
+        allLines: [],
+        coverageLines: ['Reserve, the RCR numerator: 20000.00'],
+        reserveCents: 2_000_000n,
+        floatCents: 1_500_000n,
+        cvar99Cents: 2_500_000n,
+        ratioBp: 8_000n,
+      }),
+    ).toThrow(/VISIBLY SEPARATE/);
+  });
+
+  test('at zero float the scan has nothing to tell apart, and it says so by passing', () => {
+    // Stated rather than silently handled: reserve + 0 IS reserve, so a suite
+    // that proved this control on an empty wallet would have proved nothing.
+    expect(() =>
+      assertFloatIsNotReserve({
+        allLines: ['Reserve, the RCR numerator: 20000.00'],
+        coverageLines: [
+          'Reserve, the RCR numerator: 20000.00',
+          'Wallet float, reported separately: 0.00',
+        ],
+        reserveCents: 2_000_000n,
+        floatCents: 0n,
+        cvar99Cents: 2_500_000n,
+        ratioBp: 8_000n,
+      }),
+    ).not.toThrow();
+  });
+
+  test('a red board marks the ratio line too, so a screenshot keeps the warning', () => {
+    const red = buildLiabilityHome({
+      ...WITH_COVERAGE,
+      trustSignals: green().map((signal) =>
+        signal.key === 'recon_mismatches_open'
+          ? { ...signal, state: 'red' as const, detail: '3 mismatches open' }
+          : signal,
+      ),
+    });
+    const ratioLine = renderLiabilityHome(red).find((line) =>
+      line.includes('Reserve coverage ratio'),
+    );
+    expect(ratioLine).toContain('SUSPECT, data trust is red');
   });
 });

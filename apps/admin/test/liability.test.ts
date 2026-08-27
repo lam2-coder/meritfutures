@@ -1,10 +1,18 @@
 import { describe, expect, test } from 'vitest';
 
-import { readingIsPresent, render } from '../src/figure.ts';
+import type { Cents } from '@merit/rules-engine';
+
+import { type Reading, readingIsPresent, render } from '../src/figure.ts';
 import {
   LiabilityError,
   type LiabilitySnapshot,
+  RCR_BREAKER_BP,
+  type ReserveCoverageSnapshot,
+  TREASURY_SOURCES,
+  formatRatioBp,
   inAdversarialOrder,
+  requireTreasurySource,
+  reserveCoverage,
   theThreeNumbers,
 } from '../src/liability.ts';
 
@@ -38,7 +46,7 @@ const GS_115: LiabilitySnapshot = {
   remainingLadderExposureCents: 900_000n,
 };
 
-function centsOf(reading: ReturnType<typeof theThreeNumbers>['openLiability']): bigint {
+function centsOf(reading: Reading): bigint {
   if (!readingIsPresent(reading)) throw new Error('expected a figure');
   return reading.figure.cents;
 }
@@ -135,5 +143,198 @@ describe('M6-A-08: an incoherent row is refused rather than rendered', () => {
     expect(centsOf(theThreeNumbers(GS_115).remainingLadderExposure)).toBeGreaterThan(
       centsOf(theThreeNumbers(GS_115).openLiability),
     );
+  });
+});
+
+// =============================================================================
+// M6-A: P-M6-07, and the one thing section 5.3 rules
+// =============================================================================
+// FLOAT ENTERS THE DENOMINATOR AS EXPOSURE AND NEVER THE NUMERATOR AS RESERVE.
+// GS-229 is the registered scenario, "reserve coverage computed while the
+// wallet float is LARGE", and every fixture below carries a large float for
+// that reason: on a book with an empty wallet, `reserve + float` IS `reserve`
+// and a suite that passed would have proved nothing.
+//
+// THE SAME LIMIT AS THE THREE NUMBERS ABOVE APPLIES. These are unit tests, not
+// GS-229's golden fixture: this session is fenced to `apps/admin` and cannot
+// register one.
+// =============================================================================
+
+/**
+ * The book that makes the misreading visible, and the figures are chosen so
+ * that folding the float in FLIPS THE BREAKER rather than merely moving a
+ * number:
+ *
+ *   reserve alone      2,000,000c / 2,500,000c = 8,000bp = 0.8000x  ARMED
+ *   float folded in    3,500,000c / 2,500,000c = 14,000bp = 1.4000x not armed
+ *
+ * That is AS-M20-08 in two lines: "the breaker stops meaning anything at
+ * exactly the moment it matters". The armed side is the true one.
+ */
+const GS_229: ReserveCoverageSnapshot = {
+  asOfInstant: '2026-08-20T22:00:00.000Z',
+  reserveCents: 2_000_000n,
+  cvar99Cents: 2_500_000n,
+  rcrBp: 8_000n,
+  anchor: {
+    accountCode: 'payout_wallet',
+    asOfInstant: '2026-08-20T21:45:00.000Z',
+    source: 'provider_api',
+  },
+};
+
+const GS_229_FLOAT = 1_500_000n;
+const GS_229_FLOAT_AS_OF = '2026-08-20T21:00:00.000Z';
+
+const coverageOf = (
+  overrides: Partial<ReserveCoverageSnapshot> = {},
+  floatCents: Cents = GS_229_FLOAT,
+): ReturnType<typeof reserveCoverage> =>
+  reserveCoverage({
+    coverage: { ...GS_229, ...overrides },
+    floatCents,
+    floatAsOfInstant: GS_229_FLOAT_AS_OF,
+  });
+
+describe('M6-A-31: GS-229, the RCR is computed from reserve alone', () => {
+  const coverage = coverageOf();
+
+  test('the ratio is the stored one and the float is not in it', () => {
+    expect(coverage.ratioBp).toBe(8_000n);
+    expect(coverage.breakerArmed).toBe(true);
+  });
+
+  test('folding the float in would flip the breaker, which is why it is not folded in', () => {
+    const flattered = ((GS_229.reserveCents + GS_229_FLOAT) * 10_000n) / GS_229.cvar99Cents;
+    expect(flattered).toBe(14_000n);
+    expect(flattered < 10_000n).toBe(false);
+    expect(coverage.breakerArmed).toBe(true);
+  });
+
+  test('reserve and float are two figures and neither is the other', () => {
+    expect(centsOf(coverage.reserve)).toBe(2_000_000n);
+    expect(centsOf(coverage.walletFloat)).toBe(1_500_000n);
+    expect(centsOf(coverage.reserve)).not.toBe(centsOf(coverage.walletFloat));
+  });
+
+  test('no member of the panel holds reserve plus float', () => {
+    const forbidden = GS_229.reserveCents + GS_229_FLOAT;
+    for (const reading of [coverage.reserve, coverage.cvar99, coverage.walletFloat]) {
+      expect(centsOf(reading)).not.toBe(forbidden);
+    }
+  });
+
+  test('the float carries its own as-of and its own source, INV-M6-04', () => {
+    if (!readingIsPresent(coverage.walletFloat)) throw new Error('expected a figure');
+    expect(coverage.walletFloat.figure.asOf.instant).toBe(GS_229_FLOAT_AS_OF);
+    expect(coverage.walletFloat.figure.asOf.source).toBe('liability_snapshots');
+  });
+
+  test('the coverage figures carry 0049 own clock and not the liability snapshot one', () => {
+    if (!readingIsPresent(coverage.reserve)) throw new Error('expected a figure');
+    expect(coverage.reserve.figure.asOf.instant).toBe('2026-08-20T22:00:00.000Z');
+    expect(coverage.reserve.figure.asOf.source).toBe('reserve_coverage_snapshots');
+  });
+});
+
+describe('M6-A-32: the coherence check refuses both shapes of the defect', () => {
+  test('a numerator with the float folded into it is refused', () => {
+    // The row a producer would write if it read INV-M5-15 as the numerator
+    // clause: the reserve is the sum, and rcr_bp is still the generated one.
+    expect(() => coverageOf({ reserveCents: GS_229.reserveCents + GS_229_FLOAT })).toThrow(
+      LiabilityError,
+    );
+  });
+
+  test('a ratio recomputed from float plus reserve is refused', () => {
+    expect(() => coverageOf({ rcrBp: 14_000n })).toThrow(LiabilityError);
+  });
+
+  test('the refusal names both directions, because the reader has to know which', () => {
+    let message = '';
+    try {
+      coverageOf({ rcrBp: 14_000n });
+    } catch (error) {
+      message = error instanceof Error ? error.message : '';
+    }
+    expect(message).toContain('folded into it');
+    expect(message).toContain('recomputed from float plus reserve');
+    expect(message).toContain('RESERVE ALONE');
+  });
+
+  test('a zero denominator is refused as a CVaR99 nobody computed', () => {
+    expect(() => coverageOf({ cvar99Cents: 0n, rcrBp: 0n })).toThrow(/nobody computed/);
+  });
+
+  test('a negative reserve is refused', () => {
+    expect(() => coverageOf({ reserveCents: -1n, rcrBp: 0n })).toThrow(LiabilityError);
+  });
+
+  test('a negative float is refused', () => {
+    expect(() => coverageOf({}, -1n)).toThrow(/wallet_balances_cents/);
+  });
+});
+
+describe('M6-A-33: the ratio is READ from 0049 generated column, not recomputed', () => {
+  test('integer division truncates toward zero, exactly as Postgres does', () => {
+    // 1c reserve over 3c CVaR99 is 3333.33..bp, and both Postgres integer
+    // division and BigInt division truncate toward zero. 0049 states the
+    // consequence: truncation LOWERS the ratio and therefore arms the breaker
+    // marginally sooner rather than later.
+    const coverage = coverageOf({ reserveCents: 1n, cvar99Cents: 3n, rcrBp: 3_333n }, 0n);
+    expect(coverage.ratioBp).toBe(3_333n);
+    expect(coverage.breakerArmed).toBe(true);
+  });
+
+  test('the ratio line says the database generated it and this page read it', () => {
+    expect(coverageOf().ratioLine).toContain('GENERATED by the database and read rather than');
+  });
+
+  test('the breaker threshold is the GLOSSARY 1.0 and it pauses sales, never payouts', () => {
+    expect(RCR_BREAKER_BP).toBe(10_000n);
+    expect(coverageOf().ratioLine).toContain('pauses NEW SALES and never pauses payouts');
+  });
+
+  test('basis points render by bigint division, never through formatCents', () => {
+    expect(formatRatioBp(8_000n)).toBe('0.8000');
+    expect(formatRatioBp(10_000n)).toBe('1.0000');
+    expect(formatRatioBp(12_345n)).toBe('1.2345');
+    // The one that shows why the money renderer is the wrong one: 12,500bp is
+    // 1.25x, and formatCents would print it as 125.00.
+    expect(formatRatioBp(12_500n)).toBe('1.2500');
+  });
+
+  test('exactly 1.0000x is NOT armed, because the GLOSSARY says BELOW 1.0', () => {
+    expect(coverageOf({ reserveCents: 2_500_000n, rcrBp: 10_000n }).breakerArmed).toBe(false);
+    expect(coverageOf({ reserveCents: 2_499_900n, rcrBp: 9_999n }).breakerArmed).toBe(true);
+  });
+});
+
+describe('M6-A-34: P-M6-07 attestation half, and the second ratio nobody supplies', () => {
+  test('a manual attestation says so, because P-M6-07 asks for its staleness', () => {
+    const line = coverageOf({
+      anchor: { ...GS_229.anchor, source: 'manual_attestation' },
+    }).attestationLine;
+    expect(line).toContain('MANUAL ATTESTATION');
+    expect(line).toContain('2026-08-20T21:45:00.000Z');
+  });
+
+  test('a provider reading says the staleness clause does not apply', () => {
+    expect(coverageOf().attestationLine).toContain('Not a manual attestation');
+  });
+
+  test('a third source name is refused rather than defaulted to the provider arm', () => {
+    expect(() => coverageOf({ anchor: { ...GS_229.anchor, source: 'spreadsheet' } })).toThrow(
+      LiabilityError,
+    );
+    expect(TREASURY_SOURCES).toEqual(['provider_api', 'manual_attestation']);
+    expect(requireTreasurySource('manual_attestation')).toBe('manual_attestation');
+  });
+
+  test('float coverage is absent with a named owner, never a zero', () => {
+    const { floatCoverage } = coverageOf();
+    expect(readingIsPresent(floatCoverage)).toBe(false);
+    expect(render(floatCoverage)).toContain('GET /admin/wallet/reconciliation');
+    expect(render(floatCoverage)).not.toContain('0.00');
   });
 });
