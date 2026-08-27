@@ -28,6 +28,15 @@
 // ran this file holds `UNWIRED_AUTH_BACKEND` and answers 503 on every auth
 // route, saying so rather than pretending. ADR-120.
 //
+// EVERY ROUTE SLICE THAT WIRES AN ADAPTER APPENDS HERE, AND THIS FILE IS
+// THEREFORE THE ONE SHARED FILE THE CONCURRENT ROUTE SESSIONS COLLIDE ON. It is
+// not the route registry: `registry.ts` made the module list a directory
+// listing precisely so that a slice adding a route edits nothing another slice
+// edits, and it succeeded. Installing a BACKEND is the part that has no
+// directory to read, because a backend is a choice about a deployment rather
+// than a file on disk. THE CONFLICT IS AN APPEND: keep every line, order by
+// module name, and let `tsc` catch a bad resolution.
+//
 // THE INSTALL IS BEFORE `main()` AND NOT AFTER, because `main` binds the port at
 // the end of it. A window in which the process is listening and the backend is
 // still the fail-closed default would serve 503 to real traffic for as long as
@@ -49,8 +58,17 @@
 import { databaseAuthBackend } from './auth-backend.ts';
 import { LIVE_DB } from './db.ts';
 import { main } from './index.ts';
+import { databaseAccountsBackend, useAccountsBackend } from './routes/accounts.ts';
 import { useAuthBackend } from './routes/auth.ts';
+import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
 
 useAuthBackend(databaseAuthBackend(LIVE_DB));
+useAccountsBackend(databaseAccountsBackend(LIVE_DB));
+
+// The catalogue and the purchase list, over the SAME two doors. `catalog.ts`
+// holds both halves of its port and this is the one line that installs them; a
+// process that never ran this file answers 503 on all three of its routes and
+// says so, exactly as it does for auth.
+useCatalogReads(databaseCatalogReads(LIVE_DB));
 
 await main();
