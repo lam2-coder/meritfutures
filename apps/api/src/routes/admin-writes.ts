@@ -664,17 +664,36 @@ interface PgFailure {
   readonly message: string;
 }
 
+/**
+ * THE CAUSE CHAIN IS WALKED AND THAT IS NOT DEFENSIVE PROGRAMMING.
+ *
+ * Drizzle wraps every failed statement in a `DrizzleQueryError` whose own
+ * `code` is `undefined` and whose `cause` is the `pg` error carrying the
+ * SQLSTATE, the table and the column. Measured against `drizzle-orm` in this
+ * workspace: `name: 'Error'`, `constructor.name: 'DrizzleQueryError'`, own keys
+ * `query`, `params`, `cause`. A reader that looked only at the thrown object
+ * would find no SQLSTATE, fall through to the rethrow, and answer **500** for
+ * every refusal this module exists to report -- which is what it did until this
+ * suite ran against a real database and said so.
+ *
+ * The chain is walked rather than the first `cause` taken, because nothing
+ * promises the wrapping stays one deep.
+ */
 function pgFailure(err: unknown): PgFailure | null {
-  if (typeof err !== 'object' || err === null) return null;
-  const row = err as Record<string, unknown>;
-  if (typeof row['code'] !== 'string') return null;
-  return {
-    code: row['code'],
-    ...(typeof row['table'] === 'string' ? { table: row['table'] } : {}),
-    ...(typeof row['column'] === 'string' ? { column: row['column'] } : {}),
-    ...(typeof row['constraint'] === 'string' ? { constraint: row['constraint'] } : {}),
-    message: typeof row['message'] === 'string' ? row['message'] : String(err),
-  };
+  let seen: unknown = err;
+  for (let depth = 0; depth < 8 && typeof seen === 'object' && seen !== null; depth += 1) {
+    const row = seen as Record<string, unknown>;
+    if (typeof row['code'] === 'string')
+      return {
+        code: row['code'],
+        ...(typeof row['table'] === 'string' ? { table: row['table'] } : {}),
+        ...(typeof row['column'] === 'string' ? { column: row['column'] } : {}),
+        ...(typeof row['constraint'] === 'string' ? { constraint: row['constraint'] } : {}),
+        message: typeof row['message'] === 'string' ? row['message'] : String(seen),
+      };
+    seen = row['cause'];
+  }
+  return null;
 }
 
 /**
@@ -1637,7 +1656,7 @@ function snakeCase(property: string): string {
  * the document's, transcribed, and `validatePlan` is what actually reads the
  * shape; this function only has to decide whether two versions differ.
  */
-function sensitiveFields(rules: unknown): Record<string, unknown> {
+export function sensitiveFields(rules: unknown): Record<string, unknown> {
   const funded = asRecord(asRecord(rules)?.['phase_funded']);
   return {
     payout_cap_schedule: funded?.['payout_cap_schedule'] ?? null,
@@ -1671,14 +1690,14 @@ function canonicalJson(value: unknown): string {
  * publish a different one, and an approval recorded against another version
  * does not publish this one.
  */
-function sensitivePayloadHash(planVersionId: string, rules: unknown): string {
+export function sensitivePayloadHash(planVersionId: string, rules: unknown): string {
   return createHash('sha256')
     .update(canonicalJson({ plan_version_id: planVersionId, ...sensitiveFields(rules) }), 'utf8')
     .digest('hex');
 }
 
 /** ADR-010's window: "a second `owner` approval within a 24 hour window". */
-const DUAL_CONTROL_WINDOW_MS = 24 * 60 * 60 * 1000;
+export const DUAL_CONTROL_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function instantOf(row: unknown, property: string): Date | null {
   const value = asRecord(row)?.[property];
