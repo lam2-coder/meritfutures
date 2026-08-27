@@ -278,7 +278,7 @@ Thirty-seven tables, created by [`0005`](../../../packages/db/migrations/0005_af
 | [`affiliate_commissions`](affiliate_commissions.md) | |
 | [`affiliate_statements`](affiliate_statements.md) | |
 | [`events`](events.md) | |
-| [`admin_actions`](admin_actions.md) | |
+| [`admin_actions`](admin_actions.md) | `0017`, extended by [`0043`](../../../packages/db/migrations/0043_admin_attributed_actions.sql) with **`SD-M6-11`** ([ADR-069](../../decisions/ADR-069.md)). The audit surface every mutating admin endpoint writes to. **`reason` is `NOT NULL` and `initiative` is `NOT NULL` with no default**, so no row can omit why it was taken or on whose initiative |
 | [`idempotency_keys`](idempotency_keys.md) | |
 | [`integration_contracts`](integration_contracts.md) | |
 | [`integration_dispatches`](integration_dispatches.md) | |
