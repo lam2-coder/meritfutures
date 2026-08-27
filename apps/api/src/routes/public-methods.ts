@@ -70,24 +70,28 @@
 // nothing there. Only `/health` is served by both (ADR-083, `surface.ts`).
 //
 // -----------------------------------------------------------------------------
-// THE SOURCE IS A PORT AND NOTHING IN THIS TREE WIRES IT YET
+// THE PARAGRAPH THAT STOOD HERE SAID NOTHING IN THIS TREE COULD WIRE THE SOURCE
 // -----------------------------------------------------------------------------
-// `apps/api` declares one runtime dependency, `fastify`, and holds no database
-// handle: `index.ts` says so and ADR-100 landed the registry with one route
-// that returns a constant. Wiring `packages/db` into this deployable is a
-// manifest change and a slice of its own, and it is outside this one's fence.
+// It recorded that `apps/api` declared one runtime dependency, `fastify`, and
+// held no database handle, so wiring `packages/db` into this deployable was "a
+// manifest change and a slice of its own". BOTH HALVES LANDED: ADR-120 admitted
+// `@merit/db` to this deployable and `src/db.ts` is the one file that names it,
+// `RI-08` guards the manifest, and `databaseMethodDefinitions` below is the
+// adapter that paragraph said did not exist. `start.ts` installs it.
 //
-// So the data arrives through `MethodDefinitionSource` and the default is
-// UNSET. An unset source is a deployment that has not been finished, and this
-// file answers it the way `surface.ts` answers an unset surface: loudly. The
-// handler throws, the error handler in `server.ts` renders `internal_error`,
-// and the throw is logged with the module named. It does not answer 404, which
-// would say the statistic does not exist, and it does not answer 503, which
-// would invite a retry against a process that will never succeed.
+// THE PORT AND ITS UNSET DEFAULT DO NOT MOVE, and that is the half worth
+// keeping. A process that never ran `start.ts` still holds `null` here, and an
+// unset source is a deployment that has not been finished: this file answers it
+// the way `surface.ts` answers an unset surface: loudly. The handler throws, the
+// error handler in `server.ts` renders `internal_error`, and the throw is logged
+// with the module named. It does not answer 404, which would say the statistic
+// does not exist, and it does not answer 503, which would invite a retry against
+// a process that will never succeed.
 // =============================================================================
 
 import { defineRoutes } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
+import type { ApiDb } from '../db.ts';
 import type { RouteHandler } from '../registry.ts';
 
 /** API_CONTRACT's path for the method page, without the base path. */
@@ -324,6 +328,178 @@ export function renderMethodPage(
     );
 
   return { stat_code: statCode, live_version: live, versions };
+}
+
+// -----------------------------------------------------------------------------
+// The adapter, reading through the accessor
+// -----------------------------------------------------------------------------
+
+/** The registry key for `statistic_definitions`. */
+const STATISTIC_DEFINITIONS = 'statisticDefinitions';
+
+/**
+ * Raised when a `statistic_definitions` row does not read back as its columns.
+ *
+ * SEPARATE FROM {@link MethodPageError} BECAUSE IT IS A DIFFERENT ACCUSATION.
+ * `MethodPageError` says the SET of rows cannot be rendered as a page; this says
+ * one row did not arrive as the shape `0021_transparency.sql` declares, which
+ * means the transcription in `packages/db/src/schema.ts` and the migration have
+ * come apart. Both are defects and both reach a caller as `internal_error`; only
+ * a reader of the log can act on either, and the two messages send that reader
+ * to different files.
+ */
+export class MethodRowError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MethodRowError';
+  }
+}
+
+/** `YYYY-MM-DD`, with the month and day ranges checked. `2026-19-40` is not a date. */
+const DAY = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+function asRow(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new MethodRowError('a statistic_definitions read returned something that is not a row');
+  return value as Record<string, unknown>;
+}
+
+function str(row: Record<string, unknown>, key: string): string {
+  const value = row[key];
+  if (typeof value !== 'string')
+    throw new MethodRowError(`statistic_definitions.${key} did not read back as a string`);
+  return value;
+}
+
+function maybeStr(row: Record<string, unknown>, key: string): string | null {
+  const value = row[key];
+  return value === null || value === undefined ? null : str(row, key);
+}
+
+function int(row: Record<string, unknown>, key: string): number {
+  const value = row[key];
+  if (typeof value !== 'number' || !Number.isInteger(value))
+    throw new MethodRowError(`statistic_definitions.${key} did not read back as an integer`);
+  return value;
+}
+
+/**
+ * A `date` column as `YYYY-MM-DD`.
+ *
+ * THE SHAPE IS CHECKED AND THE CALENDAR IS NOT. `effective_from` is a `date` in
+ * `0021`, so it carries no instant and no zone and there is nothing here to
+ * convert; what a check can catch is a transcription that changed the column's
+ * mode and started handing this file a `Date`, whose `toString` would reach a
+ * public page as a weekday and a timezone name. Whether the day is a SESSION is
+ * `trading_calendar`'s question and is not asked here, on
+ * `routes/economic-calendar.ts`' stated reason.
+ */
+function day(row: Record<string, unknown>, key: string): string {
+  const value = str(row, key);
+  if (!DAY.test(value))
+    throw new MethodRowError(
+      `statistic_definitions.${key} read back as \`${value}\`, which is not a \`YYYY-MM-DD\` day`,
+    );
+  return value;
+}
+
+function strings(row: Record<string, unknown>, key: string): readonly string[] {
+  const value = row[key];
+  if (!Array.isArray(value))
+    throw new MethodRowError(`statistic_definitions.${key} did not read back as an array`);
+  for (const entry of value)
+    if (typeof entry !== 'string')
+      throw new MethodRowError(`statistic_definitions.${key} holds an entry that is not a string`);
+  return value as readonly string[];
+}
+
+/**
+ * `measures`, narrowed against the enum rather than cast to it.
+ *
+ * `statistic_measure` IS A DATABASE ENUM AND THIS IS STILL CHECKED, for
+ * `renderMethodPage`'s stated reason one section up: the source is an INTERFACE
+ * rather than the database, so a value the database could not produce is exactly
+ * the value a fake or a drifted transcription can. `STATISTIC_MEASURES` is the
+ * transcription of `0001_extensions_and_enums.sql` and a member outside it is a
+ * measure this page cannot name.
+ */
+function measures(row: Record<string, unknown>, key: string): readonly StatisticMeasure[] {
+  const raw = strings(row, key);
+  const known: StatisticMeasure[] = [];
+  for (const entry of raw) {
+    const found = STATISTIC_MEASURES.find((measure) => measure === entry);
+    if (found === undefined)
+      throw new MethodRowError(
+        `statistic_definitions.${key} holds \`${entry}\`, which is not a \`statistic_measure\``,
+      );
+    known.push(found);
+  }
+  return known;
+}
+
+function readDefinition(raw: unknown): StatisticDefinitionRow {
+  const row = asRow(raw);
+  return {
+    id: str(row, 'id'),
+    stat_code: str(row, 'statCode'),
+    version: int(row, 'version'),
+    title: str(row, 'title'),
+    numerator_spec: str(row, 'numeratorSpec'),
+    denominator_spec: str(row, 'denominatorSpec'),
+    exclusions: strings(row, 'exclusions'),
+    window_spec: str(row, 'windowSpec'),
+    grain: str(row, 'grain'),
+    min_sample: int(row, 'minSample'),
+    measures: measures(row, 'measures'),
+    method_body_mdx: str(row, 'methodBodyMdx'),
+    adr_ref: maybeStr(row, 'adrRef'),
+    effective_from: day(row, 'effectiveFrom'),
+    superseded_by: maybeStr(row, 'supersededBy'),
+  };
+}
+
+/**
+ * The source, reading through the accessor.
+ *
+ * `db.firm` AND NEVER `db.scoped`, AND THE TYPE SYSTEM IS WHAT SAYS SO.
+ * `statistic_definitions` is scope class `firm` in `packages/db/src/scope.ts`
+ * ("there is no identity column and there is no correct one"), so the key is a
+ * member of `FirmTableKey` and is EXCLUDED from `ScopedTableKey`: passing it to
+ * the scoped door does not compile. That is the same refusal this file's header
+ * describes from the other end -- the reader may be anybody and the row is
+ * nobody's -- obtained here without a second control to maintain.
+ *
+ * `rowsWhere` AND NOT `rowAt`, because `:statCode` does not name one row and is
+ * not supposed to: `statistic_definitions_stat_code_version_uq` makes the
+ * ADDRESS of one definition the PAIR, and this path carries only its first half.
+ * `rowAt` promises at most one row and would throw on the second version of any
+ * statistic that has ever been revised, which is precisely the population M12
+ * section 3.2 requires this page to show.
+ *
+ * THE FILTER IS PUSHED DOWN RATHER THAN APPLIED IN MEMORY, which is the one
+ * place this adapter differs from `catalog.ts`' and `wallet.ts`' whole-set
+ * reads. Those tables are bounded by one identity's holdings; this one is
+ * bounded by nothing, and `RowFilter` is "equality, ANDed" -- `statCode` is a
+ * declared column, so the narrowing is available at the door and reading the
+ * whole registry to discard most of it would be a choice rather than a
+ * limitation. `renderMethodPage` still refuses a foreign row, because the
+ * source is an interface and this is only one of its implementations.
+ *
+ * NO ORDERING IS ASKED FOR AND NONE IS NEEDED. `renderMethodPage` sorts nothing
+ * and resolves `superseded_by` against the set it was handed, so the answer does
+ * not depend on the order the rows arrive in.
+ *
+ * @param db the two doors. Injected so the suite can watch which one this read
+ *           opened, which is the property that is this package's rather than
+ *           `packages/db`'s.
+ */
+export function databaseMethodDefinitions(db: ApiDb): MethodDefinitionSource {
+  return {
+    readDefinitions: (statCode) =>
+      db.firm(async (tx) =>
+        (await tx.rowsWhere(STATISTIC_DEFINITIONS, { statCode })).map(readDefinition),
+      ),
+  };
 }
 
 /**

@@ -62,6 +62,7 @@ import { databaseAccountReads, useAccountReadsBackend } from './routes/account-r
 import { databaseAccountsBackend, useAccountsBackend } from './routes/accounts.ts';
 import { useAuthBackend } from './routes/auth.ts';
 import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
+import { databaseMethodDefinitions, setMethodDefinitionSource } from './routes/public-methods.ts';
 import { databaseWalletBackend, useWalletBackend } from './routes/wallet.ts';
 
 useAuthBackend(databaseAuthBackend(LIVE_DB));
@@ -94,5 +95,14 @@ useCatalogReads(databaseCatalogReads(LIVE_DB));
 // 'operator-console'`, and ADR-165 refused to widen it. Wiring the read does not
 // reach that and must not be read as having reached it.
 useWalletBackend(databaseWalletBackend(LIVE_DB));
+
+// `GET /public/methods/:statCode`, over the FIRM door.
+//
+// PUBLIC IN BOTH SENSES AND THEY ARE INDEPENDENT FACTS. The READER may be
+// anybody, so no session is resolved; the ROW is nobody's, so
+// `statistic_definitions` is scope class `firm` and the scoped door would not
+// compile with that key. Nothing is withheld here because there is no field an
+// identity filter would have had to remove.
+setMethodDefinitionSource(databaseMethodDefinitions(LIVE_DB));
 
 await main();
