@@ -150,6 +150,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-121](ADR-121.md) | "shipped source" for `RI-10` means the directories the node loader loads, and `scripts/` is one of them  (2026-08-27, status: proposed) |
 | [ADR-122](ADR-122.md) | `input_digest` is taken over the computation's own argument, and it EXCLUDES the answer  (2026-08-27, status: proposed) |
 | [ADR-123](ADR-123.md) | the refusal on `accountsAudited === 0` moves into `runReplayAudit`, and an empty book now REFUSES instead of reporting clean  (2026-08-27, status: proposed) |
+| [ADR-124](ADR-124.md) | the global ledger halt is a MECHANISM and it is not a `ledger_halts` row  (2026-08-27, status: proposed) |
 | [ADR-127](ADR-127.md) | Stryker is admitted under a DELEGATED `VG-12` grant, `CI-09`'s third leg is built, and the trend-only ruling is expressed by writing NO threshold at all  (2026-08-27, status: proposed) |
 <!--/gen-->
 
