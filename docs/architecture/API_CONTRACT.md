@@ -727,6 +727,58 @@ Auth: **session**, and **elevated**: `passkey or dual_channel`, `C-27: external 
 
 **There is no endpoint that cancels a withdrawal.** `G-TRADER-CANCELS` is drawn from both `requested` and `cooling` in [STATE_MACHINES section 3.2](STATE_MACHINES.md) and `cancelled` is in `wallet_withdrawal_status`, and no approved document states a route, a body or an error set for it. It is named here as owed rather than invented, on [ADR-113](../decisions/ADR-113.md) clause 5's precedent for the operator half it could not write.
 
+### 6.3 Certificates, and the public surface that is inside an authenticated section
+
+**A subsection rather than a new top-level section, for 6.1's and 6.2's recorded reason.** Sections 12 and 13 are cited by NUMBER, so a section inserted ahead of them renumbers both and breaks every citation silently ([ADR-111](../decisions/ADR-111.md) clause 2). It sits under section 6 because `GET /accounts/:accountId/certificate?kind=pass|payout` is already here: that row and these two are one surface, and the certificate is issued against an account.
+
+**ONE OF THE TWO ROWS BELOW IS PUBLIC AND UNAUTHENTICATED, INSIDE THE SECTION WHOSE OTHER ROWS ALL REQUIRE A SESSION.** That is a placement forced by the renumbering rule above and not a claim about auth. Auth is stated per row here as it is everywhere else, and [`surface.ts`](../../apps/api/src/surface.ts) withholds by PREFIX rather than by section, so neither row is withheld from the public deployment by its address and both are reachable there. The authenticated one is protected by its session and by nothing about where it is written down.
+
+**The state a certificate is in is DERIVED and there is no status column.** [`certificates`](data-model/certificates.md) ([`0020`](../../packages/db/migrations/0020_public_surface.sql)) carries `deferred_until`, `revoked_at`, `revocation_class` and `deferred_reason` and no `status`, so `deferred_until IS NOT NULL` is deferred, `revoked_at IS NOT NULL` is revoked, and neither is issued. **[M11 section 3.1](../plans/M11-certificates-social-proof.md) draws a fourth state, `withheld`, and the table cannot hold it**: there is no column that distinguishes "Merit never made the claim" from a row that does not exist. **So `state` below is a three-member union and not a four-member one**, on [ADR-040](../decisions/ADR-040.md)'s rule applied to `PayoutListItem` in this same section: a union that advertises a value the table cannot hold gives a client a branch that never fires. `withheld` is named as owed to the slice that gives it a column, and is not typed here.
+
+#### GET /certificates
+The caller's own certificates, including the deferred ones ([M11 section 4](../plans/M11-certificates-social-proof.md), **NEW** there and defined by no section of this contract until now; `INV-M11-09`).
+```ts
+type CertificateListItem = {
+  certificate_id: string;
+  kind: "pass" | "payout";
+  state: "issued" | "deferred" | "revoked";   // DERIVED. See above
+  issued_at: string;
+  claims: { plan_code: string; size_cents: number; amount_cents?: number; trading_day: string };
+
+  // WITHHELD WHILE DEFERRED, and the column is NOT NULL underneath.
+  code: string | null;
+  verify_url: string | null;
+  image_url: string | null;                   // signed, time-limited, as section 6's singular row
+
+  deferred: { reason: string; until: string | null } | null;
+  revoked: {
+    at: string;
+    class: "fact_untrue" | "account_enforced" | "issued_in_error" | "trader_request";
+  } | null;
+};
+type CertificateListResponse = { data: CertificateListItem[]; next_cursor: string | null };
+```
+Auth: **session**, scoped to the caller's [identity](../GLOSSARY.md#trader-identity). Idempotency: not applicable. Rate limit: authenticated reads, section 11. Errors: `validation_failed` (a malformed cursor).
+
+**The envelope is typed and the item is not typed alone, which is a departure from `GET /purchases` one section up.** Section 1 rules pagination cursor-only with `{ data, next_cursor }` and `GET /purchases` states "cursor list" while typing only its item, and the cost of that was paid on this exact surface: `apps/portal/src/app/(purchases)/ports.ts` declares `readPurchases()` with **no cursor argument** because "the paging token's shape is not settled on this ref" and a parameter invented there would be a guess the screen renders paging controls against. **Typing the envelope costs one line and is what stops the same port being written blind twice.** Nothing about `GET /purchases` is changed by this paragraph.
+
+**`code`, `verify_url` and `image_url` are `null` while the state is `deferred`, and the row underneath always has a code.** `certificates.code` is `text NOT NULL` under `certificates_code_uq`, so the row is addressable from the moment it is written; the response withholds the token, which is section 1's allowlist policy doing what it is for. **The reason is that a deferred certificate is a claim Merit has NOT made yet** ([M11 section 3.1](../plans/M11-certificates-social-proof.md): `deferred --> issued` on the flag closing), and handing the trader a shareable token for an unmade claim is the wider of the two readings. `INV-M11-09`'s visible reason is served by `deferred.reason`, which is the field the trader needs, and `certificates_deferral_is_explained` makes it non-null exactly when `deferred_until` is set.
+
+**`revoked.class` is published and `revoked_reason` is never in this response.** [`certificates`](data-model/certificates.md) calls `revoked_reason` **internal** free text and `certificates_revocation_is_complete` writes the two together, so a response carrying both would publish the internal half by the one route nobody audits. `INV-M11-07` and `AS-M11-05`: the class drives the sentence, and collapsing the class into free text is how an enforcement gets described inconsistently twice.
+
+#### GET /certificates/:code/image.png
+The public card, re-rendered on fetch from the live row ([M11 section 4](../plans/M11-certificates-social-proof.md), **NEW, public**; `INV-M11-08`).
+
+**Auth: none.** Request: the path token only, no query, no body. **Success response: `image/png` bytes, and this is the first row in this contract whose successful response is not `application/json`** (section 1). Errors keep `application/problem+json`: `not_found` (`INV-M11-03`, "no certificate with this code", never "this is fake"), `rate_limited`.
+
+`Cache-Control` is **measured in minutes and never in days** ([M11 section 4](../plans/M11-certificates-social-proof.md)), and the value is config rather than a number stated here. **A revoked certificate renders as revoked**, which is the whole reason this endpoint exists rather than a static asset: `INV-M11-08` and `AS-M11-02` make the re-render the only path by which a revocation reaches an image already in circulation.
+
+**WHAT A CODE LEAKS TO WHOEVER HOLDS IT, STATED BECAUSE A CERTIFICATE NAMES A REAL TRADER'S REAL RESULT.** It leaks the claim and the state, and the claim is bounded by `INV-M11-01`: the account's plan, size, trading day and the kind-specific value, plus the simulated-environment disclosure `INV-M11-04` renders by template. **It carries no identity, no email, no display name, no cumulative total and no lifetime figure**, so a held code names a result and does not name a person. What makes that acceptable is four things and each is a control that already exists rather than an assurance: the claim is minimal by construction, so a code that escapes cannot be composed into an aggregate (`AS-M11-07`, and [M12](../plans/M12-transparency-platform.md) owns aggregates); the token is 128 bits with no sequence (`INV-M11-05`), so possession is evidence that somebody was given it; the surface is rate limited and instrumented below; and **a trader who wants it to stop can have it stopped**, because `trader_request` is a member of `certificates.revocation_class`'s CHECK and a revoked row renders as revoked on the next fetch.
+
+**This endpoint is inside `INV-M11-05`'s rate-limit and non-enumerability clauses and OUTSIDE its constant-time clause.** `INV-M11-05` names the **verify** endpoint and says "no timing difference between known and unknown", and this surface cannot honour that half: a render is orders of magnitude slower than a 404, and `FM-M11-05`'s own remedy caches rendered bytes keyed by `(code, row_version)`, which puts a timing difference between two **valid** codes before an attacker asks about an invalid one. **So the enumeration control here is the entropy, the limit and the anomaly signal, and it is not the clock.** Stated rather than left implied, because an implementer reading `INV-M11-05` as covering every public certificate surface would either build a constant-time renderer that cannot exist or record its absence as a defect.
+
+**Every fetch writes [`certificate_verifications`](data-model/certificate_verifications.md)** (`SD-M11-04`) with `code_hash` and never `code`, `result` in that table's own four-member CHECK, and hashed inputs only. **A public read keyed on `code` is one oracle however it is dressed**, and an image endpoint outside that table would be an unmetered second door onto the book `AS-M11-04` and `FM-M11-04` exist to watch. Rate limit: section 11.
+
 ## 7. KYC and affiliate
 
 ### POST /kyc/session
@@ -1096,6 +1148,7 @@ Unverified signatures return `401` and are logged as security events; they never
 | `POST /checkout` | 10/hour/identity, 20/hour/IP |
 | `POST /accounts/:id/payout` | 10/day/account, 20/day/identity |
 | `POST /accounts/:id/reset` | 10/day/identity |
+| `GET /certificates/:code/image.png` | **Public and NOT the catalog class, and the limits are data rather than prose**, on the `POST /auth/otp` sms row's precedent two tables up. Per IP and **per `code`**, because an enumeration campaign and a single hot card look identical when only the IP is counted. `INV-M11-05`, `AS-M11-04`, `FM-M11-04`. Every fetch writes [`certificate_verifications`](data-model/certificate_verifications.md), so the rate is visible to the anomaly detector and not only to the edge. **The catalog's 600/minute/IP is an enumeration budget on a 128-bit token and is deliberately not inherited here** |
 | Authenticated reads | 120/minute/identity |
 | Public catalog | 600/minute/IP (cached) |
 | Admin | 600/minute/session |
