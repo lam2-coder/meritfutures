@@ -66,7 +66,9 @@ import type {
   EvalProgressView,
   FundedProgressView,
 } from '../../view/accounts.ts';
+import type { EquitySeriesView } from '../../view/marks.ts';
 import { AsOf, Optional, Row, Section, StateWord } from './elements.ts';
+import { EquityChart } from './equity-chart.ts';
 
 /** `have` against `need`, as the compliant fixture writes it: "3 of 5". */
 function tally(have: number, need: number): string {
@@ -240,8 +242,19 @@ function NoProgress(): ReactElement {
   });
 }
 
-/** SC-M4-03's screen. */
-export function AccountDetailScreen(props: { readonly account: AccountDetailView }): ReactElement {
+/**
+ * SC-M4-03's screen, which is ONE screen and not two.
+ *
+ * M04 section 3.1 rows it as "Account detail and equity chart", so the chart is
+ * rendered here rather than beside this component. That is not tidiness: the
+ * chart's `as_of_trading_day` comes from the ACCOUNT response and not from the
+ * marks page it draws (../../view/marks.ts), so a caller free to render one
+ * without the other is a caller free to render them from two different reads.
+ */
+export function AccountDetailScreen(props: {
+  readonly account: AccountDetailView;
+  readonly series: EquitySeriesView;
+}): ReactElement {
   const { account } = props;
 
   return createElement(
@@ -264,6 +277,8 @@ export function AccountDetailScreen(props: { readonly account: AccountDetailView
       : account.progress.kind === 'funded'
         ? createElement(FundedProgress, { progress: account.progress })
         : createElement(NoProgress, null),
+
+    createElement(EquityChart, { series: props.series }),
 
     createElement(Section, {
       title: 'Account',
