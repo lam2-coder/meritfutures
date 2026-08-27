@@ -146,6 +146,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-117](ADR-117.md) | `RI-08` guards every package against an EMPTY admission list, because the two ADR-096 named were five before this session opened  (2026-08-26, status: proposed) |
 | [ADR-118](ADR-118.md) | a section headed by a date or a session number is a RECORD, and ADR-034's count rule does not reach it  (2026-08-26, status: proposed) |
 | [ADR-119](ADR-119.md) | the demo world is a VALUE at `scripts/demo/world.ts`, not a Postgres seed, and naming it reopens `CI-09` on purpose  (2026-08-26, status: proposed) |
+| [ADR-123](ADR-123.md) | the refusal on `accountsAudited === 0` moves into `runReplayAudit`, and an empty book now REFUSES instead of reporting clean  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
