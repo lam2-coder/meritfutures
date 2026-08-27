@@ -465,19 +465,39 @@ export interface EvaluationOutcomeFact {
 }
 
 /**
- * One funded account whose FUNDED LIFE ENDED in the window. `ST-02`.
+ * One funded account in `ST-02`'s denominator.
  *
- * The denominator M12 rules is "funded accounts whose funded life ended in the
- * window (first payout, breach, or closure)", so a fact exists when the life
- * ended and the numerator is the subset that ended by being PAID.
+ * `ST-02`'s ruled denominator has TWO PARTS and both are here: "funded accounts
+ * whose funded life ENDED in the window (first payout, breach, or closure),
+ * PLUS THOSE STILL FUNDED PAST THE PLAN'S MAXIMUM PLAUSIBLE TIME-TO-FIRST-
+ * PAYOUT". The numerator is the subset that ended by being PAID.
+ *
+ * THE SECOND PART IS THE ADAPTER'S TO DECIDE AND THAT IS FORCED RATHER THAN
+ * DELEGATED FOR CONVENIENCE. "The plan's maximum plausible time to first
+ * payout" is a PLAN PARAMETER, read from the account's pinned
+ * `plan_versions.rules`; the machine holds no plan and resolves none, so a
+ * machine deciding it would be re-deriving a plan rule inside a worker, which
+ * is the thing `INV-16` and `M12` section 1.3 both put outside this module.
+ * Omitting the set instead would publish a rate under a denominator its own
+ * method page does not describe, on a surface whose entire product is that the
+ * denominator is checkable.
  */
 export interface FundedLifeFact {
   readonly accountId: string;
   readonly identityId: string;
   readonly planCode: string;
-  /** The day the funded life ended, on `G-5`'s outcome anchor. */
-  readonly endedDay: TradingDay;
-  readonly ending: 'first_payout' | 'breach' | 'closure';
+  /**
+   * The day that places this fact in the window, on `G-5`'s outcome anchor.
+   *
+   * For the three ENDED members it is the day the funded life ended. For
+   * `past_first_cycle` it is the WINDOW END DAY, because that set is evaluated
+   * as of window close rather than on a day of its own: an account past its
+   * first plausible cycle is in every subsequent window's denominator and not
+   * only in the one it crossed in.
+   */
+  readonly windowDay: TradingDay;
+  /** `past_first_cycle` is the denominator's second part, above. */
+  readonly ending: 'first_payout' | 'breach' | 'closure' | 'past_first_cycle';
 }
 
 /**
@@ -655,6 +675,17 @@ export interface PublishedStatisticRow {
 // published at all.
 
 export type StatisticsHaltReason =
+  /**
+   * `effectiveDefinitions` returned NOTHING, and a run over nothing is a halt.
+   *
+   * NOT "there was nothing to publish, so nothing was published". [ADR-119]
+   * measured exactly this failure one file over: a nightly built on an audit
+   * with no world "would report `accountsAudited: 0, diverged: 0`, GREEN, EVERY
+   * NIGHT, OVER NOTHING". A statistics run that publishes zero rows because the
+   * definition read came back empty is indistinguishable from one whose read is
+   * broken, and only one of the two is a reason to sleep.
+   */
+  | 'no_effective_definitions'
   /** A definition names a `stat_code` with no computation in this build. */
   | 'unknown_stat_code'
   /** `statistic_definitions.grain` carries a value this machine cannot read. */
@@ -667,6 +698,13 @@ export type StatisticsHaltReason =
   | 'calendar_coverage_miss'
   /** A ratio would divide by zero. Not a zero, and not a suppression. */
   | 'undefined_ratio'
+  /**
+   * An elapsed time is negative: the credit is stamped before the request.
+   *
+   * A halt rather than a clamp. `ST-05` and `ST-06` publish DURATIONS, and a
+   * negative one is a wrong number on a public surface rather than a small one.
+   */
+  | 'impossible_duration'
   /** `M12` section 3.1: the day is not closed, or the self-audit did not vouch for it. */
   | 'inputs_not_vouched';
 
