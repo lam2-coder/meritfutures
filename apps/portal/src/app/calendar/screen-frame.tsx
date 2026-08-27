@@ -1,43 +1,49 @@
 // =============================================================================
 // apps/portal/src/app/calendar/screen-frame.tsx
 // =============================================================================
-// THE CHROME, RENDERED. `shell/app-shell.ts` built the `ShellView` and nothing
-// in the tree has ever drawn one, so the two obligations that file holds have
-// been types rather than pixels since it was written. This is the drawing.
-//
-//   ADR-068 requirement 4, through M04 section 3.9: the impersonation banner is
-//   SHELL CHROME, "so it is on all of section 3.1's screens AND ON EVERY ERROR,
-//   EMPTY AND LOADING STATE."
-//
-//   INV-M4-09: the simulated-environment disclosure "appears in the footer ...
-//   Constitution section 6, and it is A COMPLIANCE OBLIGATION rather than a
-//   design preference."
+// THE SCREEN'S OWN FRAME, INSIDE CHROME THE ROOT LAYOUT OWNS.
 //
 // -----------------------------------------------------------------------------
-// THE CONTENT IS A CHILD AND THE CHROME IS NOT CONDITIONAL, WHICH IS THE POINT
+// THIS FILE USED TO RENDER THE BAND AND THE FOOTER, AND IT NO LONGER MAY
 // -----------------------------------------------------------------------------
-// `shell/app-shell.ts` says of its own builder: "THERE IS NO BRANCH IN THIS
-// FUNCTION THAT CAN DROP EITHER, and the suite runs all four states." The
-// renderer inherits that obligation and the same shape holds it: the band and
-// the footer are emitted outside every branch on `content`, so no content state
-// has a path that reaches a return without them. A banner absent from the error
-// page is absent exactly when an operator is somewhere unexpected.
+// It was written while `src/app/layout.tsx` did not exist, when nothing in the
+// tree had ever drawn a `ShellView` and ADR-068 requirement 4 and INV-M4-09 were
+// types rather than pixels. Session 250 landed the root layout and it draws
+// both, around every page in this application:
 //
-// AND THE BAND HAS NO DISMISS CONTROL, because `ImpersonationBannerView` has no
-// field for one. `impersonation-banner.ts` calls that the enforcement: "it
-// cannot be closed rather than being hard to close". Nothing here adds one, and
-// there is nothing on the props for one to be built from.
+//   <ImpersonationBand view={shell.impersonation} />
+//   <main>{children}</main>
+//   <footer data-testid="simulated-environment-disclosure">...</footer>
+//
+// App Router renders that file around every route in this app, so a second band
+// and a second disclosure emitted here would not be defence in depth. They would
+// be TWO disclosures on one screen, and the layout's own header gives the reason
+// the first one is sufficient: "there is nowhere for a screen to render that is
+// outside this file."
+//
+// SO THE CHROME IS GONE FROM HERE AND THE OBLIGATIONS ARE NOT WEAKENED, they
+// moved to the file that can actually guarantee them. A frame that kept its own
+// copy would make INV-M4-09 a thing two files do, which is the shape that ends
+// with each believing the other has it.
+//
+// -----------------------------------------------------------------------------
+// WHAT IT STILL OWNS, AND WHY THAT IS NOT THE LAYOUT'S
+// -----------------------------------------------------------------------------
+// The CONTENT STATE and the screen's own title. `shell/app-shell.ts` splits them
+// exactly this way and the layout's header says so in its own words: `content`
+// is "the SCREEN's: a page decides whether it is showing data, an empty set, a
+// spinner or an error", and the layout can only assert `ready` because App
+// Router renders it around `children` and nothing more.
+//
+// `empty` STAYS A STATE AND NOT A ZERO-LENGTH `ready`, per `app-shell.ts`: "a
+// calendar with nothing scheduled and a calendar nobody loaded" must not look
+// alike, which is section 3.8's argument arriving one level up.
 //
 // -----------------------------------------------------------------------------
 // NO ROUTE HANDLER, NO SERVER ACTION, NO OPERATOR PATH
 // -----------------------------------------------------------------------------
-// ADR-083 section 3 and ADR-095 ruling 3: no route handler or server action in
-// this application may serve `/api/v1` or any operator path. The band's exit
-// control is therefore a LINK and never a form: `ImpersonationExit` carries an
-// action NAME, `end_impersonation`, which is a thing the admin surface does, and
-// a `<form action={...}>` here would be a server action taking an operator
-// verb. INV-M4-15's rule is the same one from the other side: the portal
-// renders the boundary and decides nothing.
+// ADR-083 section 3 and ADR-095 ruling 3. Nothing here submits anything, and the
+// segment holds no file with a `route` stem.
 
 import type { ReactNode } from 'react';
 
@@ -54,6 +60,15 @@ const ERROR_SENTENCE: Readonly<Record<string, string>> = {
 };
 
 export type ScreenFrameProps = {
+  /**
+   * The shell, for its `content` field and for nothing else.
+   *
+   * IT IS STILL THE WHOLE `ShellView` AND NOT A BARE `ContentState`, which is a
+   * deliberate refusal to narrow. `toShellView` is the one constructor, and a
+   * screen that took a loose `ContentState` could be handed one nobody built
+   * through it. The band and the disclosure travel on this object and are
+   * rendered by the layout; this file reads `content` and leaves them alone.
+   */
   readonly shell: ShellView;
 
   /** The screen's own heading. Rendered above the content in every state. */
@@ -71,34 +86,10 @@ export type ScreenFrameProps = {
  * and a calendar nobody loaded" must not look alike.
  */
 export function ScreenFrame({ shell, title, children }: ScreenFrameProps) {
-  const { impersonation, content } = shell;
+  const { content } = shell;
   return (
     <div className="merit-screen" data-content-state={content.kind}>
       <style>{SEGMENT_STYLES}</style>
-
-      {impersonation === null ? null : (
-        <aside
-          className="merit-band"
-          data-placement={impersonation.placement}
-          aria-label="Impersonation session"
-        >
-          <p className="merit-band__line">
-            <strong>You are viewing this account as an operator.</strong>
-          </p>
-          <p className="merit-band__line">
-            Operator {impersonation.admin_user_id}, subject {impersonation.subject_identity_id}.
-          </p>
-          <p className="merit-band__line">
-            {impersonation.reason_code}: {impersonation.reason_detail}
-          </p>
-          <p className="merit-band__line">Expires at {impersonation.expires_at}.</p>
-          <p className="merit-band__exit">
-            <a href="/admin/impersonation" data-action={impersonation.exit.action}>
-              End impersonation
-            </a>
-          </p>
-        </aside>
-      )}
 
       <h1>{title}</h1>
 
@@ -110,8 +101,6 @@ export function ScreenFrame({ shell, title, children }: ScreenFrameProps) {
           {ERROR_SENTENCE[content.error] ?? ERROR_SENTENCE['unexpected']}
         </p>
       ) : null}
-
-      <footer className="merit-footer">{shell.simulated_environment_disclosure}</footer>
     </div>
   );
 }

@@ -33,6 +33,9 @@ import {
 } from '../src/app/calendar/load.ts';
 import { RulesScreen } from '../src/app/calendar/rules-screen.tsx';
 import { TimelineScreen } from '../src/app/calendar/timeline-screen.tsx';
+import EconomicCalendarPage from '../src/app/calendar/page.tsx';
+import AccountTimelinePage from '../src/app/calendar/[accountId]/timeline/page.tsx';
+import AccountRulesPage from '../src/app/calendar/[accountId]/rules/page.tsx';
 import {
   COVERED_CALENDAR,
   DISPUTED_TRADING_DAY,
@@ -247,12 +250,17 @@ describe('the rules screen', () => {
   });
 });
 
-describe('the chrome every screen renders inside', () => {
-  it('carries the simulated-environment disclosure on all three screens (INV-M4-09)', () => {
-    const disclosure = TRADER_SHELL.simulated_environment_disclosure;
-    expect(calendarHtml()).toContain(disclosure);
-    expect(timelineHtml('2026-03-13', '2026-03-13')).toContain(disclosure);
-    expect(
+describe('the frame, inside the chrome the root layout owns', () => {
+  // `src/app/layout.tsx` renders the impersonation band and the
+  // simulated-environment disclosure around every route in this app, so these
+  // are ABSENCE assertions and that is the point: a second disclosure on one
+  // screen is not defence in depth, it is two disclosures. ADR-068 requirement 4
+  // and INV-M4-09 are the layout's to keep, and the layout's own header says why
+  // it can: "there is nowhere for a screen to render that is outside this file."
+  it('does not duplicate the band or the disclosure the layout already renders', () => {
+    for (const html of [
+      calendarHtml(),
+      timelineHtml('2026-03-13', '2026-03-13'),
       render(
         createElement(RulesScreen, {
           shell: TRADER_SHELL,
@@ -261,22 +269,18 @@ describe('the chrome every screen renders inside', () => {
           freshness: { kind: 'unstated' },
         }),
       ),
-    ).toContain(disclosure);
+    ]) {
+      expect(html).not.toContain(TRADER_SHELL.simulated_environment_disclosure);
+      expect(html).not.toContain('data-placement="shell-band"');
+      expect(html).not.toContain('<footer');
+    }
   });
 
-  it('carries the band and the disclosure on an error state, where content is not rendered', () => {
+  it('renders the error state in the portal vocabulary, and not the content behind it', () => {
     const html = render(
       createElement(EconomicCalendarScreen, {
         shell: {
-          impersonation: {
-            placement: 'shell-band',
-            admin_user_id: 'admin_44',
-            subject_identity_id: 'idn_0191c2',
-            reason_code: 'support_ticket',
-            reason_detail: 'ticket 8812, trader cannot describe their dashboard',
-            expires_at: '2026-03-13T18:00:00.000Z',
-            exit: { action: 'end_impersonation' },
-          },
+          impersonation: null,
           simulated_environment_disclosure: TRADER_SHELL.simulated_environment_disclosure,
           content: { kind: 'error', error: 'not_found' },
         },
@@ -284,38 +288,57 @@ describe('the chrome every screen renders inside', () => {
       }),
     );
 
-    expect(html).toContain('data-placement="shell-band"');
+    expect(html).toContain('data-content-state="error"');
     expect(html).toContain('data-error-kind="not_found"');
-    expect(html).toContain(TRADER_SHELL.simulated_environment_disclosure);
 
     // INV-M4-07: the wording is "not found" and the vocabulary has no `forbidden`.
     expect(html.toLowerCase()).not.toContain('forbidden');
 
-    // The content is not rendered behind the error.
+    // The content is not rendered behind the error, though the panel was built.
     expect(html).not.toContain('data-group-trading-day');
   });
 
-  it('has no dismiss control on the band, because the view model has no field for one', () => {
+  it('renders `empty` as its own state rather than as a zero-length ready', () => {
     const html = render(
       createElement(EconomicCalendarScreen, {
         shell: {
-          impersonation: {
-            placement: 'shell-band',
-            admin_user_id: 'admin_44',
-            subject_identity_id: 'idn_0191c2',
-            reason_code: 'support_ticket',
-            reason_detail: 'ticket 8812',
-            expires_at: '2026-03-13T18:00:00.000Z',
-            exit: { action: 'end_impersonation' },
-          },
+          impersonation: null,
           simulated_environment_disclosure: TRADER_SHELL.simulated_environment_disclosure,
-          content: { kind: 'ready' },
+          content: { kind: 'empty' },
         },
         panel: toEconomicCalendarPanel(COVERED_CALENDAR, VIEWER_TIMEZONE),
       }),
     );
-    expect(html).not.toContain('dismiss');
-    expect(html).not.toContain('<button');
+    expect(html).toContain('data-content-state="empty"');
+    expect(html).not.toContain('data-group-trading-day');
+  });
+});
+
+describe('the three routes', () => {
+  // THEY RENDER AN HONEST ERROR AND NOT A FIXTURE. There is no transport in this
+  // application and `surface.test.ts` still asserts there is none, so a route
+  // that rendered a release time or a contract clause would be showing a trader
+  // something Merit never sent it. `app/page.tsx` refuses the same thing in the
+  // same words one directory up.
+  it('each render the unauthenticated state, computed rather than typed', () => {
+    for (const [name, Page] of [
+      ['calendar', EconomicCalendarPage],
+      ['timeline', AccountTimelinePage],
+      ['rules', AccountRulesPage],
+    ] as const) {
+      const html = render(createElement(Page, {}));
+      expect(html, name).toContain('data-content-state="error"');
+      expect(html, name).toContain('data-error-kind="unauthenticated"');
+      expect(html.toLowerCase(), name).not.toContain('forbidden');
+    }
+  });
+
+  it('emit no chrome of their own, because the layout wraps them', () => {
+    for (const Page of [EconomicCalendarPage, AccountTimelinePage, AccountRulesPage]) {
+      const html = render(createElement(Page, {}));
+      expect(html).not.toContain('<footer');
+      expect(html).not.toContain('data-placement="shell-band"');
+    }
   });
 });
 
