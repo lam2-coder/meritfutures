@@ -54,7 +54,11 @@ export const BUILT_AT_VAR = 'MERIT_SITE_BUILT_AT';
  * name the same row. A second spelling in this file would be the drift that
  * test exists to catch, discovered a year later on a page instead.
  */
-export const DISCLOSURE_ADDRESS = { kind: 'legal', slug: 'simulated-environment', locale: 'en' } as const;
+export const DISCLOSURE_ADDRESS = {
+  kind: 'legal',
+  slug: 'simulated-environment',
+  locale: 'en',
+} as const;
 
 /**
  * The environment a build reads its two variables out of.
@@ -118,7 +122,7 @@ export function siteBuild(env: SiteEnv = process.env): SiteBuild {
       kind: 'unconfigured',
       reason:
         `${API_BASE_URL_VAR} is not set, so this build read no API. The public surface is ` +
-        'rendered from `plan_versions` and from M12\'s published statistics, and this build ' +
+        "rendered from `plan_versions` and from M12's published statistics, and this build " +
         'was handed no address to read either from.',
     };
   }
@@ -156,7 +160,9 @@ export function siteBuild(env: SiteEnv = process.env): SiteBuild {
  * (TOS_CLAUSES section 2's inventory, quoted in `render/disclosure.ts`). The
  * full form is checkout's, which is M3's origin and not this one.
  */
-export async function siteDisclosure(build: SiteBuild): Promise<SimulatedEnvironmentDisclosure | null> {
+export async function siteDisclosure(
+  build: SiteBuild,
+): Promise<SimulatedEnvironmentDisclosure | null> {
   if (build.kind !== 'wired') return null;
 
   const { kind, slug, locale } = DISCLOSURE_ADDRESS;
