@@ -20,12 +20,34 @@
 // SO THE CHECK IS INSIDE `postTransaction` AND NOT BESIDE IT. A separate
 // `assertNotHalted` a caller is asked to remember is exactly the shape ADR-008
 // rejects for scoping and ADR-102 rejects for the write path: a control that is
-// a convention at each call site. The cost is one extra read per posting, and
-// it is stated in `chart.ts`'s terms because it is the same cost -- the
-// accessor carries no predicate, so this reads every halt row and filters in
-// memory. Live halts are bounded by the partial unique index at one per
-// identity and are near zero in a healthy estate; released ones are not bounded
-// at all and accumulate forever, which is the direction this read gets slower.
+// a convention at each call site. The cost is one extra read per posting: this
+// reads every halt row and filters in memory. Live halts are bounded by the
+// partial unique index at one per identity and are near zero in a healthy
+// estate; released ones are not bounded at all and accumulate forever, which is
+// the direction this read gets slower.
+//
+// -----------------------------------------------------------------------------
+// THE ACCESSOR NOW CARRIES THE PREDICATE THIS COST WAS THE PRICE OF, AND THIS
+// FILE STILL PAYS IT (ADR-157)
+// -----------------------------------------------------------------------------
+// The paragraph above used to say the cost was there because "the accessor
+// carries no predicate", and ADR-157 admitted a NULL TERM to `scoped-db.ts` for
+// this reader by name: `rowsWhere('ledgerHalts', { releasedAt: isNull() })`
+// renders `released_at IS NULL` and returns only the rows this function keeps.
+//
+// WHAT STANDS BETWEEN THAT AND THIS LINE IS `LedgerTx`, WHICH IS NOT THE
+// ACCESSOR. `tx.ts` restates the subset of ADR-102's `SystemTx` this package
+// writes through, deliberately, because a dependency edge on `@merit/db` would
+// give this library the ability to open its own transaction and lose ADR-006's
+// central consequence. `LedgerTx` declares `rows` and `insert` and does not
+// declare `rowsWhere`, so widening it is a diff on `tx.ts` and on every fake in
+// this package's suite.
+//
+// THAT IS OUTSIDE ADR-157's FENCE AND IS REPORTED RATHER THAN REACHED FOR. The
+// cost above is REAL and is unchanged; what is no longer true is the REASON
+// this file gave for it. The session that widens `LedgerTx` deletes this
+// section while unblocking itself, and `packages/ledger/test/accessor-bind.test.ts`
+// is the file that will notice if `rowsWhere` ever stops being there to widen to.
 //
 // -----------------------------------------------------------------------------
 // THE ONE POSTING A HALT MUST NOT BLOCK

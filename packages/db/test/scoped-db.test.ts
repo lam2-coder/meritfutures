@@ -20,18 +20,32 @@ import { fileURLToPath } from 'node:url';
 
 import { getTableColumns, getTableName } from 'drizzle-orm';
 import { PgDialect, type PgColumn, type PgTable } from 'drizzle-orm/pg-core';
+import { drizzle as proxyDrizzle } from 'drizzle-orm/pg-proxy';
+import type { PoolClient } from 'pg';
 import { describe, expect, test } from 'vitest';
 
 import {
   SCOPE_RULES,
   TABLES,
   TABLE_KEYS,
+  atLeast,
+  atMost,
+  firmDb,
+  isFilterTerm,
+  isNull,
   scopePredicate,
   scopedDb,
   systemDb,
   type IdentityId,
+  type ScopedTableKey,
   type TableKey,
 } from '../src/index.ts';
+// `scopedTx`, `systemTx`, `firmTx`, `uniqueKeys` and `StatementSource` are the
+// builders rather than the package's public surface, so they come from the
+// module the way `keyed-accessor.test.ts` takes them: ADR-112 left
+// `packages/db/src/index.ts` deciding what a CALLER may name, and a suite
+// asserting what the accessor BUILDS is not a caller.
+import { firmTx, scopedTx, systemTx, uniqueKeys, type StatementSource } from '../src/scoped-db.ts';
 
 const MIGRATIONS = fileURLToPath(new URL('../migrations/', import.meta.url));
 const IDENTITY = 'i-1' as IdentityId;
@@ -1745,5 +1759,413 @@ describe('the transcription states the DDL type and nullability, not only the co
     for (const spelling of TYPE_VOCABULARY) {
       expect([...produced], `no registered column reads as ${spelling}`).toContain(spelling);
     }
+  });
+});
+
+// =============================================================================
+// ADR-157: THE RANGE TERM, THE NULL TERM AND THE ROW LOCK
+// =============================================================================
+// ADR-112 refused a range and an `IS NULL` and named its own way out: "every one
+// of them is a diff on this file with an argument attached when a caller needs
+// it". P5 is that argument. `P5-j` sweeps three expiry clocks, `readLiveHalts`
+// reads every released halt on every posting, and `GS-230` is a claim about two
+// concurrent transactions that nothing in this tree could make one of lose.
+//
+// NOTHING HERE EXECUTES AGAINST A DATABASE and the suite says so, exactly as
+// ADR-102's and ADR-112's do: `ci.yml`'s `integration` job runs on bare
+// `ubuntu-latest` with no services block. Every statement assertion reads the
+// SQL the accessor BUILDS, over a driverless Drizzle handle that records what it
+// is asked to run. ADR-157 section 9 is the round trip EXECUTED against
+// PostgreSQL 16, once, by hand, and it is evidence rather than a control.
+//
+// THE DIRECTION THIS BLOCK FAILS IN IS A FOLD THAT COVERS NOTHING, which is
+// ADR-112 section 8's own warning about `handlePinnedColumns`: a guard with
+// nothing to find looks exactly like a guard finding nothing wrong. So every
+// fold below counts what it covered and asserts the count is non-zero, and the
+// BOLA assertion is PAIRED with the case that legitimately succeeds, because a
+// lock that refused everything would pass every refusal test in this file.
+
+/** A driverless source that records the SQL and the parameters it is handed. */
+function recordingSource(): {
+  source: StatementSource;
+  sent: { sql: string; params: unknown[] }[];
+} {
+  const sent: { sql: string; params: unknown[] }[] = [];
+  const source = proxyDrizzle(async (sql: string, params: unknown[]) => {
+    sent.push({ sql, params });
+    return { rows: [] };
+  }) as unknown as StatementSource;
+  return { source, sent };
+}
+
+const stubConnection = (): PoolClient =>
+  ({ query: async () => ({ rows: [] as unknown[] }) }) as unknown as PoolClient;
+
+/** The one statement a call sent, or a failure naming how many it sent instead. */
+async function statementOf(
+  run: (source: StatementSource, conn: PoolClient) => Promise<unknown>,
+): Promise<{ sql: string; params: unknown[] }> {
+  const { source, sent } = recordingSource();
+  await run(source, stubConnection());
+  expect(sent, 'exactly one statement per call').toHaveLength(1);
+  return sent[0] as { sql: string; params: unknown[] };
+}
+
+const OTHER_IDENTITY = 'i-2' as IdentityId;
+
+/** The columns a SCOPED handle pins: the caller may not name them and they count. */
+function pinnedColumnsFor(key: TableKey): readonly string[] {
+  const rule = SCOPE_RULES[key];
+  return rule.class === 'root' || rule.class === 'owned' ? [rule.column] : [];
+}
+
+function propertyNamed(key: TableKey, sqlName: string): string | undefined {
+  const columns = getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
+  return Object.entries(columns).find(([, column]) => column.name === sqlName)?.[0];
+}
+
+function sampleFor(column: PgColumn): unknown {
+  switch (column.dataType) {
+    case 'date':
+      return new Date(0);
+    case 'number':
+      return 1;
+    case 'bigint':
+      return 1n;
+    case 'boolean':
+      return true;
+    case 'json':
+      return {};
+    case 'buffer':
+      return Buffer.from('addr', 'utf8');
+    default:
+      return 'addr';
+  }
+}
+
+/**
+ * An address a SCOPED caller could write on this table, or `undefined`.
+ *
+ * A SECOND READING OF ADR-112's RULE AND NOT A CALL INTO IT: it walks the
+ * unique keys `schema.ts` declares, drops the columns the handle pins, and
+ * returns what is left. A coverage fold built on the accessor's own answer would
+ * be the accessor agreeing with itself.
+ */
+function callerAddressFor(key: TableKey): Record<string, unknown> | undefined {
+  const pinned = pinnedColumnsFor(key);
+  const columns = getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
+  for (const candidate of uniqueKeys(key)) {
+    const address: Record<string, unknown> = {};
+    let resolved = true;
+    for (const sqlName of candidate) {
+      if (pinned.includes(sqlName)) continue;
+      const property = propertyNamed(key, sqlName);
+      if (property === undefined) {
+        resolved = false;
+        break;
+      }
+      address[property] = sampleFor(columns[property] as PgColumn);
+    }
+    if (resolved && Object.keys(address).length > 0) return address;
+  }
+  return undefined;
+}
+
+/** The first nullable column a caller may name on this table, for the null term. */
+function nullableColumnOf(key: TableKey): string | undefined {
+  const pinned = pinnedColumnsFor(key);
+  const columns = getTableColumns(TABLES[key] as PgTable) as unknown as Record<string, PgColumn>;
+  for (const [property, column] of Object.entries(columns)) {
+    if (pinned.includes(column.name)) continue;
+    if (!column.notNull) return property;
+  }
+  return undefined;
+}
+
+const SCOPED = TABLE_KEYS.filter(
+  (key): key is ScopedTableKey =>
+    SCOPE_RULES[key].class !== 'firm' && SCOPE_RULES[key].class !== 'pair',
+);
+
+describe('a term narrows a read and is refused everywhere that writes', () => {
+  test('the vocabulary is CLOSED at three shapes, read from the source rather than restated', () => {
+    // ADR-102's instrument, pointed at this file's own new vocabulary. Widening
+    // `FilterTerm` is a diff that turns this red, which is what makes "one line
+    // with an argument attached" a control rather than a hope.
+    const source = readFileSync(
+      fileURLToPath(new URL('../src/scoped-db.ts', import.meta.url)),
+      'utf8',
+    );
+    const declared = /export type FilterTerm =([\s\S]*?);\n/.exec(source)?.[1] ?? '';
+    const shapes = [...declared.matchAll(/term: '([a-z-]+)'/g)].map((m) => m[1] as string);
+    expect(shapes.sort()).toEqual(['at-least', 'at-most', 'is-null']);
+  });
+
+  test('a term is recognised by IDENTITY, so an object that merely looks like one is a VALUE', () => {
+    // THE ASSERTION THAT KEEPS `TERMS` LOAD BEARING. A `jsonb` column can hold
+    // `{ term: 'at-most', value: 1 }`, and a shape check would read it as a
+    // range and silently return a different set of rows.
+    expect(isFilterTerm(atMost(1))).toBe(true);
+    expect(isFilterTerm(atLeast(1))).toBe(true);
+    expect(isFilterTerm(isNull())).toBe(true);
+    expect(isFilterTerm({ term: 'at-most', value: 1 })).toBe(false);
+    expect(isFilterTerm({ term: 'is-null' })).toBe(false);
+    expect(isFilterTerm(JSON.parse(JSON.stringify(atMost(1))))).toBe(false);
+    expect(isFilterTerm(null)).toBe(false);
+    expect(isFilterTerm('at-most')).toBe(false);
+  });
+
+  test('a null bound is refused by the constructor rather than rendered as a no-op', () => {
+    expect(() => atMost(null as never)).toThrow(/is not a bound/);
+    expect(() => atLeast(undefined as never)).toThrow(/is not a bound/);
+  });
+
+  test('a term is frozen, so a caller cannot mutate one after the accessor has read it', () => {
+    const term = atMost(1) as { value?: unknown };
+    expect(Object.isFrozen(term)).toBe(true);
+  });
+
+  test('the three terms render <=, >= and IS NULL, and bind the caller`s bound', async () => {
+    const range = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).rowsWhere('ledgerHalts', {
+        escalateAt: atMost(new Date(0)),
+      }),
+    );
+    expect(range.sql).toMatch(/"escalate_at"\s*<=\s*\$2/);
+    // THE BOUND GOES THROUGH THE COLUMN'S OWN MAPPER, which is what `eq` has
+    // always done and is why a term is built with `lte` rather than with an
+    // `sql` template: a `Date` handed to a `timestamptz` arrives as the string
+    // Postgres parses, and a bound assembled by hand would not.
+    expect(range.params).toEqual(['i-1', new Date(0).toISOString()]);
+
+    const above = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).rowsWhere('ledgerHalts', {
+        escalateAt: atLeast(new Date(0)),
+      }),
+    );
+    expect(above.sql).toMatch(/"escalate_at"\s*>=\s*\$2/);
+
+    const absent = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).rowsWhere('ledgerHalts', { releasedAt: isNull() }),
+    );
+    expect(absent.sql).toMatch(/"released_at"\s+is\s+null/i);
+    // A NULL TERM BINDS NOTHING, which is the whole reason it is a term and not
+    // an equality: `col = NULL` would bind a parameter and match no row.
+    expect(absent.params).toEqual(['i-1']);
+  });
+
+  test('EVERY scoped table ANDs the tenancy narrowing with a term, and binds the HANDLE`s identity first', async () => {
+    let covered = 0;
+    for (const key of SCOPED) {
+      const property = nullableColumnOf(key);
+      if (property === undefined) continue;
+      covered += 1;
+      const { sql: text, params } = await statementOf((source, conn) =>
+        scopedTx(source, conn, IDENTITY).rowsWhere(key, { [property]: isNull() }),
+      );
+      const rule = SCOPE_RULES[key];
+      if (rule.class === 'root' || rule.class === 'owned') {
+        expect(text, key).toContain(`"${rule.column}" = $1`);
+      } else {
+        expect(text, key).toMatch(/exists/i);
+      }
+      expect(text, key).toMatch(/is\s+null/i);
+      // THE TENANCY VALUE IS THE HANDLE'S AND IT IS FIRST. A term is appended to
+      // a predicate that already names this identity, never substituted for one.
+      expect(params[0], key).toBe('i-1');
+    }
+    // THE FOLD COVERED SOMETHING. A `nullableColumnOf` that stopped resolving
+    // would leave every assertion above unrun and this block green.
+    expect(covered).toBeGreaterThan(20);
+  });
+
+  test('a term in an ADDRESS is refused at every authority, on the read and on both writes', async () => {
+    const { source } = recordingSource();
+    const conn = stubConnection();
+    const scoped = scopedTx(source, conn, IDENTITY);
+    const system = systemTx(source, conn, 'nightly-batch');
+    const firm = firmTx(source, conn);
+
+    await expect(scoped.rowAt('ledgerHalts', { id: atMost('h') } as never)).rejects.toThrow(
+      /term in an ADDRESS/,
+    );
+    await expect(scoped.lockAt('ledgerHalts', { id: isNull() } as never)).rejects.toThrow(
+      /term in an ADDRESS/,
+    );
+    await expect(
+      scoped.updateAt('ledgerHalts', { id: atLeast('h') } as never, { reasonNote: 'x' }),
+    ).rejects.toThrow(/term in an ADDRESS/);
+    await expect(scoped.deleteAt('ledgerHalts', { id: atMost('h') } as never)).rejects.toThrow(
+      /term in an ADDRESS/,
+    );
+    await expect(system.rowAt('ledgerHalts', { id: atMost('h') } as never)).rejects.toThrow(
+      /term in an ADDRESS/,
+    );
+    await expect(system.updateAt('ledgerHalts', { id: atMost('h') } as never, {})).rejects.toThrow(
+      /term in an ADDRESS/,
+    );
+    await expect(firm.rowAt('coupons', { id: atMost('c') } as never)).rejects.toThrow(
+      /term in an ADDRESS/,
+    );
+  });
+
+  test('a term in a VALUES object is refused, which is the hazard this entry CREATES', async () => {
+    // Before ADR-157 no caller held an object a filter treated specially. Now
+    // one does, and `{ releasedAt: isNull() }` in a SET is somebody meaning
+    // "clear this column" and writing a row of JSON into a timestamptz.
+    const { source } = recordingSource();
+    const conn = stubConnection();
+    await expect(
+      scopedTx(source, conn, IDENTITY).updateAt(
+        'ledgerHalts',
+        { id: 'h' },
+        { releasedAt: isNull() },
+      ),
+    ).rejects.toThrow(/term in a write/);
+    await expect(
+      scopedTx(source, conn, IDENTITY).insert('ledgerHalts', { reasonNote: atMost('x') }),
+    ).rejects.toThrow(/term in a write/);
+    await expect(
+      systemTx(source, conn, 'nightly-batch').insert('ledgerHalts', { reasonNote: isNull() }),
+    ).rejects.toThrow(/term in a write/);
+  });
+});
+
+describe('a row lock reaches exactly what the matching read reaches, and no further', () => {
+  test('THE BOLA PAIR: a scoped lock carries the HANDLE`s identity and the CALLER`s address', async () => {
+    // THE ONE THAT MATTERS, and it is a PAIR because a lock that refused
+    // everything would pass the refusal half on its own.
+    //
+    // The refusal is not visible in the SQL, because the SQL is the same
+    // statement either way: what changes is the parameter the accessor binds
+    // into the tenancy conjunct, and it is ALWAYS the handle's. So a caller
+    // scoped to `i-1` naming a row of `i-2`'s sends `identity_id = 'i-1' AND id
+    // = <i-2's row>`, which matches nothing and therefore locks nothing.
+    // ADR-157 section 9 row 8 is that statement executed against PostgreSQL 16,
+    // where it returned zero rows rather than an error or the other row.
+    const mine = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).lockAt('ledgerHalts', { id: 'halt-of-i-1' }),
+    );
+    const theirs = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).lockAt('ledgerHalts', { id: 'halt-of-i-2' }),
+    );
+
+    expect(mine.sql).toBe(theirs.sql);
+    expect(mine.params).toEqual(['i-1', 'halt-of-i-1']);
+    expect(theirs.params).toEqual(['i-1', 'halt-of-i-2']);
+    expect(theirs.params).not.toContain(OTHER_IDENTITY);
+    expect(mine.sql).toContain('"identity_id" = $1');
+    expect(mine.sql).toContain('"id" = $2');
+    expect(mine.sql).toMatch(/for update\s*$/i);
+  });
+
+  test('a lock composes the SAME predicate the matching read composes, on EVERY scoped table', async () => {
+    let covered = 0;
+    for (const key of SCOPED) {
+      const address = callerAddressFor(key);
+      if (address === undefined) continue;
+      covered += 1;
+      const read = await statementOf((source, conn) =>
+        scopedTx(source, conn, IDENTITY).rowAt(key, address),
+      );
+      const lock = await statementOf((source, conn) =>
+        scopedTx(source, conn, IDENTITY).lockAt(key, address),
+      );
+      // The lock is the read plus `for update` and nothing else. A lock whose
+      // predicate drifted from the read's would be a lock on a row somebody
+      // else's read returns, which is the failure with no visible symptom.
+      expect(lock.sql, key).toBe(`${read.sql} for update`);
+      expect(lock.params, key).toEqual(read.params);
+      expect(lock.params[0], key).toBe('i-1');
+    }
+    expect(covered).toBeGreaterThan(20);
+  });
+
+  test('lockScope takes NO argument and names the registry`s only root table', async () => {
+    const locked = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).lockScope(),
+    );
+    expect(locked.sql).toContain('from "identities"');
+    expect(locked.sql).toContain('"identities"."id" = $1');
+    expect(locked.sql).toMatch(/for update\s*$/i);
+    // ONE PARAMETER, AND IT IS THE HANDLE'S. There is no caller half at all, so
+    // there is no address to point at another identity.
+    expect(locked.params).toEqual(['i-1']);
+    expect(scopedTx({} as StatementSource, stubConnection(), IDENTITY).lockScope).toHaveLength(0);
+    expect(SCOPE_RULES.identities.class).toBe('root');
+  });
+
+  test('the unscoped lock carries the address ALONE, which is what that door is for', async () => {
+    const locked = await statementOf((source, conn) =>
+      systemTx(source, conn, 'nightly-batch').lockAt('ledgerHalts', { id: 'halt-of-i-2' }),
+    );
+    expect(locked.params).toEqual(['halt-of-i-2']);
+    expect(locked.sql).not.toContain('"identity_id" = $');
+    expect(locked.sql).toMatch(/for update\s*$/i);
+  });
+
+  test('a lock still has to NAME A ROW, so the unaddressed lock is refused at both authorities', async () => {
+    const { source } = recordingSource();
+    const conn = stubConnection();
+    await expect(
+      scopedTx(source, conn, IDENTITY).lockAt('ledgerHalts', { reasonCode: 'manual' }),
+    ).rejects.toThrow(/must name a row/);
+    await expect(
+      systemTx(source, conn, 'nightly-batch').lockAt('ledgerHalts', { reasonCode: 'manual' }),
+    ).rejects.toThrow(/must name a row/);
+  });
+
+  test('there is no lock on a read handle and none on the firm door', () => {
+    // A row lock is released at COMMIT, so a lock taken outside a transaction is
+    // released before the next statement runs. `FirmTx` is excluded for a
+    // different reason: a firm row belongs to nobody and no invariant in the
+    // corpus names a lock on one.
+    const source = {} as StatementSource;
+    const conn = stubConnection();
+    for (const handle of [scopedDb(IDENTITY), systemDb('nightly-batch'), firmDb()]) {
+      for (const verb of ['lockAt', 'lockScope']) {
+        expect(handle, `${handle.__brand} carries ${verb}`).not.toHaveProperty(verb);
+      }
+    }
+    expect(firmTx(source, conn)).not.toHaveProperty('lockAt');
+    expect(systemTx(source, conn, 'nightly-batch')).not.toHaveProperty('lockScope');
+  });
+});
+
+describe('what ADR-157 REFUSED to widen, watched rather than only written down', () => {
+  const accessorSource = (): string =>
+    readFileSync(fileURLToPath(new URL('../src/scoped-db.ts', import.meta.url)), 'utf8');
+
+  test('`SqlExecutorReason` is still exactly one member, so the raw-SQL door did not move', () => {
+    // P5 section 11 rule 10 and P7 section 11 rule 10 both foreclose adding a
+    // member here, and both say the reach-around is one line. This is that rule
+    // made mechanical rather than remembered.
+    const declared = /export type SqlExecutorReason =([^;]+);/.exec(accessorSource())?.[1] ?? '';
+    const members = [...declared.matchAll(/'([a-z-]+)'/g)].map((m) => m[1] as string);
+    expect(members).toEqual(['job-enqueue']);
+  });
+
+  test('`SystemReason` is still exactly two members, so a request handler is still neither', () => {
+    const declared = /export type SystemReason =([^;]+);/.exec(accessorSource())?.[1] ?? '';
+    const members = [...declared.matchAll(/'([a-z-]+)'/g)].map((m) => m[1] as string);
+    expect(members.sort()).toEqual(['nightly-batch', 'operator-console']);
+  });
+
+  test('THE AGGREGATE P7 ASKED FOR IS NOT HERE, and no handle carries a join either', () => {
+    // P7 section 10 item 1 asked this slice for an aggregate and said every
+    // wave-2 slice is blocked without it. ADR-157 section 5 REFUSES it, on the
+    // evidence that P7's own section 3.1 names a JOIN as the blocker and that a
+    // scalar aggregate would not have served one detector. This assertion is
+    // that refusal, so a later session that adds one does so by editing a test
+    // that says why it is not there.
+    const source = accessorSource();
+    const conn = stubConnection();
+    for (const verb of ['countWhere', 'sumWhere', 'aggregate', 'joinOn']) {
+      expect(scopedTx({} as StatementSource, conn, IDENTITY), verb).not.toHaveProperty(verb);
+      expect(systemTx({} as StatementSource, conn, 'nightly-batch'), verb).not.toHaveProperty(verb);
+    }
+    // And no SQL aggregate is rendered anywhere in the accessor.
+    expect(source).not.toMatch(/\bcount\(\*\)/i);
+    expect(source).not.toMatch(/\bsql`\s*sum\(/i);
   });
 });
