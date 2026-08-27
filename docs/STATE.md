@@ -11624,4 +11624,4 @@ This section first said the choice was *"250 first, or 250's commit carries `CI-
 
 **MONEY PATH BY CONTENT and NO `E2` READ IS OWED, because nothing was written that a founder must read line by line.** Approval line UNSIGNED.
 
-**Measured on this branch with `pnpm install` run first: 33 of 33 gates, 11 of 11 invariants, `typecheck` exit 0, `lint` exit 0, 170 test files / 3,115 passed / 6 skipped -- the dispatch's `main` baseline, reproduced before anything was changed and unmoved by any of it. `falsify.mjs` is run last and alone and its result is in the pull-request body.**
+**Measured on this branch with `pnpm install` run first, every command run separately: 33 of 33 gates, 11 of 11 invariants, `typecheck` exit 0, `lint` exit 0, 170 test files / 3,115 passed / 6 skipped, and `falsify.mjs` exit 0 at 33 gates clean-and-dirty, 80 scope cases and 10 loader cases. That IS the dispatch's `main` baseline, reproduced before anything was changed and unmoved by any of it, which is the expected result for a session that writes no code.**
