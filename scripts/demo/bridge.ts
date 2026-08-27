@@ -27,9 +27,9 @@ import type {
   CalendarSlice,
   DailyMark,
   TradingDay,
-} from '../../packages/rules-engine/src/index.js';
-import { buildCalendarSlice } from '../../packages/rules-engine/src/index.js';
-import type { SimDay, SimSession } from '../../packages/rithmic/src/index.js';
+} from '../../packages/rules-engine/src/index.ts';
+import { buildCalendarSlice } from '../../packages/rules-engine/src/index.ts';
+import type { SimDay, SimSession } from '../../packages/rithmic/src/index.ts';
 
 /**
  * The engine's `TradingDay` is branded and the simulator's is a bare string.
