@@ -23,11 +23,17 @@
 // by a library running DDL on the money database at boot.
 //
 // NOTHING HERE IMPORTS IT YET, and the reason is a manifest rather than a
-// design. `apps/worker/package.json` declares `@merit/rules-engine` and nothing
-// else; adding `@merit/queue` to it is outside session 147's fence, and under
-// `node-linker=isolated` an undeclared import does not resolve at all. So the
-// wiring is one manifest line and one call, in the session that brings the first
-// job with it.
+// design. `apps/worker/package.json` declares `@merit/rules-engine` AND
+// `@merit/db` (ADR-165, session 292) and nothing else; adding `@merit/queue` to
+// it is outside session 147's fence, and under `node-linker=isolated` an
+// undeclared import does not resolve at all. So the wiring is one manifest line
+// and one call, in the session that brings the first job with it.
+//
+// THIS SENTENCE READ "AND NOTHING ELSE" UNTIL 2026-08-27 AND ADR-165 MADE IT
+// FALSE. That entry's section 10 finding 2 named both occurrences in this file,
+// reported them rather than reaching into a file it was fenced out of, and said
+// "whoever holds it next repairs the sentence in the same commit". This is that
+// commit.
 //
 // THE FIRST JOB IS THE NIGHTLY BATCH, and it is here as a function rather than
 // as a scheduled worker. `runNightlyBatch` takes its ports as an argument and
@@ -52,12 +58,13 @@
 // `enqueueProvisioningOp` calls it.
 //
 // **THE MANIFEST LINE THIS HEADER HAS ASKED FOR SINCE SESSION 147 IS STILL
-// OWED, AND IT IS OWED BY A DIFFERENT SESSION THAN THIS ONE.** The paragraph
-// above still stands: `apps/worker/package.json` declares `@merit/rules-engine`
-// and nothing else, `node-linker=isolated` makes an undeclared import
-// unresolvable, and P3 wave 3's `P3-l` fence holds `src/provisioning/**`,
+// OWED FOR `@merit/queue`, AND IT IS OWED BY A DIFFERENT SESSION THAN THIS
+// ONE.** The paragraph above still stands FOR THE QUEUE: `@merit/queue` is not
+// in `apps/worker/package.json`, `node-linker=isolated` makes an undeclared
+// import unresolvable, and P3 wave 3's `P3-l` fence holds `src/provisioning/**`,
 // this file and `test/provisioning.test.ts` and holds neither the manifest nor
-// `pnpm-lock.yaml`. So the saga is written against PORTS, exactly as
+// `pnpm-lock.yaml`. **IT NO LONGER STANDS FOR THE ACCESSOR**, which ADR-165
+// admitted; the second half of finding 2 is repaired here with the first. So the saga is written against PORTS, exactly as
 // `runNightlyBatch` is, and `src/provisioning/ports.ts` says what each port's
 // implementation is and what blocks two of them.
 //
@@ -214,25 +221,43 @@ export type {
 // stall: every hold and every freeze silently becoming indefinite at once, with
 // no operator having forgotten anything.
 //
-// **THE THREE CLOCKS ARE THREE DIFFERENT ACTS AND THE THIRD IS NOT WRITABLE BY
-// ANY CODE IN THIS TREE.** The hold releases and PAYS (`INV-M5-17`); the
-// withdrawal halt releases, resumes the rail and posts NOTHING (`INV-M20-14`);
-// the payout freeze's release target is `settled`, which needs
-// `effective_trading_day` (no trading calendar exists here) and the win-day
-// reset of `INV-M5-07` (no `applySettlement` exists here), so that leg is swept,
-// warned on, and REPORTED as an `unreleasable` finding rather than guessed.
-// `sweeps/expiry.ts`'s header section 3 is the measurement.
+// **THE THREE CLOCKS ARE THREE DIFFERENT ACTS AND THE THIRD IS NOT WRITABLE
+// FROM THIS PATH.** The hold releases and PAYS (`INV-M5-17`); the withdrawal
+// halt releases, resumes the rail and posts NOTHING (`INV-M20-14`); the payout
+// freeze's release target is `settled`, which needs `effective_trading_day` and
+// so an exchange session calendar, and `merit/no-calendar-in-expiry-path` bans
+// that import in this exact path by glob under ADR-042 -- a rule whose own
+// header names THIS SWEEP as the failure it was written for. `INV-M5-07`'s
+// `applySettlement` EXISTS, in `packages/rules-engine/src/payout/settle.ts`, and
+// takes a `CalendarSlice`, so calling it needs the very import that rule
+// forbids. So that leg is swept, warned on, and REPORTED as an `unreleasable`
+// finding rather than guessed. `sweeps/expiry.ts`'s header section 3 is the
+// measurement, and AN EARLIER DRAFT OF IT CLAIMED THE FUNCTION DID NOT EXIST AT
+// ALL, WHICH WAS FALSE -- a truncated grep read as an absence, which is the
+// error class CLAUDE.md names by name. The correction makes the blocker a
+// checkable control rather than a gap somebody could close by writing a
+// function, and `test/expiry.test.ts` now asserts both halves of it.
 //
-// **IT IS WRITTEN AGAINST PORTS AND IT IS UNWIRED, exactly as `runNightlyBatch`
-// and the provisioning saga are, and the gap here is a WORD rather than an
-// adapter.** `SystemReason` is `'nightly-batch' | 'operator-console'` and an
-// hourly sweep is neither; adding a third member is one line in
-// `packages/db/src/scoped-db.ts`, which is `P5-a`'s file and not this session's,
-// and P5 rule 10 says to report that rather than reach. So
-// `ExpirySweepIo.transact` takes the unit of work and the wiring decides the
-// authority. WHAT IS REAL IS THE THREE LEGS, THE LOCK, THE KEY DISCIPLINE AND
-// THE REPORT; WHAT IS NOT IS THE WIRING, and the difference is visible in the
-// type rather than left to a reader.
+// **IT IS WRITTEN AGAINST PORTS AND IT IS STILL UNWIRED, but the reason it gave
+// for that has been RULED AND IS NO LONGER TRUE.** This header said the gap was
+// a WORD: that `SystemReason` is `'nightly-batch' | 'operator-console'`, that an
+// hourly sweep is neither, and that adding a third member was `P5-a`'s line to
+// write. **ADR-165 (session 292) ruled the opposite and ruled it better**:
+// `SystemReason` gains NO member, because `'nightly-batch'` "already names what
+// a detector run, a fold, a sweep and a nightly assertion each are", and this
+// deployable now takes exactly ONE door at `src/db.ts`. So the vocabulary was
+// never the obstacle and P5 rule 10 was right to forbid reaching for it: the
+// slice that owned the question answered it, and the answer was that there was
+// nothing to add.
+//
+// **WHAT REMAINS IS AN ADAPTER AND A SCHEDULE, AND NEITHER IS TAKEN HERE.**
+// `WorkerDb` is not re-exported from this barrel and `ExpirySweepIo` has no
+// implementation over it; ADR-165 section 10 finding 6 names that one line and
+// leaves it to the slice that needs it, and inventing a caller for it in a
+// barrel would be this file deciding how the sweep is scheduled. WHAT IS REAL IS
+// THE THREE LEGS, THE LOCK, THE KEY DISCIPLINE AND THE REPORT; WHAT IS NOT IS
+// THE WIRING, and the difference is visible in the type rather than left to a
+// reader.
 export {
   EXPIRY_CLOCKS,
   FREEZE_EXPIRING_LEAD_HOURS,
