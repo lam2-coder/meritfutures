@@ -366,6 +366,155 @@ export type {
   LiveSubscription,
 } from './live/ports.ts';
 
+// THE DETECTOR RUNNER AND THE CANARIES (session 300, `P7-e`)
+// -----------------------------------------------------------------------------
+// **`P7`'s FIRST DONE-GATE, AND IT IS A REFUSAL RATHER THAN A FEATURE.** P7
+// section 8: "a canary gate fires when a detector finds NOTHING", and none of
+// this phase's three gates "can be satisfied by writing more code". So the
+// thing to read here is not what the runner produces; it is what it refuses to
+// report.
+//
+// **THE SENTENCE THE SLICE EXISTS TO MAKE FALSE IS `AS-M7-05`'s**: a
+// `detector_runs` row reading `status: ok`, `rows_scanned: 0`, `flags_raised: 0`
+// "is indistinguishable from a genuinely quiet night, and quiet nights are the
+// normal case, so nobody looks." `FM-M7-01` calls it the worst failure in M07,
+// because everything downstream reads a green dashboard. Every run therefore
+// seeds a battery of synthetic subjects, asserts it found them, and a run that
+// finds fewer than it seeded is `degraded` and emits `detector.run_degraded`,
+// which pages (`INV-M7-07`, `SD-M7-01`, `GS-122`).
+//
+// **BOTH OF `AS-M7-05`'s IMPLEMENTATION NOTES SHIP AS ASSERTIONS AND NEITHER AS
+// A COMMENT**, which is `P7` section 11 rule 13:
+//
+//   NOTE 1, excluded from every aggregate  A CANARY IS NEVER WRITTEN AT ALL.
+//     The `is_synthetic` marker `AS-M7-05` names does not exist in any
+//     migration -- `M02 OQ-M2-01` PROPOSES it and is open -- and no migration
+//     number is allocated to this slice. So the subjects are minted in memory
+//     and discarded, which makes "excluded from every aggregate" true of the
+//     queries nobody has written yet rather than of the ones somebody audited.
+//     `test/detector-runner.test.ts` section 3 walks every value of every
+//     committed write and every counter the run reported and fails on a canary
+//     identifier in any of them.
+//   NOTE 2, regenerated per run  EVERY CANARY IDENTIFIER CARRIES THE RUN'S
+//     NONCE and the runner checks each one, so a battery built at module load
+//     is refused rather than counted. A detector cannot pass this by being
+//     careful; only by having minted from the mint it was handed.
+//
+// **THE HALF THAT IS NOT DISCHARGED IS STATED RATHER THAN IMPLIED.** A canary
+// that never travelled through `rowsWhere` proves the detector's PREDICATE
+// still matches and proves nothing about whether the READ still returns the
+// rows it used to. Closing that needs a persisted subject, which needs the
+// marker column, which needs a migration and the ruling that goes with it.
+// `src/detectors/canary.ts`'s header is the argument and the suite pins the
+// case: a run whose read returned nothing still finds its canaries and reports
+// `ok` at `rows_scanned: 0`.
+//
+// **NO PATH TO `enforced`, AND IT IS THE TYPE THAT STOPS IT** (`ADR-155`,
+// `INV-M7-02`, `STATE_MACHINES` section 7, `P7` rule 11). `DetectorTx` has no
+// addressed write, so a transition has no method to go through, and
+// `DetectorFinding` has no `status` field, so `enforced` is not a value a
+// detector avoids -- it is a word with nowhere to go. The runner stamps `open`
+// and reads nothing from the finding.
+//
+// **THE READ SHAPE IS `ADR-157`'s AND ITS REFUSAL IS DESIGNED FOR.** That entry
+// refused the aggregate `P7` section 10 item 1 asked for, on the evidence that
+// `P7`'s own section 3.1 names a JOIN as every wave-2 detector's blocker. What
+// it granted is the range term, and the shape here is what that grant implies:
+// a detector declares WINDOWS, the runner reads each through `rowsWhere`, and
+// the join happens in the runner. The cost is named rather than waved at -- the
+// rows crossing the boundary are the window's rather than the match's -- so
+// `DetectorRunOutcome.rowsByStream` reports it per stream and a window that is
+// too wide is a number somebody can read rather than a slow night.
+//
+// **IT IS WRITTEN AGAINST PORTS AND IT IS UNWIRED, exactly as `runNightlyBatch`,
+// the provisioning saga and the expiry sweep are.** The gap here is an ADAPTER
+// rather than a word: `src/db.ts`'s `LIVE_DB.batch` already satisfies
+// `DetectorRunnerIo.transact` at `systemDb('nightly-batch')`, which `M07`
+// section 1.1 makes the right authority for a nightly run, so `SystemReason`
+// gains no member and `ADR-165`'s one door is not opened a second time. What is
+// missing is the event sink (`P5-n`'s), the scheduler, and the detectors
+// themselves (`P7-f`, `P7-g`, `P7-h`). WHAT IS REAL IS THE RUN RECORD, THE
+// BATTERY, THE PARTITION AND THE THREE-STATE VERDICT; WHAT IS NOT IS THE
+// WIRING, and the difference is visible in the type rather than left to a
+// reader.
+export {
+  CANARY_NONCE_MIN_LENGTH,
+  CANARY_PREFIX,
+  CANARY_SHAPES,
+  CanaryNonceError,
+  canaryMint,
+  canaryNonce,
+  canarySubjectId,
+  canarySubjectOf,
+  carriesNonce,
+  hedgedPair,
+  isCanaryId,
+  martingaleSequence,
+  sameSecondFillCluster,
+  sharedDestination,
+} from './detectors/canary.ts';
+export type {
+  CanaryMint,
+  CanaryNonce,
+  CanaryRow,
+  CanaryShape,
+  CanarySubject,
+  CanarySubjectId,
+  FillClusterOptions,
+  HedgedPairOptions,
+  MartingaleOptions,
+  SharedDestinationOptions,
+} from './detectors/canary.ts';
+
+export {
+  DETECTOR_READ_TABLES,
+  DETECTOR_RUN_STATUSES,
+  DETECTOR_WRITE_TABLES,
+  DetectorDeclined,
+  DetectorRunnerUnwired,
+  FLAG_SOURCE_INTERNAL,
+  FLAG_STATUS_ON_RAISE,
+  SLA_REQUIRED_AT_SEVERITY,
+  UNWIRED_DETECTOR_RUNNER_IO,
+} from './detectors/ports.ts';
+export type {
+  Detector,
+  DetectorDefinition,
+  DetectorEvent,
+  DetectorEventName,
+  DetectorEventPort,
+  DetectorFilter,
+  DetectorFilterTerm,
+  DetectorFinding,
+  DetectorGroup,
+  DetectorOutcome,
+  DetectorReadTable,
+  DetectorRow,
+  DetectorRunStatus,
+  DetectorRunnerIo,
+  DetectorScanInput,
+  DetectorScanRequest,
+  DetectorStream,
+  DetectorTerms,
+  DetectorTx,
+  DetectorValues,
+  DetectorWriteTable,
+} from './detectors/ports.ts';
+
+export {
+  DetectorBatteryError,
+  DetectorCanaryLeak,
+  DetectorFindingError,
+  DetectorUnregistered,
+  UNREGISTERED_VERSION,
+  runDetectors,
+} from './detectors/runner.ts';
+export type {
+  DetectorRunConfig,
+  DetectorRunOutcome,
+  DetectorRunReport,
+} from './detectors/runner.ts';
+
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;
 
@@ -386,6 +535,6 @@ export const SERVICE = 'worker' as const;
 export function main(): void {
   console.log(
     `merit ${SERVICE}: nightly batch built, provisioning saga built, expiry sweep built, ` +
-      'job interface built, no job store and no scheduler yet',
+      'detector runner built, job interface built, no job store and no scheduler yet',
   );
 }
