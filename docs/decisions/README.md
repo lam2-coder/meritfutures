@@ -153,9 +153,11 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-124](ADR-124.md) | the global ledger halt is a MECHANISM and it is not a `ledger_halts` row  (2026-08-27, status: proposed) |
 | [ADR-126](ADR-126.md) | the vocabulary that moves is the TABLE and never the REASON, and mint and resolve are not the same shape  (2026-08-27, status: proposed) |
 | [ADR-130](ADR-130.md) | A derivable count can belong to ONE DOCUMENT, and the count vocabulary could not say so  (2026-08-27, status: proposed) |
+| [ADR-131](ADR-131.md) | the `CI-06<letter>` series is CLOSED at `w`, the last letter is retired UNUSED, and the retirement is a gate rather than a convention  (2026-08-27, status: proposed) |
 | [ADR-132](ADR-132.md) | a registry README indexes by ROW, and `CI-06n` stops accepting a sentence  (2026-08-27, status: proposed) |
 | [ADR-134](ADR-134.md) | a design record names exactly the columns its table carries, and the check that says so lands unregistered  (2026-08-27, status: proposed) |
 | [ADR-137](ADR-137.md) | `OI-16` never held `GS-004` and `GS-031`'s expected end state, and the blocker on both is the calendar record's missing `halted` key  (2026-08-27, status: proposed) |
+| [ADR-138](ADR-138.md) | a Server Action has no path, so the refusal is TOTAL, and the first rendered document is what makes it reachable  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
