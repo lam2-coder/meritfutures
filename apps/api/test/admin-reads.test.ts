@@ -12,6 +12,7 @@ import adminReads, {
   ADMIN_ROLES,
   ADMIN_SESSION_COOKIE,
   AdminReadError,
+  EVIDENCE_PACK_AUDIENCES,
   LIMIT_MAX,
   adminTokenFromCookie,
   assertContractScalars,
@@ -26,6 +27,7 @@ import type {
   AdminReadSource,
   AdminRole,
   AdminSessionLookup,
+  EvidencePackAudience,
   EvidencePackResponse,
   FlagListItem,
   IdentityGraph,
@@ -62,7 +64,7 @@ const ADDRESSES = {
   account: '/admin/accounts/acc-1',
   graph: '/admin/identities/id-1/graph',
   flags: '/admin/flags',
-  evidence: '/admin/evidence/acc-1?reason=chargeback+representment',
+  evidence: '/admin/evidence/acc-1?reason=chargeback+representment&audience=counsel',
 } as const;
 
 const COOKIE = { cookie: `${ADMIN_SESSION_COOKIE}=operator-token` };
@@ -131,12 +133,16 @@ const GRAPH: IdentityGraph = {
   },
 };
 
+// `audience` matches what `ADDRESSES.evidence` asks for, and it has to: the
+// route refuses a pack built for an audience other than the requested one, so a
+// fixture that disagreed with the address would fail every test that uses both.
 const PACK: EvidencePackResponse = {
   evidence_pack_id: 'pack-1',
   download_url: 'https://storage.example.invalid/pack-1',
   content_sha256: 'a'.repeat(64),
   expires_at: '2026-08-27T01:00:00Z',
   generated_at: '2026-08-27T00:00:00Z',
+  audience: 'counsel',
 };
 
 function flag(id: string, severity: 1 | 2 | 3 | 4 | 5, on: string): FlagListItem {
@@ -621,24 +627,103 @@ test('an account and an identity nobody has are 404, which on this surface means
 
 test('an evidence export without a reason is refused, and the reason reaches the generator', async () => {
   setAdminSessionSource(sessionOf(operator('readonly')));
-  let seen: { reason: string; actor: AdminPrincipal } | null = null;
+  let seen: { reason: string; audience: EvidencePackAudience; actor: AdminPrincipal } | null = null;
   setAdminReadSource(
     sourceOf({
       exportEvidence: (request) => {
-        seen = { reason: request.reason, actor: request.actor };
+        seen = { reason: request.reason, audience: request.audience, actor: request.actor };
         return Promise.resolve(PACK);
       },
     }),
   );
-  expect((await get('operator', '/admin/evidence/acc-1', COOKIE)).statusCode).toBe(400);
-  expect((await get('operator', '/admin/evidence/acc-1?reason=%20', COOKIE)).statusCode).toBe(400);
+  expect((await get('operator', '/admin/evidence/acc-1?audience=counsel', COOKIE)).statusCode).toBe(
+    400,
+  );
+  expect(
+    (await get('operator', '/admin/evidence/acc-1?reason=%20&audience=counsel', COOKIE)).statusCode,
+  ).toBe(400);
   expect(seen).toBeNull();
 
   expect((await get('operator', ADDRESSES.evidence, COOKIE)).statusCode).toBe(200);
   expect(seen).toEqual({
     reason: 'chargeback representment',
+    audience: 'counsel',
     actor: { actorId: 'actor-1', role: 'readonly' },
   });
+});
+
+// ADR-166, SD-M6-04, AS-M6-01.
+//
+// THESE ARE WRITTEN TO FAIL RATHER THAN TO PASS. The assertion that matters is
+// not that a valid audience is accepted, which any implementation that ignored
+// the parameter entirely would also satisfy; it is that an ABSENT one is refused
+// and never defaulted, and that the generator is not reached when it is missing.
+// A route that quietly chose `trader` would look correct in every test that
+// supplied an audience, and would be the disclosure decision made by the process
+// instead of by the operator.
+test('an evidence export without an audience is refused and no default is chosen', async () => {
+  setAdminSessionSource(sessionOf(operator('owner')));
+  let reached = 0;
+  setAdminReadSource(
+    sourceOf({
+      exportEvidence: () => {
+        reached += 1;
+        return Promise.resolve(PACK);
+      },
+    }),
+  );
+
+  // Absent, blank, and a name the merged CHECK would refuse. All three are 400.
+  for (const address of [
+    '/admin/evidence/acc-1?reason=dispute',
+    '/admin/evidence/acc-1?reason=dispute&audience=',
+    '/admin/evidence/acc-1?reason=dispute&audience=%20',
+    '/admin/evidence/acc-1?reason=dispute&audience=press',
+    '/admin/evidence/acc-1?reason=dispute&audience=Trader',
+  ])
+    expect((await get('operator', address, COOKIE)).statusCode, address).toBe(400);
+
+  expect(reached, 'the generator is never reached without a valid audience').toBe(0);
+});
+
+test('every audience the merged CHECK admits is accepted, and the response echoes it', async () => {
+  setAdminSessionSource(sessionOf(operator('owner')));
+  for (const audience of EVIDENCE_PACK_AUDIENCES) {
+    setAdminReadSource(sourceOf({ exportEvidence: () => Promise.resolve({ ...PACK, audience }) }));
+    const response = await get(
+      'operator',
+      `/admin/evidence/acc-1?reason=dispute&audience=${audience}`,
+      COOKIE,
+    );
+    expect(response.statusCode, audience).toBe(200);
+    expect((JSON.parse(response.body) as EvidencePackResponse).audience).toBe(audience);
+  }
+});
+
+// THE ONE A TYPE CHECK CANNOT CATCH. Both audiences are valid members, so the
+// mismatch produces a well-formed response carrying a real audience, and nothing
+// else in this module would notice it.
+test('a pack built for an audience other than the one requested is refused, not relabelled', async () => {
+  setAdminSessionSource(sessionOf(operator('owner')));
+  setAdminReadSource(
+    sourceOf({ exportEvidence: () => Promise.resolve({ ...PACK, audience: 'internal' }) }),
+  );
+  expect(
+    (await get('operator', '/admin/evidence/acc-1?reason=dispute&audience=trader', COOKIE))
+      .statusCode,
+  ).toBe(500);
+});
+
+// The four names are a TRANSCRIPTION of `evidence_packs.audience`'s CHECK in a
+// merged migration, so the migration is the source and this asserts against it
+// rather than against a copy. A fifth name added to the route would type-check,
+// pass every test above, and fail at the database on first use.
+test('the audience vocabulary is exactly the merged CHECK in 0008_risk.sql', () => {
+  const ddl = readFileSync(join(ROOT, 'packages/db/migrations/0008_risk.sql'), 'utf8');
+  const clause = /audience\s+text NOT NULL CHECK \(audience IN \(([^)]*)\)\)/.exec(ddl);
+  expect(clause, '0008_risk.sql declares the audience CHECK').not.toBeNull();
+  const inDdl = [...(clause?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
+  expect(inDdl).toEqual([...EVIDENCE_PACK_AUDIENCES].sort());
 });
 
 test('a pack whose digest is not a SHA-256 is refused, because it authenticates nothing', async () => {

@@ -530,6 +530,31 @@ export interface IdentityGraph {
   };
 }
 
+/**
+ * Section 8's `EvidencePackAudience`, and it is a TRANSCRIPTION rather than a
+ * second vocabulary.
+ *
+ * The four names are `evidence_packs.audience`'s CHECK in `0008_risk.sql`, which
+ * is merged and therefore sacred. A fifth name added here would type-check, pass
+ * every test in this file, and fail at the database on the first export that
+ * used it, which is the direction that costs the most to discover.
+ *
+ * `SD-M6-04`, `AS-M6-01`, and ADR-166. THE AUDIENCE DECIDES WHAT LEAVES THE
+ * BUILDING: `0008_risk.sql`'s own header says a pack given to a trader in a
+ * dispute "is a channel that discloses detector thresholds to the adversary who
+ * triggered them", which is why the column is `NOT NULL` and why this parameter
+ * has no default.
+ */
+export type EvidencePackAudience = 'internal' | 'trader' | 'counsel' | 'regulator';
+
+/** {@link EvidencePackAudience} as data, for the validator and for the suite. */
+export const EVIDENCE_PACK_AUDIENCES = [
+  'internal',
+  'trader',
+  'counsel',
+  'regulator',
+] as const satisfies readonly EvidencePackAudience[];
+
 /** Section 8, `EvidencePackResponse`. */
 export interface EvidencePackResponse {
   readonly evidence_pack_id: string;
@@ -537,6 +562,16 @@ export interface EvidencePackResponse {
   readonly content_sha256: string;
   readonly expires_at: string;
   readonly generated_at: string;
+  /**
+   * Echoed, so a caller can tell from the response what the bytes behind
+   * `download_url` were built as rather than from what it remembers sending.
+   *
+   * `redaction_profile` is NOT echoed and is not on this type. It is recorded on
+   * the pack row, its vocabulary carries no CHECK in `0008_risk.sql` and is
+   * unruled, and `INV-M7-10` makes the strip list DERIVED from
+   * `detector_definitions.is_sensitive` rather than named. ADR-166 F3.
+   */
+  readonly audience: EvidencePackAudience;
 }
 
 /**
@@ -600,6 +635,17 @@ export interface EvidenceExportRequest {
   readonly accountId: string;
   /** Section 8: "Query `?reason=` is required". Never empty. */
   readonly reason: string;
+  /**
+   * Section 8: "Query `?reason=` and `?audience=` are both required" (ADR-166).
+   *
+   * NOT OPTIONAL AND NOT DEFAULTED, which is the whole point of the field.
+   * `evidence_packs` makes `audience`, `redaction_profile` and
+   * `includes_detector_detail` all `NOT NULL`, so before this parameter existed
+   * the generator had to supply an audience the caller never named, and
+   * `M06` section 4 already forbade that in words: the profile "follows from the
+   * audience and is recorded on the pack, not chosen per export".
+   */
+  readonly audience: EvidencePackAudience;
   /** Who asked. `admin_actions.actor`, which the generator records. */
   readonly actor: AdminPrincipal;
 }
@@ -1027,13 +1073,36 @@ function projectIdentityGraph(graph: IdentityGraph): IdentityGraph {
 
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
-/** Section 8's `EvidencePackResponse`, field by field, with the digest checked. */
-function projectEvidencePack(pack: EvidencePackResponse): EvidencePackResponse {
+/**
+ * Section 8's `EvidencePackResponse`, field by field, with the digest checked and
+ * the audience checked against the one that was ASKED FOR.
+ *
+ * THE AUDIENCE COMPARISON IS THE POINT AND IT IS NOT A TYPE CHECK. The port
+ * returns a pack carrying its own `audience`, and the caller asked for one. A
+ * generator that built an `internal` pack for a request that said `trader` is
+ * the failure `SD-M6-04` exists to prevent, and it produces a well-formed
+ * response with a valid audience in it, so nothing else in this file would
+ * notice. `AS-M6-01`, ADR-166 clause 2.
+ *
+ * It is refused rather than corrected. Overwriting the pack's own audience with
+ * the requested one would make the response say `trader` about bytes built as
+ * `internal`, which is the same disclosure with a truthful label removed.
+ */
+function projectEvidencePack(
+  pack: EvidencePackResponse,
+  requested: EvidencePackAudience,
+): EvidencePackResponse {
   if (!SHA256_HEX.test(pack.content_sha256))
     throw new AdminReadError(
       `\`content_sha256\` is ${JSON.stringify(pack.content_sha256)}, which is not a SHA-256 ` +
         'digest. The digest is what makes an exported pack the pack that was exported, and a ' +
         'pack whose digest cannot be compared is evidence nobody can authenticate',
+    );
+  if (pack.audience !== requested)
+    throw new AdminReadError(
+      `the generator returned a pack built for \`${pack.audience}\` against a request for ` +
+        `\`${requested}\`. The audience decides what leaves the building (AS-M6-01), so a pack ` +
+        'whose audience is not the one that was asked for is refused rather than relabelled',
     );
   return {
     evidence_pack_id: pack.evidence_pack_id,
@@ -1041,6 +1110,7 @@ function projectEvidencePack(pack: EvidencePackResponse): EvidencePackResponse {
     content_sha256: pack.content_sha256,
     expires_at: pack.expires_at,
     generated_at: pack.generated_at,
+    audience: pack.audience,
   };
 }
 
@@ -1250,19 +1320,52 @@ export const ADMIN_READ_ENDPOINTS: readonly AdminEndpointSpec[] = [
       // reason must contain, and the `admin_actions` row it lands in, is the
       // concurrent writes slice's ruling; this route refuses an absent or blank
       // one and hands the rest to the generator with the actor attached.
+      const errors: AdminFieldError[] = [];
+
       const rawReason = queryParam(request, 'reason');
       const reason = rawReason === null ? '' : rawReason.trim();
       if (reason === '')
-        return adminValidationFailed(reply, request.id, [
-          {
-            path: 'reason',
-            message: 'is required and must not be blank: an unexplained export is unauditable',
-          },
-        ]);
+        errors.push({
+          path: 'reason',
+          message: 'is required and must not be blank: an unexplained export is unauditable',
+        });
 
-      const pack = await source.exportEvidence({ accountId, reason, actor: principal });
+      // Section 8, ADR-166: "?reason= and ?audience= are both required ... there
+      // is no default".
+      //
+      // THE ABSENT CASE AND THE UNRECOGNISED CASE ARE BOTH REFUSED AND NEITHER
+      // FALLS BACK. An audience this route invented would be the disclosure
+      // decision made by the process rather than by the operator, which is
+      // exactly what AS-M6-01 and `0008_risk.sql`'s header put in the schema.
+      // The narrowest possible default, `trader`, is the one that would look
+      // safest and it is still refused: a pack silently narrowed is a pack
+      // somebody hands to counsel believing it is complete.
+      const rawAudience = queryParam(request, 'audience');
+      let audience: EvidencePackAudience | null = null;
+      if (rawAudience === null || rawAudience.trim() === '')
+        errors.push({
+          path: 'audience',
+          message:
+            'is required: the audience decides what leaves the building and has no default ' +
+            `(one of: ${EVIDENCE_PACK_AUDIENCES.join(', ')})`,
+        });
+      else {
+        const trimmed = rawAudience.trim();
+        const match = EVIDENCE_PACK_AUDIENCES.find((value) => value === trimmed);
+        if (match === undefined)
+          errors.push({
+            path: 'audience',
+            message: `must be one of: ${EVIDENCE_PACK_AUDIENCES.join(', ')}`,
+          });
+        else audience = match;
+      }
+
+      if (errors.length > 0 || audience === null)
+        return adminValidationFailed(reply, request.id, errors);
+
+      const pack = await source.exportEvidence({ accountId, reason, audience, actor: principal });
       if (pack === null) return adminNotFound(reply, request.id);
-      return projectEvidencePack(pack);
+      return projectEvidencePack(pack, audience);
     },
   },
 ];
