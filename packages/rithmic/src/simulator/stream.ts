@@ -413,14 +413,23 @@ export const DECLARED_LIVE_FEED_OPTIONS: LiveFeedOptions = Object.freeze({
  * consumer unsubscribing mid-session exercises a no-op and every test of that
  * path passes vacuously.
  *
- * So ticks are pumped one per microtask and `close()` stops the pump. A
- * consumer that closes after n ticks receives exactly n, which is assertable,
- * and it is the behaviour a feed with a wire behind it actually has.
+ * So ticks are pumped one per turn of the event loop and `close()` stops the
+ * pump. A consumer that closes after n ticks receives exactly n, which is
+ * assertable, and it is the behaviour a feed with a wire behind it actually has.
+ *
+ * **A TURN AND NOT A MICROTASK, AND THE DIFFERENCE IS THE WHOLE POINT.** A
+ * microtask pump queued inside `streamLive` runs BEFORE the caller's `await`
+ * continuation, so the first tick is delivered while the consumer is still
+ * waiting for the `Subscription` that would let it close: `close()` from inside
+ * the handler is a reference to a variable that has not been assigned. One
+ * `setImmediate` per tick puts every delivery strictly after the consumer holds
+ * the object, whatever the length of its own promise chain.
  *
  * **NO CLOCK AND NO TIMER**, which `no-clock.test.ts` enforces over this whole
- * directory. A microtask chain is ordered without being timed: delivery is
- * deterministic, one pump per turn, and a consumer drains it by yielding rather
- * than by waiting out a duration.
+ * directory. `setImmediate` takes no duration and reads nothing: it is the next
+ * turn, not a moment. Delivery stays deterministic, one tick per turn, and a
+ * consumer drains the whole feed by yielding one turn rather than by waiting out
+ * a duration.
  *
  * **NOTHING HERE CATCHES THE HANDLER'S EXCEPTION.** A feed that swallowed a
  * consumer's error would turn a broken live surface into a silent one, which is
@@ -459,10 +468,10 @@ export function simulatorLiveFeed(
         // handler stops the next tick rather than the one after it. That is the
         // only ordering under which "a consumer that closes after n ticks
         // receives exactly n" is true, and it is what the test asserts.
-        queueMicrotask(pump);
+        setImmediate(pump);
       };
 
-      queueMicrotask(pump);
+      setImmediate(pump);
       return Promise.resolve({
         close(): void {
           open = false;
