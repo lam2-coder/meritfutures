@@ -241,6 +241,61 @@ jobs:
         run: node scripts/ci/falsify-ci.mjs CI-02
 
   # ===========================================================================
+  # CI-07  Build and bundle checks
+  # ===========================================================================
+  #
+  # THIS STAGE EXISTS BECAUSE ITS ARTIFACT ARRIVED, NOT BECAUSE THE ROW WAS
+  # RELAXED. `CI-06/gate-inventory` reads activation conditions in BOTH
+  # directions: STRATEGY's CI-07 row waited on "a page, layout or route file
+  # under apps/*/src/app/" (ADR-095 section 6), session 250 created the first
+  # one, and the row reopened on that commit as a FINDING. A gate that fails on
+  # good news is a condition working, so the stage is written here rather than
+  # the register being edited to keep it quiet.
+  #
+  # `next build` is the whole point and it is not a formality: before session
+  # 250 it exited 1 on "Couldn't find any `pages` or `app` directory", so this
+  # line went from impossible to meaningful in one commit. A build that
+  # produces no route is the failure this watches for, and Next exits non-zero
+  # on it rather than reporting an empty success.
+  build-and-bundle:
+    name: CI-07 build and bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      # THE UI DEPLOYABLE'S PRODUCTION BUILD. `apps/portal` is the only package
+      # in this workspace carrying a `build` script that compiles a rendered
+      # document; the four non-UI apps run their entry module directly under
+      # ADR-083 and have nothing to build.
+      - name: Portal production build
+        run: pnpm --filter @merit/portal build
+
+      # VG-2 RAN HERE THE MOMENT ITS CHAIN EXPIRED. Its disposition read
+      # "Chained on CI-07" because its subject is the BUILT BUNDLE, and under
+      # ADR-080 (d) a chain is available only while the row it names is not
+      # implemented. Writing CI-07's stage expired it, so the leg itself lands
+      # in the same commit rather than the row being re-chained to something
+      # else.
+      #
+      # It runs AFTER the build and never before: the check refuses an absent
+      # or empty bundle rather than passing over one, because a grep that
+      # scanned nothing reports the same green as a grep with nothing to find.
+      - name: VG-2 no secrets in client output
+        run: node scripts/ci/vg2-no-secrets-in-bundle.mjs
+
+  # ===========================================================================
   # CI-05  Security static
   # ===========================================================================
   security-static:
