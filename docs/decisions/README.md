@@ -149,6 +149,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-120](ADR-120.md) | `apps/api` joins the admission list, and wiring the auth surface finds that ADR-112 unblocked everything a session can DO and nothing that makes one  (2026-08-27, status: proposed) |
 | [ADR-121](ADR-121.md) | "shipped source" for `RI-10` means the directories the node loader loads, and `scripts/` is one of them  (2026-08-27, status: proposed) |
 | [ADR-122](ADR-122.md) | `input_digest` is taken over the computation's own argument, and it EXCLUDES the answer  (2026-08-27, status: proposed) |
+| [ADR-123](ADR-123.md) | the refusal on `accountsAudited === 0` moves into `runReplayAudit`, and an empty book now REFUSES instead of reporting clean  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

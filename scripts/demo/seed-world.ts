@@ -19,6 +19,13 @@
 //      would carry: "when it is built it refuses on `accountsAudited === 0`".
 //      `runReplayAudit`'s own `OI-14` guard fires on `storedRows > 0 &&
 //      inScope === 0` and therefore cannot see the empty world at all.
+//      **THAT REFUSAL IS THE AUDIT'S AND NOT THIS RUNNER'S**, as of
+//      [ADR-123](../../docs/decisions/ADR-123.md): it lived in
+//      [`world.ts`](world.ts)'s caller until then, because `apps/worker` was
+//      outside session 231's fence, and ADR-119 clause 7 rowed the move as owed
+//      on the ground that "a refusal in the caller is weaker than a refusal in
+//      the audit, because the next caller inherits nothing". This run inherits
+//      it. So does the nightly job, and so does every caller after them.
 //   2. THE REPLAY REPRODUCES THE SEED. Every counter of the report against the
 //      figure the seed counted BEFORE the audit ran: accounts, stored rows, in
 //      scope, out of scope, matched, diverged, and the number of divergences
@@ -50,6 +57,8 @@
 // adapter implementing `BatchPorts` over it; that is ADR-119's central
 // measurement and it is printed on every run rather than left in a ruling.
 // =============================================================================
+
+import { ReplayAuditRefusal } from '../../apps/worker/src/index.ts';
 
 import {
   DEFAULT_WORLD,
@@ -345,7 +354,15 @@ export async function main(
     // that is not one account life. Both are the audit declining to report, and
     // an audit that declines to report must never look like one that found
     // nothing (FM-17).
-    const label = error instanceof DemoWorldRefusal ? 'REFUSED' : 'ERROR';
+    // `DemoWorldRefusal` is the money field that is not a bigint and the sealed
+    // world's write port; `ReplayAuditRefusal` is the AUDIT declining to report,
+    // which is now the empty world (ADR-123) as well as OI-14 and the history
+    // that is not one account life. BOTH ARE REFUSALS AND NEITHER IS A CRASH, so
+    // both carry the label: an audit that declines to report must never look
+    // like one that found nothing (FM-17), and it must not look like a bug in
+    // the runner either.
+    const refused = error instanceof DemoWorldRefusal || error instanceof ReplayAuditRefusal;
+    const label = refused ? 'REFUSED' : 'ERROR';
     writeError(`${label}  ${error instanceof Error ? error.message : String(error)}\n`);
     return 1;
   }
