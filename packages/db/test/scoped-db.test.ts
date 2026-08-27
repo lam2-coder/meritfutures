@@ -362,8 +362,14 @@ describe('the registry is total', () => {
     expect(rules).toBe(104);
     expect(withoutRule).toEqual([]);
 
+    // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, and it is
+    // NOT registered here. ADR-092's rule, quoted above, is that the first
+    // session that NEEDS a table registers it, and no producer exists yet (M06
+    // is unbuilt). It is also FIRM by construction for `liability_snapshots`'
+    // reason on a different surface: a per-identity slice of the firm's reserve
+    // coverage is not a smaller version of it.
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
-    expect(createdTables).toBe(111);
+    expect(createdTables).toBe(112);
   });
 
   // FIVE MEMBERS SINCE ADR-106, AND THE ASSERTION IS THE REASON THE FIFTH COULD

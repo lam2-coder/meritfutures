@@ -1887,8 +1887,20 @@ const markedFixtureRow = (d) => {
 //
 // A seed that moves a row and leaves the summary alone fires assertion 5 as well
 // as its own finding, and a `PASS` case cannot tolerate a second finding at all.
+//
+// THE COUNT IS INSIDE A GENERATED SPAN SINCE `OI-25` AND `ADR-133`, so the digits
+// no longer sit directly against the emphasis. Both seeds below broke on the
+// commit that installed the spans and BOTH ANNOUNCED THEMSELVES, one as
+// `SEED IS STALE` and one as `CONTROL DID NOT FIRE`, which is this harness
+// working: an anchor that stops describing the corpus is a harness problem and
+// reads nothing like a gate problem. The span markers are optional in the
+// pattern rather than required, so it reads a summary cell whether or not that
+// cell has been derived yet.
 const bumpFixtureSummary = (body, term, delta) => {
-  const p = new RegExp(`(\\|\\s*\\*{0,2}\`?${term}\`?\\*{0,2}\\s*\\|\\s*\\*{0,2})(\\d+)(\\*{0,2}\\s*\\|)`);
+  const p = new RegExp(
+    `(\\|\\s*\\*{0,2}\`?${term}\`?\\*{0,2}\\s*\\|\\s*\\*{0,2}(?:<!--gen:[a-z0-9_]+-->)?)` +
+      `(\\d+)((?:<!--/gen-->)?\\*{0,2}\\s*\\|)`,
+  );
   const m = p.exec(body);
   if (m === null) throw new Error(`seed anchor not found: the "${term}" summary row`);
   return body.replace(p, `$1${Number(m[2]) + delta}$3`);

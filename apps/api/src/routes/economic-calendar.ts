@@ -315,7 +315,7 @@ export function renderEconomicCalendar(panel: EconomicCalendarPanel): EconomicCa
   const occurrences: EconomicCalendarOccurrence[] = [];
 
   for (const row of panel.occurrences) {
-    const address = `${row.event_key} ${row.occurrence_key}`;
+    const address = `${row.event_key}\0${row.occurrence_key}`;
     if (seen.has(address))
       throw new EconomicCalendarError(
         `\`${row.event_key}\` occurrence \`${row.occurrence_key}\` arrived twice. ` +

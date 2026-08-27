@@ -606,6 +606,11 @@ export const liabilitySnapshots = pgTable('liability_snapshots', {
     .notNull()
     .default(0n),
   computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+  // OI-01, ADR-128, added by 0049. NOT NULL with no default in the DDL, which is
+  // the point of it: a defaulted zero is a number the dashboard would render and
+  // nobody counted. P-M6-01 is a sum "across funded accounts" and this is the
+  // count that says whether that sum is one account or a thousand.
+  fundedAccounts: integer('funded_accounts').notNull(),
 });
 
 // -----------------------------------------------------------------------------
