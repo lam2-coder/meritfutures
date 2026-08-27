@@ -30,3 +30,11 @@ coverage/
 # and a committed trace is a stale copy of a rendering nobody can reproduce.
 test-results/
 playwright-report/
+
+# `CI-09`'s Stryker leg working directory. Stryker copies the package into
+# `.stryker-tmp/sandbox-*` and mutates the COPY, which is what keeps a mutation
+# run from being the tree-mutating operation `falsify:ci` has to be. It is
+# removed at the end of a clean run and survives a crash, which is exactly when
+# a `git add -A` would sweep a directory of half-mutated source into a commit.
+# ADR-127. The report itself lands in `test-results/`, ignored above.
+.stryker-tmp/
