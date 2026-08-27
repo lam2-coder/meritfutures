@@ -151,6 +151,8 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-122](ADR-122.md) | `input_digest` is taken over the computation's own argument, and it EXCLUDES the answer  (2026-08-27, status: proposed) |
 | [ADR-123](ADR-123.md) | the refusal on `accountsAudited === 0` moves into `runReplayAudit`, and an empty book now REFUSES instead of reporting clean  (2026-08-27, status: proposed) |
 | [ADR-124](ADR-124.md) | the global ledger halt is a MECHANISM and it is not a `ledger_halts` row  (2026-08-27, status: proposed) |
+| [ADR-125](ADR-125.md) | `no-fixture-format` is one sentence written 227 times, this document's own `GS-030` row refutes it, and seven of the 227 are asserted and passing today  (2026-08-27, status: proposed) |
+| [ADR-127](ADR-127.md) | Stryker is admitted under a DELEGATED `VG-12` grant, `CI-09`'s third leg is built, and the trend-only ruling is expressed by writing NO threshold at all  (2026-08-27, status: proposed) |
 | [ADR-130](ADR-130.md) | A derivable count can belong to ONE DOCUMENT, and the count vocabulary could not say so  (2026-08-27, status: proposed) |
 | [ADR-131](ADR-131.md) | the `CI-06<letter>` series is CLOSED at `w`, the last letter is retired UNUSED, and the retirement is a gate rather than a convention  (2026-08-27, status: proposed) |
 | [ADR-132](ADR-132.md) | a registry README indexes by ROW, and `CI-06n` stops accepting a sentence  (2026-08-27, status: proposed) |
@@ -158,7 +160,14 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-135](ADR-135.md) | `OQ-F3-01` and `OQ-F3-02` were ruled on 2026-08-20 and the wallet exit was shut on 2026-08-21, so a credit to a `closed` identity is an obligation Merit records and currently cannot pay  (2026-08-27, status: proposed) |
 | [ADR-137](ADR-137.md) | `OI-16` never held `GS-004` and `GS-031`'s expected end state, and the blocker on both is the calendar record's missing `halted` key  (2026-08-27, status: proposed) |
 | [ADR-138](ADR-138.md) | a Server Action has no path, so the refusal is TOTAL, and the first rendered document is what makes it reachable  (2026-08-27, status: proposed) |
+| [ADR-139](ADR-139.md) | the dispatch named four endpoints, `API_CONTRACT` has two of them free, and `AccountDetail.progress` is refused by the contract's own nullability  (2026-08-27, status: proposed) |
 | [ADR-141](ADR-141.md) | a trader-scoped response that names a catalogue row is TWO reads in one direction, and the compiler already refuses the version of that mistake everybody looks for  (2026-08-27, status: proposed) |
+| [ADR-144](ADR-144.md) | an admin route is an ordinary route module, and the surface that serves it is selected by the partition that already exists  (2026-08-27, status: proposed) |
+| [ADR-145](ADR-145.md) | `admin_actions.reason` is a PRECONDITION, so the audit row is written first and the route never supplies one (2026-08-27, status: proposed) |
+| [ADR-146](ADR-146.md) | two date vocabularies meet on one object, so the contract's suffix rule stops being a convention and becomes a refusal (2026-08-27, status: proposed) |
+| [ADR-147](ADR-147.md) | `M04` section 3.3's consistency meter names five figures, three of them reach no client, and two of those three are `R-29`'s own operands  (2026-08-27, status: proposed) |
+| [ADR-148](ADR-148.md) | `G-ELIGIBLE` conjoins two terms the eligibility response declares no gate for, so the differentiator screen can render ten passing gates beside a refusal  (2026-08-27, status: proposed) |
+| [ADR-152](ADR-152.md) | an as-of stamp's staleness is a claim the SERVER makes and the portal ORDERS, never one the portal computes, and no account-state contract publishes the fact today  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
