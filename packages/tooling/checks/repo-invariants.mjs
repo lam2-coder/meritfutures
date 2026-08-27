@@ -1481,7 +1481,79 @@ const ri10 = {
   },
 };
 
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri08, ri09, ri10, ri11];
+// -----------------------------------------------------------------------------
+// RI-12  No tracked document repeats a whole line more than a handful of times
+// -----------------------------------------------------------------------------
+//
+// THIS INVARIANT EXISTS BECAUSE A DEFECT RAN UNCAUGHT FOR A DAY AND WAS FOUND BY
+// EYE. `docs/STATE.md` carried the same 340-character sentence FOUR THOUSAND SIX
+// HUNDRED AND SEVENTY-TWO TIMES. The file was 11,601 lines and 2,479 of them were
+// distinct; the other nine thousand were one line, duplicated.
+//
+// NOTHING SAW IT, AND THE REASON IS INSTRUCTIVE. The sentence is a generated span
+// under CI-06g, so `gates.mjs generate` dutifully rewrote every copy and reported
+// "every span already matches its query" -- 4,672 spans, all correct, all the same
+// span. CI-06/derivable-counts read the counts and found them right. Every gate was
+// green on a document that was 80% one repeated line, because every gate was asking
+// whether the content was CORRECT and none was asking whether it was there ONCE.
+//
+// THE CAUSE WAS A MERGE RULE, WHICH IS WHY THE FIX IS A CHECK AND NOT A CLEANUP.
+// STATE.md is appended to by every session, so the resolution for a conflict in it
+// is "keep both sides" -- correct for two sessions appending two different sections,
+// and catastrophic for a line both sides already had. Under a wave of concurrent
+// branches that rule doubles the line on every merge that touches it. A cleanup
+// without this check buys one clean day and then the doubling resumes.
+//
+// THE THRESHOLD IS A CEILING RATHER THAN A ZERO, and that is deliberate. Legitimate
+// repetition exists in these documents: a `---` rule, a `|---|---|` table separator,
+// a `> ` quote marker, a bare fence. Those are short structural tokens, so the check
+// scopes to lines of real length and allows a small count above one. A zero would be
+// a check nobody could keep green; a ceiling catches doubling, which is the failure
+// mode, and stays quiet about prose that happens to rhyme.
+//
+// WHAT IT DOES NOT COVER, stated rather than left to be discovered: it reads only
+// docs/, it reads whole lines, and two lines differing by one character are two
+// lines to it. A duplicated PARAGRAPH whose lines were each reflowed would pass. It
+// catches the mechanical doubling a merge produces, which is the one that happened.
+//
+/** @type {Invariant} */
+const ri12 = {
+  id: 'RI-12',
+  title: 'No document under docs/ repeats a substantial line more than 8 times',
+  covers:
+    'every tracked `.md` under docs/, read whole-line. A line of at least 80 ' +
+    'characters after trimming may appear at most 8 times in one file. Short ' +
+    'lines are OUT OF SCOPE because markdown structure legitimately repeats ' +
+    'them: rules, table separators, quote markers and fences. It catches the ' +
+    'MECHANICAL doubling a keep-both merge produces on a line both sides ' +
+    'already carried, which is how STATE.md reached 4,672 copies of one ' +
+    'sentence with every gate green. It says nothing about duplicated prose ' +
+    'that was reflowed, and nothing about whether the line is CORRECT: ' +
+    'CI-06g already checks that, and checked it 4,672 times.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const docs = join(root, 'docs');
+    if (!existsSync(docs)) return findings;
+    for (const rel of walk(docs)) {
+      if (!rel.endsWith('.md')) continue;
+      /** @type {Map<string, number>} */
+      const counts = new Map();
+      for (const line of readFileSync(join(docs, rel), 'utf8').split('\n')) {
+        const t = line.trim();
+        if (t.length < 80) continue;
+        counts.set(t, (counts.get(t) ?? 0) + 1);
+      }
+      for (const [line, n] of counts) {
+        if (n <= 8) continue;
+        findings.push(`docs/${rel}: one line appears ${n} times: ${line.slice(0, 90)}...`);
+      }
+    }
+    return findings;
+  },
+};
+
+export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri08, ri09, ri10, ri11, ri12];
 
 function main() {
   const [arg] = process.argv.slice(2);
