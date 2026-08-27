@@ -33,71 +33,18 @@
 // with an ADR, so there is no totals row and this paragraph is why.
 //
 // -----------------------------------------------------------------------------
-// THE LABELS ARE THIS FILE'S AND THE RULE SENTENCES ARE NOT, AND FM-M4-05 IS
-// THE LINE BETWEEN THEM
+// THE FIGURES THEMSELVES ARE ./figures.ts's AND NOT THIS FILE'S
 // -----------------------------------------------------------------------------
-// FM-M4-05 is "the portal renders A RULE from its own source rather than
-// `copy_blocks`", and its detection is "a build-time check that no RULE-SHAPED
-// string literal exists in portal source". A column label is not rule shaped: it
-// names a field, states no threshold, carries no operator and changes with no
-// plan version. The compliant fixture settles it by precedent, since it authors
-// "Wallet balance", "Win days recorded" and "Next request opens" in its own
-// body while taking every NUMBER from the data.
-//
-// WHAT IS STILL REFUSED HERE IS THE COMPOSED SENTENCE, which is the thing
-// ../../view/accounts.ts names: "there is no `statusLabel`, no 'you are 3 days
-// away', no assembled headline ... a composed sentence is where both of those
-// get broken by somebody being helpful." Nothing below joins two server fields
-// into a clause. Each label names one field and each value is one field's
-// already-formatted string.
+// `AccountDetailView extends AccountCardView`, so SC-M4-03's screen is handed
+// every field this one is, and a second transcription of the row list would
+// drift. `AccountFigures` is that list, once, and it carries the ordering
+// requirement and the per-card as-of label with it.
 
 import { createElement } from 'react';
 import type { ReactElement } from 'react';
 
-import type { AccountCardView, BlockedReason } from '../../view/accounts.ts';
-import { AsOf, Row, StateWord } from './elements.ts';
-
-/**
- * The block keys the server reports, as nouns.
- *
- * EXHAUSTIVE BY TYPE RATHER THAN BY VIGILANCE. It is a `Record` over
- * `BlockedReason`, so a fourth member added to that union in
- * ../../view/accounts.ts fails this file's type check instead of rendering as a
- * blank cell on a screen whose whole subject is what is holding an account.
- *
- * EACH ENTRY STATES THE BLOCK AND NEVER ITS REMEDY. "What to do about it" is a
- * rule, it depends on the plan version, and it is `copy_blocks`'s (INV-M4-08).
- */
-const BLOCKED_LABEL: Readonly<Record<BlockedReason, string>> = {
-  payouts_frozen: 'payouts frozen',
-  recon_blocked: 'reconciliation incomplete',
-  kyc_required: 'identity verification required',
-};
-
-/**
- * `phase` and `status`, as nouns.
- *
- * BOTH ARE RENDERED AND NEITHER IS DERIVED FROM THE OTHER. They are two
- * independent server fields on `AccountListItem`: a `funded` account can be
- * `breached`, and a screen that showed one of them would be choosing which half
- * of that pair the trader gets to see.
- */
-const PHASE_LABEL: Readonly<Record<AccountCardView['phase'], string>> = {
-  eval: 'evaluation',
-  funded: 'funded',
-  closed: 'closed',
-  graduated: 'graduated',
-};
-
-const STATUS_LABEL: Readonly<Record<AccountCardView['status'], string>> = {
-  provisioning_pending: 'provisioning',
-  active: 'active',
-  breached: 'breached',
-  expired: 'expired',
-  closed_admin: 'closed by Merit',
-  closed_chargeback: 'closed after a chargeback',
-  graduated: 'graduated',
-};
+import type { AccountCardView } from '../../view/accounts.ts';
+import { AccountFigures } from './figures.ts';
 
 /**
  * One card. SC-M4-02.
@@ -110,44 +57,11 @@ const STATUS_LABEL: Readonly<Record<AccountCardView['status'], string>> = {
  * information reaches the trader without this file writing a clause.
  */
 export function AccountCard(props: { readonly account: AccountCardView }): ReactElement {
-  const { account } = props;
-
   return createElement(
     'article',
     null,
-    createElement('h2', null, account.plan.name),
-
-    // FIRST, AND THE ORDER IS THE REQUIREMENT. SC-M4-02 and FM-M4-08.
-    createElement(Row, { label: 'Floor distance', children: account.floor_distance }),
-    createElement(Row, { label: 'Balance', children: account.balance }),
-    createElement(Row, { label: 'Floor', children: account.floor }),
-    createElement(Row, { label: 'Withdrawable', children: account.withdrawable }),
-    createElement(Row, { label: 'Account size', children: account.size }),
-    createElement(Row, {
-      label: 'Phase',
-      children: createElement(StateWord, { children: PHASE_LABEL[account.phase] }),
-    }),
-    createElement(Row, {
-      label: 'Status',
-      children: createElement(StateWord, { children: STATUS_LABEL[account.status] }),
-    }),
-
-    // ABSENT WHEN NOTHING IS BLOCKED, rather than present and empty.
-    // ../../view/accounts.ts: an empty `blocked` "is a different fact from
-    // 'eligible': eligibility is the eligibility endpoint's answer and this is
-    // the account card's, and conflating them is how a card and a gate list end
-    // up disagreeing on one screen." So there is no "eligible" row here and
-    // there never will be; SC-M4-04 renders that endpoint's answer.
-    account.blocked.length === 0
-      ? null
-      : createElement(Row, {
-          label: 'Blocked',
-          children: account.blocked.map((reason) =>
-            createElement(StateWord, { key: reason, children: BLOCKED_LABEL[reason] }),
-          ),
-        }),
-
-    createElement(AsOf, { as_of_trading_day: account.as_of_trading_day }),
+    createElement('h2', null, props.account.plan.name),
+    createElement(AccountFigures, { account: props.account }),
   );
 }
 

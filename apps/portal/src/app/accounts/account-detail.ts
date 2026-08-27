@@ -67,7 +67,8 @@ import type {
   FundedProgressView,
 } from '../../view/accounts.ts';
 import type { EquitySeriesView } from '../../view/marks.ts';
-import { AsOf, Optional, Row, Section, StateWord } from './elements.ts';
+import { Optional, Row, Section, StateWord } from './elements.ts';
+import { AccountFigures } from './figures.ts';
 import { EquityChart } from './equity-chart.ts';
 
 /** `have` against `need`, as the compliant fixture writes it: "3 of 5". */
@@ -262,15 +263,12 @@ export function AccountDetailScreen(props: {
     null,
     createElement('h1', null, account.plan.name),
 
-    // THE SAME ORDER AS THE CARD, FOR THE SAME REASON. SC-M4-02's number is the
-    // number that decides whether the trader trades tomorrow, and it does not
-    // stop being that on the screen they opened to look at it (FM-M4-08).
-    createElement(Row, { label: 'Floor distance', children: account.floor_distance }),
-    createElement(Row, { label: 'Balance', children: account.balance }),
-    createElement(Row, { label: 'Floor', children: account.floor }),
-    createElement(Row, { label: 'Withdrawable', children: account.withdrawable }),
-    createElement(Row, { label: 'Account size', children: account.size }),
-    createElement(AsOf, { as_of_trading_day: account.as_of_trading_day }),
+    // EVERY FIGURE THE CARD SHOWS, FROM ./figures.ts AND NOT TRANSCRIBED AGAIN.
+    // `AccountDetailView extends AccountCardView`, so the phase, the status and
+    // the blocks belong on this screen too. The first draft of this file
+    // omitted all three, and a breached account's own screen then showed its
+    // funded progress and never said "breached" anywhere.
+    createElement(AccountFigures, { account }),
 
     account.progress.kind === 'eval'
       ? createElement(EvalProgress, { progress: account.progress })
