@@ -215,6 +215,17 @@
 // `adminWalletHandler` rather than of this paragraph, and the suite asserts it by
 // requiring the recorder to be EMPTY rather than by reading a status code.
 //
+// AND THE BUSINESS REFUSALS ARE INSIDE THE TRANSACTION, WHICH IS THE OTHER HALF
+// OF THE SAME DISTINCTION RATHER THAN AN INCONSISTENCY. A malformed body, a
+// `corrects_entry_id` that names nobody, an unsatisfied dual control and a
+// shortfall are all decided after the lock, exactly as every body validation in
+// `admin-payouts.ts` is, and each throws out of `operator()` so the transaction
+// rolls back. They therefore leave a lock that was taken and released and NOTHING
+// ELSE, which is a different record from the authorization refusals' nothing at
+// all. `INV-M5-23` is about the authorization pair and the suite asserts the
+// empty recorder on those alone: asserting it on a `precondition_failed` would be
+// asserting a different property under that invariant's name.
+//
 // -----------------------------------------------------------------------------
 // WHAT THIS MODULE DOES NOT WRITE, EACH REPORTED RATHER THAN INVENTED
 // -----------------------------------------------------------------------------
