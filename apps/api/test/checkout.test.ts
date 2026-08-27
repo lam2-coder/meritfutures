@@ -35,6 +35,20 @@
 // `number` appears is at that boundary.
 // =============================================================================
 
+import { readFileSync } from 'node:fs';
+
+import {
+  ENRICHMENT_CONTRACT_VERSION,
+  ENRICHMENT_EVENT_NAME,
+  ENRICHMENT_FIELD_ALLOWLIST,
+  ENRICHMENT_INTEGRATION,
+  ENRICHMENT_TIMEOUT_MS,
+  SCORE_SCALE_BP,
+  answeringVendor,
+  failingVendor,
+  hangingVendor,
+} from '@merit/enrichment';
+import type { EnrichmentAdapter, EnrichmentTx, ObserveOutcome } from '@merit/enrichment';
 import { createPspAFake } from '@merit/psp';
 import type { MidCandidate, PspAdapter, PspId } from '@merit/psp';
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
@@ -62,6 +76,7 @@ import type {
   AccountCapRow,
   CheckoutAdapters,
   CheckoutBackend,
+  CheckoutEnrichment,
   CheckoutTx,
   CouponRow,
   GeoDecisionRow,
@@ -163,15 +178,33 @@ const RESET_TARGET: ResetTargetRow = {
 // The store, and a transaction that really rolls back
 // -----------------------------------------------------------------------------
 
+interface SignalRow {
+  id: string;
+  kind: unknown;
+  valueHash: unknown;
+  observationCount: number;
+}
+
 interface Store {
   purchases: PurchaseInsert[];
   attributions: { purchaseId: string; row: AttributionRow }[];
   redemptions: { couponId: string; purchaseId: string }[];
   tos: { versionIds: readonly string[]; ip: string }[];
+  /** `identity_signals`, as `packages/enrichment` writes them. */
+  signals: SignalRow[];
+  /** `integration_dispatches`. One per purchase, per ADR-115 clause 4. */
+  dispatches: Readonly<Record<string, unknown>>[];
 }
 
 function emptyStore(): Store {
-  return { purchases: [], attributions: [], redemptions: [], tos: [] };
+  return {
+    purchases: [],
+    attributions: [],
+    redemptions: [],
+    tos: [],
+    signals: [],
+    dispatches: [],
+  };
 }
 
 function copyStore(store: Store): Store {
@@ -180,6 +213,13 @@ function copyStore(store: Store): Store {
     attributions: [...store.attributions],
     redemptions: [...store.redemptions],
     tos: [...store.tos],
+    // THE ENRICHMENT ROWS STAGE WITH EVERYTHING ELSE, which is the half of
+    // `packages/enrichment/src/tx.ts`'s ruling this fixture can actually model:
+    // "an observation of a checkout that did not happen is worse than no
+    // observation". A signal written on a checkout that rolls back is discarded
+    // with it, and a case below asserts exactly that.
+    signals: store.signals.map((row) => ({ ...row })),
+    dispatches: [...store.dispatches],
   };
 }
 
@@ -193,8 +233,16 @@ interface Fixture {
   resetTarget: ResetTargetRow | null;
   /** Live claims, so a second claim of one code by this identity loses. */
   claimed: Set<string>;
-  /** THE SEED FOR THE APPROVAL LINE. When set, `insertAttribution` throws it. */
+  /** THE SEED FOR SESSION 220's APPROVAL LINE. When set, `insertAttribution` throws it. */
   attributionFailure: Error | null;
+  /** ADR-023 step 1's wiring, or `null` for a deployment that observes nothing. */
+  enrichment: CheckoutEnrichment | null;
+  /** Every `ObserveOutcome` the call site reported, in order. */
+  outcomes: ObserveOutcome[];
+  /** When set, the enrichment writer's `insert` rejects with it. */
+  enrichmentWriteFailure: Error | null;
+  /** When set, the enrichment REPORTER throws it. ADR-115's control 3. */
+  reporterFailure: Error | null;
 }
 
 let fixture: Fixture;
@@ -217,6 +265,10 @@ function freshFixture(): Fixture {
     resetTarget: RESET_TARGET,
     claimed: new Set<string>(),
     attributionFailure: null,
+    enrichment: null,
+    outcomes: [],
+    enrichmentWriteFailure: null,
+    reporterFailure: null,
   };
 }
 
@@ -288,6 +340,98 @@ function txOver(staging: Store): CheckoutTx {
     // this tree answers `null` and `@merit/affiliate` refuses to read that as a
     // verdict of zero.
     linkConfidence: () => Promise.resolve(null),
+
+    enrichment: enrichmentTxOver(staging),
+  };
+}
+
+/**
+ * `EnrichmentTx` over the SAME staging store, which is the point.
+ *
+ * `packages/enrichment` takes the caller's open transaction with no overload
+ * that omits it, so an observation commits with the purchase that caused it or
+ * not at all. A fake that wrote to its own array would satisfy every type here
+ * and would make that property untestable, which is this file's own rule about
+ * `transact` applied one table down.
+ *
+ * WHAT IT CANNOT MODEL, SAID HERE RATHER THAN IMPLIED. ADR-115 clause 2 states
+ * that when a write THIS PACKAGE issues fails, the caller's transaction is
+ * ALREADY aborted before `observeEnrichment`'s catch runs: Postgres puts the
+ * transaction into the aborted state at the failing statement and turns its
+ * `COMMIT` into a `ROLLBACK`. Nothing in a JavaScript staging store does that.
+ * So the write-failure case below asserts what is true HERE, that the throw does
+ * not escape and the outcome is reported as `record_failed`, and says in its own
+ * comment that the rollback is Postgres's and is not observable in this suite. A
+ * test that claimed otherwise would be asserting a fact about a database this
+ * file never opens.
+ */
+function enrichmentTxOver(staging: Store): EnrichmentTx {
+  let next = 0;
+  return {
+    rowsWhere: (_key, where) =>
+      Promise.resolve(
+        staging.signals.filter(
+          (row) => row.kind === where['kind'] && row.valueHash === where['valueHash'],
+        ),
+      ),
+
+    insert: (key, values) => {
+      if (fixture.enrichmentWriteFailure !== null) {
+        return Promise.reject(fixture.enrichmentWriteFailure);
+      }
+      if (key === 'identitySignals') {
+        next += 1;
+        const row: SignalRow = {
+          id: `signal-${String(next)}`,
+          kind: values['kind'],
+          valueHash: values['valueHash'],
+          observationCount: 1,
+        };
+        staging.signals.push(row);
+        return Promise.resolve([row]);
+      }
+      staging.dispatches.push(values);
+      return Promise.resolve([values]);
+    },
+
+    updateAt: (_key, at, values) => {
+      const row = staging.signals.find((candidate) => candidate.id === at['id']);
+      if (row === undefined) return Promise.resolve([]);
+      row.observationCount = values['observationCount'] as number;
+      return Promise.resolve([row]);
+    },
+  };
+}
+
+/**
+ * The wiring a deployment that observes would install, over a fake vendor.
+ *
+ * THE CLOCK IS FIXED AND THE TIMEOUT IS NOT PASSED. `ENRICHMENT_TIMEOUT_MS` is
+ * 800 and `ObserveDeps.timeoutMs` is documented "for suites, not for routes", so
+ * a route that passed one would be moving a shared budget into one caller. The
+ * hanging-vendor case below therefore waits the real 800ms, which is the honest
+ * price of asserting the route's own budget rather than a shortened one.
+ */
+function enrichmentWith(adapter: EnrichmentAdapter): CheckoutEnrichment {
+  return {
+    adapter,
+    contracts: {
+      rows: () =>
+        Promise.resolve([
+          {
+            integration: ENRICHMENT_INTEGRATION,
+            eventName: ENRICHMENT_EVENT_NAME,
+            fieldAllowlist: [...ENRICHMENT_FIELD_ALLOWLIST],
+            enabled: true,
+            version: ENRICHMENT_CONTRACT_VERSION,
+          },
+        ]),
+    },
+    now: () => new Date(),
+    report: (outcome) => {
+      fixture.outcomes.push(outcome);
+      if (fixture.reporterFailure !== null) throw fixture.reporterFailure;
+    },
   };
 }
 
@@ -322,6 +466,11 @@ function adaptersFor(psps: readonly PspId[]): CheckoutAdapters {
     adapterFor: (psp: PspId) => table.get(psp),
     returnUrl: 'https://merit.test/checkout/return',
     cancelUrl: 'https://merit.test/checkout/cancel',
+    // Read from the fixture rather than captured, so a case can install the
+    // wiring after the adapters are.
+    get enrichment(): CheckoutEnrichment | null {
+      return fixture.enrichment;
+    },
   };
 }
 
@@ -921,5 +1070,290 @@ describe('recomputeDiscount', () => {
       expect(outcome.discountCents).toBeLessThanOrEqual(SIZE.priceCents);
       expect(outcome.discountCents).toBeGreaterThanOrEqual(0n);
     }
+  });
+});
+
+// =============================================================================
+// ADR-023 STEP 1: ENRICHMENT OBSERVES, AND THE TWO PLACES IT COULD STOP
+// =============================================================================
+// ADR-115's title is "the two places observe mode could quietly become
+// enforcement are closed by shape rather than by discipline", and its clause 2
+// is both of them:
+//
+//   1. A RETURN VALUE A CALL SITE COULD BRANCH ON, closed by `Promise<void>`.
+//   2. A THROW THAT PROPAGATES INTO CHECKOUT'S TRANSACTION, closed by a `catch`
+//      that makes `observeEnrichment` total. A throw inside the transaction is a
+//      `ROLLBACK`, so a propagating enrichment failure is enforcement by
+//      exception, and enforcement by exception is a SILENT decline.
+//
+// BOTH ARE PROPERTIES OF THE CALL SITE AND NOT OF THE PACKAGE, which is why they
+// are asserted here as well as in `packages/enrichment/test/observe.test.ts`. A
+// package that decides nothing becomes enforcement at the site that calls it.
+//
+// THE NEGATIVE CONTROL IS THE `answeringVendor('maximal')` CASE AND IT IS NOT
+// OPTIONAL. A suite that only ever seeded failures would pass against a call
+// site that never calls enrichment at all, which is DELTA_MANIFEST section 13's
+// own lesson: "every probe in section 10 attempted a forbidden thing and
+// asserted a rejection, so EVERY ONE OF THEM PASSES AGAINST A GUARD THAT REJECTS
+// EVERYTHING." So the worst answer a vendor can give is asserted to commit the
+// same purchase AND to have been recorded.
+
+/** The response with enrichment unwired, which every enrichment case compares against. */
+async function baselineCheckout(): Promise<Record<string, unknown>> {
+  fixture.enrichment = null;
+  const res = await call({
+    method: 'POST',
+    path: CHECKOUT_PATH,
+    token: TOKEN,
+    payload: checkoutBody(),
+  });
+  expect(res.statusCode).toBe(200);
+  const body = res.json() as Record<string, unknown>;
+  fixture = freshFixture();
+  return body;
+}
+
+/** A response with the two per-attempt fields dropped, so two runs are comparable. */
+function comparable(body: Record<string, unknown>): Record<string, unknown> {
+  const { purchase_id: _id, payment_session: _session, ...rest } = body;
+  return rest;
+}
+
+describe('enrichment observes and decides nothing (ADR-023 step 1, ADR-115)', () => {
+  it('PLACE 1: the call site binds nothing, and this file says no decision word', () => {
+    // A SOURCE-READING ASSERTION, because a behavioural one cannot see this.
+    // `observeEnrichment` returns `Promise<void>`, so a call site that bound and
+    // branched on its result would not compile today; the failure mode this
+    // guards is the day somebody widens the return type and the nearest caller
+    // quietly starts reading it. ADR-115's seed `S-1` is that shape.
+    const source = readFileSync(new URL('../src/routes/checkout.ts', import.meta.url), 'utf8');
+
+    const calls = source.split('\n').filter((line) => line.includes('observeEnrichment('));
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.trim()).toBe('await observeEnrichment(tx.enrichment, {');
+
+    // No `const x = await observeEnrichment`, no `void`, and no `.then` or
+    // `.catch` chained onto the statement: the call is awaited and its value
+    // goes nowhere, which is the only shape `Promise<void>` should ever have.
+    expect(source).not.toMatch(/=\s*await\s+observeEnrichment/);
+    expect(source).not.toMatch(/void\s+observeEnrichment/);
+    expect(source).not.toMatch(/observeEnrichment\([\s\S]*?\}\);\s*\./);
+
+    // And nothing in this route reads a score, a band or a threshold. ADR-115
+    // clause 1: observe mode writes no `risk_flags` row and the score has no
+    // persisted column, so a checkout that named one would be inventing it.
+    for (const word of ['riskBp', 'FootprintScore', 'scoreAssessment', 'severity']) {
+      expect(source).not.toContain(word);
+    }
+  });
+
+  it('PLACE 2: a vendor that never answers does not roll back the purchase', async () => {
+    // THE APPROVAL LINE'S SECOND HALF. `hangingVendor` returns a promise that
+    // never settles and IGNORES the abort signal deliberately, so what is
+    // measured is the route's own 800ms budget rather than an adapter's manners.
+    const baseline = await baselineCheckout();
+    fixture.enrichment = enrichmentWith(hangingVendor());
+
+    const startedAt = Date.now();
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(res.statusCode).toBe(200);
+    expect(comparable(res.json() as Record<string, unknown>)).toEqual(comparable(baseline));
+    expect(fixture.committed.purchases).toHaveLength(1);
+    expect(fixture.committed.purchases[0]?.amountPaidCents).toBe(SIZE.priceCents);
+
+    // The outcome is REPORTED and not returned, which is the whole shape.
+    expect(fixture.outcomes.map((o) => o.kind)).toEqual(['timed_out']);
+    expect(fixture.outcomes[0]?.failure).toBe(
+      `no answer within ${String(ENRICHMENT_TIMEOUT_MS)}ms`,
+    );
+
+    // The transaction really was held open for the budget and no longer. The
+    // upper bound is generous because it is a wall clock on shared CI; the point
+    // of the lower bound is that the race was actually run.
+    expect(elapsedMs).toBeGreaterThanOrEqual(ENRICHMENT_TIMEOUT_MS - 50);
+
+    // THE SUBJECT LEFT MERIT, SO THE DISCLOSURE IS RECORDED EVEN THOUGH NOTHING
+    // CAME BACK. ADR-115 clause 4: "a vendor that received a buyer's email and
+    // then failed to answer received it exactly as much as one that answered."
+    expect(fixture.committed.dispatches).toHaveLength(1);
+    expect(fixture.committed.dispatches[0]?.['status']).toBe('failed');
+    expect(fixture.committed.dispatches[0]?.['idempotencyKey']).toBe(
+      `${ENRICHMENT_EVENT_NAME}:${String(fixture.committed.purchases[0]?.id)}`,
+    );
+  });
+
+  it('PLACE 2: a vendor that throws does not roll back the purchase', async () => {
+    const baseline = await baselineCheckout();
+    fixture.enrichment = enrichmentWith(failingVendor('vendor exploded'));
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(comparable(res.json() as Record<string, unknown>)).toEqual(comparable(baseline));
+    expect(fixture.committed.purchases).toHaveLength(1);
+    expect(fixture.outcomes.map((o) => o.kind)).toEqual(['vendor_error']);
+    expect(fixture.outcomes[0]?.failure).toBe('vendor exploded');
+  });
+
+  it('PLACE 2: a REPORTER that throws does not roll back the purchase', async () => {
+    // ADR-115's control 3, one layer out: "an observability call that can abort a
+    // purchase is the identical defect wearing a different hat." Seeded here
+    // rather than in the package because the sink is the ROUTE's, not the
+    // package's.
+    const baseline = await baselineCheckout();
+    fixture.enrichment = enrichmentWith(answeringVendor('clean'));
+    fixture.reporterFailure = new Error('the log sink is down');
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(comparable(res.json() as Record<string, unknown>)).toEqual(comparable(baseline));
+    expect(fixture.committed.purchases).toHaveLength(1);
+  });
+
+  it('THE NEGATIVE CONTROL: a MAXIMAL risk score commits the same purchase', async () => {
+    // Every reading at its worst: `reputationBp: 0`, `footprintPresent: false`,
+    // `datacenter: true`. ADR-115 clause 1 rules that no `risk_flags` row is
+    // written and the score has no persisted column, so the worst answer
+    // available changes exactly nothing about what checkout returns.
+    const baseline = await baselineCheckout();
+    fixture.enrichment = enrichmentWith(answeringVendor('maximal'));
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(comparable(res.json() as Record<string, unknown>)).toEqual(comparable(baseline));
+    expect(fixture.committed.purchases).toHaveLength(1);
+
+    // AND IT WAS ACTUALLY REACHED. Without this the four cases above would pass
+    // against a route that never calls enrichment at all.
+    expect(fixture.outcomes.map((o) => o.kind)).toEqual(['recorded']);
+    expect(fixture.outcomes[0]?.signalsInserted).toBe(1);
+    expect(fixture.committed.signals).toHaveLength(1);
+
+    // The score is CARRIED IN THE OUTCOME AND STORED NOWHERE, which is ADR-115
+    // clause 1: no `risk_flags` row, no `severity`, no persisted column, and no
+    // mapping from one to the other. It is integer basis points on
+    // `identity_links.confidence_bp`'s 0 to 10000 scale, never a float.
+    const score = fixture.outcomes[0]?.score;
+    expect(score?.kind).toBe('scored');
+    if (score?.kind === 'scored') {
+      expect(Number.isInteger(score.riskBp)).toBe(true);
+      expect(score.riskBp).toBeGreaterThan(0);
+      expect(score.riskBp).toBeLessThanOrEqual(SCORE_SCALE_BP);
+    }
+  });
+
+  it('sends the IP and nothing else, because checkout holds nothing else', async () => {
+    fixture.enrichment = enrichmentWith(answeringVendor('clean'));
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    expect(res.statusCode).toBe(200);
+    // Four of the five facets are ABSENT rather than empty: `CheckoutRequest`
+    // carries a plan, a size, a coupon code, a click token and TOS ids, and
+    // `AuthSession` carries ids. The contract row below permits all five, so
+    // what narrows the disclosure here is what the route HAS.
+    expect(fixture.outcomes[0]?.fieldsSent).toEqual(['ip']);
+    expect(ENRICHMENT_FIELD_ALLOWLIST).toContain('ip');
+    expect(ENRICHMENT_CONTRACT_VERSION).toBe(1);
+    expect(ENRICHMENT_INTEGRATION).toBe('enrichment');
+  });
+
+  it('records NOTHING when the deployment wires no vendor, and commits anyway', async () => {
+    // `PRODUCTION_CHECKOUT_ADAPTERS.enrichment` is `null`, which is ADR-115
+    // clause 4's "no enabled contract row means no call at all" reached one step
+    // earlier: no vendor, no disclosure, no signal, and a checkout that commits
+    // exactly as it would have.
+    fixture.enrichment = null;
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(fixture.committed.purchases).toHaveLength(1);
+    expect(fixture.outcomes).toEqual([]);
+    expect(fixture.committed.signals).toEqual([]);
+    expect(fixture.committed.dispatches).toEqual([]);
+  });
+
+  it('discards the observation when the purchase itself rolls back', async () => {
+    // The direction `packages/enrichment/src/tx.ts` exists for: "an observation
+    // of a checkout that DID NOT HAPPEN is worse than no observation, because
+    // ADR-023's whole purpose in observe mode is to learn the distribution on
+    // Merit's own traffic and a distribution polluted by abandoned checkouts is
+    // not that." Session 220's attribution seed is what rolls this one back.
+    fixture.enrichment = enrichmentWith(answeringVendor('clean'));
+    fixture.attributionFailure = new Error('attribution write failed');
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody({ affiliate_click_token: CLICK_TOKEN }),
+    });
+
+    expect(res.statusCode).toBe(500);
+    expect(fixture.committed.purchases).toEqual([]);
+    expect(fixture.committed.signals).toEqual([]);
+    expect(fixture.committed.dispatches).toEqual([]);
+    // The attribution write is BEFORE the observation, so enrichment never ran.
+    expect(fixture.outcomes).toEqual([]);
+  });
+
+  it('reports a failed enrichment write rather than throwing it at checkout', async () => {
+    // WHAT THIS FIXTURE CAN AND CANNOT SHOW. ADR-115 clause 2: when a write this
+    // package issues fails, the caller's transaction is ALREADY aborted before
+    // the catch runs, its `COMMIT` is already a `ROLLBACK`, and swallowing the
+    // error changes only that checkout is not ALSO handed a second exception
+    // from a path that decides nothing. A JavaScript staging store does not
+    // enter an aborted state, so what is asserted here is the half that IS true
+    // here: the throw does not escape `observeEnrichment`, and the failure is
+    // reported as `record_failed` rather than being absent. THE ROLLBACK IS
+    // POSTGRES'S AND IS NOT OBSERVABLE IN THIS SUITE.
+    fixture.enrichment = enrichmentWith(answeringVendor('clean'));
+    fixture.enrichmentWriteFailure = new Error('identity_signals insert failed');
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(fixture.outcomes.map((o) => o.kind)).toEqual(['record_failed']);
+    expect(fixture.outcomes[0]?.failure).toBe('identity_signals insert failed');
   });
 });
