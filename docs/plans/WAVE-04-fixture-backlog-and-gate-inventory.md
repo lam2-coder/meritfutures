@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [../STATE.md, ../decisions/ALLOCATION.md, ../testing/STRATEGY.md, ../testing/golden-scenarios/README.md, WAVE-03-duplicate-registry-keys.md]
-last_updated: 2026-08-20
+last_updated: 2026-08-27
 ---
 
 # WAVE-04: the fixture backlog and the gate inventory, eight sessions, six of them concurrent
@@ -364,6 +364,20 @@ the third is a reading, and `ADR-072` is where it is settled.
 the defect this wave is partly about rather than an exception to it.** `ADR-074` decides
 whether `OI` gets a table. Until it does, this row is the only place the two numbers are
 claimed, which is exactly how `SD-M6-nn` and `M6-N-nn` were allocated one wave ago.
+
+**`OI-25` IS CLOSED, ON 2026-08-27, AND THIS SECTION IS ITS ORIGIN RATHER THAN ITS OWNER
+(session 245, [ADR-133](../decisions/ADR-133.md)).** The item this table opened is the one
+sentence in section 2 that everything after it inherits: the backlog is arrived at BY
+SUBTRACTION. Every count in
+[section 39](../testing/golden-scenarios/39-fixture-status-and-blockers.md)'s two summary
+tables, and the row total in its opening sentence, is now a generated span whose query is
+[`fixture-backlog.mjs`](../../scripts/corpus/fixture-backlog.mjs) reading the rows below, so
+the number is read and can no longer be typed. **`ADR-076` was expected to close this and did
+not**, which the [ALLOCATION](../decisions/ALLOCATION.md) row records rather than drops.
+
+**Both numbers now live in a registry**, which is what the paragraph above said was owed:
+`ADR-074` gave `OI` its table and [ALLOCATION](../decisions/ALLOCATION.md) carries it, so this
+plan document is no longer the only place either is claimed.
 
 ---
 
