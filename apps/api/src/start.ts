@@ -60,8 +60,15 @@ import { LIVE_DB } from './db.ts';
 import { main } from './index.ts';
 import { databaseAccountsBackend, useAccountsBackend } from './routes/accounts.ts';
 import { useAuthBackend } from './routes/auth.ts';
+import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
 
 useAuthBackend(databaseAuthBackend(LIVE_DB));
 useAccountsBackend(databaseAccountsBackend(LIVE_DB));
+
+// The catalogue and the purchase list, over the SAME two doors. `catalog.ts`
+// holds both halves of its port and this is the one line that installs them; a
+// process that never ran this file answers 503 on all three of its routes and
+// says so, exactly as it does for auth.
+useCatalogReads(databaseCatalogReads(LIVE_DB));
 
 await main();
