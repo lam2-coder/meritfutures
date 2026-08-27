@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, data-model/README.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md]
-last_updated: 2026-08-16
+last_updated: 2026-08-27
 ---
 
 # Events (Constitution §2 "everything is an event")
@@ -192,6 +192,24 @@ Breach uses strict `<` against the floor: touching the floor exactly is not a br
 | `batch.failed` | Worker | `{ run_id, stage, account_cursor, error }` | ALERT |
 
 `ingest.correction_received` and `replay.divergence_detected` are the two events that must never be quiet. A correction that changes a settled payout's basis is absorbed and never clawed back (B4 #5), but it is always flagged, always evidenced, and always visible in the account timeline.
+
+### 5.4 The live feed (ADR-020 tier 2, ADR-161)
+
+[ADR-020](../decisions/ADR-020.md)'s tier 2 streams indicative values into the live cache. **Feed loss is a first-class state rather than an error** ([M02 section 3.5](../plans/M02-rithmic-bridge.md)), and [RB-05](../ops/runbooks/RB-05-rithmic-sftp-failure.md) step 1 already tells an operator to confirm every live surface fell back, which assumes a detection that has to exist somewhere.
+
+**Nothing below is produced by the feed, and nothing below is produced by the streaming ingest.** A feed that stops opens no transaction, so section 1's delivery rule would have nothing to attach an event to; and `INV-M2-14` makes streaming ingest **write-only into the live cache**, so a process that also wrote `events` would be a second writer in the one place the corpus describes as having exactly one. **The producer of every row here is the expectation sweep**, whose own expectation row changing state IS the transaction the event is written in. That is the same shape `report_deliveries.due_at` and `economic_calendar_loads`' coverage bound already use: an absence is only detectable against an expectation.
+
+| Event | Producer | Payload | Consumers |
+|---|---|---|---|
+| `feed.stalled` | Worker, expectation sweep | `{ feed, trading_day, expected_by, last_tick_at, elapsed_minutes, accounts_expected }` | ALERT, FEED |
+| `feed.resumed` | Worker, expectation sweep | `{ feed, trading_day, stalled_since, elapsed_minutes }` | ALERT, FEED |
+| `feed.gap_detected` | Worker, expectation sweep | `{ feed, account_id, trading_day, last_sequence, received_sequence }` | ALERT, FEED |
+
+**`feed.gap_detected` reads an ordinal and never a timestamp.** `LiveAccountTick.sequence` is 1-based per account per trading day, and a consumer that has seen `n` and receives `n + 2` has lost a tick; a timestamp comparison cannot tell a lost tick from a quiet market, which is the whole reason the ordinal exists. **At most one per feed, account and trading day**, on section 12 item 3's reasoning about a family that is high volume and low value individually: the second gap in a session tells an operator nothing the first did not.
+
+**There is no `feed.connected` and no `feed.disconnected`.** A connection lifecycle is per process, so a deploy would page and a socket that reconnects in a second would look identical to one that never came back. The alarm-worthy fact is the absence measured against the expectation, which is what `feed.stalled` carries.
+
+**None of these is a command, and tier 2 failing is not a money incident.** Indicative data never feeds an eligibility, breach, or money decision ([ADR-020](../decisions/ADR-020.md)'s hard rule), so no consumer here may pause sales, hold a payout, or touch a rule state, and the family is not part of section 10's evidence pack: an evidence pack reconstructs an account's money history and no number in this family entered one.
 
 ## 6. Payouts
 
