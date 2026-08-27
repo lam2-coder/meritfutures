@@ -923,18 +923,24 @@ export function databaseAccountsBackend(db: ApiDb): AccountsBackend {
       return await snapshotFrom([read.account], read.ruleStates, read.kyc);
     },
 
+    // IT REJECTS RATHER THAN THROWING SYNCHRONOUSLY, which is `db.ts`'s own
+    // ruling about its guard: "a method whose type says `Promise<T>` and which
+    // sometimes throws before returning one is the shape a caller writing
+    // `db.scoped(...).catch(...)` gets wrong".
     readProgress(): Promise<AccountProgress> {
-      throw new AccountsBackendUnwired(
-        'readProgress',
-        'section 6 types `win_days.need`, `win_days.floor_cents`, `traded_days.need`, ' +
-          '`cadence.need` and `ladder.payouts_to_graduate` as NON-NULLABLE, and every one is a ' +
-          'plan parameter. `0004_catalog.sql`: there is no plan parameter anywhere in ' +
-          'application code, and the sanctioned reader of `plan_versions.rules` is ' +
-          '`resolvePlan` in `@merit/rules-engine`, which `apps/api` does not declare. ' +
-          '`cadence.next_eligible_trading_day` is worse than undeclared: `trading_calendar` is ' +
-          'refused registration in `packages/db/src/schema.ts` because `0032` carries an ' +
-          '`ALTER TABLE ... DROP NOT NULL` that ADR-094 refuses, so it is in neither `TABLES` ' +
-          'nor `SCOPE_RULES` and no scope class reaches it. See ADR-139',
+      return Promise.reject(
+        new AccountsBackendUnwired(
+          'readProgress',
+          'section 6 types `win_days.need`, `win_days.floor_cents`, `traded_days.need`, ' +
+            '`cadence.need` and `ladder.payouts_to_graduate` as NON-NULLABLE, and every one is a ' +
+            'plan parameter. `0004_catalog.sql`: there is no plan parameter anywhere in ' +
+            'application code, and the sanctioned reader of `plan_versions.rules` is ' +
+            '`resolvePlan` in `@merit/rules-engine`, which `apps/api` does not declare. ' +
+            '`cadence.next_eligible_trading_day` is worse than undeclared: `trading_calendar` is ' +
+            'refused registration in `packages/db/src/schema.ts` because `0032` carries an ' +
+            '`ALTER TABLE ... DROP NOT NULL` that ADR-094 refuses, so it is in neither `TABLES` ' +
+            'nor `SCOPE_RULES` and no scope class reaches it. See ADR-139',
+        ),
       );
     },
   };
