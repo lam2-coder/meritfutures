@@ -45,22 +45,41 @@ import type { ReactElement } from 'react';
 
 import { toAccountList } from '../../view/accounts.ts';
 import { AccountListScreen } from './account-list.ts';
-import { accountsSource } from './ports.ts';
+import { load } from './source.ts';
+import { AccountsError, AccountsUnavailable } from './states.ts';
 
 /** Never prerendered, never cached. See the header. */
 export const dynamic = 'force-dynamic';
 
+/** The heading every arm of this screen carries. One string, one screen. */
+const HEADING = 'Accounts';
+
 /**
  * `/accounts`.
  *
- * IT THROWS TODAY, and the throw is `AccountsSourceNotWiredError` from
- * ./ports.ts rather than anything this file decides. The portal has screens and
- * no transport, and ./ports.ts states why a rendering session is not the one to
- * write the client. The alternative, a page that caught the absence and drew an
- * empty list, would render a trader who holds no accounts and a portal that
- * cannot reach the API as the same screen.
+ * IT PERFORMS `GET /api/v1/accounts` NOW, through ADR-162's client, carrying
+ * the trader's `merit_session` cookie forward from the inbound request.
+ * ./ports.ts used to throw here and stated why a rendering session was not the
+ * one to write a transport; ./source.ts is that transport's caller and this
+ * file is the branch.
+ *
+ * THREE ARMS AND NOT TWO, WHICH IS THE WHOLE OF WHAT THIS FILE DECIDES. The old
+ * throw's argument was that "a page that caught the absence and drew an empty
+ * list would render a trader who holds no accounts and a portal that cannot
+ * reach the API as the same screen", and it survives intact: only `ready`
+ * reaches ./account-list.ts, so a zero-length list there still means one thing.
+ * What the third arm adds is the distinction the payout centre cannot make
+ * (ADR-162 section 5 item 1): an endpoint that refused is not an endpoint that
+ * does not exist yet, and this screen says a different sentence for each.
  */
 export default async function AccountsPage(): Promise<ReactElement> {
-  const { accounts } = await accountsSource().list();
-  return createElement(AccountListScreen, { accounts: toAccountList(accounts) });
+  const loaded = await load();
+
+  if (loaded.kind === 'unavailable')
+    return createElement(AccountsUnavailable, { heading: HEADING, missing: loaded.missing });
+
+  if (loaded.kind === 'error')
+    return createElement(AccountsError, { heading: HEADING, error: loaded.error });
+
+  return createElement(AccountListScreen, { accounts: toAccountList(loaded.accounts) });
 }
