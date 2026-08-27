@@ -180,6 +180,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-158](ADR-158.md) | the wallet surface enters the contract, and every row that disagreed with a plan was written from the CHECK  (2026-08-27, status: proposed) |
 | [ADR-159](ADR-159.md) | an event NAME becomes a catalogue ROW only where every field is a column or a named mirror, and the reservation that funded this entry named a different catalogue  (2026-08-27, status: proposed) |
 | [ADR-161](ADR-161.md) | the live tier enters `API_CONTRACT` as a PAYLOAD rather than as an endpoint, its degradation is one object rather than two messages, and `feed.*` is produced by the sweep and never by the feed  (2026-08-27, status: proposed) |
+| [ADR-164](ADR-164.md) | the live cache is a Postgres table reachable only by a fifth role, and the grant that makes `INV-M2-14` structural is a REVOKE against `0026`'s own default  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

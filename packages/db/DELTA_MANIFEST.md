@@ -8,23 +8,23 @@ last_updated: 2026-08-23
 
 **The completeness gate reads this file.** [ADR-026](../../docs/decisions/ADR-026.md) requires that every `SD-nn` and `U-nn` appearing anywhere in `docs/` appears **exactly once** here with a disposition. A count nobody can drift is better than a count someone remembers to update.
 
-<!--gen:manifest_changes-->117<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+<!--gen:manifest_changes-->118<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
 
 **The count moved from 93 to 94 by founder ruling (2026-08-14).** `U-06` is the sixth unnumbered change, found while folding. [ADR-026](../../docs/decisions/ADR-026.md)'s table of five did not carry it. See section 5.
 
-**It moved from 94 to <!--gen:manifest_changes-->117<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
-<!--gen:manifest_changes-->117<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
-**It moved from 94 to <!--gen:manifest_changes-->117<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
-<!--gen:manifest_changes-->117<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
-**It moved from 94 to <!--gen:manifest_changes-->117<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
-<!--gen:manifest_changes-->117<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
-**It moved from 94 to <!--gen:manifest_changes-->117<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
-<!--gen:manifest_changes-->117<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
-**It moved from 94 to <!--gen:manifest_changes-->117<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
-<!--gen:manifest_changes-->117<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
-**It moved from 94 to <!--gen:manifest_changes-->117<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
-<!--gen:manifest_changes-->117<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
-**It moved from 94 to <!--gen:manifest_changes-->117<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+**It moved from 94 to <!--gen:manifest_changes-->118<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+<!--gen:manifest_changes-->118<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+**It moved from 94 to <!--gen:manifest_changes-->118<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+<!--gen:manifest_changes-->118<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+**It moved from 94 to <!--gen:manifest_changes-->118<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+<!--gen:manifest_changes-->118<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+**It moved from 94 to <!--gen:manifest_changes-->118<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+<!--gen:manifest_changes-->118<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+**It moved from 94 to <!--gen:manifest_changes-->118<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+<!--gen:manifest_changes-->118<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+**It moved from 94 to <!--gen:manifest_changes-->118<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
+<!--gen:manifest_changes-->118<!--/gen--> **schema changes in scope: 96 numbered, 7 unnumbered.** No delta was rejected. 100 land in the v1 core sequence and 3 in the marked reserved sequence.
+**It moved from 94 to <!--gen:manifest_changes-->118<!--/gen--> on 2026-08-16, with [ADR-039](../../docs/decisions/ADR-039.md) and [`0029`](migrations/0029_phone_identity_and_auth.sql).** Nine changes: eight numbered and `U-07`. See section 5a. **The total is a [CI-06g](../../docs/testing/STRATEGY.md) span now** and the split beside it is not, because no query parses the numbered and unnumbered halves apart; that split is prose and drifts like prose, which is the position [ADR-036](../../docs/decisions/ADR-036.md) records for the State column one registry over.
 
 Migrations are sacred: once merged, never edited, only superseded. Greenfield rule: every delta is **folded at create**, not applied as a base-plus-ALTER chain, because the repository contains no application code and no database.
 
@@ -32,10 +32,10 @@ Migrations are sacred: once merged, never edited, only superseded. Greenfield ru
 
 ## 1. The migration sequence
 
-<!--gen:migration_files-->49<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
-<!--gen:migration_files-->49<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
-<!--gen:migration_files-->49<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
-<!--gen:migration_files-->49<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->50<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->50<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->50<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
+<!--gen:migration_files-->50<!--/gen--> files. Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 **The v1 core sequence is these 27 files.** Money-path files open with an `E2 READ: MONEY PATH` header naming what needs the founder's line-by-line read and why.
 
 **Superseding migrations are not added to this table**, because it is the record of where each delta was **folded** and a supersession folds no delta. Each arrives instead in its own dated section with the execution that justified it: `0028` in section 13, `0030` and `0031` in section 14. The file count on disk is a generated span in [INDEX](../../docs/INDEX.md) and [STATE](../../docs/STATE.md) rather than a sentence here, for the reason section 12 records at length.
@@ -234,7 +234,7 @@ Both are cycle breaks on a column that is created with its table, not a delta ap
 
 **`SD-M6-07`'s load-bearing half is the delivery log and not the schedule**, and the reason is [M05](../../docs/plans/M05-payout-system.md):91 `INV-M5-18` rather than anything new. That invariant is asserted *"on the QUERY, never on the job"*, evaluated independently of whether the sweep reported success, on the stated ground that **a job that reports success is not evidence that the work happened**. A second sweep with the same shape gets the same control rather than a new one: the delivery-failure alarm reads `report_deliveries` and never the job's own report, and `GS-288` pins the case where the job reports success and nothing arrived. **`due_at` is what makes that askable**, because without a stored window "nothing arrived" and "not due yet" return the same empty set, which is [`economic_calendar_loads`](../../docs/architecture/data-model/economic_calendar_loads.md)'s coverage bound one table over and one row up.
 
-**`0040` was executed rather than only read, and two of the twenty-four assertions were refused by a constraint other than the one they were aimed at.** All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 under `ON_ERROR_STOP` with zero errors, and 24 assertions ran against the applied schema, 24 / 24: four successes first, on section 13's lesson that a probe which only attempts forbidden things passes against a guard that rejects everything.
+**`0040` was executed rather than only read, and two of the twenty-four assertions were refused by a constraint other than the one they were aimed at.** All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 under `ON_ERROR_STOP` with zero errors, and 24 assertions ran against the applied schema, 24 / 24: four successes first, on section 13's lesson that a probe which only attempts forbidden things passes against a guard that rejects everything.
 
 | Aimed at | What actually refused it |
 |---|---|
@@ -477,11 +477,11 @@ Run before the workflow's first push, so [CI-06h](../../docs/testing/STRATEGY.md
 
 ## 14. `0029` lands, and forty-eight assertions are executed (2026-08-16)
 
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->49<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->112<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->49<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->112<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->49<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->112<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->49<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->112<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
-**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->49<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->112<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->50<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->113<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->50<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->113<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->50<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->113<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->50<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->113<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
+**[`0029_phone_identity_and_auth.sql`](migrations/0029_phone_identity_and_auth.sql), [ADR-039](../../docs/decisions/ADR-039.md).** The full <!--gen:migration_files-->50<!--/gen-->-file set applies forward-only from empty against PostgreSQL 16 with `ON_ERROR_STOP=1`, re-applying it is rejected, and the database reports **<!--gen:sql_tables-->113<!--/gen--> tables, 340 indexes, 381 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**. No file was edited to make that pass.
 
 **The deltas relative to `0028`'s figures are +3 tables, +14 indexes, +34 check constraints, +0 triggers.** `0029` installs **no trigger and no function**, which is why the trigger count does not move and why [CI-06j](../../docs/testing/STRATEGY.md) has nothing new to resolve. The hard link's severity-5 flag is application logic, not a trigger, because [ADR-039](../../docs/decisions/ADR-039.md) rules that it changes no state automatically and a trigger that opens a flag **is** automatic state.
 
@@ -731,11 +731,11 @@ A gate nobody has watched fail is not a gate ([STRATEGY](../../docs/testing/STRA
 
 The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that object counts are not repeated there **and then repeated them one sentence later** ("30 files and 97 / 331 / 351 / 6"). `0032` landed the same day and made all four wrong. **A count in a comment was found wrong twice in one file on one day**, the second time inside the comment documenting the first. The figures are gone rather than corrected; the job derives them on every run and this file records them dated.
 
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->112<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->49<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->112<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->49<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->112<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->49<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->112<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->49<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
-**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->112<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->49<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->113<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->50<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->113<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->50<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->113<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->50<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->113<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->50<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
+**The live figures on the whole set**, derived from the database rather than from a grep: **<!--gen:sql_tables-->113<!--/gen--> tables, 351 indexes, 397 check constraints, <!--gen:sql_triggers-->20<!--/gen--> triggers**, across <!--gen:migration_files-->50<!--/gen--> files. **The words "the full 32-file set" are gone from this sentence and the span beside them is not**, which is the same one-adjective correction section 12 records: the number is derived and the adjective was not, so `0033` landing would have made the sentence disagree with its own span. **The index and check figures are hand-maintained and were unmoved by `0033`**, which is luck rather than a control and is why section 17 re-derives all four.
 
 ---
 
@@ -845,10 +845,10 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
-**All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
-**All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
-**All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
+**All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep:
 
 | | Before `0033` | After `0033` |
 |---|---|---|
@@ -923,10 +923,10 @@ The header of [`corpus.yml`](../../.github/workflows/corpus.yml) declared that o
 
 ### Install verification, from empty
 
-**All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
-**All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
-**All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
-**All <!--gen:migration_files-->49<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
+**All <!--gen:migration_files-->50<!--/gen--> files apply forward-only from empty against PostgreSQL 16.13 with `ON_ERROR_STOP`, zero errors**, and the counts are read from the catalogue rather than from a grep:
 
 | | Before `0034` | After `0034` |
 |---|---|---|
@@ -1671,3 +1671,111 @@ assert_append_only_grants: falsified in both directions, and the seed did not le
 **`treasury_balances` is NOT made append-only.** `RESERVE-C1` proves the copy was true when it was written, and a later correction to an attestation is outside what a trigger on the citing table can see. That limit is named in `0049`'s header rather than left to be discovered.
 
 **`CI-06w` is NOT extended to the `OI` table**, which ALLOCATION names as the check that would have caught session 120. `scripts/corpus/` was outside this session's fence apart from `CI-06h`'s needle list.
+
+## 27. `0050` lands, and the hazard it answers was executed before it was believed (2026-08-27)
+
+**[ADR-164](../../docs/decisions/ADR-164.md) proposed, founder approval PENDING. `MONEY PATH, E2 READ OWED`.** [P6 section 10 item 1](../../docs/plans/P6-live-tier.md) held `P6-c` for a founder answer, that answer was delegated to session 278, and reading 1 of the three is taken: **a Postgres table plus a fifth role**.
+
+| Delta | Table | Change | Migration | Status |
+|---|---|---|---|---|
+| SD-M2-07 | new `live_account_state` | [ADR-020](../../docs/decisions/ADR-020.md) tier 2's live cache, one row per account, plus the fifth role `merit_live` and the `REVOKE` that takes `0026`'s default privileges back from `merit_app` | 0050 | **landed** |
+
+**This is the first `SD-M2-nn` since the fold and it is deliberately NOT added to section 3's table**, whose heading states a count of that batch. A row here satisfies [ADR-026](../../docs/decisions/ADR-026.md)'s completeness gate, which reads the file for pipe-leading rows and not for a section.
+
+### The default-privileges hazard, executed rather than asserted
+
+**`0026` ends with `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO merit_app`, so the sentence [P6 section 3.3](../../docs/plans/P6-live-tier.md) opens with -- that the separation gets FURTHER AWAY when a table is added -- is a claim about a running database.** It was run, on the tree with `0001` to `0049` applied from empty and before `0050` existed:
+
+```
+=== A. THE HAZARD IS REAL: 0026 default privileges on a table created after it ===
+                  probe                  | sel | ins | upd | del
+-----------------------------------------+-----+-----+-----+-----
+ merit_app on a NEW table with no revoke | t   | t   | t   | t
+```
+
+**A bare `CREATE TABLE zz_hazard_demo (id int)` is fully readable and writable by the application role on the instant it exists.** Nothing grants it and nothing has to.
+
+### Install verification against PostgreSQL 16 (2026-08-27)
+
+**PostgreSQL 16.13, forward-only apply from empty under `ON_ERROR_STOP=1`, all 50 files in filename order: exit 0.** Counts read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep, on two databases built the same way so the delta is measured and not inferred.
+
+| | `0001`..`0049` | `0001`..`0050` | Delta |
+|---|---|---|---|
+| Tables (`pg_tables`, schema `public`) | 112 | **113** | +1, `live_account_state` |
+| Indexes (`pg_indexes`) | 395 | **396** | +1, the primary key's |
+| `CHECK` constraints (`pg_constraint`, `contype='c'`) | 477 | **479** | +2, `sequence_is_positive` and `is_indicative` |
+| All constraints (`pg_constraint`) | 773 | **777** | +4, the two `CHECK`s, the primary key and the `accounts` foreign key |
+| Triggers (`pg_trigger`, not internal) | 20 | **20** | **+0, and that is the ruling rather than an omission**: [ADR-164](../../docs/decisions/ADR-164.md) `F6` refuses a monotonicity trigger and gives the guard to `P6-f`'s upsert predicate |
+
+### The grant probe, in both directions, which is the whole claim
+
+**Run against the `0001`..`0050` database. The row that matters is the second: a `t` anywhere in it would mean the stats worker can read the indicative tier.**
+
+```
+=== B. merit_app MUST NOT REACH THE CACHE (FM-M12-08, DEP-M12-08) ===
+              probe              | sel | ins | upd | del
+---------------------------------+-----+-----+-----+-----
+ merit_app on live_account_state | f   | f   | f   | f
+
+=== C. merit_live MUST REACH THE CACHE, AND MUST NOT HOLD DELETE ===
+              probe               | sel | ins | upd | del
+----------------------------------+-----+-----+-----+-----
+ merit_live on live_account_state | t   | t   | t   | f
+
+=== D. INV-M2-14: merit_live holds NOTHING on the four authoritative tables ===
+ authoritative_table | sel | ins | upd | del
+---------------------+-----+-----+-----+-----
+ fills               | f   | f   | f   | f
+ raw_ingest_rows     | f   | f   | f   | f
+ daily_marks         | f   | f   | f   | f
+ rule_states         | f   | f   | f   | f
+
+=== E. FM-M13-07 / PUBLIC: analytics and PUBLIC hold nothing on the cache ===
+      role       | sel | ins
+-----------------+-----+-----
+ merit_analytics | f   | f
+ public          | f   | f
+
+=== F. The one grant the ingest needs: the burn list, read only ===
+                probe                | sel | ins | upd | del
+-------------------------------------+-----+-----+-----+-----
+ merit_live on platform_account_refs | t   | f   | f   | f
+```
+
+### Five rejections watched firing, four of them by name
+
+**The constraints and the generated column were seeded rather than read.** The foreign key is dropped inside a transaction that rolls back, because the fixture under test is the check set and not the reference.
+
+```
+=== SUCCESS 1: the movement is the database's arithmetic, in integer cents ===
+ sequence | opening_equity_cents | equity_cents | intraday_movement_cents | indicative
+----------+----------------------+--------------+-------------------------+------------
+        1 |              5000000 |      4987325 |                  -12675 | t
+
+=== SUCCESS 2: a NEGATIVE movement, and equity through zero is accepted ===
+ sequence | equity_cents | intraday_movement_cents
+----------+--------------+-------------------------
+        2 |        -1200 |                -5001200
+
+=== REJECTION 1 ===
+ERROR:  new row for relation "live_account_state" violates check constraint
+        "live_account_state_sequence_is_positive"
+
+=== REJECTION 2 ===
+ERROR:  new row for relation "live_account_state" violates check constraint
+        "live_account_state_is_indicative"
+
+=== REJECTION 3 ===
+ERROR:  cannot insert a non-DEFAULT value into column "intraday_movement_cents"
+DETAIL:  Column "intraday_movement_cents" is a generated column.
+
+=== REJECTION 4: the belt, SET LOCAL ROLE merit_live; DELETE FROM live_account_state ===
+ERROR:  permission denied for table live_account_state
+
+=== REJECTION 5: SET LOCAL ROLE merit_app; SELECT count(*) FROM live_account_state ===
+ERROR:  permission denied for table live_account_state
+```
+
+**`SUCCESS 2` is the one worth keeping.** An account whose equity has gone through zero produces a movement of `-5,001,200` cents and the row is accepted, because a non-negative `CHECK` on either equity column would drop exactly the ticks a trader most needs to see. **Both figures are integer cents and neither passes through a float at any point.**
+
+**`REJECTION 5` is the claim of the whole file.** It is the stats worker's role, on the cache, refused by the database rather than by a reviewer.
