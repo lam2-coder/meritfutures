@@ -17,31 +17,52 @@
 // comes from and what the two `page.ts` files do when it does not arrive.
 //
 // -----------------------------------------------------------------------------
-// FOUR ENDPOINTS, THREE OF THEM REGISTERED, AND THE COUNT WAS BUILT NOT GREPPED
+// FOUR ENDPOINTS, AND THE COUNT WAS BUILT RATHER THAN GREPPED. TWICE
 // -----------------------------------------------------------------------------
 // `discoverRouteModules()` then `buildServer({ surface: 'public', modules })`,
-// reading `CompositionReport.registered` on this tree:
+// reading `CompositionReport.registered`. MEASURED TWICE, because the answer
+// moved between the two runs and the tense is the whole of what changed:
 //
-//   `GET /accounts`                          REGISTERED
-//   `GET /accounts/:accountId`               REGISTERED
-//   `GET /plans/:planId/versions/:version`   REGISTERED
-//   `GET /accounts/:accountId/marks`         NOT REGISTERED. Nothing serves it
+//                                          at e444ab6      after session 284
+//   `GET /accounts`                        REGISTERED      REGISTERED
+//   `GET /accounts/:accountId`             REGISTERED      REGISTERED
+//   `GET /plans/:planId/versions/:version` REGISTERED      REGISTERED
+//   `GET /accounts/:accountId/marks`       NOT REGISTERED  REGISTERED
 //
 // THE DISPATCH FOR THIS SESSION NAMED TWO OF THOSE FOUR AND CALLED THE SEGMENT
-// "all endpoints registered". It is not: the marks route is absent, which is
-// why SC-M4-03's screen below cannot reach `ready` from a browser today, and
-// `GET /accounts/:accountId` was registered and unnamed. A grep over route
-// files has been wrong twice in this repository and a dispatch has now been
-// wrong twice as well; the composition report is the only source either of
+// "all endpoints registered". At the SHA it was measured against it was wrong
+// in both directions: `GET /accounts/:accountId` was registered and unnamed,
+// and the marks route was named nowhere and served by nothing. A grep over
+// route files has been wrong twice in this repository and a dispatch has now
+// been wrong twice as well; the composition report is the only source either of
 // them can be checked against.
 //
+// SESSION 284 REGISTERED THE MARKS ROUTE WHILE THIS SEGMENT WAS BEING WIRED,
+// AND THE SCREEN STILL NAMES IT. That is not a stale measurement left standing:
+// the route exists and THIS APPLICATION STILL CANNOT READ IT, for two reasons
+// that are each somebody else's file.
+//
+//   THE PORTAL HAS NO TRANSCRIPTION OF THE LIST ENVELOPE. `apps/api/src/routes/
+//   account-reads.ts` answers `{ data: MarkListItem[]; next_cursor: string |
+//   null }`, which is API_CONTRACT section 1's envelope; `../../api/types.ts`
+//   declares `MarkListItem` and NO envelope type at all, and that file is the
+//   transcription of the contract and is outside this segment.
+//
+//   AND NOBODY HAS RULED WHAT THE PORTAL DOES WITH A CURSOR. ../../view/
+//   marks.ts takes `as_of_trading_day` as an argument precisely because "the
+//   newest row in THIS PAGE is the newest row the client happens to hold", so a
+//   screen that read one page and stopped is a chart with a page's worth of
+//   history on it and no statement anywhere about which page. A limit and a
+//   follow-or-not are a decision, and inventing one inside a `load` is how it
+//   gets made by nobody.
+//
 // SO THE LIST SCREEN IS WIRED END TO END AND THE DETAIL SCREEN IS WIRED AS FAR
-// AS IT GOES. `loadDetail` performs both reads that exist, because a refusal on
+// AS IT GOES. `loadDetail` performs both reads it can, because a refusal on
 // either is a thing the trader should be told about (INV-M4-07's 404 is the
 // case that matters), and reports the marks endpoint as the one it is waiting
-// on. Whoever registers `GET /accounts/:accountId/marks` writes `isMarkList`
-// beside the guards below and passes the response to `loadDetailFrom`, which
-// does not change.
+// on. Whoever wires it writes the envelope beside `MarkListItem`, takes the
+// paging decision, writes `isMarkList` beside the guards below, and passes the
+// result to `loadDetailFrom`, WHICH DOES NOT CHANGE.
 //
 // -----------------------------------------------------------------------------
 // THERE IS AN ERROR ARM, AND ADDING IT IS THIS SESSION'S ONE ARGUED DEPARTURE
@@ -479,14 +500,18 @@ export async function loadListFrom(input: {
  * SC-M4-03, from a client and whatever marks the caller could obtain.
  *
  * `marks` IS A PARAMETER RATHER THAN A THIRD FETCH, AND THE `null` IS A
- * MEASUREMENT RATHER THAN A PLACEHOLDER. `GET /accounts/:accountId/marks` is
- * not registered by `apps/api` on this tree (see the header). ./../payouts/
- * source.ts took eligibility the same way for the same reason, and the shape is
- * what makes landing the endpoint a guard and a call rather than a rewrite.
+ * MEASUREMENT RATHER THAN A PLACEHOLDER. The header has the two runs and what
+ * moved between them: the route was unregistered when this segment was wired
+ * and session 284 registered it in the same wave, and the two things still
+ * missing are the list envelope's transcription and the paging decision,
+ * neither of which is this segment's file. ./../payouts/source.ts took
+ * eligibility the same way for the same reason, and the shape is what makes
+ * landing the endpoint a guard and a call rather than a rewrite.
  *
- * THE TWO READS THAT EXIST ARE PERFORMED ANYWAY AND THAT IS DELIBERATE. The
- * screen cannot reach `ready` without marks, so short-circuiting before the
- * requests would render the same words for less work. What it would cost is the
+ * THE TWO READS THIS SEGMENT CAN MAKE ARE PERFORMED ANYWAY AND THAT IS
+ * DELIBERATE. The screen cannot reach `ready` without marks, so
+ * short-circuiting before the requests would render the same words for less
+ * work. What it would cost is the
  * two things that make the difference between a screen and a placeholder: a
  * refusal on a registered endpoint would never be reported as a refusal
  * (INV-M4-07's 404 is the case that matters), and the wired path would first
