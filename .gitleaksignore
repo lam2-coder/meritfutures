@@ -1,0 +1,105 @@
+# =============================================================================
+# .gitleaksignore
+# =============================================================================
+# VG-1's suppression list, and it holds FOUR FINGERPRINTS THAT ARE ALL ONE
+# VALUE. Written by session 254, which is the session that created the finding.
+#
+# -----------------------------------------------------------------------------
+# WHAT THE FINDING IS
+# -----------------------------------------------------------------------------
+# `gitleaks`' `generic-api-key` rule fires on a high-entropy string assigned to a
+# key whose name contains `token`. Session 254's `affiliate.test.ts` wrote
+#
+#   click_token: '<a fabricated uuid>'
+#
+# inside a TEST DOUBLE's return value, and the two session logs that quote the
+# pasted HTTP response quote it again. Four sites, one fabricated uuid, no
+# credential: `POST /affiliate/links` has no wiring, no vendor and no secret, and
+# the value was typed by hand into a fixture.
+#
+# -----------------------------------------------------------------------------
+# WHY A SUPPRESSION AND NOT A REPAIR, WHICH IS THE PART THAT NEEDS DEFENDING
+# -----------------------------------------------------------------------------
+# BECAUSE `gitleaks git .` READS COMMITS AND NOT THE WORKING TREE, AND THESE FOUR
+# COMMITS ARE IN `main`. Changing the fixture forward, which session 254 also
+# did, leaves all four findings exactly where they are, forever. The only repair
+# that removes them is rewriting published history on the default branch, and
+# that invalidates every checkout and every open branch in the repository to
+# suppress a fabricated uuid.
+#
+# SESSION 255 REACHED THE SAME TWO OPTIONS AND ASSIGNED THIS ONE HERE. Its
+# section 10 closes: *"Session 254's branch is where this closes, either by the
+# fixture moving out of a `*token*` key or by a `.gitleaksignore` that session
+# owns."* Both halves are taken, because after the merge neither is sufficient
+# alone.
+#
+# SESSION 255's OWN PROPOSED WORKFLOW FIX IS NOW DEAD AND THAT IS WORTH SAYING
+# HERE. It proposed `--log-opts="HEAD"` on the gitleaks step, on the measurement
+# that the findings lived on one unmerged branch while `fetch-depth: 0` made the
+# scan read every ref. That was right on the day it was written. `#336` merged,
+# so the commits are ancestors of `HEAD` now: re-measured against `main` at
+# `a4f1bfc`, both `--log-opts="HEAD"` and `--log-opts="origin/main"` report
+# **4 leaks over 341 commits**, identical to the unscoped run. The workflow is
+# therefore NOT edited, because the edit no longer changes the result.
+#
+# -----------------------------------------------------------------------------
+# WHY THIS IS NOT "WEAKENING A GATE TO PASS IT", STATED SO IT CAN BE OVERTURNED
+# -----------------------------------------------------------------------------
+# A fingerprint is `commit:file:rule:startline` and every field is pinned. These
+# four entries cannot suppress a fifth finding, cannot suppress the same rule in
+# another file, and cannot suppress the same file at another line. The RULE is
+# untouched and every future commit is scanned by it exactly as before; what is
+# suppressed is four immutable points in a history that cannot change.
+#
+# THE COMMIT SHAs HERE ARE STABLE IN A WAY THEY WOULD NOT HAVE BEEN A DAY AGO,
+# which is the objection session 255 raised against writing this file from its
+# own branch and it was correct then: a fingerprint naming an unmerged commit
+# goes stale silently the moment that branch is rebased. All four of these are
+# merged into `main` and can never be rebased away, so the staleness mode that
+# objection names does not exist for them.
+#
+# **THE HONEST COST, WHICH IS REAL:** a future secret committed at exactly one of
+# these four (commit, file, line) points would be suppressed. That is impossible
+# rather than unlikely, since a commit's content is fixed once written.
+#
+# ADDING A FIFTH ENTRY HERE IS A DIFFERENT DECISION FROM ADDING THESE FOUR, and a
+# session that finds itself wanting one should read this header first: these
+# exist because a merge made the repair unavailable, not because a fixture was
+# inconvenient to change.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# THE TWO SHAPES BELOW ARE TWO DIFFERENT SCANS, WHICH IS WHY SIX ENTRIES COVER
+# FOUR SITES
+# -----------------------------------------------------------------------------
+# `ci.yml` runs gitleaks TWICE and the second is not redundant: `gitleaks git .`
+# reads commits and `gitleaks dir .` reads the working tree, so a value that
+# survives in a checked-out file is found by the second even when the first is
+# clean. A `git` fingerprint carries the commit and a `dir` fingerprint does not.
+#
+# THE TWO `dir` ENTRIES ARE LINE-NUMBERED AND THEREFORE FRAGILE, AND THAT IS
+# ACCEPTED RATHER THAN OVERLOOKED. Both name a session log, both logs are
+# APPEND-ONLY RECORDS under ADR-118, and appending does not move an earlier line.
+# Session 254's own section 9 was appended after these were pinned and both lines
+# held. An edit that inserts ABOVE either line turns `CI-05` red with a stale
+# fingerprint, which is loud rather than silent and is the failure mode to
+# prefer.
+#
+# NEITHER LOG IS EDITED TO SATISFY THIS SCANNER. Both quote the value inside a
+# pasted HTTP response, and rewriting evidence to make a red light green is the
+# move this repository exists to refuse. Session 255 may of course change its own
+# quote; that entry disappears from here when it does.
+
+# apps/api/test/affiliate.test.ts, the test double's `issueLink` return value.
+6c1bb834cffaa77a51cf61d0b052b396daaa852d:apps/api/test/affiliate.test.ts:generic-api-key:189
+# The same value, asserted against in the links test.
+6c1bb834cffaa77a51cf61d0b052b396daaa852d:apps/api/test/affiliate.test.ts:generic-api-key:673
+# docs/sessions/2026-08-27-session-254.md, the pasted `POST /affiliate/links` response.
+818e8756cde589f748286119da5a6b5da2ba7cb6:docs/sessions/2026-08-27-session-254.md:generic-api-key:178
+# docs/sessions/2026-08-27-session-255.md, quoting session 254's finding back.
+cb2d8a6f15de98dce7dfacb40733ea1be35dbce2:docs/sessions/2026-08-27-session-255.md:generic-api-key:206
+
+# The same two log lines again, for `gitleaks dir .`, which reads the working
+# tree and carries no commit in its fingerprint.
+docs/sessions/2026-08-27-session-254.md:generic-api-key:178
+docs/sessions/2026-08-27-session-255.md:generic-api-key:206
