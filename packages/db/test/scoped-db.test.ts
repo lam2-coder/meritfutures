@@ -181,6 +181,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   attributions: 'attributions',
   otpChallenges: 'otp_challenges',
   paymentDisputes: 'payment_disputes',
+  payoutDestinations: 'payout_destinations',
 };
 
 /**
@@ -378,13 +379,13 @@ describe('the registry is total', () => {
   // declares a column against `identities(id)`, and `root` is `identities`'
   // alone. What it needs is a SIXTH CLASS, which ADR-106 is the precedent for
   // the cost of, and that slice was allocated no ADR number.
-  test('105 declared tables, 105 scope rules, 0 reachable without one', () => {
+  test('106 declared tables, 106 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(105);
-    expect(rules).toBe(105);
+    expect(declared).toBe(106);
+    expect(rules).toBe(106);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, and it is
@@ -408,8 +409,15 @@ describe('the registry is total', () => {
     // rule and the grant answer different questions: `0050` revokes all four
     // verbs from `merit_app`, so a correctly scoped read still fails unless the
     // process connects as `merit_live`.
+    //
+    // 114 SINCE ADR-169, AND THIS ONE IS REGISTERED, WHICH IS WHY THE TWO
+    // COUNTS ABOVE MOVED WITH IT. `0051` creates `payout_destinations`,
+    // OI-06's registry, and P5-e both wrote the DDL and registered it -- so
+    // ADR-092's "the first session that needs it" and "the session that
+    // created it" are the same session here, which they are not for the two
+    // tables above.
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
-    expect(createdTables).toBe(113);
+    expect(createdTables).toBe(114);
   });
 
   // FIVE MEMBERS SINCE ADR-106, AND THE ASSERTION IS THE REASON THE FIFTH COULD
