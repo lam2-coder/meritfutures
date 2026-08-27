@@ -642,7 +642,7 @@ export interface EvidenceExportRequest {
    * `evidence_packs` makes `audience`, `redaction_profile` and
    * `includes_detector_detail` all `NOT NULL`, so before this parameter existed
    * the generator had to supply an audience the caller never named, and
-   * `M06` section 5 already forbade that in words: the profile "follows from the
+   * `M06` section 4 already forbade that in words: the profile "follows from the
    * audience and is recorded on the pack, not chosen per export".
    */
   readonly audience: EvidencePackAudience;

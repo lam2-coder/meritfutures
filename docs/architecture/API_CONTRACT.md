@@ -948,7 +948,7 @@ type EvidencePackResponse = {
 };
 ```
 Query `?reason=` **and** `?audience=` are both required ([ADR-166](../decisions/ADR-166.md), `SD-M6-04`,
-[M06 section 5](../plans/M06-admin-ops-console.md)). An absent or unrecognised `audience` is
+[M06 section 4](../plans/M06-admin-ops-console.md)). An absent or unrecognised `audience` is
 `validation_failed`, and there is **no default**: the audience decides what leaves the building
 (`AS-M6-01`), so a generator that supplied one the caller never named would be making the disclosure
 decision on the caller's behalf. **The redaction profile follows from the audience and is recorded on the
