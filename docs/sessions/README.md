@@ -169,7 +169,7 @@ dispatched against a number claims it before it runs. **`119` is this session an
 | **269** | **`P5-c`: the contract half of P5 wave 1, lane B.** Concurrent with `P5-d` and with lane A. `ADR-158` reserved CONDITIONALLY | **CLAIMED**, dispatched by this session |
 | **270** | **`P5-d`: the catalogue half of P5 wave 1, lane B.** Concurrent with `P5-c` and with lane A. `ADR-159` reserved CONDITIONALLY | **CLAIMED**, dispatched by this session |
 | **271** | **`P6-a`: the adapter learns `streamLive`, and the seam moves from the ARTIFACT to the TYPE.** [P6](../plans/P6-live-tier.md)'s dispatch order marks it *"ADR-154, landed. NOTHING ELSE"* -- the only wave-1 slice with no dependency at all. `ADR-160` reserved CONDITIONALLY. Not money | **CLAIMED**, dispatched by this session |
-| **272** | **`P6-d`: the contract and the catalogue for the live tier.** Wave 1, concurrent with `P6-a`. **`P6-b` is SERIAL behind `P6-a` on `OVERVIEW` and is NOT dispatched here**; `P6-c` is blocked on [P6](../plans/P6-live-tier.md) section 10 item 1, which is the founder's. `ADR-161` reserved REQUIRED, in the plan's own words | **CLAIMED**, dispatched by this session |
+| ~~**272**~~ | ~~**`P6-d`: the contract and the catalogue for the live tier.** Wave 1, concurrent with `P6-a`. **`P6-b` is SERIAL behind `P6-a` on `OVERVIEW` and is NOT dispatched here**; `P6-c` is blocked on [P6](../plans/P6-live-tier.md) section 10 item 1, which is the founder's. `ADR-161` reserved REQUIRED, in the plan's own words~~ | **IN FLIGHT**, this branch. Its entry joins the list below when it lands |
 
 **A row moves out of this table by being written, not by being edited.** When the session
 lands, its entry joins the list below and its row here is **struck THROUGH, never deleted**.
