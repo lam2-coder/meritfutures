@@ -410,10 +410,12 @@ both probes were removed with `git status --porcelain` clean after.
 | `RI-08` | **[ADR-096](ADR-096.md) section 9, IN PROSE, assigned to `P4-e`, which landed without it.** Cited again by [ADR-095](ADR-095.md) `F4` and section 9 item 5b. Written by session **229** and its shape ruled by [ADR-117](ADR-117.md) | No package in this workspace declares the database accessor, in any dependency field     |
 | `RI-09` | [ADR-098](ADR-098.md), session 189, closing the ROUTE half of [ADR-095](ADR-095.md)'s `F4`                                                                                                                                           | Of 5 deployables only apps/api holds a file whose path spells a route on the API surface |
 | `RI-10` | **The 686-specifier repair of 2026-08-25, and the check's own header is its only allocation site**, which is the defect this table exists for                                                                                        | Every relative import in shipped source names a file that exists                         |
-| `RI-11` | [ADR-138](ADR-138.md), session **250**, closing the SERVER ACTION half of [ADR-095](ADR-095.md) ruling 3 and the REWRITE blind spot `RI-09`'s own `covers` line names first                                                          | No package declares a Server Action, and no framework routing config spells the API surface |
+| `RI-12` | **The 2026-08-27 STATE.md duplication, found by eye rather than by a check**, and this row is written in the commit that writes the check as the note below requires | No document under docs/ repeats a substantial line more than 8 times |
 
-**`RI-12` IS THE NEXT FREE NUMBER.** A session taking it writes its row here in the commit that
+**`RI-13` IS THE NEXT FREE NUMBER.** A session taking it writes its row here in the commit that
 writes the check, not in the ADR that names it.
+
+**`RI-12` IS THE ONLY MEMBER MINTED BY A DEFECT RATHER THAN BY A PLAN OR AN ADR.** Every other row here was claimed by a document that reasoned about the property first. `RI-12` was written the morning `docs/STATE.md` was found carrying **4,672 copies of one sentence** with every gate green, because every gate was asking whether the content was CORRECT and none was asking whether it was there ONCE. [CLAUDE.md](../../CLAUDE.md)'s own rule is what decided the shape: *"Prefer a new CI gate over a bigger model whenever the error is checkable."* **The check found a SECOND instance the first time it ran**, in [data-model/README](../architecture/data-model/README.md), which is the argument for it in one line.
 
 **`RI-11` IS THE FIRST MEMBER WHOSE CHECK IS NOT IN [`repo-invariants.mjs`](../../packages/tooling/checks/repo-invariants.mjs).**
 It lives in [`ui-server-endpoints.mjs`](../../packages/tooling/checks/ui-server-endpoints.mjs) and is
