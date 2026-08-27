@@ -1,0 +1,1580 @@
+// =============================================================================
+// apps/api/src/routes/wallet-withdrawals.ts
+// =============================================================================
+// API_CONTRACT SECTION 6.2's `POST /wallet/withdrawals`. THE EXTERNAL LEG, AND
+// THE LAST UNREGISTERED ROW OF THE CONTRACT'S TRADER SURFACE.
+//
+// P5 section 8's `P5-h`. MONEY PATH. E2 READ OWED ON EVERY LINE.
+//
+// -----------------------------------------------------------------------------
+// THE ONE THING TO READ FIRST: THIS ROUTE DOES NOT POST `LT-06`, AND TWO
+// APPROVED DOCUMENTS DISAGREE ABOUT WHETHER IT SHOULD
+// -----------------------------------------------------------------------------
+// M05 section 1.1's external-leg listing is:
+//
+//     POST /wallet/withdrawals
+//       -> KYC verified, destination outside its cooling window, name matched
+//       -> amount >= 10,000c, wallet balance sufficient, no withdrawal in flight
+//       -> post LT-06, debiting the wallet position
+//       -> status: approved -> enqueue transfer (idempotent) -> Rise
+//
+// and P5 section 8's own `P5-h` row ends "FIFO composition into
+// `source_provenance_summary`, then `LT-06`".
+//
+// API_CONTRACT section 6.2 types this endpoint's response as
+//
+//     status: "requested" | "cooling";  // The creation's reachable states,
+//                                       // per STATE_MACHINES section 3.2
+//
+// and M05 section 2.1 names `LT-06`'s kind `wallet_withdrawal_approval`, "The
+// external leg's APPROVAL". STATE_MACHINES section 3.2 draws
+// `requested --> approved: G-WITHDRAWAL-CLEARED` as an edge OUT OF `requested`,
+// which is a transition after the row exists rather than the row's creation.
+//
+// THIS FILE TAKES THE CONTRACT, AND THE ARGUMENT IS ASYMMETRY OF HARM RATHER
+// THAN SENIORITY.
+//
+//   * A row created at `requested` or `cooling` with nothing posted is a row a
+//     later ruling can advance. `LT-06` posted here is an irrevocable entry
+//     against `trader_wallet` under a `text NOT NULL UNIQUE` idempotency key,
+//     and M05 section 2.1 names no reversal for it the way `LT-03` reverses
+//     `LT-01`.
+//   * The response would carry a `status` value the contract's own union cannot
+//     express, on the one screen that tells a trader their money is leaving.
+//   * The contract is the document that governs the wire. ADR-158 wrote section
+//     6.2 FROM the DDL after seven contract-schema disagreements were found,
+//     and its clause 5 and finding 6 are that author reading THIS seam:
+//     "M20 section 3.3's sequence reads request, compose FIFO, provenance
+//     check, LT-06, which puts the composition at request time. The CHECK puts
+//     it at approval."
+//   * M05 section 1.1's listing is the same listing the corpus has already
+//     caught TWICE carrying `settled_to_wallet`, a status value ADR-028
+//     explicitly rejected, which makes it the weaker source for a status word
+//     specifically.
+//
+// SO THE RULING IS REPORTED AND NOT TAKEN. No ADR number is allocated to this
+// session. What is owed is a ruling on which document governs, and, whichever
+// way it falls, A DRIVER FOR `requested --> approved` AND `cooling --> approved`
+// (`G-COOLING-ELAPSED`): nothing in this tree performs either edge today, and
+// P5's `P5-j` sweeps three FREEZE clocks and not the cooling one.
+//
+// THE KEY THIS FILE WOULD HAVE USED IS RECORDED, BECAUSE THE ANALYSIS WAS DONE
+// AND A LATER SESSION SHOULD NOT REDO IT. `ledger_transactions.idempotency_key`
+// is `text NOT NULL UNIQUE`, and `payouts.ts`, `admin-payouts.ts` and
+// `apps/worker/src/sweeps/expiry.ts` all build the IDENTICAL string
+// `` `${PAYOUT_ENDPOINT} ${idempotencyKey}` `` for `LT-01`, so one approval is
+// one posting whichever of the three doors reaches it. `LT-06`'s equivalent is
+// the string derived from `wallet_withdrawals.idempotency_key`, which is the
+// key the trader supplied and which the schema already makes unique per
+// identity -- NOT one naming this endpoint, because the approval edge is
+// reachable from a sweep and an operator console as well as from here, and a
+// key naming this endpoint is how one withdrawal becomes two postings. And the
+// SIGN is not a caller's to write: `packages/ledger/src/posting.ts` applies it
+// in exactly one place, `+amountCents` on the debit and `-amountCents` on the
+// credit, and a caller names a debit account, a credit account and a POSITIVE
+// amount. `LT-06` debits `trader_wallet` (identity) and credits `firm_treasury`
+// (M05 section 2.1).
+//
+// -----------------------------------------------------------------------------
+// `C-27` ALREADY REFUSES THIS FROM A NON-ELEVATED SESSION AND THIS FILE ADDS NO
+// SECOND REFUSAL
+// -----------------------------------------------------------------------------
+// The endpoint declares `required: 'passkey or dual_channel'` and
+// `c27: 'external withdrawal'`, which `auth.ts`'s `authorize` applies before
+// any handler body runs. M05 section 3.6 argues the rest once: an impersonation
+// session can never elevate because `0042_impersonation_sessions.sql` carries
+// neither `elevated_at` nor `elevated_by_factor` nor a `user_id`, so there is
+// no column an elevation could be written to, and "writing a second refusal
+// here would state that this module enforces what C-27 already enforces", whose
+// reading is that one of the two is redundant. P5 section 8 repeats it.
+//
+// -----------------------------------------------------------------------------
+// THE ACCESSOR IS THE ONE DOOR AND NOTHING HERE REACHES AROUND IT
+// -----------------------------------------------------------------------------
+// No `SqlExecutorReason` member, no `SystemReason` member, no `pg` import, no
+// cast past a key type, and no advisory lock -- ADR-157 clause 4 and P5 rule 10
+// refuse `pg_advisory_xact_lock` by name, because it can only be sent through
+// `sqlExecutor` and carries no tenancy narrowing.
+//
+// "ONE IN FLIGHT" IS DECIDED UNDER `lockScope()`, AND THAT IS THE LOCK THE CASE
+// NEEDS RATHER THAN `lockAt`. `lockAt(key, at)` locks a row that EXISTS; the
+// row a concurrent second request would create does not exist yet, so there is
+// nothing to point it at. `lockScope()` takes no argument at all and locks this
+// handle's own `identities` row -- ADR-157 clause 4 calls it "INV-M20-01's
+// per-identity lock" and its section 9 rows 15 to 17 watch a second A-scoped
+// transaction BLOCK while a B-scoped one does not. So two concurrent
+// withdrawals by one identity serialise, the second sees the first's row, and
+// `G-NO-IN-FLIGHT` refuses it. Without the lock both read an empty in-flight
+// set and both insert, and `wallet_withdrawals_open_idx` IS NOT UNIQUE
+// (ADR-158 finding 8), so the database would not catch it.
+//
+// THE AGGREGATE IS REFUSED AND THIS FILE PAYS THE COST ADR-157 SECTION 5 NAMES.
+// There is no `SUM`, no `ORDER BY`, no `LIMIT` and no `OR`. The balance, the
+// FIFO composition and the in-flight set are all folded here from rows the
+// accessor returned, which is `wallet.ts`'s shape and its recorded cost: "the
+// rows crossing the boundary are the window's rather than the match's".
+// `G-NO-IN-FLIGHT` is four statuses, which is an `OR`, and an `OR` is one of
+// the two terms ADR-157 still refuses -- so the statuses are filtered in
+// memory rather than composed into a predicate.
+//
+// -----------------------------------------------------------------------------
+// MONEY IS `bigint` INTEGER CENTS IN THIS FILE AND A JSON INTEGER ON THE WIRE
+// -----------------------------------------------------------------------------
+// Every money column read or written here is `bigint`. There is no float in
+// this file, in its suite, or in any fixture either one holds, and
+// `centsToJson` REFUSES past `Number.MAX_SAFE_INTEGER` rather than serialising
+// a wrong number. The minimum is `10000n` and it is compared as a `bigint`
+// against a `bigint`.
+//
+// -----------------------------------------------------------------------------
+// NO `@merit/db` IMPORT, WHICH IS `db.ts`'s CONVENTION
+// -----------------------------------------------------------------------------
+// `db.ts` asks that `grep -rln '@merit/db' apps/api/src` name exactly one file.
+// This module takes `ApiDb` and names its table keys as the plain strings the
+// accessor's own key types check, which is `wallet.ts`'s and `accounts.ts`'s
+// shape. `centsToJson` and the row readers are a second copy of `wallet.ts`'s
+// for `catalog.ts`'s recorded reason: importing them would make a withdrawal
+// defect surface as a `WalletRowError` in an incident log, and a route module
+// importing another route module is a dependency the registry does not have.
+// =============================================================================
+
+import type { JsonValue } from '@merit/psp';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+
+import type { ApiDb } from '../db.ts';
+import {
+  beginIdempotent,
+  completeIdempotent,
+  identityScope,
+  problemForOutcome,
+  type IdempotencyOutcome,
+  type IdempotencyStore,
+} from '../idempotency.ts';
+import { defineRoutes } from '../registry.ts';
+import { PROBLEM_MEDIA_TYPE, PROBLEM_TYPE_PREFIX, problem } from '../server.ts';
+import {
+  requiredFactorTable,
+  toRoutes,
+  withSessionContext,
+  type AuthSession,
+  type EndpointSpec,
+  type FieldError,
+} from './auth.ts';
+
+/** API_CONTRACT section 6.2's row, as the contract writes it. No base path. */
+export const WITHDRAWALS_PATH = '/wallet/withdrawals';
+
+/** `idempotency_keys.endpoint`, in `payouts.ts`'s `METHOD /path` spelling. */
+export const WITHDRAWALS_ENDPOINT = `POST ${WITHDRAWALS_PATH}`;
+
+/**
+ * The minimum, `10000` INTEGER CENTS.
+ *
+ * API_CONTRACT section 6.2: "The minimum is `10000` integer cents (M05 section
+ * 4, stated there as `$100`), and there is no fee." A `bigint`, compared
+ * against a `bigint`, so there is no path on which a float touches it.
+ *
+ * THE CONTRACT ALSO RECORDS WHAT IT DOES NOT KNOW AND SO DOES THIS CONSTANT:
+ * "Whether the minimum is a plan parameter or a firm-wide constant is stated by
+ * no approved document; it is written here as the constant M05 states." So this
+ * is the contract's constant transcribed and NOT a parameter this file chose.
+ */
+export const MINIMUM_WITHDRAWAL_CENTS = 10_000n;
+
+/**
+ * `C-11`'s window, 48 WALL-CLOCK hours.
+ *
+ * THE DURATION BELONGS IN CONFIG AND THIS IS A CONSTANT, WHICH IS REPORTED
+ * RATHER THAN HIDDEN. ADR-037 rules the number config's, and `0051`'s own
+ * column comment keeps it out of the schema for that reason: "48 hours is a
+ * launch CANDIDATE that lives in config, and a schema that restated it would be
+ * a second copy of a number the config owns." There is no config reader in this
+ * deployable, so the value is a module constant on `payouts.ts`'s precedent
+ * (`HOLD_WINDOW_MS`, the same 48 hours for the internal leg's hold) and moving
+ * both to config is owed. SECURITY section 4 item 1 and ADR-017 are the source.
+ */
+export const DESTINATION_COOLING_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+// -----------------------------------------------------------------------------
+// The wire, section 6.2's own shapes
+// -----------------------------------------------------------------------------
+
+/** Section 6.2's `WithdrawalRequestBody`. */
+export interface WithdrawalRequestBody {
+  readonly amount_cents: number;
+  readonly destination_ref: string;
+}
+
+/**
+ * The CLOSED credit list, `0011`'s own CHECK on `wallet_entries.provenance`.
+ *
+ * There is no deposit member (`INV-WALLET-NO-DEPOSITS`) and no
+ * `promotional_credit` member (`0011` header item 3, `OQ-FREEZE-01`), and
+ * neither may be added here without the migration that adds it there.
+ */
+export const WALLET_PROVENANCES = ['payout', 'refund_wallet_funded', 'correction'] as const;
+
+/** One of {@link WALLET_PROVENANCES}. */
+export type WalletProvenance = (typeof WALLET_PROVENANCES)[number];
+
+/** `direction`'s two members, `0011`'s CHECK. */
+export const WALLET_DIRECTIONS = ['credit', 'debit'] as const;
+
+/** One of {@link WALLET_DIRECTIONS}. */
+export type WalletDirection = (typeof WALLET_DIRECTIONS)[number];
+
+/** One member of section 6.2's `composition` array. */
+export interface CompositionEntry {
+  readonly provenance: WalletProvenance;
+  readonly cents: number;
+}
+
+/**
+ * The states this endpoint's response may carry.
+ *
+ * TWO MEMBERS AND NOT SEVEN. `wallet_withdrawal_status` has seven values and
+ * API_CONTRACT section 6.2 types THIS response at two, annotated "The
+ * creation's reachable states". See this file's header for the disagreement
+ * that makes the narrowing load-bearing rather than incidental.
+ */
+export const CREATED_STATUSES = ['requested', 'cooling'] as const;
+
+/** One of {@link CREATED_STATUSES}. */
+export type CreatedStatus = (typeof CREATED_STATUSES)[number];
+
+/** Section 6.2's `WithdrawalResponse`. */
+export interface WithdrawalResponse {
+  readonly withdrawal_id: string;
+  readonly status: CreatedStatus;
+  readonly amount_cents: number;
+  readonly destination_ref: string;
+  readonly requested_at: string;
+  /** The destination registry's clock. Non-null exactly when `status` is `cooling`. */
+  readonly cooling_until: string | null;
+  readonly composition: readonly CompositionEntry[] | null;
+  readonly earliest_credit_at: string | null;
+  /** P-1. Always `false` today, and {@link provenanceReview} is why. */
+  readonly provenance_review: boolean;
+  /** `halt: null` -- "a withdrawal cannot be created halted". */
+  readonly halt: null;
+}
+
+// -----------------------------------------------------------------------------
+// The statuses `G-NO-IN-FLIGHT` reads
+// -----------------------------------------------------------------------------
+
+/**
+ * `wallet_withdrawals_open_idx`'s predicate, written out.
+ *
+ * IT IS THE INDEX'S OWN LIST AND NOT A LIST THIS FILE CHOSE.
+ * `0011_wallet.sql`: `WHERE status IN ('requested', 'cooling', 'approved',
+ * 'transferring')`, re-created under the same name by `0031` so a HALTED row
+ * stays inside it. A guard that disagreed with its own index would be a gate
+ * that holds on Tuesdays, which is what STATE_MACHINES says about
+ * `G-NO-IN-FLIGHT` on the other leg.
+ *
+ * AND ON THIS LEG THE APPLICATION CHECK IS THE WHOLE CONTROL. ADR-158
+ * finding 8: `payout_requests_no_in_flight_uq` is a UNIQUE partial index and
+ * `wallet_withdrawals_open_idx` is a plain one, "so G-NO-IN-FLIGHT is a
+ * database constraint on the leg that moves no cash and an application check on
+ * the leg that does". That is why the check below runs under `lockScope()` and
+ * not merely inside the transaction.
+ */
+export const OPEN_WITHDRAWAL_STATUSES = [
+  'requested',
+  'cooling',
+  'approved',
+  'transferring',
+] as const;
+
+// -----------------------------------------------------------------------------
+// The rows, as this file reads them off the accessor
+// -----------------------------------------------------------------------------
+
+/** Raised when a row is not the shape its migration declares. */
+export class WithdrawalRowError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WithdrawalRowError';
+  }
+}
+
+/** Raised when a value on the money path is not integer cents. */
+export class WithdrawalMoneyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'WithdrawalMoneyError';
+  }
+}
+
+function asRow(value: unknown, table: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new WithdrawalRowError(`a \`${table}\` read returned something that is not a row`);
+  return value as Record<string, unknown>;
+}
+
+function text(row: Record<string, unknown>, field: string, table: string): string {
+  const value = row[field];
+  if (typeof value !== 'string')
+    throw new WithdrawalRowError(`\`${table}.${field}\` is not a string. It is \`NOT NULL\``);
+  return value;
+}
+
+function nullableText(row: Record<string, unknown>, field: string, table: string): string | null {
+  const value = row[field];
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string')
+    throw new WithdrawalRowError(`\`${table}.${field}\` is neither a string nor null`);
+  return value;
+}
+
+function flag(row: Record<string, unknown>, field: string, table: string): boolean {
+  const value = row[field];
+  if (typeof value !== 'boolean')
+    throw new WithdrawalRowError(`\`${table}.${field}\` is not a boolean. It is \`NOT NULL\``);
+  return value;
+}
+
+/**
+ * A `bigint` column.
+ *
+ * `schema.ts` declares every money column with `{ mode: 'bigint' }`, so the
+ * driver hands a `bigint` back. A `number` here would be a schema whose mode
+ * changed underneath this file, and reading it as money is the
+ * `Number.MAX_SAFE_INTEGER` defect ADR-122 refuses, so it is refused rather
+ * than coerced.
+ */
+function big(row: Record<string, unknown>, field: string, table: string): bigint {
+  const value = row[field];
+  if (typeof value !== 'bigint')
+    throw new WithdrawalRowError(
+      `\`${table}.${field}\` is not a bigint. \`schema.ts\` declares it ` +
+        "`bigint(..., { mode: 'bigint' })`, so reading it as a JSON number would be the digit " +
+        'loss ADR-122 refuses',
+    );
+  return value;
+}
+
+/** A `timestamptz` column, as a `Date`. One code path renders every instant here. */
+function instant(row: Record<string, unknown>, field: string, table: string): Date {
+  const value = row[field];
+  if (!(value instanceof Date) || Number.isNaN(value.getTime()))
+    throw new WithdrawalRowError(`\`${table}.${field}\` is not a Date. It is \`timestamptz\``);
+  return value;
+}
+
+function member<T extends string>(
+  row: Record<string, unknown>,
+  field: string,
+  table: string,
+  allowed: readonly T[],
+): T {
+  const value = text(row, field, table);
+  if (!(allowed as readonly string[]).includes(value))
+    throw new WithdrawalRowError(
+      `\`${table}.${field}\` is \`${value}\`, which the column's own CHECK closes at ` +
+        allowed.join(' | '),
+    );
+  return value as T;
+}
+
+/** `identity_status`, `0001`'s three-member enum. ADR-041 refused a fourth. */
+export const IDENTITY_STATUSES = ['active', 'restricted', 'closed'] as const;
+
+/** One of {@link IDENTITY_STATUSES}. */
+export type IdentityStatus = (typeof IDENTITY_STATUSES)[number];
+
+/** The two `identities` columns this leg's gates read, and no others. */
+export interface IdentityRow {
+  readonly status: IdentityStatus;
+  readonly payoutsFrozen: boolean;
+}
+
+/** One `identities` row, narrowed. */
+export function toIdentityRow(value: unknown): IdentityRow {
+  const row = asRow(value, 'identities');
+  return {
+    status: member(row, 'status', 'identities', IDENTITY_STATUSES),
+    payoutsFrozen: flag(row, 'payoutsFrozen', 'identities'),
+  };
+}
+
+/**
+ * `kyc_status`, `0001`'s enum, in API_CONTRACT section 6's spelling.
+ *
+ * DECLARED HERE RATHER THAN IMPORTED FROM `accounts.ts`. A route module
+ * importing another route module is an edge the registry does not have and the
+ * directory listing cannot express; `wallet.ts` declined the same import of
+ * `checkout.ts`'s money helper for `catalog.ts`'s recorded reason. The list is
+ * the column's CHECK either way.
+ */
+export const KYC_STATES = ['kyc_required', 'pending', 'verified', 'rejected', 'expired'] as const;
+
+/** One of {@link KYC_STATES}. */
+export type KycState = (typeof KYC_STATES)[number];
+
+/**
+ * The identity's current verification state.
+ *
+ * A RE-VERIFICATION IS A NEW ROW AND NOT A RE-READ (`SD-M19-01`, `INV-M19-06`),
+ * so a scoped read returns the whole chain and the current row is the one
+ * NOTHING SUPERSEDES. `accounts.ts` reads it the same way and for the same
+ * reason, and a chain whose head cannot be named FAILS CLOSED: the alternative
+ * is reporting somebody verified on the strength of an ordering this table does
+ * not declare, on the door where that means paying them.
+ */
+export function currentKycState(rows: readonly unknown[]): KycState {
+  const parsed = rows.map((value) => {
+    const row = asRow(value, 'kycVerifications');
+    return {
+      id: text(row, 'id', 'kycVerifications'),
+      state: member(row, 'state', 'kycVerifications', KYC_STATES),
+      supersedes: nullableText(row, 'supersedes', 'kycVerifications'),
+    };
+  });
+  if (parsed.length === 0) return 'kyc_required';
+  const superseded = new Set(
+    parsed.map((row) => row.supersedes).filter((id): id is string => id !== null),
+  );
+  const live = parsed.filter((row) => !superseded.has(row.id));
+  if (live.length !== 1) return 'kyc_required';
+  return live[0]?.state ?? 'kyc_required';
+}
+
+/** One `wallet_entries` row, narrowed to what a balance and a composition need. */
+export interface WalletEntryRow {
+  readonly id: bigint;
+  readonly direction: WalletDirection;
+  readonly amountCents: bigint;
+  readonly provenance: WalletProvenance;
+  readonly balanceAfterCents: bigint;
+  readonly occurredAt: Date;
+}
+
+/** One accessor row, narrowed. Exported so the suite names it directly. */
+export function toWalletEntryRow(value: unknown): WalletEntryRow {
+  const row = asRow(value, 'walletEntries');
+  const amountCents = big(row, 'amountCents', 'walletEntries');
+  if (amountCents <= 0n)
+    throw new WithdrawalRowError(
+      `\`wallet_entries.amount_cents\` is ${amountCents.toString()}, and the column is ` +
+        '`CHECK (amount_cents > 0)`. Direction carries the sign',
+    );
+  return {
+    id: big(row, 'id', 'walletEntries'),
+    direction: member(row, 'direction', 'walletEntries', WALLET_DIRECTIONS),
+    amountCents,
+    provenance: member(row, 'provenance', 'walletEntries', WALLET_PROVENANCES),
+    balanceAfterCents: big(row, 'balanceAfterCents', 'walletEntries'),
+    occurredAt: instant(row, 'occurredAt', 'walletEntries'),
+  };
+}
+
+/** The one `wallet_withdrawals` column `G-NO-IN-FLIGHT` reads. */
+export interface WithdrawalStatusRow {
+  readonly status: string;
+}
+
+/** One `wallet_withdrawals` row, narrowed to its status. */
+export function toWithdrawalStatusRow(value: unknown): WithdrawalStatusRow {
+  return { status: text(asRow(value, 'walletWithdrawals'), 'status', 'walletWithdrawals') };
+}
+
+/** One `payout_destinations` row, `0051`. */
+export interface DestinationRow {
+  readonly firstSeenAt: Date;
+  readonly coolingUntil: Date;
+}
+
+/** One `payout_destinations` row, narrowed. Both columns are `NOT NULL`. */
+export function toDestinationRow(value: unknown): DestinationRow {
+  const row = asRow(value, 'payoutDestinations');
+  return {
+    firstSeenAt: instant(row, 'firstSeenAt', 'payoutDestinations'),
+    coolingUntil: instant(row, 'coolingUntil', 'payoutDestinations'),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Money at the boundary. It refuses rather than rounds
+// -----------------------------------------------------------------------------
+
+/**
+ * `bigint` cents to a JSON integer.
+ *
+ * It throws past `Number.MAX_SAFE_INTEGER` rather than serialising a wrong
+ * number. The columns are `bigint`, so a value that cannot be a JSON integer is
+ * expressible in the schema.
+ */
+export function centsToJson(value: bigint): number {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < -BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new WithdrawalMoneyError(
+      `${value.toString()} cents cannot be a JSON integer; API_CONTRACT section 1 says ` +
+        '*_cents are JSON integers',
+    );
+  }
+  return Number(value);
+}
+
+/**
+ * A JSON number to `bigint` cents, or `null` for anything that is not one.
+ *
+ * A FLOAT IS `null` AND NEVER A ROUND. `5.5` is exactly the value the
+ * constitution bans on a financial path, and `Math.round` on this door is a
+ * withdrawal for an amount the trader did not ask for.
+ */
+export function centsFromJson(value: unknown): bigint | null {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null;
+  if (!Number.isSafeInteger(value)) return null;
+  return BigInt(value);
+}
+
+// -----------------------------------------------------------------------------
+// The balance, and the hold that has no input
+// -----------------------------------------------------------------------------
+
+/**
+ * The balance, which is the LAST ROW APPENDED's stored running balance.
+ *
+ * BY GREATEST `id` AND NOT BY GREATEST `occurred_at`, which is `wallet.ts`'s
+ * rule and its reason: `balance_after_cents` is computed AT APPEND TIME, `id`
+ * is `bigint GENERATED ALWAYS AS IDENTITY` and therefore append order, and
+ * `occurred_at` is the business instant a correction or a backfill may
+ * legitimately set to the past.
+ */
+export function balanceOf(rows: readonly WalletEntryRow[]): bigint {
+  let latest: WalletEntryRow | null = null;
+  for (const row of rows) if (latest === null || row.id > latest.id) latest = row;
+  return latest === null ? 0n : latest.balanceAfterCents;
+}
+
+/**
+ * What section 6.2 calls `withdrawable_cents`, which is what
+ * `insufficient_funds` is measured against.
+ *
+ * EQUAL TO THE BALANCE TODAY BECAUSE NO HOLD IN THIS CORPUS CAN BE COMPUTED,
+ * and that is a finding rather than an implementation. P-3 is the only rule
+ * that holds a wallet BALANCE and ADR-158 clause 6 measured its input absent:
+ * "no landed column carries that window's end for a purchase". `wallet.ts`
+ * renders `held_cents: 0` for the same reason and states the same limit, so
+ * this leg and the read leg agree: this door does not refuse an amount the
+ * balance screen said was available.
+ *
+ * IT IS A FUNCTION AND NOT A CALL TO {@link balanceOf} AT THE SITE, so the day
+ * P-3's input lands there is ONE place to subtract it.
+ */
+export function withdrawableCents(rows: readonly WalletEntryRow[]): bigint {
+  return balanceOf(rows);
+}
+
+/**
+ * P-1, which this tree cannot evaluate, so it is `false` and says so.
+ *
+ * READ THIS BEFORE CHANGING IT. M20 section 3.4's P-1 holds a withdrawal "whose
+ * composition includes payout credits from accounts PURCHASED WITH PROMOTIONAL
+ * CREDIT", and NOTHING IN THIS SCHEMA RECORDS THAT. `purchases.payment_method`
+ * is `CHECK (payment_method IN ('psp', 'wallet', 'mixed'))` (`0006`) and has no
+ * promotional member; `promotional_credit_grants.funding_purchase_id` (`0024`)
+ * is the purchase that FUNDED a grant, which is the clawback read and the other
+ * direction entirely; and `wallet_entries.reference_id` "declares no foreign
+ * key" and is polymorphic over three kinds, so even the first hop is not a
+ * traversal this schema supports.
+ *
+ * `false` IS THEREFORE HONEST AND NOT A DEFAULT: no review is in force because
+ * nothing in this tree places one. What it must not be read as is "P-1 was
+ * evaluated and found nothing". It takes the composition it cannot yet use so
+ * that the day the input lands, the change is this function.
+ */
+export function provenanceReview(_composition: readonly CompositionEntry[]): boolean {
+  return false;
+}
+
+// -----------------------------------------------------------------------------
+// The FIFO composition, which is what makes `source_provenance_summary` mean
+// anything (SD-M20-03, AS-M20-01, AS-M20-05)
+// -----------------------------------------------------------------------------
+
+/** What a composition run produced. */
+export interface Composition {
+  readonly entries: readonly CompositionEntry[];
+  /** The oldest credit this withdrawal consumes. `earliest_credit_at`. */
+  readonly earliestCreditAt: Date;
+}
+
+/** One credit still unspent, in the FIFO queue. */
+interface Lot {
+  readonly provenance: WalletProvenance;
+  readonly occurredAt: Date;
+  remaining: bigint;
+}
+
+/**
+ * Oldest first, which is what FIFO means and what the composition is ordered
+ * by.
+ *
+ * `(occurred_at, id)` AND NOT `occurred_at` ALONE. `wallet_entries` has no
+ * unique constraint on the instant and two entries written in one transaction
+ * share it by default, so the instant alone is not a total order and two runs
+ * over the same rows could compose differently. The id half is a `bigint`
+ * comparison and never a lexical one.
+ */
+export function oldestFirst(a: WalletEntryRow, b: WalletEntryRow): number {
+  const at = a.occurredAt.getTime();
+  const bt = b.occurredAt.getTime();
+  if (at !== bt) return at < bt ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
+ * The unspent credits, oldest first, after every debit has consumed from the
+ * front.
+ *
+ * THE DEBITS CONSUME THE OLDEST CREDITS, WHICH IS THE HALF THAT MAKES THE
+ * ANSWER RIGHT RATHER THAN MERELY ORDERED. A wallet that took a payout, then a
+ * refund credit, then bought a reset has spent the PAYOUT, and a composition
+ * that ignored the debit would compose the withdrawal out of money already
+ * gone. M20 section 3.4: "a wallet holding $500 of settled payout and $99 of
+ * refund_wallet_funded is not the same object as one holding $599 of payout."
+ *
+ * IT CROSS-CHECKS ITSELF AGAINST THE STORED RUNNING BALANCE AND THROWS ON A
+ * DIVERGENCE. `0011` states what `balance_after_cents` is for: "a divergence
+ * between the stored balance and the recomputed one is a detectable tamper
+ * indication rather than an invisible one." This is the door where detecting it
+ * is worth something, and the fail-closed answer is to refuse the withdrawal.
+ */
+export function unspentLots(rows: readonly WalletEntryRow[]): readonly Lot[] {
+  const ordered = [...rows].sort(oldestFirst);
+  const lots: Lot[] = [];
+  let head = 0;
+  for (const row of ordered) {
+    if (row.direction === 'credit') {
+      lots.push({
+        provenance: row.provenance,
+        occurredAt: row.occurredAt,
+        remaining: row.amountCents,
+      });
+      continue;
+    }
+    let owed = row.amountCents;
+    while (owed > 0n) {
+      const lot = lots[head];
+      if (lot === undefined)
+        throw new WithdrawalRowError(
+          `a \`wallet_entries\` debit of ${row.amountCents.toString()}c consumes more than the ` +
+            'credits before it. `balance_after_cents` is `CHECK (balance_after_cents >= 0)`, so ' +
+            'this set cannot be the whole statement and a composition over it would be fiction',
+        );
+      const taken = lot.remaining < owed ? lot.remaining : owed;
+      lot.remaining -= taken;
+      owed -= taken;
+      if (lot.remaining === 0n) head += 1;
+    }
+  }
+  const live = lots.slice(head).filter((lot) => lot.remaining > 0n);
+  let total = 0n;
+  for (const lot of live) total += lot.remaining;
+  const stored = balanceOf(rows);
+  if (total !== stored)
+    throw new WithdrawalRowError(
+      `the recomputed wallet balance ${total.toString()}c does not equal the stored running ` +
+        `balance ${stored.toString()}c. \`0011\` keeps \`balance_after_cents\` so that this ` +
+        'divergence is detectable rather than invisible, and this is the door where it matters',
+    );
+  return live;
+}
+
+/**
+ * `amount` composed out of the unspent credits, oldest first.
+ *
+ * ONE ENTRY PER PROVENANCE, IN FIRST-CONSUMED ORDER, which is why this is a
+ * SUMMARY. FIFO can take three lots of two classes; the wire shape is
+ * `Array<{provenance, cents}>` and it carries no lot identity, so two entries
+ * naming one class would be a breakdown a reader could only add back together.
+ * The ORDER is still FIFO's, so the first entry is the oldest money.
+ *
+ * IT RETURNS `null` WHEN THE LOTS DO NOT COVER `amount`, and the caller answers
+ * `insufficient_funds`. That case is already refused one step earlier against
+ * {@link withdrawableCents}; it is checked again here because this function is
+ * exported and a second caller must not be able to compose a withdrawal out of
+ * money that is not there.
+ */
+export function composeFifo(lots: readonly Lot[], amountCents: bigint): Composition | null {
+  if (amountCents <= 0n) return null;
+  const cents = new Map<WalletProvenance, bigint>();
+  const order: WalletProvenance[] = [];
+  let owed = amountCents;
+  let earliest: Date | null = null;
+  for (const lot of lots) {
+    if (owed === 0n) break;
+    const taken = lot.remaining < owed ? lot.remaining : owed;
+    if (taken === 0n) continue;
+    if (earliest === null) earliest = lot.occurredAt;
+    if (!cents.has(lot.provenance)) order.push(lot.provenance);
+    cents.set(lot.provenance, (cents.get(lot.provenance) ?? 0n) + taken);
+    owed -= taken;
+  }
+  if (owed > 0n || earliest === null) return null;
+  return {
+    entries: order.map((provenance) => ({
+      provenance,
+      cents: centsToJson(cents.get(provenance) ?? 0n),
+    })),
+    earliestCreditAt: earliest,
+  };
+}
+
+/** {@link unspentLots} then {@link composeFifo}, which is the whole rule. */
+export function composeWithdrawal(
+  rows: readonly WalletEntryRow[],
+  amountCents: bigint,
+): Composition | null {
+  return composeFifo(unspentLots(rows), amountCents);
+}
+
+// -----------------------------------------------------------------------------
+// `G-DESTINATION-COOLING`, against `0051`'s registry
+// -----------------------------------------------------------------------------
+
+/** What the cooling gate decided, and what the caller must do about it. */
+export type CoolingDecision =
+  /** A row exists and its window has elapsed. `requested`. */
+  | { readonly kind: 'cleared' }
+  /** A row exists and its window is running. `cooling`, and nothing is written. */
+  | { readonly kind: 'cooling'; readonly until: Date }
+  /** No row exists. It is REGISTERED and cooled, and the withdrawal is `cooling`. */
+  | { readonly kind: 'register'; readonly until: Date };
+
+/**
+ * `G-DESTINATION-COOLING`, read as `0051`'s header requires it to be read.
+ *
+ * AN ABSENT ROW IS "REGISTER IT AND COOL IT" AND NEVER "NOT COOLING". This is
+ * the obligation `0051` places on this slice BY NAME, in the paragraph
+ * explaining why `destination_ref` is byte-exact `text` rather than `citext`:
+ * "Byte-exact is the fail-closed direction, and it is only fail-closed if the
+ * reader treats an ABSENT ROW as 'register it and cool it' rather than as 'not
+ * cooling'. That obligation is P5-h's and is recorded here because this file's
+ * shape is what makes it load-bearing."
+ *
+ * SO THE FIRST DESTINATION AN IDENTITY EVER USES IS COOLED TOO, which ADR-169
+ * section 3 rules deliberate rather than incidental: `C-11` says a CHANGE
+ * triggers cooling, and "on an identity that has never withdrawn there is
+ * nothing to change FROM, so a first-destination exemption is a hole that opens
+ * on every account that has not yet used the rail, which at launch is all of
+ * them".
+ *
+ * AN ELAPSED WINDOW IS NOT RE-ARMED. Registering a destination arms its window
+ * once; a destination Merit has seen before whose window has elapsed is not a
+ * change, and re-arming it would make `C-11` a control a trader can never get
+ * past. `PAYOUT-DEST-C1` permits equality and refuses a backward move, so
+ * nothing here can shorten a running window either.
+ *
+ * THE COMPARISON IS STRICT. `cooling_until` is the instant the window ENDS, so
+ * a destination is cooling while `now < cooling_until` and cleared at exactly
+ * that instant.
+ */
+export function coolingDecision(
+  row: DestinationRow | undefined,
+  at: Date,
+  windowMs: number = DESTINATION_COOLING_WINDOW_MS,
+): CoolingDecision {
+  if (row === undefined) return { kind: 'register', until: new Date(at.getTime() + windowMs) };
+  return at.getTime() < row.coolingUntil.getTime()
+    ? { kind: 'cooling', until: row.coolingUntil }
+    : { kind: 'cleared' };
+}
+
+// -----------------------------------------------------------------------------
+// The port
+// -----------------------------------------------------------------------------
+
+/** The row this module writes into `wallet_withdrawals`. */
+export interface WithdrawalInsert {
+  readonly amountCents: bigint;
+  readonly destinationRef: string;
+  readonly status: CreatedStatus;
+  readonly idempotencyKey: string;
+  readonly requestedAt: Date;
+  /**
+   * `source_provenance_summary`, which is `jsonb NOT NULL DEFAULT '{}'`.
+   *
+   * WRITTEN AT CREATION AND NOT LEFT EMPTY, and the CHECK permits both.
+   * `wallet_withdrawals_approved_has_provenance` REQUIRES a non-empty summary
+   * from `approved` on and permits `'{}'` at `requested` and `cooling`, so
+   * writing the real composition here is inside the constraint and is what M20
+   * section 3.3's sequence asks for: "compose from wallet_entries, oldest first
+   * (FIFO)" is a request-time step.
+   *
+   * A CAUTION THE CHECK CANNOT CARRY: `'[]'::jsonb <> '{}'::jsonb` is TRUE, so
+   * an EMPTY ARRAY would satisfy `wallet_withdrawals_approved_has_provenance`
+   * while carrying no composition at all. This module never writes one --
+   * `composeFifo` returns `null` rather than an empty array, and `null` is a
+   * refusal here -- and the weakness is reported rather than relied upon.
+   */
+  readonly sourceProvenanceSummary: readonly CompositionEntry[];
+  readonly earliestCreditAt: Date;
+}
+
+/** The row this module writes into `payout_destinations` (`0051`). */
+export interface DestinationInsert {
+  readonly destinationRef: string;
+  readonly firstSeenAt: Date;
+  readonly coolingUntil: Date;
+}
+
+/**
+ * What this module needs from one open transaction.
+ *
+ * EVERY METHOD IS SCOPED TO THE CALLER'S IDENTITY BY THE ACCESSOR BEFORE THIS
+ * FILE SEES A ROW, so nothing here is a tenancy control and nothing here can
+ * become one by accident. No method takes an identity.
+ */
+export interface WithdrawalTx {
+  /**
+   * `INV-M20-01`'s per-identity lock, held until this transaction ends.
+   *
+   * IT IS THE FIRST THING THE HANDLER DOES AND THE ORDER IS THE CONTROL. See
+   * this file's header: `G-NO-IN-FLIGHT` on this leg is an application check
+   * over a NON-UNIQUE index, so two concurrent requests that both read an empty
+   * in-flight set both insert, and nothing refuses the second.
+   */
+  lockScope(): Promise<void>;
+
+  /** This identity's own row. `identities` is the registry's only `root`. */
+  identity(): Promise<IdentityRow>;
+
+  /** The whole verification chain. {@link currentKycState} picks the head. */
+  kycVerifications(): Promise<readonly unknown[]>;
+
+  /** Every `wallet_withdrawals` row of this identity's. Filtered in memory. */
+  withdrawals(): Promise<readonly WithdrawalStatusRow[]>;
+
+  /** Every `wallet_entries` row of this identity's. The balance and the FIFO. */
+  entries(): Promise<readonly WalletEntryRow[]>;
+
+  /** One `payout_destinations` row, or `undefined`. A keyed lookup, `0051`. */
+  destination(destinationRef: string): Promise<DestinationRow | undefined>;
+
+  /** Register a destination and arm its window, in one INSERT. */
+  registerDestination(row: DestinationInsert): Promise<void>;
+
+  /** Write the withdrawal. Returns `wallet_withdrawals.id`. */
+  insertWithdrawal(row: WithdrawalInsert): Promise<{ readonly id: string }>;
+}
+
+/** What opens a transaction, plus the store the idempotency layer needs. */
+export interface WithdrawalBackend {
+  /** Run `fn` on one transaction. IT COMMITS ONLY IF `fn` RETURNS. */
+  transact<T>(session: AuthSession, fn: (tx: WithdrawalTx) => Promise<T>): Promise<T>;
+
+  /**
+   * `idempotency_keys`, read and stamped OUTSIDE the withdrawal transaction.
+   *
+   * `payouts.ts`'s shape and its reason: "a claim that rolled back with a
+   * failed request would be re-claimable, which is the retry becoming a second
+   * payout".
+   */
+  readonly idempotency: IdempotencyStore;
+
+  /** The clock. Injected so the suite can pin an instant. */
+  readonly now: () => Date;
+}
+
+/** Thrown by the unwired backend. Answered as 503 rather than 500. */
+export class WithdrawalBackendUnwired extends Error {
+  constructor(method: string) {
+    super(
+      `WithdrawalBackend.${method} is not wired. The external leg is declared and its ` +
+        'persistence is not installed, so this deployment answers 503 rather than opening a ' +
+        'withdrawal it cannot record',
+    );
+    this.name = 'WithdrawalBackendUnwired';
+  }
+}
+
+const UNWIRED_STORE: IdempotencyStore = {
+  find: () => Promise.reject(new WithdrawalBackendUnwired('idempotency.find')),
+  begin: () => Promise.reject(new WithdrawalBackendUnwired('idempotency.begin')),
+  complete: () => Promise.reject(new WithdrawalBackendUnwired('idempotency.complete')),
+};
+
+/**
+ * A backend that refuses every call.
+ *
+ * ON `payouts.ts`'s AND `wallet.ts`'s PRECEDENT AND FOR THEIR REASON: "a
+ * backend that returned plausible values would be a fixture serving real
+ * traffic", and on THIS route it would be a fixture telling a trader their cash
+ * is on its way. The route is REGISTERED because the contract row exists; a
+ * missing route answers 404 and reads as a contract Merit never wrote.
+ */
+export const UNWIRED_WITHDRAWAL_BACKEND: WithdrawalBackend = {
+  transact: () => Promise.reject(new WithdrawalBackendUnwired('transact')),
+  idempotency: UNWIRED_STORE,
+  now: () => new Date(),
+};
+
+let backend: WithdrawalBackend = UNWIRED_WITHDRAWAL_BACKEND;
+
+/** Install the backend. The wiring slice calls this; so does the suite. */
+export function useWithdrawalBackend(next: WithdrawalBackend): void {
+  backend = next;
+}
+
+/** Restore the fail-closed default. */
+export function resetWithdrawalBackend(): void {
+  backend = UNWIRED_WITHDRAWAL_BACKEND;
+}
+
+/** The installed backend. */
+export function currentWithdrawalBackend(): WithdrawalBackend {
+  return backend;
+}
+
+/**
+ * The backend, reading and writing through the accessor.
+ *
+ * `db.scoped` AND NEVER `db.firm`. The identity is the one the handler resolved
+ * from the session.
+ *
+ * `tx.rowAt('payoutDestinations', { destinationRef })` NAMES ONE ROW AND THE
+ * HANDLE SUPPLIES THE OTHER HALF OF THE KEY. `0051`'s primary key is
+ * `(identity_id, destination_ref)` and `identity_id` is the tenancy column, so
+ * the caller MAY NOT name it and it counts toward the unique key anyway --
+ * which is exactly the composition ADR-112's second draft was rewritten to
+ * admit. The same is true of the INSERT: `identity_id` is written by the
+ * accessor and is not in `DestinationInsert`.
+ *
+ * `idempotency` REFUSES BY NAME AND THE REASON IS NOT THIS SLICE'S.
+ * `idempotency.ts`'s own header records that no implementation of
+ * `IdempotencyStore` exists in this tree, because `complete` is an UPDATE of
+ * exactly one row and `systemTx`/`firmTx` hardcode `undefined` for the `WHERE`.
+ * A store built here would be that gap papered over on the cash door.
+ */
+export function databaseWithdrawalBackend(
+  db: ApiDb,
+  now: () => Date = () => new Date(),
+): WithdrawalBackend {
+  return {
+    now,
+    idempotency: UNWIRED_STORE,
+    transact: (session, fn) =>
+      db.scoped(session.identityId, async (tx) =>
+        fn({
+          lockScope: async () => {
+            await tx.lockScope();
+          },
+          identity: async () => {
+            const rows = await tx.rows('identities');
+            const row = rows[0];
+            if (rows.length !== 1 || row === undefined)
+              throw new WithdrawalRowError(
+                `a scoped read of \`identities\` returned ${String(rows.length)} rows. The rule ` +
+                  "is `root` on `id`, so it returns the caller's own row and exactly one",
+              );
+            return toIdentityRow(row);
+          },
+          kycVerifications: () => tx.rows('kycVerifications'),
+          withdrawals: async () => (await tx.rows('walletWithdrawals')).map(toWithdrawalStatusRow),
+          entries: async () => (await tx.rows('walletEntries')).map(toWalletEntryRow),
+          destination: async (destinationRef) => {
+            const row = await tx.rowAt('payoutDestinations', { destinationRef });
+            return row === undefined ? undefined : toDestinationRow(row);
+          },
+          registerDestination: async (row) => {
+            await tx.insert('payoutDestinations', {
+              destinationRef: row.destinationRef,
+              firstSeenAt: row.firstSeenAt,
+              coolingUntil: row.coolingUntil,
+            });
+          },
+          insertWithdrawal: async (row) => {
+            const written = await tx.insert('walletWithdrawals', {
+              amountCents: row.amountCents,
+              destinationRef: row.destinationRef,
+              status: row.status,
+              idempotencyKey: row.idempotencyKey,
+              requestedAt: row.requestedAt,
+              sourceProvenanceSummary: row.sourceProvenanceSummary,
+              earliestCreditAt: row.earliestCreditAt,
+            });
+            const first = written[0];
+            if (first === undefined)
+              throw new WithdrawalRowError('the `wallet_withdrawals` INSERT returned no row');
+            return { id: text(asRow(first, 'walletWithdrawals'), 'id', 'walletWithdrawals') };
+          },
+        }),
+      ),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Validation. Total over the one shape section 6.2 declares, and hand written
+// -----------------------------------------------------------------------------
+
+type Validated<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly errors: readonly FieldError[] };
+
+function asBody(body: unknown): Record<string, unknown> | null {
+  return typeof body === 'object' && body !== null && !Array.isArray(body)
+    ? (body as Record<string, unknown>)
+    : null;
+}
+
+/**
+ * Section 6.2's body. BOTH members are required and neither has a default.
+ *
+ * `validation_failed` IS THE ANSWER FOR "non-integer, zero, negative, or below
+ * the minimum", which is the contract's own error list for this row. THE
+ * MINIMUM IS A `validation_failed` AND NOT AN `insufficient_funds`: the two
+ * answer different questions, and a trader asking for 5,000c when they hold
+ * 900,000c has enough money and has asked for too little.
+ *
+ * EVERY ERROR IS COLLECTED RATHER THAN THE FIRST RETURNED, because a client
+ * that fixes one field at a time on the cash door is a client making two more
+ * requests than it needs to.
+ */
+export function validateWithdrawalRequest(body: unknown): Validated<WithdrawalRequestBody> {
+  const row = asBody(body);
+  if (row === null) return { ok: false, errors: [{ path: '', message: 'body must be an object' }] };
+  const errors: FieldError[] = [];
+
+  const cents = centsFromJson(row['amount_cents']);
+  if (cents === null)
+    errors.push({ path: 'amount_cents', message: 'must be an integer number of cents' });
+  else if (cents <= 0n) errors.push({ path: 'amount_cents', message: 'must be greater than zero' });
+  else if (cents < MINIMUM_WITHDRAWAL_CENTS)
+    errors.push({
+      path: 'amount_cents',
+      message: `must be at least ${MINIMUM_WITHDRAWAL_CENTS.toString()} cents`,
+    });
+
+  const destination = row['destination_ref'];
+  if (typeof destination !== 'string' || destination === '')
+    errors.push({
+      path: 'destination_ref',
+      message: 'must be a non-empty provider destination id',
+    });
+
+  if (errors.length > 0) return { ok: false, errors };
+  return {
+    ok: true,
+    value: {
+      amount_cents: Number(cents),
+      destination_ref: destination as string,
+    },
+  };
+}
+
+/**
+ * `Idempotency-Key`, which section 1 makes REQUIRED on this endpoint.
+ *
+ * "The last of those is required by the SCHEMA rather than by this sentence":
+ * `wallet_withdrawals.idempotency_key` is `text NOT NULL` under
+ * `wallet_withdrawals_identity_idempotency_uq`, so a withdrawal without a key
+ * is unwritable rather than merely undesirable.
+ */
+export function idempotencyKeyOf(request: FastifyRequest): string | null {
+  const raw = request.headers['idempotency-key'];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
+// -----------------------------------------------------------------------------
+// The refusals
+// -----------------------------------------------------------------------------
+
+interface ProblemDocument {
+  readonly type: string;
+  readonly title: string;
+  readonly status: number;
+  readonly code: string;
+  readonly instance: string;
+  readonly detail?: string;
+}
+
+/**
+ * A code section 2 defines that `server.ts`'s closed `TITLE` table does not
+ * carry, because that table holds the codes the TRANSPORT can produce.
+ */
+function handlerProblem(
+  code: string,
+  title: string,
+  status: number,
+  instance: string,
+  detail?: string,
+): ProblemDocument {
+  return {
+    type: `${PROBLEM_TYPE_PREFIX}${code}`,
+    title,
+    status,
+    code,
+    instance,
+    ...(detail === undefined ? {} : { detail }),
+  };
+}
+
+/** Section 2: "The identity is restricted." */
+export const IDENTITY_RESTRICTED = 'identity_restricted';
+/** Section 2: "Account or identity under investigation." */
+export const PAYOUTS_FROZEN = 'payouts_frozen';
+/** Section 2: "Verification needed before this action." */
+export const KYC_REQUIRED = 'kyc_required';
+
+/**
+ * The contract names this code on THREE endpoint rows and section 2's code
+ * table does NOT carry it, which is reported rather than smoothed.
+ *
+ * `grep insufficient_funds docs/architecture/API_CONTRACT.md` returns the
+ * `POST /wallet/withdrawals` row and two rows of the admin wallet-correction
+ * surface, and section 2's table -- which `payouts.ts` records as CLOSED --
+ * lists fifteen codes and not this one. So the CODE is the contract's and its
+ * STATUS is not stated anywhere. `422` is taken because every other business
+ * refusal in that table sits at 422 and this is one, and the alternative would
+ * be inventing a code as well as a status. **A section 2 row is owed.**
+ */
+export const INSUFFICIENT_FUNDS = 'insufficient_funds';
+
+/** A refusal decided inside the transaction, carried out of it. */
+export interface Refusal {
+  readonly send: (reply: FastifyReply, requestId: string) => FastifyReply;
+}
+
+function refuse(code: string, title: string, status: number, detail: string): Refusal {
+  return {
+    send: (reply, requestId) =>
+      reply
+        .code(status)
+        .type(PROBLEM_MEDIA_TYPE)
+        .send(handlerProblem(code, title, status, requestId, detail)),
+  };
+}
+
+/** Thrown so a refusal decided mid-transaction rolls the transaction back. */
+class RefusalThrown extends Error {
+  readonly refusal: Refusal;
+  constructor(refusal: Refusal) {
+    super('withdrawal refused');
+    this.name = 'RefusalThrown';
+    this.refusal = refusal;
+  }
+}
+
+/**
+ * `G-WITHDRAWAL-CLEARED`'s identity-status term.
+ *
+ * THE PREDICATE IS `=== 'active'` AND NOT A LIST OF WHAT IS REFUSED, which is
+ * ADR-075's own first reason: "`<>` fails open and `=` fails closed on every
+ * value the enum gains later. A fourth `identity_status` value passes
+ * `<> 'restricted'` silently on the day it is added and fails `= 'active'`
+ * loudly on the same day. The form that breaks safely when a stranger widens a
+ * type is the form an OUTBOUND door takes."
+ *
+ * ADR-075 IS `status: accepted` AND ITS FOUNDER APPROVAL WAS GRANTED
+ * 2026-08-21. `M20:62`'s `INV-M20-06` and STATE_MACHINES'
+ * `G-WITHDRAWAL-CLEARED` both read `= 'active'` and have since that date. The
+ * contradiction several dispatches still carry -- that `INV-M20-06` blocks on
+ * `restricted` while the payout gate reads `active` -- is CLOSED, and P5
+ * section 5.1 measured that the stale text is `M20`'s `OQ-M20-07` BODY rather
+ * than the invariant. Nothing here re-rules it.
+ *
+ * THE CODE IS `identity_restricted` FOR BOTH REFUSED VALUES and the imprecision
+ * is recorded rather than smoothed: a `closed` identity is not restricted and
+ * the code's name says it is. Section 2's code table is CLOSED, so a sixth
+ * spelling would be a ruling; the `detail` carries what the code cannot. This
+ * is `payouts.ts`'s reasoning, on the other extraction door, unchanged.
+ */
+export function gateIdentityStatus(status: IdentityStatus): Refusal | null {
+  if (status === 'active') return null;
+  return refuse(
+    IDENTITY_RESTRICTED,
+    'Identity restricted',
+    422,
+    `This identity is ${status} and cannot withdraw.`,
+  );
+}
+
+/**
+ * `identities.payouts_frozen`, which is a different refusal about the same
+ * person.
+ *
+ * IT IS SEPARATE FROM THE STATUS GATE AND MUST STAY SEPARATE. API_CONTRACT
+ * section 2: "`payouts_frozen` is per account or per payment and blocks one
+ * door; a restriction is per human." Collapsing the two would answer one code
+ * for two operationally different states, and the freeze is the reversible one.
+ */
+export function gatePayoutsFrozen(row: IdentityRow): Refusal | null {
+  if (!row.payoutsFrozen) return null;
+  return refuse(
+    PAYOUTS_FROZEN,
+    'Payouts frozen',
+    422,
+    'Payouts are frozen on this identity while an investigation is open.',
+  );
+}
+
+/** `G-WITHDRAWAL-CLEARED`'s KYC term. Anything but `verified` refuses. */
+export function gateKyc(state: KycState): Refusal | null {
+  if (state === 'verified') return null;
+  return refuse(
+    KYC_REQUIRED,
+    'Verification required',
+    422,
+    `Identity verification is \`${state}\` and an external withdrawal requires \`verified\`.`,
+  );
+}
+
+/**
+ * `G-NO-IN-FLIGHT`, scoped to this leg.
+ *
+ * FOUR STATUSES, FILTERED IN MEMORY, AND UNDER `lockScope()`. See
+ * {@link OPEN_WITHDRAWAL_STATUSES} for why the list is the index's and this
+ * file's header for why the lock is what makes the check a control.
+ */
+export function gateNoInFlight(rows: readonly WithdrawalStatusRow[]): Refusal | null {
+  const open = rows.filter((row) =>
+    (OPEN_WITHDRAWAL_STATUSES as readonly string[]).includes(row.status),
+  );
+  if (open.length === 0) return null;
+  return refuse(
+    'conflict',
+    'Conflict',
+    409,
+    'A withdrawal is already open for this identity. One withdrawal is in flight at a time.',
+  );
+}
+
+/** The balance term. Measured against `withdrawable_cents`, section 6.2. */
+export function gateFunds(amountCents: bigint, rows: readonly WalletEntryRow[]): Refusal | null {
+  const available = withdrawableCents(rows);
+  if (amountCents <= available) return null;
+  return refuse(
+    INSUFFICIENT_FUNDS,
+    'Insufficient funds',
+    422,
+    `This wallet holds ${available.toString()}c and the request is for ` +
+      `${amountCents.toString()}c.`,
+  );
+}
+
+// -----------------------------------------------------------------------------
+// The ordered behavior, in one transaction
+// -----------------------------------------------------------------------------
+
+/** What a successful run decided, before it becomes a response. */
+export interface CreatedWithdrawal {
+  readonly id: string;
+  readonly status: CreatedStatus;
+  readonly amountCents: bigint;
+  readonly destinationRef: string;
+  readonly requestedAt: Date;
+  readonly coolingUntil: Date | null;
+  readonly composition: readonly CompositionEntry[];
+  readonly earliestCreditAt: Date;
+}
+
+/**
+ * The whole decision, on one transaction, in the order M05 section 1.1 and
+ * STATE_MACHINES section 3.2 put it.
+ *
+ * THE LOCK IS FIRST AND EVERY GATE BELOW IS DECIDED UNDER IT. A gate evaluated
+ * before the lock is a gate evaluated against a state another transaction can
+ * still change.
+ *
+ * THE IDENTITY GATES COME BEFORE THE WALLET IS READ, which is `payouts.ts`'s
+ * placement and its reason applied one door over: the refusal is about the
+ * PERSON, and reading their money to tell them they may not have it is work
+ * done on a decision already made.
+ *
+ * THE COOLING GATE RUNS AFTER THE FUNDS CHECK AND BEFORE THE INSERT, and the
+ * order matters in one direction only: `register` WRITES a row, so a request
+ * that is going to be refused for any other reason must be refused first. A
+ * destination registered by a request that then failed on funds would carry a
+ * `first_seen_at` earlier than the trader's first real use of it, and
+ * `PAYOUT-DEST-C1` makes that column immutable.
+ */
+export async function decideWithdrawal(args: {
+  readonly tx: WithdrawalTx;
+  readonly amountCents: bigint;
+  readonly destinationRef: string;
+  readonly idempotencyKey: string;
+  readonly at: Date;
+}): Promise<CreatedWithdrawal | Refusal> {
+  const { tx, amountCents, destinationRef, idempotencyKey, at } = args;
+
+  await tx.lockScope();
+
+  const identity = await tx.identity();
+  const restricted = gateIdentityStatus(identity.status);
+  if (restricted !== null) return restricted;
+  const frozen = gatePayoutsFrozen(identity);
+  if (frozen !== null) return frozen;
+
+  const kyc = gateKyc(currentKycState(await tx.kycVerifications()));
+  if (kyc !== null) return kyc;
+
+  const inFlight = gateNoInFlight(await tx.withdrawals());
+  if (inFlight !== null) return inFlight;
+
+  const entries = await tx.entries();
+  const funds = gateFunds(amountCents, entries);
+  if (funds !== null) return funds;
+
+  // The composition is computed BEFORE the destination is registered, for the
+  // reason this function's doc gives: a throw here must not leave a
+  // `first_seen_at` behind. `unspentLots` throws on a statement that cannot be
+  // one, and that is a 500 rather than a refusal, deliberately: it is Merit's
+  // records disagreeing with themselves and it is not the trader's fault.
+  const composition = composeWithdrawal(entries, amountCents);
+  if (composition === null) return gateFunds(amountCents, entries) ?? unreachableFunds(amountCents);
+
+  const cooling = coolingDecision(await tx.destination(destinationRef), at);
+  if (cooling.kind === 'register') {
+    await tx.registerDestination({
+      destinationRef,
+      firstSeenAt: at,
+      coolingUntil: cooling.until,
+    });
+  }
+  const status: CreatedStatus = cooling.kind === 'cleared' ? 'requested' : 'cooling';
+  const coolingUntil = cooling.kind === 'cleared' ? null : cooling.until;
+
+  const written = await tx.insertWithdrawal({
+    amountCents,
+    destinationRef,
+    status,
+    idempotencyKey,
+    requestedAt: at,
+    sourceProvenanceSummary: composition.entries,
+    earliestCreditAt: composition.earliestCreditAt,
+  });
+
+  return {
+    id: written.id,
+    status,
+    amountCents,
+    destinationRef,
+    requestedAt: at,
+    coolingUntil,
+    composition: composition.entries,
+    earliestCreditAt: composition.earliestCreditAt,
+  };
+}
+
+/**
+ * The refusal for a composition that came up short against a balance that said
+ * it would not.
+ *
+ * IT IS UNREACHABLE TODAY AND IT IS NOT AN `unreachable` THROW. `gateFunds`
+ * compares against the same rows `composeWithdrawal` walks, and `unspentLots`
+ * throws rather than returns when the two disagree -- so the only way here is a
+ * future change that makes `withdrawableCents` larger than the lots. On the
+ * cash door the fail-closed answer to "these two disagree" is to refuse, and a
+ * `500` would be the same refusal with a worse label.
+ */
+function unreachableFunds(amountCents: bigint): Refusal {
+  return refuse(
+    INSUFFICIENT_FUNDS,
+    'Insufficient funds',
+    422,
+    `This wallet cannot compose ${amountCents.toString()}c out of its unspent credits.`,
+  );
+}
+
+/** Section 6.2's `WithdrawalResponse`, built field by field. */
+export function renderWithdrawal(created: CreatedWithdrawal): WithdrawalResponse {
+  return {
+    withdrawal_id: created.id,
+    status: created.status,
+    amount_cents: centsToJson(created.amountCents),
+    destination_ref: created.destinationRef,
+    requested_at: created.requestedAt.toISOString(),
+    cooling_until: created.coolingUntil === null ? null : created.coolingUntil.toISOString(),
+    composition: created.composition,
+    earliest_credit_at: created.earliestCreditAt.toISOString(),
+    provenance_review: provenanceReview(created.composition),
+    // "a withdrawal cannot be created halted". The freeze trio is all-or-none
+    // under `wallet_withdrawals_freeze_is_complete` and this INSERT writes none
+    // of it, so the field is a constant rather than a read.
+    halt: null,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// The endpoint
+// -----------------------------------------------------------------------------
+
+/**
+ * The response as a `JsonValue`, built field by field.
+ *
+ * A CONSTRUCTION AND NOT A CAST. `payouts.ts` writes `response as unknown as
+ * JsonValue` at the same call site; the two are equivalent today and stop being
+ * equivalent the moment a field of a non-JSON type is added, at which point the
+ * cast stores it and this function does not compile. `readonly` arrays and
+ * `readonly` properties are what `tsc` refuses here, and copying them is the
+ * whole of the difference.
+ */
+function toJsonBody(response: WithdrawalResponse): JsonValue {
+  return {
+    withdrawal_id: response.withdrawal_id,
+    status: response.status,
+    amount_cents: response.amount_cents,
+    destination_ref: response.destination_ref,
+    requested_at: response.requested_at,
+    cooling_until: response.cooling_until,
+    composition:
+      response.composition === null
+        ? null
+        : response.composition.map((entry) => ({
+            provenance: entry.provenance,
+            cents: entry.cents,
+          })),
+    earliest_credit_at: response.earliest_credit_at,
+    provenance_review: response.provenance_review,
+    halt: response.halt,
+  };
+}
+
+/** An unwired backend is a 503 and never a 500. Anything else is the transport's. */
+function unwiredOrThrow(err: unknown, request: FastifyRequest, reply: FastifyReply): FastifyReply {
+  if (!(err instanceof WithdrawalBackendUnwired)) throw err;
+  request.log.error({ err }, 'withdrawal backend is not wired');
+  return reply
+    .code(503)
+    .type(PROBLEM_MEDIA_TYPE)
+    .send({ ...problem('service_unavailable', 503, request.id), title: 'Service unavailable' });
+}
+
+/**
+ * The raw request body, for the idempotency hash.
+ *
+ * `payouts.ts`'s function and its stated limitation: without a capture hook two
+ * bodies that parse equal and serialise differently hash the same, which makes
+ * the `idempotency_key_reuse` check slightly WEAKER than section 1 specifies
+ * and never stronger.
+ */
+function rawBodyOf(request: FastifyRequest): Uint8Array {
+  const raw = (request as { rawBody?: unknown }).rawBody;
+  if (raw instanceof Uint8Array) return raw;
+  if (typeof raw === 'string') return new TextEncoder().encode(raw);
+  if (request.body === undefined || request.body === null) return new Uint8Array(0);
+  return new TextEncoder().encode(JSON.stringify(request.body));
+}
+
+/**
+ * API_CONTRACT section 6.2's `POST /wallet/withdrawals`.
+ *
+ * `required: 'passkey or dual_channel'` AND `c27: 'external withdrawal'`, which
+ * is section 12's row and section 6.2's own "Auth: session, and ELEVATED". THIS
+ * FILE ADDS NO SECOND REFUSAL -- see the header, and M05 section 3.6.
+ *
+ * THE ANSWER IS `200` AND NOT `201`, which the contract does not state either
+ * way. `payouts.ts` returns 200 on the other money-path creation and
+ * `completeIdempotent` stores the status a replay will return verbatim, so two
+ * creation doors answering differently would be a difference a client has to
+ * learn per endpoint. Reported as owed rather than decided in the contract.
+ */
+export const WITHDRAWAL_ENDPOINTS: readonly EndpointSpec[] = [
+  {
+    method: 'POST',
+    path: WITHDRAWALS_PATH,
+    required: 'passkey or dual_channel',
+    c27: 'external withdrawal',
+    handle: withSessionContext(async ({ request, reply, session }) => {
+      const key = idempotencyKeyOf(request);
+      if (key === null)
+        return reply
+          .code(400)
+          .type(PROBLEM_MEDIA_TYPE)
+          .send({
+            ...problem('validation_failed', 400, request.id),
+            errors: [
+              {
+                path: 'Idempotency-Key',
+                message: `this header is required on ${WITHDRAWALS_ENDPOINT}`,
+              },
+            ],
+          });
+
+      const validated = validateWithdrawalRequest(request.body);
+      if (!validated.ok)
+        return reply
+          .code(400)
+          .type(PROBLEM_MEDIA_TYPE)
+          .send({ ...problem('validation_failed', 400, request.id), errors: validated.errors });
+
+      const active = currentWithdrawalBackend();
+      const scope = identityScope(session.identityId);
+      const at = active.now();
+
+      let outcome: IdempotencyOutcome;
+      try {
+        // OVER THE RAW BYTES AND NEVER OVER A PARSED BODY RE-SERIALISED, which
+        // is `payouts.ts`'s rule: a hash taken after a parse makes "an
+        // identical body" a property of this process's serialiser.
+        outcome = await beginIdempotent(
+          active.idempotency,
+          scope,
+          WITHDRAWALS_ENDPOINT,
+          key,
+          rawBodyOf(request),
+        );
+      } catch (err) {
+        return unwiredOrThrow(err, request, reply);
+      }
+
+      // Section 1: "Replaying a key with an identical body returns the original
+      // response VERBATIM." On this door a re-run would be a second withdrawal.
+      if (outcome.kind === 'replay') return reply.code(outcome.status).send(outcome.body);
+      const refusalDoc = problemForOutcome(outcome, request.id);
+      if (refusalDoc !== null)
+        return reply.code(refusalDoc.status).type(PROBLEM_MEDIA_TYPE).send(refusalDoc);
+      if (outcome.kind !== 'fresh') {
+        /* c8 ignore next 2 */
+        throw new Error('unreachable: every non-fresh outcome is a replay or a problem');
+      }
+
+      let response: WithdrawalResponse;
+      try {
+        response = await active.transact(session, async (tx) => {
+          const decided = await decideWithdrawal({
+            tx,
+            amountCents: BigInt(validated.value.amount_cents),
+            destinationRef: validated.value.destination_ref,
+            idempotencyKey: key,
+            at,
+          });
+          // A REFUSAL DECIDED INSIDE THE TRANSACTION IS THROWN OUT OF IT rather
+          // than returned, so the transaction rolls back whatever it had
+          // already written. On this route that is not theoretical: the
+          // destination registration is a write, and a refusal after it must
+          // not leave a `first_seen_at` behind.
+          if ('send' in decided) throw new RefusalThrown(decided);
+          return renderWithdrawal(decided);
+        });
+      } catch (err) {
+        if (err instanceof RefusalThrown) {
+          // THE KEY IS NOT STAMPED ON A REFUSAL, which is `payouts.ts`'s rule:
+          // stamping it would make a trader who fixed the cause and retried
+          // with the same key read their own old refusal back.
+          return err.refusal.send(reply, request.id);
+        }
+        return unwiredOrThrow(err, request, reply);
+      }
+
+      try {
+        await completeIdempotent(active.idempotency, scope, outcome, 200, toJsonBody(response));
+      } catch (err) {
+        return unwiredOrThrow(err, request, reply);
+      }
+      return response;
+    }),
+  },
+];
+
+/** The declaration as data, on `auth.ts`'s shape. Section 12's factor column. */
+export const WITHDRAWAL_REQUIRED_FACTORS = requiredFactorTable(WITHDRAWAL_ENDPOINTS);
+
+export default defineRoutes({
+  name: 'wallet-withdrawals',
+  routes: toRoutes(WITHDRAWAL_ENDPOINTS),
+});
