@@ -1,0 +1,19 @@
+{
+  "name": "@merit/enrichment",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ADR-023's checkout enrichment, OBSERVE MODE. The vendor-agnostic port, its integration_contracts row, the scorer, and a recorder that returns nothing a caller can refuse a checkout on. No network, no vendor SDK, no route, no decision.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT DECLARES NO RUNTIME DEPENDENCY AND NO WORKSPACE DEPENDENCY, AND BOTH ABSENCES ARE THE DESIGN, on packages/ledger's precedent rather than as a new argument. This code runs INSIDE checkout's transaction, so the writer is injected: `observeEnrichment` takes the caller's open transaction as an argument with no overload that omits it, and a library that could reach a pool is a library that could open a SECOND transaction and record a signal that survives a rolled-back purchase. It declares no `pg` and no `drizzle-orm` either, which is what makes `merit/no-raw-db-client` (VG-4) satisfiable here with no `ignores` line. THE VENDOR CALL IS INJECTED FOR THE SAME REASON AND A SECOND ONE: this package opens no socket, which is packages/psp's precedent under M03 section 2.1, so VG-12 is asked to admit NOTHING and the only line pnpm-lock.yaml gains is this package's own `importers` block. The cost is that `EnrichmentTx` RESTATES the subset of ADR-102's `ScopedTx` this path uses, which is ADR-092 section 5's two-statements-of-one-fact hazard, and it is closed the only way it can be from here: the suite READS packages/db/src/scoped-db.ts and compares the two.",
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

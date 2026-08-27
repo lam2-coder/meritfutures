@@ -145,6 +145,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-117](ADR-117.md) | `RI-08` guards every package against an EMPTY admission list, because the two ADR-096 named were five before this session opened  (2026-08-26, status: proposed) |
 | [ADR-118](ADR-118.md) | a section headed by a date or a session number is a RECORD, and ADR-034's count rule does not reach it  (2026-08-26, status: proposed) |
 | [ADR-119](ADR-119.md) | the demo world is a VALUE at `scripts/demo/world.ts`, not a Postgres seed, and naming it reopens `CI-09` on purpose  (2026-08-26, status: proposed) |
+| [ADR-115](ADR-115.md) | enrichment observes, and the two places observe mode could quietly become enforcement are closed by shape rather than by discipline  (2026-08-26, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
