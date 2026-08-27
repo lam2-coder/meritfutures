@@ -555,10 +555,13 @@ test('an unset port is a 500 on every row and never a 503', async () => {
   // batch row every retry is another manual trigger during an incident.
   const { app } = buildServer({ surface: 'operator', modules: onDisk });
   for (const route of INTERNAL_ENDPOINTS) {
+    // `payload` is spread in rather than set to `undefined`, because
+    // `exactOptionalPropertyTypes` makes an explicit `undefined` a different
+    // thing from an absent key and `InjectOptions` admits only the second.
     const res = await app.inject({
       method: route.method,
       url: url(route.path),
-      payload: route.method === 'POST' ? VALID_BODY : undefined,
+      ...(route.method === 'POST' ? { payload: VALID_BODY } : {}),
     });
     expect(res.statusCode).toBe(500);
     expect(res.headers['content-type']).toContain(PROBLEM_MEDIA_TYPE);
