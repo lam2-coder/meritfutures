@@ -545,7 +545,11 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   test('RI-10 does NOT refuse a scripts/ specifier naming a file that is genuinely `.js`', () => {
     const root = cleanTree();
     write(root, 'scripts/demo/hook.js', 'export const hook = 1;\n');
-    write(root, 'scripts/demo/uses-hook.ts', "import { hook } from './hook.js';\nexport { hook };\n");
+    write(
+      root,
+      'scripts/demo/uses-hook.ts',
+      "import { hook } from './hook.js';\nexport { hook };\n",
+    );
     expect(findings('RI-10', root)).toEqual([]);
   });
 
