@@ -24,11 +24,18 @@
 // ESLint rule as the only thing standing between an app and an unscoped query,
 // and a lint rule is a control a `// eslint-disable-next-line` can route around.
 //
-// SEVEN TABLES OF 111 ARE REACHABLE, AND THAT IS REPORTED RATHER THAN ROUNDED.
-// The other 104 have no rule in `SCOPE_RULES`, so naming one is a COMPILE ERROR
-// at the call site rather than an unscoped read at runtime. A table joins the
-// reachable set by getting a rule written by a person, which is a diff on
-// `scope.ts` forever. That is the cost and it is the point.
+// A TABLE IS REACHABLE ONLY IF SOMEBODY WROTE ITS RULE, AND THE REST ARE A
+// COMPILE ERROR AT THE CALL SITE rather than an unscoped read at run time. A
+// table joins the reachable set by getting a rule written by a person, which is
+// a diff on `scope.ts` forever. That is the cost and it is the point.
+//
+// THIS PARAGRAPH USED TO STATE THE SIZE OF THE REGISTRY AND THE FIGURE WENT
+// STALE IN THE DIRECTION THAT UNDERSTATES THE TREE. It read "SEVEN TABLES OF
+// 111 ARE REACHABLE ... The other 104 have no rule", written when seven had one;
+// the two numbers have since traded places and the sentence read as though the
+// registry had shrunk. `test/scoped-db.test.ts` COMPUTES the figure from
+// `TABLES` and `SCOPE_RULES` rather than stating it, which is ADR-034's rule
+// applied to a comment, so the count is not restated here.
 //
 // MIGRATIONS ARE NOT SOURCE. `migrations/` is plain reviewable SQL, forward
 // only, reviewed on `main`, never edited after merge, only superseded
@@ -81,6 +88,20 @@ export {
   type SystemTx,
   type WriteValues,
 } from './scoped-db.ts';
+
+// THE FILTER TERMS (ADR-157). A read may narrow by a range or by `IS NULL` and
+// a write may not, so these are exported and there is nothing here a write path
+// could reach for. `atMost`, `atLeast` and `isNull` are the ONLY producers of a
+// term in this workspace and `isFilterTerm` is the only reader of the set they
+// mint into, which is what makes "a jsonb value that looks like a term is a
+// value" true rather than hoped for.
+//
+// THE LOCK IS NOT EXPORTED HERE AND DOES NOT NEED TO BE. `lockAt` and
+// `lockScope` are methods on the transaction handles, which a caller already
+// reaches through `transaction(handle, fn)`; ADR-112 section 10 records the same
+// fact about `updateAt` and the same consequence, that a caller wanting to
+// DECLARE a variable of one of these types adds the line.
+export { atLeast, atMost, isFilterTerm, isNull, type FilterTerm } from './scoped-db.ts';
 
 export {
   SCOPE_RULES,
