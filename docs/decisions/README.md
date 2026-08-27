@@ -139,13 +139,13 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-110](ADR-110.md) | the method page is a public read of a versioned definition, and the address of a definition is a pair whose second half the path does not carry (2026-08-26, status: accepted) |
 | [ADR-111](ADR-111.md) | two of the three homeless shapes get a contract row and the third gets a home it cannot be given here, because a banner that describes a session must arrive on the response that resolved it (2026-08-26, status: accepted) |
 | [ADR-112](ADR-112.md) | the accessor learns to name ONE ROW, and the six writes that could not are removed rather than documented  (2026-08-26, status: proposed) |
-| [ADR-114](ADR-114.md) | the composite trigger set fires on funnel order because every condition is monotone, and the KYC webhook's contractual anchor names no table  (2026-08-26, status: proposed) |
 | [ADR-113](ADR-113.md) | the creative-submission endpoint enters the contract, and the row is written from the CONSTRAINTS rather than from the plan's sentence  (2026-08-26, status: proposed) |
+| [ADR-114](ADR-114.md) | the composite trigger set fires on funnel order because every condition is monotone, and the KYC webhook's contractual anchor names no table  (2026-08-26, status: proposed) |
+| [ADR-115](ADR-115.md) | enrichment observes, and the two places observe mode could quietly become enforcement are closed by shape rather than by discipline  (2026-08-26, status: proposed) |
 | [ADR-116](ADR-116.md) | Playwright `1.56.1` is admitted under a DELEGATED `VG-12` grant, and `CI-08` becomes a stage that renders fixtures because there is no page  (2026-08-26, status: proposed) |
 | [ADR-117](ADR-117.md) | `RI-08` guards every package against an EMPTY admission list, because the two ADR-096 named were five before this session opened  (2026-08-26, status: proposed) |
 | [ADR-118](ADR-118.md) | a section headed by a date or a session number is a RECORD, and ADR-034's count rule does not reach it  (2026-08-26, status: proposed) |
 | [ADR-119](ADR-119.md) | the demo world is a VALUE at `scripts/demo/world.ts`, not a Postgres seed, and naming it reopens `CI-09` on purpose  (2026-08-26, status: proposed) |
-| [ADR-115](ADR-115.md) | enrichment observes, and the two places observe mode could quietly become enforcement are closed by shape rather than by discipline  (2026-08-26, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
