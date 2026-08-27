@@ -172,6 +172,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-147](ADR-147.md) | `M04` section 3.3's consistency meter names five figures, three of them reach no client, and two of those three are `R-29`'s own operands  (2026-08-27, status: proposed) |
 | [ADR-148](ADR-148.md) | `G-ELIGIBLE` conjoins two terms the eligibility response declares no gate for, so the differentiator screen can render ten passing gates beside a refusal  (2026-08-27, status: proposed) |
 | [ADR-152](ADR-152.md) | an as-of stamp's staleness is a claim the SERVER makes and the portal ORDERS, never one the portal computes, and no account-state contract publishes the fact today  (2026-08-27, status: proposed) |
+| [ADR-153](ADR-153.md) | `API_CONTRACT` section 12 names `GET /auth/otp`, the contract defines no such endpoint, and the row means `POST` (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

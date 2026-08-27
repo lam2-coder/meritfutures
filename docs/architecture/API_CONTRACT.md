@@ -792,7 +792,7 @@ Every row is a named test that must exist before the endpoint ships ([VG-5](../.
 | Payout body with `amount_cents` below `min_payout_cents` | `session` | `payout_not_eligible` with `minimum_amount` failing; no partial payment |
 | Checkout with a client-supplied price field | `session` | field ignored; server price used |
 | `/docs`, `/openapi.json`, `/swagger` in production | `none` | 404 |
-| `GET /auth/otp` with `channel: "sms"` driven past the per-number velocity | `none` | `rate_limited`. The pre-identity class is **not** exempt, and a `202` carrying `deferred` is the degraded path rather than a refusal |
+| `POST /auth/otp` with `channel: "sms"` driven past the per-number velocity | `none` | `rate_limited`. The pre-identity class is **not** exempt, and a `202` carrying `deferred` is the degraded path rather than a refusal |
 | `POST /auth/elevate` offering an SMS-established factor | `passkey or dual_channel` | `validation_failed`. **There is no such value to send**: the factor union admits `passkey` and `dual_channel` only, which is "never SMS alone" expressed as a type rather than as a check |
 | Changing a payout destination from a session whose only factor is SMS OTP | `passkey or dual_channel` (C-27: payout destination change) | 403 `forbidden`, and the response names the factor required so the client can offer it. The read that showed the destination succeeded, which is the boundary working |
 | Changing an email or phone contact from a non-elevated session | `passkey or dual_channel` (C-27: contact change) | 403 `forbidden`. **Either kind**, which is why `POST /phone/change` and the email equivalent share one row |
