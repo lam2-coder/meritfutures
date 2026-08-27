@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [README.md, ../../decisions/ADR-072.md, ../../decisions/ADR-076.md]
-last_updated: 2026-08-26
+last_updated: 2026-08-27
 ---
 
 ## 39. Fixture status and blockers
