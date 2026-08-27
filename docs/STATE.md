@@ -4335,3 +4335,37 @@ which is [ALLOCATION](decisions/ALLOCATION.md)'s own warning that *"a vacated nu
 **A SEED THAT PROVED NOTHING IS RECORDED AS PROVING NOTHING.** The first falsification added a value derived FROM the facts to the digest and turned zero tests red, correctly: a value the facts already determine can move no comparison. The seed that discriminates folds in something the facts do not determine, which is the computed value, and it turns the `ST-04` pair test red. *"I mutated the digest and the suite went red"* is not the claim; *"I mutated what the digest depends on"* is.
 
 **Measured on the merge with `origin/main` at `e3782d4`, which is the SECOND merge and the one the figures name: 32 of 32 gates, 10 of 10 invariants, `pnpm run verify` exit 0, `pnpm exec vitest run` 150 files / 2,646 passed / 1 skipped.** On the first merge, at `ad4eb3c`, the same run was 148 files / 2,613 passed / 1 skipped; session 232's `apps/api` suites are the difference and neither figure is this session's to claim. **`VG-1` was RED on both merges and on `main` itself for a reason outside this branch**, and it is recorded because a green run today is not evidence the gate was always green: `gitleaks git .` found a `generic-api-key` at `apps/api/test/auth-backend.test.ts:83` in commit `89874dbf`, which was reachable from `claude/auth-wiring` and from NEITHER `main` NOR this branch. Session 232 rewrote that branch, `89874dbf` is unreachable from any ref, and `gitleaks git .` over this merge reports **no leaks found** across 1,324 commits.** `statistics.test.ts` carries 60 cases and four seeded mutations were watched failing and reverted byte-identically. **MONEY PATH, `E2` READ PENDING, NOT MERGED.**
+
+---
+
+## The portal renders, and the classification the dispatch cited does not exist (2026-08-27, session 261)
+
+**`apps/portal` has two rendered screens.** `apps/portal/src/app/(purchases)/ports.ts` serves `/purchases` (`SC-M4-06`) and `/certificates` (`SC-M4-08`) out of one route group, against the view modules that had existed and rendered nothing since P4-h. **It is UNWIRED**: session 250's `next.config` and `app/layout.tsx` had not landed, so `next build` still exits 1 for the missing layout and the segment shipped honestly unwired on [session 223](sessions/2026-08-26-session-223.md)'s pattern.
+
+### `ADR-149` is NOT TAKEN, and the reservation's own reason is the finding
+
+The `149` row and the `261` row both read *"Certificates are a public artifact and `GS-302` is `restricted`; a rendered certificate is the first place that classification is tested"*. **Every citation under that sentence resolves and the inference does not.** [`0001`](../packages/db/migrations/0001_extensions_and_enums.sql):27 is `CREATE TYPE identity_status AS ENUM ('active', 'restricted', 'closed')`, [ADR-041](decisions/ADR-041.md) refused a fourth value **of that enum**, and `GS-302` impersonates a **`restricted` identity**.
+
+**`identity_status` is an identity's status and not a classification of data**, and no data-classification vocabulary exists anywhere in this corpus. A rendered certificate therefore tests nothing about one. The word travelled from an enum of identity states into a sentence about data sensitivity because the word was the same, which is [session 95](sessions/2026-08-20-session-95.md)'s recurring error class with the citation checked and the inference not.
+
+**What a public certificate may carry IS settled, in two places that agree.** [M11](plans/M11-certificates-social-proof.md) `INV-M11-01` enumerates the claims and closes them with *"and nothing else"*; [M04](plans/M04-trader-portal.md) `AS-M4-03` rule 3 states the same set as absences. The condition was *"if the corpus does not settle it"*, so no entry is minted and the `149` row is amended in place under [ADR-065](decisions/ADR-065.md) T3.
+
+### The control that ships instead, and the leak it caught
+
+`publishedCertificate()` builds its result **field by field from a closed allowlist** rather than by spreading the view model, so a field added to `CertificateView` later cannot reach a public artifact until somebody writes its name in the list. **`certificate_id` does not cross it**, on `SD-M11-01`'s own reason for separating the primary key from the public `code`: the token can be rotated after an incident only while the key it replaced is not already published.
+
+**The refusal path was publishing that id through an error message**, and the assertion is written over the rendered bytes rather than over the model's fields, so it failed. A value reaches a page through an `alt`, a `title` or an error string without ever appearing in a visible field.
+
+### Four reads named, two of which nobody owns
+
+`GET /purchases` and `GET /plans/:planId/versions/:version` are session **253**'s and in flight. **`GET /accounts/:accountId/certificate?kind=` is approved in [API_CONTRACT](architecture/API_CONTRACT.md) section 6 and is claimed by no session in the 250 to 264 wave**, and **no contract row serves `content_documents` to the portal at all**, which leaves `INV-M4-09`'s required disclosure with no wire source. `GET /certificates`, M11's trader-facing list carrying the `deferred` state, is in no `API_CONTRACT` section.
+
+**Two things measured and reported rather than taken**: [`view/certificates.ts`](../apps/portal/src/view/certificates.ts) and [`view/disclosure.ts`](../apps/portal/src/view/disclosure.ts) each declare an error class with a TypeScript parameter property, which `node --experimental-strip-types` refuses to load; it does not bite the portal because [ADR-095](decisions/ADR-095.md) moved its start script to `next start`. Rendering forced no change to either file.
+
+### `CI-07` reopens on this commit and is left RED, deliberately
+
+`CI-06/gate-inventory` reports one finding: `CI-07`'s artifact, *"a `page`, `layout` or `route` file under `apps/*/src/app/`"*, **has arrived**, so the row reopened on the commit that delivered it. **That is [ADR-073](decisions/ADR-073.md) disposition (b) failing on good news exactly as designed**, and [`apps/portal/package.json`](../apps/portal/package.json)'s own note predicted this reopen when the `build` script landed.
+
+**The stage still cannot be written.** `next build` in `apps/portal` exits 1 until session **250** lands `next.config` and `app/layout.tsx`, so a `CI-07` written now could only fail forever, which [STRATEGY](testing/STRATEGY.md) section 4 forbids, and skipping it is forbidden by `repo-invariants.mjs` rule 2. An implemented leg names a job in [`ci.yml`](../.github/workflows/ci.yml), which [P4 section 8](plans/P4-portal-and-site.md) gives to **`P4-i`** and to no portal-page slice.
+
+**Session 250 triggers the identical reopen**, because `app/layout.tsx` is itself a layout file under `apps/*/src/app/`, and 250 is the first commit on which the row can move to IMPLEMENTED rather than to a second re-ruling. **So this decides merge order: 250 first, or 250's commit carries `CI-07`'s disposition.** The gate was not weakened and the fence was not widened. **31 of 32.**
