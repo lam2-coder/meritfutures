@@ -77,15 +77,28 @@
 //      slice rather than this one's. This session is not money by content and
 //      does not become so by wiring a store.
 //
-// SO `productionDeps` RESOLVES NOTHING AND A LIVE DEPLOYMENT ANSWERS 503, WHICH
-// IS SECTION 2's CODE FOR A DEPENDENCY THAT IS NOT THERE. It is 503 and not the
-// 404 `webhooks-kyc.ts` answers, and the difference is the PATH rather than a
+// SO `productionDeps` RESOLVES NOTHING AND THE RECEIVER ANSWERS 503, WHICH IS
+// SECTION 2's CODE FOR A DEPENDENCY THAT IS NOT THERE. It is 503 and not the 404
+// the KYC receiver answers, and the difference is the PATH rather than a
 // preference: that row carries `:provider` and an unselected vendor genuinely
 // names no resource, so its resolver answers `not_found` before any dependency
-// is consulted. This row names no resource to be absent. The route is REGISTERED
-// either way, because the contract row exists and an unregistered route answers
-// a 404 that is the ROUTER's and looks identical to a contract Merit never
-// wrote.
+// is consulted. This row names no resource to be absent.
+//
+// WHAT A LIVE DEPLOYMENT ANSWERS TODAY IS 500, AND THAT IS MEASURED RATHER THAN
+// REASONED. `MERIT_API_SURFACE=public PORT=8899 node --experimental-strip-types
+// apps/api/src/start.ts`, then a POST to each of the three webhook rows:
+// `/webhooks/rise`, `/webhooks/psp/psp_a` and `/webhooks/kyc/acme` all answer
+// `500 internal_error`, and the log carries `RawBodyUnavailableError` for all
+// three. `installRawWebhookBodyParser` is not registered by `compose`, so
+// `rawBodyOf` refuses the parsed object BEFORE any of the three receivers is
+// entered and no receiver's own answer is reachable over HTTP yet. ADR-109
+// ruling 4 is the seam that ends that for all three at once, and it is outside
+// this fence. The 503 above is the receiver's answer and the suite reaches it
+// with the parser installed, which is `webhooks-psp.test.ts`'s own arrangement.
+//
+// The route is REGISTERED either way, because the contract row exists and an
+// unregistered route answers a 404 that is the ROUTER's and looks identical to a
+// contract Merit never wrote.
 //
 // -----------------------------------------------------------------------------
 // APPLY, THEN CLAIM, AND THE REASON IS NO LONGER THE OBSTACLE IT WAS
