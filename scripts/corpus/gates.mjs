@@ -6802,39 +6802,24 @@ const artifactKey = (text) =>
 // `page`, `layout` and `route` are App Router's own reserved file names; the
 // extension is `.tsx` today, `.ts` for a route handler, and neither is worth
 // hard-coding when the stem is the thing the framework reserves.
-const APP_ROUTER_STEMS = new Set(['page', 'layout', 'route']);
+// -----------------------------------------------------------------------------
+// `appRouterFiles` IS RETIRED, ON THE SAME RULE AS `playwrightInLockfile` BELOW
+// -----------------------------------------------------------------------------
+// It probed CI-07's activation condition, "a page, layout or route file under
+// apps/*/src/app/". THE ARTIFACT ARRIVED on 2026-08-27: session 250 wrote
+// `apps/portal/src/app/layout.tsx` and `page.tsx`, the first renderable document
+// this repository has ever had, and `next build` went from exiting 1 on
+// "Couldn't find any `pages` or `app` directory" to prerendering a route.
+//
+// CI-07's stage was WRITTEN in the same series rather than its row relaxed, so
+// the row now reads **Implemented.** and no condition in STRATEGY section 4.1
+// names that artifact any more. This gate said so itself, in the finding that
+// forced the deletion: "the row was written, the artifact was re-ruled, or the
+// wording moved; either way the probe asserts nothing. Remove it or repoint it."
+//
+// `APP_ROUTER_STEMS` went with it. It had one caller and a set nothing reads is
+// the same furniture as a probe nothing runs.
 
-function appRouterFiles() {
-  const apps = 'apps';
-  if (!existsSync(join(ROOT, apps))) {
-    throw new Error(
-      "CI-06/gate-inventory found no apps/ directory, so CI-07's probe reads nothing and " +
-        'would report the artifact absent for the wrong reason',
-    );
-  }
-  // Rule 2 again, one level down: the probe must be reading a real set of apps.
-  // Zero would report ABSENT for the reason a broken walk reports it.
-  const roots = readdirSync(join(ROOT, apps))
-    .sort()
-    .map((app) => `${apps}/${app}/src/app`)
-    .filter((p) => existsSync(join(ROOT, p)));
-  const found = [];
-  const walk = (rel) => {
-    for (const entry of readdirSync(join(ROOT, rel), { withFileTypes: true }).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    )) {
-      const child = `${rel}/${entry.name}`;
-      if (entry.isDirectory()) {
-        walk(child);
-        continue;
-      }
-      const stem = entry.name.replace(/\.[^.]+$/, '');
-      if (APP_ROUTER_STEMS.has(stem)) found.push(child);
-    }
-  };
-  for (const rel of roots) walk(rel);
-  return found.length === 0 ? null : `${found.join(', ')} is an App Router file`;
-}
 
 // -----------------------------------------------------------------------------
 // `playwrightInLockfile` IS RETIRED, AND THE REGISTER'S OWN RULE IS WHY
@@ -6865,7 +6850,6 @@ function appRouterFiles() {
 // artifact is the dependency, never a mention of it.
 
 const INVENTORY_PROBES = new Map([
-  ['a page, layout or route file under apps/*/src/app/', appRouterFiles],
 ]);
 
 // THE UNPROBEABLE REGISTER, and it is a register rather than an exemption list
@@ -7103,7 +7087,42 @@ const gateInventory = {
     // Rule 2 on the registers themselves. Either one emptied would report every
     // artifact unregistered or every artifact registered, and both read as a gate
     // asserting something it is not.
-    if (INVENTORY_PROBES.size === 0) throw new Error('INVENTORY_PROBES is empty; no artifact is read');
+    // 2026-08-27: THE EMPTY PROBE MAP HAS TWO CAUSES AND ONLY ONE IS A DEFECT.
+    // The rule above was written when at least one condition was probeable, and
+    // it read emptiness as neglect. Implementing CI-07 removed the last probe --
+    // the app-router artifact ARRIVED, and this gate's own finding said of the
+    // stale entry "the row was written, the artifact was re-ruled, or the wording
+    // moved; either way the probe asserts nothing. Remove it or repoint it."
+    //
+    // What remains is three conditions that are each genuinely unreadable from
+    // the tree and each REGISTERED with its reason: a Neon branch is estate and
+    // not tree, the VG-12 admission is a human agreement no job can see, and
+    // M07's detector code names a module plan rather than a path. An empty map
+    // over exactly those is the world reported faithfully, not a register nobody
+    // maintains.
+    //
+    // SO THE ASSERTION NARROWS TO WHAT IT ALWAYS MEANT, and it narrows by DELETING
+    // a rule rather than by adding one, which is worth reading twice before anyone
+    // restores it. The emptiness throw was a proxy for "some artifact is now read
+    // by nothing", and THE PER-CONDITION LOOP ABOVE ALREADY ASSERTS EXACTLY THAT,
+    // one artifact at a time, naming the artifact: every condition must be probed
+    // or registered, and one that is neither is a finding there. So on every tree
+    // where a throw here would have fired, that loop has already pushed a better
+    // message -- and the throw's only remaining effect was to REPLACE it, which is
+    // how `CI-06/gate-inventory/register-shrinks-when-an-artifact-is-re-ruled`
+    // caught this: the scope case seeds a re-ruled artifact, expects the finding
+    // that names it, and got the emptiness error instead.
+    //
+    // A CHECK THAT MASKS A MORE PRECISE CHECK IS NOT A SECOND OPINION. What is
+    // left is the note below, which reports the honest state out loud so an empty
+    // registry can never pass in silence.
+    if (INVENTORY_PROBES.size === 0) {
+      console.log(
+        `       CI-06/gate-inventory note: INVENTORY_PROBES is empty and every one of the ` +
+          `${seenArtifacts.size} waiting artifact(s) is registered unprobeable with a reason. ` +
+          'The next condition naming a readable artifact fails here until a probe is written for it',
+      );
+    }
     if (UNPROBEABLE_ARTIFACTS.size === 0) {
       throw new Error('UNPROBEABLE_ARTIFACTS is empty; the register asserts nothing');
     }
