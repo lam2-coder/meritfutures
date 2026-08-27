@@ -1349,11 +1349,18 @@ export function firmDb(): FirmDb {
 // -----------------------------------------------------------------------------
 // `SystemReason` and `SqlExecutorReason` are closed vocabularies of WHY, and
 // every member of either grants EVERY TABLE. A third `SystemReason` member would
-// hand a request handler all 104 registered tables at six verbs in exchange for
-// one table at one verb. A closed vocabulary of WHICH grants exactly what it
-// names. So both constructions below take a TABLE vocabulary, `SystemReason`
-// stays at two members for the third time (ADR-096 clause 3, ADR-102 clause 3,
-// and here), and `SqlExecutorReason` stays at one.
+// hand a request handler EVERY REGISTERED TABLE AT EVERY VERB `SystemTx`
+// DECLARES, in exchange for one table at one verb. A closed vocabulary of WHICH
+// grants exactly what it names. So both constructions below take a TABLE
+// vocabulary, `SystemReason` stays at two members for the third time (ADR-096
+// clause 3, ADR-102 clause 3, and here), and `SqlExecutorReason` stays at one.
+//
+// THIS SENTENCE USED TO STATE THE TWO FIGURES AND ADR-157 MOVED ONE OF THEM.
+// It read "all 104 registered tables at six verbs", and the verb count went to
+// seven the moment `lockAt` landed on `SystemTx`. The arithmetic was never the
+// argument -- the argument is that one side is bounded by a table name and the
+// other is not -- so the figures are gone and the property is stated instead,
+// which is ADR-034's rule applied to a comment.
 //
 // THAT IS A RULING RATHER THAN A PREFERENCE, AND `ledger_entries` IS WHY.
 // It is `derived` with `traversal: 'hop'` via `ledger_accounts`, so an
