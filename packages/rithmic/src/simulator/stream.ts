@@ -64,8 +64,24 @@
 //
 // If the mechanism turns out to be neither, what moves is this file and nothing
 // upstream of it: `simulate` is untouched and the file mode is untouched.
+//
+// -----------------------------------------------------------------------------
+// AND THIS FILE NOW SATISFIES `streamLive`, WHICH IT ONCE COULD NOT. ADR-154
+// -----------------------------------------------------------------------------
+// `index.ts` used to refuse the simulator satisfying `PlatformAdapter` at all,
+// and its reason was the PARSER: `ingestEOD` and `ingestFills` consume files,
+// the simulator produces them, and INV-M2-11 holds only while the simulator
+// stops at the file. **In tier 2 there is no file to stop at**, so ADR-154 ruled
+// that the reason does not reach `streamLive` and that the shared thing becomes
+// `LiveAccountTick` rather than an artifact.
+//
+// `simulatorLiveFeed`, at the bottom of this file, is that ruling. It is typed
+// `Pick<PlatformAdapter, 'streamLive'>` and NOT `PlatformAdapter`, which is
+// ADR-154 clause 3 stated to the compiler rather than to a reader: the other
+// five operations stay refused for the reason above, undisturbed.
 // =============================================================================
 
+import type { LiveTickHandler, PlatformAdapter, Subscription } from '../index.ts';
 import type { Cents, SimDay, SimRun, SimWaypoint, TradingDay } from './types.ts';
 import { parseInstantUtc } from './time.ts';
 
@@ -342,4 +358,116 @@ export function foldStream(ticks: readonly LiveAccountTick[]): readonly StreamFo
   }
 
   return order.map((key) => byKey.get(key)!);
+}
+
+// -----------------------------------------------------------------------------
+// THE IMPLEMENTATION OF `streamLive`. ADR-154 clause 1
+// -----------------------------------------------------------------------------
+
+/** How a `simulatorLiveFeed` delivers, on top of the path `streamRun` produces. */
+export interface LiveFeedOptions extends StreamOptions {
+  /**
+   * `null` for PUSH delivery, one tick per waypoint, which is what a stream is.
+   * A whole number of seconds for the POLLED mechanism `V-M2-16` may turn out
+   * to be, sampled by `sampleTicks` above.
+   *
+   * **BOTH ARE THE SAME PATH AND NEITHER IS A SECOND SIMULATOR.** They are the
+   * two shapes M02 section 3.5 says the adapter absorbs ("an R|API+ admin
+   * connection, or high-frequency snapshot polling where a stream is
+   * unavailable ... so the consumer sees one stream either way"), and
+   * `stream-conformance.test.ts` runs the tier-2 invariants over each of them
+   * because "the consumer sees one stream either way" is a claim rather than a
+   * definition.
+   *
+   * **A POLL CADENCE AND `order: 'account'` TOGETHER ARE REFUSED RATHER THAN
+   * SILENTLY RESOLVED.** `sampleTicks` states its own total order and it is the
+   * instant order, so honouring both is not possible; ignoring the one the
+   * caller wrote is worse than saying so.
+   */
+  readonly pollSeconds: number | null;
+}
+
+export const DECLARED_LIVE_FEED_OPTIONS: LiveFeedOptions = Object.freeze({
+  order: 'time',
+  pollSeconds: null,
+});
+
+/**
+ * The simulator as a live feed, and ADR-154 clause 1 written as a type.
+ *
+ * **`Pick<PlatformAdapter, 'streamLive'>` AND NOT `PlatformAdapter`.** Clause 3:
+ * "`provision`, `entitle`, `ingestFills`, `ingestEOD` and `reconcile` are still
+ * not implemented by the simulator ... the argument 'the simulator implements
+ * one method, so it may implement the others' is foreclosed here in advance,
+ * because those five have a parser and this one does not." Widening this return
+ * type is how that foreclosure gets reversed by accident, so it is written as a
+ * `Pick` rather than left to the compiler to infer from an object literal.
+ *
+ * -----------------------------------------------------------------------------
+ * DELIVERY IS ASYNCHRONOUS, AND THAT IS WHAT MAKES THE SUBSCRIPTION REAL
+ * -----------------------------------------------------------------------------
+ * Every tick this feed will ever emit is already known when `streamLive` is
+ * called, so the cheap implementation delivers all of them inside the call and
+ * then resolves. **That implementation makes `Subscription.close` a lie**: by
+ * the time a consumer holds the object there is nothing left to stop, so a
+ * consumer unsubscribing mid-session exercises a no-op and every test of that
+ * path passes vacuously.
+ *
+ * So ticks are pumped one per microtask and `close()` stops the pump. A
+ * consumer that closes after n ticks receives exactly n, which is assertable,
+ * and it is the behaviour a feed with a wire behind it actually has.
+ *
+ * **NO CLOCK AND NO TIMER**, which `no-clock.test.ts` enforces over this whole
+ * directory. A microtask chain is ordered without being timed: delivery is
+ * deterministic, one pump per turn, and a consumer drains it by yielding rather
+ * than by waiting out a duration.
+ *
+ * **NOTHING HERE CATCHES THE HANDLER'S EXCEPTION.** A feed that swallowed a
+ * consumer's error would turn a broken live surface into a silent one, which is
+ * ADR-020 rule 3's named failure wearing a different hat. What an escaped error
+ * costs is the host's to decide and this package has no host.
+ */
+export function simulatorLiveFeed(
+  run: SimRun,
+  options: Partial<LiveFeedOptions> = {},
+): Pick<PlatformAdapter, 'streamLive'> {
+  const resolved: LiveFeedOptions = { ...DECLARED_LIVE_FEED_OPTIONS, ...options };
+  if (resolved.pollSeconds !== null && resolved.order !== 'time') {
+    throw new StreamError(
+      `a poll cadence delivers in instant order, so order ${resolved.order} cannot be honoured`,
+    );
+  }
+
+  const pushed = streamRun(run, { order: resolved.order });
+  const ticks = resolved.pollSeconds === null ? pushed : sampleTicks(pushed, resolved.pollSeconds);
+
+  return {
+    streamLive(handler: LiveTickHandler): Promise<Subscription> {
+      let open = true;
+      let next = 0;
+
+      const pump = (): void => {
+        if (!open) return;
+        const tick = ticks[next];
+        if (tick === undefined) {
+          open = false;
+          return;
+        }
+        next += 1;
+        handler(tick);
+        // Scheduled AFTER the handler ran, so a `close()` made from inside the
+        // handler stops the next tick rather than the one after it. That is the
+        // only ordering under which "a consumer that closes after n ticks
+        // receives exactly n" is true, and it is what the test asserts.
+        queueMicrotask(pump);
+      };
+
+      queueMicrotask(pump);
+      return Promise.resolve({
+        close(): void {
+          open = false;
+        },
+      });
+    },
+  };
 }
