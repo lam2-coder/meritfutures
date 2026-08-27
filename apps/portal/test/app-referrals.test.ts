@@ -131,10 +131,10 @@ test('a pending creative with no disclosure renders the disclosure as REQUIRED, 
   const region = requiredRegion(html);
   expect(region).toContain('Disclosure required at approval');
   expect(region).toContain('This submission does not carry a disclosure.');
-  expect(region.indexOf('does not carry a disclosure')).toBeLessThan(
-    region.indexOf(REQUIRED_TEXT),
+  expect(
+    region.indexOf('does not carry a disclosure'),
     'the absence is stated before the text a reader would otherwise attach to the row',
-  );
+  ).toBeLessThan(region.indexOf(REQUIRED_TEXT));
 
   // 4. NOTHING ON THE SCREEN CALLS IT ATTACHED. These are the words a redesign
   //    would reach for, and the screen may not carry any of them.
