@@ -65,8 +65,18 @@
 export type AsOfFreshness =
   /** The figure is at the day the firm has closed through. */
   | { readonly kind: 'current' }
-  /** The figure is behind. `closed_through_day` is the server's later day. */
-  | { readonly kind: 'stale'; readonly closed_through_day: string }
+  /**
+   * The figure is behind, because the server said so.
+   *
+   * `closed_through_day` IS NULLABLE AND THE NULL IS NOT A CONVENIENCE. Two
+   * different endpoints produce this arm and only one of them can name a later
+   * day. An account-state surface reaches it by ordering two trading days, so
+   * it has the later one in hand. The economic-calendar panel reaches it from
+   * `freshness.stale`, which is "the server's answer, EVALUATED AGAINST ITS OWN
+   * THRESHOLD" (`api/types.ts`) and names no day at all. Forcing a day here
+   * would make the second caller invent one.
+   */
+  | { readonly kind: 'stale'; readonly closed_through_day: string | null }
   /** No endpoint published a freshness fact. NOT the same as current. */
   | { readonly kind: 'unstated' };
 
@@ -117,8 +127,18 @@ export class AsOfContradictionError extends Error {
 }
 
 export type AsOfStampProps = {
-  /** INV-M4-02's required prop, carried through to the render. */
-  readonly as_of_trading_day: string;
+  /**
+   * INV-M4-02's required prop, carried through to the render.
+   *
+   * NULLABLE FOR THE COVERAGE CASE AND NOT FOR THE ACCOUNT-STATE ONE, which the
+   * types already keep apart: `TimelineView` and every other view model
+   * extending `AccountState` declare it `string`, so no account-state caller can
+   * reach the null branch even by accident. What can is the economic-calendar
+   * panel, whose `covered_through_day` is null "when nothing has ever been
+   * loaded", and a screen that printed a blank there would be the confident
+   * empty panel DEP-M4-09 names.
+   */
+  readonly as_of_trading_day: string | null;
 
   /** Required. See the file header: there is no default and there must not be one. */
   readonly freshness: AsOfFreshness;
@@ -140,20 +160,31 @@ export function AsOfStamp({ as_of_trading_day, freshness, subject }: AsOfStampPr
     <p
       className={`merit-as-of merit-as-of--${freshness.kind}`}
       data-freshness={freshness.kind}
-      data-as-of-trading-day={as_of_trading_day}
+      data-as-of-trading-day={as_of_trading_day ?? 'none'}
     >
-      <strong>
-        {subject} is as of the close of trading day <time>{as_of_trading_day}</time>.
-      </strong>{' '}
+      {as_of_trading_day === null ? (
+        <strong>{subject} carries no trading day at all. Merit has never loaded one.</strong>
+      ) : (
+        <strong>
+          {subject} is as of the close of trading day <time>{as_of_trading_day}</time>.
+        </strong>
+      )}{' '}
       {freshness.kind === 'current' ? (
         <span className="merit-as-of__note">
-          That is the most recent trading day Merit has closed.
+          Merit reports that as current: there is no later closed trading day this screen is
+          missing.
         </span>
       ) : null}
-      {freshness.kind === 'stale' ? (
+      {freshness.kind === 'stale' && freshness.closed_through_day !== null ? (
         <span className="merit-as-of__note">
-          Merit has since closed trading day <time>{freshness.closed_through_day}</time>, so this
-          figure is behind and is not what your account is worth now.
+          Merit has since closed trading day <time>{freshness.closed_through_day}</time>, so this is
+          behind and is not what your account is worth now.
+        </span>
+      ) : null}
+      {freshness.kind === 'stale' && freshness.closed_through_day === null ? (
+        <span className="merit-as-of__note">
+          Merit has reported this as stale and has not named the day it is behind by, so treat it as
+          out of date rather than as current.
         </span>
       ) : null}
       {freshness.kind === 'unstated' ? (
