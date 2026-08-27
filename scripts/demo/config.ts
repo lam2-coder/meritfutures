@@ -33,14 +33,14 @@ import type {
   BasisPoints,
   PlanVersionId,
   ResolvedPlan,
-} from '../../packages/rules-engine/src/index.js';
+} from '../../packages/rules-engine/src/index.ts';
 import type {
   ContractSpec,
   PopulationBehaviour,
   PopulationSpec,
   SimSession,
-} from '../../packages/rithmic/src/index.js';
-import { civilFromDays, parseTradingDay } from '../../packages/rithmic/src/index.js';
+} from '../../packages/rithmic/src/index.ts';
+import { civilFromDays, parseTradingDay } from '../../packages/rithmic/src/index.ts';
 
 /** The one cast that makes a basis point a `BasisPoints`, as the engine's suites spell it. */
 const bp = (n: number): BasisPoints => n as BasisPoints;
