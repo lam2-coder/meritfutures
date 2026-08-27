@@ -41,11 +41,20 @@
 // own fresh context. A read-only session that had started on the elevation
 // prompt would have spent that session's budget with none of its care.
 //
-// THERE IS NO FRAMEWORK HERE YET EITHER. M04 section 1.1 names a Next.js App
-// Router application; the workspace holds no Next.js, and admitting one is a
-// VG-12 dependency decision plus a root lockfile change, which belongs to P1's
-// scaffold rather than to a read-surface session. What a framework would render
-// is what this app now exports.
+// THERE IS TRANSPORT NOW, AND IT IS ONE FILE. `src/http/client.ts`, ADR-162,
+// and `app/payouts/` is the one segment wired to it. The other five still
+// render from ports and reach nothing; each is one `load` function and a guard,
+// and none of them needs a second client.
+//
+// THE FRAMEWORK ARRIVED AND THIS PARAGRAPH IS CORRECTED RATHER THAN LEFT
+// STANDING. It read "the workspace holds no Next.js, and admitting one is a
+// VG-12 dependency decision plus a root lockfile change". ADR-095 made that
+// admission and session 250 landed `next.config.mjs`, `app/layout.tsx` and the
+// root page, so `pnpm-workspace.yaml` pins `next: 16.3.2` and this application
+// renders documents. The sentence is repaired here because this session is the
+// first to IMPORT that framework -- `src/http/client.ts` reaches
+// `next/headers.js` for the inbound cookie -- and a header claiming the
+// dependency does not exist would be false beside a file that resolves it.
 
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'portal' as const;
@@ -85,6 +94,33 @@ export type {
   PurchaseListItem,
   TimelineItem,
 } from './api/types.ts';
+
+// -----------------------------------------------------------------------------
+// ADR-162. The one file in this application that performs a network call.
+// -----------------------------------------------------------------------------
+// `apps/portal/test/surface.test.ts` used to assert that NO file here holds a
+// `fetch(`; it now asserts that exactly `src/http/client.ts` does, per needle,
+// with `XMLHttpRequest`, `WebSocket` and `EventSource` still at zero files. The
+// client is exported because five other segments need this one and not a sixth,
+// and because a transport reachable only through a deep relative path is a
+// transport the next author writes again.
+export {
+  API_BASE_PATH,
+  API_ORIGIN_VAR,
+  ApiConfigError,
+  SESSION_COOKIE,
+  createApiClient,
+  resolveApiOrigin,
+  serverApiClient,
+} from './http/client.ts';
+export type {
+  ApiClient,
+  ApiFailure,
+  ApiResult,
+  ApiSuccess,
+  SessionToken,
+  Transport,
+} from './http/client.ts';
 
 // -----------------------------------------------------------------------------
 // INV-M4-01's only permitted consumer of a money field.
