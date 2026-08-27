@@ -1275,6 +1275,32 @@ const ri09 = {
 };
 
 /**
+ * Whether one area-relative path is code the node loader loads, which is RI-10's
+ * scope stated once rather than spelled inline.
+ *
+ * TWO POSITIVE TERMS AND ONE SUBTRACTION, IN THAT ORDER. `src/` under apps/ or
+ * packages/ is where the deployables live, by ADR-083. Everything under
+ * scripts/ is the second term, by ADR-121, because scripts/demo is loaded by the
+ * node loader and nightly.yml runs it. `test/` comes back off both, because
+ * Vitest resolves the tolerant way and a `.js` specifier in a test is not a
+ * runtime defect.
+ *
+ * THE SUBTRACTION IS A DIRECTORY SEGMENT AND NEVER A PACKAGE OR FILE NAME. That
+ * distinction is the whole lesson of this check's first draft, which excluded a
+ * package by name. See RI-10's header for why `e2e/` is not allowed to join it.
+ *
+ * @param {string} area
+ * @param {string} rel
+ * @returns {boolean}
+ */
+function runtimeLoaded(area, rel) {
+  const segments = rel.split('/');
+  if (segments.includes('test')) return false;
+  if (area === 'scripts') return true;
+  return segments.includes('src');
+}
+
+/**
  * A relative import must name the file it ACTUALLY IS, because the resolver that
  * runs this code does not rewrite extensions.
  *
@@ -1297,6 +1323,48 @@ const ri09 = {
  * file, `packages/eslint-plugin-merit/index.js` being genuine JavaScript. Only
  * running the suite found it. This check finds both directions statically.
  *
+ * -----------------------------------------------------------------------------
+ * WHY `scripts/` JOINED THE SCOPE ON 2026-08-27, AND WHY IT WAS NOT THERE FIRST
+ * -----------------------------------------------------------------------------
+ * ADR-121. The original scope was `src/` in apps/ and packages/, on the stated
+ * reasoning that "only `src/` is loaded by the runtime". That reasoning was a
+ * considered decision and not an oversight, and it was WRONG BY OMISSION rather
+ * than in principle: `scripts/demo/` is loaded by the node loader too, and
+ * `.github/workflows/nightly.yml` runs it as CI-09's replay self-audit leg.
+ *
+ * THE OMISSION COST WAS MEASURED, NOT ARGUED. On the tree this widening landed
+ * against, `scripts/demo/` carried 19 broken specifiers across 5 non-test files
+ * (32 across 7 once its two Vitest suites are counted), and
+ * `node --experimental-strip-types scripts/demo/main.ts` died with
+ * ERR_MODULE_NOT_FOUND on its own first relative import. Every gate in this
+ * repository was green throughout, RI-10 included, because RI-10 was not
+ * looking there.
+ *
+ * THE SCOPE IS STILL POSITIVE AND STRUCTURAL, WHICH IS THE PART THAT MATTERS.
+ * `runtimeLoaded` names the directories the node loader loads and subtracts
+ * `test/`; it does not name a package, a file or an area to skip. The earlier
+ * `src/` line was itself the principled repair of a draft that excluded a
+ * package BY NAME, and this widening is held to the same standard: a check that
+ * needs a name-based exception is scoped wrong, and that applies to the widening
+ * as much as to the original.
+ *
+ * THE `test/` SUBTRACTION IS THE OLD RULING AND NOT A NEW EXCEPTION. Under
+ * `src/` it was structural for free, because nothing under `src/` is a test.
+ * Under `scripts/` it has to be written down, because `scripts/demo/test/` is a
+ * sibling of the source rather than a sibling of `src/`. The reason is
+ * unchanged: Vitest resolves the tolerant way, so a `.js` specifier in a test is
+ * not a runtime defect.
+ *
+ * `e2e/` IS THE NEAR MISS THAT DECIDED THE SHAPE. The tempting simplification is
+ * to drop the `src/` clause entirely and scan every non-`test/` TypeScript file
+ * in apps/, packages/ and scripts/. Measured, that finds the SAME 19 findings
+ * and nothing else, so it looks free. It is not: it silently admits
+ * `apps/portal/e2e/` and `apps/site/e2e/`, which are Playwright specs, which are
+ * tests, which the ruling above puts out of scope. Keeping them out would cost a
+ * second name in the subtraction list, and a subtraction list that grows by name
+ * is the failure mode this check's own history is about. So the `src/` clause
+ * stays, and `scripts/` is added beside it as a second positive term.
+ *
  * @type {Invariant}
  */
 const ri10 = {
@@ -1304,12 +1372,18 @@ const ri10 = {
   title: 'Every relative import in shipped source names a file that exists',
   covers:
     'every `.ts`, `.tsx` and `.mts` file under a `src/` directory in apps/ or ' +
-    'packages/, which is exactly the code `node --experimental-strip-types` ' +
-    'loads. TEST files are deliberately OUT OF SCOPE and that is a ruling ' +
+    'packages/, PLUS every one under scripts/, which together are the code ' +
+    '`node --experimental-strip-types` loads: the deployables by ADR-083, and ' +
+    "scripts/demo by nightly.yml, which runs it as CI-09's replay self-audit " +
+    'leg. scripts/ joined by ADR-121, after the `src/` line missed 19 broken ' +
+    'specifiers there while every gate stayed green. TEST files are ' +
+    'deliberately OUT OF SCOPE and that is a ruling ' +
     'rather than an omission: Vitest resolves specifiers the tolerant way, so a ' +
     '`.js` specifier in a test is not a runtime defect, and rule-test fixtures ' +
     'carry synthetic specifiers as DATA that no regex can tell from a ' +
-    'statement. It reads STATIC specifiers and literal `import(...)` only, from ' +
+    'statement. Under `src/` that held for free; under scripts/ it is written ' +
+    'down, because scripts/demo/test/ is a sibling of the source rather than of ' +
+    '`src/`. It reads STATIC specifiers and literal `import(...)` only, from ' +
     'source with comments stripped, so a specifier BUILT AT RUNTIME is invisible ' +
     'to it. It resolves LITERALLY: no extension is added, substituted or ' +
     'dropped, which is the one thing that separates it from RI-07 and from ' +
@@ -1319,13 +1393,12 @@ const ri10 = {
   run(root) {
     /** @type {string[]} */
     const findings = [];
-    for (const area of ['apps', 'packages']) {
+    for (const area of ['apps', 'packages', 'scripts']) {
       const areaRoot = join(root, area);
       if (!existsSync(areaRoot)) continue;
       for (const rel of walk(areaRoot)) {
         if (!/\.(ts|tsx|mts)$/.test(rel)) continue;
-        // Only `src/` is loaded by the runtime. See `covers`.
-        if (!rel.split('/').includes('src')) continue;
+        if (!runtimeLoaded(area, rel)) continue;
         const file = join(areaRoot, rel);
         for (const spec of specifiersIn(readFileSync(file, 'utf8'))) {
           if (!spec.startsWith('.')) continue;

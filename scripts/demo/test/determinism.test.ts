@@ -24,10 +24,10 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_OPTIONS, parseArgs, runDemo } from '../main.js';
-import { money, signedMoney, stateDigestLine } from '../render.js';
-import { foldAccount } from '../fold.js';
-import { buildPopulation } from '../../../packages/rithmic/src/index.js';
+import { DEFAULT_OPTIONS, parseArgs, runDemo } from '../main.ts';
+import { money, signedMoney, stateDigestLine } from '../render.ts';
+import { foldAccount } from '../fold.ts';
+import { buildPopulation } from '../../../packages/rithmic/src/index.ts';
 import {
   CORE_EOD_50K,
   COHORTS,
@@ -35,7 +35,7 @@ import {
   SEQUENCE_BASE,
   populationSpec,
   sessions,
-} from '../config.js';
+} from '../config.ts';
 
 /** Small enough to run twice in a unit stage, long enough to fund and breach. */
 const OPTIONS = { ...DEFAULT_OPTIONS, days: 25, accountsPerCohort: 2 };

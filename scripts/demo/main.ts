@@ -14,7 +14,7 @@
 // `write` callback below.
 // =============================================================================
 
-import { buildPopulation } from '../../packages/rithmic/src/index.js';
+import { buildPopulation } from '../../packages/rithmic/src/index.ts';
 import {
   CORE_EOD_50K,
   COHORTS,
@@ -23,9 +23,9 @@ import {
   SEQUENCE_BASE,
   populationSpec,
   sessions,
-} from './config.js';
-import { foldAccount, type AccountRun } from './fold.js';
-import { render } from './render.js';
+} from './config.ts';
+import { foldAccount, type AccountRun } from './fold.ts';
+import { render } from './render.ts';
 
 export interface Options {
   readonly seed: string;
