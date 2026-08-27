@@ -359,6 +359,16 @@ export function assertContractScalars(value: unknown, path: string): void {
       continue;
     }
     if (TRADING_DAY_KEY.test(key)) {
+      // A CONTAINER NAMED FOR A DAY IS NOT A DAY. `LiabilityResponse` carries
+      // `eligible_next_7d.by_day`, an ARRAY whose elements each carry a
+      // `trading_day`, and a rule that read the name alone would refuse the
+      // shape the contract declares. So the check is type directed: an object
+      // or an array under a day-shaped name is walked, and anything else must
+      // be a `YYYY-MM-DD` string.
+      if (typeof member === 'object' && member !== null) {
+        assertContractScalars(member, at);
+        continue;
+      }
       if (typeof member !== 'string' || !TRADING_DAY.test(member))
         throw new AdminReadError(
           `\`${at}\` is ${JSON.stringify(member)}, and API_CONTRACT section 1 makes every ` +
