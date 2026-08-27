@@ -6,7 +6,6 @@ import {
   PROBLEM_MEDIA_TYPE,
   PROBLEM_TYPE_PREFIX,
   buildServer,
-  classifyPath,
   defineRoutes,
   discoverRouteModules,
 } from '../src/index.ts';
@@ -90,7 +89,15 @@ test('the public deployment answers 404 for an operator route it was given', asy
   const { app, report } = buildServer({ surface: 'public', modules: [...onDisk, ops] });
   // The route was DECLARED and not registered. That is the whole mechanism:
   // there is nothing at this path for a permission check to run against.
-
+  //
+  // ASSERTED ON THE REPORT AND NOT ONLY ON THE STATUS CODE, because a 404 is
+  // what a typo returns too. `CompositionReport.withheld` says it in its own
+  // words -- "THE PUBLIC DEPLOYMENT'S 404 IS THIS LIST BEING NON-EMPTY AND
+  // NOTHING ELSE" -- so a test that reads only the response cannot tell the
+  // router withholding a declared route from the router never having heard of
+  // it, and those are different facts about ADR-083 section 3.
+  expect(report.withheld).toContain(`GET ${OPS_PATH}`);
+  expect(report.registered).not.toContain(`GET ${OPS_PATH}`);
 
   const res = await app.inject({ method: 'GET', url: `${BASE_PATH}${OPS_PATH}` });
   expect(res.statusCode).toBe(404);
