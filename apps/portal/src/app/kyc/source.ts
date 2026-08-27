@@ -63,24 +63,89 @@
 // STATUS, never a document, and never a value screened out of a payload.
 //
 // -----------------------------------------------------------------------------
-// THE PORT FAILS CLOSED, WHICH IS `routes/kyc.ts`'s SHAPE ONE DEPLOYABLE OVER
+// THE PORT IS FILLED NOW, AND IT IS FILLED THROUGH ADR-162's ONE TRANSPORT FILE
 // -----------------------------------------------------------------------------
-// There is no transport in this application. `apps/portal` consumes `/api/v1`
-// and nothing else (M04 section 1.1) and the API is its own deployable at its
-// own origin, whose hostname this repository does not hold (ADR-012). So the
-// production source resolves nothing and every method refuses, exactly as
-// `productionKycDeps` does in `apps/api/src/routes/kyc.ts`: a default that
-// returned plausible values would be a fixture serving real traffic.
+// THIS HEADER USED TO SAY "THERE IS NO TRANSPORT IN THIS APPLICATION" AND THAT
+// SENTENCE HAS EXPIRED. ADR-162 landed `../../http/client.ts`, which is the one
+// file under `apps/portal/src` permitted to call `fetch(`, and it named the
+// wiring this file was waiting for: "the other five segments are not wired
+// here; each is one `load` and one guard." This is that guard and that load for
+// the `kyc` segment.
 //
-// NOTHING HERE OPENS A CONNECTION AND NOTHING HERE IS A SERVER ACTION. ADR-095
-// ruling 3 and ADR-083 section 3: no route handler and no Server Action in this
-// deployable may serve `/api/v1` or any operator path. A server action that
-// went and got a KYC document would break that and the no-proxy invariant at
-// once, which is why the seam is a port a wiring slice fills rather than a
-// call this file makes.
+// NOTHING BELOW OPENS A CONNECTION ITSELF. `statusFrom` takes an `ApiClient` and
+// `SERVER_KYC_SCREEN_SOURCE` asks `serverApiClient()` for one; there is no
+// `fetch(` in this directory and `apps/portal/test/surface.test.ts` fails on one
+// by name and line. The origin, the forwarded cookie, the `no-store` and the
+// status mapping are all ADR-162's and none of them is re-decided here.
+//
+// `GET /kyc/status` IS REGISTERED AND WAS MEASURED RATHER THAN ASSUMED.
+// `discoverRouteModules()` then `buildServer({ surface: 'public', modules })`,
+// reading `CompositionReport.registered` on this tree, lists `GET /kyc/status`.
+// ADR-162's own dispatch was told two endpoints were registered and only one
+// was, so this segment measured its own.
+//
+// -----------------------------------------------------------------------------
+// `POST /kyc/session` IS REGISTERED TOO AND THIS SEGMENT DOES NOT CALL IT
+// -----------------------------------------------------------------------------
+// The same measurement lists it, so the refusal below is not "the endpoint does
+// not exist". IT IS THE FENCE, AND TWO INDEPENDENT ONES AT THAT.
+//
+//   ONE. IT IS A WRITE, AND `apps/portal/test/surface.test.ts` asserts that
+//   "nothing that changes a trader account exists in this app". That is not a
+//   guess about what the route does: `apps/api/src/routes/kyc.ts` declares
+//   `openVerification`, which "WRITES TWO ROWS IN ONE TRANSACTION" -- a
+//   `kyc_verifications` row and a `kyc_funnel_events` row at `session_created`
+//   -- and the same file records that "it is a new row every time and there is
+//   no update on this port". A read surface that started one would be changing
+//   the trader's identity record from a page whose whole fence is that it does
+//   not. The forbidden list in that test already carries `kycSubmit`.
+//
+//   TWO. THE TRANSPORT CANNOT DO IT. `ApiClient` in ../../http/client.ts
+//   declares `get` and NO SECOND METHOD, and that file is ADR-162's: its
+//   foreclosure 1 is that no other file in `apps/portal/src` may call `fetch(`,
+//   so a POST from here is either an edit to a file this session may not touch
+//   or a second transport the suite fails on.
+//
+// SESSION 158's RULE IS WHY NEITHER IS ROUTED AROUND: "a session that deletes an
+// entry instead of narrowing it has removed the control while appearing to
+// satisfy it." Nothing is narrowed in `surface.test.ts` by this session, because
+// nothing here needs it narrowed.
+//
+// NOTHING HERE IS A SERVER ACTION. ADR-095 ruling 3 and ADR-083 section 3: no
+// route handler and no Server Action in this deployable may serve `/api/v1` or
+// any operator path. A server action that went and got a KYC document would
+// break that and the no-proxy invariant at once.
+//
+// -----------------------------------------------------------------------------
+// AND THE WHOLE SEGMENT FAILS CLOSED, WHICH ON THIS SCREEN IS A COMPLIANCE RULE
+// -----------------------------------------------------------------------------
+// `apps/api/src/routes/accounts.ts:824` carries the posture for this class of
+// read, on the identical question one deployable over: a verification chain
+// whose head cannot be named "fails closed, because the alternative is
+// reporting somebody verified on the strength of an ordering this table does
+// not declare."
+//
+// THIS FILE IS THAT SENTENCE ON THE SCREEN SIDE. A status that cannot be read,
+// cannot be parsed, or carries a key this surface may never render REFUSES, and
+// ./page.ts renders the refusal as a content state. It never renders `verified`,
+// because a screen that said "verified" on a failure path would be Merit making
+// a statement about an identity check nobody performed; and it never renders
+// nothing, because a blank reads as neither and leaves the trader unable to tell
+// a passed check from a broken page.
+//
+// IT DOES NOT SUBSTITUTE `kyc_required` EITHER, WHICH IS WHERE THIS DIVERGES
+// FROM `accounts.ts` ON PURPOSE. That function is computing a value the API will
+// state; this one is rendering a value the API stated. Falling back to
+// `kyc_required` here would put a sentence in the server's mouth -- "you need to
+// verify" -- that no server said, and would tell an already-verified trader to
+// go and do it again. The honest fail-closed answer on a screen is the error
+// state, and `ContentState` already has one.
 // =============================================================================
 
 import type { KycStatus } from '../../api/types.ts';
+import type { ApiClient } from '../../http/client.ts';
+import { ApiConfigError, serverApiClient } from '../../http/client.ts';
+import type { PortalErrorKind } from '../../shell/app-shell.ts';
 
 /**
  * API_CONTRACT section 7's `KycStatus`, field for field, as an allowlist.
@@ -268,24 +333,30 @@ export interface KycScreenSource {
 }
 
 /**
- * Thrown by the default source, and the page RENDERS it rather than dying on it.
+ * Thrown by an EMPTIED port, and the page RENDERS it rather than dying on it.
  *
- * THAT CHANGED WHEN THE ROOT LAYOUT LANDED, and the new behaviour is the better
- * one. While this segment owned the footer, an unwired disclosure had to throw:
- * a screen that cannot render a required disclosure must not render. The layout
- * renders the footer now, unconditionally and around every page, so an
- * unavailable status is content that failed rather than an obligation that
- * failed, and the honest answer is the error state inside intact chrome.
+ * IT IS NO LONGER WHAT A PRODUCTION DEPLOYMENT MEETS, and the change is the
+ * wiring rather than a softening. `SERVER_KYC_SCREEN_SOURCE` below is the
+ * default now and it performs a real read; what remains here is the value a
+ * caller installs when it wants a source that answers nothing, which is what
+ * the suite installs and what any later slice that needs a hard "no source"
+ * reaches for. The class is kept rather than deleted because a fail-closed
+ * default that exists is a thing a reviewer can point at.
+ *
+ * THE PAGE STILL RENDERS IT AS A CONTENT STATE. While this segment owned the
+ * footer, an unwired disclosure had to throw: a screen that cannot render a
+ * required disclosure must not render. `app/layout.tsx` renders the footer now,
+ * unconditionally and around every page, so an unavailable status is content
+ * that failed rather than an obligation that failed.
  */
 export class KycScreenSourceUnwired extends Error {
   constructor(readonly method: string) {
     super(
-      `KycScreenSource.${method} is not wired. This page renders and has no transport: ` +
-        'apps/portal consumes the API base path and nothing else (M04 section 1.1), the API is ' +
-        'its own deployable at an origin this repository does not hold (ADR-012), and no route ' +
-        'handler ' +
-        'or Server Action in this deployable may serve that surface (ADR-095 ruling 3). The ' +
-        'seam is a port a wiring slice fills.',
+      `KycScreenSource.${method} is not wired. The installed source answers nothing, which is ` +
+        'the port emptied on purpose rather than a deployment that has no API: ' +
+        '`SERVER_KYC_SCREEN_SOURCE` is the default and reads GET /kyc/status through ' +
+        "ADR-162's client. A deployment with no API origin configured raises " +
+        '`KycStatusUnavailable` instead, and both render as an error content state.',
     );
     this.name = 'KycScreenSourceUnwired';
   }
@@ -295,21 +366,145 @@ function unwired(method: string): () => Promise<never> {
   return () => Promise.reject(new KycScreenSourceUnwired(method));
 }
 
-/** The default, and it fails CLOSED on every method. */
+/** A source that answers nothing. It fails CLOSED on every method. */
 export const UNWIRED_KYC_SCREEN_SOURCE: KycScreenSource = {
   status: unwired('status'),
 };
 
-let source: KycScreenSource = UNWIRED_KYC_SCREEN_SOURCE;
+// -----------------------------------------------------------------------------
+// The seam, which is ADR-162's client and no second transport
+// -----------------------------------------------------------------------------
+
+/**
+ * `GET /kyc/status`, as API_CONTRACT section 7 spells it.
+ *
+ * NO BASE PATH. ../../http/client.ts appends `/api/v1` and its header calls
+ * that "one string in one file"; a segment that spelled the base path here
+ * would be a second copy of `apps/api/src/surface.ts`'s `BASE_PATH` that
+ * nothing asserts against, and `apps/portal/test/kyc-page.test.ts` already
+ * fails this directory on the literal.
+ *
+ * THE STRING IS ASSERTED AGAINST THE HANDLER THAT SERVES IT.
+ * `apps/portal/test/kyc-source.test.ts` reads `KYC_STATUS_PATH` out of
+ * `apps/api/src/routes/kyc.ts` and fails if the two stop agreeing, which is the
+ * treatment ADR-162 gives `API_BASE_PATH` and `SESSION_COOKIE` for the same
+ * reason: a second copy nobody checks drifts silently.
+ */
+export const KYC_STATUS_PATH = '/kyc/status';
+
+/**
+ * `GET /kyc/status` could not be read, and WHICH refusal it was.
+ *
+ * `error` IS MEASURED AND NOT A CONSTANT, and that is the whole of what this
+ * type adds. ./page.ts rendered `toPortalErrorKind(503)` for every failure,
+ * which told a trader whose session had expired that Merit could not load the
+ * page just now. ADR-162's client already mapped the status the API actually
+ * returned; this carries it the last two files, and `status` comes with it so a
+ * reader can tell "the API said 401" from "nothing answered".
+ *
+ * IT IS `PortalErrorKind` AND THIS FILE ADDS NO MEMBER TO THAT UNION, which is
+ * ADR-162 clause 3 and ../../shell/app-shell.ts's paragraph on why `403` is
+ * deliberately unmapped.
+ */
+export class KycStatusUnavailable extends Error {
+  constructor(
+    readonly error: PortalErrorKind,
+    readonly status: number | null,
+  ) {
+    super(
+      `GET ${KYC_STATUS_PATH} could not be read: ${error}` +
+        (status === null ? ' with no response at all' : ` (HTTP ${String(status)})`) +
+        '. The screen refuses rather than rendering a status nobody sent, because a ' +
+        'verification screen that guesses is what SC-M4-07 exists to prevent, and a screen ' +
+        'that guessed VERIFIED would be a statement Merit makes about an identity check.',
+    );
+    this.name = 'KycStatusUnavailable';
+  }
+}
+
+/**
+ * The status, from a client.
+ *
+ * THE GUARD IS `screenKycStatus` AND IT WAS ALREADY HERE. ADR-162 clause 5
+ * returns `unknown` from the transport and rules that "narrowing is the
+ * segment's and is forced", landing "beside the transcription that declares the
+ * shape". This segment wrote that narrowing months before a transport existed;
+ * what this function adds is the line that hands it the bytes.
+ *
+ * IT CHECKS EVERY FIELD THE VIEW READS AND NOT A SUBSET, which is ADR-162's
+ * foreclosure 5: "a partial guard reads as a complete one at the call site and
+ * crashes on the field it skipped, which is worse than none because it looks
+ * like a control." `screenKycStatus` reads all five of `KYC_STATUS_FIELDS`,
+ * refuses a non-string on any of them, and screens the WHOLE payload for a
+ * document-shaped key before it reads one field.
+ *
+ * EXPORTED SEPARATELY FROM THE SOURCE SO THE READY BRANCH IS REACHED THROUGH
+ * THE REAL CLIENT. `apps/portal/test/kyc-source.test.ts` calls it with a client
+ * built by `createApiClient` over a stub transport, which exercises the whole
+ * seam -- URL composition, the forwarded cookie, `no-store`, the status
+ * mapping, the JSON read, this screen -- rather than a mock of it.
+ */
+export async function statusFrom(client: ApiClient): Promise<KycStatus> {
+  const response = await client.get(KYC_STATUS_PATH);
+  if (!response.ok) throw new KycStatusUnavailable(response.error, response.status);
+  return screenKycStatus(response.body);
+}
+
+/**
+ * The production source. ONE READ, THROUGH ADR-162's CLIENT, PER REQUEST.
+ *
+ * THE CLIENT IS BUILT INSIDE `status()` AND NOT AT MODULE SCOPE, and that is
+ * required rather than tidy. `serverApiClient()` is bound to ONE SESSION: it
+ * reads the inbound request's `merit_session` cookie and closes over it. A
+ * client built once when this module loaded would serve the first trader's
+ * cookie to every trader afterwards, which is `FM-M4-03`, "the single most
+ * common vibe-code fatality", reached by a `const` at the top of a file.
+ *
+ * `ApiConfigError` AND NOTHING ELSE IS CONVERTED. An unset `MERIT_API_ORIGIN`
+ * means this deployment has no API, so the status is genuinely unreadable and
+ * the screen should say so; it is `server_error` with `status: null`, which is
+ * the shape ADR-162 gives a request that never reached a status line and for
+ * the same reason -- there is no number, and inventing one would put a sentence
+ * in the server's mouth that no server said.
+ *
+ * ANYTHING ELSE PROPAGATES. A transport failure is already an `ApiFailure` and
+ * arrives through `statusFrom`; a bug in a path, a `cookies()` called outside a
+ * request scope, or anything else this file did not foresee is NOT dressed up
+ * as a configuration problem, because converting it would make every fault in
+ * this application look like a deployment that was never configured.
+ */
+export const SERVER_KYC_SCREEN_SOURCE: KycScreenSource = {
+  status: async (): Promise<KycStatus> => {
+    let client: ApiClient;
+    try {
+      client = await serverApiClient();
+    } catch (cause) {
+      if (!(cause instanceof ApiConfigError)) throw cause;
+      throw new KycStatusUnavailable('server_error', null);
+    }
+    return statusFrom(client);
+  },
+};
+
+let source: KycScreenSource = SERVER_KYC_SCREEN_SOURCE;
 
 /** Install the source. A wiring slice calls this; so does the suite. */
 export function useKycScreenSource(next: KycScreenSource): void {
   source = next;
 }
 
-/** Restore the fail-closed default. */
+/**
+ * Restore the default, which READS rather than refuses.
+ *
+ * IT USED TO RESTORE `UNWIRED_KYC_SCREEN_SOURCE` AND THE OBSERVABLE BEHAVIOUR
+ * OF A DEPLOYMENT WITH NO API IS UNCHANGED: with `MERIT_API_ORIGIN` unset,
+ * `SERVER_KYC_SCREEN_SOURCE.status()` raises `KycStatusUnavailable` before it
+ * reaches a socket, and ./page.ts renders the same error content state it
+ * rendered for `KycScreenSourceUnwired`. What changed is that a CONFIGURED
+ * deployment now gets the trader's real status.
+ */
 export function resetKycScreenSource(): void {
-  source = UNWIRED_KYC_SCREEN_SOURCE;
+  source = SERVER_KYC_SCREEN_SOURCE;
 }
 
 /** The installed source. */
