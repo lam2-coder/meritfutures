@@ -22,9 +22,17 @@
 // screened before anything is assembled, so a document-shaped key refuses the
 // content rather than reaching a component.
 //
-// IT OPENS NO CONNECTION. There is no transport in this application and
-// `surface.test.ts` asserts that no source file here performs a network call.
-// The seam is `KycScreenSource`, whose production value refuses every method.
+// IT OPENS NO CONNECTION AND NEITHER DOES ANY OTHER FILE IN THIS SEGMENT.
+// ADR-162 put the one `fetch(` in this application in `src/http/client.ts` and
+// `surface.test.ts` fails, by name and line, on a second file that grows one.
+// The seam is still `KycScreenSource`; what changed is that its default reads
+// `GET /kyc/status` through that client instead of refusing.
+//
+// IT STARTS NOTHING. `POST /kyc/session` is registered and is a WRITE -- two
+// rows in one transaction, per `apps/api/src/routes/kyc.ts` -- and
+// `surface.test.ts` asserts "nothing that changes a trader account exists in
+// this app". `screen.ts` renders the next-step control with NO HANDLER for
+// exactly this reason and this file adds none.
 //
 // -----------------------------------------------------------------------------
 // THE CHROME IS THE LAYOUT'S, SO EVERY FAILURE HERE IS A CONTENT STATE
@@ -43,13 +51,66 @@
 // dying, which is strictly better than what this file did an hour ago and is
 // the wiring rather than a softening: nothing was relaxed, the obligation simply
 // moved to a file that cannot skip it.
+//
+// -----------------------------------------------------------------------------
+// THE ERROR KIND IS A MEASUREMENT NOW AND WAS A CONSTANT BEFORE
+// -----------------------------------------------------------------------------
+// THIS FILE RENDERED `toPortalErrorKind(503)` FOR EVERY FAILURE, which was the
+// only honest answer while nothing here could fail for a reason: with no
+// transport, every refusal was the same refusal. ADR-162's client maps the
+// status the API actually returned, `./source.ts` carries it out on
+// `KycStatusUnavailable`, and this file reads it.
+//
+// THE DIFFERENCE IS A SENTENCE A TRADER CAN ACT ON. A 401 is a session that
+// expired and its copy says to sign in again; a 500 is Merit's outage and its
+// copy says to try again shortly. Wording the first as the second sends a
+// trader who could fix it in five seconds away to wait for nothing.
+//
+// EVERYTHING THAT IS NOT A MEASURED REFUSAL IS STILL `server_error`, which is
+// the same value `toPortalErrorKind(503)` produced, so nothing about the
+// screened-payload, malformed-payload or internal-tier-language paths moves.
+// Those are defects upstream, the trader can do nothing about any of them, and
+// no other member of the vocabulary is true.
+//
+// -----------------------------------------------------------------------------
+// AND EVERY BRANCH OF THIS FUNCTION FAILS CLOSED, WHICH HERE IS COMPLIANCE
+// -----------------------------------------------------------------------------
+// `apps/api/src/routes/accounts.ts:824` states the posture one deployable over:
+// a chain whose head cannot be named "fails closed, because the alternative is
+// reporting somebody verified on the strength of an ordering this table does
+// not declare."
+//
+// A KYC SCREEN IS NOT AN ORDINARY READ, and the two wrong answers are wrong in
+// different ways. Rendering "verified" for a trader who is not is a statement
+// Merit makes about an identity check that did not happen. Rendering NOTHING is
+// the failure `screen.ts` and `view/kyc.ts` each already refuse, because a
+// blank reads as neither and leaves the trader unable to tell a passed check
+// from a broken page. There is exactly one non-`ready` return below, it always
+// carries a `ContentState` with copy, and `toKycScreenPlaceholder` cannot be
+// handed `ready` because its type excludes it.
 // =============================================================================
 
 import type { ReactElement } from 'react';
 
-import { toPortalErrorKind } from '../../shell/app-shell.ts';
+import type { PortalErrorKind } from '../../shell/app-shell.ts';
 import { KycScreen, toKycScreenPlaceholder, toKycScreenView } from './screen.ts';
-import { currentKycScreenSource, screenKycStatus } from './source.ts';
+import { KycStatusUnavailable, currentKycScreenSource, screenKycStatus } from './source.ts';
+
+/**
+ * How to word a refusal, from what actually refused.
+ *
+ * `server_error` IS THE FALLBACK AND IT IS THE VALUE THIS FILE USED TO HARDCODE
+ * for everything. Every error that is not a `KycStatusUnavailable` is a defect
+ * somebody must fix upstream -- a screened key, a malformed payload, an
+ * internal-tier sentence, a source that answers nothing -- and none of them is
+ * anything the trader did or can act on.
+ *
+ * IT ADDS NO MEMBER TO `PortalErrorKind`. ADR-162 clause 3, and
+ * `../../shell/app-shell.ts` is where the portal decides how to word a refusal.
+ */
+function refusalKind(cause: unknown): PortalErrorKind {
+  return cause instanceof KycStatusUnavailable ? cause.error : 'server_error';
+}
 
 /**
  * Next.js's own metadata export. The tab title, and nothing else.
@@ -93,7 +154,7 @@ export default async function KycStatusPage(): Promise<ReactElement> {
     // which is `ScreenedFieldError`'s stated reason for its own wording.
     console.error('kyc status refused', cause);
     return KycScreen({
-      view: toKycScreenPlaceholder({ state: { kind: 'error', error: toPortalErrorKind(503) } }),
+      view: toKycScreenPlaceholder({ state: { kind: 'error', error: refusalKind(cause) } }),
     });
   }
 }

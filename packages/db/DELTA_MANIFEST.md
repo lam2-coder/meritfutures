@@ -1672,110 +1672,15 @@ assert_append_only_grants: falsified in both directions, and the seed did not le
 
 **`CI-06w` is NOT extended to the `OI` table**, which ALLOCATION names as the check that would have caught session 120. `scripts/corpus/` was outside this session's fence apart from `CI-06h`'s needle list.
 
-## 27. `0050` lands, and the hazard it answers was executed before it was believed (2026-08-27)
-
-**[ADR-164](../../docs/decisions/ADR-164.md) proposed, founder approval PENDING. `MONEY PATH, E2 READ OWED`.** [P6 section 10 item 1](../../docs/plans/P6-live-tier.md) held `P6-c` for a founder answer, that answer was delegated to session 278, and reading 1 of the three is taken: **a Postgres table plus a fifth role**.
-
-| Delta | Table | Change | Migration | Status |
+| Where | What it says |
 |---|---|---|---|---|
+| [`0049:47`](migrations/0049_reserve_coverage_snapshots.sql) | *"`per_plan` ALREADY HAS A HOME AND NEEDS NOTHING. API_CONTRACT's `per_plan` is loss ratio, threshold, `sales_paused` and CUSUM per plan, and that is `plan_breaker_state`, which `0016` built with `plan_id`, `evaluated_on`, `ratio_bp`, `threshold_bp` and a state enum whose values include `'paused'`."* |
+| **Section 26 of this file**, the `OI-01` register row | *"It has had one since `0016`. API_CONTRACT's `per_plan` is loss ratio, threshold, `sales_paused` and CUSUM per plan, and that is `plan_breaker_state` **column for column**. Thirty-three migrations of an orphan that was not orphaned."* |
+| Delta | Table | Change | Migration | Status |
 | SD-M2-07 | new `live_account_state` | [ADR-020](../../docs/decisions/ADR-020.md) tier 2's live cache, one row per account, plus the fifth role `merit_live` and the `REVOKE` that takes `0026`'s default privileges back from `merit_app` | 0050 | **landed** |
-
-**This is the first `SD-M2-nn` since the fold and it is deliberately NOT added to section 3's table**, whose heading states a count of that batch. A row here satisfies [ADR-026](../../docs/decisions/ADR-026.md)'s completeness gate, which reads the file for pipe-leading rows and not for a section.
-
-### The default-privileges hazard, executed rather than asserted
-
-**`0026` ends with `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO merit_app`, so the sentence [P6 section 3.3](../../docs/plans/P6-live-tier.md) opens with -- that the separation gets FURTHER AWAY when a table is added -- is a claim about a running database.** It was run, on the tree with `0001` to `0049` applied from empty and before `0050` existed:
-
-```
-=== A. THE HAZARD IS REAL: 0026 default privileges on a table created after it ===
-                  probe                  | sel | ins | upd | del
------------------------------------------+-----+-----+-----+-----
- merit_app on a NEW table with no revoke | t   | t   | t   | t
-```
-
-**A bare `CREATE TABLE zz_hazard_demo (id int)` is fully readable and writable by the application role on the instant it exists.** Nothing grants it and nothing has to.
-
-### Install verification against PostgreSQL 16 (2026-08-27)
-
-**PostgreSQL 16.13, forward-only apply from empty under `ON_ERROR_STOP=1`, all 50 files in filename order: exit 0.** Counts read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger` rather than from a grep, on two databases built the same way so the delta is measured and not inferred.
-
 | | `0001`..`0049` | `0001`..`0050` | Delta |
-|---|---|---|---|
 | Tables (`pg_tables`, schema `public`) | 112 | **113** | +1, `live_account_state` |
 | Indexes (`pg_indexes`) | 395 | **396** | +1, the primary key's |
 | `CHECK` constraints (`pg_constraint`, `contype='c'`) | 477 | **479** | +2, `sequence_is_positive` and `is_indicative` |
 | All constraints (`pg_constraint`) | 773 | **777** | +4, the two `CHECK`s, the primary key and the `accounts` foreign key |
 | Triggers (`pg_trigger`, not internal) | 20 | **20** | **+0, and that is the ruling rather than an omission**: [ADR-164](../../docs/decisions/ADR-164.md) `F6` refuses a monotonicity trigger and gives the guard to `P6-f`'s upsert predicate |
-
-### The grant probe, in both directions, which is the whole claim
-
-**Run against the `0001`..`0050` database. The row that matters is the second: a `t` anywhere in it would mean the stats worker can read the indicative tier.**
-
-```
-=== B. merit_app MUST NOT REACH THE CACHE (FM-M12-08, DEP-M12-08) ===
-              probe              | sel | ins | upd | del
----------------------------------+-----+-----+-----+-----
- merit_app on live_account_state | f   | f   | f   | f
-
-=== C. merit_live MUST REACH THE CACHE, AND MUST NOT HOLD DELETE ===
-              probe               | sel | ins | upd | del
-----------------------------------+-----+-----+-----+-----
- merit_live on live_account_state | t   | t   | t   | f
-
-=== D. INV-M2-14: merit_live holds NOTHING on the four authoritative tables ===
- authoritative_table | sel | ins | upd | del
----------------------+-----+-----+-----+-----
- fills               | f   | f   | f   | f
- raw_ingest_rows     | f   | f   | f   | f
- daily_marks         | f   | f   | f   | f
- rule_states         | f   | f   | f   | f
-
-=== E. FM-M13-07 / PUBLIC: analytics and PUBLIC hold nothing on the cache ===
-      role       | sel | ins
------------------+-----+-----
- merit_analytics | f   | f
- public          | f   | f
-
-=== F. The one grant the ingest needs: the burn list, read only ===
-                probe                | sel | ins | upd | del
--------------------------------------+-----+-----+-----+-----
- merit_live on platform_account_refs | t   | f   | f   | f
-```
-
-### Five rejections watched firing, four of them by name
-
-**The constraints and the generated column were seeded rather than read.** The foreign key is dropped inside a transaction that rolls back, because the fixture under test is the check set and not the reference.
-
-```
-=== SUCCESS 1: the movement is the database's arithmetic, in integer cents ===
- sequence | opening_equity_cents | equity_cents | intraday_movement_cents | indicative
-----------+----------------------+--------------+-------------------------+------------
-        1 |              5000000 |      4987325 |                  -12675 | t
-
-=== SUCCESS 2: a NEGATIVE movement, and equity through zero is accepted ===
- sequence | equity_cents | intraday_movement_cents
-----------+--------------+-------------------------
-        2 |        -1200 |                -5001200
-
-=== REJECTION 1 ===
-ERROR:  new row for relation "live_account_state" violates check constraint
-        "live_account_state_sequence_is_positive"
-
-=== REJECTION 2 ===
-ERROR:  new row for relation "live_account_state" violates check constraint
-        "live_account_state_is_indicative"
-
-=== REJECTION 3 ===
-ERROR:  cannot insert a non-DEFAULT value into column "intraday_movement_cents"
-DETAIL:  Column "intraday_movement_cents" is a generated column.
-
-=== REJECTION 4: the belt, SET LOCAL ROLE merit_live; DELETE FROM live_account_state ===
-ERROR:  permission denied for table live_account_state
-
-=== REJECTION 5: SET LOCAL ROLE merit_app; SELECT count(*) FROM live_account_state ===
-ERROR:  permission denied for table live_account_state
-```
-
-**`SUCCESS 2` is the one worth keeping.** An account whose equity has gone through zero produces a movement of `-5,001,200` cents and the row is accepted, because a non-negative `CHECK` on either equity column would drop exactly the ticks a trader most needs to see. **Both figures are integer cents and neither passes through a float at any point.**
-
-**`REJECTION 5` is the claim of the whole file.** It is the stats worker's role, on the cache, refused by the database rather than by a reviewer.

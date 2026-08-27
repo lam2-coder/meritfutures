@@ -180,6 +180,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   dedupeMatches: 'dedupe_matches',
   attributions: 'attributions',
   otpChallenges: 'otp_challenges',
+  paymentDisputes: 'payment_disputes',
 };
 
 /**
@@ -367,13 +368,23 @@ describe('the registry is total', () => {
   // the one no scope rule reaches: `kyc.dedupe_hit` carries
   // `matched_identity_id`, so a row whose own tenancy column is right still
   // names a DIFFERENT identity inside the payload.
-  test('104 declared tables, 104 scope rules, 0 reachable without one', () => {
+  //
+  // P5-b WAS DISPATCHED TO REGISTER IT BY NAME AND STOPPED AT THE SAME PLACE, so
+  // the refusal is no longer "no session's fence held it". All five members of
+  // the vocabulary were tried against the shape: `owned` on `identity_id`
+  // compiles and drops every account-level row, `derived` through `account_id`
+  // is refused by ADR-101 clauses 1 AND 2, `pair` needs a second IDENTITY column
+  // and this row's second is an ACCOUNT, `firm` is refused because the row
+  // declares a column against `identities(id)`, and `root` is `identities`'
+  // alone. What it needs is a SIXTH CLASS, which ADR-106 is the precedent for
+  // the cost of, and that slice was allocated no ADR number.
+  test('105 declared tables, 105 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(104);
-    expect(rules).toBe(104);
+    expect(declared).toBe(105);
+    expect(rules).toBe(105);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, and it is
@@ -2182,5 +2193,145 @@ describe('what ADR-157 REFUSED to widen, watched rather than only written down',
     // And no SQL aggregate is rendered anywhere in the accessor.
     expect(source).not.toMatch(/\bcount\(\*\)/i);
     expect(source).not.toMatch(/\bsql`\s*sum\(/i);
+  });
+});
+
+// =============================================================================
+// P5-b. A SCOPE RULE IS A CLAIM ABOUT TENANCY AND THIS IS WHAT MAKES IT ONE.
+// =============================================================================
+// EVERY ASSERTION ABOVE THIS LINE ASKS WHETHER A RULE RESOLVES, WHETHER IT
+// MATCHES THE DDL, AND WHETHER ITS CLASS IS ADMISSIBLE. None of them asks the
+// question a BOLA failure is: can a handle scoped to one person reach a row
+// belonging to another? The generic folds above cover it across every scoped
+// table at once, and the two tables below are named because P5-b's whole
+// subject is their tenancy and a fold nobody can point at is a fold nobody
+// reads when the answer changes.
+//
+// THE REFUSAL IS NOT VISIBLE IN THE SQL AND THAT IS THE POINT, which is
+// ADR-157's own framing at the lock. The statement is the SAME statement either
+// way; what changes is the parameter the accessor binds into the tenancy
+// conjunct, and it is ALWAYS the handle's. So a caller scoped to `i-1` naming a
+// row of `i-2`'s sends a predicate that matches nothing, rather than one that
+// errors -- and an assertion that only watched it throw would pass against an
+// accessor that returned the row.
+describe('P5-b: a handle for one identity cannot reach another identity`s row', () => {
+  test('payment_disputes: the tenancy conjunct is the EXISTS through purchases, and its parameter is the handle`s', async () => {
+    // THE BOLA PAIR. Two reads, one naming a dispute of this identity's and one
+    // naming a dispute of somebody else's, and the caller's half is the ONLY
+    // thing that differs.
+    const mine = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).rowAt('paymentDisputes', { id: 'dispute-of-i-1' }),
+    );
+    const theirs = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).rowAt('paymentDisputes', { id: 'dispute-of-i-2' }),
+    );
+
+    expect(mine.sql).toBe(theirs.sql);
+    // THE HANDLE'S IDENTITY IS BOUND AND THE OTHER ONE IS NOWHERE. A caller
+    // cannot put `i-2` into the tenancy position, because the tenancy position
+    // is not a thing a caller writes.
+    expect(theirs.params).toContain('i-1');
+    expect(theirs.params).not.toContain(OTHER_IDENTITY);
+
+    // AND THE NARROWING IS THE ONE THE RULE CLAIMS, read off the SQL rather
+    // than trusted: an EXISTS into `purchases`, comparing `identity_id` there.
+    // A rule that had drifted to `ledger_transaction_id` -- the trap this
+    // table's `why` names -- would reach `ledger_transactions` instead, and
+    // this assertion is what says which one is rendered.
+    expect(mine.sql).toMatch(/exists/i);
+    expect(mine.sql).toContain('"purchases"');
+    expect(mine.sql).toContain('"identity_id"');
+    expect(mine.sql).toContain('"purchase_id"');
+    expect(mine.sql).not.toContain('"ledger_transactions"');
+    // A HOP, NOT A JOIN. A join would return the dispute once per matching
+    // parent, and `traversal: 'hop'` is what claims it cannot.
+    expect(mine.sql).not.toMatch(/\bjoin\b/i);
+  });
+
+  test('payment_disputes: the derivation terminates at an OWNED rule one hop out, and never at the row itself', () => {
+    const rule = SCOPE_RULES.paymentDisputes;
+    expect(rule.class).toBe('derived');
+    if (rule.class !== 'derived') throw new Error('unreachable');
+    expect(rule.via).toBe('purchases');
+    expect(rule.traversal).toBe('hop');
+    // THE TERMINUS IS ASSERTED RATHER THAN ASSUMED. `purchases` being `owned`
+    // and NOT NULL is the whole reason this rule returns a person all of their
+    // disputes rather than a subset of them.
+    //
+    // AND THIS NARROWING IS A COMPILE-TIME CONTROL AS WELL AS A RUNTIME ONE,
+    // which was found by seeding it rather than predicted. `SCOPE_RULES` is
+    // `as const`, so `SCOPE_RULES[rule.via]` has a literal type: re-pointing
+    // `via` at `ledgerTransactions` -- the trap this table's `why` names --
+    // makes the two lines below `TS2367` and `TS2339` at typecheck, before
+    // ADR-101 clause 2 gets to refuse the nullable edge at runtime.
+    const via = SCOPE_RULES[rule.via];
+    expect(via.class).toBe('owned');
+    if (via.class !== 'owned') throw new Error('unreachable');
+    expect(via.nullable).toBe(false);
+    // AND THE ROW ITSELF REACHES NOBODY DIRECTLY, which is ADR-101 clause 1
+    // holding for this table specifically rather than across the fold.
+    expect(identityColumnsOf('payment_disputes')).toEqual([]);
+  });
+
+  test('wallet_spend_limits: INV-M20-07`s storage is narrowed by `identity_id` and by nothing a caller supplies', async () => {
+    // THE REGISTRATION IS SESSION 202'S AND IS NOT RE-ARGUED (ADR-092 section 2
+    // clause 1). What P5-b adds is the tenancy assertion, because the velocity
+    // limit is read on the checkout path in `P5-i` and a limit read for the
+    // wrong person is a spend cap applied to the wrong wallet.
+    //
+    // THE GRAIN IS `(identity_id, effective_from)` AND `identity_id` IS PINNED,
+    // so the only half of the key a caller may name is the timestamp -- and a
+    // caller naming somebody else's timestamp still gets their own row set.
+    const mine = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).rowAt('walletSpendLimits', {
+        effectiveFrom: new Date(0),
+      }),
+    );
+    const theirs = await statementOf((source, conn) =>
+      scopedTx(source, conn, IDENTITY).rowAt('walletSpendLimits', {
+        effectiveFrom: new Date(86_400_000),
+      }),
+    );
+
+    expect(mine.sql).toBe(theirs.sql);
+    expect(mine.sql).toContain('"identity_id" = $1');
+    expect(mine.params[0]).toBe('i-1');
+    expect(theirs.params[0]).toBe('i-1');
+    expect(theirs.params).not.toContain(OTHER_IDENTITY);
+    // NOT NARROWED BY `set_by`, AND THE PREDICATE IS WHERE THAT IS TRUE. The
+    // first draft of this assertion read the WHOLE statement and failed,
+    // because `set_by` is in the SELECT list like every other column; the claim
+    // is about what NARROWS the read, so it is made against the WHERE clause
+    // alone. `set_by` is an operator name in 0002's `actor` idiom and not a
+    // `users` row, so it reaches no identity and must not appear here.
+    const where = mine.sql.slice(mine.sql.indexOf(' where '));
+    expect(where).not.toContain('"set_by"');
+    expect(where).not.toContain('"reason"');
+    // And the predicate is exactly the two conjuncts: the handle's tenancy and
+    // the caller's address. Nothing else narrows it.
+    expect(where).toContain('"identity_id" = $1');
+    expect(where).toContain('"effective_from" = $2');
+    expect(mine.params).toHaveLength(2);
+  });
+
+  test('wallet_spend_limits: a caller may not name the tenancy column, so there is no way to ask for another identity`s limit', async () => {
+    // THE REFUSAL THAT MATTERS IS AT THE ADDRESS. `identity_id` is pinned by the
+    // handle, so a caller that writes it is not narrowing a read, it is trying
+    // to re-parent one -- and ADR-112 clause 4 refuses that at both authorities.
+    const { source } = recordingSource();
+    const conn = stubConnection();
+    await expect(
+      scopedTx(source, conn, IDENTITY).rowAt('walletSpendLimits', {
+        identityId: OTHER_IDENTITY,
+        effectiveFrom: new Date(0),
+      } as never),
+    ).rejects.toThrow();
+  });
+
+  test('both tables are members of ScopedTableKey, which is what having a rule at all buys them', () => {
+    // A table with no rule is not reachable through EITHER accessor, so this is
+    // the assertion that says the registration did the thing it was for.
+    expect(SCOPED).toContain('paymentDisputes');
+    expect(SCOPED).toContain('walletSpendLimits');
   });
 });
