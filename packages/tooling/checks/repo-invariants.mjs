@@ -42,6 +42,20 @@ import { builtinModules } from 'node:module';
 import { join, dirname, resolve, relative, extname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// RI-11 LIVES IN ITS OWN FILE AND IS IMPORTED HERE, WHICH IS THE FIRST TIME A
+// CHECK IN THIS ARRAY HAS. ADR-138: three sessions were live in this file's
+// neighbours when it was written, and a ruling that needs 250 lines of argument
+// is a ruling that reads better beside its own mechanism than wedged between
+// RI-10 and the runner. The `CHECKS` array below is still the one list, so the
+// runner, `pnpm run check:invariants`, the ALLOCATION table and the suite that
+// walks every check all see it without learning anything new.
+//
+// THE IMPORT IS A CYCLE: ui-server-endpoints.mjs reads `DEPLOYABLES` and
+// `apiSurfaceVocabulary` back out of this file rather than keeping a second copy
+// of apps/api's vocabulary. It touches neither at module-evaluation time, so the
+// cycle links; its header states the constraint that keeps it that way.
+import { ri11 } from './ui-server-endpoints.mjs';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** The workspace root, three levels up from `packages/tooling/checks`. */
@@ -1467,7 +1481,7 @@ const ri10 = {
   },
 };
 
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri08, ri09, ri10];
+export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri08, ri09, ri10, ri11];
 
 function main() {
   const [arg] = process.argv.slice(2);

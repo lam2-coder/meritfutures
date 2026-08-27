@@ -20,19 +20,36 @@ import type { FastifyInstance } from 'fastify';
 // binds a real listener and issues real `fetch` requests over TCP, so every
 // status code below came off the wire.
 //
-// THE ONE THING NEITHER SUITE COVERS IS THE PLAIN-NODE RUNTIME, and it is
-// reported rather than papered over. `pnpm --filter @merit/api start` cannot run
-// today: `node --experimental-strip-types` requires an import specifier to name
-// the file that exists, and every module under `apps/api/src` writes `./x.js`
-// against `x.ts`. That is not this deployable's defect alone -- `apps/admin` and
-// `apps/worker` declare the same start script and fail the same way on their own
-// first relative import -- and the repair needs `allowImportingTsExtensions` in
-// a `tsconfig.json` that is outside session 209's fence. Session 209's log and
-// pull request carry the measurement.
+// THE PARAGRAPH THAT STOOD HERE SAID THE PLAIN-NODE RUNTIME COULD NOT RUN, AND
+// IT CAN. It recorded that `pnpm --filter @merit/api start` died because every
+// module under `apps/api/src` wrote `./x.js` specifiers against `x.ts`. BOTH
+// HALVES OF THE REPAIR LANDED (the specifiers, and `allowImportingTsExtensions`
+// in `tsconfig.base.json`), `RI-10` now asserts the first over every
+// deployable's shipped source, and `start.ts`'s own header replaced the same
+// stale claim on the same evidence. Session 255 ran the process on both
+// surfaces to measure this suite's subject over a real socket, so the finding is
+// replaced rather than left beside a tree that refutes it.
+//
+// WHAT NEITHER SUITE COVERS IS STILL WORTH NAMING: `main()` reads the
+// environment and binds a port, and this suite calls `buildServer` and
+// `listen` directly. `resolveSurface` and the port parse are `listen`-adjacent
+// and are asserted in `surface.test.ts` rather than here.
+
+/**
+ * A synthetic operator module, on `server.test.ts`'s stated reason and with its
+ * path.
+ *
+ * IT USED TO BORROW API_CONTRACT SECTION 9's QUEUE-DEPTH ROW. Session 255's
+ * `routes/internal.ts` now declares that row for real, `compose` refuses a
+ * duplicate `METHOD /path`, and this suite's subject is the MECHANISM rather
+ * than any endpoint: what it needs is an operator-classified path that no
+ * contract row will ever spell, so the two cannot collide again.
+ */
+const OPS_PATH = '/internal/never-a-contract-row';
 
 const ops = defineRoutes({
   name: 'ops',
-  routes: [{ method: 'GET', path: '/internal/jobs', handler: () => ({ depth: 0 }) }],
+  routes: [{ method: 'GET', path: OPS_PATH, handler: () => ({ depth: 0 }) }],
 });
 
 /** `{ public: origin, operator: origin }`, each on an ephemeral port. */
@@ -72,7 +89,7 @@ test('a real request to the operator origin gets 200 for liveness too', async ()
 // module set and answer differently, and the difference is which routes each
 // registered at startup.
 test('one path, two origins: 404 on public and 200 on operator', async () => {
-  const path = `${BASE_PATH}/internal/jobs`;
+  const path = `${BASE_PATH}${OPS_PATH}`;
 
   const refused = await fetch(`${origins['public'] ?? ''}${path}`);
   expect(refused.status).toBe(404);
