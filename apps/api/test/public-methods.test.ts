@@ -3,7 +3,9 @@ import { afterEach, expect, test } from 'vitest';
 import { BASE_PATH, PROBLEM_MEDIA_TYPE, buildServer, discoverRouteModules } from '../src/index.ts';
 import {
   MethodPageError,
+  MethodRowError,
   PUBLIC_METHODS_PATH,
+  databaseMethodDefinitions,
   renderMethodPage,
   setMethodDefinitionSource,
 } from '../src/routes/public-methods.ts';
@@ -12,6 +14,7 @@ import type {
   MethodPageResponse,
   StatisticDefinitionRow,
 } from '../src/routes/public-methods.ts';
+import { recordingDb } from './db-recorder.ts';
 
 // CI-02, the `unit` project.
 //
@@ -268,4 +271,135 @@ test('a chain in which every version is superseded is refused', () => {
       { ...V2, superseded_by: V1.id },
     ]),
   ).toThrow(/every one of them is superseded/);
+});
+
+// -----------------------------------------------------------------------------
+// The adapter, through `db-recorder.ts`
+// -----------------------------------------------------------------------------
+// WHICH DOOR THIS READ OPENS AND WHAT IT NAMES. That is a property of `apps/api`
+// and it fails in the direction ADR-008 was accepted for. It proves NOTHING
+// about whether the composed predicate reaches one row or many; that is
+// `packages/db`'s and is asserted in `packages/db/test/keyed-accessor.test.ts`.
+
+/** One row as the ACCESSOR hands it over: Drizzle's field names, not the DDL's. */
+const RAW = {
+  id: '11111111-1111-4111-8111-111111111111',
+  statCode: 'ST-01',
+  version: 1,
+  title: 'Pass rate',
+  numeratorSpec: 'accounts passed',
+  denominatorSpec: 'accounts started',
+  exclusions: ['refunded'],
+  windowSpec: 'trailing 90 days',
+  grain: 'plan',
+  minSample: 30,
+  measures: ['rate'],
+  methodBodyMdx: '# Method',
+  adrRef: 'ADR-032',
+  effectiveFrom: '2026-09-01',
+  supersededBy: null,
+};
+
+test('the definitions read opens the FIRM door and hands it no identity', async () => {
+  // `statistic_definitions` is scope class `firm`: there is no identity column
+  // and there is no correct one. `firmDb()` takes no reason and no identity.
+  const { db, calls } = recordingDb({ rowsWhere: [] });
+  await databaseMethodDefinitions(db).readDefinitions('ST-01');
+
+  expect(calls).toStrictEqual([
+    {
+      door: 'firm',
+      verb: 'rowsWhere',
+      key: 'statisticDefinitions',
+      address: { statCode: 'ST-01' },
+    },
+  ]);
+  for (const call of calls) expect(call.identityId).toBeUndefined();
+});
+
+test('the stat code is pushed down to the door and is not filtered in memory', async () => {
+  // `RowFilter` is "equality, ANDed", `stat_code` is a declared column, so the
+  // narrowing is available AT the door. This table is bounded by nothing, unlike
+  // `catalog.ts`' and `wallet.ts`' whole-set reads over one identity's holdings.
+  const { db, calls } = recordingDb({ rowsWhere: [] });
+  await databaseMethodDefinitions(db).readDefinitions('ST-42');
+
+  expect(calls[0]?.address).toStrictEqual({ statCode: 'ST-42' });
+  expect(calls.map((c) => c.verb)).not.toContain('rows');
+});
+
+test('the code is taken verbatim, because an address is exact', async () => {
+  // The route does not upper-case or trim, and neither does this: a normalising
+  // adapter makes two addresses into one silently.
+  const { db, calls } = recordingDb({ rowsWhere: [] });
+  await databaseMethodDefinitions(db).readDefinitions('  st-01 ');
+
+  expect(calls[0]?.address).toStrictEqual({ statCode: '  st-01 ' });
+});
+
+test('a row is narrowed column for column out of the accessors field names', async () => {
+  const { db } = recordingDb({ rowsWhere: [RAW] });
+  const rows = await databaseMethodDefinitions(db).readDefinitions('ST-01');
+
+  expect(rows).toStrictEqual([
+    {
+      id: '11111111-1111-4111-8111-111111111111',
+      stat_code: 'ST-01',
+      version: 1,
+      title: 'Pass rate',
+      numerator_spec: 'accounts passed',
+      denominator_spec: 'accounts started',
+      exclusions: ['refunded'],
+      window_spec: 'trailing 90 days',
+      grain: 'plan',
+      min_sample: 30,
+      measures: ['rate'],
+      method_body_mdx: '# Method',
+      adr_ref: 'ADR-032',
+      effective_from: '2026-09-01',
+      superseded_by: null,
+    } satisfies StatisticDefinitionRow,
+  ]);
+});
+
+test('a measure outside the enum is refused rather than published', async () => {
+  // `statistic_measure` is a database enum and this is still checked, because
+  // the source is an INTERFACE rather than the database.
+  const { db } = recordingDb({ rowsWhere: [{ ...RAW, measures: ['rate', 'geometric-mean'] }] });
+  await expect(databaseMethodDefinitions(db).readDefinitions('ST-01')).rejects.toThrow(
+    MethodRowError,
+  );
+});
+
+test('an effective_from that is not a YYYY-MM-DD day is refused', async () => {
+  // A transcription that changed the column's mode would hand this file a
+  // `Date`, whose `toString` reaches a public page as a weekday and a zone name.
+  const { db } = recordingDb({
+    rowsWhere: [{ ...RAW, effectiveFrom: '2026-09-01T00:00:00.000Z' }],
+  });
+  await expect(databaseMethodDefinitions(db).readDefinitions('ST-01')).rejects.toThrow(
+    /not a `YYYY-MM-DD` day/,
+  );
+});
+
+test('a null column that the DDL declares NOT NULL is refused rather than defaulted', async () => {
+  const { db } = recordingDb({ rowsWhere: [{ ...RAW, title: null }] });
+  await expect(databaseMethodDefinitions(db).readDefinitions('ST-01')).rejects.toThrow(
+    /statistic_definitions\.title did not read back as a string/,
+  );
+});
+
+test('a nullable column reads back as null and is not confused with a missing one', async () => {
+  const { db } = recordingDb({ rowsWhere: [{ ...RAW, adrRef: null, supersededBy: null }] });
+  const rows = await databaseMethodDefinitions(db).readDefinitions('ST-01');
+
+  expect(rows[0]?.adr_ref).toBeNull();
+  expect(rows[0]?.superseded_by).toBeNull();
+});
+
+test('something that is not a row is refused before any field is read', async () => {
+  const { db } = recordingDb({ rowsWhere: ['ST-01'] });
+  await expect(databaseMethodDefinitions(db).readDefinitions('ST-01')).rejects.toThrow(
+    /returned something that is not a row/,
+  );
 });
