@@ -4,12 +4,19 @@
 // THE HOURLY EXPIRY SWEEP'S I/O BOUNDARY, DECLARED STRUCTURALLY AND IMPORTING
 // NOTHING.
 //
-// `batch/ports.ts` and `provisioning/ports.ts` are the idiom and the reason is
-// the same one both of them state: `apps/worker/package.json` declares
-// `@merit/rules-engine` and nothing else, `node-linker=isolated` makes an
-// undeclared import unresolvable, and the manifest is not in this slice's
-// fence. So every shape this job needs is DECLARED here and SATISFIED
-// structurally by the accessor the wiring supplies. `@merit/db`'s `SystemTx` is
+// `batch/ports.ts` and `provisioning/ports.ts` are the idiom, and THE REASON
+// BOTH OF THEM GIVE HAS BEEN SUPERSEDED BY A BETTER ONE. They say
+// `apps/worker/package.json` declares `@merit/rules-engine` and nothing else, so
+// `@merit/db` is unresolvable here. **That stopped being true on 2026-08-27**:
+// ADR-165 admitted the accessor to this deployable's manifest. The structural
+// declaration is not weakened by that; it is now REQUIRED rather than merely
+// forced, because the same entry rules ONE door and ONE acquisition point --
+// `src/db.ts` -- and states the check in terms: `grep -rlE "from '@merit/db'"
+// apps/worker/src` must print `apps/worker/src/db.ts` AND NOTHING ELSE. This
+// file is not that file. So every shape this job needs is DECLARED here and
+// SATISFIED structurally by the accessor the wiring supplies, and the suite
+// asserts the absence of the import rather than trusting a manifest to enforce
+// it. `@merit/db`'s `SystemTx` is
 // assignable to `ExpiryTx` with no import in either direction, and the suite
 // binds the two by reading the accessor's source rather than by restating it.
 //
@@ -31,14 +38,25 @@
 // -----------------------------------------------------------------------------
 // THE AUTHORITY THIS JOB RUNS AT IS THE WIRING'S, AND THE GAP IS REPORTED
 // -----------------------------------------------------------------------------
-// `SystemReason` is `'nightly-batch' | 'operator-console'` and AN HOURLY SWEEP
-// IS NEITHER OF THOSE WORDS. Adding a third is one line in
-// `packages/db/src/scoped-db.ts`, which is `P5-a`'s file and not this one, and
-// P5 rule 10 is explicit about what to do here: report it and stop rather than
-// reach. So `ExpirySweepIo.transact` takes the whole unit of work and the wiring
-// decides the authority, which is `AdminPayoutBackend.operator`'s shape and its
-// stated reason: a transaction cannot outlive the function that opened it and no
-// caller has a `commit` to forget.
+// THIS FILE REPORTED A GAP HERE AND ADR-165 HAS SINCE RULED IT SHUT, IN THE
+// DIRECTION THAT COSTS NOTHING. The report read: `SystemReason` is
+// `'nightly-batch' | 'operator-console'`, an hourly sweep is neither of those
+// words, adding a third is `P5-a`'s line to write, and P5 rule 10 says to report
+// it and stop rather than reach. **The ruling is that `SystemReason` gains NO
+// member**, because `'nightly-batch'` "already names what a detector run, a
+// fold, a sweep and a nightly assertion each are", and a member minted for a
+// SERVICE rather than for a KIND of access is the vocabulary joining itself.
+// `apps/worker` runs at `systemDb('nightly-batch')` through `src/db.ts`, which
+// declares no reason parameter at all, so `'operator-console'` is unreachable
+// from this deployable BY CONSTRUCTION.
+//
+// **SO THE VOCABULARY WAS NEVER THE OBSTACLE, AND NOT REACHING FOR IT WAS THE
+// RIGHT CALL RATHER THAN A LUCKY ONE**: a session that had added the third
+// member would have spent a widening on a question whose answer was that there
+// was nothing to add. `ExpirySweepIo.transact` still takes the whole unit of
+// work, which is `AdminPayoutBackend.operator`'s shape and its stated reason: a
+// transaction cannot outlive the function that opened it and no caller has a
+// `commit` to forget. WHAT IS STILL MISSING IS AN ADAPTER, NOT A WORD.
 // =============================================================================
 
 // -----------------------------------------------------------------------------
@@ -258,9 +276,9 @@ export interface ExpiryEventPort {
  * `transact` TAKES THE UNIT OF WORK RATHER THAN HANDING BACK A HANDLE, which is
  * `ApiDb`'s and `AdminPayoutBackend`'s shape and their reason: a transaction
  * cannot outlive the function that opened it and no caller has a `commit` to
- * forget. It is also where this file's reported gap lives: `SystemReason` has no
- * word for an hourly sweep and this fence may not add one, so the AUTHORITY is
- * the wiring's decision and the shape is all this file fixes.
+ * forget. The AUTHORITY is the wiring's decision and the shape is all this file
+ * fixes; ADR-165 has since named that authority, `systemDb('nightly-batch')`
+ * through `src/db.ts`, and this file's header says why no word was minted.
  *
  * `now` IS INJECTED AND IS THE ONLY CLOCK IN THIS JOB. ADR-157: the bound handed
  * to `atMost` is the sweep's own instant, so a fixture pins it and the database
