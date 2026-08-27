@@ -178,6 +178,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-156](ADR-156.md) | `OI-28` was closed by a ruling and dispatched as open, and `0047` proves the publish decision sound AT THE WRITE and nothing preserves it after  (2026-08-27, status: proposed) |
 | [ADR-157](ADR-157.md) | a read may narrow by a RANGE and by IS NULL and a write may not, the lock is a ROW lock rather than an advisory one, and the aggregate P7 asked for is refused on evidence  (2026-08-27, status: proposed) |
 | [ADR-158](ADR-158.md) | the wallet surface enters the contract, and every row that disagreed with a plan was written from the CHECK  (2026-08-27, status: proposed) |
+| [ADR-159](ADR-159.md) | an event NAME becomes a catalogue ROW only where every field is a column or a named mirror, and the reservation that funded this entry named a different catalogue  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
