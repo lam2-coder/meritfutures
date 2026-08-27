@@ -123,6 +123,21 @@
 // SATISFIES what the row requires; closing the row is a documentation edit in a
 // directory this session does not touch.
 //
+// AND `OI-14` READS STORED STATE, SO IT CANNOT SEE THE EMPTY BOOK AT ALL. Its
+// guard fires on `storedRows > 0 && inScope === 0`. Over a book with no rows the
+// left conjunct is false, and this function returned `accountsAudited: 0,
+// diverged: 0` and exited green over nothing. ADR-073 section 5 refused to build
+// `CI-09`'s replay leg on exactly that shape and named the refusal that would
+// unblock it: "when it is built it refuses on `accountsAudited === 0`".
+//
+// THAT REFUSAL LIVES HERE NOW AND IT USED TO LIVE IN A CALLER. ADR-119 clause 7
+// recorded it as owed in one sentence: "A refusal in the caller is weaker than a
+// refusal in the audit", because the next caller inherits nothing. ADR-123 is
+// the entry that moved it, and it is a change to what this function PROMISES
+// rather than a transcription: a run that compared nothing now refuses at both
+// scales, and an empty production book refuses rather than reporting clean. That
+// cost is deliberate and ADR-123 section 3 argues it.
+//
 // -----------------------------------------------------------------------------
 // WHAT THIS IS NOT, stated the way `nightly.ts` states its own gaps
 // -----------------------------------------------------------------------------
@@ -170,10 +185,12 @@ import {
  * Thrown when the audit cannot honestly report.
  *
  * `OI-14`'s empty in-scope set is the instance `DELTA_MANIFEST` allocates. A
- * history that is not ONE ACCOUNT LIFE is the other, and `lifeOf` below is where
- * that one is raised. They are the same failure at two scales: an audit that has
- * stopped looking reports exactly like one that found nothing (FM-17), so both
- * refuse rather than return a report a reader could mistake for a clean one.
+ * history that is not ONE ACCOUNT LIFE is the second, and `lifeOf` below is
+ * where that one is raised. ADR-073 section 5's EMPTY BOOK is the third, and it
+ * is the widest: not one account had anything to compare. They are the same
+ * failure at three scales: an audit that has stopped looking reports exactly
+ * like one that found nothing (FM-17), so all three refuse rather than return a
+ * report a reader could mistake for a clean one.
  */
 export class ReplayAuditRefusal extends Error {
   constructor(message: string) {
@@ -604,6 +621,31 @@ export async function runReplayAudit(
     diverged: total((a) => a.diverged),
     accounts,
   };
+
+  // ADR-073 SECTION 5, AND IT IS READ FIRST BECAUSE IT IS THE WIDER FAILURE.
+  // `OI-14` below reads STORED STATE and therefore cannot see this case at all:
+  // its guard needs `storedRows > 0`, and a book with no rows has none, so this
+  // function used to return `accountsAudited: 0, diverged: 0` and exit green
+  // over nothing. See this file's header, ADR-119 clause 7 and ADR-123.
+  //
+  // THE ORDER OF THE TWO GUARDS IS DECIDED RATHER THAN INCIDENTAL. Over an empty
+  // book the `OI-14` conjunct is false anyway, so swapping them changes no
+  // outcome today. It is fixed so a reader is handed the diagnosis that is TRUE,
+  // "there was nothing to audit", rather than the narrower "nothing was in
+  // scope", which would send somebody looking for an engine upgrade that did not
+  // happen.
+  if (report.accountsAudited === 0) {
+    throw new ReplayAuditRefusal(
+      `the replay audit found no account with stored state, so it compared nothing and has ` +
+        `nothing to report. ADR-073 section 5 closed CI-09's replay leg on exactly this ` +
+        `outcome: a nightly built on a green report over zero accounts is green every night, ` +
+        `forever, over nothing, and reads exactly like an audit that found nothing (FM-17). ` +
+        `OI-14's guard cannot catch it, because that guard reads stored state and fires on ` +
+        `storedRows > 0 && inScope === 0. If this run is over a book that genuinely holds no ` +
+        `rule_states row yet, then INV-04 has no subject and the answer is that the batch has ` +
+        `not written one, not that the replay agreed with storage.`,
+    );
+  }
 
   // OI-14. THROWN RATHER THAN REPORTED, because a refusal that returns a report
   // can be read like a clean one, which is the exact failure the row names.

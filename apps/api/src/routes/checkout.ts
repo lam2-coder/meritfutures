@@ -109,12 +109,38 @@
 // PIPELINE AND NOT THE PROVIDER: every `payment_session` in this file's tests
 // comes from a fake, and shipping this to a real customer needs a procurement
 // decision nobody has taken.
+//
+// -----------------------------------------------------------------------------
+// ENRICHMENT IS CALLED HERE AND DECIDES NOTHING, WHICH IS A PROPERTY OF THIS
+// FILE AND NOT OF THE PACKAGE
+// -----------------------------------------------------------------------------
+// `packages/enrichment` was shipped complete, tested and UNWIRED by session 223,
+// deliberately: this file did not exist when that branch was cut and inventing
+// it would have cost both branches. ADR-115 records the shape and this session
+// is the call.
+//
+// ADR-023 STEP 1 IS OBSERVE MODE AND NO ENRICHMENT OUTCOME MAY CHANGE WHAT
+// CHECKOUT RETURNS. ADR-115's title names the two places that could quietly stop
+// being true, and BOTH OF THEM ARE HERE: a package that decides nothing becomes
+// enforcement at the site that calls it, either by branching on something it
+// returned or by letting something it threw reach this transaction, where a
+// throw is a `ROLLBACK` and a rollback the buyer is not told about is a silent
+// decline. The call site's own comment states both and names the assertions;
+// what matters at this altitude is that **a vendor timeout must not roll back a
+// purchase**, and it does not.
 // =============================================================================
 
 import { randomUUID } from 'node:crypto';
 
 import { resolveAttribution } from '@merit/affiliate';
 import type { AffiliateRef, AttributionRow, ClickRef, LinkConfidence } from '@merit/affiliate';
+import { observeEnrichment } from '@merit/enrichment';
+import type {
+  ContractSource,
+  EnrichmentAdapter,
+  EnrichmentTx,
+  ObserveReporter,
+} from '@merit/enrichment';
 import { BothMidsUnhealthyError, cardLegOf, chooseMidForNewAttempt } from '@merit/psp';
 import type { MidCandidate, PaymentSession, PspAdapter, PspId } from '@merit/psp';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -399,6 +425,29 @@ export interface CheckoutTx {
    * zero.
    */
   linkConfidence(affiliate: AffiliateRef): Promise<LinkConfidence | null>;
+
+  /**
+   * THIS transaction, as `packages/enrichment` writes through one, or `null`
+   * when the deployment records no observation.
+   *
+   * IT IS A HANDLE AND NOT A QUERY, which is why it is a property beside twelve
+   * methods. `observeEnrichment` takes the caller's OPEN transaction as its
+   * first argument with no overload that omits it, and `packages/enrichment`
+   * declares no `@merit/db` and cannot import `client()`, `drizzle-orm` or `pg`
+   * at all. So an observation commits with the purchase that caused it or not at
+   * all, and an observation of a checkout that DID NOT HAPPEN is unreachable
+   * rather than merely avoided. `tx.ts`'s header states why that matters: a
+   * distribution polluted by abandoned checkouts is not the distribution
+   * ADR-023's observe mode exists to learn.
+   *
+   * `null` IS THE SAME ANSWER `adapterFor` GIVES FOR AN UNCONFIGURED PROVIDER
+   * and it is not a second kill switch dressed as a port. ADR-115 clause 4 rules
+   * that no enabled `integration_contracts` row means no call at all; a backend
+   * that cannot write `identity_signals` is that condition met one step earlier,
+   * and the two agree on the outcome, which is a checkout that commits exactly
+   * as it would have.
+   */
+  readonly enrichment: EnrichmentTx | null;
 }
 
 /** What opens a transaction. One method, and it takes the session. */
@@ -413,6 +462,26 @@ export interface CheckoutBackend {
   transact<T>(session: AuthSession, fn: (tx: CheckoutTx) => Promise<T>): Promise<T>;
 }
 
+/**
+ * Everything an enrichment observation needs that is not the transaction.
+ *
+ * FOUR FIELDS AND NOT ONE, because `ObserveDeps` takes four things this route
+ * cannot invent: a vendor, the `firm` reader that holds the contract row, a
+ * clock and a sink. `timeoutMs` IS DELIBERATELY ABSENT: `ENRICHMENT_TIMEOUT_MS`
+ * is exported "so the number is read in one place by whoever is answering how
+ * long a purchase may wait on a fraud signal", and a route that passed its own
+ * would be moving a shared budget into one caller.
+ */
+export interface CheckoutEnrichment {
+  readonly adapter: EnrichmentAdapter;
+  /** The `firm` reader for `integration_contracts`. `firmDb()` satisfies it. */
+  readonly contracts: ContractSource;
+  /** The clock. Injected so a suite is deterministic; `() => new Date()` in a deployment. */
+  readonly now: () => Date;
+  /** Where the outcome is reported. Its own throw is caught by `observeEnrichment`. */
+  readonly report: ObserveReporter;
+}
+
 /** Where a provider's adapter comes from. Section 5's `psp` union is closed. */
 export interface CheckoutAdapters {
   /** The adapter for this MID, or `undefined` when none is configured. */
@@ -420,6 +489,17 @@ export interface CheckoutAdapters {
   /** Where the provider returns the buyer. Configuration, never a request field. */
   readonly returnUrl: string;
   readonly cancelUrl: string;
+  /**
+   * ADR-023 step 1's enrichment wiring, or `null` when this deployment observes
+   * nothing.
+   *
+   * `null` IS WHAT A LIVE DEPLOYMENT RESOLVES TODAY, for `adapterFor`'s reason
+   * one line up: `packages/enrichment` ships a port and FOUR FAKES and no vendor
+   * adapter, and a route that invented one would be a fixture serving real
+   * traffic. There is also no `integration_contracts` row installed anywhere in
+   * this tree, and ADR-115 clause 4 makes that row's absence the same answer.
+   */
+  readonly enrichment: CheckoutEnrichment | null;
 }
 
 /** Thrown by the unwired backend. Answered as 503 rather than 500. */
@@ -457,6 +537,7 @@ export const PRODUCTION_CHECKOUT_ADAPTERS: CheckoutAdapters = {
   adapterFor: () => undefined,
   returnUrl: '',
   cancelUrl: '',
+  enrichment: null,
 };
 
 let backend: CheckoutBackend = UNWIRED_CHECKOUT_BACKEND;
@@ -1011,10 +1092,73 @@ async function completePurchase(args: {
     }
   }
 
-  // THE ATTRIBUTION WRITE IS THE LAST THING AND IT IS NOT GUARDED. A throw here
-  // rolls the purchase back, which is this session's approval line.
+  // THE ATTRIBUTION WRITE IS THE LAST WRITE AND IT IS NOT GUARDED. A throw here
+  // rolls the purchase back, which is session 220's approval line.
   if (decision.kind === 'attributed') {
     await tx.insertAttribution(purchaseId, decision.row);
+  }
+
+  // ---------------------------------------------------------------------------
+  // ADR-023 STEP 1: ENRICHMENT OBSERVES, AND THIS IS THE PLACE IT COULD STOP
+  // ---------------------------------------------------------------------------
+  // ADR-023 step 1 is observe mode: "Signals recorded, scored, and reported;
+  // nothing is blocked. The purpose is to learn the distribution on Merit's own
+  // traffic." ADR-115's title names the TWO PLACES that could quietly stop being
+  // true, and both of them are HERE rather than in `packages/enrichment`: a
+  // package that decides nothing becomes enforcement at the site that calls it.
+  //
+  //   1. A RETURN VALUE A CALL SITE COULD BRANCH ON. `observeEnrichment` returns
+  //      `Promise<void>`, so there is nothing to branch on and this line binds
+  //      nothing. That is ADR-105's second rule for the payment port tightened
+  //      one notch, and it is asserted BY READING THIS FILE in
+  //      `checkout.test.ts`, because a call site that ignored a returned
+  //      decision looks identical from outside until somebody reads it.
+  //
+  //   2. A THROW THAT PROPAGATES INTO THIS TRANSACTION. A throw here is a
+  //      `ROLLBACK`, so a propagating enrichment failure is enforcement by
+  //      EXCEPTION, and enforcement by exception is a SILENT decline: the buyer
+  //      is refused and told nothing, which ADR-023 forbids even in step 3 where
+  //      declining is permitted at all. `observeEnrichment` is total: its `try`
+  //      catches everything `run` can throw, including the reporter's own throw
+  //      one layer in. A hanging vendor, a failing vendor and a throwing sink
+  //      each commit this purchase, watched in `checkout.test.ts`.
+  //
+  // SO IT IS THE LAST THING THE TRANSACTION DOES, AND THE POSITION IS PART OF
+  // THE ARGUMENT. Nothing below reads an outcome because there is no outcome to
+  // read, and nothing below runs at all except building the response out of
+  // figures computed before this line.
+  //
+  // A VENDOR TIMEOUT MUST NOT ROLL BACK A PURCHASE, and what happens when the
+  // vendor is slow is stated rather than hoped for: `ENRICHMENT_TIMEOUT_MS` is
+  // 800 integer milliseconds, the race is against the adapter's PROMISE and not
+  // against its manners, the abandoned call is given its rejection handler at
+  // the moment it is made so a late failure settles a promise nobody awaits, the
+  // dispatch row is still written because the subject left Merit either way, the
+  // outcome is reported as `timed_out`, and the purchase commits. The cost is
+  // one open transaction held up to 800ms longer, which is the same hazard this
+  // file's header already REPORTS about `createSession` rather than routes
+  // around.
+  //
+  // WHAT THIS CALL SITE DOES NOT DO. It sends no email, no phone, no device and
+  // no BIN, because checkout holds none of them: `CheckoutRequest` carries a
+  // plan, a size, a coupon code, a click token and TOS ids, and `AuthSession`
+  // carries ids. Four of `EnrichmentSubject`'s five facets are therefore ABSENT
+  // rather than empty, and `redactToAllowlist` narrows even the one to what the
+  // contract row permits before an adapter sees it.
+  const enrichment = currentCheckoutAdapters().enrichment;
+  if (enrichment !== null && tx.enrichment !== null) {
+    await observeEnrichment(tx.enrichment, {
+      adapter: enrichment.adapter,
+      contracts: enrichment.contracts,
+      subject: { ip },
+      // `purchases.id`. ADR-115 clause 4: `integration_dispatches_idempotency_uq`
+      // makes ONE enrichment disclosure per purchase a fact rather than a
+      // convention, and a retried payment attempt is a new session against the
+      // same purchase (M03 section 3.2).
+      purchaseId,
+      now: enrichment.now,
+      report: enrichment.report,
+    });
   }
 
   return {

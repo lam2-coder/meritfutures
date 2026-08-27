@@ -123,6 +123,9 @@ importers:
       '@merit/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@merit/enrichment':
+        specifier: workspace:*
+        version: link:../../packages/enrichment
       '@merit/kyc':
         specifier: workspace:*
         version: link:../../packages/kyc
