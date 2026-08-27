@@ -17,8 +17,10 @@ import {
 } from '../src/app/kyc/copy.ts';
 import {
   KYC_STATUS_FIELDS,
+  KycScreenSourceUnwired,
   KycStatusShapeError,
   SCREENED_KEY_TERMS,
+  SERVER_KYC_SCREEN_SOURCE,
   ScreenedFieldError,
   UNWIRED_KYC_SCREEN_SOURCE,
   currentKycScreenSource,
@@ -27,6 +29,7 @@ import {
   useKycScreenSource,
   type KycScreenSource,
 } from '../src/app/kyc/source.ts';
+import { API_ORIGIN_VAR } from '../src/http/client.ts';
 import {
   KycScreen,
   UnknownPlacementError,
@@ -437,18 +440,52 @@ test('the root layout renders the chrome this segment stopped rendering', () => 
 // The page, and what it refuses to be
 // -----------------------------------------------------------------------------
 
-test('the production source is unwired and the page renders an honest error', async () => {
-  // IT USED TO THROW, and that was right while this segment owned the footer:
-  // a screen that cannot render a required disclosure must not render. The
-  // layout renders the footer now, so an unavailable status is content that
-  // failed rather than an obligation that failed.
-  resetKycScreenSource();
-  expect(currentKycScreenSource()).toBe(UNWIRED_KYC_SCREEN_SOURCE);
-  expect(Object.keys(UNWIRED_KYC_SCREEN_SOURCE)).toEqual(['status']);
+test('the production source READS now, and an unconfigured deployment still errors', async () => {
+  // THE DEFAULT MOVED AND THE OBSERVABLE BEHAVIOUR OF THIS BRANCH DID NOT.
+  // `UNWIRED_KYC_SCREEN_SOURCE` was the default while this application had no
+  // transport at all; ADR-162 landed one and `SERVER_KYC_SCREEN_SOURCE` reads
+  // `GET /kyc/status` through it. With `MERIT_API_ORIGIN` unset there is no API
+  // to read, so the page renders exactly the error state it rendered before.
+  //
+  // IT USED TO THROW BEFORE THAT, and that was right while this segment owned
+  // the footer: a screen that cannot render a required disclosure must not
+  // render. The layout renders the footer now, so an unavailable status is
+  // content that failed rather than an obligation that failed.
+  const saved = process.env[API_ORIGIN_VAR];
+  delete process.env[API_ORIGIN_VAR];
+  try {
+    resetKycScreenSource();
+    expect(currentKycScreenSource()).toBe(SERVER_KYC_SCREEN_SOURCE);
 
-  const html = renderToStaticMarkup(await KycStatusPage());
-  expect(html).toContain('data-content="server_error"');
-  expect(html).toContain('data-screen="SC-M4-07"');
+    const html = renderToStaticMarkup(await KycStatusPage());
+    expect(html).toContain('data-content="server_error"');
+    expect(html).toContain('data-screen="SC-M4-07"');
+  } finally {
+    if (saved !== undefined) process.env[API_ORIGIN_VAR] = saved;
+  }
+});
+
+test('ADR-114 clause 6 half one holds on the LIVE source and not only on the unwired one', async () => {
+  // THE SHAPE ASSERTION HAD TO FOLLOW THE DEFAULT. "The port has no method
+  // returning a document and no field one could be assigned to" is a claim
+  // about the source a production request actually reaches, and until this
+  // session that was `UNWIRED_KYC_SCREEN_SOURCE`. Asserting it only there would
+  // now be asserting it about a value nothing serves.
+  expect(Object.keys(SERVER_KYC_SCREEN_SOURCE)).toEqual(['status']);
+
+  // AND THE FAIL-CLOSED VALUE IS STILL HERE AND STILL FAILS CLOSED. It is what
+  // a caller installs when it wants a source that answers nothing.
+  expect(Object.keys(UNWIRED_KYC_SCREEN_SOURCE)).toEqual(['status']);
+  await expect(UNWIRED_KYC_SCREEN_SOURCE.status()).rejects.toThrow(KycScreenSourceUnwired);
+
+  useKycScreenSource(UNWIRED_KYC_SCREEN_SOURCE);
+  try {
+    const html = renderToStaticMarkup(await KycStatusPage());
+    expect(html).toContain('data-content="server_error"');
+    expect(html).toContain('data-screen="SC-M4-07"');
+  } finally {
+    resetKycScreenSource();
+  }
 });
 
 test('the page is never statically generated', () => {

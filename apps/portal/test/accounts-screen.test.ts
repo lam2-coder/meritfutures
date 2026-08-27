@@ -8,7 +8,11 @@ import { expect, test } from 'vitest';
 import type { AccountDetail, AccountListItem, MarkListItem } from '../src/api/types.ts';
 import { AccountListScreen } from '../src/app/accounts/account-list.ts';
 import { AccountDetailScreen } from '../src/app/accounts/account-detail.ts';
-import { AccountsSourceNotWiredError, accountsSource } from '../src/app/accounts/ports.ts';
+import {
+  ACCOUNTS_ERROR_COPY,
+  AccountsError,
+  AccountsUnavailable,
+} from '../src/app/accounts/states.ts';
 import { MissingCopyBlockError } from '../src/copy/copy-block.ts';
 import type { PinnedPlanCopy } from '../src/copy/copy-block.ts';
 import { toAccountDetail, toAccountList } from '../src/view/accounts.ts';
@@ -344,12 +348,38 @@ test('an account with no closed day gets an honest chart and not an empty box', 
 // The segment's own fences
 // -----------------------------------------------------------------------------
 
-test('the segment renders through a port and constructs no transport of its own', () => {
-  // `surface.test.ts` asserts the absence of a network call by reading source.
-  // This asserts what the absence DOES: the page fails loudly rather than
-  // drawing an empty list, which would render "no accounts" and "cannot reach
-  // the API" as the same screen (../src/shell/app-shell.ts's distinction).
-  expect(() => accountsSource()).toThrow(AccountsSourceNotWiredError);
+test('a trader with no accounts, an unwired endpoint and a refusal are three screens', () => {
+  // THIS TEST IS NARROWED RATHER THAN DELETED, and the narrowing is the whole
+  // of what session 285 changed about this segment's fence.
+  //
+  // It used to read `expect(() => accountsSource()).toThrow(...)`, under the
+  // reason that the page must "fail loudly rather than drawing an empty list,
+  // which would render 'no accounts' and 'cannot reach the API' as the same
+  // screen (../src/shell/app-shell.ts's distinction)". ADR-162's client landed
+  // and ../src/app/accounts/source.ts replaced that throw with a three-armed
+  // load, so the function is gone and THE PROPERTY IT PROTECTED IS NOT.
+  //
+  // The property is asserted here directly instead of through the exception
+  // that used to stand in for it, and it is now a stronger claim than the old
+  // one: the old test proved that ONE of the three screens was distinct, by
+  // making it impossible to reach. This proves all three are.
+  const empty = listHtml([]);
+  const unwired = renderToStaticMarkup(
+    AccountsUnavailable({ heading: 'Accounts', missing: ['GET /accounts/:accountId/marks'] }),
+  );
+  const refused = renderToStaticMarkup(AccountsError({ heading: 'Accounts', error: 'not_found' }));
+
+  expect(new Set([empty, unwired, refused]).size, 'three distinct renderings').toBe(3);
+  expect(empty).toContain('You hold no accounts.');
+  expect(unwired).toContain('Nothing has failed');
+  expect(unwired).toContain('GET /accounts/:accountId/marks');
+  expect(refused).toContain(ACCOUNTS_ERROR_COPY.not_found);
+
+  // AND THE ONE THAT MATTERS MOST: the empty screen says nothing about the API
+  // and the two failure screens say nothing about holding no accounts.
+  expect(empty).not.toContain('Waiting on');
+  expect(unwired).not.toContain('You hold no accounts.');
+  expect(refused).not.toContain('You hold no accounts.');
 });
 
 test('the markup uses the compliant fixture vocabulary and invents no class', () => {
@@ -368,7 +398,15 @@ test('the markup uses the compliant fixture vocabulary and invents no class', ()
     'utf8',
   );
 
-  const html = detailHtml(DETAIL) + listHtml([ITEM]);
+  // THE TWO NON-`ready` SCREENS ARE IN THIS SUM, and they were added the
+  // session they were written. A screen exempt from the class check because
+  // nobody remembered to render it here is the check quietly not covering the
+  // newest markup in the segment.
+  const html =
+    detailHtml(DETAIL) +
+    listHtml([ITEM]) +
+    renderToStaticMarkup(AccountsUnavailable({ heading: 'Account', missing: ['GET /x'] })) +
+    renderToStaticMarkup(AccountsError({ heading: 'Account', error: 'server_error' }));
   const used = new Set([...html.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1]!.split(' ')));
 
   expect(used.size, 'classes used').toBeGreaterThan(3);
