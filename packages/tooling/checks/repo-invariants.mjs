@@ -1644,7 +1644,217 @@ const ri12 = {
   },
 };
 
-export const CHECKS = [ri01, ri02, ri03, ri04, ri05, ri06, ri07, ri08, ri09, ri10, ri11, ri12];
+// -----------------------------------------------------------------------------
+// RI-13  An unsigned ADR says what the founder must decide
+// -----------------------------------------------------------------------------
+//
+// THE BACKLOG IS NOT THE PROBLEM; ITS SHAPE IS. On 2026-08-27 this corpus held 162
+// ADRs and 55 of them declared their own approval line withheld. "Read 55 documents"
+// is not an actionable ask and it had been growing for a day. "Answer these 55
+// questions" is, and the difference is entirely in what the entries themselves say.
+//
+// THE ENTRIES ALREADY KNEW THIS. Twenty of the 55 carried a marked block reading
+// `**What a founder read adds and this entry cannot.**` and then named the
+// judgements: which reading was taken, why it is a judgement rather than a
+// derivation, and what goes wrong if it is the wrong one. ADR-157 is the best of
+// them and names three. THIRTY-FIVE CARRIED NOTHING OF THE KIND, and a founder
+// arriving at one of those has to reconstruct the question from the ruling before
+// they can answer it, on every entry, alone.
+//
+// SO THE PROPERTY IS ABOUT THE ENTRY AND NOT ABOUT THE SIGNATURE. It does not ask
+// that anything be signed -- that is the founder's and no check may stand in for it.
+// It asks that an entry which is WAITING on a signature state, in its own words,
+// what the signature is for.
+//
+// WHY A MARKED BLOCK AND NOT A PHRASE LIST. The tempting implementation is a list of
+// the ways an entry can gesture at a founder judgement -- "the clause a later session
+// will want to reverse", "the part that needs the founder", "that judgement is the
+// founder's and no grep reaches it" -- all of which are in the tree. A phrase list is
+// a SECOND COPY OF A CONVENTION, it drifts the first time somebody writes a
+// twenty-fourth phrasing, and it passes an entry that merely MENTIONS a founder.
+// One marked block is the convention itself: 32 entries had already written it
+// before this check existed, so the check adopts what the corpus does rather than
+// inventing a rule it will then have to police.
+//
+// "NOTHING HERE IS A JUDGEMENT" IS A VALID ANSWER AND THE CHECK MUST ACCEPT IT.
+// A pure transcription against an approved document owes the founder no decision,
+// and an entry FORCED TO FABRICATE A QUESTION is worse than one that had none: it
+// spends a founder read on a decision nobody has to make. So the marker is followed
+// by prose and the check reads its LENGTH rather than its meaning; an entry whose
+// prose says "nothing, and here is why" passes on exactly the same terms as one
+// naming three judgements.
+//
+// THE FILE BOUNDARY, WHICH IS A REAL ONE. This file's own header says these are
+// build-tooling invariants and that `scripts/corpus/` is where corpus checks live.
+// RI-12 landed here the same morning reading nothing but docs/, which is the
+// precedent this follows: the corpus RUNNER asserts things about corpus CONTENT
+// against its own registries, and this asserts a property of a document's structure
+// that needs no registry at all. It runs at CI-01 beside the checks that need
+// nothing but the tree.
+//
+/** An `##`-to-`######` heading whose title names an approval. */
+const ADR_APPROVAL_HEADING = /^#{2,6}\s+.*\bapprovals?\b/i;
+
+/** A line that names the approval line itself, wherever in the entry it sits. */
+const ADR_APPROVAL_LINE = /\b(?:approval line|founder approval|founder ruling)\b/i;
+
+/** The status vocabulary of an approval statement that is still waiting. */
+const ADR_WITHHELD = /\b(?:UNSIGNED|PENDING|NOT GIVEN)\b|_{5,}/i;
+
+/** The status vocabulary of an approval statement that records a disposition. */
+const ADR_GRANTED = /\b(?:GRANTED|ACCEPTED|SIGNED|ADOPTED|REFUSED|SPLIT)\b/;
+
+/** How much prose the marked block must carry before it is an answer rather than a label. */
+const FOUNDER_QUESTION_FLOOR = 120;
+
+/**
+ * The lines of an ADR that state its approval status.
+ *
+ * TWO POSITIONS, because the corpus writes the status in two places and neither is
+ * going away: inline on a line that names the approval line, and as the first line
+ * of prose under a section heading that names the approval. A blockquote or table
+ * row is excluded -- both quote OTHER entries' approval lines, and ADR-135 quotes a
+ * migration's header comment about one.
+ *
+ * @param {string[]} lines
+ * @returns {{ n: number, text: string }[]}
+ */
+function adrApprovalStatements(lines) {
+  /** @type {{ n: number, text: string }[]} */
+  const out = [];
+  const plain = (/** @type {string} */ l) => l.replace(/\*\*|__|\*|`/g, '');
+  for (const [i, line] of lines.entries()) {
+    if (ADR_APPROVAL_HEADING.test(line)) {
+      out.push({ n: i + 1, text: plain(line) });
+      for (const [j, below] of lines.entries()) {
+        if (j <= i) continue;
+        if (below.trim() === '') continue;
+        if (/^#{1,6}\s/.test(below)) break;
+        out.push({ n: j + 1, text: plain(below) });
+        break;
+      }
+      continue;
+    }
+    if (/^\s*[>|]/.test(line)) continue;
+    if (ADR_APPROVAL_LINE.test(line)) out.push({ n: i + 1, text: plain(line) });
+  }
+  return out;
+}
+
+/**
+ * The index of the marked block, or -1. A bolded lead-in and a section heading are
+ * both accepted because the corpus writes it both ways: 31 entries bold it, ADR-164
+ * makes it a section of its own, and the two say the same thing.
+ *
+ * @param {string[]} lines
+ * @returns {number}
+ */
+function founderQuestionAt(lines) {
+  for (const [i, line] of lines.entries()) {
+    const t = line
+      .replace(/^\s*[#>\-*+\d.)\s]*/, '')
+      .replace(/^\*+/, '')
+      .trim();
+    if (/^what a founder read adds/i.test(t)) return i;
+  }
+  return -1;
+}
+
+/**
+ * The prose the marked block carries, counted from the end of its own sentence to
+ * the next heading or rule. It is a LENGTH and never a meaning: this check catches
+ * an entry that is silent, not one that answers badly.
+ *
+ * @param {string[]} lines
+ * @param {number} at
+ * @returns {number}
+ */
+function founderQuestionProse(lines, at) {
+  const head = (lines[at] ?? '').replace(/^\s*[#>\-*+\d.)\s]*/, '');
+  let body = head.replace(/^[^.!?\n]*[.!?]?/, '');
+  for (const line of lines.slice(at + 1, at + 25)) {
+    if (/^#{1,6}\s/.test(line) || /^---\s*$/.test(line)) break;
+    body += ` ${line}`;
+  }
+  return body.replace(/\*\*|__|\*|`|\s+/g, ' ').trim().length;
+}
+
+/** @type {Invariant} */
+const ri13 = {
+  id: 'RI-13',
+  title: 'Every ADR whose approval line is unsigned states what the founder must decide',
+  covers:
+    'every `ADR-*.md` under docs/decisions. AN ENTRY IS IN SCOPE WHEN ITS ' +
+    'APPROVAL STATEMENT IS WITHHELD: a line naming the approval line, founder ' +
+    'approval or founder ruling, or the first line of prose under a section ' +
+    'heading that names an approval, carrying UNSIGNED, PENDING, NOT GIVEN or a ' +
+    'blank signature rule, and carrying no disposition. A DISPOSITION IS READ IN ' +
+    'CAPITALS -- GRANTED, ACCEPTED, SIGNED, ADOPTED, REFUSED, SPLIT -- because ' +
+    'these entries write a status in capitals and write ABOUT one in lowercase ' +
+    'prose: four fell out of scope on a case-insensitive read, on "refused by", ' +
+    '"a correctly signed Rise payload" and "an accepted ruling". ' +
+    'Such an entry must carry the marked block `What a founder ' +
+    'read adds` -- bolded or as a heading, the form 32 entries already used ' +
+    'before this check existed -- followed by at least ' +
+    `${FOUNDER_QUESTION_FLOOR} characters of prose. ` +
+    'WHAT IT DOES NOT CATCH, stated rather than left to be discovered. (1) It ' +
+    "reads the block's LENGTH and never its meaning, so it catches SILENCE and " +
+    'not a bad answer, and "nothing here is a judgement, and here is why" passes ' +
+    'on the same terms as three named judgements -- deliberately, because an ' +
+    'entry forced to fabricate a question is worse than one that had none. (2) It ' +
+    'does not read whether a SIGNATURE is owed or given: it never asks anything ' +
+    "to be signed, which is the founder's alone. (3) An entry whose approval " +
+    'status this check cannot read at all is OUT OF SCOPE rather than a finding, ' +
+    'and 31 entries are in that position today -- the pre-FREEZE rulings that ' +
+    'carry no approval statement. That is a SECOND defect and a different ' +
+    'invariant; this one never fails an entry whose status it could not read, ' +
+    'because guessing in that direction would fail 31 documents for a convention ' +
+    'that did not exist when they were written.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const dir = join(root, 'docs/decisions');
+    if (!existsSync(dir)) return findings;
+    const entries = readdirSync(dir)
+      .filter((f) => /^ADR-.*\.md$/.test(f))
+      .sort();
+    for (const file of entries) {
+      const lines = readFileSync(join(dir, file), 'utf8').split('\n');
+      const statements = adrApprovalStatements(lines);
+      if (statements.some((s) => ADR_GRANTED.test(s.text))) continue;
+      const withheld = statements.filter((s) => ADR_WITHHELD.test(s.text)).pop();
+      if (!withheld) continue;
+      const at = founderQuestionAt(lines);
+      if (at >= 0 && founderQuestionProse(lines, at) >= FOUNDER_QUESTION_FLOOR) continue;
+      const why =
+        at < 0
+          ? 'carries no `What a founder read adds` block'
+          : `states the block at :${at + 1} and then says nothing: ` +
+            `${founderQuestionProse(lines, at)} characters, ${FOUNDER_QUESTION_FLOOR} required`;
+      findings.push(
+        `docs/decisions/${file}: approval withheld at :${withheld.n} and the entry ${why}. ` +
+          'An unsigned entry states what the founder must decide, or states that nothing here is a judgement and why.',
+      );
+    }
+    return findings;
+  },
+};
+
+export const CHECKS = [
+  ri01,
+  ri02,
+  ri03,
+  ri04,
+  ri05,
+  ri06,
+  ri07,
+  ri08,
+  ri09,
+  ri10,
+  ri11,
+  ri12,
+  ri13,
+];
 
 function main() {
   const [arg] = process.argv.slice(2);
