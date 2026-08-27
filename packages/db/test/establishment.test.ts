@@ -104,6 +104,11 @@ function stubConn(): PoolClient {
   return { query: async () => ({ rows: [] as unknown[] }) } as unknown as PoolClient;
 }
 
+/** The leading keyword of every statement sent, in order. What a recorder can see. */
+function verbs(sent: readonly Sent[]): string[] {
+  return sent.map((s) => (/^\s*(\w+)/.exec(s.sql)?.[1] ?? '').toLowerCase());
+}
+
 // =============================================================================
 // RESOLVE: the pre-identity read, where the address is the WHOLE predicate
 // =============================================================================
@@ -248,24 +253,30 @@ describe('insertUnder proves the parent before it writes the row', () => {
   });
 
   test('THE PARENT NOT BEING THIS IDENTITY IS A THROW AND NO INSERT IS SENT', async () => {
-    // THE CONTROL. Zero proving rows means the named `user_id` is not one of
-    // this identity's logins, and a session minted there is somebody else's
-    // account. The assertion is on `sent`, not only on the throw: a refusal
-    // that raises AFTER writing the row is the failure this case exists for.
+    // THE CONTROL, AND THE STATEMENT LIST IS ASSERTED BEFORE THE EXCEPTION IS.
+    // Zero proving rows means the named `user_id` is not one of this identity's
+    // logins, and a session minted there is somebody else's account. A refusal
+    // that raised AFTER writing the row would satisfy every `rejects.toThrow`
+    // in this file, so the ORDER of these two assertions is itself the control:
+    // this case has to fail on the recorder rather than on the missing throw.
     const { source, sent } = proving(0);
-    await expect(
-      insertUnderStatement(source, PARENTED as 'sessions', IDENTITY, MINT),
-    ).rejects.toThrow(/cannot be proved/);
-    expect(sent).toHaveLength(1);
-    expect((sent[0] as Sent).sql).toMatch(/^select/i);
+    const outcome = await insertUnderStatement(source, PARENTED as 'sessions', IDENTITY, MINT).then(
+      () => 'resolved' as unknown,
+      (error: unknown) => error,
+    );
+    expect(verbs(sent), 'an INSERT was sent for a parent that was not proved').toEqual(['select']);
+    expect(outcome).toBeInstanceOf(Error);
+    expect(String(outcome)).toMatch(/cannot be proved/);
   });
 
   test('a proof that matched more than one row is a hop drift and writes nothing', async () => {
     const { source, sent } = proving(2);
-    await expect(
-      insertUnderStatement(source, PARENTED as 'sessions', IDENTITY, MINT),
-    ).rejects.toThrow(/matched 2 rows of users/);
-    expect(sent).toHaveLength(1);
+    const outcome = await insertUnderStatement(source, PARENTED as 'sessions', IDENTITY, MINT).then(
+      () => 'resolved' as unknown,
+      (error: unknown) => error,
+    );
+    expect(verbs(sent)).toEqual(['select']);
+    expect(String(outcome)).toMatch(/matched 2 rows of users/);
   });
 
   test('a caller that does not name the parent is refused, because the handle cannot stamp it', async () => {
