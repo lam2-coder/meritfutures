@@ -680,10 +680,12 @@ type LiabilityResponse = {
 };
 ```
 
-### GET /admin/liability/live
-Section 3.5's live Open Liability ([ADR-020](../decisions/ADR-020.md), [M06 section 3.5](../plans/M06-admin-ops-console.md), [ADR-161](../decisions/ADR-161.md)).
+#### The live Open Liability ([ADR-020](../decisions/ADR-020.md) tier 2, [ADR-161](../decisions/ADR-161.md))
+
+Section 3.5's live figure ([M06 section 3.5](../plans/M06-admin-ops-console.md)). **A payload rather than a `METHOD /path` heading, for section 6.1's reason and applied to both surfaces rather than to one**: whether the operator's live figure arrives on a route or on the same channel the trader's frames do is the transport ruling [P6](../plans/P6-live-tier.md) gives to another slice, and a path fixed here would take it. **What this section does fix is that the path carries an operator prefix**, because [`surface.ts`](../../apps/api/src/surface.ts) withholds by prefix and a live operator path outside `['/admin', '/internal']` is withheld from the public deployment by nothing at all.
+
 ```ts
-type AdminLiveLiabilityResponse =
+type AdminLiveLiability =
   | { kind: "suppressed"; reason: string }
   | {
       kind: "indicative";
@@ -696,13 +698,15 @@ type AdminLiveLiabilityResponse =
       freshness: LiveFreshness;                       // section 6.1's type
     };
 ```
-**A separate endpoint rather than a field on `GET /admin/liability` above.** The authoritative response is the one an operator opens during an incident, and a live field on it makes the number Merit is most often disputed about depend on a feed that is down. `INV-M6-12` says no breaker, alarm, or task threshold reads the live figure; a response that cannot be served without it is the same coupling in a different shape.
+Auth: **`admin_sso`**, admin origin only, RBAC per this section's header. Errors: `unauthenticated`, `forbidden`.
+
+**It is never a field on `GET /admin/liability` above.** That response is the one an operator opens during an incident, and a live field on it makes the number Merit is most often disputed about depend on a feed that is down. `INV-M6-12` says no breaker, alarm, or task threshold reads the live figure; a response that cannot be served without it is the same coupling in a different shape.
 
 **`suppressed` is a value and not an empty response.** When data trust is red the figure is refused and the reason is printed where the number would have been (`P-M6-09`), because *"a live number derived from a feed we already distrust is worse than no number"*. A figure that silently vanishes on a red day is one the reader assumes is still being computed.
 
 **The three terms are carried separately because two of them are authoritative**, and hiding which one was the feed would make the whole figure look like a vendor feed when most of it is not. **It sits beside the as-of figure and never replaces it**: [M06 section 3.5](../plans/M06-admin-ops-console.md), *"Two numbers, both labeled, is the entire design."* No liability snapshot is written from it.
 
-**`freshness` is section 6.1's type and not a second one.** The operator's live figure goes stale for the same reason the trader's does, and a second shape here would be a second answer to one question. Auth: **`admin_sso`**, admin origin only, RBAC per this section's header. Errors: `unauthenticated`, `forbidden`.
+**`freshness` is section 6.1's type and not a second one.** The operator's live figure goes stale for the same reason the trader's does, and a second shape here would be a second answer to one question.
 
 ### GET /admin/eligible-forecast, /admin/loss-ratios, /admin/cusum
 Focused projections of the same underlying data for charting, all cursor-free and cached for 60 seconds.
