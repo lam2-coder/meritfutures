@@ -12,8 +12,9 @@
 // implementation against unconfirmed mechanics is how a bounded edit becomes a
 // redesign.
 //
-// The five operations are named in OVERVIEW's container table and are
-// reproduced here rather than invented.
+// The operations are named in OVERVIEW's container table and are reproduced
+// here rather than invented. `streamLive` joined them by ADR-154, and the
+// paragraphs below are that ruling written where the interface is.
 //
 // -----------------------------------------------------------------------------
 // WHAT NOW EXISTS BESIDE IT: THE SYNTHETIC SIMULATOR, FILE MODE
@@ -27,13 +28,19 @@
 // account population, deterministically. `simulator/` is the whole of it and
 // `simulator/assumptions.ts` is the list of what the vendor call must confirm.
 //
-// **IT DOES NOT IMPLEMENT `PlatformAdapter`, AND THAT IS THE BOUNDARY RATHER
-// THAN AN OMISSION.** `ingestEOD` and `ingestFills` CONSUME files; the
+// **IT IMPLEMENTS NONE OF THE FILE-MODE OPERATIONS, AND THAT IS THE BOUNDARY
+// RATHER THAN AN OMISSION.** `ingestEOD` and `ingestFills` CONSUME files; the
 // simulator PRODUCES them. INV-M2-11 is that simulator output and vendor output
 // go through the same parser, which is only true if the simulator stops at the
-// file and the adapter starts there. A simulator that satisfied the interface
-// would be a mock at the parser boundary, which is the one thing STRATEGY
-// section 2 rejected by name.
+// file and the adapter starts there. A simulator that satisfied those
+// operations would be a mock at the parser boundary, which is the one thing
+// STRATEGY section 2 rejected by name.
+//
+// **THAT SENTENCE USED TO SAY `PlatformAdapter` AND IT NOW SAYS THE FILE-MODE
+// OPERATIONS, WHICH IS A NARROWING RATHER THAN A REPEAL.** `provision`,
+// `entitle`, `ingestFills`, `ingestEOD` and `reconcile` are still not
+// implemented here and the reason above is undisturbed for all five. What
+// changed is `streamLive`, and the next block is why.
 //
 // -----------------------------------------------------------------------------
 // AND STREAMING MODE, ADR-020's TIER 2, WHICH ATTACHED AT THAT SEAM
@@ -57,10 +64,78 @@
 // **`V-M2-16` is the mechanism and it is unconfirmed**, so it moved from
 // `OUT_OF_SCOPE_FOR_FILE_MODE` into `STREAM_MODE_VENDOR_ASSUMPTIONS` on the day
 // this landed, which is what its out-of-scope entry said would happen.
+//
+// -----------------------------------------------------------------------------
+// AND THEN THE SEAM MOVED FROM THE ARTIFACT TO THE TYPE. ADR-154
+// -----------------------------------------------------------------------------
+// The refusal above is stated as a PARSER argument and it is right about one.
+// In file mode the parser is the thing both sources must traverse, so a
+// simulator that satisfied `ingestEOD` would skip it. **IN TIER 2 THERE IS
+// NOTHING TO SKIP**: no file, no ingest directory and no parser, and M02
+// section 3.5 puts the adapter between the wire and the tick by design ("the
+// adapter absorbs the difference, exactly as it already absorbs report shape,
+// so the consumer sees one stream either way").
+//
+// So ADR-154 ruled that **the simulator implements `streamLive` and `streamLive`
+// joins this interface**, and that **the thing both implementations share stops
+// being an artifact and becomes a TYPE**. In tier 1 what the simulator and the
+// vendor both produce is a CSV file; in tier 2 it is `LiveAccountTick`, which
+// `stream.ts` had already built to be exactly that: `indicative: true` as a
+// required literal, a per-account-per-day `sequence` so a lost tick is
+// distinguishable from a quiet market, and `Cents` as `bigint`.
+//
+// **`GS-084`'s PROPERTY HAS NO TIER-2 ANALOGUE AND NOTHING HERE CLAIMS ONE.**
+// "No downstream code branches on source" is purchasable only where both
+// sources write into one directory. What replaces it is a CONFORMANCE
+// assertion run over each implementation rather than asserted of the interface,
+// and `test/stream-conformance.test.ts` is it.
+//
+// **ONE METHOD, AND THE REFUSAL IS THE LOAD-BEARING HALF.** ADR-154 clause 3
+// forecloses in advance the argument that a simulator implementing one
+// operation may implement the others: those five have a parser and this one
+// does not. `simulatorLiveFeed` is typed `Pick<PlatformAdapter, 'streamLive'>`
+// so the compiler says it, and `adapter.test.ts` asserts the key set of what it
+// returns rather than trusting the annotation.
 // =============================================================================
+
+import type { LiveAccountTick } from './simulator/stream.ts';
 
 /** An account on the trading platform, as the vendor identifies it. */
 export type PlatformAccountId = string & { readonly __brand: 'PlatformAccountId' };
+
+/**
+ * What `streamLive` pushes each observation to. M02 section 3.5 names the shape.
+ *
+ * `void` rather than `Promise<void>` on purpose: a handler the feed awaited
+ * would make delivery order a property of the consumer's slowest write, and
+ * `LiveAccountTick.sequence` exists so ordering is the FEED's statement. A
+ * consumer that needs to do I/O per tick queues it and says so.
+ */
+export type LiveTickHandler = (tick: LiveAccountTick) => void;
+
+/**
+ * An open live feed, and the only thing a consumer may do to one.
+ *
+ * **FEED LOSS IS NOT HERE AND ITS ABSENCE IS DELIBERATE.** ADR-020 rule 3 makes
+ * feed loss a first-class state rather than an error, and M02 section 3.5 rule 3
+ * says what a surface must do when it happens. Neither is expressible as a
+ * method on this object: the shape of a staleness claim is the SERVER's under
+ * ADR-152, and [P6](../../../docs/plans/P6-live-tier.md) section 3.4 holds the
+ * event family that has no member yet. A `Subscription` that carried its own
+ * `onLoss` would be this slice deciding a contract two other slices own, so it
+ * carries the one operation a consumer genuinely has: stop asking.
+ */
+export interface Subscription {
+  /**
+   * Stop delivery. Idempotent, and no tick is delivered after it returns.
+   *
+   * Idempotent because the two ways a feed ends -- the consumer closing it and
+   * the feed running out -- are indistinguishable from the consumer's side
+   * until something says otherwise, and making the second one throw would put a
+   * `try` around every teardown in the estate.
+   */
+  close(): void;
+}
 
 /**
  * Everything the rest of the system is allowed to ask a trading platform for.
@@ -80,6 +155,23 @@ export interface PlatformAdapter {
   ingestEOD(): Promise<void>;
   /** Compare what the platform says against what Merit recorded. */
   reconcile(): Promise<void>;
+  /**
+   * Open ADR-020's tier-2 indicative feed. M02 section 3.5, ADR-154.
+   *
+   * **THE ONLY OPERATION HERE THE SIMULATOR IMPLEMENTS**, and the header says
+   * why the other five stay refused. `LiveAccountTick` appears nowhere in the
+   * authoritative pipeline and is deliberately not convertible into a
+   * `NormalizedFill`, which is what makes "the stream never feeds a money
+   * decision" a compiler fact rather than a reviewer's memory (INV-M2-14,
+   * SECURITY C-26).
+   *
+   * **IT CARRIES ITS REAL SIGNATURE AND THE FIVE ABOVE DO NOT**, which is not
+   * an inconsistency to tidy: the five are declarations whose parameter lists
+   * are owed to M02, which holds at `review` by ADR-005 pending the vendor
+   * call. This one has an implementation, so it has the signature M02 section
+   * 3.5 already wrote.
+   */
+  streamLive(handler: LiveTickHandler): Promise<Subscription>;
 }
 
 // -----------------------------------------------------------------------------
@@ -125,10 +217,13 @@ export { contractsTraded, simulate, SimulationError } from './simulator/session.
 export {
   foldStream,
   sampleTicks,
+  simulatorLiveFeed,
   streamRun,
+  DECLARED_LIVE_FEED_OPTIONS,
   DECLARED_STREAM_OPTIONS,
   StreamError,
   type LiveAccountTick,
+  type LiveFeedOptions,
   type StreamFold,
   type StreamOptions,
 } from './simulator/stream.ts';

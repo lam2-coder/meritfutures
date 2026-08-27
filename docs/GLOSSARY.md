@@ -296,7 +296,7 @@ Outbound account lifecycle operations to the platform: creating users and accoun
 A billable platform permission attached to an account (market data, platform access, API tier). Entitlements cost real money per month, so a nightly hygiene job disables them for closed and expired accounts and alerts if any closed account remains entitled for more than 24 hours.
 
 ## platform adapter
-The interface (`provision`, `entitle`, `ingestFills`, `ingestEOD`, `reconcile`) that isolates all platform specifics. v1 ships one implementation (Rithmic). A second platform is a new adapter, never a rewrite.
+The interface (`provision`, `entitle`, `ingestFills`, `ingestEOD`, `reconcile`, `streamLive`) that isolates all platform specifics. A second platform is a new adapter, never a rewrite. **v1 ships one VENDOR implementation (Rithmic) and a synthetic simulator that implements the streaming operation only** ([ADR-154](decisions/ADR-154.md)): tier 1's boundary between simulator and vendor is an artifact, the CSV file both write into the ingest path, and tier 2 has no artifact at all, so the shared thing there is the type `streamLive` hands its consumer. The simulator implements none of the five file-mode operations, because those consume a file it produces and INV-M2-11 holds only while it stops at the file.
 
 ---
 
