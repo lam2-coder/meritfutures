@@ -30,3 +30,14 @@ coverage/
 # and a committed trace is a stale copy of a rendering nobody can reproduce.
 test-results/
 playwright-report/
+
+# `next-env.d.ts`, which `next build` WRITES rather than reads. Next.js
+# regenerates it on every build from a template it owns, and the file says so in
+# its own body: "This file should not be edited". Committing it would put a
+# generated file under `prettier --check`, which reformats it, which the next
+# build undoes: a gate that goes red on a clean build is the failure mode
+# `.next/` is already ignored to avoid. Nothing in this workspace reads it
+# either, because no `tsconfig` `include` names it and `pnpm run typecheck`
+# passes without it (measured, session 250). It is an artifact OF a run and not
+# an input to one, which is this file's own test one entry up.
+next-env.d.ts
