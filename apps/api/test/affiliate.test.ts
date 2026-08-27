@@ -102,6 +102,25 @@ const STATS: AffiliateStats = {
   chargeback_rate_bp: 145,
 };
 
+/**
+ * The click token the fake mints, and its LOW ENTROPY IS DELIBERATE.
+ *
+ * `affiliate_clicks.click_token` is a `uuid`, so the wire value is one and this
+ * fixture keeps that shape. What it does NOT keep is randomness: `VG-1`'s
+ * `gitleaks` run scans the whole history under the default ruleset, whose
+ * `generic-api-key` rule fires on a high-entropy value assigned beside the word
+ * `token`, and a random uuid here IS that shape. A fixture credential is still a
+ * credential to a scanner reading a diff, and the scanner is right to be unable
+ * to tell.
+ *
+ * SO THE VALUE IS CHANGED AND THE RULE IS NOT. This is the half of the repair
+ * that PREVENTS RECURRENCE: `.gitleaksignore` pins four fingerprints that are
+ * already in `main`'s permanent history and cannot cover a fifth, so without
+ * this constant the next edit to either of these two lines mints a new finding
+ * and turns `CI-05` red again for every open branch. See `.gitleaksignore`.
+ */
+const CLICK_TOKEN_FIXTURE = '00000000-0000-4000-8000-000000000001';
+
 const DISCLOSURE: RequiredDisclosure = {
   tos_version_id: 'a2c0a8f4-3b6e-4a1f-9e42-77c1f6d8b900',
   version: 'affiliate-terms-v3',
@@ -186,7 +205,7 @@ const backend: AffiliateBackend = {
     state.linkRequests.push(request);
     return Promise.resolve({
       url: `https://merit.example${request.landing_path}?ref=${REF.code}`,
-      click_token: '7d3f2b90-1a44-4c0e-8b21-5e9f0c6a2d13',
+      click_token: CLICK_TOKEN_FIXTURE,
     });
   },
   requiredDisclosure: () => {
@@ -670,7 +689,7 @@ describe('links refuses anything that is not a site-relative path', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toStrictEqual({
       url: 'https://merit.example/plans?ref=MERIT-LUKE',
-      click_token: '7d3f2b90-1a44-4c0e-8b21-5e9f0c6a2d13',
+      click_token: CLICK_TOKEN_FIXTURE,
     });
     expect(state.linkRequests[0]).toStrictEqual({ landing_path: '/plans', campaign: 'summer' });
   });
