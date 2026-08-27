@@ -166,6 +166,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-146](ADR-146.md) | two date vocabularies meet on one object, so the contract's suffix rule stops being a convention and becomes a refusal (2026-08-27, status: proposed) |
 | [ADR-147](ADR-147.md) | `M04` section 3.3's consistency meter names five figures, three of them reach no client, and two of those three are `R-29`'s own operands  (2026-08-27, status: proposed) |
 | [ADR-148](ADR-148.md) | `G-ELIGIBLE` conjoins two terms the eligibility response declares no gate for, so the differentiator screen can render ten passing gates beside a refusal  (2026-08-27, status: proposed) |
+| [ADR-152](ADR-152.md) | an as-of stamp's staleness is a claim the SERVER makes and the portal ORDERS, never one the portal computes, and no account-state contract publishes the fact today  (2026-08-27, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
