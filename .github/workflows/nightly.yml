@@ -8,17 +8,25 @@ name: nightly
 #
 #   Simulation harness    BUILT. It "needs none" of the inputs the others wait
 #                         on: pure compute from a seed, folding the real engine
-#   Replay self-audit     WAITING, 2026-08-20, on a demo-world seed script.
-#                         `runReplayAudit` reads stored state, and with zero
-#                         rows its OI-14 refusal DOES NOT FIRE, so a nightly
-#                         would report `accountsAudited: 0, diverged: 0` and
-#                         exit green, every night, over nothing
+#   Replay self-audit     BUILT, 2026-08-27. The artifact it waited on arrived
+#                         as `scripts/demo/world.ts` (ADR-119), and the reason
+#                         it could not be built before is exactly why the world
+#                         had to come first: `runReplayAudit` reads stored
+#                         state, and with zero rows its OI-14 refusal DOES NOT
+#                         FIRE, so a nightly over an empty world would report
+#                         `accountsAudited: 0, diverged: 0` and exit green
+#                         every night, over nothing. The seed runner carries
+#                         the `accountsAudited === 0` refusal that closes that,
+#                         and ADR-119 clause 7 records it as OWED A HOME IN
+#                         `replay.ts`: a refusal in the caller is weaker than a
+#                         refusal in the audit, because the next caller
+#                         inherits nothing
 #   Stryker on the engine WAITING, 2026-08-20, on the VG-12 admission, whose
 #                         human half a session cannot grant itself
 #   Detector canary       WAITING, 2026-08-20, on M07's detector code. `canary`
 #                         appears in no `.ts` file in this tree
 #
-# THE THREE ABSENT LEGS ARE NOT SKIPPED STEPS AND MUST NOT BECOME ONE. ADR-073
+# THE TWO REMAINING ABSENT LEGS ARE NOT SKIPPED STEPS AND MUST NOT BECOME ONE. ADR-073
 # rejects that shape by name: "a job whose every step is `if: false` satisfies
 # (a) by a parse and satisfies nothing else, and it is strictly worse than (b)
 # because it removes the day the condition would have fired." Their conditions
@@ -193,3 +201,63 @@ jobs:
       # failure and not the size of the run.
       - name: Gates are falsifiable
         run: node scripts/ci/falsify-ci.mjs CI-09
+
+  # ===========================================================================
+  # CI-09  Nightly, the replay self-audit leg
+  # ===========================================================================
+  # BUILT 2026-08-27, ON THE ARTIFACT ADR-119 RULED. This is the leg that turned
+  # `CI-06/gate-inventory` red the day `scripts/demo/world.ts` landed, which is
+  # ADR-073 section 2 (b) working: "the day it arrives the row is a finding until
+  # the stage is written". This job is that stage, so the finding closes.
+  #
+  # IT IS A SEPARATE JOB AND NOT A STEP IN THE HARNESS JOB. ADR-073 rules each of
+  # CI-09's four legs separately, and a leg folded into another job cannot go red
+  # on its own or be read on its own. The two absent legs stay absent rather than
+  # becoming `if: false` steps, for the reason the header gives.
+  replay-self-audit:
+    name: CI-09 nightly replay self-audit
+    runs-on: ubuntu-latest
+    # The harness leg's reasoning, unchanged: the observed run is seconds of
+    # compute behind an install, and a nightly that hangs is one nobody cancels.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # RIDER 3, OQ-P1-03, and RI-05 fails any workflow that pins inline.
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+        env:
+          COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+
+      - name: Install, frozen
+        run: pnpm install --frozen-lockfile
+
+      # THE RUNNER IS THE `.mjs` ENTRY AND THAT IS DELIBERATE RATHER THAN
+      # INCIDENTAL. `scripts/demo/` carries 16 specifiers naming `.js` files that
+      # are `.ts`, so `node --experimental-strip-types scripts/demo/seed-world.ts`
+      # dies with ERR_MODULE_NOT_FOUND on this tree. That defect predates
+      # ADR-119, `RI-10` does not catch it because `RI-10` is scoped to `src/`
+      # and `scripts/` is not `src/`, and it is reported rather than repaired
+      # here because this file is a workflow and that one is a specifier sweep.
+      # WHEN THAT SWEEP LANDS, THIS LINE SHOULD MOVE TO THE `.ts` ENTRY.
+      #
+      # The runner refuses on `accountsAudited === 0`, so an empty world fails
+      # this job rather than passing it quietly. That is the whole reason the
+      # leg could not be written before the world existed.
+      - name: CI-09 replay self-audit over the demo world
+        run: node scripts/demo/seed-world.mjs
+
+      # The harness leg's guard, for its reason: the report worth keeping is the
+      # one from the run that went red, and `always()` alone turns a crashed
+      # runner into a second red step about a file that could not exist.
+      - name: Keep the report
+        if: always() && hashFiles('test-results/**') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-09-replay-self-audit
+          path: test-results/
+          if-no-files-found: error
