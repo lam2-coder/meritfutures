@@ -49,6 +49,7 @@ import {
   hangingVendor,
 } from '@merit/enrichment';
 import type { EnrichmentAdapter, EnrichmentTx, ObserveOutcome } from '@merit/enrichment';
+import type { LedgerTx } from '@merit/ledger';
 import { createPspAFake } from '@merit/psp';
 import type { MidCandidate, PspAdapter, PspId } from '@merit/psp';
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
@@ -65,12 +66,19 @@ import type { AuthBackend, AuthSession } from '../src/routes/auth.ts';
 import {
   CHECKOUT_PATH,
   CHECKOUT_REQUIRED_FACTORS,
+  DAILY_WINDOW_MS,
+  DEFAULT_PAYMENT_METHOD,
+  PAYMENT_METHODS,
   RESET_PATH,
+  ROLLING_7D_WINDOW_MS,
   centsToJson,
+  lt08,
+  lt08KeyOf,
   recomputeDiscount,
   resetCheckoutWiring,
   useCheckoutAdapters,
   useCheckoutBackend,
+  velocityOf,
 } from '../src/routes/checkout.ts';
 import type {
   AccountCapRow,
@@ -80,10 +88,16 @@ import type {
   CheckoutTx,
   CouponRow,
   GeoDecisionRow,
+  IdentityStatus,
+  PaymentMethod,
   PlanVersionRow,
   PlanVersionSizeRow,
   PurchaseInsert,
   ResetTargetRow,
+  WalletDebitHistoryRow,
+  WalletDebitInsert,
+  WalletSpendGates,
+  WalletSpendLimitRow,
 } from '../src/routes/checkout.ts';
 import type { AffiliateRef, AttributionRow, ClickRef } from '@merit/affiliate';
 
@@ -175,6 +189,39 @@ const RESET_TARGET: ResetTargetRow = {
 };
 
 // -----------------------------------------------------------------------------
+// The wallet seed. SD-M3-06, and every figure integer cents.
+// -----------------------------------------------------------------------------
+
+/** `INV-M20-06`'s set, all five members open. Each case below closes exactly one. */
+const WALLET_OPEN: WalletSpendGates = {
+  identityStatus: 'active',
+  identityPayoutsFrozen: false,
+  accountPayoutsFrozen: false,
+  accountReconBlocked: false,
+  kycState: 'verified',
+};
+
+/** The seeded wallet position: comfortably above `SIZE.priceCents`, and derived from it. */
+const WALLET_BALANCE_CENTS = SIZE.priceCents * 3n;
+
+/**
+ * `ledger_accounts`, the two rows `LT-08` resolves.
+ *
+ * `readChart` builds its key FROM THE ROW and not from the package's opinion of
+ * the class, so these carry `scope` and `identityId` exactly as `0009`'s
+ * `ledger_accounts_scope_identity` constrains them.
+ */
+const LEDGER_ACCOUNTS: readonly Record<string, unknown>[] = [
+  {
+    id: 'acct-trader-wallet',
+    code: 'trader_wallet',
+    scope: 'identity',
+    identityId: BUYER_IDENTITY,
+  },
+  { id: 'acct-fees-revenue', code: 'fees_revenue', scope: 'firm', identityId: null },
+];
+
+// -----------------------------------------------------------------------------
 // The store, and a transaction that really rolls back
 // -----------------------------------------------------------------------------
 
@@ -183,6 +230,26 @@ interface SignalRow {
   kind: unknown;
   valueHash: unknown;
   observationCount: number;
+}
+
+/**
+ * One `wallet_entries` row, as the fixture holds it.
+ *
+ * IT CARRIES NO `provenance` AND THAT IS THE SCHEMA FINDING MODELLED RATHER THAN
+ * A FIELD OMITTED FROM A FAKE. ADR-158 finding 3: the column is `NOT NULL` and
+ * its three members are the CREDIT list, so no value describes the `LT-08`
+ * debit this suite writes. A fixture that invented one would make the route's
+ * `WalletDebitInsert` look complete.
+ */
+interface WalletEntryStoreRow {
+  id: bigint;
+  direction: 'credit' | 'debit';
+  amountCents: bigint;
+  cause: string;
+  referenceId: string;
+  ledgerTransactionId: string;
+  balanceAfterCents: bigint;
+  occurredAt: Date;
 }
 
 interface Store {
@@ -194,6 +261,19 @@ interface Store {
   signals: SignalRow[];
   /** `integration_dispatches`. One per purchase, per ADR-115 clause 4. */
   dispatches: Readonly<Record<string, unknown>>[];
+  /** SD-M20-01. The wallet's own statement, which the ledger is not. */
+  walletEntries: WalletEntryStoreRow[];
+  /**
+   * `ledger_transactions` and `ledger_entries`, STAGED WITH EVERYTHING ELSE.
+   *
+   * THAT IS THE PART THAT COULD HAVE BEEN FAKED AND MUST NOT BE. `INV-M3-13`
+   * says a wallet purchase debits the wallet IN THE SAME TRANSACTION that
+   * creates it, and a ledger fake that wrote straight through would pass every
+   * happy-path assertion while making the rollback case unfalsifiable, which is
+   * this file's own rule about `transact` applied one table down.
+   */
+  ledgerTransactions: Record<string, unknown>[];
+  ledgerEntries: Record<string, unknown>[];
 }
 
 function emptyStore(): Store {
@@ -204,6 +284,9 @@ function emptyStore(): Store {
     tos: [],
     signals: [],
     dispatches: [],
+    walletEntries: [],
+    ledgerTransactions: [],
+    ledgerEntries: [],
   };
 }
 
@@ -220,6 +303,9 @@ function copyStore(store: Store): Store {
     // with it, and a case below asserts exactly that.
     signals: store.signals.map((row) => ({ ...row })),
     dispatches: [...store.dispatches],
+    walletEntries: store.walletEntries.map((row) => ({ ...row })),
+    ledgerTransactions: store.ledgerTransactions.map((row) => ({ ...row })),
+    ledgerEntries: store.ledgerEntries.map((row) => ({ ...row })),
   };
 }
 
@@ -243,6 +329,28 @@ interface Fixture {
   enrichmentWriteFailure: Error | null;
   /** When set, the enrichment REPORTER throws it. ADR-115's control 3. */
   reporterFailure: Error | null;
+
+  // --- the wallet leg -------------------------------------------------------
+
+  /** `INV-M20-06`'s set. A case closes one member and asserts the refusal. */
+  walletGates: WalletSpendGates;
+  /** `INV-M20-02`. Which accounts the SERVER says this identity holds. */
+  ownedAccounts: Set<string>;
+  /** `INV-M20-07`'s current limit, or `null` for the unlimited case (no row). */
+  walletLimit: WalletSpendLimitRow | null;
+  /** `ledger_halts`, read by `assertNoLiveHalt` through the posting handle. */
+  ledgerHalts: Record<string, unknown>[];
+  /** When false, `CheckoutTx.ledger` is `null` and the wallet arm answers 503. */
+  ledgerInstalled: boolean;
+  /**
+   * EVERY WALLET-ARM PORT CALL, IN ORDER.
+   *
+   * It is what makes `INV-M20-01`'s "under the lock" assertable at all. A
+   * position read is indistinguishable from a position read under a lock by its
+   * RESULT, so the only observable difference is the order of the two calls, and
+   * a suite that did not record it would pass with `lockScope()` deleted.
+   */
+  trace: string[];
 }
 
 let fixture: Fixture;
@@ -269,6 +377,84 @@ function freshFixture(): Fixture {
     outcomes: [],
     enrichmentWriteFailure: null,
     reporterFailure: null,
+    walletGates: { ...WALLET_OPEN },
+    ownedAccounts: new Set<string>([RESET_TARGET.accountId]),
+    walletLimit: null,
+    ledgerHalts: [],
+    ledgerInstalled: true,
+    trace: [],
+  };
+}
+
+/**
+ * A store seeded with one wallet CREDIT, so the buyer has a position to spend.
+ *
+ * THE BALANCE IS THE LAST ROW'S `balance_after_cents` AND NOT A SUM, which is
+ * `routes/wallet.ts`'s `balanceOf` and `0011`'s stored running balance. The
+ * fixture obeys the same rule the port's docstring requires an implementation to
+ * obey, and a case below binds that rule to `wallet.ts` by reading the file.
+ */
+function storeWithWallet(
+  balanceCents: bigint,
+  debits: readonly WalletDebitHistoryRow[] = [],
+): Store {
+  const store = emptyStore();
+  let id = 0n;
+  let running = 0n;
+  id += 1n;
+  running += balanceCents;
+  store.walletEntries.push({
+    id,
+    direction: 'credit',
+    amountCents: balanceCents,
+    cause: 'payout settled',
+    referenceId: 'payout-request-seed',
+    ledgerTransactionId: 'ltx-seed',
+    balanceAfterCents: running,
+    occurredAt: new Date(Date.now() - 30 * DAILY_WINDOW_MS),
+  });
+  for (const debit of debits) {
+    id += 1n;
+    running -= debit.amountCents;
+    store.walletEntries.push({
+      id,
+      direction: 'debit',
+      amountCents: debit.amountCents,
+      cause: 'checkout: wallet-funded purchase',
+      referenceId: `purchase-seed-${id.toString()}`,
+      ledgerTransactionId: `ltx-seed-${id.toString()}`,
+      balanceAfterCents: running,
+      occurredAt: debit.occurredAt,
+    });
+  }
+  return store;
+}
+
+/**
+ * `LedgerTx` over the SAME staging store, for `enrichmentTxOver`'s reason.
+ *
+ * `postTransaction` takes the caller's OPEN transaction with no overload that
+ * omits it, so a posting commits with the purchase that caused it or not at all.
+ * A fake that wrote to its own array would satisfy the type and make the
+ * rollback case below unfalsifiable.
+ */
+function ledgerTxOver(staging: Store): LedgerTx {
+  return {
+    rows: (key) =>
+      Promise.resolve(key === 'ledgerAccounts' ? [...LEDGER_ACCOUNTS] : [...fixture.ledgerHalts]),
+    insert: (key, values) => {
+      if (key === 'ledgerTransactions') {
+        const row = {
+          id: `ltx-${String(staging.ledgerTransactions.length + 1)}`,
+          ...values,
+        };
+        staging.ledgerTransactions.push(row);
+        return Promise.resolve([row]);
+      }
+      const entry = { ...values };
+      staging.ledgerEntries.push(entry);
+      return Promise.resolve([entry]);
+    },
   };
 }
 
@@ -342,6 +528,76 @@ function txOver(staging: Store): CheckoutTx {
     linkConfidence: () => Promise.resolve(null),
 
     enrichment: enrichmentTxOver(staging),
+
+    // --- the wallet leg. SD-M3-06 -------------------------------------------
+
+    walletSpendGates: () => {
+      fixture.trace.push('walletSpendGates');
+      return Promise.resolve(fixture.walletGates);
+    },
+
+    ownsAccount: (accountId: string) => {
+      fixture.trace.push('ownsAccount');
+      return Promise.resolve(fixture.ownedAccounts.has(accountId));
+    },
+
+    lockScope: () => {
+      fixture.trace.push('lockScope');
+      return Promise.resolve();
+    },
+
+    walletBalanceCents: () => {
+      fixture.trace.push('walletBalanceCents');
+      // `routes/wallet.ts`'s `balanceOf`: the greatest `id`'s stored running
+      // balance, and `0n` for an identity with no row at all.
+      let latest: WalletEntryStoreRow | null = null;
+      for (const row of staging.walletEntries) {
+        if (latest === null || row.id > latest.id) latest = row;
+      }
+      return Promise.resolve(latest === null ? 0n : latest.balanceAfterCents);
+    },
+
+    walletSpendLimit: (at: Date) => {
+      fixture.trace.push('walletSpendLimit');
+      const limit = fixture.walletLimit;
+      // Supersession is a NEW ROW at a later `effective_from`, so a limit dated
+      // in the future has not arrived and does not bind yet.
+      return Promise.resolve(
+        limit !== null && limit.effectiveFrom.getTime() <= at.getTime() ? limit : null,
+      );
+    },
+
+    walletDebitsSince: (since: Date) => {
+      fixture.trace.push('walletDebitsSince');
+      return Promise.resolve(
+        staging.walletEntries
+          .filter((row) => row.direction === 'debit' && row.occurredAt.getTime() >= since.getTime())
+          .map((row) => ({ amountCents: row.amountCents, occurredAt: row.occurredAt })),
+      );
+    },
+
+    insertWalletDebit: (row: WalletDebitInsert) => {
+      fixture.trace.push('insertWalletDebit');
+      let greatest = 0n;
+      for (const existing of staging.walletEntries) {
+        if (existing.id > greatest) greatest = existing.id;
+      }
+      staging.walletEntries.push({
+        id: greatest + 1n,
+        direction: 'debit',
+        amountCents: row.amountCents,
+        cause: row.cause,
+        referenceId: row.referenceId,
+        ledgerTransactionId: row.ledgerTransactionId,
+        balanceAfterCents: row.balanceAfterCents,
+        occurredAt: new Date(),
+      });
+      return Promise.resolve();
+    },
+
+    get ledger(): LedgerTx | null {
+      return fixture.ledgerInstalled ? ledgerTxOver(staging) : null;
+    },
   };
 }
 
@@ -1355,5 +1611,878 @@ describe('enrichment observes and decides nothing (ADR-023 step 1, ADR-115)', ()
     expect(res.statusCode).toBe(200);
     expect(fixture.outcomes.map((o) => o.kind)).toEqual(['record_failed']);
     expect(fixture.outcomes[0]?.failure).toBe('identity_signals insert failed');
+  });
+});
+
+// =============================================================================
+// THE WALLET LEG. SD-M3-06, P5-i
+// =============================================================================
+// M20 SECTION 3.7 IS THE ORDERING RULE AND THE FIRST BLOCK BELOW IS IT, ASSERTED
+// FROM THE DIRECTION THAT CATCHES THE DEFECT. The rule is that "one
+// authorization decision before the branch refuses all three, AND THE ASSERTION
+// SHOULD BE RUN AGAINST ALL THREE", and the reason is measured rather than
+// feared: M03 section 3.5.1 records that before ADR-041's fold a restricted
+// identity was refused on `wallet`, COMPLETED on `psp`, and on `mixed` was
+// "refused, on the wallet leg, after the card leg is underway".
+//
+// So a suite that asserted the refusal only on the method this slice added would
+// pass with the refusal moved INSIDE the wallet arm, which is exactly the
+// defect. Every hard-limit case below runs over all three methods.
+// =============================================================================
+
+/** The three methods, read from the exported vocabulary rather than restated. */
+const EVERY_METHOD: readonly PaymentMethod[] = PAYMENT_METHODS;
+
+/** A body that names a method. `undefined` omits the field entirely. */
+function bodyWith(method: PaymentMethod | undefined): Record<string, unknown> {
+  return method === undefined ? checkoutBody() : checkoutBody({ payment_method: method });
+}
+
+/** Nothing was written, on any table this transaction can reach. */
+function expectNothingWritten(): void {
+  expect(fixture.committed.purchases).toEqual([]);
+  expect(fixture.committed.walletEntries.filter((row) => row.direction === 'debit')).toEqual([]);
+  expect(fixture.committed.ledgerTransactions).toEqual([]);
+  expect(fixture.committed.ledgerEntries).toEqual([]);
+  expect(fixture.committed.tos).toEqual([]);
+}
+
+describe('M20 section 3.7: the hard limit sits BEFORE the payment-method branch', () => {
+  beforeEach(() => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+  });
+
+  for (const status of ['restricted', 'closed'] as const satisfies readonly IdentityStatus[]) {
+    for (const method of EVERY_METHOD) {
+      it(`refuses a ${status} identity asking for ${method}, and writes nothing`, async () => {
+        fixture.cap = { ...fixture.cap, identityStatus: status };
+
+        const res = await call({
+          method: 'POST',
+          path: CHECKOUT_PATH,
+          token: TOKEN,
+          payload: bodyWith(method),
+        });
+
+        // ADR-075's predicate is `= 'active'` and NOT an enumeration of what is
+        // refused, so `closed` is refused for the same reason `restricted` is.
+        // `INV-M20-06` carried `= 'restricted'` until 2026-08-21 and "a closed
+        // identity therefore passed it".
+        expect(res.statusCode).toBe(403);
+        const body = res.json() as { code: string; detail?: string };
+        // A DEFECT THIS SESSION REPORTS AND DOES NOT REPAIR. API_CONTRACT
+        // section 2 defines `identity_restricted` at 422 for this exact
+        // refusal, "on EVERY payment method", and `routes/payouts.ts` already
+        // answers it on the sibling money route. Changing it here is a
+        // wire-visible change to the CARD leg, which P5 section 6 says this
+        // slice touches neither of. Today's behaviour is pinned so that the day
+        // somebody takes the two-line patch in `gateIdentity`, this assertion
+        // says why it moved.
+        expect(body.code).toBe('forbidden');
+        expect(body.detail).toContain(status);
+        expectNothingWritten();
+      });
+    }
+  }
+
+  it('refuses the SAME WAY on all three methods, which is the property the rule is about', async () => {
+    fixture.cap = { ...fixture.cap, identityStatus: 'restricted' };
+    const answers: { method: PaymentMethod; status: number; code: string }[] = [];
+    for (const method of EVERY_METHOD) {
+      fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+      const res = await call({
+        method: 'POST',
+        path: CHECKOUT_PATH,
+        token: TOKEN,
+        payload: bodyWith(method),
+      });
+      answers.push({ method, status: res.statusCode, code: (res.json() as { code: string }).code });
+    }
+    // ONE ANSWER, THREE METHODS. A refusal written inside the wallet arm makes
+    // this array carry a 200 for `psp` and a 503 for `mixed`.
+    expect(new Set(answers.map((a) => `${String(a.status)} ${a.code}`)).size).toBe(1);
+  });
+
+  it('never reaches the wallet gate set at all, because the hard limit is above the branch', async () => {
+    fixture.cap = { ...fixture.cap, identityStatus: 'restricted' };
+    // Both controls would refuse. GS-302's own note is that when both do, the
+    // outcome cannot say which; the TRACE can, and the ordering rule is about
+    // which one runs.
+    fixture.walletGates = { ...WALLET_OPEN, identityPayoutsFrozen: true };
+
+    await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(fixture.trace).toEqual([]);
+  });
+
+  it('refuses on the RESET endpoint too, on all three methods', async () => {
+    fixture.cap = { ...fixture.cap, identityStatus: 'restricted' };
+    for (const method of EVERY_METHOD) {
+      const res = await call({
+        method: 'POST',
+        path: `/accounts/${RESET_TARGET.accountId}/reset`,
+        token: TOKEN,
+        payload: { accept_tos_version_ids: ['tos-v3'], payment_method: method },
+      });
+      // M03 section 3.5's coverage row: "POST /checkout and
+      // POST /accounts/:id/reset, all three payment_method values".
+      expect(res.statusCode).toBe(403);
+    }
+    expectNothingWritten();
+  });
+
+  it('refuses a restricted identity asking for `mixed` with the IDENTITY refusal and not the mixed one', async () => {
+    fixture.cap = { ...fixture.cap, identityStatus: 'restricted' };
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('mixed'),
+    });
+    // THE ORDERING RULE FROM THE OTHER SIDE. Refusing `mixed` at the wire would
+    // answer 400, and refusing it above `gateIdentity` would answer 503; the
+    // contract requires the identity refusal to answer first.
+    expect(res.statusCode).toBe(403);
+    expect((res.json() as { code: string }).code).toBe('forbidden');
+  });
+});
+
+describe('the contract-conformant body is untouched, which is what makes this a superset', () => {
+  beforeEach(() => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+  });
+
+  it('answers a five-member body exactly as it does today and funds it with a card', async () => {
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody(),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as Record<string, unknown>;
+    // API_CONTRACT section 5's `CheckoutResponse`, field for field and no sixth.
+    expect(Object.keys(body).sort()).toEqual(
+      [
+        'amount_cents',
+        'discount_cents',
+        'payment_session',
+        'plan_version_id',
+        'psp',
+        'purchase_id',
+      ].sort(),
+    );
+    expect(body['payment_method']).toBeUndefined();
+
+    const written = fixture.committed.purchases[0];
+    expect(written?.paymentMethod).toBe(DEFAULT_PAYMENT_METHOD);
+    expect(written?.paymentMethod).toBe('psp');
+    // `purchases_wallet_leg_matches_method`: `'psp'` requires a zero wallet leg,
+    // and `purchases_wallet_debit_is_posted` then permits the null pointer.
+    expect(written?.walletDebitCents).toBe(0n);
+    expect(written?.walletLedgerTransactionId).toBeNull();
+    expect(written?.status).toBe('pending');
+    expect(written?.paidAt).toBeNull();
+    // NOTHING WAS POSTED. A card purchase writes no ledger row at checkout.
+    expect(fixture.committed.ledgerTransactions).toEqual([]);
+  });
+
+  it('refuses a fourth `payment_method` word, because the CHECK list is closed at three', async () => {
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody({ payment_method: 'crypto' }),
+    });
+    expect(res.statusCode).toBe(400);
+    const body = res.json() as { code: string; errors: { path: string }[] };
+    expect(body.code).toBe('validation_failed');
+    expect(body.errors.map((e) => e.path)).toContain('payment_method');
+    expectNothingWritten();
+  });
+});
+
+describe('INV-M20-06: the enumerated gate set, one case per member', () => {
+  beforeEach(() => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+  });
+
+  const CASES: readonly {
+    readonly member: string;
+    readonly gates: Partial<WalletSpendGates>;
+    readonly code: string;
+  }[] = [
+    {
+      member: 'identities.status',
+      gates: { identityStatus: 'restricted' },
+      code: 'identity_restricted',
+    },
+    {
+      member: 'identities.payouts_frozen',
+      gates: { identityPayoutsFrozen: true },
+      code: 'payouts_frozen',
+    },
+    {
+      member: 'accounts.payouts_frozen',
+      gates: { accountPayoutsFrozen: true },
+      code: 'payouts_frozen',
+    },
+    {
+      member: 'accounts.recon_blocked',
+      gates: { accountReconBlocked: true },
+      code: 'payouts_frozen',
+    },
+    { member: 'kyc not verified', gates: { kycState: 'pending' }, code: 'kyc_required' },
+  ];
+
+  for (const testCase of CASES) {
+    it(`refuses a wallet spend on ${testCase.member}, and posts nothing`, async () => {
+      // The identity-status member is reached here only because `gateIdentity`
+      // reads `AccountCapRow` and this reads `WalletSpendGates`: the fixture
+      // closes the member on the wallet row alone, which is how a set that
+      // dropped it because another control covers it would be caught.
+      fixture.walletGates = { ...WALLET_OPEN, ...testCase.gates };
+
+      const res = await call({
+        method: 'POST',
+        path: CHECKOUT_PATH,
+        token: TOKEN,
+        payload: bodyWith('wallet'),
+      });
+
+      expect(res.statusCode).toBe(422);
+      expect((res.json() as { code: string }).code).toBe(testCase.code);
+      expectNothingWritten();
+    });
+  }
+
+  it('covers every member of WalletSpendGates, counted rather than assumed', () => {
+    // A guard with nothing to find looks exactly like a guard finding nothing
+    // wrong: this counts what the block above covered and asserts the count
+    // against the type's own field list, so a sixth member added to the gate set
+    // and not refused turns this red.
+    expect(CASES).toHaveLength(Object.keys(WALLET_OPEN).length);
+  });
+
+  it('refuses BEFORE consulting whether this deployment can post at all', async () => {
+    fixture.walletGates = { ...WALLET_OPEN, identityPayoutsFrozen: true };
+    fixture.ledgerInstalled = false;
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    // A frozen identity is told it is frozen. Answering 503 would tell them the
+    // service is down and teach them to retry, which is the silent-decline shape
+    // OQ-M3-03 argues against one code over.
+    expect(res.statusCode).toBe(422);
+    expect((res.json() as { code: string }).code).toBe('payouts_frozen');
+  });
+});
+
+describe('INV-M20-02: own accounts only, resolved SERVER SIDE in the debit transaction', () => {
+  it('refuses a reset onto an account the server says this identity does not hold', async () => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+    // THE SCOPED READ IS SEEDED TO LEAK, which is the only way to exercise the
+    // check at all: `resetTarget` is a scoped read and already answers `null`
+    // for a foreign account. DEP-M20-02 asks M3 to resolve ownership server side
+    // in this transaction precisely so the control does not depend on an earlier
+    // read having stayed scoped, and AS-M20-06 is what it costs when it does.
+    fixture.ownedAccounts = new Set<string>();
+
+    const res = await call({
+      method: 'POST',
+      path: `/accounts/${RESET_TARGET.accountId}/reset`,
+      token: TOKEN,
+      payload: { accept_tos_version_ids: ['tos-v3'], payment_method: 'wallet' },
+    });
+
+    expect(res.statusCode).toBe(403);
+    expectNothingWritten();
+  });
+
+  it('completes the same reset when the server DOES hold the account', async () => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+    const res = await call({
+      method: 'POST',
+      path: `/accounts/${RESET_TARGET.accountId}/reset`,
+      token: TOKEN,
+      payload: { accept_tos_version_ids: ['tos-v3'], payment_method: 'wallet' },
+    });
+
+    // The opposite direction from the same fixture, because a check that refuses
+    // everything passes the case above on its own.
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { payment_method: string; parent_account_id: string };
+    expect(body.payment_method).toBe('wallet');
+    expect(body.parent_account_id).toBe(RESET_TARGET.accountId);
+    expect(fixture.committed.purchases[0]?.amountPaidCents).toBe(SIZE.resetPriceCents);
+  });
+
+  it('checks nothing on a NEW purchase, because there is no other identity it could be for', async () => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+    fixture.ownedAccounts = new Set<string>();
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(fixture.trace).not.toContain('ownsAccount');
+  });
+});
+
+describe('INV-M20-01: the position, checked under ADR-157 clause 4 ROW lock', () => {
+  it('refuses a purchase the position does not cover, and posts nothing', async () => {
+    fixture.committed = storeWithWallet(SIZE.priceCents - 1n);
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(res.statusCode).toBe(422);
+    expect((res.json() as { code: string }).code).toBe('insufficient_funds');
+    expectNothingWritten();
+  });
+
+  it('admits a purchase the position covers EXACTLY, and leaves the balance at zero', async () => {
+    fixture.committed = storeWithWallet(SIZE.priceCents);
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const debit = fixture.committed.walletEntries.find((row) => row.direction === 'debit');
+    // `CHECK (balance_after_cents >= 0)` reached from above rather than from
+    // below: the boundary case is the one that proves the comparison is `<` and
+    // not `<=`.
+    expect(debit?.balanceAfterCents).toBe(0n);
+  });
+
+  it('TAKES THE LOCK BEFORE IT READS THE POSITION, which is the whole of the invariant', async () => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+
+    await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    // FM-M20-01 is the concurrent overdraw, and a position read before the lock
+    // is a position another transaction may already have spent. The RESULT of
+    // the two orders is identical, so the order is the only observable, and this
+    // suite would pass with `lockScope()` deleted if it did not read it.
+    expect(fixture.trace.indexOf('lockScope')).toBeGreaterThanOrEqual(0);
+    expect(fixture.trace.indexOf('lockScope')).toBeLessThan(
+      fixture.trace.indexOf('walletBalanceCents'),
+    );
+  });
+
+  it('takes the lock through the accessor and never as an advisory lock', () => {
+    // ADR-157 clause 4 and P5 section 11 rule 10 each foreclose the alternative
+    // BY NAME: `pg_advisory_xact_lock` can only be sent through `sqlExecutor`.
+    //
+    // THIS WAS WRITTEN AS A BARE SUBSTRING TEST FIRST AND THE TREE REFUTED IT,
+    // which is session 292's finding on a different file arriving here: this
+    // file's header NAMES `sqlExecutor`, `SqlExecutorReason` and `SystemReason`
+    // in order to say it does not widen them, so a mention test fails on the
+    // sentence that promises the thing it is checking. What is asserted instead
+    // is the SYNTAX a reach-around would have to take.
+    const source = readFileSync(new URL('../src/routes/checkout.ts', import.meta.url), 'utf8');
+    //
+    // A `pg_advisory` mention test fails for the same reason, on the two
+    // docstrings that quote ADR-157's own argument, so what is forbidden is the
+    // ONLY MECHANISM by which one could be sent: an advisory lock reaches the
+    // connection through `sqlExecutor().executeSql(...)` and by no other route,
+    // and this file cannot even import a client.
+    expect(source).not.toMatch(/\.sqlExecutor\(/);
+    expect(source).not.toContain('executeSql');
+    expect(source).not.toMatch(/from 'pg'/);
+    expect(source).not.toMatch(/from '@merit\/db'/);
+    // And the positive half, because an assertion that only forbids passes on a
+    // file that takes no lock at all.
+    expect(source).toContain('await tx.lockScope();');
+  });
+});
+
+describe('INV-M20-07: the velocity limit DELAYS and does not refuse', () => {
+  const NOW = new Date('2026-08-26T12:00:00.000Z');
+  const LIMIT = (over: Partial<WalletSpendLimitRow> = {}): WalletSpendLimitRow => ({
+    dailyCents: 50_000n,
+    rolling7dCents: 200_000n,
+    effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+    ...over,
+  });
+
+  it('is within the limit when no row exists at all, because absence is unlimited', () => {
+    // API_CONTRACT: "there is no value that means unlimited: the absence of any
+    // row for an identity is what unlimited looks like."
+    expect(velocityOf({ amountCents: 10_000_000n, limit: null, debits: [], at: NOW })).toEqual({
+      kind: 'within',
+    });
+  });
+
+  it('is within when the spend fits under both windows', () => {
+    expect(
+      velocityOf({
+        amountCents: 10_000n,
+        limit: LIMIT(),
+        debits: [
+          { amountCents: 20_000n, occurredAt: new Date(NOW.getTime() - 3 * 60 * 60 * 1000) },
+        ],
+        at: NOW,
+      }),
+    ).toEqual({ kind: 'within' });
+  });
+
+  it('DELAYS on the daily window and names the instant the oldest debit rolls off', () => {
+    const oldest = new Date(NOW.getTime() - 20 * 60 * 60 * 1000);
+    const outcome = velocityOf({
+      amountCents: 10_000n,
+      limit: LIMIT(),
+      debits: [
+        { amountCents: 30_000n, occurredAt: oldest },
+        { amountCents: 15_000n, occurredAt: new Date(NOW.getTime() - 60 * 60 * 1000) },
+      ],
+      at: NOW,
+    });
+    // 45,000c spent against a 50,000c daily limit leaves 5,000c of headroom and
+    // the purchase is 10,000c. Dropping the 30,000c debit leaves 15,000c spent,
+    // which admits it, so the instant is that debit's own roll-off and NOT "a
+    // whole window from now": rounding up would delay this trader by 20 hours
+    // more than the rule requires.
+    expect(outcome).toEqual({
+      kind: 'delayed',
+      limitKind: 'daily',
+      retryAt: new Date(oldest.getTime() + DAILY_WINDOW_MS),
+    });
+  });
+
+  it('DELAYS on the rolling 7d window even though the weekly ceiling is the higher one', () => {
+    const oldest = new Date(NOW.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const outcome = velocityOf({
+      amountCents: 10_000n,
+      limit: LIMIT({ dailyCents: 200_000n, rolling7dCents: 200_000n }),
+      debits: [
+        { amountCents: 195_000n, occurredAt: oldest },
+        { amountCents: 1_000n, occurredAt: new Date(NOW.getTime() - 60 * 60 * 1000) },
+      ],
+      at: NOW,
+    });
+    // `wallet_spend_limits_weekly_exceeds_daily` keeps the weekly CEILING at or
+    // above the daily one and says nothing about which WINDOW fills first: the
+    // weekly one is seven times longer and holds seven times the spend.
+    expect(outcome).toEqual({
+      kind: 'delayed',
+      limitKind: 'rolling_7d',
+      retryAt: new Date(oldest.getTime() + ROLLING_7D_WINDOW_MS),
+    });
+  });
+
+  it('reports the window that binds LONGEST when both bind', () => {
+    const dailyOldest = new Date(NOW.getTime() - 20 * 60 * 60 * 1000);
+    const weeklyOldest = new Date(NOW.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const outcome = velocityOf({
+      amountCents: 10_000n,
+      limit: LIMIT({ dailyCents: 50_000n, rolling7dCents: 60_000n }),
+      debits: [
+        { amountCents: 45_000n, occurredAt: weeklyOldest },
+        { amountCents: 45_000n, occurredAt: dailyOldest },
+      ],
+      at: NOW,
+    });
+    // The earlier of two retry times is a retry that arrives to be delayed
+    // again, so the later one is the honest answer.
+    expect(outcome.kind).toBe('delayed');
+    if (outcome.kind === 'delayed') {
+      expect(outcome.retryAt).toEqual(new Date(weeklyOldest.getTime() + ROLLING_7D_WINDOW_MS));
+      expect(outcome.limitKind).toBe('rolling_7d');
+    }
+  });
+
+  it('reports NO retry instant when the limit itself is below the amount', () => {
+    // API_CONTRACT: "daily_cents: 0 is writable and MEANS NO WALLET SPEND AT
+    // ALL, not 'no limit'." No amount of window rolling admits a positive spend,
+    // and a fabricated Retry-After would send the trader back forever.
+    expect(
+      velocityOf({ amountCents: 1n, limit: LIMIT({ dailyCents: 0n }), debits: [], at: NOW }),
+    ).toEqual({ kind: 'delayed', limitKind: 'daily', retryAt: null });
+  });
+
+  it('ignores a debit that has already rolled out of the window', () => {
+    expect(
+      velocityOf({
+        amountCents: 50_000n,
+        limit: LIMIT(),
+        debits: [
+          { amountCents: 50_000n, occurredAt: new Date(NOW.getTime() - DAILY_WINDOW_MS - 1) },
+        ],
+        at: NOW,
+      }),
+    ).toEqual({ kind: 'within' });
+  });
+
+  it('answers 429 with a Retry-After and WRITES NOTHING, because a delay is not a partial commit', async () => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS, [
+      { amountCents: 50_000n, occurredAt: new Date(Date.now() - 60 * 60 * 1000) },
+    ]);
+    fixture.walletLimit = {
+      dailyCents: 60_000n,
+      rolling7dCents: 60_000n,
+      effectiveFrom: new Date(Date.now() - DAILY_WINDOW_MS * 30),
+    };
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(res.statusCode).toBe(429);
+    expect((res.json() as { code: string }).code).toBe('rate_limited');
+    expect(res.headers['retry-after']).toBeDefined();
+    expect(Number(res.headers['retry-after'])).toBeGreaterThan(0);
+    // THE DELAY IS THE WHOLE ANSWER. A partial commit here would leave a debit
+    // against a purchase that does not exist. `expectNothingWritten` is not used
+    // because this fixture SEEDS a debit to fill the window, so what is asserted
+    // is that no NEW one arrived.
+    expect(fixture.committed.purchases).toEqual([]);
+    expect(fixture.committed.ledgerTransactions).toEqual([]);
+    expect(fixture.committed.ledgerEntries).toEqual([]);
+    expect(fixture.committed.tos).toEqual([]);
+    expect(fixture.committed.walletEntries.filter((row) => row.direction === 'debit')).toHaveLength(
+      1,
+    );
+  });
+
+  it('omits Retry-After when no instant exists, rather than inventing one', async () => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+    fixture.walletLimit = {
+      dailyCents: 0n,
+      rolling7dCents: 0n,
+      effectiveFrom: new Date(Date.now() - DAILY_WINDOW_MS * 30),
+    };
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(res.statusCode).toBe(429);
+    expect(res.headers['retry-after']).toBeUndefined();
+    expect((res.json() as { detail: string }).detail).toContain('no window admits it');
+  });
+
+  it('does not bind on a limit whose effective_from has not arrived', async () => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+    // Supersession is a NEW ROW at a later `effective_from`, so a limit dated in
+    // the future is a record of a decision that has not taken effect.
+    fixture.walletLimit = {
+      dailyCents: 0n,
+      rolling7dCents: 0n,
+      effectiveFrom: new Date(Date.now() + DAILY_WINDOW_MS),
+    };
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('is checked AFTER the position, so an empty wallet is refused rather than delayed', async () => {
+    fixture.committed = storeWithWallet(SIZE.priceCents - 1n);
+    fixture.walletLimit = {
+      dailyCents: 0n,
+      rolling7dCents: 0n,
+      effectiveFrom: new Date(Date.now() - DAILY_WINDOW_MS),
+    };
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    // M20 section 3.2 draws `insufficient position` above `velocity limit
+    // exceeded`, and the reason is what the trader is told: sending somebody
+    // with no balance away for six hours and refusing them on arrival is worse
+    // than refusing them now.
+    expect(res.statusCode).toBe(422);
+    expect((res.json() as { code: string }).code).toBe('insufficient_funds');
+  });
+});
+
+describe('LT-08, posted in the purchase transaction', () => {
+  beforeEach(() => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+  });
+
+  it('posts ONE transaction with TWO entries that sum to zero', async () => {
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+    expect(res.statusCode).toBe(200);
+
+    expect(fixture.committed.ledgerTransactions).toHaveLength(1);
+    const header = fixture.committed.ledgerTransactions[0];
+    const purchaseId = fixture.committed.purchases[0]?.id;
+    expect(header?.['kind']).toBe('wallet_purchase_debit');
+    expect(header?.['referenceKind']).toBe('purchase');
+    expect(header?.['referenceId']).toBe(purchaseId);
+    expect(header?.['idempotencyKey']).toBe(lt08KeyOf(purchaseId ?? ''));
+    expect(header?.['reversalOf']).toBeNull();
+
+    const entries = fixture.committed.ledgerEntries;
+    expect(entries).toHaveLength(2);
+    let net = 0n;
+    for (const entry of entries) net += entry['amountCents'] as bigint;
+    // The imbalance is UNREPRESENTABLE rather than refused, because an entry
+    // exists only as one half of a `transfer()`.
+    expect(net).toBe(0n);
+
+    // DEBIT trader_wallet, CREDIT fees_revenue. M05:137's own words, and
+    // `psp_clearing` is deliberately untouched: there is no processor in this
+    // transaction, so there is nothing in clearing.
+    const byAccount = new Map(
+      entries.map((entry) => [entry['ledgerAccountId'] as string, entry['amountCents'] as bigint]),
+    );
+    expect(byAccount.get('acct-trader-wallet')).toBe(SIZE.priceCents);
+    expect(byAccount.get('acct-fees-revenue')).toBe(-SIZE.priceCents);
+    expect(byAccount.has('acct-psp-clearing')).toBe(false);
+  });
+
+  it('writes the wallet statement row with the running balance and NO provenance', async () => {
+    await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    const debit = fixture.committed.walletEntries.find((row) => row.direction === 'debit');
+    expect(debit?.amountCents).toBe(SIZE.priceCents);
+    expect(debit?.balanceAfterCents).toBe(WALLET_BALANCE_CENTS - SIZE.priceCents);
+    expect(debit?.referenceId).toBe(fixture.committed.purchases[0]?.id);
+    expect(debit?.ledgerTransactionId).toBe(fixture.committed.ledgerTransactions[0]?.['id']);
+    // ADR-158 finding 3 and clause 2: the column's three members are the CREDIT
+    // list and none describes this row, so the shape declares no such field and
+    // what the debit MEANS is `cause` and `reference_id`.
+    expect(Object.keys(debit ?? {})).not.toContain('provenance');
+    expect(debit?.cause).toContain('wallet-funded purchase');
+  });
+
+  it('writes a purchase row that could not be mistaken for a stalled PSP purchase', async () => {
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    const written = fixture.committed.purchases[0];
+    expect(written?.paymentMethod).toBe('wallet');
+    // `purchases_wallet_leg_matches_method`: `'wallet'` requires
+    // `wallet_debit_cents = amount_paid_cents > 0`.
+    expect(written?.walletDebitCents).toBe(SIZE.priceCents);
+    expect(written?.amountPaidCents).toBe(SIZE.priceCents);
+    // `purchases_wallet_debit_is_posted`: a wallet debit that posted no ledger
+    // transaction is money that moved outside the ledger.
+    expect(written?.walletLedgerTransactionId).toBe(
+      fixture.committed.ledgerTransactions[0]?.['id'],
+    );
+    // INV-M3-13: the payment either committed or it did not, so there is no
+    // `provisioning_pending` limbo on this path.
+    expect(written?.status).toBe('paid');
+    expect(written?.paidAt).toBeInstanceOf(Date);
+
+    // THE TWO NOT NULL COLUMNS THIS SESSION CANNOT WRITE. `0006` declares
+    // `psp text NOT NULL CHECK (psp IN ('psp_a','psp_b'))` and
+    // `psp_reference text NOT NULL`, and SD-M3-06 relaxed neither. Writing
+    // `'psp_a'` onto a row that reached no processor is exactly the state
+    // SD-M3-06 exists to make unrepresentable, so the type carries the truth and
+    // the write fails closed. A superseding migration is owed.
+    expect(written?.psp).toBeNull();
+    expect(written?.pspReference).toBeNull();
+
+    // NO SESSION WAS CREATED AT A PROCESSOR, which is `cardLegOf`'s refusal
+    // honoured by never reaching it.
+    const body = res.json() as Record<string, unknown>;
+    expect(body['payment_session']).toBeUndefined();
+    expect(body['psp']).toBeUndefined();
+    expect(body['payment_method']).toBe('wallet');
+    expect(body['wallet_debit_cents']).toBe(centsToJson(SIZE.priceCents));
+  });
+
+  it('ROLLS THE POSTING BACK when a later step refuses, and leaves no orphan entry', async () => {
+    // The coupon claim is the file's own after-a-write refusal, and on this path
+    // the write it comes after is a LEDGER POSTING. A wallet arm that committed
+    // its posting independently would leave a debit against a purchase that does
+    // not exist, which is the class of error INV-M20-10's nightly per-identity
+    // reconciliation exists to find the morning after.
+    fixture.claimed.add('coupon-launch');
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: checkoutBody({ payment_method: 'wallet', coupon_code: 'LAUNCH20' }),
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(fixture.committed.purchases).toEqual([]);
+    expect(fixture.committed.ledgerTransactions).toEqual([]);
+    expect(fixture.committed.ledgerEntries).toEqual([]);
+    expect(fixture.committed.walletEntries.filter((row) => row.direction === 'debit')).toEqual([]);
+  });
+
+  it('refuses the whole purchase when a ledger halt is live against this identity', async () => {
+    // ADR-016 and INV-M5-16 make the halt identity-scoped, and NOTHING IN THE
+    // DATABASE HONOURS IT: `postTransaction` is the code path that does. A throw
+    // here is a rollback, which on this route is the correct outcome.
+    fixture.ledgerHalts = [
+      {
+        identityId: BUYER_IDENTITY,
+        reasonCode: 'recon_divergence',
+        reasonNote: 'nightly assertion failed',
+        releasedAt: null,
+        escalateAt: new Date(),
+      },
+    ];
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(res.statusCode).toBe(500);
+    expectNothingWritten();
+  });
+
+  it('builds LT-08 from M05 section 2.1 and refuses a non-positive amount at construction', () => {
+    const post = lt08({
+      identityId: BUYER_IDENTITY,
+      purchaseId: 'purchase-1',
+      idempotencyKey: lt08KeyOf('purchase-1'),
+      walletDebitCents: SIZE.priceCents,
+    });
+    expect(post.transfers).toHaveLength(1);
+    expect(post.transfers[0]?.debit).toEqual({
+      scope: 'identity',
+      code: 'trader_wallet',
+      identityId: BUYER_IDENTITY,
+    });
+    expect(post.transfers[0]?.credit).toEqual({ scope: 'firm', code: 'fees_revenue' });
+
+    // `transfer()` refuses a non-positive amount, so a zero-value wallet purchase
+    // is unrepresentable rather than a row somebody has to notice.
+    expect(() =>
+      lt08({
+        identityId: BUYER_IDENTITY,
+        purchaseId: 'purchase-1',
+        idempotencyKey: 'k',
+        walletDebitCents: 0n,
+      }),
+    ).toThrow(RangeError);
+  });
+});
+
+describe('the doors this slice reports rather than opens', () => {
+  beforeEach(() => {
+    fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
+  });
+
+  it('answers 503 for a deployment with no posting handle, and writes nothing', async () => {
+    // `postTransaction` takes a `LedgerTx`, which only `SystemTx` satisfies, and
+    // `SystemReason` is 'nightly-batch' | 'operator-console'. A checkout posting
+    // from `apps/api` is neither of those words, and `packages/ledger/src/tx.ts`
+    // says so in its own header. Nothing here widens that vocabulary.
+    fixture.ledgerInstalled = false;
+
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('wallet'),
+    });
+
+    expect(res.statusCode).toBe(503);
+    expectNothingWritten();
+  });
+
+  it('refuses `mixed` with a stated reason rather than half-building it', async () => {
+    const res = await call({
+      method: 'POST',
+      path: CHECKOUT_PATH,
+      token: TOKEN,
+      payload: bodyWith('mixed'),
+    });
+
+    expect(res.statusCode).toBe(503);
+    const body = res.json() as { detail: string };
+    // The refusal states WHY, because `mixed` needs a ruling and P5 section 8's
+    // `P5-i` fence admits an ADR only if it does: the wallet leg of a mixed
+    // purchase POSTS rather than holds, and the compensating release has no
+    // provenance in `wallet_entries` and no site in this module.
+    expect(body.detail).toContain('posts rather than holds');
+    expectNothingWritten();
+  });
+
+  it('has no session type to refuse an impersonation on, and does not invent one', () => {
+    // INV-M20-16 and M6-N-02. `AuthSession` has six fields and none of them is a
+    // session type, so the refusal M20 section 3.7 requires cannot be
+    // implemented here. That is `routes/payouts.ts`'s finding about INV-M5-23
+    // arriving on a second money route, and M05 section 3.6's corollary applies:
+    // a refusal nothing asserts disappears silently. It is REPORTED, in this
+    // file's header and in this assertion, rather than faked.
+    const auth = readFileSync(new URL('../src/routes/auth.ts', import.meta.url), 'utf8');
+    expect(auth).not.toContain('impersonation');
+    const source = readFileSync(new URL('../src/routes/checkout.ts', import.meta.url), 'utf8');
+    expect(source).toContain('CANNOT BE');
+    expect(source).toContain('INV-M20-16');
+  });
+
+  it('states the balance rule `routes/wallet.ts` owns rather than deriving a second one', () => {
+    // The dispatch's own instruction, made mechanical: two code paths disagreeing
+    // about whether the balance is the stored running total or a recomputed sum
+    // is `0011`'s tamper indicator read two ways.
+    const wallet = readFileSync(new URL('../src/routes/wallet.ts', import.meta.url), 'utf8');
+    expect(wallet).toContain('LAST ROW APPENDED');
+    expect(wallet).toContain('export function balanceOf');
+    const source = readFileSync(new URL('../src/routes/checkout.ts', import.meta.url), 'utf8');
+    expect(source).toContain('LAST ROW APPENDED');
+    expect(source).toContain("routes/wallet.ts`'s `balanceOf`");
   });
 });
