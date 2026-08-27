@@ -151,6 +151,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-122](ADR-122.md) | `input_digest` is taken over the computation's own argument, and it EXCLUDES the answer  (2026-08-27, status: proposed) |
 | [ADR-123](ADR-123.md) | the refusal on `accountsAudited === 0` moves into `runReplayAudit`, and an empty book now REFUSES instead of reporting clean  (2026-08-27, status: proposed) |
 | [ADR-124](ADR-124.md) | the global ledger halt is a MECHANISM and it is not a `ledger_halts` row  (2026-08-27, status: proposed) |
+| [ADR-125](ADR-125.md) | `no-fixture-format` is one sentence written 227 times, this document's own `GS-030` row refutes it, and seven of the 227 are asserted and passing today  (2026-08-27, status: proposed) |
 | [ADR-130](ADR-130.md) | A derivable count can belong to ONE DOCUMENT, and the count vocabulary could not say so  (2026-08-27, status: proposed) |
 | [ADR-131](ADR-131.md) | the `CI-06<letter>` series is CLOSED at `w`, the last letter is retired UNUSED, and the retirement is a gate rather than a convention  (2026-08-27, status: proposed) |
 | [ADR-132](ADR-132.md) | a registry README indexes by ROW, and `CI-06n` stops accepting a sentence  (2026-08-27, status: proposed) |
