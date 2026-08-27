@@ -137,7 +137,7 @@ const scoreOptions = JSON.parse(readFileSync(schemaPath, 'utf8')).definitions
 if (!scoreOptions) {
   throw new Error(
     `${schemaPath}: no mutationScoreThresholds definition. This config omits the ` +
-      'breaking-score option deliberately and relies on the tool\'s default being null ' +
+      "breaking-score option deliberately and relies on the tool's default being null " +
       '(ADR-127 section 4); a schema this assertion cannot read is a default it cannot ' +
       'check, and an unchecked default is the thing the assertion exists to refuse.',
   );
@@ -174,19 +174,39 @@ export default {
   timeoutMS: 15000,
   timeoutFactor: 2,
 
-  // THE SANDBOX GOES UNDER `node_modules` AND THAT IS A WORKAROUND WITH A NAME.
-  // Stryker copies the package into this directory and mutates the COPY, which
-  // is what keeps a mutation run from being the tree-mutating operation
-  // `falsify:ci` has to be. But `gates.mjs`'s `walk` skips `node_modules` and
-  // `.git` AND NOTHING ELSE, so a `.stryker-tmp` beside the source is READ BY
-  // EVERY CI-06 GATE even though `.gitignore` names it: measured on this branch
-  // with a run in flight, CI-06a reported 427 findings and
-  // CI-06/retired-constraints 35, every one of them a copy of a file already in
-  // the tree. `node_modules` is the one directory name every walker in this
-  // repository already skips, and it puts the sandbox outside ESLint's and
-  // Prettier's defaults in the same move. THE FIX IS A GATE EDIT AND IS NOT
-  // THIS SESSION'S; ADR-127 finding 3 records it and the edge-case entry is owed.
-  tempDirName: 'node_modules/.stryker-tmp',
+  // THE SANDBOX STAYS AT STRYKER'S DEFAULT, AND THE TWO PLACES IT WOULD HAVE
+  // BEEN SAFER WERE BOTH TRIED AND BOTH BROKE THE RUN.
+  //
+  // Stryker copies the package into `.stryker-tmp/sandbox-*` and mutates the
+  // COPY, which is what keeps a mutation run from being the tree-mutating
+  // operation `falsify:ci` has to be. The cost is that `gates.mjs`'s `walk`
+  // skips `node_modules` and `.git` AND NOTHING ELSE, so a sandbox beside the
+  // source is READ BY EVERY CI-06 GATE even though `.gitignore` names it:
+  // measured on this branch with a run in flight, CI-06a reported 427 findings
+  // and CI-06/retired-constraints 35, every one of them a copy of a file
+  // already in the tree.
+  //
+  // MEASURED, NOT ASSUMED, IN BOTH DIRECTIONS:
+  //
+  //   node_modules/.stryker-tmp   The one directory name every walker here
+  //                               skips. IT BREAKS THE RUN. Vitest excludes
+  //                               `**/node_modules/**` by default, so with the
+  //                               sandbox under that path every test file is
+  //                               excluded and the dry run reports "No tests
+  //                               were found".
+  //   an absolute path in os.tmpdir()
+  //                               Out of the tree entirely. ALSO BREAKS: the
+  //                               sandbox cannot resolve the package's own
+  //                               dependencies from there and the initial test
+  //                               run dies.
+  //
+  // So the default stands and the landmine is NAMED rather than hidden.
+  // `cleanTempDir` removes the sandbox after a run that finishes, which was
+  // verified; A RUN THAT CRASHES LEAVES IT, which was also verified, and until
+  // somebody deletes it `pnpm run verify` on that laptop is red over files that
+  // are about to be deleted. THE FIX IS A GATE EDIT AND IS NOT THIS SESSION'S:
+  // `walk` reading `.gitignore`, or a skip list. ADR-127 finding 3 records it
+  // and the edge-case entry TR-04 requires is owed.
   cleanTempDir: true,
 
   reporters: ['clear-text', 'json', 'html', 'progress'],

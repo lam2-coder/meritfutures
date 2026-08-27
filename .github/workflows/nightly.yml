@@ -313,16 +313,21 @@ jobs:
   # THE TIMEOUT IS A MEASUREMENT AND NOT A ROUND NUMBER
   # ---------------------------------------------------------------------------
   # The other two legs are seconds of compute behind an install and carry 20
-  # minutes. THIS ONE IS NOT. Measured on this branch, on a 4-core host, which is
-  # the core count `ubuntu-latest` gives: 1,921 mutants over 19 source files.
-  # ADR-127 section 5 carries the wall clock and the score. The timeout below is
-  # that measurement with room for a cold runner and a slower shared host, and it
-  # is a bound on a job that hangs rather than a budget the run is expected to
-  # approach. A nightly that hangs is a nightly nobody cancels.
+  # minutes. THIS ONE IS NOT, and the number below is a measurement rather than a
+  # round figure. Measured on this branch on a 4-core host, which is the core
+  # count `ubuntu-latest` gives: 1,921 mutants over 19 source files in
+  # 28 minutes 31 seconds of wall clock and 105 minutes of CPU. ADR-127 section 5
+  # carries the score.
+  #
+  # 90 IS THAT MEASUREMENT WITH ROOM FOR A COLD AND SHARED RUNNER, roughly three
+  # times the observed run. It is a bound on a job that HANGS and not a budget
+  # the run is expected to approach: the default job timeout is six hours, and a
+  # nightly that hangs is a nightly nobody cancels. A run that starts taking 80
+  # minutes is a signal to read rather than a number to raise.
   stryker-mutation:
     name: CI-09 nightly Stryker on the rules engine
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
