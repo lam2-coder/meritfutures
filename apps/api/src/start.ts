@@ -62,6 +62,7 @@ import { databaseAccountReads, useAccountReadsBackend } from './routes/account-r
 import { databaseAccountsBackend, useAccountsBackend } from './routes/accounts.ts';
 import { useAuthBackend } from './routes/auth.ts';
 import { databaseCatalogReads, useCatalogReads } from './routes/catalog.ts';
+import { databaseWalletBackend, useWalletBackend } from './routes/wallet.ts';
 
 useAuthBackend(databaseAuthBackend(LIVE_DB));
 useAccountsBackend(databaseAccountsBackend(LIVE_DB));
@@ -78,5 +79,20 @@ useAccountReadsBackend(databaseAccountReads(LIVE_DB));
 // process that never ran this file answers 503 on all three of its routes and
 // says so, exactly as it does for auth.
 useCatalogReads(databaseCatalogReads(LIVE_DB));
+
+// `GET /wallet` and `GET /wallet/entries`, over the scoped door.
+//
+// IT IS ON THE MONEY PATH BY NAME AND IT MOVES NO MONEY, and the distinction is
+// the whole of why this line is a line rather than a slice. `databaseWalletBackend`
+// is `db.scoped(identityId, tx => tx.rows('walletEntries'))` and a clock: one
+// read of one `owned` table, no write, no posting, no ledger handle. The balance
+// is `balanceOf`, which is the greatest row's stored `balance_after_cents` and
+// not a sum, so this installs a STATEMENT and never an authority to spend.
+//
+// THE WRITE HALF OF THE WALLET IS STILL 503 AND STAYS THAT WAY. `checkout.ts`'s
+// debit arm needs a `LedgerTx`, `SystemReason` is `'nightly-batch' |
+// 'operator-console'`, and ADR-165 refused to widen it. Wiring the read does not
+// reach that and must not be read as having reached it.
+useWalletBackend(databaseWalletBackend(LIVE_DB));
 
 await main();
