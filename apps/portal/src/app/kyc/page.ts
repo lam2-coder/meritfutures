@@ -27,27 +27,22 @@
 // The seam is `KycScreenSource`, whose production value refuses every method.
 //
 // -----------------------------------------------------------------------------
-// THE TWO LEGS FAIL IN DIFFERENT DIRECTIONS, WHICH IS THE WHOLE OF THIS FILE
+// THE CHROME IS THE LAYOUT'S, SO EVERY FAILURE HERE IS A CONTENT STATE
 // -----------------------------------------------------------------------------
-// THE CHROME FAILS THE PAGE. The impersonation band (ADR-068 requirement 4,
-// through M04 section 3.9) and the simulated-environment disclosure
-// (INV-M4-09, constitution section 6) are properties of the shell, required on
-// every screen and on every error, empty and loading state. A page that
-// rendered without them would be a compliance obligation failing silently,
-// which is the only way that obligation fails, so an unavailable chrome leg
-// throws and no document is produced.
+// This file rendered the impersonation band and the INV-M4-09 disclosure itself
+// until session 250 landed `app/layout.tsx`, and it threw when either was
+// unavailable: a page that cannot render a required disclosure must not render.
 //
-// THE CONTENT FAILS TO A STATE. A status that cannot be read, or one that
-// arrives malformed or carrying a screened key, renders the error content state
-// inside intact chrome. That is `ContentState`'s reason for existing, and it is
-// also the second line of the no-proxy defence: the refusal path renders a
-// screen with no field of that payload anywhere on it.
+// THE LAYOUT RENDERS BOTH NOW, around every page in this app and outside every
+// branch this file can take, so the obligation cannot fail here at all. What is
+// left is content, and content fails to a STATE: a status that cannot be read,
+// or one that arrives malformed or carrying a screened key, renders the error
+// content state inside chrome that is already there.
 //
-// SO THE PRODUCTION DEPLOYMENT OF THIS PAGE THROWS TODAY, and that is stated
-// rather than smoothed over. `UNWIRED_KYC_SCREEN_SOURCE` refuses `disclosure()`
-// first, and a portal that cannot render a required disclosure must not render
-// the screen it belongs on. It is `routes/kyc.ts`'s "a deployment that cannot
-// store a payload does not verify one", one deployable over.
+// SO THE PRODUCTION DEPLOYMENT OF THIS PAGE RENDERS AN HONEST ERROR rather than
+// dying, which is strictly better than what this file did an hour ago and is
+// the wiring rather than a softening: nothing was relaxed, the obligation simply
+// moved to a file that cannot skip it.
 // =============================================================================
 
 import type { ReactElement } from 'react';
@@ -88,14 +83,9 @@ export const dynamic = 'force-dynamic';
 export default async function KycStatusPage(): Promise<ReactElement> {
   const source = currentKycScreenSource();
 
-  // THE CHROME FIRST, AND UNCAUGHT. See the header: an obligation that cannot
-  // be met does not render.
-  const disclosure = await source.disclosure();
-  const impersonation = await source.impersonation();
-
   try {
     const status = screenKycStatus(await source.status());
-    return KycScreen({ view: toKycScreenView({ status, impersonation, disclosure }) });
+    return KycScreen({ view: toKycScreenView({ status }) });
   } catch (cause) {
     // THE REFUSAL IS LOGGED AND THE SCREEN SAYS NOTHING ABOUT IT. Every error
     // reaching here is a defect somebody must fix upstream, and every one of
@@ -103,11 +93,7 @@ export default async function KycStatusPage(): Promise<ReactElement> {
     // which is `ScreenedFieldError`'s stated reason for its own wording.
     console.error('kyc status refused', cause);
     return KycScreen({
-      view: toKycScreenPlaceholder({
-        content: { kind: 'error', error: toPortalErrorKind(503) },
-        impersonation,
-        disclosure,
-      }),
+      view: toKycScreenPlaceholder({ state: { kind: 'error', error: toPortalErrorKind(503) } }),
     });
   }
 }

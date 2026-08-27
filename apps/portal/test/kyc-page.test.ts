@@ -26,7 +26,6 @@ import {
   screenKycStatus,
   useKycScreenSource,
   type KycScreenSource,
-  type PublishedDisclosure,
 } from '../src/app/kyc/source.ts';
 import {
   KycScreen,
@@ -35,8 +34,6 @@ import {
   toKycScreenView,
 } from '../src/app/kyc/screen.ts';
 import { INTERNAL_TIER_TERMS, KYC_STATES } from '../src/view/kyc.ts';
-import { disclosureBlock } from '../src/view/disclosure.ts';
-import type { ImpersonationBannerView } from '../src/shell/impersonation-banner.ts';
 
 // =============================================================================
 // SC-M4-07 RENDERED, AND THE CLAUSE THAT GOVERNS THE SCREEN
@@ -54,27 +51,6 @@ import type { ImpersonationBannerView } from '../src/shell/impersonation-banner.
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const SEGMENT = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'app', 'kyc');
-
-/** A disclosure minted the only way `view/disclosure.ts` allows one to be. */
-const DISCLOSURE: PublishedDisclosure = {
-  slug: 'simulated-environment-short',
-  version: 4,
-  text: disclosureBlock(
-    { slug: 'simulated-environment-short', version: 4 },
-    'Merit evaluations and funded accounts trade in a simulated environment. No order reaches ' +
-      'a live market and no customer funds are traded.',
-  ),
-};
-
-const BAND: ImpersonationBannerView = {
-  placement: 'shell-band',
-  admin_user_id: 'adm_7f3',
-  subject_identity_id: 'idn_91c',
-  reason_code: 'support_ticket',
-  reason_detail: 'Support ticket 4821, the trader asked why their verification is still open.',
-  expires_at: '2026-08-27T18:00:00Z',
-  exit: { action: 'end_impersonation' as const },
-};
 
 /** A well-formed `GET /kyc/status` body. */
 function statusBody(over: Record<string, unknown> = {}): Record<string, unknown> {
@@ -111,26 +87,18 @@ function documentBearingBody(): Record<string, unknown> {
   });
 }
 
-function sourceReturning(
-  body: unknown,
-  band: ImpersonationBannerView | null = null,
-): KycScreenSource {
+function sourceReturning(body: unknown): KycScreenSource {
   return {
     // The port's declared return type is `KycStatus`, which has no field a
     // document could be assigned to. This cast is the suite standing in for a
     // SERVER, which is not type checked by this workspace and is exactly the
     // gap `screenKycStatus` exists to cover.
     status: () => Promise.resolve(body as never),
-    impersonation: () => Promise.resolve(band),
-    disclosure: () => Promise.resolve(DISCLOSURE),
   };
 }
 
-async function renderPage(
-  body: unknown,
-  band: ImpersonationBannerView | null = null,
-): Promise<string> {
-  useKycScreenSource(sourceReturning(body, band));
+async function renderPage(body: unknown): Promise<string> {
+  useKycScreenSource(sourceReturning(body));
   try {
     return renderToStaticMarkup(await KycStatusPage());
   } finally {
@@ -170,7 +138,6 @@ test('THE CLAUSE: no document and no screened value reaches this page', async ()
   // WHAT IT RENDERS INSTEAD IS AN ERROR STATE INSIDE INTACT CHROME, which is
   // the refusal being visible rather than the page being blank.
   expect(html).toContain('data-content="server_error"');
-  expect(html).toContain('data-disclosure="simulated-environment"');
 });
 
 test('the same page renders the status when the payload carries no screened key', async () => {
@@ -214,13 +181,9 @@ test('screenKycStatus refuses rather than redacts, and names key paths and never
 
 test('the port has no method that could return a document', () => {
   // ADR-114 clause 6's FIRST half, asserted as a shape rather than read as a
-  // sentence: three methods, and the one that answers with the trader's status
-  // is typed to API_CONTRACT section 7's five fields.
-  expect(Object.keys(UNWIRED_KYC_SCREEN_SOURCE).sort()).toEqual([
-    'disclosure',
-    'impersonation',
-    'status',
-  ]);
+  // sentence: ONE method, typed to API_CONTRACT section 7's five fields, and no
+  // second method a document could arrive through.
+  expect(Object.keys(UNWIRED_KYC_SCREEN_SOURCE)).toEqual(['status']);
 
   // AND THE FIVE FIELDS ARE THE CONTRACT'S, re-derived from the handler that
   // serves them rather than from memory.
@@ -342,8 +305,6 @@ test('an unknown state and an unknown placement each refuse', async () => {
         expires_at: null,
         action_required: null,
       },
-      impersonation: null,
-      disclosure: DISCLOSURE,
     }),
   ).toThrow(/is not a member of kyc_status/);
 
@@ -356,8 +317,6 @@ test('an unknown state and an unknown placement each refuse', async () => {
         expires_at: null,
         action_required: null,
       },
-      impersonation: null,
-      disclosure: DISCLOSURE,
     }),
   ).toThrow(UnknownPlacementError);
 });
@@ -415,7 +374,17 @@ test('INV-M4-07: no string in this segment words a refusal as forbidden', () => 
 // The chrome, which no content state can drop
 // -----------------------------------------------------------------------------
 
-test('the disclosure and the band survive every content state', async () => {
+test('this segment renders NO chrome, because the root layout owns all of it', async () => {
+  // THE INVERSE OF THE TEST THIS REPLACES, and the reason is that session 250
+  // landed `app/layout.tsx`. This segment rendered the band, a `<main>` and the
+  // INV-M4-09 footer while no layout existed. The layout renders all three
+  // around every page now, so a segment that still rendered them would produce a
+  // second band, a `<main>` nested in a `<main>`, and the compliance disclosure
+  // printed twice.
+  //
+  // THE DUPLICATED DISCLOSURE IS THE ONE THAT MATTERS. A doubled obligation is
+  // not a safer failure than a missing one, and this assertion is what stops it
+  // coming back.
   const states = [
     { kind: 'loading' as const },
     { kind: 'empty' as const },
@@ -423,34 +392,63 @@ test('the disclosure and the band survive every content state', async () => {
     { kind: 'error' as const, error: 'server_error' as const },
   ];
 
-  for (const content of states) {
-    const view = toKycScreenPlaceholder({ content, impersonation: BAND, disclosure: DISCLOSURE });
-    const html = renderToStaticMarkup(KycScreen({ view }));
-    expect(html, `${content.kind} carries the disclosure`).toContain(DISCLOSURE.text);
-    expect(html, `${content.kind} carries the band`).toContain('data-band="shell-band"');
-  }
+  const rendered = [
+    ...states.map((state) =>
+      renderToStaticMarkup(KycScreen({ view: toKycScreenPlaceholder({ state }) })),
+    ),
+    await renderPage(statusBody()),
+  ];
 
-  // AND THE READY STATE TOO, which is the fifth case and the one a loop over
-  // ContentState would miss because it is built by a different function.
-  const ready = await renderPage(statusBody(), BAND);
-  expect(ready).toContain(DISCLOSURE.text);
-  expect(ready).toContain('data-band="shell-band"');
+  for (const html of rendered) {
+    for (const chrome of ['<main', '<footer', '<html', '<body', 'data-band', 'data-disclosure']) {
+      expect(html, `${chrome} is the layout's, not this segment's`).not.toContain(chrome);
+    }
+    // AND IT STILL RENDERS ITS OWN HEADING, so "no chrome" is not "no output".
+    expect(html).toContain('data-screen="SC-M4-07"');
+  }
 });
 
-test('a blank disclosure cannot be minted, so a screen cannot be assembled without one', () => {
-  expect(() => disclosureBlock({ slug: 'simulated-environment-short', version: 4 }, '   ')).toThrow(
-    /carries no text for a required disclosure/,
-  );
+test('the root layout renders the chrome this segment stopped rendering', () => {
+  // THE OTHER HALF, asserted against the layout's SOURCE rather than assumed.
+  // The test above proves this segment emits no footer; on its own that is also
+  // what a page with no disclosure anywhere looks like.
+  //
+  // IT IS READ AS TEXT RATHER THAN IMPORTED, AND THAT IS FORCED RATHER THAN
+  // LAZY. `apps/portal/tsconfig.json` sets `jsx: preserve`, which hands JSX to
+  // the framework's bundler and is correct for `next build`; Vitest reads the
+  // same setting and leaves JSX untransformed, so importing any `.tsx` in this
+  // workspace fails before a single assertion runs:
+  //
+  //   Failed to parse source for import analysis because the content contains
+  //   invalid JS syntax. If you use tsconfig.json, make sure to not set jsx to
+  //   preserve.  (vite:import-analysis, src/app/layout.tsx)
+  //
+  // Measured on this tree by trying it. No test in this repository imports a
+  // `.tsx` file today, so nothing else has hit it yet. Reading the source is
+  // strictly weaker than rendering it and is what is available; the tsconfig
+  // line is session 250's and the finding is reported rather than taken.
+  const layout = readFileSync(join(SEGMENT, '..', 'layout.tsx'), 'utf8');
+  expect(layout).toContain('<main>{children}</main>');
+  expect(layout).toContain('simulated-environment-disclosure');
+  expect(layout).toContain('ImpersonationBand');
 });
 
 // -----------------------------------------------------------------------------
 // The page, and what it refuses to be
 // -----------------------------------------------------------------------------
 
-test('the production source is unwired and the page does not render without its chrome', async () => {
+test('the production source is unwired and the page renders an honest error', async () => {
+  // IT USED TO THROW, and that was right while this segment owned the footer:
+  // a screen that cannot render a required disclosure must not render. The
+  // layout renders the footer now, so an unavailable status is content that
+  // failed rather than an obligation that failed.
   resetKycScreenSource();
   expect(currentKycScreenSource()).toBe(UNWIRED_KYC_SCREEN_SOURCE);
-  await expect(KycStatusPage()).rejects.toThrow(/KycScreenSource.disclosure is not wired/);
+  expect(Object.keys(UNWIRED_KYC_SCREEN_SOURCE)).toEqual(['status']);
+
+  const html = renderToStaticMarkup(await KycStatusPage());
+  expect(html).toContain('data-content="server_error"');
+  expect(html).toContain('data-screen="SC-M4-07"');
 });
 
 test('the page is never statically generated', () => {

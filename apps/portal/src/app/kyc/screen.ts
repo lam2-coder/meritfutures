@@ -36,28 +36,35 @@
 // to exactly these calls; nothing about the rendered output differs.
 //
 // -----------------------------------------------------------------------------
-// THE SHELL IS RENDERED HERE BECAUSE THERE IS NO LAYOUT YET, AND THAT IS ONE
-// LINE TO UNDO
+// THE CHROME IS THE ROOT LAYOUT'S AND THIS FILE RENDERS NONE OF IT
 // -----------------------------------------------------------------------------
 // ADR-068 requirement 4, through M04 section 3.9, makes the impersonation band
 // SHELL CHROME: "on all of section 3.1's screens AND ON EVERY ERROR, EMPTY AND
 // LOADING STATE." INV-M4-09 makes the disclosure the same kind of thing.
-// SC-M4-07 is one of section 3.1's screens, so this page cannot render without
-// both, and `app/layout.tsx` is session 250's and has not landed.
 //
-// `KycShell` below is therefore a component of this segment rather than a
-// borrowed layout, and when the root layout arrives the page composes that
-// instead. Nothing is invented in the meantime: the chrome is assembled by
-// `toShellView`, which is the shell module's own function, and both obligations
-// are its required fields.
+// THIS SEGMENT RENDERED BOTH UNTIL SESSION 250 LANDED, and said so at the time:
+// there was no `app/layout.tsx`, and a screen that cannot render its required
+// disclosure must not render. `app/layout.tsx` now exists and owns `<html>`,
+// `<body>`, the band, `<main>` and the footer, so this file renders the CONTENT
+// and nothing around it.
+//
+// KEEPING BOTH WOULD HAVE BEEN THREE DEFECTS RATHER THAN ONE TIDY-UP: a second
+// impersonation band, a `<main>` nested inside the layout's `<main>`, and the
+// INV-M4-09 disclosure printed twice on a compliance surface. The last is the
+// one that matters, and a duplicated obligation is not a safer failure than a
+// missing one; it is a screen nobody can quote.
+//
+// THE LAYOUT IS WHY THIS IS A PROPERTY RATHER THAN A HABIT, in its own words:
+// "App Router renders this file around every page in this app, so a screen that
+// forgot the footer is not a screen a reviewer has to catch: there is nowhere
+// for a screen to render that is outside this file." That applies to a screen
+// that DOUBLED it too, and this file is on the other side of that sentence.
 // =============================================================================
 
 import { createElement, type ReactElement, type ReactNode } from 'react';
 
-import type { ContentState, ShellView } from '../../shell/app-shell.ts';
-import type { ImpersonationBannerView } from '../../shell/impersonation-banner.ts';
+import type { ContentState } from '../../shell/app-shell.ts';
 import type { KycStatus } from '../../api/types.ts';
-import { toShellView } from '../../shell/app-shell.ts';
 import { toKycStatusView, type KycStatusView } from '../../view/kyc.ts';
 import {
   KYC_CONTENT_COPY,
@@ -69,7 +76,6 @@ import {
   KYC_STATE_COPY,
   type KycPlacement,
 } from './copy.ts';
-import type { PublishedDisclosure } from './source.ts';
 
 const h = createElement;
 
@@ -98,10 +104,17 @@ export type KycScreenContent = {
   readonly placement: KycPlacement;
 };
 
-/** SC-M4-07 assembled: the chrome, and the content when there is any. */
+/**
+ * SC-M4-07 assembled.
+ *
+ * NO SHELL FIELD, WHICH IS THE WIRING STATED AS A TYPE. The band and the
+ * disclosure are the root layout's, so there is no field here they could be
+ * assigned to and no way for this screen to render a second copy of either.
+ */
 export type KycScreenView = {
-  readonly shell: ShellView;
-  /** Present exactly when `shell.content.kind` is `ready`. */
+  /** Which of `ContentState`'s four the screen is showing. */
+  readonly state: ContentState;
+  /** Present exactly when `state.kind` is `ready`. */
   readonly content: KycScreenContent | null;
 };
 
@@ -113,18 +126,10 @@ export type KycScreenView = {
  * and a page that projected the wire shape itself would be a second, weaker
  * copy of a check that already exists.
  */
-export function toKycScreenView(input: {
-  readonly status: KycStatus;
-  readonly impersonation: ImpersonationBannerView | null;
-  readonly disclosure: PublishedDisclosure;
-}): KycScreenView {
+export function toKycScreenView(input: { readonly status: KycStatus }): KycScreenView {
   const status = toKycStatusView(input.status);
   return {
-    shell: toShellView({
-      impersonation: input.impersonation,
-      simulated_environment_disclosure: input.disclosure.text,
-      content: { kind: 'ready' },
-    }),
+    state: { kind: 'ready' },
     content: { status, placement: toPlacement(status.placement) },
   };
 }
@@ -137,31 +142,9 @@ export function toKycScreenView(input: {
  * to prevent, and the exclusion means it cannot be written.
  */
 export function toKycScreenPlaceholder(input: {
-  readonly content: Exclude<ContentState, { readonly kind: 'ready' }>;
-  readonly impersonation: ImpersonationBannerView | null;
-  readonly disclosure: PublishedDisclosure;
+  readonly state: Exclude<ContentState, { readonly kind: 'ready' }>;
 }): KycScreenView {
-  return {
-    shell: toShellView({
-      impersonation: input.impersonation,
-      simulated_environment_disclosure: input.disclosure.text,
-      content: input.content,
-    }),
-    content: null,
-  };
-}
-
-function band(impersonation: ImpersonationBannerView | null): ReactNode {
-  if (impersonation === null) return null;
-  // A RESERVED BAND AND NEVER AN OVERLAY, which is the banner module's own
-  // literal type. It is first in document order so it is first for a screen
-  // reader too, and it carries no dismiss control because there is no field
-  // for one.
-  return h(
-    'aside',
-    { 'data-band': impersonation.placement, role: 'status' },
-    h('p', null, impersonation.reason_detail),
-  );
+  return { state: input.state, content: null };
 }
 
 function definition(term: string, value: ReactNode): readonly ReactElement[] {
@@ -258,28 +241,11 @@ function placeholder(content: ContentState): ReactElement {
  * the bytes it produced.
  */
 export function KycScreen(props: { readonly view: KycScreenView }): ReactElement {
-  const { shell, content } = props.view;
+  const { state, content } = props.view;
   return h(
     'article',
     { 'data-screen': 'SC-M4-07' },
-    band(shell.impersonation),
-    h(
-      'main',
-      null,
-      h('h1', null, KYC_SCREEN_COPY.heading),
-      content === null ? placeholder(shell.content) : ready(content),
-    ),
-
-    // INV-M4-09'S FOOTER, AND IT IS OUTSIDE EVERY BRANCH ABOVE. Constitution
-    // section 6 makes it a compliance obligation rather than a design
-    // preference, so there is no content state that can drop it: the shell's
-    // field is required, `disclosureBlock()` refuses a blank one, and this
-    // element is a sibling of the branch rather than inside it.
-    h(
-      'footer',
-      { 'data-disclosure': 'simulated-environment' },
-      h('h2', null, KYC_SCREEN_COPY.disclosure_label),
-      h('p', null, shell.simulated_environment_disclosure),
-    ),
+    h('h1', null, KYC_SCREEN_COPY.heading),
+    content === null ? placeholder(state) : ready(content),
   );
 }

@@ -80,8 +80,6 @@
 // call this file makes.
 // =============================================================================
 
-import type { DisclosureBlock } from '../../view/disclosure.ts';
-import type { ImpersonationBannerView } from '../../shell/impersonation-banner.ts';
 import type { KycStatus } from '../../api/types.ts';
 
 /**
@@ -248,23 +246,7 @@ export function screenKycStatus(raw: unknown): KycStatus {
 }
 
 /**
- * INV-M4-09's disclosure, with the legal document it was published in.
- *
- * `text` IS A `DisclosureBlock` AND NOT A `string`, which is the whole reason
- * `view/disclosure.ts` exists: a required disclosure "cannot be a literal typed
- * at the point of render, cannot be an empty string, and cannot be omitted,
- * since a screen declaring the field required does not compile without it".
- * Minting one takes `disclosureBlock(source, text)` and the source is the
- * `content_documents` row it came out of.
- */
-export type PublishedDisclosure = {
-  readonly slug: string;
-  readonly version: number;
-  readonly text: DisclosureBlock;
-};
-
-/**
- * Everything this page reaches the world through, and NO FOURTH METHOD.
+ * Everything this page reaches the world through, and NO SECOND METHOD.
  *
  * THERE IS NO METHOD HERE THAT RETURNS A DOCUMENT AND NO FIELD ONE COULD BE
  * ASSIGNED TO, which is ADR-114 clause 6's first half stated as a type. There
@@ -272,19 +254,29 @@ export type PublishedDisclosure = {
  * the hosted flow is `POST /kyc/session`'s answer and starting one is a
  * mutation, which is money-adjacent, another session's, and not a thing a read
  * surface may grow quietly.
+ *
+ * IT CARRIED `impersonation()` AND `disclosure()` UNTIL SESSION 250 LANDED, and
+ * losing them is the wiring rather than a narrowing. The band and the footer are
+ * `app/layout.tsx`'s, which renders around every page in this app, so a page
+ * that still fetched them could only render a second copy. One method left is
+ * the honest shape: the only thing this screen needs from the world is the
+ * trader's status.
  */
 export interface KycScreenSource {
   /** `GET /kyc/status`. Five fields, none of them a document. */
   status(): Promise<KycStatus>;
-
-  /** ADR-068's band, or `null` for the trader's own session, which is ordinary. */
-  impersonation(): Promise<ImpersonationBannerView | null>;
-
-  /** INV-M4-09's required disclosure, published rather than typed. */
-  disclosure(): Promise<PublishedDisclosure>;
 }
 
-/** Thrown by the default source. The page renders it as a content error. */
+/**
+ * Thrown by the default source, and the page RENDERS it rather than dying on it.
+ *
+ * THAT CHANGED WHEN THE ROOT LAYOUT LANDED, and the new behaviour is the better
+ * one. While this segment owned the footer, an unwired disclosure had to throw:
+ * a screen that cannot render a required disclosure must not render. The layout
+ * renders the footer now, unconditionally and around every page, so an
+ * unavailable status is content that failed rather than an obligation that
+ * failed, and the honest answer is the error state inside intact chrome.
+ */
 export class KycScreenSourceUnwired extends Error {
   constructor(readonly method: string) {
     super(
@@ -306,8 +298,6 @@ function unwired(method: string): () => Promise<never> {
 /** The default, and it fails CLOSED on every method. */
 export const UNWIRED_KYC_SCREEN_SOURCE: KycScreenSource = {
   status: unwired('status'),
-  impersonation: unwired('impersonation'),
-  disclosure: unwired('disclosure'),
 };
 
 let source: KycScreenSource = UNWIRED_KYC_SCREEN_SOURCE;
