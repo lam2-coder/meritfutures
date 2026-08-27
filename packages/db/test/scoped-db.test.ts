@@ -2242,6 +2242,13 @@ describe('P5-b: a handle for one identity cannot reach another identity`s row', 
     // THE TERMINUS IS ASSERTED RATHER THAN ASSUMED. `purchases` being `owned`
     // and NOT NULL is the whole reason this rule returns a person all of their
     // disputes rather than a subset of them.
+    //
+    // AND THIS NARROWING IS A COMPILE-TIME CONTROL AS WELL AS A RUNTIME ONE,
+    // which was found by seeding it rather than predicted. `SCOPE_RULES` is
+    // `as const`, so `SCOPE_RULES[rule.via]` has a literal type: re-pointing
+    // `via` at `ledgerTransactions` -- the trap this table's `why` names --
+    // makes the two lines below `TS2367` and `TS2339` at typecheck, before
+    // ADR-101 clause 2 gets to refuse the nullable edge at runtime.
     const via = SCOPE_RULES[rule.via];
     expect(via.class).toBe('owned');
     if (via.class !== 'owned') throw new Error('unreachable');
