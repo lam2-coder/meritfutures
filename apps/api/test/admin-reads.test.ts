@@ -374,7 +374,20 @@ test('apps/admin transcribes the same closed set, and neither imports the other'
   for (const specifier of specifiers) expect(specifier).not.toContain('apps/');
 });
 
-test('section 8 s GET rows are these seven plus the two focused projections nobody has taken', () => {
+// THE NAME STOPPED STATING A COUNT ON 2026-08-27, and the reason is the thing
+// that broke it. It read "these seven plus the TWO focused projections nobody
+// has taken", and `P5-c` legitimately added a third when the wallet surface
+// entered the contract (ADR-158). The RULING held and the ENUMERATION did not,
+// which is the ninth time that shape has appeared in this corpus and the first
+// time in a test NAME, where ADR-034's count rule and `CI-06/derivable-counts`
+// do not reach.
+//
+// WHAT IS PINNED IS STILL PINNED, AND DELIBERATELY. The unserved list below is
+// a register of contract rows nobody has built, so it catches a route being
+// REMOVED as well as one being added, and deriving it would assert nothing. It
+// grows when the contract grows, and it is the second assertion that carries
+// the invariant: every path this module serves is declared by the contract.
+test('every section 8 GET row is served or is a named projection nobody has taken', () => {
   const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
   const declared = new Set<string>();
   for (const row of contract.split('\n')) {
@@ -384,7 +397,14 @@ test('section 8 s GET rows are these seven plus the two focused projections nobo
   }
   const served = new Set(ADMIN_READ_ENDPOINTS.map((spec) => spec.path));
   const unserved = [...declared].filter((path) => !served.has(path)).sort();
-  expect(unserved).toEqual(['/admin/cusum', '/admin/loss-ratios']);
+  expect(unserved).toEqual([
+    '/admin/cusum',
+    '/admin/loss-ratios',
+    // Added by ADR-158 when the wallet surface entered the contract. P5's own
+    // wave has no slice for it: `P5-l` is the liability half and this is the
+    // reconciliation half, which no plan currently claims.
+    '/admin/wallet/reconciliation',
+  ]);
   expect([...served].filter((path) => !declared.has(path))).toEqual([]);
 });
 
