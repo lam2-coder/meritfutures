@@ -205,17 +205,95 @@ export type {
   ReplayMode,
 } from './batch/replay.ts';
 
+// -----------------------------------------------------------------------------
+// THE HOURLY EXPIRY SWEEP (session 291, `P5-j`)
+// -----------------------------------------------------------------------------
+// THE SECOND SCHEDULED JOB TO EXIST AS CODE, AND THE FIRST ONE THAT PAYS.
+// `CRON_INVENTORY`'s release-job table gives THREE clocks to ONE row, on its own
+// rule that "a second sweep is a second thing to stall", and `FM-M5-13` is that
+// stall: every hold and every freeze silently becoming indefinite at once, with
+// no operator having forgotten anything.
+//
+// **THE THREE CLOCKS ARE THREE DIFFERENT ACTS AND THE THIRD IS NOT WRITABLE BY
+// ANY CODE IN THIS TREE.** The hold releases and PAYS (`INV-M5-17`); the
+// withdrawal halt releases, resumes the rail and posts NOTHING (`INV-M20-14`);
+// the payout freeze's release target is `settled`, which needs
+// `effective_trading_day` (no trading calendar exists here) and the win-day
+// reset of `INV-M5-07` (no `applySettlement` exists here), so that leg is swept,
+// warned on, and REPORTED as an `unreleasable` finding rather than guessed.
+// `sweeps/expiry.ts`'s header section 3 is the measurement.
+//
+// **IT IS WRITTEN AGAINST PORTS AND IT IS UNWIRED, exactly as `runNightlyBatch`
+// and the provisioning saga are, and the gap here is a WORD rather than an
+// adapter.** `SystemReason` is `'nightly-batch' | 'operator-console'` and an
+// hourly sweep is neither; adding a third member is one line in
+// `packages/db/src/scoped-db.ts`, which is `P5-a`'s file and not this session's,
+// and P5 rule 10 says to report that rather than reach. So
+// `ExpirySweepIo.transact` takes the unit of work and the wiring decides the
+// authority. WHAT IS REAL IS THE THREE LEGS, THE LOCK, THE KEY DISCIPLINE AND
+// THE REPORT; WHAT IS NOT IS THE WIRING, and the difference is visible in the
+// type rather than left to a reader.
+export {
+  EXPIRY_CLOCKS,
+  FREEZE_EXPIRING_LEAD_HOURS,
+  FREEZE_EXPIRING_LEAD_MS,
+  FREEZE_UNRELEASABLE,
+  HELD,
+  HOLD_COLUMNS,
+  PAYOUT_ENDPOINT,
+  PAYOUT_PATH,
+  WITHDRAWAL_FREEZE_COLUMNS,
+  ExpiryRowError,
+  clearHold,
+  clearWithdrawalHalt,
+  expirySweepClean,
+  releaseLedgerKey,
+  runExpirySweep,
+} from './sweeps/expiry.ts';
+export type {
+  ExpiryClock,
+  ExpiryClockReport,
+  ExpiryDisposition,
+  ExpiryOutcome,
+  ExpirySweepReport,
+} from './sweeps/expiry.ts';
+
+export { EXPIRY_TABLES, ExpirySweepUnwired, UNWIRED_EXPIRY_SWEEP_IO } from './sweeps/ports.ts';
+export type {
+  ExpiryEvent,
+  ExpiryEventName,
+  ExpiryEventPort,
+  ExpiryFilter,
+  ExpiryFilterTerm,
+  ExpiryLedgerPort,
+  ExpirySweepIo,
+  ExpiryTable,
+  ExpiryTerms,
+  ExpiryTx,
+  ExpiryValues,
+  Lt01Values,
+} from './sweeps/ports.ts';
+
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;
 
 /**
- * Still not a scheduled application, and the missing piece has moved.
+ * Still not a scheduled application, and the missing piece has moved again.
  *
- * The batch exists, the queue's INTERFACE exists (ADR-086), and what is absent
- * is the job store: pg-boss's schema is not in `packages/db/migrations`, so
- * there is nothing to enqueue into. `CRON_INVENTORY` is not this session's
- * either, so the jobs themselves are still nobody's.
+ * The batch exists, the queue's INTERFACE exists (ADR-086), the provisioning
+ * saga exists, and now the hourly expiry sweep does. What is absent is the job
+ * store: pg-boss's schema is not in `packages/db/migrations`, so there is
+ * nothing to enqueue into, and nothing here installs a scheduler.
+ *
+ * **THAT ABSENCE IS ITSELF ALARMED AND THAT IS WHY IT IS SAFE TO STATE PLAINLY.**
+ * `CRON_INVENTORY` gives the expiry sweep an **S1 dead-man switch on the job's
+ * absence**, and `INV-M5-18`'s nightly assertion runs **on the query** rather
+ * than on the job, so a deployment with no scheduler is a deployment two
+ * unsuppressible alarms are already about to page on.
  */
 export function main(): void {
-  console.log(`merit ${SERVICE}: nightly batch built, job interface built, no job store yet`);
+  console.log(
+    `merit ${SERVICE}: nightly batch built, provisioning saga built, expiry sweep built, ` +
+      'job interface built, no job store and no scheduler yet',
+  );
 }
