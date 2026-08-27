@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, data-model/README.md, EVENTS.md, ../decisions/ADR-039.md, ../decisions/ADR-040.md, ../decisions/ADR-041.md, ../decisions/ADR-042.md, ../decisions/ADR-061.md, ../decisions/ADR-062.md, ../plans/FOLD-01-phone-identity.md, ../plans/FOLD-02-enforcement-window-and-suspension.md]
-last_updated: 2026-08-20
+last_updated: 2026-08-27
 ---
 
 # State Machines (Constitution B5 §3)
@@ -223,9 +223,9 @@ The open index is re-created under the same name and the same predicate so a hal
 | `transferring` | `settled` | G-SETTLEMENT-CONFIRMED | `wallet.withdrawal_settled` |
 | `transferring` | `failed` | G-TRANSFER-EXHAUSTED | `wallet.withdrawal_failed` |
 | any pre-terminal | (halted in place) | G-WITHDRAWAL-HALTED. **No state change.** The row keeps its rail status and gains its freeze trio | `wallet.withdrawal_halted` |
-| (halted) | (resumes in place) | G-WITHDRAWAL-HALT-CLEARED, at expiry or on dismissal | `wallet.withdrawal_halt_cleared` |
+| (halted) | (resumes in place) | G-WITHDRAWAL-HALT-CLEARED, at expiry or on dismissal | `wallet.withdrawal_halt_released` |
 
-**Event names in the last three rows are proposed, not folded.** [EVENTS](EVENTS.md) is session 6's file and no name is claimed by appearing here; the drawing needs a column and the registry is what makes a name real.
+**Event names in the last three rows WERE proposed and are now folded**, and the last one changed spelling on the way in. [EVENTS](EVENTS.md) registers the halt release as `wallet.withdrawal_halt_released`; this table read `wallet.withdrawal_halt_cleared`, and the guard beside it is still `G-WITHDRAWAL-HALT-CLEARED`, because a guard is named here and an event is named there. The rule that settled it is this paragraph's own: **no name is claimed by appearing in this column, the drawing needs one and the registry is what makes a name real.** The rest of the family was folded in the same commit, so every event this table names now resolves. **Two edges the diagram above draws are still not in this table**, both into `cancelled` under `G-TRADER-CANCELS`, and universal rule 1 is unmet until they are rowed and an event exists for them. That repair is a row in this table and is not made here.
 
 ## 4. Purchase and provisioning saga
 
