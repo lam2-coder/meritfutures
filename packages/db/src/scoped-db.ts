@@ -45,6 +45,7 @@ import {
   SCOPE_RULES,
   TABLES,
   type FirmTableKey,
+  type ScopeRule,
   type ScopedTableKey,
   type TableKey,
 } from './scope.ts';
@@ -983,6 +984,359 @@ export function firmDb(): FirmDb {
   };
 }
 
+// =============================================================================
+// ESTABLISHMENT, WHICH IS CREATING A SCOPE RATHER THAN EXERCISING ONE (ADR-126)
+// =============================================================================
+// EVERYTHING ABOVE THIS LINE ASSUMES THE CALLER IS ALREADY SOMEBODY. Three doors
+// take an identity, a reason, or nothing, and every one of them answers a
+// question of the form "what may THIS caller do". An authentication handler is
+// the code that runs BEFORE that question has an answer, and ADR-120 measured
+// the consequence in one sentence: ADR-112 unblocked everything a session can DO
+// and nothing that MAKES one.
+//
+// THE TWO ACTS ARE NOT ONE ACT AND THEY DO NOT GET ONE DOOR.
+//
+//   RESOLVE  turn the address a person typed into the identity that owns it. A
+//            read ACROSS the tenancy boundary by construction, because the
+//            caller is not yet anyone. This IS an authority problem.
+//   MINT     write the session row that establishes the scope. By the time a
+//            handler mints it has already resolved, so it HOLDS an identity;
+//            what it lacks is a way to write a `derived` row whose parent it can
+//            prove. This is NOT an authority problem, and treating it as one is
+//            how a vocabulary gets widened for a construction that did not need
+//            it.
+//
+// AND NEITHER IS A MISSING CONSTRUCTION. Both are expressible at `systemTx`
+// today: `SystemTx.insert` is generic over `TableKey` and reaches `sessions`,
+// `unscopedInsertStatement` does not run `refuseTenancyColumn` so naming
+// `user_id` there is permitted, and `SystemTx.rowAt` is generic over `TableKey`
+// and reaches `users` by `email`. What neither has is a WORD a request handler
+// may write. That is exactly the offer ADR-109 clause 1 declined, and it
+// declined it because "admitting 'request-handler' would buy a door that still
+// writes the whole table". ADR-112 made that sentence false. THE REFUSAL STANDS
+// AND ITS REASON DOES NOT, which is why the replacement reason is written here
+// rather than assumed.
+//
+// -----------------------------------------------------------------------------
+// THE VOCABULARY THAT MOVES IS THE TABLE AND NEVER THE REASON
+// -----------------------------------------------------------------------------
+// `SystemReason` and `SqlExecutorReason` are closed vocabularies of WHY, and
+// every member of either grants EVERY TABLE. A third `SystemReason` member would
+// hand a request handler all 104 registered tables at six verbs in exchange for
+// one table at one verb. A closed vocabulary of WHICH grants exactly what it
+// names. So both constructions below take a TABLE vocabulary, `SystemReason`
+// stays at two members for the third time (ADR-096 clause 3, ADR-102 clause 3,
+// and here), and `SqlExecutorReason` stays at one.
+//
+// THAT IS A RULING RATHER THAN A PREFERENCE, AND `ledger_entries` IS WHY.
+// It is `derived` with `traversal: 'hop'` via `ledger_accounts`, so an
+// `insertUnder` generic over the CLASS -- which reads naturally, and which the
+// first draft of this section had -- would let a scoped request handler write
+// ONE LEG of a double-entry posting under its own ledger account. That is money
+// creation behind a handle every authenticated request already holds, and
+// `packages/ledger/test/accessor-bind.test.ts` states the property it would
+// break in its own words: "A posting touches two parties' accounts, so only
+// `SystemTx` can write it". The generalisation was MEASURED before it was
+// refused, which is the only reason this file does not carry it.
+//
+// -----------------------------------------------------------------------------
+// WHAT IS NOT HERE, NAMED RATHER THAN LEFT TO BE DISCOVERED
+// -----------------------------------------------------------------------------
+// ESTABLISHING AN IDENTITY AT ALL HAS NO DOOR AND NO CALLER. `identities` is
+// `class: 'root'` and `OwnedTableKey` excludes it, so an address that resolves
+// to NOBODY cannot be signed up through any authority a request handler holds.
+// ADR-120 named two constructions and there are three. The third is reported and
+// not built, on `job-queue.ts`'s rule that a primitive admitted before a caller
+// exists is a primitive nobody can remove -- and there is no caller, because the
+// endpoint that would sign somebody up is `POST /auth/verify`, which is blocked
+// on the OTP digest whatever this file does.
+
+/**
+ * The tables a caller with NO IDENTITY may read ONE ROW of.
+ *
+ * A CLOSED LIST OF ONE, AND JOINING IT IS A DIFF ON THIS FILE with an argument
+ * attached. That is `SystemReason`'s own control moved from the reason to the
+ * table, and it is strictly narrower: a reason grants every table and a table
+ * grants one. `users` is here because `POST /auth/verify` must turn the address
+ * a person typed into the identity that owns it, and no other table in the
+ * registry has stated that need.
+ */
+export type ResolvableTableKey = 'users';
+
+/**
+ * The columns each resolvable table may be addressed BY.
+ *
+ * THE TABLE LIST IS NOT ENOUGH AND THIS IS THE OTHER HALF. `users` declares TWO
+ * unique keys -- `id` inline and `email` inline -- and `refuseUnaddressed` would
+ * honour either, so a table-only vocabulary would make EVERY user row in the
+ * estate readable before authentication by naming its uuid. The construction
+ * does not need that: a person types an address, never a uuid. Naming `id` is
+ * `TS2353` at the call site and a throw behind it.
+ */
+export const RESOLUTION_ADDRESS = { users: ['email'] } as const;
+
+/** The address shape one resolvable table accepts, derived from the list above. */
+export type ResolutionAddress<K extends ResolvableTableKey> = Readonly<
+  Record<(typeof RESOLUTION_ADDRESS)[K][number], unknown>
+>;
+
+/**
+ * Refuse a resolution address that is not EXACTLY the declared one.
+ *
+ * BOTH DIRECTIONS, because they are different failures. A column the list does
+ * not carry is a caller reaching past the vocabulary; a declared column the
+ * caller omitted is a narrower predicate than the one this door was opened for,
+ * and on a one-column list it is the empty address.
+ */
+function refuseUnresolvableAddress(
+  key: ResolvableTableKey,
+  at: Readonly<Record<string, unknown>>,
+): void {
+  const permitted: readonly string[] = RESOLUTION_ADDRESS[key];
+  for (const named of Object.keys(at)) {
+    if (permitted.includes(named)) continue;
+    throw new Error(
+      `"${named}" is not a resolution address on ${key}. A pre-identity read reaches ` +
+        `[${permitted.join(', ')}] and nothing else, because this door is open to a caller who ` +
+        'has proved nothing and the address is the only thing bounding what it can name.',
+    );
+  }
+  for (const required of permitted) {
+    if (Object.prototype.hasOwnProperty.call(at, required)) continue;
+    throw new Error(
+      `a resolution read of ${key} must name "${required}". The declared address is ` +
+        `[${permitted.join(', ')}] and a subset of it is a wider predicate than this door grants.`,
+    );
+  }
+}
+
+/**
+ * The pre-identity reader.
+ *
+ * READ ONLY, NON-TRANSACTIONAL, ONE ROW, ONE TABLE, ONE ADDRESS. Its brand is
+ * disjoint from the other three, so it is not assignable to a `ScopedDb`, a
+ * `SystemDb` or a `FirmDb` and none of them is assignable to it.
+ *
+ * THERE IS NO `transaction(resolutionDb(), ...)` OVERLOAD and that absence is
+ * the ruling rather than an omission. Every write in this file is reached
+ * through `transaction`, so a door with no overload cannot participate in one at
+ * any authority: the pre-identity reader can be composed into nothing.
+ *
+ * WHAT IT COSTS, STATED RATHER THAN LEFT TO BE FOUND. A handler that resolves
+ * and then mints does so in TWO units of work, so a crash between them leaves a
+ * consumed challenge and no session and the person asks for another code. That
+ * is the price of a door that cannot write, and it is paid in an inconvenience
+ * rather than in a row.
+ */
+export interface ResolutionDb {
+  readonly __brand: 'ResolutionDb';
+  /** ONE row, or `undefined`. The address is the declared one and no other. */
+  rowAt<K extends ResolvableTableKey>(key: K, at: ResolutionAddress<K>): Promise<unknown>;
+}
+
+/**
+ * The pre-identity reader. No identity, because finding one is the point.
+ *
+ * IT TAKES NO REASON, on `firmDb()`'s precedent one door along: the question a
+ * reason answers is "why are you reading rows that are not yours", and the
+ * honest answer here is fixed by the vocabulary rather than chosen at the call
+ * site. There is one table and one address and no second thing this handle could
+ * be doing.
+ */
+/**
+ * THE ONLY PRODUCER OF A PRE-IDENTITY READ PREDICATE, and the seam the suite
+ * asserts through.
+ *
+ * IT IS A SEPARATE FUNCTION FOR THE REASON `scopedWritePredicate` IS. The handle
+ * itself reads `client()`, which throws when `DATABASE_URL` is unset, so a
+ * refusal asserted only through `resolutionDb().rowAt` would be a refusal no
+ * suite in this workspace could reach. `ci.yml`'s `integration` job has no
+ * services block, which is the same absence ADR-102 section 16, ADR-112 section
+ * 9 and ADR-120 section 7 all name.
+ *
+ * THERE IS NO TENANCY CONJUNCT AND THERE IS NO CORRECT ONE. That is what makes
+ * this door the one where the vocabulary is the whole control: the address is
+ * the entire predicate, and the two guards below are everything standing between
+ * a caller who has proved nothing and a row.
+ */
+export function resolutionPredicate<K extends ResolvableTableKey>(
+  key: K,
+  at: ResolutionAddress<K>,
+): SQL {
+  const address = at as Readonly<Record<string, unknown>>;
+  refuseUnresolvableAddress(key, address);
+  // THE FOLD TO `schema.ts` STILL RUNS. The vocabulary says which column is
+  // permitted; this says the database agrees that column names one row, so a
+  // later member added to `RESOLUTION_ADDRESS` over a non-unique column is a
+  // throw rather than a many-row read at an authority carrying no tenancy.
+  refuseUnaddressed(key, address);
+  return addressPredicate(key, address);
+}
+
+export function resolutionDb(): ResolutionDb {
+  return {
+    __brand: 'ResolutionDb',
+    async rowAt<K extends ResolvableTableKey>(key: K, at: ResolutionAddress<K>): Promise<unknown> {
+      const found = (await client()
+        .select()
+        .from(TABLES[key] as PgTable)
+        .where(resolutionPredicate(key, at))) as unknown[];
+      return oneOrNone(key, found);
+    },
+  };
+}
+
+/** Every table the registry reaches through ANOTHER table. Derived, never listed. */
+type DerivedTableKey = {
+  [K in TableKey]: (typeof SCOPE_RULES)[K]['class'] extends 'derived' ? K : never;
+}[TableKey];
+
+/**
+ * The tables a SCOPED handle may insert into by PROVING the parent.
+ *
+ * A CLOSED LIST OF ONE, WRITTEN AS AN `Extract` SO THE REGISTRY POLICES IT. If
+ * `sessions` ever stops being `derived` this type is `never` and every use of it
+ * stops compiling, rather than the list quietly describing a table whose class
+ * moved underneath it.
+ *
+ * IT IS A LIST AND NOT THE WHOLE CLASS, and the reason is measured rather than
+ * cautious: `ledger_entries` is `derived` with `traversal: 'hop'`, so the class
+ * contains one leg of a double-entry posting. See this section's header.
+ */
+export type ParentedTableKey = Extract<DerivedTableKey, 'sessions'>;
+
+/**
+ * INSERT one row of a `derived` table, with the parent PROVED rather than
+ * stamped.
+ *
+ * THE CALLER NAMES THE PARENT AND THE ACCESSOR PROVES IT, and that inversion is
+ * the whole construction. On an `owned` table the tenancy value is KNOWN to the
+ * handle, so `scopedInsertStatement` stamps it and `refuseTenancyColumn` refuses
+ * a caller who names it. On a `derived` table the handle cannot stamp anything:
+ * an identity may hold MORE THAN ONE user (ADR-041), so `user_id` is a choice
+ * among this identity's own children and only the caller knows which. That is
+ * ADR-112 section 5's second draft finding one class along -- "one identity owns
+ * many accounts, so the caller's half really does have to name which".
+ *
+ * SO THE PARENT IS READ, INSIDE THIS TRANSACTION, THROUGH `scopePredicate`. The
+ * read is `SELECT ... FROM via WHERE via.<foreign> = <the value the caller named>
+ * AND <the via table's own scope predicate>`, and zero rows is a THROW rather
+ * than an insert. ADR-102 section 4 named this construction and declined to
+ * build it, on the argument that the read "inside a transaction is a `SELECT`
+ * the caller could have skipped and outside one is a race". The second half is
+ * why the read is on `source` and not on `client()`; the first half is a cost
+ * this entry accepts, on ADR-112 clause 2's own trade -- a run-time check bought
+ * a guarantee that holds BY CONSTRUCTION rather than by the caller's care, and
+ * the guarantee here is that a session cannot be minted for somebody else.
+ *
+ * `hop` ONLY. A `semi-join` traversal is one-to-many in the direction traversed,
+ * so proving the parent proves that SOME child of this identity's is on the
+ * other end and not that this row is. `ledger_transactions` is the registry's
+ * only one and it is refused by the type before this ever runs; the check below
+ * is the run-time half.
+ */
+export async function insertUnderStatement(
+  source: StatementSource,
+  key: ParentedTableKey,
+  identityId: IdentityId,
+  values: WriteValues,
+): Promise<unknown[]> {
+  // WIDENED DELIBERATELY, AND THE COMPILER SAID SO. `SCOPE_RULES[key]` at a
+  // literal key narrows this `const` to the ONE rule `sessions` carries, which
+  // makes both guards below unreachable branches: the first draft reported
+  // `TS2339: Property 'class' does not exist on type 'never'` from inside its
+  // own error message. Widening the index restores the union, so the guards are
+  // written against the REGISTRY rather than against the type -- which is the
+  // only version of them that survives the registry moving.
+  const rule: ScopeRule = SCOPE_RULES[key as TableKey];
+  if (rule.class !== 'derived') {
+    throw new Error(
+      `${key} is registered "${rule.class}" and insertUnder proves a PARENT. An owned or root ` +
+        'row carries its own tenancy column, which `insert` stamps; a firm or pair row has no ' +
+        'parent to prove. The registry moved and this list did not follow it.',
+    );
+  }
+  if (rule.traversal !== 'hop') {
+    throw new Error(
+      `${key} reaches its identity by a ${rule.traversal}, which is one-to-many in the direction ` +
+        'traversed, so proving the parent proves that SOME row of this identity is on the other ' +
+        'end rather than that this one is. insertUnder takes a hop and nothing else.',
+    );
+  }
+
+  const table = TABLES[key] as PgTable;
+  const property = propertyForColumn(table, rule.localColumn);
+  if (property === undefined) {
+    throw new Error(
+      `scope registry names column "${rule.localColumn}" on ${key}, which does not exist on this ` +
+        'table. The registry and the schema have drifted.',
+    );
+  }
+
+  // THE SQL SPELLING IS REFUSED RATHER THAN ACCEPTED, because Drizzle keys a
+  // values object by PROPERTY name: a caller writing `user_id` would have the
+  // column silently dropped from the INSERT and the parent proved against a
+  // value the row never carried. `refuseTenancyColumn` refuses both spellings on
+  // the paths that stamp; this one requires one and refuses the other.
+  if (
+    property !== rule.localColumn &&
+    Object.prototype.hasOwnProperty.call(values, rule.localColumn)
+  ) {
+    throw new Error(
+      `"${rule.localColumn}" is ${key}'s SQL column name and a values object is keyed by Drizzle ` +
+        `property name. Name "${property}" instead: written this way the column is dropped from ` +
+        'the INSERT and the parent is proved against a value the row would not have carried.',
+    );
+  }
+  if (!Object.prototype.hasOwnProperty.call(values, property)) {
+    throw new Error(
+      `an insert under ${key}'s parent must name "${property}". The handle cannot stamp it: ` +
+        `${key} reaches its identity through ${rule.via}, an identity may hold more than one of ` +
+        'those, and the accessor has no way to choose which without being told.',
+    );
+  }
+
+  const parent = values[property];
+  if (parent === null || parent === undefined) {
+    throw new Error(
+      `"${property}" is ${parent === null ? 'null' : 'undefined'} in an insert under ${key}'s ` +
+        'parent. A NULL parent proves nothing, because equality against NULL matches no row, so ' +
+        'it is refused rather than read as an unparented insert.',
+    );
+  }
+
+  // THE PROOF. Not a count and not an EXISTS: the rows come back so that the
+  // second refusal below can see a hop that named a column the via table does
+  // not hold unique, which is a registry drift and not a caller error.
+  const via = TABLES[rule.via] as PgTable;
+  const proved = (await source
+    .select()
+    .from(via)
+    .where(
+      bothOf(
+        eq(columnByName(via, rule.foreignColumn), parent),
+        scopePredicate(rule.via, identityId),
+      ),
+    )) as unknown[];
+
+  if (proved.length === 0) {
+    throw new Error(
+      `no row of ${rule.via} with ${rule.foreignColumn} = the value named for "${property}" ` +
+        `belongs to this identity, so the parent of this ${key} row cannot be proved. The row is ` +
+        'NOT written. This is the refusal that stops a session being minted for somebody else.',
+    );
+  }
+  if (proved.length > 1) {
+    throw new Error(
+      `proving the parent of a ${key} row matched ${proved.length} rows of ${rule.via}. The ` +
+        `registry calls this traversal a hop, which asserts that "${rule.foreignColumn}" is ` +
+        'unique on that table, and the database disagreed.',
+    );
+  }
+
+  return (await source.insert(table).values(values).returning()) as unknown[];
+}
+
 // -----------------------------------------------------------------------------
 // THE TRANSACTION, AND THE `JobTransaction` NOTHING IN THIS WORKSPACE COULD
 // PRODUCE (ADR-102 clause 2)
@@ -1049,6 +1403,15 @@ export interface ScopedTx extends TxCommon {
   readonly identityId: IdentityId;
   rows<K extends ScopedTableKey>(key: K): Promise<unknown[]>;
   insert<K extends OwnedTableKey>(key: K, values: WriteValues): Promise<unknown[]>;
+  /**
+   * INSERT one row of a `derived` table whose PARENT this handle proves.
+   *
+   * `ParentedTableKey` is a CLOSED LIST and not the whole class, for the reason
+   * the establishment section measures: `ledger_entries` is `derived` and a
+   * generic version of this method would hand a request handler one leg of a
+   * double-entry posting.
+   */
+  insertUnder<K extends ParentedTableKey>(key: K, values: WriteValues): Promise<unknown[]>;
   /** Rows matching a filter, ANDed with this identity's scope. Many rows. */
   rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
     key: K,
@@ -1156,6 +1519,12 @@ export function scopedTx(
         identityId,
         values,
       ).returning()) as unknown[];
+    },
+    async insertUnder<K extends ParentedTableKey>(key: K, values: WriteValues): Promise<unknown[]> {
+      // THE READ AND THE WRITE ARE ON `source`, which is this transaction's own
+      // handle. Proving the parent on `client()` would prove it against
+      // committed state and leave the window ADR-102 section 4 calls a race.
+      return await insertUnderStatement(source, key, identityId, values);
     },
     async rowsWhere<K extends ScopedTableKey, F extends RowFilter<K>>(
       key: K,
