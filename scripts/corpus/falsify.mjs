@@ -1459,35 +1459,51 @@ const SEEDS = {
   // 29 of 30. A harness that had matched loosely would have seeded a second key
   // and passed.
   //
-  // THE ARTIFACT IS NOW `scopedDb` NAMED UNDER `apps/api/src`, which is
-  // API_CONTRACT section 1's own mechanism for what both rows are about:
-  // "Every authenticated handler resolves the caller to an identity and reads
-  // through `scopedDb(identity)`". The seed is that name arriving in the
-  // deployable.
+  // AND IT MOVED A SECOND TIME, ON 2026-08-27, FOR THE SAME REASON AND IN THE
+  // SAME WAY. It seeded a `scopedDb` call into `apps/api/src` while VG-3 and
+  // VG-6 waited on one; ADR-120 wired `AuthBackend` and `IdempotencyStore`
+  // against the accessor and put a real one there, so `CI-06/vg-inventory` went
+  // to 31 of 32 on the good news and THIS CASE STOPPED FAILING -- `DID NOT
+  // FAIL`, one problem, on the commit that delivered the artifact. **A HARNESS
+  // WHOSE SEED STILL FIRES AFTER ITS ARTIFACT HAS ARRIVED IS A HARNESS THAT HAS
+  // STOPPED WATCHING ANYTHING**, and the two failure shapes this register has now
+  // produced -- a seed anchor that throws, and a seed that no longer reopens
+  // anything -- are the same design working from two sides.
   //
-  // THE KEY IS ANCHORED AND THE NEAR-MISS IS A SCOPE CASE, unchanged in shape.
-  // `scopedDbFixture` contains `scopedDb`; a substring probe would fire on it
-  // and pass in exactly the same way as one that works, which is the
-  // @vitest/browser-playwright lesson. The pair is deliberate: this seed proves
-  // the probe FIRES, and `scoped-db-near-miss` proves it does not fire on a
-  // longer name.
+  // THE ARTIFACT IS NOW `a services: block on ci.yml's integration job`. VG-3's
+  // implementation is "review plus the VG-6 suite" and VG-6's is "integration
+  // suite calling endpoints with no UI in the path": that suite became WRITABLE
+  // when the accessor arrived and it is still not RUNNABLE, because every
+  // entitlement it would assert is a row in a database and `ci.yml`'s
+  // `integration` job runs on bare `ubuntu-latest`. ADR-102 section 16, ADR-112
+  // section 9 and ADR-120 have each named that gap in the same words.
+  //
+  // THE PROBE IS JOB-SCOPED AND THE NEAR-MISS IS A SCOPE CASE, which is this
+  // register's unchanged shape. A `services:` block anywhere in that workflow
+  // would satisfy a file-wide grep and would report the artifact ARRIVED on a
+  // job VG-6 is not about, passing in exactly the same way as one that works.
+  // The pair is deliberate: this seed proves the probe FIRES on the
+  // `integration` job, and `services-on-another-job` proves it does not fire on
+  // a different one.
   'CI-06/vg-inventory': {
-    what: "an activation condition's artifact ARRIVING: `scopedDb` named inside apps/api reopens VG-3 and VG-6",
+    what: "an activation condition's artifact ARRIVING: a services: block on ci.yml's integration job reopens VG-3 and VG-6",
     real:
       'VG-3 and VG-6 chained on CI-04 until 2026-08-24 and the chain EXPIRED when CI-04 got ' +
       'an implemented leg (ADR-085). Their condition is a fact about the tree precisely so that ' +
-      'the commit making server-side authz writable reopens both rows on the day it lands ' +
-      'rather than whenever somebody rereads the table. It was a lockfile key until ADR-100 ' +
-      'delivered that key; it is now the accessor the contract names',
+      'the commit making an entitlement testable through the API reopens both rows on the day ' +
+      'it lands rather than whenever somebody rereads the table. It was a lockfile key until ' +
+      'ADR-100, then the accessor the contract names until ADR-120, and it is now the database ' +
+      'that stage has never had',
     expect: () => 'HAS ARRIVED',
     seed: (d) => {
-      const rel = 'apps/api/src/falsify_seeded_handler.ts';
-      if (existsSync(join(d, rel))) {
-        throw new Error(`seed anchor not found: ${rel} already exists`);
-      }
-      writeFileSync(
-        join(d, rel),
-        '// seeded by falsify.mjs\nexport const read = () => scopedDb(identity);\n',
+      edit(d, CI_WORKFLOW, (b) =>
+        once(
+          b,
+          '  integration:\n    name: CI-04 integration\n    runs-on: ubuntu-latest\n    steps:',
+          '  integration:\n    name: CI-04 integration\n    runs-on: ubuntu-latest\n' +
+            '    services:\n      postgres:\n        image: postgres:16 # seeded by falsify.mjs\n' +
+            '    steps:',
+        ),
       );
     },
   },
@@ -2221,6 +2237,9 @@ const soleWaiterVgRow = (d) => {
 
 const LOCKFILE = 'pnpm-lock.yaml';
 
+/** The pipeline workflow, which two `CI-06/vg-inventory` cases seed into. */
+const CI_WORKFLOW = '.github/workflows/ci.yml';
+
 const SCOPE_CASES = [
   // -------------------------------------------------------------------------
   // CI-06/retired-constraints. Six cases, on CI-06o's rule that a gate
@@ -2468,12 +2487,29 @@ const SCOPE_CASES = [
     name: 'CI-06/vg-inventory/scoped-db-near-miss',
     gate: 'CI-06/vg-inventory',
     what: 'scopedDbFixture inside apps/api must NOT reopen a row waiting on scopedDb (the substring lesson)',
-    // MUST NOT FIRE. `scopedDbFixture` contains `scopedDb`, so a probe matching
-    // on substring reports the artifact ARRIVED on a name that is not it, and
-    // passes in exactly the same way as one that works. This is the
-    // @vitest/browser-playwright case carried onto the artifact ADR-100 re-ruled
-    // these rows onto. Its control is the SEEDS entry for this gate, which seeds
-    // a real `scopedDb` call and requires HAS ARRIVED.
+    // RETAINED VERBATIM ON 2026-08-27 AND NO LONGER BOUNDING A LIVE PROBE, which
+    // is `fastify-near-miss`'s position two entries up, arrived at by the same
+    // route and resolved by the same rule. ADR-120 re-ruled VG-3 and VG-6 off
+    // the accessor's name onto a database in CI, so `VG_PROBES` no longer holds
+    // a `scopedDb` entry and this seed can no longer reopen anything. It still
+    // PASSES, and it is neither deleted nor repointed for one reason:
+    // **ADR-100 is `accepted` and its section 7 cites this case BY NAME** --
+    // "`CI-06/vg-inventory/scoped-db-near-miss` is the live anchoring case" --
+    // and a signed entry moves by a superseding ADR and never by a session.
+    // Deleting it leaves that citation resolving to nothing; repointing its seed
+    // makes its name and ADR-100's sentence describe something it does not do.
+    //
+    // THAT IS THE SECOND TIME THIS EXACT THING HAS HAPPENED IN THIS REGISTER AND
+    // IT IS NOW A PATTERN RATHER THAN AN INCIDENT: an artifact arrives, the row
+    // is re-ruled, and the near-miss that bounded the old probe is stranded by a
+    // signed citation. **A near-miss case named after the artifact it bounds
+    // becomes uneditable the moment an ADR cites it**, and the corpus now
+    // carries two of them. Naming the next one after the SHAPE it refuses --
+    // `substring-not-scope` rather than `scoped-db-near-miss` -- would have made
+    // both repointable. Reported here rather than repaired, because renaming
+    // this one is the same edit the citation forbids.
+    //
+    // THE LIVE ANCHORING CASE IS `services-on-another-job` BELOW.
     expect: () => 'PASS',
     seed: (d) => {
       const rel = 'apps/api/src/falsify_near_miss.ts';
@@ -2483,6 +2519,30 @@ const SCOPE_CASES = [
       writeFileSync(
         join(d, rel),
         '// seeded by falsify.mjs\nexport const a = scopedDbFixture;\nexport const b = unscopedDbThing;\n',
+      );
+    },
+  },
+  {
+    name: 'CI-06/vg-inventory/services-on-another-job',
+    gate: 'CI-06/vg-inventory',
+    what: 'a services: block on a DIFFERENT ci.yml job must NOT reopen a row waiting on one on `integration`',
+    // MUST NOT FIRE. `services:` appears nowhere in that workflow today, so a
+    // file-wide grep is the shape everybody reaches for first and it reports the
+    // artifact ARRIVED the day any other job acquires one -- passing in exactly
+    // the same way as one that works. This is the @vitest/browser-playwright
+    // lesson carried onto the artifact ADR-120 re-ruled these rows onto, and the
+    // probe reads the `integration` job's own body rather than the file. Its
+    // control is the SEEDS entry for this gate, which seeds the same block onto
+    // `integration` and requires HAS ARRIVED.
+    expect: () => 'PASS',
+    seed: (d) => {
+      edit(d, CI_WORKFLOW, (b) =>
+        once(
+          b,
+          '  unit-and-property:',
+          '  unit-and-property:\n    services:\n      postgres:\n' +
+            '        image: postgres:16 # seeded by falsify.mjs',
+        ),
       );
     },
   },
