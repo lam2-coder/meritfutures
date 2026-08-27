@@ -436,8 +436,23 @@ async function callAs(
   return response;
 }
 
-const RELEASE = ADMIN_PAYOUT_ENDPOINTS[0];
-const ENFORCE = ADMIN_PAYOUT_ENDPOINTS[1];
+/**
+ * The spec for one contract path.
+ *
+ * BOUND BY PATH AND NOT BY POSITION, and that is not only `noUncheckedIndexedAccess`
+ * satisfied. `ADMIN_PAYOUT_ENDPOINTS[0]` would keep compiling if the two rows were
+ * ever reordered, and every assertion below would then exercise the OTHER endpoint
+ * while still passing: `RELEASE` would post nothing and `ENFORCE` would post `LT-01`,
+ * and the suite would agree with both. A lookup that throws cannot do that.
+ */
+function endpointAt(path: string): (typeof ADMIN_PAYOUT_ENDPOINTS)[number] {
+  const spec = ADMIN_PAYOUT_ENDPOINTS.find((candidate) => candidate.path === path);
+  if (spec === undefined) throw new Error(`no endpoint in this module declares \`${path}\``);
+  return spec;
+}
+
+const RELEASE = endpointAt(PAYOUT_RELEASE_PATH);
+const ENFORCE = endpointAt(PAYOUT_ENFORCE_PATH);
 
 // -----------------------------------------------------------------------------
 // 4. AN AUTHORIZATION REFUSAL IS NEVER A GATE RESULT (INV-M5-23's shape)
