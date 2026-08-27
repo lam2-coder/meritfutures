@@ -1,18 +1,29 @@
 {
   "extends": "../../tsconfig.base.json",
-
-  "//jsx": "ADR-095 RULED THIS APP A NEXT.JS APP ROUTER APPLICATION AND A ROUTER APPLICATION IS WRITTEN IN JSX, so the option lands with the first rendered file rather than with the framework's manifest entry. `react-jsx` is the automatic runtime, which is what React 19 and Next 16 both expect: no `import React` is needed in a component file, and a file that imported it for the side effect would be carrying a React 16 habit into a tree that has never had one.",
-
-  "//lib": "`DOM` IS ADDED HERE AND IN NO OTHER PACKAGE, AND THE NARROWNESS IS THE ARGUMENT. tsconfig.base.json withholds it from every package on purpose, and the root manifest's `//typecheck` note records why: the four non-UI deployables run under `node --experimental-strip-types` and a DOM global in one of them is a type that exists at compile time and not at run time. `apps/portal` is now the exception ADR-095 created rather than an exception taken from that rule: `@types/react` references `Element`, `HTMLElement` and `Event` from its own declarations, so a React component cannot be type-checked without them, and this application renders in a browser. `apps/site` will need the same line for the same reason and takes it in its own commit.",
-
-  "//include": "THE `.tsx` PATTERNS ARE ADDITIVE AND THE `.ts` ONES ARE UNCHANGED. `test/**/*.tsx` is listed even though no such file exists today, because the alternative is a second edit to this file the day one does, made by whoever is least expecting to edit build configuration.",
-
-  "//fence": "SESSION 264 EDITED A FILE THAT IS ARGUABLY SESSION 250's. Saying so is cheaper than the reader deriving it from the blame. 250 owns `next.config`, `src/app/layout.tsx` and the root page, and any one of those needs exactly these three options; 264 needed them first because it landed the first `.tsx` in the tree. The edit is additive in all three keys, so a 250 branch that writes the same options merges as a duplicate rather than as a conflict in behaviour.",
-
   "compilerOptions": {
     "types": ["node"],
-    "jsx": "react-jsx",
-    "lib": ["ES2023", "DOM"]
+
+    // `.tsx` ARRIVES WITH THE FIRST PAGE, WHICH IS ADR-095 `F7` VERBATIM: "each
+    // app's `tsconfig` gains `jsx` and a `dom` lib ... it belongs with the first
+    // page rather than here". Session 250 is that page, so this is the edit that
+    // entry deferred rather than a widening taken here.
+    //
+    // `preserve` HANDS JSX TO THE FRAMEWORK, which is tsconfig.base.json's
+    // "nothing in this repository is built by `tsc`" applied one level down: the
+    // bundler emits, `tsc --noEmit` only reads.
+    "jsx": "preserve",
+
+    // REQUIRED BECAUSE `@types/react@19` DECLARES NO GLOBAL `JSX` NAMESPACE.
+    // React 18's types did, so `jsx: preserve` alone type-checked; 19 moved it
+    // to `React.JSX` and a config that relied on the global silently stops
+    // resolving intrinsic elements. Named here so the next reader does not
+    // re-derive it from an error message.
+    "jsxImportSource": "react",
+
+    // THE `dom` LIB IS THIS APP'S AND NOT THE BASE CONFIG'S. tsconfig.base.json
+    // withholds it from every Node deployable on purpose; a rendered document
+    // is the one place in this workspace where `document` is real.
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"]
 }
