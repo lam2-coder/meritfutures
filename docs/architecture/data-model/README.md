@@ -221,6 +221,7 @@ Created by [`0013_ingest`](../../../packages/db/migrations/0013_ingest.sql), [`0
 | [`daily_marks`](daily_marks.md) | |
 | [`reconciliations`](reconciliations.md) | |
 | [`rule_states`](rule_states.md) | |
+| [`live_account_state`](live_account_state.md) | `0050`. **[ADR-020](../../decisions/ADR-020.md)'s tier 2 live cache, and the only table in this section the engine cannot read.** One row per account, upserted, discardable. [`0050`](../../../packages/db/migrations/0050_live_cache_and_role.sql) revokes **all four verbs** from `merit_app` and grants a fifth role `merit_live` instead, which is `INV-M2-14` and `FM-M12-08` as permissions rather than conventions ([ADR-164](../../decisions/ADR-164.md)) |
 
 ## 8. Payouts, ledger, wallet and treasury controls
 
