@@ -1581,13 +1581,13 @@ CONTEXT:  PL/pgSQL function inline_code_block line 183 at RAISE
 |---|---|
 | Deferred trigger, first run | `ERROR: cannot TRUNCATE "trading_calendar" because it has pending trigger events`, so `REJECTION 8` met the executor instead of `CALENDAR-C2` |
 | Deferred trigger, after flushing the pending events | `CALENDAR-C3: trading_calendar day 2026-06-01 was INSERTED at or before 2026-06-02`. **The probe's fixture inserts the calendar and then folds over it, in one transaction**, and a deferred guard asks its question at commit, by which time the transaction has folded past the day it just added |
-| Immediate trigger, with `0032`'s revisions foreign key superseded as `DEFERRABLE` | All fourteen probes pass. The flush stays in `REJECTION 8`, because a pending foreign-key event blocks `TRUNCATE` the same way a pending trigger event did |
+| Immediate trigger, with `0032`'s revisions foreign key superseded as `DEFERRABLE` | Every probe passes. The flush stays in `REJECTION 8`, because a pending foreign-key event blocks `TRUNCATE` the same way a pending trigger event did |
 
 **A transaction that seeds a calendar and then writes marks against it is not exotic**: it is what that fixture does, and it is what a demo seed does. The guard has to ask whether the day was retroactive **when it was inserted**, which is a statement about the moment rather than about the transaction, and that is the one place this file departs from `CALENDAR-C1`'s shape on purpose.
 
 ### Install verification, from empty
 
-**All 49 migrations apply in order against PostgreSQL 16.13 with `ON_ERROR_STOP=1`.** Counts read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger`, never from a grep.
+**All 49 migrations apply in order against PostgreSQL 16.13 with `ON_ERROR_STOP=1`.** **This table read "14 of 14 probes" when it was first written and there are 15**, because the count was taken from a run made while only one of this session's two probes existed. It is corrected here rather than quietly, since a hand-maintained count found wrong is this manifest's most repeated finding and the tenth instance does not get an exception. Counts read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger`, never from a grep.
 
 | Check | Result |
 |---|---|
@@ -1596,7 +1596,7 @@ CONTEXT:  PL/pgSQL function inline_code_block line 183 at RAISE
 | Tables / indexes / checks / triggers | **112 / 395 / 477 / 20** (was 111 / 392 / 474 / 18 at `0047`) |
 | `CREATE TABLE` and `CREATE TRIGGER` in the DDL | 112 and 20, agreeing with the database, which is what `CI-06h` compares |
 | Append-only set, from `has_table_privilege` | **26**, and the document declares the same 26 |
-| Every probe in `scripts/db/`, plus `assert_no_floats.sql` | **14 of 14 pass**, section 18's rule |
+| Every probe in `scripts/db/`, plus `assert_no_floats.sql` | **15 of 15 pass**, section 18's rule |
 | Corpus gates | **32 of 32** |
 
 ### The counterfactuals, recorded as observed rather than as predicted
