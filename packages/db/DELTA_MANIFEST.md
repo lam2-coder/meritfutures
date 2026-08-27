@@ -1545,3 +1545,129 @@ CONTEXT:  PL/pgSQL function inline_code_block line 183 at RAISE
 ### One check was available, is not one of the three, and is deliberately not installed
 
 `completed_at <= published_at` costs nothing extra in the same trigger and would refuse a publish citing a run that had not finished when the decision was recorded. **A money-path migration that installs an unruled constraint because it was cheap is how a schema acquires rules nobody decided**, and the next reader cannot tell which of its controls were ruled and which were convenient. [ADR-087 section 6](../../docs/decisions/ADR-087.md) records it as a candidate for a ruling.
+
+---
+
+## 26. `0048` and `0049` land, and the defect was found by writing a fixture rather than by reading anything (2026-08-27)
+
+**[ADR-128](../../docs/decisions/ADR-128.md) proposed, founder approval PENDING. `OI-01`, `OI-03`, `OI-04`, `OI-12` and `OI-13` close.** Two migrations rather than one, and `OI-03` takes neither: its own words ask for a check that reads `0026`'s revoke list **against the document**, and a `.sql` file cannot read markdown.
+
+| | |
+|---|---|
+| [`0048_audited_writes_on_append_only_tables.sql`](migrations/0048_audited_writes_on_append_only_tables.sql) | `OI-04`, `OI-12`, `OI-13`. Three `SECURITY DEFINER` paths and `CALENDAR-C3` |
+| [`0049_reserve_coverage_snapshots.sql`](migrations/0049_reserve_coverage_snapshots.sql) | `OI-01`. `reserve_coverage_snapshots`, plus `liability_snapshots.funded_accounts` |
+| [`scripts/db/assert_append_only_grants.mjs`](../../scripts/db/assert_append_only_grants.mjs) | `OI-03`. No DDL, no migration number |
+
+**No numbered delta lands here.** All five are open items rather than `SD-nn` rows, so [ADR-026](../../docs/decisions/ADR-026.md)'s completeness gate has nothing to count. `SD-M6-01` stays dispositioned against `0009`.
+
+### The ruled mark correction has never been executable, and no reading found it
+
+**`0014`: "A CORRECTION PRODUCES A NEW MARK ROW AND POINTS THE OLD ONE HERE. Never an UPDATE." `0026` says the same thing in different words. The database refuses both orders and there is no third.**
+
+| Order | Result, executed against PostgreSQL 16.13 |
+|---|---|
+| Insert the replacement, then point the old row at it | `duplicate key value violates unique constraint "daily_marks_live_per_account_day_uq"`. For the instant before the old row is pointed away, the account-day carries **two live marks**, and the index is partial on `superseded_by IS NULL` |
+| Point the old row first, then insert the replacement | `insert or update on table "t2" violates foreign key constraint "t2_superseded_by_fkey"`, reproduced on a minimal copy of the shape. `superseded_by` cannot name a row that does not exist yet |
+
+**It was found by writing the fixture for `SUCCESS 4` of the probe**, which is the same way `EC-157`'s constraint and [ADR-035](../../docs/decisions/ADR-035.md)'s trigger were each found: by trying to perform the legitimate operation. `daily_marks` has zero rows and no correction has ever been attempted, so nothing failed and nothing could.
+
+**The repair defers the uniqueness rather than weakening it.** A partial `UNIQUE INDEX` cannot be deferred, because only a constraint can be deferred and a unique constraint cannot be partial; an `EXCLUDE` constraint can be both. `0048` installs `EXCLUDE USING btree (account_id WITH =, trading_day WITH =) WHERE (superseded_by IS NULL) DEFERRABLE INITIALLY DEFERRED` under the same name, over the same btree, with the same predicate. **The violation class moves from `unique_violation` to `exclusion_violation`**, which is why `REJECTION 6b` checks the class as well as the name.
+
+### `CALENDAR-C3` is immediate, and the deferred version refused its own fixtures
+
+**Written first as a `DEFERRABLE INITIALLY DEFERRED` constraint trigger, on `CALENDAR-C1`'s precedent. Running every existing probe against the new schema, which is section 18's rule, broke [`probe_calendar_revision_required.sql`](../../scripts/db/probe_calendar_revision_required.sql) twice for two different reasons, and the second one was a design finding rather than a probe repair.**
+
+| Run | What happened |
+|---|---|
+| Deferred trigger, first run | `ERROR: cannot TRUNCATE "trading_calendar" because it has pending trigger events`, so `REJECTION 8` met the executor instead of `CALENDAR-C2` |
+| Deferred trigger, after flushing the pending events | `CALENDAR-C3: trading_calendar day 2026-06-01 was INSERTED at or before 2026-06-02`. **The probe's fixture inserts the calendar and then folds over it, in one transaction**, and a deferred guard asks its question at commit, by which time the transaction has folded past the day it just added |
+| Immediate trigger, with `0032`'s revisions foreign key superseded as `DEFERRABLE` | All fourteen probes pass. The flush stays in `REJECTION 8`, because a pending foreign-key event blocks `TRUNCATE` the same way a pending trigger event did |
+
+**A transaction that seeds a calendar and then writes marks against it is not exotic**: it is what that fixture does, and it is what a demo seed does. The guard has to ask whether the day was retroactive **when it was inserted**, which is a statement about the moment rather than about the transaction, and that is the one place this file departs from `CALENDAR-C1`'s shape on purpose.
+
+### Install verification, from empty
+
+**All 49 migrations apply in order against PostgreSQL 16.13 with `ON_ERROR_STOP=1`.** Counts read from `pg_tables`, `pg_indexes`, `pg_constraint` and `pg_trigger`, never from a grep.
+
+| Check | Result |
+|---|---|
+| Forward-only apply, `0001` to `0049` | **applies clean** |
+| Re-apply of `0048` | **rejected** (`function "supersede_daily_mark" already exists with same argument types`) |
+| Tables / indexes / checks / triggers | **112 / 395 / 477 / 20** (was 111 / 392 / 474 / 18 at `0047`) |
+| `CREATE TABLE` and `CREATE TRIGGER` in the DDL | 112 and 20, agreeing with the database, which is what `CI-06h` compares |
+| Append-only set, from `has_table_privilege` | **26**, and the document declares the same 26 |
+| Every probe in `scripts/db/`, plus `assert_no_floats.sql` | **14 of 14 pass**, section 18's rule |
+| Corpus gates | **32 of 32** |
+
+### The counterfactuals, recorded as observed rather than as predicted
+
+**Each artifact was run against the migration set WITHOUT the file it belongs to.** A guard nobody has watched fail is not a guard.
+
+```
+$ psql -d cf47 -v ON_ERROR_STOP=1 -f scripts/db/probe_audited_writes.sql     # 0001-0047
+NOTICE:  SUCCESS 1: with nothing folded, a calendar INSERT needs no revision row
+NOTICE:  SUCCESS 2: a day beyond the fold extent is an extension and needs nothing
+ERROR:  insert or update on table "trading_calendar_revisions" violates foreign key
+        constraint "trading_calendar_revisions_trading_day_fkey"
+exit 3
+```
+
+**That is not what the probe header predicted and the header now says what happened.** It said `SUCCESS 4` would fail first, because `supersede_daily_mark` does not exist before `0048`. In fact `SUCCESS 1` and `SUCCESS 2` **pass** without the migration, because a guard that does not exist refuses nothing, and the first thing that breaks is the deferrable foreign key. **Both facts were kept**: those two successes are assertions about the guard's shape rather than its existence, and that is worth knowing about them.
+
+```
+$ psql -d cf48 -v ON_ERROR_STOP=1 -f scripts/db/probe_reserve_coverage.sql   # 0001-0048
+ERROR:  type "reserve_coverage_snapshots" does not exist
+LINE 2: DECLARE v_row reserve_coverage_snapshots;
+exit 3
+```
+
+**It dies at a `DECLARE` rather than at a write**, because the probe binds the table's own composite type, so the absence is caught at PL/pgSQL compile time.
+
+```
+$ PGDATABASE=cf48 node scripts/db/assert_append_only_grants.mjs             # 0001-0048
+APPEND-ONLY: the declared set (26) and the installed set (25) disagree on 1:
+  reserve_coverage_snapshots: DATA_MODEL section 1 declares it append-only and
+  merit_app still holds UPDATE or DELETE on it. The word "append-only" in its
+  comment is false (VG-8) ...
+exit 1
+```
+
+**And the assertion falsifies in both directions on the full schema**, which is the direction that matters, because `OI-03` is a stale-list defect and the stale direction is the one nobody looks in:
+
+```
+$ node scripts/db/assert_append_only_grants.mjs --falsify
+FALSIFIED (declared and unguarded): zzz_phantom_append_only: DATA_MODEL section 1
+  declares it append-only and merit_app still holds UPDATE or DELETE on it ...
+FALSIFIED (guarded and undeclared): payout_requests: the database revokes UPDATE and
+  DELETE from merit_app and DATA_MODEL section 1 does not list it ...
+assert_append_only_grants: falsified in both directions, and the seed did not leak.
+```
+
+### What `OI-03` actually found, which is not what it predicted either
+
+**The item says a list drifts. It had already drifted, three ways, and every gate was green.** DATA_MODEL section 1 carried **three** copies of its Mutability bullet, left by three keep-both merges, claiming "twenty-three tables ... four migrations", "twenty-two ... three" and "twenty-two ... three", over three different lists of which migrations revoke. **The installed set was twenty-five.** `CI-06u` looks for duplicated passages and these had diverged; `CI-06i` reads table names and not privileges; nothing at all read the database's grants.
+
+**The replacement carries no count.** Every previous version of that sentence opened with one and every one of them was wrong, and a list a machine reads needs no number in front of it.
+
+### Two register rows were wrong, and the register calling its own entry stale is [ADR-117](../../docs/decisions/ADR-117.md)'s named blind spot
+
+| Row | What it says | What is true |
+|---|---|---|
+| `OI-04` | "two legitimate **single-column** updates" | The `identity_links` write is **four** columns. `suppressed` is the operative field and `identity_links_suppression_has_author` makes `suppressed_by` mandatory, so `disputed_at`, `dispute_note`, `suppressed` and `suppressed_by` move together |
+| `OI-01` | `per_plan` is among the fields with no home | It has had one since `0016`. API_CONTRACT's `per_plan` is loss ratio, threshold, `sales_paused` and CUSUM per plan, and that is `plan_breaker_state` column for column. **Thirty-three migrations of an orphan that was not orphaned** |
+
+### `NULLIF` in `rcr_bp` is load-bearing, and the ordering it depends on was executed rather than assumed
+
+**A `GENERATED` column is computed BEFORE the row's `CHECK` constraints are evaluated.** With a plain `(reserve_cents * 10000) / cvar99_cents`, a zero denominator raises a bare `division by zero` and `reserve_coverage_snapshots_cvar99_is_positive` never fires at all; with `NULLIF(cvar99_cents, 0)` the generated value is `NULL`, the row reaches its constraints, and the operator gets the named one. Both were run on a scratch table before either was written into the migration.
+
+**The overflow bound is stated rather than constrained, for the same reason.** A coverage above 214,748x raises `integer out of range`, and no `CHECK` can intercept it, because the generated column is computed first. A reserve 214,748 times the CVaR99 floor is not a state this business reaches.
+
+### What `0048` and `0049` do not do
+
+**No producer, no loader, no replay job, no rows.** `daily_marks`, `identity_links`, `rule_states`, `liability_snapshots` and `reserve_coverage_snapshots` all have zero rows, so nothing in either file can be read as evidence that a populated table satisfies it. The probes are where the evidence is, and they run in CI on every push.
+
+**`0026`'s default privileges are NOT inverted.** Making new tables append-only by default would be strictly stronger and would reverse a decision `0026` states and reasons, which `0045` already writes against. `OI-03` asks for a check.
+
+**`treasury_balances` is NOT made append-only.** `RESERVE-C1` proves the copy was true when it was written, and a later correction to an attestation is outside what a trigger on the citing table can see. That limit is named in `0049`'s header rather than left to be discovered.
+
+**`CI-06w` is NOT extended to the `OI` table**, which ALLOCATION names as the check that would have caught session 120. `scripts/corpus/` was outside this session's fence apart from `CI-06h`'s needle list.
