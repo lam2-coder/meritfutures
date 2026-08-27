@@ -274,6 +274,73 @@ export type {
   Lt01Values,
 } from './sweeps/ports.ts';
 
+// -----------------------------------------------------------------------------
+// THE STREAMING INGEST (session 299, `P6-f`)
+// -----------------------------------------------------------------------------
+// ADR-020's TIER 2, AND THE ONE MODULE IN THIS DEPLOYABLE THAT MAY NOT REACH THE
+// DATABASE THROUGH `src/db.ts`. That is not a style choice and it is worth the
+// paragraph, because the reflex is to wire it like everything above.
+//
+// `client.ts` opens ONE pool from ONE `DATABASE_URL`, so **one process is one
+// role**, and this deployable holds `merit_app`. `0050` ends
+// `REVOKE ALL ON live_account_state FROM merit_app, PUBLIC`, which is
+// `FM-M12-08` ("the stats worker holds no read grant on the live cache") and
+// `FM-M13-07` written as permissions rather than conventions. **So `merit_app`
+// can neither read nor write the live cache, and no adapter built on
+// `workerHandle()` can serve this ingest.** ADR-164 clause 4: any process that
+// touches the cache connects as `merit_live`, and no process holds both roles.
+// WHICH process that is, is `P6-b`'s address and `P6-g`'s mechanism.
+//
+// **THE CHEAP ESCAPE IS `0050`'s `F1` AND IT IS NOT TAKEN**: granting
+// `merit_app` `SELECT` makes `FM-M12-08` false SILENTLY -- nothing fails, the
+// read works, and the stats worker acquires a read grant on the indicative tier.
+//
+// **WHAT IS REAL IS THE PREDICATE, THE COALESCING QUEUE, THE REFUSALS AND THE
+// REPORT; WHAT IS NOT IS THE WIRING**, and the difference is visible in the type
+// rather than left to a reader. That is `runNightlyBatch`'s standard, the
+// provisioning saga's and the expiry sweep's, applied unchanged.
+//
+// **`INV-M2-14` IS ASSERTED AND NOT ASSUMED.** `src/live/` imports nothing but
+// itself, and `test/live-ingest.test.ts` derives the four forbidden tables from
+// `0050`'s own `REVOKE` and asserts each is present in the module headers and
+// absent from the module code.
+//
+// TWO THINGS ARE OWED AND BOTH ARE REPORTED RATHER THAN REACHED FOR. The
+// expectation row feed loss is measured against needs a table `merit_live` can
+// write and `merit_app` can read, which is a migration and a grant; and every
+// `feed.*` event belongs to the expectation sweep (ADR-161 clause 7), so nothing
+// here emits one.
+export { TICK_REFUSALS, liveIngestClean, refuseTick, startLiveIngest } from './live/ingest.ts';
+export type {
+  FeedGap,
+  LiveIngestConfig,
+  LiveIngestReport,
+  LiveIngestRun,
+  TickRefusal,
+} from './live/ingest.ts';
+
+export {
+  LIVE_CACHE_UPSERT_SQL,
+  LIVE_CACHE_WRITTEN_COLUMNS,
+  LiveIngestUnwired,
+  UNWIRED_LIVE_INGEST_IO,
+  supersedes,
+} from './live/ports.ts';
+export type {
+  FeedExpectation,
+  FeedExpectationPort,
+  IngestTick,
+  LiveAccountRefPort,
+  LiveCacheOutcome,
+  LiveCacheRow,
+  LiveCacheWritePort,
+  LiveCacheWrittenColumn,
+  LiveFeedPort,
+  LiveIngestIo,
+  LiveOrdinal,
+  LiveSubscription,
+} from './live/ports.ts';
+
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;
 
