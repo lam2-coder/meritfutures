@@ -263,7 +263,11 @@ export function checkCitations(citations, readFile) {
   const lines = new Map();
   for (const { where, cite, quote } of citations) {
     const m = CITE.exec(cite);
-    if (!m) reject('cite-not-a-location', `${where} cites ${JSON.stringify(cite)}, expected <path>:<line>`);
+    if (!m)
+      reject(
+        'cite-not-a-location',
+        `${where} cites ${JSON.stringify(cite)}, expected <path>:<line>`,
+      );
     const [, path, lineNo] = m;
     if (path !== AUTHORITY)
       reject(
@@ -363,7 +367,10 @@ function readRowDefaults(d) {
     if (!entry || typeof entry !== 'object')
       reject('row-defaults-not-transcribed', `row_defaults.${k} is not stated`);
     if (entry.state !== 'chosen' && entry.state !== 'stated')
-      reject('row-default-state-unknown', `row_defaults.${k}.state is ${JSON.stringify(entry.state)}`);
+      reject(
+        'row-default-state-unknown',
+        `row_defaults.${k}.state is ${JSON.stringify(entry.state)}`,
+      );
     if (typeof entry.reason !== 'string' || entry.reason.length === 0)
       reject(
         'chosen-value-without-a-reason',
@@ -403,7 +410,8 @@ function checkPosture(p) {
   if (!p.recommendation || typeof p.recommendation.cite !== 'string')
     reject('posture-not-recorded', 'posture.recommendation is not cited');
   const r = p.routing;
-  if (!r || typeof r !== 'object') reject('posture-not-recorded', 'posture.routing is not recorded');
+  if (!r || typeof r !== 'object')
+    reject('posture-not-recorded', 'posture.routing is not recorded');
   if (r.state !== 'contested')
     reject(
       'contested-posture-resolved',
@@ -471,7 +479,10 @@ function checkParameter(detector, key, p) {
     );
   if (p.state === 'not_applicable') {
     if (p.value !== null)
-      reject('not-applicable-parameter-has-a-value', `${where} is not_applicable and carries a value`);
+      reject(
+        'not-applicable-parameter-has-a-value',
+        `${where} is not_applicable and carries a value`,
+      );
     if (typeof p.reason !== 'string' || p.reason.length === 0)
       reject(
         'not-applicable-without-a-reason',
@@ -481,7 +492,10 @@ function checkParameter(detector, key, p) {
   }
   if (p.state === 'contextual') {
     if (p.value !== null)
-      reject('contextual-parameter-has-a-scalar', `${where} is contextual and carries a scalar value`);
+      reject(
+        'contextual-parameter-has-a-scalar',
+        `${where} is contextual and carries a scalar value`,
+      );
     if (!Array.isArray(p.cases) || p.cases.length === 0)
       reject(
         'contextual-parameter-without-cases',
@@ -571,7 +585,10 @@ export function generate(source, defaults) {
         reject('detector-field-uncited', `${d.detector}.${k} is not cited`);
     }
     if (typeof d.m07_row !== 'string' || !CITE.test(d.m07_row))
-      reject('detector-row-not-located', `${d.detector} does not name its M07 row as <path>:<line>`);
+      reject(
+        'detector-row-not-located',
+        `${d.detector} does not name its M07 row as <path>:<line>`,
+      );
 
     // `is_sensitive` is P7-j's strip list and every value is a security
     // decision, so a row that states one without saying why is refused. The

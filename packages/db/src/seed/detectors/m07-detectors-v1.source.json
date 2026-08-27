@@ -96,17 +96,50 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:108",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:108", "quote": "Fill clustering" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:108", "quote": "`fills` self-join" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:108", "quote": "Cross-identity copy trading, which is now itself a ToS violation" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:108",
+        "quote": "Cross-identity copy trading, which is now itself a ToS violation"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "The 2 second window and the fill-share threshold are the line an adversary needs. A ring told the window is 2 seconds spaces its entries by 3. The FLAG's evidence discloses none of this and does not need to: M07 section 3.4 says the conduct IS the violation now, so the trader pack carries these fills on these accounts at these timestamps against the ToS clause, and the window that FOUND them is exactly the internal GS-112 says a trader pack must not carry."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "window_seconds": { "state": "stated", "value": 2, "unit": "seconds", "cite": "docs/plans/M07-risk-abuse.md:108", "quote": "within a 2 second window" },
-        "min_shared_fill_share_bp": { "state": "unstated", "value": null, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:108", "quote": "more than a configured share of both accounts' fills" },
-        "same_identity_pairs_filtered_at_query": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:108", "quote": "Same-identity pairs are filtered at the detector" },
-        "runs_on_ingest": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:292", "quote": "On-ingest detection, not only nightly, for D-01." },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "window_seconds": {
+          "state": "stated",
+          "value": 2,
+          "unit": "seconds",
+          "cite": "docs/plans/M07-risk-abuse.md:108",
+          "quote": "within a 2 second window"
+        },
+        "min_shared_fill_share_bp": {
+          "state": "unstated",
+          "value": null,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:108",
+          "quote": "more than a configured share of both accounts' fills"
+        },
+        "same_identity_pairs_filtered_at_query": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:108",
+          "quote": "Same-identity pairs are filtered at the detector"
+        },
+        "runs_on_ingest": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:292",
+          "quote": "On-ingest detection, not only nightly, for D-01."
+        },
         "severity": {
           "state": "contextual",
           "value": null,
@@ -114,11 +147,25 @@
           "cite": "docs/plans/M07-risk-abuse.md:322",
           "quote": "Severity is contextual, not per-detector.",
           "cases": [
-            { "value": 3, "cite": "docs/plans/M07-risk-abuse.md:322", "quote": "D-01 across evaluations is severity 3" },
-            { "value": 5, "cite": "docs/plans/M07-risk-abuse.md:322", "quote": "the same pattern with a funded member eligible this week is severity 5" }
+            {
+              "value": 3,
+              "cite": "docs/plans/M07-risk-abuse.md:322",
+              "quote": "D-01 across evaluations is severity 3"
+            },
+            {
+              "value": 5,
+              "cite": "docs/plans/M07-risk-abuse.md:322",
+              "quote": "the same pattern with a funded member eligible this week is severity 5"
+            }
           ]
         },
-        "blocked_on_dependency": { "state": "stated", "value": "DEP-M7-01", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:467", "quote": "D-01, D-04, and D-05 are impossible" }
+        "blocked_on_dependency": {
+          "state": "stated",
+          "value": "DEP-M7-01",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:467",
+          "quote": "D-01, D-04, and D-05 are impossible"
+        }
       }
     },
 
@@ -127,14 +174,29 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:109",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:109", "quote": "Inverse P&L pair" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:109", "quote": "`daily_marks`" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:109", "quote": "The hedged-pair signature, named in the constitution as the number one industry threat" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:109",
+        "quote": "The hedged-pair signature, named in the constitution as the number one industry threat"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "THE FLOOR IS THE ONE NUMBER M07 SAYS OUT LOUD IS ALREADY LEAKED, and that is an argument for marking it sensitive rather than against it. AS-M7-02 calls -0.8 industry folklore and assumes the ring knows it; AS-M7-07 gives the exact sentence a leak produces, `Your correlation was -0.87 against a -0.80 threshold`, and says it publishes the threshold in the same breath as it invites an argument about the number. Folklore is not disclosure: confirming the number turns a guess into a specification, and the whole defence of this detector is that the ring must guess."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "window_trading_days": { "state": "stated", "value": 20, "unit": "trading_days", "cite": "docs/plans/M07-risk-abuse.md:109", "quote": "Rolling 20 trading day Pearson correlation" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "window_trading_days": {
+          "state": "stated",
+          "value": 20,
+          "unit": "trading_days",
+          "cite": "docs/plans/M07-risk-abuse.md:109",
+          "quote": "Rolling 20 trading day Pearson correlation"
+        },
         "correlation_floor_bp": {
           "state": "stated",
           "value": -8000,
@@ -143,8 +205,20 @@
           "quote": "below the configured floor (dossier: below -0.8)",
           "conversion": "M07 writes the correlation as the decimal -0.8. Money is integer cents and thresholds are basis points or integer cents, and no float appears in this seed, so -0.8 is carried as -8000 bp. A Pearson correlation is a pure ratio in [-1, 1], so basis points express it exactly with no rounding at all."
         },
-        "comparable_size_tolerance_bp": { "state": "unstated", "value": null, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:109", "quote": "with comparable size" },
-        "second_cycle_detector": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:291", "quote": "D-02 keeps its long window" },
+        "comparable_size_tolerance_bp": {
+          "state": "unstated",
+          "value": null,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:109",
+          "quote": "with comparable size"
+        },
+        "second_cycle_detector": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:291",
+          "quote": "D-02 keeps its long window"
+        },
         "severity": {
           "state": "contextual",
           "value": null,
@@ -152,7 +226,11 @@
           "cite": "docs/plans/M07-risk-abuse.md:322",
           "quote": "Severity is contextual, not per-detector.",
           "cases": [
-            { "value": 4, "cite": "docs/plans/M07-risk-abuse.md:151", "quote": "D-02 below the floor with both accounts funded" }
+            {
+              "value": 4,
+              "cite": "docs/plans/M07-risk-abuse.md:151",
+              "quote": "D-02 below the floor with both accounts funded"
+            }
           ]
         }
       }
@@ -162,18 +240,54 @@
       "detector": "D-03",
       "m07_row": "docs/plans/M07-risk-abuse.md:110",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:110", "quote": "Group inverse exposure" },
-      "input": { "cite": "docs/plans/M07-risk-abuse.md:110", "quote": "`daily_marks` across a linked cluster" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:110", "quote": "AS-M7-02: rings that defeat pairwise correlation by rotating a third leg" },
+      "input": {
+        "cite": "docs/plans/M07-risk-abuse.md:110",
+        "quote": "`daily_marks` across a linked cluster"
+      },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:110",
+        "quote": "AS-M7-02: rings that defeat pairwise correlation by rotating a third leg"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "The variance ratio is the detector AS-M7-02 says a ring cannot rotate its way past, and it is invariant to the rotation for a reason a ring that knew the ratio could work against. Disclosing the bound tells a group exactly how much independent variance to manufacture, which converts the one detector that survives the third leg into one more number to trade around."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "max_variance_ratio_bp": { "state": "unstated", "value": null, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:110", "quote": "variance far below the sum of member variances" },
-        "candidate_group_discovery": { "state": "stated", "value": "identity_links plus accounts sharing any signal", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:110", "quote": "Group discovery from `identity_links` plus a candidate search over accounts sharing any signal" },
-        "max_candidate_group_size": { "state": "unstated", "value": null, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:310", "quote": "with a bounded search size so the cost stays linear" },
-        "window_trading_days": { "state": "unstated", "value": null, "unit": "trading_days", "cite": "docs/plans/M07-risk-abuse.md:291", "quote": "must operate on short windows" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "max_variance_ratio_bp": {
+          "state": "unstated",
+          "value": null,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:110",
+          "quote": "variance far below the sum of member variances"
+        },
+        "candidate_group_discovery": {
+          "state": "stated",
+          "value": "identity_links plus accounts sharing any signal",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:110",
+          "quote": "Group discovery from `identity_links` plus a candidate search over accounts sharing any signal"
+        },
+        "max_candidate_group_size": {
+          "state": "unstated",
+          "value": null,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:310",
+          "quote": "with a bounded search size so the cost stays linear"
+        },
+        "window_trading_days": {
+          "state": "unstated",
+          "value": null,
+          "unit": "trading_days",
+          "cite": "docs/plans/M07-risk-abuse.md:291",
+          "quote": "must operate on short windows"
+        },
         "severity": {
           "state": "contextual",
           "value": null,
@@ -181,7 +295,11 @@
           "cite": "docs/plans/M07-risk-abuse.md:322",
           "quote": "Severity is contextual, not per-detector.",
           "cases": [
-            { "value": 5, "cite": "docs/plans/M07-risk-abuse.md:150", "quote": "D-03 with a funded member eligible this week" }
+            {
+              "value": 5,
+              "cite": "docs/plans/M07-risk-abuse.md:150",
+              "quote": "D-03 with a funded member eligible this week"
+            }
           ]
         }
       }
@@ -191,18 +309,54 @@
       "detector": "D-04",
       "m07_row": "docs/plans/M07-risk-abuse.md:111",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:111", "quote": "News-window clustering" },
-      "input": { "cite": "docs/plans/M07-risk-abuse.md:111", "quote": "`fills` plus a maintained Tier-1 economic calendar" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:111", "quote": "Straddle farming. The pattern qualifier is load bearing: one trade around a release is a normal trading day" },
+      "input": {
+        "cite": "docs/plans/M07-risk-abuse.md:111",
+        "quote": "`fills` plus a maintained Tier-1 economic calendar"
+      },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:111",
+        "quote": "Straddle farming. The pattern qualifier is load bearing: one trade around a release is a normal trading day"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "The release window and the minimum event count together say how far from a release a straddle farmer must sit and how few releases they may farm. Both are pure evasion instructions, and the event count is the more valuable of the two: it is the number that says how many times you may do this before the pattern becomes a pattern."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "release_window_seconds": { "state": "unstated", "value": null, "unit": "seconds", "cite": "docs/plans/M07-risk-abuse.md:111", "quote": "Entries within a configured window of a scheduled release" },
-        "min_events_in_pattern": { "state": "unstated", "value": null, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:111", "quote": "as a pattern across many events" },
-        "fires_on_single_event": { "state": "stated", "value": false, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:111", "quote": "never a single event" },
-        "calendar_dependency": { "state": "stated", "value": "DEP-M7-06", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:472", "quote": "A maintained Tier-1 economic calendar, as data" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "release_window_seconds": {
+          "state": "unstated",
+          "value": null,
+          "unit": "seconds",
+          "cite": "docs/plans/M07-risk-abuse.md:111",
+          "quote": "Entries within a configured window of a scheduled release"
+        },
+        "min_events_in_pattern": {
+          "state": "unstated",
+          "value": null,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:111",
+          "quote": "as a pattern across many events"
+        },
+        "fires_on_single_event": {
+          "state": "stated",
+          "value": false,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:111",
+          "quote": "never a single event"
+        },
+        "calendar_dependency": {
+          "state": "stated",
+          "value": "DEP-M7-06",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:472",
+          "quote": "A maintained Tier-1 economic calendar, as data"
+        },
         "severity": {
           "state": "contextual",
           "value": null,
@@ -210,10 +364,20 @@
           "cite": "docs/plans/M07-risk-abuse.md:322",
           "quote": "Severity is contextual, not per-detector.",
           "cases": [
-            { "value": 1, "cite": "docs/plans/M07-risk-abuse.md:154", "quote": "D-04 single-window observations" }
+            {
+              "value": 1,
+              "cite": "docs/plans/M07-risk-abuse.md:154",
+              "quote": "D-04 single-window observations"
+            }
           ]
         },
-        "blocked_on_dependency": { "state": "stated", "value": "DEP-M7-01", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:467", "quote": "D-01, D-04, and D-05 are impossible" }
+        "blocked_on_dependency": {
+          "state": "stated",
+          "value": "DEP-M7-01",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:467",
+          "quote": "D-01, D-04, and D-05 are impossible"
+        }
       }
     },
 
@@ -222,19 +386,64 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:112",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:112", "quote": "Martingale sequence" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:112", "quote": "`fills`" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:112", "quote": "Eval brute-forcing. Strategy level, never a single sequence" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:112",
+        "quote": "Eval brute-forcing. Strategy level, never a single sequence"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "The minimum sequence count is the number of martingale runs a brute-forcer may complete before the detector sees a strategy rather than a bad week, and the regression slope is the aggression it may use inside them. Both are directly actionable by the adversary and neither is needed by any trader to understand a flag raised against them."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "statistic": { "state": "stated", "value": "size-after-loss regression", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:112", "quote": "Size-after-loss regression at strategy level" },
-        "size_after_loss_slope_bp": { "state": "unstated", "value": null, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:112", "quote": "Size-after-loss regression at strategy level" },
-        "min_sequences": { "state": "unstated", "value": null, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:112", "quote": "over a minimum number of sequences" },
-        "scope": { "state": "stated", "value": "strategy", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:112", "quote": "Strategy level, never a single sequence" },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." },
-        "blocked_on_dependency": { "state": "stated", "value": "DEP-M7-01", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:467", "quote": "D-01, D-04, and D-05 are impossible" }
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "statistic": {
+          "state": "stated",
+          "value": "size-after-loss regression",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:112",
+          "quote": "Size-after-loss regression at strategy level"
+        },
+        "size_after_loss_slope_bp": {
+          "state": "unstated",
+          "value": null,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:112",
+          "quote": "Size-after-loss regression at strategy level"
+        },
+        "min_sequences": {
+          "state": "unstated",
+          "value": null,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:112",
+          "quote": "over a minimum number of sequences"
+        },
+        "scope": {
+          "state": "stated",
+          "value": "strategy",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:112",
+          "quote": "Strategy level, never a single sequence"
+        },
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        },
+        "blocked_on_dependency": {
+          "state": "stated",
+          "value": "DEP-M7-01",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:467",
+          "quote": "D-01, D-04, and D-05 are impossible"
+        }
       }
     },
 
@@ -243,16 +452,43 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:113",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:113", "quote": "Velocity anomaly" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:113", "quote": "`daily_marks`, purchases" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:113", "quote": "The generic outlier feed; low precision by design, useful only as a group-with signal" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:113",
+        "quote": "The generic outlier feed; low precision by design, useful only as a group-with signal"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "THE LOW-PRECISION DETECTOR IS NOT THE HARMLESS ONE TO LEAK. Its percentile bound is the outer edge of what looks normal, which is the single most useful number a fleet can have: everything else in this set is a pattern to avoid and this one is a shape to imitate. That the flags it raises alone are severity 2 says what an operator should do with them, not what an adversary could do with the parameter."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "measures": { "state": "stated", "value": "win rate, pace to target, reset velocity", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:113", "quote": "Win rate, pace to target, and reset velocity" },
-        "population_percentile_bp": { "state": "unstated", "value": null, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:113", "quote": "against the population distribution" },
-        "baseline_population": { "state": "stated", "value": "honest", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:388", "quote": "not the whole population's, because a population containing the fleet normalizes the fleet" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "measures": {
+          "state": "stated",
+          "value": "win rate, pace to target, reset velocity",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:113",
+          "quote": "Win rate, pace to target, and reset velocity"
+        },
+        "population_percentile_bp": {
+          "state": "unstated",
+          "value": null,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:113",
+          "quote": "against the population distribution"
+        },
+        "baseline_population": {
+          "state": "stated",
+          "value": "honest",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:388",
+          "quote": "not the whole population's, because a population containing the fleet normalizes the fleet"
+        },
         "severity": {
           "state": "contextual",
           "value": null,
@@ -260,7 +496,11 @@
           "cite": "docs/plans/M07-risk-abuse.md:322",
           "quote": "Severity is contextual, not per-detector.",
           "cases": [
-            { "value": 2, "cite": "docs/plans/M07-risk-abuse.md:153", "quote": "D-06 velocity alone" }
+            {
+              "value": 2,
+              "cite": "docs/plans/M07-risk-abuse.md:153",
+              "quote": "D-06 velocity alone"
+            }
           ]
         }
       }
@@ -271,17 +511,50 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:114",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:114", "quote": "Entity cap aggregation" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:114", "quote": "`identities`, `accounts`" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:114", "quote": "B4 #17. Grandfathered, not enforced retroactively (INV-M7-06)" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:114",
+        "quote": "B4 #17. Grandfathered, not enforced retroactively (INV-M7-06)"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "THIS IS THE ROW WHERE MARKING SENSITIVE OVER-STRIPS, AND IT IS STILL THE RIGHT VALUE. The bound is the PLAN MAXIMUM, which a trader can read off the plan catalogue, so stripping it from a trader pack removes a number the trader already has. INV-M7-10 is unqualified, `Detector parameters never appear in a trader-audience evidence pack`, and this seed does not carve an exception into an invariant to save a reader one lookup. The over-strip costs a trader nothing; an exception carved here is a precedent for carving one where it costs something."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "max_accounts_per_entity": { "state": "unstated", "value": null, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:114", "quote": "Resolved entity holding more accounts than the plan maximum after a merge" },
-        "evaluated_after_merge": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:114", "quote": "after a merge" },
-        "grandfathered": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:114", "quote": "Grandfathered, not enforced retroactively (INV-M7-06)" },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "max_accounts_per_entity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:114",
+          "quote": "Resolved entity holding more accounts than the plan maximum after a merge"
+        },
+        "evaluated_after_merge": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:114",
+          "quote": "after a merge"
+        },
+        "grandfathered": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:114",
+          "quote": "Grandfathered, not enforced retroactively (INV-M7-06)"
+        },
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     },
 
@@ -290,16 +563,43 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:115",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:115", "quote": "Payment velocity" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:115", "quote": "`identity_signals`" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:115", "quote": "Stolen-card evaluation purchasing (dossier item 7)" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:115",
+        "quote": "Stolen-card evaluation purchasing (dossier item 7)"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "Both counts are the batch size a carder may use per identity and per fingerprint before the velocity is visible. This is the parameter set with the shortest distance between disclosure and exploitation in the whole file: it needs no trading, no accounts and no patience, only arithmetic at checkout."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "max_distinct_cards_or_bins_per_identity": { "state": "unstated", "value": null, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:115", "quote": "Distinct cards or BINs per identity" },
-        "max_identities_per_payment_fingerprint": { "state": "unstated", "value": null, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:115", "quote": "identities per payment fingerprint" },
-        "window_days": { "state": "unstated", "value": null, "unit": "days", "cite": "docs/plans/M07-risk-abuse.md:115", "quote": "over a window" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "max_distinct_cards_or_bins_per_identity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:115",
+          "quote": "Distinct cards or BINs per identity"
+        },
+        "max_identities_per_payment_fingerprint": {
+          "state": "unstated",
+          "value": null,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:115",
+          "quote": "identities per payment fingerprint"
+        },
+        "window_days": {
+          "state": "unstated",
+          "value": null,
+          "unit": "days",
+          "cite": "docs/plans/M07-risk-abuse.md:115",
+          "quote": "over a window"
+        },
         "link_class": {
           "state": "stated",
           "value": "hard",
@@ -308,7 +608,13 @@
           "quote": "same payment fingerprint (D-08)",
           "note": "THE CLASS IS RECORDED AND THE BEHAVIOUR IS NOT. Section 7.9's Hard row carries the behaviour `Auto-enforce.` and this seed writes no behaviour at all; see the `refusals` block. The class is a fact about the strength of the signal, which is what a link class is; what follows from it is ADR-155's and OQ-M7-05's."
         },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     },
 
@@ -317,14 +623,29 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:116",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:116", "quote": "Destination concentration" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:116", "quote": "`payout_transfers`" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:116", "quote": "The strongest mule detector available" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:116",
+        "quote": "The strongest mule detector available"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "THE STRONGEST MULE DETECTOR AVAILABLE, AND ITS PARAMETER IS ONE INTEGER, WHICH IS PRECISELY WHY IT IS SENSITIVE. `more than one` is trivially evaded by a second destination the moment it is known, and it is the detector M05 AS-M5-02 leans on. Its flags are severity 5, the band that holds a payout, so a leak here is worth more to a ring than any other row in the file."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "unrelated_identities_per_destination_greater_than": { "state": "stated", "value": 1, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:116", "quote": "One `destination_ref` receiving payouts from more than one unrelated identity" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "unrelated_identities_per_destination_greater_than": {
+          "state": "stated",
+          "value": 1,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:116",
+          "quote": "One `destination_ref` receiving payouts from more than one unrelated identity"
+        },
         "link_class": {
           "state": "stated",
           "value": "hard",
@@ -340,10 +661,20 @@
           "cite": "docs/plans/M07-risk-abuse.md:322",
           "quote": "Severity is contextual, not per-detector.",
           "cases": [
-            { "value": 5, "cite": "docs/plans/M07-risk-abuse.md:150", "quote": "D-09 destination concentration" }
+            {
+              "value": 5,
+              "cite": "docs/plans/M07-risk-abuse.md:150",
+              "quote": "D-09 destination concentration"
+            }
           ]
         },
-        "blocked_on_dependency": { "state": "stated", "value": "DEP-M7-04", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:470", "quote": "D-09, the strongest mule detector, has no input" }
+        "blocked_on_dependency": {
+          "state": "stated",
+          "value": "DEP-M7-04",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:470",
+          "quote": "D-09, the strongest mule detector, has no input"
+        }
       }
     },
 
@@ -352,14 +683,29 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:117",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:117", "quote": "Affiliate self-deal" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:117", "quote": "attributions" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:117", "quote": "B4 #16, voids attribution and flags" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:117",
+        "quote": "B4 #16, voids attribution and flags"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "THE ONLY DETECTOR IN THE SET WITH NO THRESHOLD, AND THE VALUE IS STILL `true`, DELIBERATELY. What its parameters disclose is not a number but the JOIN: that Merit resolves the affiliate to an identity and tests that identity against the buyer's graph. An affiliate who learns that routes the purchase through an identity the graph has not linked yet, which is the same evasion a threshold would buy, one level up. INV-M7-10 is about parameters and not about numbers."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "condition": { "state": "stated", "value": "attributed code's affiliate identity is linked to the buyer", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:117", "quote": "Purchase attributed to a code whose affiliate identity is linked to the buyer" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "condition": {
+          "state": "stated",
+          "value": "attributed code's affiliate identity is linked to the buyer",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:117",
+          "quote": "Purchase attributed to a code whose affiliate identity is linked to the buyer"
+        },
         "numeric_thresholds": {
           "state": "not_applicable",
           "value": null,
@@ -368,29 +714,92 @@
           "quote": "Purchase attributed to a code whose affiliate identity is linked to the buyer",
           "reason": "THE ABSENCE IS A POSITIVE FACT AND NOT AN UNTRANSCRIBED VALUE. D-10's statistic cell states a condition and no quantity: an edge exists between the affiliate identity and the buyer, or it does not. `not_applicable` says a threshold cannot exist here; `unstated` would say M07 named one and withheld it, which would send a later session hunting for a number that was never there."
         },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     },
 
     {
       "detector": "D-15",
       "m07_row": "docs/plans/M07-risk-abuse.md:118",
-      "name": { "cite": "docs/plans/M07-risk-abuse.md:118", "quote": "Digital-footprint enrichment" },
-      "input": { "cite": "docs/plans/M07-risk-abuse.md:118", "quote": "checkout enrichment adapter" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:118", "quote": "A fresh identity with a clean card is invisible to every other detector at checkout, which is the cheapest moment to see it" },
+      "name": {
+        "cite": "docs/plans/M07-risk-abuse.md:118",
+        "quote": "Digital-footprint enrichment"
+      },
+      "input": {
+        "cite": "docs/plans/M07-risk-abuse.md:118",
+        "quote": "checkout enrichment adapter"
+      },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:118",
+        "quote": "A fresh identity with a clean card is invisible to every other detector at checkout, which is the cheapest moment to see it"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "The footprint-age and reputation bounds are what a fresh identity must clear to look aged, and they are purchasable: an adversary who knows the age bound buys an email that old. `mode: observe` is itself sensitive in a way a number is not, because it says out loud that nothing is declining today, which is a window rather than a threshold."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "mode": { "state": "stated", "value": "observe", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:118", "quote": "Observe mode at launch" },
-        "signals": { "state": "stated", "value": "footprint age and connectedness, device and IP reputation, VPN or datacenter origin, BIN intelligence", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:118", "quote": "device and IP reputation, VPN or datacenter origin, BIN intelligence" },
-        "footprint_age_days_min": { "state": "unstated", "value": null, "unit": "days", "cite": "docs/plans/M07-risk-abuse.md:118", "quote": "Email and phone footprint age and connectedness" },
-        "post_beta_posture": { "state": "stated", "value": "soft-decline plus review queue", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:118", "quote": "thresholds tuned on beta data, then soft-decline plus review queue" },
-        "silent_decline": { "state": "stated", "value": false, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:118", "quote": "Never a silent decline" },
-        "fail_open_on_timeout": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:138", "quote": "Non-blocking, fail-open on timeout, VoIP scored and never rejected" },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "mode": {
+          "state": "stated",
+          "value": "observe",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:118",
+          "quote": "Observe mode at launch"
+        },
+        "signals": {
+          "state": "stated",
+          "value": "footprint age and connectedness, device and IP reputation, VPN or datacenter origin, BIN intelligence",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:118",
+          "quote": "device and IP reputation, VPN or datacenter origin, BIN intelligence"
+        },
+        "footprint_age_days_min": {
+          "state": "unstated",
+          "value": null,
+          "unit": "days",
+          "cite": "docs/plans/M07-risk-abuse.md:118",
+          "quote": "Email and phone footprint age and connectedness"
+        },
+        "post_beta_posture": {
+          "state": "stated",
+          "value": "soft-decline plus review queue",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:118",
+          "quote": "thresholds tuned on beta data, then soft-decline plus review queue"
+        },
+        "silent_decline": {
+          "state": "stated",
+          "value": false,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:118",
+          "quote": "Never a silent decline"
+        },
+        "fail_open_on_timeout": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:138",
+          "quote": "Non-blocking, fail-open on timeout, VoIP scored and never rejected"
+        },
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     },
 
@@ -399,20 +808,71 @@
       "m07_row": "docs/plans/M07-risk-abuse.md:119",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:119", "quote": "Link-confidence score" },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:119", "quote": "all identity signals" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:119", "quote": "Asks the question the detector list never asked: how confident are we that these two accounts are one person" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:119",
+        "quote": "Asks the question the detector list never asked: how confident are we that these two accounts are one person"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "M07 SAYS THIS ONE IN TERMS AND IT IS THE ONLY ROW WHERE THE COLUMN'S VALUE IS TRANSCRIBED RATHER THAN ARGUED. Section 7.9: the signal weights `are the detector internals that M06's two-tier evidence packs keep internal-tier always, and the richer the graph the more a leak is worth`. The confidence ceiling belongs with them: it is the number that says how much evidence buys a hard link."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "aggregates": { "state": "stated", "value": "every other detector", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:119", "quote": "aggregation of every other one" },
-        "signal_weights": { "state": "unstated", "value": null, "unit": "list", "cite": "docs/plans/M07-risk-abuse.md:119", "quote": "The signal-weight table is config" },
-        "signal_weights_tier": { "state": "stated", "value": "v1.x", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:396", "quote": "Probabilistic scoring, the signal-weight table" },
-        "shipping_tier": { "state": "stated", "value": "v1", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:395", "quote": "Hard links plus KYC dedupe" },
-        "inferred_edge_confidence_bp_exclusive_max": { "state": "stated", "value": 10000, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:49", "quote": "never 10000 for an inferred edge" },
-        "hard_link_confidence_ceiling_bp": { "state": "unstated", "value": null, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:49", "quote": "may exceed a configured ceiling" },
-        "soft_cluster_review_timing": { "state": "stated", "value": "pre-funding", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:119", "quote": "soft clusters queue a **pre-funding** review" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "aggregates": {
+          "state": "stated",
+          "value": "every other detector",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:119",
+          "quote": "aggregation of every other one"
+        },
+        "signal_weights": {
+          "state": "unstated",
+          "value": null,
+          "unit": "list",
+          "cite": "docs/plans/M07-risk-abuse.md:119",
+          "quote": "The signal-weight table is config"
+        },
+        "signal_weights_tier": {
+          "state": "stated",
+          "value": "v1.x",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:396",
+          "quote": "Probabilistic scoring, the signal-weight table"
+        },
+        "shipping_tier": {
+          "state": "stated",
+          "value": "v1",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:395",
+          "quote": "Hard links plus KYC dedupe"
+        },
+        "inferred_edge_confidence_bp_exclusive_max": {
+          "state": "stated",
+          "value": 10000,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:49",
+          "quote": "never 10000 for an inferred edge"
+        },
+        "hard_link_confidence_ceiling_bp": {
+          "state": "unstated",
+          "value": null,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:49",
+          "quote": "may exceed a configured ceiling"
+        },
+        "soft_cluster_review_timing": {
+          "state": "stated",
+          "value": "pre-funding",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:119",
+          "quote": "soft clusters queue a **pre-funding** review"
+        },
         "auto_enforce": {
           "state": "not_applicable",
           "value": null,
@@ -428,7 +888,11 @@
           "cite": "docs/plans/M07-risk-abuse.md:322",
           "quote": "Severity is contextual, not per-detector.",
           "cases": [
-            { "value": 5, "cite": "docs/plans/M07-risk-abuse.md:91", "quote": "severity-5 flag opens against both identities" }
+            {
+              "value": 5,
+              "cite": "docs/plans/M07-risk-abuse.md:91",
+              "quote": "severity-5 flag opens against both identities"
+            }
           ]
         }
       }
@@ -437,15 +901,27 @@
     {
       "detector": "D-17",
       "m07_row": "docs/plans/M07-risk-abuse.md:120",
-      "name": { "cite": "docs/plans/M07-risk-abuse.md:120", "quote": "Behavioral fingerprint against the banned corpus" },
+      "name": {
+        "cite": "docs/plans/M07-risk-abuse.md:120",
+        "quote": "Behavioral fingerprint against the banned corpus"
+      },
       "input": { "cite": "docs/plans/M07-risk-abuse.md:120", "quote": "`fills`, `daily_marks`" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:120", "quote": "Requires a banned corpus, which requires having banned people" },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:120",
+        "quote": "Requires a banned corpus, which requires having banned people"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "A behavioural fingerprint's parameters describe WHICH FEATURES OF HOW SOMEBODY TRADES ARE BEING MATCHED, which is the most imitable disclosure in the set: a banned operator who learns the feature list changes those features and nothing else. That the detector is post-launch does not soften it, because the row exists years before the corpus does and a row written now is read by whoever builds it."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
         "shipping_tier": {
           "state": "stated",
           "value": "post-launch",
@@ -454,10 +930,34 @@
           "quote": "post-launch tier.",
           "note": "THE TIER IS A PARAMETER RATHER THAN A REASON TO OMIT THE ROW, AND THAT IS THE POINT OF THE TABLE. A detector with no row has no version, no effective date, and no answer to INV-M7-04's question. With this row, `why did D-17 not fire in March` is answered from data in one read: its tier is post-launch and its corpus is empty."
         },
-        "auto_enforce": { "state": "stated", "value": false, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:120", "quote": "Flag-and-review only, never auto-enforce" },
-        "output_must_be_evidence_grade": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:120", "quote": "the output must be evidence-grade" },
-        "min_banned_corpus_size": { "state": "unstated", "value": null, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:397", "quote": "A fingerprint corpus with three members is a false-positive engine" },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "auto_enforce": {
+          "state": "stated",
+          "value": false,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:120",
+          "quote": "Flag-and-review only, never auto-enforce"
+        },
+        "output_must_be_evidence_grade": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:120",
+          "quote": "the output must be evidence-grade"
+        },
+        "min_banned_corpus_size": {
+          "state": "unstated",
+          "value": null,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:397",
+          "quote": "A fingerprint corpus with three members is a false-positive engine"
+        },
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     },
 
@@ -465,20 +965,68 @@
       "detector": "D-11",
       "m07_row": "docs/plans/M07-risk-abuse.md:121",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:121", "quote": "Dilution timing" },
-      "input": { "cite": "docs/plans/M07-risk-abuse.md:121", "quote": "`rule_states.engine_gates`" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:121", "quote": "manufactured dilution" },
+      "input": {
+        "cite": "docs/plans/M07-risk-abuse.md:121",
+        "quote": "`rule_states.engine_gates`"
+      },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:121",
+        "quote": "manufactured dilution"
+      },
       "is_sensitive": {
         "value": true,
         "reason": "THE INPUT IS A NUMBER THE TRADER ALREADY HAS AND THE PARAMETERS ARE NOT. M07 records the trade in terms: `profit_needed_to_dilute_cents` is published to the trader by design and is what makes this pattern arithmetic to detect. What must not travel back is the size bound and the sibling-correlation floor, which together say how large a manufactured day may be and how loosely the sibling must be coupled before the pair is invisible."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "condition": { "state": "stated", "value": "small positive days while consistency is the only failing gate", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:121", "quote": "Small positive days appearing precisely while consistency is the only failing gate" },
-        "max_daily_profit_cents": { "state": "unstated", "value": null, "unit": "cents", "cite": "docs/plans/M07-risk-abuse.md:121", "quote": "Small positive days appearing precisely while consistency is the only failing gate" },
-        "requires_inverse_correlated_sibling": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:121", "quote": "with an inverse-correlated sibling" },
-        "sibling_correlation_floor_bp": { "state": "unstated", "value": null, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:121", "quote": "with an inverse-correlated sibling" },
-        "reads_published_engine_figure": { "state": "stated", "value": "profit_needed_to_dilute_cents", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:121", "quote": "the engine already stores `profit_needed_to_dilute_cents`" },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "condition": {
+          "state": "stated",
+          "value": "small positive days while consistency is the only failing gate",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:121",
+          "quote": "Small positive days appearing precisely while consistency is the only failing gate"
+        },
+        "max_daily_profit_cents": {
+          "state": "unstated",
+          "value": null,
+          "unit": "cents",
+          "cite": "docs/plans/M07-risk-abuse.md:121",
+          "quote": "Small positive days appearing precisely while consistency is the only failing gate"
+        },
+        "requires_inverse_correlated_sibling": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:121",
+          "quote": "with an inverse-correlated sibling"
+        },
+        "sibling_correlation_floor_bp": {
+          "state": "unstated",
+          "value": null,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:121",
+          "quote": "with an inverse-correlated sibling"
+        },
+        "reads_published_engine_figure": {
+          "state": "stated",
+          "value": "profit_needed_to_dilute_cents",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:121",
+          "quote": "the engine already stores `profit_needed_to_dilute_cents`"
+        },
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     },
 
@@ -486,8 +1034,14 @@
       "detector": "D-12",
       "m07_row": "docs/plans/M07-risk-abuse.md:122",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "Day-0 graph-prior pairing" },
-      "input": { "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "`identity_links`, `identity_signals`" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "The ring that funds and extracts inside one cycle." },
+      "input": {
+        "cite": "docs/plans/M07-risk-abuse.md:122",
+        "quote": "`identity_links`, `identity_signals`"
+      },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:122",
+        "quote": "The ring that funds and extracts inside one cycle."
+      },
       "is_sensitive": {
         "value": true,
         "reason": "D-12 RAISES NO FLAG AND IS STILL SENSITIVE, WHICH IS WHY THE COLUMN IS ABOUT PARAMETERS AND NOT ABOUT FLAGS. Its priors are the list of signals that put a funding account under watch before it trades, and a ring that knows the list funds without any of them, which takes D-13 and D-14 down with it because both operate on its clusters. Its parameters could never reach a trader through a flag of its own; they reach one through a D-13 or D-14 pack, which is precisely why the strip list is computed per detector rather than per flag."
@@ -501,12 +1055,48 @@
           "quote": "Output is a watched-cluster set, not a flag",
           "reason": "THE ONE ROW IN THE SET THAT WRITES NO `risk_flags` ROW AT ALL. `open` here would be false rather than merely cautious, and a runner reading `flag_status: \"open\"` off every row would look for a flag D-12 never raises and report it missing. `not_applicable` is the positive statement that the column cannot apply, which is the same three-state discipline every other value in this file follows."
         },
-        "window_trading_days": { "state": "stated", "value": 0, "unit": "trading_days", "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "at funding time, with zero trading data" },
-        "runs_at": { "state": "stated", "value": "funding", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "at funding time, with zero trading data" },
-        "candidate_source": { "state": "stated", "value": "graph priors", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "Candidate pairs and groups formed from graph priors" },
-        "output": { "state": "stated", "value": "watched-cluster set", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "Output is a watched-cluster set, not a flag" },
-        "seeds": { "state": "stated", "value": "D-13, D-14", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "it seeds D-13 and D-14 rather than accusing anyone" },
-        "prior_weights": { "state": "unstated", "value": null, "unit": "list", "cite": "docs/plans/M07-risk-abuse.md:122", "quote": "Candidate pairs and groups formed from graph priors" },
+        "window_trading_days": {
+          "state": "stated",
+          "value": 0,
+          "unit": "trading_days",
+          "cite": "docs/plans/M07-risk-abuse.md:122",
+          "quote": "at funding time, with zero trading data"
+        },
+        "runs_at": {
+          "state": "stated",
+          "value": "funding",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:122",
+          "quote": "at funding time, with zero trading data"
+        },
+        "candidate_source": {
+          "state": "stated",
+          "value": "graph priors",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:122",
+          "quote": "Candidate pairs and groups formed from graph priors"
+        },
+        "output": {
+          "state": "stated",
+          "value": "watched-cluster set",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:122",
+          "quote": "Output is a watched-cluster set, not a flag"
+        },
+        "seeds": {
+          "state": "stated",
+          "value": "D-13, D-14",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:122",
+          "quote": "it seeds D-13 and D-14 rather than accusing anyone"
+        },
+        "prior_weights": {
+          "state": "unstated",
+          "value": null,
+          "unit": "list",
+          "cite": "docs/plans/M07-risk-abuse.md:122",
+          "quote": "Candidate pairs and groups formed from graph priors"
+        },
         "severity": {
           "state": "not_applicable",
           "value": null,
@@ -522,15 +1112,33 @@
       "detector": "D-13",
       "m07_row": "docs/plans/M07-risk-abuse.md:123",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:123", "quote": "Young-account fast path" },
-      "input": { "cite": "docs/plans/M07-risk-abuse.md:123", "quote": "`daily_marks`, `fills`, over a **5 trading day** window" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:123", "quote": "The hedged pair, caught inside the extraction window." },
+      "input": {
+        "cite": "docs/plans/M07-risk-abuse.md:123",
+        "quote": "`daily_marks`, `fills`, over a **5 trading day** window"
+      },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:123",
+        "quote": "The hedged pair, caught inside the extraction window."
+      },
       "is_sensitive": {
         "value": true,
         "reason": "THE DETECTOR THAT DEFENDS THE FIRST CYCLE, AND THE ONLY ONE WHOSE LEAK IS SURVIVABLE FOR THE ADVERSARY IN A SINGLE CYCLE. AS-M7-01 puts the earliest cash out at trading day 7 to 8; a ring that knows the floor is -0.95 and that all three conditions are required breaks exactly one of the three and extracts on the same schedule with nothing watching. Its own cell explains that -0.8 would be noise on five days, which tells a reader how little room there is between the threshold and useless."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "window_trading_days": { "state": "stated", "value": 5, "unit": "trading_days", "cite": "docs/plans/M07-risk-abuse.md:123", "quote": "over a **5 trading day** window" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "window_trading_days": {
+          "state": "stated",
+          "value": 5,
+          "unit": "trading_days",
+          "cite": "docs/plans/M07-risk-abuse.md:123",
+          "quote": "over a **5 trading day** window"
+        },
         "correlation_floor_bp": {
           "state": "stated",
           "value": -9500,
@@ -539,11 +1147,41 @@
           "quote": "Correlation below **-0.95**",
           "conversion": "M07 writes -0.95 as a decimal. Carried as -9500 bp for the same reason as D-02's floor, and exactly: a correlation is a pure ratio and basis points lose nothing."
         },
-        "size_mirroring_tolerance_bp": { "state": "unstated", "value": null, "unit": "bp", "cite": "docs/plans/M07-risk-abuse.md:123", "quote": "size mirroring" },
-        "timing_mirroring_tolerance_seconds": { "state": "unstated", "value": null, "unit": "seconds", "cite": "docs/plans/M07-risk-abuse.md:123", "quote": "timing mirroring" },
-        "conditions_combined": { "state": "stated", "value": "conjunction", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:123", "quote": "All three, not any of three" },
-        "operates_on": { "state": "stated", "value": "D-12 clusters", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:298", "quote": "D-13 and D-14 both operate on D-12's clusters" },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "size_mirroring_tolerance_bp": {
+          "state": "unstated",
+          "value": null,
+          "unit": "bp",
+          "cite": "docs/plans/M07-risk-abuse.md:123",
+          "quote": "size mirroring"
+        },
+        "timing_mirroring_tolerance_seconds": {
+          "state": "unstated",
+          "value": null,
+          "unit": "seconds",
+          "cite": "docs/plans/M07-risk-abuse.md:123",
+          "quote": "timing mirroring"
+        },
+        "conditions_combined": {
+          "state": "stated",
+          "value": "conjunction",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:123",
+          "quote": "All three, not any of three"
+        },
+        "operates_on": {
+          "state": "stated",
+          "value": "D-12 clusters",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:298",
+          "quote": "D-13 and D-14 both operate on D-12's clusters"
+        },
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     },
 
@@ -551,19 +1189,61 @@
       "detector": "D-14",
       "m07_row": "docs/plans/M07-risk-abuse.md:124",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:124", "quote": "Clique position-sum" },
-      "input": { "cite": "docs/plans/M07-risk-abuse.md:124", "quote": "live and end-of-day positions across a D-12 clique" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:124", "quote": "Third-leg rotation, detected **inside the day** rather than after it closes." },
+      "input": {
+        "cite": "docs/plans/M07-risk-abuse.md:124",
+        "quote": "live and end-of-day positions across a D-12 clique"
+      },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:124",
+        "quote": "Third-leg rotation, detected **inside the day** rather than after it closes."
+      },
       "is_sensitive": {
         "value": true,
         "reason": "`at or near zero` has no number in M07 and the number it acquires is the residual imbalance a clique may carry to look independent. That is the single parameter a rotating ring would most like to have, because it converts `stay hedged and hope` into `stay hedged to within this much`."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "max_abs_summed_position": { "state": "unstated", "value": null, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:124", "quote": "Summed positions across the clique at or near zero" },
-        "basis": { "state": "stated", "value": "positions", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:124", "quote": "working on positions rather than realized P&L" },
-        "evaluated_intraday": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:124", "quote": "inside the day" },
-        "operates_on": { "state": "stated", "value": "D-12 clusters", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:298", "quote": "D-13 and D-14 both operate on D-12's clusters" },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "max_abs_summed_position": {
+          "state": "unstated",
+          "value": null,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:124",
+          "quote": "Summed positions across the clique at or near zero"
+        },
+        "basis": {
+          "state": "stated",
+          "value": "positions",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:124",
+          "quote": "working on positions rather than realized P&L"
+        },
+        "evaluated_intraday": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:124",
+          "quote": "inside the day"
+        },
+        "operates_on": {
+          "state": "stated",
+          "value": "D-12 clusters",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:298",
+          "quote": "D-13 and D-14 both operate on D-12's clusters"
+        },
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     },
 
@@ -571,20 +1251,68 @@
       "detector": "D-18",
       "m07_row": "docs/plans/M07-risk-abuse.md:125",
       "name": { "cite": "docs/plans/M07-risk-abuse.md:125", "quote": "Registration phone lookup" },
-      "input": { "cite": "docs/plans/M07-risk-abuse.md:125", "quote": "`identity_phones` carrier metadata at capture" },
-      "evidence_of": { "cite": "docs/plans/M07-risk-abuse.md:125", "quote": "A fleet at the **earliest** and cheapest moment it is observable." },
+      "input": {
+        "cite": "docs/plans/M07-risk-abuse.md:125",
+        "quote": "`identity_phones` carrier metadata at capture"
+      },
+      "evidence_of": {
+        "cite": "docs/plans/M07-risk-abuse.md:125",
+        "quote": "A fleet at the **earliest** and cheapest moment it is observable."
+      },
       "is_sensitive": {
         "value": true,
         "reason": "THE FOUR LEGS ARE THE FLEET SIGNATURE ITSELF AND ANY ONE OF THEM IS THE EVASION. M07 says the number is the one signal a fleet operator cannot mint in bulk for free, so disclosing that the composite REQUIRES all four tells an operator to buy one real mobile number and break the signature at its cheapest leg. And `line_type = 'voip'` reaching a trader is worse than a leak: M07 rules that VoIP is scored and never rejected precisely because a legitimate customer's only number is often VoIP, so a trader shown that leg reads a refusal Merit did not make."
       },
       "parameters": {
-        "flag_status": { "state": "stated", "value": "open", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:50", "quote": "No detector transitions a flag past `open`" },
-        "required_legs": { "state": "stated", "value": 4, "unit": "count", "cite": "docs/plans/M07-risk-abuse.md:127", "quote": "Four legs, all four required." },
-        "composite": { "state": "stated", "value": "VoIP plus a fresh email plus a datacenter IP plus no digital footprint", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:127", "quote": "VoIP plus a fresh email plus a datacenter IP plus no digital footprint." },
-        "leg_voip": { "state": "stated", "value": "identity_phones.line_type = 'voip'", "unit": "sql", "cite": "docs/plans/M07-risk-abuse.md:131", "quote": "`identity_phones.line_type = 'voip'`" },
-        "leg_fresh_email": { "state": "stated", "value": "D-15 footprint age", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:132", "quote": "D-15's footprint age" },
-        "leg_datacenter_ip": { "state": "stated", "value": "D-15 IP reputation", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:133", "quote": "D-15's IP reputation" },
-        "leg_no_footprint": { "state": "stated", "value": "identity_phones.footprint_present = false", "unit": "sql", "cite": "docs/plans/M07-risk-abuse.md:134", "quote": "`identity_phones.footprint_present = false`" },
+        "flag_status": {
+          "state": "stated",
+          "value": "open",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:50",
+          "quote": "No detector transitions a flag past `open`"
+        },
+        "required_legs": {
+          "state": "stated",
+          "value": 4,
+          "unit": "count",
+          "cite": "docs/plans/M07-risk-abuse.md:127",
+          "quote": "Four legs, all four required."
+        },
+        "composite": {
+          "state": "stated",
+          "value": "VoIP plus a fresh email plus a datacenter IP plus no digital footprint",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:127",
+          "quote": "VoIP plus a fresh email plus a datacenter IP plus no digital footprint."
+        },
+        "leg_voip": {
+          "state": "stated",
+          "value": "identity_phones.line_type = 'voip'",
+          "unit": "sql",
+          "cite": "docs/plans/M07-risk-abuse.md:131",
+          "quote": "`identity_phones.line_type = 'voip'`"
+        },
+        "leg_fresh_email": {
+          "state": "stated",
+          "value": "D-15 footprint age",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:132",
+          "quote": "D-15's footprint age"
+        },
+        "leg_datacenter_ip": {
+          "state": "stated",
+          "value": "D-15 IP reputation",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:133",
+          "quote": "D-15's IP reputation"
+        },
+        "leg_no_footprint": {
+          "state": "stated",
+          "value": "identity_phones.footprint_present = false",
+          "unit": "sql",
+          "cite": "docs/plans/M07-risk-abuse.md:134",
+          "quote": "`identity_phones.footprint_present = false`"
+        },
         "footprint_present_test": {
           "state": "stated",
           "value": "IS FALSE",
@@ -593,12 +1321,48 @@
           "quote": "D-18 tests `footprint_present IS FALSE`",
           "note": "THE WHOLE RELIABILITY OF THE DETECTOR IS IN THIS ONE VALUE AND IT IS SEEDED AS DATA SO THAT A CODE PATH CAN BE CHECKED AGAINST IT. `footprint_present` is three-valued because the lookup fails open: null means the vendor was not reached and false means the vendor looked and found none. A detector written against `IS NOT TRUE` scores every vendor timeout as a fleet member, which turns a supplier outage into a flood of flags against real customers. `generate.mjs` refuses `IS NOT TRUE` here on its own finding."
         },
-        "refuses_line_type": { "state": "stated", "value": false, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:125", "quote": "No threshold anywhere refuses a line type" },
-        "evaluated_as_refusal": { "state": "stated", "value": false, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:125", "quote": "never evaluated as a refusal" },
-        "scored_by": { "state": "stated", "value": "D-16", "unit": "text", "cite": "docs/plans/M07-risk-abuse.md:125", "quote": "never evaluated as a refusal" },
-        "fail_open_on_timeout": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:138", "quote": "Non-blocking, fail-open on timeout, VoIP scored and never rejected" },
-        "records_lookup_provenance": { "state": "stated", "value": true, "unit": "boolean", "cite": "docs/plans/M07-risk-abuse.md:138", "quote": "`lookup_provider` and `lookup_at` are recorded on every row" },
-        "severity": { "state": "unstated", "value": null, "unit": "severity", "cite": "docs/plans/M07-risk-abuse.md:146", "quote": "Severity is scored, not asserted." }
+        "refuses_line_type": {
+          "state": "stated",
+          "value": false,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:125",
+          "quote": "No threshold anywhere refuses a line type"
+        },
+        "evaluated_as_refusal": {
+          "state": "stated",
+          "value": false,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:125",
+          "quote": "never evaluated as a refusal"
+        },
+        "scored_by": {
+          "state": "stated",
+          "value": "D-16",
+          "unit": "text",
+          "cite": "docs/plans/M07-risk-abuse.md:125",
+          "quote": "never evaluated as a refusal"
+        },
+        "fail_open_on_timeout": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:138",
+          "quote": "Non-blocking, fail-open on timeout, VoIP scored and never rejected"
+        },
+        "records_lookup_provenance": {
+          "state": "stated",
+          "value": true,
+          "unit": "boolean",
+          "cite": "docs/plans/M07-risk-abuse.md:138",
+          "quote": "`lookup_provider` and `lookup_at` are recorded on every row"
+        },
+        "severity": {
+          "state": "unstated",
+          "value": null,
+          "unit": "severity",
+          "cite": "docs/plans/M07-risk-abuse.md:146",
+          "quote": "Severity is scored, not asserted."
+        }
       }
     }
   ],

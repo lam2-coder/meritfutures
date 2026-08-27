@@ -4,7 +4,7 @@
   "generator_version": 1,
   "note": "GENERATED, COMMITTED AND REVIEWED. Do not edit: edit the source file and regenerate. These are detector_definitions rows as 0008_risk.sql declares the table, one per detector M07 section 3.2 names, and EVERY VALUE IN parameters CARRIES THE LINE OF M07 IT WAS READ FROM. INV-M7-04 is the reason the citation travels into the row rather than staying in the source file: a threshold whose provenance lives in git and whose value lives in the database cannot answer \"why did this not fire in March\" without an archaeology exercise.",
   "source_file": "m07-detectors-v1.source.json",
-  "source_sha256": "997dbc88b37fdeb666586a2aa615114582a785f79a7da63b10535b82c83e4c57",
+  "source_sha256": "decfc28030892527e0fa3055706c821feec3310a2b26335af0e82a160f7dadfc",
   "provenance": {
     "_note": "The authority is a document in this repository rather than a retrieved publication, so there is no artifact to commit and no `artifact_sha256`. What replaces both is the LINE-LEVEL CITE on every value plus `authority_sha256`, the digest of the authority file as read. A cite that still resolves against a DIFFERENT M07 is a cite that has silently changed meaning; the digest is what turns that from an archaeology exercise into a one-line check. `generate.mjs` re-derives it and refuses a disagreement.",
     "authority": "docs/plans/M07-risk-abuse.md",
