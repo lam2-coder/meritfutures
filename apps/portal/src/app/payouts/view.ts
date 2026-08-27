@@ -164,7 +164,9 @@ export function toPayoutHistory(items: readonly PayoutListItem[]): PayoutHistory
  *
  * So a trader whose identity is `restricted` or `closed`, or who already has a
  * request in flight, can receive `eligible: false` with all ten rendered gates
- * passing. On the one screen whose stated job is to show the whole rule, that
+ * passing. THE SECOND OF THOSE IS THE ORDINARY ONE: nothing in this tree writes
+ * `identities.status` today, while a trader with an outstanding request is the
+ * most common thing that happens on this screen. ADR-148 finding 7. On the one screen whose stated job is to show the whole rule, that
  * is ten green rows beside a refusal, and M04 section 3.2's copy rule ("not
  * yet, here is exactly what is left") has nothing to name.
  *
