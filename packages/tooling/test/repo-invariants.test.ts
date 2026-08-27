@@ -501,6 +501,55 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // RI-10's SCOPE, AND THE WIDENING IS SEEDED BECAUSE THE `src/` LINE WAS BLIND
+  // ---------------------------------------------------------------------------
+  // ADR-121. `scripts/` joined the scope after the `src/` line let 19 broken
+  // specifiers sit in `scripts/demo/` while every gate in the repository stayed
+  // green, `node --experimental-strip-types scripts/demo/main.ts` died with
+  // ERR_MODULE_NOT_FOUND, and nightly.yml ran the directory anyway.
+  //
+  // THE FIRST CASE IS THE SEEDED VIOLATION and it is the whole point: without
+  // the widening it returns nothing, which is the state this ADR ended.
+  //
+  // THE SECOND IS THE NEAR MISS THAT MUST NOT FIRE, and it matters as much. The
+  // test ruling survives the widening: `scripts/demo/test/` holds Vitest suites,
+  // Vitest resolves the tolerant way, and a `.js` specifier there is not a
+  // runtime defect. A widening that swallowed the ruling would be a different
+  // check wearing this one's name.
+  //
+  // THE THIRD IS THE OTHER DIRECTION UNDER THE NEW SCOPE: a specifier naming a
+  // real `.js` file in `scripts/` passes, because the file is there. Session
+  // 148's blanket rewrite broke `packages/eslint-plugin-merit/index.js` and this
+  // is that lesson pointed at the directory that just joined.
+  test('RI-10 reaches scripts/, which the `src/` scope could not see', () => {
+    const root = cleanTree();
+    write(root, 'scripts/demo/thing.ts', 'export const thing = 1;\n');
+    write(root, 'scripts/demo/main.ts', "import { thing } from './thing.js';\nexport { thing };\n");
+    const out = findings('RI-10', root).join('\n');
+    expect(out).toContain('scripts/demo/main.ts');
+    expect(out).toContain('`./thing.js` names no file');
+    expect(out).toContain('scripts/demo/thing.ts is what is there');
+  });
+
+  test('RI-10 still exempts tests after the widening, including under scripts/', () => {
+    const root = cleanTree();
+    write(root, 'scripts/demo/thing.ts', 'export const thing = 1;\n');
+    write(
+      root,
+      'scripts/demo/test/thing.test.ts',
+      "import { thing } from '../thing.js';\nexport { thing };\n",
+    );
+    expect(findings('RI-10', root)).toEqual([]);
+  });
+
+  test('RI-10 does NOT refuse a scripts/ specifier naming a file that is genuinely `.js`', () => {
+    const root = cleanTree();
+    write(root, 'scripts/demo/hook.js', 'export const hook = 1;\n');
+    write(root, 'scripts/demo/uses-hook.ts', "import { hook } from './hook.js';\nexport { hook };\n");
+    expect(findings('RI-10', root)).toEqual([]);
+  });
+
+  // ---------------------------------------------------------------------------
   // RI-09, AND THE FIRST TWO CASES ARE THE RULING (ADR-098) STATED AS A TEST
   // ---------------------------------------------------------------------------
   // ADR-095's approval clause is a path and four green commands: seed
