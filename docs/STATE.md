@@ -6125,3 +6125,104 @@ prose was changed instead, which fixes the occurrence and not the class.
 **No ADR number, no migration number, no `packages/db` change, no contract change, no `SqlExecutorReason` member, no `SystemReason` member, no `pg` import and no cast past a key type.** `apps/api` is untouched, so `wiring.test.ts`'s `{declared, wired, blocked}` triple does not move.
 
 **Measured with `pnpm install` first and each command run separately: 33 of 33 gates, 14 of 14 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 209 test files / 4,837 passed / 6 skipped, `falsify.mjs` clean.** The `main` baseline of 33 / 14 / 0 / 0 / clean / **208 files / 4,764 passed / 6 skipped** was reproduced exactly before a line changed.
+
+---
+
+## `firm_treasury` is an asset, the prose is right, and the three postings written against it are amended (2026-08-28, session 326)
+
+**[ADR-180](decisions/ADR-180.md) lands, `status: proposed`, approval line UNSIGNED, and `0053` IS
+TAKEN** as [`0053_firm_treasury_kind.sql`](../packages/db/migrations/0053_firm_treasury_kind.sql),
+`E2 READ: MONEY PATH`. **[ADR-177](decisions/ADR-177.md) measured that this corpus contradicts
+itself about this account and refused to choose. This entry chooses.**
+
+**BOTH HALVES WERE RE-DERIVED AT THEIR OWN SOURCES RATHER THAN INHERITED, and both are CONFIRMED
+UNANIMOUS.** `LT-02` debits `firm_treasury` at settlement, `LT-06` credits it at approval and
+`LT-07` debits it at settlement, and read through
+[`posting.ts:235-236`](../packages/ledger/src/posting.ts) all three are correct as a `liability` and
+backwards as an `asset`. **The prose side is one site larger than [ADR-177](decisions/ADR-177.md)
+counted**, because [`payouts.ts:773`](../apps/api/src/routes/payouts.ts) states it in shipped
+source beside [M05:141](plans/M05-payout-system.md), [ADR-027:48](decisions/ADR-027.md),
+[ADR-033:20](decisions/ADR-033.md), [ADR-067:77](decisions/ADR-067.md) and
+[`0038:48-49`](../packages/db/migrations/0038_account_adjustments.sql).
+
+**WHAT SEPARATES THEM IS NOT THEIR UNANIMITY BUT WHAT EACH UNANIMITY IS MADE OF.** The load-bearing
+ground is that **under `liability` the chart of accounts holds NO CASH ACCOUNT AT ALL, and nothing
+in this tree has ever recorded that absence**, while the absence the corpus DID record is the other
+one: [ADR-174](decisions/ADR-174.md) clause 4 names the external leg's missing in-flight obligation
+in terms and derives it from the three-state rail. **An absence nobody noticed, weighed against one
+somebody wrote down, is evidence about which is real.**
+**[`treasury_balances`](../packages/db/migrations/0009_ledger.sql) IS SCHEMA RATHER THAN PROSE AND
+ONLY PARSES AS CASH**, its balance being the RAIL's reported balance under
+`source CHECK IN ('provider_api','manual_attestation')`, and a provider API has nothing to return
+for an obligation; stated at its real strength, `account_code` carries no key into the chart, so it
+is an argument from the table's SUBJECT and not from a join. **THE ARITHMETIC'S UNANIMITY IS ONE
+HAND AND NOT THREE WITNESSES**: three cells of ONE table, at the site
+[ADR-027:73](decisions/ADR-027.md) records three direction-or-class errors landing on in a single
+day with a fourth inside the ADR describing them, and the one-place sign function exists because of
+it. **FOUR OF THE PROSE SITES ARE DECISIONS RATHER THAN DESCRIPTIONS**, and no session has ever
+declined an action on the ground that this account is an obligation. **The name is recorded and
+relied on for nothing.**
+
+**[ADR-174](decisions/ADR-174.md) FINDING 6's ZERO IS NAMED AS EVIDENCE FOR NEITHER SIDE**, because
+it holds for every kind, which that entry said in terms: under `liability` it is correct and under
+`asset` it is the fingerprint of the defect. **It is not counted.**
+
+**ALL THREE ROWS ARE AMENDED AND `LT-02` IS ONE OF THEM.**
+[M05](plans/M05-payout-system.md) section 2.1 moves ONLY the leg naming `firm_treasury`, and each
+row keeps its original text quoted inside it, which is [ADR-027](decisions/ADR-027.md)'s own
+precedent in that exact table. **`LT-02` and `LT-07` CREDIT it** at settlement, because cash
+derecognizes at settlement; **`LT-06` does not name it at all**, because no cash moves at an
+approval. **All three are marked UNPOSTABLE, which is stronger than what they carried before: they
+used to read as postable and wrong.** **[ADR-174](decisions/ADR-174.md) REFUSED THIS AMENDMENT AND
+ITS GROUND IS RECORDED AS NO LONGER HOLDING** rather than stepped around, because the row could not
+be half-corrected while neither leg was determined and now one is. **The counterparty slots stay
+open and the `LT-07` repair is untouched**, which makes it the only question left on that row.
+**`LT-01` is out of fence, was checked anyway and reads correctly**, as does `LT-08`.
+
+**EXECUTED against PostgreSQL 16 with `0001` through `0053` applied forward-only from empty under
+`ON_ERROR_STOP`, 114 base tables.** Fourteen perturbations, every one as designed: `firm_treasury`
+REFUSED as `liability`, `revenue`, `equity` and `expense`; an UPDATE reclassifying the seeded row
+REFUSED; **`asset` ACCEPTED with the seed deleted inside the transaction first, so acceptance was
+watched rather than assumed**; `0052`'s arms still refusing; the eighth code, the second firm row
+and the re-apply all REFUSED; the CI ledger probe still reporting every constraint firing; and
+**the hole still watched**, with `psp_clearing` as `expense` and `reserve` as `equity` both
+ACCEPTED. `ledger_accounts` goes from **1 row to 2**. `0009`, `0027`, `0038` and `0052` are byte for
+byte unchanged, and the constraint is SUPERSEDED by a DROP and an ADD under its own name.
+
+**A DEFECT WAS FOUND THAT WAS NOT IN THE DISPATCH AND IT IS IN A FILE `E2` MAKES UNAMENDABLE.**
+[`0052:115-116`](../packages/db/migrations/0052_chart_of_accounts.sql) says asset-shaped prose
+*"turned out to be **wrong** for firm_treasury"* where [ADR-177](decisions/ADR-177.md) section 4
+says *"turned out to be **contradicted**"*. **The migration names a loser the entry it transcribes
+refused to name, and names the half this ruling finds was RIGHT**, so its warning to the next
+reader is inverted, in the file that reader will open, about the two codes still open. Its
+conclusion about `reserve` survives on its other stated ground.
+
+**[ADR-177](decisions/ADR-177.md)'s THREE ARMED ASSERTIONS ALL FIRED** and are updated to assert the
+answer rather than deleted.
+[`chart-of-accounts-kinds.test.ts`](../packages/ledger/test/chart-of-accounts-kinds.test.ts) now
+reads the constraint IN FORCE rather than `0052`'s by name, and gains three cases watching the
+SUPERSESSION itself, one of them the arm that could go missing SILENTLY by falling back through
+`ELSE true`.
+
+**THIRTY-ONE DEFECTS SEEDED, ALL THIRTY-ONE CAUGHT, AND TWO WERE MISSES FIRST. One of them stayed
+GREEN THROUGH THIS SESSION'S OWN RULING**, which is the measurement worth keeping:
+[`lt-07.test.ts`](../packages/rail/test/lt-07.test.ts)'s finding C watcher asserted that no file
+writes a `kind` for `firm_treasury` while looping over the probe and `0052` **by name**, so `0053`
+writing that literal passed it; and it could not have worked anyway, because its pattern matched
+the seven-code VOCABULARY in `0009` and `0027` rather than a ruling. The second miss was seeded at
+the replacement and has the same cause one level down. **Both are the same sentence in two
+registers: a watcher must read the CLAIM and not the place the claim happened to live when it was
+written.**
+
+**THE FOUNDER QUESTION IS REAL AND IS NAMED PLAINLY: which of two unanimous readings is the wrong
+one is a JUDGEMENT and not a derivation**, and [ADR-180](decisions/ADR-180.md) section 8 names where
+it is most likely wrong, that its load-bearing ground is an argument from silence. **The reversal is
+one migration and one ADR and nothing else in the tree moves, because nothing posts these three
+transactions yet.** No `SystemReason` member, no `SqlExecutorReason` member, no `pg` import, no cast
+past a key type, no new code, no new column, no trigger, vocabulary still closed at seven, and
+`wiring.test.ts` read and not edited.
+
+**Measured with each command run separately: 33 of 33 gates, 15 of 15 invariants, `typecheck`
+exit 0, `lint` exit 0, `format:check` clean, 212 files / 4,984 passed / 6 skipped against a `main`
+baseline of 212 / 4,981 / 6 reproduced exactly first, and `falsify` clean with the tree clean
+after it.**
