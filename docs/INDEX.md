@@ -69,7 +69,7 @@ Every doc in the corpus, one line each. **If a thing is not in this file, it doe
 | [OVERVIEW.md](architecture/OVERVIEW.md) | System diagram, module map, end-to-end data flow | approved | founder |
 | [DATA_MODEL.md](architecture/data-model/README.md) | Every table, column, type, index, constraint, retention. **Amended under [ADR-026](decisions/ADR-026.md): the schema-delta reconciliation is folded** | approved | founder |
 | [API_CONTRACT.md](architecture/API_CONTRACT.md) | B2 expanded: every endpoint, schemas, errors, the negative-authz matrix | approved | founder |
-| [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers | approved | founder |
+| [EVENTS.md](architecture/EVENTS.md) | Every event: name, payload schema, producer, consumers. **Section 13 is the wire format money takes inside a payload, added by [ADR-198](decisions/ADR-198.md)**: a `_cents` value is a DECIMAL STRING, because `payload` is `jsonb`, `JSON.stringify` refuses a `bigint` outright, and a JSON number would hand every reader of a forever-retained table the one type `assertPayloadRules` refuses. **The amendment moved no line**, which was deliberate: 104 `EVENTS:N` citations in 24 files are all outside that entry's fence, so section 1's sentence grew on the line it already occupied and the reasoning was appended | approved | founder |
 | [STATE_MACHINES.md](architecture/STATE_MACHINES.md) | Account, payout, flag, identity lifecycles as Mermaid | approved | founder |
 | [INFRA.md](architecture/INFRA.md) | Environments, deploy pipeline, backups, the VG gate table, cost guards | approved | founder |
 | [SECURITY.md](architecture/SECURITY.md) | Appendix D instantiated: per-asset threat model and control map | approved | founder |

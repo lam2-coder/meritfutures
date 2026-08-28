@@ -1147,17 +1147,19 @@ describe('the composition file', () => {
     // LEFT THIS LIST when their modules landed, and both left it by turning
     // this case red rather than by anyone remembering.
     //
-    // `searchAccounts` IS THE ONE LEFT THAT NO TABLE REGISTRATION UNBLOCKS.
-    // API_CONTRACT section 8 makes its term "account id, platform ref, email,
-    // identity id, NAME FRAGMENT, coupon, or payout id"; a fragment is a
-    // SUBSTRING predicate, ADR-112's vocabulary is a typed equality and ADR-157
-    // admits a range term and an `IS NULL` and refuses the rest. Six of the
-    // seven terms are keyed reads and the seventh is not, so an adapter serving
-    // six would narrow a contract behaviour behind a green suite.
+    // `searchAccounts` HAS NOW LEFT IT TOO, AND THE PARAGRAPH THAT STOOD HERE
+    // WAS TRUE WHEN IT WAS WRITTEN AND WAS OVERTURNED BY A RULING RATHER THAN BY
+    // A MODULE. It read that the term is "account id, platform ref, email,
+    // identity id, NAME FRAGMENT, coupon, or payout id" and that the seventh
+    // form is a substring predicate ADR-157 refuses, so an adapter serving six
+    // "would narrow a contract behaviour behind a green suite". ADR-194 removed
+    // the seventh form FROM THE CONTRACT, on the measurement that it named data
+    // this estate deliberately does not hold, so six of six is the whole row and
+    // `admin-source/search.ts` serves it with no widening anywhere.
     const missing = declared.filter(
       (name) => !(IMPLEMENTED_ADMIN_READS as readonly string[]).includes(name),
     );
-    expect(missing).toStrictEqual(['exportEvidence', 'readLiability', 'searchAccounts']);
+    expect(missing).toStrictEqual(['exportEvidence', 'readLiability']);
   });
 
   it('returns the page from listFlags and drops the cost', async () => {

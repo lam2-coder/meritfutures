@@ -1,7 +1,7 @@
 ---
 status: approved
 depends_on: [MERIT_BUILD_MASTER_PROMPT.md, ../GLOSSARY.md, OVERVIEW.md, data-model/README.md, ../decisions/ADR-039.md, ../plans/FOLD-01-phone-identity.md]
-last_updated: 2026-08-27
+last_updated: 2026-08-28
 ---
 
 # Events (Constitution §2 "everything is an event")
@@ -14,7 +14,7 @@ Every event Merit emits: name, payload schema, producer, consumers. One append-o
 
 **Payloads carry ids and numbers, never PII.** No email addresses, no names, no document data, no card details, no IP addresses inside a payload. An event references `identity_id` and `account_id`; anything sensitive is fetched through an authorized read at display time. This keeps the forever-retained table free of the data a privacy deletion request would have to reach into.
 
-**Money and ratios** in payloads follow the same rules as the schema: integer cents in `_cents` fields, basis points in `_bp` fields.
+**Money and ratios** in payloads follow the same rules as the schema: integer cents in `_cents` fields, basis points in `_bp` fields. **A `_cents` value is a JSON STRING holding the decimal integer number of cents and a `_bp` value is a JSON integer** ([ADR-198](../decisions/ADR-198.md)); the canonical form of a `_cents` value matches `/^(0|-?[1-9][0-9]*)$/`, a `_cents` field a producer leaves empty is JSON `null` and never `"0"` or `""`, and a consumer parses one with `BigInt(...)` in JavaScript or `(payload ->> 'field')::bigint` in SQL. Section 13 is the format and the reason.
 
 **Versioning.** Every event row stores `schema_version`. A payload may add optional fields at the same version; any removal, rename, or semantic change increments the version and both shapes stay readable forever, because consumers include a 2031 audit reading a 2027 row.
 
@@ -417,3 +417,19 @@ Suppression rules exist because a commiseration email to someone we just restric
 1. **`day.closed` volume: RESOLVED at the Wave 2 gate (2026-08-13).** The **full mark payload** is carried in the event, not a thin pointer. At 5,000 active accounts that is roughly 1.25M rows per year in `events` on top of `daily_marks`, and it is the right price: the account timeline and the [evidence pack](../GLOSSARY.md#evidence-pack) both reconstruct from the event stream alone, without joining to state that may since have been superseded by a correction. An event that points at a mutable row proves nothing in 2031.
 2. **Public stats derived from events (STATS consumers).** Confirm which aggregates go on the public page at launch: trailing pass rate, payouts paid, average payout, and average time to first payout are the candidate set. (Still open; M12 owns it.)
 3. **`identity.signal_observed`** is high volume and low value individually. Proposed: emit only on first observation of a signal per identity, not on every re-observation. (Still open; M7 owns it.)
+
+## 13. Money in a payload: the wire format
+
+**Added by [ADR-198](../decisions/ADR-198.md), which rules it. Nothing above this section changed shape**: every field list, every fenced payload block, every consumer and every `schema_version` is as it was. What this section states is what a `_cents` field of one of them looks like once it is a row.
+
+**A `_cents` value is a JSON STRING holding the decimal integer number of cents.** The canonical form is an optional leading `-`, then either `0` or a nonzero digit followed by any digits: `/^(0|-?[1-9][0-9]*)$/`. No `+`, no leading zeros, no `-0`, no decimal point, no exponent, no thousands separator, no whitespace, and never the empty string. `"150000"` is a hundred and fifty thousand cents. **A `_cents` field a producer leaves empty is JSON `null`**, never `"0"` and never `""`, so "no figure" and "zero cents" stay different rows forever. **The format is exact over every integer and carries no ceiling.**
+
+**A `_bp` value is unchanged and stays a JSON integer.** `BasisPoints` is an integer `number` and a ratio in basis points has no magnitude problem. This section rules on `_cents` and on nothing else inside a payload.
+
+**A consumer parses a `_cents` value with `BigInt(...)` in JavaScript and `(payload ->> 'field')::bigint` in SQL. `Number(...)` on one is the defect the format exists to prevent.** In Metabase and in any other reader that charts the raw value, the cast is required: a `jsonb` string rendered without one sorts lexicographically, which puts `"9"` above `"10"`.
+
+**The reason is the type a consumer holds and not the size of the number.** `payload` is `jsonb`, whose driver mapping is `JSON.stringify`, and `JSON.stringify` refuses a `bigint` outright, so producing a JSON number from one requires `Number(value)` -- the coercion this corpus refuses for money everywhere else, because a `number` that reached a financial path may already have lost digits. `JSON.parse` would then hand an IEEE-754 double to every JavaScript reader of a table that is append-only and retained forever, and **nothing looking at that double can tell a value that is exact from a value that lost digits**. A decimal string parses back to an exact integer, so the question stays decidable at the 2031 audit reading a 2027 row that section 1 names. The magnitude ceiling is real arithmetic and is not the argument: `Number.MAX_SAFE_INTEGER` is 9,007,199,254,740,991 cents, and no figure this system can produce approaches it.
+
+**This is the same answer [ADR-158](../decisions/ADR-158.md) clause 3 gives `entry_id`, for the same reason.** It does not change [API_CONTRACT](API_CONTRACT.md) section 1, where a `*_cents` response field is still a JSON integer: a response body and a stored event are different surfaces with different retention, and the one whose rows outlive every consumer that reads them is this one.
+
+**`schema_version` does not move.** Section 1 keeps two shapes readable forever because a 2031 audit reads a 2027 row, and that rule protects readers of rows that exist. No row of any money name in this catalogue has ever been written, so there is no earlier shape to keep readable.
