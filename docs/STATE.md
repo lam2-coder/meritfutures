@@ -6754,3 +6754,84 @@ line changed.
 **TWO THINGS THE PLAN ASKED FOR COULD NOT BE FOLLOWED AND BOTH ARE THE PLAN DISAGREEING WITH ITSELF.** Section 9's collision row says `W6-c` creates the file _"with the liability and feed shapes"_, while the same plan's section 4.2 measured that **the feed has no contract row** and gave the row to `W6-e`, which is the one slice in this wave that REQUIRES an ADR: a feed shape here would be inventing the contract the file exists to copy. And the `W6-c` row says _"sections 8 and 9"_, while section 9 is a five-row table of which **four rows declare no response body at all** and the fifth is `GET /health`, marked Public and outside the operator prefixes this client will reach. **Both absences are stated in the file rather than left as omissions.**
 
 **NO ADR NUMBER AND NO MIGRATION NUMBER.** `test/service.test.ts`, `apps/admin/tsconfig.json`, `src/app/**`, `page.ts`, `liability.ts`, `live-liability.ts`, `apps/api/**`, [API_CONTRACT](architecture/API_CONTRACT.md), `packages/**`, `pnpm-workspace.yaml` and `pnpm-lock.yaml` were not touched, and `apps/admin/package.json` needed nothing. **Measured with `pnpm install` first and each command run separately, reproduced on `main` before a line changed: 33 of 33 gates, 16 of 16 invariants, `typecheck` 0, `lint` 0, `format:check` clean, and 214 test files / 5,064 passed / 6 skipped becoming 215 / 5,084 / 6.** `falsify.mjs` ran LAST and ALONE on a committed tree and the working tree was clean after.
+
+## `RI-17` lands as a gate, and the boundary decided which file it lands in (2026-08-28, session 342)
+
+**THE DIFF WAS RE-DERIVED BEFORE ANYTHING WAS PINNED AND IT IS STILL EMPTY IN BOTH DIRECTIONS.**
+[API_CONTRACT](architecture/API_CONTRACT.md) declares **73** distinct `METHOD /path` endpoints; the
+modules on disk declare **73** across the two surfaces; the symmetric difference is **0** and every
+declared route is registered somewhere. The move from [session 338](sessions/2026-08-28-session-338.md)'s
+**72** is [session 336](sessions/2026-08-28-session-336.md) landing a contract row and its route
+between the two measurements, which is session 338's own landmine coming true rather than a defect.
+`public` registers **46** and withholds **27**; `operator` registers **28** and withholds **45**; the
+two registered sets sum to 74 against a union of 73, so exactly one endpoint is registered on both,
+which is section 9's liveness row doing what it says.
+
+**THE NUMBER IS A GATE NOW AND IT IS NOT IN `repo-invariants.mjs`.** `check:invariants` still reports
+**16 of 16**, and the dispatch's "17 of 17" could not be met. The reservation named that file and the
+dispatch said in advance that a check which cannot legally reach a real `compose()` is **a finding to
+report and a check to move, never a fence to widen**. Three things were measured on the branch and
+each alone is disqualifying: `packages/tooling/checks/` resolves neither `@merit/api` nor `fastify`
+(`ERR_MODULE_NOT_FOUND` both, with `packages/tooling/node_modules/@merit` absent), and
+`Invariant.run` returns `string[]` synchronously while `discoverRouteModules` is `async`. Declaring
+`@merit/api` there would make a shared package depend on a deployable, which is `RI-04`'s argument
+pointed the other way. **The only shape that keeps the number in that file reads `routes/*.ts` as
+TEXT**, and that is refused on the rule
+[`account-reads.test.ts`](../apps/api/test/account-reads.test.ts) states in its own header: a grep
+over route files has been wrong twice in this repository. So it landed as
+[`apps/api/test/api-contract-coverage.test.ts`](../apps/api/test/api-contract-coverage.test.ts), the
+[`RI-17` row](decisions/ALLOCATION.md) is amended IN PLACE to say what actually landed rather than
+joined by a second row, and the precedent is one deployable over at
+[`apps/site/test/manifest.test.ts`](../apps/site/test/manifest.test.ts), whose header says the same
+thing about the same file.
+
+**THE COST IS REAL AND IT IS NOT A FORMALITY.** `RI-17` runs in `CI-02` with the suite and the
+fifteen invariants beside it run in `CI-01`, so a change that skips the test run is not refused by it.
+A repository that wants contract coverage refused at the same stage as the others needs either a
+`packages/tooling` that may compose a deployable or an `apps/api` that may hold an invariant, and
+that is a ruling rather than a file.
+
+**NEITHER HALF IS STORED, WHICH IS THE WHOLE DIFFERENCE FROM THE COUNT IT REPLACES.** The contract is
+read live through
+[`api-contract-endpoints.mjs`](../packages/tooling/checks/api-contract-endpoints.mjs); the routes
+through a real `compose()` over `discoverRouteModules()`, unioning `registered` AND `withheld` across
+`API_SURFACES`, because a withheld route is DECLARED and merely not served by that deployment.
+`API_SURFACES` is read out of [`surface.ts`](../apps/api/src/surface.ts) rather than written in the
+check, so a third surface is composed the day it is declared. The reader is loaded by COMPUTED PATH
+and its shape validated at run time, because a static import of a `.mjs` with no declaration file is
+`TS7016` from that project; the alternatives were `allowJs` on a deployable's compiler settings, which
+is outside the fence, and a hand-written `.d.mts`, which is INSIDE it and refused anyway as a second
+copy of the reader's type surface that nothing checks against the reader.
+
+**FIVE SEEDS WATCHED FAILING AGAINST THE REAL DOCUMENT**, mutated in memory with its SHA-256 verified
+unchanged: a contract row with no route, a route with no contract row, an endpoint table the reader
+stops seeing, a heading it enters and cannot parse, and a fifth that watches a LIMIT rather than a
+defect. **THAT FIFTH IS THE FINDING AND IT WAS NOT IN THE DISPATCH: "assert the reader's own coverage
+statement" is weaker than it sounds.** A `count > 0` floor sees a structure the reader stopped reading
+ENTIRELY and cannot see one it stopped reading in PART, and this document declares endpoints in two
+tables, so renaming one `Endpoint` header leaves the count non-zero and the coverage report reads as
+intact. The diff catches it, the division is watched, and the floor is deliberately NOT strengthened
+into a stored count of tables, which is the very thing `RI-17` exists to remove.
+
+**TWO OF SESSION 338'S FINDINGS ARE UNMOVED AND ONE IS NEW.**
+[API_CONTRACT](architecture/API_CONTRACT.md) still says two admin projections are *"registered by
+nothing"* while [`admin-breaker.ts`](../apps/api/src/routes/admin-breaker.ts) registers both, and
+**this check is blind to that by construction**: it compares `METHOD /path` and reads prose not at
+all. `apps/api` still resolves `@merit/tooling` through the workspace ROOT it does not declare, and
+the computed-path load means the repair, when it comes, cannot break this check. The new one is a
+universal in [ALLOCATION](decisions/ALLOCATION.md)'s `RI-nn` section, *"THE ROWS ARE READ OUT OF
+`repo-invariants.mjs`'s `CHECKS` ARRAY, NEVER TYPED"*, which `RI-17`'s own row now falsifies; the
+fence was that row alone, so it is REGISTERED with the repair named and not made.
+
+**A SLOW CHECK WOULD HAVE BEEN A DEFECT AND THIS ONE IS NOT.** The ten cases run in **15 ms**, the
+reader parses the live document in **0.488 ms** minimum over twenty reads, and the file's two to three
+second wall is importing 27 route modules and `fastify`, which is shared with the twenty-odd other
+`apps/api` suites: the whole suite runs in **45.74 s** against a **45.93 s** baseline, so the check
+adds no measurable cost to it.
+
+**NO CONTRACT ROW AND NO ROUTE REPAIRED, NO ADR NUMBER TAKEN, `repo-invariants.mjs` BYTE FOR BYTE
+UNCHANGED, AND [STRATEGY](testing/STRATEGY.md) UNTOUCHED** because no rule requiring a row there could
+be cited and it is `status: approved` in a frozen corpus. 33 of 33 gates, 16 of 16 invariants and
+still 16, typecheck 0, lint 0, `format:check` clean, **219 test files / 5,149 passed / 6 skipped**
+against a `main` baseline of **218 / 5,139 / 6** reproduced exactly first, `falsify.mjs` clean with
+the tree clean after it.
