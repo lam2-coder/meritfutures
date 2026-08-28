@@ -404,9 +404,23 @@ test('B.2 every module under src/ is a leg or is deliberately absent, and never 
   // met. It is not a hypothetical here. `feed.ts` landed as M06 section 1.1's
   // fifth surface, exporting fourteen names, and no check in this package could
   // tell that the entry point had never learned it.
-  const modules = readdirSync(SRC, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.ts') && entry.name !== 'index.ts')
-    .map((entry) => `./${entry.name}`);
+  //
+  // **THE WALK IS RECURSIVE AND `src/` IS FLAT TODAY, WHICH IS THE POINT.**
+  // `W6-c` adds `src/api/types.ts` and `src/http/client.ts`, so a sweep over the
+  // top level alone would stop covering this package on the next slice, silently
+  // and while staying green. A control that has to be widened by the slice it
+  // was written to catch is not a control. The recursion is exercised by a
+  // seeded `src/api/types.ts`, which this test refuses, rather than by the
+  // committed tree, which is flat.
+  const modules: string[] = [];
+  const walk = (relative: string): void => {
+    for (const entry of readdirSync(join(SRC, relative), { withFileTypes: true })) {
+      const next = relative === '' ? entry.name : `${relative}/${entry.name}`;
+      if (entry.isDirectory()) walk(next);
+      else if (entry.name.endsWith('.ts') && next !== 'index.ts') modules.push(`./${next}`);
+    }
+  };
+  walk('');
   expect(modules.length).toBeGreaterThan(5);
 
   const legs = new Set<string>(ADMIN_BARREL_LEGS);
