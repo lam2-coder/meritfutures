@@ -47,6 +47,7 @@ import adminCertificates, {
   ADMIN_CERTIFICATE_ENDPOINTS,
   ADMIN_CERTIFICATE_ROLES,
   ADMIN_CERTIFICATE_TABLES,
+  AdminCertificateUnwired,
   CERTIFICATE_REVOKE_PATH,
   DERIVED_AUDIT_FIELDS,
   INITIATIVE_BY_CLASS,
@@ -789,10 +790,30 @@ describe('the response is what the verify page will say', () => {
 // -----------------------------------------------------------------------------
 
 describe('an unwired backend', () => {
-  test('answers 503 and revokes nothing', async () => {
+  // ADR-192 clause 2. THE 503 DID NOT GO AWAY; IT MOVED BEHIND THE 401. Which
+  // of this deployment's ports are uncomposed is a fact about the deployment,
+  // and an anonymous caller may not have it, so `principal`'s refusal answers
+  // 401. `operator` and `presentation` still answer 503, and the two cases
+  // below the first are the legs that would pass by accident if this module
+  // simply stopped sending 503 at all.
+  test('answers 401 and not 503, revokes nothing, and discloses no deployment state', async () => {
+    const res = await revoke({});
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({ code: 'unauthenticated', status: 401 });
+  });
+
+  test('answers 503 to an authenticated operator whose deployment wired no `operator`', async () => {
+    const { calls } = wire({});
+    useCertificateRevokeBackend({
+      operator: () => Promise.reject(new AdminCertificateUnwired('operator')),
+      principal: () => Promise.resolve({ actor: 'ops@merit.invalid', role: 'owner' }),
+      now: () => AT,
+      presentation: () => PRESENTATION,
+    });
     const res = await revoke({});
     expect(res.statusCode).toBe(503);
     expect(res.json()).toMatchObject({ code: 'service_unavailable', status: 503 });
+    expect(calls).toEqual([]);
   });
 
   test('a backend with no copy answers 503 rather than committing a write it cannot show', async () => {

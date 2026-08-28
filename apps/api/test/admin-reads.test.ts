@@ -1047,9 +1047,19 @@ test("ADR-190 ruling 2: 503 IS section 2's code and the operator surface does se
     } else if (res.statusCode === 401) authenticating.push(entry);
     await app.close();
   }
-  // BOTH SETS ARE NON-EMPTY, which is the split the ruling is about.
-  expect(unavailable.length).toBeGreaterThan(0);
-  expect(authenticating.length).toBeGreaterThan(0);
+  // ADR-192 CLAUSE 2 MOVED THIS LINE, AND THE MOVE IS A STRENGTHENING RATHER
+  // THAN A RELAXATION. ADR-190 wrote `unavailable.length > 0` because thirteen
+  // routes answered 503 to this exact anonymous probe, and ADR-190 section 7
+  // item 3 registered that answer as a DISCLOSURE to be repaired: it tells an
+  // unauthenticated caller which of this deployment's ports are uncomposed.
+  // Discharging that item empties this set, so the assertion that pinned the
+  // defect is replaced by the one that refuses it -- an equality, not a bound.
+  // The 503 did not leave the surface; the four write modules still send it,
+  // behind authentication, and their own suites assert it there.
+  expect(unavailable).toEqual([]);
+  // AND `authenticating` NOW HOLDS EVERY `/admin/` ROUTE, which is the property
+  // ADR-192 rules and the reason the bound above could become an equality.
+  expect(authenticating).toEqual(admin);
   // And every route of THIS module is in the second set, never the first.
   for (const spec of ADMIN_READ_ENDPOINTS)
     expect(unavailable, spec.path).not.toContain(`${spec.method} ${spec.path}`);
