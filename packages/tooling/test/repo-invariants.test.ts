@@ -68,6 +68,20 @@ function cleanTree(): string {
 
   write(root, 'pnpm-workspace.yaml', "packages:\n  - 'apps/*'\n  - 'packages/*'\n");
   write(root, '.nvmrc', '22\n');
+  // RI-14 reads these files BY NAME, so the clean tree carries all of them with
+  // reasons that are TRUE. A fixture missing one makes the rename guard fire on
+  // every case, which is the guard working and the fixture wrong. That happened
+  // twice while this check was written, both times caught by running it.
+  write(
+    root,
+    'apps/api/test/wiring.test.ts',
+    'const BLOCKED = {\n' +
+      '  useRailBackend:\n' +
+      "    'a vendor adapter this workspace does not ship, named in no package.json.',\n" +
+      '};\n',
+  );
+  write(root, 'apps/api/src/idempotency.ts', '// The protocol over the store port.\n');
+  write(root, 'apps/api/src/routes/wallet-withdrawals.ts', '// The external leg.\n');
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(
     root,
@@ -714,6 +728,114 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
       'export function GET(): Response { return new Response("{}"); }\n',
     );
     expect(findings('RI-09', root).join('\n')).toContain('`/ops` is an OPERATOR_PREFIXES entry');
+  });
+
+  // ---------------------------------------------------------------------------
+  // RI-14, seeded with THE ACTUAL SENTENCE, in both directions
+  // ---------------------------------------------------------------------------
+  // The seed is not invented. It is the reason `apps/api/test/wiring.test.ts`
+  // carried on 2026-08-28, beside the export that refuted it, which is the state
+  // the file was actually in while every gate reported green. A check watched
+  // failing on a fabricated shape proves it recognises the shape; watched failing
+  // on the sentence that got through proves it would have caught the thing.
+  //
+  // BOTH DIRECTIONS ON THE SAME FILE, for RI-13's reason: a case that only ever
+  // plants a violation cannot tell a check that reads the refuted-marker from one
+  // that fails every absence claim it sees.
+  // BOTH exports, because the real tree has both and the distinction is the whole
+  // reason this check cannot tell a type from its implementation: `IdempotencyStore`
+  // is the interface in `idempotency.ts` and `databaseIdempotencyStore` is the
+  // implementation in `idempotency-store.ts`. The false reason denied the second by
+  // naming the first, and it is the first that a runner can look up.
+  const STORE_EXPORT =
+    'export interface IdempotencyStore { readonly find: () => void }\n' +
+    'export function databaseIdempotencyStore(): IdempotencyStore {\n' +
+    '  return null as never;\n' +
+    '}\n';
+
+  const FALSE_REASON =
+    'const BLOCKED = {\n' +
+    '  useWithdrawalBackend:\n' +
+    "    'an `IdempotencyStore` implementation, which no file in this tree provides. ' +\n" +
+    "    'The adapter returns UNWIRED_STORE for that arm deliberately.',\n" +
+    '};\n';
+
+  test('RI-14 catches the reason that actually got through, beside the export refuting it', () => {
+    const root = cleanTree();
+    write(root, 'apps/api/src/idempotency-store.ts', STORE_EXPORT);
+    write(root, 'apps/api/test/wiring.test.ts', FALSE_REASON);
+    expect(findings('RI-14', root).join('\n')).toContain(
+      'the reason claims `IdempotencyStore` does not exist and the tree EXPORTS it',
+    );
+  });
+
+  test('RI-14 goes quiet on the SAME file once the claim is marked as refuted', () => {
+    // THE DIRECTION THE CHECK MUST NOT PUSH. The corrected file deliberately
+    // QUOTES the false sentence rather than deleting it, because a false sentence
+    // deleted leaves nothing for the next reader to check. If this case failed,
+    // the check would be pressuring every correction into a deletion.
+    const root = cleanTree();
+    write(root, 'apps/api/src/idempotency-store.ts', STORE_EXPORT);
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      '// THE REASON THAT STOOD HERE WAS FALSE AND IS REPLACED RATHER THAN DELETED.\n' +
+        '// It read: no implementation of `IdempotencyStore` exists in this tree.\n' +
+        '// `databaseIdempotencyStore` has exported it since ADR-112.\n' +
+        FALSE_REASON.replace('which no file in this tree provides', 'no driver for its edges'),
+    );
+    expect(findings('RI-14', root)).toEqual([]);
+  });
+
+  test('RI-14 does not fire on a thing that exists and cannot be CONSTRUCTED', () => {
+    // ADR-172's finding 1 was TRUE: `usePayoutBackend` cannot be constructed at
+    // all, because `PayoutTx.ledger` is a non-nullable `LedgerTx` no live door
+    // satisfies. A check that failed that reason would be wrong, and it is the
+    // nearest true claim to the false one, which is why it is asserted here.
+    const root = cleanTree();
+    write(root, 'apps/api/src/payouts.ts', 'export interface PayoutTx { readonly x: number }\n');
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        '  usePayoutBackend:\n' +
+        "    'a door satisfying `PayoutTx`. It is declared and NO LIVE DEPLOYMENT CAN ' +\n" +
+        "    'CONSTRUCT ONE, which is a fact about its ledger arm and not about its absence.',\n" +
+        '};\n',
+    );
+    expect(findings('RI-14', root)).toEqual([]);
+  });
+
+  test('RI-14 reads a SHOUTED claim, which the first draft of it did not', () => {
+    // THE GAP THAT WAS REAL. The first version of this check was case-sensitive
+    // and a claim reading "No implementation of `IdempotencyStore` exists in this
+    // tree" walked straight past it. This codebase shouts in its comments as a
+    // house style, and the emphatic half is exactly where somebody states a claim
+    // they are sure of, so a case-sensitive matcher reads the quiet half and skips
+    // the half that matters.
+    const root = cleanTree();
+    write(root, 'apps/api/src/idempotency-store.ts', STORE_EXPORT);
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        '  useWithdrawalBackend:\n' +
+        "    'NO IMPLEMENTATION OF `IdempotencyStore` EXISTS IN THIS TREE.',\n" +
+        '};\n',
+    );
+    expect(findings('RI-14', root).join('\n')).toContain(
+      'the reason claims `IdempotencyStore` does not exist',
+    );
+  });
+
+  test('RI-14 fails loudly when the file it reads is renamed away', () => {
+    // A check that names the files it reads is emptied by a rename, silently, and
+    // then reports PASS forever. This is that failure made loud.
+    const root = cleanTree();
+    rmSync(join(root, 'apps/api/test/wiring.test.ts'));
+    expect(findings('RI-14', root).join('\n')).toContain(
+      'apps/api/test/wiring.test.ts does not exist',
+    );
   });
 
   // ---------------------------------------------------------------------------

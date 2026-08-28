@@ -57,25 +57,63 @@
 // no float in this file, in its suite, or in any fixture either one holds.
 //
 // -----------------------------------------------------------------------------
-// IF A PAYOUT POSTS, IT POSTS THROUGH `packages/ledger`, AND THIS FILE HOLDS NO
-// LEDGER ARITHMETIC
+// THIS ROUTE RECORDS THE APPROVAL AND DOES NOT POST IT. ADR-176 APPLIES ADR-172
+// CLAUSE 2 HERE, WHICH IS WHERE ADR-172 REPORTED IT AND FENCED IT
 // -----------------------------------------------------------------------------
-// `LT-01` is `debit trader_withdrawable approved_cents; credit trader_wallet
-// trader_cents; credit fees_revenue firm_cents` (M05 section 2.1). It is built
-// with `transfer()` and `posting()` and written with `postTransaction`, so the
-// imbalance is unrepresentable by construction rather than refused by a check
-// this file would have to remember to write (ADR-104 ruling 1). `lt01` below
-// names three accounts and one amount each and computes nothing.
+// `PayoutTx` USED TO CARRY A `LedgerTx` AND NO LONGER DOES, and the reason is a
+// type fact rather than a preference. `postTransaction` takes a `LedgerTx`,
+// whose `insert` names `ledgerTransactions` and `ledgerEntries`
+// (`packages/ledger/src/tx.ts:64`). Both are scope class `derived`
+// (`packages/db/src/scope.ts:513,522`); `ScopedTx.insert` takes
+// `OwnedTableKey` (`scoped-db.ts:1739`) and `insertUnder` takes
+// `ParentedTableKey`, which is `Extract<DerivedTableKey, 'sessions'>`
+// (`scoped-db.ts:1540`), a closed list of ONE. So the ONLY handle that
+// satisfies `LedgerTx` is `SystemTx.insert<K extends TableKey>`
+// (`scoped-db.ts:1802`), which is generic over EVERY TABLE IN THE ESTATE.
 //
-// THE DOOR THAT POSTING NEEDS DOES NOT EXIST FOR THIS DEPLOYABLE AND IS NAMED
-// RATHER THAN ROUTED AROUND. `postTransaction` takes a `LedgerTx`, which only
-// ADR-102's `SystemTx` satisfies, and `SystemReason` is `'nightly-batch' |
-// 'operator-console'`. `packages/ledger/src/tx.ts`'s own header says it: "A
-// CHECKOUT POSTING FROM `apps/api` IS NEITHER OF THOSE WORDS ... On the WRITE
-// side the gap is open." So `PayoutTx` carries the `LedgerTx` as a field the
-// WIRING supplies, exactly as `checkout.ts` carries `insertAttribution` as a
-// port for the same wall. NOTHING HERE WIDENS `SystemReason`, and a live
-// deployment answers 503 until somebody rules that door.
+// A DOOR IN `apps/api/src/db.ts` RETURNING SUCH A HANDLE WOULD BE `systemDb`
+// UNDER ANOTHER NAME, and ADR-172 clause 2 refuses it: admitting it to a
+// request handler hands the trader surface authority over every row Merit
+// holds. `SystemReason` gains no member (ADR-165) and the word was never the
+// obstacle, because the word would still hand over that signature.
+//
+// SO THE PORT WAS THE DEFECT AND THE MISSING DOOR WAS NOT. The request path
+// RECORDS the approval; the posting is performed at a system authority, which
+// is the arrangement already in force at all three of the other places the same
+// posting is reachable: the worker, which posts through `ExpiryLedgerPort`
+// (`apps/worker/src/sweeps/ports.ts:226`) on a handle opened at
+// `systemDb(WORKER_REASON)`, and `WORKER_REASON` is `'nightly-batch'`
+// (`apps/worker/src/db.ts:112,124`); the operator console, whose release arm
+// posts at `AdminPayoutTx.ledger` (`admin-payouts.ts:1179`); and
+// `POST /wallet/withdrawals`, which declined to post on its own request path
+// deliberately and in writing (`wallet-withdrawals.ts:9-12`).
+//
+// `INV-M5-06` SURVIVES THE MOVE BY CONSTRUCTION, WHICH IS WHY THE MOVE IS SAFE.
+// `ledger_transactions.idempotency_key` is `text NOT NULL UNIQUE` and every
+// door that posts `LT-01` builds `` `${PAYOUT_ENDPOINT} ${key}` `` from the
+// REQUEST ROW'S OWN STORED KEY: `admin-payouts.ts:916` and
+// `apps/worker/src/sweeps/expiry.ts:305` are both `releaseLedgerKey`, and both
+// call sites pass `held.idempotencyKey` off the locked row
+// (`admin-payouts.ts:1185`, `expiry.ts:667`). The key is therefore a property
+// of the APPROVAL and not of the DOOR, so removing one of the doors that mint
+// the identical string cannot produce a second posting, and the DATABASE
+// refuses a duplicate rather than application memory that forgets on restart.
+//
+// WHAT IS OWED, STATED HERE RATHER THAN LEFT TO BE NOTICED. Nothing in this
+// tree yet posts `LT-01` for a request that was approved with NO hold: the two
+// remaining doors both fire on a HELD request being released. ADR-172 section 5
+// names that driver and checked at `0010_payouts.sql` that it needs no
+// migration; ADR-176 does not build it and does not pretend it exists. THE GAP
+// IS UNREACHABLE IN EVERY DEPLOYMENT, and that is a control rather than a
+// hope: `usePayoutBackend` is unwired, `apps/api/test/wiring.test.ts` asserts
+// `start.ts` does not call it, and this route answers 503 before it reaches a
+// transaction at all.
+//
+// THIS FILE STILL HOLDS NO LEDGER ARITHMETIC AND STILL BUILDS `LT-01`. `lt01`
+// below names three accounts and one amount each and computes nothing, and it
+// stays here because `admin-payouts.ts:203` IMPORTS it: a second transcription
+// of `debit trader_withdrawable / credit trader_wallet / credit fees_revenue`
+// is ADR-092 section 5's two-statements-of-one-fact hazard on the money path.
 //
 // -----------------------------------------------------------------------------
 // `C-27` DOES NOT REACH THIS ROUTE, AND THE ANSWER IS THE CONTRACT'S RATHER
@@ -106,16 +144,7 @@
 
 import { randomUUID } from 'node:crypto';
 
-import {
-  firmAccount,
-  identityAccount,
-  posting,
-  postTransaction,
-  readChart,
-  transfer,
-  type LedgerTx,
-  type Posting,
-} from '@merit/ledger';
+import { firmAccount, identityAccount, posting, transfer, type Posting } from '@merit/ledger';
 import { evaluatePayout } from '@merit/rules-engine';
 import type {
   Cents,
@@ -323,6 +352,27 @@ export interface HoldFlag {
 export interface PayoutRequestInsert {
   readonly id: string;
   readonly accountId: string;
+  /**
+   * `payout_requests.idempotency_key`, THE CALLER'S OWN TOKEN, UNPREFIXED.
+   *
+   * ADDED BY ADR-176 AND LOAD BEARING FOR `INV-M5-06` RATHER THAN DECORATIVE.
+   * While this route posted `LT-01` itself, the key reached the posting from
+   * the handler's own memory and this shape never needed it; the column was
+   * `text NOT NULL` the whole time (`0010_payouts.sql:82`) and NOTHING HERE
+   * COULD WRITE IT. With the posting moved to a system authority (ADR-172
+   * clause 2), the driver has no other place to read it from: it rebuilds
+   * `` `${PAYOUT_ENDPOINT} ${idempotency_key}` `` off the stored row, exactly as
+   * `admin-payouts.ts:809,1185` and `apps/worker/src/sweeps/expiry.ts:667`
+   * already do off the same column. AN APPROVAL COMMITTED WITHOUT THIS VALUE IS
+   * AN APPROVAL NO DOOR CAN EVER POST.
+   *
+   * IT IS STORED WITHOUT THE `PAYOUT_ENDPOINT` PREFIX because the column is the
+   * client's token: `payout_requests_account_idempotency_uq` is
+   * `(account_id, idempotency_key)` (`0010_payouts.sql:177-178`), which is
+   * "the same key on the same account is the same request", and the prefix
+   * belongs to the LEDGER key that every door composes from it.
+   */
+  readonly idempotencyKey: string;
   readonly status: 'approved' | 'held_pending_review';
   readonly basisTradingDay: string;
   readonly ordinal: number;
@@ -379,20 +429,17 @@ export interface PayoutTx {
   /** `G-HOLD-REQUIRED`, resolved. `null` when no flag stands. */
   holdFlag(accountId: string): Promise<HoldFlag | null>;
 
-  /** Write the request. Returns the stored snapshot id. */
+  /**
+   * Write the request. Returns the stored snapshot id.
+   *
+   * THE LAST WRITE ON THIS PATH, AND THAT IS ADR-176 IN THE INTERFACE. What
+   * this transaction commits is the APPROVAL; the `LT-01` posting is performed
+   * at a system authority, so there is no ledger handle on this port and no
+   * member of this interface that a scoped door cannot serve.
+   */
   insertPayoutRequest(
     row: PayoutRequestInsert,
   ): Promise<{ readonly eligibilitySnapshotId: string }>;
-
-  /**
-   * The handle `postTransaction` posts through.
-   *
-   * SUPPLIED BY THE WIRING AND NOT OPENED HERE. See this file's header: no
-   * `SystemReason` names a request handler, so a live deployment has nothing to
-   * put here and answers 503. That is reported rather than solved by a third
-   * word in a closed vocabulary.
-   */
-  readonly ledger: LedgerTx;
 }
 
 /** What opens a transaction, plus the store the idempotency layer needs. */
@@ -904,16 +951,32 @@ export function snapshotOf(evaluation: PayoutEvaluation, minimumAmountPass: bool
  * immutable snapshot, post the ledger transaction, approve, enqueue the
  * transfer." The identity-status refusal precedes all of it and reads nothing
  * about the account, per `ADR-140` and on `INV-M5-23`'s placement argument.
+ *
+ * ONE STEP OF THAT SENTENCE IS NO LONGER PERFORMED HERE AND ADR-176 SAYS SO
+ * RATHER THAN LEAVING THE SENTENCE TO BE READ AGAINST A FUNCTION THAT STOPPED
+ * MATCHING IT. "Post the ledger transaction" happens at a system authority
+ * (ADR-172 clause 2 and clause 3), for the reason this file's header sets out:
+ * the only handle satisfying `LedgerTx` is generic over the whole estate. The
+ * contract's WIRE SHAPE is untouched -- `PayoutResponse` carried no ledger
+ * transaction id and `estimated_settlement` was already a business-day range,
+ * so no field of section 6's response changes and no client can observe the
+ * difference. Whether section 6's PROSE is amended is a founder question and
+ * ADR-176 asks it rather than editing a frozen document.
+ *
+ * THIS FUNCTION NO LONGER TAKES THE SESSION, WHICH IS `PayoutTx`'s OWN RULE
+ * APPLIED. That interface "carries no identity parameter" because the handle is
+ * already bound to one; the identity was read here only to name `LT-01`'s
+ * trader leg, and with the posting gone there is nothing on this path that an
+ * identity supplied out of band could address.
  */
 async function decidePayout(args: {
   readonly tx: PayoutTx;
-  readonly session: AuthSession;
   readonly accountId: string;
   readonly requestedCents: Cents | null;
   readonly idempotencyKey: string;
   readonly at: Date;
 }): Promise<PayoutResponse | Refusal> {
-  const { tx, session, accountId, requestedCents, idempotencyKey, at } = args;
+  const { tx, accountId, requestedCents, idempotencyKey, at } = args;
 
   // `ADR-140`. NOTHING ABOUT THE ACCOUNT HAS BEEN READ AT THIS LINE.
   const identityGate = gateIdentityStatus(await tx.identityStatus());
@@ -960,6 +1023,7 @@ async function decidePayout(args: {
   const row: PayoutRequestInsert = {
     id: payoutRequestId,
     accountId: subject.accountId,
+    idempotencyKey,
     status: flag === null ? 'approved' : 'held_pending_review',
     basisTradingDay: evaluation.asOfTradingDay,
     ordinal: evaluation.ordinal,
@@ -988,34 +1052,39 @@ async function decidePayout(args: {
 
   const { eligibilitySnapshotId } = await tx.insertPayoutRequest(row);
 
-  // `INV-M5-21`. A HELD REQUEST HAS POSTED NOTHING: no ledger transaction, no
-  // wallet credit, no anchor advance, no win-day reset. The ledger is the
-  // discriminator between `held_pending_review` and `frozen`, and it is what
-  // makes release mean "approve and pay" on a hold rather than "let settlement
-  // proceed". Every money field below is still populated, because the decision
-  // is computed and FROZEN at request time and only the posting is deferred:
+  // THE POSTING USED TO BE HERE, GUARDED BY `flag === null`, AND ADR-176 MOVED
+  // IT OFF THIS PATH RATHER THAN DELETING IT. `PayoutTx` no longer carries a
+  // `LedgerTx`, because the only handle that satisfies one is generic over
+  // every table in the estate and a request handler must not hold it. This
+  // file's header carries the whole argument and ADR-172 clause 2 is the
+  // ruling.
+  //
+  // `INV-M5-21` IS NOT WEAKENED AND ITS ENFORCEMENT MOVES WITH THE POSTING. A
+  // HELD REQUEST MUST POST NOTHING: no ledger transaction, no wallet credit,
+  // no anchor advance, no win-day reset, because the ledger is the
+  // discriminator between `held_pending_review` and `frozen` and is what makes
+  // release mean "approve and pay" rather than "let settlement proceed". At
+  // request time NOTHING posts now, so the invariant holds here trivially and
+  // BINDS ON THE DRIVER: the system-authority job ADR-172 section 5 names must
+  // select on `status = 'approved'`, and a driver that posted for a
+  // `held_pending_review` row would be the violation. That is stated where it
+  // can be checked rather than assumed, and no such driver exists yet.
+  //
+  // THE KEY IS NOW WRITTEN TO THE ROW, AND THAT IS THE HALF OF THIS RULING THAT
+  // IS A REPAIR RATHER THAN A REMOVAL. `PayoutRequestInsert` GAINED
+  // `idempotencyKey` here: while the posting stood above, the key reached it
+  // out of this function's memory and no field of the insert shape carried it,
+  // so an approval committed with nothing a later door could read. Every door
+  // that posts `LT-01` rebuilds `` `${PAYOUT_ENDPOINT} ${key}` `` from
+  // `payout_requests.idempotency_key`, `text NOT NULL`
+  // (`0010_payouts.sql:82`), against `ledger_transactions.idempotency_key`,
+  // `text NOT NULL UNIQUE`. THE DATABASE IS WHAT REFUSES A SECOND POSTING, and
+  // it can only do that because the key survives in a column.
+  //
+  // Every money field below is still populated, because the decision is
+  // computed and FROZEN at request time and only the posting is deferred:
   // release re-evaluates nothing (`INV-M5-02`), so the number shown is the
   // number sent.
-  if (flag === null) {
-    await postTransaction(
-      tx.ledger,
-      await readChart(tx.ledger),
-      lt01({
-        identityId: session.identityId,
-        payoutRequestId,
-        // THE CALLER'S KEY IS THE POSTING'S KEY, and that is `INV-M5-06`:
-        // "the same `idempotency_key` on every attempt, generated BEFORE the
-        // first send and persisted in the same transaction". `ledger_transactions
-        // .idempotency_key` is `text NOT NULL UNIQUE`, so a re-drive that got
-        // past the layer above is refused by the DATABASE rather than by
-        // application memory, which forgets on a restart.
-        idempotencyKey: `${PAYOUT_ENDPOINT} ${idempotencyKey}`,
-        approvedCents: clamp.approvedCents,
-        traderCents: clamp.traderCents,
-        firmCents: clamp.firmCents,
-      }),
-    );
-  }
 
   return {
     payout_request_id: payoutRequestId,
@@ -1129,7 +1198,6 @@ export const PAYOUT_ENDPOINTS: readonly EndpointSpec[] = [
         response = await active.transact(session, async (tx) => {
           const decided = await decidePayout({
             tx,
-            session,
             accountId,
             requestedCents,
             idempotencyKey: key,

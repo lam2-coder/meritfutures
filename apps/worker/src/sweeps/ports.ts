@@ -194,8 +194,11 @@ export interface ExpiryTx {
  *
  * `idempotencyKey` IS THE LEDGER TRANSACTION'S KEY AND IS ALREADY DERIVED. See
  * `releaseLedgerKey` in `expiry.ts`: it is the request's OWN stored key under
- * the same prefix `payouts.ts` and `admin-payouts.ts` both use, so `LT-01` for
- * one payout request is ONE posting whichever of the three doors reaches it.
+ * the `PAYOUT_ENDPOINT` prefix `payouts.ts` declares and `admin-payouts.ts`
+ * imports, so `LT-01` for one payout request is ONE posting whichever door
+ * reaches it. ADR-176 removed the request path's own posting, so the doors that
+ * mint the string are this sweep and the operator console; the prefix and the
+ * source column are unchanged, which is why the property is unchanged.
  */
 export interface Lt01Values {
   readonly identityId: string;

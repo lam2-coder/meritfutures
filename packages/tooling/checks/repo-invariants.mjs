@@ -1823,6 +1823,204 @@ function founderQuestionProse(lines, at) {
   return body.replace(/\*\*|__|\*|`|\s+/g, ' ').trim().length;
 }
 
+// -----------------------------------------------------------------------------
+// RI-14  A reason that claims something does not exist is right, or says it was wrong
+// -----------------------------------------------------------------------------
+//
+// THIS IS THE ONE ERROR CLASS THAT HAS NOW COST THIS PROJECT MORE THAN ANY OTHER,
+// AND IT IS THE ONE THE CONSTITUTION NAMES BY NAME: "Each was a failure to check a
+// claim against the primary source. Escalating the model does not fix that class of
+// error; reading the source and adding a mechanical assertion does. Prefer a new CI
+// gate over a bigger model whenever the error is checkable."
+//
+// WHAT HAPPENED, THREE TIMES, IN ONE FILE. apps/api/test/wiring.test.ts records why
+// each unwired backend port is unwired. On 2026-08-28 its `useWithdrawalBackend`
+// entry read "an `IdempotencyStore` implementation, which no file in this tree
+// provides", while its `usePayoutBackend` entry, A HUNDRED LINES ABOVE, read
+// "`databaseIdempotencyStore` already exists and satisfies the `idempotency` member
+// alone". Both were in the file at once and every gate was green, because NOTHING
+// READS A REASON AGAINST THE TREE IT DESCRIBES. `apps/api/src/idempotency-store.ts`
+// had exported that store since ADR-112.
+//
+// The claim was a stale header restated four times: idempotency.ts's own header said
+// it, a session's adapter comment repeated it without opening the file beside it, a
+// BLOCKED entry cited the header AND that comment as two sources, and ALLOCATION
+// row 172 then reserved an ADR REQUIRED, MONEY PATH against it. Four restatements
+// and no reader between them opened the file. After two pull requests corrected it,
+// a THIRD copy was still alive in the same file, in the comment on `accountedByPort`.
+//
+// WHY THE CHECK IS NARROW, AND WHY THAT IS THE POINT. It reads ONE shape: a claim
+// that a NAMED thing does not exist. Not "is blocked", not "has no driver", not "no
+// SystemReason names a request handler" -- those are claims about behaviour and
+// about vocabularies, they are argued rather than looked up, and a check that
+// pretended to read them would be a check somebody switches off. A non-existence
+// claim about a named export is the one thing here a runner can settle outright, and
+// it is exactly the one that went wrong.
+//
+// A REFUTED CLAIM MAY STAY, AND MUST SAY SO. The corrected file deliberately QUOTES
+// the false sentence rather than deleting it, "because a false sentence deleted
+// leaves nothing for the next reader to check". That is right and this check must
+// not punish it. So a non-existence claim about a thing that DOES exist passes when
+// the comment block carrying it marks the claim as refuted -- `It read:`, `WAS
+// FALSE`, `IS FALSE`, `REFUTED`, `STALE`, or a strikethrough. The requirement is not
+// that the file be silent about its own history; it is that the file never states a
+// refuted claim AS IF IT WERE CURRENT.
+//
+// WHAT IT DOES NOT CATCH, stated rather than left to be discovered. (1) It reads
+// EXPORTS and never behaviour, so a reason saying a thing exists but cannot be
+// CONSTRUCTED is out of scope -- that is ADR-172's finding 1, which was true, and a
+// check that failed it would be wrong. (2) It reads only files a session is likely
+// to make this mistake in, listed in SOURCED_CLAIM_FILES, rather than the whole
+// tree: the property is about REASONS somebody wrote down, and a survey of all prose
+// would drown the finding. (3) It cannot tell a type from its implementation, so
+// "no implementation of `Foo` exists" where `Foo` is an exported TYPE is flagged and
+// must be either fixed or marked. That direction is deliberate: a false positive is
+// an argument somebody has, and a false negative is this defect a fifth time.
+const SOURCED_CLAIM_FILES = [
+  'apps/api/test/wiring.test.ts',
+  // THE OTHER TWO SITES THE CHAIN ACTUALLY RAN THROUGH, added once both were
+  // corrected. `idempotency.ts`'s header is where the claim ORIGINATED and
+  // `wallet-withdrawals.ts`'s adapter comment is where a session repeated it
+  // without opening the file beside it. Both now mark their own history, and
+  // listing them is what keeps a later edit from quietly restoring the claim.
+  'apps/api/src/idempotency.ts',
+  'apps/api/src/routes/wallet-withdrawals.ts',
+];
+
+// THE SHAPES THAT ASSERT A NAMED THING IS ABSENT. Deliberately few, and
+// CASE-INSENSITIVE, which is not a detail here.
+//
+// The first draft of this check was case-sensitive and a seeded claim reading
+// "No implementation of `IdempotencyStore` exists in this tree" walked straight
+// past it. THIS CODEBASE SHOUTS IN ITS COMMENTS AS A HOUSE STYLE -- the very
+// sentence this check exists for is written "THE HEADER IS STALE AND THE FILE
+// BESIDE IT SAYS OTHERWISE" -- so a case-sensitive matcher is one that reads the
+// quiet half of the corpus and skips the emphatic half, which is the half where
+// somebody states a claim they are sure of.
+const ABSENCE_CLAIMS = [
+  /no implementation of `([A-Za-z_][\w]*)`/gi,
+  /`([A-Za-z_][\w]*)`[^.`]{0,40}\bdoes not exist\b/gi,
+  /no `([A-Za-z_][\w]*)`[^.`]{0,30}\bexists\b/gi,
+  /`([A-Za-z_][\w]*)`[^.`]{0,60}\bwhich no file in this tree provides\b/gi,
+];
+
+/** A block that marks its own claim as history rather than stating it. */
+const REFUTED =
+  /it read\b|was false|is false|refuted|\bstale\b|~~|no longer true|was true when|correction rather than/i;
+
+/** Where an export would live if the claim were wrong. */
+const EXPORT_ROOTS = ['apps', 'packages'];
+
+/**
+ * Every identifier exported from shipped source, as one set.
+ * @param {string} root
+ * @returns {Set<string>}
+ */
+function exportedNames(root) {
+  /** @type {Set<string>} */
+  const names = new Set();
+  /** @param {string} dir */
+  const walk = (dir) => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name === 'node_modules' || e.name === 'dist' || e.name === 'test') continue;
+        walk(p);
+        continue;
+      }
+      if (!/\.ts$/.test(e.name) || /\.d\.ts$/.test(e.name)) continue;
+      const src = readFileSync(p, 'utf8');
+      const re =
+        /^export\s+(?:declare\s+)?(?:async\s+)?(?:const|function|class|type|interface|enum|let|var)\s+([A-Za-z_][\w]*)/gm;
+      for (const m of src.matchAll(re)) {
+        const name = m[1];
+        if (name !== undefined) names.add(name);
+      }
+    }
+  };
+  for (const r of EXPORT_ROOTS) walk(join(root, r));
+  return names;
+}
+
+/**
+ * The comment block or entry a line sits in: back to a blank-ish boundary and forward.
+ * @param {readonly string[]} lines
+ * @param {number} i
+ * @returns {string}
+ */
+function blockAround(lines, i) {
+  let a = i;
+  while (a > 0 && (lines[a - 1] ?? '').trim() !== '' && !/^\s*\/\/ -{10,}/.test(lines[a - 1] ?? ''))
+    a -= 1;
+  let b = i;
+  while (b < lines.length - 1 && (lines[b + 1] ?? '').trim() !== '') b += 1;
+  return lines.slice(a, b + 1).join('\n');
+}
+
+/** @type {Invariant} */
+const ri14 = {
+  id: 'RI-14',
+  title: 'No reason claims a named thing does not exist while the tree exports it',
+  covers:
+    'the reason text in ' +
+    SOURCED_CLAIM_FILES.join(', ') +
+    '. A claim is in scope when it asserts that a BACKTICKED, NAMED thing is ' +
+    'absent: `no implementation of X`, `X does not exist`, `no X exists`, or ' +
+    '`X, which no file in this tree provides`. Such a claim FAILS when an ' +
+    '`export` of that name is present anywhere under apps/ or packages/, ' +
+    'excluding test directories, UNLESS the block carrying it marks the claim as ' +
+    'history rather than stating it -- `It read:`, `WAS FALSE`, `IS FALSE`, ' +
+    '`REFUTED`, `STALE`, a strikethrough, or `was true when`. A REFUTED CLAIM MAY ' +
+    'STAY AND MUST SAY SO: the corrected file deliberately quotes the false ' +
+    'sentence, because a false sentence deleted leaves nothing for the next ' +
+    'reader to check, and this check must not punish that. WHAT IT DOES NOT ' +
+    'CATCH. (1) It reads EXPORTS and never behaviour, so a reason saying a thing ' +
+    'exists and cannot be CONSTRUCTED is out of scope -- that is ADR-172 finding ' +
+    '1, which was TRUE, and a check that failed it would be wrong. (2) It reads ' +
+    'only the listed files rather than all prose, because the property is about ' +
+    'reasons somebody wrote down and a survey of the tree would drown the ' +
+    'finding. (3) It cannot tell a type from its implementation, so a claim about ' +
+    'an exported TYPE is flagged and must be fixed or marked. That direction is ' +
+    'deliberate: a false positive is an argument somebody has, and a false ' +
+    'negative is this defect a fifth time.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const exported = exportedNames(root);
+    for (const rel of SOURCED_CLAIM_FILES) {
+      const abs = join(root, rel);
+      if (!existsSync(abs)) {
+        findings.push(
+          `${rel} does not exist. This check names the files whose REASONS it reads, ` +
+            `so a rename silently empties it; point it at the new path`,
+        );
+        continue;
+      }
+      const lines = readFileSync(abs, 'utf8').split('\n');
+      for (let i = 0; i < lines.length; i += 1) {
+        for (const pattern of ABSENCE_CLAIMS) {
+          pattern.lastIndex = 0;
+          for (const m of (lines[i] ?? '').matchAll(pattern)) {
+            const name = m[1];
+            if (name === undefined || !exported.has(name)) continue;
+            if (REFUTED.test(blockAround(lines, i))) continue;
+            findings.push(
+              `${rel}:${i + 1}: the reason claims \`${name}\` does not exist and the tree ` +
+                `EXPORTS it. Nothing else reads a reason against the tree it describes, ` +
+                `which is how one such claim survived four restatements and reached an ` +
+                `allocated money-path ADR. Open the file: either the claim is wrong and the ` +
+                `reason is rewritten with the surviving one, or it was true when written ` +
+                `and the block says so`,
+            );
+          }
+        }
+      }
+    }
+    return findings;
+  },
+};
+
 /** @type {Invariant} */
 const ri13 = {
   id: 'RI-13',
@@ -1902,6 +2100,7 @@ export const CHECKS = [
   ri11,
   ri12,
   ri13,
+  ri14,
 ];
 
 function main() {

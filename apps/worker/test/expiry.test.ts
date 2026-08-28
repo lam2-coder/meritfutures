@@ -43,8 +43,9 @@
 // source by reading that source as text. A retyped constant that drifts is the
 // defect this file exists to catch, and the worst of them is the ledger
 // idempotency key: a key naming this sweep instead of the payout endpoint would
-// let three doors mint three `LT-01` postings for one approval, and all three
-// would commit.
+// let every door that reaches one approval mint its own `LT-01` posting, and
+// every one of them would commit. ADR-176 took the request path out of that set
+// and changed nothing else about it.
 //
 //   packages/db/migrations/0031_...sql   the five hold columns, from the CHECK
 //   packages/db/migrations/0011_wallet.sql the three freeze columns, from its CHECK
@@ -324,9 +325,10 @@ describe('the constants are BOUND to their sources and not merely retyped', () =
 
   // THE ASSERTION THIS SUITE IS MOST FOR. `ledger_transactions.idempotency_key`
   // is `text NOT NULL UNIQUE`, so a key naming this sweep instead of the payout
-  // endpoint would let THREE doors mint THREE `LT-01` postings for ONE approval
-  // and every one of them would commit. `admin-payouts.ts` says the same in its
-  // own header and this is the mechanical half of that sentence.
+  // endpoint would let every door that reaches ONE approval mint its own
+  // `LT-01` posting and every one of them would commit. `admin-payouts.ts` says
+  // the same in its own header and this is the mechanical half of that
+  // sentence.
   it('releaseLedgerKey is `admin-payouts.ts`’s, character for character', () => {
     const body =
       /export function releaseLedgerKey\(idempotencyKey: string\): string \{\s*return ([^\n]+);\s*\}/.exec(
@@ -337,8 +339,18 @@ describe('the constants are BOUND to their sources and not merely retyped', () =
     expect(releaseLedgerKey('trader-key-01')).toBe(`${PAYOUT_ENDPOINT} trader-key-01`);
   });
 
-  it('the key this sweep posts under is the string `payouts.ts` posts under when NO hold stands', () => {
-    expect(source(PAYOUTS_TS)).toContain('idempotencyKey: `${PAYOUT_ENDPOINT} ${idempotencyKey}`,');
+  // THIS CASE USED TO READ THE POSTING OUT OF `payouts.ts` AND ADR-176 DELETED
+  // THAT POSTING, SO IT READS WHAT SURVIVED IT rather than being relaxed. The
+  // request path now RECORDS the approval and the key it stores is the client's
+  // token, unprefixed; the prefix is `PAYOUT_ENDPOINT`, which that file still
+  // declares and which this sweep still retypes and binds here. The FAILING
+  // DIRECTION is unchanged: if `payouts.ts` starts posting again, or if the
+  // constant drifts, one of the three expectations below goes red.
+  it('binds to `payouts.ts`, which declares the prefix and no longer posts at all', () => {
+    const payouts = source(PAYOUTS_TS);
+    expect(payouts).toContain('export const PAYOUT_ENDPOINT = `POST ${PAYOUT_PATH}`;');
+    expect(payouts).toContain('    idempotencyKey,\n');
+    expect(payouts.replace(/^\s*\/\/.*$/gm, '')).not.toMatch(/\bpostTransaction\b/);
     expect(releaseLedgerKey('k')).toBe('POST /accounts/:accountId/payout k');
   });
 

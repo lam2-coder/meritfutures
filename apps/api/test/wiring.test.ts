@@ -155,11 +155,11 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'an operator session. ADR-171 rules this port never waited on the operator door, and that ' +
     'THREE OTHER PORTS WAIT ON THIS ONE through `principal(request)`.',
   useAdminPayoutBackend:
-    '`principal(request)` (`routes/admin-payouts.ts:381`), which resolves only through ' +
+    '`principal(request)` (`routes/admin-payouts.ts:390`), which resolves only through ' +
     '`AdminSessionSource` and is therefore blocked on `setAdminSessionSource` above. THIS IS THE ' +
     'ONE OF THE FIVE THAT IS CLOSEST TO WIREABLE and ADR-171 section 4 says so: `AdminPayoutTx` ' +
     'is `lockAt`, `rowAt`, `insert` and `updateAt`, every one a `SystemTx` method, plus a ' +
-    '`LedgerTx` which `routes/admin-payouts.ts:349-355` correctly observes `SystemTx` ' +
+    '`LedgerTx` which `routes/admin-payouts.ts:350-353` correctly observes `SystemTx` ' +
     'structurally satisfies at a reason that already exists. ONE SUPPLIER SHORT, AND THE ' +
     'SUPPLIER IS NOT A DOOR. Wiring it with `principal: async () => null` would report an ' +
     'unfinished deployment as a caller who is not an operator, on the endpoint that releases ' +
@@ -173,7 +173,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'resolve either finding and must not paper over them. MONEY PATH.',
   useAdminWriteBackend:
     'THREE SUPPLIERS AND NONE OF THEM IS A DOOR. `principal(request)` ' +
-    '(`routes/admin-writes.ts:266`), blocked on `setAdminSessionSource` above. `tradingDay()`, ' +
+    '(`routes/admin-writes.ts:269`), blocked on `setAdminSessionSource` above. `tradingDay()`, ' +
     'which is the smallest and the least tractable: nothing in this workspace maps an instant to ' +
     'an exchange trading day, and ADR-145 names the gap rather than papering over it with a UTC ' +
     'date. And a projection of `ValidationResult` onto `PlanValidation`, whose `errors` is ' +
@@ -186,15 +186,51 @@ const BLOCKED: Readonly<Record<string, string>> = {
     "handler file and outside that entry's fence.",
 
   // ---------------------------------------------------------------------------
-  // The ledger door, which is the same closed vocabulary reached from the money
-  // path. `packages/ledger`'s `LedgerTx` is satisfied only by ADR-102's
-  // `SystemTx`, which is opened at a `SystemReason`.
+  // THE LEDGER DOOR, AND THE TWO PORTS THAT REACHED FOR IT ARE NOW ONE.
+  //
+  // `packages/ledger`'s `LedgerTx` is satisfied only by ADR-102's `SystemTx`,
+  // which is opened at a `SystemReason`, and ADR-165 ruled that vocabulary gains
+  // no member. BOTH ENTRIES BELOW USED TO NAME THAT AS THEIR BLOCKER AND ONLY
+  // ONE STILL DOES.
+  //
+  // ADR-172 clause 2 ruled that the handle is not the missing thing: the only
+  // value satisfying `LedgerTx` is generic over EVERY TABLE IN THE ESTATE
+  // (`scoped-db.ts:1802`, `insert<K extends TableKey>`), so a door in `apps/api`
+  // returning one would be `systemDb` renamed. ADR-176 applied that to
+  // `routes/payouts.ts`: `PayoutTx.ledger` is DELETED, the `LT-01` posting is
+  // performed at a system authority, and the request path records the approval
+  // and stores the client's key for the door that posts it.
+  //
+  // SO `usePayoutBackend`'S ENTRY IS REWRITTEN RATHER THAN SHRUNK. The port did
+  // not become wireable; a different obstruction was underneath the one that
+  // moved, and it is a READ rather than a write. `useCheckoutBackend` is
+  // untouched by that ruling and still names the ledger among its blockers,
+  // because nothing has ruled where a CHECKOUT posting happens.
   // ---------------------------------------------------------------------------
   usePayoutBackend:
-    '`PayoutTx.ledger` (`routes/payouts.ts:395`), which is a `LedgerTx` and is NOT NULLABLE, so ' +
-    'no live deployment can supply a `PayoutBackend` at all. `LedgerTx` is satisfied only by ' +
-    "ADR-102's `SystemTx` at a `SystemReason`, and ADR-165 refused to widen that vocabulary. " +
-    '`databaseIdempotencyStore` already exists and satisfies the `idempotency` member alone.',
+    'A `RuleState` NO MIGRATION IN THIS TREE CAN STORE, AND NOT THE LEDGER HANDLE THIS ENTRY ' +
+    'USED TO NAME (ADR-176). The old reason was `PayoutTx.ledger`, a non-nullable `LedgerTx`; ' +
+    'ADR-176 applied ADR-172 clause 2 and DELETED that member, so the port no longer asks for a ' +
+    'handle any door refuses. WHAT REFUSES NOW IS A READ. `PayoutTx.subject` returns ' +
+    '`PayoutSubject` (`routes/payouts.ts:328`) whose `state` is the engine`s own `RuleState` ' +
+    '(`:330`), and `RuleState` requires `lifetimeSettledCents` ' +
+    '(`packages/rules-engine/src/types.ts:1004`), `breached` (`:1009`) and `breachKind` ' +
+    '(`:1010`). `0015_rule_states.sql` declares NONE of the three; ' +
+    '`grep -rn lifetime_settled packages/db/migrations` returns nothing at all, and no migration ' +
+    'names any member of `BreachKind` (`types.ts:789`). THIS IS THE SAME BLOCKER A WIRED ' +
+    'SIBLING ALREADY CARRIES: `databaseAccountReads` is installed and its `readEligibility` ' +
+    'rejects on `ELIGIBILITY_BLOCKER` (`routes/account-reads.ts:851`) for these exact three ' +
+    'fields, and `INV-M5-02` is what binds the two, because it requires both payout endpoints ' +
+    'to call `evaluatePayout` with identical inputs. SECOND, AND INDEPENDENT: `PayoutSubject' +
+    '.plan` (`:331`) is a `ResolvedPlan`, which M01 section 1.3 builds from `plan_versions' +
+    '.rules` and a `plan_version_sizes` row; both tables are scope class `firm` ' +
+    '(`packages/db/src/scope.ts:482,487`) and `ScopedTableKey` is ' +
+    '`Exclude<TableKey, FirmTableKey | PairTableKey>` (`scope.ts:1165`), so no `ScopedTx` read ' +
+    'reaches either, while `PayoutTx` runs every method on ONE transaction. A PARTIAL BACKEND ' +
+    'IS REFUSED RATHER THAN OVERLOOKED: `listPayouts` and `idempotency` are both constructible ' +
+    'today (`payoutRequests` is `owned`, `scope.ts:822`, and `databaseIdempotencyStore` exists ' +
+    'at `src/idempotency-store.ts:144`), and installing them beside a `transact` that rejects ' +
+    'would put a live-looking route in front of the arm that approves payouts. MONEY PATH.',
   useCheckoutBackend:
     '`CheckoutTx.insertAttribution` (`routes/checkout.ts:878`) writes `attributions`, which is ' +
     'scope class `pair` and which no authority in `packages/db` admits a request handler ' +
@@ -269,7 +305,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
   // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
   // drives `requested --> approved` or `cooling --> approved`, and `:283-288`
   // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES`, on
-  // which `gateNoInFlight` (`:1233`) refuses. So a wired endpoint writes a row
+  // which `gateNoInFlight` (`:1254`) refuses. So a wired endpoint writes a row
   // nothing will ever advance and then refuses that identity's every later
   // withdrawal, permanently, behind a screen saying a withdrawal is in flight.
   //
@@ -280,12 +316,16 @@ const BLOCKED: Readonly<Record<string, string>> = {
   useWithdrawalBackend:
     'A DRIVER FOR THE APPROVAL EDGE, AND NOT THE STORE THIS ENTRY USED TO NAME (ADR-172 clause ' +
     '5). `databaseIdempotencyStore` (`src/idempotency-store.ts:144`) exists and serves the ' +
-    'identity arm this route presents (`routes/wallet-withdrawals.ts:1506`), so the idempotency ' +
+    'identity arm this route presents (`routes/wallet-withdrawals.ts:1527`), so the idempotency ' +
     'half is no longer what refuses. What refuses is that NOTHING IN THIS TREE performs ' +
     '`requested --> approved` or `cooling --> approved` (`routes/wallet-withdrawals.ts:57-60`), ' +
-    'and both statuses are in `OPEN_WITHDRAWAL_STATUSES` (`:283-288`), so `gateNoInFlight` ' +
-    '(`:1233`) would refuse that identity every later withdrawal. Wiring it trades an honest 503 ' +
-    'for a permanent per-trader lockout, and only the 503 is reversible.',
+    'and both statuses are in `OPEN_WITHDRAWAL_STATUSES` (`:287-292`), so `gateNoInFlight` ' +
+    '(`:1254`) would refuse that identity every later withdrawal. Wiring it trades an honest 503 ' +
+    'for a permanent per-trader lockout, and only the 503 is reversible. TWO LINE NUMBERS IN ' +
+    'THIS ENTRY WERE FALSE BY EIGHTEEN LINES WHEN ADR-176 CHECKED THEM, in the reason ADR-172 ' +
+    'wrote one session earlier to replace a false one: `:1233` was the KYC term and `:1506` was ' +
+    'a `.send(`. The CLAIMS held at their real lines and the CITATIONS did not, which is the ' +
+    'same drift in its quietest form.',
 };
 
 // -----------------------------------------------------------------------------
