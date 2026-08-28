@@ -466,16 +466,23 @@ describe('M6-A-69: two blockers, where the three screens before this one had one
     expect(text(markup)).toContain('nothing about this account is invented');
   });
 
-  test('the adapter blocker names the unregistered table and why seven of eight is not enough', async () => {
+  test('the read blocker names the port, the three methods missing from it and the table that is not', async () => {
     const markup = renderToStaticMarkup(
       await AccountDrillDownRoute({ params: Promise.resolve({ accountId: SUBJECT }) }),
     );
     expect(markup).toContain('data-origin="WAVE-06 section 10 item 3"');
     expect(markup).toContain('data-origin="ADR-171"');
     const served = text(markup);
-    expect(served).toContain('AdminReadSource.readAccount');
+    expect(served).toContain('AdminReadSource');
+    // THE BLOCKER MOVED FROM THE TABLE TO THE PORT AND THIS CASE MOVED WITH IT.
+    // It used to require the words "rejected response", which was the claim that
+    // seven of eight sections is not a smaller screen; ADR-191 registered
+    // `events` and session 356 wrote the adapter, so all eight are reachable and
+    // the sentence that case pinned is false. What is still true is the port.
     expect(served).toContain('`events`');
-    expect(served).toContain('rejected response');
+    expect(served).toContain('readAccount');
+    expect(served).toContain('searchAccounts');
+    expect(served).toContain('setAdminReadSource');
   });
 
   test('the document`s own absences are separate from the deployment`s, and survive it', () => {

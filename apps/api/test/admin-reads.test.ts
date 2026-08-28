@@ -168,9 +168,22 @@ function flag(id: string, severity: 1 | 2 | 3 | 4 | 5, on: string, depth = 1): F
   };
 }
 
-const DETAIL: AdminAccountDetail = Object.fromEntries(
-  ACCOUNT_DETAIL_SECTIONS.map((section) => [section, []]),
-) as AdminAccountDetail;
+/**
+ * The eight sections, with a REAL `account` root and seven empty lists.
+ *
+ * THE ROOT IS A RECORD CARRYING `account_id` BECAUSE `accountDetailLicence`
+ * READS IT. `INV-M6-10` licenses the subject the PATH named, so the response has
+ * to say which account it is about before anything on it can be licensed, and a
+ * root of `[]` is a drill-down that does not. That is the first field-level
+ * requirement anything places on the one route API_CONTRACT section 8 does not
+ * type, and it is placed by the invariant rather than by a schema.
+ */
+const DETAIL: AdminAccountDetail = {
+  ...(Object.fromEntries(
+    ACCOUNT_DETAIL_SECTIONS.map((section) => [section, []]),
+  ) as AdminAccountDetail),
+  account: { account_id: 'acc-1' },
+};
 
 /** A source over fixed rows. Every method records that it was called. */
 function sourceOf(overrides: Partial<AdminReadSource> = {}): AdminReadSource & {
