@@ -1,8 +1,8 @@
 // =============================================================================
 // packages/db/src/schema.ts
 // =============================================================================
-// ONE HUNDRED AND EIGHT TABLES OF 114, AND THAT IS REPORTED RATHER THAN ROUNDED
-// UP. The other 6 are not reachable through ANY accessor: `SCOPE_RULES` is total
+// ONE HUNDRED AND NINE TABLES OF 114, AND THAT IS REPORTED RATHER THAN ROUNDED
+// UP. The other 5 are not reachable through ANY accessor: `SCOPE_RULES` is total
 // over the keys of this file, so a table that is not here is a COMPILE ERROR at
 // the call site rather than an unscoped read at runtime.
 //
@@ -14,9 +14,9 @@
 // `packages/db/migrations` for the second. `test/scoped-db.test.ts` asserts
 // both, which is why the staleness could survive here and not there.
 //
-// NOT ALL 108 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
-// RATHER THAN ONE. 42 are `firm` and 3 are `pair` (ADR-106), so 63 of
-// the 108 are served by `scopedDb`. A `pair` table belongs to TWO identities and
+// NOT ALL 109 ARE REACHABLE THROUGH THE SCOPED ONE, AND THE GAP IS TWO CLASSES
+// RATHER THAN ONE. 43 are `firm` and 3 are `pair` (ADR-106), so 63 of
+// the 109 are served by `scopedDb`. A `pair` table belongs to TWO identities and
 // is scoped to neither: it is excluded from `ScopedTableKey` because returning
 // the row to either party hands them the other party's identity uuid, and from
 // `FirmTableKey` because `firmDb()` takes no reason on the ground that no
@@ -33,7 +33,7 @@
 // declares its identity column NOT NULL, which makes them `owned` with no
 // disjunction to write.
 //
-// THE ONE HUNDRED AND EIGHT ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
+// THE ONE HUNDRED AND NINE ARE NOT ONE PHASE'S SET AND WILL NEVER BE. ADR-092 makes the
 // owner the TABLE rather than the module: a table is registered ONCE, by the
 // first session that needs it, and the registration is never re-argued. Every
 // `why` in `scope.ts` therefore states that TABLE's tenancy and never the
@@ -62,15 +62,23 @@
 // stale CREATE. THIS SENTENCE READ "`ALTER COLUMN` STAYS AN OFFENDER" UNTIL
 // ADR-106, WHICH IS FALSE ABOUT THIS TREE AND WOULD HAVE TOLD A READER THAT
 // `otp_challenges` COULD NOT BE REGISTERED; ADR-094's clause was superseded by
-// ADR-103 and the sentence outlived it by one session. ELEVEN of the 108 below
-// carry later columns -- `sessions`, `plan_versions`, `rule_states`,
+// ADR-103 and the sentence outlived it by one session. THE SAME SENTENCE SURVIVED
+// IN TWO MORE PLACES AND COST A SECOND TABLE TEN WAVES: the `trading_calendar_loads`
+// and `trading_calendar_revisions` headers below both said the neighbour
+// `trading_calendar` "cannot be registered" for that reason, and it is registered
+// here. A REFUSAL IN A COMMENT OUTLIVES THE RULING THAT SUPERSEDED IT, and the
+// only defence is that a comment naming a ruling is read against it. ELEVEN of
+// the 109 below carry later columns -- `sessions`, `plan_versions`, `rule_states`,
 // `contact_channels`, `notification_kinds`, `identity_phones`,
 // `phone_change_requests`, `admin_actions`, `payout_requests`,
 // `promotional_credit_grants` and `otp_challenges` -- and none of them could be
 // registered at all before ADR-094, which is why the ruling came before the
 // transcription rather than after it. `otp_challenges` IS THE ONLY ONE OF THE
 // ELEVEN THAT ALSO CARRIES AN `ALTER COLUMN`, and until it was registered the
-// fold's second member ran on no registered table at all. `events` IS NOT ONE OF
+// fold's second member ran on no registered table at all. `trading_calendar` IS
+// THE SECOND REGISTERED CARRIER AND IS NOT ONE OF THE ELEVEN: it takes TWO
+// relaxations and no `ADD COLUMN` at all, so it is a table whose CREATE body is
+// its column set and whose NULLABILITY still moved. `events` IS NOT ONE OF
 // THE ELEVEN: `0017` is the whole of its DDL and no later migration touches it,
 // so the fold replays nothing onto it and the CREATE body is the column set.
 // `reserve_coverage_snapshots` IS NOT ONE OF THEM EITHER, and it is the table
@@ -4321,6 +4329,82 @@ export const idempotencyKeys = pgTable('idempotency_keys', {
 });
 
 // -----------------------------------------------------------------------------
+// trading_calendar -- 0004_catalog.sql, relaxed by
+// 0032_trading_calendar_holidays_coverage_revisions.sql. FIRM.
+// -----------------------------------------------------------------------------
+// THE TRADING DAY IS DATA, NEVER ARITHMETIC (B4 #1). Session boundaries are
+// stored as UTC instants derived from the CT session definitions, so DST is a
+// row rather than a calculation, and no engine rule derives a trading day from
+// a timestamp's UTC date.
+//
+// IT IS REGISTERED, AND THE TWO BLOCKS BELOW USED TO SAY IT COULD NOT BE. 0032
+// carries `ALTER TABLE trading_calendar ALTER COLUMN session_open_at DROP NOT
+// NULL` and the same for `session_close_at`, which ADR-094's one-member fold
+// refused. ADR-103 clause 2 SUPERSEDED that clause and only that clause: the
+// fold's vocabulary gained a SECOND member, `ALTER COLUMN <name> DROP NOT NULL`
+// is folded and moves the nullability, and that entry names this table by name
+// as one of the two the widening makes REGISTRABLE. The refusal outlived the
+// ruling that superseded it and is discharged here.
+//
+// THE SUB-VOCABULARY IS STILL CLOSED AT ONE SHAPE WITH A DEFAULT OF FAIL
+// (ADR-103 clause 3), so this registration rests on a reading rather than on a
+// permission. Replayed across every migration, each `ALTER TABLE
+// trading_calendar` statement is one of those two `DROP NOT NULL`s or a
+// CONSTRAINT statement the fold deliberately ignores: no `ADD COLUMN`, no
+// `SET DATA TYPE`, no `SET NOT NULL`, no `DROP COLUMN` and no `RENAME`. So
+// 0004's CREATE body IS this column set, with exactly two nullabilities moved.
+//
+// FIRM IS THE READING OF THE DDL AND NOT A DEFAULT. The primary key is
+// `trading_day date`, which is a DAY; the row declares NO foreign key at all
+// and no column against `identities(id)` or `accounts(id)`, so `owned`, `pair`
+// and `either` have no column to name, `derived` has no edge to traverse, and
+// `root` is `identities`' alone. Every trader gets the same exchange calendar,
+// which is the reason its two satellites below are firm as well.
+//
+// BOTH SESSION COLUMNS ARE NULLABLE, WHICH IS THE FOLD AND NOT THE CREATE: a
+// reader transcribing 0004 alone writes `.notNull()` on both and is wrong as of
+// 0032. `trading_calendar_holiday_has_no_session` makes the nullability
+// BICONDITIONAL with `is_holiday` -- `is_holiday = (session_open_at IS NULL)`
+// -- so a NULL session means A HOLIDAY here and never "nothing was recorded",
+// which is the opposite of `idempotency_keys.identity_id` two blocks above.
+// This file transcribes no CHECK, so that biconditional is the database's and a
+// reader of the declaration alone does not have it.
+//
+// WHAT THIS TABLE DOES NOT SAY IS WHICH DAYS IT KNOWS ABOUT. Coverage is in
+// `trading_calendar_loads`, and a day outside it is UNKNOWN rather than a
+// holiday (ADR-042 F-4), which is what makes an exhausted calendar an answer
+// instead of an unbroken silent holiday. A row is CORRECTED and never removed:
+// 0033 installs CALENDAR-C1 and CALENDAR-C2 and 0048 installs CALENDAR-C3, all
+// three of them triggers and none of them expressible here.
+export const tradingCalendar = pgTable('trading_calendar', {
+  // The exchange's CT trading day, never a UTC calendar date.
+  tradingDay: date('trading_day').primaryKey(),
+  // NULLABLE SINCE 0032, and exactly when the day is a holiday. A holiday row
+  // had to carry a FABRICATED session interval before that, under a CHECK whose
+  // own comment said a holiday has no session to contain fills in -- and R-01
+  // is a containment lookup, so a fabricated interval is an interval a fill can
+  // fall inside.
+  sessionOpenAt: timestamp('session_open_at', { withTimezone: true }),
+  // On an early-close day this is the LATEST close across the product groups
+  // `contract_specs` lists (ADR-042 F-3), because the latest close is the one
+  // that cannot orphan a fill. The per-group times are in `notes`.
+  sessionCloseAt: timestamp('session_close_at', { withTimezone: true }),
+  // A half day counts as a FULL DAY (B4 #3). A half day that counted as half a
+  // day would make the minimum-trading-days gate a different promise in
+  // November.
+  isHalfDay: boolean('is_half_day').notNull().default(false),
+  isHoliday: boolean('is_holiday').notNull().default(false),
+  // Day counters advance, win days do NOT (B4 #2).
+  halted: boolean('halted').notNull().default(false),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // THE ROW MOVES, which is why this table carries an `updated_at` and its two
+  // satellites carry none: a correction is an UPDATE, and 0033's trigger is
+  // what makes it leave a prior image.
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
 // trading_calendar_loads -- 0032_trading_calendar_holidays_coverage_revisions.sql.
 // FIRM.
 // -----------------------------------------------------------------------------
@@ -4331,15 +4415,22 @@ export const idempotencyKeys = pgTable('idempotency_keys', {
 // free-text operator string on 0002's `actor` idiom rather than a `users`
 // reference. `firm` here is the reading of the DDL and not a default.
 //
-// ITS NEIGHBOUR `trading_calendar` IS REFUSED AND THIS TABLE IS NOT, AND THE
-// FOLD STATUS WAS DERIVED PER TABLE RATHER THAN INHERITED. 0032 carries
-// `ALTER TABLE trading_calendar ALTER COLUMN session_open_at DROP NOT NULL` and
-// the same for `session_close_at`, which ADR-094's one-member vocabulary
-// REFUSES, so `trading_calendar` cannot be registered. Replayed across all 47
-// migrations with the suite's own multiline match, `trading_calendar_loads`
-// carries NO `ALTER TABLE` of any shape at all -- not `ADD COLUMN`, not
-// `ADD CONSTRAINT` -- so its `CREATE TABLE` body IS its column set as of the
-// last migration. A refusal is a fact about a table's own history.
+// ITS NEIGHBOUR `trading_calendar` IS REGISTERED, AND THIS PARAGRAPH USED TO
+// SAY IT COULD NOT BE. It read that 0032's two `ALTER TABLE trading_calendar
+// ALTER COLUMN ... DROP NOT NULL` statements are refused by ADR-094's one-member
+// vocabulary, "so `trading_calendar` cannot be registered". ADR-103 CLAUSE 2
+// SUPERSEDED EXACTLY THAT CLAUSE: the fold's vocabulary gained a second member,
+// `ALTER COLUMN <name> DROP NOT NULL` is folded, and the entry names the
+// neighbour as one of the two tables the widening makes REGISTRABLE. The
+// sentence outlived the ruling that superseded it; the declaration is above.
+//
+// THE FOLD STATUS IS STILL DERIVED PER TABLE RATHER THAN INHERITED, which is
+// what the old paragraph had right. Replayed across every migration with the
+// suite's own multiline match, `trading_calendar_loads` carries NO `ALTER TABLE`
+// of any shape at all -- not `ADD COLUMN`, not `ADD CONSTRAINT` -- so its
+// `CREATE TABLE` body IS its column set as of the last migration, and a
+// neighbour's history says nothing about it. All three tables of this family
+// have DIFFERENT histories and the block below is the third one.
 //
 // THE COVERAGE BOUNDS ARE TRADING DAYS AND NOT UTC CALENDAR DATES, which is why
 // they are `date` in the same domain as `trading_calendar.trading_day`. A day
@@ -4386,16 +4477,30 @@ export const tradingCalendarLoads = pgTable('trading_calendar_loads', {
 // change and non-zero is an incident, which is what the `incident_ref` CHECK
 // reads.
 //
-// `trading_day` CARRIES NO `.references()` AND THE REASON IS THIS FILE'S OWN
-// RULE. The FK is declared inline -- `date NOT NULL REFERENCES
-// trading_calendar(trading_day) ON DELETE RESTRICT` -- but `trading_calendar` is
-// not one of this file's tables and cannot become one: 0032's two
-// `ALTER COLUMN ... DROP NOT NULL` statements are refused by ADR-094's fold. The
-// COLUMN alone is transcribed and the constraint is left to the database.
+// `trading_day` STILL CARRIES NO `.references()` AND THE REASON CHANGED
+// ENTIRELY. It used to be that `trading_calendar` "is not one of this file's
+// tables and cannot become one", ADR-094's fold refusing it; ADR-103 clause 2
+// superseded that clause and the table is declared above. THE REASON NOW IS
+// THIS FILE'S OTHER RULE AND IT IS 0048 THAT DECIDES IT: 0032 declares this FK
+// INLINE in the CREATE body, and 0048 DROPS that constraint and re-ADDS it under
+// the same name as `DEFERRABLE INITIALLY DEFERRED`, through
+// `ALTER TABLE ... ADD CONSTRAINT`. This file admits `.references()` only for an
+// FK the CREATE body declares inline, and the constraint standing as of the last
+// migration is an ALTER-added one, which the drift assertion deliberately does
+// not read. It would also be a NARROWER claim than the constraint it named:
+// drizzle-orm cannot state DEFERRABLE at all, and WHEN the referenced day has to
+// exist is the whole of what 0048 changed, which is what lets a backfill record
+// the absence before it adds the day. The COLUMN alone is transcribed and the
+// constraint is left to the database.
 //
-// REPLAYED ACROSS ALL 47 MIGRATIONS, THIS TABLE CARRIES NO `ALTER TABLE` OF ANY
-// SHAPE, so its `CREATE TABLE` body is its column set as of the last migration.
-// It sits in the same file as the refusal above and does not inherit it.
+// THIS TABLE DOES CARRY `ALTER TABLE` STATEMENTS AND THAT SENTENCE SAID IT DID
+// NOT. It read "replayed across all 47 migrations, this table carries no
+// `ALTER TABLE` of any shape", and 0048 carries two of them: the DROP CONSTRAINT
+// and ADD CONSTRAINT pair the paragraph above describes. THE CONCLUSION SURVIVES
+// AND THE STATED REASON DOES NOT. Neither statement touches a column, so the
+// fold passes over both and the `CREATE TABLE` body is still this table's column
+// set as of the last migration. A constraint is not a column, which is the same
+// distinction the paragraph above draws about `.references()`.
 export const tradingCalendarRevisions = pgTable('trading_calendar_revisions', {
   id: bigint('id', { mode: 'bigint' }).generatedAlwaysAsIdentity().primaryKey(),
   // NO `.references()`: `trading_calendar` is not one of this file's tables.

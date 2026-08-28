@@ -175,6 +175,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   tosAcceptances: 'tos_acceptances',
   certificateVerifications: 'certificate_verifications',
   idempotencyKeys: 'idempotency_keys',
+  tradingCalendar: 'trading_calendar',
   tradingCalendarLoads: 'trading_calendar_loads',
   tradingCalendarRevisions: 'trading_calendar_revisions',
   identityLinks: 'identity_links',
@@ -386,13 +387,22 @@ describe('the registry is total', () => {
   // ADR number, and session 349 then measured the same wall from downstream: a
   // `Tx` naming `'events'` failed `tsc` with `TS2322` against `TABLE_KEYS`. The
   // adapter that unblocks is a LATER SLICE and this registration is not it.
-  test('108 declared tables, 108 scope rules, 0 reachable without one', () => {
+  //
+  // `trading_calendar` IS THE 109th AND IT IS THE FIRST REGISTRATION THIS FILE
+  // RECORDS THAT NEEDED NO CLASS ARGUMENT AND NO RULING AT ALL. It was refused
+  // by ADR-094's one-member fold, ADR-103 clause 2 superseded exactly that
+  // clause and named this table REGISTRABLE, and nobody spent the widening for
+  // ten waves while `schema.ts` and `scope.ts` went on saying in prose that the
+  // table "cannot be registered". A REFUSAL IN A COMMENT OUTLIVES THE RULING
+  // THAT SUPERSEDED IT, which is this registration's only general lesson, and
+  // the block near the end of this file is the argument from the DDL.
+  test('109 declared tables, 109 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(108);
-    expect(rules).toBe(108);
+    expect(declared).toBe(109);
+    expect(rules).toBe(109);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, AND IT IS
@@ -860,6 +870,34 @@ function alterStatementsFor(fileSql: string, table: string): string[] {
 }
 
 /**
+ * The text BETWEEN the parentheses of a table's `CREATE TABLE`, table-level
+ * clauses included.
+ *
+ * WHAT IT READS IS WHAT `ddlColumnDefs` DISCARDS. That reader drops every line
+ * beginning `CONSTRAINT`, `PRIMARY KEY`, `UNIQUE`, `CHECK`, `FOREIGN KEY` or
+ * `EXCLUDE`, because a scope rule is checked against COLUMNS. A claim that a
+ * table declares NO foreign key at all cannot be made from that map: a
+ * table-level `FOREIGN KEY (...) REFERENCES` clause is exactly one of the lines
+ * it drops, and the absence would read as a finding.
+ */
+function createBody(rawSql: string, table: string): string {
+  const sqlText = rawSql.replace(/--[^\n]*/g, '');
+  const at = sqlText.search(new RegExp(`CREATE TABLE ${table} \\(`, 'i'));
+  if (at < 0) throw new Error(`no CREATE TABLE for ${table}`);
+  const body = sqlText.slice(sqlText.indexOf('(', at) + 1);
+  let depth = 0;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '(') depth++;
+    else if (ch === ')') {
+      if (depth === 0) return body.slice(0, i);
+      depth--;
+    }
+  }
+  throw new Error(`unbalanced CREATE TABLE body for ${table}`);
+}
+
+/**
  * ONE TABLE, REPLAYED. ADR-094, WIDENED ONCE BY ADR-103.
  *
  * A transcription reads a table AS OF THE LAST MIGRATION and never as of its
@@ -909,8 +947,9 @@ function foldTable(table: string): ColumnFold {
 
   for (const file of files.slice(createdIn)) {
     for (const statement of alterStatementsFor(read(file), table)) {
-      // A statement that touches no column at all -- ADD CONSTRAINT is the only
-      // shape in this tree -- changes nothing the transcription states.
+      // A statement that touches no column at all -- ADD CONSTRAINT and DROP
+      // CONSTRAINT are the shapes in this tree, and `0032` and `0048` both carry
+      // the pair -- changes nothing the transcription states.
       if (!/\b(ADD|DROP|ALTER)\s+COLUMN\b|\bRENAME\b/i.test(statement)) continue;
 
       // ADR-103'S MEMBER, AND ITS SUB-VOCABULARY HAS THE SAME DEFAULT OF FAIL.
@@ -1832,6 +1871,185 @@ describe('the firm class is the DDL"s answer here and not a reading of the name'
   });
 });
 
+/**
+ * ADR-103 CLAUSE 2, SPENT. THE TABLE A MERGED COMMENT SAID COULD NOT BE
+ * REGISTERED, ON A CLAUSE THAT HAD ALREADY BEEN SUPERSEDED.
+ *
+ * THE BLOCK ABOVE REGISTERED A TABLE NOTHING COULD READ; THIS ONE REGISTERS A
+ * TABLE THIS PACKAGE SAID IT MAY NOT READ, AND THE DIFFERENCE IS WHERE THE
+ * REFUSAL LIVED. ADR-094 closed the drift fold at one member and named
+ * `ALTER COLUMN` a STATED PROXY for a type-and-nullability comparison nobody had
+ * written; ADR-103 wrote the comparison, superseded that clause and only that
+ * clause, and named this table as one of the two the widening makes REGISTRABLE.
+ * `schema.ts` and `scope.ts` went on carrying the refusal in prose, so a reader
+ * of either file alone concluded the opposite of the ruling.
+ *
+ * WHAT IS ASSERTED HERE IS THE PREDICATE AND NEVER THE NAME, on the block
+ * above's rule. "The exchange calendar belongs to nobody" is a sentence a reader
+ * could believe and be right about by accident; these cases read 0004, 0032 and
+ * 0048 and refuse each other member on a fact of the DDL.
+ *
+ * AND THE FOLD IS ASSERTED WHERE IT NOW RUNS. Under ADR-103 the second member
+ * ran on NO registered table; ADR-106 registered `otp_challenges` and made it
+ * one; this registration makes it two, and it is the only registered table whose
+ * fold relaxes TWO columns, so a fold that stopped after the first statement of
+ * a file is red here and nowhere else.
+ */
+const CALENDAR_KEY_IS_FIRM: FirmTableKey = 'tradingCalendar';
+
+describe('the calendar is registered, and the refusal that stood over it was stale', () => {
+  const CALENDAR = 'trading_calendar';
+
+  // NON-VACUITY FIRST. Every absence below is read through the same fold, and a
+  // parse that found nothing would make all of them pass for the wrong reason.
+  test('the folded row is the nine columns 0004 declares, with nothing added since', () => {
+    expect(sqlNames('tradingCalendar')).toStrictEqual([
+      'created_at',
+      'halted',
+      'is_half_day',
+      'is_holiday',
+      'notes',
+      'session_close_at',
+      'session_open_at',
+      'trading_day',
+      'updated_at',
+    ]);
+    const fold = foldTable(CALENDAR);
+    // NO `ADD COLUMN` ANYWHERE, which is what makes 0004's body the column set,
+    // and TWO RELAXATIONS, which is what makes it not the whole transcription.
+    expect(fold.added).toStrictEqual([]);
+    expect([...fold.relaxed].sort()).toStrictEqual(['session_close_at', 'session_open_at']);
+    // AND NOTHING REFUSED, which is the clause-3 half: `SET DATA TYPE`,
+    // `SET NOT NULL`, either `DEFAULT` shape, `DROP COLUMN` and `RENAME` all
+    // still fail, and this table asks for none of them.
+    expect(fold.refused).toStrictEqual([]);
+  });
+
+  // `root`, `owned`, `pair` AND `either` ALL NEED AN IDENTITY COLUMN AND THERE
+  // IS NOT ONE, and `derived` needs an edge and there is not one of those
+  // either. This is the estate-wide firm assertion's fact, repeated against the
+  // folded definitions so the argument for THIS registration stands alone.
+  test('the row reaches nobody: no identity column, no account column, and no foreign key at all', () => {
+    expect(identityColumnsOf(CALENDAR)).toStrictEqual([]);
+    expect(accountColumnsOf(CALENDAR)).toStrictEqual([]);
+    expect(eitherShaped(CALENDAR)).toBe(false);
+
+    // `derived` IS REFUSED BY AN ABSENCE RATHER THAN BY AN ARGUMENT, and the
+    // absence is read on the whole CREATE body rather than on the column defs
+    // alone, because a table-level `FOREIGN KEY (...) REFERENCES` clause is not
+    // a column and `ddlColumnDefs` drops it.
+    const body = createBody(allMigrationSql(), CALENDAR);
+    expect(body, `${CALENDAR} declares a foreign key`).not.toMatch(/\bREFERENCES\b/i);
+    // AND NONE WAS ADDED LATER. 0048 adds one to the NEIGHBOUR out of a file
+    // that touches both, which is the reason this is asserted over every
+    // migration rather than over 0004.
+    for (const statement of alterStatementsFor(allMigrationSql(), CALENDAR)) {
+      expect(statement, `${CALENDAR} gains a foreign key: ${statement}`).not.toMatch(
+        /\bREFERENCES\b/i,
+      );
+    }
+  });
+
+  // THE READER IS NOT BLIND, WHICH IS WHAT THE ABSENCES ABOVE REST ON. The same
+  // two readers find the FK the NEIGHBOUR declares, and the neighbour's target
+  // is this table.
+  test('the same readers find the neighbour"s foreign key, so the absences are findings', () => {
+    expect(createBody(allMigrationSql(), 'trading_calendar_revisions')).toMatch(
+      /REFERENCES\s+trading_calendar\s*\(\s*trading_day\s*\)/i,
+    );
+    const added = alterStatementsFor(allMigrationSql(), 'trading_calendar_revisions').filter(
+      (statement) => /\bREFERENCES\b/i.test(statement),
+    );
+    // 0048 re-ADDS it DEFERRABLE under the same name, which is why
+    // `schema.ts` transcribes the COLUMN and leaves the constraint to the
+    // database even now that the target is one of its tables.
+    expect(added.length, 'the neighbour"s FK is re-added by ALTER TABLE').toBeGreaterThan(0);
+    expect(added.join('\n')).toMatch(/DEFERRABLE\s+INITIALLY\s+DEFERRED/i);
+  });
+
+  // THE TRANSCRIPTION FOLLOWS THE FOLD AND NOT THE CREATE, WHICH IS THE WHOLE
+  // OF WHAT ADR-103 CLAUSE 2 BOUGHT. A reader transcribing 0004 alone writes
+  // `.notNull()` on both session columns; the per-table comparison above would
+  // then be RED on this table, which is the ordering ADR-103 insisted on --
+  // the comparison landed first and the vocabulary widened after it.
+  test('both session columns are NOT NULL at their CREATE and nullable in the transcription', () => {
+    const created = ddlColumnDefs(allMigrationSql(), CALENDAR);
+    const folded = foldTableDefs(CALENDAR);
+    for (const name of ['session_open_at', 'session_close_at']) {
+      expect(declaredNotNull(created.get(name)), `${CALENDAR}.${name} at its CREATE`).toBe(true);
+      expect(declaredNotNull(folded.get(name)), `${CALENDAR}.${name} after the fold`).toBe(false);
+      const column = Object.values(columnsOf('tradingCalendar')).find((c) => c.name === name);
+      expect(column?.notNull, `${CALENDAR}.${name} in schema.ts`).toBe(false);
+    }
+    // AND THE COLUMN THE FOLD DOES NOT TOUCH IS UNMOVED, so the assertion above
+    // is about these two rather than about a transcription that dropped every
+    // `.notNull()`.
+    expect(declaredNotNull(folded.get('is_holiday'))).toBe(true);
+  });
+
+  // THE RULING THE REFUSAL OUTLIVED, READ OUT OF THE ENTRY RATHER THAN
+  // REMEMBERED. This is the case that goes red if ADR-103 is ever narrowed
+  // back, and it is why the registration above is a session's work rather than
+  // a ruling's.
+  test('ADR-103 clause 2 supersedes the clause that refused this table, and names it', () => {
+    const adr = readFileSync(
+      join(MIGRATIONS, '..', '..', '..', 'docs/decisions/ADR-103.md'),
+      'utf8',
+    );
+    expect(adr).toContain("SECTION 3's `ALTER COLUMN` CLAUSE IS SUPERSEDED, AND ONLY THAT CLAUSE");
+    expect(adr).toContain('`ALTER COLUMN <name> DROP NOT NULL` is folded');
+    expect(adr).toContain('`otp_challenges` and `trading_calendar` become REGISTRABLE');
+    // CLAUSE 3 IS THE HALF THAT KEEPS THIS A READING RATHER THAN A PERMISSION.
+    expect(adr).toContain('`SET DATA TYPE`, `SET NOT NULL`, `SET DEFAULT`, `DROP DEFAULT`');
+    // The statement the entry names, in the migration it names, byte for byte.
+    expect(
+      readFileSync(
+        join(MIGRATIONS, '0032_trading_calendar_holidays_coverage_revisions.sql'),
+        'utf8',
+      ),
+    ).toContain('ALTER TABLE trading_calendar ALTER COLUMN session_open_at  DROP NOT NULL;');
+  });
+
+  // THE DOOR, and the runtime half of the type fact above it.
+  test('a scoped read of it is refused, and the refusal names the accessor that serves it', () => {
+    expect(() => scopePredicate('tradingCalendar', IDENTITY)).toThrow(/belongs to no identity/);
+    expect(() => scopePredicate('tradingCalendar', IDENTITY)).toThrow(/systemDb/);
+    expect(SCOPE_RULES.tradingCalendar.class).toBe('firm');
+    // Read so the type-level witness above is not dead code. `tsc` is what
+    // enforces it: the annotation is `TS2322` the moment the rule stops being
+    // `firm`.
+    expect(TABLE_KEYS as string[]).toContain(CALENDAR_KEY_IS_FIRM);
+  });
+
+  // AND IT IS ADDRESSABLE, WHICH `treasury_balances` IS NOT. The primary key is
+  // transcribed, so ADR-112's addressability check finds a key and a keyed read
+  // of one day is available to the reader this registration is for. A
+  // registration that left the key off would compile, pass every assertion
+  // above, and hand the next session a whole-table scan.
+  test('the day is an address, so a keyed read of one calendar day exists', () => {
+    expect(uniqueKeys('tradingCalendar')).toStrictEqual([['trading_day']]);
+  });
+
+  // THE FAMILY IS THREE TABLES, ONE CLASS, AND THREE SEPARATE DERIVATIONS.
+  test('all three calendar tables are firm, each on its own row rather than by inheritance', () => {
+    for (const key of [
+      'tradingCalendar',
+      'tradingCalendarLoads',
+      'tradingCalendarRevisions',
+    ] as const) {
+      expect(SCOPE_RULES[key].class, key).toBe('firm');
+      expect(identityColumnsOf(SQL_NAME[key]), SQL_NAME[key]).toStrictEqual([]);
+    }
+    // AND THE HISTORIES DIFFER, which is what "derived per table" means here:
+    // the calendar carries two `ALTER COLUMN` relaxations, the revisions table
+    // carries two CONSTRAINT statements and no column statement, and the loads
+    // table carries no `ALTER TABLE` at all.
+    expect(foldTable('trading_calendar').relaxed).toHaveLength(2);
+    expect(alterStatementsFor(allMigrationSql(), 'trading_calendar_revisions')).toHaveLength(2);
+    expect(alterStatementsFor(allMigrationSql(), 'trading_calendar_loads')).toHaveLength(0);
+  });
+});
+
 // =============================================================================
 // ADR-103. THE TYPE AND THE NULLABILITY, WHICH THE NAME SET NEVER SAW.
 // =============================================================================
@@ -2059,10 +2277,12 @@ describe('the transcription states the DDL type and nullability, not only the co
   // vocabulary member no assertion runs is a vocabulary member nobody has
   // checked, which is ADR-094's own seed-B argument about a fold that folds
   // nothing. ADR-106 registers `otp_challenges` and the assertion above is where
-  // the member now runs on the registered path. THESE TWO STAY BECAUSE
-  // `trading_calendar` IS STILL UNREGISTERED and because a by-name fold is the
-  // only thing that can see an UNREGISTERED carrier at all, which is what the
-  // closure assertion below depends on.
+  // the member now runs on the registered path. BOTH CARRIERS ARE REGISTERED
+  // NOW, `trading_calendar` under ADR-103 clause 2 itself, and THESE TWO STAY
+  // ANYWAY: a by-name fold is the only thing that can see an UNREGISTERED
+  // carrier at all, which is what the closure assertion below depends on, and
+  // the day a third table takes a relaxation it is unregistered on the morning
+  // it lands.
 
   const ALTER_COLUMN_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
     // 0029_phone_identity_and_auth.sql, SD-M16-05. An SMS challenge has no
@@ -2106,8 +2326,10 @@ describe('the transcription states the DDL type and nullability, not only the co
   // member was the pair of assertions that fold those two BY NAME. Registering
   // `otp_challenges` moves it onto the registered path, where the per-table
   // TYPE-and-NULLABILITY comparison reads the relaxed column against the
-  // transcription. THE ASSERTION IS A COMMAND: at least one REGISTERED table
-  // must replay a relaxation, and its transcription must agree.
+  // transcription, and registering `trading_calendar` makes it TWO tables and
+  // THREE relaxed columns, so a fold that stopped after the first statement of
+  // a file is red here. THE ASSERTION IS A COMMAND: at least one REGISTERED
+  // table must replay a relaxation, and its transcription must agree.
   test('the fold second member now runs on a REGISTERED table, which it did not under ADR-103', () => {
     const relaxedTables = DDL_NAMES.filter(([, sqlName]) => foldTable(sqlName).relaxed.length > 0);
     expect(
