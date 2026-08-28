@@ -52,13 +52,20 @@ const ACCOUNT_A = '33333333-3333-4333-8333-333333333333';
 const COOKIE = { cookie: `${ADMIN_SESSION_COOKIE}=operator-token` };
 
 /**
- * A read source whose six methods all reject.
+ * A read source whose seven methods all reject.
  *
  * WIRED SO THE HANDLER IS REACHED AT ALL. `adminHandler` resolves
  * `currentReadSource()` before it calls any spec's `handle`
- * (`admin-reads.ts:823`), so a suite that wired nothing would be asserting the
- * 500 that resolution throws and would never enter this module. None of the six
- * is called by the feed, and a call to one would be a test failure naming it.
+ * (`admin-reads.ts:849`), so a suite that wired nothing would be asserting the
+ * 500 that resolution throws and would never enter this module. None of the
+ * seven is called by the feed, and a call to one would be a test failure naming
+ * it.
+ *
+ * `listEvents` IS ON THE STUB AND IS STILL NOT CALLED, which is the state
+ * ADR-184 ruling 1 leaves behind rather than an oversight: the method is on the
+ * port now and this handler still refuses the read itself. The slice that makes
+ * the handler call it turns this leg red with the method's own name in the
+ * message, which is where that obligation should be noticed.
  */
 function readSourceStub(): AdminReadSource {
   const refuse = (name: string) => () =>
@@ -70,6 +77,7 @@ function readSourceStub(): AdminReadSource {
     listFlags: refuse('listFlags'),
     readLiability: refuse('readLiability'),
     exportEvidence: refuse('exportEvidence'),
+    listEvents: refuse('listEvents'),
   } as unknown as AdminReadSource;
 }
 

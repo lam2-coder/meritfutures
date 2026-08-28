@@ -1100,7 +1100,7 @@ describe('money is integer cents', () => {
 describe('the composition file', () => {
   const ADMIN_READS = read(join(APP, 'src', 'routes', 'admin-reads.ts'));
 
-  /** `AdminReadSource`'s six method names, read out of its declaration. */
+  /** `AdminReadSource`'s seven method names, read out of its declaration. */
   const declared = (() => {
     const block = /export interface AdminReadSource \{([\s\S]*?)\n\}/.exec(ADMIN_READS)?.[1] ?? '';
     return [...block.matchAll(/^\s{2}(\w+)\(/gm)].map((match) => match[1] ?? '').sort();
@@ -1112,9 +1112,14 @@ describe('the composition file', () => {
     });
   }
 
-  it('reads the ports six methods out of its own declaration', () => {
+  it('reads the ports seven methods out of its own declaration', () => {
+    // SEVEN SINCE ADR-184 RULING 1, and the seventh is read here rather than
+    // typed here: the list is the port's declaration transcribed, so a method
+    // added without this file following is two cases red rather than a silent
+    // gap between the port and its composition.
     expect(declared).toStrictEqual([
       'exportEvidence',
+      'listEvents',
       'listFlags',
       'readAccount',
       'readIdentityGraph',
@@ -1137,13 +1142,17 @@ describe('the composition file', () => {
 
   it('composes a PARTIAL port, which is why nothing wires it', () => {
     expect(IMPLEMENTED_ADMIN_READS.length).toBeLessThan(declared.length);
-    // The four this directory does not implement, named so a later slice knows
-    // what is left rather than counting.
+    // The five this directory does not implement, named so a later slice knows
+    // what is left rather than counting. `listEvents` joins them because ADR-184
+    // ruling 1 puts the method on the port and leaves the ADAPTER unwritten:
+    // `IMPLEMENTED_ADMIN_READS` is about what THIS DIRECTORY supplies, and it
+    // supplies no feed module, so that half of the defence is untouched.
     const missing = declared.filter(
       (name) => !(IMPLEMENTED_ADMIN_READS as readonly string[]).includes(name),
     );
     expect(missing).toStrictEqual([
       'exportEvidence',
+      'listEvents',
       'readAccount',
       'readLiability',
       'searchAccounts',

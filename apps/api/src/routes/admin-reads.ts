@@ -96,6 +96,7 @@ import { defineRoutes } from '../registry.ts';
 import { PROBLEM_MEDIA_TYPE, problem } from '../server.ts';
 import type { HttpMethod, RouteDefinition, RouteHandler } from '../registry.ts';
 import type { Problem } from '../server.ts';
+import type { AdminEventQuery, AdminEventRow } from './admin-feed.ts';
 
 // -----------------------------------------------------------------------------
 // Refusals this module makes about itself
@@ -698,6 +699,38 @@ export interface AdminReadSource {
   listFlags(query: FlagListQuery): Promise<AdminPage<FlagListItem>>;
   readLiability(): Promise<LiabilityResponse | null>;
   exportEvidence(request: EvidenceExportRequest): Promise<EvidencePackResponse | null>;
+  /**
+   * The event feed's page, BEFORE `INV-M6-10` is applied to it.
+   *
+   * A SEVENTH METHOD HERE RATHER THAN A PORT OF ITS OWN, which is ADR-184
+   * ruling 1 and it is a measurement rather than a preference: this deployable
+   * declares ONE admin read port and FOUR admin write backends, so the tree's
+   * split is reads-versus-writes and not one module one port. The feed is a
+   * read through the same door, the same unit of work and the same authority,
+   * and a second read port would be a second name for one door and a second
+   * wiring obligation for one missing thing.
+   *
+   * THE SCOPE ARRIVES ON THE QUERY, so the licence a page was served under is a
+   * value the adapter is handed rather than a rule it has to remember. The
+   * withholding itself stays on the RESPONSE, in `admin-feed.ts`, because it is
+   * a property of the bytes and not of the rows.
+   *
+   * THIS ONE NARROWS THE SHAPE REASON ABOVE AND DOES NOT RETIRE IT, and the
+   * difference is the whole of why the method stays here. `AdminEventRow` IS a
+   * projection of one table, so "there is no join and no aggregate to reach
+   * for" is now measured false for a THIRD method, after `listFlags` and
+   * `readIdentityGraph`. The composition file records that narrowing, on its own
+   * precedent, and `test/wiring.test.ts`'s entry is not this slice's to edit:
+   * the triple does not move, because a method is not a port.
+   *
+   * THE COMPOSITION IS NOT NAMED BY PATH ANYWHERE IN THIS MODULE, AND THAT IS A
+   * CONTROL RATHER THAN AN OMISSION. Its own suite asserts that this file
+   * contains no reference to that directory, as a SUBSTRING and not as an
+   * import read, so a pointer written here turns it red. The dependency runs
+   * one way: the composition cites this module and this module cites it back
+   * nowhere.
+   */
+  listEvents(query: AdminEventQuery): Promise<AdminPage<AdminEventRow>>;
 }
 
 let readSource: AdminReadSource | null = null;

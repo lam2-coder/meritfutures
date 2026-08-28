@@ -107,6 +107,10 @@ function sourceOf(overrides: Partial<AdminReadSource> = {}): AdminReadSource {
     listFlags: () => Promise.resolve({ data: [], next_cursor: null }),
     readLiability: () => Promise.resolve(LIABILITY),
     exportEvidence: () => Promise.resolve(null),
+    // ADR-184 ruling 1's seventh method. The breaker routes read the liability
+    // side of this port and never the feed; the leg exists so the literal
+    // satisfies `AdminReadSource` rather than because anything here calls it.
+    listEvents: () => Promise.resolve({ data: [], next_cursor: null }),
     ...overrides,
   };
 }

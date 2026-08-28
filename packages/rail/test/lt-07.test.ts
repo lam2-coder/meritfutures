@@ -458,7 +458,24 @@ describe('ADR-174 section 4: the absence is down to two codes and both are silen
     expect(KIND_SQL).not.toMatch(/'identity'/);
   });
 
-  test('0009 still ties no kind to a code, and the tie in force names five', () => {
+  test('0009 still ties no kind to a code, and the tie in force names all seven', () => {
+    // THIS CASE WENT RED WHEN `0055` LANDED AND THE SESSION CAME HERE TO SAY SO,
+    // which is the third time an entry in this sequence has had to (ADR-177,
+    // ADR-180, ADR-183). Its title read "names five" and its last three lines
+    // read:
+    //
+    //   // WHAT IS STILL OPEN, and both are SILENCES rather than contradictions:
+    //   // nothing posts against either, and nothing reads `reserve` at all.
+    //   expect(arms).not.toContain('psp_clearing');
+    //   expect(arms).not.toContain('reserve');
+    //   expect(inForce).toMatch(/ELSE\s+true/);
+    //
+    // ADR-186 rules both codes `asset` and closes the hole, so the two absences
+    // and the `ELSE true` are all three false at once. THE PREMISE OF THOSE
+    // LINES IS RE-ASSERTED RATHER THAN DROPPED: nothing posts against either
+    // code and nothing reads `reserve`, both re-derived at source by that
+    // session, and neither is what the entry rules from.
+    //
     // 0009's CHECK is on the ROW and a constraint tying the two would name both
     // columns in one expression. That is still true OF 0009, and the tie lives
     // in the LAST migration to install the constraint, which is why this case
@@ -475,14 +492,21 @@ describe('ADR-174 section 4: the absence is down to two codes and both are silen
       'fees_revenue',
       'firm_treasury',
       'promotional_credit',
+      'psp_clearing',
+      'reserve',
       'trader_wallet',
       'trader_withdrawable',
     ]);
-    // WHAT IS STILL OPEN, and both are SILENCES rather than contradictions:
-    // nothing posts against either, and nothing reads `reserve` at all.
-    expect(arms).not.toContain('psp_clearing');
-    expect(arms).not.toContain('reserve');
-    expect(inForce).toMatch(/ELSE\s+true/);
+    // WHAT IS CLOSED. The CASE is total over the vocabulary and the ELSE arm
+    // REFUSES, so an eighth code is rejected by this constraint as well as by
+    // `0009`'s CHECK and `0027`'s LEDGER-C2. That is a THIRD statement the mint
+    // this file watches for must move, and the one the database enforces.
+    //
+    // BOTH HALVES, because deleting the ELSE is not the same closure: a CASE
+    // with no ELSE returns NULL for an unmatched code and a CHECK PASSES on
+    // NULL, which is `ELSE true` under another name.
+    expect(inForce).toMatch(/ELSE\s+false/);
+    expect(inForce).not.toMatch(/ELSE\s+true/);
   });
 });
 
