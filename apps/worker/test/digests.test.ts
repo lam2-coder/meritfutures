@@ -589,7 +589,30 @@ test('4.12 a disabled schedule is not the alarm’s subject', async () => {
   expect(report.findings).toEqual([]);
 });
 
-test('4.13 the cadence is derived from the digest and a row that disagrees is refused', () => {
+test('4.13 an adapter that ignores the filter still cannot enrol a disabled schedule', async () => {
+  // **SEEDED AND NOT CAUGHT UNTIL THIS FIXTURE EXISTED.** Deleting the alarm's
+  // re-read of `enabled` changes nothing while the fake honours the filter it
+  // was given, and a filter is a PROMISE ABOUT A READ rather than a property of
+  // the row that came back. A disabled schedule alarming forever is how an
+  // operator learns to ignore this page, so the predicate the whole subject set
+  // rests on is checked on the row as well as sent in the filter.
+  const store = emptyStore();
+  store.reportSchedules.push(schedule({ enabled: false }));
+  store.reportSchedules.push(schedule({ id: 'sched-flags', digest: 'weekly_flag_queue' }));
+  const blind: DigestAlarmIo = {
+    read: (fn) =>
+      fn({
+        rowsWhere: (key: DigestReadTable) => Promise.resolve(store[key]),
+      }),
+    terms: { atLeast },
+    now: () => NOW,
+  };
+  const report = await findUndeliveredWindows(blind);
+  expect(report.schedulesEvaluated).toBe(1);
+  expect(report.findings.map((one) => one.scheduleId)).toEqual(['sched-flags']);
+});
+
+test('4.14 the cadence is derived from the digest and a row that disagrees is refused', () => {
   expect(() => readAlarmSchedule(schedule({ cadence: 'monthly' }), 'reportSchedules[0]')).toThrow(
     DigestRowError,
   );
@@ -600,13 +623,13 @@ test('4.13 the cadence is derived from the digest and a row that disagrees is re
   );
 });
 
-test('4.14 an outcome 0040 does not admit is refused rather than counted as not-delivered', () => {
+test('4.15 an outcome 0040 does not admit is refused rather than counted as not-delivered', () => {
   expect(() => foldWindows([delivery({ outcome: 'skipped' })], 'reportDeliveries')).toThrow(
     DigestRowError,
   );
 });
 
-test('4.15 a `due_at` that is not a Date is refused, because Invalid Date compares false', () => {
+test('4.16 a `due_at` that is not a Date is refused, because Invalid Date compares false', () => {
   expect(() =>
     foldWindows([delivery({ dueAt: '2026-08-24T00:00:00.000Z' })], 'reportDeliveries'),
   ).toThrow(/Invalid Date/);
@@ -615,7 +638,7 @@ test('4.15 a `due_at` that is not a Date is refused, because Invalid Date compar
   );
 });
 
-test('4.16 the two M06 section 3.6 metrics are computed from the table', async () => {
+test('4.17 the two M06 section 3.6 metrics are computed from the table', async () => {
   expect(M06).toContain('`admin.report_windows_undelivered`, which is zero, always, and is');
   const store = emptyStore();
   store.reportSchedules.push(schedule());
