@@ -44,7 +44,7 @@
 // unpinned at exactly the point it is load bearing.
 // =============================================================================
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -1142,21 +1142,22 @@ describe('the composition file', () => {
 
   it('composes a PARTIAL port, which is why nothing wires it', () => {
     expect(IMPLEMENTED_ADMIN_READS.length).toBeLessThan(declared.length);
-    // The five this directory does not implement, named so a later slice knows
-    // what is left rather than counting. `listEvents` joins them because ADR-184
-    // ruling 1 puts the method on the port and leaves the ADAPTER unwritten:
-    // `IMPLEMENTED_ADMIN_READS` is about what THIS DIRECTORY supplies, and it
-    // supplies no feed module, so that half of the defence is untouched.
+    // The three this directory does not implement, named so a later slice knows
+    // what is left rather than counting. `listEvents` and `readAccount` both
+    // LEFT THIS LIST when their modules landed, and both left it by turning
+    // this case red rather than by anyone remembering.
+    //
+    // `searchAccounts` IS THE ONE LEFT THAT NO TABLE REGISTRATION UNBLOCKS.
+    // API_CONTRACT section 8 makes its term "account id, platform ref, email,
+    // identity id, NAME FRAGMENT, coupon, or payout id"; a fragment is a
+    // SUBSTRING predicate, ADR-112's vocabulary is a typed equality and ADR-157
+    // admits a range term and an `IS NULL` and refuses the rest. Six of the
+    // seven terms are keyed reads and the seventh is not, so an adapter serving
+    // six would narrow a contract behaviour behind a green suite.
     const missing = declared.filter(
       (name) => !(IMPLEMENTED_ADMIN_READS as readonly string[]).includes(name),
     );
-    expect(missing).toStrictEqual([
-      'exportEvidence',
-      'listEvents',
-      'readAccount',
-      'readLiability',
-      'searchAccounts',
-    ]);
+    expect(missing).toStrictEqual(['exportEvidence', 'readLiability', 'searchAccounts']);
   });
 
   it('returns the page from listFlags and drops the cost', async () => {
@@ -1177,7 +1178,13 @@ describe('the composition file', () => {
 });
 
 describe('what this directory does not do', () => {
-  const FILES = ['flags.ts', 'graph.ts', 'index.ts'];
+  // EVERY MODULE IN THE DIRECTORY, DERIVED RATHER THAN LISTED. The literal list
+  // this replaced named three of the four files that existed and would have
+  // named three of the five the next slice adds: a sweep whose subject is a
+  // hand-kept list is a sweep that goes quiet exactly when a file is added.
+  const FILES = readdirSync(join(APP, 'src', 'admin-source')).filter((name) =>
+    name.endsWith('.ts'),
+  );
 
   /**
    * Every bare module specifier a file imports, `db.test.ts`'s own reader.

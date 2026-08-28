@@ -393,6 +393,61 @@ test('apps/admin transcribes the same closed set, and neither imports the other'
   for (const specifier of specifiers) expect(specifier).not.toContain('apps/');
 });
 
+// -----------------------------------------------------------------------------
+// 3a. The search term list is the contract's, read from the contract (ADR-194)
+// -----------------------------------------------------------------------------
+//
+// ADR-194 narrowed `GET /admin/accounts?query=` from seven forms to six by
+// REMOVING a name fragment, and the validation message in `admin-reads.ts` is a
+// TRANSCRIPTION of the contract sentence that carries them. Two transcriptions
+// of one list is the drift this entry exists to repair, so the two are bound
+// here rather than kept true by hand.
+//
+// THE DIRECTION THIS ASSERTION FAILS IN IS A PARSER THAT STOPS MATCHING. Two
+// empty lists compare equal, and a reader whose rule no longer matches returns
+// one, so both halves are asserted non-empty before they are compared. That is
+// ADR-112 section 8's warning and ADR-157 section 8's, applied to a reader
+// rather than to a fold.
+//
+// WHAT IS NOT ASSERTED IS A COUNT. The ruling is that the list is the same on
+// both sides and holds no pattern; an enumeration has drifted in this corpus
+// every time one was pinned, and `name fragment` is named in the negative
+// because it is the one form the ruling removed.
+const SEARCH_TERM_ARTICLES = /^(?:an|a) /;
+
+function searchTermsOf(sentence: string): string[] {
+  const list = sentence.split(':')[1] ?? '';
+  return list
+    .replace(/\.$/, '')
+    .split(',')
+    .flatMap((part) => part.split(' or '))
+    .map((part) => part.trim().replace(SEARCH_TERM_ARTICLES, '').trim())
+    .filter((part) => part.length > 0);
+}
+
+test('ADR-194: the account search term list is the contract s, and holds no pattern', () => {
+  const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
+  const declared = contract
+    .split('\n')
+    .find((row) => row.startsWith('Search by an exact subject:'));
+  expect(declared, 'API_CONTRACT declares the search terms on one line').toBeDefined();
+  const contractTerms = searchTermsOf(declared ?? '');
+
+  const module = readFileSync(join(ROOT, 'apps/api/src/routes/admin-reads.ts'), 'utf8');
+  const message = /'must name an exact subject: ([^']*)' \+\n\s*'([^']*)'/.exec(module);
+  expect(message, 'the route states the term list in one validation message').not.toBeNull();
+  const routeTerms = searchTermsOf(`:${message?.[1] ?? ''}${message?.[2] ?? ''}`);
+
+  // A reader that stopped matching returns nothing, and two empty lists are equal.
+  expect(contractTerms.length).toBeGreaterThan(0);
+  expect(routeTerms.length).toBeGreaterThan(0);
+  expect(routeTerms).toEqual(contractTerms);
+
+  // ADR-194 clause 1: every term is a value that exists in the estate.
+  expect(contractTerms).not.toContain('name fragment');
+  for (const term of contractTerms) expect(term).not.toMatch(/fragment|prefix|partial|pattern/);
+});
+
 // THE NAME STOPPED STATING A COUNT ON 2026-08-27, and the reason is the thing
 // that broke it. It read "these seven plus the TWO focused projections nobody
 // has taken", and `P5-c` legitimately added a third when the wallet surface

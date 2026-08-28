@@ -991,7 +991,30 @@ fields, leaving the running statistic with no column it fits, and where it lives
 ruling. A projection cannot be specified over a table nobody has chosen.
 
 ### GET /admin/accounts?query=
-Search by anything: account id, platform ref, email, identity id, name fragment, coupon, or payout id.
+Search by an exact subject: account id, platform ref, email, identity id, coupon, or payout id
+([ADR-194](../decisions/ADR-194.md), **AMENDED**).
+
+**This row read *"Search by anything: account id, platform ref, email, identity id, name fragment,
+coupon, or payout id"* and the seventh form is REMOVED rather than left unimplemented.** The six that
+remain are VALUES THAT EXIST IN THE ESTATE and reach their tables through a typed equality. A name
+fragment is a PATTERN THE OPERATOR COMPOSED, and three separate things are wrong with it.
+
+**It names nothing here.** [`identities.display_name`](data-model/identities.md) is the only column in
+this schema that holds a person's name, it is reserved for a leaderboard that has no table, it is
+nullable *"because v1 never shows it"*, and [M11](../plans/M11-certificates-social-proof.md)'s
+`INV-M11-10` makes it a handle that is expressly **not** the trader's legal name.
+
+**The estate holds no legal name at all, by design rather than by omission.**
+[`kyc_verifications`](../../packages/db/migrations/0003_kyc.sql) keeps `provider_applicant_id`, *"the
+only pointer we keep"*, and [`payout_transfers`](../../packages/db/migrations/0010_payouts.sql) keeps
+`destination_name_match` as a boolean beside a score, which is a comparison OUTCOME and not the names
+compared. A name search is therefore a search of data Merit deliberately does not hold, and
+`AdminAccountSearchItem` below carries no name field to render one back with.
+
+**And a fragment cannot satisfy `INV-M6-10`**, which grants trader-identifying data only where the
+query names a specific subject. A coupon is a subject and the accounts that redeemed it share it; two
+identities whose handles both contain `jo` share nothing, which is `FM-M6-10`'s bulk PII surface
+arriving as a convenience feature.
 ```ts
 type AdminAccountSearchItem = {
   account_id: string; identity_id: string; email: string;

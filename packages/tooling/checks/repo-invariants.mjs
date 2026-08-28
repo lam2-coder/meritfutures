@@ -2226,13 +2226,13 @@ const OWN_PACKAGE = (() => {
  * grammar's WORKED EXAMPLES and its suite's SEEDS rather than claims about this
  * tree -- ``[`:874`](../a/path.ts)`` in a header, ``store.ts:99999`` in a case.
  * That is RI-16's exclusion 2, which masks a fenced block for the same reason,
- * arriving in source. Derived at the commit that widened it: 590 source files
+ * arriving in source. Derived at the commit that widened it: 594 source files
  * carry 358 citations, 78 findings fall inside this package and ALL 78 are in
  * the two files whose subject IS this grammar, and the other four source files
  * here carry no finding at all. The exclusion is therefore exact today and
  * stated rather than tuned.
  *
- * WHAT IT NEWLY REFUSES, DERIVED AT THE SAME COMMIT: 584 files where there were
+ * WHAT IT NEWLY REFUSES, DERIVED AT THE SAME COMMIT: 588 files where there were
  * 6, 207 citations where there were 94, and EIGHT findings where there was one.
  * Every one is registered below with its owner.
  *
@@ -2647,8 +2647,8 @@ function citationsIn(text, inherit = true) {
       at - inheritedAt <= CITATION_INHERIT_LINES
     ) {
       // ONLY A BARE POINTER CONTINUES THE PATH ABOVE IT. A token carrying its
-      // own prefix names its own thing, and over the 584 source files this
-      // reader now covers there are 152 of them and NOT ONE is a symbol in the
+      // own prefix names its own thing, and over the 588 source files this
+      // reader now covers there are 154 of them and NOT ONE is a symbol in the
       // file above: `0029:565` and `0017:82` are MIGRATION numbers, `M07:111`
       // and `M10:372` are PLANS and section lines, `EVENTS:407` and `INFRA:53`
       // are documents, and `+00:00`, `-06:00`, `1:30` and
@@ -2788,7 +2788,7 @@ const ri15 = {
     'exclusion is this package, whose citations are the grammar WORKED EXAMPLES ' +
     'and the suite SEEDS rather than claims about this tree, and it is measured: ' +
     'all 78 findings inside it sit in the two files whose subject IS this ' +
-    'grammar and the other four carry none. It is 584 files and 207 citations ' +
+    'grammar and the other four carry none. It is 588 files and 207 citations ' +
     'where it was 6 and 94. Plus the bare `:12` that continues a path cited within ' +
     `${CITATION_INHERIT_LINES} lines above it. THREE THINGS ARE ASSERTED: the ` +
     'path resolves to a file in this tree, the file reaches the line, and -- ' +
@@ -2807,7 +2807,7 @@ const ri15 = {
     'reads today carry a bindable name, 27 of them in `wiring.test.ts`. (1a) ' +
     'THE IN-TOKEN NAME IS RI-16s HALF IN PRACTICE, because it is read only ' +
     'where a markdown LINK states the path and no source file here writes one. ' +
-    'A prefixed token INHERITS NO PATH AT ALL: all 152 in this input are a ' +
+    'A prefixed token INHERITS NO PATH AT ALL: all 154 in this input are a ' +
     'MIGRATION number, a PLAN and a section line, a document, or a clock ' +
     '(`0017:82`, `M07:111`, `EVENTS:407`, `+00:00`), and not one is a symbol ' +
     'in the file cited above it. (2) A ' +
@@ -2926,8 +2926,8 @@ const ri15 = {
 //
 // RI-15 READS SIX SOURCE FILES AND ITS OWN `covers` LINE SAYS IT READS
 // `docs/decisions` "NOT AT ALL". That was the right call for the input it had and
-// it left the larger half of this corpus unread: 916 markdown documents under
-// `docs/` carrying 4,234 pointers of the form `file.ts:12`, and until this check
+// it left the larger half of this corpus unread: 922 markdown documents under
+// `docs/` carrying 4,469 pointers of the form `file.ts:12`, and until this check
 // nothing mechanical followed one of them.
 //
 // WHY THIS MATTERS MORE HERE THAN IN SOURCE. A wrong citation in a test file is
@@ -2942,10 +2942,10 @@ const ri15 = {
 // MEASURED. This is the hard half of the slice and the numbers are the argument.
 // Measured on this branch, 2026-08-28:
 //
-//   * 2,950 citations carry a path of their own or a markdown link beside them.
-//     2,288 of those sit UNDER A DATED OR SESSION HEADING and 662 do not.
-//   * 1,284 citations are a bare `:12` with no path anywhere near them.
-//   * In scope: 662 citations across 916 documents, 19 of them carrying a name
+//   * 3,055 citations carry a path of their own or a markdown link beside them.
+//     2,387 of those sit UNDER A DATED OR SESSION HEADING and 668 do not.
+//   * 1,414 citations are a bare `:12` with no path anywhere near them.
+//   * In scope: 668 citations across 922 documents, 19 of them carrying a name
 //     this check can bind. EIGHT FINDINGS, all eight registered below.
 //
 // EXCLUSION 1: A DATED OR SESSION HEADING, AND IT IS NOT THIS CHECK'S IDEA.
@@ -2990,7 +2990,7 @@ const ri15 = {
 // DIVERGENCE IS NOT A NARROWING. A markdown citation routinely carries its own
 // path in the link beside it, as `[`0004:40`](../../packages/db/migrations/0004_catalog.sql)`
 // does, and that path is STATED BY THE DOCUMENT rather than guessed by the
-// runner. Reading it brings 154 more citations into scope, a 30 percent gain
+// runner. Reading it brings 157 more citations into scope, a 30 percent gain
 // over the path-carrying set alone, and resolves each one to ONE file rather
 // than to every file in the tree whose name ends the same way.
 //
@@ -3015,19 +3015,20 @@ const ri15 = {
 //
 // THE LAST ROW IS THE ONE THAT DECIDES THE SHAPE OF THE RULE, and it is a
 // measurement rather than a preference: every one of the seven prefixed tokens
-// in `CITED_REASON_FILES` is `M07:nnn` or `M20:62`, and 41 of the 163 in scope
-// here are the same shape. So the in-token name is read ONLY where the path is
-// STATED -- in a markdown link beside the pointer -- and never where it was
-// inherited, because a name bound onto a guessed path is two guesses stacked.
-// It brings the bindable set from 5 to 19 and every one of the 14 it adds is a
-// citation whose own link names the file it points into.
+// in RI-15's input is a migration number, a plan, a document or a clock, and 41
+// of the 166 in scope here are the same shape. So the in-token name is read ONLY
+// where the path is STATED -- in a markdown link beside the pointer -- and never
+// where it was inherited, because a name bound onto a guessed path is two
+// guesses stacked. The bindable set is 19 where the name-in-front half alone
+// binds 5, and every one of the 14 the in-token half adds is a citation whose
+// own link names the file it points into.
 //
 // WHAT IT DOES NOT CATCH, stated rather than left to be discovered.
-// (1) THE NAME HALF IS STILL THIN AND THE NUMBER SAYS SO: 19 of the 662
+// (1) THE NAME HALF IS STILL THIN AND THE NUMBER SAYS SO: 19 of the 668
 //     citations in scope carry a name this check can bind, against 27 in
 //     `wiring.test.ts` alone. Markdown writes a citation alone in a table cell
 //     as readily as inside a link, and a bare cell has no name in either place.
-//     The other 643 are checked for RESOLUTION AND RANGE only, which is the half
+//     The other 649 are checked for RESOLUTION AND RANGE only, which is the half
 //     that found `DECISIONS.md:483`.
 // (2) A NAME AFTER THE POINTER is not read. This corpus writes
 //     "`routes/account-reads.ts:851` `ELIGIBILITY_BLOCKER`" as readily as the
@@ -3178,14 +3179,14 @@ const ri16 = {
     'lines of it, matched case-insensitively as a substring. THREE EXCLUSIONS, ' +
     'ALL BY SHAPE, ALL MEASURED on this branch on 2026-08-28. (1) A citation ' +
     'under a level-1 or level-2 heading naming a DATE or a SESSION is out of ' +
-    'scope: 2,288 of the 2,950 path-bearing citations, and the rule is ' +
+    'scope: 2,387 of the 3,055 path-bearing citations, and the rule is ' +
     "CI-06/derivable-counts' rather than this check's -- such an entry is a " +
     'record of a measurement made that day, and repairing it would rewrite the ' +
     'record to say something it did not say. It reaches INSIDE `docs/STATE.md`, ' +
     'a LIVE document that accumulates dated sections and that no directory rule ' +
     'could split. (2) A fenced block or a generated span, masked with CI-06s ' +
     'own two expressions. (3) A bare `:12` with NO path of its own and no link ' +
-    'beside it: 1,284 citations. RI-15 lets such a pointer inherit the nearest ' +
+    'beside it: 1,414 citations. RI-15 lets such a pointer inherit the nearest ' +
     'path within 6 lines and names that as its miss (6); in THIS corpus ' +
     'inheritance adds 15 findings inside this scope and ALL FIFTEEN are the ' +
     'check guessing, because a bare pointer here is usually a REGISTRY ID: ' +
@@ -3195,11 +3196,11 @@ const ri16 = {
     'BEGINS WITH names the file by this corpus nickname for it ' +
     '(``[`EVENTS:396`](../architecture/EVENTS.md)``), and a prefixed token ' +
     'whose path was INHERITED rather than stated is a registry shorthand in 41 ' +
-    'of the 163 cases here and in 7 of 7 in RI-15s input. None of the three ' +
+    'of the 166 cases here and in 154 of 154 in RI-15s input. None of the three ' +
     'binds. WHAT IT DOES NOT CATCH. (1) The name half is STILL THIN and the ' +
-    'number says so: 19 of the 662 citations in scope carry a bindable name, ' +
+    'number says so: 19 of the 668 citations in scope carry a bindable name, ' +
     'against 27 in `wiring.test.ts` alone, because markdown writes a citation ' +
-    'alone in a table cell as readily as inside a link. The other 643 ' +
+    'alone in a table cell as readily as inside a link. The other 649 ' +
     'are checked for RESOLUTION AND RANGE only, which is the half that found ' +
     '`DECISIONS.md:483`. (2) A name written AFTER the pointer, in a SECOND ' +
     'backticked token, is not read; the in-token half reads the name inside the ' +
