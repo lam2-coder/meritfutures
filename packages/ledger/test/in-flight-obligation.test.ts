@@ -27,6 +27,36 @@
 // directions, because a watcher pinned to a list of file names watches those
 // files and not the claim -- which is the miss `packages/rail/test/lt-07.test.ts`
 // records against itself under finding C.
+//
+// -----------------------------------------------------------------------------
+// ADR-187 PAID THE PRICE AND FOUND TWO DEFECTS IN THE REGISTRY THAT PRICED IT
+// -----------------------------------------------------------------------------
+// DEFECT 1: THE REGISTRY REQUIRED MERGED MIGRATIONS TO MOVE, AND E2 FORBIDS IT.
+// `ENUMERATES_ALL` held five migrations and asserted that EVERY registered site
+// "still states exactly the set it is registered for" -- every code in
+// `LEDGER_ACCOUNT_CODES`. A merged migration is never edited, only superseded,
+// so that assertion could only ever have been satisfied by breaking E2. The
+// contradiction was inside one object: `0009`'s own `why` string already read
+// "Superseded, never edited" while the case demanded it be edited.
+//
+// THE REPAIR IS A PARTITION AND IT IS STRICTLY STRONGER THAN WHAT IT REPLACES.
+// A migration states the vocabulary AS OF ITS OWN TIME. What a mint owes it is a
+// SUPERSESSION -- a new migration re-declaring the whole vocabulary -- and what
+// this file owes it is the opposite assertion: that it still says what it said,
+// unedited, and does NOT name a code minted after it. That is checkable, and it
+// catches an edit to a merged migration, which the old shape could not see.
+//
+// DEFECT 2: THE SCAN IS BLIND TO A NEGATIVE FIXTURE, AND ONE OF THEM NAMED THE
+// SPELLING TWO ENTRIES PLANNED TO MINT. `enumerating` finds files that state the
+// WHOLE vocabulary or the FIRM subset. A file that names an UNDECLARED code, as
+// a fixture for watching a guard refuse it, states neither and is invisible to
+// both directions of the scan. `scripts/db/probe_ledger_constraints.sql` holds
+// two: `firm_payable`, which ADR-181 section 4 refuses to mint for exactly this
+// reason, and `withdrawals_payable`, added by ADR-186's K1c block, which is the
+// spelling ADR-181 section 5 and ADR-186 section 7 each fired at a database AS
+// the eighth code. Minting either would make that probe assert the opposite of
+// what it says, and nothing in this file would have said so. `NEGATIVE_FIXTURES`
+// is that third category.
 // =============================================================================
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -137,39 +167,71 @@ describe('the role: what the two ruled slots force the two open ones to be', () 
   });
 });
 
-describe('no code in the chart can hold it, and each refusal has its own step', () => {
-  test('there are exactly four firm codes and three per-identity codes', () => {
-    expect(FIRM_CODES).toHaveLength(4);
+describe('none of the SEVEN could hold it, and the eighth is the one that does', () => {
+  test('there are exactly five firm codes and three per-identity codes', () => {
+    // FOUR UNTIL ADR-187. The eighth code is firm-scoped, because ADR-174 clause
+    // 3 rules that `LT-07` stays firm-only -- on arithmetic, not on scope -- and
+    // an identity-scoped in-flight position would make `LT-07` visible to an
+    // identity-scoped check, which is the exact property ADR-124 clause 3's
+    // conclusion depends on.
+    expect(FIRM_CODES).toHaveLength(5);
     expect(IDENTITY_CODES).toHaveLength(3);
   });
 
-  test('every code the chart rules a liability is per identity, so none is firm-scoped', () => {
+  test('every liability OTHER than the minted one is per identity', () => {
+    // THIS CASE WENT RED WHEN `0056` LANDED AND THE SESSION CAME HERE TO SAY SO.
+    //
+    // It used to read "every code the chart rules a liability is per identity, so
+    // none is firm-scoped", which was ADR-181's ELIMINATION: the step proving
+    // that no declared code could hold the external leg's in-flight obligation.
+    // THE ELIMINATION SUCCEEDED, and ADR-187 minted the code it proved was
+    // missing. A case asserting the absence after that is asserting the absence
+    // of the thing the ruling exists to create.
+    //
+    // WHAT SURVIVES IS THE HALF THAT WAS LOAD-BEARING: every OTHER liability in
+    // the chart is a trader's position, so the firm's obligation to pay a
+    // withdrawal onward has exactly one home and shadows none of the seven. That
+    // was ADR-181 section 8's stated worry about minting -- "a class Merit will
+    // carry forever for a role one of the seven already had" -- and it is the
+    // property that refuses it.
     const liabilities = LEDGER_ACCOUNT_CODES.filter((code) => KIND_IN_FORCE[code] === 'liability');
     expect(liabilities.length).toBeGreaterThan(0);
     for (const code of liabilities) {
+      if (code === 'withdrawals_in_flight') continue;
       expect(LEDGER_ACCOUNT_SCOPE[code], code).toBe('identity');
     }
+    expect(liabilities.filter((code) => LEDGER_ACCOUNT_SCOPE[code] === 'firm')).toStrictEqual([
+      'withdrawals_in_flight',
+    ]);
   });
 
-  test('and no firm code carries a liability, and none of them is silent any more', () => {
-    // THIS CASE WENT RED WHEN `0055` LANDED AND THE SESSION CAME HERE TO SAY SO.
+  test('every firm code is ruled, and exactly one of them is the obligation', () => {
+    // THIS CASE HAS NOW GONE RED TWICE AND EACH SESSION CAME HERE TO SAY SO.
     //
-    // It used to read, in its own comment: "TWO REFUSALS AND NOT ONE. Two firm
-    // codes are RULED something else, and two fall through the constraint's
-    // `ELSE true` and are ruled nothing at all. A silence is not an opening."
-    // ADR-186 rules `psp_clearing` and `reserve` both `asset` and closes the
-    // ELSE, so the partition it asserted no longer has a second half.
+    // ADR-186: it used to read "TWO REFUSALS AND NOT ONE. Two firm codes are
+    // RULED something else, and two fall through the constraint's `ELSE true`
+    // and are ruled nothing at all. A silence is not an opening." That entry
+    // ruled `psp_clearing` and `reserve` both `asset` and closed the ELSE.
     //
-    // THE PROPERTY IT WAS PROTECTING SURVIVES AND IS STRICTLY STRONGER. What it
-    // held is that no firm code can hold the in-flight obligation. It held that
-    // over two codes by their ruling and two by an argument in an entry; it now
-    // holds it over all four BY THE CONSTRAINT, which is why ADR-174 section 3
-    // shape (iii) is unrepresentable rather than merely refused.
+    // ADR-187: it then read "no firm code carries a liability", which was
+    // ADR-181's elimination held BY THE CONSTRAINT rather than by an argument.
+    // The elimination is what proved the eighth code necessary, and `0056` mints
+    // it, so that clause is now false by construction and by design.
+    //
+    // WHAT SURVIVES ACROSS BOTH IS THE TOTALITY, WHICH IS THE PART THAT GUARDS
+    // ANYTHING: every firm code is RULED, none is silent, and the single firm
+    // liability is the one minted for the role. `psp_clearing` and `reserve`
+    // still cannot hold it, so ADR-174 section 3 shape (iii) stays
+    // unrepresentable and the mint did not reopen it.
     const ruled = FIRM_CODES.filter((code) => KIND_IN_FORCE[code] !== undefined);
     const silent = FIRM_CODES.filter((code) => KIND_IN_FORCE[code] === undefined);
-    expect(ruled).toHaveLength(4);
+    expect(ruled).toHaveLength(5);
     expect(silent).toHaveLength(0);
     for (const code of FIRM_CODES) {
+      if (code === 'withdrawals_in_flight') {
+        expect(KIND_IN_FORCE[code], code).toBe('liability');
+        continue;
+      }
       expect(KIND_IN_FORCE[code], code).not.toBe('liability');
     }
     // The ELSE arm REFUSES now, and it is present rather than deleted: a CASE
@@ -234,29 +296,9 @@ interface Site {
  */
 const ENUMERATES_ALL: readonly Site[] = [
   {
-    path: 'packages/db/migrations/0009_ledger.sql',
+    path: 'packages/db/migrations/0056_eighth_ledger_code.sql',
     kind: 'normative',
-    why: 'ledger_accounts_code_is_declared, the primary guard. Superseded, never edited',
-  },
-  {
-    path: 'packages/db/migrations/0027_triggers_invariants.sql',
-    kind: 'normative',
-    why: "LEDGER-C2's trigger body, the second line. Superseded, never edited",
-  },
-  {
-    path: 'packages/db/migrations/0052_chart_of_accounts.sql',
-    kind: 'citation',
-    why: 'its header argues four kinds and quotes the vocabulary while doing so',
-  },
-  {
-    path: 'packages/db/migrations/0053_firm_treasury_kind.sql',
-    kind: 'citation',
-    why: "ADR-180's header, the same shape: it quotes the seven while ruling one code's kind",
-  },
-  {
-    path: 'packages/db/migrations/0055_last_two_ledger_kinds.sql',
-    kind: 'normative',
-    why: "ADR-186's CASE names all seven codes and its ELSE is `false`, so a mint MUST add an arm here or the database refuses the eighth code outright. This is the only site in this registry the DATABASE enforces, and it is what makes the price a constraint rather than a list",
+    why: "ADR-187's mint. It re-declares the WHOLE vocabulary three times in one transaction -- ledger_accounts_code_is_declared, LEDGER-C2's function body and ledger_accounts_kind_matches_code -- and it is the migration in force, so it is the only migration in this list. Its ELSE is still `false`, so a ninth code is refused until its kind is ruled in the migration that mints it",
   },
   {
     path: 'packages/ledger/src/accounts.ts',
@@ -271,12 +313,12 @@ const ENUMERATES_ALL: readonly Site[] = [
   {
     path: 'packages/ledger/test/pt-03-ledger-zero-sum.property.test.ts',
     kind: 'normative',
-    why: 'FIRM_CODES and IDENTITY_CODES are hand-kept generator inputs. A code missing from them is a code the property test never generates, and NOTHING ELSE would say so',
+    why: 'FIRM_CODES and IDENTITY_CODES are hand-kept generator inputs. A code missing from them is a code the property test never generates, and NOTHING ELSE would say so -- `tsc` least of all, since a list short of a union member is a well typed shorter list',
   },
   {
     path: 'packages/rail/test/lt-07.test.ts',
     kind: 'normative',
-    why: "two toStrictEqual over 0009's CHECK and 0027's NOT IN, in a package this session does not own",
+    why: "the vocabulary in force and the constraint's arms, in a package this session does not own. ADR-187 repaired it to read the LAST migration that declares the codes rather than 0009 by name",
   },
   {
     path: 'docs/GLOSSARY.md',
@@ -287,6 +329,78 @@ const ENUMERATES_ALL: readonly Site[] = [
     path: 'docs/architecture/data-model/ledger_accounts.md',
     kind: 'normative',
     why: 'the data model page for the table, an approved architecture document',
+  },
+];
+
+/**
+ * MIGRATIONS THAT DECLARED THE VOCABULARY AND ARE NOW SUPERSEDED.
+ *
+ * THESE ARE NOT SITES A MINT MOVES. E2 makes a merged migration unamendable:
+ * it is superseded, never edited. Each of these states the vocabulary AS OF ITS
+ * OWN TIME, and the assertion owed to it is the OPPOSITE of the one owed to a
+ * live file -- that it still says exactly what it said, and does not name a code
+ * minted after it.
+ *
+ * `declared` is the count each one stated, quoted from the file rather than
+ * computed, so a reader can see the sequence without opening seven migrations.
+ */
+const SUPERSEDED: readonly {
+  readonly path: string;
+  readonly declared: number;
+  readonly why: string;
+}[] = [
+  {
+    path: 'packages/db/migrations/0009_ledger.sql',
+    declared: 7,
+    why: 'the original ledger_accounts_code_is_declared, superseded by 0056',
+  },
+  {
+    path: 'packages/db/migrations/0027_triggers_invariants.sql',
+    declared: 7,
+    why: "LEDGER-C2's first function body, superseded by 0056's CREATE OR REPLACE",
+  },
+  {
+    path: 'packages/db/migrations/0052_chart_of_accounts.sql',
+    declared: 7,
+    why: 'its header argues four kinds and quotes the vocabulary while doing so',
+  },
+  {
+    path: 'packages/db/migrations/0053_firm_treasury_kind.sql',
+    declared: 7,
+    why: "ADR-180's header, the same shape: it quotes the seven while ruling one code's kind",
+  },
+  {
+    path: 'packages/db/migrations/0055_last_two_ledger_kinds.sql',
+    declared: 7,
+    why: "ADR-186's CASE named all seven and closed its ELSE to `false`, which is the guard that forced 0056 to rule a kind in the same statement that declared a name",
+  },
+];
+
+/**
+ * FILES THAT NAME AN UNDECLARED CODE AS A LIVE FIXTURE.
+ *
+ * THE SCAN CANNOT SEE THESE AT ALL and that is why they need their own list: a
+ * file naming a code that is deliberately NOT in the vocabulary enumerates
+ * neither the whole set nor the firm subset. Minting one of these spellings does
+ * not make such a file incomplete -- it makes it assert the OPPOSITE of what it
+ * says, silently, because the guard it was watching refuse the row now accepts
+ * it. That is ADR-181 section 4's stated reason for refusing `firm_payable` in
+ * advance, generalised to every fixture of the shape.
+ */
+const NEGATIVE_FIXTURES: readonly {
+  readonly path: string;
+  readonly code: string;
+  readonly why: string;
+}[] = [
+  {
+    path: 'scripts/db/probe_ledger_constraints.sql',
+    code: 'firm_payable',
+    why: "LEDGER-C2's negative fixture, and the class ADR-027's first draft invented. 0027 records that reading GLOSSARY's class list is what caught it",
+  },
+  {
+    path: 'scripts/db/probe_ledger_constraints.sql',
+    code: 'withdrawals_payable',
+    why: "LEDGER-K1c's undeclared-code fixture, added by ADR-186. It is the spelling ADR-181 section 5 row 1 and ADR-186 section 7 row 6 each fired at a database AS the eighth code, so it is the fixture a mint was most likely to collide with, and ADR-187 moved its name rather than this probe",
   },
 ];
 
@@ -321,20 +435,26 @@ const ENUMERATES_FIRM: readonly Site[] = [
  * names, so this registry is not a further copy of the vocabulary.
  */
 const COUNT_CLAIMS: readonly { readonly path: string; readonly quote: string }[] = [
-  { path: 'docs/GLOSSARY.md', quote: '**Seven v1 classes**' },
-  { path: 'docs/architecture/data-model/ledger_accounts.md', quote: 'Seven v1 classes' },
+  { path: 'docs/GLOSSARY.md', quote: '**Eight v1 classes**' },
+  { path: 'docs/architecture/data-model/ledger_accounts.md', quote: 'Eight v1 classes' },
   {
     path: 'docs/architecture/data-model/ledger_accounts.md',
-    quote: 'check in the seven declared codes',
+    quote: 'check in the eight declared codes',
   },
   {
     path: 'docs/architecture/data-model/README.md',
-    quote: '**Every entry resolves to one of the seven declared classes**',
+    quote: '**Every entry resolves to one of the eight declared classes**',
   },
-  { path: 'apps/api/src/routes/checkout.ts', quote: 'closes the chart at seven codes' },
-  { path: 'packages/ledger/src/chart.ts', quote: 'four firm rows plus up to three per identity' },
-  { path: 'packages/ledger/test/accounts.test.ts', quote: "'0009 declares seven codes').toBe(7)" },
+  { path: 'apps/api/src/routes/checkout.ts', quote: 'closes the chart at eight codes' },
+  { path: 'packages/ledger/src/chart.ts', quote: 'five firm rows plus up to three per identity' },
 ];
+
+// `packages/ledger/test/accounts.test.ts` USED TO BE THE SEVENTH CLAIM AND IS
+// DELIBERATELY NOT THE EIGHTH. Its quote was `'0009 declares seven codes').toBe(7)`,
+// a cardinality TYPED into a file whose whole subject is that hand-kept copies
+// drift. ADR-187 replaced it with `.toBe(LEDGER_ACCOUNT_CODES.length)`, derived
+// from the package, so there is no longer a number there to keep true. The
+// cardinality is asserted once, below, against this package.
 
 /** The directories a normative statement can live in. Entries and logs are out. */
 const SCANNED: readonly string[] = [
@@ -390,22 +510,81 @@ function enumerating(codes: readonly string[], window: number): readonly string[
 }
 
 describe('the price of the eighth code, registered and scanned for in both directions', () => {
-  test('the registry names every file that enumerates the whole vocabulary, and no other', () => {
+  test('the registry names every LIVE file that enumerates the whole vocabulary, and no other', () => {
+    // The superseded migrations drop out of this scan the moment the vocabulary
+    // widens, because they state the OLD set and no longer name every code. That
+    // is not a gap: it is what supersession looks like from here, and it is
+    // asserted from the other side in the case below.
     expect(enumerating(LEDGER_ACCOUNT_CODES, 12)).toStrictEqual(
       [...ENUMERATES_ALL].map((site) => site.path).sort(),
     );
   });
 
+  test('every superseded migration still says what it said, and names no code minted after it', () => {
+    // E2: A MERGED MIGRATION IS NEVER EDITED, ONLY SUPERSEDED. This is the
+    // assertion the old shape could not make. It required these files to contain
+    // every CURRENT code, which is satisfiable only by editing them, and their
+    // own registry entries said "Superseded, never edited" at the same time.
+    //
+    // What is asserted instead: each one still declares the count it declared,
+    // and none of them names a code that did not exist when it merged. An edit to
+    // a merged migration turns this red, which is the property that was actually
+    // wanted.
+    const bySeq = [...SUPERSEDED].map((site) => site.path).sort();
+    expect([...SUPERSEDED].map((site) => site.path)).toStrictEqual(bySeq);
+    for (const site of SUPERSEDED) {
+      const text = read(...site.path.split('/'));
+      const named = LEDGER_ACCOUNT_CODES.filter((code) => text.includes(code));
+      expect(named.length, `${site.path} declared ${String(site.declared)}`).toBe(site.declared);
+      expect(site.why.length, site.path).toBeGreaterThan(40);
+    }
+  });
+
+  test('the newest migration is the only one in the live registry, and it supersedes the rest', () => {
+    // A mint that added its migration to the live list WITHOUT retiring the one
+    // before it would leave two files claiming to state the vocabulary in force,
+    // which is the state `chart-of-accounts-kinds.test.ts` exists to refuse for
+    // the kind constraint. Exactly one migration is live here.
+    const liveMigrations = ENUMERATES_ALL.filter((site) =>
+      site.path.startsWith('packages/db/migrations/'),
+    );
+    expect(liveMigrations).toHaveLength(1);
+    const live = liveMigrations[0] as Site;
+    for (const site of SUPERSEDED) {
+      if (!site.path.startsWith('packages/db/migrations/')) continue;
+      expect(site.path < live.path, `${site.path} precedes ${live.path}`).toBe(true);
+    }
+  });
+
+  test('every negative fixture still names a code the vocabulary does NOT declare', () => {
+    // THE CATEGORY THE SCAN IS BLIND TO. A file naming an undeclared code
+    // enumerates neither the whole vocabulary nor the firm subset, so neither
+    // direction of `enumerating` can see it. Minting one of these spellings does
+    // not make the file incomplete; it makes it assert the opposite of what it
+    // says, because the guard it watches refuse the row would accept it.
+    for (const fixture of NEGATIVE_FIXTURES) {
+      expect(read(...fixture.path.split('/')), fixture.path).toContain(fixture.code);
+      expect(
+        (LEDGER_ACCOUNT_CODES as readonly string[]).includes(fixture.code),
+        `${fixture.code} is a live negative fixture in ${fixture.path} and must stay undeclared`,
+      ).toBe(false);
+      expect(fixture.why.length, fixture.code).toBeGreaterThan(40);
+    }
+  });
+
   test('the registry names every file that enumerates the firm subset, and no other', () => {
     // A tighter window than the whole vocabulary needs, because four names in
-    // twelve lines is a coincidence a prose paragraph produces and seven is not.
+    // twelve lines is a coincidence a prose paragraph produces and eight is not.
+    // The superseded migrations are excluded here too: they state the firm subset
+    // as it was, and a widened subset is not something they can be asked to say.
+    const superseded = new Set(SUPERSEDED.map((site) => site.path));
     const found = enumerating(FIRM_CODES, 3).filter(
-      (path) => !ENUMERATES_ALL.some((site) => site.path === path),
+      (path) => !ENUMERATES_ALL.some((site) => site.path === path) && !superseded.has(path),
     );
     expect(found).toStrictEqual([...ENUMERATES_FIRM].map((site) => site.path).sort());
   });
 
-  test('every registered site still states exactly the set it is registered for', () => {
+  test('every live registered site still states exactly the set it is registered for', () => {
     for (const site of ENUMERATES_ALL) {
       const text = read(...site.path.split('/'));
       for (const code of LEDGER_ACCOUNT_CODES) expect(text, site.path).toContain(code);
@@ -420,10 +599,45 @@ describe('the price of the eighth code, registered and scanned for in both direc
     for (const claim of COUNT_CLAIMS) {
       expect(read(...claim.path.split('/')), claim.path).toContain(claim.quote);
     }
-    // The claims say seven and four, and this is what makes them claims about
+    // The claims say eight and five, and this is what makes them claims about
     // THIS package rather than a number somebody typed.
-    expect(LEDGER_ACCOUNT_CODES).toHaveLength(7);
-    expect(FIRM_CODES).toHaveLength(4);
+    expect(LEDGER_ACCOUNT_CODES).toHaveLength(8);
+    expect(FIRM_CODES).toHaveLength(5);
+  });
+
+  test('the registry states its own size, so the price is a number and not an impression', () => {
+    // A PRICE NOBODY CAN QUOTE IS NOT A PRICE. Every entry above is a claim about
+    // one file, and this is the only place the SET's size is stated, derived from
+    // the lists themselves rather than typed beside them. An entry added or
+    // dropped moves this number, so a session reporting "the registry names N
+    // sites" is reporting something a control checked.
+    const sizes = {
+      live: ENUMERATES_ALL.length,
+      superseded: SUPERSEDED.length,
+      firm: ENUMERATES_FIRM.length,
+      negativeFixtures: NEGATIVE_FIXTURES.length,
+      countClaims: COUNT_CLAIMS.length,
+    };
+    expect(sizes).toStrictEqual({
+      live: 7,
+      superseded: 5,
+      firm: 3,
+      negativeFixtures: 2,
+      countClaims: 6,
+    });
+
+    // AND THE DISTINCT FILES, WHICH IS THE FIGURE A SESSION PLANNING THE NEXT
+    // MINT ACTUALLY NEEDS. Some files carry two entries: a data-model page states
+    // the vocabulary AND two cardinalities, and one probe holds two negative
+    // fixtures.
+    const files = new Set<string>([
+      ...ENUMERATES_ALL.map((site) => site.path),
+      ...SUPERSEDED.map((site) => site.path),
+      ...ENUMERATES_FIRM.map((site) => site.path),
+      ...NEGATIVE_FIXTURES.map((fixture) => fixture.path),
+      ...COUNT_CLAIMS.map((claim) => claim.path),
+    ]);
+    expect(files.size).toBe(18);
   });
 
   test('every registered site carries a reason, because a bare path is not a price', () => {
@@ -432,10 +646,12 @@ describe('the price of the eighth code, registered and scanned for in both direc
     }
   });
 
-  // THE HALF OF THE PRICE THAT DECIDED ADR-181 NOT TO MINT. Of the normative
-  // sites, this session owns the two migrations (by superseding them), this
-  // package, and nothing else. The rest are an approved architecture document,
-  // an approved glossary, two files in `packages/db/src` and one in `apps/api`.
+  // THE HALF OF THE PRICE THAT DECIDED ADR-181 NOT TO MINT, AND THAT ADR-187
+  // PAID. Of the normative sites, the minting session owns the migrations (by
+  // superseding them), this package, and nothing else. The rest are an approved
+  // architecture document, an approved glossary, two files in `packages/db/src`,
+  // one in `apps/api` and one in `packages/rail` -- six, which is the figure
+  // ADR-181 section 4 measured and the figure that was actually paid.
   test('the normative ENUMERATION sites outside this package and the migrations are six', () => {
     const outside = [...ENUMERATES_ALL, ...ENUMERATES_FIRM]
       .filter((site) => site.kind === 'normative')

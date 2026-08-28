@@ -205,6 +205,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-184](ADR-184.md) | the admin event feed gets its contract row, and the ruling underneath it is that the read belongs on `AdminReadSource` as a seventh method while `INV-M6-10`'s two modes move into the REQUEST (2026-08-28, status: proposed) |
 | [ADR-185](ADR-185.md) | `EVENTS` section 11 carries TWELVE triggers, so the count moves and the table stands; and the repair is to DELETE the number rather than correct it, because a corrected number re-arms the identical trap  (2026-08-28, status: proposed) |
 | [ADR-186](ADR-186.md) | the last two codes are both assets, the `ELSE true` closes to `ELSE false`, and shape (iii) becomes unrepresentable rather than merely refused  (2026-08-28, status: proposed) |
+| [ADR-187](ADR-187.md) | the eighth ledger code is minted, it is `withdrawals_in_flight`, and the shape was not chosen but left  (2026-08-28, status: proposed) |
 | [ADR-188](ADR-188.md) | the liability response is one snapshot row column for column, the shared name is KEPT, and the total is the reader's  (2026-08-28, status: proposed) |
 <!--/gen-->
 
