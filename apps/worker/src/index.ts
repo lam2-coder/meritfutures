@@ -515,6 +515,131 @@ export type {
   DetectorRunReport,
 } from './detectors/runner.ts';
 
+// -----------------------------------------------------------------------------
+// THE IDENTITY AND PAYMENT DETECTORS (session 311, `P7-h`)
+// -----------------------------------------------------------------------------
+// `D-07`, `D-08`, `D-09`, `D-10` and `D-11`, plus `D-16`'s v1 half and `D-18`'s
+// detector, written against the runner and ports above and touching neither.
+//
+// **ALL SEVEN DECLINE UNDER `P7-d`'s SEED AS IT STANDS, AND THAT IS THE SLICE'S
+// RESULT RATHER THAN ITS SHORTFALL.** `INV-M7-04` makes the registry the only
+// source of a threshold -- *"'why did this not fire in March' must be answerable
+// from data, and it cannot be if parameters live only in code"* -- and eleven of
+// the eighteen seeded rows carry no number at all, because `OQ-M7-02` is the
+// founder's and the seed writes no value it cannot cite. `DetectorDeclined` is
+// the named way to say so, the runner records the run `failed`, and
+// `detector_runs_unhealthy_idx` and `CRON_INVENTORY`'s dead-man switch both read
+// it on the day it happens. The alternative is `FM-M7-01` exactly: a threshold
+// this module invented, and *"detection appears healthy and is absent."*
+//
+// **SEVERITY IS THE BLOCKER FIVE OF THE SEVEN SHARE AND IT IS A MONEY DECISION
+// EVERY TIME IT IS WRITTEN.** `M07` section 3.3: moving a detector from 3 to 4
+// changes who gets held, because 4 and 5 is the band `G-HOLD-REQUIRED` reads to
+// hold a payout for 48 hours under `ADR-040`, so it is *"a data change with a
+// recorded effective date through `SD-M7-03`, never a deploy"*. A severity
+// chosen in a `.ts` file is that decision made by a deploy. **AND THE CLOCK THAT
+// BAND NEEDS IS NOT SEEDED EITHER**: `risk_flags_high_severity_has_sla` requires
+// `sla_due_at` at 4 and 5, `OQ-M7-03` PROPOSES the duration and is OPEN, so the
+// two detectors whose severity `M07` DOES state, `D-09` and `D-16` at 5, are
+// blocked on an `sla_hours` the registry has no row for. It is NAMED rather than
+// defaulted.
+//
+// **`ADR-155` BINDS HARDEST HERE AND IT IS THE TYPE THAT HOLDS IT.** `P7`
+// section 8 says so of this slice by name and `ADR-155`'s consequences repeat
+// it: `D-09`, `D-08` and `D-16`'s v1 half all produce hard-link signals and all
+// three write `open`. There is no line here resisting the temptation because
+// there is no line to resist with: `DetectorFinding` has no `status` field,
+// `DetectorTx` has no addressed write, and `identity_links` is absent from
+// `DETECTOR_WRITE_TABLES`, so **the hard link is READ here and never WRITTEN
+// here** and clause 1's edge remains the resolver's. The foreclosure runs both
+// ways and the suite asserts the flag lands at `open` at severity 5, which is
+// the band an auto-enforce would have been written for.
+//
+// **`D-18` TESTS `footprint_present IS FALSE` AND NEVER `IS NOT TRUE`**, spelled
+// once in `hasNoFootprint` and asserted at BOTH the places it runs: the window
+// narrows on an equality against `false`, and the detector re-tests every leg
+// over the merged rows because **the battery is merged AFTER the read and never
+// travels through `rowsWhere` at all**. The near-miss is `M07`'s own, a vendor
+// timeout, and the difference is a supplier outage against a flood of flags
+// against real customers.
+//
+// **NO EVIDENCE OBJECT CARRIES A THRESHOLD**, asserted mechanically against the
+// seed's own parameter keys. `INV-M7-10` is enforced several slices away by
+// `P7-j`'s strip list, and a copy of a parameter inside `risk_flags.evidence`
+// makes that stripping load-bearing in a second place; `INV-M7-04`'s chain
+// reconstructs it from data, so the copy buys nothing and can drift.
+//
+// **TWO STRUCTURAL BLOCKERS ARE REPORTED RATHER THAN REACHED FOR** (`P7` section
+// 11 rule 5). `D-09` has no input, which is `DEP-M7-04` arriving exactly where
+// that row said it would: `payout_transfers` carries no identity column and
+// reaches one only through `payout_requests`, which is not a member of
+// `DETECTOR_READ_TABLES`. The remedy is one member in `detectors/ports.ts`,
+// which is `P7-e`'s fence. And two of `D-18`'s four required legs are `D-15`'s
+// checkout enrichment, which does not exist. Both predicates are written and
+// tested against the shapes those inputs would produce, so the logic exists and
+// is proven the day they land.
+//
+// **WHAT IS REAL** is seven predicates, seven windows and seven batteries, each
+// predicate a pure exported function with a positive fixture and a near-miss
+// fixture. **WHAT IS NOT IS A SINGLE FLAG**, and the difference is visible in
+// `DETECTOR_BLOCKERS` and `detectorBlockerSummary` rather than left to a reader.
+export {
+  CANARY_MAGNITUDE,
+  CONSISTENCY_GATE,
+  CentsRangeError,
+  D07_ENTITY_CAP,
+  D08_PAYMENT_VELOCITY,
+  D09_DESTINATION_CONCENTRATION,
+  D10_AFFILIATE_SELF_DEAL,
+  D11_DILUTION_TIMING,
+  D16_LINK_CONFIDENCE,
+  D18_REGISTRATION_PHONE,
+  DETECTOR_BLOCKERS,
+  DOCUMENTED_FLAG_TYPES,
+  FLAG_TYPE_BY_DETECTOR,
+  FLEET_LEGS_WITH_INPUT,
+  FLEET_SIGNATURE_LEGS,
+  IDENTITY_DETECTORS,
+  IDENTITY_DETECTOR_IDS,
+  MIN_CORRELATION_DAYS,
+  accountOwners,
+  cents,
+  connected,
+  detectorBlockerSummary,
+  dilutionCandidates,
+  failingGates,
+  flagTypeOf,
+  fleetSignatureRows,
+  hardLinkEdges,
+  hasNoFootprint,
+  isVoipLine,
+  liveEdges,
+  overCapEntities,
+  paymentVelocityBreaches,
+  pearsonBp,
+  registryBlockers,
+  registryParameter,
+  related,
+  relatedComponents,
+  selfDealAttributions,
+  sharedDestinations,
+  statedInteger,
+  statedValue,
+} from './detectors/identity.ts';
+export type {
+  DilutionCandidate,
+  FleetSignatureRow,
+  HardLinkEdge,
+  IdentityDetectorId,
+  IdentityGraph,
+  OverCapEntity,
+  PaymentVelocityBreach,
+  RegistryBlocker,
+  RegistryParameter,
+  SelfDealAttribution,
+  SharedDestination,
+} from './detectors/identity.ts';
+
 /** The Railway service this app deploys as (INFRA section 2). */
 export const SERVICE = 'worker' as const;
 
@@ -535,6 +660,7 @@ export const SERVICE = 'worker' as const;
 export function main(): void {
   console.log(
     `merit ${SERVICE}: nightly batch built, provisioning saga built, expiry sweep built, ` +
-      'detector runner built, job interface built, no job store and no scheduler yet',
+      'detector runner built, seven identity and payment detectors built and every one of them ' +
+      'declining on an unseeded threshold, job interface built, no job store and no scheduler yet',
   );
 }
