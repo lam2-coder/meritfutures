@@ -30,7 +30,8 @@
 // a missing argument rather than as a thrown error.
 //
 // -----------------------------------------------------------------------------
-// WHAT THIS FILE CANNOT PROVE, STATED HERE BECAUSE IT IS WHY `0057` EXISTS
+// WHAT THIS FILE CANNOT PROVE, STATED HERE BECAUSE IT IS WHY `0057` AND `0059`
+// EXIST
 // -----------------------------------------------------------------------------
 // It can prove the reversal is exact, because the shape leaves no way to build
 // an inexact one. It CANNOT prove that a withdrawal which reached `failed` was
@@ -41,6 +42,24 @@
 // the second. ADR-189 section 4 is the argument that neither half is sufficient
 // alone, and this comment exists so that a later reader who deletes the
 // migration's trigger knows what it was carrying that this file is not.
+//
+// THE THIRD IS `LEDGER-C3` IN `0059`, AND IT IS THE ONE THIS FILE IS NOT MERELY
+// INSUFFICIENT FOR BUT INCAPABLE OF. `0009:103-104` says a reversal "may not
+// chain onto another reversal" and its row-local CHECK could only ever say
+// `reversal_of <> id`. `ReversalHeader.reversalOf` below is a string: whether it
+// names a row that is ITSELF a reversal is a fact about a row, this library
+// opens no database transaction and cannot, and a guard written here would
+// either refuse nothing or lie. ADR-193 rules that the trigger is the whole of
+// the control, and DELIBERATELY ADDS NOTHING HERE: `posting()` accepts
+// `reversalOf` on its header directly, so a rule enforced in `reversalPosting`
+// is bypassed by the public constructor one file over without a cast and
+// without a lint.
+//
+// WHAT `0059` DOES NOT REFUSE IS THE OPERATION. A reversal of a reversal is a
+// re-application, it is legitimate, and `0009:104` states its shape in the same
+// sentence as the prohibition: a new transaction with its own kind, its own
+// idempotency key and its own reason, and not this builder's output wearing
+// `reversal_of`.
 //
 // -----------------------------------------------------------------------------
 // WHY `LT-09` IS BUILT HERE AND NOT IN `packages/rail`
