@@ -120,6 +120,28 @@ function text(markup: string): string {
     .replaceAll('&amp;', '&');
 }
 
+/**
+ * `LiabilityResponse`'s top-level fields, parsed out of the console's own
+ * transcription.
+ *
+ * DERIVED AND NEVER TRANSCRIBED, because the claim it supports is that a
+ * blocker was retired on a fact rather than on a session's reading. It asserts
+ * its own non-vacuity first: a parser that stopped matching would make every
+ * field look absent, and a case built on the absence would then pass for the
+ * wrong reason.
+ */
+function liabilityResponseFields(): readonly string[] {
+  const source = readFileSync(join(import.meta.dirname, '..', 'src', 'api', 'types.ts'), 'utf8');
+  const start = source.indexOf('export type LiabilityResponse = {');
+  expect(start, 'LiabilityResponse is not declared where this parser looks').toBeGreaterThan(-1);
+  const body = source.slice(start, source.indexOf('\n};', start));
+  const fields = [...body.matchAll(/^ {2}readonly ([a-z_0-9]+)/gm)].map((match) => match[1] ?? '');
+  expect(fields.length, 'the field parser matched nothing, which cannot be right').toBeGreaterThan(
+    5,
+  );
+  return fields;
+}
+
 describe('M6-A-38: the document is the page VALUE, and P-M6-09 is above every number', () => {
   const page = buildLiabilityHome(INPUT);
   const markup = servedBytes(page);
@@ -505,10 +527,45 @@ describe('M6-A-61: the liability home serves the answers that were measured', ()
   });
 
   test('every blocker is served with its origin and what blocks it', () => {
+    // TWO WHERE THIS CASE PINNED THREE, AND THE THIRD IS NOT WEAKENED AWAY.
+    // It pinned `API_CONTRACT section 8`, whose entry read that four of the five
+    // figures `buildLiabilityHome` reads have no field on the response. ADR-188
+    // ruled them in and the wire carries them: `LiabilityResponse` in
+    // `src/api/types.ts` declares twelve top-level fields including all four,
+    // and `RI-18` binds all three declarations of that shape to one field set,
+    // so the count below is derived rather than transcribed.
     expect(markup).toContain('data-origin="ADR-171"');
     expect(markup).toContain('data-origin="P5-l"');
-    expect(markup).toContain('data-origin="API_CONTRACT section 8"');
-    expect(served.match(/NOT BUILT, blocked by/g)).toHaveLength(3);
+    expect(served.match(/NOT BUILT, blocked by/g)).toHaveLength(2);
+  });
+
+  test('the four fields that entry was about are on the wire, which is why it went', () => {
+    // THE MEASUREMENT THAT RETIRED A BLOCKER, ASSERTED RATHER THAN ASSUMED. A
+    // blocker removed on a session's reading is a blocker that comes back; this
+    // reads the transcription the console itself narrows to.
+    for (const field of [
+      'wallet_balances_cents',
+      'bounded_near_term_cents',
+      'remaining_ladder_exposure_cents',
+      'absorbed_corrections_cents',
+    ])
+      expect(liabilityResponseFields(), field).toContain(field);
+  });
+
+  test('what survived that entry is served as INCOMPLETE and never as a blocker', () => {
+    // ADR-195's third component of `P-M6-01`. It has no column and so no field,
+    // `../src/liability.ts` renders it absent with its reason and marks the
+    // total incomplete, and a term the page renders honestly is not a term the
+    // page is waiting for. The two sections are kept apart in the bytes so an
+    // operator can tell which is which.
+    expect(markup).toContain('data-testid="incomplete-once-read"');
+    expect(markup).toContain('data-origin="ADR-195"');
+    expect(served).toContain('RENDERED ABSENT, because');
+    expect(served.match(/RENDERED ABSENT, because/g)).toHaveLength(1);
+    // The ADR-195 entry is in the second section and not in the first.
+    const blocked = /<section data-testid="blocked-on">([\s\S]*?)<\/section>/.exec(markup);
+    expect(blocked).not.toBeNull();
+    expect(blocked?.[1] ?? '').not.toContain('ADR-195');
   });
 
   test('it invents no number while a supplier is missing', () => {

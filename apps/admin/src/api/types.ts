@@ -46,9 +46,12 @@
 //
 // `AdminAccountSearchItem` WAS THE FIRST ROW OF THAT TABLE AND IS NOT ANY MORE:
 // `W6-j` landed it at the foot of this file, beside the drill-down's roster.
-// **IT IS THE ONE SHAPE HERE WITH NO CONSUMER IN THIS PACKAGE**, and that is
-// stated at its declaration: the search screen is not built and
-// `AdminReadSource.searchAccounts` is owned by no plan at all.
+// **IT WAS ALSO THE ONE SHAPE HERE WITH NO CONSUMER IN THIS PACKAGE, AND IT HAS
+// ONE NOW.** `src/app/search/account-search.tsx` renders it, and the two
+// reasons that sentence gave have both expired: the search screen is built, at
+// `/search`, and `AdminReadSource.searchAccounts` is
+// `apps/api/src/admin-source/search.ts`, which session 371 wrote. So every
+// shape in this file is read by a screen in this package.
 //
 // A slice that adds one of these adds it here beside its screen, which is the
 // same division WAVE-06 section 9 draws and the reason four slices can share
@@ -534,23 +537,29 @@ export type EventFeedResponse = {
  * `GET /admin/accounts?query=`. API_CONTRACT section 8, transcribed field for
  * field.
  *
- * IT HAS NO CONSUMER IN THIS PACKAGE AND IT IS STILL TRANSCRIBED HERE, which is
- * this file's own partition rather than an oversight: the header names `W6-j` as
- * this shape's owner and `W6-j` is the drill-down. The screen behind it is NOT
- * built, and the reason is one this file may state and may not fix: no slice in
- * `P5`, `P6`, `P7` or `WAVE-06` writes `AdminReadSource.searchAccounts`
- * (WAVE-06 section 10 item 3), so the route is registered against a method
- * nothing supplies.
+ * **IT WAS TRANSCRIBED HERE WITH NO CONSUMER IN THIS PACKAGE AND IT HAS TWO
+ * NOW, ON BOTH SIDES OF THE WIRE.** That paragraph read that the screen behind
+ * it is NOT built and that "no slice in `P5`, `P6`, `P7` or `WAVE-06` writes
+ * `AdminReadSource.searchAccounts` (WAVE-06 section 10 item 3), so the route is
+ * registered against a method nothing supplies". Session 371 wrote
+ * `apps/api/src/admin-source/search.ts` and the screen is
+ * `src/app/search/account-search.tsx`. The route is registered against a method
+ * that is supplied, and the read is blocked on `ADR-171`'s principal like every
+ * other read in this console.
  *
- * AND ITS SEARCH TERM IS WIDER THAN THE KEYED ACCESSOR CAN EXPRESS, which is
- * why the missing adapter is a finding and not merely an unwritten file. The
- * contract's own list is "account id, platform ref, email, identity id, name
- * fragment, coupon, or payout id". A FRAGMENT is a substring predicate;
- * `ADR-112`'s vocabulary is a typed equality over declared columns, `ADR-157`
- * adds a RANGE term and an `IS NULL` on the read path and refuses the rest. So
- * six of those seven terms are keyed reads and the seventh is not, and an
- * adapter that quietly served the six would narrow a contract behaviour where a
- * reader would see a green suite.
+ * ITS SEARCH TERM WAS WIDER THAN THE KEYED ACCESSOR CAN EXPRESS, AND THE
+ * CONTRACT MOVED RATHER THAN THE ACCESSOR. That paragraph read the contract's
+ * list as "account id, platform ref, email, identity id, name fragment, coupon,
+ * or payout id", called the fragment a substring predicate `ADR-112`'s
+ * vocabulary cannot express, and warned that an adapter quietly serving six of
+ * the seven would narrow a contract behaviour behind a green suite. **`ADR-194`
+ * REMOVED THE SEVENTH FORM FROM THE CONTRACT RATHER THAN LEAVING IT
+ * UNIMPLEMENTED**, on three grounds it states in section 8: the estate holds no
+ * legal name at all, `identities.display_name` is a leaderboard handle
+ * `INV-M11-10` says is expressly not one, and a fragment cannot satisfy
+ * `INV-M6-10` because two people whose handles share letters share no subject.
+ * The contract's list here is SIX and `ADR-157`'s refusals are untouched, so
+ * the finding that paragraph recorded is closed rather than outstanding.
  *
  * THE MONEY FIELDS ON THIS ROW HAVE NO `as_of` AND NO SOURCE, exactly as
  * `IdentityGraph`'s three do. `INV-M6-04` makes such a number unrenderable by
