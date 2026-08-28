@@ -22,6 +22,23 @@
 // This file never composes that row and the database refuses it if it ever does.
 //
 // -----------------------------------------------------------------------------
+// THE REDACTION PROFILE IS A CLOSED VOCABULARY OF TWO (`ADR-179`)
+// -----------------------------------------------------------------------------
+// `full-detail` and `trader-facts-only`, declared as a union rather than derived
+// from the audience map, because a derived vocabulary CANNOT REFUSE A MEMBER: it
+// is whatever its map says. `EvidenceRedactionProfile` carries what each member
+// promises, per member, and the suite reads this file for the member list the
+// way `packages/db/test/scoped-db.test.ts` reads `SystemReason`.
+//
+// THE CLOSURE HOLDS AT THE LAYER THAT COMPOSES THE VALUE AND NOT AT THE LAYER
+// THAT STORES IT, which `ADR-179` clause 5 states rather than leaves to be found.
+// `0008_risk.sql` puts NO `CHECK` on `redaction_profile` and `schema.ts` types it
+// as `text`, so a writer that does not come through this file can still store a
+// name nothing in the tree performs. The entry carries the DDL for the migration
+// that closes it and takes no migration number: `packages/db/migrations` is
+// another session's this wave and a merged migration is never edited.
+//
+// -----------------------------------------------------------------------------
 // THE STRIP LIST IS A QUERY OVER `detector_definitions` AND NEVER A LIST HERE
 // -----------------------------------------------------------------------------
 // `INV-M7-10`, whose own source column reads "using SD-M7-03's registry as the
@@ -123,41 +140,116 @@ export class EvidenceRedactionError extends Error {
 }
 
 // -----------------------------------------------------------------------------
-// The profile vocabulary, and the one thing in this file that is CHOSEN
+// The profile vocabulary. `ADR-179`: A CLOSED SET OF TWO, AND WHAT EACH PROMISES
 // -----------------------------------------------------------------------------
+
+/**
+ * `evidence_packs.redaction_profile`. TWO MEMBERS, AND JOINING THEM IS A DIFF ON
+ * THIS LINE WITH AN ARGUMENT ATTACHED.
+ *
+ * `ADR-179` clause 1. `SystemReason` and `SqlExecutorReason` are the precedent
+ * and the shape is theirs: a union declared in one place, a source-reading case
+ * in the suite that says how many members it has, and a widening that is
+ * therefore an edit to a test that says why the set is closed.
+ *
+ * DECLARED RATHER THAN DERIVED, WHICH IS THE WHOLE OF CLAUSE 2. This type used to
+ * read `(typeof EVIDENCE_REDACTION_PROFILES)[keyof typeof EVIDENCE_REDACTION_PROFILES]`,
+ * so the vocabulary was a SHADOW OF THE MAP: whatever the map said, the type
+ * became, and NOTHING IN THE TREE DECLARED THAT TWO WAS THE NUMBER. That is open
+ * at exactly one line rather than at a call site, and the line it is open at is
+ * the line a vocabulary change is made on. `OQ-F4-03` is the live candidate to
+ * make it: a later ruling that gives `regulator` its own profile is a MAPPING
+ * change, and under a derived type it grew the VOCABULARY as a side effect
+ * nobody argued for.
+ *
+ * ------------------------------------------------------------------------
+ * `trader-facts-only`
+ * ------------------------------------------------------------------------
+ * IT CARRIES the account's own facts whole: the `accounts` and `identities`
+ * rows, every fill, every mark, every rule state (`engine_gates` and
+ * `context_gates` are what a "gate result" IS after `SD-06` split it), the
+ * pinned plan version and its `rule_text`, and per flag the FACT that it exists
+ * -- `flag_id`, `flag_type`, `status`, `first_detected_on`, `tos_clause` -- and
+ * nothing else about the flag.
+ *
+ * IT STRIPS FOUR THINGS BY FOUR DIFFERENT MECHANISMS, which is why the promise
+ * is written per member rather than as one word:
+ *   1. every TOP-LEVEL parameter name of every `is_sensitive` registry row,
+ *      swept recursively, computed and never listed (`INV-M7-10`);
+ *   2. the flag's `evidence` bag, `severity`, `detector` and `detector_version`,
+ *      by the allowlist, which names what crosses rather than what does not;
+ *   3. the `detectors` section, which is ABSENT rather than empty;
+ *   4. any identifier belonging to another subject, anywhere inside any value,
+ *      INCLUDING inside free text.
+ *
+ * AND THE CORPUS STATES FOUR NEGATIVES WHILE `GS-112`'s OWN LINE STATES THREE.
+ * `M06` section 4, `EC-071` and the wave 3 batch 1 gate closure all add "no
+ * comparison against a population"; `GS-112` does not. The promise is the UNION
+ * of the three statements, so: no detector parameter is mechanism 1 and 3, no
+ * threshold is mechanism 1 (a threshold is named rather than valued), no other
+ * identity is mechanism 4, and no population comparison is mechanism 2, because
+ * a population comparison can only reach a pack through the `evidence` bag or a
+ * `detectors` section and the allowlist admits neither.
+ *
+ * ITS ONE UNCLOSED CHANNEL IS FREE TEXT AND IT IS NAMED RATHER THAN CLAIMED.
+ * `tos_clause` is prose an operator writes, `GS-112` REQUIRES the pack to carry
+ * it, and mechanism 4 reaches it because a uuid has a shape a runner can match.
+ * A population comparison in prose has NO such shape. `ADR-179` clause 7 reports
+ * that rather than pretending the sweep covers it.
+ *
+ * `includes_detector_detail` is `false` under this profile, always.
+ *
+ * ------------------------------------------------------------------------
+ * `full-detail`
+ * ------------------------------------------------------------------------
+ * IT CARRIES everything `trader-facts-only` carries, plus the whole flag record
+ * (`identity_id`, `account_id`, `severity`, `detector`, `detector_version`,
+ * `evidence`) and a `detectors` section holding every registry row with its
+ * parameters and its `is_sensitive`.
+ *
+ * IT STRIPS NOTHING, and the name is `M06` section 4's own phrase for that.
+ *
+ * IT DOES NOT PROMISE EVERYTHING THE FIRM HOLDS, and the distinction is the one
+ * a reader of the name is most likely to get wrong. The subject is ONE ACCOUNT:
+ * `readSubject` takes an account id and `exportEvidence` refuses a subject whose
+ * `account_id` is not the one requested. `full-detail` bounds the DETAIL and
+ * never the SCOPE.
+ *
+ * `includes_detector_detail` is `true` under this profile, always.
+ */
+export type EvidenceRedactionProfile = 'full-detail' | 'trader-facts-only';
 
 /**
  * `evidence_packs.redaction_profile`, per audience.
  *
- * TWO PROFILES OVER FOUR AUDIENCES, AND THE STRUCTURE IS RULED WHILE THE NAMES
- * ARE NOT. `M06` section 4 gives the split in its own words: the `trader`
+ * THE MAPPING IS A TRANSCRIPTION AND THE VOCABULARY IS A RULING, and `ADR-179`
+ * clause 2 keeps them separate so that changing one cannot change the other by
+ * accident. `M06` section 4 gives the split in its own words: the `trader`
  * audience gets "the account's own facts in full ... no detector parameters, no
  * thresholds, no other identity, and no comparison against a population", and
  * "`internal`, `counsel`, and `regulator`: full detail including detector
- * internals". `EC-071` says the same thing and the batch 1 gate closed it. So
- * three of the four collapsing into one profile is a TRANSCRIPTION.
+ * internals". `EC-071` says it a second time and the wave 3 batch 1 gate closure
+ * a third, in the words "The `regulator` audience follows the internal profile".
+ * So three of the four collapsing into one profile is a TRANSCRIPTION.
  *
- * THE TWO STRINGS ARE A NAMING CHOICE AND THEY ARE LABELLED AS ONE, on `P7-d`'s
- * precedent with `version: 'v1'`. `0008_risk.sql` puts no `CHECK` on this column
- * and no approved document spells a profile name, so these are the first two
- * values the column will ever hold and nothing cites them. That is reported as
- * needing a ruling rather than ruled here: this session took no ADR number.
+ * THE ANNOTATION IS THE VOCABULARY AND NOT `string`, AND THAT IS THE LINE THAT
+ * REFUSES A THIRD NAME. It read `Readonly<Record<EvidencePackAudience, string>>`,
+ * which accepted any string a session cared to write in this object.
  *
- * WHAT A RULING WOULD FIX is the strings and their `CHECK`, not the mapping.
- * A later entry that renames them supersedes rows by writing the new name, the
- * same way `SD-M7-03` supersedes a threshold, because the profile is recorded ON
- * the pack and a pack is never rewritten.
+ * NO PARALLEL ARRAY OF THE NAMES IS DECLARED, and that is `ADR-092`'s landmine
+ * avoided rather than repeated. A `readonly EvidenceRedactionProfile[]` beside
+ * the union catches a member the union does not have and NEVER a union member
+ * the array is missing, which is exactly how `DDL_NAMES` went one short of
+ * `SQL_NAME` with the suite green. The suite enumerates the union by reading
+ * this file, the way `packages/db/test/scoped-db.test.ts` reads `SystemReason`,
+ * and asserts the values here are exactly it.
  */
 export const EVIDENCE_REDACTION_PROFILES = {
   internal: 'full-detail',
   trader: 'trader-facts-only',
   counsel: 'full-detail',
   regulator: 'full-detail',
-} as const satisfies Readonly<Record<EvidencePackAudience, string>>;
-
-/** One member of {@link EVIDENCE_REDACTION_PROFILES}. */
-export type EvidenceRedactionProfile =
-  (typeof EVIDENCE_REDACTION_PROFILES)[keyof typeof EVIDENCE_REDACTION_PROFILES];
+} as const satisfies Readonly<Record<EvidencePackAudience, EvidenceRedactionProfile>>;
 
 /** The profile that FOLLOWS FROM the audience. `M06` section 4: never per export. */
 export function redactionProfileFor(audience: EvidencePackAudience): EvidenceRedactionProfile {
@@ -167,10 +259,13 @@ export function redactionProfileFor(audience: EvidencePackAudience): EvidenceRed
 /**
  * `evidence_packs.includes_detector_detail`, DERIVED from the profile.
  *
- * NOT A THIRD INDEPENDENT PARAMETER. It is `false` exactly when the profile is
- * the trader's, so the combination the merged CHECK calls "the one combination
- * that must be unrepresentable" has no expression here at all: there is no
- * argument a caller could pass to produce it.
+ * NOT A THIRD INDEPENDENT PARAMETER, and `ADR-179` clause 4 pins that. It is
+ * `false` exactly when the profile is the trader's, so the combination the
+ * merged CHECK calls "the one combination that must be unrepresentable" has no
+ * expression here at all: there is no argument a caller could pass to produce
+ * it. A boolean chosen beside the profile rather than from it would also make
+ * the OTHER lie available -- a `full-detail` pack recorded with detail off,
+ * which the DDL permits and which is a row that misdescribes its own bytes.
  */
 export function includesDetectorDetail(audience: EvidencePackAudience): boolean {
   return redactionProfileFor(audience) !== 'trader-facts-only';
