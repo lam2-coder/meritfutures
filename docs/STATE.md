@@ -6516,7 +6516,7 @@ headings and 64 endpoints from them; 2 endpoint tables and 8 rows; 22 headings s
 numbers**; **0 anomalies and 0 duplicate declarations**. A position inside a structure it claims to
 read, from which it derived no endpoint, is reported rather than dropped, because a parser that
 silently drops rows produces a coverage report that looks like success. **It reads the live document
-in 0.44 seconds' thousandth part**, 0.44 ms minimum over ten reads and 0.67 ms maximum;
+in 0.44 ms**, that being the minimum over ten reads, with 0.67 ms the maximum;
 `RI-16`'s reader took over five minutes on one document before three defects in it were found, and
 the shapes that made it slow are the shapes this one avoids on purpose.
 
