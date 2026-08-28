@@ -197,6 +197,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-176](ADR-176.md) | the request path records the approval and does not post it, and the key it must store to make that safe (2026-08-28, status: proposed) |
 | [ADR-177](ADR-177.md) | the chart of accounts is seeded and four of its seven kinds are ruled, and `firm_treasury` is refused because the corpus contradicts itself about it rather than because it is silent  (2026-08-28, status: proposed) |
 | [ADR-178](ADR-178.md) | the flag queue sorts by corroboration first, the contract's severity-then-age is kept as the order within a band, and the depth goes on the wire because the assertion cannot check a key it cannot see (2026-08-28, status: proposed) |
+| [ADR-179](ADR-179.md) | the redaction vocabulary is closed at two members, it was open at exactly one line rather than at a call site, and each member's promise is written per member because the corpus states it three times in three different lengths (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

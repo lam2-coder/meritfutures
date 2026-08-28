@@ -240,7 +240,8 @@ export type EvidenceRedactionProfile = 'full-detail' | 'trader-facts-only';
  * avoided rather than repeated. A `readonly EvidenceRedactionProfile[]` beside
  * the union catches a member the union does not have and NEVER a union member
  * the array is missing, which is exactly how `DDL_NAMES` went one short of
- * `SQL_NAME` with the suite green. The suite enumerates the union by reading
+ * `SQL_NAME` with the suite green (`ADR-092` executed that, and `DDL_NAMES` is
+ * derived from `SQL_NAME` now). The suite enumerates the union by reading
  * this file, the way `packages/db/test/scoped-db.test.ts` reads `SystemReason`,
  * and asserts the values here are exactly it.
  */
