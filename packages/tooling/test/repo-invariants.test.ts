@@ -82,6 +82,18 @@ function cleanTree(): string {
   );
   write(root, 'apps/api/src/idempotency.ts', '// The protocol over the store port.\n');
   write(root, 'apps/api/src/routes/wallet-withdrawals.ts', '// The external leg.\n');
+  // RI-15 NAMES THREE MORE FILES BY NAME AND THE FIXTURE CARRIES ALL OF THEM,
+  // for the reason stated above RI-14's three: a fixture missing one makes the
+  // rename guard fire on every case, which is the guard working and the fixture
+  // wrong. Each one carries a citation that is TRUE against this fixture, so the
+  // clean direction is a real pass rather than an empty one.
+  write(root, 'apps/api/src/idempotency-store.ts', 'export const databaseIdempotencyStore = 1;\n');
+  write(
+    root,
+    'apps/api/src/routes/payouts.ts',
+    '// The store is `databaseIdempotencyStore` (`src/idempotency-store.ts:1`).\n',
+  );
+  write(root, 'apps/worker/src/detectors/fills.ts', '// No citation here, and that is allowed.\n');
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(
     root,
@@ -835,6 +847,272 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     rmSync(join(root, 'apps/api/test/wiring.test.ts'));
     expect(findings('RI-14', root).join('\n')).toContain(
       'apps/api/test/wiring.test.ts does not exist',
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // RI-15, seeded with THE ACTUAL POINTERS, in both directions
+  // ---------------------------------------------------------------------------
+  // The seeds are not invented. They are the four line citations
+  // `apps/api/test/wiring.test.ts` carried on 2026-08-28, checked one by one
+  // against the files they name and found to point at the wrong line. THE CLAIMS
+  // HELD AT THEIR REAL LINES AND THE POINTERS DID NOT, which is why nothing
+  // failed and why a reader who followed one concluded the reason was invented.
+  //
+  // All four were also restored into the REAL FILE on the real tree while this
+  // check was written: three fire, at four sites, and the tree was restored byte
+  // for byte after. The cases below are the same seeds against the synthetic
+  // fixture, which is what makes them fast and their targets legible.
+
+  /** A file of `n` lines carrying `name` on line `at`, one-based. */
+  const fileWithNameAt = (n: number, at: number, name: string): string =>
+    Array.from({ length: n }, (_, i) =>
+      i + 1 === at ? `export function ${name}(): void {}` : '//',
+    )
+      .join('\n')
+      .concat('\n');
+
+  test('RI-15 catches the pointer that was eighteen lines off, in the reason that replaced a false one', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/routes/wallet-withdrawals.ts',
+      fileWithNameAt(1400, 1254, 'gateNoInFlight'),
+    );
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        '  useWithdrawalBackend:\n' +
+        "    'both statuses are in `OPEN_WITHDRAWAL_STATUSES`, so `gateNoInFlight` ' +\n" +
+        "    '(`routes/wallet-withdrawals.ts:1233`) would refuse that identity every later withdrawal.',\n" +
+        '};\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `routes/wallet-withdrawals.ts:1233` for `gateNoInFlight` and `gateNoInFlight` is at ' +
+        'apps/api/src/routes/wallet-withdrawals.ts:1254, 21 lines away',
+    );
+  });
+
+  test('RI-15 goes quiet on the SAME entry once the pointer is corrected', () => {
+    // THE DIRECTION THAT MATTERS AS MUCH AS THE OTHER. A case that only ever
+    // plants a violation cannot tell a check that resolves a pointer from one
+    // that fails every pointer it sees, and this check reads 57 citations in
+    // `wiring.test.ts` alone.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/routes/wallet-withdrawals.ts',
+      fileWithNameAt(1400, 1254, 'gateNoInFlight'),
+    );
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        '  useWithdrawalBackend:\n' +
+        "    'both statuses are in `OPEN_WITHDRAWAL_STATUSES`, so `gateNoInFlight` ' +\n" +
+        "    '(`routes/wallet-withdrawals.ts:1254`) would refuse that identity every later withdrawal.',\n" +
+        '};\n',
+    );
+    expect(findings('RI-15', root)).toEqual([]);
+  });
+
+  test('RI-15 reads a bare `:12` against the path cited above it', () => {
+    // The corrected file writes the path once and continues with bare pointers,
+    // and the defect this check exists for was written in that shape. A check
+    // that skipped them would pass the thing it was written for.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/routes/wallet-withdrawals.ts',
+      fileWithNameAt(1400, 1254, 'gateNoInFlight'),
+    );
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        '  useWithdrawalBackend:\n' +
+        "    'NOTHING drives `requested --> approved` (`routes/wallet-withdrawals.ts:57-60`), ' +\n" +
+        "    'and so `gateNoInFlight` ' +\n" +
+        "    '(`:1233`) would refuse that identity.',\n" +
+        '};\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `routes/wallet-withdrawals.ts:1233`',
+    );
+  });
+
+  test('RI-15 stays armed after a backtick used as an APOSTROPHE, which its first draft did not', () => {
+    // THE BUG THAT WAS REAL, AND IT WAS SILENT. The first version paired
+    // backticks from the start of the file. `wiring.test.ts:215` writes "the
+    // engine`s own `RuleState`", using a backtick as an apostrophe, and ONE
+    // stray backtick inverts every pairing after it: the check found no name
+    // beside any of the three seeded pointers below it and reported PASS. A
+    // check that cannot fail, hiding inside a check that can.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/routes/wallet-withdrawals.ts',
+      fileWithNameAt(1400, 1254, 'gateNoInFlight'),
+    );
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        '  usePayoutBackend:\n' +
+        "    'whose `state` is the engine`s own `RuleState`.',\n" +
+        '  useWithdrawalBackend:\n' +
+        "    'so `gateNoInFlight` (`routes/wallet-withdrawals.ts:1233`) would refuse.',\n" +
+        '};\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('for `gateNoInFlight`');
+  });
+
+  test('RI-15 reads a SHOUTED name, for the reason RI-14 reads a shouted claim', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/routes/wallet-withdrawals.ts',
+      fileWithNameAt(1400, 1254, 'gateNoInFlight'),
+    );
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        "  useWithdrawalBackend: 'AND `GATENOINFLIGHT` (`routes/wallet-withdrawals.ts:1233`) REFUSES.',\n" +
+        '};\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('for `GATENOINFLIGHT`');
+  });
+
+  test('RI-15 catches a path no file in this tree has', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      "const BLOCKED = { useRailBackend: 'the adapter (`routes/rail-vendor.ts:12`) is not shipped.' };\n",
+    );
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `routes/rail-vendor.ts:12` and NO FILE IN THIS TREE has that path',
+    );
+  });
+
+  test('RI-15 catches a pointer past the end of the file it names', () => {
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      "const BLOCKED = { useStore: 'the store (`src/idempotency-store.ts:900`) exists.' };\n",
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('has 2 lines');
+  });
+
+  test('RI-15 does not fire on a NEGATED claim, whose cited line must NOT hold the name', () => {
+    // "`fills` HAS NO `identity_id` (`schema.ts:3005`)" cites the line the table
+    // is DECLARED on, and the name must be absent from it. Asserting the inverse
+    // is a second check and the existence half of it is RI-14's. This is the
+    // shape that put three false findings on `detectors/fills.ts` before the
+    // rule was written, and it is one of the two that keep this check quiet.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    write(
+      root,
+      'apps/worker/src/detectors/fills.ts',
+      '// The identity edge is on the `accounts` row below, because `fills` HAS NO\n' +
+        '// `identity_id` (`packages/db/src/schema.ts:20`), and a canary carrying a\n' +
+        '// column the table does not have is one a detector could find.\n',
+    );
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // AND THE SAME SENTENCE WITHOUT THE NEGATION FIRES, which is what keeps this
+    // case from passing for some other reason. A quiet rule asserted only in the
+    // quiet direction is indistinguishable from a binding that never happened.
+    write(
+      root,
+      'apps/worker/src/detectors/fills.ts',
+      '// The identity edge is on the `accounts` row below, because `fills` carries\n' +
+        '// `identity_id` (`packages/db/src/schema.ts:20`), and a canary carrying a\n' +
+        '// column the table does not have is one a detector could find.\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('for `identity_id`');
+  });
+
+  test('RI-15 does not fire on a POSSESSIVE, which names a thing the pointer is not about', () => {
+    // "`realized_pnl_cents` is `daily_marks`' (`schema.ts:652`)" cites the COLUMN
+    // and names the TABLE. An apostrophe is not glue, so the binding is dropped
+    // rather than guessed, and the citation is checked for resolution and range.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'realizedPnlCents'));
+    write(
+      root,
+      'apps/worker/src/detectors/fills.ts',
+      "// `realized_pnl_cents` is `daily_marks`' (`packages/db/src/schema.ts:20`).\n",
+    );
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // AND THE SAME SENTENCE WITHOUT THE APOSTROPHE FIRES, for the reason above.
+    write(
+      root,
+      'apps/worker/src/detectors/fills.ts',
+      '// `realized_pnl_cents` is on `daily_marks` (`packages/db/src/schema.ts:20`).\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('for `daily_marks`');
+  });
+
+  test('RI-15 says nothing about a citation with NO name beside it, which is its stated miss', () => {
+    // THE HOLE, ASSERTED RATHER THAN LEFT TO BE DISCOVERED. This is the fourth
+    // of the four false citations of 2026-08-28: `:1506` was a `.send({` and the
+    // identity arm was at `:1527`, and the sentence carrying it says "the
+    // identity arm this route presents", which names nothing a runner can look
+    // up. The check is silent here and its `covers` says so.
+    const root = cleanTree();
+    write(
+      root,
+      'apps/api/src/routes/wallet-withdrawals.ts',
+      fileWithNameAt(1600, 1527, 'identityScope'),
+    );
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        "  useWithdrawalBackend: 'it serves the identity arm this route presents " +
+        "(`routes/wallet-withdrawals.ts:1506`).',\n" +
+        '};\n',
+    );
+    expect(findings('RI-15', root)).toEqual([]);
+  });
+
+  test('RI-15 admits a pointer one line off and catches one three lines off', () => {
+    // THE WINDOW, IN BOTH DIRECTIONS, AT ITS TWO BOUNDARIES. The widest TRUE
+    // citation measured in this corpus is one line off, and the narrowest FALSE
+    // one on record is three: `admin-writes.ts:266` for a declaration at `:269`.
+    // A case that only asserted the catch could not tell this window from one of
+    // zero, and a window of zero is a check nobody could keep green.
+    const root = cleanTree();
+    write(root, 'apps/api/src/routes/admin-writes.ts', fileWithNameAt(300, 269, 'principal'));
+    const reason = (line: number): string =>
+      'const BLOCKED = {\n' +
+      `  useAdminWriteBackend: '\`principal(request)\` (\`routes/admin-writes.ts:${line}\`).',\n` +
+      '};\n';
+
+    write(root, 'apps/api/test/wiring.test.ts', reason(267));
+    expect(findings('RI-15', root)).toEqual([]);
+
+    write(root, 'apps/api/test/wiring.test.ts', reason(266));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'cites `routes/admin-writes.ts:266` for `principal` and `principal` is at ' +
+        'apps/api/src/routes/admin-writes.ts:269, 3 lines away',
+    );
+  });
+
+  test('RI-15 fails loudly when a file it reads is renamed away', () => {
+    // The same failure RI-14 makes loud, for the same reason: a check that names
+    // the files it reads is emptied by a rename, silently, and then reports PASS
+    // forever.
+    const root = cleanTree();
+    rmSync(join(root, 'apps/worker/src/detectors/fills.ts'));
+    expect(findings('RI-15', root).join('\n')).toContain(
+      'apps/worker/src/detectors/fills.ts does not exist',
     );
   });
 
