@@ -386,7 +386,8 @@ function digestRun(run) {
     }
   }
   const counts = run.aggregate.counts;
-  for (const key of Object.keys(counts).sort()) hash.update(`count.${key}=${String(counts[key])}\n`);
+  for (const key of Object.keys(counts).sort())
+    hash.update(`count.${key}=${String(counts[key])}\n`);
   for (const output of run.aggregate.outputs) {
     hash.update(
       [
@@ -409,7 +410,9 @@ function digestRun(run) {
     ].join('|') + '\n',
   );
   for (const band of run.bands) {
-    hash.update(`band=${band.bandId}|verdict=${band.verdict}|sampleSize=${String(band.sampleSize)}\n`);
+    hash.update(
+      `band=${band.bandId}|verdict=${band.verdict}|sampleSize=${String(band.sampleSize)}\n`,
+    );
   }
   return hash.digest('hex');
 }
@@ -483,7 +486,9 @@ function checkRefusalKinds(run) {
   }
   const unexpected = [...byKind].filter(([kind]) => kind !== 'calendar_coverage_miss');
   const misses = byKind.get('calendar_coverage_miss') ?? 0;
-  const example = run.trials.find((t) => t.refusal !== null && t.refusal.kind !== 'calendar_coverage_miss');
+  const example = run.trials.find(
+    (t) => t.refusal !== null && t.refusal.kind !== 'calendar_coverage_miss',
+  );
   return {
     name: 'No refusal other than a calendar coverage miss',
     cites: 'FM-05, ADR-049, and INV-18 to INV-20',
@@ -520,7 +525,8 @@ function checkProvenance(run) {
     if (p.calibrationId !== run.provenance.calibrationId || p.calibrationDigest !== digest) {
       findings.push(`${output.key}: provenance names a different calibration`);
     }
-    if (p.seed !== run.provenance.seed) findings.push(`${output.key}: provenance names a different seed`);
+    if (p.seed !== run.provenance.seed)
+      findings.push(`${output.key}: provenance names a different seed`);
     if (p.harnessVersion !== HARNESS_VERSION) findings.push(`${output.key}: harness version drift`);
     if ((output.value === null) !== (output.sampleSize === 0)) {
       findings.push(
@@ -640,7 +646,7 @@ function renderReport(options, run, digest, checks, elapsedMs) {
   lines.push('');
   lines.push(
     '**A value is absent and never zero when its sample is empty** (`HO-07` generalised), and ' +
-      'the sample beside each value is that output\'s own denominator and not the run\'s trial ' +
+      "the sample beside each value is that output's own denominator and not the run's trial " +
       'count (`AS-M21-02`).',
   );
   lines.push('');
@@ -700,7 +706,7 @@ function renderReport(options, run, digest, checks, elapsedMs) {
       'repository (P2 section 6).',
   );
   lines.push(
-    '- **Three of `CI-09`\'s four legs are not here.** [ADR-073](../docs/decisions/ADR-073.md) ' +
+    "- **Three of `CI-09`'s four legs are not here.** [ADR-073](../docs/decisions/ADR-073.md) " +
       'section 5 gives each a dated activation condition: the replay self-audit waits on a ' +
       'demo-world seed script, Stryker on the `VG-12` admission, and the detector canary on ' +
       "M07's detector code.",
@@ -807,7 +813,9 @@ function main(argv) {
 
   const failed = checks.filter((check) => !check.passed);
   if (failed.length > 0) {
-    console.log(`\n${String(failed.length)} check(s) FAILED: ${failed.map((f) => f.name).join('; ')}`);
+    console.log(
+      `\n${String(failed.length)} check(s) FAILED: ${failed.map((f) => f.name).join('; ')}`,
+    );
     return 1;
   }
   console.log(`\n${String(checks.length)} of ${String(checks.length)} checks passed.`);

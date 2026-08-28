@@ -191,7 +191,9 @@ function split() {
   console.log(
     `${blockCount} entry files + 1 battery file (${batteries[0].ids.length} identifiers), README.md`,
   );
-  console.log(`map: ${Object.keys(map.anchors).length} anchors, ${Object.keys(map.ids).length} ids`);
+  console.log(
+    `map: ${Object.keys(map.anchors).length} anchors, ${Object.keys(map.ids).length} ids`,
+  );
   return 0;
 }
 

@@ -1290,7 +1290,7 @@ const SEEDS = {
     real:
       'PR #299 (2026-08-26). Inserting the session 227 reservation row landed PAST the ' +
       "table's terminating blank line, and the prettier run that followed absorbed the " +
-      'paragraph below into the table: the blank line and the paragraph\'s first sentence ' +
+      "paragraph below into the table: the blank line and the paragraph's first sentence " +
       'vanished and NINE PROSE LINES BECAME TABLE ROWS, with first cells like "lands, its ' +
       'entry joins the list below". The paragraph it ate was the one explaining the ' +
       'strikethrough rule. ALL 30 GATES STAYED GREEN: CI-06u looks for duplicate first ' +
@@ -1410,7 +1410,7 @@ const SEEDS = {
     what: 'a fixture on disk whose registry row does not say "written"',
     real:
       'GS-080 (W2, session 109), GS-059 and GS-049 (W4, session 117) all landed on disk while ' +
-      "their rows went on reading writable or blocked. CI-03 has reported this direction as " +
+      'their rows went on reading writable or blocked. CI-03 has reported this direction as ' +
       "CI-06's and not switched on, on every run, since it was written",
     expect: (d) => `${seededFixtureId(d)} has a fixture on disk`,
     seed: (d) => {
@@ -1497,7 +1497,7 @@ const SEEDS = {
   // gate makes that automatic: it fails on any condition whose artifact is
   // neither probed nor registered, so the next one cannot land unnoticed.
   'CI-06/gate-inventory': {
-    what: 'a stage row losing its disposition, which is ADR-073 section 2\'s headline case',
+    what: "a stage row losing its disposition, which is ADR-073 section 2's headline case",
     real:
       'ADR-073 section 2 rules a row closed when it is implemented, when it carries a ' +
       'dated activation condition naming one artifact, or when a register outside Actions ' +
@@ -1837,7 +1837,10 @@ const fixtureRows = (d) =>
     .map((line, i) => ({ line, n: i }))
     .filter(({ line }) => /^\|\s*GS-\d{3}\s*\|/.test(line))
     .map(({ line, n }) => {
-      const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+      const cells = line
+        .split('|')
+        .slice(1, -1)
+        .map((c) => c.trim());
       return {
         n,
         line,
@@ -2133,7 +2136,9 @@ const withheldMember = (d) => {
     if (!register || register.includes('##') || !register.endsWith('.md')) continue;
     return { id, series, register };
   }
-  throw new Error('seed anchor not found: no withheld member whose series has a whole-file register');
+  throw new Error(
+    'seed anchor not found: no withheld member whose series has a whole-file register',
+  );
 };
 
 // The withheld identifier read back out of the row the seed wrote, which is the
@@ -2268,7 +2273,8 @@ const bothLegsRow = (d) => {
   const row = pipelineRowsIn(d).find(
     (r) => r.closure.includes('**Implemented') && /\bwaiting,\s*\d{4}-\d{2}-\d{2}/i.test(r.closure),
   );
-  if (!row) throw new Error('seed anchor not found: no row carrying an implementation AND a condition');
+  if (!row)
+    throw new Error('seed anchor not found: no row carrying an implementation AND a condition');
   return row;
 };
 
@@ -2300,7 +2306,10 @@ const vgRowsIn = (d) => {
   const rows = [];
   for (const line of (end === -1 ? after : after.slice(0, end)).split('\n')) {
     if (!line.startsWith('|')) continue;
-    const cells = line.trim().replace(/^\||\|$/g, '').split('|');
+    const cells = line
+      .trim()
+      .replace(/^\||\|$/g, '')
+      .split('|');
     const m = /^\s*\*{0,2}`?(VG-\d{1,2})\b/.exec(cells[0] ?? '');
     if (!m) continue;
     rows.push({ id: m[1], closure: (cells[cells.length - 1] ?? '').trim() });
@@ -2329,7 +2338,9 @@ const wiredVgRow = (d) => {
   // The forms are the table's own: `steps \`a\` and \`b\``, `step \`a\``. Read off
   // the rows rather than assumed; a first version matched `**\`x\`**` and matched
   // nothing, which made the gate's step assertion vacuous.
-  const row = vgRowsIn(d).find((r) => /\*\*Wired\b/.test(r.closure) && /\bsteps?\s+`/.test(r.closure));
+  const row = vgRowsIn(d).find(
+    (r) => /\*\*Wired\b/.test(r.closure) && /\bsteps?\s+`/.test(r.closure),
+  );
   if (!row) throw new Error('no wired VG row naming a step');
   return row;
 };
@@ -2341,7 +2352,8 @@ const soleWaiterVgRow = (d) => {
   const counts = new Map();
   for (const r of rows) counts.set(art(r), (counts.get(art(r)) ?? 0) + 1);
   const row = rows.find((r) => counts.get(art(r)) === 1);
-  if (!row) throw new Error('every waiting artifact has more than one waiter; the seed has no anchor');
+  if (!row)
+    throw new Error('every waiting artifact has more than one waiter; the seed has no anchor');
   return row;
 };
 
@@ -2581,7 +2593,11 @@ const SCOPE_CASES = [
     seed: (d) => {
       const row = soleWaiterVgRow(d);
       edit(d, STRATEGY_PATH, (b) =>
-        once(b, row.closure, row.closure.replace(/Artifact:\s*\*\*(.+?)\*\*/, 'Artifact: **something else entirely**')),
+        once(
+          b,
+          row.closure,
+          row.closure.replace(/Artifact:\s*\*\*(.+?)\*\*/, 'Artifact: **something else entirely**'),
+        ),
       );
     },
   },
@@ -2605,7 +2621,11 @@ const SCOPE_CASES = [
     // a superseding entry rather than repaired here.
     expect: () => 'PASS',
     seed: (d) => {
-      edit(d, LOCKFILE, (b) => `${b}\n  fastify-plugin@5.0.1:\n    resolution: {integrity: sha512-seeded}\n`);
+      edit(
+        d,
+        LOCKFILE,
+        (b) => `${b}\n  fastify-plugin@5.0.1:\n    resolution: {integrity: sha512-seeded}\n`,
+      );
     },
   },
   {
@@ -3530,7 +3550,8 @@ const SCOPE_CASES = [
         edit(
           d,
           'docs/GLOSSARY.md',
-          (b) => `${b}\n<!-- control -->\n\n| ctl-x | no delimiter |\n| ctl-y | none here either |\n`,
+          (b) =>
+            `${b}\n<!-- control -->\n\n| ctl-x | no delimiter |\n| ctl-y | none here either |\n`,
         ),
     },
     seed: (d) =>
@@ -3562,7 +3583,8 @@ const SCOPE_CASES = [
         edit(
           d,
           'docs/GLOSSARY.md',
-          (b) => `${b}\n<!-- control -->\n\n| ctl-solo | and a second line below it |\n| ctl-pair | which makes a run of two |\n`,
+          (b) =>
+            `${b}\n<!-- control -->\n\n| ctl-solo | and a second line below it |\n| ctl-pair | which makes a run of two |\n`,
         ),
     },
     seed: (d) =>
@@ -4007,7 +4029,7 @@ const SCOPE_CASES = [
     // in ALLOCATION's own ADR table, where the discarded cell is a whole
     // disposition paragraph in the registry a sibling branch reads to decide
     // whether a number is free.
-    expect: 'cell(s) where its table\'s delimiter declares 2',
+    expect: "cell(s) where its table's delimiter declares 2",
     seed: (d) =>
       edit(
         d,
@@ -4029,7 +4051,7 @@ const SCOPE_CASES = [
     // which is the single character separating content from a cell boundary: one
     // passes, the other fires.
     control: {
-      expect: 'cell(s) where its table\'s delimiter declares 2',
+      expect: "cell(s) where its table's delimiter declares 2",
       seed: (d) =>
         edit(
           d,
@@ -4072,7 +4094,7 @@ const SCOPE_CASES = [
   {
     name: 'CI-06/table-row-width/a-run-with-no-delimiter-is-CI-06v-s',
     gate: 'CI-06/table-row-width',
-    what: 'an orphan run carrying no delimiter row, which is CI-06v\'s finding and must NOT be this gate\'s',
+    what: "an orphan run carrying no delimiter row, which is CI-06v's finding and must NOT be this gate's",
     expect: 'PASS',
     // THE TWO GATES DIVIDE ONE POPULATION AND NEITHER MAY CLAIM THE OTHER'S
     // HALF. A run with no delimiter declares no width, so there is nothing here
@@ -4084,7 +4106,7 @@ const SCOPE_CASES = [
     // The control adds a delimiter of a DIFFERENT width to the same rows: the
     // single edit that turns CI-06v's finding into this gate's.
     control: {
-      expect: 'cell(s) where its table\'s delimiter declares 3',
+      expect: "cell(s) where its table's delimiter declares 3",
       seed: (d) =>
         edit(
           d,
@@ -4240,8 +4262,7 @@ const SCOPE_CASES = [
           d,
           DERIVABLE_DOC,
           (b) =>
-            `${b}\n## control, out of the table\n\nthe runner ` +
-            `${gateCountIn(d)} gates today\n`,
+            `${b}\n## control, out of the table\n\nthe runner ` + `${gateCountIn(d)} gates today\n`,
         ),
     },
     seed: (d) =>
@@ -4425,7 +4446,9 @@ const SCOPE_CASES = [
     what: 'a written row whose .expected.json is gone while its .yaml remains, which MUST be a finding',
     expect: 'with no .expected.json sibling',
     seed: (d) => {
-      const f = readdirSync(join(d, FIXTURE_DIR)).find((x) => /^GS-\d{3}-.*\.expected\.json$/.test(x));
+      const f = readdirSync(join(d, FIXTURE_DIR)).find((x) =>
+        /^GS-\d{3}-.*\.expected\.json$/.test(x),
+      );
       if (!f) throw new Error(`seed anchor not found: no .expected.json in ${FIXTURE_DIR}`);
       rmSync(join(d, FIXTURE_DIR, f));
     },
@@ -4496,7 +4519,11 @@ const SCOPE_CASES = [
     },
     seed: (d) => {
       const { register, id } = declaredFileRegister(d);
-      edit(d, register, (b) => `${b}\n**${id}** is discussed here in prose, in bold, mid-document.\n`);
+      edit(
+        d,
+        register,
+        (b) => `${b}\n**${id}** is discussed here in prose, in bold, mid-document.\n`,
+      );
     },
   },
   {
@@ -4524,7 +4551,11 @@ const SCOPE_CASES = [
     },
     seed: (d) => {
       const { id } = declaredFileRegister(d);
-      edit(d, 'docs/GLOSSARY.md', (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | cited outside its register |\n`);
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | cited outside its register |\n`,
+      );
     },
   },
   {
@@ -4583,7 +4614,8 @@ const SCOPE_CASES = [
     name: 'CI-06/identifier-series/withheld-vanished',
     gate: 'CI-06/identifier-series',
     what: 'a withheld identifier that no longer appears anywhere, which MUST make the entry a finding',
-    expect: (d) => `WITHHELD_MEMBERS holds ${withheldMember(d).id} and the census no longer finds it`,
+    expect: (d) =>
+      `WITHHELD_MEMBERS holds ${withheldMember(d).id} and the census no longer finds it`,
     seed: (d) => eraseIdentifier(d, withheldMember(d).id),
   },
   {
@@ -4605,13 +4637,23 @@ const SCOPE_CASES = [
       expect: (d) => `${seededWithheldId(d)} has NO definition site in its declared register`,
       seed: (d) => {
         const { id } = withheldMember(d);
-        edit(d, 'docs/GLOSSARY.md', (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | ${CITED_SEED_MARK} |\n`);
-        edit(d, GATES_PATH, (b) => once(b, new RegExp(`^\\s*\\['${id}',[\\s\\S]*?\\],\\n`, 'm'), ''));
+        edit(
+          d,
+          'docs/GLOSSARY.md',
+          (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | ${CITED_SEED_MARK} |\n`,
+        );
+        edit(d, GATES_PATH, (b) =>
+          once(b, new RegExp(`^\\s*\\['${id}',[\\s\\S]*?\\],\\n`, 'm'), ''),
+        );
       },
     },
     seed: (d) => {
       const { id } = withheldMember(d);
-      edit(d, 'docs/GLOSSARY.md', (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | ${CITED_SEED_MARK} |\n`);
+      edit(
+        d,
+        'docs/GLOSSARY.md',
+        (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | ${CITED_SEED_MARK} |\n`,
+      );
     },
   },
 ];

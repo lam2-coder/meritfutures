@@ -195,8 +195,7 @@ export function declaredTables(markdown, begin = BEGIN, end = END) {
   }
   const seen = new Set();
   for (const name of names) {
-    if (seen.has(name))
-      throw new Error(`${DOC}: ${name} is listed twice in the ${begin} block`);
+    if (seen.has(name)) throw new Error(`${DOC}: ${name} is listed twice in the ${begin} block`);
     seen.add(name);
   }
   const sorted = [...names].sort();
@@ -305,11 +304,11 @@ export function unclassified(names) {
   return names.map(
     (t) =>
       `${t}: merit_app holds neither UPDATE nor DELETE on it, so its rows are ` +
-        `immutable to the application, but it holds SELECT and not INSERT -- so it ` +
-        `is neither append-only nor unreachable and NEITHER declared set describes ` +
-        `it. A REVOKE took INSERT and left SELECT. Decide which sentence the table ` +
-        `implements and declare it there; a table in no list is a table this check ` +
-        `does not read`,
+      `immutable to the application, but it holds SELECT and not INSERT -- so it ` +
+      `is neither append-only nor unreachable and NEITHER declared set describes ` +
+      `it. A REVOKE took INSERT and left SELECT. Decide which sentence the table ` +
+      `implements and declare it there; a table in no list is a table this check ` +
+      `does not read`,
   );
 }
 
@@ -413,7 +412,10 @@ function falsify() {
   //    database still lets merit_app touch. Phantom, for seed 1's reason.
   watch(
     'unreachable and reachable',
-    compareUnreachable([...declaredUnreachable, 'zzz_phantom_unreachable'].sort(), installedUnreachable),
+    compareUnreachable(
+      [...declaredUnreachable, 'zzz_phantom_unreachable'].sort(),
+      installedUnreachable,
+    ),
     'zzz_phantom_unreachable',
   );
 
@@ -451,7 +453,10 @@ function falsify() {
   //    discipline assert_no_floats.sql applies to its own two seeds.
   const after = installedTables();
   const afterUnreachable = installedTables('', DERIVE_UNREACHABLE_SQL, true);
-  if (after.length !== installed.length || afterUnreachable.length !== installedUnreachable.length) {
+  if (
+    after.length !== installed.length ||
+    afterUnreachable.length !== installedUnreachable.length
+  ) {
     console.error(
       `FALSIFY FAILED: a seeded REVOKE leaked. The installed sets were ` +
         `${installed.length} and ${installedUnreachable.length} before, and are ` +

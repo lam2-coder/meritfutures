@@ -157,7 +157,6 @@ const REGISTRIES = {
   },
 };
 
-
 const rel = (from, to) => {
   const r = relative(dirname(join(ROOT, from)), join(ROOT, to));
   return r.startsWith('.') ? r : `./${r}`.replace(/^\.\//, '');
@@ -179,7 +178,10 @@ function main() {
   }
   const map = JSON.parse(read(reg.map));
   const LINK = new RegExp(`\\[([^\\]]*)\\]\\(${reg.target.source}(#[A-Za-z0-9._-]+)?\\)`, 'g');
-  const files = walk('docs').concat(walk('research'), walk('packages').filter((f) => f.endsWith('.md')));
+  const files = walk('docs').concat(
+    walk('research'),
+    walk('packages').filter((f) => f.endsWith('.md')),
+  );
 
   const stats = { anchored: 0, byId: 0, named: 0, generic: 0, rebased: 0 };
   const unresolved = [];
@@ -194,49 +196,49 @@ function main() {
     // 1. Inbound: anything pointing at DECISIONS.md.
     // -------------------------------------------------------------------------
     body = body.replace(LINK, (whole, text, _path, frag) => {
-        let target = null;
-        let bucket = null;
-        if (frag) {
-          target = map.anchors[frag.slice(1).toLowerCase()] ?? null;
-          bucket = 'anchored';
+      let target = null;
+      let bucket = null;
+      if (frag) {
+        target = map.anchors[frag.slice(1).toLowerCase()] ?? null;
+        bucket = 'anchored';
+      }
+      if (!target) {
+        // The overwhelmingly common case: the link TEXT is the identifier.
+        // 732 links read `[ADR-nnn](../DECISIONS.md)`.
+        const id = reg.id.exec(text.trim());
+        if (id && map.ids[id[1]]) {
+          target = map.ids[id[1]];
+          bucket = 'byId';
         }
-        if (!target) {
-          // The overwhelmingly common case: the link TEXT is the identifier.
-          // 732 links read `[ADR-nnn](../DECISIONS.md)`.
-          const id = reg.id.exec(text.trim());
-          if (id && map.ids[id[1]]) {
-            target = map.ids[id[1]];
-            bucket = 'byId';
+      }
+      if (!target && reg.sub) {
+        const sub = reg.sub.exec(text);
+        if (sub && map.ids[`ADR-${sub[1]}`]) {
+          target = map.ids[`ADR-${sub[1]}`];
+          bucket = 'byId';
+        }
+      }
+      if (!target) {
+        for (const [needle, dest] of Object.entries(reg.named)) {
+          if (text.includes(needle)) {
+            target = dest;
+            bucket = 'named';
+            break;
           }
         }
-        if (!target && reg.sub) {
-          const sub = reg.sub.exec(text);
-          if (sub && map.ids[`ADR-${sub[1]}`]) {
-            target = map.ids[`ADR-${sub[1]}`];
-            bucket = 'byId';
-          }
+      }
+      if (!target) {
+        // Text that names the document itself rather than an entry.
+        if (reg.self.test(text.trim())) {
+          target = reg.readme;
+          bucket = 'generic';
         }
-        if (!target) {
-          for (const [needle, dest] of Object.entries(reg.named)) {
-            if (text.includes(needle)) {
-              target = dest;
-              bucket = 'named';
-              break;
-            }
-          }
-        }
-        if (!target) {
-          // Text that names the document itself rather than an entry.
-          if (reg.self.test(text.trim())) {
-            target = reg.readme;
-            bucket = 'generic';
-          }
-        }
-        if (!target) {
-          unresolved.push(`${file}: [${text}](...${name}${frag ?? ''})`);
-          return whole;
-        }
-        stats[bucket]++;
+      }
+      if (!target) {
+        unresolved.push(`${file}: [${text}](...${name}${frag ?? ''})`);
+        return whole;
+      }
+      stats[bucket]++;
       return `[${text}](${rel(file, target)})`;
     });
 
@@ -248,16 +250,19 @@ function main() {
     // Same-directory decision links (ADR-027.md) already resolve and are skipped
     // by the existsSync check on the old base.
     if (moved) {
-      body = body.replace(/\[([^\]]*)\]\(([^)\s#]+)(#[A-Za-z0-9._-]+)?\)/g, (whole, text, path, frag) => {
-        if (/^(https?:|mailto:|#)/.test(path)) return whole;
-        if (path.startsWith(reg.dir) || existsSync(resolve(ROOT, dirname(file), path))) {
-          return whole; // already correct from the new location
-        }
-        const old = resolve(ROOT, reg.from, path);
-        if (!existsSync(old)) return whole; // not a path this move broke
-        stats.rebased++;
-        return `[${text}](${rel(file, relative(ROOT, old))}${frag ?? ''})`;
-      });
+      body = body.replace(
+        /\[([^\]]*)\]\(([^)\s#]+)(#[A-Za-z0-9._-]+)?\)/g,
+        (whole, text, path, frag) => {
+          if (/^(https?:|mailto:|#)/.test(path)) return whole;
+          if (path.startsWith(reg.dir) || existsSync(resolve(ROOT, dirname(file), path))) {
+            return whole; // already correct from the new location
+          }
+          const old = resolve(ROOT, reg.from, path);
+          if (!existsSync(old)) return whole; // not a path this move broke
+          stats.rebased++;
+          return `[${text}](${rel(file, relative(ROOT, old))}${frag ?? ''})`;
+        },
+      );
 
       // Self-links inside the old single file: `[ADR-034](#)` placeholders and
       // `[LEDGER-C2](#adr-027-...)` same-file anchors. Both resolved to somewhere
