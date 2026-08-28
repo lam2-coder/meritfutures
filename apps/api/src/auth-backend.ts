@@ -16,32 +16,33 @@
 //   ADR-112 UNBLOCKED EVERYTHING A SESSION CAN DO AND NOTHING THAT MAKES ONE.
 //
 // Reading a session, revoking one, listing them, stamping one: all four are an
-// ADDRESS through the scoped door and all four land. MINTING one does not, and
-// neither does resolving a person from the address they typed. Two
-// constructions are missing and neither is a predicate:
+// ADDRESS through the scoped door and all four land. MINTING one did not, and
+// neither did resolving a person from the address they typed. Two constructions
+// were missing and neither was a predicate:
 //
-//   B1  A PRE-IDENTITY READ HAS NO DOOR. `users.email` is `citext NOT NULL
-//       UNIQUE` (0002_identity.sql) and `users` is scope class `owned` on
-//       `identity_id` (scope.ts), so resolving an email to a person requires
-//       already knowing the person. `firmDb()` refuses an `owned` key.
-//       `systemDb(reason)` reaches it and its vocabulary is `'nightly-batch' |
-//       'operator-console'`, which ADR-109 clause 1 declined to widen -- on the
-//       argument that a third reason would buy a door with no predicate, which
-//       ADR-112 has since supplied. THE GROUND OF THAT REFUSAL HAS MOVED AND THE
-//       REFUSAL HAS NOT BEEN REVISITED. That is `packages/db`'s and the
-//       founder's, on ADR-109 clause 2's own precedent, and ADR-120 reports it.
-//
+//   B1  A PRE-IDENTITY READ HAS NO DOOR.
 //   B2  A SESSION ROW CANNOT BE INSERTED AT ANY AUTHORITY A HANDLER HOLDS.
-//       `ScopedTx.insert` takes `OwnedTableKey` and `sessions` is `derived`, and
-//       that is deliberate rather than accidental: the accessor "cannot
-//       establish that the parent is this identity's without reading it -- which
-//       inside a transaction is a SELECT the caller could have skipped and
-//       outside one is a race" (scoped-db.ts, on `OwnedTableKey`). ADR-102
-//       section 4 names the construction that would serve it and does not build
-//       it.
+//
+// BOTH ARE DISCHARGED AND THIS PARAGRAPH SPENT SEVERAL SESSIONS SAYING
+// OTHERWISE. ADR-126 built `resolutionDb` for B1 -- in its own docblock's words,
+// "because `POST /auth/verify` must turn the address a person typed into the
+// identity that owns it" -- and `insertUnder` for B2, whose one-member table
+// vocabulary is `sessions`. The refusal strings below went on citing both, so a
+// live 503's log line told an operator that a door had not been built which had.
+// ADR-196 finding 2 reported the first; ADR-197 found the second stale beside it
+// and repairs both.
+//
+// AND THE FIRST WAS HALF TRUE FOR A REASON WORTH KEEPING. `resolutionDb` was
+// never added to `packages/db/src/index.ts`, and `db.ts` is the one file in this
+// deployable that takes a handle off that package, so the endpoint the door was
+// built for could not import it: the refusal was true of the package SURFACE
+// while being false of the package. ADR-197 exports it. That is the shape a
+// stale refusal takes when it is nobody's fence to repair -- it stops being
+// checkable rather than becoming wrong.
 //
 // So `POST /auth/verify` still answers 503 on a tree where `POST /auth/logout`
-// answers 204, and the reason is structural rather than unfinished.
+// answers 204, and the reason is now that nobody has written the handler:
+// ADR-196 section 7 item 4, the smallest of that entry's four and the last.
 //
 // -----------------------------------------------------------------------------
 // THE SESSION TOKEN CARRIES ITS OWN IDENTITY, AND THAT IS A RULING
@@ -65,12 +66,15 @@
 // `VerifyResponse` and in `Me`, so the client already holds the value the cookie
 // now also carries.
 //
-// **THERE IS NO MINTER IN THIS FILE AND ITS ABSENCE IS B2 RATHER THAN AN
-// OVERSIGHT.** `job-queue.ts`'s rule -- a primitive admitted before a caller
-// exists is a primitive nobody can remove -- is why `mintSessionToken` is not
-// written: nothing can insert the row it would be minted for. What IS written is
-// the parser and the digest, which have a caller, and a minter that ever lands
-// must produce its token through {@link sessionTokenHash} and
+// **THERE IS NO MINTER IN THIS FILE AND ITS ABSENCE IS NO LONGER B2.** The rule
+// that kept it out is `job-queue.ts`'s -- a primitive admitted before a caller
+// exists is a primitive nobody can remove -- and the sentence under it was
+// "nothing can insert the row it would be minted for". THAT SENTENCE IS FALSE
+// SINCE ADR-126: `insertUnder` inserts a `sessions` row at a scoped handle by
+// proving its parent. What is missing now is the CALLER rather than the
+// capability, and the caller is the handler ADR-196 section 7 item 4 names. What
+// IS written is the parser and the digest, and a minter that ever lands must
+// produce its token through {@link sessionTokenHash} and
 // {@link SESSION_TOKEN_SEPARATOR} rather than by respelling the format.
 //
 // -----------------------------------------------------------------------------
@@ -84,7 +88,7 @@
 // `POST /auth/passkey/login/options`.
 // =============================================================================
 
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 
 import type { ApiDb } from './db.ts';
 import { isIdentityId } from './db.ts';
@@ -96,6 +100,7 @@ import type {
   ElevationFactor,
   SessionRow,
 } from './routes/auth.ts';
+import type { Environment } from './surface.ts';
 
 /**
  * Raised when a row this surface read violates a CHECK its own DDL declares.
@@ -153,6 +158,245 @@ export function parseSessionToken(token: string): { readonly identityId: string 
   // deliberate: this one is about a request and that one is about a call site.
   if (!isIdentityId(identityId)) return null;
   return { identityId };
+}
+
+// -----------------------------------------------------------------------------
+// The OTP digest, and the key it is taken under
+// -----------------------------------------------------------------------------
+// ADR-197 rulings 1 and 2. `otp_challenges.code_hash bytea NOT NULL`
+// (`0002_identity.sql:311`) says only "NEVER store the code itself", and the
+// code is a six-digit one a human types: a plain hash of it is a
+// one-million-candidate offline break for anybody holding the table. This is
+// the keyed MAC that answers it, and the key is a DEPLOYMENT SECRET rather than
+// a row.
+//
+// WHY NOT A ROW, IN ONE SENTENCE THAT IS MECHANICAL RATHER THAN AESTHETIC. The
+// role that verifies is `merit_app`, `0026_roles_and_grants.sql` gives it
+// table-level SELECT, and a table-level SELECT implies every column -- so a key
+// table would be readable by exactly the role that reads `otp_challenges`, and
+// the dump that yields the digests would yield the key that opens them. ADR-046
+// ruled the same shape one table over: "A key registry in the same database as
+// the ciphertext is one dump away from being a key ceremony."
+//
+// THE ROTATION COST THAT ARGUES FOR A ROW IS BOUNDED TO THE TTL AND THEREFORE
+// NEEDS NO COLUMN. `otp_challenges.expires_at` is a "short TTL, 10 minutes"
+// (`0002_identity.sql:313`), so the only rows a key must still open are the ones
+// that can still verify. A rotation admits two keys for one TTL and then retires
+// the old one, which is INFRA section 7's own "delay window before the old
+// credential is revoked, so a rotation cannot itself become an outage" with an
+// upper bound the schema states. That is why {@link resolveOtpMacKeys} returns a
+// LIST and why `otp_challenges` needs no `key_id`.
+
+/** Raised when a key, or the absence of one, makes a digest unsafe to take. */
+export class OtpKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OtpKeyError';
+  }
+}
+
+/** The deployment secret the digest is taken under. Standard padded base64. */
+export const OTP_MAC_KEY_VAR = 'MERIT_OTP_MAC_KEY';
+
+/** The key being retired, admitted for VERIFY only, for one TTL. Optional. */
+export const OTP_MAC_KEY_RETIRING_VAR = 'MERIT_OTP_MAC_KEY_RETIRING';
+
+/** A key shorter than the digest it keys buys nothing. HMAC-SHA-256 is 32. */
+export const OTP_MAC_KEY_MIN_BYTES = 32;
+
+/**
+ * The domain separator, and it carries a VERSION because the encoding below is
+ * the thing a later ruling would change. Changing the input without changing
+ * this string is how two deployments compute different digests and neither
+ * knows.
+ */
+export const OTP_DIGEST_DOMAIN = 'merit.otp.code.v1';
+
+/** What a code was issued FOR. Every field is bound into the digest. */
+export interface OtpChallengeSubject {
+  /** `otp_challenges.channel`, `0029:519`. */
+  readonly channel: 'email' | 'sms';
+  /**
+   * The destination AS THE PERSON TYPED IT, never the normalized form.
+   *
+   * THIS IS THE LOAD-BEARING FIELD AND THE REASON IS A MERGED `CREATE INDEX`.
+   * `otp_challenges` keys off `email_normalized` (`0002:306-308`, "Issued
+   * before a user may exist"), and `users.email_normalized` is
+   * "Indexed but deliberately NOT unique. Two people can legitimately share a
+   * normalized form" (`0002:250-253`). So the CHALLENGE ROW CANNOT TELL TWO
+   * PEOPLE APART WHOM THE NORMALIZER MERGED, while `users.email` -- the column
+   * `RESOLUTION_ADDRESS` addresses -- is `UNIQUE` and can. Binding the digest to
+   * the address as typed is the only place that separation can live: without it
+   * a code mailed to `bob@gmail.com` answers a challenge presented as
+   * `b.ob@gmail.com`, which is one human authenticating as another out of two
+   * individually correct merged decisions.
+   */
+  readonly destination: string;
+  /** The code, exactly as it will be presented. This function normalizes none of it. */
+  readonly code: string;
+}
+
+/**
+ * ASCII case folding, and it is ASCII-only ON PURPOSE.
+ *
+ * `users.email` is `citext` so that "casing never creates a duplicate human"
+ * (`0002:247`), and a digest that did not fold would refuse a person who typed
+ * `Bob@x.com` on Tuesday and `bob@x.com` on Wednesday. `citext` folds with
+ * `lower()`, which is LOCALE DEPENDENT above ASCII; a digest has to be
+ * reproducible byte for byte in every process that ever verifies it, so this
+ * folds the range where the two agree everywhere and leaves the rest alone.
+ * The divergence that leaves is in the fail-closed direction: an address
+ * differing only in the case of a non-ASCII letter fails to verify rather than
+ * verifying as somebody it is not.
+ */
+function asciiFold(value: string): string {
+  return value.replace(/[A-Z]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 32));
+}
+
+/**
+ * One field of the digest input, length-prefixed.
+ *
+ * WITHOUT THE LENGTH THE CONCATENATION IS AMBIGUOUS, and ambiguity here is a
+ * collision a caller chooses: `('ab', 'c')` and `('a', 'bc')` would hash
+ * identically, so a destination could be extended into the code. Four bytes big
+ * endian in front of every field makes exactly one tuple produce one input.
+ */
+function digestField(value: string): Buffer {
+  const bytes = Buffer.from(value, 'utf8');
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(bytes.length, 0);
+  return Buffer.concat([header, bytes]);
+}
+
+/** A key too short to key the digest is refused rather than stretched. */
+function refuseWeakKey(key: Uint8Array, where: string): void {
+  if (key.length < OTP_MAC_KEY_MIN_BYTES)
+    throw new OtpKeyError(
+      `${where} is ${String(key.length)} bytes and the OTP MAC key floor is ` +
+        `${String(OTP_MAC_KEY_MIN_BYTES)}. A key shorter than the digest it keys is the ` +
+        'weakest link in a construction whose entire purpose is to be stronger than a ' +
+        'one-million-candidate search',
+    );
+}
+
+/**
+ * `otp_challenges.code_hash`, as a keyed MAC over the whole challenge.
+ *
+ * HMAC-SHA-256 RATHER THAN A SLOW KDF, and the alternative was priced rather
+ * than skipped. A six-digit code is 10^6 candidates, so no work factor that fits
+ * a request path makes the space infeasible; a work factor that did would be
+ * paid on every verification by every person. A key the attacker does not have
+ * makes the space infinite instead of large, which is the only answer that
+ * scales to a secret this short. See ADR-197 section 3.
+ *
+ * THE CHANNEL IS IN THE INPUT because `otp_challenges_exactly_one_destination`
+ * (`0029:532`) admits two destination shapes on one table, and a digest that did
+ * not name which one it was taken over is a digest an email challenge and an SMS
+ * challenge could collide on.
+ *
+ * @param key one admitted key. {@link otpCodeMatches} is what a VERIFIER calls.
+ */
+export function otpCodeDigest(key: Uint8Array, subject: OtpChallengeSubject): Uint8Array {
+  refuseWeakKey(key, 'the OTP MAC key');
+  if (subject.destination === '')
+    throw new OtpKeyError('an OTP digest over an empty destination binds the code to nobody');
+  if (subject.code === '')
+    throw new OtpKeyError('an OTP digest over an empty code is a digest of the destination alone');
+  const input = Buffer.concat([
+    digestField(OTP_DIGEST_DOMAIN),
+    digestField(subject.channel),
+    digestField(asciiFold(subject.destination)),
+    digestField(subject.code),
+  ]);
+  return createHmac('sha256', key).update(input).digest();
+}
+
+/** Equal, in time that does not depend on WHERE they differ. */
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  // THE LENGTH IS COMPARED FIRST AND IT IS NOT A LEAK. `timingSafeEqual` throws
+  // on a length mismatch rather than answering, and a digest length is not a
+  // secret: it is a property of the algorithm, which is written above in the
+  // clear. `rise-webhook.ts` makes the same argument for the same reason.
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
+/**
+ * Whether a presented code answers a stored digest, under ANY admitted key.
+ *
+ * EVERY KEY IS TRIED AND THE LOOP DOES NOT SHORT CIRCUIT ON A MISS, which is
+ * what makes a rotation window invisible to a person verifying inside it: a
+ * challenge issued under the retiring key still answers, and one issued under
+ * the current key answers first. Which key matched is not a secret and is not
+ * reported; that a code did not match at all is the only fact this returns.
+ */
+export function otpCodeMatches(
+  keys: readonly Uint8Array[],
+  subject: OtpChallengeSubject,
+  stored: Uint8Array,
+): boolean {
+  if (keys.length === 0)
+    throw new OtpKeyError(
+      'a verification with no admitted key would answer `false` to every correct code, which is ' +
+        'a total outage wearing the costume of a wrong code. The absence is refused here rather ' +
+        'than returned as a denial',
+    );
+  let matched = false;
+  for (const key of keys) {
+    // `||` EVALUATES ITS LEFT SIDE ALWAYS, so every key costs one HMAC whether
+    // an earlier one matched or not. Written this way round on purpose.
+    matched = constantTimeEqual(otpCodeDigest(key, subject), stored) || matched;
+  }
+  return matched;
+}
+
+/** One key off the environment, decoded strictly. `null` only when optional and unset. */
+function readMacKey(env: Environment, name: string, required: boolean): Uint8Array | null {
+  const raw = env[name];
+  if (raw === undefined || raw.trim() === '') {
+    if (!required) return null;
+    throw new OtpKeyError(
+      `${name} is unset. There is no default and there must not be one: a deployment that has ` +
+        'not been given a key cannot issue a challenge anybody else could not also issue, and a ' +
+        'baked-in fallback is a published key. INFRA section 7 is where it comes from',
+    );
+  }
+  const decoded = Buffer.from(raw, 'base64');
+  // STRICT, BY ROUND TRIP. `Buffer.from(_, 'base64')` silently ignores every
+  // character it does not recognise, so a truncated or corrupted secret decodes
+  // to a SHORTER KEY rather than to an error, and the deployment runs on it.
+  if (decoded.toString('base64') !== raw.trim())
+    throw new OtpKeyError(
+      `${name} is not standard padded base64. It is decoded strictly because a lenient decode ` +
+        'turns a corrupted secret into a shorter working key instead of into a failure',
+    );
+  refuseWeakKey(decoded, name);
+  return decoded;
+}
+
+/**
+ * The admitted keys, newest first: the current key, then the retiring one.
+ *
+ * A LIST RATHER THAN A KEY IS THE WHOLE OF THE ROTATION STORY, and it is what
+ * `otp_challenges` having no `key_id` column costs and does not cost. It costs
+ * nothing durable, because a challenge older than its TTL cannot verify under
+ * ANY key; what it costs is that a verifier inside a rotation window computes
+ * two HMACs instead of one.
+ *
+ * ISSUING ALWAYS USES `[0]`. Verifying uses all of them.
+ */
+export function resolveOtpMacKeys(env: Environment): readonly Uint8Array[] {
+  const current = readMacKey(env, OTP_MAC_KEY_VAR, true);
+  if (current === null) throw new OtpKeyError('unreachable: the current key is required');
+  const retiring = readMacKey(env, OTP_MAC_KEY_RETIRING_VAR, false);
+  if (retiring === null) return [current];
+  if (constantTimeEqual(current, retiring))
+    throw new OtpKeyError(
+      `${OTP_MAC_KEY_RETIRING_VAR} holds the same key as ${OTP_MAC_KEY_VAR}. A rotation window ` +
+        'that rotated to the value it was rotating away from is a rotation nobody performed, and ' +
+        'it would read as complete on every dashboard',
+    );
+  return [current, retiring];
 }
 
 // -----------------------------------------------------------------------------
@@ -288,19 +532,32 @@ export function userAgentFamily(raw: string | null): string {
 // The blockers, each named once so twelve refusals cannot drift apart
 // -----------------------------------------------------------------------------
 
-const NO_PRE_IDENTITY_READ =
-  'a pre-identity read has no door. `users.email` is UNIQUE and `users` is scope class `owned` ' +
-  'on `identity_id`, so resolving an address to a person requires already knowing the person; ' +
-  "`firmDb()` refuses an `owned` key and `systemDb`'s reason vocabulary is `nightly-batch | " +
-  'operator-console`, which a request handler is not in. ADR-109 clause 1 declined to widen it ' +
-  'because a third reason would have bought a door with no predicate, and ADR-112 has since ' +
-  'supplied the predicate. ADR-120 reports that the ground of that refusal has moved';
+// -----------------------------------------------------------------------------
+// TWO REFUSALS THAT STOOD HERE ARE GONE, AND THE REPLACEMENT SAYS WHAT IS LEFT
+// -----------------------------------------------------------------------------
+// `NO_PRE_IDENTITY_READ` and `NO_DERIVED_INSERT` were B1 and B2 of this file's
+// header. ADR-126 discharged both and this file went on citing them, so a live
+// 503's log line told an operator that a pre-identity read had no door where
+// ADR-126 had built one. ADR-196 finding 2 reported the first; the second was
+// stale beside it and no entry had said so. ADR-197 repairs both, and section 4
+// of that entry reports what made the first one HALF true for as long as it
+// was: `resolutionDb` was never added to `packages/db/src/index.ts`, so the
+// endpoint the door was built for could not import it.
+//
+// NEITHER IS REPLACED BY A SOFTER VERSION OF ITSELF. What blocks `verifyOtp`
+// now is that nobody has written it, which is a different fact and is the one
+// below.
 
-const NO_DERIVED_INSERT =
-  'a `sessions` row cannot be inserted at any authority a request handler holds. `ScopedTx.insert` ' +
-  'takes `OwnedTableKey` and `sessions` is `derived`, because the accessor cannot establish that ' +
-  "the parent row is this identity's without reading it. ADR-102 section 4 names the construction " +
-  'that would serve it and deliberately does not build it';
+const NO_VERIFY_HANDLER =
+  'every construction `POST /auth/verify` needs now exists and the handler that composes them ' +
+  'does not. ADR-196 priced the build at four rulings and named this one last: resolve the ' +
+  'address through `resolutionDb`, branch on whether it answered, establish through ' +
+  '`establishmentDb` when it did not, and mint a session through `ScopedTx.insertUnder`. What ' +
+  'is genuinely absent is the MINTER: this file deliberately ships the token parser and the ' +
+  "token digest and no producer, on `job-queue.ts`'s rule, and the sentence that justified the " +
+  'absence -- "nothing can insert the row it would be minted for" -- stopped being true when ' +
+  'ADR-126 landed `insertUnder`. A minter that lands must produce its token through ' +
+  '`sessionTokenHash` and `SESSION_TOKEN_SEPARATOR` rather than by respelling the format';
 
 const NO_WEBAUTHN =
   'no WebAuthn verifier is admitted in this workspace. A registration or assertion ceremony needs ' +
@@ -308,13 +565,18 @@ const NO_WEBAUTHN =
   'hand-rollable on the money path and none of which any dependency here provides. Admitting one ' +
   'is a VG-12 decision with an entry of its own, not a line in a wiring slice';
 
-const NO_OTP_DIGEST =
-  '`otp_challenges.code_hash` has no specified digest and cannot be given one here. The column ' +
-  'says only "NEVER store the code itself", the code is a short one a human types, and a plain ' +
-  'hash of it is a one-million-candidate offline break for anybody holding the table. A keyed MAC ' +
-  'is the correct answer and there is nowhere to keep the key: the table carries no salt column ' +
-  'and no key id, so the repair is a deployment secret or a migration. Either is a ruling with a ' +
-  "config surface behind it and neither is a wiring slice's";
+// `NO_OTP_DIGEST` STOOD HERE AND ADR-197 RULED IT. The digest is
+// `otpCodeDigest` above, the key is a deployment secret rather than a row, and
+// `otp_challenges` needs no `key_id` because a challenge older than its TTL
+// cannot verify under any key. What is left of that blocker is the WIRING: this
+// backend is constructed with a database and a clock and holds no key, because
+// the only methods that would use one are blocked on something else anyway.
+const NO_OTP_KEY_WIRED =
+  'this backend holds no OTP MAC key. ADR-197 ruled the digest and the key surface -- ' +
+  '`otpCodeDigest` and `resolveOtpMacKeys` in this file, read from `MERIT_OTP_MAC_KEY` per INFRA ' +
+  'section 7 -- and deliberately did not wire them, because every method that would use a key is ' +
+  'blocked on delivery or on a handler and a key admitted before its caller is a key nobody can ' +
+  'rotate out. `start.ts` is where it lands, with the handler';
 
 const NO_DELIVERY =
   'nothing in this deployable delivers a code. A handler that writes an `otp_challenges` row and ' +
@@ -434,13 +696,14 @@ export function databaseAuthBackend(db: ApiDb, clock: () => Date = () => new Dat
 
     // THREE INDEPENDENT BLOCKERS ON ONE METHOD, which is why the corpus's most
     // load-bearing endpoint is the one furthest from working.
-    verifyOtp: blocked(
-      'verifyOtp',
-      `${NO_PRE_IDENTITY_READ}. It is also blocked twice more: ${NO_DERIVED_INSERT}; and ` +
-        NO_OTP_DIGEST,
-    ),
+    // THIS METHOD CARRIED THREE INDEPENDENT BLOCKERS AND CARRIES ONE. ADR-126
+    // discharged two of them and this file did not notice for as long as
+    // ADR-196 measured; ADR-197 discharged the third. The remaining one is that
+    // nobody has written the handler, which is the honest state and is a
+    // smaller sentence than the three it replaces.
+    verifyOtp: blocked('verifyOtp', `${NO_VERIFY_HANDLER}. And ${NO_OTP_KEY_WIRED}`),
 
-    requestOtp: blocked('requestOtp', `${NO_DELIVERY}. And ${NO_OTP_DIGEST}`),
+    requestOtp: blocked('requestOtp', `${NO_DELIVERY}. And ${NO_OTP_KEY_WIRED}`),
 
     // BOTH ARMS ARE BLOCKED AND FOR DIFFERENT REASONS, which is worth stating
     // because the union is C-27 and a reader will ask whether the refusal is the
@@ -448,7 +711,8 @@ export function databaseAuthBackend(db: ApiDb, clock: () => Date = () => new Dat
     // COMPILE time and always did, and these two are the two members it admits.
     elevate: blocked(
       'elevate',
-      `the passkey arm: ${NO_WEBAUTHN}. The dual_channel arm: ${NO_OTP_DIGEST}`,
+      `the passkey arm: ${NO_WEBAUTHN}. The dual_channel arm: ${NO_DELIVERY}. And ` +
+        NO_OTP_KEY_WIRED,
     ),
 
     passkeyRegisterOptions: blocked('passkeyRegisterOptions', NO_WEBAUTHN),
@@ -456,14 +720,17 @@ export function databaseAuthBackend(db: ApiDb, clock: () => Date = () => new Dat
     passkeyLoginOptions: blocked('passkeyLoginOptions', NO_WEBAUTHN),
     passkeyLoginVerify: blocked(
       'passkeyLoginVerify',
-      `${NO_WEBAUTHN}. And, before the ceremony: ${NO_PRE_IDENTITY_READ}. And ${NO_DERIVED_INSERT}`,
+      // ONE BLOCKER NOW, NOT THREE. The pre-identity read and the `derived`
+      // insert this method also cited are ADR-126's, discharged; the ceremony
+      // is the whole of what is left, and it is a VG-12 decision.
+      NO_WEBAUTHN,
     ),
 
     verifyPhone: blocked(
       'verifyPhone',
       '`PhoneVerifyResponse.line_type` is a carrier lookup (ADR-039 (a) scores VoIP and never ' +
         'rejects it) and no lookup adapter exists in this workspace, so the field would have to ' +
-        `be invented. And ${NO_OTP_DIGEST}`,
+        `be invented. And ${NO_DELIVERY}`,
     ),
 
     // THE PHONE-CHANGE TRIO IS BLOCKED BY A SCHEMA GAP AND NOT BY THE ACCESSOR,
