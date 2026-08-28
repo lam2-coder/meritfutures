@@ -213,6 +213,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-192](ADR-192.md) | the thirteen keep their 503 and stop disclosing it before authenticating, because ADR-190's ground is two grounds and only one of them reaches here (2026-08-28, status: proposed) |
 | [ADR-193](ADR-193.md) | a reversal may not chain onto another reversal, the rule refuses the LINK and not the operation, and it lives in a trigger because the builder is not weak here but incapable  (2026-08-28, status: proposed) |
 | [ADR-194](ADR-194.md) | a search term is a VALUE THE ESTATE HOLDS and never a pattern the operator composed, so the name fragment is removed from the contract rather than expressed (2026-08-28, status: proposed) |
+| [ADR-195](ADR-195.md) | the in-flight obligation is a TERM IN Open Liability and not a figure beside it, `INV-M5-15` does not move, and the column the term needs does not exist  (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
