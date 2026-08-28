@@ -936,6 +936,64 @@ export type {
   ProducerSchedule,
 } from './digests/produce.ts';
 
+// -----------------------------------------------------------------------------
+// M10's LIFECYCLE MESSAGING (session 328, P7-m)
+// -----------------------------------------------------------------------------
+// `IN-M10-03`, AND WHAT IS REAL IS THE CONTRACT SET AND THE PROJECTION; WHAT IS
+// NOT IS ANY DECLARED FIELD LIST AND ANY SEND. That is this file's own standard
+// for the batch and the saga above, applied to a disclosure path.
+//
+// `integration_contracts` is `SD-M10-01`'s row and its stated reason is that
+// "what are we sending Loops" should be answerable without reading a repository.
+// The twelve contracts below carry the answer and today it is NOTHING: every
+// allowlist ships `undeclared` and EMPTY, because `M10:31` says the module
+// carries "the minimum payload each needs" and the corpus never says what that
+// is for any of the twelve. `0018`'s own
+// `integration_contracts_enabled_has_fields` is what makes that a legal row.
+//
+// **TWELVE AND NOT NINE.** `M10:31` and `M10:165` both say nine and `EVENTS`
+// section 11 carries twelve; session 163 found it and this slice transcribes the
+// document. The three M10 does not count are `payout.held`,
+// `payout.hold_released` and `identity.restriction_lifted`, all three "always
+// send", and `M10:372` generates the negative allowlist tests FROM THE CONTRACT
+// ROWS, so a nine-row table would have generated a correct suite that never met
+// them.
+//
+// THERE IS NO PORT AND NO `events` READ HERE, AND THE REASON IS NOT THIS SLICE'S
+// CHOICE. `P7` section 8 named `P5-b` as the dependency for `events`; `P5-b` ran
+// and REFUSED that table, and `packages/db/src/scope.ts` still says why. So the
+// module takes the event as a VALUE, imports nothing at all, and the dispatcher
+// that reads the table is owed by the session that gets `events` a scope class.
+export {
+  DISPATCH_STATUSES,
+  FORBIDDEN_FIELDS,
+  LOOPS_CONTRACTS,
+  LOOPS_DISPATCH_POLICY,
+  LOOPS_INTEGRATION,
+  LOOPS_TRIGGERS,
+  LoopsEgressError,
+  contractFor,
+  dispatchToLoops,
+  evaluateGuard,
+  forbiddenFor,
+  projectForLoops,
+  projectWith,
+  triggerFor,
+} from './integrations/loops.ts';
+export type {
+  DispatchNumber,
+  DispatchStatus,
+  GuardOutcome,
+  LoopsContract,
+  LoopsDispatchDecision,
+  LoopsDispatchPolicy,
+  LoopsEvent,
+  LoopsGuard,
+  LoopsLiveState,
+  LoopsProjection,
+  LoopsTrigger,
+} from './integrations/loops.ts';
+
 // =============================================================================
 // THE BARREL'S OWN LEGS, AS DATA, BECAUSE A TYPE CHECKER CANNOT SEE AN EXPORT
 // THAT IS SIMPLY GONE
@@ -994,6 +1052,7 @@ export const WORKER_BARREL_LEGS = [
   './digests/ports.ts',
   './digests/produce.ts',
   './digests/rows.ts',
+  './integrations/loops.ts',
   './live/ingest.ts',
   './live/ports.ts',
   './provisioning/index.ts',
