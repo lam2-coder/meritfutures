@@ -218,6 +218,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-197](ADR-197.md) | the OTP key is a deployment secret, the digest binds the address as typed, and the establishment door is one verb  (2026-08-28, status: proposed) |
 | [ADR-198](ADR-198.md) | a `_cents` value inside `events.payload` is a DECIMAL STRING  (2026-08-28, status: proposed) |
 | [ADR-199](ADR-199.md) | `reserve_coverage_snapshots` is `firm` and registering it is the whole of what `packages/db` owed `readLiability`, because the other three figures are DERIVABLE and `0062` returns unspent  (2026-08-28, status: proposed) |
+| [ADR-200](ADR-200.md) | a verified code creates the identity, the consumption is ruled and guarded, and the two pre-identity doors are narrowed at the door rather than refused  (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures

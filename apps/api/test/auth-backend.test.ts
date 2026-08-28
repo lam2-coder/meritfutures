@@ -806,7 +806,7 @@ test('the read names every reason a row is not a candidate, and the newest live 
   ]);
   // KEYED ON THE NORMALIZED FORM, because `otp_challenges` is: "Issued before a
   // user may exist, so this keys off the normalized email rather than a user_id"
-  // (`0002:305-307`). The DIGEST is bound to the typed form, which is the
+  // (`0002:306-308`). The DIGEST is bound to the typed form, which is the
   // separation those two columns cannot make between themselves.
   expect(filter['emailNormalized']).toBe(normalizedEmail(TYPED));
   expect(filter['emailNormalized']).not.toBe(TYPED);
