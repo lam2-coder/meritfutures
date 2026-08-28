@@ -182,6 +182,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   otpChallenges: 'otp_challenges',
   paymentDisputes: 'payment_disputes',
   payoutDestinations: 'payout_destinations',
+  events: 'events',
 };
 
 /**
@@ -359,33 +360,37 @@ describe('the registry is total', () => {
   // the first session that NEEDS a table registers it; M18 names this one and
   // session 215 does not need it.
   //
-  // `events` IS STILL ABSENT AND IT IS THE NEAR MISS. It reaches an identity TWO
-  // ways -- `identity_id uuid NULL` and `account_id uuid NULL`, neither required
-  // and no CHECK tying them -- which is ONE identity column beside one ACCOUNT
-  // column and therefore not a pair at all. An `owned` rule on the first drops
-  // every account-level row and a `derived` hop through the second drops every
-  // identity-level row, while the portal's timeline (EVENTS.md section 2,
-  // consumer TL) reads both. Its `jsonb` payload is the second reason and it is
-  // the one no scope rule reaches: `kyc.dedupe_hit` carries
-  // `matched_identity_id`, so a row whose own tenancy column is right still
-  // names a DIFFERENT identity inside the payload.
+  // `events` IS REGISTERED AND IT IS THE SIXTH CLASS (ADR-191). It was the near
+  // miss for sixteen sessions: it reaches an identity TWO ways -- `identity_id
+  // uuid NULL` and `account_id uuid NULL`, neither required and no CHECK tying
+  // them -- which is ONE identity column beside one ACCOUNT column and therefore
+  // not a pair at all. All five earlier members were tried against the shape and
+  // each is refused or lossy: `owned` on `identity_id` compiles and drops every
+  // account-level row, `derived` through `account_id` is refused by ADR-101
+  // clauses 1 AND 2, `pair` needs a second IDENTITY column, `firm` is refused
+  // because the row declares a column against `identities(id)`, and `root` is
+  // `identities`' alone.
   //
-  // P5-b WAS DISPATCHED TO REGISTER IT BY NAME AND STOPPED AT THE SAME PLACE, so
-  // the refusal is no longer "no session's fence held it". All five members of
-  // the vocabulary were tried against the shape: `owned` on `identity_id`
-  // compiles and drops every account-level row, `derived` through `account_id`
-  // is refused by ADR-101 clauses 1 AND 2, `pair` needs a second IDENTITY column
-  // and this row's second is an ACCOUNT, `firm` is refused because the row
-  // declares a column against `identities(id)`, and `root` is `identities`'
-  // alone. What it needs is a SIXTH CLASS, which ADR-106 is the precedent for
-  // the cost of, and that slice was allocated no ADR number.
-  test('106 declared tables, 106 scope rules, 0 reachable without one', () => {
+  // `either` IS THE RULING AND THE PREDICATE IS THE DISJUNCTION, because both
+  // halves are read on one screen: EVENTS.md section 2 rows the `TL` consumer
+  // as PER-ACCOUNT and M04 section 5 consumes `phone.verified` and
+  // `phone.change_requested`, which have no account. THE PAYLOAD OBJECTION IS
+  // RULED RATHER THAN CARRIED: `idempotency_keys` already says a scope rule
+  // states which ROWS reach an identity and nothing about what is inside one,
+  // and ADR-191 section 6 names the two event names that carry a third party's
+  // uuid and the projection that owns them.
+  //
+  // P5-b WAS DISPATCHED TO REGISTER IT BY NAME AND COULD NOT, being allocated no
+  // ADR number, and session 349 then measured the same wall from downstream: a
+  // `Tx` naming `'events'` failed `tsc` with `TS2322` against `TABLE_KEYS`. The
+  // adapter that unblocks is a LATER SLICE and this registration is not it.
+  test('107 declared tables, 107 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(106);
-    expect(rules).toBe(106);
+    expect(declared).toBe(107);
+    expect(rules).toBe(107);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, and it is
@@ -420,13 +425,22 @@ describe('the registry is total', () => {
     expect(createdTables).toBe(114);
   });
 
-  // FIVE MEMBERS SINCE ADR-106, AND THE ASSERTION IS THE REASON THE FIFTH COULD
-  // NOT BE ADDED QUIETLY. It compares the classes IN USE against the whole
-  // vocabulary, so a member declared in `ScopeClass` and used by no table fails
-  // here rather than sitting in the type as an option nobody has justified.
+  // SIX MEMBERS SINCE ADR-191, AND THE ASSERTION IS THE REASON NEITHER THE FIFTH
+  // NOR THE SIXTH COULD BE ADDED QUIETLY. It compares the classes IN USE against
+  // the whole vocabulary, so a member declared in `ScopeClass` and used by no
+  // table fails here rather than sitting in the type as an option nobody has
+  // justified. It ran green on five for eight waves and this line is what a
+  // sixth member had to move first.
   test('every class in the vocabulary has at least one member, so none is vacuous', () => {
     const classes = new Set(TABLE_KEYS.map((k) => SCOPE_RULES[k].class));
-    expect([...classes].sort()).toEqual(['derived', 'firm', 'owned', 'pair', 'root']);
+    expect([...classes].sort()).toEqual([
+      'derived',
+      'either',
+      'firm',
+      'owned',
+      'pair',
+      'root',
+    ]);
   });
 
   test('every rule carries a reason and none is a placeholder', () => {
@@ -1450,6 +1464,245 @@ describe('a row that belongs to two identities is scoped to neither', () => {
         sqlText.replace(/--[^\n]*/g, '').replace(/\s+/g, ' '),
         `${table}'s pair-distinctness constraint`,
       ).toMatch(pattern);
+    }
+  });
+});
+
+// =============================================================================
+// ADR-191. A ROW THAT REACHES AN IDENTITY TWO DIFFERENT WAYS, AND WHICH WAY IS
+// A FACT ABOUT THE ROW.
+// =============================================================================
+// EVERY ASSERTION ABOVE THIS LINE ASKS HOW MANY IDENTITY COLUMNS A ROW HAS.
+// ADR-101 asks about the ONE column a rule names, ADR-106 asks whether there are
+// TWO, and neither asks whether the row's SECOND path to an identity is a
+// column of a DIFFERENT TABLE. `events` is that shape and it is the only table
+// in the migration set that is: `identity_id uuid NULL REFERENCES identities(id)`
+// beside `account_id uuid NULL REFERENCES accounts(id)`, no CHECK tying them.
+//
+// THE REFUSAL THIS SECTION EXISTS FOR IS `owned` ON `identity_id`, which
+// COMPILES, renders a correct-looking predicate, binds the identity, and DROPS
+// EVERY ACCOUNT-LEVEL ROW IN SILENCE. That is the failure mode every rejected
+// member had and it is the one no earlier assertion in this file can see.
+
+/** Columns on `table`'s folded row declared against `accounts(id)`. */
+const accountColumnsOf = (table: string): string[] =>
+  [...foldTableDefs(table).entries()]
+    .filter(([, def]) => /REFERENCES\s+accounts\s*\(\s*id\s*\)/i.test(def))
+    .map(([name]) => name)
+    .sort();
+
+/**
+ * The shape ADR-191 rules: a NULLABLE identity column of its own beside a
+ * column reaching `accounts`.
+ *
+ * READ OUT OF THE MIGRATIONS AND NEVER OUT OF THE REGISTRY, which is the whole
+ * reason the refusal below can fire on a rule that names the wrong class.
+ */
+const eitherShaped = (table: string): boolean => {
+  const identity = identityColumnsOf(table);
+  if (identity.length !== 1) return false;
+  if (declaredNotNull(foldTableDefs(table).get(identity[0] as string))) return false;
+  return accountColumnsOf(table).length > 0;
+};
+
+/**
+ * THE TYPE HALF, AND IT IS THE HALF vitest CANNOT SEE AT ALL, because the suite
+ * runs transpiled code and a type error is gone by then.
+ *
+ * `ScopedTableKey` is `Exclude<TableKey, FirmTableKey | PairTableKey>`, so an
+ * `either` key is served exactly while it is a member of neither exclusion. This
+ * line is `TS2322` the moment `events` is given a `pair` or a `firm` rule, which
+ * is the door ADR-191 opens stated as a compile-time fact rather than as a
+ * sentence. It is READ by the assertion below so it is not dead code.
+ */
+const EITHER_KEY_IS_SCOPED: ScopedTableKey = 'events';
+
+describe('a row that reaches an identity two ways is scoped by BOTH', () => {
+  // THE CLASS IS NOT VACUOUS AND THE READER IS NOT DEGENERATE, in both
+  // directions at once. `eitherShaped` passing by finding nothing would leave
+  // every refusal below green on an empty set, exactly as ADR-106's clause-4
+  // guard would have; so it must find the registered member AND it must NOT
+  // find a table whose identity column is NOT NULL beside an account edge,
+  // which is the seven-table majority this shape is discriminated from.
+  test('the shape reader finds the either tables and refuses the ones that merely resemble them', () => {
+    const eithers = TABLE_KEYS.filter((key) => SCOPE_RULES[key].class === 'either');
+    expect(eithers.length).toBeGreaterThan(0);
+    for (const key of eithers) {
+      expect(eitherShaped(SQL_NAME[key]), `${SQL_NAME[key]} is either-shaped in the DDL`).toBe(
+        true,
+      );
+    }
+
+    // THE OTHER DIRECTION, DERIVED RATHER THAN LISTED. Tables carrying BOTH an
+    // identities edge and an accounts edge are found by reading the DDL, and
+    // every one of them whose identity column is NOT NULL must be refused by
+    // this reader: its owned leg covers every row, so it needs no disjunction
+    // and `owned` is the correct class. If that set ever empties, the
+    // discrimination above is untested and this fails.
+    const bothEdges = DDL_NAMES.map(([, name]) => name).filter(
+      (name) => identityColumnsOf(name).length > 0 && accountColumnsOf(name).length > 0,
+    );
+    const notNullIdentity = bothEdges.filter((name) =>
+      declaredNotNull(foldTableDefs(name).get(identityColumnsOf(name)[0] as string)),
+    );
+    expect(notNullIdentity.length).toBeGreaterThan(0);
+    for (const name of notNullIdentity) {
+      expect(eitherShaped(name), `${name} carries a NOT NULL identity column`).toBe(false);
+    }
+  });
+
+  // THE CLAUSE WITH TEETH. A table of this shape may not be registered `owned`
+  // or `derived`: `owned` names one column and drops the rows the other column
+  // covers, and `derived` is refused twice by ADR-101 besides. This is the
+  // assertion that would have refused the wrong answer two sessions declined to
+  // write, and it reads the DDL rather than the rule.
+  test('a row with a NULLABLE identity column beside an account edge is registered either, never owned', () => {
+    for (const key of TABLE_KEYS) {
+      if (!eitherShaped(SQL_NAME[key])) continue;
+      expect(
+        SCOPE_RULES[key].class,
+        `${SQL_NAME[key]} declares a NULLABLE identity column beside a column reaching ` +
+          'accounts, so it reaches an identity two DIFFERENT ways and a rule naming one of ' +
+          'them returns a strict subset of a person`s rows with no error anywhere. `owned` ' +
+          'drops every account-level row; `derived` is refused by ADR-101 clause 1 because ' +
+          'the row carries its own identity column and by clause 2 because the edge is ' +
+          'nullable. Register it `either` (ADR-191), or leave it unregistered: unregistered ' +
+          'is unreachable and unreachable is safe.',
+      ).toBe('either');
+    }
+  });
+
+  // BOTH LEGS ARE READ OUT OF THE DDL, which is what stops the rule being
+  // asserted against itself. The identity leg must be a declared identity
+  // column; the account leg must be a declared foreign key to the via table.
+  test('every either rule names an identity column and a foreign key the DDL declares', () => {
+    for (const key of TABLE_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'either') continue;
+      expect(identityColumnsOf(SQL_NAME[key]), `${SQL_NAME[key]}.${rule.column}`).toEqual([
+        rule.column,
+      ]);
+      const def = foldTableDefs(SQL_NAME[key]).get(rule.localColumn);
+      expect(def, `${SQL_NAME[key]}.${rule.localColumn} is not a column`).toBeDefined();
+      expect(
+        new RegExp(`REFERENCES\\s+${SQL_NAME[rule.via]}\\s*\\(`, 'i').test(def ?? ''),
+        `${SQL_NAME[key]}.${rule.localColumn} is declared "${def ?? ''}"`,
+      ).toBe(true);
+    }
+  });
+
+  // ADR-101 CLAUSE 2, INVERTED RATHER THAN EVADED. That clause refuses a
+  // `derived` rule on a nullable edge because the null rows are a subset it
+  // returns in silence. Here the null rows are returned BY THE OTHER LEG, and
+  // that is only true while BOTH legs are nullable: a NOT NULL identity column
+  // means the owned leg already covers every row and the class is `owned`, and a
+  // NOT NULL account edge means the same the other way round. So the class
+  // REQUIRES what clause 2 refuses, and requires it of both.
+  test('every either rule stands on TWO nullable columns, which is what makes the disjunction admissible', () => {
+    for (const key of TABLE_KEYS) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'either') continue;
+      const defs = foldTableDefs(SQL_NAME[key]);
+      for (const column of [rule.column, rule.localColumn]) {
+        const def = defs.get(column);
+        expect(def, `${SQL_NAME[key]}.${column} is not a column`).toBeDefined();
+        expect(
+          declaredNotNull(def),
+          `${SQL_NAME[key]}.${column} is declared "${def ?? ''}". An either rule stands on ` +
+            'two OPTIONAL paths: if this one were required, the rows the other leg exists ' +
+            'to reach would not exist and the class would be a one-leg class wearing two.',
+        ).toBe(false);
+      }
+    }
+  });
+
+  // THE PREDICATE IS THE RULING, RENDERED. A rule that dropped a leg would pass
+  // every assertion above: the fields would still be right and the DDL would
+  // still declare them. This is where the SQL is read.
+  test('the either predicate is a DISJUNCTION naming both legs, and binds the handle`s identity on each', () => {
+    const eithers = TABLE_KEYS.filter((key) => SCOPE_RULES[key].class === 'either');
+    expect(eithers.length).toBeGreaterThan(0);
+    for (const key of eithers) {
+      const rule = SCOPE_RULES[key];
+      if (rule.class !== 'either') continue;
+      const { sql: text, params } = new PgDialect().sqlToQuery(scopePredicate(key, IDENTITY)) as {
+        sql: string;
+        params: unknown[];
+      };
+      // THE OWNED LEG, THE DERIVED LEG, AND THE `or` THAT MAKES THEM ONE. An
+      // `and` here would return only the rows carrying BOTH, which is neither
+      // half of the table.
+      expect(text, key).toMatch(new RegExp(`"${rule.column}"\\s*=\\s*\\$\\d`, 'i'));
+      expect(text, key).toMatch(/\bor\b/i);
+      expect(text, key).toMatch(/exists/i);
+      expect(text, key).toContain(`"${SQL_NAME[rule.via]}"`);
+      expect(text, key).toMatch(new RegExp(`"${rule.localColumn}"`, 'i'));
+      // BOTH LEGS BIND THE HANDLE'S IDENTITY AND NOTHING BINDS ANYTHING ELSE.
+      expect(params, key).toEqual([IDENTITY, IDENTITY]);
+    }
+  });
+
+  // PRECEDENCE IS REFUSED AND THE REFUSAL IS MECHANICAL RATHER THAN A COMMENT.
+  // Guarding the account leg with `identity_id IS NULL` would stop a row ever
+  // reaching two identity uuids, and it would hide a HARD-MERGED person's
+  // account-level history from the survivor: this table is append-only so
+  // `identity_id` keeps the merged uuid, while `accounts.identity_id` is
+  // repointed into the survivor. A predicate that grew that guard is red here.
+  test('the legs carry no precedence, so a merged identity`s account history is not hidden from the survivor', () => {
+    for (const key of TABLE_KEYS) {
+      if (SCOPE_RULES[key].class !== 'either') continue;
+      const { sql: text } = new PgDialect().sqlToQuery(scopePredicate(key, IDENTITY)) as {
+        sql: string;
+      };
+      expect(text, `${key}'s predicate guards one leg on the other being null`).not.toMatch(
+        /is\s+null/i,
+      );
+    }
+  });
+
+  // THE DOOR. Unlike `pair`, an either table IS served by the scoped accessor,
+  // and the reason is that no row this predicate returns discloses a second
+  // party through a tenancy column: `identity_id` is this person and the account
+  // is this person's. The runtime half of a type fact, kept because a caller
+  // reaching this through a cast still has to get the same answer.
+  test('an either table has a scoped reading, which is what distinguishes it from pair and from firm', () => {
+    const eithers = TABLE_KEYS.filter((key) => SCOPE_RULES[key].class === 'either');
+    expect(eithers.length).toBeGreaterThan(0);
+    for (const key of eithers) {
+      expect(() => scopePredicate(key, IDENTITY), key).not.toThrow();
+      // NOT A MEMBER OF EITHER REFUSAL. `ScopedTableKey` excludes `firm` and
+      // `pair` keys by class, so this is the runtime reading of the same fact.
+      expect(SCOPE_RULES[key].class, key).not.toBe('firm');
+      expect(SCOPE_RULES[key].class, key).not.toBe('pair');
+    }
+    // THE TYPE-LEVEL WITNESS, read here so the declaration is not dead code and
+    // so a reader of this block finds the compile-time half beside the runtime
+    // one. `tsc` is what actually enforces it.
+    expect(eithers as string[]).toContain(EITHER_KEY_IS_SCOPED);
+    for (const key of eithers) {
+      expect(SCOPE_RULES[key].why.length, key).toBeGreaterThan(40);
+    }
+  });
+
+  // A CHAIN MAY TERMINATE HERE, AND THAT IS A RULING RATHER THAN AN ACCIDENT.
+  // `pair` and `firm` are not terminals because a scoped read of them
+  // constructs no predicate and throws; an either rule constructs one, so a
+  // `derived` rule through an either table resolves. ADR-191 section 7 records
+  // that `integration_dispatches.event_id` and `discord_announcements.event_id`
+  // become writable this way and are refused on their own ground.
+  test('an either rule is a TERMINAL for a derivation chain, because it constructs a predicate', () => {
+    for (const key of TABLE_KEYS) {
+      if (SCOPE_RULES[key].class !== 'either') continue;
+      const chained = TABLE_KEYS.filter((k) => {
+        const rule = SCOPE_RULES[k];
+        return rule.class === 'derived' && rule.via === key;
+      });
+      // No table derives through one today, and the property is asserted
+      // anyway: this is what a session adding one inherits.
+      for (const k of chained) {
+        expect(() => scopePredicate(k, IDENTITY), k).not.toThrow();
+      }
+      expect(() => scopePredicate(key, IDENTITY), key).not.toThrow();
     }
   });
 });

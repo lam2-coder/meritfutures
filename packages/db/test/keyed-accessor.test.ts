@@ -201,6 +201,10 @@ function setFor(key: TableKey): Record<string, unknown> {
     ...pinned,
     ...(rule.class === 'derived' ? [rule.localColumn] : []),
     ...(rule.class === 'pair' ? [rule.columnA, rule.columnB] : []),
+    // BOTH LEGS, because ADR-191's class has two tenancy columns and
+    // `refuseTenancyColumn` refuses both: re-pointing `account_id` moves the row
+    // into whichever identity owns the account it is repointed at.
+    ...(rule.class === 'either' ? [rule.column, rule.localColumn] : []),
   ]);
   for (const [property, column] of Object.entries(columns)) {
     if (!forbidden.has(column.name)) return { [property]: sampleValue(column) };
@@ -441,7 +445,14 @@ describe('a scoped keyed write ANDs the tenancy predicate with the address', () 
       expect(theirs.sql, key).toBe(mine.sql);
       expect(mine.params, key).toContain(IDENTITY);
       expect(theirs.params, key).toContain(OTHER);
-      expect(mine.params.filter((p) => p === IDENTITY).length, key).toBe(1);
+      // ONCE PER LEG, AND THE COUNT IS ASSERTED PER CLASS RATHER THAN RELAXED
+      // TO "at least one". ADR-191's `either` predicate is a DISJUNCTION and it
+      // names the handle's identity on BOTH legs -- the equality on this row's
+      // own column and the EXISTS through the account -- so a flat 1 is wrong
+      // for it and a `toBeGreaterThan(0)` would stop this assertion noticing a
+      // class that grew a leg nobody bound.
+      const legs = SCOPE_RULES[key].class === 'either' ? 2 : 1;
+      expect(mine.params.filter((p) => p === IDENTITY).length, key).toBe(legs);
       expect(theirs.params.filter((p) => p === IDENTITY).length, key).toBe(0);
       const withoutIdentity = (params: unknown[]): unknown[] =>
         params.filter((p) => p !== IDENTITY && p !== OTHER);

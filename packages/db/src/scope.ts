@@ -54,6 +54,7 @@ import {
   dualControlApprovals,
   economicCalendar,
   economicCalendarLoads,
+  events,
   evidencePacks,
   fills,
   geoRestrictions,
@@ -138,18 +139,28 @@ import {
 /**
  * The registry. `TableKey` is exactly `keyof` this object, by construction.
  *
- * ONE HUNDRED AND SIX OF 114, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
+ * ONE HUNDRED AND SEVEN OF 114, AND THE SET IS NOT A PHASE'S. ADR-092 makes the
  * owner the TABLE: a table is registered ONCE by the first session that needs
  * it, the registration is never re-argued, and a session computes its own slice
  * from `TABLE_KEYS` on the tree it opened rather than from a roster.
  *
- * THE VOCABULARY HAS FIVE MEMBERS AND THE FIFTH IS ADR-106's. This file used to
+ * THE VOCABULARY HAS SIX MEMBERS AND THE SIXTH IS ADR-191's. This file used to
  * say the question `HOW DOES A ROW REACH AN IDENTITY?` has "exactly these four
  * answers on this schema", and that sentence was FALSE about migrations that
  * have been in the tree since `0002`: four tables carry TWO columns declared
  * `REFERENCES identities(id)`, and the fifth answer is BOTH OF THEM. `pair` is
  * that answer, and the ruling attached to it is that a row belonging to two
  * identities is scoped to NEITHER -- see the `PairRule` docblock below.
+ *
+ * ADR-106 THEN CLOSED THE SET AT FIVE AND THAT SENTENCE WAS FALSE TOO, in a way
+ * this file has recorded against `events` since session 195. Its arithmetic ran
+ * over WHERE THE IDENTITY IS -- the row itself, one column of this row, a column
+ * of another row, two columns of this row, or nothing -- and asked only whether
+ * a SIXTH would be THREE columns of this row, which it measured at zero tables.
+ * The enumeration is over PLACES and the answer that was missing is over PATHS:
+ * a row may reach an identity by one column of ITSELF **or** by a column of
+ * ANOTHER ROW, on the same table, with the row deciding which. `either` is that
+ * answer -- see the `EitherRule` docblock below.
  *
  * `identity_links`, `dedupe_matches` AND `attributions` ARE REGISTERED `pair`
  * AND ARE STILL UNREACHABLE THROUGH THE SCOPED ACCESSOR. Their absence from
@@ -185,46 +196,57 @@ import {
  * and session 215's stop condition is four registrations. The refusal that stood
  * here since session 208 is DISCHARGED and replaced by this sentence.
  *
- * `events` IS ABSENT AND ITS ABSENCE IS UNCHANGED BY ADR-106, which is worth
- * saying because it is the near miss. It carries `identity_id uuid NULL
- * REFERENCES identities(id)` AND `account_id uuid NULL REFERENCES accounts(id)`,
- * with NO CHECK tying them and neither one required. That is not a `pair`: a
- * pair is TWO IDENTITIES on one row, and this is one identity beside one
- * ACCOUNT, so `pair` has no second identity column to name and both columns are
- * nullable besides. A rule naming `identity_id` drops every account-level row
- * and a rule hopping `account_id` drops every identity-level row -- and
- * EVENTS.md section 2 rows the portal's timeline as PER-ACCOUNT while M04
- * section 5 consumes identity-level events on the same screen, so both halves
- * are read and neither column covers them. The payload is the second reason:
- * `kyc.dedupe_hit` carries `matched_identity_id` and `identity.merged` carries
- * `merged_identity_id`, so a row whose own tenancy column is correct still names
- * a DIFFERENT identity inside `jsonb`, which no scope rule can express and which
- * INV-M4-06 forbids the portal to receive. A transcription rules nothing, so
- * this is reported and not allocated.
+ * `events` IS REGISTERED AND IT IS THE SIXTH CLASS'S ONLY MEMBER (ADR-191).
+ * It carries `identity_id uuid NULL REFERENCES identities(id)` AND `account_id
+ * uuid NULL REFERENCES accounts(id)`, with NO CHECK tying them and neither one
+ * required. That is not a `pair`: a pair is TWO IDENTITIES on one row, and this
+ * is one identity beside one ACCOUNT, so `pair` has no second identity column to
+ * name and both columns are nullable besides. All five earlier members were
+ * tried against the shape and every one is either refused by a mechanical
+ * assertion or silently lossy: `owned` on `identity_id` compiles and drops every
+ * account-level row; `derived` through `account_id` is refused by ADR-101 clause
+ * 1, because the row carries its own identity column, and again by clause 2,
+ * because the edge is nullable; `pair` needs a SECOND IDENTITY column; `firm` is
+ * refused by the suite's own assertion, because the row declares a column
+ * against `identities(id)`; `root` is `identities`' alone.
  *
- * P5-b LOOKED AT IT AGAIN WITH A FENCE THAT CONTAINED IT AND STOPPED AT THE SAME
- * PLACE, WHICH IS WORTH ONE SENTENCE BECAUSE THE CIRCUMSTANCES CHANGED AND THE
- * ANSWER DID NOT. That slice was dispatched to register this table by name, so
- * the refusal is no longer "no session's fence held it"; it is that all five
- * members of the vocabulary were tried against the shape and every one is either
- * refused by a mechanical assertion or silently lossy. `owned` on `identity_id`
- * compiles and drops every account-level row. `derived` through `account_id` is
- * refused by ADR-101 clause 1, because the row carries its own identity column,
- * and again by clause 2, because the edge is nullable. `pair` needs a SECOND
- * IDENTITY column and this row's second column is an ACCOUNT. `firm` is refused
- * by the suite's own assertion, because the row declares a column against
- * `identities(id)`. `root` is `identities`' alone. WHAT THE TABLE NEEDS IS A
- * SIXTH CLASS, and ADR-106 is the precedent for what adding one costs: a whole
- * entry, whose ruling is that a row reaching an identity two ways is scoped by
- * the answer to a question the DDL does not settle. P5-b was allocated no ADR
- * number and was forbidden to take one, so it registered `payment_disputes` and
- * left this. THE PAYLOAD REASON IS THE WEAKER OF THE TWO AND IS DEMOTED HERE
- * RATHER THAN REPEATED: `idempotency_keys`, registered out of THIS SAME
- * MIGRATION, says in its own `why` that "a scope rule states which ROWS reach an
- * identity and nothing about what is inside one", so the corpus has already
- * ruled the adjacent question the other way. What survives of it is that
- * `response_body` holds THIS person's stored response and an `events` payload
- * holds a THIRD PARTY's uuid -- and that distinction is a ruling too.
+ * WHAT IT NEEDED WAS A SIXTH CLASS AND `either` IS IT. The rule names BOTH legs
+ * and the predicate is their DISJUNCTION, because both halves are genuinely
+ * read: EVENTS.md section 2 rows the portal's timeline as PER-ACCOUNT while M04
+ * section 5 consumes identity-level events on the same screen, so a rule serving
+ * one half is the `owned` failure with a new name. See the `EitherRule` docblock
+ * for the arithmetic, for why precedence between the legs is REFUSED, and for
+ * what a row reaching neither leg is.
+ *
+ * THE PAYLOAD OBJECTION IS RULED RATHER THAN CARRIED FORWARD. It ran: a row
+ * whose own tenancy column is correct still names a DIFFERENT identity inside
+ * `jsonb`, which INV-M4-06 forbids the portal to receive. `idempotency_keys`,
+ * registered out of THIS SAME MIGRATION SET, already says in its own `why` that
+ * "a scope rule states which ROWS reach an identity and nothing about what is
+ * inside one", so the corpus had ruled the adjacent question the other way. What
+ * survived of it was a real distinction -- `response_body` holds THIS person's
+ * stored response and an `events` payload holds a THIRD PARTY's uuid -- and
+ * ADR-191 section 6 rules ON that distinction rather than on the whole
+ * objection. THE TWO EVENT NAMES ARE NAMED HERE RATHER THAN COUNTED, because a
+ * count is a thing a later session has to re-derive and a name is a thing it can
+ * grep: `kyc.dedupe_hit` carries `matched_identity_id` and `identity.merged`
+ * carries `merged_identity_id`, and they are the whole of the set as of this
+ * entry, read out of EVENTS.md section 3 rather than remembered. NEITHER IS
+ * CONSUMED BY `TL`, which is the trader-facing consumer, so the corpus's own
+ * catalogue already excludes both from the surface INV-M4-06 is about -- and
+ * that exclusion is a PROJECTION and not this rule, which is exactly the
+ * division ADR-191 section 6 rules. REGISTERING A TABLE MAKES IT READABLE AND
+ * NOTHING ELSE, which is `risk_flags`' sentence and `evidence_packs`' sentence
+ * arriving on the first table where the thing being read is `jsonb`.
+ *
+ * P5-b LOOKED AT IT WITH A FENCE THAT CONTAINED IT AND STOPPED, and that is
+ * still worth a sentence because it is why this registration is an ENTRY. That
+ * slice was dispatched to register this table by name, tried all five members,
+ * was allocated no ADR number and was forbidden to take one, so it registered
+ * `payment_disputes` and left this. Session 349 then measured the same wall from
+ * downstream: a `Tx` naming `'events'` fails `tsc` with `TS2322` against
+ * `TABLE_KEYS`, so the admin event feed could not be adapted. Registering the
+ * table is what unblocks that adapter, and the adapter is a LATER SLICE.
  */
 export const TABLES = {
   identities,
@@ -344,12 +366,18 @@ export const TABLES = {
   // one that wrote its DDL, so there is no waiting reader and nothing to
   // re-argue.
   payoutDestinations,
+  // ADR-191. THE SIXTH CLASS'S ONLY MEMBER, and the table two sessions were
+  // dispatched to register and neither could. It is `either`: one nullable
+  // identity column of its own beside one nullable account column, so a row
+  // reaches an identity through the first, or through the second, or through
+  // neither. See the class docblock and this table's `why`.
+  events,
 } as const;
 
 export type TableKey = keyof typeof TABLES;
 
 /**
- * The five classes, partitioning one question: HOW DOES A ROW REACH AN IDENTITY?
+ * The six classes, partitioning one question: HOW DOES A ROW REACH AN IDENTITY?
  *
  * THE VOCABULARY WAS FOUR AND THE CLAIM THAT FOUR WAS ALL OF THEM WAS FALSE.
  * This declaration read "The question has exactly these four answers on this
@@ -360,8 +388,28 @@ export type TableKey = keyof typeof TABLES;
  * a column of this row, a column of another row, two columns of this row, the
  * row itself, or nothing -- so the fifth member is the answer that was missing
  * rather than the first of many.
+ *
+ * IT WAS FIVE AND THE CLAIM THAT FIVE CLOSED IT WAS FALSE IN THE SAME WAY, about
+ * a table this file has argued with by name since session 195. ADR-106's
+ * arithmetic enumerates WHERE the identity is and asks only whether a sixth
+ * would be a third column; `events` is a sixth that is not a third column at
+ * all. It carries `identity_id uuid NULL` and `account_id uuid NULL`, so ONE ROW
+ * reaches an identity the `owned` way, the NEXT reaches one the `derived` way,
+ * and a THIRD reaches none -- and the table is one table. ADR-191 adds `either`,
+ * and restates the closure over PATHS rather than places: a rule names one path
+ * (`root`, `owned`, `derived`), or two paths of the SAME kind (`pair`), or two
+ * paths of DIFFERENT kinds (`either`), or none (`firm`).
+ *
+ * WHAT A SEVENTH WOULD BE IS STATED SO THE NEXT SESSION MEASURES IT RATHER THAN
+ * ARGUES IT: THREE paths on one row. ADR-191 does NOT claim that is zero, and
+ * the reason is that ADR-106's measurement does not cover it: "no table declares
+ * three columns `REFERENCES identities(id)`" is re-measured here and still true,
+ * and it says nothing about a row carrying one identity column beside TWO
+ * different tables that each reach an identity. That shape is UNMEASURED and is
+ * registered as such rather than asserted away, which is the honest difference
+ * between this closure claim and the two before it.
  */
-export type ScopeClass = 'root' | 'owned' | 'derived' | 'pair' | 'firm';
+export type ScopeClass = 'root' | 'owned' | 'derived' | 'pair' | 'either' | 'firm';
 
 export interface RootRule {
   readonly class: 'root';
@@ -442,13 +490,97 @@ export interface PairRule {
   readonly why: string;
 }
 
+/**
+ * A ROW THAT REACHES AN IDENTITY TWO DIFFERENT WAYS, AND WHICH WAY IS A FACT
+ * ABOUT THE ROW. ADR-191.
+ *
+ * ONE NULLABLE IDENTITY COLUMN OF ITS OWN BESIDE ONE NULLABLE FOREIGN KEY TO A
+ * ROW THAT CARRIES ONE. `events` declares `identity_id uuid NULL REFERENCES
+ * identities(id)` and `account_id uuid NULL REFERENCES accounts(id)`
+ * (0017_events_and_audit.sql), with NO CHECK tying them and neither one
+ * required. This is not `pair`: a pair is TWO IDENTITY columns, both NOT NULL,
+ * both true at once. Here the second column is an ACCOUNT, and on any given row
+ * at most one of the two is the answer.
+ *
+ * THE PREDICATE IS THE DISJUNCTION AND NEITHER HALF MAY BE LOST, which is the
+ * whole ruling. An `owned` rule on `identity_id` COMPILES and drops every
+ * account-level row; a `derived` hop through `account_id` drops every
+ * identity-level row. Both halves are genuinely read on one screen: EVENTS.md
+ * section 2 rows the `TL` consumer as a PER-ACCOUNT chronological view, and M04
+ * section 5 consumes `phone.verified` and `phone.change_requested`, which have
+ * no account at all. A rule answering "whose row is this" for one half is the
+ * `owned` failure with a new name.
+ *
+ * A ROW REACHING NEITHER LEG BELONGS TO NO IDENTITY AND IS RETURNED TO NOBODY,
+ * and no second predicate is needed for it. SQL NULL never equals anything, so
+ * `identity_id = $1` drops the firm rows on its own and the EXISTS drops them
+ * again -- `ledger_accounts`' mechanism arriving on both legs at once. THIS IS
+ * THE FIRST CLASS IN THIS REGISTRY WHOSE `firm` HALF IS A PROPERTY OF THE ROW
+ * RATHER THAN OF THE TABLE, and a session that wants those rows reads them
+ * through `systemDb(reason)` like every other firm row.
+ *
+ * PRECEDENCE BETWEEN THE LEGS IS REFUSED, AND IT IS THE ONE ALTERNATIVE THAT
+ * LOOKS STRICTLY SAFER. Making the row's own column authoritative when populated
+ * -- `identity_id = $1 OR (identity_id IS NULL AND EXISTS ...)` -- would
+ * guarantee that no row is ever returned to two different identity uuids. It is
+ * refused because the rows on which the two legs disagree are the rows a HARD
+ * MERGE produces: a merge REPOINTS OWNERSHIP into the surviving `identities` row,
+ * `accounts.identity_id` moves with it, and this table is APPEND-ONLY -- no
+ * UPDATE, no DELETE, by 0017's own comment -- so an account-level event written
+ * before a merge names the MERGED identity on the row and the SURVIVOR through
+ * the account. Precedence hands that row to the identity that no longer logs in
+ * and hides it from the person who owns the account, which is `purchases`' own
+ * refusal in this file: "a strict subset of a merged person's purchase history,
+ * silently". The disjunction returns it to both, and after a hard merge both ARE
+ * one person.
+ *
+ * SO THE TWO UUIDS THIS RULE CAN REACH FROM ONE ROW ARE NOT TWO PARTIES, AND
+ * THAT IS WHY THIS CLASS IS IN `ScopedTableKey` WHERE `pair` IS NOT. ADR-106
+ * clause 2 excludes a pair table because every row a disjunction returns carries
+ * the OTHER party's identity uuid out of a NOT NULL column. Here `identity_id`
+ * is this person and `account_id` is this person's account: no row this
+ * predicate returns discloses a second party through a tenancy column. That
+ * ground is ABSENT rather than outweighed.
+ *
+ * WHAT IT STILL LOSES IS NAMED RATHER THAN LEFT TO BE FOUND: a merged identity's
+ * own IDENTITY-LEVEL events. Those rows carry the dead uuid in `identity_id` and
+ * no `account_id`, this table is append-only so the column is never repointed,
+ * and `identity_merges` is not registered -- so the survivor's scoped read
+ * cannot reach them by any rule this vocabulary can write. ADR-191 section 8
+ * registers it; it is a consequence of append-only storage and not of this
+ * class, and no sixth member fixes it.
+ *
+ * IT CARRIES NO `nullable` FIELD AND NEVER WILL, on ADR-101 clause 3's rule that
+ * a field nothing reads and nothing checks is a second thing asserting itself.
+ * BOTH columns being NULLABLE is the class rather than a property of one member,
+ * and it is asserted against the migrations by the suite. That inverts ADR-101
+ * clause 2 rather than evading it: that clause refuses a `derived` rule on a
+ * nullable edge because the null rows are a subset it returns in silence, and
+ * here the null rows are returned by the OTHER leg, which is the only reason a
+ * nullable edge is admissible at all.
+ */
+export interface EitherRule {
+  readonly class: 'either';
+  /** The identity column carried on the row itself. NULLABLE by construction. */
+  readonly column: string;
+  /** The table this row ALSO reaches an identity through. */
+  readonly via: TableKey;
+  /** This row's column holding `via`'s key. NULLABLE by construction. */
+  readonly localColumn: string;
+  /** `via`'s column that `localColumn` points at. */
+  readonly foreignColumn: string;
+  /** As `DerivedRule.traversal`, and checked by the same assertion. */
+  readonly traversal: 'hop' | 'semi-join';
+  readonly why: string;
+}
+
 export interface FirmRule {
   readonly class: 'firm';
   /** Why no identity owns these rows. A reason, never a placeholder. */
   readonly why: string;
 }
 
-export type ScopeRule = RootRule | OwnedRule | DerivedRule | PairRule | FirmRule;
+export type ScopeRule = RootRule | OwnedRule | DerivedRule | PairRule | EitherRule | FirmRule;
 
 /**
  * THE REGISTRY. Total over `TableKey` by the `satisfies` clause below: omit a
@@ -1125,6 +1257,16 @@ export const SCOPE_RULES = {
     column: 'identity_id',
     nullable: false,
     why: "`identity_id uuid NOT NULL REFERENCES identities(id) ON DELETE RESTRICT` on the row (0051_payout_destinations.sql), where it is also the FIRST HALF of the primary key `(identity_id, destination_ref)`. A DESTINATION BELONGS TO A HUMAN AND NEVER TO AN ACCOUNT, which is the reading `wallet_withdrawals` already carries under SD-M5-06: the external leg has no `account_id` because the money is the person's by the time it is there, and the destination it moves to is the person's for the same reason. THE ROW REACHES EXACTLY ONE IDENTITY AND CARRIES NO SECOND PATH TO ANYBODY: `destination_ref` is a PROVIDER-SIDE id and never bank details, so it names a row in a vendor's database rather than one in this one, and `first_seen_at`, `cooling_until` and `created_at` are timestamps. There is nothing here for ADR-101 clause 1 to refuse and nothing for a `derived` rule to reach through, which makes this the rare registration whose available mistake is not a second column but a second TABLE. THE AFFILIATE RAIL SHARES THIS TENANCY RATHER THAN NEEDING ITS OWN, and that is the table's own property rather than a reader's use: C-24 requires affiliate destination changes to carry the same 48 hour window as trader destinations, and `affiliates.identity_id uuid NOT NULL REFERENCES identities(id)` (0005_affiliate_program.sql) makes an affiliate an identity -- so ADR-017's one rail, one destination table is expressible here with no discriminator column and no disjunction. WHAT A SCOPED READ RETURNS IS THE PERSON'S WHOLE DESTINATION HISTORY INCLUDING THE WINDOWS THAT HAVE ELAPSED, and that is deliberate: the row is never deleted (0051 REVOKEs DELETE from merit_app and PUBLIC) and `cooling_until` moves only forward under PAYOUT-DEST-C1, so a contested refusal is explicable months later out of the rows themselves. THE SCOPE RULE AND THE GRANT ANSWER DIFFERENT QUESTIONS HERE, which is 0050's lesson on a table that is readable rather than one that is not: a correctly scoped DELETE through this rule still fails, because merit_app holds SELECT, INSERT and UPDATE on this table and nothing else.",
+  },
+
+  events: {
+    class: 'either',
+    column: 'identity_id',
+    via: 'accounts',
+    localColumn: 'account_id',
+    foreignColumn: 'id',
+    traversal: 'hop',
+    why: "THE ROW REACHES AN IDENTITY TWO DIFFERENT WAYS AND WHICH WAY IS A FACT ABOUT THE ROW (ADR-191). `identity_id uuid NULL REFERENCES identities(id) ON DELETE RESTRICT` and `account_id uuid NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0017_events_and_audit.sql), with NO CHECK tying them and neither one required, so one row is reached the `owned` way, the next the `derived` way, and a third by neither. BOTH HALVES ARE READ ON ONE SCREEN, which is what makes the disjunction the ruling rather than a convenience: EVENTS.md section 2 rows the `TL` consumer as a PER-ACCOUNT chronological view and M04 section 5 consumes `phone.verified` and `phone.change_requested`, which carry no account at all. An `owned` rule on `identity_id` COMPILES and drops every account-level row; a `derived` hop through `account_id` is refused twice by ADR-101, by clause 1 because this row carries its own identity column and by clause 2 because the edge is nullable, and would drop every identity-level row if it were written. `hop` RATHER THAN `semi-join`: an event names ONE account and `accounts.id` is that table's primary key, so the traversal cannot multiply this row. THE CHAIN TERMINATES ONE HOP OUT: `accounts` is `owned` on `identity_id`, `nullable: false`. `subject_kind`/`subject_id` ARE THE AVAILABLE MISTAKE AND ARE REFUSED HERE RATHER THAN IN REVIEW: 0017 calls the pair a polymorphic subject and not a foreign key, `subject_id uuid NOT NULL` is on every row including the firm ones, and a plan version and a payout request are subjects, so a rule reading it hands every event ever written to whoever's uuid happens to match. THE PAYLOAD IS NOT THIS RULE'S BUSINESS AND THE DISTINCTION IS RULED RATHER THAN WAVED: `idempotency_keys`, out of this same migration set, says a scope rule states which ROWS reach an identity and nothing about what is inside one; what is different here is that `kyc.dedupe_hit` and `identity.merged` carry a THIRD PARTY's uuid in `jsonb`, and ADR-191 section 6 rules that registering the table makes it readable and nothing else, exactly as `evidence_packs` says about its own redaction profile. WHAT A SCOPED READ RETURNS IS THIS PERSON'S EVENTS BY EITHER PATH AND THE FIRM ROWS BY NEITHER, and what it still cannot return is a MERGED identity's identity-level history: this table is APPEND-ONLY so `identity_id` is never repointed into the survivor, `identity_merges` is not registered, and ADR-191 section 8 registers the gap rather than closing it with a rule no class can write.",
   },
 } as const satisfies { readonly [K in TableKey]: ScopeRule };
 
