@@ -171,7 +171,7 @@ export function scopePredicate(key: TableKey, identityId: IdentityId): SQL {
       // would hide a merged person's account-level history from the survivor.
       // The `EitherRule` docblock carries the argument.
       const via = TABLES[rule.via] as PgTable;
-      return or(
+      const disjunction = or(
         eq(columnByName(table, rule.column), identityId),
         exists(
           new QueryBuilder()
@@ -184,7 +184,21 @@ export function scopePredicate(key: TableKey, identityId: IdentityId): SQL {
               ),
             ),
         ),
-      ) as SQL;
+      );
+      // REFUSED RATHER THAN CAST. `or` is typed `SQL | undefined` because it
+      // returns `undefined` when EVERY argument is, which cannot happen here:
+      // both legs are constructed on the two lines above. A cast would say the
+      // same thing and say it in the one direction that is silent if it ever
+      // stops being true -- an unscoped read, which is what this file exists to
+      // make impossible.
+      if (disjunction === undefined) {
+        throw new Error(
+          `${key} is registered "either" and its disjunction constructed no predicate. ` +
+            'A scoped read with no predicate is an unscoped read. The registry and this ' +
+            'builder have drifted.',
+        );
+      }
+      return disjunction;
     }
 
     case 'pair':
