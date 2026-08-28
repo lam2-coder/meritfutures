@@ -14,9 +14,11 @@ import adminReads, {
   ADMIN_SESSION_COOKIE,
   AdminReadError,
   EVIDENCE_PACK_AUDIENCES,
+  LIABILITY_GAP_CAUSES,
   LIMIT_MAX,
   adminTokenFromCookie,
   assertContractScalars,
+  assertLiabilityGapsPaired,
   authorizeAdmin,
   resolveAdminRole,
   setAdminReadSource,
@@ -32,6 +34,7 @@ import type {
   EvidencePackResponse,
   FlagListItem,
   IdentityGraph,
+  LiabilityGap,
   LiabilityResponse,
 } from '../src/routes/admin-reads.ts';
 
@@ -129,6 +132,12 @@ const LIABILITY: LiabilityResponse = {
     recon: { last_run_at: '2026-08-26T22:10:00Z', mismatches_open: 0 },
     batch: { last_success_at: '2026-08-26T23:05:00Z', last_duration_ms: 41_200 },
   },
+
+  // COMPLETE, SO THERE IS NOTHING TO EXPLAIN. `ADR-203` makes `gaps` required
+  // and `[]` rather than omitted: a response that drops the field when it has
+  // no gaps makes "nothing is missing" and "this producer does not know about
+  // gaps" the same body.
+  gaps: [],
 };
 
 const GRAPH: IdentityGraph = {
@@ -540,6 +549,152 @@ test('the CUSUM statistic and threshold are floats and are correctly left alone'
   expect(() => {
     assertContractScalars({ cusum: { statistic: 2.718, threshold: 5.5 } }, '');
   }).not.toThrow();
+});
+
+// -----------------------------------------------------------------------------
+// 4b. ADR-203. An absent figure, and the two ways of getting it wrong
+// -----------------------------------------------------------------------------
+
+test('the sweep refuses a nullable cents member, which is why the absence is at the OBJECT', () => {
+  // **THIS IS THE HALF OF ADR-203 THAT WAS ENFORCED BEFORE IT WAS RULED, and it
+  // is measured here rather than argued.** Ruling 3 puts the `null` on
+  // `payout_velocity` and never on `payout_velocity.last_7d_cents`, and the
+  // corpus's own money rule already made the second shape unservable: every
+  // `*_cents` and `*_bp` is a JSON integer at this boundary, so a producer that
+  // pushed the absence down to a member would meet a 500 rather than a ruling.
+  // A shape the sweep refuses is not a shape this contract may declare.
+  expect(() => {
+    assertContractScalars({ payout_velocity: { last_7d_cents: null } }, '');
+  }).toThrow(AdminReadError);
+  expect(() => {
+    assertContractScalars({ payout_velocity: { ratio_bp: null } }, '');
+  }).toThrow(AdminReadError);
+  // AND THE RULED SHAPE PASSES IT. Non-vacuity: a case that only ever attempts
+  // forbidden things passes against a sweep that rejects everything.
+  expect(() => {
+    assertContractScalars({ payout_velocity: null, per_plan: [{ cusum: null }] }, '');
+  }).not.toThrow();
+  // `awaiting` IS THE NAME AND `blocked_on` IS NOT, and the sweep is the reason
+  // rather than taste: a key ending `_on` must be a trading day, a null or a
+  // boolean, so a dependency identifier under that name is refused at the wire.
+  expect(() => {
+    assertContractScalars({ gaps: [{ awaiting: 'DEP-M6-05' }] }, '');
+  }).not.toThrow();
+  expect(() => {
+    assertContractScalars({ gaps: [{ blocked_on: 'DEP-M6-05' }] }, '');
+  }).toThrow(AdminReadError);
+});
+
+/** A response with one absent figure, built from the fixture above. */
+function withGap(
+  patch: Partial<LiabilityResponse>,
+  gaps: readonly LiabilityGap[],
+): LiabilityResponse {
+  return { ...LIABILITY, ...patch, gaps };
+}
+
+const CUSUM_ABSENT: LiabilityGap = {
+  field: 'per_plan[].cusum',
+  cause: 'awaiting_dependency',
+  awaiting: 'DEP-M6-05',
+  detail: 'ADR-167 clause 5 renders the CUSUM absent until the harness supplies mu_0 and sigma.',
+};
+
+test('ADR-203: a null with no gap naming it is refused, in both directions', () => {
+  // DIRECTION ONE, THE BARE NULL. It is the option ADR-203 exists to beat: an
+  // honest gap arriving as an indistinguishable zero, on the panel where that is
+  // the difference between "we do not know" and "there is none".
+  expect(() => {
+    assertLiabilityGapsPaired(withGap({ payout_velocity: null }, []));
+  }).toThrow(AdminReadError);
+
+  // DIRECTION TWO, AND IT IS THE WORSE ONE. A gap over a figure that is PRESENT
+  // tells an operator that a number they are looking straight at is missing.
+  expect(() => {
+    assertLiabilityGapsPaired(withGap({}, [CUSUM_ABSENT]));
+  }).toThrow(AdminReadError);
+
+  // THE PAIRED FORM PASSES, which is the acceptance half. A control that only
+  // ever refuses passes against a function that refuses everything.
+  expect(() => {
+    assertLiabilityGapsPaired(
+      withGap({ payout_velocity: null }, [
+        {
+          field: 'payout_velocity',
+          cause: 'estate_uncovered',
+          awaiting: null,
+          detail: 'trading_calendar_loads covers no interval containing 2026-08-26.',
+        },
+      ]),
+    );
+  }).not.toThrow();
+
+  // AND A COMPLETE RESPONSE WITH NO GAPS PASSES, which is the ordinary day.
+  expect(() => {
+    assertLiabilityGapsPaired(LIABILITY);
+  }).not.toThrow();
+});
+
+test('ADR-203: `awaiting` is non-null exactly when the cause is `awaiting_dependency`', () => {
+  const absent = { per_plan: LIABILITY.per_plan.map((plan) => ({ ...plan, cusum: null })) };
+  expect(() => {
+    assertLiabilityGapsPaired(withGap(absent, [CUSUM_ABSENT]));
+  }).not.toThrow();
+  // A DEPENDENCY CAUSE THAT NAMES NOTHING is the gap that says "wait" and gives
+  // the reader nowhere to look, which is the free-text reason wearing a closed
+  // vocabulary's clothes.
+  expect(() => {
+    assertLiabilityGapsPaired(withGap(absent, [{ ...CUSUM_ABSENT, awaiting: null }]));
+  }).toThrow(AdminReadError);
+  // AND THE REVERSE: an `estate_uncovered` gap that names a deliverable is
+  // claiming somebody owes a thing that nobody owes.
+  expect(() => {
+    assertLiabilityGapsPaired(withGap(absent, [{ ...CUSUM_ABSENT, cause: 'estate_uncovered' }]));
+  }).toThrow(AdminReadError);
+});
+
+test('ADR-203: a blank detail and a duplicated field are each refused', () => {
+  const absent = { per_plan: LIABILITY.per_plan.map((plan) => ({ ...plan, cusum: null })) };
+  // "'unavailable' written by the schema is the same silence, spelled"
+  // (`apps/admin/src/figure.ts`), and whitespace is that sentence's loophole.
+  expect(() => {
+    assertLiabilityGapsPaired(withGap(absent, [{ ...CUSUM_ABSENT, detail: '   ' }]));
+  }).toThrow(AdminReadError);
+  expect(() => {
+    assertLiabilityGapsPaired(withGap(absent, [CUSUM_ABSENT, CUSUM_ABSENT]));
+  }).toThrow(AdminReadError);
+});
+
+test('ADR-203: the cause vocabulary is CLOSED at three, and this case is what says so', () => {
+  // `SystemReason`'s and `SqlExecutorReason`'s shape, on ADR-179's precedent:
+  // "a union declared in one place, a source-reading case that says how many
+  // members it has, and a widening that is therefore a diff on a test which says
+  // why the set is closed."
+  //
+  // WHY THREE. Each is a DIFFERENT ACT by whoever reads the panel:
+  // `awaiting_dependency` waits on the named deliverable; `insufficient_history`
+  // waits on time and nothing is wrong; `estate_uncovered` is ADR-042 F-4's
+  // unknown, which is somebody's job TODAY. A fourth member is a fourth act, and
+  // a member minted for a FIGURE rather than for a KIND of absence is the
+  // vocabulary joining itself, which is ADR-165's refusal one vocabulary over.
+  expect(LIABILITY_GAP_CAUSES).toStrictEqual([
+    'awaiting_dependency',
+    'insufficient_history',
+    'estate_uncovered',
+  ]);
+  expect(LIABILITY_GAP_CAUSES).toHaveLength(3);
+  // DECLARED AND NOT DERIVED, which is finding 2 of ADR-179 restated as a
+  // property of this file: a vocabulary read off a map cannot refuse a member,
+  // because it is whatever the map says.
+  const source = readFileSync(join(ROOT, 'apps/api/src/routes/admin-reads.ts'), 'utf8');
+  expect(source).toContain(
+    "export type LiabilityGapCause = 'awaiting_dependency' | 'insufficient_history' | 'estate_uncovered';",
+  );
+  // AND ALL THREE COPIES OF THE RESPONSE SPELL THE SAME THREE. `RI-18` compares
+  // field SETS and never the members of a string union, so it cannot see this.
+  for (const rel of ['docs/architecture/API_CONTRACT.md', 'apps/admin/src/api/types.ts'])
+    for (const member of LIABILITY_GAP_CAUSES)
+      expect(readFileSync(join(ROOT, rel), 'utf8'), `${rel} ${member}`).toContain(member);
 });
 
 test('a trading day that is a timestamp is refused', () => {

@@ -363,7 +363,7 @@ function stated(number: PolicyNumber, name: string): bigint {
  * a hand-written shape, so a field added to the panel is a type error here on the
  * day it lands rather than a silently short object.
  */
-export type PayoutVelocityPanel = LiabilityResponse['payout_velocity'];
+export type PayoutVelocityPanel = NonNullable<LiabilityResponse['payout_velocity']>;
 
 /**
  * What this evaluator can answer, and the three answers are genuinely different.

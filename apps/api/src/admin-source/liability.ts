@@ -482,7 +482,9 @@ function latestBy(rows: readonly unknown[], column: string, at: string): unknown
 // -----------------------------------------------------------------------------
 
 /** ADR-188 clause 1: the top-level fields are one `liability_snapshots` row, column for column. */
-function readSnapshot(row: unknown): Omit<LiabilityBook, 'reserve' | 'per_plan' | 'integrations'> {
+function readSnapshot(
+  row: unknown,
+): Omit<LiabilityBook, 'reserve' | 'per_plan' | 'integrations' | 'gaps'> {
   const at = 'the liability snapshot';
   return {
     as_of: instant(row, 'asOf', at),
@@ -831,6 +833,15 @@ export async function readLiabilityBook(tx: LiabilityTx): Promise<LiabilityBookR
         recon: { mismatches_open: openMismatches.length },
         batch,
       },
+
+      // EMPTY, AND THAT IS TRUE OF THIS TYPE RATHER THAN OF THE RESPONSE.
+      // `ADR-203` gives `LiabilityResponse` a way to say a figure is absent and
+      // why; this BOOK says it by OMITTING the group instead, which is what
+      // `LiabilityBook`'s `Omit` list is, so the book carries no null and
+      // therefore no gap. The two spellings are the reason `readLiability` is
+      // still not composed: the day a blocker lifts, the session that lifts it
+      // deletes an `Omit` and writes the gap here rather than dropping a field.
+      gaps: [],
     },
     cost: {
       liabilitySnapshotsScanned: snapshots.length,

@@ -902,10 +902,11 @@ type LiabilityResponse = {
   absorbed_corrections_cents: number;            // P-M6-10. SIGNED, and the only signed figure on this response
   funded_accounts: number;
   eligible_next_7d: { total_cents: number; account_count: number; by_day: Array<{ trading_day: string; cents: number; accounts: number }> };
-  payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean };
+  payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean } | null;
   reserve: { as_of: string; reserve_cents: number; cvar99_cents: number; rcr_bp: number; breaker_armed: boolean; treasury_account_code: string; treasury_as_of: string; treasury_source: "provider_api" | "manual_attestation" };
-  per_plan: Array<{ plan_id: string; code: string; loss_ratio_bp: number; threshold_bp: number; sales_paused: boolean; cusum: { statistic: number; threshold: number; alarm: boolean } }>;
+  per_plan: Array<{ plan_id: string; code: string; loss_ratio_bp: number; threshold_bp: number; sales_paused: boolean; cusum: { statistic: number; threshold: number; alarm: boolean } | null }>;
   integrations: { mid_health: Array<{ psp: string; decline_rate_bp: number; chargeback_rate_bp: number; healthy: boolean }>; recon: { last_run_at: string; mismatches_open: number }; batch: { last_success_at: string; last_duration_ms: number } };
+  gaps: Array<{ field: string; cause: "awaiting_dependency" | "insufficient_history" | "estate_uncovered"; awaiting: string | null; detail: string }>;  // ADR-203. Every null above is named here, with why
 };
 ```
 
@@ -922,6 +923,48 @@ type LiabilityResponse = {
 **`absorbed_corrections_cents` is SIGNED.** `0009` declares it signed and it is the only field on this response that may be negative. A renderer that clamps it at zero reports an absorbed correction as none.
 
 **`reserve` carries its OWN `as_of` because it is a different table on a different clock.** `reserve_coverage_snapshots` is a ratio of the rail's balance ([M05](../plans/M05-payout-system.md) `SD-M5-03`) against ours, and [`data-model/liability_snapshots.md`](data-model/liability_snapshots.md) records that as the second reason the two were not one table: *"one row forces one `as_of` on two sources that do not move together"*. A response that dated both with the top-level `as_of` would re-collapse in the payload what the schema separated. `treasury_account_code`, `treasury_as_of` and `treasury_source` are the anchor `0049` stores as a reference; `P-M6-07` requires *"attestation staleness shown when the balance is a manual attestation"*, and `treasury_source` is the only field on this response that answers which of the two it is.
+
+#### A figure that is not there is a `null` whose reason is on the body ([ADR-203](../decisions/ADR-203.md), **AMENDED**)
+
+**`payout_velocity` and `per_plan[].cusum` gained `| null`, and `gaps` was added.** Two producers now
+exist that understand their figure and cannot express it in the shape declared above, which is
+[ADR-203](../decisions/ADR-203.md)'s subject. The amendment is additive in the only direction that
+matters to a reader: no field is removed, no field is renamed, no member of a present object changes
+type, and the sum [ADR-188](../decisions/ADR-188.md) refuses to send is still not sent.
+
+**THE KEY IS ALWAYS PRESENT AND `null` IS THE ABSENCE.** An optional key would make *"this figure is
+blocked and here is why"* and *"this deployment did not fill the field"* the same response, which is
+[ADR-198](../decisions/ADR-198.md) clause 2's reasoning one type over: *"encoding an absence as a
+number would make 'no figure' and 'zero cents' the same row forever."* A `null` is a value the
+response asserts; a missing key is a value it withholds.
+
+**THE ABSENCE IS AT THE OBJECT AND NEVER AT A MEMBER, AND SECTION 1 ALREADY ENFORCED THAT BEFORE
+[ADR-203](../decisions/ADR-203.md) RULED IT.** `last_7d_cents: null` is refused at the boundary by the
+scalar sweep, which makes every `*_cents` and `*_bp` a JSON integer. So a nullable member is not a
+shape this contract could serve even if it declared one, and the absence of a computation is a
+property of the computation rather than of its outputs.
+
+**NO `null` TRAVELS ALONE.** `gaps` carries one entry per absent figure, `field` names the JSON path
+of the `null`, and the two are paired in both directions: a `null` with no entry naming it and an
+entry naming a path that is not `null` are each refused. `gaps` is `[]` on a complete response and is
+never omitted.
+
+**`cause` IS A CLOSED VOCABULARY OF THREE AND `detail` IS FREE TEXT.** The three are kinds of absence
+rather than names of figures, on `SystemReason`'s rule that a scope vocabulary names kinds and not
+services ([ADR-165](../decisions/ADR-165.md)), and each is a different act by whoever reads the panel:
+`awaiting_dependency` waits on the named deliverable in `awaiting`; `insufficient_history` waits on
+time and nothing is wrong; `estate_uncovered` means the estate records no opinion about the period at
+all, which is `ADR-042` F-4's unknown and is somebody's job today. `awaiting` is non-`null` exactly
+when `cause` is `awaiting_dependency`. `detail` is required and may not be blank, on
+[`figure.ts`](../../apps/admin/src/figure.ts)'s rule for the console's own absences: *"'unavailable'
+written by the schema is the same silence, spelled."*
+
+**`blocked_on` IS NOT THE NAME, AND THE NAME MOVED RATHER THAN THE SWEEP.** Section 1 refuses any key
+ending `_on` or `_day` that is not a `YYYY-MM-DD` trading day, because a container named for a day
+that is not one is how a timestamp reaches a chart axis.
+[`admin-breaker.ts`](../../apps/api/src/routes/admin-breaker.ts)'s `ProjectionGap` met this first and
+chose `awaiting`; this shape is that one with a `cause` added, so the two admin surfaces that carry an
+absence carry it in one spelling.
 
 #### The live Open Liability ([ADR-020](../decisions/ADR-020.md) tier 2, [ADR-161](../decisions/ADR-161.md))
 

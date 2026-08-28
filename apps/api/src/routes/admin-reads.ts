@@ -525,6 +525,87 @@ export interface EligibleNext7d {
   }[];
 }
 
+/**
+ * Section 8, one figure this response cannot supply, and WHY. `ADR-203`.
+ *
+ * `ProjectionGap` in {@link ../routes/admin-breaker.ts} is this shape with no
+ * `cause`, and the resemblance is deliberate rather than accidental: that type
+ * met the naming constraint first and the spelling is taken from it. **`awaiting`
+ * AND NOT `blocked_on`**, because {@link assertContractScalars} refuses any key
+ * ending `_on` or `_day` that is not a `YYYY-MM-DD` trading day, and it is right
+ * to: a container named for a day that is not one is how a timestamp reaches a
+ * chart axis.
+ */
+export interface LiabilityGap {
+  /**
+   * The JSON path of the `null` this entry explains, as it appears on the body.
+   *
+   * A STRING AND NOT A CLOSED UNION, which is the one vocabulary this entry
+   * leaves open and the reason is `ADR-034` rather than convenience. The set of
+   * paths that may be absent is exactly the set of nullable sites the type above
+   * declares, so a union here would be a FOURTH copy of the shape and `ADR-185`
+   * is the general form: generate the value or delete it and point at the
+   * source, there is no third. The control is
+   * {@link assertLiabilityGapsPaired}, which reads the value, not a list.
+   */
+  readonly field: string;
+
+  /** WHY there is no figure, from the closed set. `ADR-203` ruling 4. */
+  readonly cause: LiabilityGapCause;
+
+  /**
+   * The deliverable, ADR or type that has to move first.
+   *
+   * Non-`null` EXACTLY when `cause` is `awaiting_dependency`, which is the one
+   * pairing a reader may rely on and which
+   * {@link assertLiabilityGapsPaired} enforces. The other two causes wait on
+   * nothing nameable: one waits on time and one on a load nobody has run.
+   */
+  readonly awaiting: string | null;
+
+  /**
+   * What a reader should do with the absence. Required and never blank.
+   *
+   * FREE TEXT ON PURPOSE, and the pair with `cause` is the ruling rather than a
+   * compromise. `cause` is BRANCHED ON, so it is closed. This is RENDERED, and
+   * it carries the quantities a closed vocabulary cannot hold: how many trading
+   * days short, which anchor day the estate has no opinion about.
+   * `apps/admin/src/figure.ts` states the bar it has to clear -- "'unavailable'
+   * written by the schema is the same silence, spelled".
+   */
+  readonly detail: string;
+}
+
+/**
+ * WHY a figure is absent. CLOSED at three, and widening it is a diff on
+ * {@link LIABILITY_GAP_CAUSES} and on the case that counts it.
+ *
+ * THE THREE ARE KINDS OF ABSENCE AND NEVER NAMES OF FIGURES, which is
+ * `SystemReason`'s rule one vocabulary over (`ADR-165`: it "DOES NOT NAME
+ * SERVICES, IT NAMES KINDS OF ACCESS"). What moves is `awaiting`; the cause set
+ * does not grow when a fourth figure goes absent for a reason already here.
+ *
+ * EACH IS A DIFFERENT ACT BY WHOEVER READS THE PANEL, which is what makes three
+ * the number rather than one:
+ *
+ *   `awaiting_dependency`   a named deliverable is outstanding. Nothing in the
+ *                           estate is wrong and `awaiting` names what is owed
+ *   `insufficient_history`  the estate is correct and does not reach far enough
+ *                           back to cover the window the figure is defined over.
+ *                           Waiting is the whole remedy
+ *   `estate_uncovered`      the estate records NO OPINION about the period at
+ *                           all. `ADR-042` F-4's unknown, which is not a "no",
+ *                           and which is somebody's job today rather than later
+ */
+export type LiabilityGapCause = 'awaiting_dependency' | 'insufficient_history' | 'estate_uncovered';
+
+/** {@link LiabilityGapCause} as data, for the validator and for the suite. */
+export const LIABILITY_GAP_CAUSES = [
+  'awaiting_dependency',
+  'insufficient_history',
+  'estate_uncovered',
+] as const satisfies readonly LiabilityGapCause[];
+
 /** Section 8, `LiabilityResponse`. */
 export interface LiabilityResponse {
   readonly as_of: string;
@@ -551,12 +632,24 @@ export interface LiabilityResponse {
   readonly absorbed_corrections_cents: number;
   readonly funded_accounts: number;
   readonly eligible_next_7d: EligibleNext7d;
+  /**
+   * `null` WHEN THE WINDOW CANNOT BE SUPPLIED, and `gaps` says which way.
+   *
+   * `ADR-203`. `evaluatePayoutVelocity` answers three ways -- `evaluated`,
+   * `exhausted`, `uncovered` -- and this field carried one, so an uncovered
+   * calendar had to be rendered `0 / false` and read exactly like a quiet week.
+   *
+   * THE ABSENCE IS AT THE OBJECT AND NOT AT A MEMBER, and that half was already
+   * enforced before it was ruled: {@link assertContractScalars} makes every
+   * `*_cents` and `*_bp` a JSON integer, so `last_7d_cents: null` is refused at
+   * the boundary. A nullable member is not a shape this response could serve.
+   */
   readonly payout_velocity: {
     readonly last_7d_cents: number;
     readonly avg_30d_cents: number;
     readonly ratio_bp: number;
     readonly alarm: boolean;
-  };
+  } | null;
   readonly reserve: {
     /**
      * ITS OWN `as_of`, BECAUSE IT IS A DIFFERENT TABLE ON A DIFFERENT CLOCK.
@@ -593,12 +686,20 @@ export interface LiabilityResponse {
     readonly loss_ratio_bp: number;
     readonly threshold_bp: number;
     readonly sales_paused: boolean;
-    /** NOT money and NOT basis points. See this file's header. */
+    /**
+     * NOT money and NOT basis points. See this file's header.
+     *
+     * `null` UNTIL `DEP-M6-05`, which is `ADR-202` ruling 3 transcribed and not
+     * re-decided here. The members are unchanged in name and in type, so
+     * `ADR-167` clause 4's integer basis points stand exactly as written; what
+     * moved is that the object may be absent, and `gaps` carries the reason
+     * ONCE on the body because it is identical for every plan on every day.
+     */
     readonly cusum: {
       readonly statistic: number;
       readonly threshold: number;
       readonly alarm: boolean;
-    };
+    } | null;
   }[];
   readonly integrations: {
     readonly mid_health: readonly {
@@ -610,6 +711,21 @@ export interface LiabilityResponse {
     readonly recon: { readonly last_run_at: string; readonly mismatches_open: number };
     readonly batch: { readonly last_success_at: string; readonly last_duration_ms: number };
   };
+
+  /**
+   * Every `null` above, named, with why. `[]` on a complete response.
+   *
+   * `ADR-203` ruling 2: NO `null` TRAVELS ALONE. A bare `null` turns an honest
+   * gap into an indistinguishable zero, which on this panel is the difference
+   * between "we do not know" and "there is none". It is REQUIRED and never
+   * omitted, for the same reason the nulls above are nulls rather than missing
+   * keys.
+   *
+   * ONE ENTRY PER ABSENT FIGURE AND NOT ONE PER `null` VALUE. `per_plan[].cusum`
+   * is absent on every plan for one reason, so it is one entry whose `field` is
+   * the path with the index elided, exactly as `CUSUM_GAPS` already writes it.
+   */
+  readonly gaps: readonly LiabilityGap[];
 }
 
 /**
@@ -1198,8 +1314,75 @@ function projectEligibleNext7d(value: EligibleNext7d): EligibleNext7d {
   };
 }
 
+/**
+ * `ADR-203` ruling 2, as a control rather than as a sentence: NO `null` TRAVELS
+ * ALONE, AND NO GAP NAMES A FIGURE THAT IS THERE.
+ *
+ * BOTH DIRECTIONS, and the second one is the half a reader would not think to
+ * ask for. A `null` with no entry naming it is the bare null this ruling exists
+ * to refuse: an honest gap rendered as an indistinguishable zero. An entry
+ * naming a path that is NOT `null` is the opposite failure and it is worse,
+ * because it tells an operator that a figure they are looking straight at is
+ * missing, and the figure is the firm's own position.
+ *
+ * THE ABSENT PATHS ARE READ OFF THE VALUE AND NEVER OFF A LIST. A list of the
+ * nullable sites would be a fourth copy of the shape, which is `RI-18`'s subject
+ * and `ADR-034`'s: it would agree with the type on the day it was written and
+ * drift the first time a field went nullable without this function moving.
+ *
+ * `per_plan[].cusum` IS ONE PATH AND NOT ONE PER PLAN. The index is elided
+ * because the absence is a property of the calibration rather than of a plan,
+ * which is `ADR-202` ruling 3's reason for putting the object's absence at the
+ * object; `CUSUM_GAPS` in `admin-breaker.ts` already writes the path this way.
+ */
+export function assertLiabilityGapsPaired(value: LiabilityResponse): void {
+  const absent = new Set<string>();
+  if (value.payout_velocity === null) absent.add('payout_velocity');
+  if (value.per_plan.some((plan) => plan.cusum === null)) absent.add('per_plan[].cusum');
+
+  const named = new Set<string>();
+  for (const gap of value.gaps) {
+    if (named.has(gap.field))
+      throw new AdminReadError(
+        `\`gaps\` names \`${gap.field}\` twice, and ADR-203 ruling 2 is one entry per absent ` +
+          'figure. Two reasons for one absence is an operator choosing which to believe',
+      );
+    named.add(gap.field);
+    if (gap.detail.trim() === '')
+      throw new AdminReadError(
+        `\`gaps\` names \`${gap.field}\` with a blank \`detail\`, and ADR-203 ruling 4 requires ` +
+          'one. A blank reason is the bare null this ruling refuses, spelled',
+      );
+    const awaits = gap.cause === 'awaiting_dependency';
+    if (awaits !== (gap.awaiting !== null))
+      throw new AdminReadError(
+        `\`gaps\` names \`${gap.field}\` with cause \`${gap.cause}\` and awaiting ` +
+          `${JSON.stringify(gap.awaiting)}. ADR-203 ruling 4 makes \`awaiting\` non-null EXACTLY ` +
+          'when the cause is `awaiting_dependency`, because that is the one cause that names ' +
+          'something a reader can go and look at',
+      );
+  }
+
+  for (const path of absent)
+    if (!named.has(path))
+      throw new AdminReadError(
+        `\`${path}\` is null and \`gaps\` does not name it. ADR-203 ruling 2: a null nothing ` +
+          'explains is an honest gap arriving as an indistinguishable zero, and on this panel ' +
+          'that is the difference between "we do not know" and "there is none"',
+      );
+
+  for (const path of named)
+    if (!absent.has(path))
+      throw new AdminReadError(
+        `\`gaps\` names \`${path}\` and that figure is PRESENT on this response. ADR-203 ` +
+          'ruling 2 pairs the two in both directions: a gap over a figure an operator is ' +
+          'looking straight at is worse than no gap at all',
+      );
+}
+
 /** Section 8's `LiabilityResponse`, field by field. */
 function projectLiability(value: LiabilityResponse): LiabilityResponse {
+  assertLiabilityGapsPaired(value);
   return {
     as_of: value.as_of,
     open_liability_cents: value.open_liability_cents,
@@ -1209,12 +1392,15 @@ function projectLiability(value: LiabilityResponse): LiabilityResponse {
     absorbed_corrections_cents: value.absorbed_corrections_cents,
     funded_accounts: value.funded_accounts,
     eligible_next_7d: projectEligibleNext7d(value.eligible_next_7d),
-    payout_velocity: {
-      last_7d_cents: value.payout_velocity.last_7d_cents,
-      avg_30d_cents: value.payout_velocity.avg_30d_cents,
-      ratio_bp: value.payout_velocity.ratio_bp,
-      alarm: value.payout_velocity.alarm,
-    },
+    payout_velocity:
+      value.payout_velocity === null
+        ? null
+        : {
+            last_7d_cents: value.payout_velocity.last_7d_cents,
+            avg_30d_cents: value.payout_velocity.avg_30d_cents,
+            ratio_bp: value.payout_velocity.ratio_bp,
+            alarm: value.payout_velocity.alarm,
+          },
     reserve: {
       as_of: value.reserve.as_of,
       reserve_cents: value.reserve.reserve_cents,
@@ -1231,11 +1417,14 @@ function projectLiability(value: LiabilityResponse): LiabilityResponse {
       loss_ratio_bp: plan.loss_ratio_bp,
       threshold_bp: plan.threshold_bp,
       sales_paused: plan.sales_paused,
-      cusum: {
-        statistic: plan.cusum.statistic,
-        threshold: plan.cusum.threshold,
-        alarm: plan.cusum.alarm,
-      },
+      cusum:
+        plan.cusum === null
+          ? null
+          : {
+              statistic: plan.cusum.statistic,
+              threshold: plan.cusum.threshold,
+              alarm: plan.cusum.alarm,
+            },
     })),
     integrations: {
       mid_health: value.integrations.mid_health.map((mid) => ({
@@ -1253,6 +1442,12 @@ function projectLiability(value: LiabilityResponse): LiabilityResponse {
         last_duration_ms: value.integrations.batch.last_duration_ms,
       },
     },
+    gaps: value.gaps.map((gap) => ({
+      field: gap.field,
+      cause: gap.cause,
+      awaiting: gap.awaiting,
+      detail: gap.detail,
+    })),
   };
 }
 
