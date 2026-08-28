@@ -236,15 +236,28 @@ export function servedFlagQueueStrings(page: FlagQueuePage): readonly string[] {
  * `apps/api/src/admin-source/index.ts` argues for its own pair of defences.
  *
  * **AND THE SECOND LEG IS LOAD BEARING RATHER THAN BELT AND BRACES, MEASURED
- * RATHER THAN ASSUMED.** `assertNamesNoSubject`'s pattern is a `\b`-anchored
- * uuid, so a uuid GLUED TO A WORD CHARACTER is not a match: an
- * `evidence_summary` reading `linked_to_<identity_id>` passes it and an
- * `evidence_summary` reading `linked to <identity_id>` does not. Both were run.
- * That is `../../page.ts`'s regex, which is `P5-l`'s file and outside this
- * slice's fence, so the gap is REPORTED and this leg is what keeps THIS
- * screen's promise in the meantime. What neither leg catches is a subject id
- * that is in no field of this response AND is glued to a word character, and
- * that residue is the reported gap exactly.
+ * RATHER THAN ASSUMED. THE REASON IS NOT THE ONE THIS PARAGRAPH GAVE, AND THE
+ * OLD REASON IS GONE.** It read that `assertNamesNoSubject`'s pattern was a
+ * `\b`-anchored uuid, so a uuid GLUED TO A WORD CHARACTER was not a match and
+ * `linked_to_<identity_id>` passed the pattern leg while `linked to
+ * <identity_id>` threw. **SESSION 348 DROPPED BOTH BOUNDARIES FROM `UUID` IN
+ * `../../page.ts` AND THE GLUED SPELLING IS REFUSED BY THE PATTERN LEG ON ITS
+ * OWN NOW**, so the residue that paragraph reported, a subject id in no field
+ * of this response AND glued to a word character, is closed rather than open.
+ * Removing an assertion from a regex can only ADD matches, so nothing this leg
+ * used to catch was traded away.
+ *
+ * WHAT KEEPS THE TWO LEGS APART IS THAT EACH REFUSES SOMETHING THE OTHER CANNOT
+ * SEE, and both directions are run rather than argued. **The pattern leg
+ * alone:** a uuid that is in no field of this response at all, a third party's
+ * id, which a search for THESE three values is blind to and which is a subject
+ * name all the same. **The value leg alone:** an identifier OF this response
+ * that is not uuid shaped, which the contract permits because it types
+ * `identity_id` as a plain string, and which no pattern over a uuid shape can
+ * match. `test/flags-render.test.ts`'s case *"THE TWO LEGS STILL FAIL AT
+ * DIFFERENT TIMES, AND NEITHER SUBSUMES THE OTHER"* holds all four of those
+ * assertions, and `M6-A-55` in `test/page.test.ts` holds the pattern's own
+ * before and after.
  */
 function assertRowIdentifiersAreWithheld(page: FlagQueuePage, served: readonly string[]): void {
   for (const row of page.rows) {

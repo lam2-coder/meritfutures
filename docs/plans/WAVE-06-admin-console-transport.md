@@ -245,10 +245,23 @@ which both surfaces serve. The public surface registers 46, and the union is
 
 ### 4.1 What is registered is not what answers
 
-**Every one of the 26 operator routes above answers 503 today**, because `AdminReadSource` is a port
-nothing wires ([`admin-reads.ts:694`](../../apps/api/src/routes/admin-reads.ts),
-[`setAdminReadSource:706`](../../apps/api/src/routes/admin-reads.ts)) and the write backends resolve
-`principal(request)` through a session source nothing supplies.
+**Every registered operator route answers 401 `unauthenticated` to an anonymous caller, and nothing this
+console can reach answers 503 before authenticating** (amended by [ADR-190](../decisions/ADR-190.md), then by
+[ADR-192](../decisions/ADR-192.md); section 8.1 below carries ADR-190's measurement in full and it is the
+document of what the surface did before that second entry moved it).
+
+**What a caller CARRYING a cookie meets still splits by module, and that half did not move.** The routes
+served by `admin-reads.ts`'s shared `adminHandler`, which is the family every screen in this wave reads,
+answer **500 `internal_error`**, because `AdminReadSource` is a port nothing wires
+([`AdminReadSource:695`](../../apps/api/src/routes/admin-reads.ts),
+[`setAdminReadSource:739`](../../apps/api/src/routes/admin-reads.ts)). The routes served by the four write
+backends answer **503 `service_unavailable`**, which ADR-192 clause 1 KEPT on the ground that those four
+classes carry one fact each: *no backend is installed*. What ADR-192 clause 2 changed is the ORDER, moving
+that 503 behind the 401 so an anonymous caller is no longer told which of this deployment's ports are
+uncomposed. **NEITHER SIDE OF THE PARTITION IS COUNTED HERE AND THAT IS DELIBERATE**:
+[ADR-190](../decisions/ADR-190.md) section 5 holds it and pins no cardinal, on its own ground that a slice
+wiring a backend moves a route between the sets, so a figure written down here would go false for the right
+thing happening.
 [`wiring.test.ts:457`](../../apps/api/test/wiring.test.ts) pins the triple at
 `{ declared: 23, wired: 6, blocked: 17 }`.
 
@@ -442,7 +455,7 @@ assumption would be doing exactly that.
 | #          | Slice                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Fence, by file                                                                                                                                                                                                                                                                                                                                         | ADR               | Money                                                                                                                      | Depends on, by file                                                             |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | **`W6-e`** | **The event feed gets a contract row, which is an amendment and therefore an ADR.** Section 4.2: `M06` section 1.1 names the feed a launch surface, `feed.ts` implements it in 507 lines, and `API_CONTRACT` sections 8 and 9 carry no endpoint. The entry adds the row, decides whether `AdminReadSource` gains a seventh method or the feed gets a port of its own, and **carries `INV-M6-10`'s two modes into the request shape** so that "no subject named" is a property of the query rather than of a handler's care                                                                                                     | `docs/decisions/ADR-1NN.md` (new, **REQUIRED**), `docs/architecture/API_CONTRACT.md`, `apps/api/src/routes/admin-feed.ts` (new), `apps/api/test/admin-feed.test.ts` (new), `apps/api/src/routes/admin-reads.ts` (**the port declaration ONLY, if the ruling puts it there**), `ALLOCATION` (its row), `INDEX` (its row), `STATE` (append), `sessions/` | **YES, REQUIRED** | **no by file.** Sensitive by what it governs: an unfiltered page of `events` is the bulk identity read `INV-M6-10` refuses | **nothing in this wave.** Concurrent with `W6-d`                                |
-| **`W6-f`** | **The flags queue screen. THE ONE SURFACE WHOSE BOTH HALVES EXIST.** `GET /admin/flags` is registered and `listFlags` is composed ([`admin-source/index.ts:204`](../../apps/api/src/admin-source/index.ts)), so this screen renders real rows the day a session source lands and 503s honestly before then. **The ordering is [ADR-178](../decisions/ADR-178.md)'s and is not recomputed in the console**: corroboration depth first, severity then age within a band, and the console renders `corroboration_depth` beside the severity because an operator shown a severity 3 above a severity 5 needs the reason on the row | `apps/admin/src/app/flags/**` (new), `apps/admin/src/view/flags.ts` (new), `apps/admin/test/flags-render.test.ts` (new), `apps/admin/src/api/types.ts`, `apps/admin/src/index.ts`, `STATE` (append), `sessions/`                                                                                                                                       | no                | **no**                                                                                                                     | **`W6-d`** for the layout, **`W6-c`** for the client                            |
+| **`W6-f`** | **The flags queue screen. THE ONE SURFACE WHOSE BOTH HALVES EXIST.** `GET /admin/flags` is registered and `listFlags` is composed ([`admin-source/index.ts:204`](../../apps/api/src/admin-source/index.ts)), so this screen renders real rows the day a session source lands and, before then, renders the blocked state against the status its own route answers, which is a **401** to an anonymous caller and a **500** to one carrying a cookie and is NOT a 503 ([ADR-190](../decisions/ADR-190.md); `GET /admin/flags` is served by `admin-reads.ts`'s shared `adminHandler`). **The ordering is [ADR-178](../decisions/ADR-178.md)'s and is not recomputed in the console**: corroboration depth first, severity then age within a band, and the console renders `corroboration_depth` beside the severity because an operator shown a severity 3 above a severity 5 needs the reason on the row | `apps/admin/src/app/flags/**` (new), `apps/admin/src/view/flags.ts` (new), `apps/admin/test/flags-render.test.ts` (new), `apps/admin/src/api/types.ts`, `apps/admin/src/index.ts`, `STATE` (append), `sessions/`                                                                                                                                       | no                | **no**                                                                                                                     | **`W6-d`** for the layout, **`W6-c`** for the client                            |
 | **`W6-g`** | **The identity drill-down, `M06` section 3.2a.** `GET /admin/identities/:identityId/graph` is registered and `readIdentityGraph` is composed. **It is reachable only by naming a subject and there is no list behind it**, which is `M06` section 3.2a's own sentence and the property that separates it from `FM-M6-10`'s bulk PII surface. **NO RESTRICTION AFFORDANCE**: `INV-M6-14`'s write is behind `ADR-171`, section 8's wave 4                                                                                                                                                                                        | `apps/admin/src/app/identities/**` (new), `apps/admin/src/view/identity.ts` (new), `apps/admin/test/identity-render.test.ts` (new), `apps/admin/src/api/types.ts`, `apps/admin/src/index.ts`, `STATE` (append), `sessions/`                                                                                                                            | no                | **no**                                                                                                                     | **`W6-d`**, **`W6-c`**. **SERIAL WITH `W6-f` ON `api/types.ts` AND `index.ts`** |
 
 ### Wave 4: the surfaces behind another slice or another plan
@@ -507,8 +520,14 @@ names none, states its blockers with their owners, and quotes the measured statu
 operator reads them. `W6-f` and `W6-g` shipped that way before it was written down;
 `apps/admin/src/app/page.tsx` was corrected to it and `apps/admin/test/render.test.ts`'s `M6-A-60` now
 sweeps the whole `src/app/` directory for it. **Section 4.1, the `W6-f` row in section 8, section 10's
-item, and the two sentences in `apps/admin/src/http/client.ts` still carry the old claim**: they are
-outside ADR-190's fence and are registered in that entry's section 7 item 5 with their line numbers.
+item, the two sentences in `apps/admin/src/http/client.ts` and one in `apps/admin/src/index.ts` carried the
+old claim**: they were outside ADR-190's fence and were registered in that entry's section 7 item 5 with
+their line numbers, and re-registered unchanged at [ADR-192](../decisions/ADR-192.md) section 10 item 5.
+**ALL SIX ARE NOW REPAIRED**, as a transcription of those two rulings and not as a third, so nothing in this
+plan or in `apps/admin/src/` states the retired sentence any longer. **The repairs carry ADR-192's answer and
+not ADR-190's**, because that entry moved the write backends' 503 behind a 401 after ADR-190 measured it in
+front: section 4.1 above states the surface as it stands, and the paragraph opening this section stays as
+ADR-190 wrote it, because it is the record of what the surface did on the day that entry measured it.
 
 **The condition that changes this** is [ADR-171](../decisions/ADR-171.md) section 9's own: the slice that
 lands an `AdminSessionSource` a deployment can install. **This plan does not schedule it, because
@@ -598,7 +617,9 @@ read like a finding.**
    an `admin_actions.actor` string IS. Until it exists, `M06`'s entire write half and every read's actual
    rows are unreachable, and **that is roughly two thirds of the module by surface count**. **The
    founder's decision is not "which vendor" for this plan's purposes; it is whether the console's read
-   surfaces are worth building against 503s in the meantime.** This plan's answer is yes, on the ground
+   surfaces are worth building against the status those routes actually answer in the meantime, which
+   [ADR-190](../decisions/ADR-190.md) measured as a **401** to an anonymous caller and a **500** to one carrying a
+   cookie rather than the 503 this item used to name.** This plan's answer is yes, on the ground
    that `page.ts`'s `PendingPanel` and `data-trust.ts`'s missing-signal shape were designed for exactly
    that state, and on the ground that the arithmetic they render has been sitting unreachable for weeks.
    **It is a judgement about sequencing and it is stated as one.**

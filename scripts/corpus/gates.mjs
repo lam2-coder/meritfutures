@@ -871,7 +871,7 @@ const ci06f = {
         findings.push(
           `ADR-${String(n).padStart(3, '0')}: the allocation row still reads "Reserved, unwritten" ` +
             'and the entry file exists. ADR-065 T3 amends the reservation row IN PLACE when the ' +
-            'artifact lands; a row left reserved is a permanent exemption from this gate\'s own ' +
+            "artifact lands; a row left reserved is a permanent exemption from this gate's own " +
             'gaplessness check',
         );
       }
@@ -1580,7 +1580,7 @@ const ci06h = {
         'nothing asserts that a published plan_version records what it was ' +
           'decided on, that the recorded exception stays cheap while the ' +
           'unrecorded one is impossible, that a blank waiver is refused by its ' +
-          'own named floor, or that calibrationDigest()\'s HEX output decodes ' +
+          "own named floor, or that calibrationDigest()'s HEX output decodes " +
           'to the 32 bytea bytes the column requires',
       ],
       // 0046, ADR-079. Pinned in the commit that wires it. THE PIN MATTERS MORE
@@ -3284,7 +3284,8 @@ const CI06O_SOURCE = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
 const ci06o = {
   id: 'CI-06o',
-  title: 'No model SDK or model endpoint on the money path, and no money path outside the scope list',
+  title:
+    'No model SDK or model endpoint on the money path, and no money path outside the scope list',
   covers:
     "ADR-044 section 8's prohibition 1, in two assertions. ONE: no file under a " +
     'money-path scope entry imports a model SDK or names a model endpoint host, ' +
@@ -4840,8 +4841,8 @@ const ci06v = {
     'THE CAUSE IT IS AIMED AT is the review desk merge script resolving keep-both ' +
     'mid-table, which re-inserts a header and a delimiter and leaves a blank line behind ' +
     'them; the rows below the blank become an orphan run. STRATEGY section 4.4 carried ' +
-    'one of exactly that shape holding six of its own gate rows, CI-06u\'s among them, ' +
-    'and ADR-065 records four more in ALLOCATION\'s letter table. ' +
+    "one of exactly that shape holding six of its own gate rows, CI-06u's among them, " +
+    "and ADR-065 records four more in ALLOCATION's letter table. " +
     'THE RULE ON RUN LENGTH IS TWO, AND IT IS A CHOICE. A single isolated pipe line ' +
     'claims nothing: a sentence that happens to start with a pipe, or a one-row table ' +
     'quoted illustratively outside a fence, is prose and a gate that called it a fragment ' +
@@ -4853,7 +4854,7 @@ const ci06v = {
     'which half is true is a founder ruling. It cannot see a genuine ONE-row orphan, by ' +
     'the rule above. It says nothing about a table that is well formed and wrong: a ' +
     'delimiter row is the whole test, so a run carrying a delimiter passes however ' +
-    'damaged its content is, which is CI-06u\'s business and not this gate\'s. And it ' +
+    "damaged its content is, which is CI-06u's business and not this gate's. And it " +
     'inherits the one-ref gap CI-06f, CI-06h, CI-06p and CI-06u each declare: it catches ' +
     'a fragment introduced by a merge at the merge, never at the pull request that fed it.',
   run() {
@@ -5050,23 +5051,23 @@ const ci06TableRowWidth = {
     '1,593 multi-row tables, needs 25 registered rows, AND MISSES #299 (the reservation table ' +
     'falls to 27 of 35 conforming, below any usable threshold); at 50%, it catches #299 and ' +
     'costs 155 registered rows in 67 tables. CELL COUNT covers 1,604 of 1,604 tables, needs ' +
-    'NO shape exemption of any kind, costs 17 registered rows, and names all eight of #299\'s ' +
-    'absorbed rows. RI-10\'s lesson decided it: a check needing a name-based exception is ' +
+    "NO shape exemption of any kind, costs 17 registered rows, and names all eight of #299's " +
+    "absorbed rows. RI-10's lesson decided it: a check needing a name-based exception is " +
     'scoped wrong, and this one needs no exception. ' +
-    'THE DELIMITER ROW IS THE AUTHORITY, which is GFM\'s own rule: it declares the column ' +
+    "THE DELIMITER ROW IS THE AUTHORITY, which is GFM's own rule: it declares the column " +
     'count, the header must match it or nothing renders as a table, a short row is padded ' +
     'with empty cells and a long row has its excess SILENTLY DISCARDED. Both directions are ' +
-    'findings and they are different defects: SHORT is #299\'s absorbed prose, LONG is a cell ' +
+    "findings and they are different defects: SHORT is #299's absorbed prose, LONG is a cell " +
     'split by an unescaped pipe with its tail dropped on render -- fifteen of the seventeen ' +
     "registered rows, six in ALLOCATION's own ADR table where a whole disposition paragraph " +
     'is invisible to every reader of the rendered file. ' +
     'FOUR THINGS IT DOES NOT DO. It counts cells and reads none of them, so a row of the ' +
-    'right width holding absorbed prose passes and that is CI-06u\'s question. A ONE-COLUMN ' +
+    "right width holding absorbed prose passes and that is CI-06u's question. A ONE-COLUMN " +
     'table is beyond it by construction and docs/ has none (the narrowest is two, 479 of ' +
     'them). It inherits the one-ref gap CI-06f, CI-06h, CI-06p, CI-06u and CI-06v each ' +
     'declare. And a row indented past a list marker parses as prose and is claimed as ' +
     'nothing, exactly as it is for CI-06u, because both read the same run splitter. ' +
-    'THE REGISTER IS CI-06u\'S, KEYED BY (file, first cell) AND SHRINKING ONLY: an entry that ' +
+    "THE REGISTER IS CI-06u'S, KEYED BY (file, first cell) AND SHRINKING ONLY: an entry that " +
     'no longer names a ragged row is a finding, so a repair forces it down by one. Its size ' +
     'is printed on every run rather than stated here, because a repair moves it and this ' +
     'text does not.',
@@ -5125,16 +5126,16 @@ const ci06TableRowWidth = {
           findings.push(
             cells.length < width
               ? `${file}:${row.n}: this row has ${cells.length} cell(s) where its table's ` +
-                `delimiter declares ${width} (table opens at line ${table[0].n}). First cell: ` +
-                `"${key.slice(0, 60)}". A SHORT row renders as empty cells, and the shape ` +
-                'that produces one is prose absorbed past the blank line that ended the ' +
-                'table, which is PR #299 exactly. Either the row belongs and is missing ' +
-                'cells, or it is a sentence and belongs outside the table'
+                  `delimiter declares ${width} (table opens at line ${table[0].n}). First cell: ` +
+                  `"${key.slice(0, 60)}". A SHORT row renders as empty cells, and the shape ` +
+                  'that produces one is prose absorbed past the blank line that ended the ' +
+                  'table, which is PR #299 exactly. Either the row belongs and is missing ' +
+                  'cells, or it is a sentence and belongs outside the table'
               : `${file}:${row.n}: this row has ${cells.length} cell(s) where its table's ` +
-                `delimiter declares ${width} (table opens at line ${table[0].n}). First cell: ` +
-                `"${key.slice(0, 60)}". A LONG row has its excess cells SILENTLY DISCARDED on ` +
-                'render, so the tail of this row is invisible to every reader of the ' +
-                'rendered file. The usual cause is a pipe inside a cell: escape it as \\|',
+                  `delimiter declares ${width} (table opens at line ${table[0].n}). First cell: ` +
+                  `"${key.slice(0, 60)}". A LONG row has its excess cells SILENTLY DISCARDED on ` +
+                  'render, so the tail of this row is invisible to every reader of the ' +
+                  'rendered file. The usual cause is a pipe inside a cell: escape it as \\|',
           );
         }
       }
@@ -5754,7 +5755,10 @@ function fixtureStatusRows() {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!/^\|\s*GS-\d{3}\s*\|/.test(line)) continue;
-    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    const cells = line
+      .split('|')
+      .slice(1, -1)
+      .map((c) => c.trim());
     rows.push({
       id: /GS-\d{3}/.exec(cells[0])[0],
       status: (cells[1] ?? '').replace(/[`*]/g, ''),
@@ -6545,7 +6549,10 @@ const DECLARED_SERIES = new Map([
 const PENDING_SERIES = new Map([
   // A register with holes or doubles: the repair is to the register. The ten
   // ADR-074 section 5 names, which is now the whole of its first class.
-  ['R', "a repair to M01's rule table: 13 members are doubled because a coverage table shares a section with the definition table"],
+  [
+    'R',
+    "a repair to M01's rule table: 13 members are doubled because a coverage table shares a section with the definition table",
+  ],
   ['ST', "a repair to M12's table: 7 members doubled, the same coverage-beside-definition shape"],
   ['RE-U', 'a table in the document that owns it; members have no row'],
   ['L', 'a table in the fixtures README; members have no row'],
@@ -6554,7 +6561,10 @@ const PENDING_SERIES = new Map([
   ['M6-N', 'a table in M06; members have no row'],
   ['INV-M6', 'a table in M06 covering every member; some have no row'],
   ['PW', 'a table in the document that owns it; members have no row'],
-  ['OI', "an OI allocation table in ALLOCATION.md, superseding DELTA_MANIFEST section 16 (ADR-074 section 7). NOT this session's to move, and the gate does not wait on it: the day that table lands this entry stops naming a defect and the gate fails until OI is promoted in the same commit"],
+  [
+    'OI',
+    "an OI allocation table in ALLOCATION.md, superseding DELTA_MANIFEST section 16 (ADR-074 section 7). NOT this session's to move, and the gate does not wait on it: the day that table lands this entry stops naming a defect and the gate fails until OI is promoted in the same commit",
+  ],
   // No register at all, small. Each needs a table in the document that owns it,
   // or an argued move into ADR-074 section 4's class X3.
   ['RE-C', 'a table in the document that owns it, or an argued move into X3'],
@@ -6562,30 +6572,93 @@ const PENDING_SERIES = new Map([
   ['SF-M21', 'a table in M21, or an argued move into X3'],
   ['DT', 'a table in the document that owns it, or an argued move into X3'],
   ['PG-M9', 'a table in M09, or an argued move into X3'],
-  ['OQ-P', 'a register that is a corpus document: its rows are in docs/reviews, which ADR-074 section 1 rules can never be a register because a review record binds nothing by existing'],
+  [
+    'OQ-P',
+    'a register that is a corpus document: its rows are in docs/reviews, which ADR-074 section 1 rules can never be a register because a review record binds nothing by existing',
+  ],
   // `OQ-M*`, no register at all. Twenty series, and the ruling this waits on is
   // expressly NOT ADR-074's to make, because it is a question about how rulings
   // are recorded rather than about identifiers.
-  ['OQ-M2', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M3', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M4', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M5', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M6', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M7', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M8', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M9', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M10', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M11', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M12', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M13', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M14', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M15', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M16', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M17', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M18', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M19', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M20', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
-  ['OQ-M21', 'a ruling naming which end of an open question\'s lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it'],
+  [
+    'OQ-M2',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M3',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M4',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M5',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M6',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M7',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M8',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M9',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M10',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M11',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M12',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M13',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M14',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M15',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M16',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M17',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M18',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M19',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M20',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
+  [
+    'OQ-M21',
+    "a ruling naming which end of an open question's lifecycle owns it: the module plan that raises it, or the gate-closure document that disposes of it",
+  ],
 ]);
 
 // THE WITHHELD TABLE (ADR-074 section 5.1). A gap in a series has two possible
@@ -6614,7 +6687,10 @@ const PENDING_SERIES = new Map([
 // make the cited-in-a-session-log shape a finding, which is the opposite of what
 // section 5.1 exists to record.
 const WITHHELD_MEMBERS = new Map([
-  ['P-M6-11', "session 112 declined to mint it, in terms: \"a `P-M6-nn` written in application code is a claim on a series with no allocation table, made from a fence that cannot add the row to the document that owns it, which is ADR-034's condition exactly\". The code cites AS-M6-04, an identifier that already exists, and the session's roster carries the eleventh number with the reason beside it. It ends when whoever holds M06 next decides whether the panel table gains a row or the third number is declared to live inside P-M6-01's block, which is a question about M06's read surface and is not ADR-074's to take"],
+  [
+    'P-M6-11',
+    "session 112 declined to mint it, in terms: \"a `P-M6-nn` written in application code is a claim on a series with no allocation table, made from a fence that cannot add the row to the document that owns it, which is ADR-034's condition exactly\". The code cites AS-M6-04, an identifier that already exists, and the session's roster carries the eleventh number with the reason beside it. It ends when whoever holds M06 next decides whether the panel table gains a row or the third number is declared to live inside P-M6-01's block, which is a question about M06's read surface and is not ADR-074's to take",
+  ],
 ]);
 
 // The member census. Digits are TWO OR THREE, which is the survey's own floor
@@ -6650,12 +6726,17 @@ function registerBody(register) {
   if (statSync(path).isDirectory()) {
     const entries = readdirSync(path).filter((f) => extname(f) === '.md');
     if (entries.length === 0) return null;
-    return entries.sort().map((f) => read(join(file, f))).join('\n');
+    return entries
+      .sort()
+      .map((f) => read(join(file, f)))
+      .join('\n');
   }
   const body = read(file);
   if (!section) return body;
   const lines = body.split('\n');
-  const start = lines.findIndex((l) => /^##\s/.test(l) && l.replace(/^##\s+/, '').trim() === section);
+  const start = lines.findIndex(
+    (l) => /^##\s/.test(l) && l.replace(/^##\s+/, '').trim() === section,
+  );
   if (start === -1) return null;
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
@@ -6747,9 +6828,9 @@ const identifierSeries = {
     'THE SCOPE IS WRITTEN AND NEVER COMPUTED (ADR-074 section 2), because a gate whose scope ' +
     'is "every series that currently satisfies the rule" passes forever by construction: the ' +
     'day a series breaks it leaves scope and the gate reports every series clean. ' +
-    'A BOLD LEAD IS NOT A DEFINITION SITE: a bold span opening a line is this corpus\'s ' +
+    "A BOLD LEAD IS NOT A DEFINITION SITE: a bold span opening a line is this corpus's " +
     'ordinary emphasis idiom and admitting it makes the rule match prose. SECTION ' +
-    'GRANULARITY IS LOAD BEARING, not a convenience: M01 section 1 holds INV\'s definition ' +
+    "GRANULARITY IS LOAD BEARING, not a convenience: M01 section 1 holds INV's definition " +
     'rows and Appendix A holds a COVERAGE row for the same identifiers, so a file-wide ' +
     'register reports INV, CV and RB as broken. ' +
     'AN INDENTED TABLE ROW IS A ROW: ADR-067 writes its open-question table two spaces in, ' +
@@ -6768,7 +6849,7 @@ const identifierSeries = {
     'AND NOT BY RE-SCOPING: section 3.1 retraces 118 and 1,086 to 117 and 1,083 inside a ' +
     'partition of all 215 series that closes in both columns; OQ-F6 is in scope on a register ' +
     'class that now admits the ADR entry raising it; P-M6 is in scope with P-M6-11 withheld; ' +
-    "and the first pending class is narrowed to the ten series it names. " +
+    'and the first pending class is narrowed to the ten series it names. ' +
     'THREE THINGS IT DOES NOT DO. The member census has a TWO-DIGIT FLOOR, so a ' +
     'single-digit member is invisible to it exactly as it was to the census ADR-074 is ' +
     'ruled on. It says nothing about the CONTENT of a definition, only that exactly one ' +
@@ -6790,8 +6871,10 @@ const identifierSeries = {
     // correct edit is to REMOVE THE LAST ROW, and a runner that threw on an
     // empty table would make the repair session edit this line to land it. That
     // is the furniture the register was designed against, pointing the other way.
-    if (DECLARED_SERIES.size === 0) throw new Error('DECLARED_SERIES is empty; the gate asserts nothing');
-    if (PENDING_SERIES.size === 0) throw new Error('PENDING_SERIES is empty; the register asserts nothing');
+    if (DECLARED_SERIES.size === 0)
+      throw new Error('DECLARED_SERIES is empty; the gate asserts nothing');
+    if (PENDING_SERIES.size === 0)
+      throw new Error('PENDING_SERIES is empty; the register asserts nothing');
 
     // -- the declared scope --------------------------------------------------
     let scoped = 0;
@@ -6827,11 +6910,11 @@ const identifierSeries = {
         findings.push(
           sites === 0
             ? `${register}: ${id} has NO definition site in its declared register. A row whose ` +
-              'first cell leads with it, or a heading whose text does, and neither exists: ' +
-              'every occurrence of it in the corpus is a citation of something undefined'
+                'first cell leads with it, or a heading whose text does, and neither exists: ' +
+                'every occurrence of it in the corpus is a citation of something undefined'
             : `${register}: ${id} has ${sites} definition sites in its declared register and ` +
-              'must have exactly one. Two rows or headings leading with one identifier are two ' +
-              'definitions, and which is the definition cannot be read off the page',
+                'must have exactly one. Two rows or headings leading with one identifier are two ' +
+                'definitions, and which is the definition cannot be read off the page',
         );
       }
     }
@@ -6933,7 +7016,7 @@ const identifierSeries = {
         `narrowed to the ten it names by section 8 resolution 4) ON ARRIVAL, and this run ` +
         `${reproduces ? 'reproduces all three' : 'DOES NOT reproduce all three'}. ` +
         "The pending MEMBER figure is a different kind of number: the ruling's 281 is the " +
-        'survey\'s count under docs/ at e23578a and reproduces there exactly, while this gate ' +
+        "survey's count under docs/ at e23578a and reproduces there exactly, while this gate " +
         'counts the whole repository as section 1 requires and every document minted since ' +
         "moves it, which is section 3's own rule that a count of identifiers is a fact about a " +
         'moment rather than a transcription target',
@@ -7154,7 +7237,6 @@ const artifactKey = (text) =>
 // `APP_ROUTER_STEMS` went with it. It had one caller and a set nothing reads is
 // the same furniture as a probe nothing runs.
 
-
 // -----------------------------------------------------------------------------
 // `playwrightInLockfile` IS RETIRED, AND THE REGISTER'S OWN RULE IS WHY
 // -----------------------------------------------------------------------------
@@ -7183,8 +7265,7 @@ const artifactKey = (text) =>
 // than from a grep, and the distinction it encodes is the general one: the
 // artifact is the dependency, never a mention of it.
 
-const INVENTORY_PROBES = new Map([
-]);
+const INVENTORY_PROBES = new Map([]);
 
 // THE UNPROBEABLE REGISTER, and it is a register rather than an exemption list
 // because it carries CI06U_REGISTER's defining property: AN ENTRY THAT NO LONGER
@@ -7235,8 +7316,8 @@ const gateInventory = {
     'least one leg and every leg is well formed, and it is OPEN for each activation ' +
     'condition it carries whether or not it also carries an implementation. That rule is ' +
     "THIS GATE's and not ADR-073's, which gave CI-09 a disposition and no " +
-    'partial-implementation rule; session 114 built one of CI-09\'s four legs and a gate ' +
-    'reading the row\'s first word would read one leg as four. ' +
+    "partial-implementation rule; session 114 built one of CI-09's four legs and a gate " +
+    "reading the row's first word would read one leg as four. " +
     'AN IMPLEMENTED LEG names a workflow under .github/workflows/ and the job or jobs that ' +
     'run it, and every one of them must be a top-level job key in that file. ' +
     'A WAITING LEG carries a date in its opener and exactly one `Artifact: **...**` clause, ' +
@@ -7246,7 +7327,7 @@ const gateInventory = {
     'IT ASSERTS BOTH READINGS OF (b), SPLIT PER ARTIFACT: every condition must be present, ' +
     'dated and name one artifact, and each artifact that is a fact about THIS TREE is ' +
     'additionally probed and must resolve to ABSENT, so the gate FAILS ON GOOD NEWS the day ' +
-    'a build script or an installed Playwright lands. CI-04\'s Neon branch is not a fact ' +
+    "a build script or an installed Playwright lands. CI-04's Neon branch is not a fact " +
     'about this tree, so for that row the gate asserts the CONDITION and never the ARTIFACT. ' +
     'THE PROBE TABLE AND THE UNPROBEABLE REGISTER ARE WRITTEN AND NEVER COMPUTED, so a new ' +
     'condition fails until somebody decides in this file whether its artifact can be read; ' +
@@ -7316,8 +7397,9 @@ const gateInventory = {
             );
             continue;
           }
-          const named = [...leg.text.matchAll(/\bjobs?\s+((?:`[A-Za-z0-9_-]+`(?:\s+and\s+)?)+)/g)]
-            .flatMap((m) => [...m[1].matchAll(/`([A-Za-z0-9_-]+)`/g)].map((j) => j[1]));
+          const named = [
+            ...leg.text.matchAll(/\bjobs?\s+((?:`[A-Za-z0-9_-]+`(?:\s+and\s+)?)+)/g),
+          ].flatMap((m) => [...m[1].matchAll(/`([A-Za-z0-9_-]+)`/g)].map((j) => j[1]));
           if (named.length === 0) {
             findings.push(
               `${where} names ${WORKFLOW_DIR}/${file[1]} and no job in it. A workflow file ` +
@@ -7572,7 +7654,6 @@ const VG_PROBES = {
   },
 };
 
-
 // Artifacts no repository file can report. Each carries ADR-080's own reason.
 const VG_UNPROBEABLE = {
   'a bucket declared in any infrastructure manifest':
@@ -7639,7 +7720,10 @@ const vgInventory = {
     // two expressions of one concept agree exactly until they do not (OQ-P1-04).
     const stages = new Map();
     for (const r of pipelineRows()) {
-      stages.set(r.id, closureLegs(r.closure).some((l) => l.kind === 'implemented'));
+      stages.set(
+        r.id,
+        closureLegs(r.closure).some((l) => l.kind === 'implemented'),
+      );
     }
 
     const liveArtifacts = new Set();
@@ -7725,7 +7809,9 @@ const vgInventory = {
       }
 
       // --- CHAINED ------------------------------------------------------------
-      for (const m of cell.matchAll(/\*\*Chained,\s*(\d{4}-\d{2}-\d{2})\*\*,\s*on\s*`(CI-\d{2})`/g)) {
+      for (const m of cell.matchAll(
+        /\*\*Chained,\s*(\d{4}-\d{2}-\d{2})\*\*,\s*on\s*`(CI-\d{2})`/g,
+      )) {
         legs++;
         chained++;
         const onStage = m[2];
@@ -7788,7 +7874,9 @@ const vgInventory = {
         discharged++;
         const links = [...cell.matchAll(/\]\(([^)\s]+)\)/g)].map((m2) => m2[1]);
         const resolves = links.some((l) =>
-          existsSync(join(ROOT, resolve(dirname(join(ROOT, STRATEGY_DOC)), l).replace(`${ROOT}/`, ''))),
+          existsSync(
+            join(ROOT, resolve(dirname(join(ROOT, STRATEGY_DOC)), l).replace(`${ROOT}/`, '')),
+          ),
         );
         if (links.length === 0 || !resolves) {
           findings.push(
@@ -7991,7 +8079,7 @@ const RETIRED_REGISTER = new Map([
       sites: 3,
       why:
         "the migrations job's comments state what two superseded constraints asserted and why " +
-        'each probe names the REPLACEMENT. `CI-06s`\'s near-miss is here: one of these comments ' +
+        "each probe names the REPLACEMENT. `CI-06s`'s near-miss is here: one of these comments " +
         'sits three lines above the step it describes, which is why that gate matches the STEP ' +
         'and not the mention',
     },
@@ -8050,7 +8138,7 @@ const RETIRED_REGISTER = new Map([
     'docs/architecture/data-model/kyc_verifications.md',
     {
       sites: 1,
-      why: "the same shape again: `0003` wrote the check inline and `0029` renamed it",
+      why: 'the same shape again: `0003` wrote the check inline and `0029` renamed it',
     },
   ],
   [
@@ -8077,7 +8165,7 @@ const RETIRED_REGISTER = new Map([
     {
       sites: 2,
       why:
-        "the entry whose Repair A produced the superseding migration. It names the constraint " +
+        'the entry whose Repair A produced the superseding migration. It names the constraint ' +
         'in order to rule on it, which is the permitted shape in a document that is not ' +
         'append-only',
     },
@@ -8189,7 +8277,7 @@ const retiredConstraintsGate = {
     'RETIRED_REGISTER PINS THE COUNT IN BOTH DIRECTIONS, which is the assertion this gate ' +
     'exists for: three stale citations reached one file before anybody counted, and a register ' +
     'saying only "this file is known" would have taken the fourth in silence. It SHRINKS ONLY, ' +
-    'CI06U_REGISTER\'s property, and BOTH registers do: a permitted class exempting nothing and ' +
+    "CI06U_REGISTER's property, and BOTH registers do: a permitted class exempting nothing and " +
     'a register entry naming nothing are each a finding. ' +
     'RULE 2 EVERYWHERE, because every assertion here is over a needle list: zero migrations, ' +
     'zero DROP statements, zero retired names, zero files walked or zero files read all THROW ' +
@@ -8297,7 +8385,9 @@ const retiredConstraintsGate = {
 
     for (const [file, sites] of [...cited].sort()) {
       const entry = RETIRED_REGISTER.get(file);
-      const at = sites.map((s) => `${s.line} (\`${s.name}\`, dropped by ${s.droppedBy})`).join(', ');
+      const at = sites
+        .map((s) => `${s.line} (\`${s.name}\`, dropped by ${s.droppedBy})`)
+        .join(', ');
       if (!entry) {
         for (const site of sites) {
           findings.push(
@@ -8623,7 +8713,7 @@ const ci06DerivableCounts = {
     "numerals adjacent to a registry noun needs the generator and is NOT run here'. ADR-034 " +
     'ruled the property and recorded that the sweep is its first run and was not done there. ' +
     'THE RECEIPT IS A SHAPE NO MERGE CAN SEE: two tranches independently raised the same ' +
-    "prose number to NINE for DIFFERENT tables, each copy internally consistent and each " +
+    'prose number to NINE for DIFFERENT tables, each copy internally consistent and each ' +
     'wrong by one, and git saw no conflict because both sides wrote the same character. ' +
     'THE RECOGNISER IS VALUE-ANCHORED AND THE ALTERNATIVES WERE MEASURED WITH THE SAME ' +
     'READER, so the comparison is between rules and not between parsers. A cardinal GOVERNING ' +

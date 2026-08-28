@@ -322,22 +322,22 @@ jobs:
       # or empty bundle rather than passing over one, because a grep that
       # scanned nothing reports the same green as a grep with nothing to find.
       #
-      # AND IT READS ONE OF THE THREE BUNDLES THIS JOB NOW PRODUCES, WHICH IS
-      # REPORTED HERE RATHER THAN QUIETLY WIDENED. `scripts/ci/
-      # vg2-no-secrets-in-bundle.mjs` hard-codes `BUNDLE_DIRS` to
-      # `apps/portal/.next/static` and `apps/portal/.next/server`, and its own
-      # comment beside that list still calls the portal "the one deployable that
-      # builds a bundle". That stopped being true when the site's step landed
-      # above, and this commit makes it a third short rather than a second.
-      # Measured on this tree after all three builds: the scan reads 249 emitted
-      # file(s) and 5,831,402 byte(s), while `apps/site` emits 219 file(s) and
-      # 4,739,271 byte(s) and `apps/admin` emits 92 file(s) and 3,798,346
-      # byte(s) that nothing greps.
+      # IT READ ONE OF THE THREE BUNDLES THIS JOB PRODUCES AND SESSION 348
+      # CLOSED THAT. This block stated the gap as open over three hand-derived
+      # file and byte figures, and every half of it is stale:
+      # `scripts/ci/vg2-no-secrets-in-bundle.mjs` no longer hard-codes
+      # `BUNDLE_DIRS` to the portal's two paths. It DERIVES the expected set
+      # from `apps/*/package.json`, taking every deployable that declares a
+      # `build` script and a `next` dependency, and an app it cannot classify
+      # fails naming the app rather than being silently omitted. So a fourth UI
+      # deployable landing with no build step above now turns VG-2 RED, where
+      # before it would have been scanned by nothing and reported an identical
+      # PASS.
       #
-      # THE FILE IS NOT IN `W6-i`'s FENCE, so the gap is stated and left. What
-      # it is NOT is a new exposure opened by the step above: adding the admin
-      # build does not put that app's output in front of this grep, because the
-      # list names paths and not the job's steps.
+      # NO FIGURE IS RESTATED HERE. A hand-maintained count in a workflow
+      # comment is checked by nothing: session 348 re-derived `apps/site` 32
+      # bytes below the number this block carried. The runner's header holds
+      # the reasoning, the rejected targets and the residue; read it instead.
       - name: VG-2 no secrets in client output
         run: node scripts/ci/vg2-no-secrets-in-bundle.mjs
 

@@ -378,7 +378,10 @@ export const ADMIN_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = {
  * AND THE HALF THAT WAS NEVER STALE IS UNCHANGED: NOTHING HERE INVENTS AN
  * INPUT. `buildLiabilityHome` needs an environment, a role, a snapshot row and
  * the trust signals, and `src/app/page.tsx` names the three things that block a
- * supplier and renders the 503 with its reason instead. A `main` that invented
+ * supplier and renders THEM with their reasons instead. It used to render a 503,
+ * and ADR-190 clause 5 removed that: a screen renders no error kind it did not
+ * receive, this route performs no read, so the page carries no `AdminErrorKind`
+ * at all rather than a corrected one. A `main` that invented
  * inputs in order to print something would be the confidently wrong number
  * AS-M6-04 is about, printed by the process whose subject is not printing it.
  */

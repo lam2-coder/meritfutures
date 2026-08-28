@@ -123,7 +123,7 @@ M5 consumes [DATA_MODEL section 8](../architecture/data-model/README.md) as appr
 
 ### 2.1 The ledger transactions, stated exactly
 
-Every money movement in Merit is one of these five shapes. Amounts are signed, positive is debit, and each transaction sums to zero (INV-M5-04).
+Every money movement in Merit is one of the `LT-nn` shapes in the table below. Amounts are signed, positive is debit, and each transaction sums to zero (INV-M5-04).
 
 | ID | Kind | Entries |
 |---|---|---|

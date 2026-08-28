@@ -180,13 +180,18 @@ function split(cfg) {
         .trim() +
       `\n\n${cfg.lead}\n\n## Entries\n\n| | |\n|---|---|\n` +
       entries
-        .map((e) => `| [${e.heading.split(':')[0]}](${e.file.replace(`${cfg.out}/`, '')}) | ${e.heading.includes(':') ? e.heading.split(':').slice(1).join(':').trim() : ''} |`)
+        .map(
+          (e) =>
+            `| [${e.heading.split(':')[0]}](${e.file.replace(`${cfg.out}/`, '')}) | ${e.heading.includes(':') ? e.heading.split(':').slice(1).join(':').trim() : ''} |`,
+        )
         .join('\n'),
   );
 
   write(`${cfg.out}/.map.json`, JSON.stringify(map, null, 2) + '\n');
   console.log(`${entries.length} entry files, README.md`);
-  console.log(`map: ${Object.keys(map.anchors).length} anchors, ${Object.keys(map.ids).length} ids`);
+  console.log(
+    `map: ${Object.keys(map.anchors).length} anchors, ${Object.keys(map.ids).length} ids`,
+  );
   return 0;
 }
 

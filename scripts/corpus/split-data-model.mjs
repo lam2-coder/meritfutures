@@ -136,7 +136,10 @@ function split() {
       'about a table.\n\n' +
       sections
         .map((s) => {
-          const prose = s.lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+          const prose = s.lines
+            .join('\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
           const index = s.tables.length
             ? `\n\n| Table | |\n|---|---|\n${s.tables.map((t) => `| [\`${t.name}\`](${t.name}.md) | |`).join('\n')}`
             : '';
@@ -147,7 +150,9 @@ function split() {
 
   write(MAP, JSON.stringify(map, null, 2) + '\n');
   console.log(`${tables.length} table files across ${sections.length} sections, README.md`);
-  console.log(`map: ${Object.keys(map.anchors).length} anchors, ${Object.keys(map.ids).length} ids`);
+  console.log(
+    `map: ${Object.keys(map.anchors).length} anchors, ${Object.keys(map.ids).length} ids`,
+  );
   return 0;
 }
 

@@ -57,7 +57,12 @@ import {
   type ProcessEnvironment,
 } from '../../../packages/golden-loader/test/harness/environment.ts';
 import { DEFAULT_OPTIONS, runDemo } from '../main.ts';
-import type { DailyMark, CalendarSlice, RuleState, TradingDay } from '../../../packages/rules-engine/src/index.ts';
+import type {
+  DailyMark,
+  CalendarSlice,
+  RuleState,
+  TradingDay,
+} from '../../../packages/rules-engine/src/index.ts';
 import { buildPopulation, simulate } from '../../../packages/rithmic/src/index.ts';
 import { asTradingDay, toCalendarSlice, toDailyMark } from '../bridge.ts';
 import {

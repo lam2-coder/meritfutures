@@ -204,7 +204,9 @@ function split() {
 
   if (adrs.length === 0) throw new Error('no ADR sections parsed; refusing to split');
   if (allocation.length !== ALLOCATION_HEADINGS.length) {
-    throw new Error(`expected ${ALLOCATION_HEADINGS.length} allocation tables, got ${allocation.length}`);
+    throw new Error(
+      `expected ${ALLOCATION_HEADINGS.length} allocation tables, got ${allocation.length}`,
+    );
   }
   if (closures.length === 0) throw new Error('no gate closures parsed; refusing to split');
 
@@ -221,9 +223,16 @@ function split() {
   for (const c of closures) {
     const records = c.records.length
       ? '\n\n## Architecture decision records closed at this gate\n\n' +
-        c.records.map((r) => `- [${r.id}](../${r.id}.md): ${r.heading.split(':').slice(1).join(':').trim()}`).join('\n')
+        c.records
+          .map(
+            (r) => `- [${r.id}](../${r.id}.md): ${r.heading.split(':').slice(1).join(':').trim()}`,
+          )
+          .join('\n')
       : '';
-    write(c.file, [c.lead, records.replace(/^\n\n/, ''), ...c.rulings].filter(Boolean).join('\n\n'));
+    write(
+      c.file,
+      [c.lead, records.replace(/^\n\n/, ''), ...c.rulings].filter(Boolean).join('\n\n'),
+    );
   }
 
   write(
@@ -254,7 +263,10 @@ function split() {
         .join('\n') +
       '\n\n## Gate closures\n\n| Closure | Rulings | ADRs |\n|---|---|---|\n' +
       closures
-        .map((c) => `| [${c.heading}](gates/${c.anchor}.md) | ${c.rulings.length} | ${c.records.length} |`)
+        .map(
+          (c) =>
+            `| [${c.heading}](gates/${c.anchor}.md) | ${c.rulings.length} | ${c.records.length} |`,
+        )
         .join('\n'),
   );
 
@@ -265,7 +277,9 @@ function split() {
       `(${closures.reduce((n, c) => n + c.rulings.length, 0)} rulings kept inside them), ` +
       'ALLOCATION.md, README.md',
   );
-  console.log(`map: ${Object.keys(map.anchors).length} anchors, ${Object.keys(map.ids).length} ids`);
+  console.log(
+    `map: ${Object.keys(map.anchors).length} anchors, ${Object.keys(map.ids).length} ids`,
+  );
   return 0;
 }
 

@@ -174,9 +174,9 @@ export function requestPath(path: string): string {
  *
  * AND THIS CONSOLE AUTHORIZES NOBODY. `../roles.ts` resolves a role STRING and
  * nothing produces one; ADR-171 finding 5 puts the mapping from a session to an
- * actor and a role with the admin identity provider, which does not exist. Every
- * operator route answers 503 until it does, and section 3 below is what lets the
- * console say that rather than guess.
+ * actor and a role with the admin identity provider, which does not exist. NO
+ * operator route serves a row until it does, and every `/admin/*` route answers
+ * 401 to an anonymous caller (ADR-192); the 500 and the 503 sit behind it.
  */
 const CREDENTIALS_POLICY = 'same-origin' as const;
 
@@ -194,15 +194,15 @@ const CREDENTIALS_POLICY = 'same-origin' as const;
  * A caller that needs `detail` is a caller rendering a server's prose, which is
  * a decision a screen takes and not one a transport takes for it.
  *
- * `unavailable` IS ITS OWN MEMBER AND THAT IS THE ONE MEMBER THIS SURFACE
- * GENUINELY NEEDS. ADR-171's blocker means every operator route answers 503
- * until an `AdminSessionSource` lands, so 503 is not an edge case on this
- * console, it is the state it lives in today. WAVE-06 section 8.1: "The console
- * renders the 503 with its reason, which is `page.ts`'s `PendingPanel` shape
- * used for what it was built for." A vocabulary that folded 503 into a general
- * server error would make the console unable to tell "not built yet" from
- * "broke just now", which is the two-failures-look-identical class ADR-166 named
- * one section over.
+ * `unavailable` IS ITS OWN MEMBER AND IT STAYS, THOUGH NOT ON THE GROUND
+ * WRITTEN HERE FIRST. This block read that ADR-171's blocker makes EVERY
+ * operator route answer 503, and quoted a WAVE-06 section 8.1 sentence ADR-190
+ * has since replaced. Both are false. ADR-190 injected the surface route by
+ * route and found it split by MODULE; ADR-192 then moved the write backends'
+ * 503 BEHIND a 401, so every `/admin/*` route answers 401 to an anonymous caller
+ * and the 503 is what an AUTHENTICATED one meets on an unwired backend. So 503
+ * has named producers rather than being the state this console lives in, and
+ * folding it into a server error still loses ADR-166's distinction.
  *
  * `forbidden` IS MAPPED AND IS NOT AN INTERNAL FAULT, WHICH IS WHERE THIS
  * DIVERGES FROM THE PORTAL. `apps/portal/src/shell/app-shell.ts` deliberately
