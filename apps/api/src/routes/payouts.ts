@@ -81,10 +81,10 @@
 // RECORDS the approval; the posting is performed at a system authority, which
 // is the arrangement already in force at all three of the other places the same
 // posting is reachable: the worker, which posts through `ExpiryLedgerPort`
-// (`apps/worker/src/sweeps/ports.ts:226`) on a handle opened at
+// (`apps/worker/src/sweeps/ports.ts:229`) on a handle opened at
 // `systemDb(WORKER_REASON)`, and `WORKER_REASON` is `'nightly-batch'`
 // (`apps/worker/src/db.ts:112,124`); the operator console, whose release arm
-// posts at `AdminPayoutTx.ledger` (`admin-payouts.ts:1179`); and
+// posts at `AdminPayoutTx.ledger` (`admin-payouts.ts:1192`); and
 // `POST /wallet/withdrawals`, which declined to post on its own request path
 // deliberately and in writing (`wallet-withdrawals.ts:9-12`).
 //
