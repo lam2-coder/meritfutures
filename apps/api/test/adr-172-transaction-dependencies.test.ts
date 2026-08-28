@@ -42,7 +42,7 @@ test('the store the cash door needs is CONSTRUCTED and drives the protocol end t
   // THE DISPATCH ASKED FOR A CONSTRUCTION AND NOT A TYPE. This builds the real
   // adapter over the recorder and runs `beginIdempotent` through it, on the
   // SAME scope arm `POST /wallet/withdrawals` presents at
-  // `routes/wallet-withdrawals.ts:1506` -- `identityScope(session.identityId)`,
+  // `routes/wallet-withdrawals.ts:1527` -- `identityScope(session.identityId)`,
   // never `UNOWNED_SCOPE`. So the arm `idempotency-store.ts` refuses is not on
   // this route's path at all.
   const { db, calls } = recordingDb({ rowAt: undefined, insert: [{}] });

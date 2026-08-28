@@ -62,7 +62,10 @@ import {
   readIdentityGraph,
 } from '../src/admin-source/graph.ts';
 import type { GraphTx } from '../src/admin-source/graph.ts';
-import { IMPLEMENTED_ADMIN_READS, composeAdminReadSource } from '../src/admin-source/index.ts';
+import {
+  IMPLEMENTED_ADMIN_READS,
+  composeImplementedAdminReads,
+} from '../src/admin-source/index.ts';
 import type { AdminSourceTx } from '../src/admin-source/index.ts';
 import { AdminReadError } from '../src/routes/admin-reads.ts';
 import type { FlagListItem, FlagListQuery } from '../src/routes/admin-reads.ts';
@@ -1069,8 +1072,8 @@ describe('the composition file', () => {
     return [...block.matchAll(/^\s{2}(\w+)\(/gm)].map((match) => match[1] ?? '').sort();
   })();
 
-  function composedOver(tables: Tables): ReturnType<typeof composeAdminReadSource> {
-    return composeAdminReadSource({
+  function composedOver(tables: Tables): ReturnType<typeof composeImplementedAdminReads> {
+    return composeImplementedAdminReads({
       operator: async (fn) => await fn(new Recorder(tables) as unknown as AdminSourceTx),
     });
   }

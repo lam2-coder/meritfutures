@@ -29,15 +29,8 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->167<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Wave 3 batch 2 (M09 to M20)          | **APPROVED**                                                                                                                                                                                                                                                      |
@@ -4786,9 +4779,6 @@ This section first said the choice was *"250 first, or 250's commit carries `CI-
 
 **Three of the four slices behind `P5-b` are unblocked and the fourth is not.** `P5-i` needed `wallet_spend_limits` and it was already present. `P5-l` needed `payment_disputes` and this session registers it. `P5-e` needed `schema.ts` and `scope.ts` and takes them cleanly. **`P5-n` is NOT unblocked**: its subject is the producer under the `events` feed, and `events` has no scope rule and cannot get one without the entry named above.
 
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 ---
 
 ## `P6-b` lands: the live tier's address is `apps/api`, and taking the recommendation means neither table gains a row (2026-08-27, session 277)
@@ -5716,6 +5706,275 @@ first, `falsify` clean.
 **Twelve seeded defects, twelve caught**, including the conjunction turned into a disjunction, the correlation comparison reversed, the money band entered, the idle clique flagged, and a barrel leg dropped. **Four of them were MISSES first and the reason is recorded rather than counted as a pass**: `D-02`'s window and `D-12`'s lone-identity refusal are each enforced in two places, so a single-site seed is caught by the other site and the suite stays green.
 
 **Measured on this branch with `pnpm install` run first and each command separately: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 192 test files / 4,164 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The dispatch baseline of 33 / 13 / 0 / 0 / clean / 191 files / 4,088 passed / 6 skipped was reproduced exactly before a line changed. **No ADR number, no migration number, no `packages/db` change, no `apps/api` change, no contract change, no `SqlExecutorReason` member, no `SystemReason` member, and `runner.ts`, `ports.ts`, `canary.ts` and `src/db.ts` read in full and NOT touched.**
+
+## ADR-176 lands: the request path records the approval and does not post it, and the key that had to go with it (2026-08-28, session 316)
+
+**[ADR-172](decisions/ADR-172.md) clause 2 applied where that entry reported it and fenced it: [`routes/payouts.ts`](../apps/api/src/routes/payouts.ts).** `PayoutTx.ledger` is DELETED and `decidePayout`'s posting arm is REMOVED. **The premises were re-derived at source rather than inherited from the ruling that settled them**, and they hold: `LedgerWriteKey` is `ledgerTransactions | ledgerEntries` ([`tx.ts:64`](../packages/ledger/src/tx.ts)), both scope class `derived` (`scope.ts:513,522`); `ScopedTx.insert` takes `OwnedTableKey` (`scoped-db.ts:1739`) and `ParentedTableKey` is `Extract<DerivedTableKey, 'sessions'>` (`:1540`), a closed list of ONE; so the only handle satisfying `LedgerTx` is `insert<K extends TableKey>` over the whole estate (`:1802`), and a door in `apps/api` returning one would be `systemDb` renamed.
+
+**THE VERIFICATION FOUND ONE THING THE RULING NEEDED AND [ADR-172](decisions/ADR-172.md) DID NOT SEE.** `PayoutRequestInsert` carried no `idempotencyKey` member, while `payout_requests.idempotency_key` is `text NOT NULL` ([`0010:82`](../packages/db/migrations/0010_payouts.sql)) and [`admin-payouts.ts:784,809`](../apps/api/src/routes/admin-payouts.ts) already READS that column on release. **While the posting stood inside the handler the key reached it out of local memory, so the gap was invisible; removing the posting alone would have committed an approval no door could ever post, and the failure would have been silent.** The field is added and stored UNPREFIXED, on `payout_requests_account_idempotency_uq (account_id, idempotency_key)`. **The removal and the field are ONE change, and either one without the other is worse than neither.**
+
+**`INV-M5-06` IS SHOWN AT THREE FILES RATHER THAN CITED.** Both remaining doors are `releaseLedgerKey` character for character (`admin-payouts.ts:916`, `expiry.ts:305`) and **both call sites pass `held.idempotencyKey` off the LOCKED row** (`:1185`, `:667`). The key is a property of the APPROVAL and not of the DOOR, so removing one of three doors that mint the identical string cannot produce a second posting, and `ledger_transactions.idempotency_key text NOT NULL UNIQUE` is what refuses one.
+
+**`usePayoutBackend` DOES NOT BECOME CONSTRUCTIBLE, AND ITS `BLOCKED` ENTRY IS REWRITTEN RATHER THAN SHRUNK.** The recorded reason was the deleted field, so it is now false; a different obstruction was underneath it and **it is a READ rather than a write**. `PayoutSubject.state` is the engine's `RuleState`, which requires `lifetimeSettledCents`, `breached` and `breachKind` ([`types.ts:1004,1009,1010`](../packages/rules-engine/src/types.ts)); **`0015_rule_states.sql` declares none of the three, `lifetime_settled` appears in NO migration in the tree, and no migration names any member of `BreachKind`.** That is **the same blocker a WIRED sibling already carries**: `databaseAccountReads` is installed and `readEligibility` rejects on `ELIGIBILITY_BLOCKER` ([`account-reads.ts:851`](../apps/api/src/routes/account-reads.ts)) for those exact three fields, and `INV-M5-02` is what binds the two endpoints to one `RuleState`. Independently, `ResolvedPlan` is built from `plan_versions.rules` and a `plan_version_sizes` row, both scope class `firm` (`scope.ts:482,487`), which `ScopedTableKey` excludes (`scope.ts:1165`), while `PayoutTx` runs every method on ONE transaction. **A partial backend is REFUSED rather than overlooked**: `listPayouts` and `idempotency` are constructible today, and installing them beside a `transact` that rejects would put a live-looking route in front of the arm that approves payouts.
+
+**FOUR LINE CITATIONS IN [`wiring.test.ts`](../apps/api/test/wiring.test.ts) POINTED AT THE WRONG LINE, AND TWO ARE IN THE ENTRY [ADR-172](decisions/ADR-172.md) WROTE ONE SESSION EARLIER TO REPLACE A FALSE REASON.** `wallet-withdrawals.ts:1233` is `G-WITHDRAWAL-CLEARED`'s KYC term and `gateNoInFlight` is at `:1251`; `:1506` is a `.send({` and the identity arm is at `:1524`; both off by eighteen lines, both checked on `origin/main` before this branch moved anything. Also `admin-payouts.ts:381` for a declaration at `:382` and `admin-writes.ts:266` for one at `:269`. **The claims held at their real lines and the pointers did not**, which is the same drift in its quietest form: nothing fails, and a reader who follows the pointer concludes the reason was invented. **This is the third consecutive session in which that file has been found carrying something nothing checks**, and the gate that would have caught all four -- resolve every `file:line` inside a reason string -- is still not written.
+
+**FOUR STALE "three doors" CLAIMS WERE CORRECTED AT THEIR OWN FILES**, because a diff that falsifies a comment owns that comment: `expiry.ts`, `sweeps/ports.ts`, `wallet-withdrawals.ts` and `admin-payouts.ts`, the last of which had compared its own ledger field to `PayoutTx.ledger` by name. [ADR-172](decisions/ADR-172.md)'s reported landmine about `wallet-withdrawals.ts`'s `IdempotencyStore` comment was **checked and is already closed** at `:950-959`.
+
+**THE SIX `LT-01` COMPOSITION ASSERTIONS WERE RETARGETED, NOT DELETED.** They now run over `postTransaction(recorder, chart, lt01(...))` directly: one header, four entries, two debits summing to `approved_cents`, the signs read off `posting.ts:235-236`, the zero sum and the `bigint` check. Four new source-reading cases pin the removal, which a behavioural suite cannot hold, and they also pin the paired half: **`lt01` must STAY exported here and `admin-payouts.ts` must keep importing it**, so a later session cannot "finish" this ruling by giving each door its own transcription of the legs.
+
+**THE GAP THIS RULING OPENS IS REAL AND IS UNREACHABLE, AND ONLY THE SECOND HALF IS A CONTROL.** Nothing in the tree posts `LT-01` for a request approved with NO hold, because both remaining doors fire on a HELD request being released. The driver is [ADR-172](decisions/ADR-172.md) section 5's, checked at `0010` to need no DDL, and **this entry does not build it**: different deployable, and [ADR-003](decisions/ADR-003.md)'s money-path regime is one objective per session. It cannot be reached because `usePayoutBackend` is unwired, `wiring.test.ts` asserts `start.ts` does not call it, and the route answers 503 before it opens a transaction. **The route answered 503 before this ruling and answers 503 after it.** `INV-M5-21`'s enforcement moves with the posting and is written down where the driver will be: its predicate must be `status = 'approved'`.
+
+**Triple unmoved at `{21, 6, 15}`. NO migration, no `SystemReason` member, no `SqlExecutorReason` member, no cast past a key type, no `pg` import, `packages/db` untouched.** Approval line UNSIGNED, **MONEY PATH, `E2` READ OWED**; section 7 puts three judgements to the founder, including whether `API_CONTRACT` section 6's ordered sentence is amended now that it names a step this route no longer performs. **The wire shape does not change**: `PayoutResponse` carried no ledger transaction id and `estimated_settlement` was already a business-day range.
+
+**Five defects seeded and five caught**, including the one worth keeping: a STORED key prefixed with `PAYOUT_ENDPOINT` typechecks, reads plausibly, and would make every door compose the prefix twice. It is caught because the assertion is `.not.toContain(PAYOUT_ENDPOINT)` rather than "a key is present".
+
+**Baseline reproduced on `main` before anything moved and every command run separately after each file: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 204 test files / 4,443 passed / 6 skipped BEFORE and 204 / 4,448 / 6 AFTER.** The five added are four source-reading cases and one retargeted composition case; **no case was deleted.**
+
+**`main` MOVED UNDER THIS BRANCH MID-SESSION AND WHAT IT LANDED READS THIS BRANCH'S DIFF.** `c733fcd` merged `RI-14`, *"No reason claims a named thing does not exist while the tree exports it"*, whose `covers` names [`wiring.test.ts`](../apps/api/test/wiring.test.ts) as the file whose reasons it reads -- **the same file this session rewrote, for the same defect, from a different session on the same night.** It was merged in and re-run rather than waited out. **On the merged head: 33 of 33 gates, `14 of 14` invariants, typecheck 0, lint 0, format clean, 204 files / 4,454 passed / 6 skipped**, and `RI-14` passes over the rewritten `usePayoutBackend` reason: its three absence claims are about a COLUMN and about strings in a migration, not about a name the tree exports. **`RI-14` closes one half of this session's landmine and its own `covers` says which.** It reads EXPORTS and does not resolve a `file:line`, so the four wrong pointers found here would still pass it. **That gate is still unwritten, and it is a smaller ask than it was this morning**, because `RI-14` already parses the reason strings and would only need to resolve what they cite.
+
+---
+
+## `LT-07`'s credit leg was the wrong half of the finding, and the chart of accounts has never been seeded (2026-08-28, session 315)
+
+**[ADR-174](decisions/ADR-174.md) takes findings (A) and (C), [ADR-175](decisions/ADR-175.md)
+takes (B), and the split is argued rather than assumed: they live in TWO TABLES and only one of
+them is blocked.** (A) is `ledger_accounts` and `ledger_entries`, (B) is one `text NOT NULL
+UNIQUE` column on `ledger_transactions`, and a transaction's key is decided by its own header
+while its entries are still undecided. **Migration `0052` is RETURNED TO THE POOL UNSPENT** and no
+`E2` read is owed on a migration that does not exist.
+
+**THE RESERVATION ANTICIPATED A HOLE IN THE CREDIT SLOT AND THE MEASUREMENT FOUND THE SLOT BESIDE
+IT WRONG TOO.** `LT-06` credits `firm_treasury` `amount_cents` ([M05:135](plans/M05-payout-system.md))
+and `LT-07` debits it ([M05:136](plans/M05-payout-system.md)), and
+[`posting.ts:235-236`](../packages/ledger/src/posting.ts) writes `+amountCents` on a debit and
+`-amountCents` on a credit, so **the external leg returns `firm_treasury` to exactly where it
+started**: on the one account [M05:141](plans/M05-payout-system.md) names as where a cash movement
+books, in the leg whose own row calls it *"The external leg's cash movement"*. **That holds for
+every `kind`**, so the ruling on (A) survives finding (C) rather than waiting on it, and **a code
+minted for the credit slot would complete a posting that is wrong in the other slot.** `LT-07`'s
+row also names no amount, where every other row in that table does.
+
+**`trader_wallet` IS REFUSED ON ARITHMETIC RATHER THAN ON SCOPE.** `LT-06` already debits it at
+approval, so an `LT-07` crediting it would return the trader's wallet to where it started while
+the money left the firm. That refusal is worth having because **[ADR-124:33](decisions/ADR-124.md)'s
+version of it quotes the row under repair**: *"`LT-02` and `LT-07` both move `firm_treasury`
+against the payout wallet position"* is [M05:131,136](plans/M05-payout-system.md) restated, so its
+conclusion survives this entry and its stated ground cannot settle the repair. **[ADR-124](decisions/ADR-124.md)
+is not amended** and the finding is filed where the repair will be read.
+
+**(C) IS RECORDED AS AN ABSENCE, NO DIRECTION IS INFERRED, AND THE ABSENCE IS LARGER THAN THE
+DISPATCH SAID.** Executed against PostgreSQL 16.13 with `0001` through `0051` applied forward-only
+under `ON_ERROR_STOP`: **`ledger_accounts` HOLDS ZERO ROWS**, and the database accepted
+`firm_treasury` as `'asset'`, as `'liability'` and as `'revenue'` in turn. `treasury_balances.account_code`
+carries no foreign key and no CHECK into the chart and its own record says it is anchored outside
+the ledger deliberately. **NOTHING SEEDS THE CHART OF ACCOUNTS AT ALL**, the only `kind` literals
+in the tree are three fixtures inside a probe written to watch constraints fire, and **four of the
+seven codes have no `kind` written anywhere**: `firm_treasury`, `psp_clearing`, `reserve` and
+`promotional_credit`. **The five sites that call `firm_treasury` the account where cash books were
+weighed and NOT taken as a `kind`**, because the corpus's own arithmetic disagrees with them at
+`LT-06` and because nothing in this fence needs the answer.
+
+**SO (A) CANNOT BE CLOSED WHILE (C) IS OPEN**, and [ADR-174](decisions/ADR-174.md) section 3 names
+the three available repair shapes and why each needs the absence filled first. **The next session
+on this row rules the chart of accounts BEFORE the posting**, which is the opposite order from the
+one the reservation anticipated.
+
+**(B) IS CLOSED, AND THE TWO CONVENTIONS WERE NEVER IN CONFLICT.** They are one rule under two
+spellings and the rule is that a `ledger_transactions.idempotency_key` **names the EVENT it posts
+and never the DOOR that reached it**. `PAYOUT_ENDPOINT` is a module constant three call sites
+share, so `LT-01`'s prefix does not vary with the door: it names the payout-approval event and is
+merely SPELLED as a route, which is the identical rule `wallet-withdrawals.ts` states when it
+refuses a prefix. **An event is `(kind, reference)` and both are columns on the header row**, so
+**`LT-07`'s key is `` `${kind} ${wallet_withdrawals.idempotency_key}` ``**. Every leg EXECUTED: the
+bare key claimed by `LT-06` and refused to `LT-07`; the same refusal across a DIFFERENT
+`reference_kind` and `reference_id`, so per-reference scoping is unavailable without superseding a
+merged constraint; **the endpoint prefix watched FAILING**, two doors spelling one settlement
+admitting **two postings for one withdrawal** with no constraint violated; and the kind-prefixed
+key accepted beside `LT-06`'s while its own replay was refused. **`LT-01`'s three doors are NOT
+re-spelled**, because `ledger_entries` is append-only with no `UPDATE` and no `DELETE` grant and
+re-spelling a landed key costs a compensating posting.
+
+**NO MIGRATION, NO DOCUMENT AMENDED, AND NO MONEY-PATH CODE CHANGED.** `0009`, `0027` and `0038`
+are byte for byte unchanged, [M05](plans/M05-payout-system.md) section 2.1 stands as written
+because rewriting half a defective row is how a reader stops being able to see that it was
+defective, and `payouts.ts`, `admin-payouts.ts`, `expiry.ts` and `wallet-withdrawals.ts` are
+untouched. No `SystemReason` member, no `SqlExecutorReason` member, no cast past a key type and no
+`pg` import.
+
+**[`packages/rail`](../packages/rail/src/settlement.ts) IS UPDATED DELIBERATELY AND BY ADDITION.**
+Its `LT_07_FINDINGS` said *"this slice does not have an ADR number, so each of these is
+REPORTED"*, which is now false; each finding gains a `ruled` field naming the entry that decided
+it and what that entry left open. `test/lt-07.test.ts` gains twelve cases and **every original
+case still passes unedited**, because no primary source that suite reads is amended. The new cases
+hold `LT-06`'s and `LT-07`'s rows as TEXT, so the day either is repaired the package goes red.
+
+**Eight defects seeded and seven caught first time. The eighth was a MISS and the reason is
+recorded rather than counted as a pass**: a `toContain` over a seven-code list is a prefix match
+and still matches once an eighth code is appended at its end, so a widened `LEDGER-C2` vocabulary
+passed. The case now parses the `NOT IN (...)` and compares it whole, and was then watched
+failing; `packages/ledger/test/accounts.test.ts` caught the same seed independently through its
+three-way bind. **A ninth failure was watched and is not a seed**: the endpoint-prefixed key
+admitting two postings for one settlement is the corpus's own predicted failure executed against a
+live schema.
+
+**Measured on this branch with `pnpm install` run first and each command separately: 33 of 33
+gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 204 test
+files / 4,455 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The
+baseline is `main` itself: the branch was created at `bdc99d7`, confirmed identical to
+`origin/main`, so 33 / 13 / 0 / 0 / clean / 204 files / 4,443 passed / 6 skipped was measured on
+the unmodified tree before a line changed. **`pnpm run verify` was never run.**
+
+## ADR-173 is applied to the wallet correction route, and the append it did not unblock stays refused (2026-08-28, session 317)
+
+**MONEY PATH, `E2` READ OWED.** [ADR-173](decisions/ADR-173.md) ruled the first of the four disagreements [session 298](sessions/2026-08-27-session-298.md) stopped `POST /admin/wallet/:identityId/correct` on, and named the divergence its own ruling created: the handler required a field the repaired contract makes optional. **This session applies the ruling to [`apps/api/src/routes/admin-wallet.ts`](../apps/api/src/routes/admin-wallet.ts) and its suite, and touches nothing else.**
+
+**FOUR THINGS ARE NOW TRUE OF THE ROUTE.** `corrects_entry_id` is OPTIONAL and its absence is not an error. The `conflict` answer is CONDITIONED on the field being present rather than deleted, so an operator who names an entry still gets it validated against this identity's own statement under the lock. `admin_actions.before.corrected_entry` still carries the whole prior entry and the `evidence_refs` entry of kind `wallet_entry` still names it, and **both are OMITTED rather than NULLED** when the operator names no entry, because `admin_actions` is append-only and a `corrected_entry` of `null` would be the handler asserting that an entry was looked for and not found. And **`wallet_entries.reference_id` IS `account_adjustments.id` and nothing else**, stated at the port so a wiring slice inherits the ruling instead of the contract's error.
+
+**THE DISPATCH SAID THE BLOCKER WAS GONE AND [ADR-173](decisions/ADR-173.md) CLAUSE 6 SAYS THE APPEND STAYS STOPPED. THE ENTRY GOVERNS.** Its clause 6 is titled *"THE STOPPED APPEND STAYS STOPPED, and this entry unblocks nothing"*, and three of session 298's four findings are marked **STANDS** there. What could be finished tonight is the SPECIFICATION of the append and not the append: items 2, 3 and 4 need contract rows nobody has written, and item 3 needs a number that is the founder's. **No ADR number is allocated to this session, so the disagreement is reported and not ruled.**
+
+**EVERY CLAIM WAS RE-DERIVED AT A RUNNING PostgreSQL 16**, `0001` through `0051` forward-only under `ON_ERROR_STOP`, one fixture and seven writes, because that is the method that moved `ADR-173`'s own conclusion. The correction written as the OLD contract instructed fails on `invalid input syntax for type uuid: "1"`. The same correction with the adjustment's id COMMITS, `provenance = 'correction'`, `balance_after_cents = 60000`. **A WELL-FORMED uuid that is not the adjustment's raises `ADJ-C3` BY NAME**, which is this session's own write and the one the deliverable rests on: it proves the binding is EXCLUSIVE rather than merely that a `bigint` is not a `uuid`, and a wiring slice that wrote the ledger transaction's id there would be well typed and would fail at `COMMIT`. A `goodwill` credit against a NULL `account_id` COMMITS as `correction`, which is why the field is optional. The correcting DEBIT fails on `account_adjustments_debit_is_a_reversal`, and an amount at the row's threshold with no approval fails on `account_adjustments_dual_control_above_threshold`. **`0026`'s revoke was verified AT THE CATALOG and not off the DDL**: `information_schema.role_table_grants` gives `merit_app` exactly `INSERT, SELECT` on `admin_actions`, on `wallet_entries` and on `account_adjustments`, and PUBLIC nothing.
+
+**FOUR FINDINGS ARE REPORTED AND NOT REPAIRED.**
+
+| # | Finding |
+| --- | --- |
+| **A** | **The dispatch's premise is wrong about scope and the entry it cites says so in terms.** All four of the dispatch's own must-be-true items are satisfied and none of them requires the append to write. Reconciling the two by widening instead would have meant a `reason_code` this repository chose on a trader's behalf and a dual-control threshold it invented on the cash door |
+| **B** | **The dual-control threshold has no SOURCE ROW to read from, not merely no value in the tree.** A sweep of the live catalog returns `dual_control_threshold_cents` on `account_adjustments` alone. `0038` calls it *"The threshold IN FORCE when this row was written"*, which is a SNAPSHOT of a policy value no table in this schema holds, so the first correction ever written has nowhere to read it from and every later one could only read the last row's snapshot. **Session 298's finding 3, sharpened, and still unrulable from any document in this tree** |
+| **C** | **Nothing in the database refuses a correction composed without its audit row.** [ADR-173](decisions/ADR-173.md) section 6 item 1 priced this and the price is now paid in code: the record of which entry a correction corrects is written by this handler and by nothing else. The repair it names is an [`0048`](../packages/db/migrations/0048_audited_writes_on_append_only_tables.sql)-shaped `SECURITY DEFINER` function taking an `admin_actions.id` as a PRECONDITION. It is a migration, it is `E2`, and it is not this session's |
+| **D** | **The contract row still carries three statements the database refuses.** `direction: "debit"`, `second_approver` and the absent `reason_code`. The route is made honest about one field and the row is not made honest |
+
+**EIGHT DEFECTS WERE SEEDED AND ALL EIGHT WERE CAUGHT**, each applied to a byte-identical copy, watched failing and reverted. **Three of them are in the migrations themselves** -- `ADJ-C3` rebound to the ledger transaction, and `admin_actions` dropped from `0026`'s revoke list -- because three of the new assertions read primary sources nobody is editing, and an assertion against such a file can be vacuous without anyone noticing.
+
+**Measured on this branch with each command run separately: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 204 test files / 4,452 passed / 6 skipped, `falsify.mjs` clean.** The `main` baseline of 33 / 13 / 0 / 0 / clean / 204 files / 4,443 passed / 6 skipped was reproduced exactly before a line changed; this session contributes nine cases and no test file. **No migration, no migration number, no ADR number, no `packages/db` change, no `API_CONTRACT` change, no `SystemReason` member, no `SqlExecutorReason` member, no `pg` import, no invented threshold, and [`apps/api/test/wiring.test.ts`](../apps/api/test/wiring.test.ts) untouched with its `{declared, wired, blocked}` triple unmoved.**
+
+---
+
+## Session 319: `P7-j`, the evidence-pack generator, and the strip list is a query rather than a list
+
+**[P7](plans/P7-risk-and-abuse.md) section 8's `P7-j`, THE SECOND DONE-GATE, is written.**
+[`apps/api/src/admin-source/evidence.ts`](../apps/api/src/admin-source/evidence.ts) (new),
+[`apps/api/test/admin-source-evidence.test.ts`](../apps/api/test/admin-source-evidence.test.ts) (new,
+**155 cases**) and [`apps/api/src/admin-source/index.ts`](../apps/api/src/admin-source/index.ts), the
+composition, which this session created because `P7-i` had not pushed one. **No migration number, no ADR
+number, no `SystemReason` member, no `SqlExecutorReason` member, no `pg` import, no cast past a key type,
+and no edit to [`admin-reads.ts`](../apps/api/src/routes/admin-reads.ts),
+[`wiring.test.ts`](../apps/api/test/wiring.test.ts), `schema.ts` or `scope.ts`.**
+
+**`INV-M7-10`'s MECHANISM IS NOW TESTED, WHICH [SESSION 282](sessions/2026-08-27-session-282.md) SAID THE
+SEED COULD NOT DO.** That session recorded the consequence of a uniformly `true` `is_sensitive`: a pack
+that COMPUTES its strip list and one that strips every detector UNCONDITIONALLY produce byte-identical
+output, so `GS-112` passes either way. The distinguishing fixture is a **registry**, not a seed row:
+`sensitiveParameterNames` is driven with a two-row registry whose second row is `is_sensitive: false`, and
+the two answers are asserted to DIFFER. **The union is asserted separately** and it is the reading that
+costs the most if taken per detector: `severity` and `window_trading_days` are parameters of several
+detectors at once, so one row flipped to `false` releases only the names it alone claims. The seed's
+uniformity is pinned in its own case, so **the day the column acquires its first `false` this suite goes
+red** rather than quietly absorbing it.
+
+**THE SUITE FOUND A REAL DEFECT IN THIS SESSION'S OWN CONTROL AND IT IS THE INTERESTING FINDING.** The
+"no other identity" check tested `^uuid$` against each string, which reads a value that IS an identifier
+and is blind to one that CONTAINS an identifier. **`tos_clause` is free text an operator writes during a
+dispute and `GS-112` REQUIRES a `trader` pack to carry it**, so an investigator who wrote *"coordinated
+with account `<uuid>`"* had put another identity into a trader pack through a field the pack must not
+drop, and the anchored check saw nothing at all. It is a property of every free-text column a pack
+carries. Repaired to a scan within strings, pinned by its own case, and the end-to-end refusal is watched
+firing on exactly that clause.
+
+**FOUR FINDINGS ABOUT THE CORPUS, EACH READ AT ITS SOURCE.**
+
+| # | Finding |
+| --- | --- |
+| **A** | **THERE IS NO `gate_results` TABLE AND THERE IS NOT MEANT TO BE.** `GS-112` and [API_CONTRACT:987](architecture/API_CONTRACT.md) both name "gate result" as a thing a pack carries; `grep` for `gate_results` over `packages/db` returns nothing. `SD-06` ([M01:280](plans/M01-rules-engine.md)) SPLIT it into [`rule_states.engine_gates` and `rule_states.context_gates`](../packages/db/migrations/0015_rule_states.sql), because freeze, recon, KYC and in-flight were true on the day and may not be true now. **The pack carries two columns on a rule state**, and the suite asserts them BY NAME, because a `gate_results` section built from a table that does not exist would be silently empty and would read as covered |
+| **B** | **`risk_flags` CARRIES NO ToS CLAUSE COLUMN, so the clause `GS-112` requires is not derivable from the flag.** A clause lives on the ENFORCEMENT that cites the flag: [`payout_requests.hold_tos_clause`](../packages/db/migrations/0031_payout_hold_and_identity_restriction.sql) under `payout_requests_hold_is_complete`, and `identity_restriction_episodes` under [ADR-041](decisions/ADR-041.md). An `open` flag nobody has acted on has none, and **`DEP-M7-05` still owes two of the three clause texts**. The pack carries `null` and **never invents one**: a flag-type-to-clause map written in this file would be the hand-listed drift `INV-M7-10` exists to prevent, one table over |
+| **C** | **`redaction_profile`'s VOCABULARY IS STILL UNRULED AND THIS SESSION TOOK NO ADR NUMBER.** The STRUCTURE is ruled and transcribed: [M06:299](plans/M06-admin-ops-console.md), [EC-071](edge-cases/EC-071.md) and the batch 1 gate give all four audiences a profile and collapse three into one. What no approved document spells is the two STRINGS, and [`0008_risk.sql`](../packages/db/migrations/0008_risk.sql) puts no `CHECK` on the column. `full-detail` and `trader-facts-only` are therefore **labelled as CHOSEN**, on `P7-d`'s `version: 'v1'` precedent, and **a ruling is REPORTED AS NEEDED rather than taken**: what it would fix is the two strings and a `CHECK`, never the mapping |
+| **D** | **THIS SLICE TAKES NO HANDLE OFF THE ACCESSOR AND COULD NOT.** [`src/db.ts`](../apps/api/src/db.ts) declares `scoped` and `firm` and NO `system(reason)` door, [ADR-171](decisions/ADR-171.md) refused to open one on the measurement that it unblocks none of the five admin ports, and [`db.test.ts`](../apps/api/test/db.test.ts) pins the map of which file takes which value. So the rows arrive through `EvidenceReadPort` and the row is written through `EvidencePackWriter`, and **the door remains the wiring slice's** |
+
+**THREE CONTROLS, AND THE SUITE ASSERTS THAT EACH FAILS DIFFERENTLY.** The projection is an ALLOWLIST, so
+a flag's `evidence` bag never crosses; the sweep REMOVES a key the computed strip list claims; and
+`assertTraderPackIsClean` re-derives both answers over the finished document and **THROWS rather than
+repairing**, because quietly deleting a key would ship a pack whose author never learned it leaked.
+Nothing is stored and no row is written when it fires, asserted end to end. **`AS-M6-01` is permanent
+damage on a single occurrence**, which is why the negatives are stated one at a time: seventy-eight cases,
+one per seeded parameter name, so an incident reads WHICH name leaked rather than "the pack leaked".
+
+**A BARE `2` IS NOT A THRESHOLD BY ITS VALUE, IT IS A THRESHOLD BY THE NAME IT ARRIVES UNDER.**
+`quantity: 2` is a trader fact and `window_seconds: 2` is a detector internal, and no value-based filter
+distinguishes them. That is why `INV-M7-10`'s list is NAMES, and the suite asserts both halves: the
+distinctive threshold values the fixture carried are absent, and the small integers that are trader facts
+survive.
+
+**`evidence.pack_exported` IS NOT EMITTED AND IS REPORTED AS OWED.** [M06:263](plans/M06-admin-ops-console.md)
+says the event now carries `audience` and `redaction_profile`, and the event catalogue is outside this
+fence. **The audit is not lost by the omission**: `0008_risk.sql`'s own header says export is *"ITSELF AN
+AUDITED ACT"* about the ROW, and `INV-M6-05` is satisfied by the row this slice writes.
+
+**THE COLLISION `P7` PREDICTED ON [`admin-source/index.ts`](../apps/api/src/admin-source/index.ts) HAS NOT
+HAPPENED YET AND IS STILL COMING.** `P7-i` owns that file this wave, had pushed no branch and landed
+nothing on `main` when this slice finished, so the composition was created here rather than edited.
+**It is written for the merge**: a `Partial<AdminReadSource>` whose unimplemented methods THROW WITH THEIR
+OWN NAME, so the keep-both merge that P7 section 5.5 says type-checks while dropping a leg answers
+*"no module supplies `listFlags`"* at the first request instead of compiling into silence. **Whoever
+resolves that conflict keeps BOTH keys and re-reads the file; a green typecheck is not evidence.**
+
+**Measured on this branch with `pnpm install` first and each command run separately: 33 of 33 gates,
+14 of 14 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 205 test files / 4,604
+passed / 6 skipped.** The baseline was reproduced on the dispatch tree before a line changed and read
+**33 of 33 / 13 of 13 / 0 / 0 / clean / 204 files / 4,443 passed / 6 skipped**; the invariant count moved
+from 13 to 14 because `RI-14` landed on `main` mid-session and was merged in, not because this slice
+touched [`repo-invariants.mjs`](../packages/tooling/checks/repo-invariants.mjs). **This session contributes
+one module, one composition file and 155 cases.**
+
+**AND WRITING THAT LOG FOUND A LATENT DEFECT IN [`scripts/corpus/gates.mjs`](../scripts/corpus/gates.mjs),
+REPORTED AND NOT REPAIRED.** Its span writer interpolates the generated text into the **replacement**
+argument of `String.prototype.replace`, and a replacement string is not literal text: JavaScript gives it
+a substitution vocabulary whose members can insert the parts of the subject the match did not cover. A
+session-log index line carrying a dollar sign immediately before a backtick therefore wrote **the entire
+text preceding the span back into the span**, taking [`docs/sessions/README.md`](sessions/README.md) from
+549 lines to 743 with its own frontmatter inside the generated table. **`generate` exited 0 and reported
+one span rewritten; `CI-06g` failed on the next run**, which is the gate working. **Re-running `generate`
+does not heal it**, because each run rewrites the corruption. The exposure belongs to any span whose query
+returns prose rather than an integer. The repair is one line in that runner, passing a FUNCTION as the
+replacement so the substitution vocabulary is suppressed, and it is **outside this slice's fence**: the
+prose was changed instead, which fixes the occurrence and not the class.
+
+---
+
+## `P7-k` has landed: the breaker has a producer, `insufficient_data` does not pause sales, and `INV-M5-12` is the write union rather than a comment (2026-08-28, session 320)
+
+**[P7](plans/P7-risk-and-abuse.md) section 8's `P7-k`, the THIRD DONE-GATE.** `plan_breaker_state` landed in [`0016`](../packages/db/migrations/0016_treasury_controls.sql) and [`apps/admin/src/page.ts`](../apps/admin/src/page.ts) has said *"nothing writes it"* ever since. It has a writer now: [`apps/worker/src/breaker/evaluate.ts`](../apps/worker/src/breaker/evaluate.ts) and [`ports.ts`](../apps/worker/src/breaker/ports.ts) beside it, 52 cases in [`test/breaker.test.ts`](../apps/worker/test/breaker.test.ts), plus [`apps/api/src/routes/admin-breaker.ts`](../apps/api/src/routes/admin-breaker.ts) and 20 cases behind it. **`GS-113` is the gate and it is asserted with its NEAR-MISS beside it.**
+
+**`INV-M5-12` IS THE WRITE UNION AND NOT A COMMENT, AND THAT IS THE ENTRY'S WHOLE CONTENT.** [M05](plans/M05-payout-system.md)'s evidence column reads *"Structural: the breaker's only effect is a flag read by M3's checkout. There is no code path from any liability signal to a payout block"*, and structural is what it now is: `BREAKER_WRITE_TABLES` has EXACTLY ONE MEMBER, so no payout, wallet, halt or restriction table is reachable through the port at all. **The read side carries `payoutRequests` and the asymmetry is the design**: the loss ratio's numerator IS settled payouts (`P-M6-05`), so a port that could not read them would have no ratio, and one that could write one would be the code path the invariant says does not exist. **Read many, write one.**
+
+**THE SEED THE PROMPT ASKED FOR WAS RUN IN BOTH DIRECTIONS AND THE SECOND IS THE ONE WORTH READING.** Written straight, `await tx.insert('payoutRequests', ...)` inside the paused branch is a COMPILE ERROR (`TS2345`, *"not assignable to parameter of type 'planBreakerState'"*). Written with the cast that gets past `tsc`, **the typechecker reports ZERO errors** and TEN cases go red, among them the source sweep over write verbs and the fake transaction that refuses any key but `planBreakerState`. That second half is why `INV-M5-12` is enforced at four levels here rather than one: a control that lives only in the type system is one `as` away from gone.
+
+**`insufficient_data` IS THE STATE BELOW THE MINIMUM AND SALES ARE NOT PAUSED THERE, AND THE LADDER'S ORDER IS THE CONTROL.** `decideState` tests the FLOOR BEFORE THE RATIO, always, and the ratio is not consulted below it, because a ladder that computed an opinion and then discarded it is one edit from reporting it. `GS-113` is asserted as `AS-M6-02` writes it: one purchase, one 150,000c payout, a ratio of **151,515bp against a 6,000bp threshold**, and the state is `insufficient_data` with `salesPaused` FALSE. **Its near-miss is the same plan at the floor**, which pauses. Seeding the ladder reversed turns five cases red.
+
+**`sample_size` IS WRITTEN BESIDE `min_sample` ON EVERY ROW AND ON EVERY STATE**, `insufficient_data`, `paused` and `armed` alike, because `INV-M6-07` is *"the ratio is shown next to its sample size EVERYWHERE it appears"*. **`breaker.state_changed` carries both as REQUIRED fields** and its payload is [M06:265](plans/M06-admin-ops-console.md) transcribed field for field, asserted against that line parsed out of the document rather than against a copy. **`breaker.state_changed` HAS NO ROW IN [EVENTS](architecture/EVENTS.md)**, which is `detector.run_degraded`'s position one directory over; the absence is PINNED by a test, so the session that lands the row meets the transcription.
+
+**`ADR-167` SECTION 5's RULING IS APPLIED AND THE TERM IT COULD NOT PLACE IS APPLIED WHERE THE ENTRY PUT IT.** `sample_size` is the DENOMINATOR's count and never the settled-payout count; `OQ-M6-02`'s second term, *"3 settled payouts"*, lives in the evaluator, reaches `decideState`, and **reaches no column at all**. A row whose `sample_size` held the payout count *"would satisfy every CHECK in `0016` and describe the wrong population, and no gate in this repository can see which count an integer is"*, so the gate is a test: seven purchases, one payout, and a `sample_size` of 1 turns eight cases red.
+
+**NO NUMBER IN THIS SLICE IS THIS SESSION'S.** `LOSS_RATIO_POLICY` carries `windowDays: 30` and `thresholdBp: 6000` with `M06:95` quoted on each, and **both `OQ-M6-02` terms ship `unstated` with `null`**. So **the evaluator DECLINES** rather than running on an invented floor, which is `DetectorDeclined`'s shape one directory over: a floor of zero is refused by `min_sample > 0` at the database, and a floor of one is `AS-M6-02`'s launch-week outage with a `CHECK` satisfied. A test asserts both terms are STILL `unstated`, so filling one in is a red suite rather than a quiet commit.
+
+**THE CUSUM IS FOLDED IN INTEGER BASIS POINTS AND RENDERS ABSENT, WHICH IS `ADR-167` CLAUSES 4 AND 5 BOTH.** `foldCusum` is integer addition, subtraction and comparison only; the slack is configured as `k_bp` so `sigma` is never halved on the evaluation path. **The one remaining division is the pass rate's and it is declared rather than hidden**: it truncates downward, at most 1bp per day, and because `S_t` is a running sum the bias accumulates in the direction of NOT alarming, which is the safe direction for an advisory panel and cannot be configured away the way the halving could. An unordered series is REFUSED rather than sorted, because a recurrence over a reordered series is a different statistic.
+
+**THE API HALF DECLARES NO PORT, AND THAT IS A RULING RATHER THAN A CONVENIENCE.** [ADR-166](decisions/ADR-166.md) clause 10 measured `GET /admin/loss-ratios` and `GET /admin/cusum` as *"in NEITHER list on EITHER surface"*; measured again from `CompositionReport` after this module, **operator `registered` moves 24 to 26, public `withheld` moves 23 to 25, and `modules` moves 23 to 24**. Section 8 makes both endpoints *"focused projections of `GET /admin/liability`'s UNDERLYING DATA"*, so a second port would have been the second query [`admin-reads.ts`](../apps/api/src/routes/admin-reads.ts) already refuses for `/admin/eligible-forecast` **and** would have moved [`wiring.test.ts`](../apps/api/test/wiring.test.ts)'s `{declared: 21, wired: 6, blocked: 15}` triple, whose file is session 316's this wave. **The triple does not move and the whole `apps/api` suite is green.**
+
+**A POPULATED CUSUM ON THE SOURCE RENDERS AS `null`, AND THAT IS THE ASSERTION THE API SUITE EXISTS FOR.** `LiabilityResponse.per_plan[].cusum` is a NON-OPTIONAL field, so a source hands this module `{statistic: 6.25, threshold: 5.5, alarm: true}` and it must not reach the wire: `DEP-M6-05` is M06 **Wave 4**, so any statistic today is uncalibrated, `FM-M6-07` makes an uncalibrated CUSUM *"either constant alarms or none, which is the same as no chart"*, and `apps/admin` already lists `P-M6-06` as pending naming that blocker. **A second surface drawing the chart the console refuses to draw would be the same failure with a different renderer.** Seeding the pass-through turns it red.
+
+**TWO FIELDS THE PORT CANNOT CARRY ARE STATED ABSENCES AND NOT OMISSIONS, AND BOTH ARE REPORTED RATHER THAN REPAIRED.** `per_plan[].sample_size` is `null` with its blocker named beside it, in `P-M6-09`'s `suppressed` idiom: a body with no field reads as a ratio that never had a sample size. **And `sales_paused` cannot carry the three-state distinction**: `state` has four values, `sales_paused` is `state = 'paused'`, so `false` covers `armed` AND `insufficient_data` and a reader cannot tell *"the breaker is watching and content"* from *"the breaker has no opinion"*, which is precisely `GS-113`'s difference. Both repairs are a field on `LiabilityResponse.per_plan`, which is `admin-reads.ts`'s type and `P7-b`'s file. **The gap is pinned by a test that goes red the day the field lands.**
+
+**A THIRD ABSENCE IS REPORTED AND IT IS A TEST THAT NOW SAYS SOMETHING FALSE BY IMPLICATION.** [`admin-reads.test.ts`](../apps/api/test/admin-reads.test.ts) pins an unserved list, *"a register of contract rows nobody has built"*, and it is **STILL GREEN** after this slice, because it derives `served` from `ADMIN_READ_ENDPOINTS` rather than from `CompositionReport`. `/admin/cusum` and `/admin/loss-ratios` are now SERVED, by another module, and that register cannot see it. **The file is not this slice's fence and no gate caught this**; the repair is to derive `served` from the composition report, which is the measurement `ADR-166` itself used.
+
+**THE BARREL BIT EXACTLY AS THE DISPATCH WARNED, AND THE CONTROL IS NOW MECHANICAL.** [P7 section 9](plans/P7-risk-and-abuse.md) calls `apps/worker/src/index.ts` the phase's largest collision. Deleting BOTH re-export blocks sourced from `detectors/graph.ts`, which is what a keep-both merge produced, leaves **`pnpm run typecheck` at ZERO ERRORS**: a type checker cannot see an export that is simply gone. One assertion catches it, and it is in this slice's own suite: the barrel's leg list, **17 modules**, enumerated and asserted.
+
+**A LATENT DEFECT IN [`db.test.ts`](../apps/worker/test/db.test.ts) WAS FOUND BY WALKING INTO IT.** Its bare-specifier scan matches `from '...'` across a WRAPPED string literal, so an error message whose line ends with the word *"from"* is read as an import of whatever the next line opens with, and it reported `" +\n        "` as a package this deployable imports. [`admin-reads.test.ts`](../apps/api/test/admin-reads.test.ts) documents that exact hazard for its own scan and anchors against it; this one does not. **The message was reworded rather than the scan widened**, because the scan is `P7-a`'s file.
+
+**HALF OF [CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md)'s NUMBERED FINDING IS CLOSED AND THE ROW SAYS WHICH HALF.** That finding names TWO daily recomputations with no scheduled row, `plan_breaker_state` and `otp_send_budget`, and only the first is this fence's. The new row asserts the QUERY and not the job, on the three rows above it, and it records that **the exemption for `plan_breaker_state.override_expires_at` rests on this job and on nothing else**: an override *"lapses by being recomputed rather than by being released"*, so a stalled evaluation converts a dated override into an indefinite one. **`insufficient_data` must never be alarmed as a failure of the job**, because an alarm on it teaches an operator to override the state that exists to prevent an override.
+
+**Fifteen defects seeded and fifteen caught**, including the named `INV-M5-12` seed in both its forms, the ladder reversed, the payout count in `sample_size`, `min_sample` dropped from the row, the sample size dropped from the alert, the ratio computed as a float, a CUSUM alarm reaching the state, `OQ-M6-02` quietly answered, the CUSUM passed through on the wire, `sales_paused` derived rather than carried, a gap field named `blocked_on` (which turns every 200 into a 500, and is why the name moved rather than the sweep), and both graph legs lost from the barrel.
+
+**Measured on this branch with `pnpm install` run first and each command separately: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 206 test files / 4,515 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The `main` baseline of 33 / 13 / 0 / 0 / clean / **204 files / 4,443 passed / 6 skipped** was reproduced exactly before a line changed. **NO ADR NUMBER, NO MIGRATION NUMBER, no `packages/db` change, no contract change, no `SqlExecutorReason` member, no `SystemReason` member, no `pg` import, no cast past a key type, `wiring.test.ts` and `admin-reads.ts` and its suite untouched, and `CRON_INVENTORY` gains one row and nothing else.**
 
 ## The flags queue acquires a data source, and its ordering is one the route refuses (2026-08-28, `P7-i`)
 
