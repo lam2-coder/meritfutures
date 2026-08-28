@@ -894,16 +894,34 @@ Roles: `owner` (all), `ops` (read plus account actions, no config or role change
 ### GET /admin/liability
 ```ts
 type LiabilityResponse = {
-  as_of: string;
-  open_liability_cents: number;
+  as_of: string;                                 // liability_snapshots.as_of. The instant every field below EXCEPT reserve describes
+  open_liability_cents: number;                  // liability_snapshots.open_liability_cents. ONE COMPONENT of the P-M6-01 panel, not the panel
+  wallet_balances_cents: number;                 // the OTHER component. ADR-019, INV-M6-11
+  bounded_near_term_cents: number;               // P-M6-02, the cash figure
+  remaining_ladder_exposure_cents: number;       // AS-M6-04's third number, the upper bound on lifetime commitment
+  absorbed_corrections_cents: number;            // P-M6-10. SIGNED, and the only signed figure on this response
   funded_accounts: number;
   eligible_next_7d: { total_cents: number; account_count: number; by_day: Array<{ trading_day: string; cents: number; accounts: number }> };
   payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean };
-  reserve: { reserve_cents: number; cvar99_cents: number; rcr_bp: number; breaker_armed: boolean };
+  reserve: { as_of: string; reserve_cents: number; cvar99_cents: number; rcr_bp: number; breaker_armed: boolean; treasury_account_code: string; treasury_as_of: string; treasury_source: "provider_api" | "manual_attestation" };
   per_plan: Array<{ plan_id: string; code: string; loss_ratio_bp: number; threshold_bp: number; sales_paused: boolean; cusum: { statistic: number; threshold: number; alarm: boolean } }>;
   integrations: { mid_health: Array<{ psp: string; decline_rate_bp: number; chargeback_rate_bp: number; healthy: boolean }>; recon: { last_run_at: string; mismatches_open: number }; batch: { last_success_at: string; last_duration_ms: number } };
 };
 ```
+
+#### The response is a projection of two ROWS, and the panel arithmetic is not on the wire ([ADR-188](../decisions/ADR-188.md))
+
+**THE TOP-LEVEL FIELDS ARE ONE [`liability_snapshots`](data-model/liability_snapshots.md) ROW, COLUMN FOR COLUMN, AND NO FIELD IS NAMED FOR A PANEL.** That is the completeness rule and it is checkable: the only columns of that table this response does not carry are `id`, a surrogate key, and `computed_at`, which records when a batch ran rather than what any number describes. `reserve` is one [`reserve_coverage_snapshots`](data-model/reserve_coverage_snapshots.md) row joined to its `treasury_balances` anchor, on the same rule and with one stated exception below. `eligible_next_7d`, `payout_velocity`, `per_plan` and `integrations` are fed by other tables and are untouched by [ADR-188](../decisions/ADR-188.md).
+
+**`breaker_armed` is the one member of `reserve` that is not a column, and it stays.** `0049` deliberately stores it nowhere, because armed is `rcr_bp < 10000` against a threshold the [GLOSSARY](../GLOSSARY.md) fixes at 1.0 and *"storing it would recreate in one column exactly the drift item 1 removes from another"*. It is on this response already and removing a field from a served shape is a break rather than a repair.
+
+**`open_liability_cents` IS ONE COMPONENT OF THE PANEL THAT SHARES ITS NAME, and the name is deliberately kept.** [`0009_ledger.sql`](../../packages/db/migrations/0009_ledger.sql) documents the column as *"the sum of withdrawable across funded accounts"* and carries `wallet_balances_cents` separately, *"because ADR-019 made wallet balances part of Open Liability (INV-M5-15)"*. `P-M6-01`'s panel is the two summed and `INV-M6-11` makes that not optional. The field keeps the column's name because a wire name that disagreed with the column would move the ambiguity rather than remove it: a reader tracing the field back to the schema would find no such column, and the one place a console states the mapping today is the boundary crossing where it reads this response. [`apps/admin/src/liability.ts`](../../apps/admin/src/liability.ts) is that reader and it renames on arrival for exactly this reason.
+
+**NO TOTAL IS SENT AND THAT IS A DECISION RATHER THAN AN OMISSION.** `P-M6-01` requires the two components *"shown separately as well as summed"*, and the sum is a pure function of two fields of one row at one `as_of`, so the server knows nothing about it the reader does not. A total on the wire would be a third number that can disagree with the two beside it, which is [`0049_reserve_coverage_snapshots.sql`](../../packages/db/migrations/0049_reserve_coverage_snapshots.sql)'s own reason for making `rcr_bp` a `GENERATED` column, and no such column exists for this sum. It would also be the single convenient figure a client can render alone, under the panel's name, with the components ignored: `AS-M6-04` is what that produces and `INV-M6-11` is what it breaks.
+
+**`absorbed_corrections_cents` is SIGNED.** `0009` declares it signed and it is the only field on this response that may be negative. A renderer that clamps it at zero reports an absorbed correction as none.
+
+**`reserve` carries its OWN `as_of` because it is a different table on a different clock.** `reserve_coverage_snapshots` is a ratio of the rail's balance ([M05](../plans/M05-payout-system.md) `SD-M5-03`) against ours, and [`data-model/liability_snapshots.md`](data-model/liability_snapshots.md) records that as the second reason the two were not one table: *"one row forces one `as_of` on two sources that do not move together"*. A response that dated both with the top-level `as_of` would re-collapse in the payload what the schema separated. `treasury_account_code`, `treasury_as_of` and `treasury_source` are the anchor `0049` stores as a reference; `P-M6-07` requires *"attestation staleness shown when the balance is a manual attestation"*, and `treasury_source` is the only field on this response that answers which of the two it is.
 
 #### The live Open Liability ([ADR-020](../decisions/ADR-020.md) tier 2, [ADR-161](../decisions/ADR-161.md))
 

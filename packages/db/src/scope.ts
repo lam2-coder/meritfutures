@@ -506,7 +506,7 @@ export const SCOPE_RULES = {
     class: 'owned',
     column: 'identity_id',
     nullable: true,
-    why: "NULLABLE ON PURPOSE. `scope` is CHECKed to ('firm','identity') and the table's own constraint ties it to `identity_id`: an identity row has one, a firm row has NULL. Filtering `identity_id = $1` excludes `firm_treasury`, `psp_clearing`, `fees_revenue` and `reserve` WITHOUT a second predicate, because SQL NULL never equals anything.",
+    why: "NULLABLE ON PURPOSE. `scope` is CHECKed to ('firm','identity') and the table's own constraint ties it to `identity_id`: an identity row has one, a firm row has NULL. Filtering `identity_id = $1` excludes `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve` and `withdrawals_in_flight` WITHOUT a second predicate, because SQL NULL never equals anything.",
   },
 
   ledgerEntries: {

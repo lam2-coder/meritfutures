@@ -30,6 +30,42 @@ const read = (...parts: string[]): string => readFileSync(join(ROOT, ...parts), 
 
 const M05 = read('docs', 'plans', 'M05-payout-system.md');
 const LEDGER_SQL = read('packages', 'db', 'migrations', '0009_ledger.sql');
+const MIGRATION_DIR = join(ROOT, 'packages', 'db', 'migrations');
+
+/**
+ * THE DECLARED VOCABULARY THE DATABASE ACTUALLY HAS, not the one `0009` wrote.
+ *
+ * The last migration to ADD `ledger_accounts_code_is_declared` is the one that
+ * installed the constraint in force. Comments come off the whole file BEFORE the
+ * anchor is looked for, because these migrations quote their own statements
+ * while arguing for them and anchoring on raw text slices the argument.
+ */
+const VOCABULARY_FILE: string = (() => {
+  const files = readdirSync(MIGRATION_DIR)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+    .filter((name) =>
+      readFileSync(join(MIGRATION_DIR, name), 'utf8')
+        .replace(/--[^\n]*/g, '')
+        .includes('ADD CONSTRAINT ledger_accounts_code_is_declared'),
+    );
+  const last = files[files.length - 1];
+  if (last === undefined) throw new Error('no migration ADDs ledger_accounts_code_is_declared');
+  return last;
+})();
+
+function codesInForce(): string[] {
+  const sql = readFileSync(join(MIGRATION_DIR, VOCABULARY_FILE), 'utf8').replace(/--[^\n]*/g, '');
+  const at = sql.indexOf('ADD CONSTRAINT ledger_accounts_code_is_declared');
+  const open = sql.indexOf('(', at);
+  const close = sql.indexOf(';', open);
+  // `flatMap` and not `map`: a capture group is `string | undefined` under
+  // `noUncheckedIndexedAccess`, and a narrowing that drops nothing is honest
+  // where a `!` would be a claim about a regex nobody re-reads.
+  return [...sql.slice(open, close).matchAll(/'([a-z_]+)'/g)].flatMap((m) =>
+    m[1] === undefined ? [] : [m[1]],
+  );
+}
 const POSTING = read('packages', 'ledger', 'src', 'posting.ts');
 const RAIL_SRC = read('packages', 'rail', 'src', 'settlement.ts');
 const PROBE = read('scripts', 'db', 'probe_ledger_constraints.sql');
@@ -49,6 +85,17 @@ const SEED_SQL = SEED_MIGRATION.replace(/--[^\n]*/g, '');
 const KIND_MIGRATION = read('packages', 'db', 'migrations', '0053_firm_treasury_kind.sql');
 /** `0053` with its `--` comments removed, for the same reason `SEED_SQL` is. */
 const KIND_SQL = KIND_MIGRATION.replace(/--[^\n]*/g, '');
+/**
+ * `0056`, ADR-187's mint: the eighth code, its kind, and the row.
+ *
+ * COMMENTS OFF FOR THE SAME REASON AGAIN, and this file is the reason the reason
+ * exists: `0056`'s header argues the ruling at length and quotes its own
+ * statements while doing so, including the seed and both CHECKs.
+ */
+const MINT_SQL = read('packages', 'db', 'migrations', '0056_eighth_ledger_code.sql').replace(
+  /--[^\n]*/g,
+  '',
+);
 /**
  * EVERY migration's SQL, comments stripped, keyed by file name.
  *
@@ -121,17 +168,24 @@ describe('finding A: LT-07s credit leg names an account class that does not exis
     expect(M05).toContain('the row read `debit firm_treasury; credit the payout wallet position`');
   });
 
-  test('0009 declares seven codes and none of them is a pooled payout wallet position', () => {
-    const check = LEDGER_SQL.slice(
-      LEDGER_SQL.indexOf('ledger_accounts_code_is_declared'),
-      LEDGER_SQL.indexOf('ledger_accounts_scope_identity'),
-    );
-    // `flatMap` and not `map`: a capture group is `string | undefined` under
-    // `noUncheckedIndexedAccess`, and a narrowing that drops nothing is honest
-    // where a `!` would be a claim about a regex nobody re-reads.
-    const codes = [...check.matchAll(/'([a-z_]+)'/g)].flatMap((m) =>
-      m[1] === undefined ? [] : [m[1]],
-    );
+  test('the vocabulary IN FORCE names the eighth code and none of them is a pooled payout wallet position', () => {
+    // THIS CASE READ `0009` BY NAME AND THAT WAS A DEFECT, FOUND BY ADR-187 AND
+    // FIXED HERE. A CHECK cannot be extended in place: it moves by DROP and
+    // re-ADD under one name, so the constraint the database HAS is the last one
+    // installed. `0056` supersedes `0009`'s. Read by file name, this case would
+    // have gone on asserting a superseded seven-code list and STAYED GREEN,
+    // which is the exact failure this file's own header records under finding C
+    // -- "a watcher pinned to file names watches those files and not the claim".
+    // It was fixed for the `kind` literal there and not for the CODE vocabulary
+    // here.
+    //
+    // THE `payable` / `payout` REFUSAL IS THE HALF THAT MATTERS AND IT IS NOT
+    // WEAKENED. It is a third refused spelling class that no entry lists:
+    // ADR-181 section 4 named `firm_payable` and `payouts_*` and did not name
+    // this. It refuses `withdrawals_payable`, which is the spelling ADR-181
+    // section 5 and ADR-186 section 7 each fired at a database as the eighth
+    // code, so ADR-187 moved the NAME rather than this assertion.
+    const codes = codesInForce();
     expect(codes).toStrictEqual([
       'firm_treasury',
       'psp_clearing',
@@ -140,8 +194,19 @@ describe('finding A: LT-07s credit leg names an account class that does not exis
       'trader_withdrawable',
       'trader_wallet',
       'promotional_credit',
+      'withdrawals_in_flight',
     ]);
     expect(codes.some((code) => code.includes('payable') || code.includes('payout'))).toBe(false);
+  });
+
+  test('the vocabulary in force is read from a migration that supersedes 0009', () => {
+    // The reader above resolves a file rather than naming one, so this asserts
+    // that it resolved to something LATER than `0009` and that `0009` still
+    // carries its own original list, unedited. A merged migration is never
+    // edited, only superseded, and both halves of that are checkable.
+    expect(VOCABULARY_FILE > '0009_ledger.sql').toBe(true);
+    expect(LEDGER_SQL).toContain("'promotional_credit'");
+    expect(LEDGER_SQL).not.toContain('withdrawals_in_flight');
   });
 
   test('SD-M5-07 is why the pooled class went away, and it took LT-01s credit with it', () => {
@@ -426,11 +491,16 @@ describe('ADR-174: the measurement the ruling turns on, held against M05', () =>
 });
 
 describe('ADR-174 section 4: the absence is down to two codes and both are silences', () => {
-  test('two migrations seed the chart, one row each, and both rows are firm-scoped', () => {
-    // THIS CASE ASSERTED AN EMPTY LIST, ADR-177 FILLED IT, ADR-180 EXTENDED IT
-    // AND ADR-183 EXTENDS IT AGAIN. Each step was armed by the one before, which
-    // is what ADR-174 section 7 built it for, and each has had to come here and
-    // say so.
+  test('three migrations seed the chart, one row each, and every seeded row is firm-scoped', () => {
+    // THIS CASE ASSERTED AN EMPTY LIST, ADR-177 FILLED IT, ADR-180 EXTENDED IT,
+    // ADR-183 EXTENDED IT AGAIN AND ADR-187 EXTENDS IT A THIRD TIME. Each step
+    // was armed by the one before, which is what ADR-174 section 7 built it for,
+    // and each has had to come here and say so.
+    //
+    // ADR-187 IS THE MINT THIS WHOLE FILE WAS BUILT TO WATCH. `0056` seeds
+    // `withdrawals_in_flight`, the eighth code and the only firm-scoped
+    // `liability` in the chart, and it is a firm seed like the other two: no
+    // identity opens a position in it.
     //
     // ITS SECOND SENTENCE USED TO READ: "A migration has no identity to seed
     // against, so the three per-identity classes still have no writer anywhere
@@ -445,20 +515,24 @@ describe('ADR-174 section 4: the absence is down to two codes and both are silen
       '0052_chart_of_accounts.sql',
       '0053_firm_treasury_kind.sql',
       '0054_identity_ledger_accounts.sql',
+      '0056_eighth_ledger_code.sql',
     ]);
     expect(SEED_SQL.match(/INSERT\s+INTO\s+ledger_accounts/gi)).toHaveLength(1);
     expect(KIND_SQL.match(/INSERT\s+INTO\s+ledger_accounts/gi)).toHaveLength(1);
     expect(SEED_SQL).toContain("'fees_revenue', 'revenue', 'firm'");
     expect(KIND_SQL).toContain("'firm_treasury', 'asset', 'firm'");
+    expect(MINT_SQL.match(/INSERT\s+INTO\s+ledger_accounts/gi)).toHaveLength(1);
+    expect(MINT_SQL).toContain("'withdrawals_in_flight', 'liability', 'firm'");
 
-    // AND THE TWO FIRM SEEDS STAY FIRM SEEDS. `0054` is the only writer that is
-    // identity scoped, and neither of the other two gained a second row, which
+    // AND EVERY FIRM SEED STAYS A FIRM SEED. `0054` is the only writer that is
+    // identity scoped, and none of the other three gained a second row, which
     // is the half of this case that was never about the count.
     expect(SEED_SQL).not.toMatch(/'identity'/);
     expect(KIND_SQL).not.toMatch(/'identity'/);
+    expect(MINT_SQL).not.toMatch(/'identity',/);
   });
 
-  test('0009 still ties no kind to a code, and the tie in force names all seven', () => {
+  test('0009 still ties no kind to a code, and the tie in force names all eight', () => {
     // THIS CASE WENT RED WHEN `0055` LANDED AND THE SESSION CAME HERE TO SAY SO,
     // which is the third time an entry in this sequence has had to (ADR-177,
     // ADR-180, ADR-183). Its title read "names five" and its last three lines
@@ -496,11 +570,20 @@ describe('ADR-174 section 4: the absence is down to two codes and both are silen
       'reserve',
       'trader_wallet',
       'trader_withdrawable',
+      'withdrawals_in_flight',
     ]);
+    // THE THIRD GUARD DID EXACTLY WHAT `0055` INSTALLED IT TO DO, AND ADR-187 IS
+    // THE SESSION IT DID IT TO. `ELSE false` made minting a name impossible
+    // without ruling its kind in the same migration, and `0056` rules
+    // `withdrawals_in_flight` a `liability` in the same statement that declares
+    // it. Watched rather than argued: with `ledger_accounts_code_is_declared`
+    // dropped inside a transaction, the pre-`0056` constraint refuses the row on
+    // THIS constraint, by name.
+    //
     // WHAT IS CLOSED. The CASE is total over the vocabulary and the ELSE arm
-    // REFUSES, so an eighth code is rejected by this constraint as well as by
-    // `0009`'s CHECK and `0027`'s LEDGER-C2. That is a THIRD statement the mint
-    // this file watches for must move, and the one the database enforces.
+    // REFUSES, so a NINTH code is rejected by this constraint as well as by the
+    // CHECK and by LEDGER-C2. That is a THIRD statement any future mint must
+    // move, and the one the database enforces.
     //
     // BOTH HALVES, because deleting the ELSE is not the same closure: a CASE
     // with no ELSE returns NULL for an unmatched code and a CHECK PASSES on

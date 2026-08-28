@@ -56,7 +56,7 @@ const COOKIE = { cookie: `${ADMIN_SESSION_COOKIE}=operator-token` };
  *
  * WIRED SO THE HANDLER IS REACHED AT ALL. `adminHandler` resolves
  * `currentReadSource()` before it calls any spec's `handle`
- * (`admin-reads.ts:849`), so a suite that wired nothing would be asserting the
+ * (`admin-reads.ts:856`), so a suite that wired nothing would be asserting the
  * 500 that resolution throws and would never enter this module. None of the
  * seven is called by the feed, and a call to one would be a test failure naming
  * it.

@@ -15,7 +15,7 @@
 //
 // THE FEED IS THE ONE READ WHERE AN ABSENT FILTER CHANGES WHAT MAY BE RENDERED,
 // AND `admin-reads.ts` SAYS THE OPPOSITE ABOUT ITS OWN QUEUE IN TERMS. At
-// `admin-reads.ts:1354` the flag queue records: "FILTERABLE, not filtered ...
+// `admin-reads.ts:1361` the flag queue records: "FILTERABLE, not filtered ...
 // an absent filter is the whole queue and is correct." For `events` an absent
 // filter is the bulk identity screen `INV-M6-10` says does not exist. Two rules
 // that read alike and mean opposite things do not belong in one file where a
@@ -111,7 +111,7 @@
 // for one door and a second wiring obligation.
 //
 // **THE METHOD IS ON THE PORT NOW.** `AdminReadSource.listEvents` is declared at
-// `admin-reads.ts:726` and `composeAdminReadSource` carries its arm, so a
+// `admin-reads.ts:733` and `composeAdminReadSource` carries its arm, so a
 // deployment that composes a feed adapter has somewhere to put it. ADR-184
 // section 5 said three files had to move together and the count is SIX,
 // measured: the two typed `AdminReadSource` literals in `test/admin-reads.test.ts`
@@ -134,7 +134,7 @@
 // `WAVE-06` section 4.1 states that every operator route "answers 503 today".
 // **IT IS 500, AND THE MEASUREMENT IS IN ADR-184 SECTION 7.** `adminHandler`
 // resolves `currentReadSource()` BEFORE it calls `spec.handle`
-// (`admin-reads.ts:849`), that throws an `AdminReadError` carrying no
+// (`admin-reads.ts:856`), that throws an `AdminReadError` carrying no
 // `statusCode`, and `server.ts`'s error handler maps an absent status to 500.
 //
 // **THAT 500 IS THE DESIGN AND NOT A DEFECT TO ROUTE AROUND.** `STATUS_CODE`
