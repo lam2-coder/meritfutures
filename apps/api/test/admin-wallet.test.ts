@@ -51,6 +51,7 @@ import adminWallet, {
   ADMIN_WALLET_ROLES,
   ADMIN_WALLET_TABLES,
   AdminWalletMoneyError,
+  AdminWalletUnwired,
   CORRECTION_PROVENANCE,
   INSUFFICIENT_FUNDS_STATUS,
   WALLET_CORRECT_PATH,
@@ -482,8 +483,8 @@ describe('the surface boundary', () => {
     const { app } = buildServer({ surface: 'public', modules: [adminWallet] });
     // NO BACKEND IS INSTALLED. If this 404 came from a permission check the check
     // would have needed a principal, and asking for one would have thrown
-    // `AdminWalletUnwired` and answered 503. A 404 here therefore proves the
-    // route was never registered.
+    // `AdminWalletUnwired` and answered 401 (ADR-192 clause 2). A 404 here
+    // therefore proves the route was never registered.
     for (const spec of ADMIN_WALLET_ENDPOINTS) {
       const url = urlFor(spec.path);
       const response = await app.inject({
@@ -741,9 +742,39 @@ describe('the authorization refusals', () => {
     }
   });
 
-  it('answers 503 and not 500 when no backend is installed', async () => {
+  // ADR-192 clause 2. THE 503 DID NOT GO AWAY; IT MOVED BEHIND THE 401. Which
+  // of this deployment's ports are uncomposed is a fact about the deployment,
+  // and an anonymous caller may not have it, so `principal`'s refusal answers
+  // 401 and every other port member's refusal answers 503.
+  it('answers 401 and not 503 when no backend is installed, disclosing no deployment state', async () => {
     for (const spec of ADMIN_WALLET_ENDPOINTS) {
       resetAdminWalletBackend();
+      const { app } = buildServer({ surface: 'operator', modules: [adminWallet] });
+      const response = await app.inject({
+        method: spec.method,
+        url: urlFor(spec.path),
+        ...(spec.method === 'GET' ? {} : { payload: bodyFor(spec.path) }),
+      });
+      await app.close();
+      expect([spec.path, response.statusCode]).toEqual([spec.path, 401]);
+      expect([spec.path, (response.json() as { code: string }).code]).toEqual([
+        spec.path,
+        'unauthenticated',
+      ]);
+    }
+  });
+
+  it('answers 503 to an authenticated operator whose deployment wired no `operator` or `reconcile`', async () => {
+    // The leg that would pass by accident if the module simply stopped sending
+    // 503 at all. Both mutating routes meet an unwired `operator` and the read
+    // route meets an unwired `reconcile`, so every route of this module is
+    // covered by one of the two.
+    for (const spec of ADMIN_WALLET_ENDPOINTS) {
+      useAdminWalletBackend({
+        ...fakeBackend('owner'),
+        operator: () => Promise.reject(new AdminWalletUnwired('operator')),
+        reconcile: () => Promise.reject(new AdminWalletUnwired('reconcile')),
+      });
       const { app } = buildServer({ surface: 'operator', modules: [adminWallet] });
       const response = await app.inject({
         method: spec.method,
