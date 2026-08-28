@@ -88,12 +88,37 @@ function cleanTree(): string {
   // wrong. Each one carries a citation that is TRUE against this fixture, so the
   // clean direction is a real pass rather than an empty one.
   write(root, 'apps/api/src/idempotency-store.ts', 'export const databaseIdempotencyStore = 1;\n');
+  write(root, 'apps/worker/src/detectors/fills.ts', '// No citation here, and that is allowed.\n');
+  // RI-16 READS docs/ AND ITS REGISTER NAMES TWO DOCUMENTS AND TWO SOURCE
+  // FILES, so the fixture carries all four and reproduces all four registered
+  // findings. THE REGISTER SHRINKS ONLY: an entry matching no finding is itself
+  // a finding, so a fixture that omitted these would make RI-16 report four on
+  // every case in this file -- the register working and the fixture wrong. That
+  // is the same trap RI-14's three files and RI-15's six set twice while they
+  // were being written.
   write(
     root,
     'apps/api/src/routes/payouts.ts',
-    '// The store is `databaseIdempotencyStore` (`src/idempotency-store.ts:1`).\n',
+    '// The store is `databaseIdempotencyStore` (`src/idempotency-store.ts:1`).\n' +
+      '//\n'.repeat(399),
   );
-  write(root, 'apps/worker/src/detectors/fills.ts', '// No citation here, and that is allowed.\n');
+  write(root, 'apps/worker/src/sweeps/ports.ts', '//\n'.repeat(250));
+  write(
+    root,
+    'docs/plans/FOLD-01-phone-identity.md',
+    '# FOLD-01\n\n## Evidence\n\n' +
+      '| 3 | the vendor already buys phone footprint | `DECISIONS.md:483` |\n' +
+      '| 4 | the store that exists | `databaseIdempotencyStore` ' +
+      '(`apps/api/src/idempotency-store.ts:1`) |\n',
+  );
+  write(
+    root,
+    'docs/decisions/ALLOCATION.md',
+    '# Number allocation\n\n## Reservations\n\n' +
+      '| 164 | `PayoutTx.ledger` (`routes/payouts.ts:395`) is required, and the worker at ' +
+      "`systemDb('nightly-batch')` (`sweeps/ports.ts:219`) already posts |\n" +
+      '| 168 | `PayoutTx.ledger` is a required `LedgerTx` at `routes/payouts.ts:395` |\n',
+  );
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(
     root,
