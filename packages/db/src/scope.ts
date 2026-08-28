@@ -112,6 +112,7 @@ import {
   publishedStatistics,
   purchases,
   rawIngestRows,
+  reconciliationRuns,
   reconciliations,
   reportDeliveries,
   reportSchedules,
@@ -379,6 +380,7 @@ export const TABLES = {
   platformEntitlements,
   ingestFiles,
   rawIngestRows,
+  reconciliationRuns,
   reconciliations,
   loyaltyCriteria,
   loyaltyStates,
@@ -1204,6 +1206,11 @@ export const SCOPE_RULES = {
     traversal: 'hop',
     why: "`account_id uuid NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT` (0014_marks.sql), and `accounts` carries the identity. NOT NULL and single-valued, so a join cannot multiply rows. THE GRAIN IS ONE ACCOUNT'S BALANCE, OURS BESIDE THEIRS, FOR ONE TRADING DAY, which is `daily_marks`' rule exactly and the day contributes nothing to who may read the row. `source_ingest_file_id` IS THE TRAP AND IT IS THIS MODULE'S CHARACTERISTIC ONE: it is a foreign key to `ingest_files`, which is FIRM, so a derivation through it constructs no predicate and throws, and it is NULLABLE besides, so even a firm-free version of the reading would drop every row reconciled before SD-M2-06 landed. `delta_cents` is GENERATED from the two balances and `resolved_by` is an operator name on 0002's `actor` idiom rather than a `users` row.",
   },
+  reconciliationRuns: {
+    class: 'firm',
+    why: "ONE ROW PER RECONCILIATION SWEEP, OVER THE WHOLE POPULATION, INSIDE ONE NIGHTLY BATCH RUN (0064_reconciliation_runs.sql). There is no identity column and there is no correct one: the sweep compares every funded account, and the accounts it disagreed with are its OUTPUT -- recorded on `reconciliations`, which carries its own `account_id` and is `derived` through it -- rather than its owner. That is `detector_runs`' rule arriving on the check that blocks eligibility rather than on the one that raises flags. THE ROW ABOVE IS ONE COMPARISON AND THIS IS THE RUN THAT MADE IT, and the distinction is the whole reason the table exists: `reconciliations.account_id` is NOT NULL under `reconciliations_account_day_uq (account_id, trading_day)`, so a fold across those rows is a fold over PER-ACCOUNT CLOCKS, which ADR-199 section 5 refuses for the batch because a sweep resumable at the account boundary would report a success for a run that crashed. `batch_run_id` IS THE AVAILABLE MISTAKE AND IT IS NOT A HOP: it is `uuid NOT NULL` with NO declared foreign key, because no batch run is a row anywhere in this schema -- EVENTS section 5.3 declares the `run_id` in the payloads of `batch.started`, `batch.completed` and `batch.failed` and stores it nowhere -- so `DerivedRule` has no edge to name, and a table it could name would be a firm run record in any case, which is `reserve_coverage_snapshots`' refusal in a second dress. REGISTERING THE TABLE MAKES IT READABLE AND NOTHING ELSE: how often our balances disagree with the platform's is the firm's own operational health, no trader owns it, and `0026`'s default privileges leave it off the `merit_analytics` surface until a consumer names itself.",
+  },
+
   loyaltyCriteria: {
     class: 'firm',
     why: "VERSIONED PROMISES, AND A PROMISE BELONGS TO NOBODY UNTIL IT IS EARNED (0023_loyalty_and_graduation.sql). The table holds the PUBLISHED DEFINITION of a benefit rather than an instance of one, it carries no identity column, and there is no correct one, because criteria that differed per trader would not be published criteria -- which is `statistic_definitions`' reason applied to promises rather than to statistics, and 0023's own COMMENT ON TABLE says so. THE DIRECTION OF THE EDGE IS WHAT DECIDES IT: `loyalty_benefit_grants` cites `(benefit_code, criteria_version)` and carries the identity itself, so ownership flows FROM the grant and never from the criteria, and a `derived` rule the other way would hand every trader the whole published catalogue. THE GRAIN IS `(benefit_code, version)` AND IT IS THE WHOLE PRIMARY KEY, so the table has no `uuid` of its own; `superseded_by text NULL` names a successor CODE with no foreign key and cannot address the pair, which is transcribed rather than repaired. A version is what stops a criteria change silently rewriting what past traders were promised (INV-M14-07, INV-M14-09), so a superseded row stays firm for exactly as long as a live one.",

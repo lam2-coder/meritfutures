@@ -165,6 +165,7 @@ const SQL_NAME: Readonly<Record<TableKey, string>> = {
   ingestFiles: 'ingest_files',
   rawIngestRows: 'raw_ingest_rows',
   reconciliations: 'reconciliations',
+  reconciliationRuns: 'reconciliation_runs',
   loyaltyCriteria: 'loyalty_criteria',
   loyaltyStates: 'loyalty_states',
   loyaltyBenefitGrants: 'loyalty_benefit_grants',
@@ -396,13 +397,13 @@ describe('the registry is total', () => {
   // table "cannot be registered". A REFUSAL IN A COMMENT OUTLIVES THE RULING
   // THAT SUPERSEDED IT, which is this registration's only general lesson, and
   // the block near the end of this file is the argument from the DDL.
-  test('109 declared tables, 109 scope rules, 0 reachable without one', () => {
+  test('110 declared tables, 110 scope rules, 0 reachable without one', () => {
     const declared = TABLE_KEYS.length;
     const rules = Object.keys(SCOPE_RULES).length;
     const withoutRule = TABLE_KEYS.filter((k) => !(k in SCOPE_RULES));
 
-    expect(declared).toBe(109);
-    expect(rules).toBe(109);
+    expect(declared).toBe(110);
+    expect(rules).toBe(110);
     expect(withoutRule).toEqual([]);
 
     // 112 since ADR-128: 0049 creates `reserve_coverage_snapshots`, AND IT IS
@@ -436,8 +437,26 @@ describe('the registry is total', () => {
     // the same session here, which they are not for either table above.
     // `live_account_state` IS NOW THE ONLY ONE OF THE THREE STILL
     // UNREGISTERED, and its paragraph is two above this one.
+    //
+    // 115 SINCE `0064`, AND `reconciliation_runs` IS THE 110th REGISTRATION.
+    // Session 384 both wrote the DDL and registered it, which is
+    // `payout_destinations`' shape rather than the two above it: the reader is
+    // `apps/api`'s and does not exist yet, and ADR-092's rule is about the
+    // session that NEEDS the table, which is why the argument for taking it now
+    // is stated rather than assumed -- session 374 measured
+    // `integrations.recon.last_run_at` as having no source at all, and leaving
+    // the table unregistered would make the next session on that read path open
+    // `packages/db` again for a transcription this one has already done.
+    //
+    // THE CLASS IS FIRM AND THE DDL SETTLES IT, on ADR-199's predicate rather
+    // than on a fresh argument: no column of the row is declared against
+    // `identities(id)` or `accounts(id)`, so `owned`, `pair` and `either` have
+    // nothing to name and `root` is `identities`' alone. `batch_run_id` is the
+    // available mistake and it is not an edge at all: it carries NO foreign key,
+    // because EVENTS section 5.3 declares that `run_id` in three payloads and no
+    // table in this schema stores it.
     const createdTables = (allMigrationSql().match(/^CREATE TABLE /gim) ?? []).length;
-    expect(createdTables).toBe(114);
+    expect(createdTables).toBe(115);
   });
 
   // SIX MEMBERS SINCE ADR-191, AND THE ASSERTION IS THE REASON NEITHER THE FIFTH
