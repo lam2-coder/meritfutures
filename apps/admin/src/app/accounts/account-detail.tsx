@@ -171,15 +171,20 @@ export const WITHHELD_SECTIONS: readonly PendingPanel[] = [
     origin: 'WAVE-06 section 10 item 3',
     title: 'The rows themselves: no deployment composes `AdminReadSource`',
     blockedBy:
-      'three of the port`s seven methods, and `readAccount` is no longer one of them. ADR-191 ' +
+      'ONE of the port`s seven methods, and `readAccount` is not it. ADR-191 ' +
       'gave `events` the sixth scope class it needed, so it is a `TableKey` today and a handle ' +
       'naming it IS satisfied by `SystemTx`; `apps/api/src/admin-source/account.ts` supplies ' +
-      'all eight sections and `IMPLEMENTED_ADMIN_READS` holds four names where this panel once ' +
-      'read two. WHAT IS LEFT IS THE PORT AND NOT THE TABLE: `exportEvidence`, `readLiability` ' +
-      'and `searchAccounts` have no module, so no value satisfies `AdminReadSource`, ' +
+      'all eight sections and `IMPLEMENTED_ADMIN_READS` holds FIVE names where this panel once ' +
+      'read two. THE COUNT ON THIS PANEL WAS THREE AND IS ONE, RE-DERIVED RATHER THAN ' +
+      'CARRIED: it named `exportEvidence`, `readLiability` and `searchAccounts`, and two of ' +
+      'the three now have modules. `exportEvidence` reaches the port through ' +
+      '`adminReadSourceParts` rather than through `IMPLEMENTED_ADMIN_READS`, so counting off ' +
+      'that array alone undercounts by one, and `searchAccounts` is ' +
+      '`apps/api/src/admin-source/search.ts`. WHAT IS LEFT IS THE PORT AND NOT THE TABLE: ' +
+      '`readLiability` has no module, so no value satisfies `AdminReadSource`, ' +
       '`apps/api/src/start.ts` calls no setter, and `setAdminReadSource` stays in ' +
       '`wiring.test.ts`s BLOCKED list. Composing a partial port would answer this screen and ' +
-      'throw on the first request to one of the other three',
+      'throw on the first request to the liability home',
   },
   {
     origin: 'ADR-171',

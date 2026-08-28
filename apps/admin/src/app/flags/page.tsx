@@ -5,9 +5,10 @@
 // HALVES ARE BUILT.
 //
 // `GET /admin/flags` is registered on the operator surface and `listFlags` is
-// one of the TWO methods `apps/api/src/admin-source/index.ts`'s
-// `IMPLEMENTED_ADMIN_READS` composes. So this screen renders real rows on the
-// day an operator session exists, and until then it says what it is waiting for.
+// one of the FIVE methods `apps/api/src/admin-source/index.ts`'s
+// `IMPLEMENTED_ADMIN_READS` composes, where this sentence said TWO. So this
+// screen renders real rows on the day an operator session exists, and until
+// then it says what it is waiting for.
 //
 // -----------------------------------------------------------------------------
 // THIS ROUTE PERFORMS NO READ, AND WHAT IT DOES NOT CLAIM IS THE MEASUREMENT
@@ -50,11 +51,14 @@ type FlagQueueRead =
 /**
  * What has to land before this route renders a row, each named with its owner.
  *
- * ONE ENTRY, AND THE SHORTNESS OF THE LIST IS THE POINT OF THIS SCREEN. The
- * liability home names three: an operator session, an adapter nobody wrote and
- * a contracted response four fields short of its input. The flags queue names
- * ONE, because its adapter is composed and its contract row carries every field
- * this document renders.
+ * ONE ENTRY, AND THE SHORTNESS OF THE LIST WAS THE POINT OF THIS SCREEN. It
+ * read that the liability home names three, "an operator session, an adapter
+ * nobody wrote and a contracted response four fields short of its input", and
+ * the third has since cleared: ADR-188's fields are on the wire and
+ * `../page.tsx` retired that entry. **SO THE LIABILITY HOME NAMES TWO AND THIS
+ * QUEUE STILL NAMES ONE**, and the reason it is shorter is unchanged: its
+ * adapter is composed and its contract row carries every field this document
+ * renders. `../search/page.tsx` names one as well, on the same ground.
  */
 const BLOCKED_ON: readonly PendingPanel[] = [
   {

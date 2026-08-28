@@ -21,14 +21,27 @@
 // -----------------------------------------------------------------------------
 // THIS ROUTE PERFORMS NO READ, AND THAT IS MEASURED RATHER THAN DEFERRED
 // -----------------------------------------------------------------------------
-// The three reasons are in `BLOCKED_ON` below with their citations, and the
-// first two were known when WAVE-06 was written. The third was not, and it is
-// reported by this slice rather than worked around:
+// The reasons are in `BLOCKED_ON` below with their citations. **THIS PARAGRAPH
+// NAMED THREE AND NAMES TWO, RE-DERIVED AT THIS EDIT RATHER THAN CARRIED
+// FORWARD.**
 //
-//   `GET /admin/liability`'s CONTRACTED RESPONSE CANNOT PRODUCE THIS PAGE'S
-//   INPUT. That is not a missing adapter; it is a shape that is four fields
-//   short. ADR-188 has since ruled the four fields in, on the document; no code
-//   carries them yet.
+// The one that cleared was this file's own finding and it read: `GET /admin/
+// liability`'s CONTRACTED RESPONSE CANNOT PRODUCE THIS PAGE'S INPUT, a shape
+// four fields short, ruled in by ADR-188 on the document with no code carrying
+// them. **THE CODE CARRIES THEM NOW.** `LiabilityResponse` in `../api/types.ts`
+// declares TWELVE top-level fields, `wallet_balances_cents`,
+// `bounded_near_term_cents`, `remaining_ladder_exposure_cents` and
+// `absorbed_corrections_cents` among them, and `RI-18` holds all three
+// declarations of that shape to one field set, so the wire cannot carry a field
+// in one place and not another. Every column `LiabilitySnapshot` reads is on the
+// response.
+//
+// WHAT SURVIVED THAT ENTRY IS NOT A BLOCKER AND IS NOT IN THAT LIST. See
+// {@link INCOMPLETE_ONCE_READ}: `P-M6-01`'s third component has no column and
+// therefore no field, and `../liability.ts` renders it ABSENT with its reason
+// and marks the total INCOMPLETE. A term the page renders honestly is not a
+// thing the page is waiting for, and filing it as one would tell an operator
+// the screen is broken when it is being careful.
 //
 // -----------------------------------------------------------------------------
 // THIS ROUTE NAMES NO ERROR KIND, AND ADR-190 IS WHY
@@ -129,19 +142,45 @@ const BLOCKED_ON: readonly PendingPanel[] = [
       'the first: a caller who got past the session source would meet this one and could not ' +
       'tell the two apart from the response',
   },
+];
+
+/**
+ * What this page will still not carry ONCE both blockers clear, with the reason.
+ *
+ * IT IS NOT A `PendingPanel` AND IT IS NOT IN {@link BLOCKED_ON}, WHICH IS THE
+ * WHOLE DISTINCTION. A blocker is a thing that stops the read; this is a term
+ * the read cannot supply and the page renders anyway, ABSENT, with its reason
+ * and with the total marked INCOMPLETE. `../liability.ts` already does exactly
+ * that (`theThreeNumbers`, the `withdrawalsInFlight` component), so nothing here
+ * is waiting on it and a reader looking for it in the blocked list would
+ * conclude the page is broken when it is being honest.
+ *
+ * **THE ENTRY THAT USED TO STAND IN `BLOCKED_ON` FOR THIS IS GONE BECAUSE ITS
+ * PREMISE WAS MEASURED FALSE.** It read "four of the five figures
+ * `buildLiabilityHome` reads have no field on the response", naming
+ * `wallet_balances_cents`, `bounded_near_term_cents`,
+ * `remaining_ladder_exposure_cents` and `absorbed_corrections_cents`. ADR-188
+ * ruled them in and they are on the wire: `LiabilityResponse` declares twelve
+ * top-level fields, all four are among them, and `RI-18` binds all three
+ * declarations of that shape to one field set. Every column `LiabilitySnapshot`
+ * reads is now reachable.
+ */
+export const INCOMPLETE_ONCE_READ: readonly PendingPanel[] = [
   {
-    origin: 'API_CONTRACT section 8',
-    title: 'Four of the five figures `buildLiabilityHome` reads have no field on the response',
+    origin: 'ADR-195',
+    title: 'P-M6-01`s THIRD component, the firm-scoped withdrawals_in_flight obligation',
     blockedBy:
-      'REPORTED BY W6-d AND RULED BY ADR-188, WHOSE APPROVAL LINE IS UNSIGNED AND WHOSE FIELDS ' +
-      'ARE ON NO WIRE YET. `liability_snapshots` in `0009_ledger.sql` carries ' +
-      '`open_liability_cents`, `wallet_balances_cents`, `bounded_near_term_cents`, ' +
-      '`remaining_ladder_exposure_cents` and `absorbed_corrections_cents`, and ' +
-      '`LiabilityHomeInput` reads all five. `LiabilityResponse` carries the first name and none ' +
-      'of the other four, so P-M6-01 cannot show "the two components separately as well as ' +
-      'summed", INV-M6-11 cannot include wallet balances, and P-M6-02, AS-M6-04 and P-M6-10 ' +
-      'have no source at all. The one shared name is the ambiguity `../liability.ts` renamed on ' +
-      'arrival to prevent: the column is ONE COMPONENT of the panel that shares its name',
+      'NO COLUMN AND SO NO FIELD. ADR-195 section 6 row 1: `0009_ledger.sql` gives ' +
+      '`liability_snapshots` its as_of, open_liability_cents, wallet_balances_cents, ' +
+      'bounded_near_term_cents, remaining_ladder_exposure_cents, absorbed_corrections_cents, ' +
+      'funded_accounts, id and computed_at, and not one of them is this obligation, so ' +
+      '`LiabilityResponse` has nothing to project. IT IS RENDERED ABSENT RATHER THAN ZERO AND ' +
+      'THE TOTAL SAYS IT IS INCOMPLETE, which is `../liability.ts`s own choice and its reason: ' +
+      'a zero says the obligation was measured and found empty. Nothing in this tree posts ' +
+      'LT-06 yet, so the term IS zero today and this panel starts understating on the day that ' +
+      'stops being true, which is why the column has to land before the first writer of LT-06 ' +
+      'does. INV-M6-15 is the rule that follows: Open Liability does not move when a wallet ' +
+      'withdrawal is approved, and falls when that withdrawal`s cash leaves',
   },
 ];
 
@@ -175,6 +214,16 @@ export default function LiabilityHomeRoute(): ReactElement {
           {read.blocked.map((entry) => (
             <li key={entry.origin} data-origin={entry.origin}>
               {`[${entry.origin}] ${entry.title}: NOT BUILT, blocked by ${entry.blockedBy}`}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section data-testid="incomplete-once-read">
+        <h2>What will still be incomplete once it does</h2>
+        <ul>
+          {INCOMPLETE_ONCE_READ.map((entry) => (
+            <li key={entry.origin} data-origin={entry.origin}>
+              {`[${entry.origin}] ${entry.title}: RENDERED ABSENT, because ${entry.blockedBy}`}
             </li>
           ))}
         </ul>

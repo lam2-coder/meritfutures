@@ -91,17 +91,22 @@ const BLOCKED_ON: readonly PendingPanel[] = [
     origin: 'ADR-184',
     title: 'A composed `AdminReadSource`, which no deployment installs',
     blockedBy:
-      'three of the port`s seven methods having no module, and `listEvents` is no longer one ' +
-      'of them. THE TABLE THAT BLOCKED IT IS REGISTERED: ADR-191 gave `events` the sixth ' +
-      'scope class its two nullable tenancy columns needed, `TableKey` admits it, and ' +
+      'ONE of the port`s seven methods having no module, and `listEvents` is not it. THE ' +
+      'TABLE THAT BLOCKED IT IS REGISTERED: ADR-191 gave `events` the sixth scope class its ' +
+      'two nullable tenancy columns needed, `TableKey` admits it, and ' +
       '`apps/api/src/admin-source/events.ts` reads it, so `IMPLEMENTED_ADMIN_READS` holds ' +
-      'four names where this panel once read two. ADR-184 section 3`s reasoning that the feed ' +
+      'FIVE names where this panel once read two. ADR-184 section 3`s reasoning that the feed ' +
       'is "a keyed range read over ONE table" is therefore a third case where the port`s ' +
-      'BLOCKED reason is measured false, and the narrowing DOES reach this method now. WHAT ' +
-      'IS LEFT IS `exportEvidence`, `readLiability` AND `searchAccounts`: no value satisfies ' +
-      '`AdminReadSource` while any of them is missing, so `apps/api/src/start.ts` calls no ' +
-      'setter and `setAdminReadSource` stays in `wiring.test.ts`s BLOCKED list. This console ' +
-      'reports the measurement rather than assuming a shape for it',
+      'BLOCKED reason is measured false, and the narrowing DOES reach this method now. THE ' +
+      'COUNT ON THIS PANEL WAS THREE AND IS ONE, RE-DERIVED RATHER THAN CARRIED: it named ' +
+      '`exportEvidence`, `readLiability` and `searchAccounts`, and two of those three now ' +
+      'have modules. `exportEvidence` reaches the port through `adminReadSourceParts`, the ' +
+      'other producer in the same composition file, so counting implemented methods off ' +
+      '`IMPLEMENTED_ADMIN_READS` alone undercounts by one; `searchAccounts` is ' +
+      '`apps/api/src/admin-source/search.ts`. WHAT IS LEFT IS `readLiability` ALONE: no ' +
+      'value satisfies `AdminReadSource` while it is missing, so `apps/api/src/start.ts` ' +
+      'calls no setter and `setAdminReadSource` stays in `wiring.test.ts`s BLOCKED list. ' +
+      'This console reports the measurement rather than assuming a shape for it',
   },
 ];
 

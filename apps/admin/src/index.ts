@@ -1,7 +1,15 @@
 // =============================================================================
 // apps/admin
 // =============================================================================
-// Liability dashboard, account drill-down, flags queue, evidence export.
+// Liability dashboard, account search, account drill-down, identity drill-down,
+// flags queue, event feed. Evidence export is the one M06 surface with no screen
+// here.
+//
+// THE LINE IS DERIVED FROM THE BUILD AND NOT FROM MEMORY. `pnpm --filter
+// @merit/admin build` prints SEVEN routes -- `/`, `/_not-found`, `/accounts/
+// [accountId]`, `/feed`, `/flags`, `/identities/[identityId]` and `/search` --
+// and `/` is M06 section 3.1's liability home, which is why no `/liability`
+// appears among them.
 //
 // A SEPARATE DEPLOYABLE FROM THE FIRST COMMIT, AND IT WILL LOOK LIKE WASTE FOR
 // WEEKS. P1 section 2.1 makes the argument and three documents carry the
@@ -55,7 +63,8 @@
 // which is [ADR-191](../../../docs/decisions/ADR-191.md) and session 356:
 // `events` is a `TableKey` today, `admin-source/events.ts` supplies `listEvents`
 // and `admin-source/account.ts` supplies `readAccount`, and
-// `IMPLEMENTED_ADMIN_READS` holds FOUR names where this sentence said two.
+// `IMPLEMENTED_ADMIN_READS` holds FIVE names where this sentence said two, the
+// fifth being `searchAccounts`, which session 371 wrote.
 // `GET /admin/accounts/:accountId` is registered on the operator surface,
 // `AdminReadSource` declares `readAccount`, and all eight sections API_CONTRACT
 // section 8 names now read registered tables. IT IS ALSO THE ONE READ IN
@@ -65,35 +74,53 @@
 // was the ONE screen in this package whose route exists and whose adapter could
 // not be written until the account drill-down joined it above, on the same table
 // and for the same reason. **WHAT BLOCKS BOTH SCREENS NOW IS THE PORT AND NOT A
-// TABLE**: no deployment composes `AdminReadSource`, because three of its seven
-// methods -- `exportEvidence`, `readLiability` and `searchAccounts` -- have no
-// module, so `start.ts` calls no setter and `setAdminReadSource` stays in
-// `wiring.test.ts`'s BLOCKED list. Each screen states the measurement as a named
+// TABLE**: no deployment composes `AdminReadSource`, so `start.ts` calls no
+// setter and `setAdminReadSource` stays in `wiring.test.ts`'s BLOCKED list.
+//
+// **THE COUNT IN THAT SENTENCE WAS THREE AND IS ONE, DERIVED AT THIS EDIT AND
+// NOT CARRIED FORWARD.** It read that `exportEvidence`, `readLiability` and
+// `searchAccounts` have no module. `AdminReadSource` declares seven methods;
+// `IMPLEMENTED_ADMIN_READS` names five of them and `adminReadSourceParts`
+// supplies `exportEvidence` as a sixth, through the OTHER producer in the same
+// file, so a reader counting implemented methods off that array alone
+// undercounts by one. **`readLiability` IS THE ONE METHOD LEFT**, which is why
+// the port is still uncomposed and why the liability home at `/` is the screen
+// that waits on it. A stale count here is not cosmetic: every screen in this
+// package quotes it into a blocked panel an operator reads. Each screen states the measurement as a named
 // blocker rather than rendering an invented row. THE FLAGS QUEUE (3.3) AND THE
 // IDENTITY DRILL-DOWN (3.2a) ARE NO LONGER AMONG THEM, which is another sentence
 // in this header WAVE-06 has narrowed rather than left standing: `W6-f` landed
 // `src/app/flags/` and `W6-g` landed `src/app/identities/`. `GET /admin/flags`
 // and `GET /admin/identities/:identityId/graph` are registered on the operator
-// surface and `listFlags` and `readIdentityGraph` are two of the four entries in
+// surface and `listFlags` and `readIdentityGraph` are two of the FIVE entries in
 // `IMPLEMENTED_ADMIN_READS` (`apps/api/src/admin-source/index.ts`), so each
 // renders real rows the day an operator session exists and neither waits on an
 // adapter nobody wrote.
 //
-// AND THE TWO DRILL-DOWNS ARE THE SCREENS IN THIS PACKAGE THAT MAY RENDER A
-// SUBJECT, which is a sentence that named ONE of them until `W6-j`.
+// AND THE TWO DRILL-DOWNS WERE THE SCREENS IN THIS PACKAGE THAT MAY RENDER A
+// SUBJECT, which is a sentence that named ONE of them until `W6-j` and names
+// THREE now: `src/app/search/` joined them, and it is the only one of the three
+// whose licence covers several humans at once, because a coupon is a subject
+// and the accounts that redeemed it share it (M06 section 7.10, ADR-194
+// clause 3).
 // `INV-M6-10` grants trader-identifying data only where the query names one,
 // and M06 section 3.2a is where the bound on that licence is written for the
 // identity: no index route, no search, no list. `src/app/identities/` holds one
 // dynamic segment and the document module, and `test/identity-render.test.ts`
 // asserts the directory rather than the intention.
 //
-// `src/app/accounts/` HOLDS THE SAME TWO FILES AND NO INDEX, FOR TWO REASONS
-// RATHER THAN ONE. Section 3.2 states no browse bound of its own, so the fence
-// is the first reason: the search surface is a different contract row and
-// `AdminReadSource.searchAccounts` is owned by no plan at all. The second
-// outlives the fence: an index with no query behind it is `FM-M6-10`, and the
-// registered endpoint already refuses one by making `?query=` a validation
-// failure when absent rather than an implied "everybody".
+// `src/app/accounts/` HOLDS THE SAME TWO FILES AND NO INDEX, AND THE TWO
+// REASONS IT GAVE ARE NOW ONE. The first was a fence -- "the search surface is
+// a different contract row and `AdminReadSource.searchAccounts` is owned by no
+// plan at all" -- AND IT HAS EXPIRED IN BOTH HALVES: session 371 wrote
+// `apps/api/src/admin-source/search.ts` and this package now holds the screen,
+// at `src/app/search/` rather than here.
+//
+// THE SECOND ALWAYS OUTLIVED THE FIRST AND IS WHY THE SEARCH SCREEN IS ITS OWN
+// SEGMENT: an index with no query behind it is `FM-M6-10`, the registered
+// endpoint refuses one by making `?query=` a validation failure when absent
+// rather than an implied "everybody", and `src/app/search/account-search.tsx`
+// refuses the same input a second time on the value it renders from.
 //
 // THE TWO LICENCES ARE NOT THE SAME SIZE, AND THE DIFFERENCE IS THE CONTRACT
 // RATHER THAN THE SCREEN. The identity drill-down checks every served id

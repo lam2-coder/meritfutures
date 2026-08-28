@@ -112,5 +112,13 @@ test('every route that reaches the API refuses to be prerendered', () => {
   // rejects everything. If the closure walk silently stopped resolving, every
   // page would look like it reads nothing and the loop above would assert
   // nothing at all.
-  expect(reachingTheClient, 'routes whose imports reach src/http/client.ts').toBe(10);
+  //
+  // TEN BECAME TWELVE WHEN `/wallet` AND `/security` LANDED, AND MOVING THIS
+  // NUMBER IS THE ONLY CORRECT RESPONSE TO THAT. The control is the loop above,
+  // which requires the declaration on every page that reaches the client and
+  // passed for both new pages before this line was touched; this number is the
+  // negative control on the WALK, and a walk that now resolves twelve routes
+  // must be asserted at twelve or it is asserting a tree that no longer exists.
+  // Derived by running the walk at the moment of writing, not carried forward.
+  expect(reachingTheClient, 'routes whose imports reach src/http/client.ts').toBe(12);
 });
