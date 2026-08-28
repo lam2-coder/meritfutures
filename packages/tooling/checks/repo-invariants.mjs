@@ -2186,21 +2186,62 @@ const ri13 = {
 // DEFECT A SEVENTH TIME, so where the two are in tension this check takes the
 // noisier side and the narrowings above are each stated with their reason.
 
-/** The files whose `file:line` citations describe the tree as it is now. */
-const CITED_REASON_FILES = [
-  // RI-14'S OWN THREE, because this is the same property read at a different
-  // resolution: a reason somebody wrote down, checked against the tree it
-  // describes. RI-14 asks whether the named thing is there at all; this asks
-  // whether it is where the reason says.
-  'apps/api/test/wiring.test.ts',
-  'apps/api/src/idempotency.ts',
-  'apps/api/src/routes/wallet-withdrawals.ts',
-  // The file whose absence the first false claim asserted, and the two densest
-  // live reason files in the tree after `wiring.test.ts`.
-  'apps/api/src/idempotency-store.ts',
-  'apps/api/src/routes/payouts.ts',
-  'apps/worker/src/detectors/fills.ts',
-];
+/** The extensions a reason is written in. */
+const CITED_REASON_EXTENSIONS = /\.(?:ts|tsx|mts|mjs|js)$/;
+
+/**
+ * The package this check is declared in, WALKED UP TO rather than written down.
+ *
+ * A rename of this package moves the exclusion with it, which is the whole
+ * reason it is found rather than spelled.
+ */
+const OWN_PACKAGE = (() => {
+  let dir = HERE;
+  while (!existsSync(join(dir, 'package.json'))) {
+    const up = dirname(dir);
+    if (up === dir)
+      throw new Error(
+        'repo-invariants.mjs sits under no package.json, so RI-15 cannot find the package it ' +
+          'must not read as a reason. That is a moved file rather than a clean tree',
+      );
+    dir = up;
+  }
+  return `${relative(REPO_ROOT, dir)}/`;
+})();
+
+/**
+ * THE FILES WHOSE `file:line` CITATIONS DESCRIBE THE TREE AS IT IS NOW, DERIVED
+ * FROM THE WALK RATHER THAN NAMED.
+ *
+ * THIS WAS SIX FILES WRITTEN BY HAND AND THAT IS THE DEFECT RI-05's OWN `covers`
+ * NAMES: "a hand-maintained count in a different costume, and it drifts the same
+ * way". It drifted exactly that way. Session 351 found
+ * `apps/api/src/routes/verify.ts` carrying the SAME two drifted pointers as the
+ * copies this check flagged, in a file the list did not name, and repointed them
+ * by hand while every gate stayed green. A check whose input is a list is a
+ * check whose coverage is somebody's memory.
+ *
+ * SO THE SET IS THE WALK, AND THE ONE EXCLUSION IS BY SHAPE AND IS MEASURED.
+ * This check's own package is skipped, because its `file:line` tokens are the
+ * grammar's WORKED EXAMPLES and its suite's SEEDS rather than claims about this
+ * tree -- ``[`:874`](../a/path.ts)`` in a header, ``store.ts:99999`` in a case.
+ * That is RI-16's exclusion 2, which masks a fenced block for the same reason,
+ * arriving in source. Derived at the commit that widened it: 590 source files
+ * carry 358 citations, 78 findings fall inside this package and ALL 78 are in
+ * the two files whose subject IS this grammar, and the other four source files
+ * here carry no finding at all. The exclusion is therefore exact today and
+ * stated rather than tuned.
+ *
+ * WHAT IT NEWLY REFUSES, DERIVED AT THE SAME COMMIT: 584 files where there were
+ * 6, 207 citations where there were 94, and EIGHT findings where there was one.
+ * Every one is registered below with its owner.
+ *
+ * @param {readonly string[]} tree
+ * @returns {string[]}
+ */
+function citedReasonFiles(tree) {
+  return tree.filter((f) => CITED_REASON_EXTENSIONS.test(f) && !f.startsWith(OWN_PACKAGE));
+}
 
 /**
  * THE ONE FINDING THIS CHECK MADE ON ITS FIRST RUN THAT THE SESSION WRITING IT
@@ -2225,12 +2266,79 @@ const CITED_REASON_FILES = [
  * pointer is corrected it matches nothing and the check stays green. It is then
  * a dead constant for a later session to delete, which is the smaller of the two
  * costs; the other is a red build on somebody else's branch on the day they fix
- * the thing this asked them to fix.
+ * the thing this asked them to fix. THE REGISTER NOW SHRINKS ONLY, on RI-16's
+ * rule and CI-06u's: an entry that names nothing on this ref is itself a
+ * finding, which is the difference between a register and an exemption list.
+ *
+ * SEVEN ARRIVED THE DAY THE INPUT SET STOPPED BEING SIX FILES SOMEBODY TYPED,
+ * AND THAT IS THE POINT OF DERIVING IT. Not one of the seven is in a file this
+ * check's fence holds, and each names the repair it is waiting for.
+ *
+ *   FOUR ARE A POINTER THAT NO LONGER LANDS ON WHAT IT NAMES, and the repair is
+ *   to repoint it:
+ *     `apps/admin/src/index.ts:253`     `IMPLEMENTED_ADMIN_READS` is at :193 and
+ *                                      the pointer says :178. FIFTEEN lines, and
+ *                                      it was hidden until `citationTargets`
+ *                                      learned to follow a `../..` path
+ *     `routes/webhooks-psp.ts:66`      `firmTx.update` at `scoped-db.ts:720`,
+ *                                      which is a docblock line about a null
+ *                                      bound. The nearest `update` is 177 away
+ *     `test/db.test.ts:66`             `atMost` mints a `FilterTerm` at
+ *                                      `scoped-db.ts:662`, and `atMost` is at
+ *                                      :722 with `FilterTerm` at :687
+ *     `admin-source/flags.ts:48`       three flag types against three pointers,
+ *                                      ``(`detectors/fills.ts:505`, `:810`,
+ *                                      `:1059`)``. THE CITATION IS TRUE --
+ *                                      `martingale` IS at :1059 -- and the
+ *                                      reader binds the nearest name to the
+ *                                      FIRST pointer, which is miss (8). The
+ *                                      repair is to write each name beside its
+ *                                      own pointer
+ *
+ *   THREE ARE THE NAME BESIDE A TRUE POINTER BEING THE WRONG NOUN, and the
+ *   repair is one word in the sentence rather than a new line number:
+ *     `routes/admin-feed.ts:137`       and its suite copy at
+ *     `test/admin-feed.test.ts:59`     ``resolves `currentReadSource()` BEFORE
+ *                                      it calls `spec.handle`
+ *                                      (`admin-reads.ts:856`)``. :856 IS
+ *                                      `currentReadSource()`; `handle` is the
+ *                                      nearest token and sits 3 lines up
+ *     `test/admin-payouts.test.ts:814` ``read off `entriesOf` at
+ *                                      `posting.ts:235``` quotes the two lines
+ *                                      at :235-236 and `entriesOf` declares at
+ *                                      :232. Miss (5), a body whose declaration
+ *                                      sits above the range
+ *
+ * BOTH KINDS ARE REGISTERED AND NEITHER IS EXCUSED. A sentence whose pointer
+ * drifted and a sentence whose pointer is right beside the wrong noun mislead
+ * the same reader in the same way, and each is one line for whoever owns the
+ * file. Widening the window from two to three would silence three of these and
+ * would blind the check to the narrowest FALSE citation on record, which is
+ * also three; that trade is refused here and stated rather than taken quietly.
  *
  * @type {readonly {file: string, cites: string, name: string}[]}
  */
 const CITATIONS_OWNED_ELSEWHERE = [
   { file: 'apps/api/test/wiring.test.ts', cites: 'routes/admin-wallet.ts:538', name: 'principal' },
+  {
+    file: 'apps/admin/src/index.ts',
+    cites: '../../api/src/admin-source/index.ts:178',
+    name: 'IMPLEMENTED_ADMIN_READS',
+  },
+  {
+    file: 'apps/api/src/admin-source/flags.ts',
+    cites: 'detectors/fills.ts:505',
+    name: 'martingale',
+  },
+  { file: 'apps/api/src/routes/admin-feed.ts', cites: 'admin-reads.ts:856', name: 'handle' },
+  { file: 'apps/api/src/routes/webhooks-psp.ts', cites: 'scoped-db.ts:720', name: 'update' },
+  { file: 'apps/api/test/admin-feed.test.ts', cites: 'admin-reads.ts:856', name: 'handle' },
+  {
+    file: 'apps/api/test/admin-payouts.test.ts',
+    cites: 'packages/ledger/src/posting.ts:235',
+    name: 'entriesOf',
+  },
+  { file: 'apps/api/test/db.test.ts', cites: 'scoped-db.ts:662', name: 'FilterTerm' },
 ];
 
 /** How far from the cited line the name may sit. Two, and the header says why. */
@@ -2512,7 +2620,8 @@ function citationsIn(text, inherit = true) {
     // `[`0004:40`](../../packages/db/migrations/0004_catalog.sql)` is how this
     // corpus writes a citation whose pointer alone would resolve to nothing.
     // Read here rather than in one caller so that BOTH checks read one grammar;
-    // no source file in `CITED_REASON_FILES` carries the shape.
+    // and `apps/admin/src/index.ts` carries it in a SOURCE COMMENT, which is why
+    // `citationTargets` resolves it for both checks rather than for one.
     /** @type {string | null} */
     let href = null;
     if (flat.slice(close + 1, close + 3) === '](') {
@@ -2531,7 +2640,21 @@ function citationsIn(text, inherit = true) {
       inheritedAt = at;
     } else if (href !== null) {
       target = href;
-    } else if (inherit && inherited !== null && at - inheritedAt <= CITATION_INHERIT_LINES) {
+    } else if (
+      inherit &&
+      before === '' &&
+      inherited !== null &&
+      at - inheritedAt <= CITATION_INHERIT_LINES
+    ) {
+      // ONLY A BARE POINTER CONTINUES THE PATH ABOVE IT. A token carrying its
+      // own prefix names its own thing, and over the 584 source files this
+      // reader now covers there are 152 of them and NOT ONE is a symbol in the
+      // file above: `0029:565` and `0017:82` are MIGRATION numbers, `M07:111`
+      // and `M10:372` are PLANS and section lines, `EVENTS:407` and `INFRA:53`
+      // are documents, and `+00:00`, `-06:00`, `1:30` and
+      // `http://localhost:3000` are not citations at all. Inheriting a path into
+      // one of those resolves a pointer nobody wrote and range-checks it against
+      // a file it was never about.
       target = inherited;
     }
     if (target === null) continue;
@@ -2590,6 +2713,34 @@ function nearestName(files, linesOf, start, end, needle) {
 }
 
 /**
+ * The files that could answer one citation written in `rel`.
+ *
+ * ONE RESOLUTION, READ BY BOTH CHECKS, for `citationsIn`'s reason. A path the
+ * text STATES relative to itself -- a markdown link's href, or a `../..` pointer
+ * written in a source comment -- is resolved AGAINST THE CITING FILE and lands
+ * on ONE file. Anything else is matched by suffix against the tree, which is how
+ * this corpus writes `routes/payouts.ts:395` and means the one file whose path
+ * ends that way.
+ *
+ * RI-16 ALREADY DID THE FIRST HALF FOR ITS LINKS AND RI-15 DID NOT, so
+ * `apps/admin/src/index.ts` citing `../../api/src/admin-source/index.ts:178`
+ * read as A PATH NO FILE IN THIS TREE HAS. It is one instance in 210 and it was
+ * hiding a real one: the pointer resolves and the name is not within reach of it.
+ *
+ * @param {string} root
+ * @param {string} rel  the file the citation is written in
+ * @param {{target: string, href: string | null}} c
+ * @param {(target: string) => string[]} candidates
+ * @returns {string[]}
+ */
+function citationTargets(root, rel, c, candidates) {
+  const spec = c.href ?? c.target;
+  if (c.href === null && !/^\.\.?\//.test(spec)) return candidates(spec);
+  const found = relative(root, resolve(dirname(join(root, rel)), spec));
+  return existsSync(join(root, found)) ? [found] : [];
+}
+
+/**
  * A reader over one tree, resolving a cited path to the files that could answer
  * it and caching every file it reads.
  *
@@ -2628,9 +2779,17 @@ const ri15 = {
   id: 'RI-15',
   title: 'No reason cites a line that does not hold the name beside it',
   covers:
-    'every `file.ts:12` and `file.ts:12-34` citation in ' +
-    CITED_REASON_FILES.join(', ') +
-    ', plus the bare `:12` that continues a path cited within ' +
+    'every `file.ts:12` and `file.ts:12-34` citation in EVERY SOURCE FILE THIS ' +
+    `TREE HOLDS -- ${CITED_REASON_EXTENSIONS.source} outside \`${OWN_PACKAGE}\`, ` +
+    'DERIVED FROM THE WALK and not a list, because a list is the hand-maintained ' +
+    "count RI-05's `covers` names and it drifted exactly that way: session 351 " +
+    'found `routes/verify.ts` carrying the same two drifted pointers as the ' +
+    'copies this check flagged, in a file the list did not name. The one ' +
+    'exclusion is this package, whose citations are the grammar WORKED EXAMPLES ' +
+    'and the suite SEEDS rather than claims about this tree, and it is measured: ' +
+    'all 78 findings inside it sit in the two files whose subject IS this ' +
+    'grammar and the other four carry none. It is 584 files and 207 citations ' +
+    'where it was 6 and 94. Plus the bare `:12` that continues a path cited within ' +
     `${CITATION_INHERIT_LINES} lines above it. THREE THINGS ARE ASSERTED: the ` +
     'path resolves to a file in this tree, the file reaches the line, and -- ' +
     'when the citation is preceded by a BACKTICKED NAME with nothing but glue ' +
@@ -2648,9 +2807,10 @@ const ri15 = {
     'reads today carry a bindable name, 27 of them in `wiring.test.ts`. (1a) ' +
     'THE IN-TOKEN NAME IS RI-16s HALF IN PRACTICE, because it is read only ' +
     'where a markdown LINK states the path and no source file here writes one. ' +
-    'A prefixed token whose path was INHERITED is left unbound deliberately: ' +
-    'all SEVEN in this input are `M07:nnn` or `M20:62`, a PLAN and a section ' +
-    'line, and a name bound onto a guessed path is two guesses stacked. (2) A ' +
+    'A prefixed token INHERITS NO PATH AT ALL: all 152 in this input are a ' +
+    'MIGRATION number, a PLAN and a section line, a document, or a clock ' +
+    '(`0017:82`, `M07:111`, `EVENTS:407`, `+00:00`), and not one is a symbol ' +
+    'in the file cited above it. (2) A ' +
     'NEGATED claim is skipped, ' +
     'because "`fills` HAS NO `identity_id` (`schema.ts:3005`)" cites the line ' +
     'the name must be ABSENT from; that half is RI-14. (3) Only the NEAREST ' +
@@ -2665,27 +2825,38 @@ const ri15 = {
     'cited for something else. (7) It ' +
     'never reads git history, so it cannot say whether a citation DRIFTED or was ' +
     'FALSE THE DAY IT WAS WRITTEN; both kinds are in the tree and both are ' +
-    'findings. ONE CITATION IS NAMED AND NOT ENFORCED, in ' +
-    'CITATIONS_OWNED_ELSEWHERE: `wiring.test.ts:168` cites ' +
+    'findings. (8) A LIST of names against a LIST of pointers binds only its ' +
+    'first pair, because the nearest token is the only one this reader can ' +
+    'attach without guessing the positions. ' +
+    `${CITATIONS_OWNED_ELSEWHERE.length} CITATION(S) ARE NAMED AND NOT ENFORCED, in ` +
+    'CITATIONS_OWNED_ELSEWHERE, each exact on file, pointer and name so that it ' +
+    'covers one citation and expires by itself. `wiring.test.ts:168` cites ' +
     '`routes/admin-wallet.ts:538` for `principal(request)`, which is declared at ' +
-    '`:601`. That is a FIFTH false citation in that file, found by this check on ' +
-    'its first run, and the session that wrote the check does not own the file. ' +
-    'The entry is exact and covers that one citation only.',
+    '`:601`; the other seven arrived with the derived input set, four of them a ' +
+    'pointer that no longer lands and three the wrong noun beside a true ' +
+    'pointer, and NONE is in a file this fence holds. The register SHRINKS ' +
+    'ONLY: an entry matching no finding on this ref is itself a finding.',
   run(root) {
     /** @type {string[]} */
     const findings = [];
-    const { linesOf, candidates } = citationReader(root);
+    const { tree, linesOf, candidates } = citationReader(root);
+    const sources = citedReasonFiles(tree);
+    if (sources.length === 0) {
+      throw new Error(
+        'RI-15 cannot run: the walk reached NO source file outside this check own package. A ' +
+          'derived input set cannot be silently emptied by a rename, which is why it is derived, ' +
+          'but it can be emptied by a walk that has stopped reaching the tree -- and then every ' +
+          'drifted pointer in it would pass for the wrong reason',
+      );
+    }
+    let scoped = 0;
+    /** @type {Set<string>} */
+    const raised = new Set();
 
-    for (const rel of CITED_REASON_FILES) {
-      if (!existsSync(join(root, rel))) {
-        findings.push(
-          `${rel} does not exist. This check names the files whose CITATIONS it reads, ` +
-            `so a rename silently empties it; point it at the new path`,
-        );
-        continue;
-      }
+    for (const rel of sources) {
       for (const c of citationsIn(read(root, rel))) {
-        const found = candidates(c.target);
+        scoped += 1;
+        const found = citationTargets(root, rel, c, candidates);
         if (found.length === 0) {
           findings.push(
             `${rel}:${c.at}: cites \`${c.cited}\` and NO FILE IN THIS TREE has that path. ` +
@@ -2705,6 +2876,7 @@ const ri15 = {
         if (c.name === null) continue;
         const hit = nearestName(reachable, linesOf, c.start, c.end, c.name.toLowerCase());
         if (hit !== null && hit.away <= CITATION_WINDOW) continue;
+        raised.add(`${rel} ${c.cited} ${c.name}`);
         if (
           CITATIONS_OWNED_ELSEWHERE.some(
             (k) => k.file === rel && k.cites === c.cited && k.name === c.name,
@@ -2722,6 +2894,27 @@ const ri15 = {
             `restatements. Open the file and repoint it, or say what the line does hold`,
         );
       }
+    }
+
+    if (scoped === 0) {
+      throw new Error(
+        `RI-15 read ${sources.length} source file(s) and found NO citation in any of them. This ` +
+          'tree argues in `file:line` pointers, so zero is the reader having stopped matching ' +
+          'rather than a clean tree',
+      );
+    }
+
+    // THE REGISTER SHRINKS ONLY, which is CI-06u's rule and RI-16's. An entry
+    // naming a citation that is no longer a finding is a repair that landed
+    // without the register following it.
+    for (const k of CITATIONS_OWNED_ELSEWHERE) {
+      if (raised.has(`${k.file} ${k.cites} ${k.name}`)) continue;
+      findings.push(
+        `${k.file}: the register claims \`${k.cites}\` for \`${k.name}\` is a known finding and ` +
+          'it is not one on this ref. Either the repair landed and this entry goes, or the file ' +
+          'moved and the entry moves with it. A register entry that names nothing exempts ' +
+          'nothing and hides the next one',
+      );
     }
     return findings;
   },
