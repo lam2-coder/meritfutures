@@ -49,11 +49,23 @@
 // and 2 made mechanical for the first time.
 //
 // The account drill-down (3.2) and the evidence pack are M06 surfaces this
-// package does not contain. THE FLAGS QUEUE (3.3) IS NO LONGER ONE OF THEM,
-// which is another sentence in this header WAVE-06 has narrowed rather than
-// left standing: `W6-f` landed `src/app/flags/`, and it is the one M06 surface
-// whose BOTH halves exist, `GET /admin/flags` registered on the operator
-// surface and `listFlags` composed in `apps/api/src/admin-source/index.ts`.
+// package does not contain. THE FLAGS QUEUE (3.3) AND THE IDENTITY DRILL-DOWN
+// (3.2a) ARE NO LONGER AMONG THEM, which is another sentence in this header
+// WAVE-06 has narrowed rather than left standing: `W6-f` landed
+// `src/app/flags/` and `W6-g` landed `src/app/identities/`. THEY ARE THE TWO
+// M06 SURFACES WHOSE BOTH HALVES EXIST, and that is why they came before the
+// others: `GET /admin/flags` and `GET /admin/identities/:identityId/graph` are
+// registered on the operator surface and `listFlags` and `readIdentityGraph`
+// are the two entries in `IMPLEMENTED_ADMIN_READS`
+// (`apps/api/src/admin-source/index.ts`), so each renders real rows the day an
+// operator session exists and neither waits on an adapter nobody wrote.
+//
+// AND THE IDENTITY DRILL-DOWN IS THE ONE SCREEN IN THIS PACKAGE THAT MAY
+// RENDER A SUBJECT. `INV-M6-10` grants trader-identifying data only where the
+// query names one, and M06 section 3.2a is where the bound on that licence is
+// written: no index route, no search, no list. `src/app/identities/` holds one
+// dynamic segment and the document module, and `test/identity-render.test.ts`
+// asserts the directory rather than the intention.
 //
 // THERE IS A RENDERED DOCUMENT NOW, WHICH IS THE THIRD SENTENCE IN THIS HEADER
 // THAT `WAVE-06` HAS NARROWED RATHER THAN LEFT STANDING. `W6-d` landed
@@ -292,8 +304,9 @@ export const ADMIN_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = {
     "holds exactly these two entries and that neither module's names reach the package surface, " +
     'which turns the absence into a checked property rather than a hole. AND THE PROMOTION IS ' +
     'STILL OWED AND NO SLICE IN THIS WAVE MAY TAKE IT: B.1 requires a leg to declare more than ' +
-    'three exports and W6-f has taken this module from one declaration to two, `LiabilityResponse` ' +
-    'and `FlagListItem`, so it is still short of a leg. AND THE PROMOTION IS FENCED OUT OF ' +
+    'three exports and W6-f and W6-g together have taken this module from one declaration to ' +
+    'three, `LiabilityResponse`, `FlagListItem` and `IdentityGraph`, so it is still short of a ' +
+    'leg by one. AND THE PROMOTION IS FENCED OUT OF ' +
     'this wave rather than merely unreached: `test/service.test.ts` pins the surface at 74 names ' +
     'over 8 legs and derives its compile-time coverage from its own source, and ' +
     '`test/surface.test.ts` pins this list at exactly two entries, so a ninth leg cannot land ' +

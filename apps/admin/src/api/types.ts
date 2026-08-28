@@ -22,8 +22,10 @@
 // WHAT IS HERE, AND THE ABSENCES ARE THIS SLICE'S FENCE
 // -----------------------------------------------------------------------------
 // `GET /admin/liability`, the data source for the liability home `W6-d`
-// renders, and `GET /admin/flags`, the data source for the flags queue `W6-f`
-// renders. Both are API_CONTRACT section 8 headings.
+// renders; `GET /admin/flags`, the data source for the flags queue `W6-f`
+// renders; and `GET /admin/identities/:identityId/graph`, the data source for
+// the identity drill-down `W6-g` renders. All three are API_CONTRACT section 8
+// headings.
 //
 // THE PARTITION IS THE WAVE'S AND IT IS WRITTEN DOWN. WAVE-06 section 9's row
 // for this file reads "FIVE SLICES, ONE TRANSCRIPTION ... each screen slice
@@ -31,7 +33,6 @@
 // shapes in section 8 are deliberately absent and each has an owner:
 //
 //   `AdminAccountSearchItem`   `GET /admin/accounts?query=`         `W6-j`
-//   `IdentityGraph`            `GET /admin/identities/:id/graph`    `W6-g`
 //   `EvidencePackResponse`     `GET /admin/evidence/:accountId`     wave 5,
 //                              blocked on ADR-171 (the export is an audited ACT
 //                              and therefore behind the actor)
@@ -281,4 +282,76 @@ export type FlagListItem = {
 
   /** How many INDEPENDENT detector families are implicated on `identity_id`. */
   readonly corroboration_depth: number;
+};
+
+/**
+ * `GET /admin/identities/:identityId/graph`. API_CONTRACT section 8,
+ * transcribed field for field.
+ *
+ * THE SCREEN THAT READS THIS IS REACHABLE ONLY BY NAMING A SUBJECT, which is
+ * M06 section 3.2a's own sentence and the property that separates this endpoint
+ * from the bulk PII surface `FM-M6-10` exists to refuse: "A screen that
+ * aggregates one human is a convenience; a screen that aggregates humans is the
+ * bulk PII surface FM-M6-10 exists to refuse, and the difference is one query
+ * parameter." The path parameter is that difference and it is the whole of the
+ * licence `INV-M6-10` grants: there is no list endpoint here, and this file
+ * carries no shape for one because the contract declares none.
+ *
+ * THE THREE `_cents` FIELDS ARE ON THIS TYPE AND ARE NOT ON THE SCREEN, AND
+ * THAT IS `INV-M6-04` RATHER THAN A RENDERING PREFERENCE. **This response
+ * carries no `as_of` and no source, for any of them.** `GET /admin/liability`
+ * declares `as_of` as its first field and the header on `LiabilityResponse`
+ * above says why: "a number without its as-of and its source is a number this
+ * console may not render". `../figure.ts` is where that obligation is a type,
+ * and it closes its origin roster at `P-M6-01` to `P-M6-10` and `AS-M6-04`
+ * (`ORIGIN_ID`), which are M06 section 3.1's panels, so a figure on section
+ * 3.2a's screen has no admissible origin either. `../app/identities/
+ * identity-graph.tsx` states all three as a named absence with its owner rather
+ * than rendering an undated figure, and the contract gap is REPORTED: both
+ * repairs are files outside `W6-g`'s fence.
+ */
+export type IdentityGraph = {
+  /**
+   * The human the query named.
+   *
+   * IT IS ALSO THE CHECK THE DRILL-DOWN RUNS FIRST. A response whose `root` is
+   * not the identity the path asked for is trader-identifying data about a
+   * human the query did not name, which is INV-M6-10 breached by a mismatch
+   * rather than by a rendering.
+   */
+  readonly root: {
+    readonly identity_id: string;
+    readonly status: string;
+    readonly accounts: number;
+  };
+  readonly nodes: readonly {
+    readonly identity_id: string;
+    readonly status: string;
+    readonly accounts: number;
+    readonly total_withdrawable_cents: number;
+  }[];
+
+  /**
+   * The resolved links, and `evidence` is the field the screen does not render.
+   *
+   * M06 section 3.2a names what the drill-down shows of an edge and it is two
+   * things: "the resolved graph edges with their KIND and CONFIDENCE". It does
+   * not name the evidence, and `Record<string, unknown>` is unbounded
+   * server-supplied content on the one screen in this console that holds a PII
+   * licence. The document's header argues the refusal and its suite asserts the
+   * module never reads the field.
+   */
+  readonly edges: readonly {
+    readonly a: string;
+    readonly b: string;
+    readonly link_kind: string;
+    readonly confidence_bp: number;
+    readonly evidence: Record<string, unknown>;
+  }[];
+  readonly aggregate: {
+    readonly identities: number;
+    readonly accounts: number;
+    readonly open_liability_cents: number;
+    readonly payouts_lifetime_cents: number;
+  };
 };
