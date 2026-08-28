@@ -5381,3 +5381,114 @@ holds `page.ts`, `liability.ts` and `live-liability.ts` and no session holds tha
 **ONE FENCE EXCEPTION, ARGUED RATHER THAN TAKEN QUIETLY.** [`apps/api/test/registry.test.ts`](../apps/api/test/registry.test.ts) derived its expected module order by stripping `.ts` **before** sorting, while `discoverRouteModules` sorts filenames; the two agree only while no module stem is a prefix of another's, and `wallet-withdrawals` beside `wallet` is the first pair that is not. One line, no behavior change, the assertion unchanged. The alternatives were a red suite or renaming a module the contract's own path names. **[P5](plans/P5-payouts-and-wallet.md) section 9's claim that concurrent route modules are "NOT A COLLISION" is true of the source and was not true of this test's derivation.**
 
 **Measured on this branch with `pnpm install` run first and each command separately: 33 of 33 gates, 12 of 12 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 189 test files / 3,991 passed / 6 skipped.** The dispatch baseline of 33 / 12 / 0 / 0 / clean / 188 / 3,925 / 6 was reproduced exactly before a line changed. **Fifteen defects were seeded and all fifteen were caught**, including the cooling gate skipped, the minimum applied as a float, two withdrawals in flight, `identities.status` not checked, `ADR-075` reversed to `<> 'restricted'`, and the lock not taken in either of the two places it is written.
+
+---
+
+## `P7-h` lands: seven identity and payment detectors, and every one of them declines because the registry states no number (2026-08-28, session 311)
+
+[`apps/worker/src/detectors/identity.ts`](../apps/worker/src/detectors/identity.ts) builds
+[P7](plans/P7-risk-and-abuse.md) section 8's `P7-h`: `D-07`, `D-08`, `D-09`, `D-10` and `D-11`, plus
+`D-16`'s v1 half and `D-18`'s detector, against the runner and ports
+[`P7-e`](sessions/2026-08-27-session-300.md) landed and touching neither.
+
+**SEVEN OF SEVEN DECLINE UNDER `P7-d`'s SEED, AND THAT IS THE RESULT RATHER THAN THE SHORTFALL.**
+`INV-M7-04` makes the registry the only source of a threshold, *"'why did this not fire in March' must
+be answerable from data, and it cannot be if parameters live only in code"*, and eleven of the eighteen
+seeded rows carry no number at all because `OQ-M7-02` is the founder's. `DetectorDeclined` is the named
+way to say so, the run is recorded `failed`, and `detector_runs_unhealthy_idx` and
+[CRON_INVENTORY](ops/runbooks/CRON_INVENTORY.md)'s dead-man switch both read that on the day it happens.
+The alternative is `FM-M7-01` exactly: a threshold this module invented, and *"detection appears healthy
+and is absent."* What each detector waits for is a LIST rather than a shrug, in `registryBlockers`, and
+the moment a value is seeded the detector runs with no change to the file.
+
+| Detector | Waiting on |
+|---|---|
+| `D-07` entity cap | `max_accounts_per_entity`, `severity` |
+| `D-08` payment velocity | both counts, `window_days`, `severity` |
+| `D-09` destination concentration | **`input`** (`DEP-M7-04`), `sla_hours` |
+| `D-10` affiliate self-deal | `severity` alone. Its detection is complete |
+| `D-11` dilution timing | `max_daily_profit_cents`, `sibling_correlation_floor_bp`, `sibling_window_days`, `severity` |
+| `D-16` link confidence v1 | `hard_link_confidence_ceiling_bp`, `sla_hours` |
+| `D-18` registration phone | **`input`** (`D-15`), `severity` |
+
+**SEVERITY IS THE BLOCKER FIVE OF THE SEVEN SHARE AND IT IS A MONEY DECISION EVERY TIME.**
+[M07](plans/M07-risk-abuse.md) section 3.3: moving a detector from 3 to 4 changes who gets held, because
+4 and 5 is the band `G-HOLD-REQUIRED` reads to hold a payout for 48 hours under
+[ADR-040](decisions/ADR-040.md), so it is *"a data change with a recorded effective date through
+`SD-M7-03`, **never a deploy**"*. A severity chosen in a `.ts` file is that decision made by a deploy.
+
+**AND THE CLOCK THAT BAND NEEDS IS NOT SEEDED, WHICH IS THIS SESSION'S FIRST FINDING.**
+`risk_flags_high_severity_has_sla` reads `severity < 4 OR sla_due_at IS NOT NULL`, so a severity-5
+finding needs a duration. **`OQ-M7-03` PROPOSES *"4 hours to first touch during business hours, 24 hours
+otherwise"* and is OPEN**, and no seeded row carries an `sla_hours`. So `D-09` and `D-16`, the only two
+whose severity `M07` states, are blocked on a parameter the registry has no row for. It is NAMED rather
+than defaulted, because a default here is a 48-hour money gate set by a deploy.
+
+**`ADR-155` BINDS HARDEST HERE AND IT IS THE TYPE THAT HOLDS IT.** Three of these seven are in
+[M07](plans/M07-risk-abuse.md) section 7.9's Hard row, whose Behavior cell reads `Auto-enforce.` No line
+in this module resists that, because there is no line to resist with: `DetectorFinding` has no `status`
+field, `DetectorTx` has no addressed write, `DetectorScanInput` hands a detector no transaction at all,
+and `identity_links` is absent from `DETECTOR_WRITE_TABLES`. **So the hard link is READ here and never
+WRITTEN here**, clause 1's edge stays the resolver's, and the foreclosure is asserted in both directions.
+**The seeded violation does not compile**: `status: 'enforced'` on a finding is
+`TS2353: 'status' does not exist in type 'DetectorFinding'`, and the suite goes red beside it.
+
+**`D-18` TESTS `footprint_present IS FALSE` AND NEVER `IS NOT TRUE`, AND IT IS ASSERTED AT BOTH THE
+PLACES IT RUNS.** The window narrows on an equality against `false`, so a vendor-timeout row carrying
+`null` never crosses; and the detector re-tests every leg over the merged rows, because **the battery is
+merged AFTER the read and never travels through `rowsWhere` at all**, which is `P7-e`'s own landmine 1
+arriving as a live hazard rather than as a caveat. Seeded as `value !== true`, the vendor timeout scores
+`no_digital_footprint: true` and three cases go red. **`ADR-157`'s refused `isNotNull` term costs this
+detector nothing**, because `IS FALSE` is an equality.
+
+**THE BATTERY FOUND A REAL DEFECT WHILE THE SUITE WAS BEING WRITTEN, AND IT IS THE ONE A READER SHOULD
+CARRY FORWARD TO [`P7-g`](plans/P7-risk-and-abuse.md).** `D-11` is the one detector here whose join
+crosses ROWS, and the runner merges the synthetic subjects into the same stream, so a real account
+inverse-correlated with the canary's manufactured series put a synthetic subject and a real one in ONE
+finding. `DetectorCanaryLeak` refused it and failed the run, correctly. **A detector cannot tell a canary
+from a real row and must not be able to**, so the repair is in what the finding NAMES: the candidate and
+not the pair, which makes the straddle unreachable rather than unlikely. `GS-112` wanted that anyway,
+*"no detector parameter, no threshold and no other identity"*. **Every join-based detector has this
+shape**, and `P7-g` writes five of them.
+
+**NO EVIDENCE OBJECT CARRIES A THRESHOLD, AND THE ASSERTION IS MECHANICAL** against the seed's own
+parameter keys. `INV-M7-10` is enforced several slices away by `P7-j`'s strip list, computed from
+`is_sensitive`, which is `true` for all seven of these rows; a copy of a parameter inside
+`risk_flags.evidence` makes that stripping load-bearing in a second place, and `AS-M6-01` is where it is
+wrong once. The investigator loses nothing, because `INV-M7-04` already built the chain that reconstructs
+it: `risk_flags.detector_run_id -> detector_runs.(detector, detector_version) ->
+detector_definitions.parameters`.
+
+**TWO STRUCTURAL BLOCKERS ARE REPORTED RATHER THAN REACHED FOR, AND NEITHER IS AN ACCESSOR ARGUMENT.**
+`D-09` has no input, which is **`DEP-M7-04` arriving exactly where that row said it would**:
+[`scope.ts`](../packages/db/src/scope.ts) classes `payout_transfers` `derived via payoutRequests` and
+says *"THE TABLE CARRIES NO IDENTITY COLUMN AT ALL"*, so *"more than one unrelated identity"* needs
+`payout_requests.identity_id` and `payoutRequests` is not a member of `DETECTOR_READ_TABLES`. **The
+remedy is one member in [`detectors/ports.ts`](../apps/worker/src/detectors/ports.ts), which is `P7-e`'s
+fence**, and it is not a JOIN argument against `scoped-db.ts`: both tables are already `TableKey`s, both
+are already reachable, and a detector reading both and joining in the runner is the shape
+[ADR-157](decisions/ADR-157.md) section 5 granted. And two of `D-18`'s four required legs are `D-15`'s
+checkout enrichment, which does not exist. **Both predicates are written and tested against the shapes
+those inputs would produce.**
+
+**THREE SMALLER FINDINGS, EACH MEASURED.** `canary.ts`'s `sharedDestination` already mints `identityId`
+onto a `payoutTransfers` row and that column does not exist on that table, which is `DEP-M7-04` from the
+battery's side. `CANARY_SHAPES` is a closed union of four and holds **no identity-side shape**, so five
+of this file's batteries carry the nearest label rather than an exact one. And `ports.ts` reads
+[ADR-157](decisions/ADR-157.md) as granting a two-sided window, while a filter is **one value per column
+ANDed**, so `atLeast(a)` and `atMost(b)` on the SAME column cannot both appear in one call; `D-11`'s
+marks window is one-sided and its upper bound is applied in memory.
+
+**FOUR OF THE SEVEN HAVE NO `risk_flags.flag_type`.** The vocabulary in
+[risk_flags.md](architecture/data-model/risk_flags.md) and `0008_risk.sql:119` predates `D-16` and
+`D-18` and never carried a destination-concentration or dilution-timing member, and the column has **no
+`CHECK`**, so an invented value would insert, ship, and become the vocabulary by having been written.
+`D-09`, `D-11`, `D-16` and `D-18` read `flag_type` from their registry row and refuse when it is absent.
+
+**Measured on this branch with `pnpm install` run first and each command separately: 33 of 33 gates,
+13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 192 test files / 4,190
+passed / 6 skipped.** The dispatch baseline of 33 / 13 / 0 / 0 / clean / 191 / 4,088 / 6 was reproduced
+exactly before a line changed. **Twelve defects were seeded and all twelve were caught**, including
+`IS NOT TRUE` in place of `IS FALSE`, a path writing `enforced`, a detector shipping with no battery,
+an unstated severity defaulted to 3, a suppressed edge treated as live, a threshold copied back into an
+evidence object, and `D-11` naming the pair so its join could straddle the battery again.
