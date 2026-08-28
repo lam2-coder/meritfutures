@@ -49,7 +49,14 @@
 // and 2 made mechanical for the first time.
 //
 // The account drill-down (3.2) and the evidence pack are M06 surfaces this
-// package does not contain. THE FLAGS QUEUE (3.3) AND THE IDENTITY DRILL-DOWN
+// package does not contain. THE EVENT FEED (1.1) IS NO LONGER AMONG THEM
+// EITHER: `W6-h` landed `src/app/feed/`, and it is the one screen in this
+// package whose route exists and whose ADAPTER CANNOT BE WRITTEN YET. `GET
+// /admin/events` is registered on the operator surface and `AdminReadSource`
+// declares `listEvents`, but `events` is unregistered in `packages/db` and
+// therefore is not a `TableKey`, so the keyed accessor has no way to read it
+// and `IMPLEMENTED_ADMIN_READS` still holds two names. That screen states the
+// measurement as a named blocker rather than rendering an invented row. THE FLAGS QUEUE (3.3) AND THE IDENTITY DRILL-DOWN
 // (3.2a) ARE NO LONGER AMONG THEM, which is another sentence in this header
 // WAVE-06 has narrowed rather than left standing: `W6-f` landed
 // `src/app/flags/` and `W6-g` landed `src/app/identities/`. THEY ARE THE TWO
@@ -303,11 +310,13 @@ export const ADMIN_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = {
     'not reach a module in this list, so `test/surface.test.ts` asserts instead that this list ' +
     "holds exactly these two entries and that neither module's names reach the package surface, " +
     'which turns the absence into a checked property rather than a hole. AND THE PROMOTION IS ' +
-    'STILL OWED AND NO SLICE IN THIS WAVE MAY TAKE IT: B.1 requires a leg to declare more than ' +
-    'three exports and W6-f and W6-g together have taken this module from one declaration to ' +
-    'three, `LiabilityResponse`, `FlagListItem` and `IdentityGraph`, so it is still short of a ' +
-    'leg by one. AND THE PROMOTION IS FENCED OUT OF ' +
-    'this wave rather than merely unreached: `test/service.test.ts` pins the surface at 74 names ' +
+    'STILL OWED AND NO SLICE IN THIS WAVE MAY TAKE IT, WHICH IS NOW A FENCE RATHER THAN A ' +
+    'SHORTFALL: B.1 requires a leg to declare more than three exports, and where W6-f and W6-g ' +
+    'left this module three declarations short of nothing but the count, W6-h has taken it to ' +
+    'SIX, `LiabilityResponse`, `FlagListItem`, `IdentityGraph`, `EventFeedQuery`, ' +
+    '`AdminEventItem` and `EventFeedResponse`, so the count no longer holds the promotion back ' +
+    'and the fence alone does. AND THE FENCE IS MECHANICAL rather than a preference: ' +
+    '`test/service.test.ts` pins the surface at 74 names ' +
     'over 8 legs and derives its compile-time coverage from its own source, and ' +
     '`test/surface.test.ts` pins this list at exactly two entries, so a ninth leg cannot land ' +
     'without both files moving and no slice in WAVE-06 holds either.',
