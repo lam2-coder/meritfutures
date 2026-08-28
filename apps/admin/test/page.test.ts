@@ -172,6 +172,49 @@ describe('M6-A-23: INV-M6-10, the home page names no subject', () => {
       assertNamesNoSubject(renderLiabilityHome(buildLiabilityHome(INPUT))),
     ).not.toThrow();
   });
+
+  // ---------------------------------------------------------------------------
+  // WHERE THIS ASSERTION NOW RUNS, AND WHAT IT COVERED BEFORE THE PAGE EXISTED
+  // ---------------------------------------------------------------------------
+  // WAVE-06 section 5.2: "A React page renders a DOM, not a line array", so an
+  // `assertNamesNoSubject` reading only the array after `apps/admin/src/app/`
+  // exists is an assertion about something nobody serves. `W6-d` re-pointed it
+  // at the served bytes and `test/render.test.ts` is where that half lives.
+  //
+  // THE LINES ARE NOT DELETED AND THE TWO CASES ABOVE STAY, which is the other
+  // half of the same section. What is added here is the MEASUREMENT that made
+  // the re-point load bearing rather than tidy.
+
+  test('the call INSIDE `buildLiabilityHome` covers the panels and not the live line', () => {
+    // `buildLiabilityHome` applies the assertion to `panels.flatMap(lines)`.
+    // The live figure is not a panel, and its `source` is a string a FEED
+    // supplies: `liveOpenLiability` puts `movement.feed` into the live figure's
+    // `asOf.source`. So a subject name arriving that way is assembled without
+    // complaint here, is printed by `renderLiabilityHome`, and is refused by
+    // the served-bytes assertion in `test/render.test.ts`.
+    //
+    // THIS IS A MEASUREMENT OF SCOPE AND NOT A DEFECT REPORT AGAINST THIS FILE.
+    // `src/page.ts` is `P5-l`'s this wave and `W6-d` may not widen the call it
+    // makes; what `W6-d` can do, and did, is put the wider control on the bytes
+    // an operator receives.
+    const subject = '0e9c0b3a-1f2d-4c5e-8a7b-9d0e1f2a3b4c';
+    const page = buildLiabilityHome({
+      ...INPUT,
+      live: {
+        movement: {
+          cents: 12_500n,
+          asOfInstant: '2026-08-21T12:59:00.000Z',
+          feed: `indicative feed for identity ${subject}`,
+        },
+        sameDayAdjustments: { cents: 0n, asOfInstant: '2026-08-21T12:00:00.000Z' },
+      },
+    });
+
+    expect(page.live.kind).toBe('indicative');
+    expect(page.panels.flatMap((panel) => panel.lines).join('\n')).not.toContain(subject);
+    expect(renderLiabilityHome(page).join('\n')).toContain(subject);
+    expect(() => assertNamesNoSubject(renderLiabilityHome(page))).toThrow(PageError);
+  });
 });
 
 describe('M6-A-24: the five panels nobody fills are listed, not omitted', () => {

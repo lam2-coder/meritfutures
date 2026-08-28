@@ -6805,3 +6805,104 @@ line changed.
 **A SEED RESTORE DISCARDED UNSTAGED WORK AND THE FIRST COMMIT WAS RED, WHICH IS RECORDED RATHER THAN QUIETLY FIXED.** Seeds run against [`admin-source/index.ts`](../apps/api/src/admin-source/index.ts) AFTER that file had been edited were restored with `git checkout -- <file>`, which takes an unstaged file back to **HEAD** and therefore reverted the real change with the seed. The file dropped out of `git status --porcelain`'s list, the first commit landed **seven** files where the work was eight, and CI answered with `TS2741` on the composition and a red third method list: **the two failures this session's own seeds had already watched.** The arm was re-applied verbatim and every check below re-run on the restored tree. **Seed into a file only before you edit it, or stash rather than check out.**
 
 **Measured with `pnpm install` first and each command run separately: 33 of 33 gates, 16 of 16 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 218 test files / 5,139 passed / 6 skipped with a TEST DELTA OF ZERO, `falsify.mjs` clean with the tree clean after it.** The `main` baseline of 33 / 16 / 0 / 0 / clean / **218 files / 5,139 passed / 6 skipped** was reproduced exactly at `5d1d28b9` before a line changed.
+
+## `RI-17` lands as a gate, and the boundary decided which file it lands in (2026-08-28, session 342)
+
+**THE DIFF WAS RE-DERIVED BEFORE ANYTHING WAS PINNED AND IT IS STILL EMPTY IN BOTH DIRECTIONS.**
+[API_CONTRACT](architecture/API_CONTRACT.md) declares **73** distinct `METHOD /path` endpoints; the
+modules on disk declare **73** across the two surfaces; the symmetric difference is **0** and every
+declared route is registered somewhere. The move from [session 338](sessions/2026-08-28-session-338.md)'s
+**72** is [session 336](sessions/2026-08-28-session-336.md) landing a contract row and its route
+between the two measurements, which is session 338's own landmine coming true rather than a defect.
+`public` registers **46** and withholds **27**; `operator` registers **28** and withholds **45**; the
+two registered sets sum to 74 against a union of 73, so exactly one endpoint is registered on both,
+which is section 9's liveness row doing what it says.
+
+**THE NUMBER IS A GATE NOW AND IT IS NOT IN `repo-invariants.mjs`.** `check:invariants` still reports
+**16 of 16**, and the dispatch's "17 of 17" could not be met. The reservation named that file and the
+dispatch said in advance that a check which cannot legally reach a real `compose()` is **a finding to
+report and a check to move, never a fence to widen**. Three things were measured on the branch and
+each alone is disqualifying: `packages/tooling/checks/` resolves neither `@merit/api` nor `fastify`
+(`ERR_MODULE_NOT_FOUND` both, with `packages/tooling/node_modules/@merit` absent), and
+`Invariant.run` returns `string[]` synchronously while `discoverRouteModules` is `async`. Declaring
+`@merit/api` there would make a shared package depend on a deployable, which is `RI-04`'s argument
+pointed the other way. **The only shape that keeps the number in that file reads `routes/*.ts` as
+TEXT**, and that is refused on the rule
+[`account-reads.test.ts`](../apps/api/test/account-reads.test.ts) states in its own header: a grep
+over route files has been wrong twice in this repository. So it landed as
+[`apps/api/test/api-contract-coverage.test.ts`](../apps/api/test/api-contract-coverage.test.ts), the
+[`RI-17` row](decisions/ALLOCATION.md) is amended IN PLACE to say what actually landed rather than
+joined by a second row, and the precedent is one deployable over at
+[`apps/site/test/manifest.test.ts`](../apps/site/test/manifest.test.ts), whose header says the same
+thing about the same file.
+
+**THE COST IS REAL AND IT IS NOT A FORMALITY.** `RI-17` runs in `CI-02` with the suite and the
+fifteen invariants beside it run in `CI-01`, so a change that skips the test run is not refused by it.
+A repository that wants contract coverage refused at the same stage as the others needs either a
+`packages/tooling` that may compose a deployable or an `apps/api` that may hold an invariant, and
+that is a ruling rather than a file.
+
+**NEITHER HALF IS STORED, WHICH IS THE WHOLE DIFFERENCE FROM THE COUNT IT REPLACES.** The contract is
+read live through
+[`api-contract-endpoints.mjs`](../packages/tooling/checks/api-contract-endpoints.mjs); the routes
+through a real `compose()` over `discoverRouteModules()`, unioning `registered` AND `withheld` across
+`API_SURFACES`, because a withheld route is DECLARED and merely not served by that deployment.
+`API_SURFACES` is read out of [`surface.ts`](../apps/api/src/surface.ts) rather than written in the
+check, so a third surface is composed the day it is declared. The reader is loaded by COMPUTED PATH
+and its shape validated at run time, because a static import of a `.mjs` with no declaration file is
+`TS7016` from that project; the alternatives were `allowJs` on a deployable's compiler settings, which
+is outside the fence, and a hand-written `.d.mts`, which is INSIDE it and refused anyway as a second
+copy of the reader's type surface that nothing checks against the reader.
+
+**FIVE SEEDS WATCHED FAILING AGAINST THE REAL DOCUMENT**, mutated in memory with its SHA-256 verified
+unchanged: a contract row with no route, a route with no contract row, an endpoint table the reader
+stops seeing, a heading it enters and cannot parse, and a fifth that watches a LIMIT rather than a
+defect. **THAT FIFTH IS THE FINDING AND IT WAS NOT IN THE DISPATCH: "assert the reader's own coverage
+statement" is weaker than it sounds.** A `count > 0` floor sees a structure the reader stopped reading
+ENTIRELY and cannot see one it stopped reading in PART, and this document declares endpoints in two
+tables, so renaming one `Endpoint` header leaves the count non-zero and the coverage report reads as
+intact. The diff catches it, the division is watched, and the floor is deliberately NOT strengthened
+into a stored count of tables, which is the very thing `RI-17` exists to remove.
+
+**TWO OF SESSION 338'S FINDINGS ARE UNMOVED AND ONE IS NEW.**
+[API_CONTRACT](architecture/API_CONTRACT.md) still says two admin projections are *"registered by
+nothing"* while [`admin-breaker.ts`](../apps/api/src/routes/admin-breaker.ts) registers both, and
+**this check is blind to that by construction**: it compares `METHOD /path` and reads prose not at
+all. `apps/api` still resolves `@merit/tooling` through the workspace ROOT it does not declare, and
+the computed-path load means the repair, when it comes, cannot break this check. The new one is a
+universal in [ALLOCATION](decisions/ALLOCATION.md)'s `RI-nn` section, *"THE ROWS ARE READ OUT OF
+`repo-invariants.mjs`'s `CHECKS` ARRAY, NEVER TYPED"*, which `RI-17`'s own row now falsifies; the
+fence was that row alone, so it is REGISTERED with the repair named and not made.
+
+**A SLOW CHECK WOULD HAVE BEEN A DEFECT AND THIS ONE IS NOT.** The ten cases run in **15 ms**, the
+reader parses the live document in **0.488 ms** minimum over twenty reads, and the file's two to three
+second wall is importing 27 route modules and `fastify`, which is shared with the twenty-odd other
+`apps/api` suites: the whole suite runs in **45.74 s** against a **45.93 s** baseline, so the check
+adds no measurable cost to it.
+
+**NO CONTRACT ROW AND NO ROUTE REPAIRED, NO ADR NUMBER TAKEN, `repo-invariants.mjs` BYTE FOR BYTE
+UNCHANGED, AND [STRATEGY](testing/STRATEGY.md) UNTOUCHED** because no rule requiring a row there could
+be cited and it is `status: approved` in a frozen corpus. 33 of 33 gates, 16 of 16 invariants and
+still 16, typecheck 0, lint 0, `format:check` clean, **219 test files / 5,149 passed / 6 skipped**
+against a `main` baseline of **218 / 5,139 / 6** reproduced exactly first, `falsify.mjs` clean with
+the tree clean after it.
+
+## The operator console renders, and the INV-M6-10 assertion moves onto the bytes it serves (2026-08-28, session 340)
+
+**[WAVE-06](plans/WAVE-06-admin-console-transport.md)'s `W6-d` landed and it is that plan's wave 2 done-gate.** [`apps/admin/src/app/layout.tsx`](../apps/admin/src/app/layout.tsx), the liability home at `/` in [`page.tsx`](../apps/admin/src/app/page.tsx), and [`liability-home.tsx`](../apps/admin/src/app/liability-home.tsx), which turns a `LiabilityHomePage` VALUE into a document. `pnpm --filter @merit/admin build` compiles **one route** where the manifest's own note recorded it exiting 1 on _"Couldn't find any `pages` or `app` directory"_. No ADR number and no migration number.
+
+**THE SECTION AT `:6049` IS SUPERSEDED BY THIS ONE IN TWO SENTENCES AND STATE IS APPEND-ONLY, SO IT IS SAID HERE RATHER THAN EDITED THERE.** That entry recorded `apps/admin` as the fourth no-server app, with no `build` script and with `main()` printing _"no server yet"_. `W6-a` gave the manifest `build` and `next start`; this slice gives it the page those scripts need, so both halves are now false: the deployable serves HTTP and `main()` is neither the entry point nor on the request path. [ADR-182](decisions/ADR-182.md) section 8 item 3 named `W6-d` as the slice that makes them false in FACT rather than in intent, and [`index.ts`](../apps/admin/src/index.ts)'s two sentences are corrected in the same commit.
+
+**`INV-M6-10` IS RE-POINTED AT WHAT THE BROWSER RECEIVES AND IT IS STRICTLY WIDER THAN THE CALL INSIDE THE BUILDER.** [WAVE-06 section 5.2](plans/WAVE-06-admin-console-transport.md) is the instruction and the measurement is what makes it load bearing: `buildLiabilityHome` asserts over `panels.flatMap(lines)`, the live figure's line is not in that array, and its `source` is a string a FEED supplies through `movement.feed`. **The seed is a subject name arriving that way, assembled without complaint by the builder and refused on the served bytes.** `renderLiabilityHome`'s lines are neither deleted nor the page.
+
+**THE SHIPPED GUARD WALKS THE ELEMENT TREE AND NOT A RENDERED STRING, WHICH IS THE FRAMEWORK'S RULING RATHER THAN A CHOICE.** The markup shape was written first and `next build` refused it, naming the file and the import trace: _"You're importing a component that imports react-dom/server."_ `M6-A-42` binds the two by rendering the real markup in the suite, where the restriction does not apply, and asserting that every string the shipped walk collects is in it. **The walk throws on a node it cannot resolve rather than skipping it**, and both refusals are watched throwing.
+
+**THE ROUTE PERFORMS NO READ AND INVENTS NO NUMBER.** It renders the 503 with its reason in `PendingPanel` shape, which is [WAVE-06 section 8.1](plans/WAVE-06-admin-console-transport.md) blocker 1 verbatim, and names three things that block a supplier. **The third is this session's largest finding and it is in no plan: `GET /admin/liability`'s contracted response cannot produce this page's input.** [`0009_ledger.sql:164`](../packages/db/migrations/0009_ledger.sql) carries five figures the page reads and [`API_CONTRACT:894`](architecture/API_CONTRACT.md) carries ONE, so `P-M6-01` cannot show the two components separately as well as summed, `INV-M6-11` cannot include wallet balances, and `P-M6-02`, `AS-M6-04` and `P-M6-10` have no field at all. **The one shared name, `open_liability_cents`, is the exact ambiguity [`liability.ts`](../apps/admin/src/liability.ts) renames on arrival to prevent**: the column is one COMPONENT of the panel that shares its name. Reported and not repaired, because both files belong to other slices.
+
+**SECOND FINDING: A CONTROL STOPS COVERING THIS PACKAGE ON THIS COMMIT AND ITS OWN HEADER SAYS IT DOES NOT.** [`surface.test.ts`](../apps/admin/test/surface.test.ts)'s transport sweep walks `sourceFiles()`, which is `.ts` only, while the file's header names this slice: _"`W6-d` adds `.tsx` ... none of them would be covered by a `.ts` filter."_ Measured in both directions: one seeded second `fetch(` call site is **invisible as `.tsx`** and **fails three cases as `.ts`**. Its origin and `NEXT_PUBLIC_` sweeps walk every file and are unaffected. `service.test.ts`'s `B.2` reads `.ts` too, and that pair also forced the shape of this slice: a `.ts` module under `src/app/` cannot land without another slice's suite going red, so every file added here is `.tsx`. [`test/render.test.ts`](../apps/admin/test/render.test.ts) sweeps `src/app/` for all four needles in the meantime.
+
+**THIRD: THIS DEPLOYABLE'S BUILD RUNS IN NO CI STAGE ON THE COMMIT THAT MAKES IT BUILDABLE.** [`ci.yml`](../.github/workflows/ci.yml)'s `CI-07` job builds `apps/portal` and `apps/site` by name, so `VG-2`'s bundle grep never reads this app's output either; and `apps/admin` carries no `next.config.mjs`, so [ADR-095](decisions/ADR-095.md) `F5`'s telemetry remedy is undischarged here. `RI-11` is unaffected, because a config that does not exist spells no API path.
+
+**`apps/admin/tsconfig.json` takes `ADR-095` `F7`'s three keys and carries its prose in a `//` KEY**, because `surface.test.ts` reads every `.json` in this package through `JSON.parse` and a JSONC tsconfig fails two of its cases with a syntax error rather than a finding. A second, narrower [`src/app/tsconfig.json`](../apps/admin/src/app/tsconfig.json) gives Vitest `react-jsx`, on [`apps/portal/src/app/calendar/tsconfig.json`](../apps/portal/src/app/calendar/tsconfig.json)'s measured precedent.
+
+**Ten seeded defects, all ten caught, each by the case named for it.** Measured with `pnpm install` first and each command run separately, with the `main` baseline reproduced before a line changed: **33 of 33 gates, 16 of 16 invariants** with `RI-04` at five separate deployables and `RI-09` and `RI-11` unmoved, `typecheck` 0, `lint` 0, `format:check` clean, and **218 files / 5,139 passed / 6 skipped becoming 219 / 5,161 / 6**. `falsify.mjs` ran alone and the working tree was clean after it.
