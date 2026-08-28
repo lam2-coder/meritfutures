@@ -513,9 +513,9 @@ function projectEvent(row: unknown): Record<string, unknown> {
     actor_kind: text(row, 'actorKind', at),
     actor_id: optionalText(row, 'actorId', at),
     correlation_id: optionalText(row, 'correlationId', at),
-    // VERBATIM, AND NOTHING HERE GATES IT. See {@link readAccountDetail}: this
-    // response has no `INV-M6-10` projection where the feed's does, and that is
-    // reported rather than repaired inside an adapter.
+    // VERBATIM, AND NOTHING HERE GATES IT. See {@link readAccountDetail}: the
+    // `INV-M6-10` projection is on the RESPONSE, in `routes/admin-reads.ts`, and
+    // a second gate inside an adapter is the shape ADR-184 ruling 3 refused.
     payload: json(row, 'payload', at),
     created_at: instant(row, 'createdAt', at),
   };
@@ -672,15 +672,18 @@ function chronologically<T extends Record<string, unknown>>(
  * the two checks are independent on purpose: a section dropped here is a 500
  * there rather than a hole an operator reads as an answer.
  *
- * **NOTHING ON THIS RESPONSE IS WITHHELD AND THE DRILL-DOWN HAS NO PROJECTION
- * WHERE THE FEED HAS ONE.** `GET /admin/events` gates every key ending
- * `identity_id` or `account_id` against the scope the query named (ADR-184
- * ruling 3); this route names its subject in the PATH, does no gating, and the
- * `events` section therefore carries payloads verbatim, including the two the
- * catalogue writes with a third party's uuid in them (`kyc.dedupe_hit` and
- * `identity.merged`, `scope.ts`). That is `admin-reads.ts`'s to rule and is
- * REPORTED rather than repaired here: a gate inside an adapter is the second
- * place the rule can be slightly different, which is the shape ADR-184 refused.
+ * **NOTHING THIS FUNCTION RETURNS IS WITHHELD, AND THAT IS STILL DELIBERATE
+ * RATHER THAN OUTSTANDING.** Session 356 measured what it cost: the `events`
+ * section carries payloads verbatim, including the two the catalogue writes with
+ * a third party's uuid in them (`kyc.dedupe_hit`'s `matched_identity_id` and
+ * `identity.merged`'s `merged_identity_id`, `scope.ts`), so a second person's
+ * identity reached a response about the first. **`routes/admin-reads.ts` now
+ * carries the projection that stops it**, on the RESPONSE and over the
+ * SERIALIZED body, which is ADR-184 ruling 3 in its own words: the withholding
+ * is "a property of the response and not of the renderer". **A gate here would
+ * be the second place that rule can be slightly different from the feed's**, so
+ * this adapter still hands its rows over exactly as the database holds them and
+ * the two unit cases that say so are kept rather than retired.
  */
 export async function readAccountDetail(
   tx: AccountTx,

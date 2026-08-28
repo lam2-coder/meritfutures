@@ -389,11 +389,19 @@ describe('M6-A-61: the route reads nothing, defaults no scope and names no error
     expect(html).toContain('no event on this page is invented while a supplier is missing');
   });
 
-  test('it names both blockers, and the second is the adapter with its measured reason', () => {
+  test('it names both blockers, and the second is the port with its measured reason', () => {
     expect(html).toContain('data-origin="ADR-171"');
     expect(html).toContain('data-origin="ADR-184"');
-    expect(html).toContain('AdminReadSource.listEvents');
-    expect(html).toContain('unregistered in `packages/db`');
+    expect(html).toContain('AdminReadSource');
+    // THIS CASE USED TO REQUIRE THE WORDS "unregistered in `packages/db`" AND
+    // THAT IS NOW FALSE. ADR-191 registered `events` and
+    // `apps/api/src/admin-source/events.ts` supplies `listEvents`, so the panel
+    // names what actually blocks the screen: three methods the port still has
+    // no module for.
+    expect(html).toContain('listEvents');
+    expect(html).toContain('ADR-191');
+    expect(html).toContain('searchAccounts');
+    expect(html).toContain('setAdminReadSource');
   });
 
   test('IT NAMES NO ERROR KIND, because 503 is a status no operator route produces', () => {

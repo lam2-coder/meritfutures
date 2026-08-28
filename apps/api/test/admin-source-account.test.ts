@@ -35,11 +35,20 @@ import { BASE_PATH, buildServer, discoverRouteModules } from '../src/index.ts';
 import {
   ACCOUNT_DETAIL_SECTIONS,
   ADMIN_SESSION_COOKIE,
+  AdminDetailLeak,
   AdminReadError,
+  WITHHELD,
   assertContractScalars,
+  assertNothingWithheldOnTheWire,
+  namesASubject,
   setAdminReadSource,
   setAdminSessionSource,
 } from '../src/routes/admin-reads.ts';
+import {
+  WITHHELD as FEED_WITHHELD,
+  namesASubject as feedNamesASubject,
+} from '../src/routes/admin-feed.ts';
+import type { AdminAccountDetail } from '../src/routes/admin-reads.ts';
 import { ACCOUNT_READ_TABLES, readAccountDetail } from '../src/admin-source/account.ts';
 import {
   IMPLEMENTED_ADMIN_READS,
@@ -664,8 +673,8 @@ describe('every list section is chronological, oldest first, tie-broken on the r
 // 6. WHAT THIS RESPONSE DOES NOT DO, MEASURED RATHER THAN ASSUMED
 // =============================================================================
 
-describe('the drill-down has no INV-M6-10 projection where the feed has one', () => {
-  it('carries an event payload naming a third party verbatim, which is the finding', async () => {
+describe('the adapter hands its rows over verbatim, which is where the gate is NOT', () => {
+  it('carries an event payload naming a third party verbatim, one layer under the projection', async () => {
     const detail = await detailOf(
       tablesOf({
         events: [
@@ -677,10 +686,11 @@ describe('the drill-down has no INV-M6-10 projection where the feed has one', ()
       }),
     );
     const [one] = list(detail, 'events');
-    // MEASURED AND REPORTED RATHER THAN REPAIRED IN AN ADAPTER. The feed gates
-    // every key ending `identity_id` against the scope the query named; this
-    // route names its subject in the PATH and does no gating, and a second gate
-    // inside this module is the shape ADR-184 ruling 3 refused.
+    // THE ROWS ARE UNGATED HERE AND THE RESPONSE IS GATED IN `admin-reads.ts`,
+    // which is ADR-184 ruling 3: the withholding is a property of the response
+    // and not of the renderer, and a second gate inside this module is the shape
+    // that ruling refused. Section 8 serves the same fixture through the real
+    // route and watches the same uuid leave as `withheld`.
     expect((one?.['payload'] as Record<string, unknown>)['matched_identity_id']).toBe(
       OTHER_IDENTITY,
     );
@@ -708,30 +718,43 @@ describe('the composition gains one arm and the port is still partial', () => {
   });
 });
 
-describe('served through the real route, which is where the allowlist and the sweep run', () => {
-  async function serve(tables: Tables = tablesOf()): Promise<{ statusCode: number; body: string }> {
-    const recorder = new Recorder(tables);
-    setAdminSessionSource({
-      lookup: () =>
-        Promise.resolve({ kind: 'operator', principal: { actorId: 'actor-1', role: 'owner' } }),
-    });
-    setAdminReadSource(
-      composeAdminReadSource(
-        composeImplementedAdminReads({
-          operator: async (fn) => await fn(recorder as unknown as AdminSourceTx),
-        }),
-      ),
-    );
-    const { app } = buildServer({ surface: 'operator', modules: onDisk });
-    const res = await app.inject({
-      method: 'GET',
-      url: `${BASE_PATH}/admin/accounts/${ACCOUNT}`,
-      headers: COOKIE,
-    });
-    await app.close();
-    return { statusCode: res.statusCode, body: res.body };
-  }
+/**
+ * The drill-down as an operator receives it: a real `compose()`, the real route
+ * and Fastify's own injector.
+ *
+ * AT MODULE SCOPE BECAUSE TWO SECTIONS NEED IT. Section 7 reads what the
+ * allowlist and the scalar sweep do to a real projected row, and section 8 reads
+ * what `INV-M6-10` does to one. Both live in `admin-reads.ts` and neither is
+ * reachable from a unit call on this module, which is the whole reason these
+ * cases go through the wire.
+ */
+async function serve(
+  tables: Tables = tablesOf(),
+  at: string = ACCOUNT,
+): Promise<{ statusCode: number; body: string }> {
+  const recorder = new Recorder(tables);
+  setAdminSessionSource({
+    lookup: () =>
+      Promise.resolve({ kind: 'operator', principal: { actorId: 'actor-1', role: 'owner' } }),
+  });
+  setAdminReadSource(
+    composeAdminReadSource(
+      composeImplementedAdminReads({
+        operator: async (fn) => await fn(recorder as unknown as AdminSourceTx),
+      }),
+    ),
+  );
+  const { app } = buildServer({ surface: 'operator', modules: onDisk });
+  const res = await app.inject({
+    method: 'GET',
+    url: `${BASE_PATH}/admin/accounts/${at}`,
+    headers: COOKIE,
+  });
+  await app.close();
+  return { statusCode: res.statusCode, body: res.body };
+}
 
+describe('served through the real route, which is where the allowlist and the sweep run', () => {
   it('answers 200 where session 353 measured 500, and the difference is the adapter', async () => {
     const res = await serve();
     // Session 353 measured this route at 500 `internal_error` with an admin
@@ -763,5 +786,306 @@ describe('served through the real route, which is where the allowlist and the sw
   it('answers 404 for an account nobody has, over the same wiring', async () => {
     const res = await serve(tablesOf({ accounts: [] }));
     expect(res.statusCode).toBe(404);
+  });
+});
+
+// =============================================================================
+// 8. `INV-M6-10` ON THE DRILL-DOWN, WHICH IS A LICENCE AND NOT A REFUSAL
+// =============================================================================
+// The projection lives in `routes/admin-reads.ts`, on the RESPONSE, which is
+// ADR-184 ruling 3: "the withholding is a property of the response and not of
+// the renderer". So every case here goes through the real route, and the two
+// unit cases in section 6 stay exactly as they were: this module still hands
+// its rows over verbatim and is still the wrong place for a gate.
+// =============================================================================
+
+describe('the third party in an operator response is withheld, and it is the finding repaired', () => {
+  it('withholds `kyc.dedupe_hit`s `matched_identity_id`, which arrived verbatim before', async () => {
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            eventName: 'kyc.dedupe_hit',
+            payload: { matched_identity_id: OTHER_IDENTITY },
+          }),
+        ],
+      }),
+    );
+    expect(res.statusCode).toBe(200);
+    // THE VALUE IS NOWHERE IN THE BYTES, asserted over the serialized body and
+    // not over the field, because a field check passes a copy of the same uuid
+    // that reached the response through some other key.
+    expect(res.body).not.toContain(OTHER_IDENTITY);
+    const events = (JSON.parse(res.body) as Record<string, unknown>)['events'];
+    const payload = (events as readonly Record<string, unknown>[])[0]?.['payload'];
+    // WITHHELD AND NOT DROPPED: a row with no identity shown must not read as a
+    // row with no identity involved.
+    expect((payload as Record<string, unknown>)['matched_identity_id']).toBe('withheld');
+  });
+
+  it('withholds `identity.merged`s `merged_identity_id`, the second name scope.ts gives', async () => {
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            eventName: 'identity.merged',
+            payload: { merged_identity_id: OTHER_IDENTITY, surviving_identity_id: IDENTITY },
+          }),
+        ],
+      }),
+    );
+    const events = (JSON.parse(res.body) as Record<string, unknown>)['events'];
+    const payload = (events as readonly Record<string, unknown>[])[0]?.['payload'] as Record<
+      string,
+      unknown
+    >;
+    expect(payload['merged_identity_id']).toBe('withheld');
+    // AND THE OWNER'S OWN UUID ON THE SAME BAG IS SERVED. The rule is not
+    // "never render an id", it is "render one the query reached".
+    expect(payload['surviving_identity_id']).toBe(IDENTITY);
+  });
+});
+
+describe('what the licence admits, which is why this projection is narrower and not absent', () => {
+  it('serves the account named in the path and the identity that account row names', async () => {
+    const body = JSON.parse((await serve()).body) as Record<string, unknown>;
+    expect((body['account'] as Record<string, unknown>)['account_id']).toBe(ACCOUNT);
+    expect((body['account'] as Record<string, unknown>)['identity_id']).toBe(IDENTITY);
+    // THE `identity` SECTION IS ONE OF THE EIGHT THE CONTRACT NAMES, so the
+    // owner is a subject this query reached and withholding them would blank
+    // the section section 8 asks for.
+    expect((body['identity'] as Record<string, unknown>)['identity_id']).toBe(IDENTITY);
+    const flags = body['flags'] as readonly Record<string, unknown>[];
+    expect(flags[0]?.['identity_id']).toBe(IDENTITY);
+    expect(flags[0]?.['account_id']).toBe(ACCOUNT);
+    const payouts = body['payouts'] as readonly Record<string, unknown>[];
+    expect(payouts[0]?.['identity_id']).toBe(IDENTITY);
+  });
+
+  it('leaves every field that names no subject byte for byte alone', async () => {
+    const body = JSON.parse((await serve()).body) as Record<string, unknown>;
+    const account = body['account'] as Record<string, unknown>;
+    expect(account['size_cents']).toBe(5_000_000);
+    expect(account['platform_account_ref']).toBe('RITH-1');
+    const states = body['rule_states'] as readonly Record<string, unknown>[];
+    expect(states[0]?.['withdrawable_cents']).toBe(12_500);
+    expect(body['events']).toHaveLength(1);
+  });
+});
+
+describe('what the licence refuses, and none of it is a column this route reads', () => {
+  it('withholds a third party account id inside a stored payload', async () => {
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            payload: { linked_account_id: OTHER_ACCOUNT },
+          }),
+        ],
+      }),
+    );
+    expect(res.body).not.toContain(OTHER_ACCOUNT);
+  });
+
+  it('withholds `on_behalf_of_identity_id` when it names somebody other than the owner', async () => {
+    const res = await serve(
+      tablesOf({ adminActions: [actionRow('1', { onBehalfOfIdentityId: OTHER_IDENTITY })] }),
+    );
+    expect(res.body).not.toContain(OTHER_IDENTITY);
+    const actions = (JSON.parse(res.body) as Record<string, unknown>)['admin_actions'];
+    expect((actions as readonly Record<string, unknown>[])[0]?.['on_behalf_of_identity_id']).toBe(
+      'withheld',
+    );
+  });
+
+  it('withholds a foreign `subject_id` where `subject_kind` names a person', async () => {
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            subjectKind: 'identity',
+            subjectId: OTHER_IDENTITY,
+          }),
+        ],
+      }),
+    );
+    expect(res.body).not.toContain(OTHER_IDENTITY);
+  });
+
+  it('leaves a `subject_id` alone where `subject_kind` names an object and not a person', async () => {
+    const handle = '99999999-0000-4000-8000-000000000009';
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            subjectKind: 'payout_request',
+            subjectId: handle,
+          }),
+        ],
+      }),
+    );
+    // `admin-feed.ts`'s rule kept: withholding the handle an operator clicks
+    // through to protects nothing INV-M6-10 is about and leaves a screen
+    // nobody can act on.
+    expect(res.body).toContain(handle);
+  });
+
+  it('reaches a foreign id nested inside a stored jsonb bag on three sections', async () => {
+    const res = await serve(
+      tablesOf({
+        riskFlags: [
+          flagRow('f-1', { evidence: { peers: [{ matched_identity_id: OTHER_IDENTITY }] } }),
+        ],
+        payoutRequests: [
+          payoutRow('p-1', '2026-08-20', {
+            eligibilitySnapshot: { reviewed_by_identity_id: OTHER_IDENTITY },
+          }),
+        ],
+        adminActions: [actionRow('1', { before: { prior_account_id: OTHER_ACCOUNT } })],
+      }),
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.body).not.toContain(OTHER_IDENTITY);
+    expect(res.body).not.toContain(OTHER_ACCOUNT);
+  });
+});
+
+describe('the root the port answered with is checked against the path FIRST', () => {
+  /** A port that answers with a drill-down for an account nobody asked about. */
+  async function serveLying(at: string): Promise<{ statusCode: number; body: string }> {
+    const detail = await detailOf();
+    setAdminSessionSource({
+      lookup: () =>
+        Promise.resolve({ kind: 'operator', principal: { actorId: 'actor-1', role: 'owner' } }),
+    });
+    setAdminReadSource(
+      composeAdminReadSource({
+        readAccount: () => Promise.resolve(detail as unknown as AdminAccountDetail),
+      }),
+    );
+    const { app } = buildServer({ surface: 'operator', modules: onDisk });
+    const res = await app.inject({
+      method: 'GET',
+      url: `${BASE_PATH}/admin/accounts/${at}`,
+      headers: COOKIE,
+    });
+    await app.close();
+    return { statusCode: res.statusCode, body: res.body };
+  }
+
+  it('serves the drill-down when the root is the account the path named', async () => {
+    expect((await serveLying(ACCOUNT)).statusCode).toBe(200);
+  });
+
+  it('refuses the whole response when the root is a different account', async () => {
+    // WITHOUT THIS CHECK THE LICENCE WOULD BE THE ACCOUNT THE PORT RETURNED
+    // rather than the one the operator asked about, and every id on the page
+    // would then be licensed by the wrong subject. `W6-g` checks the root first
+    // for this reason and this is the server half of it.
+    const res = await serveLying(OTHER_ACCOUNT);
+    expect(res.statusCode).toBe(500);
+    expect(res.body).not.toContain(IDENTITY);
+  });
+});
+
+describe('the walk rebuilds plain objects and returns everything else untouched', () => {
+  it('leaves a value carrying its own prototype inside a stored bag intact', async () => {
+    // A WALK THAT RECONSTRUCTED EVERY OBJECT WOULD TURN THIS INTO `{}`, which is
+    // a stored bag silently emptied on the screen whose whole discipline is that
+    // it shows the stored row. `json()` returns whatever the accessor handed
+    // back and a driver hands back `Date` for a timestamp inside `jsonb`.
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            payload: { observed: new Date('2026-08-20T10:00:00.000Z') },
+          }),
+        ],
+      }),
+    );
+    expect(res.statusCode).toBe(200);
+    const events = (JSON.parse(res.body) as Record<string, unknown>)['events'];
+    const payload = (events as readonly Record<string, unknown>[])[0]?.['payload'] as Record<
+      string,
+      unknown
+    >;
+    expect(payload['observed']).toBe('2026-08-20T10:00:00.000Z');
+  });
+});
+
+describe('the control over the serialized body catches what the key rule cannot', () => {
+  it('refuses the whole response when a withheld value survives in a free text field', async () => {
+    // THE KEY RULE CANNOT SEE THIS AND THE WIRE CONTROL CAN. `admin_actions.reason`
+    // is `NOT NULL` because `0017`'s own words are "no unexplained admin action,
+    // ever", so it is text a human wrote, and a human who pasted a second
+    // person's uuid into it has put that uuid under a key `namesASubject` does
+    // not match. It is withheld under `matched_identity_id` on the same
+    // response, so the control fires on the body rather than on the field.
+    const res = await serve(
+      tablesOf({
+        events: [
+          eventRow('1', '2026-08-20T09:00:00.000Z', {
+            eventName: 'kyc.dedupe_hit',
+            payload: { matched_identity_id: OTHER_IDENTITY },
+          }),
+        ],
+        adminActions: [actionRow('1', { reason: `duplicate of ${OTHER_IDENTITY}` })],
+      }),
+    );
+    // A 500 BEATS A LEAK, which is `admin-feed.ts`'s choice for the same
+    // control and `AdminReadError`'s status by ADR-190.
+    expect(res.statusCode).toBe(500);
+    expect(res.body).not.toContain(OTHER_IDENTITY);
+  });
+
+  it('serves the same response when nothing was withheld to survive', async () => {
+    const res = await serve(
+      tablesOf({ adminActions: [actionRow('1', { reason: `duplicate of ${OTHER_IDENTITY}` })] }),
+    );
+    // NOTHING WAS WITHHELD, so there is no value to look for and the uuid in the
+    // free text is served. The control asserts a property of THIS response and
+    // is not a second uuid sweep; `apps/admin`'s pattern check is that layer.
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain(OTHER_IDENTITY);
+  });
+
+  it('throws AdminDetailLeak on a value it was told was withheld, and returns on none', () => {
+    expect(() => {
+      assertNothingWithheldOnTheWire({ note: OTHER_IDENTITY }, [OTHER_IDENTITY]);
+    }).toThrow(AdminDetailLeak);
+    expect(() => {
+      assertNothingWithheldOnTheWire({ note: OTHER_IDENTITY }, []);
+    }).not.toThrow();
+  });
+});
+
+describe('the two transcriptions of one rule are bound rather than trusted', () => {
+  it('spells a withheld value the same way the feed does', () => {
+    expect(WITHHELD).toBe(FEED_WITHHELD);
+  });
+
+  it('agrees with the feed about which keys name a subject, in both directions', () => {
+    const keys = [
+      'identity_id',
+      'account_id',
+      'matched_identity_id',
+      'merged_identity_id',
+      'surviving_identity_id',
+      'on_behalf_of_identity_id',
+      'linked_account_id',
+      'subject_id',
+      'actor_id',
+      'plan_code',
+      'identity_ids',
+      'account_idx',
+      '',
+    ];
+    const mine = keys.filter((key) => namesASubject(key));
+    const feed = keys.filter((key) => feedNamesASubject(key));
+    // BOTH HALVES NON-EMPTY BEFORE THEY ARE COMPARED, which is session 357's
+    // landmine: two lists neither of which could be produced compare equal.
+    expect(mine.length).toBeGreaterThan(0);
+    expect(feed.length).toBeGreaterThan(0);
+    expect(mine).toStrictEqual(feed);
   });
 });
