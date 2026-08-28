@@ -31,7 +31,8 @@
 -- `reversal_of`, so the UNIQUE index is satisfied by it and always was; and two
 -- reversals of one original are both un-chained, so `LEDGER-C3` is satisfied by
 -- them. `0057` did not leave this open by oversight: its header item 7 says so
--- in its own words and ADR-189 section 6 reports it as a finding.
+-- in its own words at `0057:152-160`, and ADR-189 section 6 reports it as a
+-- finding.
 --
 -- -----------------------------------------------------------------------------
 -- WHETHER, BEFORE WHERE. A REVERSAL OF A REVERSAL IS A RE-APPLICATION AND THE
@@ -42,7 +43,7 @@
 -- **This file does not forbid that outcome and could not.** The corpus already
 -- rules what shape it takes, one table over, in the same sentence that names the
 -- prohibition: "a reversal of a reversal is an adjustment and should be posted
--- as one" (`0009:104`), and `0038`'s own note under
+-- as one" (`0009:104`), and `0038:293-296`'s own note under
 -- `assert_adjustment_reversal_is_sound` finishes the thought -- "reversing a
 -- reversal here is therefore not a hard case, it is a new credit with its own
 -- reason and its own second key".
@@ -73,15 +74,15 @@
 -- insufficient: it is INCAPABLE.** `reversalPosting(original, header)` receives
 -- `reversalOf` as an opaque string. Whether that string names a row that is
 -- itself a reversal is a fact about a row, `packages/ledger` opens no database
--- transaction and cannot (`reversal.ts` says so in its own `@param` note), and
--- nothing it holds can answer the question. A guard written there would either
--- refuse nothing or lie.
+-- transaction and cannot (`reversal.ts:259` says so in its own `@param` note),
+-- and nothing it holds can answer the question. A guard written there would
+-- either refuse nothing or lie.
 --
 -- THERE IS A SECOND DOOR AND IT DOES NOT PASS THROUGH `reversalPosting` AT ALL.
--- `posting.ts`'s `PostingHeader` carries `reversalOf?: string`, so
+-- `posting.ts:136`'s `PostingHeader` carries `reversalOf?: string`, so
 -- `posting({ ..., reversalOf: x }, transfers)` writes the column directly and
--- `post.ts` carries it to the INSERT. A rule enforced in `reversalPosting` would
--- be bypassed by the public constructor one file over, without a cast and
+-- `post.ts:176` carries it to the INSERT. A rule enforced in `reversalPosting`
+-- would be bypassed by the public constructor one file over, without a cast and
 -- without a lint.
 --
 -- -----------------------------------------------------------------------------
@@ -111,8 +112,8 @@
 --   2. THE `WHEN` CLAUSE IS THE ARM AND THE EARLY RETURN IS NOT REDUNDANT. The
 --      trigger fires only for rows carrying a `reversal_of`, so the function is
 --      never entered for the ordinary posting. The `IS NULL` return inside it is
---      kept for `LEDGER-C2`'s stated reason (`0027`): a guarantee that depends
---      on a clause a later migration could drop is a guarantee with a
+--      kept for `LEDGER-C2`'s stated reason (`0027:97-100`): a guarantee that
+--      depends on a clause a later migration could drop is a guarantee with a
 --      dependency, and without the early return a function re-attached without
 --      its `WHEN` clause would refuse every non-reversal in the ledger.
 --
@@ -130,7 +131,7 @@
 --      With this branch removed the write is still refused, by
 --      `ledger_transactions_reversal_of_fkey` one moment later. It is kept
 --      because a guard that silently depends on a constraint a later migration
---      could drop is `0027`'s own objection, and its ERRCODE is
+--      could drop is `0027:97-100`'s own objection, and its ERRCODE is
 --      `foreign_key_violation` rather than `check_violation` so that a caller
 --      catching one from the other still sees the class it would have seen.
 --
@@ -220,7 +221,7 @@ CREATE TRIGGER ledger_transactions_reversal_does_not_chain
 COMMENT ON FUNCTION assert_reversal_does_not_chain() IS
   'LEDGER-C3, ADR-193. 0009:103-104 promised that a reversal "may not chain '
   'onto another reversal" and its CHECK could enforce only reversal_of <> id, '
-  'because a row-level CHECK cannot query another row. This is the other clause. '
+  'because a row-level CHECK cannot query another row. This is that clause. '
   'It refuses the LINK and not the operation: a re-application is posted as a '
   'new transaction with its own reason and its own key, which is 0009''s own '
   'remedy and 0038''s note under assert_adjustment_reversal_is_sound. It is a '
