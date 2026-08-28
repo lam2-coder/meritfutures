@@ -101,8 +101,10 @@
 // THIS COMPOSES A PARTIAL PORT AND SAYS SO, WHICH IS WHY NOTHING WIRES IT
 // -----------------------------------------------------------------------------
 // `AdminReadSource` has SEVEN methods since ADR-184 ruling 1 and this directory
-// implements FOUR, which {@link IMPLEMENTED_ADMIN_READS} states as data rather
-// than this sentence stating it as prose. There is still no value in this tree
+// implements the ones {@link IMPLEMENTED_ADMIN_READS} names, WHICH IS WHY NO
+// NUMERAL APPEARS IN THIS SENTENCE. It carried one, it went stale every time a
+// slice landed, and two concurrent slices bumping the same word is a merge
+// conflict over a count the array beside it already states as data. There is still no value in this tree
 // that satisfies the port, `start.ts` calls no setter, and `setAdminReadSource`
 // stays in `test/wiring.test.ts`'s `BLOCKED` list with the triple unchanged.
 //
@@ -161,10 +163,12 @@ import { readAccountDetail } from './account.ts';
 import { readEventFeed } from './events.ts';
 import { readFlagQueue } from './flags.ts';
 import { DEFAULT_GRAPH_LIMITS, readIdentityGraph } from './graph.ts';
+import { readAccountSearch } from './search.ts';
 import type { AccountTx } from './account.ts';
 import type { EventsTx } from './events.ts';
 import type { FlagsTx } from './flags.ts';
 import type { GraphLimits, GraphTx } from './graph.ts';
+import type { SearchTx } from './search.ts';
 import type { AdminReadSource } from '../routes/admin-reads.ts';
 
 /**
@@ -175,7 +179,7 @@ import type { AdminReadSource } from '../routes/admin-reads.ts';
  * satisfies it structurally, and because every arm of the intersection is
  * read-only, so is this.
  */
-export type AdminSourceTx = AccountTx & EventsTx & FlagsTx & GraphTx;
+export type AdminSourceTx = AccountTx & EventsTx & FlagsTx & GraphTx & SearchTx;
 
 /**
  * The unit of work this directory cannot open for itself.
@@ -210,6 +214,7 @@ export const IMPLEMENTED_ADMIN_READS = [
   'listFlags',
   'readAccount',
   'readIdentityGraph',
+  'searchAccounts',
 ] as const;
 
 /** One of {@link IMPLEMENTED_ADMIN_READS}. */
@@ -249,6 +254,8 @@ export function composeImplementedAdminReads(
     readIdentityGraph: async (identityId) =>
       (await backend.operator((tx) => readIdentityGraph(tx, identityId, graphLimits)))?.graph ??
       null,
+    searchAccounts: async (query) =>
+      (await backend.operator((tx) => readAccountSearch(tx, query))).page,
   };
 }
 
