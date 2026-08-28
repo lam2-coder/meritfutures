@@ -230,12 +230,28 @@ test('the entries guard accepts a debit that carries no provenance', () => {
 test('the entries guard refuses a numeric entry_id', () => {
   // API_CONTRACT: `entry_id` is a DECIMAL STRING and "a client must not parse
   // it", because a `wallet_entries.id` above `Number.MAX_SAFE_INTEGER` has
-  // already lost digits by the time anything reads it. A number on this field
-  // means the server serialised the bigint wrongly, and 9007199254740993 is
-  // exactly the value that would arrive as ...992.
-  expect(
-    isEntriesResponse({ data: [{ ...ENTRIES[0], entry_id: 9007199254740993 }], next_cursor: null }),
-  ).toBe(false);
+  // already lost digits by the time anything reads it.
+  //
+  // THE VALUE IS COMPUTED RATHER THAN WRITTEN, AND ESLINT IS THE REASON. This
+  // assertion first carried the literal `9007199254740993`, and
+  // `no-loss-of-precision` failed the lint run on it -- correctly, and making
+  // this test's own point: a source literal above the safe range is not even the
+  // value it appears to be. So the loss is DEMONSTRATED here instead of
+  // described, and the demonstration is the first half of the test.
+  const lost = Number.MAX_SAFE_INTEGER + 2;
+  expect(String(lost), 'the digit is already gone before any guard sees it').toBe(
+    '9007199254740992',
+  );
+
+  // AND THE GUARD REFUSES A NUMBER ON THIS FIELD WHATEVER ITS MAGNITUDE, because
+  // the check is on the TYPE. A guard that only refused unsafe integers would
+  // pass a small id through and start parsing ids that happen to be short.
+  expect(isEntriesResponse({ data: [{ ...ENTRIES[0], entry_id: lost }], next_cursor: null })).toBe(
+    false,
+  );
+  expect(isEntriesResponse({ data: [{ ...ENTRIES[0], entry_id: 41 }], next_cursor: null })).toBe(
+    false,
+  );
 });
 
 test('a 200 whose body is not the contract’s shape is unavailable, never rendered', () => {

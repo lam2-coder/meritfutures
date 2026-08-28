@@ -216,11 +216,7 @@ export function isEntriesResponse(
   if (!isRecord(value)) return false;
   const data = value['data'];
   const cursor = value['next_cursor'];
-  return (
-    Array.isArray(data) &&
-    data.every(isEntry) &&
-    (cursor === null || isString(cursor))
-  );
+  return Array.isArray(data) && data.every(isEntry) && (cursor === null || isString(cursor));
 }
 
 // -----------------------------------------------------------------------------

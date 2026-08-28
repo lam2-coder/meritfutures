@@ -82,12 +82,7 @@
 // figures are three amounts and a timestamp, and `test/wallet.test.ts` asserts
 // the absence by name so the next field cannot arrive quietly.
 
-import type {
-  WalletEntry,
-  WalletHold,
-  WalletProvenance,
-  WalletResponse,
-} from '../api/types.ts';
+import type { WalletEntry, WalletHold, WalletProvenance, WalletResponse } from '../api/types.ts';
 import type { CopyBlock } from '../copy/copy-block.ts';
 import { formatCents } from '../format/money.ts';
 import type { Tiered } from './as-of.ts';
