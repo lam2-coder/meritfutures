@@ -219,6 +219,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-198](ADR-198.md) | a `_cents` value inside `events.payload` is a DECIMAL STRING  (2026-08-28, status: proposed) |
 | [ADR-199](ADR-199.md) | `reserve_coverage_snapshots` is `firm` and registering it is the whole of what `packages/db` owed `readLiability`, because the other three figures are DERIVABLE and `0062` returns unspent  (2026-08-28, status: proposed) |
 | [ADR-200](ADR-200.md) | a verified code creates the identity, the consumption is ruled and guarded, and the two pre-identity doors are narrowed at the door rather than refused  (2026-08-28, status: proposed) |
+| [ADR-201](ADR-201.md) | the payout-velocity window is seven trading days against thirty scaled to seven, and the settled threshold PROVES that reading rather than this entry choosing it  (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
