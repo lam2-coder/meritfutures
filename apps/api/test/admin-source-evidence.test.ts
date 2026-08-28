@@ -1162,12 +1162,15 @@ describe('composeAdminReadSource', () => {
     expect(() => source.readLiability()).toThrow(AdminSourceNotComposed);
   });
 
-  test('every one of the six methods is present on a composed source', () => {
-    // The count is read off the port rather than typed, so a seventh method
-    // added to `AdminReadSource` is a red test here rather than a silent gap.
+  test('every one of the seven methods is present on a composed source', () => {
+    // The count is read off the port rather than typed, so a method added to
+    // `AdminReadSource` is a red test here rather than a silent gap. IT WENT RED
+    // FOR EXACTLY THAT REASON when ADR-184 ruling 1's `listEvents` landed, which
+    // is the control working; the list follows the port and never leads it.
     const source = composeAdminReadSource({});
     expect(Object.keys(source).sort()).toEqual([
       'exportEvidence',
+      'listEvents',
       'listFlags',
       'readAccount',
       'readIdentityGraph',
