@@ -12,6 +12,7 @@ import {
   SURFACE_OWNER,
   needle,
 } from '../checks/repo-invariants.mjs';
+import { SUBJECTS } from '../checks/response-shape-copies.mjs';
 
 // =============================================================================
 // EACH INVARIANT IS WATCHED FAILING BEFORE IT IS TRUSTED
@@ -281,6 +282,57 @@ function cleanTree(): string {
     'apps/api/test/db.test.ts',
     '// `atMost(value)` mints a frozen `FilterTerm` (`scoped-db.ts:662`).\n',
   );
+  // RI-18'S THREE INPUTS, AND THE FIXTURE DECLARES EACH SHAPE THREE TIMES ON
+  // PURPOSE. The check compares COPIES, so a fixture with one declaration would
+  // make it throw its own non-vacuity guard on every case in this file -- the
+  // guard working and the fixture wrong, which is the trap RI-14's, RI-15's and
+  // RI-16's inputs each set once while they were being written.
+  //
+  // THE NAMES COME FROM `SUBJECTS` AND ARE NOT A SECOND COPY OF THEM, for the
+  // reason `DEPLOYABLES` is read above rather than retyped: a fixture holding
+  // its own list of what the check is about cannot fail when that list grows,
+  // it goes stale in step.
+  //
+  // THE THREE COPIES SPELL THE SHAPE DIFFERENTLY ON PURPOSE: an `interface`
+  // reaching a second declaration by reference, a `type` alias with
+  // `ReadonlyArray<>` where the contract writes `Array<>` and the interface
+  // writes `readonly []`, and no `readonly` at all in the document. The real
+  // divergence this check exists for hides behind exactly those differences,
+  // and three byte-identical copies would not tell a reader whether the parser
+  // or a string comparison was doing the work.
+  for (const subject of SUBJECTS) {
+    write(
+      root,
+      'docs/architecture/API_CONTRACT.md',
+      `### GET /admin/${subject}\n` +
+        '```ts\n' +
+        `type ${subject} = {\n` +
+        '  as_of: string;\n' +
+        '  nested: { cents: number };\n' +
+        '  rows: Array<{ day: string }>;\n' +
+        '};\n' +
+        '```\n',
+    );
+    write(
+      root,
+      `apps/${SURFACE_OWNER}/src/routes/${subject}.ts`,
+      `interface ${subject}Nested {\n  readonly cents: number;\n}\n` +
+        `export interface ${subject} {\n` +
+        '  readonly as_of: string;\n' +
+        `  readonly nested: ${subject}Nested;\n` +
+        '  readonly rows: readonly { readonly day: string }[];\n' +
+        '}\n',
+    );
+    write(
+      root,
+      'apps/admin/src/api/types.ts',
+      `export type ${subject} = {\n` +
+        '  readonly as_of: string;\n' +
+        '  readonly nested: { readonly cents: number };\n' +
+        '  readonly rows: ReadonlyArray<{ readonly day: string }>;\n' +
+        '};\n',
+    );
+  }
   return root;
 }
 

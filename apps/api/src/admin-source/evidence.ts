@@ -104,6 +104,7 @@
 
 import { createHash } from 'node:crypto';
 
+import { AdminReadError } from '../routes/admin-reads.ts';
 import type {
   AdminPrincipal,
   EvidenceExportRequest,
@@ -837,5 +838,939 @@ export function createEvidenceExporter(deps: EvidenceExporterDeps): {
         audience: request.audience,
       };
     },
+  };
+}
+
+// =============================================================================
+// THE ADAPTER, AND WHY IT IS A THIRD OF `exportEvidence` RATHER THAN ALL OF IT
+// =============================================================================
+// Everything above this line is a GENERATOR over three injected ports. What
+// follows is the one of those three this directory may hold: {@link
+// EvidenceReadPort}, over ADR-112's keyed accessor, in `flags.ts`'s, `graph.ts`'s,
+// `events.ts`'s and `account.ts`'s module shape unaltered -- a closed tuple of
+// tables, a `Tx` keyed by it that `SystemTx` satisfies structurally, a cost
+// object beside the answer, and no `@merit/db` import under this directory.
+//
+// -----------------------------------------------------------------------------
+// THE OTHER TWO PORTS ARE NOT BLOCKED ON A TABLE AND NEITHER IS THIS DIRECTORY'S
+// -----------------------------------------------------------------------------
+// Every table this adapter names is already a `TableKey` and none needed
+// registering, which is the first thing checked and is the opposite of what
+// sessions 349 and 353 found for `events`. So `exportEvidence` STILL does not
+// join `IMPLEMENTED_ADMIN_READS`, and the reason is not a read:
+//
+//   `EvidencePackStore` IS OBJECT STORAGE AND NOTHING IN THIS TREE IS. It hands
+//   back a `storage_ref`, a signed `download_url` and an `expires_at`;
+//   `evidence_packs.storage_ref` is `text NOT NULL` carrying "Private object
+//   storage, signed URL only. Never a public path" in the DDL's own comment
+//   (`packages/db/src/schema.ts`, `0008_risk.sql`). A grep across `apps/` and
+//   `packages/` for a store finds this interface and its suite's fixture and
+//   NOTHING ELSE. No table registration reaches it, because it is not a table.
+//
+//   `EvidencePackWriter` IS AN INSERT, AND ITS HOME ALREADY EXISTS ONE DIRECTORY
+//   OVER. `routes/admin-writes.ts` names `evidencePacks` in `ADMIN_WRITE_TABLES`
+//   and `AdminWriteTx` carries `insert`. **This directory's stated property is
+//   that it holds a handle it CANNOT WRITE THROUGH** (`FlagsTx`'s docblock:
+//   `insert`, `updateAt`, `deleteAt` and `sqlExecutor` are "ABSENT rather than
+//   unused"), and `admin-source/index.ts` says `AdminSourceTx` is read-only
+//   "because every arm of the intersection is read-only". Minting a write arm
+//   here to serve one method would trade that property, directory-wide, for a
+//   row a file that already may write it can write. **So the writer is reported
+//   as the write side's and this adapter does not reach for it.**
+//
+// **THAT IS WHY `composeImplementedAdminReads` IS NOT TOUCHED AND
+// `IMPLEMENTED_ADMIN_READS` DOES NOT MOVE.** That function takes ONE parameter,
+// an `AdminSourceBackend`, and no door onto this database can produce a signed
+// URL. A key added there would have to invent a store, and a `download_url`
+// invented in this file is a pack an operator cites and nobody can open.
+//
+// -----------------------------------------------------------------------------
+// THE ADAPTER'S PROJECTION IS THE TRADER PACK'S ALLOWLIST FOR SIX OF ITS EIGHT
+// SECTIONS, WHICH IS THE REASON IT IS A COLUMN MAP AND NOT A SPREAD
+// -----------------------------------------------------------------------------
+// `buildEvidenceDocument` filters `flags` through `TRADER_FLAG_FIELDS` and
+// carries `account`, `identity`, `fills`, `marks`, `rule_states` and
+// `plan_version` THROUGH WHOLE, at every audience. So whatever this adapter puts
+// in those six is what reaches a trader, and a column added to `accounts` next
+// year would reach one the day it landed if this file read rows with a spread.
+// {@link EVIDENCE_COLUMNS} names every column instead, and the suite asserts
+// each map against `packages/db/src/schema.ts`'s own declaration IN BOTH
+// DIRECTIONS -- a column the map has and the table does not is a typo, and a
+// column the table has and the map does not is a decision somebody has to make
+// rather than a default. **A new column is a red suite, not a disclosure.**
+//
+// -----------------------------------------------------------------------------
+// THREE VALUES THE ACCESSOR RETURNS THAT `canonicalJson` CANNOT RENDER, AND ONLY
+// ONE OF THEM FAILS LOUDLY
+// -----------------------------------------------------------------------------
+// The pack IS `canonicalJson(document)` and `content_sha256` is the digest over
+// exactly those bytes, so a value that renders wrongly is an exhibit that is
+// wrong AND self-consistent about it. `pg` and Drizzle return three shapes that
+// do:
+//
+//   1. `bigint`. Every surrogate key and every cents column on these tables is
+//      `bigint`, and `JSON.stringify` THROWS on one. That is the loud failure.
+//   2. `Date`. `timestamptz` arrives as one, and `canonicalJson` reaches it
+//      through `asRecord`, which accepts any non-array object; `Object.keys(new
+//      Date())` is EMPTY, so every instant in the pack would render as `{}`.
+//      **Silently. Under a digest that makes it official.**
+//   3. `Uint8Array`. `bytea` arrives as one, and it renders as an object keyed
+//      by byte index: `{"0":31,"1":139,...}`.
+//
+// So the kinds below are not decoration. Each names what the column IS, and the
+// reader for it is the conversion that makes the bytes right: an instant becomes
+// an ISO string, a digest becomes lowercase hex on `renderEvidencePack`'s own
+// precedent, and a `bigint` becomes either a decimal STRING or a NUMBER
+// depending on which of the two things it is.
+//
+// **AN IDENTIFIER IS TEXT AND A QUANTITY IS A NUMBER, AND THE SPLIT IS
+// `events.ts`'s RULING REUSED RATHER THAN A PREFERENCE.** API_CONTRACT section 8
+// carries `events.id` as a string because "a JSON number loses that ordering
+// past 2^53", and `fills.id`, `daily_marks.id` and `rule_states.id` are the same
+// `bigint GENERATED ALWAYS AS IDENTITY` column: `'bigid'` carries them as
+// digits. Money is the other direction and `assertIntegerAmounts` is why: it
+// walks the finished document and refuses a fractional NUMBER, and a cents
+// column carried as a string would walk straight past that control. `'int'`
+// therefore carries cents as a number AND REFUSES ANYTHING OUTSIDE THE SAFE
+// INTEGER RANGE, so the precision this file will not lose silently is the
+// precision it fails on.
+//
+// -----------------------------------------------------------------------------
+// "THE PLAN'S RULE TEXT" IS `copy_blocks` AND THERE IS NO `rule_text` COLUMN
+// -----------------------------------------------------------------------------
+// `GS-112` requires the pack to carry it and `plan_versions` has no such column.
+// `0028_supersede_plan_version_immutability.sql` names the one that holds it, in
+// its own words: "`copy_blocks` (the published rule TEXT)". `INV-M4-08` says the
+// same thing from the reading end: "Every rule sentence on any screen comes from
+// `copy_blocks` on the account's pinned plan version". So the map carries
+// `copy_blocks` whole and INVENTS NO `rule_text` KEY. The existing suite's
+// `plan_version` fixture uses one; that is a fixture's shape, and this adapter
+// answers to the schema.
+//
+// -----------------------------------------------------------------------------
+// THE ToS CLAUSE IS TWO KEYED READS AND A REFUSAL, NEVER A MAP
+// -----------------------------------------------------------------------------
+// {@link EvidenceFlagRecord}'s docblock and STATE's finding B: `risk_flags`
+// carries no clause column, a clause lives on the ENFORCEMENT that cites the
+// flag -- `payout_requests.hold_tos_clause` under
+// `payout_requests_hold_is_complete`, and `identity_restriction_episodes.
+// tos_clause` under ADR-041 -- and `DEP-M7-05` still owes two of the three
+// texts. Both are reachable by equality, so both are read and neither is
+// guessed.
+//
+// **WHERE THE TWO ENFORCEMENTS CITE ONE FLAG UNDER DIFFERENT CLAUSES, THIS
+// REFUSES.** `EvidenceFlagRecord.tos_clause` is ONE string, a pack is the
+// document a dispute is argued from, and an exhibit that states one clause while
+// the firm's own record holds two is the pack citing a rule the firm did not
+// cite. It is `EvidenceExportError` and not `AdminReadError` because it is this
+// file's own sentence: "the generator was asked for something it must not guess
+// about". **A ruling that makes the field a list would retire this refusal, and
+// it is reported as owed rather than pre-empted here.**
+//
+// -----------------------------------------------------------------------------
+// WHAT THIS ADAPTER DOES NOT DO
+// -----------------------------------------------------------------------------
+// IT WITHHOLDS NOTHING AND IT MUST NOT START. ADR-184 ruling 3 puts the
+// withholding "on the RESPONSE and not in the renderer", `account.ts` and
+// `events.ts` both say so about their own rows, and session 359 landed the
+// account drill-down's projection where that ruling puts it. **This adapter's
+// audience-facing redaction is `buildEvidenceDocument`'s, which is a DIFFERENT
+// rule from `INV-M6-10`'s scope withholding and runs at a different layer**;
+// adding a second gate here would be a third place either rule could be slightly
+// different.
+//
+// IT DOES NOT BOUND WHAT IT READS. "Every fill, every mark, every rule state" is
+// `GS-112`'s ask and `account.ts` already priced the same shape: the port hands
+// back a subject and not an `AdminPage`, so there is nowhere to put a cursor.
+// {@link EvidenceSubjectCost} reports what one read cost rather than leaving it
+// to be discovered, and a cap the corpus does not state is a ruling rather than
+// a default.
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// The port onto the database
+// -----------------------------------------------------------------------------
+
+/**
+ * The tables this module reads, and no others.
+ *
+ * ELEVEN, AND EVERY ONE OF THEM WAS ALREADY A `TableKey`. `routes/admin-writes.ts`'s
+ * `ADMIN_WRITE_TABLES` idiom, for its reason: a typo is a compile error here, and
+ * the suite asserts every member is a real key of `packages/db`, which is the
+ * half this module cannot make about itself because it holds no import of that
+ * package.
+ *
+ * THE LAST THREE SERVE ONE FIELD EACH AND NONE OF THEIR ROWS ENTERS A PACK.
+ * `detectorRuns` supplies a flag's `detector` and `detector_version` (which
+ * `risk_flags` does not carry), and `payoutRequests` and
+ * `identityRestrictionEpisodes` supply its `tos_clause`. Only those three
+ * strings cross; the rows are read and dropped, which is what keeps a payout's
+ * `eligibility_snapshot` and a restoration's evidence out of a document nobody
+ * asked to put them in.
+ */
+export const EVIDENCE_READ_TABLES = [
+  'accounts',
+  'dailyMarks',
+  'detectorDefinitions',
+  'detectorRuns',
+  'fills',
+  'identities',
+  'identityRestrictionEpisodes',
+  'payoutRequests',
+  'planVersions',
+  'riskFlags',
+  'ruleStates',
+] as const;
+
+/** One of {@link EVIDENCE_READ_TABLES}. */
+export type EvidenceReadTable = (typeof EVIDENCE_READ_TABLES)[number];
+
+/** A filter or an address, by Drizzle property name. ADR-112's shape. */
+export type EvidenceRowFilter = Readonly<Record<string, unknown>>;
+
+/**
+ * ADR-112's keyed accessor, READ HALF ONLY, over this module's eleven tables.
+ *
+ * `FlagsTx`'s shape and `FlagsTx`'s reason. `insert`, `updateAt`, `deleteAt` and
+ * `sqlExecutor` are ABSENT rather than unused, and `SystemTx` satisfies this
+ * structurally. **On this module that absence is the whole of the section above
+ * this one**: `evidence_packs` is the row `exportEvidence` writes, and a handle
+ * shaped like this cannot write it, which is why the writer is a port the
+ * deployment supplies rather than a function beside this one.
+ */
+export interface EvidenceTx {
+  rows(key: EvidenceReadTable): Promise<unknown[]>;
+  rowsWhere(key: EvidenceReadTable, where: EvidenceRowFilter): Promise<unknown[]>;
+  rowAt(key: EvidenceReadTable, at: EvidenceRowFilter): Promise<unknown>;
+}
+
+// -----------------------------------------------------------------------------
+// The columns, and what each one IS
+// -----------------------------------------------------------------------------
+
+/**
+ * How a column is carried into a pack. See the header for why `bigid` and `int`
+ * are two kinds over one Postgres type.
+ */
+export type EvidenceColumnKind =
+  | 'text'
+  | 'text?'
+  | 'bigid'
+  | 'bigid?'
+  | 'int'
+  | 'int?'
+  | 'bool'
+  | 'day'
+  | 'day?'
+  | 'instant'
+  | 'instant?'
+  | 'json'
+  | 'digest';
+
+/**
+ * One table's columns: Drizzle property name to `[column name, kind]`.
+ *
+ * BOTH NAMES ARE CARRIED because both are asserted. The property name is what
+ * the accessor hands back and the column name is what the pack carries, and the
+ * suite reads `schema.ts` for both rather than trusting either.
+ */
+export type EvidenceColumnMap = Readonly<Record<string, readonly [string, EvidenceColumnKind]>>;
+
+/**
+ * Every column of the six tables whose rows reach a pack WHOLE.
+ *
+ * SIX MAPS AND NOT ELEVEN. `riskFlags` is projected into
+ * {@link EvidenceFlagRecord} field by field and `detectorDefinitions` into
+ * {@link DetectorRegistryRow}; the other three contribute one string each and no
+ * row. See the header: these six ARE the trader allowlist for the sections
+ * `buildEvidenceDocument` carries through.
+ */
+export const EVIDENCE_COLUMNS: Readonly<Record<string, EvidenceColumnMap>> = {
+  accounts: {
+    id: ['id', 'text'],
+    identityId: ['identity_id', 'text'],
+    userId: ['user_id', 'text'],
+    purchaseId: ['purchase_id', 'text'],
+    planVersionId: ['plan_version_id', 'text'],
+    sizeCents: ['size_cents', 'int'],
+    phase: ['phase', 'text'],
+    status: ['status', 'text'],
+    platform: ['platform', 'text'],
+    platformAccountRef: ['platform_account_ref', 'text?'],
+    feed: ['feed', 'text?'],
+    frontEndPermissions: ['front_end_permissions', 'json'],
+    openedOn: ['opened_on', 'day'],
+    fundedOn: ['funded_on', 'day?'],
+    closedOn: ['closed_on', 'day?'],
+    closeReason: ['close_reason', 'text?'],
+    payoutsFrozen: ['payouts_frozen', 'bool'],
+    reconBlocked: ['recon_blocked', 'bool'],
+    expiresOn: ['expires_on', 'day?'],
+    graduatedAt: ['graduated_at', 'instant?'],
+    graduationPath: ['graduation_path', 'text?'],
+    terminalSettlementId: ['terminal_settlement_id', 'text?'],
+    graduationEligible: ['graduation_eligible', 'bool'],
+    createdAt: ['created_at', 'instant'],
+    updatedAt: ['updated_at', 'instant'],
+  },
+  identities: {
+    id: ['id', 'text'],
+    displayName: ['display_name', 'text?'],
+    leaderboardOptIn: ['leaderboard_opt_in', 'bool'],
+    status: ['status', 'text'],
+    statusReason: ['status_reason', 'text?'],
+    maxAccountsOverride: ['max_accounts_override', 'int?'],
+    payoutsFrozen: ['payouts_frozen', 'bool'],
+    frozenReason: ['frozen_reason', 'text?'],
+    frozenAt: ['frozen_at', 'instant?'],
+    supportContactRef: ['support_contact_ref', 'text?'],
+    firstSeenAt: ['first_seen_at', 'instant'],
+    createdAt: ['created_at', 'instant'],
+    updatedAt: ['updated_at', 'instant'],
+  },
+  fills: {
+    id: ['id', 'bigid'],
+    accountId: ['account_id', 'text'],
+    platform: ['platform', 'text'],
+    platformFillId: ['platform_fill_id', 'text'],
+    orderId: ['order_id', 'text?'],
+    venue: ['venue', 'text?'],
+    symbol: ['symbol', 'text'],
+    side: ['side', 'text'],
+    quantity: ['quantity', 'int'],
+    // AN EXACT RATIONAL AND NEVER A QUOTIENT. `0013_ingest.sql`: "a price that
+    // rounds is a P&L that disagrees with the vendor's". Both legs cross whole.
+    priceNumerator: ['price_numerator', 'int'],
+    priceDenominator: ['price_denominator', 'int'],
+    executedAt: ['executed_at', 'instant'],
+    tradingDay: ['trading_day', 'day'],
+    correctionOf: ['correction_of', 'bigid?'],
+    isCorrected: ['is_corrected', 'bool'],
+    ingestFileId: ['ingest_file_id', 'text'],
+    rawRowId: ['raw_row_id', 'bigid'],
+    recordedAt: ['recorded_at', 'instant'],
+    tradingDayVendor: ['trading_day_vendor', 'day?'],
+    tradingDaySource: ['trading_day_source', 'text'],
+    createdAt: ['created_at', 'instant'],
+  },
+  dailyMarks: {
+    id: ['id', 'bigid'],
+    accountId: ['account_id', 'text'],
+    tradingDay: ['trading_day', 'day'],
+    openingBalanceCents: ['opening_balance_cents', 'int'],
+    closingBalanceCents: ['closing_balance_cents', 'int'],
+    highBalanceCents: ['high_balance_cents', 'int'],
+    lowBalanceCents: ['low_balance_cents', 'int'],
+    realizedPnlCents: ['realized_pnl_cents', 'int'],
+    fillCount: ['fill_count', 'int'],
+    tradedDay: ['traded_day', 'bool'],
+    winDay: ['win_day', 'bool'],
+    adjustmentCents: ['adjustment_cents', 'int'],
+    sourceHash: ['source_hash', 'digest'],
+    source: ['source', 'text'],
+    ingestFileId: ['ingest_file_id', 'text?'],
+    supersededBy: ['superseded_by', 'bigid?'],
+    computedAt: ['computed_at', 'instant'],
+    createdAt: ['created_at', 'instant'],
+  },
+  ruleStates: {
+    id: ['id', 'bigid'],
+    accountId: ['account_id', 'text'],
+    tradingDay: ['trading_day', 'day'],
+    phase: ['phase', 'text'],
+    floorCents: ['floor_cents', 'int'],
+    floorLocked: ['floor_locked', 'bool'],
+    floorOpenCents: ['floor_open_cents', 'int'],
+    highWaterBalanceCents: ['high_water_balance_cents', 'int'],
+    balanceCents: ['balance_cents', 'int'],
+    withdrawableCents: ['withdrawable_cents', 'int'],
+    tradedDaysCount: ['traded_days_count', 'int'],
+    winDaysCount: ['win_days_count', 'int'],
+    consistencyBestDayCents: ['consistency_best_day_cents', 'int'],
+    consistencyPeriodProfitCents: ['consistency_period_profit_cents', 'int'],
+    consistencyPeriodStartDay: ['consistency_period_start_day', 'day?'],
+    payoutsSettledCount: ['payouts_settled_count', 'int'],
+    payoutAnchorDay: ['payout_anchor_day', 'day?'],
+    cadenceAnchorDay: ['cadence_anchor_day', 'day?'],
+    engineEligible: ['engine_eligible', 'bool'],
+    // THE GATE RESULT, AND IT IS TWO COLUMNS. `SD-06` split it and there is no
+    // `gate_results` table; see {@link EvidenceSubject}.
+    engineGates: ['engine_gates', 'json'],
+    contextGates: ['context_gates', 'json'],
+    stateHash: ['state_hash', 'digest'],
+    engineVersion: ['engine_version', 'text'],
+    computedAt: ['computed_at', 'instant'],
+    createdAt: ['created_at', 'instant'],
+    calendarRevisionId: ['calendar_revision_id', 'bigid?'],
+  },
+  planVersions: {
+    id: ['id', 'text'],
+    planId: ['plan_id', 'text'],
+    version: ['version', 'int'],
+    status: ['status', 'text'],
+    rules: ['rules', 'json'],
+    // `GS-112`'s "the plan's rule text". See the header: there is no
+    // `rule_text` column and this is the one that holds it.
+    copyBlocks: ['copy_blocks', 'json'],
+    publicSlug: ['public_slug', 'text'],
+    publicVisible: ['public_visible', 'bool'],
+    publishedAt: ['published_at', 'instant?'],
+    retiredAt: ['retired_at', 'instant?'],
+    createdBy: ['created_by', 'text'],
+    createdAt: ['created_at', 'instant'],
+    feeBackRepeats: ['fee_back_repeats', 'bool'],
+    decidedOnSimulationRunId: ['decided_on_simulation_run_id', 'text?'],
+    simulationWaiverReason: ['simulation_waiver_reason', 'text?'],
+  },
+};
+
+// -----------------------------------------------------------------------------
+// The readers, one per kind, all defensive
+// -----------------------------------------------------------------------------
+
+function cellOf(row: unknown, property: string, at: string): unknown {
+  if (typeof row !== 'object' || row === null)
+    throw new AdminReadError(
+      `the accessor returned a ${typeof row} where ${at} was expected. An evidence pack built ` +
+        'out of that is the document a dispute is argued from, describing something else',
+    );
+  return (row as Record<string, unknown>)[property];
+}
+
+function nonEmptyText(value: unknown, column: string, at: string): string {
+  if (typeof value !== 'string' || value === '')
+    throw new AdminReadError(
+      `${at} carries no \`${column}\`, and the column is \`NOT NULL\` in the schema. That is the ` +
+        'transcription disagreeing with the database rather than a row to export',
+    );
+  return value;
+}
+
+/**
+ * A `bigint` surrogate key as digits.
+ *
+ * See the header: `events.ts` carries `events.id` as a string on API_CONTRACT
+ * section 8's reason, and `fills.id`, `daily_marks.id` and `rule_states.id` are
+ * the same column type. A `number` accepted here would be a row somebody built
+ * by hand, so it is converted and re-checked rather than trusted.
+ */
+function bigId(value: unknown, column: string, at: string): string {
+  const digits =
+    typeof value === 'bigint' || typeof value === 'number' ? String(value) : (value as unknown);
+  if (typeof digits !== 'string' || !/^\d+$/.test(digits))
+    throw new AdminReadError(
+      `${at} carries \`${column}\` as ${JSON.stringify(String(value))}, which is not the ` +
+        '`bigint GENERATED ALWAYS AS IDENTITY` the schema declares. An identifier is carried as ' +
+        'text because a JSON number loses the ordering past 2^53',
+    );
+  return digits;
+}
+
+/**
+ * An exact integer as a JSON number.
+ *
+ * THE SAFE-INTEGER REFUSAL IS THE POINT. `assertIntegerAmounts` walks the
+ * finished document and refuses a fractional number, and it cannot see a
+ * `bigint` that lost its last digits on the way in. Money is integer cents, so
+ * the precision this file will not lose silently is the precision it fails on.
+ */
+function exactInteger(value: unknown, column: string, at: string): number {
+  if (typeof value === 'bigint') {
+    if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER))
+      throw new AdminReadError(
+        `${at} carries \`${column}\` as ${String(value)}, which is outside the range a JSON ` +
+          'number holds exactly. Money is integer cents and a pack is an exhibit, so this is a ' +
+          'refusal rather than a rounding',
+      );
+    return Number(value);
+  }
+  if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
+  throw new AdminReadError(
+    `${at} carries \`${column}\` as ${JSON.stringify(String(value))}, which is not an exact ` +
+      'integer. Money is integer cents and a price is an exact rational; a pack carrying ' +
+      'anything else is an exhibit that rounds',
+  );
+}
+
+/** A `date` column, as the `YYYY-MM-DD` text the trading day IS. */
+function tradingDayText(value: unknown, column: string, at: string): string {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  throw new AdminReadError(
+    `${at} carries \`${column}\` as ${JSON.stringify(String(value))}, which is not a trading ` +
+      'day. The trading day follows the exchange session calendar and is stored as a `date`, so ' +
+      'a value derived from an instant here would be off by one for the hours CT and UTC disagree',
+  );
+}
+
+/**
+ * A `timestamptz` as an ISO instant.
+ *
+ * NOT AS THE `Date` THE ACCESSOR HANDS BACK. See the header: `canonicalJson`
+ * reaches a `Date` through `asRecord`, finds no own keys, and renders every
+ * instant in the pack as `{}` under a digest that makes it official.
+ */
+function isoInstant(value: unknown, column: string, at: string): string {
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  if (typeof value === 'string' && Number.isFinite(Date.parse(value))) return value;
+  throw new AdminReadError(
+    `${at} carries \`${column}\` as ${JSON.stringify(String(value))}, which is not an instant. ` +
+      'Storage is UTC and a pack carries the instant, not a rendering of it',
+  );
+}
+
+/**
+ * A `bytea` as lowercase hex.
+ *
+ * `renderEvidencePack`'s own choice one field over: `evidence_packs.content_sha256`
+ * is `bytea` and the response field is hex, and both are the same digest. A
+ * `Uint8Array` left alone renders as an object keyed by byte index.
+ */
+function hexDigest(value: unknown, column: string, at: string): string {
+  if (value instanceof Uint8Array) return Buffer.from(value).toString('hex');
+  if (typeof value === 'string' && /^[0-9a-f]*$/i.test(value)) return value.toLowerCase();
+  throw new AdminReadError(
+    `${at} carries \`${column}\` as ${JSON.stringify(String(value))}, which is not the \`bytea\` ` +
+      'the schema declares. A digest is what makes a superseded row provable, so it is carried ' +
+      'as hex rather than as whatever an accessor happened to return',
+  );
+}
+
+/**
+ * A record whose prototype is `Object`'s, WHICH IS NOT WHAT {@link asRecord}
+ * ANSWERS.
+ *
+ * **THIS FUNCTION EXISTS BECAUSE THE FIRST VERSION OF {@link jsonSafe} REUSED
+ * `asRecord` AND THE SUITE CAUGHT IT.** `asRecord` accepts any non-array object,
+ * which is the exact blind spot that renders a `Date` as `{}` -- a guard against
+ * that spelled in terms of the predicate that has it is not a guard. `asRecord`
+ * is correct where it is used, over documents this file composed itself; here
+ * the input is whatever the accessor handed back.
+ */
+function plainRecord(value: unknown): Readonly<Record<string, unknown>> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return null;
+  return value as Readonly<Record<string, unknown>>;
+}
+
+/**
+ * A `jsonb` value, checked for what `canonicalJson` can actually render.
+ *
+ * `pg` parses JSON into plain values, so this should never fire. It is here
+ * because when it does not fire the alternative is `canonicalJson` throwing
+ * three layers away from the row, or worse, rendering `{}` and hashing it.
+ */
+function jsonSafe(value: unknown, column: string, at: string, path: string): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value))
+      throw new AdminReadError(
+        `${at} carries ${path} inside \`${column}\` as ${String(value)}, which JSON has no ` +
+          'representation for',
+      );
+    return value;
+  }
+  if (Array.isArray(value))
+    return value.map((item, index) => jsonSafe(item, column, at, `${path}[${String(index)}]`));
+  const record = plainRecord(value);
+  if (record === null)
+    throw new AdminReadError(
+      `${at} carries ${path} inside \`${column}\` as a ${typeof value}, which \`canonicalJson\` ` +
+        'cannot render. The pack IS those bytes and `content_sha256` is the digest over exactly ' +
+        'them, so a value that renders wrongly is an exhibit that is wrong and self-consistent',
+    );
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(record))
+    out[key] = jsonSafe(item, column, at, `${path}.${key}`);
+  return out;
+}
+
+/** One row, as its map names it and in the map's own order. */
+function projectRow(row: unknown, columns: EvidenceColumnMap, at: string): EvidenceRow {
+  const out: Record<string, unknown> = {};
+  for (const [property, spec] of Object.entries(columns)) {
+    const [column, kind] = spec;
+    const value = cellOf(row, property, at);
+    const optional = kind.endsWith('?');
+    if (optional && (value === null || value === undefined)) {
+      out[column] = null;
+      continue;
+    }
+    switch (kind) {
+      case 'text':
+      case 'text?':
+        out[column] = nonEmptyText(value, column, at);
+        break;
+      case 'bigid':
+      case 'bigid?':
+        out[column] = bigId(value, column, at);
+        break;
+      case 'int':
+      case 'int?':
+        out[column] = exactInteger(value, column, at);
+        break;
+      case 'bool':
+        if (typeof value !== 'boolean')
+          throw new AdminReadError(
+            `${at} carries \`${column}\` as ${JSON.stringify(String(value))} and the column is ` +
+              '`boolean NOT NULL`. A gate rendered from a value that is neither is a gate an ' +
+              'exhibit states wrongly',
+          );
+        out[column] = value;
+        break;
+      case 'day':
+      case 'day?':
+        out[column] = tradingDayText(value, column, at);
+        break;
+      case 'instant':
+      case 'instant?':
+        out[column] = isoInstant(value, column, at);
+        break;
+      case 'json':
+        out[column] = jsonSafe(value, column, at, '$');
+        break;
+      case 'digest':
+        out[column] = hexDigest(value, column, at);
+        break;
+    }
+  }
+  return out;
+}
+
+// -----------------------------------------------------------------------------
+// The ordering
+// -----------------------------------------------------------------------------
+
+/**
+ * Oldest first, ties broken on the row's own surrogate key.
+ *
+ * `account.ts`'s `chronologically` and its reason: the drill-down and the pack
+ * are both read FORWARDS, because a dispute about a specific day is worked from
+ * before it to after it. The tie-break is a `bigid`, so it is compared as a
+ * number: `"10"` sorts before `"9"` as text.
+ */
+function oldestFirst(
+  rows: readonly EvidenceRow[],
+  instantColumn: string,
+  idColumn: string,
+): readonly EvidenceRow[] {
+  return [...rows].sort((left, right) => {
+    const a = String(left[instantColumn] ?? '');
+    const b = String(right[instantColumn] ?? '');
+    if (a !== b) return a < b ? -1 : 1;
+    const leftId = String(left[idColumn] ?? '0');
+    const rightId = String(right[idColumn] ?? '0');
+    if (leftId === rightId) return 0;
+    return BigInt(leftId) < BigInt(rightId) ? -1 : 1;
+  });
+}
+
+// -----------------------------------------------------------------------------
+// The read
+// -----------------------------------------------------------------------------
+
+/**
+ * What one subject read cost.
+ *
+ * `flags.ts`'s, `graph.ts`'s, `events.ts`'s and `account.ts`'s choice: the port's
+ * signature is the contract's and has nowhere to carry it, and a measurement the
+ * suite asserts on is worth more than one only a log carries.
+ *
+ * `identityFlags` AND `flags` ARE BOTH REPORTED because the difference is what
+ * the account narrowing removed, and `clauseSources` is what the two enforcement
+ * reads found -- both are the prices of rulings this module inherits rather than
+ * makes, so both are visible.
+ */
+export interface EvidenceSubjectCost {
+  readonly fills: number;
+  readonly marks: number;
+  readonly ruleStates: number;
+  readonly identityFlags: number;
+  readonly flags: number;
+  readonly payoutRequests: number;
+  readonly restrictionEpisodes: number;
+  readonly clauseSources: number;
+  readonly detectorRuns: number;
+}
+
+/** {@link readEvidenceSubject}'s subject, plus what it cost. */
+export interface EvidenceSubjectResult {
+  readonly subject: EvidenceSubject;
+  readonly cost: EvidenceSubjectCost;
+}
+
+/**
+ * Every ToS clause each flag is cited under, by flag id.
+ *
+ * TWO KEYED READS AND NO MAP FROM `flag_type`. See the header. The payout leg is
+ * account-scoped because a hold is a decision about one account's payout; the
+ * restriction leg is identity-scoped because ADR-041's episode is about the
+ * person. Neither read's ROWS enter the pack.
+ */
+function clausesByFlag(
+  payouts: readonly unknown[],
+  episodes: readonly unknown[],
+): ReadonlyMap<string, ReadonlySet<string>> {
+  const clauses = new Map<string, Set<string>>();
+  const add = (flagId: string, clause: string): void => {
+    const existing = clauses.get(flagId);
+    if (existing === undefined) clauses.set(flagId, new Set([clause]));
+    else existing.add(clause);
+  };
+
+  for (const row of payouts) {
+    const at = 'a payout_requests row';
+    const flagId = cellOf(row, 'holdFlagId', at);
+    const clause = cellOf(row, 'holdTosClause', at);
+    // BOTH OR NEITHER, WHICH IS `payout_requests_hold_is_complete` ITSELF: a
+    // hold carries a cited flag AND a clause AND a reason, and a row that is
+    // not held carries none of them.
+    if (flagId === null || flagId === undefined) continue;
+    add(nonEmptyText(flagId, 'hold_flag_id', at), nonEmptyText(clause, 'hold_tos_clause', at));
+  }
+
+  for (const row of episodes) {
+    const at = 'an identity_restriction_episodes row';
+    // BOTH `NOT NULL` on this table (0031), so a missing one is a refusal
+    // rather than a skip.
+    add(
+      nonEmptyText(cellOf(row, 'flagId', at), 'flag_id', at),
+      nonEmptyText(cellOf(row, 'tosClause', at), 'tos_clause', at),
+    );
+  }
+
+  return clauses;
+}
+
+/** The one clause a flag is cited under, or `null`, and never a guess. */
+function clauseFor(
+  flagId: string,
+  clauses: ReadonlyMap<string, ReadonlySet<string>>,
+): string | null {
+  const found = [...(clauses.get(flagId) ?? [])].sort();
+  if (found.length === 0) return null;
+  if (found.length === 1) return found[0] ?? null;
+  throw new EvidenceExportError(
+    `flag \`${flagId}\` is cited under ${String(found.length)} different ToS clauses by the ` +
+      'enforcements that reference it, and `EvidenceFlagRecord.tos_clause` is one string. A pack ' +
+      'stating one of them would cite a rule the firm did not cite for the other enforcement, ' +
+      'and GS-112 requires the clause rather than a choice between clauses',
+  );
+}
+
+/**
+ * `detector_definitions`, whole. THE STRIP LIST'S SOURCE.
+ *
+ * `rows` AND NOT A FILTER. `INV-M7-10`'s list is the UNION over every
+ * `is_sensitive` row, so a read narrowed to the detectors that flagged THIS
+ * account would compute a strip list missing every name only another detector
+ * claims -- and `sensitiveParameterNames` says why that matters: `severity` and
+ * `window_trading_days` belong to several detectors at once.
+ */
+export async function readEvidenceDetectorRegistry(
+  tx: EvidenceTx,
+): Promise<readonly DetectorRegistryRow[]> {
+  return (await tx.rows('detectorDefinitions')).map((row) => {
+    const at = 'a detector_definitions row';
+    const isSensitive = cellOf(row, 'isSensitive', at);
+    if (typeof isSensitive !== 'boolean')
+      throw new AdminReadError(
+        `${at} carries \`is_sensitive\` as ${JSON.stringify(String(isSensitive))} and the column ` +
+          'is `boolean NOT NULL DEFAULT true`. INV-M7-10 computes the strip list from exactly ' +
+          'that column, so a row it cannot read is a name that would not be stripped',
+      );
+    return {
+      detector: nonEmptyText(cellOf(row, 'detector', at), 'detector', at),
+      version: nonEmptyText(cellOf(row, 'version', at), 'version', at),
+      parameters: jsonSafe(cellOf(row, 'parameters', at), 'parameters', at, '$'),
+      is_sensitive: isSensitive,
+    };
+  });
+}
+
+/**
+ * Everything one pack is built from, for ONE account, with the cost attached.
+ *
+ * `null` WHEN THE ACCOUNT IS NOT THERE, which the route answers 404. An account
+ * that has never traded is NOT that case: it is a subject whose list sections
+ * are empty, and a pack that refused it would tell an operator that an account
+ * opened this morning does not exist.
+ *
+ * **THE FLAG SET IS THE ACCOUNT'S PLUS THE PERSON'S, WHICH IS `account.ts`'s
+ * NARROWING AND IS ADOPTED RATHER THAN REINVENTED.** `risk_flags.account_id` is
+ * nullable, `IS NULL` is not a term this directory can mint, so the read is a
+ * keyed read on the identity plus one predicate in memory. `full-detail`'s own
+ * docblock rules the boundary: "the subject is ONE ACCOUNT ... `full-detail`
+ * bounds the DETAIL and never the SCOPE".
+ */
+export async function readEvidenceSubject(
+  tx: EvidenceTx,
+  accountId: string,
+): Promise<EvidenceSubjectResult | null> {
+  const accountRow = await tx.rowAt('accounts', { id: accountId });
+  if (accountRow === undefined || accountRow === null) return null;
+
+  const account = projectRow(
+    accountRow,
+    EVIDENCE_COLUMNS['accounts'] ?? {},
+    `account \`${accountId}\``,
+  );
+  const identityId = String(account['identity_id']);
+  const planVersionId = String(account['plan_version_id']);
+
+  const identityRow = await tx.rowAt('identities', { id: identityId });
+  // AN ACCOUNT WHOSE PERSON IS NOT THERE IS A REFUSAL AND NOT AN EMPTY SECTION.
+  // `accounts.identity_id` REFERENCES `identities(id)`, so this cannot happen
+  // while the constraint holds, and a pack whose subject section is blank is an
+  // exhibit that says the firm does not know who this is.
+  if (identityRow === undefined || identityRow === null)
+    throw new AdminReadError(
+      `account \`${accountId}\` names identity \`${identityId}\`, which has no \`identities\` ` +
+        'row. `accounts.identity_id` references that table, so the estate and the database ' +
+        'disagree and this pack cannot be built',
+    );
+
+  const planVersionRow = await tx.rowAt('planVersions', { id: planVersionId });
+  // `GS-112` REQUIRES THE PLAN'S RULE TEXT, so a missing pinned version is a
+  // pack that cannot make the claim it exists to make, rather than a section to
+  // leave out. `accounts.plan_version_id` is `uuid NOT NULL`.
+  if (planVersionRow === undefined || planVersionRow === null)
+    throw new AdminReadError(
+      `account \`${accountId}\` pins plan version \`${planVersionId}\`, which has no ` +
+        "`plan_versions` row. GS-112 requires the pack to carry the plan's rule text, and a " +
+        'pack that omits the rule it is arguing about proves nothing',
+    );
+
+  const fills = (await tx.rowsWhere('fills', { accountId })).map((row) =>
+    projectRow(row, EVIDENCE_COLUMNS['fills'] ?? {}, `a fills row of account \`${accountId}\``),
+  );
+  const marks = (await tx.rowsWhere('dailyMarks', { accountId })).map((row) =>
+    projectRow(
+      row,
+      EVIDENCE_COLUMNS['dailyMarks'] ?? {},
+      `a daily_marks row of account \`${accountId}\``,
+    ),
+  );
+  const ruleStates = (await tx.rowsWhere('ruleStates', { accountId })).map((row) =>
+    projectRow(
+      row,
+      EVIDENCE_COLUMNS['ruleStates'] ?? {},
+      `a rule_states row of account \`${accountId}\``,
+    ),
+  );
+
+  const payouts = await tx.rowsWhere('payoutRequests', { accountId });
+  const episodes = await tx.rowsWhere('identityRestrictionEpisodes', { identityId });
+  const clauses = clausesByFlag(payouts, episodes);
+
+  const identityFlagRows = await tx.rowsWhere('riskFlags', { identityId });
+
+  // THE DETECTOR AND ITS VERSION LIVE ON THE RUN AND NOT ON THE FLAG.
+  // `risk_flags` carries `detector_run_id` and `detector_runs` carries both
+  // names, which is `flags.ts`'s reading of the same two tables. The runs are
+  // fetched ONE PER DISTINCT id rather than by reading the table: that table is
+  // one row per detector per night over the whole population.
+  const runIds = new Set<string>();
+  for (const row of identityFlagRows) {
+    const runId = cellOf(row, 'detectorRunId', 'a risk_flags row');
+    if (runId !== null && runId !== undefined)
+      runIds.add(nonEmptyText(runId, 'detector_run_id', 'a risk_flags row'));
+  }
+  const detectorByRun = new Map<string, { detector: string; version: string }>();
+  for (const runId of [...runIds].sort()) {
+    const run = await tx.rowAt('detectorRuns', { id: runId });
+    if (run === undefined || run === null) continue;
+    const at = `detector run \`${runId}\``;
+    detectorByRun.set(runId, {
+      detector: nonEmptyText(cellOf(run, 'detector', at), 'detector', at),
+      version: nonEmptyText(cellOf(run, 'detectorVersion', at), 'detector_version', at),
+    });
+  }
+
+  const identityFlags: readonly EvidenceFlagRecord[] = identityFlagRows.map((row) => {
+    const flagId = nonEmptyText(cellOf(row, 'id', 'a risk_flags row'), 'id', 'a risk_flags row');
+    const at = `flag \`${flagId}\``;
+    const on = cellOf(row, 'accountId', at);
+    const runId = cellOf(row, 'detectorRunId', at);
+    const run =
+      runId === null || runId === undefined ? undefined : detectorByRun.get(String(runId));
+    return {
+      flag_id: flagId,
+      identity_id: nonEmptyText(cellOf(row, 'identityId', at), 'identity_id', at),
+      account_id: on === null || on === undefined ? null : nonEmptyText(on, 'account_id', at),
+      flag_type: nonEmptyText(cellOf(row, 'flagType', at), 'flag_type', at),
+      severity: exactInteger(cellOf(row, 'severity', at), 'severity', at),
+      status: nonEmptyText(cellOf(row, 'status', at), 'status', at),
+      first_detected_on: tradingDayText(
+        cellOf(row, 'firstDetectedOn', at),
+        'first_detected_on',
+        at,
+      ),
+      // `null` AND NOT A SENTINEL. `flags.ts` renders an unattributed flag as
+      // `UNATTRIBUTED_DETECTOR` because its queue column is a string; this field
+      // is nullable, so the two answers are a value and no value.
+      detector: run?.detector ?? null,
+      detector_version: run?.version ?? null,
+      evidence: jsonSafe(cellOf(row, 'evidence', at), 'evidence', at, '$') as EvidenceRow,
+      tos_clause: clauseFor(flagId, clauses),
+    };
+  });
+
+  const flags = identityFlags.filter(
+    (flag) => flag.account_id === null || flag.account_id === accountId,
+  );
+
+  return {
+    subject: {
+      account_id: accountId,
+      identity_id: identityId,
+      account,
+      identity: projectRow(
+        identityRow,
+        EVIDENCE_COLUMNS['identities'] ?? {},
+        `identity \`${identityId}\``,
+      ),
+      fills: oldestFirst(fills, 'executed_at', 'id'),
+      marks: oldestFirst(marks, 'trading_day', 'id'),
+      rule_states: oldestFirst(ruleStates, 'trading_day', 'id'),
+      plan_version: projectRow(
+        planVersionRow,
+        EVIDENCE_COLUMNS['planVersions'] ?? {},
+        `plan version \`${planVersionId}\``,
+      ),
+      flags: [...flags].sort((left, right) =>
+        left.flag_id === right.flag_id ? 0 : left.flag_id < right.flag_id ? -1 : 1,
+      ),
+    },
+    cost: {
+      fills: fills.length,
+      marks: marks.length,
+      ruleStates: ruleStates.length,
+      identityFlags: identityFlags.length,
+      flags: flags.length,
+      payoutRequests: payouts.length,
+      restrictionEpisodes: episodes.length,
+      clauseSources: clauses.size,
+      detectorRuns: detectorByRun.size,
+    },
+  };
+}
+
+/**
+ * {@link EvidenceReadPort} over one unit of work.
+ *
+ * THE COST IS MEASURED AND DROPPED HERE, which is `composeImplementedAdminReads`'s
+ * choice for the other four reads and is made for its reason: the port's
+ * signatures are the generator's and have nowhere to carry it.
+ *
+ * **THIS IS TWO OF THE THREE PORTS SHORT OF A COMPOSABLE `exportEvidence` AND
+ * THE SECTION HEADER SAYS WHICH TWO.** A deployment holding a store and a writer
+ * hands this in as `EvidenceExporterDeps.reads`; nothing in this tree holds
+ * either, so nothing in this tree calls this function outside its suite.
+ */
+export function evidenceReadPort(tx: EvidenceTx): EvidenceReadPort {
+  return {
+    readSubject: async (accountId) => (await readEvidenceSubject(tx, accountId))?.subject ?? null,
+    readDetectorRegistry: async () => await readEvidenceDetectorRegistry(tx),
   };
 }

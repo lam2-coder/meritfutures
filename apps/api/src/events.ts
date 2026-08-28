@@ -25,11 +25,43 @@
 // entry, and every sentence in this header that said otherwise is corrected
 // above rather than left standing.
 //
-// WHAT HAS NOT MOVED IS WHY THE INSERT IS A PORT. `db.ts` is "THE ONE FILE IN
-// THIS DEPLOYABLE THAT NAMES `@merit/db`" (ADR-120), no writer is composed, and
-// installing one is a slice with its own fence. A registered table removes the
-// REGISTRY's refusal and installs nothing; the sink below still refuses, and
-// refusing is still the correct outcome for a deployment with no writer.
+// THE INSERT IS STILL A PORT AND THE PORT NOW HAS AN ADAPTER, WHICH THIS SESSION
+// COMPOSED. That paragraph read "no writer is composed, and installing one is a
+// slice with its own fence"; this is that slice, the writer is
+// `TRANSACTION_EVENT_WRITER` at the bottom of this file, and
+// `makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock })` writes a row where
+// `UNWIRED_EVENT_SINK` rejects. The port survives the adapter rather than being
+// replaced by it: `UNWIRED_EVENT_SINK` is still the default, because refusing is
+// still the correct outcome for a deployment that installs nothing.
+//
+// AND THE DOOR IS NARROWER THAN THE READ. ADR-191 clause 5 put `events` in
+// `ScopedTableKey`, which is what `rows` and `rowsWhere` are generic over.
+// `ScopedTx.insert` is generic over `OwnedTableKey` and always was, because a
+// scoped insert STAMPS the tenancy column from the handle and an `either` row has
+// two of them and may carry neither; `FirmTx.insert` is generic over
+// `FirmTableKey`; so `SystemTx` is the ONE handle in this workspace that can
+// write this table, and the writer refuses any other by brand. `apps/api`'s own
+// two doors are `scoped` and `firm` and it opens no system door on purpose
+// (ADR-165), so THIS DEPLOYABLE HOLDS NO TRANSACTION THAT CAN CARRY AN EVENT.
+// That is the finding this slice reports and it is not a reason to widen
+// anything: see `EventInsertTx` below, where it is stated where a caller meets
+// it.
+//
+// AND WRITING THE FIRST REAL ROW FOUND A SECOND THING NO SUITE COULD. Against a
+// live PostgreSQL with all 58 migrations applied, FOUR of these eight names write
+// and read back through the `either` predicate; ONE is `payout.freeze_expiring`,
+// refused by `assertTenanted` below; and THREE fail at the DRIVER with
+// `TypeError: Do not know how to serialize a BigInt`. `events.payload` is
+// `jsonb`, drizzle's jsonb mapping is `JSON.stringify`, and `JSON.stringify`
+// refuses a `bigint` outright, while `assertPayloadRules` below REFUSES a
+// `_cents` value that is NOT a `bigint`. The two rules together make every money
+// payload in the catalogue unwritable, and 33 of the 102 readable catalogue rows
+// carry a `_cents` field. NO UNIT TEST COULD SEE IT, because every writer double
+// in every suite records what it is handed and none of them serialises.
+// `assertSerialisablePayload` refuses it by name and states the ruling it needs,
+// which is EVENTS' to give: what a `_cents` value IS inside a `jsonb` payload. A
+// JSON number loses digits above 2^53 and a JSON string is exact but is a format
+// no document states, so neither is invented here.
 //
 // `payout.freeze_expiring` IS THE COUNTEREXAMPLE ADR-191 HAD TO ANSWER AND IT IS
 // ANSWERED RATHER THAN CLOSED. Its catalogue payload is `{ payout_request_id,
@@ -667,16 +699,17 @@ function actor(
 /**
  * The insert, on THIS transaction.
  *
- * THE WHOLE OF WHAT IS BLOCKED, AND IT IS ONE METHOD. An adapter for it is
- * `tx.insert('events', envelope)` and nothing more. THIS PARAGRAPH READ "except
- * that `'events'` is not a `TableKey`, because `packages/db/src/scope.ts`
- * registers no rule for the table" AND ADR-191 MADE THAT FALSE: the sixth scope
- * class it named as the repair is `either`, it exists, and `events` is
- * registered under it. **What is still missing is a composed WRITER**, which is
- * a different thing and a smaller one. So the adapter is still not written here,
- * still not faked here, and the capability is still not reached around: this
- * file's fence is `apps/api/src/events.ts` and installing a writer is a slice
- * with its own.
+ * THE WHOLE OF WHAT WAS BLOCKED, AND IT IS ONE METHOD. The adapter is
+ * `tx.insert('events', envelope)` and nothing more, and it is written:
+ * {@link TRANSACTION_EVENT_WRITER}, at the bottom of this file. THIS PARAGRAPH
+ * READ "except that `'events'` is not a `TableKey`, because
+ * `packages/db/src/scope.ts` registers no rule for the table" AND ADR-191 MADE
+ * THAT FALSE, then read "what is still missing is a composed WRITER" and this
+ * slice made that false too.
+ *
+ * THE PORT STAYS A PORT. `makeEventSink` takes a writer rather than being one,
+ * so a suite substitutes a recorder and a deployment that installs nothing holds
+ * {@link UNWIRED_EVENT_SINK} and says so on its first emit.
  *
  * THE TRANSACTION IS `object` AND THAT IS NOT LAZINESS. This deployable's
  * handles come from `@merit/db`, which this file may not name (ADR-120), and the
@@ -723,8 +756,10 @@ export class EventSinkUnwired extends Error {
       'no event writer is installed, so this deployment cannot record an event. The reason is no ' +
         'longer the scope registry: `events` IS a TableKey since ADR-191, which added the SIXTH ' +
         'scope class `either` for it after all five earlier members were tried against the shape ' +
-        'and each was refused by a mechanical assertion or silently lossy. What is missing is a ' +
-        'composed WRITER, and installing one is a slice with its own fence. Refusing is the ' +
+        'and each was refused by a mechanical assertion or silently lossy. A composed WRITER now ' +
+        'exists as well: install `makeEventSink({ writer: TRANSACTION_EVENT_WRITER, clock })` and ' +
+        'this rejection goes away. What is missing is the INSTALL, which is a decision about a ' +
+        'deployment rather than a file on disk. Refusing is the ' +
         'correct outcome: the state change is inside the same ' +
         'transaction (ADR-006), so a sink that swallowed the event would roll the fact back with ' +
         "it, and a sink that returned quietly would commit a transition EVENTS' universal rule 1 " +
@@ -767,3 +802,226 @@ export function makeEventSink(deps: { writer: EventWriter; clock: () => Date }):
     },
   };
 }
+
+// -----------------------------------------------------------------------------
+// The writer, composed. This is the slice that was owed
+// -----------------------------------------------------------------------------
+// `EventWriter`'s docblock above said "installing a writer is a slice with its
+// own [fence]" and this is that slice. What it installs is one method over one
+// table, and everything below it is the argument for why the handle it demands
+// is the only handle in this workspace that can carry the write.
+
+/**
+ * The one table this file writes, spelled as a value so the suite can bind it.
+ *
+ * `admin-source/events.ts`'s `EVENT_READ_TABLES` idiom, for its reason: this
+ * file holds no `@merit/db` import, so the string is a claim it cannot check
+ * about itself, and the suite asserts it is a real `TableKey` of that package.
+ * The read side names TWO tables because the disjunction has two legs; a write
+ * names ONE, because a row is written where it lives and reached from wherever
+ * the predicate finds it.
+ */
+export const EVENT_WRITE_TABLE = 'events';
+
+/**
+ * `packages/db`'s brand on the ONE handle whose `insert` reaches this table.
+ *
+ * READ AS A VALUE RATHER THAN IMPORTED AS A TYPE, and the value is the whole
+ * control. `scoped-db.ts` stamps `__brand: 'SystemTx'`, `'ScopedTx'` and
+ * `'FirmTx'` on the three transaction handles it mints, and the suite binds this
+ * literal by reading that file rather than trusting this line.
+ */
+const EVENT_INSERT_BRAND = 'SystemTx';
+
+/**
+ * A transaction that can insert into `events`, which is NOT every transaction.
+ *
+ * THE NARROWING IS THE FINDING AND NOT A CONVENIENCE, so it is stated here where
+ * a caller meets it. `packages/db` mints three transaction handles and their
+ * `insert` methods are generic over three different key sets:
+ *
+ *   `ScopedTx.insert<K extends OwnedTableKey>`  `events` is registered `either`
+ *                                               (ADR-191), not `owned`, so this
+ *                                               handle cannot name the table
+ *   `FirmTx.insert<K extends FirmTableKey>`     `events` is not `firm` either
+ *   `SystemTx.insert<K extends TableKey>`       every registered table, so this
+ *                                               one reaches it
+ *
+ * `insertUnder` IS NOT A FOURTH DOOR AND WAS CHECKED RATHER THAN ASSUMED.
+ * `ParentedTableKey` is `Extract<DerivedTableKey, 'sessions'>`, a closed list of
+ * one, and `insertUnderStatement` refuses a non-`derived` class in terms that
+ * name this one: "an either row has one [parent] through a NULLABLE edge, so
+ * proving it establishes tenancy for the rows that have a parent and nothing
+ * about the rows that reach an identity the other way".
+ *
+ * SO THE SCOPE CLASS THAT MADE THE TABLE READABLE IS NOT THE ONE THAT MAKES IT
+ * WRITABLE. ADR-191 clause 5 put `events` in `ScopedTableKey`, which is what
+ * `rows` and `rowsWhere` are generic over; `insert` on the scoped handle is
+ * generic over `OwnedTableKey` and always was, because a scoped insert STAMPS
+ * the tenancy column from the handle and an `either` row has two of them and may
+ * carry neither. That is not a gap this file may close.
+ */
+export interface EventInsertTx {
+  insert(
+    key: typeof EVENT_WRITE_TABLE,
+    values: Readonly<Record<string, unknown>>,
+  ): Promise<unknown[]>;
+}
+
+/**
+ * Refuse a handle that cannot carry this write, BEFORE the statement is built.
+ *
+ * WITHOUT THIS THE WRONG HANDLE STILL FAILS, AND IT FAILS SOMEWHERE USELESS. A
+ * `ScopedTx` has an `insert` method at run time, so duck-typing admits it, and
+ * `scopedInsertStatement` then throws `refuseTenancyColumn`'s message: `"identityId"
+ * is events' tenancy column ... and a scoped write never takes it from the
+ * caller`. That sentence is true and it describes a rule about SCOPED writes to
+ * somebody who was never allowed to make one, so the reader repairs the payload
+ * instead of the door. This refuses at the door and names the door.
+ *
+ * IT IS A BRAND CHECK AND NOT A SHAPE CHECK, because the shapes do not separate:
+ * all three handles carry `insert(key, values)` and the difference between them
+ * is entirely in a type parameter, which is gone by the time a value arrives
+ * here. The brand is the only thing on the value itself that tells them apart.
+ *
+ * A HANDLE CARRYING NO BRAND IS REFUSED TOO, rather than admitted as "not
+ * `packages/db`'s to judge". A sink is installed once per deployment and the
+ * thing on the other side of it is an append-only money record; admitting an
+ * unknown object because it happens to have an `insert` is how a recorder ships
+ * to production.
+ */
+function assertEventInsertTx(tx: object, name: EventName): asserts tx is EventInsertTx {
+  const brand: unknown = '__brand' in tx ? tx.__brand : undefined;
+  if (brand !== EVENT_INSERT_BRAND)
+    throw new EventError(
+      `${name} was handed a transaction branded ${JSON.stringify(brand)} and \`events\` is ` +
+        `written through a \`${EVENT_INSERT_BRAND}\` and through nothing else. ADR-191 clause 5 ` +
+        'made this table READABLE from the scoped handle and did not make it writable from one: ' +
+        '`ScopedTx.insert` is generic over `OwnedTableKey` because a scoped insert STAMPS the ' +
+        'tenancy column from the handle, and an `either` row has two tenancy columns and may ' +
+        'carry neither, so there is nothing to stamp. `FirmTx.insert` is generic over ' +
+        '`FirmTableKey` and this table is not firm. THE REPAIR IS THE DOOR AND NOT THIS CHECK: ' +
+        'emit inside the transaction that already writes the fact, and where that transaction is ' +
+        'a scoped one, the deployable holding it cannot record an event at all and that is the ' +
+        'finding rather than a reason to widen anything here',
+    );
+  if (!('insert' in tx) || typeof tx.insert !== 'function')
+    throw new EventError(
+      `${name} was handed a \`${EVENT_INSERT_BRAND}\` with no \`insert\` method. The brand says ` +
+        'this is the write handle and the shape says it is not, so `packages/db` and this file ' +
+        'have drifted rather than the caller being wrong',
+    );
+}
+
+/**
+ * The first `bigint` in a payload, by path, or `undefined`.
+ *
+ * WALKED THE WAY `assertPayloadRules` WALKS, and for the same reason: the money
+ * this rule is about is nested. `payout.approved` carries `gate_results` as an
+ * object and `ledger.transaction_posted` carries an `entries` ARRAY of
+ * `{ ledger_account_code, amount_cents }`, so a check that stopped at the top
+ * level would pass the exact payload the rule exists for.
+ */
+function firstBigint(value: unknown, path = 'payload'): string | undefined {
+  if (typeof value === 'bigint') return path;
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      const found = firstBigint(item, `${path}[${index}]`);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  }
+  if (value === null || typeof value !== 'object') return undefined;
+  for (const [key, nested] of Object.entries(value)) {
+    const found = firstBigint(nested, `${path}.${key}`);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Refuse a payload no `jsonb` column can be handed, and name the ruling it needs.
+ *
+ * THIS IS A FINDING RATHER THAN A RULE, AND IT WAS FOUND BY WRITING A REAL ROW.
+ * `events.payload` is `jsonb` (`schema.ts`), drizzle's jsonb mapper is
+ * `JSON.stringify(value)`, and `JSON.stringify` THROWS on a `bigint`:
+ * `TypeError: Do not know how to serialize a BigInt`. Meanwhile
+ * {@link assertPayloadRules} REFUSES a `_cents` value that is not a `bigint`,
+ * because `Cents` is `bigint` everywhere in this tree and a `number` reaching
+ * here may already have lost digits. SO THE TWO RULES TOGETHER MAKE EVERY MONEY
+ * PAYLOAD UNWRITABLE, and that is stated here rather than discovered as a driver
+ * `TypeError` on a money path in production.
+ *
+ * NO UNIT TEST COULD SEE IT. Every writer double in every suite is a function
+ * that records what it was handed; none of them serializes, so the producer and
+ * its fixtures are green over a payload the storage layer cannot take.
+ *
+ * THE REPAIR IS A RULING AND IT IS NOT THIS FILE'S. What a `_cents` value looks
+ * like INSIDE a `jsonb` payload is EVENTS' to say and EVENTS is frozen: a JSON
+ * number loses digits above 2^53, which is the constitution's no-floats rule in
+ * a financial path, and a JSON string is exact but is a wire format no document
+ * states and every consumer would have to know. Inventing either here would put
+ * a format in a forever-retained column on a producer's authority, which is
+ * ADR-159 clause 1's refusal. So this REFUSES and names the question.
+ *
+ * IT BREAKS NO CALLER, and that is measured rather than hoped: of the eight
+ * names this producer carries, THREE carry a `_cents` field and all three
+ * already fail at the driver today. This changes the message and not the
+ * outcome.
+ */
+function assertSerialisablePayload(row: EventEnvelope): void {
+  const at = firstBigint(row.payload);
+  if (at === undefined) return;
+  throw new EventError(
+    `${row.eventName} carries a bigint at \`${at}\` and \`events.payload\` is a \`jsonb\` ` +
+      'column, whose driver mapping is `JSON.stringify`, which refuses a BigInt outright. THIS ' +
+      'IS A CONTRADICTION BETWEEN TWO RULES AND NOT A CALLER ERROR: EVENTS section 1 puts ' +
+      'integer cents in `_cents` fields, `Cents` is `bigint`, and `assertPayloadRules` above ' +
+      'REFUSES a `_cents` value that is not one, because a `number` reaching here may already ' +
+      'have lost digits. So every money payload in the catalogue is unwritable, and no suite ' +
+      'could see it because a writer double never serialises. THE REPAIR IS A RULING ON WHAT A ' +
+      '`_cents` VALUE IS INSIDE A `jsonb` PAYLOAD, which EVENTS has to give: a JSON number loses ' +
+      'digits above 2^53 and a JSON string is exact but is a format no document states. This ' +
+      'file invents neither',
+  );
+}
+
+/**
+ * The writer, over the transaction it is handed and over nothing else.
+ *
+ * IT OPENS NO DOOR, WHICH IS WHY IT CAN LIVE IN A FILE THAT NAMES NO PACKAGE.
+ * `db.ts` is "THE ONE FILE IN THIS DEPLOYABLE THAT NAMES `@merit/db`" (ADR-120)
+ * and what that convention protects is the ACQUISITION of a handle: `db.test.ts`
+ * asserts that no file but that one takes `firmDb`, `scopedDb`, `systemDb` or
+ * `transaction`. This takes none of them. It receives a handle the caller
+ * already opened, which is `admin-source/events.ts`'s disposition three files
+ * over and the same argument: a module that names a table key and a method is an
+ * ADAPTER, and the suite binds both halves where `@merit/db` is reachable.
+ *
+ * THE ENVELOPE IS THE VALUES OBJECT AND THAT IS NOT A COINCIDENCE.
+ * {@link EventEnvelope} is declared "by Drizzle property name" and every one of
+ * its eleven fields is a property `schema.ts` declares on `events`; the three
+ * columns it omits are `id`, `recordedAt` and `createdAt`, which are generated
+ * or defaulted, and `id` REFUSES a supplied value. The suite reads `schema.ts`
+ * and asserts both halves of that, so a column added to the table without a
+ * field here is red rather than silently unwritten.
+ *
+ * ONE ROW COMES BACK OR THIS THROWS. `unscopedInsertStatement(...).returning()`
+ * yields the rows it wrote, and a write that inserted nothing is the failure this
+ * whole file exists to make impossible: the state change would commit and its
+ * event would not, which is EVENTS section 1's rule inverted.
+ */
+export const TRANSACTION_EVENT_WRITER: EventWriter = {
+  async insert(tx: object, row: EventEnvelope): Promise<void> {
+    assertEventInsertTx(tx, row.eventName);
+    assertSerialisablePayload(row);
+    const written = await tx.insert(EVENT_WRITE_TABLE, { ...row });
+    if (written.length !== 1)
+      throw new EventError(
+        `${row.eventName} wrote ${written.length} rows to \`${EVENT_WRITE_TABLE}\` where exactly ` +
+          'one was expected. The insert returns what it wrote, so a count that is not one means ' +
+          'the fact is about to commit without the event that records it, which is EVENTS ' +
+          'section 1 read backwards',
+      );
+  },
+};
