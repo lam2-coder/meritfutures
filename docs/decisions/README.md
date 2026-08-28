@@ -189,6 +189,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-168](ADR-168.md) | three reads `apps/portal` names and `API_CONTRACT` does not define, and they do not have the same answer (2026-08-27, status: proposed) |
 | [ADR-169](ADR-169.md) | the payout-destination cooling window gets a registry, and `cooling_until` is `NOT NULL` because a nullable one fails OPEN  (2026-08-27, status: proposed) |
 | [ADR-170](ADR-170.md) | the verification page enters the contract, and the field that addressed it for two weeks now resolves (2026-08-27, status: proposed) |
+| [ADR-172](ADR-172.md) | the ledger handle a request handler cannot hold, and the store that was already built (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
