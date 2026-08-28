@@ -196,11 +196,31 @@ describe('M6-A-63: the one read section 8 does not type renders no field of itse
     // the whole set must be `length`. A field name added later is a new member
     // here and turns this red, which is the failure a header sentence cannot
     // catch.
-    const accesses = [...code(MODULE).matchAll(/\bvalue\.\w+/g)].map((match) => match[0]);
+    const accesses = [...code(MODULE).matchAll(/\bvalue(?:\.\w+|\[[^\]]*\])/g)].map(
+      (match) => match[0],
+    );
     expect([...new Set(accesses)]).toStrictEqual(['value.length']);
   });
 
-  test('a scalar sitting inside a section never reaches the bytes', () => {
+  test('a scalar sitting inside a section never reaches the bytes, member or field', () => {
+    // TWO SHAPES AND NOT ONE. `SEEDED_MEMBER` is a section whose entries are
+    // scalars, which is the shape an index access would put on the page;
+    // `DETAIL`'s own sections are objects, which is the shape a field read
+    // would. A seeded `value[0]` passed the first draft of the source sweep
+    // above AND passed this case while it looked only at field values, which is
+    // how both halves were found.
+    const scalars = {
+      ...DETAIL,
+      marks: ['seeded-mark-member'],
+      events: ['seeded-event-member'],
+    };
+    const served = text(servedBytes({ ...PAGE, detail: scalars }));
+    expect(served).not.toContain('seeded-mark-member');
+    expect(served).not.toContain('seeded-event-member');
+    expect(served).toContain('marks: 1 entries');
+  });
+
+  test('a scalar sitting inside a section object never reaches the bytes', () => {
     // THE RUN-TIME LEG, AND IT FAILS AT A DIFFERENT TIME FROM THE ONE ABOVE. The
     // source sweep catches a field read written into this module; this catches a
     // value that reached the page by any other route, including one a future
