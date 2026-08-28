@@ -1589,6 +1589,300 @@ export function resolutionDb(): ResolutionDb {
   };
 }
 
+// =============================================================================
+// ESTABLISHING AN IDENTITY (ADR-197)
+// =============================================================================
+// THE THIRD CONSTRUCTION, WHICH THE SECTION ABOVE NAMED AND DECLINED TO BUILD.
+// It declined on `job-queue.ts`'s rule -- a primitive admitted before a caller
+// exists is a primitive nobody can remove -- and the words it used were "there
+// is no caller". ADR-196 IS THE CALLER SPECIFICATION: it rules the moment
+// (`POST /auth/verify`, on a code that verifies, when the address resolves to no
+// existing `users` row), the unit of work, and the contents of the row. A ruling
+// that names all three is what ADR-112 accepted as a caller for `insertUnder`,
+// and it is what admits this.
+//
+// -----------------------------------------------------------------------------
+// CLAUSE 2 IS ENFORCED BY THE SHAPE OF THIS DOOR AND BY NOTHING ELSE
+// -----------------------------------------------------------------------------
+// ADR-196 clause 2 is "the identity row and its `users` row are ONE UNIT OF
+// WORK". Section 8 of that entry WROTE the `DEFERRABLE INITIALLY DEFERRED`
+// constraint trigger that would enforce it, measured that it works, and refused
+// it on three grounds -- the first of which is that it breaks
+// `probe_ledger_constraints.sql`, the acceptance script for `0054`'s own
+// trigger. So the entry shipped with its own approval line saying clause 2 is
+// "the only clause with no enforcement behind it... prose that the first
+// implementer of `verifyOtp` can violate with a green test suite".
+//
+// THIS DOOR IS WHERE THAT STOPS BEING TRUE, AND IT COSTS NO DDL. `establish` is
+// ONE METHOD that issues BOTH inserts, and `EstablishmentTx` carries no other
+// verb: there is no `insert`, no `updateAt`, no `rowAt` and no executor. A
+// caller therefore has no way to write an `identities` row without the `users`
+// row that goes with it, because the only statement that writes the first is the
+// statement that writes the second. The invariant moved from a constraint
+// nobody could remove into a construction nobody can misuse.
+//
+// -----------------------------------------------------------------------------
+// AND THE RACE IS PAID FOR BY THE SAME SENTENCE
+// -----------------------------------------------------------------------------
+// ADR-196's named landmine is that two concurrent verifications of one address
+// must produce ONE identity, that only `users_email_key` stands between that and
+// two, and that each loser costs FOUR PERMANENT ROWS under `ON DELETE RESTRICT`
+// -- one `identities` plus three `ledger_accounts` from `0054`'s trigger.
+//
+// WHAT MAKES THIS WRITE IDEMPOTENT IS THAT THE UNIQUE VIOLATION IS ALLOWED TO
+// RAISE. `users_email_key` fires inside the same transaction as the `identities`
+// insert, so the ROLLBACK takes the identity row and all three ledger accounts
+// with it, and the loser of a race pays ZERO permanent rows rather than four.
+// Clause 2 is not merely tidy: it is the mechanism.
+//
+// SO `ON CONFLICT DO NOTHING` IS REFUSED BY NAME. It does not raise, so the
+// transaction would COMMIT with the `identities` row and no `users` row -- which
+// is precisely the state clause 2 forbids, and it is permanent, unreachable and
+// undeletable under `ON DELETE RESTRICT` with retention "forever (financial
+// counterparty record)" (`0002:82-85`). The lenient spelling is the one that
+// costs the four rows the strict spelling refunds.
+//
+// A READ-THEN-WRITE IS REFUSED FOR THE SAME REASON AND IT IS NOT HERE TO
+// REFUSE. `resolutionDb` is the read and it is a SEPARATE door with no
+// `transaction` overload, so a handler that resolves first is doing so in
+// another unit of work and this one still lets the constraint arbitrate.
+
+/**
+ * `users.email_normalized`, per the column's own definition.
+ *
+ * `0002_identity.sql:250-253`: "Dots and plus-tags stripped: the entity-resolution
+ * key. Indexed but deliberately NOT unique. Two people can legitimately share a
+ * normalized form, so it is a SIGNAL, not a constraint, and making it unique
+ * would refuse service to the second of them."
+ *
+ * IT IS DELIBERATELY LOSSY AND THE COLUMN SAYS SO. Stripping dots is a Gmail
+ * rule applied to every domain, which over-merges; the column is non-unique
+ * exactly because over-merging must not refuse anybody, so the imprecision is
+ * inside the design rather than a defect in this function.
+ *
+ * THE FOLD HERE IS `toLowerCase` AND THE ONE IN THE OTP DIGEST IS ASCII ONLY,
+ * and the difference is not an inconsistency. This value is only ever compared
+ * by `citext`, which folds case itself, so a locale-dependent fold cannot make
+ * two equal addresses unequal. A MAC input has no such forgiveness, which is
+ * why that one folds only where every locale agrees.
+ */
+export function normalizedEmail(email: string): string {
+  const folded = email.trim().toLowerCase();
+  const at = folded.lastIndexOf('@');
+  if (at <= 0 || at === folded.length - 1) return folded;
+  const local = folded.slice(0, at);
+  const domain = folded.slice(at + 1);
+  const stripped = (local.split('+')[0] ?? '').replace(/\./g, '');
+  // A LOCAL PART THAT IS ENTIRELY A TAG KEEPS ITS ADDRESS. `+tag@example.com`
+  // would normalize to `@example.com`, which is a resolution key naming a
+  // DOMAIN rather than a person, and the column is non-unique so nothing would
+  // object. Falling back leaves a worse signal rather than a wrong one.
+  if (stripped === '') return folded;
+  return `${stripped}@${domain}`;
+}
+
+/**
+ * The address an establishment is performed AT.
+ *
+ * IT IS THE RESOLUTION ADDRESS AND NOT A SECOND VOCABULARY. The door that finds
+ * nobody and the door that creates somebody are addressed identically, on
+ * purpose: the handler's branch is "resolve, and if that answered nothing,
+ * establish AT THE SAME ADDRESS", and two vocabularies for one address is how
+ * the two halves of one `if` come to disagree about what they are keyed on.
+ * `refuseUnresolvableAddress` is the shared guard and `RESOLUTION_ADDRESS` is
+ * the shared list.
+ */
+export interface EstablishmentAddress {
+  /** `users.email`, exactly as the person typed it. `citext`, and `UNIQUE`. */
+  readonly email: string;
+}
+
+/** What an establishment produced. Both ids, because the caller needs both. */
+export interface EstablishedIdentity {
+  /** `identities.id`. `VerifyResponse.identity_id`. */
+  readonly identityId: string;
+  /** `users.id`. `VerifyResponse.user_id`. */
+  readonly userId: string;
+}
+
+/**
+ * Raised when the address was established while this transaction was running.
+ *
+ * IT IS A TYPED OUTCOME AND NOT A 500, and translating it here rather than at
+ * the handler is what stops every caller re-deriving which `constraint` name
+ * means "somebody else won". The transaction is already rolled back by the time
+ * a caller sees this: the four rows the loser wrote are gone.
+ *
+ * `is_new` IS `false` ON THIS PATH. ADR-196 clause 4 says `is_new` is true on
+ * exactly the call that performed clause 1, and the call that raised this did
+ * not perform it.
+ */
+export class IdentityAlreadyEstablished extends Error {
+  /** The address that was already taken. */
+  readonly email: string;
+
+  constructor(email: string, options?: { readonly cause?: unknown }) {
+    super(
+      `${email} already has a users row. \`users_email_key\` arbitrated a race and this ` +
+        'transaction lost it, so the identity row and the three ledger_accounts rows ' +
+        "0054's trigger wrote have been rolled back. Resolve the address and answer " +
+        '`is_new: false`.',
+      options,
+    );
+    this.name = 'IdentityAlreadyEstablished';
+    this.email = email;
+  }
+}
+
+/** `users_email_key`, the `UNIQUE` at `0002_identity.sql:248`. Spelled once. */
+const USERS_EMAIL_KEY = 'users_email_key';
+
+/**
+ * Whether this is the ONE violation that means "somebody else got here first".
+ *
+ * THE CONSTRAINT NAME IS MATCHED AND NOT ONLY THE SQLSTATE, because `users`
+ * carries two unique keys and `23505` on `users_pkey` is a uuid collision rather
+ * than a race. Translating that one into "already established" would answer
+ * `is_new: false` for an address nobody holds. A rename makes this stop
+ * translating and surface the raw error, which is the fail-safe direction: a 500
+ * on a rare path beats a wrong answer on the money path.
+ *
+ * THE `cause` CHAIN IS WALKED AND THE FIRST DRAFT DID NOT WALK IT, WHICH IS THE
+ * DEFECT THE RACE MEASUREMENT CAUGHT. Drizzle does not re-raise the driver's
+ * error: it throws its own, carrying `code` and `constraint` one level down in
+ * `cause`. A version reading only the top level therefore matched NOTHING, and
+ * it failed in the direction that looks fine -- the rollback still refunded the
+ * four rows, so every row count was correct and only the error's TYPE was wrong.
+ * A handler branching on that type would have answered 500 to every second
+ * verification of a racing address instead of `is_new: false`.
+ */
+function isEmailAlreadyTaken(cause: unknown): boolean {
+  // BOUNDED, because a `cause` chain is somebody else's data structure and a
+  // cycle in one would hang the error path rather than the happy path, which is
+  // the worst place in this file to put an unbounded loop.
+  let at: unknown = cause;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (typeof at !== 'object' || at === null) return false;
+    const err = at as {
+      readonly code?: unknown;
+      readonly constraint?: unknown;
+      readonly cause?: unknown;
+    };
+    if (err.code === '23505' && err.constraint === USERS_EMAIL_KEY) return true;
+    at = err.cause;
+  }
+  return false;
+}
+
+/** One `id` off a `RETURNING`, or a throw naming the table. */
+function returnedId(rows: readonly unknown[], key: TableKey): string {
+  const row = rows[0];
+  if (rows.length !== 1 || typeof row !== 'object' || row === null)
+    throw new Error(
+      `an insert into ${key} returned ${String(rows.length)} rows. Establishment writes exactly ` +
+        'one of each and a different count is a schema this code no longer describes.',
+    );
+  const id = (row as Record<string, unknown>)['id'];
+  if (typeof id !== 'string' || id === '')
+    throw new Error(`${key}.id did not read back as a uuid from its own RETURNING clause.`);
+  return id;
+}
+
+/**
+ * The establishment handle. NO IDENTITY, because creating one is the point.
+ *
+ * IT TAKES NO REASON, on `firmDb()`'s and `resolutionDb()`'s shared precedent:
+ * the question a reason answers is "why are you writing rows that are not
+ * yours", and this handle can perform exactly one act on exactly two tables, so
+ * the honest answer is fixed by the type rather than chosen at the call site.
+ *
+ * ITS BRAND IS DISJOINT FROM THE OTHER FOUR, so it is not assignable to a
+ * `ScopedDb`, a `SystemDb`, a `FirmDb` or a `ResolutionDb`, and none of them is
+ * assignable to it.
+ */
+export interface EstablishmentDb {
+  readonly __brand: 'EstablishmentDb';
+}
+
+/**
+ * The establishment transaction. ONE VERB.
+ *
+ * THE ABSENCE OF EVERY OTHER METHOD IS THE CONTROL. `FirmTx` and `SystemTx`
+ * carry `insert`, `updateAt`, `deleteAt` and an `sqlExecutor`; this carries
+ * `establish` and nothing at all besides. A handle that could write `identities`
+ * freely would be `SystemTx` with a different name, and the reason `identities`
+ * is `class: 'root'` and excluded from `OwnedTableKey` is that "inserting one
+ * CREATES an identity" -- so the door that may is the door that can do nothing
+ * else.
+ */
+export interface EstablishmentTx {
+  readonly __brand: 'EstablishmentTx';
+  /**
+   * Create an identity and its first login, together.
+   *
+   * @throws {IdentityAlreadyEstablished} when `users_email_key` refused the
+   * login. The transaction is rolled back and no row survives.
+   */
+  establish(at: EstablishmentAddress): Promise<EstablishedIdentity>;
+}
+
+/** The handle. There is nothing to configure and that is the point. */
+export function establishmentDb(): EstablishmentDb {
+  return { __brand: 'EstablishmentDb' };
+}
+
+/**
+ * The two statements, in the order the foreign key requires.
+ *
+ * THE `identities` INSERT NAMES NO COLUMN, WHICH IS ADR-196 CLAUSE 3 MADE
+ * STRUCTURAL. `establish` takes no `identities` values and there is no parameter
+ * through which a caller could offer one, so `display_name`,
+ * `max_accounts_override` and `support_contact_ref` stay NULL and
+ * `leaderboard_opt_in` stays `false` because nothing in this file can say
+ * otherwise. Clause 3 reads "the identity row is written with defaults only";
+ * here that is a property of the signature rather than of the caller's care.
+ */
+export function establishmentTx(source: StatementSource): EstablishmentTx {
+  return {
+    __brand: 'EstablishmentTx',
+    async establish(at: EstablishmentAddress): Promise<EstablishedIdentity> {
+      const address = at as unknown as Readonly<Record<string, unknown>>;
+      // THE RESOLUTION DOOR'S OWN GUARD, both directions. A key the vocabulary
+      // does not carry is a caller reaching past it; the declared key missing is
+      // an establishment with no login to write.
+      refuseUnresolvableAddress('users', address);
+      const email = at.email;
+      if (typeof email !== 'string' || email.trim() === '')
+        throw new Error(
+          'an establishment address must carry a non-empty `email`. `users.email` is ' +
+            '`citext NOT NULL UNIQUE` and an identity established without one is the row with ' +
+            'no login that ADR-196 clause 2 exists to refuse.',
+        );
+
+      const created = (await unscopedInsertStatement(
+        source,
+        'identities',
+        {},
+      ).returning()) as unknown[];
+      const identityId = returnedId(created, 'identities');
+
+      try {
+        const login = (await unscopedInsertStatement(source, 'users', {
+          identityId,
+          email,
+          emailNormalized: normalizedEmail(email),
+        }).returning()) as unknown[];
+        return { identityId, userId: returnedId(login, 'users') };
+      } catch (cause) {
+        // TRANSLATED, NEVER SWALLOWED. The throw is what rolls the transaction
+        // back, so this re-raises rather than returning anything.
+        if (isEmailAlreadyTaken(cause)) throw new IdentityAlreadyEstablished(email, { cause });
+        throw cause;
+      }
+    },
+  };
+}
+
 /** Every table the registry reaches through ANOTHER table. Derived, never listed. */
 type DerivedTableKey = {
   [K in TableKey]: (typeof SCOPE_RULES)[K]['class'] extends 'derived' ? K : never;
@@ -2226,8 +2520,19 @@ function poolFromClient(): Pool {
 export function transaction<T>(handle: ScopedDb, fn: (tx: ScopedTx) => Promise<T>): Promise<T>;
 export function transaction<T>(handle: SystemDb, fn: (tx: SystemTx) => Promise<T>): Promise<T>;
 export function transaction<T>(handle: FirmDb, fn: (tx: FirmTx) => Promise<T>): Promise<T>;
+/**
+ * THE ESTABLISHMENT DOOR HAS AN OVERLOAD WHERE `resolutionDb` DELIBERATELY HAS
+ * NONE, and the asymmetry is the ruling rather than an oversight. That door
+ * READS one row and can be composed into nothing; this one WRITES two rows that
+ * ADR-196 clause 2 requires to commit or fail together, and `transaction` is the
+ * only thing in this file that can make two statements one unit of work.
+ */
+export function transaction<T>(
+  handle: EstablishmentDb,
+  fn: (tx: EstablishmentTx) => Promise<T>,
+): Promise<T>;
 export async function transaction<T>(
-  handle: ScopedDb | SystemDb | FirmDb,
+  handle: ScopedDb | SystemDb | FirmDb | EstablishmentDb,
   fn: (tx: never) => Promise<T>,
 ): Promise<T> {
   const conn = await poolFromClient().connect();
@@ -2241,7 +2546,9 @@ export async function transaction<T>(
           ? scopedTx(source, conn, handle.identityId)
           : handle.__brand === 'SystemDb'
             ? systemTx(source, conn, handle.reason)
-            : firmTx(source, conn);
+            : handle.__brand === 'EstablishmentDb'
+              ? establishmentTx(source)
+              : firmTx(source, conn);
       result = await fn(tx as never);
     } catch (cause) {
       // A failed ROLLBACK must not replace the error that caused it. The

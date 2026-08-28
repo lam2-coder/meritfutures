@@ -130,3 +130,65 @@ test('the transcription covers every field of the endpoints it claims', () => {
     expect(portalGates, `EligibilityGates declares the ${gate} gate`).toContain(gate);
   }
 });
+
+// =============================================================================
+// The barrel re-exports every name this file exports, counted rather than read
+// =============================================================================
+// `../src/index.ts` is hand maintained, and the shape of its failure is what
+// makes it worth a gate: an omission there TYPE CHECKS, LINTS AND TESTS GREEN,
+// because a name that is absent from a barrel is simply a name nobody outside
+// the package can write. Nothing goes red. `test/surface.test.ts` already
+// asserts that the read surfaces are reachable, and it does it against a
+// TRANSCRIBED list of twenty names, so it drifts the same way the barrel does
+// and for the same reason.
+//
+// THIS TEST DERIVES BOTH LISTS AND COMPARES THEM. It found `CursorPage`
+// missing: section 1's list envelope, the shape `GET /accounts/:accountId/marks`,
+// `GET /accounts/:accountId/timeline` and `GET /purchases` all return, used by
+// three modules INSIDE this application and nameable from nowhere outside it.
+// A consumer could import `MarkListItem` and could not import the envelope it
+// arrives in, so the only way to type the response was to redeclare the
+// envelope, which is a second transcription of a contract shape and is the
+// exact defect the top of this file exists to prevent.
+//
+// IT IS DELIBERATELY A SET EQUALITY AND NOT A CONTAINMENT. A name in the barrel
+// that this file does not export is the other direction of the same drift: a
+// re-export of something since renamed or deleted, which fails the build rather
+// than passing quietly, but which this assertion names precisely instead.
+
+/** Every `export type`, `export interface` and `export const` name in a source. */
+function exportedNames(source: string): readonly string[] {
+  return [...source.matchAll(/^export (?:type|interface|const) ([A-Za-z_][A-Za-z0-9_]*)/gm)]
+    .map((m) => m[1]!)
+    .sort();
+}
+
+/** Every name the barrel re-exports from `./api/types.ts`, across all its blocks. */
+function reExportedFromApiTypes(barrel: string): readonly string[] {
+  const names: string[] = [];
+
+  for (const block of barrel.matchAll(/export (?:type )?\{([^}]*)\} from '\.\/api\/types\.ts';/g)) {
+    for (const raw of block[1]!.split(',')) {
+      const name = raw.replace(/\/\/.*$/gm, '').trim();
+      if (name !== '') names.push(name);
+    }
+  }
+
+  return names.sort();
+}
+
+test('the package entry point re-exports every name api/types.ts exports', () => {
+  const types = readFileSync(join(ROOT, 'apps/portal/src/api/types.ts'), 'utf8');
+  const barrel = readFileSync(join(ROOT, 'apps/portal/src/index.ts'), 'utf8');
+
+  const declared = exportedNames(types);
+  const reExported = reExportedFromApiTypes(barrel);
+
+  // The parsers found something at all. A regex that silently matched nothing
+  // would make this whole test pass by comparing two empty lists, which is the
+  // failure mode the dispatch protocol names as a reader blinded by a reformat.
+  expect(declared.length, 'names exported by api/types.ts').toBeGreaterThan(15);
+  expect(reExported.length, 'names re-exported by index.ts').toBeGreaterThan(15);
+
+  expect(reExported, 'the barrel and api/types.ts agree, name for name').toEqual(declared);
+});
