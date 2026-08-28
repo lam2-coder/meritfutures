@@ -308,7 +308,7 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'people.',
   useVerifySource:
     'ONE ARM OF THREE, AND THE OTHER TWO ARE CONSTRUCTIBLE TODAY, WHICH IS WHY THIS ENTRY EXISTS ' +
-    'RATHER THAN AN ADAPTER. `VerifySource.lookup` (`routes/verify.ts:591`) reads `certificates`, ' +
+    'RATHER THAN AN ADAPTER. `VerifySource.lookup` (`routes/verify.ts:596`) reads `certificates`, ' +
     'and `GET /verify/:code` is UNAUTHENTICATED, so `db.scoped` has no identity to open with; ' +
     '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:568`), and ' +
     '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1131-1133`), so ' +

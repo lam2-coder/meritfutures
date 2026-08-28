@@ -407,7 +407,20 @@ export interface AdminAccountSearchItem {
   readonly recon_blocked: boolean;
 }
 
-/** Section 8, `FlagListItem`. */
+/**
+ * Section 8, `FlagListItem`.
+ *
+ * `corroboration_depth` IS ADR-178's AND IT IS THE PRICE OF THAT RULING RATHER
+ * THAN AN ADDITION TO IT. It is the number of INDEPENDENT detector families
+ * implicated on this flag's identity, which ADR-178 made this queue's first
+ * sort key. It is on the wire for two reasons and neither is convenience:
+ * {@link assertFlagOrder} cannot check a key it cannot see, and an operator
+ * shown a severity 3 above a severity 5 has nothing on the row that says why.
+ *
+ * IT IS COMPUTED AND NOT STORED. No column holds it, no filter narrows by it,
+ * and a client that re-sorts a page by it locally will disagree with the server
+ * on the next page. ADR-178 section 6 states that cost rather than hiding it.
+ */
 export interface FlagListItem {
   readonly flag_id: string;
   readonly identity_id: string;
@@ -418,6 +431,7 @@ export interface FlagListItem {
   readonly first_detected_on: string;
   readonly detector: string;
   readonly evidence_summary: string;
+  readonly corroboration_depth: number;
 }
 
 /** Section 8's `FlagListItem.status` union, closed. */
@@ -910,28 +924,77 @@ function readPaging(
 /**
  * The order a triage queue is read in, asserted rather than trusted.
  *
- * Section 8 says "Sorted by severity then age" and does not state a direction,
- * so the direction is ruled here and said out loud: MOST SEVERE FIRST, then
- * OLDEST FIRST. A queue that put a severity 1 above a severity 5, or the newest
- * flag above a three-week-old one, is a triage list that inverts triage, and the
- * operator has no way to see that from the rendered page.
+ * ADR-178 RULED THIS ORDER AND THIS FUNCTION IS WHERE THE RULING IS ENFORCED.
+ * Two approved documents ordered one queue differently. API_CONTRACT section 8
+ * said "Sorted by severity then age", which this function enforced FLAT across
+ * the page; `M07` `AS-M7-03` clause 3 says the queue sorts by the number of
+ * INDEPENDENT detector families implicated on an identity. A corroborated page
+ * inverts severity BY CONSTRUCTION, so the flat assertion refused the security
+ * control rather than the defect, on every page where the control did any work.
+ *
+ * THE RULING KEPT BOTH SENTENCES AND ORDERED THEM. Corroboration depth is the
+ * FIRST key, because it is the control and because a queue an adversary can
+ * reorder by firing one detector is not a queue. The contract's "severity then
+ * age" is kept VERBATIM as the order WITHIN one corroboration band. So this
+ * assertion did not lose a key: it gained one, it went from two keys to three,
+ * and it now enforces the control it used to refuse.
+ *
+ * THE BAND IS A DEPTH AND NOT AN IDENTITY. Two identities at the same depth
+ * interleave by severity, which is what the flag-queue adapter builds and is
+ * NOT the reconciliation session 318 recorded ("the order WITHIN one identity").
+ * ADR-178 section 1 makes that correction, and it matters because the two
+ * readings describe different queues.
+ *
+ * THE ADAPTER IS NOT NAMED IN THIS FILE ON PURPOSE. `P7-i`'s fence asserts that
+ * this module mentions its implementer nowhere, so that the dependency runs one
+ * way: the adapter imports this port and this port knows of no adapter.
+ *
+ * DEPTH IS ON THE WIRE BECAUSE THIS FUNCTION CANNOT SEE IT OTHERWISE, and that
+ * is the price of the ruling rather than a convenience. Without the field the
+ * only honest move left here is to DELETE this assertion, which is weakening a
+ * gate to pass it.
+ *
+ * DIRECTIONS ARE STATED OUT LOUD, because section 8 states none: MOST
+ * CORROBORATED FIRST, then MOST SEVERE FIRST, then OLDEST FIRST.
  *
  * ASSERTED WITHIN A PAGE AND NOT ACROSS PAGES, which is the honest limit: the
  * order is the port's, because a cursor page cannot be re-sorted here without
  * breaking the cursor, and this catches a port that ignored the rule at the one
  * place the rule is visible.
+ *
+ * EXPORTED SO THE SUITE ASSERTS THE PAGE AND NOT THE SOURCE TEXT. Before
+ * ADR-178 this refusal was pinned by a suite reading the CHARACTERS of this
+ * file, because it had no other reach; a string match is a test of a spelling
+ * and it passes the day the spelling survives the behaviour.
  */
-function assertFlagOrder(items: readonly FlagListItem[]): void {
+export function assertFlagOrder(items: readonly FlagListItem[]): void {
+  for (const item of items)
+    if (!Number.isInteger(item.corroboration_depth) || item.corroboration_depth < 0)
+      throw new AdminReadError(
+        `flag \`${item.flag_id}\` carries corroboration depth ` +
+          `${JSON.stringify(item.corroboration_depth)}, which is not a count of detector ` +
+          'families. ADR-178 makes it the first sort key of this queue, and a key that is not ' +
+          'a count orders nothing',
+      );
   for (let i = 1; i < items.length; i += 1) {
     const previous = items[i - 1];
     const current = items[i];
     if (previous === undefined || current === undefined) continue;
+    if (previous.corroboration_depth < current.corroboration_depth)
+      throw new AdminReadError(
+        `flag \`${current.flag_id}\` at corroboration depth ` +
+          `${String(current.corroboration_depth)} follows \`${previous.flag_id}\` at depth ` +
+          `${String(previous.corroboration_depth)}. ADR-178 sorts this queue by corroboration ` +
+          'first, and a queue that ranks one loud detector above three agreeing ones is the ' +
+          'queue AS-M7-03 describes an adversary building',
+      );
+    if (previous.corroboration_depth !== current.corroboration_depth) continue;
     if (previous.severity < current.severity)
       throw new AdminReadError(
         `flag \`${current.flag_id}\` at severity ${String(current.severity)} follows ` +
-          `\`${previous.flag_id}\` at severity ${String(previous.severity)}. API_CONTRACT ` +
-          'section 8 sorts this queue by severity then age, and a queue that inverts triage ' +
-          'is unreadable as triage',
+          `\`${previous.flag_id}\` at severity ${String(previous.severity)} at the same ` +
+          'corroboration depth. API_CONTRACT section 8 sorts WITHIN a corroboration band by ' +
+          'severity then age, and a band that inverts triage is unreadable as triage',
       );
     if (
       previous.severity === current.severity &&
@@ -940,8 +1003,8 @@ function assertFlagOrder(items: readonly FlagListItem[]): void {
       throw new AdminReadError(
         `flag \`${current.flag_id}\` first detected on ${current.first_detected_on} follows ` +
           `\`${previous.flag_id}\` first detected on ${previous.first_detected_on} at the same ` +
-          'severity. Section 8 sorts by severity then AGE, and the older flag is the one that ' +
-          'has been waiting',
+          'corroboration depth and severity. Section 8 sorts by severity then AGE, and the ' +
+          'older flag is the one that has been waiting',
       );
   }
 }
@@ -976,6 +1039,8 @@ function projectFlag(item: FlagListItem): FlagListItem {
     first_detected_on: item.first_detected_on,
     detector: item.detector,
     evidence_summary: item.evidence_summary,
+    // ADR-178. The sort key an operator needs in order to read the sort.
+    corroboration_depth: item.corroboration_depth,
   };
 }
 

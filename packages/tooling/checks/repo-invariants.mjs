@@ -2086,6 +2086,414 @@ const ri13 = {
   },
 };
 
+// -----------------------------------------------------------------------------
+// RI-15  A `file:line` citation resolves, and the line says the name beside it
+// -----------------------------------------------------------------------------
+//
+// THIS IS THE SIXTH APPEARANCE OF ONE ERROR CLASS AND IT IS THE HALF RI-14 CANNOT
+// READ. RI-14 settles whether a claim that a NAMED THING DOES NOT EXIST is right,
+// by asking the tree what it exports. It reads EXISTENCE. It does not read
+// LOCATION, and location is what went wrong next.
+//
+// WHAT HAPPENED, IN THE SAME FILE RI-14 WAS WRITTEN FOR. Session 316 checked the
+// pointers in `apps/api/test/wiring.test.ts` one by one against the files they
+// name and FOUR OF THEM POINTED AT THE WRONG LINE. Two were EIGHTEEN LINES OFF
+// and both sat inside the entry ADR-172 had written ONE SESSION EARLIER to
+// replace a false reason: `wallet-withdrawals.ts:1233` was `G-WITHDRAWAL-CLEARED`'s
+// KYC term while `gateNoInFlight` was at `:1254`, and `:1506` was a `.send({`
+// while the identity arm was at `:1527`. The other two were `admin-payouts.ts:381`
+// for a declaration at `:390` and `admin-writes.ts:266` for one at `:269`.
+//
+// THE CLAIMS HELD AT THEIR REAL LINES AND THE POINTERS DID NOT, which is this
+// defect in its quietest form. A citation that drifts is WORSE THAN NO CITATION:
+// it reads as verified, so the next reader follows it, finds unrelated prose, and
+// concludes the reason was invented. That is how a stale claim survived four
+// restatements in one week, and the session that found the four said so: "the
+// gate that would have caught all four -- resolve every `file:line` inside a
+// reason string -- is still not written".
+//
+// THE HARD HALF IS DECIDING WHETHER THE LINE SAYS WHAT THE CITING SENTENCE
+// CLAIMS, AND THIS CHECK DOES NOT TRY TO READ MEANING. It uses a mechanical
+// proxy, and the proxy is the shape these citations are actually written in: a
+// backticked name, then the pointer, `principal(request)` (`admin-writes.ts:269`).
+// When a citation is preceded by a backticked identifier with nothing but glue
+// between them, that identifier must appear WITHIN `CITATION_WINDOW` LINES of the
+// line cited. Nothing else is inferred, and a citation with no name beside it is
+// checked for resolution and range only.
+//
+// THE WINDOW IS TUNED AGAINST THE REAL CORPUS AND IT IS TWO. Measured over every
+// citation in the files below: the widest TRUE citation is one line off
+// (`firm` cited at `scope.ts:535`, where the word is on `:536` because `:535`
+// opens the entry), and the narrowest FALSE one on record is three
+// (`admin-writes.ts:266` for a declaration at `:269`). Two is the largest window
+// that still catches every false citation on record and the smallest that admits
+// every true one measured. A drift of one or two lines passes, and that is the
+// price stated rather than discovered.
+//
+// WHY LIVE REASON FILES AND NOT `docs/decisions`. The obvious second input is the
+// ADRs, and it is the wrong one twice over. AN ADR IS A DATED RECORD OF THE TREE
+// AS IT WAS: its citations were true at its date, they go stale BY DESIGN when
+// the tree moves, and repairing one is an amendment requiring an ADR rather than
+// a commit. ADR-172's `routes/payouts.ts:395` for `PayoutTx.ledger` is 324 lines
+// out today because ADR-176 DELETED that member, which is the entry being right
+// rather than wrong.
+//
+// AND THE TWO FINDINGS IT ACTUALLY MAKES THERE ARE BOTH THIS CHECK MISREADING A
+// DOCUMENT WRITTEN FOR A READER. Run over `ADR-170` through `ADR-176` it reports
+// exactly two. `ADR-172:29` cites `wallet-withdrawals.ts:840-863` for
+// `WithdrawalTx`, a RANGE naming the members while the declaring line sits ABOVE
+// it -- :831 the day the entry was written and :835 now. `ADR-176:32` writes the
+// bare `` `:331` `` whose path is two markdown table rows up, and a bare pointer
+// here inherits the nearest full path within six lines, which lands on
+// `start.ts` and reports a file of 109 lines. Neither is an ADR that drifted.
+//
+// So the list below is the files whose citations describe the tree AS IT IS NOW,
+// which is RI-14's scope for RI-14's reason: the property is about REASONS
+// somebody wrote down. Growing the list is the intended growth path.
+//
+// WHAT IT DOES NOT CATCH, stated rather than left to be discovered.
+// (1) A citation with NO backticked identifier beside it is checked for
+//     resolution and range only. That is a real hole and it is measured: of the
+//     four false citations of 2026-08-28 this check catches THREE, and misses
+//     `routes/wallet-withdrawals.ts:1506`, which sits behind the words "the
+//     identity arm this route presents" and names nothing a runner can look up.
+// (2) The name is matched as a CASE-INSENSITIVE SUBSTRING of a line in the
+//     window, so a line that merely mentions the name in a comment satisfies it.
+//     Case-insensitive is not a detail: RI-14's first draft was case-sensitive
+//     and a SHOUTED claim walked past it, and this codebase shouts as a house
+//     style.
+// (3) A NEGATED claim is skipped -- "`fills` HAS NO `identity_id`
+//     (`schema.ts:3005`)" cites the line where the table is DECLARED and the
+//     name must be absent from it. Asserting the inverse there is a second
+//     check, and the existence half of it is RI-14's already.
+// (4) It binds only the NEAREST backticked token, so a possessive reads as a
+//     subject and is dropped rather than guessed: "`realized_pnl_cents` is
+//     `daily_marks`' (`schema.ts:652`)" cites the column and names the table.
+// (5) A RANGE citation names a BODY, and the declaring line can sit above the
+//     range, further than the window: `ADR-172:29` measures at five. A range is
+//     therefore the shape most likely to be a false positive here, and it is
+//     left noisy on purpose rather than given a second, wider window.
+// (6) A bare `` `:12` `` inherits the nearest full path within
+//     `CITATION_INHERIT_LINES` lines, which is how a reader reads it and is
+//     wrong wherever a nearer path was cited for something else -- across the
+//     rows of a markdown table, measured at `ADR-176:32`.
+// (7) It reads the tree it is given and never git history, so it cannot say
+//     whether a citation DRIFTED or was FALSE THE DAY IT WAS WRITTEN. Both of
+//     the citations it found in `routes/payouts.ts` on its first run were the
+//     second kind, checked by hand at the commit that wrote them.
+//
+// A FALSE POSITIVE HERE IS AN ARGUMENT SOMEBODY HAS AND A FALSE NEGATIVE IS THIS
+// DEFECT A SEVENTH TIME, so where the two are in tension this check takes the
+// noisier side and the narrowings above are each stated with their reason.
+
+/** The files whose `file:line` citations describe the tree as it is now. */
+const CITED_REASON_FILES = [
+  // RI-14'S OWN THREE, because this is the same property read at a different
+  // resolution: a reason somebody wrote down, checked against the tree it
+  // describes. RI-14 asks whether the named thing is there at all; this asks
+  // whether it is where the reason says.
+  'apps/api/test/wiring.test.ts',
+  'apps/api/src/idempotency.ts',
+  'apps/api/src/routes/wallet-withdrawals.ts',
+  // The file whose absence the first false claim asserted, and the two densest
+  // live reason files in the tree after `wiring.test.ts`.
+  'apps/api/src/idempotency-store.ts',
+  'apps/api/src/routes/payouts.ts',
+  'apps/worker/src/detectors/fills.ts',
+];
+
+/**
+ * THE ONE FINDING THIS CHECK MADE ON ITS FIRST RUN THAT THE SESSION WRITING IT
+ * COULD NOT REPAIR, enumerated here rather than dropped and rather than answered
+ * with a wider window.
+ *
+ * `wiring.test.ts:168` cites `routes/admin-wallet.ts:538` for `principal(request)`
+ * and `principal(request)` is declared at `:601`. IT WAS TRUE THE DAY IT WAS
+ * WRITTEN: commit `563ac3d` wrote it against a tree where `principal` WAS on
+ * :538, and commit `224fe5b` then inserted 63 lines above it. That is a FIFTH
+ * false citation in that file, live on `main`, found by the check on its first
+ * run over the file it was built for.
+ *
+ * IT IS NOT FIXED HERE BECAUSE THIS SESSION DOES NOT OWN THAT FILE. Session 322
+ * does, this wave. Dropping `wiring.test.ts` from the list to get green would
+ * blind the check to the one file it exists for; widening the window to 63 lines
+ * would blind it everywhere. Naming the single citation is the narrowest thing
+ * that keeps both.
+ *
+ * THE ENTRY IS EXACT AND IT EXPIRES BY ITSELF: file, cited pointer and name all
+ * three must match, so it covers this citation and no other, and the day the
+ * pointer is corrected it matches nothing and the check stays green. It is then
+ * a dead constant for a later session to delete, which is the smaller of the two
+ * costs; the other is a red build on somebody else's branch on the day they fix
+ * the thing this asked them to fix.
+ *
+ * @type {readonly {file: string, cites: string, name: string}[]}
+ */
+const CITATIONS_OWNED_ELSEWHERE = [
+  { file: 'apps/api/test/wiring.test.ts', cites: 'routes/admin-wallet.ts:538', name: 'principal' },
+];
+
+/** How far from the cited line the name may sit. Two, and the header says why. */
+const CITATION_WINDOW = 2;
+
+/** How far a bare `:N` may sit from the full path it continues. */
+const CITATION_INHERIT_LINES = 6;
+
+/** The extensions a citation may name. */
+const CITED_EXTENSIONS = 'ts|tsx|mts|mjs|js|sql|md|json|ya?ml';
+
+/**
+ * A citation inside backticks: `` `path/to/file.ts:12` ``, `` `file.ts:12-34` ``
+ * or the bare `` `:12` `` that continues the path cited before it.
+ */
+const CITATION = new RegExp(
+  '`([^`\\n]*?)((?:[A-Za-z0-9_./-]*[A-Za-z0-9_-]\\.(?:' +
+    CITED_EXTENSIONS +
+    '))?):(\\d+)(?:-(\\d+))?`',
+  'g',
+);
+
+/** A backticked token that is itself a citation, which names nothing. */
+const CITATION_TOKEN = new RegExp('\\.(?:' + CITED_EXTENSIONS + '):\\d');
+
+/**
+ * What may sit between a name and the pointer that cites it. Whitespace and
+ * opening punctuation, and a linking word. AN APOSTROPHE IS NOT GLUE: `X`'
+ * makes X a possessive, so the citation is about X's something and not about X.
+ */
+const IDENTIFIER_GLUE = /^[\s(,:*-]*(?:at|in|is|see)?[\s(,:*-]*$/i;
+
+/** A claim that the cited line does NOT hold the name, which is RI-14's half. */
+const NEGATED_CLAIM =
+  /\b(?:no|not|never|neither|nor|without|nothing|none|lacks?|absent|missing)\b[^`.;]{0,40}$/i;
+
+/**
+ * One file as a single stream, with the source line of every character.
+ *
+ * A CITATION AND THE NAME IT CITES ARE ROUTINELY ON DIFFERENT PHYSICAL LINES,
+ * because these reasons are concatenated string literals and wrapped comments.
+ * The one this check exists for is exactly that shape: `gateNoInFlight` ends one
+ * line of `wiring.test.ts` and `` (`:1254`) `` opens the next. Reading line by
+ * line sees a citation with no name beside it and says nothing, which is the
+ * check passing the defect it was written for.
+ *
+ * @param {string} text
+ * @returns {{flat: string, lineAt: number[]}}
+ */
+function flattenReasons(text) {
+  const JOINER = /['"]?[ \t]*\+?[ \t]*\r?\n[ \t]*(?:\/\/+|\*|>)?[ \t]*['"]?/g;
+  let flat = '';
+  /** @type {number[]} */
+  const lineAt = [];
+  let line = 1;
+  let i = 0;
+  for (const m of text.matchAll(JOINER)) {
+    const start = m.index ?? 0;
+    for (; i < start; i += 1) {
+      flat += text.charAt(i);
+      lineAt.push(line);
+    }
+    for (const ch of m[0]) if (ch === '\n') line += 1;
+    flat += ' ';
+    lineAt.push(line);
+    i = start + m[0].length;
+  }
+  for (; i < text.length; i += 1) {
+    if (text.charAt(i) === '\n') line += 1;
+    flat += text.charAt(i);
+    lineAt.push(line);
+  }
+  return { flat, lineAt };
+}
+
+/**
+ * The name a citation is about, or null when it names none.
+ *
+ * @param {string} flat
+ * @param {number} upto  where the citation starts
+ * @returns {string | null}
+ */
+function citedIdentifier(flat, upto) {
+  // THE TWO BACKTICKS IMMEDIATELY BEFORE THE CITATION, NEVER A PAIRING WALKED
+  // FROM THE START OF THE FILE. The first draft did the latter and it was armed
+  // for 215 lines and disarmed for the rest: `wiring.test.ts:215` writes "the
+  // engine`s own `RuleState`", using a backtick as an APOSTROPHE, and one stray
+  // backtick inverts every pairing after it. The check went quiet on all three
+  // copies of the seeded historical defect and reported PASS, which is a check
+  // that cannot fail hiding inside a check that can. Read locally and a stray
+  // backtick costs one binding rather than every binding below it.
+  const close = flat.lastIndexOf('`', upto - 1);
+  if (close < 0) return null;
+  const open = flat.lastIndexOf('`', close - 1);
+  if (open < 0) return null;
+  const token = flat.slice(open + 1, close);
+  if (!IDENTIFIER_GLUE.test(flat.slice(close + 1, upto))) return null;
+  if (token.length > 80 || CITATION_TOKEN.test(token) || /[/$\s\n]/.test(token)) return null;
+  if (NEGATED_CLAIM.test(flat.slice(Math.max(0, open - 70), open))) return null;
+  // `principal(request)` is about `principal`; `CheckoutTx.insertAttribution`
+  // is about the member, which is the specific half of the two.
+  const segments = token
+    .replace(/[(<].*$/, '')
+    .split('.')
+    .filter((s) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(s));
+  const name = segments[segments.length - 1];
+  return name !== undefined && name.length >= 3 ? name : null;
+}
+
+/** @type {Invariant} */
+const ri15 = {
+  id: 'RI-15',
+  title: 'No reason cites a line that does not hold the name beside it',
+  covers:
+    'every `file.ts:12` and `file.ts:12-34` citation in ' +
+    CITED_REASON_FILES.join(', ') +
+    ', plus the bare `:12` that continues a path cited within ' +
+    `${CITATION_INHERIT_LINES} lines above it. THREE THINGS ARE ASSERTED: the ` +
+    'path resolves to a file in this tree, the file reaches the line, and -- ' +
+    'when the citation is preceded by a BACKTICKED NAME with nothing but glue ' +
+    'between them -- that name appears within ' +
+    `${CITATION_WINDOW} lines of the line cited, matched case-insensitively as ` +
+    'a substring. THE WINDOW IS TUNED AGAINST THIS CORPUS: the widest TRUE ' +
+    'citation measured is one line off and the narrowest FALSE one on record is ' +
+    'three, so two catches every false citation on record and admits every true ' +
+    'one. WHAT IT DOES NOT CATCH. (1) A citation with no name beside it is ' +
+    'checked for resolution and range only; of the four false citations of ' +
+    '2026-08-28 this catches THREE and misses `wallet-withdrawals.ts:1506`, ' +
+    'which sits behind the words "the identity arm this route presents" and ' +
+    'names nothing a runner can look up. (2) A NEGATED claim is skipped, ' +
+    'because "`fills` HAS NO `identity_id` (`schema.ts:3005`)" cites the line ' +
+    'the name must be ABSENT from; that half is RI-14. (3) Only the NEAREST ' +
+    'backticked token binds, so a possessive is dropped rather than guessed. ' +
+    '(4) It reads docs/decisions NOT AT ALL, deliberately: an ADR is a dated ' +
+    'record of the tree as it was, its citations go stale by design when the ' +
+    'tree moves, and repairing one is an amendment rather than a commit. (5) A ' +
+    'RANGE citation names a body whose declaring line can sit above the range, ' +
+    'further than the window, and that is left noisy rather than given a second ' +
+    'wider window. (6) A bare `:12` inherits the nearest full path within ' +
+    `${CITATION_INHERIT_LINES} lines, which is wrong wherever a nearer path was ` +
+    'cited for something else. (7) It ' +
+    'never reads git history, so it cannot say whether a citation DRIFTED or was ' +
+    'FALSE THE DAY IT WAS WRITTEN; both kinds are in the tree and both are ' +
+    'findings. ONE CITATION IS NAMED AND NOT ENFORCED, in ' +
+    'CITATIONS_OWNED_ELSEWHERE: `wiring.test.ts:168` cites ' +
+    '`routes/admin-wallet.ts:538` for `principal(request)`, which is declared at ' +
+    '`:601`. That is a FIFTH false citation in that file, found by this check on ' +
+    'its first run, and the session that wrote the check does not own the file. ' +
+    'The entry is exact and covers that one citation only.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const tree = walk(root);
+    /** @type {Map<string, string[]>} */
+    const cache = new Map();
+    /** @type {(rel: string) => string[]} */
+    const linesOf = (rel) => {
+      const hit = cache.get(rel);
+      if (hit !== undefined) return hit;
+      const lines = read(root, rel).split('\n');
+      cache.set(rel, lines);
+      return lines;
+    };
+
+    for (const rel of CITED_REASON_FILES) {
+      if (!existsSync(join(root, rel))) {
+        findings.push(
+          `${rel} does not exist. This check names the files whose CITATIONS it reads, ` +
+            `so a rename silently empties it; point it at the new path`,
+        );
+        continue;
+      }
+      const { flat, lineAt } = flattenReasons(read(root, rel));
+      /** @type {string | null} */
+      let inherited = null;
+      let inheritedAt = -CITATION_INHERIT_LINES - 1;
+      for (const m of flat.matchAll(CITATION)) {
+        const at = lineAt[m.index ?? 0] ?? 0;
+        const path = m[2];
+        const first = m[3];
+        const last = m[4];
+        if (first === undefined) continue;
+        /** @type {string | null} */
+        let target = null;
+        if (path !== undefined && path !== '') {
+          target = path;
+          inherited = path;
+          inheritedAt = at;
+        } else if (inherited !== null && at - inheritedAt <= CITATION_INHERIT_LINES) {
+          target = inherited;
+        }
+        if (target === null) continue;
+
+        const cited = `${target}:${first}${last === undefined ? '' : `-${last}`}`;
+        const candidates = tree.filter((f) => f === target || f.endsWith(`/${target}`));
+        if (candidates.length === 0) {
+          findings.push(
+            `${rel}:${at}: cites \`${cited}\` and NO FILE IN THIS TREE has that path. ` +
+              `A pointer nobody can follow reads as verified and is not`,
+          );
+          continue;
+        }
+        const start = Number(first);
+        const end = last === undefined ? start : Number(last);
+        const reachable = candidates.filter((f) => linesOf(f).length >= end);
+        if (reachable.length === 0) {
+          const shown = candidates[0] ?? target;
+          findings.push(
+            `${rel}:${at}: cites \`${cited}\` and ${shown} has ${linesOf(shown).length} lines. ` +
+              `The pointer is past the end of the file it names`,
+          );
+          continue;
+        }
+
+        const name = citedIdentifier(flat, m.index ?? 0);
+        if (name === null) continue;
+        const needle = name.toLowerCase();
+        const near = reachable.some((f) => {
+          const lines = linesOf(f);
+          const from = Math.max(0, start - 1 - CITATION_WINDOW);
+          const to = Math.min(lines.length, end + CITATION_WINDOW);
+          for (let j = from; j < to; j += 1)
+            if ((lines[j] ?? '').toLowerCase().includes(needle)) return true;
+          return false;
+        });
+        if (near) continue;
+        if (
+          CITATIONS_OWNED_ELSEWHERE.some(
+            (k) => k.file === rel && k.cites === cited && k.name === name,
+          )
+        )
+          continue;
+
+        let where = 'NOWHERE IN THAT FILE';
+        for (const f of reachable) {
+          const lines = linesOf(f);
+          let best = Number.POSITIVE_INFINITY;
+          let bestLine = 0;
+          for (let j = 0; j < lines.length; j += 1) {
+            if (!(lines[j] ?? '').toLowerCase().includes(needle)) continue;
+            const d = j + 1 < start ? start - (j + 1) : j + 1 - end;
+            if (d < best) {
+              best = d;
+              bestLine = j + 1;
+            }
+          }
+          if (best < Number.POSITIVE_INFINITY) {
+            where = `at ${f}:${bestLine}, ${best} lines away`;
+            break;
+          }
+        }
+        findings.push(
+          `${rel}:${at}: cites \`${cited}\` for \`${name}\` and \`${name}\` is ${where}. ` +
+            `A citation that drifts is worse than none: it reads as verified and sends the ` +
+            `next reader to the wrong line, which is how one stale claim survived four ` +
+            `restatements. Open the file and repoint it, or say what the line does hold`,
+        );
+      }
+    }
+    return findings;
+  },
+};
+
 export const CHECKS = [
   ri01,
   ri02,
@@ -2101,6 +2509,7 @@ export const CHECKS = [
   ri12,
   ri13,
   ri14,
+  ri15,
 ];
 
 function main() {

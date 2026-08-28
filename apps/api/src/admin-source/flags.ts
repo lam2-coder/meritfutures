@@ -82,41 +82,49 @@
 // history.
 //
 // -----------------------------------------------------------------------------
-// THE COLLISION WITH `admin-reads.ts`, WHICH IS REPORTED AND NOT RESOLVED
+// THE COLLISION WITH `admin-reads.ts`, RULED BY ADR-178
 // -----------------------------------------------------------------------------
-// **THIS ORDERING IS REFUSED BY THE ROUTE THAT WOULD SERVE IT, AND THE TWO
-// PRIMARY SOURCES DISAGREE WITH EACH OTHER RATHER THAN WITH THIS FILE.**
+// **TWO APPROVED DOCUMENTS ORDERED THIS ONE QUEUE DIFFERENTLY, AND THIS FILE
+// CAUSED THE COLLISION RATHER THAN CONTAINING IT.**
 //
 //   API_CONTRACT section 8, `GET /admin/flags`: "Sorted by severity then age."
-//   `routes/admin-reads.ts`'s `assertFlagOrder` enforces exactly that, flat
-//   across the page, and throws when severity is not monotonically
+//   `routes/admin-reads.ts`'s `assertFlagOrder` enforced exactly that, FLAT
+//   across the page, and threw when severity was not monotonically
 //   non-increasing. `risk_flags_queue_idx` is built for the same order.
 //
 //   `M07` `AS-M7-03` clause 3, above: sorted by independent detector families
 //   implicated on the identity.
 //
-// THEY ARE DIFFERENT SORTS OF THE SAME QUEUE and only one of them survives the
-// attack. Both documents are `approved`. A corroboration page will contain a
-// severity 3 flag above a severity 5 flag whenever the 3 is corroborated and the
-// 5 is not, so `assertFlagOrder` refuses this page BY CONSTRUCTION.
+// A corroboration page contains a severity 3 flag above a severity 5 flag
+// whenever the 3 is corroborated and the 5 is not, so the flat assertion refused
+// this page BY CONSTRUCTION, on every page where the control did any work.
 //
-// **THIS SLICE DOES NOT RESOLVE IT AND MUST NOT.** `admin-reads.ts` is `P7-b`'s
-// file and P7 section 9 rows `P7-i` as implementing the port that file declares
-// and NOT editing it; changing the contract needs an ADR and no number is
-// allocated here. What this slice does instead is three things a later reader
-// can act on: it implements the ordering the slice was dispatched to build,
-// because that is the half that is a control rather than a convention; it states
-// the collision here, at the file that causes it; and
-// `test/admin-source-flags.test.ts` asserts the collision MECHANICALLY, reading
-// both sentences out of their own documents, so the day either one moves the
-// suite says so instead of a 500 discovering it in front of an operator.
+// **ADR-178 RULED THAT THE TWO SENTENCES ARE KEPT AND ORDERED.** Corroboration
+// depth is the FIRST key and `AS-M7-03` clause 3 stands unamended; API_CONTRACT
+// section 8 is AMENDED to say that its "severity then age" is the order WITHIN
+// one corroboration band, which is verbatim what keys 2 and 3 below already do.
+// `assertFlagOrder` was RETARGETED and not deleted: it went from two keys to
+// three and now enforces the control it used to refuse.
+//
+// **THE PRICE OF THE RULING IS ON THE WIRE AND IS PAID HERE.** `FlagListItem`
+// gained `corroboration_depth`, which `projectRanked` fills from the ordering's
+// own first key. Without it the route cannot check the key it is asserting and
+// an operator is shown a severity 3 above a severity 5 with nothing on the row
+// that says why. That field is computed and never stored: no column holds it, no
+// filter narrows by it, and ADR-178 section 6 carries the cost of that.
+//
+// **THE BAND IS A DEPTH AND NOT AN IDENTITY.** `compareRanked` compares depth
+// and never `identityId`, so two identities at the same depth INTERLEAVE by
+// severity. Session 318 recorded the reconciliation as "the order WITHIN one
+// identity"; that is not what this file builds, and ADR-178 section 1 corrects
+// it, because the two readings describe different queues.
 //
 // **NOTHING WIRES THIS ADAPTER AND SO NOTHING 500s TODAY.** `setAdminReadSource`
 // is in `wiring.test.ts`'s `BLOCKED` list and stays there: this directory
 // implements two of the port's six methods, so no complete `AdminReadSource`
-// exists to install. The collision is a blocker ON the wiring rather than a
-// defect IN a deployment, which is the honest shape of it and the reason it is
-// reported in prose and in a test rather than repaired in somebody else's file.
+// exists to install. The ruling therefore lands at the cheapest moment it will
+// ever be available: the route has no client, and no page ordered either way has
+// ever been rendered for an operator.
 //
 // -----------------------------------------------------------------------------
 // `evidence_summary` CARRIES THE NAMES OF THE NUMBERS AND NEVER THE NUMBERS
@@ -688,6 +696,9 @@ function projectRanked(entry: RankedFlag): FlagListItem {
     detector: entry.detector,
     // The names of the numbers, sorted, and never the numbers. See the header.
     evidence_summary: Object.keys(entry.flag.evidence).sort().join(', '),
+    // ADR-178. The ordering's first key, carried on the row it ordered, so the
+    // route can assert it and an operator can read it.
+    corroboration_depth: entry.corroboration.depth,
   };
 }
 
