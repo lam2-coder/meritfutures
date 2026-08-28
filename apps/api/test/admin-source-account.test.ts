@@ -546,33 +546,40 @@ describe('the response survives assertContractScalars, which the route runs over
     await expect(readAccountDetail(tx, ACCOUNT)).rejects.toThrow(/safe integer/);
   });
 
-  it('omits a nullable trading day rather than carrying a null the sweep refuses', async () => {
+  it('carries a nullable trading day as a present key holding null, which is what the contract declares', async () => {
     const detail = await detailOf();
     const account = detail['account'] as Record<string, unknown>;
-    // THE SWEEP REFUSES `null` UNDER A DAY-SHAPED NAME, so the two shapes this
-    // response can carry are the day and no key at all. The fixture's account is
-    // funded and open.
+    // THIS CASE ASSERTED THE OPPOSITE UNTIL THE SWEEP WAS REPAIRED, and it is
+    // the assertion that said so. The sweep refused `null` under a day-shaped
+    // name, so a nullable day arrived as NO KEY AT ALL and a reader diffing two
+    // drill-downs watched keys appear and disappear. API_CONTRACT's
+    // `AccountDetail` writes `funded_on: string | null; closed_on: string |
+    // null`, so the key is present and the value is `null`. The fixture's
+    // account is funded and open.
     expect(account['funded_on']).toBe('2026-02-01');
-    expect(Object.hasOwn(account, 'closed_on')).toBe(false);
-    expect(Object.hasOwn(account, 'expires_on')).toBe(false);
+    expect(Object.hasOwn(account, 'closed_on')).toBe(true);
+    expect(account['closed_on']).toBeNull();
+    expect(Object.hasOwn(account, 'expires_on')).toBe(true);
+    expect(account['expires_on']).toBeNull();
     expect(() => {
       assertContractScalars({ closed_on: null }, '');
-    }).toThrow(AdminReadError);
+    }).not.toThrow();
   });
 
-  it('omits `traded_day` and `win_day`, which are booleans the sweep cannot admit', async () => {
+  it('carries `traded_day` and `win_day`, the two booleans the sweep once refused', async () => {
     const [mark] = list(await detailOf(), 'marks');
-    // BOTH ARE `boolean NOT NULL` COLUMNS WHOSE NAMES END `_day`. Carrying them
-    // is a 500 on every drill-down that has a mark; renaming them puts a field
-    // in an operator's hands that no column has. The omission is asserted so it
-    // reads as a decision rather than as a projector that missed two lines.
-    expect(Object.hasOwn(mark ?? {}, 'traded_day')).toBe(false);
-    expect(Object.hasOwn(mark ?? {}, 'win_day')).toBe(false);
+    // BOTH ARE `boolean NOT NULL` COLUMNS WHOSE NAMES END `_day`, and carrying
+    // them was a 500 on every drill-down with a mark until the sweep was
+    // repaired. API_CONTRACT section 6's `MarkListItem` declares
+    // `traded_day: boolean; win_day: boolean;`, so the document whose section 1
+    // carries the Time rule also declares the two the rule refused.
+    expect(mark?.['traded_day']).toBe(true);
+    expect(mark?.['win_day']).toBe(true);
     expect(() => {
       assertContractScalars({ traded_day: true }, '');
-    }).toThrow(AdminReadError);
-    // AND EVERY OTHER COLUMN OF THE MARK IS HERE, so the omission is two fields
-    // rather than a section that quietly narrowed.
+    }).not.toThrow();
+    // AND EVERY COLUMN OF THE MARK IS HERE, in both directions, so a later
+    // narrowing is a red case rather than a field nobody missed.
     expect(Object.keys(mark ?? {}).sort()).toStrictEqual([
       'account_id',
       'adjustment_cents',
@@ -589,7 +596,9 @@ describe('the response survives assertContractScalars, which the route runs over
       'source',
       'source_hash',
       'superseded_by',
+      'traded_day',
       'trading_day',
+      'win_day',
     ]);
   });
 
@@ -762,6 +771,16 @@ describe('served through the real route, which is where the allowlist and the sw
     expect(account['size_cents']).toBe(5_000_000);
     const states = body['rule_states'] as readonly Record<string, unknown>[];
     expect(states[0]?.['withdrawable_cents']).toBe(12_500);
+    // THE TWO BOOLEANS ARE ON THE WIRE, THROUGH THE ROUTE THAT RUNS THE SWEEP.
+    // Carrying them was a 500 here before `assertContractScalars` was repaired,
+    // measured this way rather than against the projector alone.
+    const marks = body['marks'] as readonly Record<string, unknown>[];
+    expect(marks[0]?.['traded_day']).toBe(true);
+    expect(marks[0]?.['win_day']).toBe(true);
+    // AND A NULLABLE DAY IS A PRESENT KEY HOLDING `null`, likewise served rather
+    // than projected: JSON keeps the key, so the shape a reader sees is this one.
+    expect(Object.hasOwn(account, 'closed_on')).toBe(true);
+    expect(account['closed_on']).toBeNull();
   });
 
   it('answers 404 for an account nobody has, over the same wiring', async () => {
