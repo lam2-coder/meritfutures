@@ -29,15 +29,8 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->167<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Wave 3 batch 2 (M09 to M20)          | **APPROVED**                                                                                                                                                                                                                                                      |
@@ -4786,9 +4779,6 @@ This section first said the choice was *"250 first, or 250's commit carries `CI-
 
 **Three of the four slices behind `P5-b` are unblocked and the fourth is not.** `P5-i` needed `wallet_spend_limits` and it was already present. `P5-l` needed `payment_disputes` and this session registers it. `P5-e` needed `schema.ts` and `scope.ts` and takes them cleanly. **`P5-n` is NOT unblocked**: its subject is the producer under the `events` feed, and `events` has no scope rule and cannot get one without the entry named above.
 
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-
-**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 ---
 
 ## `P6-b` lands: the live tier's address is `apps/api`, and taking the recommendation means neither table gains a row (2026-08-27, session 277)
@@ -5716,6 +5706,124 @@ first, `falsify` clean.
 **Twelve seeded defects, twelve caught**, including the conjunction turned into a disjunction, the correlation comparison reversed, the money band entered, the idle clique flagged, and a barrel leg dropped. **Four of them were MISSES first and the reason is recorded rather than counted as a pass**: `D-02`'s window and `D-12`'s lone-identity refusal are each enforced in two places, so a single-site seed is caught by the other site and the suite stays green.
 
 **Measured on this branch with `pnpm install` run first and each command separately: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 192 test files / 4,164 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The dispatch baseline of 33 / 13 / 0 / 0 / clean / 191 files / 4,088 passed / 6 skipped was reproduced exactly before a line changed. **No ADR number, no migration number, no `packages/db` change, no `apps/api` change, no contract change, no `SqlExecutorReason` member, no `SystemReason` member, and `runner.ts`, `ports.ts`, `canary.ts` and `src/db.ts` read in full and NOT touched.**
+
+## ADR-176 lands: the request path records the approval and does not post it, and the key that had to go with it (2026-08-28, session 316)
+
+**[ADR-172](decisions/ADR-172.md) clause 2 applied where that entry reported it and fenced it: [`routes/payouts.ts`](../apps/api/src/routes/payouts.ts).** `PayoutTx.ledger` is DELETED and `decidePayout`'s posting arm is REMOVED. **The premises were re-derived at source rather than inherited from the ruling that settled them**, and they hold: `LedgerWriteKey` is `ledgerTransactions | ledgerEntries` ([`tx.ts:64`](../packages/ledger/src/tx.ts)), both scope class `derived` (`scope.ts:513,522`); `ScopedTx.insert` takes `OwnedTableKey` (`scoped-db.ts:1739`) and `ParentedTableKey` is `Extract<DerivedTableKey, 'sessions'>` (`:1540`), a closed list of ONE; so the only handle satisfying `LedgerTx` is `insert<K extends TableKey>` over the whole estate (`:1802`), and a door in `apps/api` returning one would be `systemDb` renamed.
+
+**THE VERIFICATION FOUND ONE THING THE RULING NEEDED AND [ADR-172](decisions/ADR-172.md) DID NOT SEE.** `PayoutRequestInsert` carried no `idempotencyKey` member, while `payout_requests.idempotency_key` is `text NOT NULL` ([`0010:82`](../packages/db/migrations/0010_payouts.sql)) and [`admin-payouts.ts:784,809`](../apps/api/src/routes/admin-payouts.ts) already READS that column on release. **While the posting stood inside the handler the key reached it out of local memory, so the gap was invisible; removing the posting alone would have committed an approval no door could ever post, and the failure would have been silent.** The field is added and stored UNPREFIXED, on `payout_requests_account_idempotency_uq (account_id, idempotency_key)`. **The removal and the field are ONE change, and either one without the other is worse than neither.**
+
+**`INV-M5-06` IS SHOWN AT THREE FILES RATHER THAN CITED.** Both remaining doors are `releaseLedgerKey` character for character (`admin-payouts.ts:916`, `expiry.ts:305`) and **both call sites pass `held.idempotencyKey` off the LOCKED row** (`:1185`, `:667`). The key is a property of the APPROVAL and not of the DOOR, so removing one of three doors that mint the identical string cannot produce a second posting, and `ledger_transactions.idempotency_key text NOT NULL UNIQUE` is what refuses one.
+
+**`usePayoutBackend` DOES NOT BECOME CONSTRUCTIBLE, AND ITS `BLOCKED` ENTRY IS REWRITTEN RATHER THAN SHRUNK.** The recorded reason was the deleted field, so it is now false; a different obstruction was underneath it and **it is a READ rather than a write**. `PayoutSubject.state` is the engine's `RuleState`, which requires `lifetimeSettledCents`, `breached` and `breachKind` ([`types.ts:1004,1009,1010`](../packages/rules-engine/src/types.ts)); **`0015_rule_states.sql` declares none of the three, `lifetime_settled` appears in NO migration in the tree, and no migration names any member of `BreachKind`.** That is **the same blocker a WIRED sibling already carries**: `databaseAccountReads` is installed and `readEligibility` rejects on `ELIGIBILITY_BLOCKER` ([`account-reads.ts:851`](../apps/api/src/routes/account-reads.ts)) for those exact three fields, and `INV-M5-02` is what binds the two endpoints to one `RuleState`. Independently, `ResolvedPlan` is built from `plan_versions.rules` and a `plan_version_sizes` row, both scope class `firm` (`scope.ts:482,487`), which `ScopedTableKey` excludes (`scope.ts:1165`), while `PayoutTx` runs every method on ONE transaction. **A partial backend is REFUSED rather than overlooked**: `listPayouts` and `idempotency` are constructible today, and installing them beside a `transact` that rejects would put a live-looking route in front of the arm that approves payouts.
+
+**FOUR LINE CITATIONS IN [`wiring.test.ts`](../apps/api/test/wiring.test.ts) POINTED AT THE WRONG LINE, AND TWO ARE IN THE ENTRY [ADR-172](decisions/ADR-172.md) WROTE ONE SESSION EARLIER TO REPLACE A FALSE REASON.** `wallet-withdrawals.ts:1233` is `G-WITHDRAWAL-CLEARED`'s KYC term and `gateNoInFlight` is at `:1251`; `:1506` is a `.send({` and the identity arm is at `:1524`; both off by eighteen lines, both checked on `origin/main` before this branch moved anything. Also `admin-payouts.ts:381` for a declaration at `:382` and `admin-writes.ts:266` for one at `:269`. **The claims held at their real lines and the pointers did not**, which is the same drift in its quietest form: nothing fails, and a reader who follows the pointer concludes the reason was invented. **This is the third consecutive session in which that file has been found carrying something nothing checks**, and the gate that would have caught all four -- resolve every `file:line` inside a reason string -- is still not written.
+
+**FOUR STALE "three doors" CLAIMS WERE CORRECTED AT THEIR OWN FILES**, because a diff that falsifies a comment owns that comment: `expiry.ts`, `sweeps/ports.ts`, `wallet-withdrawals.ts` and `admin-payouts.ts`, the last of which had compared its own ledger field to `PayoutTx.ledger` by name. [ADR-172](decisions/ADR-172.md)'s reported landmine about `wallet-withdrawals.ts`'s `IdempotencyStore` comment was **checked and is already closed** at `:950-959`.
+
+**THE SIX `LT-01` COMPOSITION ASSERTIONS WERE RETARGETED, NOT DELETED.** They now run over `postTransaction(recorder, chart, lt01(...))` directly: one header, four entries, two debits summing to `approved_cents`, the signs read off `posting.ts:235-236`, the zero sum and the `bigint` check. Four new source-reading cases pin the removal, which a behavioural suite cannot hold, and they also pin the paired half: **`lt01` must STAY exported here and `admin-payouts.ts` must keep importing it**, so a later session cannot "finish" this ruling by giving each door its own transcription of the legs.
+
+**THE GAP THIS RULING OPENS IS REAL AND IS UNREACHABLE, AND ONLY THE SECOND HALF IS A CONTROL.** Nothing in the tree posts `LT-01` for a request approved with NO hold, because both remaining doors fire on a HELD request being released. The driver is [ADR-172](decisions/ADR-172.md) section 5's, checked at `0010` to need no DDL, and **this entry does not build it**: different deployable, and [ADR-003](decisions/ADR-003.md)'s money-path regime is one objective per session. It cannot be reached because `usePayoutBackend` is unwired, `wiring.test.ts` asserts `start.ts` does not call it, and the route answers 503 before it opens a transaction. **The route answered 503 before this ruling and answers 503 after it.** `INV-M5-21`'s enforcement moves with the posting and is written down where the driver will be: its predicate must be `status = 'approved'`.
+
+**Triple unmoved at `{21, 6, 15}`. NO migration, no `SystemReason` member, no `SqlExecutorReason` member, no cast past a key type, no `pg` import, `packages/db` untouched.** Approval line UNSIGNED, **MONEY PATH, `E2` READ OWED**; section 7 puts three judgements to the founder, including whether `API_CONTRACT` section 6's ordered sentence is amended now that it names a step this route no longer performs. **The wire shape does not change**: `PayoutResponse` carried no ledger transaction id and `estimated_settlement` was already a business-day range.
+
+**Five defects seeded and five caught**, including the one worth keeping: a STORED key prefixed with `PAYOUT_ENDPOINT` typechecks, reads plausibly, and would make every door compose the prefix twice. It is caught because the assertion is `.not.toContain(PAYOUT_ENDPOINT)` rather than "a key is present".
+
+**Baseline reproduced on `main` before anything moved and every command run separately after each file: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 204 test files / 4,443 passed / 6 skipped BEFORE and 204 / 4,448 / 6 AFTER.** The five added are four source-reading cases and one retargeted composition case; **no case was deleted.**
+
+**`main` MOVED UNDER THIS BRANCH MID-SESSION AND WHAT IT LANDED READS THIS BRANCH'S DIFF.** `c733fcd` merged `RI-14`, *"No reason claims a named thing does not exist while the tree exports it"*, whose `covers` names [`wiring.test.ts`](../apps/api/test/wiring.test.ts) as the file whose reasons it reads -- **the same file this session rewrote, for the same defect, from a different session on the same night.** It was merged in and re-run rather than waited out. **On the merged head: 33 of 33 gates, `14 of 14` invariants, typecheck 0, lint 0, format clean, 204 files / 4,454 passed / 6 skipped**, and `RI-14` passes over the rewritten `usePayoutBackend` reason: its three absence claims are about a COLUMN and about strings in a migration, not about a name the tree exports. **`RI-14` closes one half of this session's landmine and its own `covers` says which.** It reads EXPORTS and does not resolve a `file:line`, so the four wrong pointers found here would still pass it. **That gate is still unwritten, and it is a smaller ask than it was this morning**, because `RI-14` already parses the reason strings and would only need to resolve what they cite.
+
+---
+
+## `LT-07`'s credit leg was the wrong half of the finding, and the chart of accounts has never been seeded (2026-08-28, session 315)
+
+**[ADR-174](decisions/ADR-174.md) takes findings (A) and (C), [ADR-175](decisions/ADR-175.md)
+takes (B), and the split is argued rather than assumed: they live in TWO TABLES and only one of
+them is blocked.** (A) is `ledger_accounts` and `ledger_entries`, (B) is one `text NOT NULL
+UNIQUE` column on `ledger_transactions`, and a transaction's key is decided by its own header
+while its entries are still undecided. **Migration `0052` is RETURNED TO THE POOL UNSPENT** and no
+`E2` read is owed on a migration that does not exist.
+
+**THE RESERVATION ANTICIPATED A HOLE IN THE CREDIT SLOT AND THE MEASUREMENT FOUND THE SLOT BESIDE
+IT WRONG TOO.** `LT-06` credits `firm_treasury` `amount_cents` ([M05:135](plans/M05-payout-system.md))
+and `LT-07` debits it ([M05:136](plans/M05-payout-system.md)), and
+[`posting.ts:235-236`](../packages/ledger/src/posting.ts) writes `+amountCents` on a debit and
+`-amountCents` on a credit, so **the external leg returns `firm_treasury` to exactly where it
+started**: on the one account [M05:141](plans/M05-payout-system.md) names as where a cash movement
+books, in the leg whose own row calls it *"The external leg's cash movement"*. **That holds for
+every `kind`**, so the ruling on (A) survives finding (C) rather than waiting on it, and **a code
+minted for the credit slot would complete a posting that is wrong in the other slot.** `LT-07`'s
+row also names no amount, where every other row in that table does.
+
+**`trader_wallet` IS REFUSED ON ARITHMETIC RATHER THAN ON SCOPE.** `LT-06` already debits it at
+approval, so an `LT-07` crediting it would return the trader's wallet to where it started while
+the money left the firm. That refusal is worth having because **[ADR-124:33](decisions/ADR-124.md)'s
+version of it quotes the row under repair**: *"`LT-02` and `LT-07` both move `firm_treasury`
+against the payout wallet position"* is [M05:131,136](plans/M05-payout-system.md) restated, so its
+conclusion survives this entry and its stated ground cannot settle the repair. **[ADR-124](decisions/ADR-124.md)
+is not amended** and the finding is filed where the repair will be read.
+
+**(C) IS RECORDED AS AN ABSENCE, NO DIRECTION IS INFERRED, AND THE ABSENCE IS LARGER THAN THE
+DISPATCH SAID.** Executed against PostgreSQL 16.13 with `0001` through `0051` applied forward-only
+under `ON_ERROR_STOP`: **`ledger_accounts` HOLDS ZERO ROWS**, and the database accepted
+`firm_treasury` as `'asset'`, as `'liability'` and as `'revenue'` in turn. `treasury_balances.account_code`
+carries no foreign key and no CHECK into the chart and its own record says it is anchored outside
+the ledger deliberately. **NOTHING SEEDS THE CHART OF ACCOUNTS AT ALL**, the only `kind` literals
+in the tree are three fixtures inside a probe written to watch constraints fire, and **four of the
+seven codes have no `kind` written anywhere**: `firm_treasury`, `psp_clearing`, `reserve` and
+`promotional_credit`. **The five sites that call `firm_treasury` the account where cash books were
+weighed and NOT taken as a `kind`**, because the corpus's own arithmetic disagrees with them at
+`LT-06` and because nothing in this fence needs the answer.
+
+**SO (A) CANNOT BE CLOSED WHILE (C) IS OPEN**, and [ADR-174](decisions/ADR-174.md) section 3 names
+the three available repair shapes and why each needs the absence filled first. **The next session
+on this row rules the chart of accounts BEFORE the posting**, which is the opposite order from the
+one the reservation anticipated.
+
+**(B) IS CLOSED, AND THE TWO CONVENTIONS WERE NEVER IN CONFLICT.** They are one rule under two
+spellings and the rule is that a `ledger_transactions.idempotency_key` **names the EVENT it posts
+and never the DOOR that reached it**. `PAYOUT_ENDPOINT` is a module constant three call sites
+share, so `LT-01`'s prefix does not vary with the door: it names the payout-approval event and is
+merely SPELLED as a route, which is the identical rule `wallet-withdrawals.ts` states when it
+refuses a prefix. **An event is `(kind, reference)` and both are columns on the header row**, so
+**`LT-07`'s key is `` `${kind} ${wallet_withdrawals.idempotency_key}` ``**. Every leg EXECUTED: the
+bare key claimed by `LT-06` and refused to `LT-07`; the same refusal across a DIFFERENT
+`reference_kind` and `reference_id`, so per-reference scoping is unavailable without superseding a
+merged constraint; **the endpoint prefix watched FAILING**, two doors spelling one settlement
+admitting **two postings for one withdrawal** with no constraint violated; and the kind-prefixed
+key accepted beside `LT-06`'s while its own replay was refused. **`LT-01`'s three doors are NOT
+re-spelled**, because `ledger_entries` is append-only with no `UPDATE` and no `DELETE` grant and
+re-spelling a landed key costs a compensating posting.
+
+**NO MIGRATION, NO DOCUMENT AMENDED, AND NO MONEY-PATH CODE CHANGED.** `0009`, `0027` and `0038`
+are byte for byte unchanged, [M05](plans/M05-payout-system.md) section 2.1 stands as written
+because rewriting half a defective row is how a reader stops being able to see that it was
+defective, and `payouts.ts`, `admin-payouts.ts`, `expiry.ts` and `wallet-withdrawals.ts` are
+untouched. No `SystemReason` member, no `SqlExecutorReason` member, no cast past a key type and no
+`pg` import.
+
+**[`packages/rail`](../packages/rail/src/settlement.ts) IS UPDATED DELIBERATELY AND BY ADDITION.**
+Its `LT_07_FINDINGS` said *"this slice does not have an ADR number, so each of these is
+REPORTED"*, which is now false; each finding gains a `ruled` field naming the entry that decided
+it and what that entry left open. `test/lt-07.test.ts` gains twelve cases and **every original
+case still passes unedited**, because no primary source that suite reads is amended. The new cases
+hold `LT-06`'s and `LT-07`'s rows as TEXT, so the day either is repaired the package goes red.
+
+**Eight defects seeded and seven caught first time. The eighth was a MISS and the reason is
+recorded rather than counted as a pass**: a `toContain` over a seven-code list is a prefix match
+and still matches once an eighth code is appended at its end, so a widened `LEDGER-C2` vocabulary
+passed. The case now parses the `NOT IN (...)` and compares it whole, and was then watched
+failing; `packages/ledger/test/accounts.test.ts` caught the same seed independently through its
+three-way bind. **A ninth failure was watched and is not a seed**: the endpoint-prefixed key
+admitting two postings for one settlement is the corpus's own predicted failure executed against a
+live schema.
+
+**Measured on this branch with `pnpm install` run first and each command separately: 33 of 33
+gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 204 test
+files / 4,455 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The
+baseline is `main` itself: the branch was created at `bdc99d7`, confirmed identical to
+`origin/main`, so 33 / 13 / 0 / 0 / clean / 204 files / 4,443 passed / 6 skipped was measured on
+the unmodified tree before a line changed. **`pnpm run verify` was never run.**
 
 ## ADR-173 is applied to the wallet correction route, and the append it did not unblock stays refused (2026-08-28, session 317)
 
