@@ -231,23 +231,26 @@ export class SettlementAnchorError extends Error {
  * whose disposition lives only in a document nobody greps for is a finding on
  * its way back to being reported a third time.
  *
- * (A) IS RULED AND STILL BLOCKS: ADR-174 found the DEBIT slot wrong as well.
- * `LT-06` credits `firm_treasury` `amount_cents` and `LT-07` debits it, and
- * `posting.ts` writes `+amountCents` on a debit and `-amountCents` on a credit,
- * so the external leg moves `firm_treasury` by ZERO whatever its kind. A code
- * minted for the credit slot would complete a posting wrong in the other slot,
- * so no code is minted and migration `0052` returned to the pool unspent.
+ * (A) IS RULED AND STILL BLOCKS, AND ITS BLOCKER CHANGED. ADR-174 found the
+ * DEBIT slot wrong as well, so no code was minted. ADR-180 then ruled
+ * `firm_treasury` an `asset`, which puts BOTH of `LT-07`'s legs somewhere new:
+ * cash derecognizes at settlement, so the account is CREDITED there, and the
+ * DEBIT is the in-flight obligation ADR-174 clause 4 ruled must exist. What is
+ * still open is only which CODE holds it, so this finding is no longer waiting
+ * on finding C. It is waiting on ADR-174 section 3's three shapes, and each of
+ * them now has the input it lacked.
  *
  * (B) IS RULED AND CLOSED: the two conventions are one rule under two
  * spellings, a key names the EVENT and never the DOOR, and `LT-07`'s key is
  * `${kind} ${wallet_withdrawals.idempotency_key}`. THIS PACKAGE STILL MINTS
  * NONE, because the caller that mints it is the receiver and this is the port.
  *
- * (C) IS RECORDED AS AN ABSENCE AND NO DIRECTION IS INFERRED. The absence is
- * larger than this finding says: against PostgreSQL 16 with every merged
- * migration applied, `ledger_accounts` holds ZERO rows, and the database
- * accepts `firm_treasury` as an asset, as a liability and as revenue in turn.
- * Nothing seeds the chart of accounts at all.
+ * (C) IS RULED AND CLOSED, AND THE ANSWER IS `asset`. It was recorded as an
+ * absence, then measured by ADR-177 as a CONTRADICTION rather than a silence,
+ * then decided by ADR-180: the prose is right, the three postings written
+ * against the account are backwards, and `M05` section 2.1 is amended for all
+ * three. THAT IS A JUDGEMENT AND NOT A DERIVATION, and the entry ships
+ * `proposed` and UNSIGNED saying so.
  *
  * Each entry is `{id, claim, ruled, sources}`, and the sources are paths a
  * second reader can open.
@@ -256,13 +259,15 @@ export const LT_07_FINDINGS = [
   {
     id: 'A',
     ruled:
-      'ADR-174. RULED AND STILL BLOCKED. The credit slot is not the only defect: LT-06 credits ' +
-      'firm_treasury amount_cents and LT-07 debits it, so the external leg moves that account by ' +
-      'zero whatever its kind, and no code is minted for a slot whose sibling is wrong. ' +
-      'trader_wallet is refused on arithmetic rather than on scope, because LT-06 already debits ' +
-      'it at approval. Migration 0052 returned to the pool unspent. What stays open is which ' +
-      "account carries the external leg's in-flight obligation, and that cannot be settled while " +
-      'finding C is.',
+      'ADR-174, then ADR-180. RULED AND STILL BLOCKED, ON A SMALLER BLOCKER. ADR-174 found the ' +
+      'credit slot was not the only defect and minted no code, and refused trader_wallet on ' +
+      'arithmetic rather than on scope because LT-06 already debits it at approval. ADR-180 then ' +
+      'ruled firm_treasury an asset, so LT-07 CREDITS it at settlement, where cash derecognizes, ' +
+      'and its DEBIT is the in-flight obligation ADR-174 clause 4 ruled must exist between ' +
+      'approval and settlement. M05 section 2.1 is amended for that leg and the counterparty slot ' +
+      'is left open deliberately. What stays open is ONLY which code carries that obligation, ' +
+      'which is ADR-174 section 3s three shapes; this finding no longer waits on finding C, ' +
+      'because finding C is answered.',
     claim:
       "LT-07's credit leg names an account class that does not exist. M05 section 2.1 writes " +
       'LT-07 as `debit firm_treasury; credit the payout wallet position`, and ' +
@@ -307,27 +312,31 @@ export const LT_07_FINDINGS = [
   {
     id: 'C',
     ruled:
-      'ADR-174 section 4 recorded it as an ABSENCE. ADR-177 ANSWERS IT FOR FOUR OF THE SEVEN ' +
-      'CODES AND LEAVES THIS ONE OPEN. Migration 0052 seeds the chart, which held ZERO rows ' +
-      'until it, and binds kind to code for fees_revenue as revenue and for trader_wallet, ' +
-      'trader_withdrawable and promotional_credit as liability, each derived from a posting the ' +
-      'corpus already states read through the sign convention. firm_treasury, psp_clearing and ' +
-      'reserve fall through an ELSE true that is deliberate. THIS CODE IS REFUSED ON A ' +
-      'CONTRADICTION RATHER THAN ON SILENCE: five documents call it the account where cash ' +
-      'books, and LT-02, LT-06 and LT-07 every one read as a liability under the same sign ' +
-      'convention, so the arithmetic and the prose are each unanimous and opposite. LT-07 is ' +
-      'still blocked and the reason is now one question rather than an absence.',
+      'ADR-174 section 4 recorded it as an ABSENCE, ADR-177 measured it as a CONTRADICTION, and ' +
+      'ADR-180 RULES IT: firm_treasury is an ASSET. 0052 seeded the chart, which held zero rows ' +
+      'until it, and bound four codes; 0053 supersedes that constraint with a fifth arm and ' +
+      'seeds the firm_treasury row. THE PROSE IS RIGHT AND THE ARITHMETIC IS WRONG. The ground ' +
+      'is that under liability the chart holds no cash account at all and nothing in this tree ' +
+      'has ever recorded that absence, while the absence the corpus DID record is ADR-174 clause ' +
+      '4s missing in-flight obligation; that treasury_balances is schema rather than prose and ' +
+      'only parses as cash, being the rails reported balance; and that three backwards cells of ' +
+      'one table is one hand and not three witnesses, at the site ADR-027 records four ' +
+      'direction errors landing on in a single day. M05 section 2.1s LT-02, LT-06 and LT-07 are ' +
+      'AMENDED for the leg naming this account and marked UNPOSTABLE. IT IS A JUDGEMENT AND NOT ' +
+      'A DERIVATION and the entry ships proposed and UNSIGNED. psp_clearing and reserve are ' +
+      'still refused, and both of those are SILENCES.',
     claim:
-      'No file in this tree says whether firm_treasury is an asset or a liability, so a ' +
-      'receiver cannot derive which direction LT-07 moves it. ledger_accounts.kind is ' +
-      "CHECK (kind IN ('asset','liability','revenue','expense','equity')); 0052 ties four of " +
-      'the seven codes to a kind and leaves this one untied, and no migration seeds a ' +
-      'firm_treasury row. This is reported as an ABSENCE and no direction is ' +
-      'inferred from it here.',
+      'No file in this tree said whether firm_treasury is an asset or a liability, so a ' +
+      'receiver could not derive which direction LT-07 moves it. ledger_accounts.kind is ' +
+      "CHECK (kind IN ('asset','liability','revenue','expense','equity')) and 0009 ties it to no " +
+      'code at all. 0052 tied four of the seven and left this one under an ELSE true; 0053 ties ' +
+      'it and seeds the row, so the tie in force names five and the chart holds two rows.',
     sources: [
       'packages/db/migrations/0009_ledger.sql',
       'packages/db/migrations/0052_chart_of_accounts.sql',
+      'packages/db/migrations/0053_firm_treasury_kind.sql',
       'docs/decisions/ADR-177.md',
+      'docs/decisions/ADR-180.md',
     ],
   },
 ] as const;
