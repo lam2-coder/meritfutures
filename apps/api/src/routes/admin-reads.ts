@@ -80,7 +80,17 @@
 // formatted strings". `assertContractScalars` walks every response this module
 // returns and refuses any member whose NAME ends `_cents` or `_bp` and whose
 // value is not a safe integer, and any member whose name ends `_day` or `_on`
-// that is not a `YYYY-MM-DD` exchange trading day.
+// whose value is not one of the three forms the contract declares under such a
+// name.
+//
+// THE NAME SAYS WHICH RULE APPLIES AND THE CONTRACT SAYS WHAT THAT RULE ADMITS.
+// The `_day` suffix was read here as "this value IS a trading day", and section
+// 6's `MarkListItem` declares `traded_day: boolean` and `win_day: boolean` on
+// one line of the same document section 1's Time rule is written in. So the
+// rule's SHAPE was right and its EXTENT was wrong: it admitted one of the three
+// forms the contract writes under a day-shaped name and refused the other two.
+// The repair is at {@link assertContractScalars} and it TIGHTENS as well as
+// widens, because a `Date` under such a name used to pass.
 //
 // IT READS THE NAME RATHER THAN A LIST OF FIELDS, which is what makes it hold
 // for a field nobody has added yet. `cusum.statistic` and `cusum.threshold` are
@@ -327,6 +337,31 @@ const TRADING_DAY_KEY = /_(?:day|on)$/;
 const TRADING_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * A value the walk may DESCEND INTO: a plain object or an array, and nothing
+ * else.
+ *
+ * THIS IS THE HALF OF THE DAY RULE THAT TIGHTENS. The container exemption below
+ * used to be `typeof member === 'object' && member !== null`, and a `Date`
+ * satisfies that: `Object.entries(new Date())` is `[]`, so a `Date` under a
+ * day-shaped name was walked, found to carry nothing, and ADMITTED. It then
+ * serialises as `"2026-08-27T00:00:00.000Z"`, which is a UTC instant standing
+ * where the contract types an exchange trading day. That is the exact defect
+ * this sweep exists to catch, reaching an operator THROUGH the sweep.
+ *
+ * NO PROJECTOR IN THIS TREE HANDS THE SWEEP A `Date` UNDER SUCH A NAME TODAY,
+ * because each converts one to `YYYY-MM-DD` through its UTC parts first. That is
+ * a property of every writer rather than a property of this reader, which makes
+ * it a thing to remember. A `Date` arriving here is a converter that was skipped,
+ * and this is where it is refused rather than served.
+ */
+function isWalkableContainer(value: unknown): boolean {
+  if (Array.isArray(value)) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
  * Refuse a response body that breaks section 1's scalar rules.
  *
  * WALKED RATHER THAN CHECKED FIELD BY FIELD. A per-field check is a list that
@@ -363,18 +398,48 @@ export function assertContractScalars(value: unknown, path: string): void {
       // A CONTAINER NAMED FOR A DAY IS NOT A DAY. `LiabilityResponse` carries
       // `eligible_next_7d.by_day`, an ARRAY whose elements each carry a
       // `trading_day`, and a rule that read the name alone would refuse the
-      // shape the contract declares. So the check is type directed: an object
-      // or an array under a day-shaped name is walked, and anything else must
-      // be a `YYYY-MM-DD` string.
-      if (typeof member === 'object' && member !== null) {
+      // shape the contract declares. So the check is type directed. What it may
+      // descend into is a PLAIN container and never any object at all, which is
+      // {@link isWalkableContainer} and is the `Date` this branch used to admit.
+      if (isWalkableContainer(member)) {
         assertContractScalars(member, at);
         continue;
       }
+      // `null` AND `boolean` ARE THE CONTRACT'S OWN OTHER TWO FORMS UNDER A
+      // DAY-SHAPED NAME, AND THEY ARE ADMITTED BY TYPE RATHER THAN BY A LIST OF
+      // FIELD NAMES.
+      //
+      // Read the `ts` blocks of API_CONTRACT and every key ending `_day` or
+      // `_on` is declared in one of three forms. Eleven are a `YYYY-MM-DD`
+      // string. Five are `string | null`: `funded_on` and `closed_on` in
+      // `AccountDetail`, `trading_day` in `TimelineItem`,
+      // `next_eligible_trading_day` in two progress blocks, and
+      // `covered_through_day` in the calendar panel's freshness. TWO ARE
+      // `boolean`: section 6's `MarkListItem` writes `traded_day: boolean;
+      // win_day: boolean;` on one line, and `routes/account-reads.ts` already
+      // ships both of them on `GET /accounts/:accountId/marks`. A sweep that
+      // refused this document's own declarations was refusing the wrong thing.
+      //
+      // WHY BY TYPE AND NOT BY AN EXEMPTED LIST OF NAMES. A list of the two
+      // names is a hand-maintained list, which `RI-05`'s `covers` calls "a
+      // hand-maintained count in a different costume, and it drifts the same
+      // way", and it is ALREADY out of date: `trading_calendar.is_half_day`
+      // (`0004_catalog.sql:323`) is a third `boolean` under a day-shaped name,
+      // on the trading calendar table itself.
+      //
+      // WHAT ADMITTING A BOOLEAN COSTS, WHICH IS THE QUESTION A CONTROL HAS TO
+      // ANSWER BEFORE IT LOOSENS. This rule catches a value that COULD be a day
+      // and is the wrong FORM of one: a UTC instant, an epoch number, a `Date`.
+      // All three are still refused. No date rendering path in any language
+      // produces `true`, so a boolean here is a field the contract declares as a
+      // predicate and never a trading day that went wrong on its way to the
+      // wire.
+      if (member === null || typeof member === 'boolean') continue;
       if (typeof member !== 'string' || !TRADING_DAY.test(member))
         throw new AdminReadError(
-          `\`${at}\` is ${JSON.stringify(member)}, and API_CONTRACT section 1 makes every ` +
-            '`*_day` and `*_on` a `YYYY-MM-DD` exchange trading day, never a UTC date and ' +
-            'never a timestamp',
+          `\`${at}\` is ${JSON.stringify(member)}, and API_CONTRACT declares every ` +
+            '`*_day` and `*_on` member as a `YYYY-MM-DD` exchange trading day, as `null`, or ' +
+            'as a boolean predicate. Section 1: never a UTC date and never a timestamp',
         );
       continue;
     }
@@ -1242,6 +1307,226 @@ function projectAccountDetail(detail: AdminAccountDetail): AdminAccountDetail {
   return projected as AdminAccountDetail;
 }
 
+// -----------------------------------------------------------------------------
+// `INV-M6-10` on the drill-down. ADR-184 ruling 3, applied at the RESPONSE
+// -----------------------------------------------------------------------------
+// **THE FEED HAS THIS PROJECTION AND THIS ROUTE DID NOT, AND THE GAP WAS A
+// THIRD PARTY'S IDENTITY IN A RESPONSE ABOUT SOMEBODY ELSE.** Session 356
+// measured it with a case: `GET /admin/accounts/:accountId` names its subject in
+// the PATH, gated nothing, and its `events` section carried `kyc.dedupe_hit`'s
+// `matched_identity_id` verbatim.
+//
+// **IT IS HERE AND NOT IN THE ADAPTER THAT SUPPLIES `readAccount`, AND ADR-184
+// RULING 3 IS THE REASON IN ITS OWN WORDS**: "the withholding is a property of
+// the RESPONSE and not of the renderer", with the control "run over the
+// SERIALIZED body and not over the rows". An adapter hands over rows. A gate inside one is a second
+// place the rule can be slightly different from the feed's, which is the shape
+// that ruling refused, and `packages/db/src/scope.ts` draws the same line about
+// this exact pair of payload keys: the exclusion "is a PROJECTION and not this
+// rule".
+//
+// **THE RULE IS NOT "NEVER RENDER AN ID", SO THIS IS A LICENCE AND NOT A
+// REFUSAL.** `INV-M6-10` renders trader-identifying data "only when the query
+// names a specific subject" (`M06:54`), and this query names one. `W6-g`
+// established the shape one screen over and `apps/admin` states it: every id
+// served must be one the query reached. So the projection here is NARROWER than
+// the feed's rather than absent, and {@link accountDetailLicence} is the whole
+// of what it admits.
+//
+// **THE VOCABULARY IS `admin-feed.ts`'S AND THE CODE IS NOT, WHICH IS A
+// DUPLICATION TAKEN ON MEASUREMENT RATHER THAN BY PREFERENCE.** `admin-feed.ts`
+// already imports `ADMIN_READ_ROLES`, `LIMIT_DEFAULT`, `LIMIT_MAX`,
+// `adminRoleTable`, `adminValidationFailed` and `toAdminRoutes` from this file,
+// so a VALUE import back is a cycle, and both ends of it were measured on this
+// branch rather than reasoned about. Under real Node ESM it is a hard
+// `ReferenceError: Cannot access 'ADMIN_READ_ROLES' before initialization`.
+// Under Vitest's transform it does not throw at all: `ADMIN_FEED_ENDPOINTS`
+// evaluates with `roles: undefined` and `ADMIN_FEED_ROLE_TABLE` becomes
+// `{ 'GET /admin/events': undefined }`, which is an admin route registered with
+// no role requirement and a green suite over it. **The second outcome is why the
+// import is refused rather than ordered around.** The type-only import at the
+// top of this file is not that cycle, because `import type` is erased.
+//
+// **SO THE TWO STATEMENTS ARE BOUND BY AN ASSERTION INSTEAD OF BY AN IMPORT**,
+// which is session 357's repair for the same shape: the drill-down adapter's own
+// suite asserts {@link WITHHELD} against the feed's and {@link namesASubject}
+// against the feed's over a corpus of keys, both halves non-empty before they
+// are compared. **THE ONE-FILE REPAIR IS REPORTED AND NOT TAKEN**: `admin-feed.ts` importing
+// these three names from this file and deleting its own is a deletion in a file
+// this fence does not hold. Until then the two are read together.
+
+/** What a withheld value renders as. `admin-feed.ts`'s `WITHHELD`, on this response too. */
+export const WITHHELD = 'withheld';
+
+/**
+ * Whether a key names an identity or an account, WHOSEVER IT IS.
+ *
+ * A RULE ON THE SHAPE OF THE KEY AND NOT A COLUMN LIST (ADR-184 ruling 3), so
+ * `matched_identity_id` and `merged_identity_id` are covered without either
+ * having been enumerated, and so is the next payload key nobody has written yet.
+ *
+ * WHAT IT DOES NOT REACH IS SAID RATHER THAN IMPLIED: a third party's uuid
+ * stored under a key of some other shape passes this and passes
+ * {@link assertNothingWithheldOnTheWire} with it, because nothing withheld it.
+ * The console's own check on the same screen is a UUID PATTERN over the served
+ * strings rather than a key rule, so the two layers fail on different things by
+ * construction and both are wanted.
+ */
+export function namesASubject(key: string): boolean {
+  return key.endsWith('identity_id') || key.endsWith('account_id');
+}
+
+/** Thrown when a withheld value reached the drill-down's body. A 500 beats a leak. */
+export class AdminDetailLeak extends Error {
+  constructor(value: string) {
+    super(
+      `the account drill-down contains ${value}, which INV-M6-10 withheld from this response. ` +
+        'The licence of this screen is the subject the path named and the identity that ' +
+        "account row names, so an id from outside that closure is a second person's identity " +
+        'in a response about the first',
+    );
+    this.name = 'AdminDetailLeak';
+  }
+}
+
+/**
+ * The control, run over the SERIALIZED body rather than over the sections.
+ *
+ * A FIELD ADDED CARELESSLY IS WHAT THIS CATCHES, which is `admin-feed.ts`'s
+ * reason for the same control. {@link withholdAccountDetail} gates the keys it
+ * recognises; this asserts the property over whatever the body actually became,
+ * so a value withheld in one section and carried through in another is a refusal
+ * rather than a leak.
+ */
+export function assertNothingWithheldOnTheWire(
+  body: unknown,
+  withheldValues: readonly string[],
+): void {
+  if (withheldValues.length === 0) return;
+  const text = JSON.stringify(body);
+  for (const value of withheldValues) if (text.includes(value)) throw new AdminDetailLeak(value);
+}
+
+/**
+ * The ids this query reached, which is the whole of this response's licence.
+ *
+ * TWO MEMBERS, AND THE SECOND ONE IS THE CONTRACT'S DOING RATHER THAN A
+ * WIDENING. `ACCOUNT_DETAIL_SECTIONS` names `identity` as one of the eight, and
+ * the only way to reach it is `accounts.identity_id`, which `0007_accounts.sql`
+ * declares `uuid NOT NULL REFERENCES identities(id)`. So the owner is a subject this query
+ * reached and withholding them would blank a section section 8 asks for while
+ * still serving the person's whole row beside the hole.
+ *
+ * IT IS NARROWER THAN `apps/admin`'s ONE-MEMBER CLOSURE ONLY IN APPEARANCE, and
+ * the difference is which bytes each licence is over: that screen renders a
+ * count per section and never a member, so the subject it typed is the entirety
+ * of what it serves; this is the response those counts are counted from.
+ *
+ * **THE ROOT IS CHECKED AGAINST THE PATH FIRST AND THE TWO ARE ONE FUNCTION ON
+ * PURPOSE.** A licence taken from a response the port chose, without checking
+ * that the response is about the account that was asked for, licenses whatever
+ * the port returned. `W6-g` checks the root first for exactly this and
+ * `apps/admin` calls it "the worst answer this endpoint can give and the one
+ * they cannot detect". Separating the check from the licence would leave an
+ * order a later caller can get wrong, which is `FM-M6-10`'s shape.
+ */
+export function accountDetailLicence(
+  detail: AdminAccountDetail,
+  accountId: string,
+): ReadonlySet<string> {
+  const account = asRecord(detail.account);
+  if (account === null)
+    throw new AdminReadError(
+      'the account drill-down carried no `account` section to check its root against. The ' +
+        'licence of this response is the subject the path named, and a response that does not ' +
+        'say which account it is about cannot be checked against one',
+    );
+  const root = account['account_id'];
+  if (root !== accountId)
+    throw new AdminReadError(
+      `the account drill-down is headed \`${JSON.stringify(root)}\` where the path named ` +
+        `\`${accountId}\`. A page headed by the id an operator typed whose rows belong to ` +
+        'another human is the answer they cannot detect, and INV-M6-10 licenses the subject ' +
+        'the QUERY named rather than the one the source chose to answer with',
+    );
+  const identityId = account['identity_id'];
+  const licensed = new Set<string>([accountId]);
+  if (typeof identityId === 'string' && identityId !== '') licensed.add(identityId);
+  return licensed;
+}
+
+/** What {@link withholdAccountDetail} produced. `withheldValues` NEVER goes on the wire. */
+export interface WithheldDetail {
+  readonly detail: AdminAccountDetail;
+  /** Every value INV-M6-10 kept off this response. For the wire control alone. */
+  readonly withheldValues: readonly string[];
+}
+
+/**
+ * Apply `INV-M6-10` to a drill-down.
+ *
+ * A WALK AND NOT A ROW MAPPER, which is the one place this differs in SHAPE from
+ * `withholdForScope` rather than in licence. The feed gates a typed
+ * `AdminEventRow`; this route is THE ONE ROUTE OF THE SEVEN THE CORPUS DOES NOT
+ * TYPE, its eight sections are bags of stored columns, and four of them carry
+ * stored `jsonb` besides. So the rule is applied the way `assertContractScalars`
+ * applies section 1's: over every key of whatever the response actually is.
+ *
+ * NO `withheld` FLAG IS ADDED TO A ROW, where the feed's `AdminEventItem`
+ * carries one. The adapter behind `readAccount` serves the DDL's own columns
+ * under the DDL's own names and nothing else, so a boolean this module invented
+ * would be the contract-designing that adapter refuses. The value reads
+ * `withheld` in place, which says the same thing where an operator is already
+ * looking.
+ *
+ * A VALUE THAT IS NOT A PLAIN OBJECT OR AN ARRAY IS RETURNED UNTOUCHED rather
+ * than rebuilt. A walk that reconstructed every object would turn anything
+ * carrying its own prototype into `{}`, which is a stored bag silently emptied
+ * on the screen whose whole discipline is that it shows the stored row.
+ */
+export function withholdAccountDetail(
+  detail: AdminAccountDetail,
+  licensed: ReadonlySet<string>,
+): WithheldDetail {
+  const withheldValues = new Set<string>();
+
+  const gate = (value: string): string => {
+    if (licensed.has(value)) return value;
+    withheldValues.add(value);
+    return WITHHELD;
+  };
+
+  const walk = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map((item: unknown) => walk(item));
+    if (typeof value !== 'object' || value === null) return value;
+    const prototype: unknown = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return value;
+    const record = value as Record<string, unknown>;
+    // THE SUBJECT IS GATED ONLY WHERE THE SIBLING KIND SAYS IT IS A PERSON OR AN
+    // ACCOUNT, which is `withholdForScope`'s rule kept rather than re-decided: a
+    // `payout_request` subject is the handle an operator clicks through to, and
+    // withholding it leaves a screen nobody can act on while protecting nothing
+    // INV-M6-10 is about.
+    const kind = record['subject_kind'];
+    const gatesTheSubject = kind === 'identity' || kind === 'account';
+    const projected: Record<string, unknown> = {};
+    for (const [key, member] of Object.entries(record)) {
+      if (
+        typeof member === 'string' &&
+        (namesASubject(key) || (gatesTheSubject && key === 'subject_id'))
+      )
+        projected[key] = gate(member);
+      else projected[key] = walk(member);
+    }
+    return projected;
+  };
+
+  return {
+    detail: walk(detail) as AdminAccountDetail,
+    withheldValues: [...withheldValues],
+  };
+}
+
 /**
  * API_CONTRACT section 8's reads, in the document's order.
  *
@@ -1353,7 +1638,17 @@ export const ADMIN_READ_ENDPOINTS: readonly AdminEndpointSpec[] = [
       if (accountId === null) return adminNotFound(reply, request.id);
       const detail = await source.readAccount(accountId);
       if (detail === null) return adminNotFound(reply, request.id);
-      return projectAccountDetail(detail);
+      // THE ORDER IS THE POINT AND EACH STEP DEPENDS ON THE ONE ABOVE IT. The
+      // allowlist runs first, so the licence and the walk read a response whose
+      // sections are the contract's; `accountDetailLicence` checks the root
+      // against the path before it licenses anything; the walk gates what the
+      // licence does not admit; and the wire control asserts the property over
+      // whatever the body actually became, which is ADR-184 ruling 3's own
+      // last sentence.
+      const projected = projectAccountDetail(detail);
+      const withheld = withholdAccountDetail(projected, accountDetailLicence(projected, accountId));
+      assertNothingWithheldOnTheWire(withheld.detail, withheld.withheldValues);
+      return withheld.detail;
     },
   },
   {

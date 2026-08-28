@@ -31,11 +31,12 @@
 // THIS ROUTE PERFORMS NO READ, AND IT NAMES NO ERROR KIND
 // -----------------------------------------------------------------------------
 // It waits on TWO suppliers where the flags queue and the identity drill-down
-// wait on one, and that is the difference this screen records:
-// `readIdentityGraph` and `listFlags` are composed in
-// `apps/api/src/admin-source/index.ts` and `readAccount` is not, because seven
-// of the drill-down's eight sections read tables `packages/db` registers and
-// `events` is not one of them.
+// wait on one, and what the second one is has MOVED rather than cleared.
+// `readAccount` is composed in `apps/api/src/admin-source/index.ts` beside
+// `readIdentityGraph`, `listFlags` and `listEvents`, because ADR-191 registered
+// `events` and session 356 wrote the adapter. What no deployment has is the PORT:
+// `exportEvidence`, `readLiability` and `searchAccounts` have no module, so no
+// value satisfies `AdminReadSource` and nothing calls `setAdminReadSource`.
 //
 // `../../flags/page.tsx` states the measurement this route inherits, and it was
 // re-measured here against this route rather than assumed: with no admin session
@@ -80,17 +81,18 @@ type AccountDetailRead =
 const BLOCKED_ON: readonly PendingPanel[] = [
   {
     origin: 'WAVE-06 section 10 item 3',
-    title: 'The read itself: `AdminReadSource.readAccount` has no module behind it',
+    title: 'The read itself: `AdminReadSource` is composed by no deployment',
     blockedBy:
-      'an unregistered table, measured rather than assumed. `GET /admin/accounts/:accountId` is ' +
-      'registered on the operator surface and `AdminReadSource` declares `readAccount`, and no ' +
-      'slice in P5, P6, P7 or WAVE-06 writes it. SEVEN OF THE EIGHT SECTIONS ARE REACHABLE AND ' +
-      'THE EIGHTH IS NOT: `accounts`, `identities`, `dailyMarks`, `ruleStates`, `riskFlags`, ' +
-      '`payoutRequests` and `adminActions` are all keys `packages/db` registers, and `events` ' +
-      'is not one, so a handle naming it is not satisfied by the operator transaction type. ' +
-      'AND SEVEN OF EIGHT IS NOT A SMALLER SCREEN: the route refuses a drill-down that omits a ' +
-      'section API_CONTRACT section 8 names, so a partial adapter is a rejected response. This ' +
-      'is the second read that table blocks, after the event feed',
+      'three of the port`s seven methods, measured rather than assumed, and `readAccount` is ' +
+      'not one of them any more. ALL EIGHT SECTIONS ARE REACHABLE NOW: `accounts`, ' +
+      '`identities`, `dailyMarks`, `ruleStates`, `riskFlags`, `payoutRequests`, `adminActions` ' +
+      'and `events` are all keys `packages/db` registers, ADR-191 gave the last one the sixth ' +
+      'scope class it needed, and `apps/api/src/admin-source/account.ts` supplies every ' +
+      'section API_CONTRACT section 8 names. WHAT IS LEFT IS THE PORT: `exportEvidence`, ' +
+      '`readLiability` and `searchAccounts` have no module, so `apps/api/src/start.ts` calls ' +
+      'no setter and `setAdminReadSource` is still in `wiring.test.ts`s BLOCKED list. A ' +
+      'partial port composed to unblock this screen would throw at the first request to one ' +
+      'of the other three',
   },
   {
     origin: 'ADR-171',

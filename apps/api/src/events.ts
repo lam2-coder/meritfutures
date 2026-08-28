@@ -39,11 +39,26 @@
 // says `wallet.credited` carries `account_id` on the row, "resolved through
 // `reference_id` at write time", precisely because the trader timeline is a
 // per-account view -- so a producer writing neither column on a trader-subject
-// event is a PRODUCER defect and not a hole in the class. It is registered as
-// that entry's sharpest open item, because the failure is SILENT: the row
-// belongs to nobody and simply never appears in the trader's timeline. No
-// constraint on this table can catch it, which is why migration `0058` was
-// returned to the pool rather than spent on one.
+// event is a PRODUCER defect and not a hole in the class. THAT ENTRY REGISTERED
+// IT AS ITS SHARPEST OPEN ITEM BECAUSE THE FAILURE WAS SILENT, AND THE SILENCE
+// IS WHAT IS CLOSED HERE. No constraint on this table can catch it -- both
+// columns are nullable and `0058` was returned to the pool over three candidates
+// that each failed -- so the write path is the only place it can be caught, and
+// `assertTenanted` refuses there. `payout.freeze_expiring` REFUSES rather than
+// writing a row nobody can reach, and the refusal names the repair: a field on
+// the catalogue row for the producer to resolve its tenancy from, which is
+// EVENTS.md's to give and not this file's to invent.
+//
+// AND ONE THING MEASURED HERE IS NOT IN THAT ENTRY. This name's consumers are
+// ALERT and FEED, not TL, so the sharpest form of the harm -- the row never
+// appearing in the trader's TIMELINE -- is not this name's; what is this name's
+// is that no trader-scoped read of `events` reaches the row at all. Read across
+// the whole catalogue rather than this one name: 34 of the 102 rows whose
+// payload can be read name neither column, 3 more carry their payload by
+// reference and are excluded rather than assumed, and EXACTLY ONE of the 34
+// carries the TL consumer. It is `payout.settled`, it has no producer in this
+// tree yet, and it is the second instance of this shape waiting for the slice
+// that writes it.
 //
 // -----------------------------------------------------------------------------
 // WHY THIS FILE NAMES NO PACKAGE AND OPENS NO DOOR
@@ -497,6 +512,7 @@ export function buildEvent(spec: EmitSpec, defaultOccurredAt: Date): EventEnvelo
 
   const identityId = tenancy(spec, row.identityField, 'identity_id');
   const accountId = tenancy(spec, row.accountField, 'account_id');
+  assertTenanted(spec.name, identityId, accountId);
   const { actorKind, actorId } = actor(spec, row);
 
   return {
@@ -516,6 +532,65 @@ export function buildEvent(spec: EmitSpec, defaultOccurredAt: Date): EventEnvelo
     actorId,
     correlationId: spec.correlationId ?? null,
   };
+}
+
+/**
+ * Refuse a row that reaches NEITHER tenancy column.
+ *
+ * THE ONE THING ADR-191 LEFT OPEN, AND IT IS THE SILENCE RATHER THAN THE CLASS.
+ * That entry ruled the sixth scope class `either` correct and ruled that a row
+ * reaching neither leg BELONGS TO NO IDENTITY AND FALLS OUT, which is the right
+ * answer for a predicate. What it named as its sharpest open item is what
+ * happens next: the row is written, nothing raises, and its absence from every
+ * scoped read is indistinguishable from the event never having happened -- on a
+ * table that is APPEND-ONLY and retained forever, so the row cannot later be
+ * given the tenancy it was written without.
+ *
+ * NO CONSTRAINT ON THIS TABLE CAN CATCH IT AND THAT IS SETTLED RATHER THAN
+ * ASSUMED. Both columns are nullable by design, and migration `0058` was written
+ * out against three candidate constraints and RETURNED TO THE POOL because the
+ * disjunction CHECK forbids the firm rows the class admits, an agreement trigger
+ * is false on purpose after every hard merge, and `subject_kind` does not
+ * discriminate the actual counterexample. So the WRITE PATH is the only place
+ * this can be caught at all, and this is that place.
+ *
+ * IT REFUSES RATHER THAN LOGGING, on `UNWIRED_EVENT_SINK`'s argument in this
+ * file and `assertPayloadRules`' next to it. `buildEvent` runs inside `emit` and
+ * therefore inside the caller's transaction (ADR-006), so a refusal rolls the
+ * state change back WITH the event and a warning would commit the pair. EVENTS
+ * section 1's rule is that an event exists if and only if the fact does, and a
+ * row nobody can reach is not the honest half of that pair.
+ *
+ * WHAT THIS IS NOT. It is not a claim that every event belongs to somebody: 34
+ * of the 102 catalogue rows whose payload can be read name neither column, and
+ * 33 of those are consumed only by firm-level readers, where an untenanted row
+ * is exactly right. A producer for one of those would DECLARE the row
+ * firm-level and this would read the declaration. NO ROW IN EVENTS DECLARES ONE
+ * TODAY, so the field is not invented here, on ADR-159 clause 1's rule that a
+ * name is a row on the registry's authority and no other; the message below
+ * names that as the second repair rather than leaving the next reader to work
+ * out why the refusal is total.
+ */
+function assertTenanted(
+  name: EventName,
+  identityId: string | null,
+  accountId: string | null,
+): void {
+  if (identityId !== null || accountId !== null) return;
+  throw new EventError(
+    `${name} reaches neither \`events.identity_id\` nor \`events.account_id\`, so the row it ` +
+      'would write belongs to no identity and to no account. ADR-191 registered `events` under ' +
+      'the scope class `either`, whose predicate is the DISJUNCTION of those two columns, so a ' +
+      'row reaching neither falls out of every scoped read of a table that is append-only and ' +
+      'retained forever, and nothing about the absence distinguishes it from the event never ' +
+      "having happened. THE REPAIR IS IN THE PRODUCER AND NOT HERE: a row's tenancy and its " +
+      'payload are different things, which is why EVENTS says `wallet.credited` resolves ' +
+      '`account_id` through `reference_id` AT WRITE TIME, and a producer holding a ' +
+      '`payout_request_id` holds something that names an account. Give the catalogue row a ' +
+      'field to read the tenancy from, or, where the event genuinely belongs to the firm rather ' +
+      'than to a trader, say so on its row in EVENTS. No row says that today and this file ' +
+      'invents no field EVENTS does not carry',
+  );
 }
 
 /**

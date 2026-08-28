@@ -168,9 +168,22 @@ function flag(id: string, severity: 1 | 2 | 3 | 4 | 5, on: string, depth = 1): F
   };
 }
 
-const DETAIL: AdminAccountDetail = Object.fromEntries(
-  ACCOUNT_DETAIL_SECTIONS.map((section) => [section, []]),
-) as AdminAccountDetail;
+/**
+ * The eight sections, with a REAL `account` root and seven empty lists.
+ *
+ * THE ROOT IS A RECORD CARRYING `account_id` BECAUSE `accountDetailLicence`
+ * READS IT. `INV-M6-10` licenses the subject the PATH named, so the response has
+ * to say which account it is about before anything on it can be licensed, and a
+ * root of `[]` is a drill-down that does not. That is the first field-level
+ * requirement anything places on the one route API_CONTRACT section 8 does not
+ * type, and it is placed by the invariant rather than by a schema.
+ */
+const DETAIL: AdminAccountDetail = {
+  ...(Object.fromEntries(
+    ACCOUNT_DETAIL_SECTIONS.map((section) => [section, []]),
+  ) as AdminAccountDetail),
+  account: { account_id: 'acc-1' },
+};
 
 /** A source over fixed rows. Every method records that it was called. */
 function sourceOf(overrides: Partial<AdminReadSource> = {}): AdminReadSource & {
@@ -522,6 +535,126 @@ test('a trading day that is a timestamp is refused', () => {
   }).toThrow(AdminReadError);
   expect(() => {
     assertContractScalars({ first_detected_on: '2026-08-27' }, '');
+  }).not.toThrow();
+});
+
+// -----------------------------------------------------------------------------
+// 4b. A DAY-SHAPED NAME SAYS WHICH RULE APPLIES. THE CONTRACT SAYS WHAT IT ADMITS
+// -----------------------------------------------------------------------------
+// The sweep read `_day` as "this value IS a trading day" and refused everything
+// else under such a name, which refused two fields API_CONTRACT itself declares.
+// These cases derive the admitted forms FROM THE DOCUMENT rather than restating
+// them, so a future row declaring a fourth form under a day-shaped name turns a
+// case red instead of being silently admitted or silently refused.
+
+/** Every `*_day` / `*_on` member declared inside a `ts` block of API_CONTRACT. */
+function declaredDayMembers(): { readonly key: string; readonly declared: string }[] {
+  const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
+  const members: { key: string; declared: string }[] = [];
+  let inBlock = false;
+  for (const line of contract.split('\n')) {
+    if (line.trimStart().startsWith('```')) {
+      inBlock = !inBlock && line.trimStart().startsWith('```ts');
+      continue;
+    }
+    if (!inBlock) continue;
+    for (const match of line.matchAll(
+      /([A-Za-z_][A-Za-z0-9_]*(?:_day|_on))\s*\??\s*:\s*([^;,{]+)/g,
+    ))
+      members.push({ key: match[1] ?? '', declared: (match[2] ?? '').replace(/[}\s]+$/, '') });
+  }
+  return members;
+}
+
+/** Which of the four forms the contract wrote, read from the declaration alone. */
+function formOf(declared: string): 'boolean' | 'container' | 'nullable' | 'day' {
+  if (declared.includes('boolean')) return 'boolean';
+  if (declared.startsWith('Array') || declared.startsWith('{')) return 'container';
+  if (declared.includes('null')) return 'nullable';
+  return 'day';
+}
+
+test('the contract declares FOUR forms under a day-shaped name, and the sweep admits all four', () => {
+  const members = declaredDayMembers();
+  // A reader that stopped matching returns nothing, and nothing passes vacuously.
+  expect(members.length).toBeGreaterThan(0);
+
+  const byForm = new Map<string, string[]>();
+  for (const { key, declared } of members) {
+    const form = formOf(declared);
+    byForm.set(form, [...new Set([...(byForm.get(form) ?? []), key])].sort());
+  }
+  // ALL FOUR ARE PRESENT, so no branch of the rule below is asserted against an
+  // empty set.
+  expect([...byForm.keys()].sort()).toStrictEqual(['boolean', 'container', 'day', 'nullable']);
+
+  // THE TWO BOOLEANS ARE NAMED BECAUSE THEY ARE THE WHOLE FINDING. API_CONTRACT
+  // section 6's `MarkListItem` writes `traded_day: boolean; win_day: boolean;`,
+  // and the sweep refused both until this rule was repaired.
+  expect(byForm.get('boolean')).toStrictEqual(['traded_day', 'win_day']);
+  // And the nullable form is written out rather than counted, because an ABSENT
+  // KEY was the shape this repair replaced.
+  expect(byForm.get('nullable')?.length).toBeGreaterThan(0);
+
+  const witness: Record<string, unknown> = {
+    boolean: true,
+    container: [{ trading_day: '2026-08-27' }],
+    day: '2026-08-27',
+    nullable: null,
+  };
+  for (const { key, declared } of members)
+    expect(() => {
+      assertContractScalars({ [key]: witness[formOf(declared)] }, '');
+    }, `${key}: ${declared}`).not.toThrow();
+});
+
+test('every form the contract does NOT declare under such a name is still refused, on every one of those names', () => {
+  const members = declaredDayMembers();
+  expect(members.length).toBeGreaterThan(0);
+  // A UTC INSTANT, AN EPOCH SECOND AND A UTC DATE MISSING ITS PADDING. These are
+  // what a wrong trading day actually looks like on the way to an operator, and
+  // admitting `null` and `boolean` costs none of them.
+  const wrong = ['2026-08-27T00:00:00Z', '2026-8-27', '27/08/2026', 1_756_339_200, 20_260_827];
+  for (const { key } of members)
+    for (const value of wrong)
+      expect(
+        () => {
+          assertContractScalars({ [key]: value }, '');
+        },
+        `${key}: ${JSON.stringify(value)}`,
+      ).toThrow(AdminReadError);
+});
+
+test('a Date under a day-shaped name is refused, where the container exemption used to admit it', () => {
+  // THE HALF OF THIS REPAIR THAT TIGHTENS. The exemption that lets
+  // `eligible_next_7d.by_day` through was `typeof member === 'object' && member
+  // !== null`, and `Object.entries(new Date())` is `[]`: a `Date` was walked,
+  // found to carry nothing, and admitted. It serialises as a UTC instant, so the
+  // defect this sweep exists to catch reached the wire THROUGH the sweep.
+  expect(JSON.stringify({ trading_day: new Date('2026-08-27T00:00:00Z') })).toBe(
+    '{"trading_day":"2026-08-27T00:00:00.000Z"}',
+  );
+  expect(() => {
+    assertContractScalars({ trading_day: new Date('2026-08-27T00:00:00Z') }, '');
+  }).toThrow(AdminReadError);
+  // The container it exists for still passes, in both directions.
+  expect(() => {
+    assertContractScalars({ by_day: [{ trading_day: '2026-08-27', cents: 10 }] }, '');
+  }).not.toThrow();
+  expect(() => {
+    assertContractScalars({ by_day: [{ trading_day: '2026-08-27T00:00:00Z' }] }, '');
+  }).toThrow(AdminReadError);
+});
+
+test('an exempted list of the two boolean names would already be stale, which is why the rule is by type', () => {
+  // RI-05's `covers` calls two files holding one number "a hand-maintained count
+  // in a different costume, and it drifts the same way". A list of the two names
+  // the contract declares would not even reach the schema: the trading calendar
+  // itself carries a third boolean under a day-shaped name.
+  const ddl = readFileSync(join(ROOT, 'packages/db/migrations/0004_catalog.sql'), 'utf8');
+  expect(ddl).toMatch(/^ {2}is_half_day\s+boolean NOT NULL/m);
+  expect(() => {
+    assertContractScalars({ is_half_day: true }, '');
   }).not.toThrow();
 });
 
