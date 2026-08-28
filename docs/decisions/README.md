@@ -207,6 +207,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-186](ADR-186.md) | the last two codes are both assets, the `ELSE true` closes to `ELSE false`, and shape (iii) becomes unrepresentable rather than merely refused  (2026-08-28, status: proposed) |
 | [ADR-187](ADR-187.md) | the eighth ledger code is minted, it is `withdrawals_in_flight`, and the shape was not chosen but left  (2026-08-28, status: proposed) |
 | [ADR-188](ADR-188.md) | the liability response is one snapshot row column for column, the shared name is KEPT, and the total is the reader's  (2026-08-28, status: proposed) |
+| [ADR-189](ADR-189.md) | the ninth ledger transaction is `LT-09`, it reverses `LT-06` when the rail is exhausted, and `0057` is taken because a reversal nobody checks is a promise  (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
