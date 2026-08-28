@@ -23,8 +23,9 @@
 // -----------------------------------------------------------------------------
 // `GET /admin/liability`, the data source for the liability home `W6-d`
 // renders; `GET /admin/flags`, the data source for the flags queue `W6-f`
-// renders; and `GET /admin/identities/:identityId/graph`, the data source for
-// the identity drill-down `W6-g` renders. All three are API_CONTRACT section 8
+// renders; `GET /admin/identities/:identityId/graph`, the data source for the
+// identity drill-down `W6-g` renders; and `GET /admin/events`, the data source
+// for the event feed `W6-h` renders. All four are API_CONTRACT section 8
 // headings.
 //
 // THE PARTITION IS THE WAVE'S AND IT IS WRITTEN DOWN. WAVE-06 section 9's row
@@ -53,13 +54,16 @@
 // look like it had started on them, which is `apps/portal/src/api/types.ts`'s
 // stated reason for the same absence one surface over.
 //
-// THE EVENT FEED HAS NO SHAPE HERE BECAUSE IT HAS NO CONTRACT ROW, AND THAT IS
-// A MEASUREMENT RATHER THAN AN OMISSION. WAVE-06 section 4.2 found that M06
-// section 1.1 names the feed a launch surface and `feed.ts` implements it in 507
-// lines while API_CONTRACT sections 8 and 9 carry no endpoint for it. `W6-e` is
-// the slice that writes the row and it is the one slice in this wave that
-// REQUIRES an ADR. Transcribing a feed shape here would mean inventing the
-// contract this file exists to copy.
+// THE EVENT FEED HAD NO SHAPE HERE BECAUSE IT HAD NO CONTRACT ROW, AND THAT
+// SENTENCE IS NOW FALSE RATHER THAN STALE, WHICH IS WHY IT MOVED RATHER THAN
+// STOOD. WAVE-06 section 4.2 found that M06 section 1.1 names the feed a launch
+// surface and `../feed.ts` implements it while API_CONTRACT sections 8 and 9
+// carried no endpoint for it; `W6-e` was the slice that wrote the row and it is
+// the one slice in this wave that REQUIRED an ADR. ADR-184 is that entry, the
+// row is `GET /admin/events` in section 8, and the three types at the foot of
+// this file are its transcription. Nothing here invents it: the query shape,
+// the item and the envelope are the contract's own declarations with `readonly`
+// and comments added.
 //
 // SECTION 9 CONTRIBUTES NO TYPE AND THE REASON IS THE SECTION'S OWN SHAPE.
 // It is a five-row table. Four of its rows (`POST /internal/batch/run`,
@@ -354,4 +358,108 @@ export type IdentityGraph = {
     readonly open_liability_cents: number;
     readonly payouts_lifetime_cents: number;
   };
+};
+
+// -----------------------------------------------------------------------------
+// `GET /admin/events`. ADR-184's row, and INV-M6-10 lives in the QUERY
+// -----------------------------------------------------------------------------
+
+/**
+ * `GET /admin/events`'s query. API_CONTRACT section 8, transcribed field for
+ * field.
+ *
+ * `scope` IS REQUIRED AND HAS NO DEFAULT, WHICH IS THE WHOLE SHAPE. ADR-184
+ * ruling 2 carried `INV-M6-10`'s two modes into the request rather than into a
+ * handler: the invariant is "the admin console renders trader-identifying data
+ * only when the query names a specific subject", so whether a query names one
+ * is a value the caller STATES. The contract says why neither default is
+ * available: `operational` would silently redact a drill-down and either named
+ * arm would hand a bulk screen the licence a named query earns.
+ *
+ * `identity_id` AND `account_id` ARE OPTIONAL IN THE TYPE AND CONDITIONAL IN
+ * THE CONTRACT, and the difference is a limit of the transcription rather than
+ * a relaxation of the rule. The contract writes them as optional members with
+ * "required when `scope` is `identity`, refused otherwise" beside each, and
+ * "readonly and comments" is the whole of this file's licence, so the
+ * conditionality is not lifted into a discriminated union here. The server
+ * enforces it: a subject sent under a scope that does not name it is
+ * `validation_failed` and is never ignored. `../app/feed/event-feed.tsx` is
+ * where this console holds the closed union, on its own values.
+ */
+export type EventFeedQuery = {
+  readonly scope: 'operational' | 'identity' | 'account';
+  /** Required when `scope` is `identity`, refused otherwise. */
+  readonly identity_id?: string;
+  /** Required when `scope` is `account`, refused otherwise. */
+  readonly account_id?: string;
+  /** Section 1: cursor only, never offset. Maximum 100, default 25. */
+  readonly limit?: number;
+  readonly cursor?: string;
+};
+
+/**
+ * One `events` row with `INV-M6-10` already applied to it, BY THE SERVER.
+ *
+ * THE WITHHOLDING IS A PROPERTY OF THIS RESPONSE AND NOT OF A RENDERER, which
+ * is ADR-184 ruling 3 and is the reason these fields say `string | null` and
+ * carry the word rather than being absent. `api-admin` serves this body on
+ * `ADMIN_ORIGIN` with no console in the path, so a redaction living only in a
+ * renderer is a redaction a `curl` walks past.
+ *
+ * THE SET OF WITHHELD VALUES IS NEVER A FIELD ON THIS TYPE AND MUST NEVER
+ * BECOME ONE. The contract states it at the point of declaration: a response
+ * carrying it would ship every withheld identifier to the caller, which is the
+ * bulk read with an extra step.
+ *
+ * `withheld` AND `instants_incoherent` ARE THE SERVER'S VERDICTS AND NOT
+ * DERIVATIONS THIS CONSOLE MAY REDO, which is `LiabilityResponse.payout_velocity
+ * .alarm`'s rule (`INV-M6-12`, no client recomputes an alarm) arriving on a
+ * different row. They are rendered as sent.
+ */
+export type AdminEventItem = {
+  /** `events.id` is `bigint`, so a string: a JSON number loses the order past 2^53. */
+  readonly id: string;
+  readonly event_name: string;
+  /** When the fact happened. */
+  readonly occurred_at: string;
+  /** When we learned it. Corrections make these differ. */
+  readonly recorded_at: string;
+  /** `null` where the row carried none, `"withheld"` where the scope does not admit it. */
+  readonly identity_id: string | null;
+  readonly account_id: string | null;
+  readonly subject_kind: string;
+  readonly subject_id: string;
+  readonly actor_kind: string;
+  readonly actor_id: string | null;
+  readonly correlation_id: string | null;
+  /** Every key ending `identity_id` or `account_id` withheld the same way. */
+  readonly payload: Record<string, unknown>;
+  /** Whether anything on THIS row was withheld. */
+  readonly withheld: boolean;
+  /** We learned it before it happened, which cannot be true. */
+  readonly instants_incoherent: boolean;
+};
+
+/**
+ * `GET /admin/events`. Section 1's envelope plus the scope the page was served
+ * under.
+ *
+ * THE ECHO IS THE MODE AND NOT THE SUBJECT, AND THE ASYMMETRY IS LOAD BEARING
+ * FOR THE SCREEN. `scope` is `EventFeedQuery["scope"]`, so a response says
+ * WHICH of `INV-M6-10`'s two modes produced it and never which subject was
+ * named. A console therefore cannot learn the licence from the response alone:
+ * it pairs the body with the query it issued, and
+ * `../app/feed/event-feed.tsx` refuses a body whose echoed mode is not the one
+ * its query asked for.
+ *
+ * THERE IS NO `total` AND THERE IS NO WAY TO ADD ONE. ADR-157 refuses the
+ * scalar aggregate on the read path. `data.length` is counted rather than
+ * claimed and `next_cursor === null` is the difference between an exhausted
+ * query and a full page, which is the pair of honest facts the contract puts in
+ * place of a number nothing in this system can obtain.
+ */
+export type EventFeedResponse = {
+  readonly scope: EventFeedQuery['scope'];
+  readonly data: readonly AdminEventItem[];
+  readonly next_cursor: string | null;
 };
