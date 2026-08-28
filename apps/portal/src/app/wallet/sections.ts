@@ -268,7 +268,31 @@ export function Exit({ exit }: { readonly exit: WalletExitView }): ReactElement 
 export function Entry({ entry }: { readonly entry: WalletEntryView }): ReactElement {
   return el(
     'li',
-    { className: 'merit-wallet-entry', 'data-direction': entry.direction },
+    {
+      className: 'merit-wallet-entry',
+      'data-direction': entry.direction,
+
+      // THE IDENTIFIERS ARE ON THE ELEMENT AND NOT IN THE PROSE, which is two
+      // decisions rather than one.
+      //
+      // THEY ARE NOT SENTENCES A TRADER READS. A statement line reconciles to
+      // memory on its cause, its amount, its date and the running balance; an
+      // opaque id beside those is noise on the screen section 3.5 wants
+      // trusted at a glance. But a trader disputing a line quotes something,
+      // and `reference_id` is the payout request or the purchase the line came
+      // from, so the value has to be IN the document rather than only behind it.
+      //
+      // AND `entry_id` IS THE BIGINT. API_CONTRACT: it is a decimal string and
+      // "a client must not parse it", because a `wallet_entries.id` above
+      // `Number.MAX_SAFE_INTEGER` "has already lost digits by the time anything
+      // reads it". Rendering the string is what makes that property observable
+      // in the bytes rather than only in a view model nobody serves;
+      // `test/wallet.test.ts` asserts it against 9007199254740993, the first
+      // integer JavaScript cannot represent.
+      'data-entry': entry.entry_id,
+      'data-reference': entry.reference_id,
+      'data-ledger-transaction': entry.ledger_transaction_id,
+    },
     el('span', { className: 'merit-wallet-entry__direction' }, entry.direction),
     el('span', { className: 'merit-wallet-entry__amount' }, entry.amount),
     // The business event, the server's own sentence, rendered verbatim.
