@@ -7078,3 +7078,66 @@ command run separately and `pnpm run verify` never run, reproduced on `main` at 
 line changed: 33 of 33 gates, 16 of 16 invariants, `typecheck` 0, `lint` 0, `format:check` clean
 under the WIDENED glob, and 220 test files / 5,171 passed / 6 skipped unchanged in both directions.**
 `falsify.mjs` ran on a committed tree and the working tree was clean after it.
+
+---
+
+## Session 347: the ninth ledger transaction, and the proof that it happened (2026-08-28)
+
+**[ADR-189](decisions/ADR-189.md), `proposed`, approval line UNSIGNED. MONEY PATH. [`E2`](../MERIT_BUILD_MASTER_PROMPT.md)
+is owed on [`0057`](../packages/db/migrations/0057_terminal_withdrawal_obligation.sql) and is not
+discharged by the merge.**
+
+**THE NINTH LEDGER TRANSACTION IS `LT-09`, `wallet_withdrawal_failure`.** It is the exact negation of
+`LT-06` with `reversal_of` set, posted in the same database transaction as `transferring --> failed`.
+[ADR-181](decisions/ADR-181.md) section 6 found the gap and declined to mint the id;
+[ADR-187](decisions/ADR-187.md) minted the account it strands and left the finding open. It is closed.
+`SD-M5-05`'s mechanism is used and not redesigned: `LT-06` is reversed, never deleted, amended or
+adjusted in place.
+
+**WHAT TRIGGERS IT WAS DERIVED RATHER THAN ASSUMED, AND THE ARGUMENT IS NARROWER THAN THE DISPATCH'S.**
+`failed` is not special because the rail gave up. It is the only terminal state reachable from at or
+past `approved` that does not itself discharge the obligation. The three terminal states were checked
+one at a time: `settled` discharges through `LT-07`; `failed` through nothing, which is the finding;
+and `cancelled` is drawn only from `requested` and `cooling`, both before approval, so `LT-06` never
+posted. **So `WD-C1` is stated as the property and not as the procedure** -- a terminal wallet
+withdrawal leaves nothing standing in `withdrawals_in_flight` -- and it holds on all three, three
+different ways, and would hold on a fourth.
+
+**`0057` IS TAKEN AND THE DISPATCH'S BINARY IS REFUSED WITH ITS REASON.** A posting builder and a
+trigger prove different things and neither is sufficient. `reversalPosting` makes an inexact reversal
+UNREPRESENTABLE by swapping each transfer's two sides and negating nothing, so a partial reversal has
+no spelling; it cannot prove that a withdrawal which reached `failed` was ever handed to it, and it
+cannot prove the reversal was built once rather than twice. **Both of those are facts about rows.**
+The defect being closed is *a state transition happened and no posting followed*, and a builder
+proves only what a caller who called it built.
+
+**A SECOND CONTROL WAS MEASURED BEFORE THE MIGRATION WAS WRITTEN.** `ledger_transactions_reversal_of_idx`
+is NOT UNIQUE in `0009`. A second reversal of one `LT-06` under a different idempotency key LANDS,
+drives the obligation to a debit balance and `trader_wallet` negative, **and leaves the global sum at
+zero, so nothing in this database sees it.** It is superseded UNIQUE under its own name and it now
+binds `LT-03` and every future reversal.
+
+**THE WHOLE FAILURE PATH WAS POSTED END TO END** against the per-identity rows `0054`'s trigger opens,
+after an `LT-01` of 30,000 cents split 25,000 trader and 5,000 firm: `trader_wallet` **-25000**; after
+`LT-06`, `trader_wallet` **0** and the obligation **-25000**; the transition to `failed` **REFUSED**
+while the obligation stood; after `LT-09` the obligation **0**, the trader's claim back at **-25000**,
+global sum **0**.
+
+**FIVE FINDINGS THAT WERE NOT IN THE DISPATCH**, in [ADR-189](decisions/ADR-189.md) section 6. Two are
+worth this page. **`0009:103-104`'s comment claims a reversal "may not chain onto another reversal"
+and the CHECK beneath it enforces only self-reversal**; executed, and reported rather than closed,
+because that is a general ledger rule and `account_adjustments` already enforces it where reversals
+are actually written. **And [ADR-187](decisions/ADR-187.md) section 9 nominates the failed-withdrawal
+case as the cheapest place to see whether `LT-06`'s and `LT-07`'s slots are one account, and it is not
+one**: `LT-09` touches `LT-06`'s slot and no other, so the failure path is silent on that question.
+**The good news is that this ruling does not depend on its answer.**
+
+**`0009`, `0027`, `0038`, `0052`, `0053`, `0054`, `0055` AND `0056` ARE BYTE FOR BYTE UNCHANGED, none
+of `0056`'s three guards is touched, the vocabulary stays closed at EIGHT, and [M20](plans/M20-wallet.md)
+and [STATE_MACHINES](architecture/STATE_MACHINES.md) are NOT amended and neither needed to be.** `M05`
+section 2.1 gains one row and one paragraph and loses nothing; `LT-02`'s, `LT-06`'s and `LT-07`'s rows
+are untouched. **Measured with `pnpm install` first, each command run separately and `pnpm run verify`
+never run, with the `main` baseline at `9dca218d` reproduced before a line changed: 33 of 33 gates, 16
+of 16 invariants, `typecheck` 0, `lint` 0, `format:check` clean, and 223 test files / 5,240 passed / 6
+skipped against 222 / 5,220 / 6.** Eight defects seeded across the TypeScript, the migration and the
+plan and all eight caught; five more seeded into `0057` and caught by the CI probe.
