@@ -593,6 +593,36 @@ test('the flag queue is refused when it inverts triage', async () => {
   expect(await pageOf([{ ...flag('f-6', 5, '2026-08-01'), corroboration_depth: 1.5 }])).toBe(500);
 });
 
+/**
+ * `projectFlag` carries ADR-178's key to the wire, asserted on the BODY.
+ *
+ * THIS CASE EXISTS BECAUSE THE ORDER ASSERTION CANNOT COVER IT. `assertFlagOrder`
+ * runs on the PORT's rows, before the projection, so a `projectFlag` that
+ * emitted a constant depth would ship a wrong sort key to the operator with the
+ * adapter right, the ordering right and the assertion passing. That mutation was
+ * seeded and NOTHING CAUGHT IT until this case existed, which is the field-by-
+ * field projection's own warning arriving on the one field that is new.
+ */
+test('the served flag carries the corroboration depth the port computed', async () => {
+  setAdminSessionSource(sessionOf(operator('owner')));
+  setAdminReadSource(
+    sourceOf({
+      listFlags: () =>
+        Promise.resolve({
+          data: [flag('f-1', 2, '2026-08-01', 3), flag('f-2', 5, '2026-08-02', 1)],
+          next_cursor: null,
+        }),
+    }),
+  );
+  const res = await get('operator', ADDRESSES.flags, COOKIE);
+  expect(res.statusCode).toBe(200);
+  const body = JSON.parse(res.body) as { data: FlagListItem[] };
+  expect(body.data.map((item) => item.corroboration_depth)).toStrictEqual([3, 1]);
+  // And the whole row, so a field dropped anywhere in the projection is caught
+  // by the same case rather than by the next one somebody remembers to write.
+  expect(body.data[0]).toStrictEqual(flag('f-1', 2, '2026-08-01', 3));
+});
+
 test('a flag filter outside the closed vocabulary is a validation failure', async () => {
   setAdminSessionSource(sessionOf(operator('owner')));
   setAdminReadSource(sourceOf());
