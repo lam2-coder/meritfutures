@@ -464,11 +464,31 @@ export function inAdversarialOrder(three: ThreeNumbers): readonly Reading[] {
 // two diverge exactly when the wallet is doing its job". M20 section 8 says
 // that if only one number could be shown it would be that one, because it is
 // "the only number that answers what happens if the wallet's convenience is
-// tested all at once". NOTHING IN THIS TREE PRODUCES IT: the demand projection
-// has no table, and `GET /admin/wallet/reconciliation` (M20's own float
-// position for M06) is registered by no route module. It is rendered ABSENT
-// with that reason, because a float coverage of zero reads as "no float is
-// withdrawable" and a float coverage of 100 percent reads as "all of it is".
+// tested all at once". NOTHING IN THIS TREE PRODUCES IT, and one half of that
+// sentence was rewritten rather than left standing.
+//
+// THE DEMAND PROJECTION STILL HAS NO TABLE, re-derived: no migration names a
+// near-term withdrawal-demand projection.
+//
+// BUT `GET /admin/wallet/reconciliation` IS REGISTERED NOW, AND THE REASON THAT
+// SAID OTHERWISE HAD GONE FALSE. `apps/api/src/routes/admin-wallet.ts` declares
+// `WALLET_RECONCILIATION_PATH` and serves it from `ADMIN_WALLET_ENDPOINTS`, and
+// `apps/api/src/registry.ts` discovers every route module under `routes/`, so
+// the endpoint M20 section 8 makes the owner of the float position for M06 is
+// on the operator surface. What blocks it is a BACKEND: `useAdminWalletBackend`
+// is on `apps/api/test/wiring.test.ts`'s BLOCKED list, and `reconcile` in
+// particular is refused there for needing a join and an aggregate the accessor
+// vocabulary does not carry, so the unwired default rejects with
+// `AdminWalletUnwired('reconcile')`.
+//
+// THAT CORRECTION IS THE SAME REPAIR THE P-M6-07 `PENDING` ROW IN `page.ts`
+// TOOK when `0049` landed: a reason that names a closed item is worse than no
+// reason at all, because a reader who chases it finds the item closed and
+// concludes the panel is unblocked.
+//
+// It is rendered ABSENT either way, because a float coverage of zero reads as
+// "no float is withdrawable" and a float coverage of 100 percent reads as "all
+// of it is".
 // =============================================================================
 
 /**
@@ -763,11 +783,16 @@ export function reserveCoverage(input: {
         'this one, because it is the only number that answers what happens if the wallet ' +
         'convenience is tested all at once',
       reason:
-        'no supplier. The near-term external withdrawal demand projection has no table in the ' +
-        'migrations, and GET /admin/wallet/reconciliation, which M20 section 8 makes the owner ' +
-        'of the float position for M06, is registered by no route module in this tree. Rendered ' +
-        'absent rather than as a percentage, because a zero here reads as "none of the float is ' +
-        'withdrawable" and a hundred reads as "all of it is"',
+        'no supplier, and the two halves of that fail differently. The near-term external ' +
+        'withdrawal demand projection has no table in the migrations. GET ' +
+        '/admin/wallet/reconciliation, which M20 section 8 makes the owner of the float ' +
+        'position for M06, IS registered: routes/admin-wallet.ts serves ' +
+        'WALLET_RECONCILIATION_PATH and the registry discovers every route module under ' +
+        'routes/. What that endpoint has no supplier for is its BACKEND, and reconcile is on ' +
+        'the wiring BLOCKED list for needing a join and an aggregate, so it rejects with ' +
+        'AdminWalletUnwired rather than answering. Rendered absent rather than as a percentage, ' +
+        'because a zero here reads as "none of the float is withdrawable" and a hundred reads ' +
+        'as "all of it is"',
     }),
 
     ratioBp,

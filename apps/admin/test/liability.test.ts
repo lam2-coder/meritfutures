@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, test } from 'vitest';
 
 import type { Cents } from '@merit/rules-engine';
@@ -495,5 +497,29 @@ describe('M6-A-34: P-M6-07 attestation half, and the second ratio nobody supplie
     expect(readingIsPresent(floatCoverage)).toBe(false);
     expect(render(floatCoverage)).toContain('GET /admin/wallet/reconciliation');
     expect(render(floatCoverage)).not.toContain('0.00');
+  });
+
+  // THE REASON IS BOUND TO THE ROUTE MODULE RATHER THAN TO A MEMORY OF IT.
+  // This reason said the endpoint was "registered by no route module in this
+  // tree" and that had gone false: `routes/admin-wallet.ts` serves it. The
+  // repair is the one `page.ts` took on the P-M6-07 pending row when `0049`
+  // landed, and this case is what keeps it from drifting back. Reading a file
+  // from `apps/api` is `test/surface.test.ts`'s own device one suite over,
+  // where the API base path is asserted against `apps/api/src/surface.ts`
+  // because `RI-04` forbids the package dependency that would let it import.
+  test('the absence does NOT claim the endpoint is unregistered, because it is', () => {
+    const routeModule = readFileSync(
+      new URL('../../api/src/routes/admin-wallet.ts', import.meta.url),
+      'utf8',
+    );
+    expect(routeModule).toContain(
+      "export const WALLET_RECONCILIATION_PATH = '/admin/wallet/reconciliation';",
+    );
+    expect(routeModule).toContain('path: WALLET_RECONCILIATION_PATH,');
+
+    const rendered = render(coverageOf().floatCoverage);
+    expect(rendered).not.toContain('registered by no route module');
+    expect(rendered).toContain('IS registered');
+    expect(rendered).toContain('BACKEND');
   });
 });
