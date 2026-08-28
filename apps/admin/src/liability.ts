@@ -41,6 +41,60 @@
 // stated once at the call site that builds the row, and the sum happens here.
 //
 // -----------------------------------------------------------------------------
+// THE PANEL HAS THREE COMPONENTS AND NOT TWO, AND THE THIRD HAS NO COLUMN
+// -----------------------------------------------------------------------------
+// ADR-195 clause 1: the firm-scoped `withdrawals_in_flight` obligation is a
+// TERM IN Open Liability rather than a figure beside it. INV-M6-15 is the rule
+// that follows, and M06 amended P-M6-01 additively to carry it:
+//
+//   "Open Liability does not move when a wallet withdrawal is approved, and it
+//    falls when that withdrawal's cash leaves."
+//
+// THE DEFECT IT REPAIRS IS IN THE TOTAL, WHICH IS WHY IT IS A TERM. Under a
+// two-term panel `LT-06` moves only the wallet component, so the reported
+// liability falls at the APPROVAL and does not move at the SETTLEMENT, and
+// `LT-09`'s rail-exhausted reversal makes it RISE at a moment when nothing new
+// is owed. Three wrong movements from one missing term, and no number placed
+// next to a wrong sum makes it right.
+//
+// SO THE THIRD ADDEND IS IN `theThreeNumbers` AND THE OBLIGATION IS A
+// MAGNITUDE. `posting.ts` makes a credit `-amountCents`, so a standing
+// obligation of 25,000c is a ledger net of -25000 in `withdrawals_in_flight`;
+// the panel term is 25000, on `wallet_balances_cents`' own precedent of a
+// positive column for a liability whose ledger net is negative. A term written
+// as the ledger net would SUBTRACT the obligation from a figure whose whole
+// purpose is that it not fall wrongly (ADR-195 section 4).
+//
+// AND IT IS OPTIONAL, WHICH IS THE HONEST SHAPE RATHER THAN A CONVENIENCE.
+// ADR-195 section 6 is the list of what that entry does NOT hold, and row 1 is
+// the column: `0009_ledger.sql` plus `0049_reserve_coverage_snapshots.sql`'s
+// `ALTER TABLE` give `liability_snapshots` `as_of`, `open_liability_cents`,
+// `bounded_near_term_cents`, `remaining_ladder_exposure_cents`,
+// `wallet_balances_cents`, `absorbed_corrections_cents`, `funded_accounts`,
+// `id` and `computed_at`, and not one of them is this obligation. An unsupplied
+// term renders ABSENT with that reason and the total says it is INCOMPLETE, on
+// P-M6-03's own precedent one panel over: a zero would read as "nothing is in
+// flight", which is a claim no row in this tree can support.
+//
+// THE ORDERING IS THE ONE SENTENCE THAT MAKES INCOMPLETE SAFE, AND IT WAS
+// RE-DERIVED HERE RATHER THAN TAKEN. Nothing in this tree posts `LT-06`:
+// `packages/ledger/src/reversal.ts` builds the posting privately to make
+// `LT-09` its exact negation and says in terms that nothing posts it yet, and
+// `apps/api/src/routes/wallet-withdrawals.ts` says so in its first heading. So
+// the term is zero today and the panel is incomplete rather than wrong. It
+// becomes wrong on the day the first writer of `LT-06` lands, which is why the
+// column has to arrive before that writer does.
+//
+// WHAT THE THIRD TERM DOES NOT TOUCH IS THE FLOAT, AND THAT IS A CLAUSE RATHER
+// THAN AN OVERSIGHT. ADR-195 clause 4 keeps the obligation out of P-M6-07's
+// `floatCents`, which is read from `wallet_balances_cents` deliberately and is
+// the same column P-M6-01's wallet component reads. An in-flight withdrawal is
+// money already being withdrawn rather than float, and folding it into that
+// column would make one quantity mean two different things in the two places
+// this file reads it from. Whether it belongs in that panel's exposure
+// DENOMINATOR is a second question and ADR-195 does not rule it.
+//
+// -----------------------------------------------------------------------------
 // ONE ORDERING IS DERIVABLE AND IT IS ASSERTED
 // -----------------------------------------------------------------------------
 // `min(withdrawable, cap) <= withdrawable` termwise, and the accounts eligible
@@ -98,6 +152,44 @@ export interface LiabilitySnapshot {
   readonly withdrawableAcrossFundedCents: Cents;
   /** `0009.wallet_balances_cents`. The other component. ADR-019, INV-M6-11. */
   readonly walletBalancesCents: Cents;
+  /**
+   * P-M6-01's THIRD COMPONENT, AND THERE IS NO COLUMN BEHIND IT.
+   *
+   * The firm-scoped `withdrawals_in_flight` obligation, which is what
+   * `amount_cents` becomes between `LT-06` and `LT-07` (ADR-187, `0056`).
+   * ADR-195 clause 1 makes it a TERM in this panel and INV-M6-15 is the rule
+   * that follows.
+   *
+   * A MAGNITUDE AND NEVER THE LEDGER NET. See the header: the ledger net of a
+   * standing obligation is negative and a term written that way would subtract
+   * it from the panel. `requireNonNegative` refuses the sign error rather than
+   * rendering it.
+   *
+   * OPTIONAL BECAUSE NO SUPPLIER EXISTS, and undefined is not zero.
+   * `liability_snapshots` has no column for it (ADR-195 section 6 row 1) and
+   * `LiabilityResponse` has no field for it, so this record cannot pretend to
+   * carry it. Absent renders the component with that reason and marks the total
+   * incomplete; a zero would say the obligation was measured and found empty.
+   *
+   * IT CARRIES ITS OWN `source` AND THAT IS THE ONE PLACE THIS RECORD DEPARTS
+   * FROM {@link LiabilitySnapshot.asOfInstant}'s RULE. The source is a property
+   * of this function for every other figure here, because this function reads
+   * exactly one table. This term is the figure that breaks that premise: no
+   * column of `liability_snapshots` produces it, and ADR-195 clause 3 names TWO
+   * producers without choosing between them, the `withdrawals_in_flight` ledger
+   * balance and the sum of `amount_cents` over withdrawals standing at
+   * `approved` or `transferring`. `WD-C1` in `0057` binds them on the terminal
+   * set, so a divergence is confined to the open set, and INV-M6-04 requires
+   * the reader be told which of the two they are looking at. The INSTANT is not
+   * a member: ADR-195 clause 3 fixes it at the panel's own `as_of`, which is
+   * the row's.
+   */
+  readonly withdrawalsInFlight?: {
+    /** The obligation's magnitude at the row's `as_of`. Integer cents. */
+    readonly cents: Cents;
+    /** Which of ADR-195 clause 3's two producers this figure came from. */
+    readonly source: string;
+  };
   /** `0009.bounded_near_term_cents`. P-M6-02. */
   readonly boundedNearTermCents: Cents;
   /** `0009.remaining_ladder_exposure_cents`. AS-M6-04's third number. */
@@ -126,6 +218,13 @@ export interface ThreeNumbers {
     readonly withdrawable: Reading;
     /** A claim that has already cleared them all and is owed unconditionally. */
     readonly wallet: Reading;
+    /**
+     * ADR-195's third. A claim that has cleared every gate AND BEEN ACTED ON.
+     *
+     * Absent when the row carries no obligation, which is every row today: see
+     * {@link LiabilitySnapshot.withdrawalsInFlightCents}.
+     */
+    readonly withdrawalsInFlight: Reading;
   };
 }
 
@@ -160,6 +259,17 @@ export function theThreeNumbers(snapshot: LiabilitySnapshot): ThreeNumbers {
     '0009.remaining_ladder_exposure_cents',
   );
 
+  // ADR-195's third component. A magnitude, refused if it arrives as the ledger
+  // net: the header states why the two differ by a sign and why only one of
+  // them can be summed into this panel.
+  const inFlight =
+    snapshot.withdrawalsInFlight === undefined
+      ? undefined
+      : requireNonNegative(
+          snapshot.withdrawalsInFlight.cents,
+          'the withdrawals_in_flight obligation',
+        );
+
   // The derivable ordering. See the header for the proof and for why the other
   // pair has none.
   if (bounded > withdrawable)
@@ -180,8 +290,17 @@ export function theThreeNumbers(snapshot: LiabilitySnapshot): ThreeNumbers {
         'sum(withdrawable) across funded accounts plus sum(wallet balances) across identities, ' +
         'as of the last closed day. The ACCOUNTING claim: what traders could claim if every gate ' +
         'vanished. It is NOT the near-term cash requirement, which is smaller, and NOT the ' +
-        'lifetime commitment, which is larger',
-      cents: withdrawable + wallet,
+        'lifetime commitment, which is larger. THREE COMPONENTS AND NOT TWO (ADR-195): the ' +
+        'firm-scoped withdrawals_in_flight obligation is summed here as well, so this total does ' +
+        'not move when a wallet withdrawal is approved and falls when that withdrawal cash ' +
+        'leaves (INV-M6-15)' +
+        (inFlight === undefined
+          ? '. THE THIRD COMPONENT IS UNSUPPLIED ON THIS ROW, so what is printed is the first ' +
+            'two summed and it is INCOMPLETE rather than wrong: no column of liability_snapshots ' +
+            'holds the obligation, and nothing in this tree posts LT-06 yet, so the term is zero ' +
+            'today and this total starts understating on the day that stops being true'
+          : ''),
+      cents: withdrawable + wallet + (inFlight ?? 0n),
       asOf,
       authority: 'authoritative',
     }),
@@ -232,6 +351,42 @@ export function theThreeNumbers(snapshot: LiabilitySnapshot): ThreeNumbers {
         asOf,
         authority: 'authoritative',
       }),
+      withdrawalsInFlight:
+        inFlight === undefined || snapshot.withdrawalsInFlight === undefined
+          ? absent({
+              origin: 'P-M6-01',
+              label: 'Open liability: in-flight withdrawal component',
+              definition:
+                'the firm-scoped withdrawals_in_flight obligation, what amount_cents becomes ' +
+                'between LT-06 and LT-07 (ADR-187, 0056). ADR-195 clause 1 makes it this panel ' +
+                'THIRD COMPONENT rather than a figure beside the panel, because the defect a ' +
+                'missing term produces is in the TOTAL',
+              reason:
+                'NO COLUMN, and no field on the wire either. ADR-195 section 6 row 1: ' +
+                '0009_ledger.sql and 0049_reserve_coverage_snapshots.sql give ' +
+                'liability_snapshots as_of, open_liability_cents, bounded_near_term_cents, ' +
+                'remaining_ladder_exposure_cents, wallet_balances_cents, ' +
+                'absorbed_corrections_cents, funded_accounts, id and computed_at, and not one ' +
+                'of them is this obligation. Rendered absent rather than zero, because a zero ' +
+                'says the obligation was measured and found empty. Nothing in this tree posts ' +
+                'LT-06 yet, so the term is zero today and the panel is INCOMPLETE rather than ' +
+                'wrong; the column has to land before the first writer of LT-06 does',
+            })
+          : figure({
+              origin: 'P-M6-01',
+              label: 'Open liability: in-flight withdrawal component',
+              definition:
+                'the firm-scoped withdrawals_in_flight obligation, what amount_cents becomes ' +
+                'between LT-06 and LT-07 (ADR-187, 0056, INV-M6-15). A claim that has cleared ' +
+                'every gate AND BEEN ACTED ON, and the only component of this panel with TWO ' +
+                'EXITS: LT-07 out as cash, which is the one external-leg posting that moves ' +
+                'this total, or LT-09 back into the wallet component, which moves the total not ' +
+                'at all. It is a MAGNITUDE and not the ledger net, and it is NOT money already ' +
+                'gone',
+              cents: inFlight,
+              asOf: { instant: snapshot.asOfInstant, source: snapshot.withdrawalsInFlight.source },
+              authority: 'authoritative',
+            }),
     },
   };
 }
