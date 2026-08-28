@@ -287,6 +287,21 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'a door neither of the two serves. The row is read UNAUTHENTICATED, so `scoped` has no ' +
     'identity to open with, and `certificates` is scope class `owned`, so `firm` refuses the key ' +
     'AT COMPILE TIME. The port states this itself at `routes/certificates.ts:944-948`.',
+  useVerifySource:
+    'ONE ARM OF THREE, AND THE OTHER TWO ARE CONSTRUCTIBLE TODAY, WHICH IS WHY THIS ENTRY EXISTS ' +
+    'RATHER THAN AN ADAPTER. `VerifySource.lookup` (`routes/verify.ts:591`) reads `certificates`, ' +
+    'and `GET /verify/:code` is UNAUTHENTICATED, so `db.scoped` has no identity to open with; ' +
+    '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:568`), and ' +
+    '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1131-1133`), so ' +
+    '`db.firm` refuses that key AT COMPILE TIME. THE OTHER TWO ARMS HAVE WHAT THEY NEED: ' +
+    '`certificate_verifications` is scope class `firm` (`packages/db/src/scope.ts:1065`), so the ' +
+    '`record` arm is writable through `db.firm` now, and `presentation` is deployment ' +
+    'configuration rather than a read. A BACKEND WITH ONE LIVE ARM AND ONE THAT REJECTS IS ' +
+    "REFUSED HERE, on `usePayoutBackend`'s stated rule: it would put a live-looking public " +
+    "route in front of the arm that answers the caller, and this route answers `INV-M11-03`'s " +
+    '"no certificate with this code", which is a claim about Merit\'s book rather than about a ' +
+    'deployment. When `lookup` gets a door this entry shrinks to the copy rather than being ' +
+    'rewritten.',
   // ---------------------------------------------------------------------------
   // The cash door. THE REASON THAT STOOD HERE WAS FALSE AND IS REPLACED RATHER
   // THAN DELETED, because it was true when it was written. ADR-172.
@@ -420,5 +435,5 @@ test('the wired count is reported, so a regression is a number and not a paragra
     declared: declaredIn.size,
     wired: [...wired].filter((port) => declaredIn.has(port)).length,
     blocked: Object.keys(BLOCKED).length,
-  }).toStrictEqual({ declared: 21, wired: 6, blocked: 15 });
+  }).toStrictEqual({ declared: 22, wired: 6, blocked: 16 });
 });
