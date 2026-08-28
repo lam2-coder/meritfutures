@@ -355,8 +355,15 @@ test('every database adapter written in this deployable is installed or accounte
   const accountedByPort = new Set([
     'databaseCertificateBackend',
     'databaseIdempotencyStore',
-    // `useWithdrawalBackend` is blocked on an absent `IdempotencyStore`; its own
-    // entry above carries the reason, so its adapter is accounted for by it.
+    // `useWithdrawalBackend` is blocked, and its own entry above carries the
+    // reason, so its adapter is accounted for by it.
+    //
+    // THE REASON WORDED HERE WAS THE REFUTED ONE, "an absent `IdempotencyStore`",
+    // AND IT SURVIVED IN THIS COMMENT AFTER THE ENTRY ABOVE WAS CORRECTED. That
+    // is the same defect ADR-172 found in this file twice already, in a third
+    // place: a claim restated somewhere nothing reads it for agreement. The
+    // reason lives in `BLOCKED` and this comment now points at it instead of
+    // paraphrasing it, because a paraphrase is what drifts.
     'databaseWithdrawalBackend',
   ]);
   const orphaned = [...factories]
