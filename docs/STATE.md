@@ -6480,3 +6480,113 @@ invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 214 test fi
 **Twelve seeded cases, every one in both directions, and four seeds run against the REAL tree** with the finding text recorded and the tree restored byte for byte, proved by checksum: a true citation shifted 39 lines FIRED, a pointer past the end of the file its link names FIRED, a link naming a file this tree does not have FIRED, and the control seeding the same drift under a dated session heading stayed SILENT exactly as `covers` says. **No seed went uncaught.** All four design decisions are additionally watched failing under mutation.
 
 **Measured on this branch with `pnpm install` first and each command run separately: 33 of 33 gates, 16 of 16 invariants, 213 test files / 5,041 passed / 6 skipped.** The `main` baseline of 33 / 15 / 213 / 5,028 / 6 was reproduced before a line changed. Thirteen new cases are the whole of the test delta. **No ADR number, no migration number, no document repaired and no frozen document edited.**
+
+---
+
+## The contract and the tree are diffed for the first time, and they agree exactly (2026-08-28, session 338)
+
+**THE DIFF IS EMPTY IN BOTH DIRECTIONS AND THAT IS THE MEASUREMENT.**
+[API_CONTRACT](architecture/API_CONTRACT.md) declares **72** distinct `METHOD /path` endpoints. The
+modules on disk declare **72** routes and `compose()` registers **72** across the two surfaces. The
+symmetric difference is **0**: every contract row has a registered route and every registered route
+has a contract row. **Nothing in this repository could ask that question before this session**, and
+the answer is not the one the slice was priced for.
+
+**THE 35 WAS THE PARSER AND NOT THE CORPUS.** The dispatch's premise was that a backtick regex
+returned 35 distinct paths and that the parser rather than the document was wrong. It was. The reader
+that gets 72 reads **two structures and says which**: an endpoint HEADING, split on commas so a
+segment omitting a method inherits the one to its left, and an endpoint TABLE identified by its first
+header cell being exactly `Endpoint`, which is a SHAPE rather than a section number, so a new
+endpoint table is read the day it lands and a new prose table is not. **Four headings carry more than
+one endpoint and one entry per heading loses five of them**, a failure
+[API_CONTRACT](architecture/API_CONTRACT.md) section 8 names in its own words: *"One heading over
+three paths reads as one endpoint to anything parsing this document."* **Prose is read NOT AT ALL**,
+which is the skip that produced the 35: section 1 spells `POST /accounts/:id/reset` where the heading
+spells `:accountId`, and section 12 describes requests that must be REFUSED.
+
+**THE BASELINE WAS REPRODUCED BEFORE ANYTHING WAS BUILT**: `public` **46 registered / 26 withheld**,
+`operator` **27 / 45**, over a real `compose()`. **The dispatch's "73 registered routes" is a SUM and
+the distinct figure is 72**, because `GET /health` is registered on BOTH surfaces, which is
+[API_CONTRACT](architecture/API_CONTRACT.md) section 9 doing what its row says while sitting in an
+admin-origin section.
+
+**THE READER STATES ITS OWN COVERAGE AND THE COVERAGE IS DERIVED FROM THE READ.** 59 endpoint
+headings and 64 endpoints from them; 2 endpoint tables and 8 rows; 22 headings stating no method and
+5 tables keyed on `Code`, `revocation_class`, `Surface`, `Token` and `Test` skipped **with their line
+numbers**; **0 anomalies and 0 duplicate declarations**. A position inside a structure it claims to
+read, from which it derived no endpoint, is reported rather than dropped, because a parser that
+silently drops rows produces a coverage report that looks like success. **It reads the live document
+in 0.44 seconds' thousandth part**, 0.44 ms minimum over ten reads and 0.67 ms maximum;
+`RI-16`'s reader took over five minutes on one document before three defects in it were found, and
+the shapes that made it slow are the shapes this one avoids on purpose.
+
+**ITS TEST'S SUBJECT IS A FIXTURE CONTRACT AND NEVER THE LIVE DOCUMENT**, because session 336 is
+adding a contract row concurrently and a suite asserting "72 endpoints" is a check that punishes the
+work it exists to support. **The fixture found a REAL DEFECT in the reader**: it required a space
+after the method, so a heading whose whole text was a bare `GET` fell into the count of non-endpoint
+headings. A malformed endpoint heading, silently dropped, invisible on a document where every heading
+is well formed. **Four seeds were then run against the REAL corpus in memory and all four were caught
+exactly**, with the document's SHA-256 verified identical before and after; the fourth collapses a
+three-endpoint heading and produces **two false findings**, which is the comma split watched being
+load-bearing.
+
+**WHAT THE EMPTY DIFF DOES NOT SAY, stated because a green measurement is the one most likely to be
+vacuous.** It compares PATHS and nothing else, so a route whose schema, auth factor, idempotency or
+rate limit differs from its contract row is invisible to it. It is blind to a surface the contract
+never rowed: session 329's finding that sections 8 and 9 carry **no event-feed endpoint** for a
+surface `M06` names and [`feed.ts`](../apps/admin/src/feed.ts) implements in 507 lines is in neither
+list because it is in neither input. And it says nothing about WHICH surface a route landed on.
+
+**FINDING 1: A FROZEN DOCUMENT SAYS TWO ROUTES DO NOT EXIST, AND THEY DO.**
+[`API_CONTRACT:946`](architecture/API_CONTRACT.md) says `GET /admin/loss-ratios` and
+`GET /admin/cusum` are *"registered by nothing"*, that `CompositionReport.registered` *"lists them on
+neither surface"*, and that they are *"a route nobody has built yet"*. Both are in
+`CompositionReport.registered` on `operator`, registered at
+[`admin-breaker.ts:211`](../apps/api/src/routes/admin-breaker.ts) and
+[`:234`](../apps/api/src/routes/admin-breaker.ts), whose own header records the transition and cites
+`ADR-166` clause 14 as having allocated them to `P7-k`. **REGISTERED AND NOT REPAIRED**: the document
+is `status: approved`, a change to a frozen document is an ADR rather than a commit, this session
+held no ADR number, and the file is session 336's this wave. **Nothing mechanical would have found
+it**: `RI-15` reads six named source files, `RI-16` follows `file:line` pointers and this is a claim
+about a runtime list, and `CI-06/derivable-counts` reads cardinals and this sentence states none. It
+took a diff.
+
+**FINDING 2: THE PACKAGE BOUNDARY HOLDS IN ONE DIRECTION AND THE REASON GIVEN FOR IT IS FALSE IN THE
+OTHER.** `packages/tooling` genuinely cannot import `apps/api`: a probe fails
+`ERR_MODULE_NOT_FOUND` and `packages/tooling/node_modules/@merit` does not exist, so a real
+`compose()` is unreachable from a check there, exactly as the dispatch anticipated, and this
+session's reader therefore takes markdown as a STRING and reads nothing from disk. **But `apps/api`
+CAN import `@merit/tooling` without declaring it.** A probe in `apps/api/test/` RESOLVED, to
+`packages/tooling/checks/repo-invariants.mjs`, because [`package.json:30`](../package.json) declares
+that package in the workspace ROOT `devDependencies` and Node's resolution walks up the directory
+tree. **THIS FALSIFIES THE REASON `RI-08` GIVES FOR ITS OWN SCOPE**, which is that
+`node-linker=isolated` means an undeclared specifier *"resolves neither at run time nor at build time
+(TS2307, measured from apps/site and apps/api both)"*. Measured here: run time **RESOLVED**, and
+`tsc --noEmit -p apps/api/tsconfig.json` over the same import reports **`TS7016`** and not `TS2307`,
+which is resolution succeeding and only typing failing. The same sentence stands three times in
+[`apps/api/package.json`](../apps/api/package.json)'s `//dependencies` note and once in
+[`.npmrc`](../.npmrc)'s comment on `node-linker`. **THE HOLE IS BOUNDED AND IT IS NINE NAMES WIDE**,
+the root manifest's `devDependencies`, and **`@merit/db` is not one of them**, so `RI-08`'s
+CONCLUSION about the accessor stands and only its stated reason is wrong. A reason wrong in the
+permissive direction is the kind a later slice leans on. **REGISTERED AND NOT REPAIRED**: correcting
+it is a `RI-08` change and `repo-invariants.mjs` may gain nothing this slice.
+
+**NO MEASUREMENT FILE IS COMMITTED AND THAT IS FINDING 2's CONSEQUENCE.** Its only legal home is
+`apps/api/test/`, whose import of this reader today runs through the hole above, and building a
+permanent artifact on a defect this session is reporting would be the wrong order. The named repair
+is an `apps/api` `devDependency` on `@merit/tooling`, which is the legal acquisition point and a
+manifest change outside this fence.
+
+**NO `RI-nn` AND NO GATE**, and the reason survives the measurement rather than being inherited from
+the dispatch: a gate over a diff that is empty today pins an empty diff, and the first contract row
+that lands ahead of its route turns it red at the moment the work is correct.
+**`repo-invariants.mjs` is byte for byte unchanged**, the invariant count is 16 before and 16 after,
+**no contract row and no route was repaired**, and no ADR number was taken. The measurement is a
+SNAPSHOT of `b3c9cf0d`: session 336 is adding a contract row and a route concurrently, so a later
+reader who finds the numbers moved has found that landing and not a defect here.
+
+**Measured with `pnpm install` first and each command run separately: 33 of 33 gates, 16 of 16
+invariants and still 16, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 215 test files /
+5,084 passed / 6 skipped, `falsify.mjs` clean with the tree clean after it.** The `main` baseline of
+33 / 16 / 0 / 0 / clean / **214 files / 5,064 passed / 6 skipped** was reproduced exactly before a
+line changed.
