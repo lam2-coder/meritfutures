@@ -114,14 +114,26 @@ describe('finding A: LT-07s credit leg names an account class that does not exis
 });
 
 describe('finding B: the ledger key has two recorded conventions that point opposite ways', () => {
-  test('LT-01 is posted under the endpoint-prefixed key by three doors', () => {
+  // THE DOOR COUNT MOVED FROM THREE TO TWO AND FINDING B DID NOT MOVE AT ALL.
+  // ADR-176 applied ADR-172 clause 2, so `payouts.ts` records the approval and
+  // posts nothing; the CONVENTION under test here -- `LT-01` endpoint-prefixed
+  // against `LT-06` bare -- is exactly as it was, and so is the collision the
+  // finding reports. This case is rewritten to the tree rather than relaxed:
+  // it still names `payouts.ts`, and it now names the COLUMN the two remaining
+  // doors compose from, which is what the request path writes in place of the
+  // posting it used to make.
+  test('LT-01 is posted under the endpoint-prefixed key by every door that posts it', () => {
     const payouts = read('apps', 'api', 'src', 'routes', 'payouts.ts');
     const admin = read('apps', 'api', 'src', 'routes', 'admin-payouts.ts');
     const expiry = read('apps', 'worker', 'src', 'sweeps', 'expiry.ts');
 
-    expect(payouts).toContain('idempotencyKey: `${PAYOUT_ENDPOINT} ${idempotencyKey}`');
     expect(admin).toContain('return `${PAYOUT_ENDPOINT} ${idempotencyKey}`;');
     expect(expiry).toContain('return `${PAYOUT_ENDPOINT} ${idempotencyKey}`;');
+
+    // The prefix is declared once, where the endpoint is, and the request path
+    // stores the UNPREFIXED client token that both doors prefix.
+    expect(payouts).toContain('export const PAYOUT_ENDPOINT = `POST ${PAYOUT_PATH}`;');
+    expect(payouts).toContain('readonly idempotencyKey: string;');
   });
 
   test('LT-06s key is recorded as the withdrawals own key and explicitly NOT the endpoints', () => {

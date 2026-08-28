@@ -293,14 +293,21 @@ export const PAYOUT_ENDPOINT = `POST ${PAYOUT_PATH}`;
  * The ledger transaction's idempotency key for a released hold.
  *
  * IDENTICAL TO `admin-payouts.ts`'s `releaseLedgerKey` AND TO THE STRING
- * `payouts.ts` BUILDS WHEN NO HOLD STANDS, character for character. It is
- * DERIVED FROM THE REQUEST'S OWN STORED KEY and is not invented per run, which
- * is `INV-M5-06`: "the same `idempotency_key` on every attempt, generated BEFORE
- * the first send and persisted in the same transaction".
+ * `payouts.ts` DECLARES, character for character. It is DERIVED FROM THE
+ * REQUEST'S OWN STORED KEY and is not invented per run, which is `INV-M5-06`:
+ * "the same `idempotency_key` on every attempt, generated BEFORE the first send
+ * and persisted in the same transaction".
+ *
+ * THE DOOR COUNT MOVED FROM THREE TO TWO AND THE ARGUMENT DID NOT. ADR-176
+ * applied ADR-172 clause 2 and `POST /accounts/:accountId/payout` no longer
+ * posts at all: it RECORDS the approval and writes the client's token to
+ * `payout_requests.idempotency_key`, which is the column this key is composed
+ * from. `payouts.ts` still owns `PAYOUT_ENDPOINT` and this file still binds to
+ * it by reading that source as text.
  *
  * **USING THE IDENTICAL STRING IS THE FAIL-CLOSED DIRECTION.** A key naming this
- * sweep instead would make three doors mint three postings for one approval and
- * all three would commit.
+ * sweep instead would make every door that reaches one approval mint its own
+ * posting, and every one of them would commit.
  */
 export function releaseLedgerKey(idempotencyKey: string): string {
   return `${PAYOUT_ENDPOINT} ${idempotencyKey}`;

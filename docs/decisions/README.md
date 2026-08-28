@@ -194,6 +194,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-173](ADR-173.md) | the correction's reference is the adjustment, the corrected entry is in `admin_actions`, and no column is missing  (2026-08-28, status: proposed) |
 | [ADR-174](ADR-174.md) | `LT-07` is not a posting with one bad leg, it is a posting whose two legs are on the wrong sides, so no code is minted and `0052` returns to the pool unspent  (2026-08-28, status: proposed) |
 | [ADR-175](ADR-175.md) | the two ledger idempotency conventions are one rule under two spellings, and the rule is that a key names the EVENT and never the DOOR  (2026-08-28, status: proposed) |
+| [ADR-176](ADR-176.md) | the request path records the approval and does not post it, and the key it must store to make that safe (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
