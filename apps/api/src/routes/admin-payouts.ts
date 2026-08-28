@@ -347,11 +347,19 @@ export interface AdminPayoutTx {
   /**
    * The handle `postTransaction` posts through, on THIS transaction.
    *
-   * SUPPLIED BY THE WIRING AND NOT OPENED HERE, exactly as `PayoutTx.ledger` is.
-   * `LedgerTx` is structurally satisfied by ADR-102's `SystemTx`, and an
-   * operator console runs at `systemDb('operator-console')`, which is one of the
-   * two words `SystemReason` already admits. NOTHING HERE WIDENS THAT
-   * VOCABULARY.
+   * SUPPLIED BY THE WIRING AND NOT OPENED HERE. `LedgerTx` is structurally
+   * satisfied by ADR-102's `SystemTx`, and an operator console runs at
+   * `systemDb('operator-console')`, which is one of the two words `SystemReason`
+   * already admits. NOTHING HERE WIDENS THAT VOCABULARY.
+   *
+   * THIS COMMENT USED TO SAY "exactly as `PayoutTx.ledger` is" AND ADR-176
+   * DELETED THAT FIELD, so the comparison is replaced by the DISTINCTION that
+   * survived it. This handle keeps a `LedgerTx` and the request path does not,
+   * and the two are not the same case: an operator console already HAS a
+   * `SystemReason`, so nothing is widened to give it one, while a request
+   * handler has none and inventing one would hand the trader surface
+   * `insert<K extends TableKey>` over the whole estate (ADR-172 clause 2).
+   * WHICH DOOR IS ASKING IS THE WHOLE OF THE DIFFERENCE.
    *
    * IT IS THE SAME TRANSACTION AS EVERY OTHER METHOD ON THIS HANDLE, which is
    * ADR-006's consequence relied on rather than restated: the status change, the
