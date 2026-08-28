@@ -1166,7 +1166,49 @@ test('9.3 the three lists cover every module under src/, and nothing appears twi
     expect(present, `${listed} is listed by the barrel and no longer exists`).toContain(listed);
 });
 
-test('9.4 every reason in the not-re-exported list is stated rather than blank', () => {
+test('9.4 every name this slice exports is re-exported, NAME by NAME and not module by module', () => {
+  // **SEEDED AND NOT CAUGHT BY 9.1, WHICH IS WHY THIS TEST EXISTS.** Deleting
+  // the `export type { ... } from './digests/produce.ts'` block leaves the
+  // VALUE block behind, so the module is still a specifier, `9.1` is still
+  // green and `pnpm run typecheck` reports zero errors. The 2026-08-28 merge
+  // that started all of this "deleted BOTH sides of a hunk"; one side is the
+  // cheaper and likelier accident and module granularity cannot see it.
+  //
+  // ASSERTED FOR THIS SLICE'S FOUR MODULES ONLY. The other legs re-export
+  // subsets deliberately and widening this sweep onto them is a decision for
+  // whoever holds those files, which is reported rather than taken here.
+  const declared = (source: string): readonly string[] =>
+    [
+      ...source.matchAll(
+        /^export (?:declare )?(?:const|function|class|interface|type|enum) ([A-Za-z0-9_]+)/gm,
+      ),
+    ].map((match) => match[1] ?? '');
+  const reExported = new Set(
+    [...BARREL.matchAll(/^\s{2}([A-Za-z0-9_]+)(?: as [A-Za-z0-9_]+)?,$/gm)].map(
+      (match) => match[1] ?? '',
+    ),
+  );
+  // The SOURCE name is what is captured, so a leg re-exported under an alias
+  // still counts: `WindowFold as DigestWindowFold` is `alarm.ts`'s own export
+  // renamed because `breaker` already publishes a `WindowFold` from this barrel.
+  for (const [module, source] of [
+    ['./digests/ports.ts', PORTS_SOURCE],
+    ['./digests/rows.ts', readFileSync(join(ROOT, 'apps/worker/src/digests/rows.ts'), 'utf8')],
+    ['./digests/alarm.ts', ALARM_SOURCE],
+    ['./digests/produce.ts', PRODUCE_SOURCE],
+  ] as const) {
+    const names = declared(source);
+    expect(names.length, `${module} declares no exports, which cannot be right`).toBeGreaterThan(3);
+    for (const name of names)
+      expect(
+        reExported,
+        `${module} exports \`${name}\` and the barrel no longer re-exports it. A type checker ` +
+          'cannot see an export that is simply gone, so this is the only thing that can',
+      ).toContain(name);
+  }
+});
+
+test('9.5 every reason in the not-re-exported list is stated rather than blank', () => {
   for (const [module, reason] of Object.entries(WORKER_MODULES_NOT_RE_EXPORTED))
     expect(reason.trim().length, `${module} is absent with no stated reason`).toBeGreaterThan(40);
   expect(Object.keys(WORKER_MODULES_NOT_RE_EXPORTED)).toContain('./batch/statistics.ts');
