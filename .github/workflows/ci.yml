@@ -275,25 +275,41 @@ jobs:
       - name: Install, frozen
         run: pnpm install --frozen-lockfile
 
-      # THE TWO UI DEPLOYABLES' PRODUCTION BUILDS. `apps/portal` and `apps/site`
-      # both carry a `build` script that compiles a rendered document, which is
-      # ADR-095 ruling 5: "The `build` script lands in BOTH manifests in this
-      # commit". The three non-UI apps run their entry module directly under
+      # THE THREE UI DEPLOYABLES' PRODUCTION BUILDS. `apps/portal`, `apps/site`
+      # and `apps/admin` each carry a `build` script that compiles a rendered
+      # document. The two non-UI apps run their entry module directly under
       # ADR-083 and have nothing to build.
       #
-      # THIS COMMENT USED TO SAY `apps/portal` WAS THE ONLY ONE, AND IT WAS
-      # WRONG WHEN IT WAS WRITTEN. `apps/site/package.json` has carried
-      # `"build": "next build"` since ADR-095, and that manifest's own note
-      # recorded the reason it could not run: "`next build` in this directory
-      # was RUN and exits 1 on 'Couldn't find any `pages` or `app` directory'".
-      # The step below was therefore not merely missing; a comment asserted it
-      # should not exist. The app now renders ten routes plus the framework's
-      # own not-found, so the claim and the gap are repaired together.
+      # THIS COMMENT HAS NOW BEEN WRONG TWICE, IN THE SAME DIRECTION, AND THE
+      # SECOND TIME IS WORTH MORE THAN THE FIRST. It first said `apps/portal`
+      # was the only deployable that built, while `apps/site/package.json` had
+      # carried `"build": "next build"` since ADR-095 and was merely unbuildable
+      # ("Couldn't find any `pages` or `app` directory"). It then said TWO,
+      # while `apps/admin/package.json` had carried the same key since ADR-182
+      # for the same reason.
+      #
+      # `W6-d` MADE THAT APP BUILDABLE ON 2026-08-28 AND NOTHING TURNED RED,
+      # which is the shape worth naming rather than the omission. `CI-06/
+      # gate-inventory` probes CI-07's ACTIVATION CONDITION, "a page, layout or
+      # route file under apps/*/src/app/", and that condition was satisfied by
+      # `apps/portal` a day earlier: the row is Implemented, the probe is
+      # retired, and a THIRD app acquiring its first route is an event no gate
+      # in this repository can see. Session 340's log named it as a landmine in
+      # its own words, "this app's `next build` is in no CI job, so a page that
+      # stops compiling turns nothing red until somebody runs it by hand".
       - name: Portal production build
         run: pnpm --filter @merit/portal build
 
       - name: Site production build
         run: pnpm --filter @merit/site build
+
+      # The operator console. ADR-182 rules the framework, `W6-d` landed the
+      # first route, and `apps/admin/next.config.mjs` discharges ADR-095 `F5`'s
+      # telemetry remedy so this step is silent on the network like the two
+      # above it. `next build` prerenders `/` and the framework's own
+      # not-found, and it exits non-zero on a build that produces no route.
+      - name: Admin console production build
+        run: pnpm --filter @merit/admin build
 
       # VG-2 RAN HERE THE MOMENT ITS CHAIN EXPIRED. Its disposition read
       # "Chained on CI-07" because its subject is the BUILT BUNDLE, and under
@@ -305,6 +321,23 @@ jobs:
       # It runs AFTER the build and never before: the check refuses an absent
       # or empty bundle rather than passing over one, because a grep that
       # scanned nothing reports the same green as a grep with nothing to find.
+      #
+      # AND IT READS ONE OF THE THREE BUNDLES THIS JOB NOW PRODUCES, WHICH IS
+      # REPORTED HERE RATHER THAN QUIETLY WIDENED. `scripts/ci/
+      # vg2-no-secrets-in-bundle.mjs` hard-codes `BUNDLE_DIRS` to
+      # `apps/portal/.next/static` and `apps/portal/.next/server`, and its own
+      # comment beside that list still calls the portal "the one deployable that
+      # builds a bundle". That stopped being true when the site's step landed
+      # above, and this commit makes it a third short rather than a second.
+      # Measured on this tree after all three builds: the scan reads 249 emitted
+      # file(s) and 5,831,402 byte(s), while `apps/site` emits 219 file(s) and
+      # 4,739,271 byte(s) and `apps/admin` emits 92 file(s) and 3,798,346
+      # byte(s) that nothing greps.
+      #
+      # THE FILE IS NOT IN `W6-i`'s FENCE, so the gap is stated and left. What
+      # it is NOT is a new exposure opened by the step above: adding the admin
+      # build does not put that app's output in front of this grep, because the
+      # list names paths and not the job's steps.
       - name: VG-2 no secrets in client output
         run: node scripts/ci/vg2-no-secrets-in-bundle.mjs
 

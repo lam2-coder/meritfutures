@@ -89,7 +89,11 @@ export default async function StatsSurface(): Promise<ReactElement> {
         <p data-testid="no-statistics">This publication carried no statistics.</p>
       ) : (
         model.statistics.map((statistic) => (
-          <section key={statistic.stat_code} data-testid="statistic" data-code={statistic.stat_code}>
+          <section
+            key={statistic.stat_code}
+            data-testid="statistic"
+            data-code={statistic.stat_code}
+          >
             <h2>{statistic.stat_code}</h2>
             <p data-testid="statistic-value">
               {statistic.value === null ? statistic.not_meaningful : statistic.value}

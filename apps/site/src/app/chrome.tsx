@@ -97,9 +97,9 @@ export function Unavailable({
       <h2>This page has no published source yet</h2>
       <p>{reason}</p>
       <p>
-        Nothing is shown in place of the missing figures. Every number on this site is read from
-        the plan version a trader would be sold and enforced under, so a stand-in number here
-        would be the one thing this site exists to prevent.
+        Nothing is shown in place of the missing figures. Every number on this site is read from the
+        plan version a trader would be sold and enforced under, so a stand-in number here would be
+        the one thing this site exists to prevent.
       </p>
     </section>
   );

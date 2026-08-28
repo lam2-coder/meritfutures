@@ -45,9 +45,7 @@ export default async function LegalIndexSurface(): Promise<ReactElement> {
     return (
       <Surface envelope={model.envelope}>
         {model.documents.length === 0 ? (
-          <p data-testid="no-legal-documents">
-            This build read no published legal document.
-          </p>
+          <p data-testid="no-legal-documents">This build read no published legal document.</p>
         ) : (
           <ul data-testid="legal-index">
             {model.documents.map((entry) => (
@@ -56,9 +54,7 @@ export default async function LegalIndexSurface(): Promise<ReactElement> {
                 <a href={entry.version_path} data-testid="citation-address">
                   version {entry.version}
                 </a>
-                {entry.published_at === null ? null : (
-                  <span> published {entry.published_at}</span>
-                )}
+                {entry.published_at === null ? null : <span> published {entry.published_at}</span>}
               </li>
             ))}
           </ul>
