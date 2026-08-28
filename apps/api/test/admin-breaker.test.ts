@@ -105,6 +105,12 @@ const LIABILITY: LiabilityResponse = {
     recon: { last_run_at: '2026-08-28T22:10:00Z', mismatches_open: 0 },
     batch: { last_success_at: '2026-08-28T23:05:00Z', last_duration_ms: 41_200 },
   },
+
+  // COMPLETE, SO THERE IS NOTHING TO EXPLAIN. `ADR-203` makes `gaps` required
+  // and `[]` rather than omitted: a response that drops the field when it has
+  // no gaps makes "nothing is missing" and "this producer does not know about
+  // gaps" the same body.
+  gaps: [],
 };
 
 function sourceOf(overrides: Partial<AdminReadSource> = {}): AdminReadSource {

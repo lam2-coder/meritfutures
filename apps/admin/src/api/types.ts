@@ -181,6 +181,18 @@ export type LiabilityResponse = {
       readonly accounts: number;
     }[];
   };
+  /**
+   * `null` WHEN THE SERVER CANNOT SUPPLY THE WINDOW, and `gaps` says which way.
+   *
+   * `ADR-203`. A console that renders this as `0 / false` when it is absent has
+   * reported a quiet week, and the panel is the one an operator opens during an
+   * incident. `../figure.ts` is where the absence becomes a `Reading` this page
+   * may render: `absent()` takes the `detail` from the matching `gaps` entry and
+   * refuses a blank one.
+   *
+   * THE NULL IS AT THE OBJECT AND NOT AT A MEMBER, so a narrowing check here is
+   * one check and never four, and there is no half-supplied velocity panel.
+   */
   readonly payout_velocity: {
     readonly last_7d_cents: number;
     readonly avg_30d_cents: number;
@@ -188,7 +200,7 @@ export type LiabilityResponse = {
 
     /** The server's verdict. `INV-M6-12`: no client recomputes an alarm. */
     readonly alarm: boolean;
-  };
+  } | null;
 
   /**
    * `P-M6-07`'s reserve position, and FLOAT IS NOT IN IT.
@@ -255,7 +267,7 @@ export type LiabilityResponse = {
       readonly statistic: number;
       readonly threshold: number;
       readonly alarm: boolean;
-    };
+    } | null;
   }[];
 
   /**
@@ -291,6 +303,47 @@ export type LiabilityResponse = {
       readonly last_duration_ms: number;
     };
   };
+
+  /**
+   * Every `null` on this response, named, with why. `[]` when there are none.
+   *
+   * `ADR-203` ruling 2: NO `null` TRAVELS ALONE. This is the field that makes an
+   * absence on the wire say the thing `../figure.ts` has always required a
+   * console absence to say. `AbsentFigure.reason` is non-blank by construction
+   * and its docstring gives the bar -- "'unavailable' written by the schema is
+   * the same silence, spelled" -- and before this field there was nothing on the
+   * wire a renderer could put there.
+   *
+   * THE TWO SHAPES ARE DELIBERATELY NOT THE SAME AND `ADR-203` SECTION 5 IS WHY.
+   * `Reading` tags the absence AT THE SITE and carries `origin`, `label` and
+   * `definition` beside it; those three are this page's roster (`requireOrigin`
+   * admits `P-M6-01` to `P-M6-10` and `AS-M6-04` and nothing else), and putting
+   * them on the wire would move a rendering vocabulary into the API contract,
+   * which is the one thing `ADR-188` kept out of it: "no field is named for a
+   * panel". So the wire carries the PATH, the CAUSE and the DETAIL, this file's
+   * reader supplies the label and the definition, and the distinction both
+   * layers draw is the same one.
+   */
+  readonly gaps: readonly {
+    /** The JSON path of the `null` this entry explains. */
+    readonly field: string;
+
+    /**
+     * WHY, from a CLOSED set of three, and it is closed so that this console can
+     * BRANCH on it. `insufficient_history` is a panel that says "not yet";
+     * `estate_uncovered` is a panel that says the estate has no opinion, which
+     * is `ADR-042` F-4's unknown and is an operational fact rather than a
+     * roadmap one. A free-text reason would have made those two a substring
+     * match, which is the same silence with more characters in it.
+     */
+    readonly cause: 'awaiting_dependency' | 'insufficient_history' | 'estate_uncovered';
+
+    /** Non-`null` exactly when `cause` is `awaiting_dependency`. */
+    readonly awaiting: string | null;
+
+    /** Required and never blank. What this page renders as the reason. */
+    readonly detail: string;
+  }[];
 };
 
 /**

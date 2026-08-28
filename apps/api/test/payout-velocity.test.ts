@@ -809,24 +809,36 @@ describe('the ONE-DIRECTIONAL CHECK in 0010 decides which rows are money that le
 // What this module does NOT do
 // -----------------------------------------------------------------------------
 
-describe('the evaluator is not composed and the four leaves are still blocked', () => {
-  it('leaves `payout_velocity` off the liability book, and the reason is the wire shape', async () => {
-    // NOT BECAUSE THE NUMBERS ARE UNAVAILABLE -- every case above produces them
-    // -- but because this evaluator answers THREE ways and `LiabilityResponse`
-    // carries ONE. `ratio_bp` is a non-nullable number and `alarm` a
-    // non-nullable boolean, so an `uncovered` calendar would have to be rendered
-    // `0 / false`, which is indistinguishable from a quiet week. That is
-    // ADR-201 finding 3's gap arriving with a pager attached, and composing
-    // against a source that cannot fully serve the shape turns an honest 500
-    // into a wrong answer.
+describe('the evaluator is not composed, and the reason has MOVED off the wire', () => {
+  it('has the wire shape this case named as its clearing condition, and the leaves stay off the book', async () => {
+    // **THE CLEARING CONDITION FIRED AND THIS CASE IS INVERTED IN THE DIFF THAT
+    // FIRED IT**, which is B1's precedent and session 381's on the sibling case.
+    // It read: "the wire gains a shape for 'there is no window', which is a
+    // change to a response `RI-18` binds in three copies and is another entry's."
+    // `ADR-203` is that entry. The three copies moved together.
     //
-    // CLEARING CONDITION: the wire gains a shape for "there is no window", which
-    // is a change to a response `RI-18` binds in three copies and is another
-    // entry's.
+    // WHAT THE CASE HOLDS NOW IS THE OTHER HALF OF THE OLD SENTENCE. The wire
+    // could not say "there is no window"; it can, so the reason this evaluator is
+    // not composed is no longer the SHAPE and it is worth saying which reason
+    // replaced it. `readLiability` reads eight tables and this evaluator reads
+    // three, two of which (`tradingCalendar`, `tradingCalendarLoads`) the book's
+    // read does not touch, and B4 and B5 hold four other leaves besides. So the
+    // group stays in the `Omit`: composing against a source that cannot fully
+    // serve the shape turns an honest 500 into a wrong answer, and that is
+    // session 374's judgement rather than a fact about `ratio_bp`.
+    //
+    // CLEARING CONDITION, RESTATED: `IMPLEMENTED_ADMIN_READS` contains
+    // `readLiability`, which needs B4 and B5 and not this entry.
     const contract = readFileSync(join(ROOT, 'docs/architecture/API_CONTRACT.md'), 'utf8');
     expect(contract).toContain(
-      'payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean }',
+      'payout_velocity: { last_7d_cents: number; avg_30d_cents: number; ratio_bp: number; alarm: boolean } | null',
     );
+    // AND THE ABSENCE IS AT THE OBJECT AND NEVER AT A MEMBER. A nullable
+    // `last_7d_cents` is refused by `assertContractScalars` before any ruling
+    // reaches it, and a contract declaring one would declare a body it cannot
+    // serve. The four member names are still spelled exactly once each.
+    for (const leaf of ['last_7d_cents', 'avg_30d_cents', 'ratio_bp'])
+      expect(contract.split(`${leaf}: number | null`)).toHaveLength(1);
     const liability = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
     expect(liability).toContain(
       "'eligible_next_7d' | 'payout_velocity' | 'per_plan' | 'integrations'",
