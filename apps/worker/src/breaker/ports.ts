@@ -478,8 +478,8 @@ export class BreakerUnwired extends Error {
   constructor(what: string) {
     super(
       `BreakerIo.${what} cannot be served by this deployment: no adapter is installed. The ` +
-        'breaker evaluator refuses rather than returning a plausible value, because `armed` from ' +
-        'an unwired evaluator is indistinguishable from `armed` from a wired one, and that is the ' +
+        'breaker evaluator refuses rather than returning a plausible value: an `armed` reported by ' +
+        'an unwired evaluator is indistinguishable from one reported by a wired evaluator, and ' +
         "sentence CRON_INVENTORY's dead-man switch for this row exists to make false.",
     );
     this.name = 'BreakerUnwired';
