@@ -1,7 +1,11 @@
 {
+  "//": "THE THREE KEYS BELOW ARRIVE WITH THE FIRST PAGE, WHICH IS ADR-095 F7 AND NOT A WIDENING TAKEN HERE: `.tsx` arrives with the first page ... each app's tsconfig gains `jsx` and a `dom` lib`, whose reversal cost cell reads `One tsconfig each, and it belongs with the first page rather than here`. ADR-182 section 6 is the entry that moved this file into W6-d's fence rather than W6-a's, and it argued the reversal rather than performing it: the manifest and the lockfile move with the slice that pays the pnpm-lock serialization, and this file moves with the page, because exactly one slice in WAVE-06 touches it. `jsx: preserve` HANDS JSX TO THE FRAMEWORK, which is tsconfig.base.json's rule that nothing in this repository is built by `tsc`: the bundler emits and `tsc --noEmit` only reads. `jsxImportSource` IS REQUIRED BECAUSE @types/react@19 DECLARES NO GLOBAL JSX NAMESPACE; React 18's types did, so `jsx: preserve` alone type-checked, and 19 moved it to React.JSX so a config relying on the global stops resolving intrinsic elements. THE `dom` LIB IS THIS APP'S AND NOT THE BASE CONFIG'S: tsconfig.base.json withholds it from every Node deployable on purpose and a rendered document is the one place in this workspace where `document` is real. It also retires a widening src/http/client.ts took on purpose, which declares `AdminRequestInit = RequestInit & { cache?: 'no-store' }` and says the widening becomes redundant rather than wrong on the day W6-d lands the key; that file is W6-c's and a redundant type is not a defect, so the sentence is now true rather than pending. THIS FILE CARRIES ITS PROSE IN A KEY RATHER THAN IN COMMENTS, WHICH apps/portal/tsconfig.json DOES NOT HAVE TO DO: test/surface.test.ts sweeps every file in this package and reads a .json through JSON.parse, so a JSONC tsconfig here fails two of its cases with a syntax error rather than a finding. apps/admin/package.json already writes its prose this way and this is the same idiom one file over. src/app/tsconfig.json is a SEPARATE and narrower override, for Vitest rather than for the build, and its own key says why.",
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    "jsx": "preserve",
+    "jsxImportSource": "react",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts"]
 }

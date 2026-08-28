@@ -51,6 +51,21 @@
 // The account drill-down (3.2), the identity drill-down (3.2a), the flags queue
 // (3.3) and the evidence pack are M06 surfaces this package does not contain.
 //
+// THERE IS A RENDERED DOCUMENT NOW, WHICH IS THE THIRD SENTENCE IN THIS HEADER
+// THAT `WAVE-06` HAS NARROWED RATHER THAN LEFT STANDING. `W6-d` landed
+// `src/app/`: the root layout, the liability home at `/`, and the module that
+// turns a `LiabilityHomePage` value into the bytes a browser receives, with
+// `INV-M6-10` asserted over those bytes rather than over a line array.
+//
+// NO MODULE UNDER `src/app/` IS A LEG OF THIS BARREL, AND NONE IS IN THE ABSENT
+// LIST EITHER. That is a decision rather than an oversight. A route module is
+// the framework's entry point and not a name a consumer imports; `package.json`
+// publishes `.` and nothing else, and putting a React element on this read
+// surface would widen it from the figures and folds it exists to publish. Both
+// lists below are spelled in `.ts` and `B.2`'s sweep reads `.ts`, so that
+// directory is outside both by construction. `test/render.test.ts` carries the
+// sweeps that cover it.
+//
 // THE EVENT FEED WAS IN THAT SENTENCE AND IS NOT ANY MORE, WHICH IS THE SMALLER
 // HALF OF WHAT `W6-b` FOUND. `feed.ts` landed as M06 section 1.1's fifth
 // surface and this file never learned it, so the sentence describing the
@@ -288,14 +303,31 @@ export const ADMIN_MODULES_NOT_RE_EXPORTED: Readonly<Record<string, string>> = {
 };
 
 /**
- * The deployable starts, and says what it is rather than what it will be.
+ * The package says what it is.
  *
- * IT DOES NOT RENDER A PAGE. `buildLiabilityHome` needs an environment, a role,
- * a snapshot row and the trust signals, and there is no server here to receive
- * a request carrying them. A `main` that invented inputs in order to print
- * something would be the confidently wrong number AS-M6-04 is about, printed by
- * the process whose subject is not printing it.
+ * TWO SENTENCES HERE WERE TRUE UNTIL THIS COMMIT AND THE CORRECTION IS THE
+ * POINT OF THE EDIT. This docstring read "there is no server here to receive a
+ * request carrying them" and the body printed "no server yet". ADR-182 section
+ * 8 item 3 recorded both as stale in INTENT on the day `start` became `next
+ * start`, and refused to reach past its fence to repair them; WAVE-06 section 9
+ * named `W6-d` as the slice that makes them false in FACT. This is that slice:
+ * `src/app/layout.tsx` and `src/app/page.tsx` exist, `next build` compiles a
+ * served route from them, and `next start` is what the Railway service runs.
+ *
+ * SO `main()` IS NOT THE ENTRY POINT AND IS NOT ON THE REQUEST PATH. It is one
+ * line that names the deployable, `test/service.test.ts` runs it, and nothing
+ * that serves a byte reads it.
+ *
+ * AND THE HALF THAT WAS NEVER STALE IS UNCHANGED: NOTHING HERE INVENTS AN
+ * INPUT. `buildLiabilityHome` needs an environment, a role, a snapshot row and
+ * the trust signals, and `src/app/page.tsx` names the three things that block a
+ * supplier and renders the 503 with its reason instead. A `main` that invented
+ * inputs in order to print something would be the confidently wrong number
+ * AS-M6-04 is about, printed by the process whose subject is not printing it.
  */
 export function main(): void {
-  console.log(`merit ${SERVICE}: liability home read surface, no server yet`);
+  console.log(
+    `merit ${SERVICE}: liability home read surface. The service is served by ` +
+      '`next start` and this module is the package export surface rather than its entry point',
+  );
 }
