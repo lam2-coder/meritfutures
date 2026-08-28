@@ -518,6 +518,38 @@ describe('the window is counted in TRADING days and never in calendar days', () 
     expect(result.cost.settlementsAfterAnchor).toBe(0);
   });
 
+  it('attributes FORWARD and not backward, which the totals alone cannot tell apart', async () => {
+    // **THIS CASE EXISTS BECAUSE A SEEDED DEFECT DID NOT FIRE WITHOUT IT.**
+    // Rewriting attribution to take the LAST trading day on or BEFORE a
+    // settlement -- the exact opposite of ruling 4 -- left this suite green,
+    // because in every other fixture both directions land inside the same
+    // window and the TOTALS are identical. A case that asserts a sum is
+    // asserting that SOMETHING attributed the row, never that ruling 4 did.
+    //
+    // The discriminating fixture puts a weekend settlement across the NUMERATOR
+    // boundary. Anchored at 2026-11-24 the seven-day window opens on Monday
+    // 2026-11-16, so a Saturday 2026-11-14 settlement attributes FORWARD to the
+    // 16th and is inside the numerator, while the backward reading would put it
+    // on Friday the 13th, inside the thirty and outside the seven. The 30-day
+    // total is the same number either way and `last_7d_cents` is not.
+    const asOf = '2026-11-24T23:00:00.000Z';
+    const window = WEEKDAYS.slice(12, 42);
+    const { tx } = handle([
+      ...window.map((date) => ({ date, cents: 100_000n })),
+      { date: '2026-11-14', cents: 210_000n },
+    ]);
+    const v = evaluated((await evaluatePayoutVelocity(tx, asOf)).verdict);
+
+    expect(v.anchor_day).toBe('2026-11-24');
+    expect(v.numerator_from_day).toBe('2026-11-16');
+    expect(v.total_30_cents).toBe(3_210_000);
+    // FORWARD. The backward reading gives 700000 here and the same total.
+    expect(v.panel.last_7d_cents).toBe(910_000);
+    expect(v.panel.last_7d_cents).not.toBe(700_000);
+    expect(v.panel.avg_30d_cents).toBe(749_000);
+    expect(v.panel.ratio_bp).toBe(12_149);
+  });
+
   it('attributes an EXCHANGE HOLIDAY settlement forward, and 2026-11-26 is one', async () => {
     // Thanksgiving is a `trading_calendar` row with `is_holiday` true and no
     // session, and the rail settles on it. Anchored at 2026-11-27 the settlement
