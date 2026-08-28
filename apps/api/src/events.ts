@@ -140,12 +140,50 @@
 // down: F-2 asks for a gate binding a DRAWING to the registry, and this binds a
 // PRODUCER to it.
 //
-// THE SET IS THE NAMES THIS TREE HAS A PRODUCER FOR, AND IT IS EIGHT. The
+// THE SET IS THE NAMES THIS TREE HAS A PRODUCER FOR, AND IT IS NINE. The
 // catalogue's payout and wallet families are far larger; a producer table
 // carrying names no code emits is a table whose rows nothing asserts, and the
-// first one that turns out to be wrong will be wrong quietly. The three
-// producers are `routes/payouts.ts`, `routes/admin-payouts.ts` and
-// `apps/worker/src/sweeps/expiry.ts`, and every row below names which.
+// first one that turns out to be wrong will be wrong quietly. The four
+// producers are `routes/payouts.ts`, `routes/admin-payouts.ts`,
+// `apps/worker/src/sweeps/expiry.ts` and `apps/worker/src/detectors/runner.ts`,
+// and every row below names which.
+//
+// THE NINTH ARRIVED AS A TRANSCRIPTION DEFECT RATHER THAN AS A NEW NAME. Session
+// 379 ran the detector runner's three emits through this producer against a live
+// column and all three threw at the NAME, inside `buildEvent`'s first four lines
+// and before the payload was consulted. Two of those three refusals were this
+// file's: `EVENTS:354` carries `flag.raised` and `EVENTS:358` carries
+// `detector.run_completed`, and neither had been transcribed here. THE REFUSAL
+// WAS WORKING EXACTLY AS DESIGNED AND THE INCOMPLETE TRANSCRIPTION WAS THE
+// DEFECT, which is worth saying plainly because the message `buildEvent` throws
+// reads like an accusation against the caller. `flag.raised` is transcribed
+// below, field for field from `EVENTS:354`.
+//
+// AND `detector.run_completed` IS NOT TRANSCRIBED, WHICH IS A FINDING RATHER
+// THAN A SECOND OVERSIGHT. `EVENTS:358` gives its payload as `{ detector,
+// detector_version, trading_day, rows_scanned, flags_raised, duration_ms }` and
+// THAT LIST CARRIES NO `_id` FIELD AT ALL. `events.subject_id` is `uuid NOT
+// NULL` and {@link CatalogueRow.subjectField} names the payload field it is read
+// from, so this row has no field to name and picking one would be this file
+// inventing a field the registry does not carry, which is precisely what
+// ADR-159 clause 1 refuses. A SECOND AND INDEPENDENT BLOCKER SITS BEHIND IT: the
+// same payload names neither `identity_id` nor `account_id`, so even given a
+// subject the row would be refused by `assertTenanted` below, for
+// `payout.freeze_expiring`'s reason and by `payout.freeze_expiring`'s argument.
+// Its consumers are BI and ALERT, which is to say the fact is FIRM-level, and
+// `assertTenanted`'s message already names the repair for that case: a row in
+// EVENTS saying so. No row says it today. BOTH REPAIRS ARE EVENTS' AND EVENTS IS
+// FROZEN, so each moves by an ADR and neither is a commit. The absence is pinned
+// by a case in `test/events.test.ts` that goes red the day either half lands.
+//
+// NEITHER OF THE TWO ROWS CARRIES MONEY, SO ADR-198 DOES NOT REACH THEM, AND
+// THAT WAS CHECKED RATHER THAN ASSUMED. `flag.raised` carries two ids, a type, a
+// severity, a detector, a version and an evidence summary;
+// `detector.run_completed` carries a detector, a version, a trading day and
+// three counts. No `_cents` field and no `_bp` field on either, so
+// `encodeCentsForStorage` walks both and changes nothing, and session 379's
+// measurement over the worker's seven payloads holds for the two this file
+// transcribes from.
 //
 // -----------------------------------------------------------------------------
 // THE THREE COLUMNS A PAYLOAD CANNOT SUPPLY, AND WHERE EACH COMES FROM
@@ -270,10 +308,11 @@ export interface CatalogueRow {
 }
 
 /**
- * The eight names, each a row in EVENTS and each with a producer in this tree.
+ * The nine names, each a row in EVENTS and each with a producer in this tree.
  *
  * ORDERED AS THE CATALOGUE ORDERS THEM, so a reader comparing the two reads down
- * both at once.
+ * both at once. `flag.raised` is last because EVENTS puts it last: the eight
+ * above it are section 6's and it is section 8's.
  */
 export const EVENT_CATALOGUE = {
   // --- EVENTS section 6, produced by `routes/payouts.ts` ---
@@ -375,6 +414,30 @@ export const EVENT_CATALOGUE = {
       actorIdField: 'actor',
     },
     producer: 'Worker (the expiry sweep), Admin',
+  },
+
+  // --- EVENTS section 8, produced by `apps/worker/src/detectors/runner.ts` ---
+  'flag.raised': {
+    // THE SINGULAR OF `risk_flags`, AND NOT A SPELLING CHOSEN HERE.
+    // `routes/admin-writes.ts` already writes `subject_kind: 'risk_flag'` on
+    // `admin_actions` for this same table, and the suite asserts the rule
+    // against `schema.ts` rather than against that one precedent.
+    subjectKind: 'risk_flag',
+    subjectField: 'flag_id',
+    identityField: 'identity_id',
+    // `account_id?` IS OPTIONAL IN THE CATALOGUE AND THE OPTIONALITY IS REAL
+    // RATHER THAN A NOTATION. `risk_flags.account_id` is nullable
+    // (`0008_risk.sql`) because an identity-level finding has no account to
+    // name, and {@link tenancy} reads a field the payload omits as null. The
+    // row still reaches a tenancy leg on every emit, because `identity_id` is
+    // NOT optional on it and `risk_flags.identity_id` is `NOT NULL`.
+    accountField: 'account_id',
+    // A DETECTOR IS NOT A PERSON. {@link ACTOR_KINDS} is closed by `0017`'s
+    // CHECK and carries no `detector` member, and `system` is what an automated
+    // producer is here, on `payout.approved`'s precedent one section up, where
+    // the engine decided and no human did.
+    actorKind: 'system',
+    producer: 'Detector',
   },
 } as const satisfies Readonly<Record<string, CatalogueRow>>;
 
