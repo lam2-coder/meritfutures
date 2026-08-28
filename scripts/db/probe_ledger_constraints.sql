@@ -350,4 +350,174 @@ BEGIN
 END $$;
 ROLLBACK;
 
+-- ---------------------------------------------------------------------------
+-- ADDED BY ADR-189. The ninth ledger transaction's two proofs, watched firing.
+-- ---------------------------------------------------------------------------
+-- `LT-09` reverses `LT-06` when the external rail is exhausted. Neither of the
+-- guards `0057` installs is a constraint on a posting: they are the two things
+-- that make a reversal PROVABLE rather than promised, and each was watched
+-- refusing a real perturbation before `0057` was written.
+--
+-- THESE BLOCKS LIVE HERE RATHER THAN IN A FILE OF THEIR OWN BECAUSE
+-- `.github/workflows/corpus.yml` IS OUTSIDE ADR-189's FENCE. A new probe file
+-- would be a probe nothing runs, which is the whole failure this file's first
+-- line describes. The subject is the ledger's own integrity either way: K4 binds
+-- every reversal in `ledger_transactions` and K5 reads `withdrawals_in_flight`.
+
+-- K4. A TRANSACTION IS REVERSED AT MOST ONCE.
+-- 0009 created `ledger_transactions_reversal_of_idx` NOT UNIQUE and 0057
+-- supersedes it under its own name. The perturbation is the one that costs
+-- money: a SECOND reversal of one `LT-06` under a different idempotency_key.
+-- Under the plain index it LANDED, drove withdrawals_in_flight to a DEBIT
+-- balance and trader_wallet negative, and left the global sum at zero, so
+-- nothing else in this database saw it.
+BEGIN;
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
+  VALUES ('eeeeeeee-0000-0000-0000-000000000001','wallet_withdrawal_approval','wallet_withdrawal',
+          '22222222-0000-0000-0000-000000000001','probe-k4-lt06');
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key, reversal_of)
+  VALUES ('eeeeeeee-0000-0000-0000-000000000002','wallet_withdrawal_failure','wallet_withdrawal',
+          '22222222-0000-0000-0000-000000000001','probe-k4-lt09',
+          'eeeeeeee-0000-0000-0000-000000000001');
+DO $$
+BEGIN
+  BEGIN
+    INSERT INTO ledger_transactions (kind, reference_kind, reference_id, idempotency_key, reversal_of)
+      VALUES ('wallet_withdrawal_failure','wallet_withdrawal',
+              '22222222-0000-0000-0000-000000000001','probe-k4-lt09-again',
+              'eeeeeeee-0000-0000-0000-000000000001');
+    RAISE EXCEPTION
+      'PROBE FAILED: LEDGER-K4 admitted a SECOND reversal of one transaction. '
+      'SD-M5-05 makes a correction a compensating entry and never an update, so '
+      'a transaction is reversed at most once; a second LT-09 drives '
+      'withdrawals_in_flight to a debit balance with the global sum still zero';
+  EXCEPTION WHEN unique_violation THEN
+    RAISE NOTICE 'LEDGER-K4 fired as expected';
+  END;
+END $$;
+ROLLBACK;
+
+-- K5. WD-C1, THE WHOLE POINT OF ADR-189.
+-- A wallet withdrawal reaching `failed` with LT-06 posted and no LT-09 must not
+-- commit. BOTH directions are watched: the refusal, and then the ACCEPTANCE with
+-- LT-09 present, because a probe that only ever attempts forbidden things passes
+-- against a trigger that rejects everything.
+BEGIN;
+-- The fixture identity is created HERE rather than relied on from a block
+-- above: every block in this file is its own transaction and every one of them
+-- ROLLBACKs. The INSERT fires 0054's provisioning trigger, which is what opens
+-- the trader_wallet position these entries post against.
+INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
+  ON CONFLICT DO NOTHING;
+INSERT INTO wallet_withdrawals (id, identity_id, amount_cents, destination_ref, status,
+                                idempotency_key, source_provenance_summary, earliest_credit_at)
+  VALUES ('22222222-0000-0000-0000-00000000000f','11111111-1111-1111-1111-111111111111',
+          25000,'probe-dest','transferring','probe-k5','{"payout":25000}'::jsonb, now());
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
+  VALUES ('ffffffff-0000-0000-0000-000000000001','wallet_withdrawal_approval','wallet_withdrawal',
+          '22222222-0000-0000-0000-00000000000f','probe-k5-lt06');
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents, memo)
+SELECT 'ffffffff-0000-0000-0000-000000000001', a.id, v.amt, 'probe LT-06'
+  FROM (VALUES ('trader_wallet'::text,'identity'::text, 25000::bigint),
+               ('withdrawals_in_flight','firm', -25000)) AS v(code, scp, amt)
+  JOIN ledger_accounts a ON a.code = v.code AND a.scope = v.scp
+ WHERE v.scp = 'firm' OR a.identity_id = '11111111-1111-1111-1111-111111111111';
+DO $$
+BEGIN
+  BEGIN
+    UPDATE wallet_withdrawals SET status = 'failed'
+      WHERE id = '22222222-0000-0000-0000-00000000000f';
+    SET CONSTRAINTS ALL IMMEDIATE;
+    RAISE EXCEPTION
+      'PROBE FAILED: WD-C1 admitted a failed withdrawal with 25000 cents still '
+      'standing in withdrawals_in_flight. LT-06 extinguished the wallet claim '
+      'and LT-07 will never post, so without LT-09 the money is in neither '
+      'place the trader could be shown it (ADR-189)';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'WD-C1 fired as expected';
+  END;
+END $$;
+ROLLBACK;
+
+-- K5b. THE ACCEPTANCE. The same transition, with LT-09 in the same transaction.
+BEGIN;
+-- The fixture identity is created HERE rather than relied on from a block
+-- above: every block in this file is its own transaction and every one of them
+-- ROLLBACKs. The INSERT fires 0054's provisioning trigger, which is what opens
+-- the trader_wallet position these entries post against.
+INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
+  ON CONFLICT DO NOTHING;
+INSERT INTO wallet_withdrawals (id, identity_id, amount_cents, destination_ref, status,
+                                idempotency_key, source_provenance_summary, earliest_credit_at)
+  VALUES ('22222222-0000-0000-0000-00000000000e','11111111-1111-1111-1111-111111111111',
+          25000,'probe-dest-2','transferring','probe-k5b','{"payout":25000}'::jsonb, now());
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key)
+  VALUES ('ffffffff-0000-0000-0000-000000000002','wallet_withdrawal_approval','wallet_withdrawal',
+          '22222222-0000-0000-0000-00000000000e','probe-k5b-lt06');
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents, memo)
+SELECT 'ffffffff-0000-0000-0000-000000000002', a.id, v.amt, 'probe LT-06'
+  FROM (VALUES ('trader_wallet'::text,'identity'::text, 25000::bigint),
+               ('withdrawals_in_flight','firm', -25000)) AS v(code, scp, amt)
+  JOIN ledger_accounts a ON a.code = v.code AND a.scope = v.scp
+ WHERE v.scp = 'firm' OR a.identity_id = '11111111-1111-1111-1111-111111111111';
+UPDATE wallet_withdrawals SET status = 'failed'
+  WHERE id = '22222222-0000-0000-0000-00000000000e';
+INSERT INTO ledger_transactions (id, kind, reference_kind, reference_id, idempotency_key, reversal_of)
+  VALUES ('ffffffff-0000-0000-0000-000000000003','wallet_withdrawal_failure','wallet_withdrawal',
+          '22222222-0000-0000-0000-00000000000e','wallet_withdrawal_failure probe-k5b',
+          'ffffffff-0000-0000-0000-000000000002');
+INSERT INTO ledger_entries (transaction_id, ledger_account_id, amount_cents, memo)
+SELECT 'ffffffff-0000-0000-0000-000000000003', a.id, v.amt, 'probe LT-09'
+  FROM (VALUES ('withdrawals_in_flight'::text,'firm'::text, 25000::bigint),
+               ('trader_wallet','identity', -25000)) AS v(code, scp, amt)
+  JOIN ledger_accounts a ON a.code = v.code AND a.scope = v.scp
+ WHERE v.scp = 'firm' OR a.identity_id = '11111111-1111-1111-1111-111111111111';
+SET CONSTRAINTS ALL IMMEDIATE;
+DO $$
+DECLARE
+  net bigint;
+BEGIN
+  SELECT COALESCE(sum(e.amount_cents), 0) INTO net
+    FROM ledger_transactions t
+    JOIN ledger_entries  e ON e.transaction_id = t.id
+    JOIN ledger_accounts a ON a.id = e.ledger_account_id
+   WHERE t.reference_kind = 'wallet_withdrawal'
+     AND t.reference_id   = '22222222-0000-0000-0000-00000000000e'
+     AND a.code           = 'withdrawals_in_flight';
+  IF net <> 0 THEN
+    RAISE EXCEPTION
+      'PROBE FAILED: LT-09 posted and the obligation is % cents rather than 0', net;
+  END IF;
+  RAISE NOTICE 'WD-C1 accepted the reversed transition and the obligation is 0';
+END $$;
+ROLLBACK;
+
+-- K5c. WD-C1's SECOND ASSERTION, WHICH IS THE GUARD ON THE GUARD.
+-- The perturbation is the defect ADR-189 exists to close in its purest form: a
+-- handler transitions the row to `failed` and posts NOTHING AT ALL. Assertion 1
+-- sums over zero rows and gets 0, so without this block a probe watching only
+-- assertion 1 would report a guard that cannot see the bug it was built for.
+BEGIN;
+INSERT INTO identities (id) VALUES ('11111111-1111-1111-1111-111111111111')
+  ON CONFLICT DO NOTHING;
+INSERT INTO wallet_withdrawals (id, identity_id, amount_cents, destination_ref, status,
+                                idempotency_key, source_provenance_summary, earliest_credit_at)
+  VALUES ('22222222-0000-0000-0000-00000000000d','11111111-1111-1111-1111-111111111111',
+          25000,'probe-dest-3','transferring','probe-k5c','{"payout":25000}'::jsonb, now());
+DO $$
+BEGIN
+  BEGIN
+    UPDATE wallet_withdrawals SET status = 'failed'
+      WHERE id = '22222222-0000-0000-0000-00000000000d';
+    SET CONSTRAINTS ALL IMMEDIATE;
+    RAISE EXCEPTION
+      'PROBE FAILED: WD-C1 admitted a failed withdrawal that reached approval '
+      'and names NO ledger transaction at all. Assertion 1 sums over zero rows '
+      'and gets zero, which is why assertion 2 exists (ADR-189)';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'WD-C1 assertion 2 fired as expected';
+  END;
+END $$;
+ROLLBACK;
+
 \echo 'All ledger constraint probes fired as expected.'
