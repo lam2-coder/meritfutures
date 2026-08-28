@@ -3912,6 +3912,55 @@ export const reconciliations = pgTable('reconciliations', {
 });
 
 // -----------------------------------------------------------------------------
+// reconciliation_runs -- 0064_reconciliation_runs.sql. FIRM.
+// -----------------------------------------------------------------------------
+// ONE ROW PER SWEEP, OVER THE WHOLE POPULATION, INSIDE ONE NIGHTLY BATCH RUN.
+// The neighbour above is one COMPARISON and this is the CHECK that made it:
+// there is no identity column and there is no correct one, because the accounts
+// the sweep disagreed with are its OUTPUT, recorded on `reconciliations`, rather
+// than its owner. That is `detector_runs`' sentence exactly.
+//
+// `batch_run_id` IS THE TRAP HERE AND IT IS NOT A HOP. It is a `uuid NOT NULL`
+// with NO foreign key, because no batch run is a row anywhere in this schema:
+// EVENTS section 5.3 declares the `run_id` in three payloads and stores it
+// nowhere. A `derived` rule needs a declared edge and there is none, and if the
+// table it named existed the chain would terminate at a firm run record in any
+// case, which is `reserve_coverage_snapshots`' refusal.
+//
+// `reconciliation_runs_completed_is_whole` IS THE CONTROL AND NOTHING IN THIS
+// FILE IS. `status = 'completed'` requires `accounts_done = accounts_total`, so
+// a sweep killed at the account boundary cannot claim it covered the book --
+// ADR-199 section 5's refusal of a fold over per-account clocks, written as a
+// constraint instead of as prose.
+//
+// `status` IS `text` AND NOT AN ENUM because 0064 constrains it with a CHECK
+// over 'running', 'completed' and 'failed' rather than a `CREATE TYPE`, and the
+// transcription follows the DDL. 'running' is not decoration: a process that
+// dies mid-sweep updates nothing, so a row left at 'running' with an old
+// `started_at` is the only way a crashed run is visible at all.
+export const reconciliationRuns = pgTable('reconciliation_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // EVENTS 5.3's `run_id`. No `.references()`: there is no table to name.
+  batchRunId: uuid('batch_run_id').notNull(),
+  tradingDay: date('trading_day').notNull(),
+  // NOT NULL where `detector_runs`' pair is nullable: the row is created BY the
+  // start of the sweep, so the instant is always known.
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  // EVENTS 5.3's own names, from `batch.completed`'s payload. `accounts_total`
+  // has no default on purpose: `0 of 0` would satisfy the completion control
+  // vacuously.
+  accountsTotal: integer('accounts_total').notNull(),
+  accountsDone: integer('accounts_done').notNull().default(0),
+  // What THIS RUN saw, which is not `mismatches_open`, a count of the current
+  // state of `reconciliations` that moves when a human resolves one.
+  mismatchesFound: integer('mismatches_found').notNull().default(0),
+  status: text('status').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// -----------------------------------------------------------------------------
 // loyalty_criteria -- 0023_loyalty_and_graduation.sql. FIRM. SD-M14-03.
 // -----------------------------------------------------------------------------
 // VERSIONED PROMISES, AND A PROMISE BELONGS TO NOBODY UNTIL IT IS EARNED. The

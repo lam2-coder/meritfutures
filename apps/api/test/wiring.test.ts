@@ -294,12 +294,12 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'rules no door onto this database could ever serve. SECOND AND INDEPENDENT: ' +
     '`AdminCertificateTx` runs `lockAt`, `insert` and `updateAt` on ONE transaction ' +
     '(`routes/admin-certificates.ts:326`), and one of the two tables is `certificates`, scope ' +
-    'class `owned` on `identity_id` (`packages/db/src/scope.ts:757`). `db.firm` refuses that key ' +
+    'class `owned` on `identity_id` (`packages/db/src/scope.ts:761`). `db.firm` refuses that key ' +
     'at compile time because `FirmTableKey` is every key whose class is `firm` ' +
-    '(`packages/db/src/scope.ts:1309-1311`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
+    '(`packages/db/src/scope.ts:1347-1349`), and `db.scoped` needs an identity THIS ROUTE CANNOT ' +
     'KNOW UNTIL IT HAS READ THE ROW: `:id` is `certificates.id` and the identity is a column of ' +
     'the row the door would be opened to read. `adminActions` is `firm` ' +
-    '(`packages/db/src/scope.ts:907`), so the audit half alone has a door and the subject half ' +
+    '(`packages/db/src/scope.ts:910`), so the audit half alone has a door and the subject half ' +
     'does not, which is the same one-live-arm shape `useVerifySource` below refuses. THIRD, AND ' +
     'it is configuration rather than a door: `presentation()` ' +
     "(`routes/admin-certificates.ts:363`) is `GET /verify/:code`'s copy, and the " +
@@ -310,10 +310,10 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'ONE ARM OF THREE, AND THE OTHER TWO ARE CONSTRUCTIBLE TODAY, WHICH IS WHY THIS ENTRY EXISTS ' +
     'RATHER THAN AN ADAPTER. `VerifySource.lookup` (`routes/verify.ts:596`) reads `certificates`, ' +
     'and `GET /verify/:code` is UNAUTHENTICATED, so `db.scoped` has no identity to open with; ' +
-    '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:757`), and ' +
-    '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1309-1311`), so ' +
+    '`certificates` is scope class `owned` on `identity_id` (`packages/db/src/scope.ts:761`), and ' +
+    '`FirmTableKey` is every key whose class is `firm` (`packages/db/src/scope.ts:1347-1349`), so ' +
     '`db.firm` refuses that key AT COMPILE TIME. THE OTHER TWO ARMS HAVE WHAT THEY NEED: ' +
-    '`certificate_verifications` is scope class `firm` (`packages/db/src/scope.ts:1254`), so the ' +
+    '`certificate_verifications` is scope class `firm` (`packages/db/src/scope.ts:1262`), so the ' +
     '`record` arm is writable through `db.firm` now, and `presentation` is deployment ' +
     'configuration rather than a read. A BACKEND WITH ONE LIVE ARM AND ONE THAT REJECTS IS ' +
     "REFUSED HERE, on `usePayoutBackend`'s stated rule: it would put a live-looking public " +

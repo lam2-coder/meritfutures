@@ -619,6 +619,33 @@ jobs:
           set -euo pipefail
           psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_reserve_coverage.sql
 
+      # 0064. Session 374's blocker B4. MONEY PATH: a `mismatch` sets
+      # accounts.recon_blocked and blocks eligibility until a human clears it.
+      #
+      # FIVE SUCCESSES FIRST, on the same discipline: this table exists to make an
+      # operational fact WRITABLE that had nowhere to live, so a guard refusing
+      # every row would satisfy every rejection and close B4 with a table nobody
+      # can use. SUCCESS 2 is an acceptance case for a NON-revoke: the record is
+      # mutable on purpose, so merit_app must be able to UPDATE the row that
+      # closes a sweep, and a REVOKE copied from 0049 would have left every run
+      # looking like a crash.
+      #
+      # SUCCESS 4 IS THE ONE TO READ. Two sweeps over one trading day, the second
+      # killed at the account boundary: "the latest run started" and "the latest
+      # run that covered the book" then return DIFFERENT rows. That is ADR-199
+      # section 5's refusal of a fold over per-account clocks, one field to the
+      # left, and it is the whole reason this table is not a timestamp column.
+      # REJECTION 1 is the same sentence enforced by the database.
+      #
+      # SUCCESS 3 asserts that mismatches_found and mismatches_open COME APART
+      # after a human resolves one. If they could not, one would be a copy of the
+      # other and the run record would be carrying a number reconciliations
+      # already answers.
+      - name: Probe the reconciliation run record (0064)
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -q -f scripts/db/probe_reconciliation_run.sql
+
       # OI-03, ADR-128. THE APPEND-ONLY SET, ASSERTED AGAINST THE DOCUMENT.
       #
       # OI-03 is not a prediction and it had already happened three times when

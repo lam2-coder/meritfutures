@@ -1658,6 +1658,28 @@ const ci06h = {
           'rather than by arithmetic, or that the table is append-only and invisible ' +
           'to merit_analytics (OI-01)',
       ],
+      // 0064. SESSION 374's B4. Pinned in the commit that wires it, which is the
+      // rule rather than the exception now: OI-07 has four recorded occurrences
+      // of a probe wired and left unpinned, and CI-06s exists because the second
+      // edit is the one that gets forgotten.
+      //
+      // REJECTION 1 is ADR-199 section 5's refusal written as a constraint, and
+      // SUCCESS 4 is the only place anything asserts that the two readings come
+      // apart on real rows. SUCCESS 2 is the acceptance case for a table that is
+      // deliberately NOT append-only: delete this step and nothing says the
+      // producer can still close a sweep it started.
+      [
+        'probe_reconciliation_run.sql',
+        'the reconciliation run record is no longer probed, so nothing asserts ' +
+          'that a sweep which stopped at the account boundary cannot claim it ' +
+          'completed (ADR-199 section 5, reconciliation_runs_completed_is_whole), ' +
+          'that the latest run and the latest COVERING run come apart on real ' +
+          'rows, that one trading day may carry a second run at all (RB-02 ' +
+          'section A), that mismatches_found and mismatches_open are different ' +
+          'facts rather than one copied twice, that merit_app may still UPDATE ' +
+          'the row closing a run, or that reconciliation health stays off the ' +
+          'merit_analytics surface',
+      ],
     ];
     for (const [needle, why] of required) {
       if (!body.includes(needle)) findings.push(`${wf}: ${why} (no "${needle}")`);
