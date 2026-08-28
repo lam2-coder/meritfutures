@@ -12,12 +12,23 @@
 // ONLY THE READ ENDPOINTS ARE HERE, AND THE ABSENCES ARE THE SESSION FENCE.
 // The account views, the marks, the timeline, the eligibility display, the
 // economic-calendar panel, and (P4-h) the pinned plan version, the purchase
-// list, the certificate, the KYC status and the affiliate stats. There is
-// deliberately no `Me`, no auth type, no payout request body and no
-// sensitive-action declaration, because C-27's authority boundary is auth and
-// therefore money path (CLAUDE.md's regime table, ADR-003), and it gets its own
-// session. A read-only app that transcribed the auth types anyway would look
-// like it had started on them.
+// list, the certificate, the KYC status and the affiliate stats, and now
+// (SC-M4-10, SC-M4-11) the wallet and the active-session list.
+//
+// THIS PARAGRAPH READ "there is deliberately no `Me`, NO AUTH TYPE, no payout
+// request body and no sensitive-action declaration ... it gets its own session",
+// AND THIS IS THAT SESSION, SO THE SENTENCE IS NARROWED RATHER THAN DELETED.
+// What it was protecting is the WRITE half of C-27, and every part of that half
+// is still absent: no `Me`, no elevation ceremony, no OTP body, no passkey
+// challenge, no payout request body, no withdrawal body, and no
+// sensitive-action declaration. `SessionRow` and `AuthFactor` are the two READ
+// shapes SC-M4-11 renders, and API_CONTRACT section 3.1 rules them reads in
+// their own line -- `GET /sessions` "is a read and takes any single factor,
+// deliberately", because "a session you cannot see is one you cannot revoke, and
+// requiring elevation to look would lock a compromised account's real owner out
+// of the one screen that helps them". A screen that could not be typed could not
+// be built, and the surface AS-M4-05 has been owed since it was approved would
+// have stayed homeless to keep a sentence true that was never about it.
 //
 // EVERY TYPE IN THIS FILE IS NOW A TRANSCRIPTION AGAIN, WHICH IT WAS NOT.
 // `EconomicCalendarPanelResponse` and `ImpersonationSession` were shaped from
@@ -558,4 +569,214 @@ export type AffiliateStats = {
   readonly payable_cents: number;
   readonly paid_cents_lifetime: number;
   readonly chargeback_rate_bp: number;
+};
+
+// -----------------------------------------------------------------------------
+// Section 6.2. THE WALLET, WHICH SC-M4-10 RENDERS
+// -----------------------------------------------------------------------------
+// Transcribed from API_CONTRACT section 6.2, field for field, comments included
+// where the contract's own comment is the shape of a state rather than a note
+// about it. `GET /wallet` and `GET /wallet/entries` are both REGISTERED and both
+// WIRED, measured through `CompositionReport.registered` over a real `compose()`
+// rather than by grep, and `apps/api/src/start.ts:97` calls
+// `useWalletBackend(databaseWalletBackend(LIVE_DB))`.
+//
+// THE HEADER OF THIS FILE SAID THE AUTH TYPES WOULD ARRIVE WITH THEIR OWN
+// SESSION AND `SessionRow` BELOW IS THAT PROMISE KEPT, not a fence widened. What
+// that paragraph reserved was the WRITE half of C-27: the elevation ceremony,
+// the OTP bodies, the sensitive-action declarations. None of those is here. What
+// is here is the two READS SC-M4-11 renders, and section 3.1's own line is why
+// they are reads: `GET /sessions` "takes any single factor, deliberately",
+// because "a session you cannot see is one you cannot revoke".
+
+/**
+ * The hold vocabulary. A closed union with one member today.
+ *
+ * M20's P-1 IS NOT A MEMBER AND MUST NOT BECOME ONE. The contract's own comment:
+ * P-1 "holds a WITHDRAWAL and appears on POST /wallet/withdrawals, not here: it
+ * routes the withdrawal to review and leaves the value spendable, so it
+ * subtracts nothing from the figure below".
+ */
+export type WalletHoldRule = 'chargeback_window';
+
+/** Section 6.2's `WalletHold`. */
+export type WalletHold = {
+  readonly rule: WalletHoldRule;
+  readonly cents: number;
+
+  /** The oldest held credit's `occurred_at`. */
+  readonly since: string;
+
+  /**
+   * NULL UNDER `chargeback_window`, AND THE CONTRACT CALLS IT "the honest answer
+   * today" RATHER THAN AN OMISSION. No landed column carries the card networks'
+   * dispute window for a purchase, `OQ-M20-02` asks how long the hold is and is
+   * open, and "a date computed by adding a chosen number of days to
+   * `earliest_credit_at` would be a number this repository invented".
+   *
+   * SO THIS SCREEN RENDERS THE ABSENCE AS AN ABSENCE. ../format/money.ts's
+   * `formatOptionalCents` argument, applied to a date.
+   */
+  readonly available_at: string | null;
+};
+
+/**
+ * `GET /wallet`. Section 6.2.
+ *
+ * `balance_cents` EQUALS `withdrawable_cents + held_cents` AND THE PORTAL NEVER
+ * PERFORMS THAT ADDITION. The contract states the sum "rather than left to a
+ * client, because the two components are computed from different inputs and a
+ * client that derived one by subtraction would render a stale figure whenever
+ * the other moved". That is INV-M4-01's own reason arriving from the server
+ * side, and it is why all three figures are read and none is computed.
+ *
+ * NONE OF THE THREE CAN BE NEGATIVE. `wallet_entries.balance_after_cents` is
+ * `CHECK (balance_after_cents >= 0)` in `0011`, so "no response below can carry
+ * a negative wallet figure and a client need not branch on one".
+ */
+export type WalletResponse = {
+  readonly balance_cents: number;
+  readonly withdrawable_cents: number;
+  readonly held_cents: number;
+
+  /** Empty when `held_cents` is 0. */
+  readonly holds: readonly WalletHold[];
+  readonly as_of: string;
+};
+
+/**
+ * The CLOSED credit list, `0011`'s own CHECK.
+ *
+ * THERE IS NO DEPOSIT MEMBER AND THERE MAY NOT BE ONE
+ * (`INV-WALLET-NO-DEPOSITS`), and there is no `promotional_credit` member on
+ * purpose: the perk lives in `promotional_credit_grants` and is never
+ * withdrawable. The contract's reason for keeping it off this response is the
+ * reason this union may not grow one either: "a `promotional_credit_cents` field
+ * beside `balance_cents` is one client-side addition away from `AS-M20-01`,
+ * credit converted to cash".
+ */
+export type WalletProvenance = 'payout' | 'refund_wallet_funded' | 'correction';
+
+/** `direction`'s two members, `0011`'s CHECK. */
+export type WalletDirection = 'credit' | 'debit';
+
+/** Section 6.2's `WalletEntryBase`. */
+export type WalletEntryBase = {
+  /**
+   * A DECIMAL STRING, AND THE ONLY IDENTIFIER IN THE CONTRACT THAT IS NOT A
+   * UUID. `wallet_entries.id` is `bigint GENERATED ALWAYS AS IDENTITY`, and a
+   * bigint on the wire as a JSON number "admits a value above
+   * `Number.MAX_SAFE_INTEGER` that has already lost digits by the time anything
+   * reads it". A CLIENT MUST NOT PARSE IT, so nothing in this application does.
+   */
+  readonly entry_id: string;
+
+  /**
+   * A MAGNITUDE, ALWAYS > 0. `direction` carries the sign.
+   *
+   * `wallet_entries.amount_cents` is `CHECK (amount_cents > 0)` and `0011`
+   * states why it is deliberately NOT the ledger's signed convention: "a signed
+   * amount on the wire would collapse the two questions back together".
+   */
+  readonly amount_cents: number;
+
+  /** The business event, human readable, and the server's own sentence. */
+  readonly cause: string;
+
+  /** Polymorphic: a payout request, a purchase, or the corrected entry. */
+  readonly reference_id: string;
+
+  /** Every wallet movement is posted; there is no unposted entry. */
+  readonly ledger_transaction_id: string;
+
+  /** The running balance AFTER this entry. `>= 0` by CHECK. */
+  readonly balance_after_cents: number;
+  readonly occurred_at: string;
+};
+
+/** A credit, which carries the class of money it is. */
+export type WalletCredit = WalletEntryBase & {
+  readonly direction: 'credit';
+  readonly provenance: WalletProvenance;
+};
+
+/**
+ * A debit, which carries NO `provenance`.
+ *
+ * THE OMISSION IS THE SCHEMA REPORTED HONESTLY RATHER THAN A FIELD FORGOTTEN,
+ * and it is the contract's own comment: the column is `NOT NULL` on every row
+ * and its three members are the CREDIT list, "so a debit is stored carrying a
+ * class that does not describe it. What a debit MEANS is `cause` and
+ * `reference_id`". The screen therefore renders a provenance on credits only,
+ * and rendering one on a debit would state the schema's defect as a fact about
+ * the trader's money.
+ */
+export type WalletDebit = WalletEntryBase & { readonly direction: 'debit' };
+
+/** Section 6.2's `WalletEntry`, discriminated on `direction`. */
+export type WalletEntry = WalletCredit | WalletDebit;
+
+/**
+ * `GET /wallet/entries`. Section 6.2, and section 1's envelope.
+ *
+ * Ordering is `occurred_at` DESCENDING, which is
+ * `wallet_entries_identity_idx`'s own order. The portal does not sort it.
+ */
+export type WalletEntriesResponse = CursorPage<WalletEntry>;
+
+// -----------------------------------------------------------------------------
+// Section 3.1. THE ACTIVE SESSIONS, WHICH SC-M4-11 RENDERS
+// -----------------------------------------------------------------------------
+
+/**
+ * How a session was ESTABLISHED. `sessions.auth_factor`.
+ *
+ * THREE VALUES AND NO PASSWORD, WHICH IS THE WHOLE OF WHY SC-M4-11 HAS NO
+ * PASSWORD ROW. ADR-039 and `0002:280`: there is no password table anywhere in
+ * this schema by design, so there is nothing on this screen to reset and no
+ * reset link to render. `SC-M4-01`'s line says the same thing from the other
+ * end: "No password field exists anywhere. There is no password database to
+ * stuff (D2)".
+ */
+export type AuthFactor = 'email_otp' | 'sms_otp' | 'passkey';
+
+/**
+ * `GET /sessions`. Section 3.1.
+ *
+ * THE ESTABLISHING FACTOR IS ON EVERY ROW, and the contract states why in the
+ * same breath as the endpoint: it "is what makes a SIM-swapped session visible
+ * to the person it was taken from". M04 section 3.7 closes the loop -- "the
+ * trader's own defence is SC-M4-11's session list, which is why revocation is
+ * on the same screen as the factor that established the session".
+ *
+ * THERE IS NO IP FIELD HERE AND THE ABSENCE IS TRANSCRIBED RATHER THAN
+ * REPAIRED. `AS-M4-05` counter 2 promises the trader "every active session with
+ * its creation IP, user agent, and last-seen time", and `SD-M4-03` added
+ * `created_ip inet` and `last_seen_ip inet` to `sessions` to serve it. The
+ * contract's row carries neither. Both documents are approved and they disagree;
+ * M04 section 4 binds this file to the contract ("consumes API_CONTRACT
+ * verbatim, and adds no field to any of them"), so the field is absent here and
+ * the divergence is reported rather than closed by a portal session inventing a
+ * column onto a response.
+ */
+export type SessionRow = {
+  readonly id: string;
+  readonly auth_factor: AuthFactor;
+
+  /**
+   * Both halves of the elevation pair, or not elevated.
+   *
+   * The server reads `elevated_at` and `elevated_by_factor` together, on
+   * `sessions_elevation_is_complete`: a row that violated the constraint reads
+   * as NOT elevated rather than as elevated on a half-written record. The portal
+   * is handed the boolean and never the pair, which is `SD-M4-04`'s own line --
+   * "the portal reads a boolean it was given and never a clock it interprets".
+   */
+  readonly elevated: boolean;
+  readonly created_at: string;
+  readonly last_seen_at: string;
+
+  /** Coarse, never the raw string. The contract's own word. */
+  readonly user_agent_family: string;
+  readonly is_current: boolean;
 };

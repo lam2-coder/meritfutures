@@ -39,6 +39,14 @@ test('every read surface is reachable from the package entry point', () => {
     'toCertificateView',
     'toReferralPanel',
     'disclosureBlock',
+
+    // SC-M4-10 and SC-M4-11, the two screens section 3.1 named and this
+    // application did not serve until this session.
+    'toWalletView',
+    'walletFraming',
+    'toSecurityView',
+    'factorLabel',
+    'isRevocable',
   ]) {
     expect(portal, `${name} is exported`).toHaveProperty(name);
   }
