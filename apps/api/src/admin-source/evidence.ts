@@ -433,12 +433,22 @@ export function buildEvidenceDocument(input: {
 // The refusal that runs last
 // -----------------------------------------------------------------------------
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * A uuid ANYWHERE INSIDE a string, and not a string that IS one.
+ *
+ * ANCHORING THIS WAS A REAL DEFECT AND THE SUITE FOUND IT. `tos_clause` is free
+ * text an operator writes during a dispute, and `GS-112` REQUIRES a `trader`
+ * pack to carry it. An investigator who wrote "coordinated with account
+ * <uuid>" has put another identity into a trader pack through a field the pack
+ * must not drop, and an anchored test sees nothing at all: the string is not a
+ * uuid, it CONTAINS one. Every free-text column in a pack has this shape.
+ */
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
-/** Every uuid-shaped string anywhere in a value, collected. */
+/** Every uuid-shaped run anywhere in a value, collected. */
 function uuidsIn(value: unknown, into: Set<string>): void {
   if (typeof value === 'string') {
-    if (UUID.test(value)) into.add(value.toLowerCase());
+    for (const match of value.matchAll(UUID)) into.add(match[0].toLowerCase());
     return;
   }
   if (Array.isArray(value)) {
