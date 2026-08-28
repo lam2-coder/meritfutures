@@ -47,8 +47,11 @@ import { describe, expect, test } from 'vitest';
 
 import { SCOPE_RULES, TABLES, TABLE_KEYS, type TableKey } from '../src/scope.ts';
 import {
+  IdentityAlreadyEstablished,
   RESOLUTION_ADDRESS,
+  establishmentTx,
   insertUnderStatement,
+  normalizedEmail,
   resolutionPredicate,
   scopedTx,
   uniqueKeys,
@@ -418,3 +421,192 @@ function parentedMembers(): string[] {
   );
   return [...(declared?.[1] ?? '').matchAll(/'([a-zA-Z]+)'/g)].map((m) => m[1] as string);
 }
+
+// =============================================================================
+// ESTABLISH: the write sibling, where the constraint is the arbiter (ADR-197)
+// =============================================================================
+
+/**
+ * A recorder that answers an `INSERT ... RETURNING` with one row carrying `id`.
+ *
+ * `proving` above answers SELECTs and returns no rows to a write, which is what
+ * `insertUnder` needs. Establishment reads its own `RETURNING`, so this one
+ * answers writes instead, and `fail` lets a case make the second insert raise
+ * the way `users_email_key` raises.
+ */
+function establishing(options: { readonly fail?: unknown } = {}): {
+  source: StatementSource;
+  sent: Sent[];
+} {
+  const sent: Sent[] = [];
+  const ids = ['i-established', 'u-established'];
+  const source = drizzle(async (sql: string, params: unknown[]) => {
+    sent.push({ sql, params });
+    if (/into "users"/.test(sql) && options.fail !== undefined) throw options.fail;
+    return { rows: [[ids[sent.length - 1] ?? 'x']] };
+  }) as StatementSource;
+  return { source, sent };
+}
+
+/** A `pg` unique violation, wrapped the way Drizzle actually wraps one. */
+function wrappedViolation(constraint: string): Error {
+  const driver = Object.assign(new Error('duplicate key value violates unique constraint'), {
+    code: '23505',
+    constraint,
+  });
+  return new Error('Failed query: insert into "users" ...', { cause: driver });
+}
+
+describe('the establishment door writes two rows or none', () => {
+  test('it sends the identities insert first and the users insert second', async () => {
+    const { source, sent } = establishing();
+    const out = await establishmentTx(source).establish({ email: 'New.Person@Example.COM' });
+    expect(verbs(sent)).toEqual(['insert', 'insert']);
+    expect(sent[0]?.sql).toMatch(/into "identities"/);
+    expect(sent[1]?.sql).toMatch(/into "users"/);
+    expect(out).toEqual({ identityId: 'i-established', userId: 'u-established' });
+  });
+
+  test('the identities insert names EVERY column `default` and carries no parameter', async () => {
+    // ADR-196 CLAUSE 3, AS A PROPERTY OF THE STATEMENT RATHER THAN OF A CALLER.
+    // `establish` takes no `identities` values, so there is no parameter through
+    // which `display_name`, `max_accounts_override` or `support_contact_ref`
+    // could arrive. An empty parameter list is that fact, measured.
+    const { source, sent } = establishing();
+    await establishmentTx(source).establish({ email: 'a@example.com' });
+    const first = sent[0] as Sent;
+    expect(first.params).toEqual([]);
+    const columns = Object.keys(getTableColumns(TABLES['identities'] as PgTable)).length;
+    expect(first.sql.match(/\bdefault\b/g) ?? []).toHaveLength(columns);
+  });
+
+  test('the users insert carries the identity the FIRST statement returned', async () => {
+    const { source, sent } = establishing();
+    await establishmentTx(source).establish({ email: 'Someone@Example.com' });
+    expect(sent[1]?.params).toContain('i-established');
+    // AS TYPED IN `email`, NORMALIZED IN `email_normalized`. Two columns, one
+    // address, and the pair is written by one statement so it cannot drift.
+    expect(sent[1]?.params).toContain('Someone@Example.com');
+    expect(sent[1]?.params).toContain('someone@example.com');
+  });
+
+  test('it shares the resolution door’s address vocabulary and both of its refusals', async () => {
+    const { source } = establishing();
+    const tx = establishmentTx(source);
+    await expect(tx.establish({ id: 'u-1' } as unknown as { email: string })).rejects.toThrow(
+      /"id" is not a resolution address on users/,
+    );
+    await expect(tx.establish({} as unknown as { email: string })).rejects.toThrow(
+      /must name "email"/,
+    );
+    await expect(tx.establish({ email: '   ' })).rejects.toThrow(/non-empty `email`/);
+  });
+
+  test('a unique violation on `users_email_key` is TYPED, through the wrapper Drizzle throws', async () => {
+    // THE `cause` CHAIN IS THE WHOLE OF THIS CASE. Drizzle does not re-raise the
+    // driver's error, it throws its own with the driver's one in `cause`, so a
+    // translator reading only the top level matches nothing -- and fails
+    // invisibly, because the rollback still refunds the rows and only the TYPE
+    // is wrong. A handler branching on that type would answer 500 where
+    // ADR-196 clause 4 requires `is_new: false`.
+    const { source } = establishing({ fail: wrappedViolation('users_email_key') });
+    await expect(establishmentTx(source).establish({ email: 'taken@example.com' })).rejects.toThrow(
+      IdentityAlreadyEstablished,
+    );
+  });
+
+  test('a unique violation on any OTHER constraint is NOT translated', async () => {
+    // `users` carries two unique keys and `23505` on `users_pkey` is a uuid
+    // collision rather than a race. Answering `is_new: false` to it would report
+    // an address as taken that nobody holds.
+    const { source } = establishing({ fail: wrappedViolation('users_pkey') });
+    const failed = establishmentTx(source).establish({ email: 'a@example.com' });
+    await expect(failed).rejects.toThrow(/Failed query/);
+    await expect(failed).rejects.not.toThrow(IdentityAlreadyEstablished);
+  });
+
+  test('the translation re-RAISES, because the throw is what rolls the transaction back', async () => {
+    // IF THIS EVER RETURNS INSTEAD OF THROWING, the identities row and the three
+    // ledger_accounts rows 0054's trigger wrote COMMIT with no users row, which
+    // is clause 2's forbidden state and is permanent under ON DELETE RESTRICT.
+    const { source } = establishing({ fail: wrappedViolation('users_email_key') });
+    let threw = false;
+    try {
+      await establishmentTx(source).establish({ email: 'taken@example.com' });
+    } catch {
+      threw = true;
+    }
+    expect(threw, 'establish resolved on a taken address instead of throwing').toBe(true);
+  });
+
+  test('`EstablishmentTx` carries ONE verb, and the absence of the others is the control', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../src/scoped-db.ts', import.meta.url)),
+      'utf8',
+    );
+    const at = source.indexOf('export interface EstablishmentTx {');
+    expect(at, 'EstablishmentTx is no longer declared here').toBeGreaterThan(0);
+    const body = source.slice(at, source.indexOf('\n}', at));
+    for (const verb of ['insert', 'updateAt', 'deleteAt', 'rowAt', 'rows', 'sqlExecutor', 'lockAt'])
+      expect(body, `EstablishmentTx carries ${verb}`).not.toMatch(new RegExp(`\\b${verb}\\b`));
+    expect(body).toMatch(/\bestablish\b/);
+  });
+
+  test('`ON CONFLICT` is refused by name and appears nowhere on this path', () => {
+    // THE LENIENT SPELLING DOES NOT RAISE, so the transaction commits with an
+    // identity nobody can reach, delete or explain. Measured against PostgreSQL
+    // 16 in ADR-197 section 6: the strict spelling costs a racing loser ZERO
+    // permanent rows and the lenient one costs FOUR.
+    const source = readFileSync(
+      fileURLToPath(new URL('../src/scoped-db.ts', import.meta.url)),
+      'utf8',
+    );
+    const at = source.indexOf('export function establishmentTx(');
+    const body = source.slice(at, source.indexOf('\n}\n', at));
+    expect(body).not.toMatch(/onConflict/i);
+  });
+});
+
+describe('normalizedEmail is the column its own comment describes', () => {
+  test('dots and plus-tags are stripped from the local part and case is folded', () => {
+    expect(normalizedEmail('Bob.Smith+merit@Gmail.com')).toBe('bobsmith@gmail.com');
+    expect(normalizedEmail('bobsmith@gmail.com')).toBe('bobsmith@gmail.com');
+  });
+
+  test('the domain keeps its dots, which is the half a naive strip gets wrong', () => {
+    expect(normalizedEmail('a.b@mail.example.co.uk')).toBe('ab@mail.example.co.uk');
+  });
+
+  test('two distinct people CAN share a normalized form, which is why it is not unique', () => {
+    // `0002_identity.sql:250-253`, in its own words: "Two people can legitimately
+    // share a normalized form, so it is a SIGNAL, not a constraint, and making it
+    // unique would refuse service to the second of them." This case is that
+    // sentence, executed -- and it is the reason the OTP digest binds the address
+    // AS TYPED rather than this value.
+    expect(normalizedEmail('bob.smith@gmail.com')).toBe(normalizedEmail('bobsmith@gmail.com'));
+  });
+
+  test('a local part that is entirely a tag keeps its address rather than becoming a domain', () => {
+    expect(normalizedEmail('+tag@example.com')).toBe('+tag@example.com');
+  });
+
+  test('a value that is not an address is folded and otherwise left alone', () => {
+    expect(normalizedEmail('  NotAnAddress  ')).toBe('notanaddress');
+  });
+});
+
+describe('the doors ADR-126 and ADR-197 built are REACHABLE from outside this package', () => {
+  test('`index.ts` exports both, which is what ADR-196 measured to be missing', () => {
+    // THE FINDING THIS CASE IS THE GUARD FOR. `resolutionDb` landed with ADR-126
+    // and was never added to this list, so `apps/api` could not import it and
+    // `auth-backend.ts`'s refusal citing a missing pre-identity read was true of
+    // the package SURFACE while being false of the package. ADR-196 finding 3
+    // measured "no caller anywhere in `apps/`"; the reason was that there could
+    // not be one.
+    const index = readFileSync(fileURLToPath(new URL('../src/index.ts', import.meta.url)), 'utf8');
+    for (const name of ['resolutionDb', 'establishmentDb', 'normalizedEmail'])
+      expect(index, `${name} is not exported from packages/db`).toMatch(
+        new RegExp(`^\\s*${name},`, 'm'),
+      );
+  });
+});
