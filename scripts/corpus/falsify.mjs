@@ -2049,15 +2049,26 @@ const DECLARED_TABLE = /const DECLARED_SERIES = new Map\(\[([\s\S]*?)^\]\);/m;
 const PENDING_TABLE = /const PENDING_SERIES = new Map\(\[([\s\S]*?)^\]\);/m;
 const WITHHELD_TABLE = /const WITHHELD_MEMBERS = new Map\(\[([\s\S]*?)^\]\);/m;
 
+// A ROW MAY BE WRAPPED ACROSS THREE LINES AND THIS READER SPANS THEM, WHICH IT
+// DID NOT UNTIL 2026-08-28. It read `^\s*\['NAME', '`, requiring the name to
+// follow the bracket on one line and the detail string to begin on that same
+// line, and it then sliced to the end of that line to take the detail. Prettier
+// splits `['NAME', 'a long detail']` into a bare `[`, the name, and the string
+// on three separate lines as soon as the entry passes the print width, so the
+// day `scripts/**` entered `format:check`'s glob this reader silently stopped
+// seeing every long row: PENDING_SERIES fell from 36 rows to 13 and
+// WITHHELD_MEMBERS from 1 to 0, three seeds reported SEED IS STALE, and 33 of 33
+// gates stayed green throughout because the GATE's own reader is anchored
+// differently. THE INDEPENDENCE ABOVE IS WHY THAT WAS INVISIBLE AND IS STILL
+// WORTH KEEPING: this reader is repaired rather than replaced by an import of
+// the gate's parser, which would agree with it by construction.
 const seriesTable = (d, pattern) => {
   const src = readFileSync(join(d, 'scripts/corpus/gates.mjs'), 'utf8');
   const block = pattern.exec(src);
   if (!block) throw new Error('seed anchor not found: the series table in gates.mjs');
   const out = [];
-  for (const m of block[1].matchAll(/^\s*\['([A-Za-z0-9-]+)',\s*(?:'|")/gm)) {
-    const line = block[1].slice(m.index, block[1].indexOf('\n', m.index));
-    const detail = /^\s*\['[A-Za-z0-9-]+',\s*(?:'([^']*)'|"([^"]*)")/.exec(line);
-    out.push({ series: m[1], detail: (detail && (detail[1] ?? detail[2])) ?? '' });
+  for (const m of block[1].matchAll(/^\s*\[\s*'([A-Za-z0-9-]+)',\s*(?:'([^']*)'|"([^"]*)")/gm)) {
+    out.push({ series: m[1], detail: m[2] ?? m[3] ?? '' });
   }
   if (out.length === 0) throw new Error('seed anchor not found: no rows in the series table');
   return out;
@@ -4642,8 +4653,14 @@ const SCOPE_CASES = [
           'docs/GLOSSARY.md',
           (b) => `${b}\n\n| | |\n|---|---|\n| ${id} | ${CITED_SEED_MARK} |\n`,
         );
+        // `\\[\\s*'` AND NOT `\\['`, FOR THE REASON `seriesTable` ABOVE RECORDS: a
+        // prettier-formatted entry puts the bracket, the name and the string on
+        // three lines, and an anchor requiring them on one stopped matching the
+        // day `scripts/**` entered `format:check`'s glob. This one failed as a
+        // CONTROL DID NOT FIRE rather than as a stale seed, which is the same
+        // breakage arriving through the other of this harness's two doors.
         edit(d, GATES_PATH, (b) =>
-          once(b, new RegExp(`^\\s*\\['${id}',[\\s\\S]*?\\],\\n`, 'm'), ''),
+          once(b, new RegExp(`^\\s*\\[\\s*'${id}',[\\s\\S]*?\\],\\n`, 'm'), ''),
         );
       },
     },
