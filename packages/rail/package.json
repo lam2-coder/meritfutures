@@ -1,0 +1,19 @@
+{
+  "name": "@merit/rail",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The RailAdapter port: the one interface every payout rail is used through, plus one sandbox adapter. M05 sections 2.1 and 3.1 are the specification. No network, no vendor SDK, no route, no row.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "//": "IT DECLARES NO RUNTIME DEPENDENCY AND NO WORKSPACE DEPENDENCY, AND BOTH ABSENCES ARE THE DESIGN, WHICH IS packages/psp's OWN MANIFEST ARGUMENT ONE RAIL OVER. The port opens no socket: `enqueue` and `health` are the vendor's I/O and the one thing in this package that implements them is a FAKE, which is packages/rithmic's precedent under M02 section 3.5 point 4 rather than a new argument. The HMAC is `node:crypto`, a Node builtin and not a package, so VG-12 IS ASKED TO ADMIT NOTHING: the catalog is untouched, `onlyBuiltDependencies` is untouched, the closure is unchanged, and the only line pnpm-lock.yaml gains is this package's own `importers` block. P5 section 8 requires that be STATED rather than assumed, so it is stated here and again in src/index.ts. It declares no @merit/db either: the port never reads a row and never writes one, which is what keeps RI-08 satisfiable here without an admission and `merit/no-raw-db-client` satisfiable without an `ignores` line.",
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
