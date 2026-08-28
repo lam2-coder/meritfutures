@@ -111,6 +111,35 @@ function cleanTree(): string {
       '| 4 | the store that exists | `databaseIdempotencyStore` ' +
       '(`apps/api/src/idempotency-store.ts:1`) |\n',
   );
+  // AND THE FOUR THE IN-TOKEN NAME BINDING ADDED, which point from a plan into
+  // `apps/admin/src/page.ts` and are each THIRTY lines short. The fixture
+  // reproduces the drift at the same distance rather than at some other one, so
+  // a case reads the register's own numbers back.
+  write(
+    root,
+    'apps/admin/src/page.ts',
+    Array.from({ length: 680 }, (_, i) => {
+      const name = {
+        249: 'assertNamesNoSubject',
+        293: 'assertFloatIsNotReserve',
+        421: 'buildLiabilityHome',
+        660: 'renderLiabilityHome',
+      }[i + 1];
+      return name === undefined ? '//' : `export function ${name}(): void {}`;
+    })
+      .join('\n')
+      .concat('\n'),
+  );
+  write(
+    root,
+    'docs/plans/WAVE-06-admin-console-transport.md',
+    '# WAVE-06\n\n## The modules\n\n' +
+      '| [`page.ts`](../../apps/admin/src/page.ts) | the liability home assembled ' +
+      '([`buildLiabilityHome:391`](../../apps/admin/src/page.ts)), its line rendering ' +
+      '([`renderLiabilityHome:630`](../../apps/admin/src/page.ts)), and two assertions: ' +
+      '[`assertNamesNoSubject:219`](../../apps/admin/src/page.ts) and ' +
+      '[`assertFloatIsNotReserve:263`](../../apps/admin/src/page.ts) |\n',
+  );
   write(
     root,
     'docs/decisions/ALLOCATION.md',
@@ -1130,6 +1159,44 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
     );
   });
 
+  test('RI-15 does not bind a name inside a token whose path it only GUESSED', () => {
+    // THE BOUNDARY THE IN-TOKEN BINDING STOPS AT, and it is a measurement rather
+    // than a preference. `detectors/fills.ts` writes ``the tier `M07:111` names``
+    // two lines under a citation of `0008_risk.sql`, and `M07` is a PLAN and a
+    // section line rather than a symbol in that migration. EVERY ONE OF THE
+    // SEVEN prefixed tokens in this check's input is that shape -- five `M07`
+    // and two `M20` -- and none is a symbol, so a name bound onto an INHERITED
+    // path would be the check guessing a file and then guessing a name in it.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    write(
+      root,
+      'apps/api/src/idempotency.ts',
+      '// `packages/db/src/schema.ts:20` is the reader.\n// The tier `M07:23` names.\n',
+    );
+    expect(findings('RI-15', root)).toEqual([]);
+
+    // AND THE SAME INHERITED POINTER WITH THE NAME WRITTEN IN FRONT OF IT FIRES,
+    // which is what keeps the silence above from passing because the file went
+    // unread or the inheritance stopped resolving.
+    write(
+      root,
+      'apps/api/src/idempotency.ts',
+      '// `packages/db/src/schema.ts:20` is the reader.\n// The edge `fills` (`:23`) drifts.\n',
+    );
+    expect(findings('RI-15', root).join('\n')).toContain('for `fills`');
+  });
+
+  test('RI-15 reads a token whose prefix is a PATH as naming nothing', () => {
+    // `admin-reads.ts:694` names the FILE it points into and no symbol in it, so
+    // there is nothing for a runner to look up. The in-token binding takes the
+    // prefix only where it is NOT a path, and this is that boundary.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    write(root, 'apps/api/src/idempotency.ts', '// The reader is `schema.ts:23`.\n');
+    expect(findings('RI-15', root)).toEqual([]);
+  });
+
   test('RI-15 fails loudly when a file it reads is renamed away', () => {
     // The same failure RI-14 makes loud, for the same reason: a check that names
     // the files it reads is emptied by a rename, silently, and then reports PASS
@@ -1305,6 +1372,50 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
       liveDoc('The store is [`:900`](../../apps/api/src/idempotency-store.ts).'),
     );
     expect(findings('RI-16', root).join('\n')).toContain('has 2 lines');
+  });
+
+  test('RI-16 binds the name a citation carries INSIDE its own backticks', () => {
+    // THE SHAPE MARKDOWN ACTUALLY WRITES, AND THE ONE THIS CHECK WAS BLIND TO.
+    // `WAVE-06` section 4.1 carried
+    // ``[`setAdminReadSource:706`](../../apps/api/src/routes/admin-reads.ts)``
+    // against a declaration at :739 and RI-16 was GREEN on it. Seeded with
+    // `:99999`, the same citation turned it RED, so the pointer WAS in scope and
+    // the RANGE half worked; what did not reach it is the NAME half, which bound
+    // only a backticked name written IN FRONT of the pointer. There is nothing in
+    // front of this one, because the name is inside the pointer's own backticks.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    write(root, LIVE_DOC, liveDoc('The edge is [`fills:23`](../../packages/db/src/schema.ts).'));
+    expect(findings('RI-16', root).join('\n')).toContain(
+      'cites `../../packages/db/src/schema.ts:23` for `fills` and `fills` is at ' +
+        'packages/db/src/schema.ts:20, 3 lines away',
+    );
+
+    // AND THE SAME CITATION REPOINTED IS SILENT, because a catch asserted alone
+    // is indistinguishable from a check that fires on every token it can parse.
+    write(root, LIVE_DOC, liveDoc('The edge is [`fills:20`](../../packages/db/src/schema.ts).'));
+    expect(findings('RI-16', root)).toEqual([]);
+  });
+
+  test('RI-16 reads a token that names its own FILE as naming nothing', () => {
+    // THE HALF THE IN-TOKEN BINDING MUST NOT TAKE. This corpus writes
+    // ``[`EVENTS:396`](../architecture/EVENTS.md)`` for a pointer into a
+    // DOCUMENT, and `EVENTS` there is the file rather than a symbol on line 396.
+    // Binding it would assert that the line says "EVENTS", which the document
+    // never claimed, and there are more pointers of that shape than of the other.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/architecture/EVENTS.md',
+      `# Events\n\n## Catalogue\n\n${'| a |\n'.repeat(40)}`,
+    );
+    write(root, LIVE_DOC, liveDoc('Section 11 opens at [`EVENTS:40`](./EVENTS.md).'));
+    expect(findings('RI-16', root)).toEqual([]);
+
+    // AND A PREFIX THAT IS NOT THAT FILE'S NAME BINDS, which is what keeps the
+    // silence above from passing for the reason that nothing binds at all.
+    write(root, LIVE_DOC, liveDoc('Section 11 opens at [`catalogueRow:40`](./EVENTS.md).'));
+    expect(findings('RI-16', root).join('\n')).toContain('for `catalogueRow`');
   });
 
   test('RI-16 catches a register entry that no longer names a finding', () => {
@@ -1543,11 +1654,15 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
   test('RI-16 throws when every citation falls out of scope', () => {
     // THE DIRECTION THAT FAILS SILENTLY, and it is the same shape as RI-09
     // reporting PASS with no operator prefixes. The record-heading rule holds
-    // 1,737 of 2,340 path-bearing citations out of scope on the real tree, so a
+    // 2,288 of 2,950 path-bearing citations out of scope on the real tree, so a
     // rule that widened by accident would empty this check while it kept saying
     // PASS. Zero in scope is an ERROR, not a clean result.
     const root = cleanTree();
-    for (const doc of ['docs/plans/FOLD-01-phone-identity.md', 'docs/decisions/ALLOCATION.md']) {
+    for (const doc of [
+      'docs/plans/FOLD-01-phone-identity.md',
+      'docs/decisions/ALLOCATION.md',
+      'docs/plans/WAVE-06-admin-console-transport.md',
+    ]) {
       write(
         root,
         doc,
