@@ -5716,3 +5716,95 @@ first, `falsify` clean.
 **Twelve seeded defects, twelve caught**, including the conjunction turned into a disjunction, the correlation comparison reversed, the money band entered, the idle clique flagged, and a barrel leg dropped. **Four of them were MISSES first and the reason is recorded rather than counted as a pass**: `D-02`'s window and `D-12`'s lone-identity refusal are each enforced in two places, so a single-site seed is caught by the other site and the suite stays green.
 
 **Measured on this branch with `pnpm install` run first and each command separately: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 192 test files / 4,164 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The dispatch baseline of 33 / 13 / 0 / 0 / clean / 191 files / 4,088 passed / 6 skipped was reproduced exactly before a line changed. **No ADR number, no migration number, no `packages/db` change, no `apps/api` change, no contract change, no `SqlExecutorReason` member, no `SystemReason` member, and `runner.ts`, `ports.ts`, `canary.ts` and `src/db.ts` read in full and NOT touched.**
+
+---
+
+## `LT-07`'s credit leg was the wrong half of the finding, and the chart of accounts has never been seeded (2026-08-28, session 315)
+
+**[ADR-174](decisions/ADR-174.md) takes findings (A) and (C), [ADR-175](decisions/ADR-175.md)
+takes (B), and the split is argued rather than assumed: they live in TWO TABLES and only one of
+them is blocked.** (A) is `ledger_accounts` and `ledger_entries`, (B) is one `text NOT NULL
+UNIQUE` column on `ledger_transactions`, and a transaction's key is decided by its own header
+while its entries are still undecided. **Migration `0052` is RETURNED TO THE POOL UNSPENT** and no
+`E2` read is owed on a migration that does not exist.
+
+**THE RESERVATION ANTICIPATED A HOLE IN THE CREDIT SLOT AND THE MEASUREMENT FOUND THE SLOT BESIDE
+IT WRONG TOO.** `LT-06` credits `firm_treasury` `amount_cents` ([M05:135](plans/M05-payout-system.md))
+and `LT-07` debits it ([M05:136](plans/M05-payout-system.md)), and
+[`posting.ts:235-236`](../packages/ledger/src/posting.ts) writes `+amountCents` on a debit and
+`-amountCents` on a credit, so **the external leg returns `firm_treasury` to exactly where it
+started**: on the one account [M05:141](plans/M05-payout-system.md) names as where a cash movement
+books, in the leg whose own row calls it *"The external leg's cash movement"*. **That holds for
+every `kind`**, so the ruling on (A) survives finding (C) rather than waiting on it, and **a code
+minted for the credit slot would complete a posting that is wrong in the other slot.** `LT-07`'s
+row also names no amount, where every other row in that table does.
+
+**`trader_wallet` IS REFUSED ON ARITHMETIC RATHER THAN ON SCOPE.** `LT-06` already debits it at
+approval, so an `LT-07` crediting it would return the trader's wallet to where it started while
+the money left the firm. That refusal is worth having because **[ADR-124:33](decisions/ADR-124.md)'s
+version of it quotes the row under repair**: *"`LT-02` and `LT-07` both move `firm_treasury`
+against the payout wallet position"* is [M05:131,136](plans/M05-payout-system.md) restated, so its
+conclusion survives this entry and its stated ground cannot settle the repair. **[ADR-124](decisions/ADR-124.md)
+is not amended** and the finding is filed where the repair will be read.
+
+**(C) IS RECORDED AS AN ABSENCE, NO DIRECTION IS INFERRED, AND THE ABSENCE IS LARGER THAN THE
+DISPATCH SAID.** Executed against PostgreSQL 16.13 with `0001` through `0051` applied forward-only
+under `ON_ERROR_STOP`: **`ledger_accounts` HOLDS ZERO ROWS**, and the database accepted
+`firm_treasury` as `'asset'`, as `'liability'` and as `'revenue'` in turn. `treasury_balances.account_code`
+carries no foreign key and no CHECK into the chart and its own record says it is anchored outside
+the ledger deliberately. **NOTHING SEEDS THE CHART OF ACCOUNTS AT ALL**, the only `kind` literals
+in the tree are three fixtures inside a probe written to watch constraints fire, and **four of the
+seven codes have no `kind` written anywhere**: `firm_treasury`, `psp_clearing`, `reserve` and
+`promotional_credit`. **The five sites that call `firm_treasury` the account where cash books were
+weighed and NOT taken as a `kind`**, because the corpus's own arithmetic disagrees with them at
+`LT-06` and because nothing in this fence needs the answer.
+
+**SO (A) CANNOT BE CLOSED WHILE (C) IS OPEN**, and [ADR-174](decisions/ADR-174.md) section 3 names
+the three available repair shapes and why each needs the absence filled first. **The next session
+on this row rules the chart of accounts BEFORE the posting**, which is the opposite order from the
+one the reservation anticipated.
+
+**(B) IS CLOSED, AND THE TWO CONVENTIONS WERE NEVER IN CONFLICT.** They are one rule under two
+spellings and the rule is that a `ledger_transactions.idempotency_key` **names the EVENT it posts
+and never the DOOR that reached it**. `PAYOUT_ENDPOINT` is a module constant three call sites
+share, so `LT-01`'s prefix does not vary with the door: it names the payout-approval event and is
+merely SPELLED as a route, which is the identical rule `wallet-withdrawals.ts` states when it
+refuses a prefix. **An event is `(kind, reference)` and both are columns on the header row**, so
+**`LT-07`'s key is `` `${kind} ${wallet_withdrawals.idempotency_key}` ``**. Every leg EXECUTED: the
+bare key claimed by `LT-06` and refused to `LT-07`; the same refusal across a DIFFERENT
+`reference_kind` and `reference_id`, so per-reference scoping is unavailable without superseding a
+merged constraint; **the endpoint prefix watched FAILING**, two doors spelling one settlement
+admitting **two postings for one withdrawal** with no constraint violated; and the kind-prefixed
+key accepted beside `LT-06`'s while its own replay was refused. **`LT-01`'s three doors are NOT
+re-spelled**, because `ledger_entries` is append-only with no `UPDATE` and no `DELETE` grant and
+re-spelling a landed key costs a compensating posting.
+
+**NO MIGRATION, NO DOCUMENT AMENDED, AND NO MONEY-PATH CODE CHANGED.** `0009`, `0027` and `0038`
+are byte for byte unchanged, [M05](plans/M05-payout-system.md) section 2.1 stands as written
+because rewriting half a defective row is how a reader stops being able to see that it was
+defective, and `payouts.ts`, `admin-payouts.ts`, `expiry.ts` and `wallet-withdrawals.ts` are
+untouched. No `SystemReason` member, no `SqlExecutorReason` member, no cast past a key type and no
+`pg` import.
+
+**[`packages/rail`](../packages/rail/src/settlement.ts) IS UPDATED DELIBERATELY AND BY ADDITION.**
+Its `LT_07_FINDINGS` said *"this slice does not have an ADR number, so each of these is
+REPORTED"*, which is now false; each finding gains a `ruled` field naming the entry that decided
+it and what that entry left open. `test/lt-07.test.ts` gains twelve cases and **every original
+case still passes unedited**, because no primary source that suite reads is amended. The new cases
+hold `LT-06`'s and `LT-07`'s rows as TEXT, so the day either is repaired the package goes red.
+
+**Eight defects seeded and seven caught first time. The eighth was a MISS and the reason is
+recorded rather than counted as a pass**: a `toContain` over a seven-code list is a prefix match
+and still matches once an eighth code is appended at its end, so a widened `LEDGER-C2` vocabulary
+passed. The case now parses the `NOT IN (...)` and compares it whole, and was then watched
+failing; `packages/ledger/test/accounts.test.ts` caught the same seed independently through its
+three-way bind. **A ninth failure was watched and is not a seed**: the endpoint-prefixed key
+admitting two postings for one settlement is the corpus's own predicted failure executed against a
+live schema.
+
+**Measured on this branch with `pnpm install` run first and each command separately: 33 of 33
+gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 204 test
+files / 4,455 passed / 6 skipped, `falsify.mjs` exit 0 with the tree clean after it.** The
+baseline is `main` itself: the branch was created at `bdc99d7`, confirmed identical to
+`origin/main`, so 33 / 13 / 0 / 0 / clean / 204 files / 4,443 passed / 6 skipped was measured on
+the unmodified tree before a line changed. **`pnpm run verify` was never run.**
