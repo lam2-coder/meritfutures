@@ -82,6 +82,18 @@ wallet_entries
 ```
 <!-- append-only:end -->
 
+  **A SECOND SET IS DECLARED BESIDE IT, AND THE TWO ARE DIFFERENT PROPERTIES.** A table is unreachable when `merit_app` holds **no privilege on it at all**. That is not a stronger form of append-only and it does not imply it: another role may update the table freely, and on the one table in this set another role does.
+
+<!-- unreachable:begin -->
+```
+live_account_state
+```
+<!-- unreachable:end -->
+
+  **`live_account_state` is here rather than above because calling it append-only would be false in both directions.** [`0050:233`](../../../packages/db/migrations/0050_live_cache_and_role.sql) reads `REVOKE ALL ON live_account_state FROM merit_app, PUBLIC`, and the sentence it implements is `FM-M12-08`, *"the stats worker holds no read grant on the live cache"* -- a **confidentiality** sentence, not a mutability one. The stats run is [`apps/worker/src/batch/statistics.ts`](../../../apps/worker/src/batch/statistics.ts) and it runs as `merit_app`, so the verb that had to go was `SELECT`, and taking only `UPDATE` and `DELETE` would have left the sentence unimplemented. Meanwhile `0050:254` grants `SELECT, INSERT, UPDATE` to `merit_live`: **the row is updated, by the upsert the table exists for.**
+
+  **The check read it as append-only and undeclared, and that finding was false.** Its derivation asked only whether `merit_app` lacked `UPDATE` and `DELETE`, which every table in the schema answered against the unstated premise that `merit_app` could reach it at all. `0050` created the first table it cannot. The derivation now asks for `INSERT` as well, and the second block above is why that is not a narrowing: **every table immutable to `merit_app` must appear in exactly one of these two blocks**, and one that appears in neither -- `INSERT` revoked and `SELECT` left -- fails on its own finding rather than dropping silently out of the check.
+
   **A table is on that list exactly when `merit_app` holds neither `UPDATE` nor `DELETE` on it**, which is the question the assertion asks of the database. `merit_app` inherits every privilege granted to `PUBLIC`, so testing that one role is what tests both, and a revoke that bound only the application role would show up here as a table that is not on the list.
 
 - **`impersonation_sessions` is deliberately NOT in that set and is the first table to sit just outside it.** [`0042`](../../../packages/db/migrations/0042_impersonation_sessions.sql) revokes `DELETE` and **keeps `UPDATE`**, because recording the explicit exit is an update to a row that already exists. Listing it above would make the append-only set a list of tables that are *mostly* append-only, which is the kind of drift that makes an exact list worth less than no list. `IMPERSONATION-C1`'s trigger fires on `UPDATE OF token_hash`, so the one guarantee that matters survives the one update that is allowed. Enforced by grants in the database, not by convention ([VG-8](../../../research/VIBE_FAILURE_POSTMORTEMS.md)).

@@ -1808,6 +1808,24 @@ describe('the contract-conformant body is untouched, which is what makes this a 
   });
 });
 
+// GS-223, "a payouts-frozen identity attempts a wallet-funded purchase", and the
+// row's expectation is that it is REFUSED, and that "expired KYC, `recon_blocked`,
+// and an active restriction do the same". The block below is that row one case
+// per member, over a WALLET-FUNDED body, asserting on every one that no purchase,
+// no wallet debit and no ledger entry was written. The sixth case counts the
+// cases against `WalletSpendGates`'s own field list, so a member added to the
+// gate set and not refused turns this red rather than passing quietly. The
+// identity half runs again across all three payment methods and on the reset
+// endpoint above.
+//
+// AS-M20-02 IS WHY THE WALLET BODY MATTERS: a freeze that covers the payout exit
+// and not the spend exit is not a freeze, because spending converts frozen value
+// into accounts that produce fresh unfrozen credits.
+//
+// ONE RESIDUAL, STATED. The KYC member is exercised at `pending` and the row
+// says `expired`. Both refuse through the same `kycState !== 'verified'` at
+// `checkout.ts:1514`, and `KycState` carries `expired` at `checkout.ts:471`, so
+// no case names the row's own word.
 describe('INV-M20-06: the enumerated gate set, one case per member', () => {
   beforeEach(() => {
     fixture.committed = storeWithWallet(WALLET_BALANCE_CENTS);
