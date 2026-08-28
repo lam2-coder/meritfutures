@@ -151,29 +151,59 @@ describe('no code in the chart can hold it, and each refusal has its own step', 
     }
   });
 
-  test('and no firm code carries a liability, whether it is ruled or still silent', () => {
-    // TWO REFUSALS AND NOT ONE. Two firm codes are RULED something else, and two
-    // fall through the constraint's `ELSE true` and are ruled nothing at all.
-    // A silence is not an opening: ADR-181 refuses both on what the tree says
-    // they ARE, and the ELSE arm is where that open question is stored.
+  test('and no firm code carries a liability, and none of them is silent any more', () => {
+    // THIS CASE WENT RED WHEN `0055` LANDED AND THE SESSION CAME HERE TO SAY SO.
+    //
+    // It used to read, in its own comment: "TWO REFUSALS AND NOT ONE. Two firm
+    // codes are RULED something else, and two fall through the constraint's
+    // `ELSE true` and are ruled nothing at all. A silence is not an opening."
+    // ADR-186 rules `psp_clearing` and `reserve` both `asset` and closes the
+    // ELSE, so the partition it asserted no longer has a second half.
+    //
+    // THE PROPERTY IT WAS PROTECTING SURVIVES AND IS STRICTLY STRONGER. What it
+    // held is that no firm code can hold the in-flight obligation. It held that
+    // over two codes by their ruling and two by an argument in an entry; it now
+    // holds it over all four BY THE CONSTRAINT, which is why ADR-174 section 3
+    // shape (iii) is unrepresentable rather than merely refused.
     const ruled = FIRM_CODES.filter((code) => KIND_IN_FORCE[code] !== undefined);
     const silent = FIRM_CODES.filter((code) => KIND_IN_FORCE[code] === undefined);
-    expect(ruled).toHaveLength(2);
-    expect(silent).toHaveLength(2);
+    expect(ruled).toHaveLength(4);
+    expect(silent).toHaveLength(0);
     for (const code of FIRM_CODES) {
       expect(KIND_IN_FORCE[code], code).not.toBe('liability');
     }
-    expect(KIND_CONSTRAINTS[KIND_CONSTRAINTS.length - 1] as string).toMatch(/ELSE\s+true/);
+    // The ELSE arm REFUSES now, and it is present rather than deleted: a CASE
+    // with no ELSE returns NULL for an unmatched code and a CHECK passes on
+    // NULL, which is `ELSE true` wearing a different word.
+    expect(KIND_CONSTRAINTS[KIND_CONSTRAINTS.length - 1] as string).toMatch(/ELSE\s+false/);
+    expect(KIND_CONSTRAINTS[KIND_CONSTRAINTS.length - 1] as string).not.toMatch(/ELSE\s+true/);
   });
 
-  test('the two silences are refused on what the tree says they are, not on the silence', () => {
-    // `psp_clearing`: the only statement of its nature in shipped source calls
-    // crediting it booking a receivable, and a receivable is an ASSET.
-    expect(read('apps', 'api', 'src', 'routes', 'checkout.ts')).toContain(
+  test('the two former silences are ruled on what the tree says they are, and both are assets', () => {
+    // `psp_clearing` IS STATED TWICE IN SHIPPED SOURCE AND BOTH STATEMENTS ARE
+    // ASSET-SHAPED. ADR-177 and ADR-181 each quoted only the second.
+    const checkout = read('apps', 'api', 'src', 'routes', 'checkout.ts');
+    // The one ADR-181 read: a receivable, which is an ASSET.
+    expect(checkout).toContain(
       'would book a receivable from a processor that was never asked for money',
     );
-    // `reserve`: the figure is anchored OUTSIDE this ledger on purpose, so
-    // giving it a posting is what SD-M5-03 refuses in terms.
+    // The one it did not, one line above: an account that HOLDS something when a
+    // processor is present. That is ADR-181 section 8's "funds held at a payment
+    // provider", which that entry called the coherent alternative not written in
+    // this tree. It is written in this tree.
+    // The line wraps inside a JSDoc block, so the assertion spans the wrap
+    // rather than pinning one column of it.
+    expect(checkout).toMatch(
+      /There is no processor in this[\s*\n]+transaction, so there is nothing in clearing/,
+    );
+    // `reserve`: GLOSSARY calls it funds, and the `equity` reading is refused on
+    // the anchor -- a provider API reports cash it holds, not an appropriation.
+    expect(read('docs', 'GLOSSARY.md')).toContain('Funds set aside to cover projected payouts');
+    expect(read('packages', 'db', 'migrations', '0009_ledger.sql')).toContain(
+      "source         text NOT NULL CHECK (source IN ('provider_api','manual_attestation'))",
+    );
+    // And SD-M5-03's anchor still holds: the figure is outside this ledger, which
+    // is why ruling the kind is NOT the same act as seeding a row.
     expect(read('packages', 'db', 'migrations', '0009_ledger.sql')).toContain(
       'it from our own ledger makes it a number that agrees with itself, so it is',
     );
@@ -224,6 +254,11 @@ const ENUMERATES_ALL: readonly Site[] = [
     why: "ADR-180's header, the same shape: it quotes the seven while ruling one code's kind",
   },
   {
+    path: 'packages/db/migrations/0055_last_two_ledger_kinds.sql',
+    kind: 'normative',
+    why: "ADR-186's CASE names all seven codes and its ELSE is `false`, so a mint MUST add an arm here or the database refuses the eighth code outright. This is the only site in this registry the DATABASE enforces, and it is what makes the price a constraint rather than a list",
+  },
+  {
     path: 'packages/ledger/src/accounts.ts',
     kind: 'normative',
     why: 'the third statement, and the ONLY place the firm/identity partition is written',
@@ -231,7 +266,7 @@ const ENUMERATES_ALL: readonly Site[] = [
   {
     path: 'packages/ledger/test/chart-of-accounts-kinds.test.ts',
     kind: 'normative',
-    why: 'RULED and REFUSED, the two halves of the kind ruling, typed out',
+    why: 'RULED, the kind ruling typed out. It carried a REFUSED list beside it until ADR-186 emptied it',
   },
   {
     path: 'packages/ledger/test/pt-03-ledger-zero-sum.property.test.ts',
