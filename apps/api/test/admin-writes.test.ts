@@ -371,6 +371,19 @@ function approval(overrides: Record<string, unknown> = {}): Record<string, unkno
 
 const PUBLISH = ADMIN_WRITE_ENDPOINTS[6]!;
 
+// GS-314, "one owner publishes and a second has not approved", and the row's
+// expectation is that it is BLOCKED until a second owner approves THE SAME
+// PAYLOAD HASH, on M06 section 3.4's existing machine and ADR-010's sensitive
+// set. The seven cases below are that row in both directions: a publish with no
+// approval recorded answers 412 and writes nothing, a publish a second owner
+// approved writes the audit row and then the version, and an approval of a
+// DIFFERENT payload is refused, which is the case the payload hash exists for
+// and which a suite asserting only the happy pair would have passed without.
+// The window, the withdrawal and the wrong-approver refusals close the rest.
+//
+// THE SENSITIVE-SET HALF IS ASSERTED BY THE RESPONSE ITSELF, `dual_control_
+// required: true` on the publish that succeeds, so a publish that stopped being
+// sensitive would not pass quietly.
 describe('dual control on publish', () => {
   it('refuses when no approval is recorded', async () => {
     const written: Written[] = [];

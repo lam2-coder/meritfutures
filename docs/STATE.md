@@ -5492,3 +5492,21 @@ exactly before a line changed. **Twelve defects were seeded and all twelve were 
 `IS NOT TRUE` in place of `IS FALSE`, a path writing `enforced`, a detector shipping with no battery,
 an unstated severity defaulted to 3, a suppressed edge treated as live, a threshold copied back into an
 evidence object, and `D-11` naming the pair so its join could straddle the battery again.
+
+---
+
+## Four golden scenarios are registered as proven and a fifth is not, and the difference is the whole finding (2026-08-28, session 312)
+
+**`GS-155`, `GS-223`, `GS-274` and `GS-314` read `covered-elsewhere` today. They read `blocked` yesterday, with assertions that executed and passed either way.** [Session 305](sessions/2026-08-27-session-305.md) found five rows in `GS-072`'s third state, where the assertion runs and the row cannot move, and could move none of them: `CI-06/fixture-inventory` assertion 6 discharges a row only when the cited test file **carries the row's id as a literal string**, and none of those five files did. **The gate is right, is untouched, and rules its own limit in its own text**: it is a static parse and cannot see an outcome. **What was missing was a naming convention nobody had written down.** Four suites now carry the id and four rows moved by the generator rather than by hand.
+
+**`GS-038` DID NOT SURVIVE THE READING AND STAYS BLOCKED, AND THAT IS THE RESULT THIS SESSION IS MOST CONFIDENT OF.** Its duplicate half is asserted whole, seed and rollback controls included. Its out-of-order half is asserted as far as the DEFERRAL and no further: *"re-evaluated"* is in [`webhooks-psp.test.ts:490`](../apps/api/test/webhooks-psp.test.ts)'s own block title and executes nowhere. [`webhooks-psp.ts:373`](../apps/api/src/routes/webhooks-psp.ts) says `defer_attempts` counts RE-DRIVES, that the receiver never increments it, and that **the re-driver is the batch's**; no batch, job or worker in this tree reads `psp_webhook_events_deferred_idx`. **So an out-of-order delivery stops at `out_of_order_deferred` and never reaches the *"correct final state"* the row pins**, and a row whose end state is produced by code that does not exist is not proven. The row's citation now names that half instead of naming the fixture format.
+
+**`GS-038` NOW CARRIES ITS ID IN A TEST FILE AND IS STILL BLOCKED**, which is [section 39](testing/golden-scenarios/39-fixture-status-and-blockers.md)'s second trap by construction. The comment says so in capitals in its first line. **A successor who moves the row on the string will be wrong**; it moves when the re-driver lands and is asserted.
+
+**THE CONVENTION IS WRITTEN DOWN, AND THE PLACE IT IS WRITTEN IS NOT WHERE IT BELONGS.** Section 39 now carries a subsection stating that a suite proving a `GS-nnn` must carry that id as a literal string in a construct that is not skipped, and why nothing but the author can supply it. **Nobody writing a module suite opens the fixture-status table.** [Session 312](sessions/2026-08-28-session-312.md) section 5 carries the one-sentence wording and the two homes a suite author would actually meet, [`docs/testing/STRATEGY.md`](testing/STRATEGY.md) and [the golden-scenarios README](testing/golden-scenarios/README.md), whose *"tests cite scenario numbers, never prose"* is one clause short of saying it. **That is a one-line session for whoever holds either file.**
+
+**NOTHING WAS EDITED THAT COULD MAKE A ROW TRUE.** No test's assertions changed; five files gained comments and nothing else. [`gates.mjs`](../scripts/corpus/gates.mjs) is untouched and assertion 6 is not weakened ([ADR-125](decisions/ADR-125.md) clause 3). [ADR-072](decisions/ADR-072.md)'s vocabulary is closed at six and reads six. No migration, no `packages/db` file, no route, no handler, no ADR number and no migration number.
+
+**Measured on this branch with `pnpm install` run first and each command separately: 33 of 33 gates, 13 of 13 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 191 test files / 4,088 passed / 6 skipped.** The dispatch baseline was reproduced exactly before a line changed, and every cited file was executed after its comment landed: `51 / 51`, `94 / 94`, `41 / 41`, `23 / 28` with five named skips that are not `GS-314`'s, and `32 / 32`.
+
+**The headline is a number and it is FOUR.** Five were offered and one of them was not true.
