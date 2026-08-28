@@ -191,6 +191,100 @@ BEGIN
 END $$;
 ROLLBACK;
 
+-- ---------------------------------------------------------------------------
+-- LEDGER-K2: the EIGHTH code's arm, in both directions
+-- ---------------------------------------------------------------------------
+-- ADDED BY ADR-187. `withdrawals_in_flight` is the external leg's in-flight
+-- obligation and the ONLY firm-scoped `liability` in the chart. Its arm is the
+-- one thing 0056 adds to this constraint, and a guard nobody has watched fire is
+-- a guard nobody has.
+--
+-- THE ORDER IS THE ARGUMENT, as it is for K1. K2a watches a REFUSAL and K2b
+-- watches an ACCEPTANCE, because a probe that only ever attempts forbidden
+-- things passes against a guard that rejects everything.
+--
+-- BOTH BLOCKS DELETE THE SEEDED ROW INSIDE THE TRANSACTION FIRST. 0056 seeds
+-- this code, so `ledger_accounts_firm_code_uq` would reject a second row on the
+-- UNIQUE INDEX and the probe would report a kind refusal it never obtained. That
+-- is ADR-186 section 7 row 4's method: without deleting first, an acceptance
+-- test is consistent with a constraint that rejects everything AND with a unique
+-- index that rejects everything, and the two are indistinguishable.
+BEGIN;
+DO $$
+BEGIN
+  -- K2a. A REFUSAL. `asset` is the kind every OTHER firm code is ruled, so this
+  -- is the perturbation that matters: it is what the row would read if a later
+  -- session classed the obligation with the cash accounts beside it.
+  DELETE FROM ledger_accounts WHERE code = 'withdrawals_in_flight';
+  BEGIN
+    INSERT INTO ledger_accounts (code, kind, scope)
+      VALUES ('withdrawals_in_flight','asset','firm');
+    RAISE EXCEPTION
+      'PROBE FAILED: LEDGER-K1 admitted withdrawals_in_flight as an asset. It is '
+      'the external leg''s in-flight obligation and ADR-187 rules it a liability: '
+      'LT-06 credits it at approval and LT-07 debits it when the cash leaves';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'LEDGER-K2a fired as expected';
+  END;
+END $$;
+ROLLBACK;
+
+BEGIN;
+DO $$
+BEGIN
+  -- K2b. AN ACCEPTANCE, and it is the half that makes K2a mean anything.
+  DELETE FROM ledger_accounts WHERE code = 'withdrawals_in_flight';
+  INSERT INTO ledger_accounts (code, kind, scope)
+    VALUES ('withdrawals_in_flight','liability','firm');
+  IF NOT EXISTS (
+    SELECT 1 FROM ledger_accounts
+      WHERE code = 'withdrawals_in_flight' AND kind = 'liability' AND scope = 'firm'
+  ) THEN
+    RAISE EXCEPTION
+      'PROBE FAILED: LEDGER-K1 refused withdrawals_in_flight as a liability, '
+      'which is its ruled kind';
+  END IF;
+  RAISE NOTICE 'LEDGER-K2b accepted the ruled kind, as expected';
+END $$;
+ROLLBACK;
+
+-- ---------------------------------------------------------------------------
+-- LEDGER-K3: the eighth code is SEEDED, and it is firm-scoped
+-- ---------------------------------------------------------------------------
+-- ADDED BY ADR-187. The mint's whole point is that LT-06 and LT-07 become
+-- postable, and chart.ts's `resolve` throws rather than opening an account: a
+-- migration that widened the vocabulary and seeded nothing would have bought no
+-- postable transaction, which is ADR-181 section 4's third ground in a new form.
+-- ADR-183 section 7 row 3 is the standing measurement of that failure.
+--
+-- AND NO IDENTITY OPENS A POSITION IN IT. 0054's trigger writes exactly the
+-- three per-identity codes; this one is the firm's own obligation and an
+-- identity-scoped row in it would make LT-07 visible to an identity-scoped
+-- check, which is the property ADR-124 clause 3's conclusion depends on.
+DO $$
+DECLARE
+  n int;
+BEGIN
+  SELECT count(*) INTO n FROM ledger_accounts
+    WHERE code = 'withdrawals_in_flight' AND kind = 'liability' AND scope = 'firm'
+      AND identity_id IS NULL;
+  IF n <> 1 THEN
+    RAISE EXCEPTION
+      'PROBE FAILED: expected exactly one firm withdrawals_in_flight row, found %. '
+      '0056 seeds it and LT-06/LT-07 are unpostable without it', n;
+  END IF;
+
+  SELECT count(*) INTO n FROM ledger_accounts
+    WHERE code = 'withdrawals_in_flight' AND scope = 'identity';
+  IF n <> 0 THEN
+    RAISE EXCEPTION
+      'PROBE FAILED: % identity-scoped withdrawals_in_flight rows exist. The '
+      'external leg''s obligation is the FIRM''s and LT-07 stays firm-only '
+      '(ADR-174 clause 3)', n;
+  END IF;
+  RAISE NOTICE 'LEDGER-K3: the eighth code is seeded once, firm-scoped, as expected';
+END $$;
+
 BEGIN;
 DO $$
 BEGIN

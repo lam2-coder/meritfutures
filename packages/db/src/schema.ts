@@ -531,9 +531,12 @@ export const accounts = pgTable('accounts', {
 // `scope` is CHECKed to ('firm','identity') and the table's own constraint ties
 // it to `identity_id`: an identity row has one, a firm row has NULL. A scoped
 // read filters `identity_id = $1`, and SQL NULL never equals anything, so the
-// firm rows -- `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve` -- fall
-// out of a scoped read WITHOUT a second predicate. That is why the class is
-// `owned` and not something weaker.
+// firm rows -- `firm_treasury`, `psp_clearing`, `fees_revenue`, `reserve` and
+// `withdrawals_in_flight` (ADR-187) -- fall out of a scoped read WITHOUT a
+// second predicate. That is why the class is `owned` and not something weaker.
+// The eighth code strengthens rather than weakens the argument: it is the
+// external leg's in-flight obligation, a FIRM position that no identity may see,
+// and it falls out of a scoped read by the same NULL.
 export const ledgerAccounts = pgTable('ledger_accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
   code: text('code').notNull(),

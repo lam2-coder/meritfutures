@@ -12,8 +12,11 @@
 // package's handle that carries a caller's predicate. `systemTx.rows(
 // 'ledgerAccounts')` renders `SELECT * FROM ledger_accounts` with no `WHERE` at
 // all, so resolving one posting's four account references reads THE WHOLE CHART
-// OF ACCOUNTS -- four firm rows plus up to three per identity, which grows with
-// the trader population and not with the posting.
+// OF ACCOUNTS -- five firm rows plus up to three per identity, which grows with
+// the trader population and not with the posting. (Four until ADR-187 minted
+// `withdrawals_in_flight`; the firm half of this read grows by one row per
+// firm-scoped code and the identity half by three rows per trader, so the shape
+// of the cost is unchanged and only the constant moved.)
 //
 // THIS PARAGRAPH USED TO SAY "ADR-102's ACCESSOR" AND THAT STOPPED BEING TRUE
 // WITHOUT THE COST MOVING (ADR-157, and P5 section 5.4 is the instruction).
