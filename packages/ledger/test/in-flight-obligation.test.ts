@@ -401,7 +401,7 @@ describe('the price of the eighth code, registered and scanned for in both direc
   // sites, this session owns the two migrations (by superseding them), this
   // package, and nothing else. The rest are an approved architecture document,
   // an approved glossary, two files in `packages/db/src` and one in `apps/api`.
-  test('the normative sites outside packages/ledger and packages/db/migrations are six', () => {
+  test('the normative ENUMERATION sites outside this package and the migrations are six', () => {
     const outside = [...ENUMERATES_ALL, ...ENUMERATES_FIRM]
       .filter((site) => site.kind === 'normative')
       .map((site) => site.path)
