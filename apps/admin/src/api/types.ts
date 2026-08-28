@@ -21,16 +21,16 @@
 // -----------------------------------------------------------------------------
 // WHAT IS HERE, AND THE ABSENCES ARE THIS SLICE'S FENCE
 // -----------------------------------------------------------------------------
-// `GET /admin/liability` and nothing else, which is API_CONTRACT section 8's
-// first heading and the data source for the liability home `W6-d` renders.
+// `GET /admin/liability`, the data source for the liability home `W6-d`
+// renders, and `GET /admin/flags`, the data source for the flags queue `W6-f`
+// renders. Both are API_CONTRACT section 8 headings.
 //
 // THE PARTITION IS THE WAVE'S AND IT IS WRITTEN DOWN. WAVE-06 section 9's row
 // for this file reads "FIVE SLICES, ONE TRANSCRIPTION ... each screen slice
-// adds the shapes its own contract rows carry", so the four other declared read
+// adds the shapes its own contract rows carry", so the other declared read
 // shapes in section 8 are deliberately absent and each has an owner:
 //
 //   `AdminAccountSearchItem`   `GET /admin/accounts?query=`         `W6-j`
-//   `FlagListItem`             `GET /admin/flags`                   `W6-f`
 //   `IdentityGraph`            `GET /admin/identities/:id/graph`    `W6-g`
 //   `EvidencePackResponse`     `GET /admin/evidence/:accountId`     wave 5,
 //                              blocked on ADR-171 (the export is an audited ACT
@@ -217,4 +217,68 @@ export type LiabilityResponse = {
       readonly last_duration_ms: number;
     };
   };
+};
+
+/**
+ * `GET /admin/flags`. API_CONTRACT section 8, transcribed field for field.
+ *
+ * `corroboration_depth` IS THE FIRST SORT KEY AND IT IS ON THE WIRE BECAUSE
+ * THE ORDER IS OTHERWISE NEITHER CHECKABLE NOR READABLE. The contract says so
+ * at the point of declaration and gives both halves of the reason:
+ * `assertFlagOrder` "cannot enforce a key it cannot see, and an operator shown
+ * a severity 3 above a severity 5 has nothing on the row that says why".
+ * ADR-178 and `AS-M7-03` clause 3 are where the key itself is ruled: the queue
+ * sorts by the number of INDEPENDENT DETECTOR FAMILIES implicated on an
+ * identity, never by raw flag count, so that poisoning one detector does not
+ * move an identity up the queue.
+ *
+ * IT IS A COUNT AND NOT A FILTER, AND THE CONTRACT SAYS THAT TOO: "Computed per
+ * request and held in no column, so it is NOT a filter and NOT a cursor a
+ * client may compose." So this console renders it and composes nothing from it.
+ *
+ * THE ORDER IS THE SERVER'S AND THIS FILE IS NOT WHERE IT IS RE-DERIVED.
+ * `../app/flags/flags-queue.tsx` renders `rows` in the order the response
+ * carried them and its header argues why a second comparison here would be a
+ * second answer to a question `apps/api/src/routes/admin-reads.ts` already
+ * enforces, in a package `RI-04` forbids importing it from.
+ *
+ * `identity_id` AND `account_id` ARE ON THIS TYPE AND ARE NOT ON THE SCREEN.
+ * `INV-M6-10` renders trader-identifying data only when the query names a
+ * specific subject and a queue names none, so the shapes are transcribed
+ * because the contract carries them and the document renders neither. That is a
+ * rendering decision and it is argued where it is taken rather than by omitting
+ * a contracted field here, which would be this file believing in a response
+ * different from the one the server sends.
+ */
+export type FlagListItem = {
+  readonly flag_id: string;
+  readonly identity_id: string;
+  readonly account_id: string | null;
+  readonly flag_type: string;
+
+  /**
+   * The second sort key, descending within one corroboration band.
+   *
+   * A CLOSED SET OF FIVE AND NOT A `number`, which is the contract's own
+   * spelling. A severity outside it is a detector this console has no sentence
+   * for, and widening the type here would be the console agreeing to render one.
+   */
+  readonly severity: 1 | 2 | 3 | 4 | 5;
+
+  /**
+   * `STATE_MACHINES` section 7's four, as the contract spells them.
+   *
+   * NO AUTOMATIC TRANSITION INTO `enforced` (M06 section 3.3, binding), and
+   * this console takes none of them: `POST /admin/flags/:flagId/status` is a
+   * write and WAVE-06 wave 5 holds every mutating surface behind ADR-171.
+   */
+  readonly status: 'open' | 'investigating' | 'dismissed' | 'enforced';
+
+  /** The third sort key, oldest first within one band at one severity. */
+  readonly first_detected_on: string;
+  readonly detector: string;
+  readonly evidence_summary: string;
+
+  /** How many INDEPENDENT detector families are implicated on `identity_id`. */
+  readonly corroboration_depth: number;
 };
