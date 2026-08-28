@@ -57,17 +57,32 @@ import { fileURLToPath } from 'node:url';
 import { ri11 } from './ui-server-endpoints.mjs';
 
 // RI-18 IS THE SECOND CHECK IN ITS OWN FILE, on RI-11's precedent above, and
-// its reason is the same one plus a cost. Its mechanism is a TypeScript parse
-// and it loads the compiler LAZILY: a static import of `typescript` costs
-// 465ms on every invocation of this file, including the single-check form the
-// usage line advertises, and only the run that reaches RI-18 should pay it.
-// The import below is of the CHECK, which reaches the parser only inside
-// `run`; the cycle is the same shape as ui-server-endpoints.mjs's and links
-// for the same reason, since `workspacePackages` is read at run time and not
-// at module evaluation.
-import { ri18 } from './response-shape-copies.mjs';
+// ITS DEPENDENCY RUNS ONE WAY, WHICH THAT ONE'S DOES NOT. Its mechanism is a
+// TypeScript parse and it loads the compiler LAZILY, inside `run`: a static
+// import of `typescript` costs 465ms on every invocation of this file,
+// including the single-check form the usage line above advertises, and only
+// the run that reaches RI-18 should pay it.
+//
+// THE CYCLE ABOVE WAS MEASURED BEFORE THIS IMPORT WAS WRITTEN AND WAS NOT
+// COPIED. `ui-server-endpoints.mjs`'s header says its cycle links because
+// neither side touches the other at module-evaluation time; the `CHECKS`
+// literal at the foot of this file DOES, so importing that module FIRST throws
+// `ReferenceError: Cannot access 'ri11' before initialization`. Nothing has hit
+// it because every consumer today reaches this file first. RI-18 takes the
+// package lister as an ARGUMENT instead, so its module imports nothing from
+// here and there is no cycle to depend on an import order.
+import { ri18For } from './response-shape-copies.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * RI-18, handed the workspace package list rather than importing it.
+ *
+ * `workspacePackages` is a hoisted function declaration below, so this binding
+ * is safe here and sits beside its import rather than at the foot of the file,
+ * where three sessions are usually live at once.
+ */
+const ri18 = ri18For(workspacePackages);
 
 /** The workspace root, three levels up from `packages/tooling/checks`. */
 export const REPO_ROOT = resolve(HERE, '../../..');

@@ -4,8 +4,16 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, test } from 'vitest';
 
-import { REPO_ROOT } from '../checks/repo-invariants.mjs';
-import { SUBJECTS, copiesOf, ri18, typescriptFences } from '../checks/response-shape-copies.mjs';
+import { CHECKS, REPO_ROOT, workspacePackages } from '../checks/repo-invariants.mjs';
+import { SUBJECTS, copiesOf, typescriptFences } from '../checks/response-shape-copies.mjs';
+
+/**
+ * The check AS THE RUNNER COMPOSES IT, pulled out of `CHECKS` rather than built
+ * here. `ri18For` takes its package lister as an argument, so a case that
+ * composed its own would be testing a check the repository does not run.
+ */
+const ri18 = CHECKS.find((c) => c.id === 'RI-18');
+if (ri18 === undefined) throw new Error('RI-18 is not a row of CHECKS');
 
 // =============================================================================
 // RI-18 IS WATCHED FAILING ON A SEED IN EACH OF THE THREE COPIES SEPARATELY
@@ -107,7 +115,7 @@ describe('three copies that agree', () => {
   });
 
   test('it really read all three, rather than finding one and stopping', () => {
-    const copies = copiesOf(cleanTree(), SUBJECT);
+    const copies = copiesOf(cleanTree(), SUBJECT, workspacePackages);
     expect(copies.map((c) => c.rel).sort()).toEqual([ADMIN_REL, API_REL, CONTRACT_REL]);
     // The nested shape reached THROUGH a reference, which is the truncation
     // that would make two copies agree about a name and never look inside it.
@@ -330,7 +338,7 @@ describe('the fence reader', () => {
   test('reports the DOCUMENT line a fenced declaration sits on, not the fence line', () => {
     const root = cleanTree();
     const contract = readFileSync(join(root, CONTRACT_REL), 'utf8').split('\n');
-    const copy = copiesOf(root, SUBJECT).find((c) => c.rel === CONTRACT_REL);
+    const copy = copiesOf(root, SUBJECT, workspacePackages).find((c) => c.rel === CONTRACT_REL);
     expect(copy).toBeDefined();
     // 1-based, so the cited line is the array index one below it. The assertion
     // is against the document's own text rather than against a number typed

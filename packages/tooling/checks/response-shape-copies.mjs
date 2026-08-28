@@ -122,7 +122,21 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
-import { workspacePackages } from './repo-invariants.mjs';
+// THIS MODULE IMPORTS NOTHING FROM `repo-invariants.mjs`, AND THE REASON IS A
+// MEASURED DEFECT IN THE ONE PRECEDENT FOR DOING SO. `ui-server-endpoints.mjs`
+// imports `DEPLOYABLES` back out of that file while that file imports `ri11`
+// out of it, and its header says the cycle links because neither side touches
+// the other at module-evaluation time. That is true of ONE side only: `CHECKS`
+// is an array literal holding `ri11`, so evaluating it reads a `const` in the
+// other module, and importing `ui-server-endpoints.mjs` FIRST throws
+// `ReferenceError: Cannot access 'ri11' before initialization` -- measured on
+// this branch. Nothing has hit it because every consumer today happens to reach
+// `repo-invariants.mjs` first.
+//
+// So the package list this check needs is PASSED IN by `ri18For` rather than
+// imported, which leaves the dependency running one way and this module
+// importable on its own. It is still ONE source for that list: the caller hands
+// over `workspacePackages` itself, not a copy of what it returns.
 
 /**
  * The shapes this check binds.
@@ -551,14 +565,15 @@ function copyOf(name, sources, rel) {
 /**
  * Every `.ts` file in the workspace packages, repo-relative.
  *
- * Walked out of `workspacePackages` rather than a written list of directories,
- * for `RI-04`'s reason: a fixture or a check that keeps its own copy of the
+ * Walked out of the caller's package lister rather than a written list of
+ * directories, for `RI-04`'s reason: a check that keeps its own copy of the
  * package set goes stale in step with nothing noticing.
  *
  * @param {string} root
+ * @param {PackageLister} listPackages
  * @returns {string[]}
  */
-function workspaceSources(root) {
+function workspaceSources(root, listPackages) {
   /** @type {string[]} */
   const out = [];
   /** @param {string} rel */
@@ -570,8 +585,14 @@ function workspaceSources(root) {
       else if (entry.endsWith('.ts') && !entry.endsWith('.d.ts')) out.push(child);
     }
   };
-  for (const pkg of workspacePackages(root)) {
-    if (existsSync(join(root, pkg.dir))) walk(pkg.dir);
+  const dirs = listPackages(root).map((p) => p.dir);
+  if (dirs.length === 0)
+    throw new Error(
+      'the workspace resolved to zero packages; RI-18 would then compare the contract ' +
+        'against no code at all and report agreement for having read one thing',
+    );
+  for (const dir of dirs) {
+    if (existsSync(join(root, dir))) walk(dir);
   }
   return out;
 }
@@ -583,9 +604,10 @@ function workspaceSources(root) {
  *
  * @param {string} root
  * @param {string} name
+ * @param {PackageLister} listPackages
  * @returns {Copy[]}
  */
-export function copiesOf(root, name) {
+export function copiesOf(root, name, listPackages) {
   const contractPath = join(root, CONTRACT_REL);
   if (!existsSync(contractPath))
     throw new Error(`${CONTRACT_REL} does not exist; RI-18 has no specification and cannot run`);
@@ -608,7 +630,7 @@ export function copiesOf(root, name) {
     );
   copies.push(contract);
 
-  for (const rel of workspaceSources(root)) {
+  for (const rel of workspaceSources(root, listPackages)) {
     const text = readFileSync(join(root, rel), 'utf8');
     // A whole-text `includes` rather than a declaration-shaped regex: the
     // filter exists to keep the parse count down and nothing else, so it is
@@ -626,10 +648,11 @@ export function copiesOf(root, name) {
  *
  * @param {string} root
  * @param {string} name
+ * @param {PackageLister} listPackages
  * @returns {string[]}  findings, empty when every copy carries the same fields
  */
-export function compareSubject(root, name) {
-  const copies = copiesOf(root, name);
+export function compareSubject(root, name, listPackages) {
+  const copies = copiesOf(root, name, listPackages);
   if (copies.length < 2)
     throw new Error(
       `\`${name}\` is declared once, in ${CONTRACT_REL}. RI-18 compares copies and there is ` +
@@ -667,31 +690,51 @@ export function compareSubject(root, name) {
   return findings;
 }
 
-/** @type {import('./repo-invariants.mjs').Invariant} */
-export const ri18 = {
-  id: 'RI-18',
-  // COMPUTED FROM `SUBJECTS`, for the reason `RI-04`'s title and `RI-09`'s are
-  // computed: a count written beside a list is a hand-maintained count in a
-  // different costume and it drifts the same way.
-  title:
-    `Every declaration of ${SUBJECTS.length === 1 ? 'the response shape' : 'each of the ' + SUBJECTS.length + ' response shapes'} ` +
-    `${SUBJECTS.map((s) => `\`${s}\``).join(', ')} carries the same field set`,
-  covers:
-    `${SUBJECTS.join(', ')}, read live from every declaration of the name: the \`\`\`ts ` +
-    `blocks of ${CONTRACT_REL} as one declaration space, and every \`.ts\` file under every ` +
-    'workspace package, parsed with the TypeScript compilerrather than matched with a ' +
-    'regex. Field PATHS only, with `?` carried and array element shapes carried through ' +
-    '`[]`. It does NOT compare leaf types, does NOT compare `readonly`, does NOT reduce a ' +
-    'union, and does NOT read any value a handler builds; and its population is the ' +
-    'SUBJECTS list rather than every shape the contract declares, for the three measured ' +
-    'reasons that list states. A reference it cannot resolve is a FINDING, never a leaf, ' +
-    'because a truncated shape reports agreement that was never checked.',
-  run(root) {
-    /** @type {string[]} */
-    const findings = [];
-    if (SUBJECTS.length === 0)
-      throw new Error('RI-18 has no subject and would report agreement about nothing');
-    for (const name of SUBJECTS) findings.push(...compareSubject(root, name));
-    return findings;
-  },
-};
+/**
+ * Every workspace package, as `repo-invariants.mjs` resolves them.
+ *
+ * @callback PackageLister
+ * @param {string} root
+ * @returns {{ dir: string }[]}
+ */
+
+/**
+ * `RI-18`, bound to a package lister.
+ *
+ * The caller supplies `workspacePackages`, which is why this file imports
+ * nothing from the file that holds it. See the note above the imports.
+ *
+ * @param {PackageLister} listPackages
+ * @returns {import('./repo-invariants.mjs').Invariant}
+ */
+export function ri18For(listPackages) {
+  return {
+    id: 'RI-18',
+    // COMPUTED FROM `SUBJECTS`, for the reason `RI-04`'s title and `RI-09`'s
+    // are computed: a count written beside a list is a hand-maintained count in
+    // a different costume and it drifts the same way.
+    title: `Every declaration of ${
+      SUBJECTS.length === 1
+        ? 'the response shape'
+        : `each of the ${SUBJECTS.length} response shapes`
+    } ${SUBJECTS.map((s) => `\`${s}\``).join(', ')} carries the same field set`,
+    covers:
+      `${SUBJECTS.join(', ')}, read live from every declaration of the name: the \`\`\`ts ` +
+      `blocks of ${CONTRACT_REL} as one declaration space, and every \`.ts\` file under every ` +
+      "workspace package, parsed with the TypeScript compiler's own parser rather than matched " +
+      'with a regex. Field PATHS only, with `?` carried and array element shapes carried ' +
+      'through `[]`. It does NOT compare leaf types, does NOT compare `readonly`, does NOT ' +
+      'reduce a union, and does NOT read any value a handler builds; and its population is the ' +
+      'SUBJECTS list rather than every shape the contract declares, for the three measured ' +
+      'reasons that list states. A reference it cannot resolve is a FINDING, never a leaf, ' +
+      'because a truncated shape reports agreement that was never checked.',
+    run(root) {
+      /** @type {string[]} */
+      const findings = [];
+      if (SUBJECTS.length === 0)
+        throw new Error('RI-18 has no subject and would report agreement about nothing');
+      for (const name of SUBJECTS) findings.push(...compareSubject(root, name, listPackages));
+      return findings;
+    },
+  };
+}
