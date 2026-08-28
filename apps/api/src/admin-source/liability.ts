@@ -1124,6 +1124,136 @@ function lastClosedDay(
 }
 
 /**
+ * One `trading_calendar` row as {@link horizonRow} parsed it.
+ *
+ * `ReturnType` RATHER THAN A SECOND DECLARATION, on `LiabilityBook`'s reason one
+ * scale down: a hand-written copy of this shape would go stale the first time
+ * the parser carried a fourth fact.
+ */
+type ParsedCalendarRow = ReturnType<typeof horizonRow>;
+
+/**
+ * The span refusal, ONE COPY, because two walks take a span and refuse it alike.
+ *
+ * THE NUMBERS DIFFER AND THE PROPERTY DOES NOT. `EC-074` fixes the FORWARD
+ * horizon at 7 ({@link ELIGIBLE_HORIZON_TRADING_DAYS}); `ADR-201` ruling 3 fixes
+ * the TRAILING windows at 7 and 30. A span that is not a positive whole number
+ * of trading days is not a window in either direction.
+ */
+function refuseSpan(span: number, walk: string): void {
+  if (!Number.isSafeInteger(span) || span < 1)
+    throw new AdminReadError(
+      `a ${walk} of ${JSON.stringify(span)} trading days was asked for. EC-074 fixes the forward ` +
+        'horizon at 7 and ADR-201 ruling 3 fixes the trailing windows at 7 and 30, and a span ' +
+        'that is not a positive whole number of trading days is not a window in either direction',
+    );
+}
+
+/** {@link anchorCalendar}'s answer: a day to walk from, or the reason there is none. */
+type CalendarAnchor =
+  | {
+      readonly kind: 'anchored';
+      readonly cost: TradingHorizonCost;
+      readonly parsed: readonly ParsedCalendarRow[];
+      readonly anchorDay: string;
+      readonly covering: { readonly from: string; readonly to: string };
+    }
+  | {
+      readonly kind: 'uncovered';
+      readonly cost: TradingHorizonCost;
+      readonly anchor_day: string | null;
+      readonly detail: string;
+    };
+
+/**
+ * The last closed trading day, the load interval covering it, and every calendar
+ * row, read once.
+ *
+ * **EXTRACTED SO THE TWO WALKS CANNOT DRIFT APART, AND THAT IS THE WHOLE REASON
+ * IT EXISTS.** {@link readTradingHorizon} walks FORWARD off this anchor and
+ * {@link readTradingLookback} walks BACKWARD off the same one. A second
+ * transcription of "which day is the snapshot's" would be two answers to one
+ * question inside one module, which is the shape `ADR-201` names one level up as
+ * `B2`: the missing half "invented differently by every implementation that
+ * meets it". The anchor rule, the coverage rule and the three `uncovered`
+ * answers are therefore written ONCE and shared by identity rather than by
+ * resemblance.
+ *
+ * THE ANCHOR IS ALWAYS A SESSION DAY AND NEVER A HOLIDAY, which the trailing
+ * walk depends on and the forward walk does not. {@link lastClosedDay} reads
+ * only rows carrying a `closeMs`, and {@link horizonRow} gives a holiday a
+ * `closeMs` of `null` on `0032`'s two-way CHECK. So the anchor is a day
+ * `ADR-201` ruling 3 may count as the first of the trailing thirty; a holiday
+ * anchor would make the inclusive window start on a day that is not a trading
+ * day at all.
+ */
+async function anchorCalendar(tx: TradingCalendarTx, asOf: string): Promise<CalendarAnchor> {
+  const asOfMs = Date.parse(asOf);
+  if (!Number.isFinite(asOfMs))
+    throw new AdminReadError(
+      `the window was anchored at ${JSON.stringify(asOf)}, which is not an instant. INV-M6-04 ` +
+        'makes every number on this page name its as-of moment, and a window whose own edge is ' +
+        'unstated is a span of days measured from nothing',
+    );
+
+  const calendarRows = await tx.rows('tradingCalendar');
+  const loadRows = await tx.rows('tradingCalendarLoads');
+  const intervals = coveredIntervals(loadRows);
+  const cost: TradingHorizonCost = {
+    calendarRowsScanned: calendarRows.length,
+    calendarLoadsScanned: loadRows.length,
+    coveredIntervals: intervals.length,
+  };
+
+  // NO LOAD IS NOT AN EMPTY CALENDAR, AND THIS IS THE BRANCH F-4 EXISTS FOR. A
+  // `trading_calendar` full of rows and a `trading_calendar_loads` with none is
+  // an estate that has days and no record of having loaded them, so it is
+  // entitled to answer for none of them.
+  if (intervals.length === 0)
+    return {
+      kind: 'uncovered',
+      cost,
+      anchor_day: null,
+      detail:
+        `${String(calendarRows.length)} trading calendar rows are present and no ` +
+        '`trading_calendar_loads` row declares coverage for any of them. ADR-042 F-4 makes ' +
+        'coverage a stored fact precisely so this is a positive answer rather than an ' +
+        'unbroken run of non-holidays',
+    };
+
+  const parsed = calendarRows.map(horizonRow);
+  const anchorDay = lastClosedDay(parsed, asOfMs);
+
+  if (anchorDay === null)
+    return {
+      kind: 'uncovered',
+      cost,
+      anchor_day: null,
+      detail:
+        `no trading calendar session has closed at or before ${asOf}, so there is no last ` +
+        'closed day to measure a window from. P-M6-01 dates this figure at "the last closed ' +
+        'day" (INV-M6-11) and the calendar holds no such day',
+    };
+
+  const covering = intervals.find(
+    (interval) => anchorDay >= interval.from && anchorDay <= interval.to,
+  );
+  if (covering === undefined)
+    return {
+      kind: 'uncovered',
+      cost,
+      anchor_day: anchorDay,
+      detail:
+        `the last closed trading day is ${anchorDay} and no \`trading_calendar_loads\` row ` +
+        `covers it. The ${String(intervals.length)} covered interval(s) are ` +
+        `${intervals.map((i) => `${i.from}..${i.to}`).join(', ')}. A day outside coverage is ` +
+        'UNKNOWN and never a holiday (ADR-042 F-4)',
+    };
+
+  return { kind: 'anchored', cost, parsed, anchorDay, covering };
+}
+
+/**
  * The next `span` TRADING DAYS after the last closed session, or the reason there
  * are not that many.
  *
@@ -1142,7 +1272,10 @@ function lastClosedDay(
  * on the consistency period: "the very day that funded a payout counts against
  * the next cycle ... it looks like the consistency rule working rather than a
  * bug". Here it would put a day the snapshot already accounts for into the
- * forecast of what has not happened yet.
+ * forecast of what has not happened yet. **{@link readTradingLookback} IS
+ * INCLUSIVE OF THE SAME ANCHOR AND THAT IS NOT AN INCONSISTENCY**: a forecast of
+ * what has not happened excludes the day that has, and a trailing measurement of
+ * what has happened includes it. `ADR-201` ruling 3 rules the second in terms.
  *
  * NO DAY IS COMPUTED. Every returned day is a row this function read, filtered
  * to `is_holiday = false` and taken in ascending order. The accessor offers no
@@ -1154,80 +1287,16 @@ export async function readTradingHorizon(
   asOf: string,
   span: number = ELIGIBLE_HORIZON_TRADING_DAYS,
 ): Promise<TradingHorizonResult> {
-  if (!Number.isSafeInteger(span) || span < 1)
-    throw new AdminReadError(
-      `a horizon of ${JSON.stringify(span)} trading days was asked for, and EC-074 fixes it at ` +
-        '7. A span that is not a positive whole number of trading days is not a horizon',
-    );
+  refuseSpan(span, 'horizon');
 
-  const asOfMs = Date.parse(asOf);
-  if (!Number.isFinite(asOfMs))
-    throw new AdminReadError(
-      `the horizon was anchored at ${JSON.stringify(asOf)}, which is not an instant. INV-M6-04 ` +
-        'makes every number on this page name its as-of moment, and a horizon whose own start is ' +
-        'unstated is seven days measured from nothing',
-    );
-
-  const calendarRows = await tx.rows('tradingCalendar');
-  const loadRows = await tx.rows('tradingCalendarLoads');
-  const intervals = coveredIntervals(loadRows);
-  const cost: TradingHorizonCost = {
-    calendarRowsScanned: calendarRows.length,
-    calendarLoadsScanned: loadRows.length,
-    coveredIntervals: intervals.length,
-  };
-
-  // NO LOAD IS NOT AN EMPTY CALENDAR, AND THIS IS THE BRANCH F-4 EXISTS FOR. A
-  // `trading_calendar` full of rows and a `trading_calendar_loads` with none is
-  // an estate that has days and no record of having loaded them, so it is
-  // entitled to answer for none of them.
-  if (intervals.length === 0)
+  const anchor = await anchorCalendar(tx, asOf);
+  if (anchor.kind === 'uncovered')
     return {
-      horizon: {
-        kind: 'uncovered',
-        anchor_day: null,
-        detail:
-          `${String(calendarRows.length)} trading calendar rows are present and no ` +
-          '`trading_calendar_loads` row declares coverage for any of them. ADR-042 F-4 makes ' +
-          'coverage a stored fact precisely so this is a positive answer rather than an ' +
-          'unbroken run of non-holidays',
-      },
-      cost,
+      horizon: { kind: 'uncovered', anchor_day: anchor.anchor_day, detail: anchor.detail },
+      cost: anchor.cost,
     };
 
-  const parsed = calendarRows.map(horizonRow);
-  // `const`, so the narrowing below survives into the closure that reads it.
-  const anchorDay = lastClosedDay(parsed, asOfMs);
-
-  if (anchorDay === null)
-    return {
-      horizon: {
-        kind: 'uncovered',
-        anchor_day: null,
-        detail:
-          `no trading calendar session has closed at or before ${asOf}, so there is no last ` +
-          'closed day to measure a horizon from. P-M6-01 dates this figure at "the last closed ' +
-          'day" (INV-M6-11) and the calendar holds no such day',
-      },
-      cost,
-    };
-
-  const covering = intervals.find(
-    (interval) => anchorDay >= interval.from && anchorDay <= interval.to,
-  );
-  if (covering === undefined)
-    return {
-      horizon: {
-        kind: 'uncovered',
-        anchor_day: anchorDay,
-        detail:
-          `the last closed trading day is ${anchorDay} and no \`trading_calendar_loads\` row ` +
-          `covers it. The ${String(intervals.length)} covered interval(s) are ` +
-          `${intervals.map((i) => `${i.from}..${i.to}`).join(', ')}. A day outside coverage is ` +
-          'UNKNOWN and never a holiday (ADR-042 F-4)',
-      },
-      cost,
-    };
+  const { parsed, anchorDay, covering, cost } = anchor;
 
   // THE WALK. Sessions strictly after the anchor and no later than the day
   // coverage runs through, ascending, and at most `span` of them. Every bound
@@ -1262,6 +1331,144 @@ export async function readTradingHorizon(
       kind: 'resolved',
       anchor_day: anchorDay,
       covered_through_day: covering.to,
+      days,
+    },
+    cost,
+  };
+}
+
+// -----------------------------------------------------------------------------
+// THE TRAILING WALK, WHICH IS ADR-201 RULING 3 AND IS NOT THE HORIZON REVERSED
+// -----------------------------------------------------------------------------
+// `ADR-201` ruling 3: "The numerator is the 7 trading days ending at the trading
+// day of the snapshot's `as_of`, inclusive of that day. The denominator is the
+// 30 trading days ending at the same day, inclusive."
+//
+// **THREE THINGS DIFFER FROM {@link readTradingHorizon} AND EACH IS RULED RATHER
+// THAN PREFERRED**, which is why the walk is written out instead of being the
+// forward one with a flipped comparison hidden in it:
+//
+//   1. THE ANCHOR IS INCLUDED. The horizon is strictly after it and this is
+//      inclusive of it, because a forecast of what has not happened excludes the
+//      day that has and a measurement of what has happened does not.
+//   2. THE BOUND IS `covering.from` RATHER THAN `covering.to`. Coverage is the
+//      authority on what may be answered in BOTH directions (`ADR-042` F-4), and
+//      the mirror of "a session row past the coverage edge is not taken" is that
+//      a session row BEFORE the covered interval is not taken either.
+//   3. RUNNING OUT MEANS SOMETHING ELSE. A short forward horizon understates a
+//      forecast; a short TRAILING window understates the DENOMINATOR of a ratio,
+//      and a denominator scaled from 12 trading days as though it were 30 makes
+//      the pager fire on an ordinary week. So `exhausted` is a verdict here and
+//      never a shorter array, on the same reading and a sharper consequence.
+//
+// **A LOOKBACK OF `span` DAYS IS EXHAUSTED WHENEVER THE CALENDAR HOLDS FEWER
+// THAN `span` SESSIONS INSIDE COVERAGE**, and at launch that is the ordinary
+// case rather than an error: the thirtieth trading day back does not exist until
+// the estate has thirty of them. `ADR-201` section 7 answers an empty
+// DENOMINATOR and cannot answer an absent WINDOW, because a window that is not
+// there is not a figure at all.
+// -----------------------------------------------------------------------------
+
+/**
+ * What a trailing walk can answer, and the three answers are genuinely different.
+ *
+ * {@link TradingHorizon}'s shape with the coverage edge on the other side.
+ * `covered_from_day` is the first day of the interval covering the anchor, which
+ * is the day the walk stops at, and it is a different fact from
+ * `covered_through_day`: one says how far back the estate has an opinion and the
+ * other how far forward.
+ *
+ *   `resolved`   exactly `span` sessions, ascending, the anchor last
+ *   `exhausted`  fewer than `span`, and it says how many and from what day
+ *   `uncovered`  the estate has no opinion about the anchor day at all
+ */
+export type TradingLookback =
+  | {
+      readonly kind: 'resolved';
+      readonly anchor_day: string;
+      readonly covered_from_day: string;
+      readonly days: readonly HorizonDay[];
+    }
+  | {
+      readonly kind: 'exhausted';
+      readonly anchor_day: string;
+      readonly covered_from_day: string;
+      readonly days: readonly HorizonDay[];
+      readonly short_by: number;
+      readonly detail: string;
+    }
+  | { readonly kind: 'uncovered'; readonly anchor_day: string | null; readonly detail: string };
+
+/** {@link readTradingLookback}'s answer. */
+export interface TradingLookbackResult {
+  readonly lookback: TradingLookback;
+  readonly cost: TradingHorizonCost;
+}
+
+/**
+ * The `span` TRADING DAYS ENDING AT the last closed session, INCLUSIVE of it.
+ *
+ * `ADR-201` ruling 3 in code, and nothing here chooses anything: the anchor rule
+ * is {@link anchorCalendar}'s and is shared with the forward walk by identity,
+ * the day unit is the ruling's, and the inclusivity is the ruling's own word.
+ *
+ * THE DAYS COME BACK ASCENDING WITH THE ANCHOR LAST, which is the order the
+ * forward walk uses and the order a reader of a window expects. The `slice`
+ * takes the `span` days NEAREST the anchor, so the sort is descending and the
+ * reversal is at the end; taking an ascending slice would return the OLDEST
+ * `span` days of coverage, which is a window over the wrong month and looks
+ * exactly right in review.
+ *
+ * NO DAY IS COMPUTED HERE EITHER. Every returned day is a row this function
+ * read, filtered to `is_holiday = false`, and every bound is a lexicographic
+ * comparison between two `YYYY-MM-DD` strings.
+ */
+export async function readTradingLookback(
+  tx: TradingCalendarTx,
+  asOf: string,
+  span: number,
+): Promise<TradingLookbackResult> {
+  refuseSpan(span, 'lookback');
+
+  const anchor = await anchorCalendar(tx, asOf);
+  if (anchor.kind === 'uncovered')
+    return {
+      lookback: { kind: 'uncovered', anchor_day: anchor.anchor_day, detail: anchor.detail },
+      cost: anchor.cost,
+    };
+
+  const { parsed, anchorDay, covering, cost } = anchor;
+
+  const days = parsed
+    .filter((row) => !row.isHoliday && row.day <= anchorDay && row.day >= covering.from)
+    .sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : 0))
+    .slice(0, span)
+    .map((row) => row.entry)
+    .reverse();
+
+  if (days.length < span)
+    return {
+      lookback: {
+        kind: 'exhausted',
+        anchor_day: anchorDay,
+        covered_from_day: covering.from,
+        days,
+        short_by: span - days.length,
+        detail:
+          `${String(span)} trading days were asked for ending at ${anchorDay} and the calendar ` +
+          `holds ${String(days.length)} inside coverage, which begins at ${covering.from}. ` +
+          'ADR-042 F-4: an exhausted calendar is otherwise indistinguishable from an unbroken ' +
+          'holiday, and a denominator scaled from fewer days than it claims is a pager firing ' +
+          'on an ordinary week',
+      },
+      cost,
+    };
+
+  return {
+    lookback: {
+      kind: 'resolved',
+      anchor_day: anchorDay,
+      covered_from_day: covering.from,
       days,
     },
     cost,

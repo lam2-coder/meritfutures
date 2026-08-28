@@ -609,18 +609,30 @@ describe('blocker B5: eligible_next_7d`s per-account half, which nobody had look
   });
 });
 
-describe('blocker B2: payout_velocity, whose threshold is fixed and whose window is not', () => {
-  it('has the 2.5x threshold stated in three documents', () => {
+describe('blocker B2: payout_velocity, whose window ADR-201 ruled and whose WIRE still blocks it', () => {
+  it('has the 2.5x threshold stated in FOUR documents, which is one more than this case read', () => {
     // MERIT_BUILD_MASTER_PROMPT is the constitution and INFRA is what pages on
     // it, so this is a control with an operator attached rather than a chart.
-    const constitution = readFileSync(join(ROOT, 'MERIT_BUILD_MASTER_PROMPT.md'), 'utf8');
-    expect(constitution).toContain('payout velocity vs 30-day avg (alarm >2.5');
-    expect(readFileSync(join(ROOT, 'docs/architecture/INFRA.md'), 'utf8')).toContain(
-      'Over 2.5 times the 30 day average pages',
-    );
-    expect(readFileSync(join(ROOT, 'docs/plans/M06-admin-ops-console.md'), 'utf8')).toContain(
-      'Trailing 7 day settled cents against the 30 day average',
-    );
+    //
+    // **THE COUNT WAS THREE AND IS FOUR**, which session 381 re-derived while
+    // ruling ADR-201 and this case now derives rather than carries. The fourth,
+    // `research/ADVERSARY_DOSSIER.md`, is descriptive rather than normative and
+    // is asserted anyway, because a count of three that is really four is
+    // exactly the kind of thing a later reader has to re-derive, and because its
+    // agreement is evidence: the number survived being restated in a document
+    // written for a different purpose.
+    const stated: readonly (readonly [string, string])[] = [
+      ['MERIT_BUILD_MASTER_PROMPT.md', 'payout velocity vs 30-day avg (alarm >2.5'],
+      ['docs/architecture/INFRA.md', 'Over 2.5 times the 30 day average pages'],
+      [
+        'docs/plans/M06-admin-ops-console.md',
+        'Trailing 7 day settled cents against the 30 day average',
+      ],
+      ['research/ADVERSARY_DOSSIER.md', 'trips the payout-velocity alarm (>2.5'],
+    ];
+    for (const [file, quote] of stated)
+      expect(readFileSync(join(ROOT, file), 'utf8'), file).toContain(quote);
+    expect(stated).toHaveLength(4);
   });
 
   it('has avg_30d_cents DEFINED by ADR-201, which is this case cleared rather than broken', () => {
@@ -662,15 +674,35 @@ describe('blocker B2: payout_velocity, whose threshold is fixed and whose window
     expect(lines[0]?.trim().startsWith('payout_velocity: {')).toBe(true);
   });
 
-  it('has the NUMERATOR producible, which is what makes the gap the denominator', () => {
-    // `payout_transfers.amount_cents` over `settled_at` inside seven days is a
-    // range term ADR-157 admits on the read path. One of the group's four leaves
-    // is therefore reachable and the group is not, which is why the book carries
-    // none of them: three fields of four is not a shape the contract declares.
+  it('has ALL FOUR leaves producible now, and the group is blocked on the WIRE instead', () => {
+    // WHEN THIS CASE WAS WRITTEN the numerator was producible and the
+    // denominator had no definition, so one leaf of four was reachable and the
+    // group was not. **ADR-201 supplied the definition and session 383 built
+    // the evaluator**, so all four are produced today by
+    // `evaluatePayoutVelocity` over these same columns, executed against a live
+    // PostgreSQL.
+    //
+    // THE CASE IS INVERTED RATHER THAN DELETED, because the group is still not
+    // on the book and the reason MOVED rather than lifted: the evaluator answers
+    // THREE ways -- evaluated, exhausted, uncovered -- and `LiabilityResponse`
+    // carries ONE. `ratio_bp` is a non-nullable number and `alarm` a
+    // non-nullable boolean, so an uncovered calendar would have to be rendered
+    // `0 / false`, which is indistinguishable from a quiet week. That is
+    // ADR-201 finding 3's gap with a pager attached.
+    //
+    // CLEARING CONDITION: the wire gains a shape for "there is no window", which
+    // is a change to a response `RI-18` binds in three copies.
     const columns = migrationColumnNames();
     expect(columns).toContain('amount_cents');
     expect(columns).toContain('settled_at');
     expect(TABLE_KEYS).toContain('payoutTransfers');
+    const evaluator = readFileSync(
+      join(ROOT, 'apps/api/src/admin-source/payout-velocity.ts'),
+      'utf8',
+    );
+    expect(evaluator).toContain('export async function evaluatePayoutVelocity');
+    for (const leaf of ['last_7d_cents', 'avg_30d_cents', 'ratio_bp', 'alarm'])
+      expect(evaluator, leaf).toContain(leaf);
   });
 });
 
