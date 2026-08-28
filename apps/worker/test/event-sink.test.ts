@@ -28,10 +28,21 @@
 // THE FINDING SECTION 4 EXISTS FOR
 // -----------------------------------------------------------------------------
 // WIRING THE SINK WOULD NOT MAKE SEVEN CALL SITES WRITE. `buildEvent` refuses a
-// name that is not a row in `EVENT_CATALOGUE`, on ADR-159 clause 1, and four of
+// name that is not a row in `EVENT_CATALOGUE`, on ADR-159 clause 1, and three of
 // this deployable's seven names are not rows in it. A session that crossed the
-// fence and declared the slice done would have wired two call sites and broken
-// four, and nothing in either tree would have said so.
+// fence and declared the slice done would have wired the rest and broken those
+// three, and nothing in either tree would have said so.
+//
+// THE COUNT READ FOUR UNTIL THE PRODUCER'S CATALOGUE GAINED `flag.raised`, AND
+// SECTION 4 IS WHY IT MOVED RATHER THAN DRIFTED. That commit turned this case
+// red, which is what it was written to do: the split is DERIVED from the other
+// deployable's file rather than named here, so the figures below are re-derived
+// rather than adjusted. Nothing in `apps/worker` changed and nothing here was
+// widened. The two EVENTS rows this deployable's refusals were pointing at are
+// `flag.raised` (`EVENTS:354`) and `detector.run_completed` (`EVENTS:358`); the
+// first is a row in the producer now and the second cannot become one, because
+// its payload declares no `_id` for `events.subject_id` and neither tenancy
+// column, so both of its repairs are amendments to a frozen document.
 //
 //   apps/api/src/events.ts               EVENT_CATALOGUE's keys, read as text
 //   apps/worker/src/**                   the call sites and the specifiers
@@ -169,12 +180,12 @@ test('no relative specifier under src resolves outside apps/worker', () => {
 });
 
 // -----------------------------------------------------------------------------
-// 4. The producer's catalogue, read as text, holds three of the seven
+// 4. The producer's catalogue, read as text, holds four of the seven
 // -----------------------------------------------------------------------------
 // `RI-04` FORBIDS THE IMPORT, so the catalogue is parsed out of the file. THE
 // PARSE IS ASSERTED BEFORE IT IS USED, because a parse that quietly returns
 // nothing turns this case into a case that passes over an empty set: the
-// catalogue's own docblock says it carries eight names and the count is checked
+// catalogue's own docblock says it carries nine names and the count is checked
 // against that sentence, so a reshape of that file fails loudly here rather
 // than blinding the assertion below it.
 
@@ -193,34 +204,38 @@ function catalogueNames(): string[] {
   return names;
 }
 
-test('the producer one deployable over would accept three of these seven names', () => {
+test('the producer one deployable over would accept four of these seven names', () => {
   const catalogue = catalogueNames();
   // The parse, checked before anything rests on it.
-  expect(catalogue).toHaveLength(8);
+  expect(catalogue).toHaveLength(9);
   expect(catalogue).toContain('payout.requested');
 
   const emitted = Object.keys(EMITTED);
   const accepted = emitted.filter((name) => catalogue.includes(name)).sort();
   const refused = emitted.filter((name) => !catalogue.includes(name)).sort();
 
+  // `flag.raised` JOINED THIS LIST WHEN THE PRODUCER TRANSCRIBED `EVENTS:354`,
+  // AND ACCEPTING THE NAME IS NOT THE SAME AS WRITING A ROW. Nothing in this
+  // deployable can reach the producer, so no call site here writes anything
+  // today; what moved is that `buildEvent` would no longer throw at this name.
   expect(accepted).toEqual([
+    'flag.raised',
     'payout.freeze_expiring',
     'payout.hold_released',
     'wallet.withdrawal_halt_released',
   ]);
 
-  // THE FOUR THAT WOULD THROW, AND EACH IS A DIFFERENT KIND OF GAP.
-  // `flag.raised` and `detector.run_completed` ARE rows in EVENTS and are absent
-  // from the producer's transcription of it, so the repair is a catalogue row in
-  // `apps/api`. `detector.run_degraded` and `breaker.state_changed` have no row
-  // in EVENTS at all -- their payloads are M07 section 5's and M06's -- so the
-  // repair there is an amendment to a frozen document and an ADR before any
-  // producer may carry them. Neither repair is inside this deployable.
+  // THE THREE THAT WOULD STILL THROW, AND THEY ARE NOW ONE KIND OF GAP RATHER
+  // THAN TWO. `detector.run_degraded` and `breaker.state_changed` have no row in
+  // EVENTS at all -- their payloads are M07 section 5's and M06's --  and
+  // `detector.run_completed` HAS a row whose payload declares no `_id` for
+  // `events.subject_id` and neither tenancy column, so it cannot be transcribed
+  // either. All three now need an amendment to a frozen document and an ADR
+  // before any producer may carry them, and no repair is inside this deployable.
   expect(refused).toEqual([
     'breaker.state_changed',
     'detector.run_completed',
     'detector.run_degraded',
-    'flag.raised',
   ]);
 });
 
