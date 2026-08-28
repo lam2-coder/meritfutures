@@ -124,15 +124,26 @@
 // stands in full. **The entry is `wiring.test.ts`'s, and this directory reports
 // the narrowing rather than editing it.**
 //
-// **AND `readLiability` IS NOW MEASURED RATHER THAN ASSERTED, WHICH IS THE ONLY
-// PART OF THAT SENTENCE THAT MOVED THIS WAVE.** It still stands and the reason
-// is narrower and harder than "a live adapter would have to reach
-// `sqlExecutor`": `LiabilityResponse` projects SIX groups and only the seven
-// top-level fields have a source, because `liability_snapshots` is registered
-// and the rest are not there to read. `test/admin-source-liability.test.ts`
-// holds each blocker with its own clearing condition, so the day one lifts a
-// case goes red and names it. Nothing about that measurement is a reason to
-// compose the method, and this file is unchanged below this comment.
+// **AND `readLiability` IS NOW MEASURED RATHER THAN ASSERTED, AND THE ENTRY'S
+// REASON IS MEASURED FALSE FOR IT TOO.** `liability.ts` produces **27 of
+// `LiabilityResponse`'s 40 leaf paths** from live rows, through the same keyed
+// accessor, with no join, no aggregate and no `sqlExecutor`: eight `TableKey`s,
+// two whole-table folds where the accessor offers no `ORDER BY`, and two typed
+// equalities. So "a live adapter today would have to reach `sqlExecutor`" is
+// false for a FOURTH method and the entry is `wiring.test.ts`'s to repair.
+//
+// **THE METHOD IS STILL NOT COMPOSED AND THE REASON IS FOUR BLOCKERS, NONE OF
+// THEM A COLUMN.** `eligible_next_7d` needs `trading_calendar`, which is not a
+// `TableKey`; `payout_velocity` needs a 30-day window no document states;
+// `per_plan[].cusum` is ruled ABSENT by ADR-167 clause 5 until `DEP-M6-05`, and
+// the wire has no absent form for it; `integrations.recon.last_run_at` names a
+// reconciliation RUN nothing in this schema records.
+// `test/admin-source-liability.test.ts` holds each with its own clearing
+// condition and `test/admin-source-liability-book.test.ts` checks the
+// subtraction against API_CONTRACT, so the day one lifts a case goes red and
+// names it. **None of the four is this fence's to clear**, so the composition
+// below is unchanged: a method that cannot fill 13 of its own paths would answer
+// a 500 where it answers a named, synchronous "this deployment is not finished".
 //
 // **`listEvents` IS THE THIRD INSTANCE AND IT IS NOW WRITTEN RATHER THAN ONLY
 // PREDICTED.** ADR-184 section 3 measured it as a keyed range read over ONE
