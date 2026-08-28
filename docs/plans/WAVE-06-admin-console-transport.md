@@ -487,8 +487,28 @@ infrastructure the founder buys, not a file a session writes.**
 
 **Where the slices sit relative to it.** Every slice in waves 1 through 4 is **in front of it**, and
 every slice blocked by it is in wave 5 under its own name. **No slice in this wave resolves a principal,
-stubs one, or renders a screen whose correctness depends on one.** The console renders the 503 with its
+stubs one, or renders a screen whose correctness depends on one.** The console names the blocker with its
 reason, which is `page.ts`'s `PendingPanel` shape used for what it was built for.
+
+**AMENDED BY [ADR-190](../decisions/ADR-190.md), AND THE SENTENCE THIS REPLACED SAID "RENDERS THE 503".**
+Section 4.1's *"every one of the 26 operator routes above answers 503 today"* was reported false by
+session 336, measured false by session 344, and measured across the whole surface by session 350: the
+operator deployment registers **28** routes, of which **23** are `/admin/*`, and they answer **two
+different things**. The ten served by `admin-reads.ts`'s shared `adminHandler` (its own seven, plus
+`admin-breaker.ts`'s two and `admin-feed.ts`'s one) answer **401 `unauthenticated`** to a caller with no
+admin session cookie and **500 `internal_error`** to one carrying a cookie. The thirteen served by the
+four write backends answer **503 `service_unavailable`** before authenticating at all. **So the plan
+generalised from the majority of the surface and the ten routes the console reads are the exception.**
+
+**What this changes for a slice in this wave, and it is a rule rather than a number.** ADR-190 clause 5:
+**a screen renders no error kind it did not receive.** An `AdminErrorKind` is derived from a response
+(`apps/admin/src/http/client.ts` computes it from `response.status`), so a route that performs no read
+names none, states its blockers with their owners, and quotes the measured statuses in prose where an
+operator reads them. `W6-f` and `W6-g` shipped that way before it was written down;
+`apps/admin/src/app/page.tsx` was corrected to it and `apps/admin/test/render.test.ts`'s `M6-A-60` now
+sweeps the whole `src/app/` directory for it. **Section 4.1, the `W6-f` row in section 8, section 10's
+item, and the two sentences in `apps/admin/src/http/client.ts` still carry the old claim**: they are
+outside ADR-190's fence and are registered in that entry's section 7 item 5 with their line numbers.
 
 **The condition that changes this** is [ADR-171](../decisions/ADR-171.md) section 9's own: the slice that
 lands an `AdminSessionSource` a deployment can install. **This plan does not schedule it, because

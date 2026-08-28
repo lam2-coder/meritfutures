@@ -29,9 +29,9 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->179<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->180<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->179<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->180<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -7078,3 +7078,27 @@ command run separately and `pnpm run verify` never run, reproduced on `main` at 
 line changed: 33 of 33 gates, 16 of 16 invariants, `typecheck` 0, `lint` 0, `format:check` clean
 under the WIDENED glob, and 220 test files / 5,171 passed / 6 skipped unchanged in both directions.**
 `falsify.mjs` ran on a committed tree and the working tree was clean after it.
+
+---
+
+## 2026-08-28 - Session 350: the 503 three documents state, measured across the whole operator surface, and it is two answers rather than one
+
+**[ADR-190](decisions/ADR-190.md) lands, `status: proposed`, approval line UNSIGNED.** [ALLOCATION](decisions/ALLOCATION.md) row `190`, amended in place under [ADR-065](decisions/ADR-065.md) T3. **No migration number is taken and no file under `apps/api/src` is edited.**
+
+**THE SENTENCE IS FALSE AND THE REASON IT SURVIVED TWO SESSIONS IS THAT IT IS TRUE OF MOST OF THE SURFACE.** [WAVE-06](plans/WAVE-06-admin-console-transport.md) section 4.1 says *"every one of the 26 operator routes above answers 503 today"*. Measured here over a real `compose()` and Fastify's own `inject`, **every registered operator route injected one at a time**, which nobody had done: the operator deployment registers **28** routes and withholds **45**; **23** are `/admin/*`; the **ten** served by `admin-reads.ts`'s shared `adminHandler` answer **401 `unauthenticated`** with no admin session cookie and **500 `internal_error`** with one, and the **thirteen** served by the four write backends answer **503 `service_unavailable`** before authenticating at all.
+
+**TWO OF THE RESERVATION'S PREMISES DID NOT SURVIVE.** The sentence is section **4.1**'s, not section 8.1's, and the fence held 8.1 only. And *"a new code is a change to `STATUS_CODE`'s closed table"* is **false**: [API_CONTRACT:82](architecture/API_CONTRACT.md) declares `service_unavailable` at 503 in section 2's canonical table, which refutes session 336's *"section 2's canonical table, which carries no 503 and no `service_unavailable`"* at its own line.
+
+**THE RULING IS THAT THE 500 STAYS, ON A GROUND THE RESERVATION DID NOT CARRY, AND IT WAS EXECUTED RATHER THAN ARGUED.** `AdminReadError` has **fifteen** throw sites and only **two** mean *"no source is wired"*; twelve refuse the DATA a wired source returned. With `STATUS_CODE` and `TITLE` patched so a 503 really reached the wire, **12 cases failed across 2 files**, among them *"a liability body carrying a float in cents is refused"* and *"a pack whose digest is not a SHA-256 is refused"*. A 503 would answer *try again shortly* to a float in a money field.
+
+**AND THE FENCE'S CONDITIONAL IS UNUSABLE, MEASURED.** `AdminReadError` was given `readonly statusCode = 503` and **44 of 44 cases still passed with the answer still 500**, because `server.ts`'s `STATUS_CODE` has no 503 key. `admin-reads.ts` cannot move its own status, so it is byte for byte unchanged.
+
+**THE ANSWER IS EIGHT STATES AND NOT TWO**, each pinned by a case, and state **F** -- an admitted operator meeting a second uncomposed port behind the first -- was in no document. **THE THREE 500 STATES ARE ONE DOCUMENT ON THE WIRE DELIBERATELY**: a response that distinguished them would tell an unauthenticated caller which of this deployment's ports are uncomposed.
+
+**THE CONSOLE RULE IS NARROWER THAN A CORRECTED NUMBER: a screen renders no error kind it did not receive.** `apps/admin/src/app/page.tsx` drops `NOT_YET`, the `AdminErrorKind` import and `data-error`; `M6-A-60` sweeps the whole `src/app/` directory with a counterfactual over `http/client.ts`; `M6-A-61` reads the served bytes. **`unavailable` stays in the vocabulary and now has thirteen named producers.**
+
+**TWO FINDINGS REGISTERED RATHER THAN REPAIRED.** The thirteen 503 routes **confirm their own existence to an anonymous caller**, which is the disclosure `admin-writes.ts:823`'s own comment refuses one line before it happens. And **`server.ts` names only 7 of section 2's 16 codes**, so nine cannot be produced by a throw and 18 call sites spell the 503 title by hand; latent, because every 503 in this tree is built and sent rather than thrown.
+
+**ONE OF THE SENTENCE'S SIX HOMES IS REPAIRED AND FIVE ARE REGISTERED WITH THEIR LINE NUMBERS** (`WAVE-06:248`, `:445`, `:581`, `apps/admin/src/http/client.ts:178` and `:198`, `apps/admin/src/index.ts:345`), because the fence was section 8.1 only.
+
+**FIVE SEEDED DEFECTS, FIVE CAUGHT**, tree clean after each. Measured with `pnpm install` first, each command run separately and `pnpm run verify` never run, against a `main` baseline at `9dca218d` reproduced before a line changed: 33 of 33 gates, 16 of 16 invariants, `typecheck` 0, `lint` 0, `format:check` clean, **222 test files / 5,234 passed / 6 skipped** where `main` gives 222 / 5,220 / 6, `falsify.mjs` clean with the tree clean after it, and `pnpm --filter @merit/admin build` still **three** routes.
