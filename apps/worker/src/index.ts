@@ -516,6 +516,102 @@ export type {
 } from './detectors/runner.ts';
 
 // -----------------------------------------------------------------------------
+// P7-f's THREE FILL DETECTORS (session 309)
+// -----------------------------------------------------------------------------
+// APPENDED. `P7` section 9 rows this file as the phase's largest collision --
+// seven slices on one hand-maintained barrel -- and names the hazard precisely:
+// "a keep-both merge of a re-export list type-checks and drops nothing, which is
+// what makes a lost leg easy to miss". So the resolution is an APPEND, both
+// sides are kept, and the whole barrel is re-read after any merge rather than
+// trusted to the type checker, which cannot see an export that is simply gone.
+export {
+  CANARY_INSTANT,
+  D01,
+  D04,
+  D05,
+  FILL_DETECTORS,
+  fillClustering,
+  fillClusteringNightly,
+  martingaleSequences,
+  martingaleSequencesNightly,
+  newsWindowClustering,
+  newsWindowClusteringNightly,
+} from './detectors/fills.ts';
+export type { FillClusteringOptions } from './detectors/fills.ts';
+
+// The graph detectors (`P7-g`), and the count they ship at
+// -----------------------------------------------------------------------------
+//
+// `D-02`, `D-03`, `D-12`, `D-13` and `D-14`, and **ONE OF THE FIVE PRODUCES AN
+// ANSWER TONIGHT.** The other four are stated here rather than left for a reader
+// to discover from a green suite:
+//
+//   `D-02`  RUNS, capped at severity 3   `comparable_size_tolerance_bp` is
+//                                        unstated, so half of `M07:109`'s
+//                                        statistic is unevaluable, and the
+//                                        severity 4 `M07:151` gives it also
+//                                        needs an `sla_due_at` whose duration
+//                                        `SD-M7-02` asks for and nothing states
+//   `D-03`  DECLINES                     three unstated parameters, and a
+//                                        severity 5 with no clock behind them
+//   `D-12`  IS NOT A `Detector`          its output is neither a flag nor a
+//                                        group, and `runner.ts` marks a detector
+//                                        that returns neither `degraded` on
+//                                        every run. It ships as
+//                                        `discoverClusters` and the other three
+//                                        call it
+//   `D-13`  DECLINES                     two of its three tolerances unstated
+//   `D-14`  DECLINES                     its threshold unstated, AND its
+//                                        declared input -- "live and end-of-day
+//                                        POSITIONS" -- has no table in
+//                                        `scope.ts` at all
+//
+// **A DECLINE IS `DetectorDeclined` AND THE RUNNER RECORDS IT AS `failed`**, so
+// `detector_runs_unhealthy_idx` and `CRON_INVENTORY`'s dead-man switch both see
+// it on the morning of the day it happens. Leaving the three unregistered would
+// make the same absence invisible, which is `FM-M7-01` reached by omission.
+// Every threshold is read from `detector_definitions` (`INV-M7-04`) and the
+// three declines are one founder answer to `OQ-M7-02` away from running.
+export {
+  CALENDAR_DAYS_PER_TRADING_DAY,
+  CANARY_EPOCH,
+  CAPPED_SEVERITY,
+  D02,
+  D02_CANARY_TRADING_DAYS,
+  D03,
+  D03_CANARY_TRADING_DAYS,
+  D12,
+  D13,
+  D13_CANARY_TRADING_DAYS,
+  D14,
+  GRAPH_DETECTOR_IDS,
+  GRAPH_FLAG_TYPE,
+  addCalendarDays,
+  asJsonNumber,
+  bpAsDecimalString,
+  cliquePositionSumDetector,
+  correlationAtOrBelow,
+  correlationBp,
+  discoverClusters,
+  graphDetectors,
+  groupInverseExposureDetector,
+  integerSquareRoot,
+  inversePairDetector,
+  netPositionsBySymbol,
+  pearsonParts,
+  readFrom,
+  varianceRatioAtOrBelow,
+  varianceRatioBp,
+  varianceRatioParts,
+  youngAccountFastPathDetector,
+} from './detectors/graph.ts';
+export type {
+  ClusterInput,
+  PearsonParts,
+  VarianceRatioParts,
+  WatchedCluster,
+} from './detectors/graph.ts';
+
 // THE IDENTITY AND PAYMENT DETECTORS (session 311, `P7-h`)
 // -----------------------------------------------------------------------------
 // `D-07`, `D-08`, `D-09`, `D-10` and `D-11`, plus `D-16`'s v1 half and `D-18`'s
