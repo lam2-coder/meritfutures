@@ -99,10 +99,20 @@ describe('0054 provisions exactly the vocabulary this package partitions', () =>
   test('no firm-scoped code is seeded onto an identity', () => {
     const firm = LEDGER_ACCOUNT_CODES.filter((code) => LEDGER_ACCOUNT_SCOPE[code] === 'firm');
     const body = functionBody();
-    // This is the hole the database does NOT close. `reserve` and
-    // `psp_clearing` fall through `ledger_accounts_kind_matches_code`'s
-    // `ELSE true`, so an identity-scoped `reserve` row is ACCEPTED. Verified by
-    // execution against PostgreSQL 16 and recorded in ADR-183 section 7.
+    // This is the hole the database does NOT close, AND ADR-186 NARROWED IT
+    // WITHOUT CLOSING IT, which is stated here rather than left to be
+    // rediscovered.
+    //
+    // It used to read: "`reserve` and `psp_clearing` fall through
+    // `ledger_accounts_kind_matches_code`'s `ELSE true`, so an identity-scoped
+    // `reserve` row is ACCEPTED." `0055` rules both codes `asset`, so the row
+    // `0054`'s own header names -- ('reserve','liability','identity',<uuid>) --
+    // is now REFUSED, watched refused against PostgreSQL 16. But
+    // ('reserve','asset','identity',<uuid>) is still ACCEPTED, because the DDL
+    // NEVER TIES `code` TO `scope` and no migration can: the kind constraint
+    // reads `code` and `kind` and says nothing about `scope`. So the hole is one
+    // kind wide instead of five, and this test is still the only thing standing
+    // in it. Watched both ways and recorded in ADR-186 section 6.
     for (const code of firm) expect(body).not.toContain(`'${code}'`);
   });
 

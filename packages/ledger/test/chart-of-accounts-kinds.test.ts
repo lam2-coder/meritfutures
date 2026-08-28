@@ -23,9 +23,20 @@
 // against a constraint the database no longer has. It scans the whole migration
 // set in order and takes the LAST statement, which is the one installed.
 //
+// AND ADR-186 IS THE ENTRY THIS HEADER'S PREDICTION WAS ULTIMATELY ABOUT. `0055`
+// rules the LAST TWO codes -- `psp_clearing` and `reserve`, both `asset` -- and
+// CLOSES THE HOLE: the CASE now names all seven and its `ELSE` is `false` rather
+// than `true`. So the half of this file that watched an absence has nothing left
+// to watch, and it is REPLACED rather than left looping over an empty list: a
+// `for` over `[]` passes, and a case that passes by reading nothing is the shape
+// of green this file exists to refuse. What replaces it asserts the TOTALITY --
+// every declared code has an arm, no code is unbound -- and the ELSE word, which
+// is the half no reader of the migration text can see and the half that decides
+// what happens to the eighth code.
+//
 // AND IT WATCHES THE SUPERSESSION ITSELF, which is the E2 property. A merged
 // migration is never edited, only superseded: `0052` must still carry its own
-// four arms, unchanged, after `0053` exists.
+// four arms, unchanged, after `0053` and `0055` exist.
 //
 // THIS FILE MINTS NO FOURTH COPY OF THE VOCABULARY. `accounts.test.ts`'s header
 // argues why a third statement of the seven codes earns its place only while it
@@ -126,6 +137,20 @@ const ARMS: readonly (readonly [string, string])[] = [
  * the arithmetic and the prose were each unanimous and opposite, and that entry
  * ruled the prose right, the three postings backwards, and amended `M05`
  * section 2.1 accordingly.
+ *
+ * `psp_clearing` and `reserve` came from ADR-186 and are the last two. Neither
+ * has a posting, so neither is an ADR-177 derivation; both are read off what the
+ * tree says they ARE. `psp_clearing` is stated twice in shipped source and both
+ * statements are asset-shaped: `checkout.ts` says there is "nothing IN clearing"
+ * when no processor is present, and that crediting it would book "a receivable
+ * from a processor". `reserve` rests on GLOSSARY's "funds set aside ... held and
+ * reported separately", with the `equity` reading refused on `treasury_balances`'
+ * `source CHECK IN ('provider_api','manual_attestation')`: an equity
+ * appropriation has no rail balance and no provider to report it.
+ *
+ * THE MAP IS NOW TOTAL OVER THE VOCABULARY and the case below asserts that
+ * rather than assuming it, which is what makes the deleted `REFUSED` list safe
+ * to delete.
  */
 const RULED: Readonly<Record<string, string>> = {
   fees_revenue: 'revenue',
@@ -133,17 +158,9 @@ const RULED: Readonly<Record<string, string>> = {
   trader_withdrawable: 'liability',
   promotional_credit: 'liability',
   firm_treasury: 'asset',
+  psp_clearing: 'asset',
+  reserve: 'asset',
 };
-
-/**
- * What is still REFUSED, and the two refusals are not the same refusal.
- *
- * `psp_clearing` has no posting anywhere in this tree; `reserve` has no posting
- * AND no reader, because `SD-M5-03` anchors that figure outside this ledger on
- * purpose. Both are SILENCES. ADR-180 answered a CONTRADICTION and says in
- * terms that it has nothing to say about a silence, so neither moved.
- */
-const REFUSED = ['psp_clearing', 'reserve'] as const;
 
 describe('the constraint in force binds kind to code for exactly the ruled codes', () => {
   test('the ruled codes carry the kinds their entries derived or judged', () => {
@@ -161,23 +178,50 @@ describe('the constraint in force binds kind to code for exactly the ruled codes
   });
 });
 
-describe('the refused codes are absent, and the absence is the ruling', () => {
-  test('no arm names psp_clearing or reserve', () => {
-    const named = new Set(ARMS.map(([code]) => code));
-    for (const code of REFUSED) expect(named.has(code)).toBe(false);
-  });
+describe('the hole is closed, and the closure is the ruling', () => {
+  // THESE THREE CASES REPLACE THREE THAT ASSERTED THE OPPOSITE, AND THE SESSION
+  // THAT CLOSED THE HOLE HAD TO COME HERE AND SAY SO. They used to read: "no arm
+  // names psp_clearing or reserve", "the refused codes are exactly the codes the
+  // constraint leaves unbound", and "the fall-through the refused codes take is
+  // still there", the last of which asserted `/ELSE\s+true/`. ADR-186 rules both
+  // codes `asset` and closes `ELSE true` to `ELSE false`, so all three went red
+  // exactly as armed, which is what the header above says an armed case is for.
 
-  test('the refused codes are exactly the codes the constraint leaves unbound', () => {
+  test('every declared code has an arm, so nothing is left to fall through', () => {
     const named = new Set(ARMS.map(([code]) => code));
     const unbound = LEDGER_ACCOUNT_CODES.filter((code) => !named.has(code));
-    expect([...unbound].sort()).toEqual([...REFUSED].sort());
+    expect(unbound).toEqual([]);
+    expect(named.size).toBe(LEDGER_ACCOUNT_CODES.length);
   });
 
-  test('the fall-through the refused codes take is still there', () => {
-    // Without `ELSE true` the CASE returns NULL for them, and a CHECK passes on
-    // NULL, so the constraint would behave the same way and say something else.
-    // The word is what tells a reader the hole is deliberate.
-    expect(CONSTRAINT).toMatch(/ELSE\s+true/);
+  test('the ELSE arm REFUSES, and it is present rather than deleted', () => {
+    // THE WORD IS THE WHOLE OF THIS CASE. With every code armed, the ELSE is
+    // unreachable today under either word, and what separates them is the day
+    // the vocabulary widens: `ELSE true` admits an eighth code with any kind and
+    // `ELSE false` refuses it until its kind is ruled in the same migration.
+    //
+    // AND DELETING THE ELSE IS NOT THE SAME CLOSURE. A CASE with no ELSE returns
+    // NULL for an unmatched code and a CHECK PASSES on NULL, so a constraint
+    // that dropped the arm would behave exactly as `ELSE true` did while
+    // appearing to say something else. Both halves are asserted.
+    expect(CONSTRAINT).toMatch(/ELSE\s+false/);
+    expect(CONSTRAINT).not.toMatch(/ELSE\s+true/);
+  });
+
+  test('no firm code is a liability, which is ADR-181s elimination made total', () => {
+    // ADR-181 derived that the external leg's in-flight obligation is a
+    // FIRM-SCOPED `liability` and that none of the seven can hold one. Two of
+    // its four steps were "the code is ruled something else" and two were "the
+    // code is ruled nothing and falls through". After ADR-186 all four are the
+    // first kind, so ADR-174 section 3 shape (iii) is not merely refused in an
+    // entry: it is unrepresentable in the schema.
+    const ruled = new Map(ARMS);
+    const firm = LEDGER_ACCOUNT_CODES.filter((code) => LEDGER_ACCOUNT_SCOPE[code] === 'firm');
+    expect(firm).toHaveLength(4);
+    for (const code of firm) {
+      expect(ruled.get(code), code).toBeDefined();
+      expect(ruled.get(code), code).not.toBe('liability');
+    }
   });
 });
 
@@ -268,6 +312,16 @@ describe('the seeds write rows the constraint in force admits', () => {
         }
       }
     }
+    //
+    // ADR-186 RULES TWO MORE FIRM KINDS AND SEEDS NEITHER, so this list is
+    // UNCHANGED and the unchange is deliberate rather than an omission. `0052`
+    // header item 4's stated rule -- the seedable set is the firm codes with a
+    // settled kind -- would now admit `psp_clearing` and `reserve`; its
+    // ARGUMENT would not, because it seeded `fees_revenue` for a posting that
+    // resolves against it and nothing posts against either of these two. A row
+    // here would be a chart entry no posting resolves and a `readChart` cost
+    // with no reader. The list is the assertion: a later session that seeds one
+    // comes here and says why.
     expect([...seeded].sort()).toEqual(['fees_revenue', 'firm_treasury']);
   });
 

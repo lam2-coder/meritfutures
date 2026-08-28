@@ -134,6 +134,86 @@ END $$;
 ROLLBACK;
 
 -- ---------------------------------------------------------------------------
+-- LEDGER-K1: ledger_accounts_kind_matches_code must bind every declared code,
+-- and its ELSE arm must REFUSE rather than admit.
+-- ---------------------------------------------------------------------------
+-- ADDED BY ADR-186, AND THE GAP IT FILLS IS THAT THIS CONSTRAINT HAS NEVER BEEN
+-- WATCHED FIRING BY ANYTHING THAT RUNS. ADR-177 installed it, ADR-180 and
+-- ADR-186 each superseded it, and each of the three watched it in-session
+-- against a database nobody keeps. What CI has is
+-- packages/ledger/test/chart-of-accounts-kinds.test.ts, which reads the
+-- migration TEXT: it would stay green against a constraint that failed to
+-- install, against a DROP with no matching ADD, and against an arm the database
+-- parses differently from the way the regex does. This file's first line is that
+-- a constraint nobody has watched reject anything is a constraint nobody knows
+-- is wired up, and until now that was true of this one.
+--
+-- ALL THREE BLOCKS MATTER AND THE ORDER IS THE ARGUMENT. K1a watches a refusal,
+-- K1b watches an ACCEPTANCE -- a probe that only ever attempts forbidden things
+-- passes against a guard that rejects everything, which is 0052's rule and
+-- 0034's -- and K1c watches the ELSE arm, which is the half a text reader cannot
+-- see at all.
+--
+-- FIRM SCOPE ONLY, DELIBERATELY. This block opens no per-identity row: the
+-- fixtures above are READ from what 0054's trigger provisioned, and a probe that
+-- asserted its own identity-scoped account back would reproduce ADR-177's defect
+-- a third time.
+BEGIN;
+DO $$
+BEGIN
+  -- K1a. A REFUSAL. `reserve` is ruled `asset` (ADR-186); `liability` is the
+  -- kind ADR-174 section 3 shape (iii) would have needed it to be, so this is
+  -- the perturbation that matters rather than an arbitrary wrong literal.
+  BEGIN
+    INSERT INTO ledger_accounts (code, kind, scope) VALUES ('reserve','liability','firm');
+    RAISE EXCEPTION
+      'PROBE FAILED: LEDGER-K1 admitted reserve as a liability. Every declared '
+      'code has a ruled kind and no firm code is a liability (ADR-186)';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'LEDGER-K1a fired as expected';
+  END;
+END $$;
+ROLLBACK;
+
+BEGIN;
+DO $$
+BEGIN
+  -- K1b. AN ACCEPTANCE, and it is the half that makes K1a mean anything. If
+  -- this raises, the constraint is rejecting the kind it rules rather than
+  -- enforcing it, and every refusal above is vacuous.
+  INSERT INTO ledger_accounts (code, kind, scope) VALUES ('reserve','asset','firm');
+  IF NOT EXISTS (
+    SELECT 1 FROM ledger_accounts WHERE code = 'reserve' AND kind = 'asset' AND scope = 'firm'
+  ) THEN
+    RAISE EXCEPTION 'PROBE FAILED: LEDGER-K1 refused reserve as an asset, which is its ruled kind';
+  END IF;
+  RAISE NOTICE 'LEDGER-K1b accepted the ruled kind, as expected';
+END $$;
+ROLLBACK;
+
+BEGIN;
+DO $$
+BEGIN
+  -- K1c. THE ELSE ARM, WHICH IS WHY 0055 EXISTS AT ALL. `code_is_declared` is
+  -- dropped INSIDE this transaction so that the kind constraint is the only
+  -- thing left standing, which is ADR-181 section 5 row 2's method for watching
+  -- one guard independently of another. Under 0053's `ELSE true` this INSERT
+  -- LANDED; under 0055's `ELSE false` it must not. A code with a name and no
+  -- ruled kind is 0009:46's failure one column over.
+  ALTER TABLE ledger_accounts DROP CONSTRAINT ledger_accounts_code_is_declared;
+  BEGIN
+    INSERT INTO ledger_accounts (code, kind, scope) VALUES ('withdrawals_payable','liability','firm');
+    RAISE EXCEPTION
+      'PROBE FAILED: LEDGER-K1 ELSE arm admitted an undeclared code with an '
+      'unruled kind. 0055 closed ELSE true to ELSE false so that minting a code '
+      'requires ruling its kind in the same migration';
+  EXCEPTION WHEN check_violation THEN
+    RAISE NOTICE 'LEDGER-K1c fired as expected';
+  END;
+END $$;
+ROLLBACK;
+
+-- ---------------------------------------------------------------------------
 -- Zero-sum must reject an unbalanced transaction.
 -- ---------------------------------------------------------------------------
 BEGIN;
