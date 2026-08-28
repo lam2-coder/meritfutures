@@ -27,20 +27,44 @@
 //
 //   `GET /admin/liability`'s CONTRACTED RESPONSE CANNOT PRODUCE THIS PAGE'S
 //   INPUT. That is not a missing adapter; it is a shape that is four fields
-//   short, and no slice in this wave holds either file that would move.
+//   short. ADR-188 has since ruled the four fields in, on the document; no code
+//   carries them yet.
 //
-// So this route renders the 503 with its reason, in the `PendingPanel` shape,
-// which is WAVE-06 section 8.1 blocker 1 in its own words: "No slice in this
-// wave resolves a principal, stubs one, or renders a screen whose correctness
-// depends on one. The console renders the 503 with its reason, which is
-// `page.ts`'s `PendingPanel` shape used for what it was built for."
+// -----------------------------------------------------------------------------
+// THIS ROUTE NAMES NO ERROR KIND, AND ADR-190 IS WHY
+// -----------------------------------------------------------------------------
+// IT USED TO NAME ONE AND THE ONE IT NAMED WAS NOT A STATUS ANY OPERATOR ROUTE
+// SENDS. `W6-d` shipped `const NOT_YET: AdminErrorKind = toAdminErrorKind(503)`
+// on WAVE-06 section 4.1's sentence, "every one of the 26 operator routes above
+// answers 503 today". Session 344 measured that sentence false for this page's
+// own endpoint and this session measured all 28 registered operator routes, one
+// at a time, over a real `compose()` and Fastify's own `inject`:
 //
-// AND IT INVENTS NOTHING TO PUT ON THE SCREEN INSTEAD. `apps/portal/src/app/
-// page.tsx` took the same decision one deployable over, and `src/index.ts`
-// takes it about `main()`: "A `main` that invented inputs in order to print
-// something would be the confidently wrong number AS-M6-04 is about, printed by
-// the process whose subject is not printing it." A liability figure standing in
-// for a liability figure is that sentence with a browser attached.
+//   `GET /admin/liability` answers 401 `unauthenticated` with no admin session
+//   cookie, because `adminHandler` reads the cookie before it consults the
+//   session source and so has nothing to look up; and 500 `internal_error` with
+//   one, because `currentSessionSource()` throws. NEITHER IS 503.
+//
+//   AND ONLY ONE OF THE TWO IS REACHABLE BY A BROWSER. Nothing in this
+//   repository calls `setAdminSessionSource` outside a test, so no deployment
+//   can mint the cookie this console would send. THE ANSWER A REAL CONSOLE READ
+//   RECEIVES TODAY IS 401 AND NOTHING ELSE; the 500 needs a caller who
+//   fabricated a cookie.
+//
+// ADR-190 ruling 3 is the rule this file now keeps, and it is narrower than
+// "the number was wrong": AN ERROR KIND IS A VALUE DERIVED FROM A RESPONSE THIS
+// CONSOLE RECEIVED. A route that performs no read has received none, so it
+// names none. `src/app/flags/page.tsx` and `src/app/identities/[identityId]/
+// page.tsx` both shipped under that rule before it was written down, and
+// `test/render.test.ts` now asserts it over the whole `src/app/` directory so
+// that the next screen inherits a control rather than three sessions' good
+// judgement.
+//
+// WHAT IS NOT CLAIMED HERE. `unavailable` stays a member of `AdminErrorKind`
+// (`../http/client.ts`), and ADR-190 ruling 2 is why it should: 13 of the 23
+// registered `/admin/*` routes DO answer 503 `service_unavailable` today. The
+// finding is that this page's own endpoint is not one of them, not that the
+// member has no producer.
 //
 // -----------------------------------------------------------------------------
 // THE SEAM IS ONE FUNCTION BODY AND THE OTHER ARM IS ALREADY BUILT
@@ -50,33 +74,22 @@
 // bytes before returning the element, and `test/render.test.ts` renders a real
 // `buildLiabilityHome` value through exactly that path. So the day a supplier
 // exists, what changes is this one function and nothing else in this file.
+//
+// THE FAILED ARM IS NOT PRE-BUILT AND ADR-190 RULING 3 IS ALSO WHY. The arm a
+// real read needs carries a kind AND the status it was derived from, which is
+// `AdminApiFailure`'s shape in `../http/client.ts` and is already written. A
+// third arm added here before a fetch exists would be a second place to spell
+// a status nobody sent, which is the defect this file just removed.
 
 import type { ReactElement } from 'react';
 
-import { type AdminErrorKind, toAdminErrorKind } from '../http/client.ts';
 import type { LiabilityHomePage, PendingPanel } from '../page.ts';
 import { renderLiabilityHomeDocument } from './liability-home.tsx';
 
 /** A read that produced the page, or the stated reason it could not. */
 type LiabilityHomeRead =
   | { readonly kind: 'supplied'; readonly page: LiabilityHomePage }
-  | {
-      readonly kind: 'unsupplied';
-      readonly error: AdminErrorKind;
-      readonly blocked: readonly PendingPanel[];
-    };
-
-/**
- * 503, and it is `toAdminErrorKind`'s answer rather than a constant typed here.
- *
- * WAVE-06 section 8.1 blocker 1: `adminHandler` resolves the principal through
- * a source nothing supplies, so "every one of the 26 operator routes answers
- * 503" until ADR-171 section 9's condition lands. `unavailable` is the kind
- * this console keeps separate from `server_error` on purpose, per
- * `../http/client.ts`: a vocabulary that folded them would make the console
- * unable to tell "not built yet" from "broke just now".
- */
-const NOT_YET: AdminErrorKind = toAdminErrorKind(503);
+  | { readonly kind: 'unsupplied'; readonly blocked: readonly PendingPanel[] };
 
 /**
  * What has to land before this route renders a number, each named with its
@@ -96,8 +109,13 @@ const BLOCKED_ON: readonly PendingPanel[] = [
       'a role or an operator session, so `setAdminSessionSource` has no supplier in this ' +
       'repository. `requireAdminRole` in `../roles.ts` resolves a role STRING and nothing ' +
       'produces one. WAVE-06 section 8.1 blocker 1: it is an SSO vendor selection and an ' +
-      'operator directory, which is infrastructure the founder buys rather than a file a session ' +
-      'writes',
+      'operator directory, which is infrastructure the founder buys rather than a file a ' +
+      'session writes. MEASURED, and ADR-190 rules what this page may say about it: with no ' +
+      'admin session cookie `GET /admin/liability` answers 401 `unauthenticated`, and with one ' +
+      'it answers 500 `internal_error`, which is the status ' +
+      '`apps/api/src/routes/admin-reads.ts` chose at the declaration of `AdminReadError` and ' +
+      'argued there. No deployment can mint that cookie today, so 401 is the answer this ' +
+      'console would actually receive',
   },
   {
     origin: 'P5-l',
@@ -106,22 +124,24 @@ const BLOCKED_ON: readonly PendingPanel[] = [
       'the route is registered on the operator surface and `AdminReadSource.readLiability` has ' +
       'no adapter. WAVE-06 section 2.1 records the liability home as the surface with 1,764 ' +
       'lines of console code, a registered route and no adapter, and gives the adapter to ' +
-      '`P5-l`. This wave holds none of the three files that slice holds',
+      '`P5-l`. This wave holds none of the three files that slice holds. It is a SECOND ' +
+      'uncomposed port behind the first, and ADR-190 measured that it answers the same 500 as ' +
+      'the first: a caller who got past the session source would meet this one and could not ' +
+      'tell the two apart from the response',
   },
   {
     origin: 'API_CONTRACT section 8',
     title: 'Four of the five figures `buildLiabilityHome` reads have no field on the response',
     blockedBy:
-      'REPORTED BY W6-d AND NOT REPAIRED HERE. `liability_snapshots` in ' +
-      '`0009_ledger.sql` carries `open_liability_cents`, `wallet_balances_cents`, ' +
-      '`bounded_near_term_cents`, `remaining_ladder_exposure_cents` and ' +
-      '`absorbed_corrections_cents`, and `LiabilityHomeInput` reads all five. ' +
-      '`LiabilityResponse` carries the first name and none of the other four, so P-M6-01 cannot ' +
-      'show "the two components separately as well as summed", INV-M6-11 cannot include wallet ' +
-      'balances, and P-M6-02, AS-M6-04 and P-M6-10 have no source at all. The one shared name is ' +
-      'the ambiguity `../liability.ts` renamed on arrival to prevent: the column is ONE COMPONENT ' +
-      "of the panel that shares its name. API_CONTRACT is `W6-e`'s file this wave and " +
-      "`../page.ts` is `P5-l`'s, so this slice reports it rather than taking either",
+      'REPORTED BY W6-d AND RULED BY ADR-188, WHOSE APPROVAL LINE IS UNSIGNED AND WHOSE FIELDS ' +
+      'ARE ON NO WIRE YET. `liability_snapshots` in `0009_ledger.sql` carries ' +
+      '`open_liability_cents`, `wallet_balances_cents`, `bounded_near_term_cents`, ' +
+      '`remaining_ladder_exposure_cents` and `absorbed_corrections_cents`, and ' +
+      '`LiabilityHomeInput` reads all five. `LiabilityResponse` carries the first name and none ' +
+      'of the other four, so P-M6-01 cannot show "the two components separately as well as ' +
+      'summed", INV-M6-11 cannot include wallet balances, and P-M6-02, AS-M6-04 and P-M6-10 ' +
+      'have no source at all. The one shared name is the ambiguity `../liability.ts` renamed on ' +
+      'arrival to prevent: the column is ONE COMPONENT of the panel that shares its name',
   },
 ];
 
@@ -134,7 +154,7 @@ const BLOCKED_ON: readonly PendingPanel[] = [
  * route the next slice has to design rather than fill in.
  */
 function liabilityHomeRead(): LiabilityHomeRead {
-  return { kind: 'unsupplied', error: NOT_YET, blocked: BLOCKED_ON };
+  return { kind: 'unsupplied', blocked: BLOCKED_ON };
 }
 
 export default function LiabilityHomeRoute(): ReactElement {
@@ -142,12 +162,12 @@ export default function LiabilityHomeRoute(): ReactElement {
   if (read.kind === 'supplied') return renderLiabilityHomeDocument(read.page);
 
   return (
-    <article data-testid="liability-home-unsupplied" data-error={read.error}>
+    <article data-testid="liability-home-unsupplied">
       <h1>Liability home</h1>
       <p data-testid="read-state">
-        This console reads <code>/api/v1</code> on this origin and nothing else, and the read that
-        fills this page answers <strong>{read.error}</strong>. What is below is what blocks it, not
-        a placeholder for it: no number on this page is invented while a supplier is missing.
+        This console reads <code>/api/v1</code> on this origin and nothing else. The read that fills
+        this page is not performed yet, and what is below is what blocks it rather than a
+        placeholder for it: no number on this page is invented while a supplier is missing.
       </p>
       <section data-testid="blocked-on">
         <h2>What has to land first</h2>
