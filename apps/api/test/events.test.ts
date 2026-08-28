@@ -149,6 +149,7 @@ const ID = {
   withdrawal: '66666666-6666-4666-8666-666666666666',
   evidencePack: '77777777-7777-4777-8777-777777777777',
   ledgerTransaction: '88888888-8888-4888-8888-888888888888',
+  riskFlag: '99999999-9999-4999-8999-999999999999',
 } as const;
 
 const PAYLOADS: Readonly<Record<EventName, Readonly<Record<string, unknown>>>> = {
@@ -227,6 +228,26 @@ const PAYLOADS: Readonly<Record<EventName, Readonly<Record<string, unknown>>>> =
     actor: 'ops@merit',
     rail_status: 'approved',
   },
+  // EVENTS SECTION 8, FIELD FOR FIELD, AND THE ONE FIELD THE CORPUS DOES NOT
+  // DEFINE IS CARRIED IN THE ONE REAL PRODUCER'S SHAPE RATHER THAN IN A GUESS.
+  // Session 300 registered `evidence_summary` as undefined in the corpus and
+  // that registration is still open; `apps/worker/src/detectors/runner.ts` sends
+  // the sorted KEYS of the flag's evidence object, which carries what kind of
+  // accusation it is without carrying a threshold into FEED, so this fixture is
+  // that. NOTHING BELOW ASSERTS ANYTHING ABOUT THE FIELD, because the producer
+  // reads none of it: `CatalogueRow` names a subject field, two tenancy fields
+  // and an actor, and `evidence_summary` is none of them, so the owed definition
+  // does not block the row. `assertPayloadRules` walks it like any other value.
+  'flag.raised': {
+    flag_id: ID.riskFlag,
+    identity_id: ID.identity,
+    account_id: ID.account,
+    flag_type: 'copy_cluster',
+    severity: 4,
+    detector: 'D-01',
+    detector_version: '1.0.0',
+    evidence_summary: ['members', 'method', 'statistic', 'threshold'],
+  },
 };
 
 const CLOCK = new Date('2026-08-27T21:00:00.000Z');
@@ -281,8 +302,8 @@ function catalogueText(name: string): string {
 }
 
 describe('every name this producer carries is a row in the catalogue', () => {
-  test('the eight names are the keys, and the array agrees with the record', () => {
-    expect(EVENT_NAMES).toHaveLength(8);
+  test('the nine names are the keys, and the array agrees with the record', () => {
+    expect(EVENT_NAMES).toHaveLength(9);
     expect([...EVENT_NAMES].sort()).toStrictEqual(Object.keys(EVENT_CATALOGUE).sort());
   });
 
@@ -646,6 +667,147 @@ describe('the tenancy columns come from the payload and from nowhere else', () =
     const spec: EmitSpec = { name: 'payout.held', payload: PAYLOADS['payout.held'] };
     expect(Object.keys(spec)).not.toContain('identityId');
     expect(Object.keys(spec)).not.toContain('accountId');
+  });
+});
+
+// =============================================================================
+// 5b. THE TWO ROWS EVENTS DECLARES THAT THIS PRODUCER DID NOT CARRY, AND WHY
+//     EXACTLY ONE OF THEM IS NOW A ROW HERE
+// =============================================================================
+// SESSION 379 RAN THE DETECTOR RUNNER'S EMITS THROUGH THIS PRODUCER AGAINST A
+// LIVE COLUMN AND THEY THREW AT THE NAME, and two of those refusals were this
+// file's rather than the caller's: `flag.raised` and `detector.run_completed`
+// are rows in `EVENTS.md` section 8 that this producer's transcription of it
+// omitted. THE REFUSAL WAS CORRECT AND THE TRANSCRIPTION WAS THE DEFECT.
+//
+// ONE OF THE TWO IS REPAIRED HERE AND THE OTHER CANNOT BE, and the section below
+// is the difference stated mechanically rather than in prose. `flag.raised`
+// carries a uuid subject and a tenancy leg and becomes a row.
+// `detector.run_completed` carries NEITHER, so transcribing it would mean
+// naming a payload field EVENTS does not declare, which is the move ADR-159
+// clause 1 refuses and which is how the first defect happened one level up.
+//
+// **THE CASES BELOW ARE CLEARING CONDITIONS AND NOT A RECORD OF A DECISION.**
+// Each reads `EVENTS.md` at run time, so the day that document gains a subject
+// id or a firm-level declaration for `detector.run_completed`, the case goes red
+// and the session holding this fence transcribes the row. A comment saying the
+// same thing would still be passing in 2031.
+
+describe('the two EVENTS rows this producer did not carry', () => {
+  /** The payload cell of one catalogue row, as EVENTS writes it. */
+  const payloadCell = (name: string): string => {
+    const cells = (catalogueRow(name) ?? '')
+      .split(/(?<!\\)\|/)
+      .slice(1, -1)
+      .map((cell) => cell.trim());
+    return cells[2] ?? '';
+  };
+
+  /** The field NAMES of that cell, with a `?` and any `: "a"|"b"` union dropped. */
+  const payloadFields = (name: string): string[] =>
+    payloadCell(name)
+      .replace(/^`\{/, '')
+      .replace(/\}`$/, '')
+      .split(',')
+      .map((field) => field.split(':')[0]?.trim().replace(/\?$/, '') ?? '')
+      .filter((field) => field.length > 0);
+
+  test("both are rows in EVENTS, so neither was ever this producer's to invent", () => {
+    expect(catalogueRow('flag.raised')).toBeDefined();
+    expect(catalogueRow('detector.run_completed')).toBeDefined();
+  });
+
+  test("`flag.raised` is a row here now, and its fields are the catalogue's", () => {
+    expect(EVENT_NAMES).toContain('flag.raised');
+    // THE TRANSCRIPTION, ASSERTED AGAINST THE DOCUMENT AND NOT AGAINST ITSELF.
+    expect(payloadFields('flag.raised')).toStrictEqual([
+      'flag_id',
+      'identity_id',
+      'account_id',
+      'flag_type',
+      'severity',
+      'detector',
+      'detector_version',
+      'evidence_summary',
+    ]);
+  });
+
+  test('it becomes a row whose subject is the flag and whose tenancy is reached twice', () => {
+    const row = at('flag.raised');
+    expect(row.subjectKind).toBe('risk_flag');
+    expect(row.subjectId).toBe(ID.riskFlag);
+    expect(row.identityId).toBe(ID.identity);
+    expect(row.accountId).toBe(ID.account);
+    // A DETECTOR IS NOT A PERSON, and `system` is a member of the CHECK.
+    expect(row.actorKind).toBe('system');
+    expect(row.actorId).toBeNull();
+  });
+
+  test('the account is optional on it, and an identity-level finding still writes', () => {
+    // `risk_flags.account_id` is nullable, so a finding about an identity rather
+    // than about one of its accounts is the ordinary case and not a broken
+    // payload. The row still reaches a tenancy leg, which is what keeps
+    // `assertTenanted` quiet.
+    expect(SCHEMA).toContain("accountId: uuid('account_id').references(");
+    const { account_id: _dropped, ...identityOnly } = PAYLOADS['flag.raised'];
+    const row = buildEvent({ name: 'flag.raised', payload: identityOnly }, CLOCK);
+    expect(row.accountId).toBeNull();
+    expect(row.identityId).toBe(ID.identity);
+  });
+
+  test('`detector.run_completed` is deliberately NOT a row here', () => {
+    expect(EVENT_NAMES).not.toContain('detector.run_completed');
+  });
+
+  test('its payload declares no `_id`, so `events.subject_id` has nothing to read', () => {
+    // THE FIRST BLOCKER, DERIVED FROM THE DOCUMENT. `subject_id` is `uuid NOT
+    // NULL` and `CatalogueRow.subjectField` names the payload field it comes
+    // from. This payload has no field that names a row at all, so a
+    // `subjectField` here would be a field EVENTS does not carry -- ADR-159
+    // clause 1's refusal, and the same class of move as the omission that made
+    // this section necessary.
+    const fields = payloadFields('detector.run_completed');
+    expect(fields).toStrictEqual([
+      'detector',
+      'detector_version',
+      'trading_day',
+      'rows_scanned',
+      'flags_raised',
+      'duration_ms',
+    ]);
+    expect(fields.filter((field) => field.endsWith('_id'))).toStrictEqual([]);
+    expect(MIGRATION).toContain('subject_id');
+  });
+
+  test('and it names neither tenancy column, which is a SECOND and independent blocker', () => {
+    // Given a subject it would still be refused by `assertTenanted`, for
+    // `payout.freeze_expiring`'s reason. Its consumers are BI and ALERT, so the
+    // fact is FIRM-level, and `assertTenanted`'s message already names the
+    // repair for that case: a row in EVENTS saying so. No row says it today and
+    // this file invents no field EVENTS does not carry.
+    const cell = payloadCell('detector.run_completed');
+    expect(cell).not.toContain('identity_id');
+    expect(cell).not.toContain('account_id');
+    expect(catalogueRow('detector.run_completed')).toMatch(/\bBI\b/);
+    expect(catalogueRow('detector.run_completed')).not.toMatch(/\bTL\b/);
+  });
+
+  test('neither row carries money, so ADR-198 does not reach either of them', () => {
+    // CHECKED RATHER THAN ASSUMED, which is the discipline session 379 used over
+    // the worker's seven payloads and which held there too.
+    for (const name of ['flag.raised', 'detector.run_completed']) {
+      const fields = payloadFields(name);
+      expect(
+        fields.filter((field) => field.endsWith('_cents')),
+        name,
+      ).toStrictEqual([]);
+      expect(
+        fields.filter((field) => field.endsWith('_bp')),
+        name,
+      ).toStrictEqual([]);
+    }
+    // And the encoder is therefore a no-op over the one of them that is a row.
+    expect(encodeCentsForStorage(PAYLOADS['flag.raised'])).toStrictEqual(PAYLOADS['flag.raised']);
   });
 });
 
