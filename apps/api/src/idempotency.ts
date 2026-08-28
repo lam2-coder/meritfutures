@@ -11,8 +11,28 @@
 //    `409 idempotency_key_reuse`."
 //
 // -----------------------------------------------------------------------------
-// THIS FILE WRITES NO SQL AND THAT IS THE FINDING RATHER THAN A STAGE OF THE
-// WORK. ADR-109.
+// THIS FILE WRITES NO SQL, AND THE SECTION BELOW RECORDED THAT NO IMPLEMENTATION
+// OF THE PORT COULD EXIST. THAT HAS BEEN FALSE SINCE ADR-112 AND IS CORRECTED
+// HERE RATHER THAN LEFT BESIDE THE FILE THAT REFUTES IT. ADR-172 clause 1.
+//
+// `idempotency-store.ts:144` implements this port. It opens `db.scoped` on all
+// three methods, addresses the row with `tx.rowAt(TABLE, { key })`, and stamps
+// with `tx.updateAt(TABLE, { key }, ...)` -- which ADR-112 clause 3 composes as
+// `WHERE identity_id = $1 AND key = $2`, the handle pinning the tenancy and the
+// caller naming the row. `updateAt` IS the addressed UPDATE the paragraph below
+// says no accessor offers; it did not exist when that paragraph was written.
+// Eleven executed tests in `test/idempotency-store.test.ts` hold it.
+//
+// EVERYTHING BELOW REMAINS TRUE ABOUT THE DOORS IT NAMES, and that is why it is
+// kept. `systemTx` and `firmTx` do hardcode `undefined` for the `WHERE`; the
+// scoped `update` does narrow by tenancy alone. The error was concluding from
+// those three doors that the table was unreachable, when the reachable door was
+// the KEYED one. The finding that survives is ADR-109 clause 4's second arm: the
+// UNOWNED row is still addressable by nothing, and `idempotency-store.ts` raises
+// on it rather than answering `null`.
+//
+// -----------------------------------------------------------------------------
+// WHAT FOLLOWS IS THE ORIGINAL ADR-109 FINDING, KEPT FOR ITS REASONING
 // -----------------------------------------------------------------------------
 // An idempotency layer's whole job is to find ONE ROW BY ITS KEY and to stamp
 // THAT ROW with a response. Nothing in `packages/db` can do either.
@@ -182,15 +202,17 @@ export interface IdempotencyRecord {
  * The three things this layer needs a database for, and no fourth.
  *
  * EVERY METHOD TAKES THE SCOPE AND THE KEY, WHICH IS THE WHOLE POINT. An
- * implementation of this interface must name ONE ROW. See this file's header
- * for why no implementation of it exists in this tree yet, and ADR-109 for the
- * ruling that unblocks one.
+ * implementation of this interface must name ONE ROW.
  *
- * WHEN THAT IMPLEMENTATION IS WRITTEN, THIS IS THE COMMENT IT HAS TO ANSWER:
- * `packages/db/src/scoped-db.ts:694,701,704` (`systemTx`) and `714,720,723`
- * (`firmTx`) hardcode `undefined` for the `WHERE` clause, and the handles take
- * no parameter that could supply one. `complete` below is an UPDATE of exactly
- * one row. Through either of those it is an update of the whole table.
+ * THAT IMPLEMENTATION EXISTS: `idempotency-store.ts:144`, over the KEYED
+ * accessor ADR-112 built. It answers the comment this doc used to pose --
+ * `packages/db/src/scoped-db.ts`'s `systemTx` and `firmTx` do hardcode
+ * `undefined` for the `WHERE` -- by using NEITHER handle. `complete` is an
+ * UPDATE of exactly one row and `scopedTx.updateAt` is an UPDATE of exactly one
+ * row, addressed by a unique key and narrowed by tenancy in the same predicate.
+ *
+ * THE UNOWNED ARM IS STILL UNSERVED and that is a live finding rather than a
+ * stage of the work. See `idempotency-store.ts`'s header and ADR-172.
  */
 export interface IdempotencyStore {
   /**

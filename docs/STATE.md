@@ -29,10 +29,15 @@ Every document is `approved` except [M02](plans/M02-rithmic-bridge.md), which ho
 
 ## The gate that closed
 
-**<!--gen:adr_count-->163<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 
-**<!--gen:adr_count-->163<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
-**<!--gen:adr_count-->163<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 | Sign-off                             | Ruling                                                                                                                                                                                                                                                            |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Wave 3 batch 2 (M09 to M20)          | **APPROVED**                                                                                                                                                                                                                                                      |
@@ -4781,7 +4786,9 @@ This section first said the choice was *"250 first, or 250's commit carries `CI-
 
 **Three of the four slices behind `P5-b` are unblocked and the fourth is not.** `P5-i` needed `wallet_spend_limits` and it was already present. `P5-l` needed `payment_disputes` and this session registers it. `P5-e` needed `schema.ts` and `scope.ts` and takes them cleanly. **`P5-n` is NOT unblocked**: its subject is the producer under the `events` feed, and `events` has no scope rule and cannot get one without the entry named above.
 
-**<!--gen:adr_count-->163<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
+
+**<!--gen:adr_count-->164<!--/gen--> ADRs. <!--gen:ec_count-->157<!--/gen--> edge cases. <!--gen:gs_count-->316<!--/gen--> golden scenarios. Four waves.** These are generated spans under [CI-06g](testing/STRATEGY.md); this line read "25 ADRs" until it was folded, which is the drift [ADR-034](decisions/ADR-034.md) exists to end.
 ---
 
 ## `P6-b` lands: the live tier's address is `apps/api`, and taking the recommendation means neither table gains a row (2026-08-27, session 277)
@@ -5501,3 +5508,21 @@ first, `falsify` clean.
 **The evidence carries the conduct and discloses no threshold**, which is `M07` section 3.4's own standard for a flag that has to survive a public argument, asserted over every flag all three can raise.
 
 **Twelve seeded cheap implementations watched failing**, each reverted from a byte-identical copy checked by digest. Measured on this branch with `pnpm install` first and each command run separately: **33 of 33 gates, 13 of 13 invariants, typecheck 0, lint 0, format clean, 192 files / 4,137 passed / 6 skipped**, `falsify.mjs` last and alone. The dispatch baseline of 191 / 4,088 / 6 was reproduced exactly before a line changed.
+
+---
+
+## ADR-172 lands: the ledger handle no request handler can hold, and the store that was already built (2026-08-28, session 307)
+
+**[ALLOCATION](decisions/ALLOCATION.md) row `172` reserved ONE number for TWO findings and asked whether they are one ruling or two. THEY ARE TWO, AND ONLY ONE OF THEM IS A RULING.**
+
+**Finding 1 reproduced exactly and took the number.** `PayoutTx.ledger` ([`routes/payouts.ts:395`](../apps/api/src/routes/payouts.ts)) is a non-nullable `LedgerTx`; its `insert` names `ledgerTransactions` and `ledgerEntries`, both scope class `derived`; `ScopedTx.insert` takes `OwnedTableKey` and `ParentedTableKey` is `Extract<DerivedTableKey, 'sessions'>`, **a closed list of one**. Only `SystemTx` satisfies it, at a vocabulary [ADR-165](decisions/ADR-165.md) ruled gains no member. **No live deployment can construct a `PayoutBackend`.**
+
+**Finding 2 IS FALSE AT THE SOURCE AND IS OWED NO NUMBER.** [`apps/api/src/idempotency-store.ts:144`](../apps/api/src/idempotency-store.ts) has implemented `IdempotencyStore` since [ADR-112](decisions/ADR-112.md), and **`tx.updateAt` IS the addressed UPDATE the premise said no accessor offered** -- the dispatch's own fence asked that this be checked before concluding it impossible, and the check is what refuted it. **[`wiring.test.ts`](../apps/api/test/wiring.test.ts) contradicted itself about this in one file twenty lines apart**, `:150` against `:228`. The false half is replaced, not deleted.
+
+**THE RULING: the `LT-01` posting leaves the request path.** A door in `apps/api` returning a handle that satisfies `LedgerTx` would be `systemDb` under another name, because the only handle satisfying it is `insert<K extends TableKey>` over **every table in the estate**. So `PayoutTx.ledger` is the defect and the missing door is not. **Three precedents in this tree already post this way**: the worker at `systemDb('nightly-batch')`, the operator console, and the cash door which declined to post on its own request path in writing. **`INV-M5-06` survives by construction** -- all three doors build `` `${PAYOUT_ENDPOINT} ${idempotencyKey}` `` from the request's STORED key, so the key belongs to the APPROVAL rather than to the DOOR.
+
+**`useWithdrawalBackend` STAYS BLOCKED, and the true reason is worse than the false one.** Nothing in this tree drives `requested --> approved`, and `requested` and `cooling` are both in `OPEN_WITHDRAWAL_STATUSES`, so `gateNoInFlight` would refuse that identity's every later withdrawal. **Wiring it trades an honest 503 for a permanent per-trader lockout. Both refuse; only the 503 is reversible.**
+
+**No migration was needed and none was claimed** -- `0010` already carries `status`, `idempotency_key`, `identity_id` and the three clamp legs, so the driver clause 3 requires is a build slice rather than DDL. **No port was wired**, so the `{declared, wired, blocked}` triple stays `{21, 6, 15}`. **`packages/db/src/scoped-db.ts` untouched, no `SystemReason` member, no `pg` import, no cast past a key type.**
+
+**What is still owed:** the `M05`-versus-`API_CONTRACT` disagreement about whether `LT-06` posts at request time, reported by session 303 and still unowned; and the approval-edge driver, whichever way that falls. **Neither is finding 2 and neither is this entry's.**

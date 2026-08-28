@@ -252,31 +252,40 @@ const BLOCKED: Readonly<Record<string, string>> = {
     'identity to open with, and `certificates` is scope class `owned`, so `firm` refuses the key ' +
     'AT COMPILE TIME. The port states this itself at `routes/certificates.ts:944-948`.',
   // ---------------------------------------------------------------------------
-  // The cash door, and its blocker is an ABSENT IMPLEMENTATION rather than an
-  // absent door. `databaseWithdrawalBackend` exists and its `transact` arm is
-  // fully written against the scoped door; what refuses is `idempotency`, which
-  // is `UNWIRED_STORE`.
+  // The cash door. THE REASON THAT STOOD HERE WAS FALSE AND IS REPLACED RATHER
+  // THAN DELETED, because it was true when it was written. ADR-172.
   //
-  // `routes/idempotency.ts`'s own header records why: no implementation of
-  // `IdempotencyStore` exists in this tree, because `complete` is an UPDATE of
-  // exactly one row and `systemTx`/`firmTx` hardcode `undefined` for the
-  // `WHERE`. Session 303 declined to build one here and said why in terms --
-  // "a store built here would be that gap papered over on the cash door" --
-  // and that judgement is right: `POST /wallet/withdrawals` is where cash
-  // leaves Merit, and a withdrawal replayed because its idempotency store was
-  // improvised pays twice.
+  // It read: no implementation of `IdempotencyStore` exists in this tree,
+  // because `complete` is an UPDATE of exactly one row and `systemTx`/`firmTx`
+  // hardcode `undefined` for the `WHERE`. THE SECOND HALF IS STILL TRUE AND IS
+  // A FACT ABOUT DOORS THIS STORE DOES NOT USE. `databaseIdempotencyStore`
+  // (`src/idempotency-store.ts:144`) opens `db.scoped` on all three methods and
+  // stamps through `tx.updateAt(TABLE, { key }, ...)`, which ADR-112 clause 3
+  // composes as `WHERE identity_id = $1 AND key = $2`. ELEVEN EXECUTED TESTS in
+  // `idempotency-store.test.ts` hold it, and this file said so itself twenty
+  // lines above, in `usePayoutBackend`'s entry. Both could not be true.
   //
-  // SO WIRING THIS PORT WOULD BE WORSE THAN LEAVING IT BLOCKED. A backend whose
-  // `transact` works and whose `idempotency` rejects is a route that looks
-  // installed and refuses at the last step, which is the "fixture serving real
-  // traffic" the module's own header refuses.
+  // THE PORT IS STILL BLOCKED AND THE TRUE REASON IS WORSE THAN THE FALSE ONE.
+  // `routes/wallet-withdrawals.ts:57-60` records that NOTHING IN THIS TREE
+  // drives `requested --> approved` or `cooling --> approved`, and `:283-288`
+  // puts `requested` and `cooling` both inside `OPEN_WITHDRAWAL_STATUSES`, on
+  // which `gateNoInFlight` (`:1233`) refuses. So a wired endpoint writes a row
+  // nothing will ever advance and then refuses that identity's every later
+  // withdrawal, permanently, behind a screen saying a withdrawal is in flight.
+  //
+  // A 503 AND A LOCKOUT BOTH REFUSE, AND ONLY ONE OF THEM IS REVERSIBLE. That
+  // is why the 503 is kept, and it is the same fail-closed direction session
+  // 303 was reaching for with the reason it had.
   // ---------------------------------------------------------------------------
   useWithdrawalBackend:
-    'an `IdempotencyStore` implementation, which no file in this tree provides. ' +
-    '`routes/idempotency.ts` states the reason: `complete` is an UPDATE of exactly one row and ' +
-    '`systemTx`/`firmTx` hardcode `undefined` for the `WHERE`. `databaseWithdrawalBackend` is ' +
-    'otherwise written and returns `UNWIRED_STORE` for that arm deliberately, on the ground that ' +
-    'a store improvised here would be that gap papered over on the cash door.',
+    'A DRIVER FOR THE APPROVAL EDGE, AND NOT THE STORE THIS ENTRY USED TO NAME (ADR-172 clause ' +
+    '5). `databaseIdempotencyStore` (`src/idempotency-store.ts:144`) exists and serves the ' +
+    'identity arm this route presents (`routes/wallet-withdrawals.ts:1506`), so the idempotency ' +
+    'half is no longer what refuses. What refuses is that NOTHING IN THIS TREE performs ' +
+    '`requested --> approved` or `cooling --> approved` (`routes/wallet-withdrawals.ts:57-60`), ' +
+    'and both statuses are in `OPEN_WITHDRAWAL_STATUSES` (`:283-288`), so `gateNoInFlight` ' +
+    '(`:1233`) would refuse that identity every later withdrawal. Wiring it trades an honest 503 ' +
+    'for a permanent per-trader lockout, and only the 503 is reversible.',
 };
 
 // -----------------------------------------------------------------------------
