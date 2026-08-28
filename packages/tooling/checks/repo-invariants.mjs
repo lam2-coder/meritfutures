@@ -1876,18 +1876,37 @@ function founderQuestionProse(lines, at) {
 // "no implementation of `Foo` exists" where `Foo` is an exported TYPE is flagged and
 // must be either fixed or marked. That direction is deliberate: a false positive is
 // an argument somebody has, and a false negative is this defect a fifth time.
-const SOURCED_CLAIM_FILES = ['apps/api/test/wiring.test.ts'];
+const SOURCED_CLAIM_FILES = [
+  'apps/api/test/wiring.test.ts',
+  // THE OTHER TWO SITES THE CHAIN ACTUALLY RAN THROUGH, added once both were
+  // corrected. `idempotency.ts`'s header is where the claim ORIGINATED and
+  // `wallet-withdrawals.ts`'s adapter comment is where a session repeated it
+  // without opening the file beside it. Both now mark their own history, and
+  // listing them is what keeps a later edit from quietly restoring the claim.
+  'apps/api/src/idempotency.ts',
+  'apps/api/src/routes/wallet-withdrawals.ts',
+];
 
-/** The shapes that assert a NAMED thing is absent. Deliberately few. */
+// THE SHAPES THAT ASSERT A NAMED THING IS ABSENT. Deliberately few, and
+// CASE-INSENSITIVE, which is not a detail here.
+//
+// The first draft of this check was case-sensitive and a seeded claim reading
+// "No implementation of `IdempotencyStore` exists in this tree" walked straight
+// past it. THIS CODEBASE SHOUTS IN ITS COMMENTS AS A HOUSE STYLE -- the very
+// sentence this check exists for is written "THE HEADER IS STALE AND THE FILE
+// BESIDE IT SAYS OTHERWISE" -- so a case-sensitive matcher is one that reads the
+// quiet half of the corpus and skips the emphatic half, which is the half where
+// somebody states a claim they are sure of.
 const ABSENCE_CLAIMS = [
-  /no implementation of `([A-Za-z_][\w]*)`/g,
-  /`([A-Za-z_][\w]*)`[^.`]{0,40}\bdoes not exist\b/g,
-  /no `([A-Za-z_][\w]*)`[^.`]{0,30}\bexists\b/g,
-  /`([A-Za-z_][\w]*)`[^.`]{0,60}\bwhich no file in this tree provides\b/g,
+  /no implementation of `([A-Za-z_][\w]*)`/gi,
+  /`([A-Za-z_][\w]*)`[^.`]{0,40}\bdoes not exist\b/gi,
+  /no `([A-Za-z_][\w]*)`[^.`]{0,30}\bexists\b/gi,
+  /`([A-Za-z_][\w]*)`[^.`]{0,60}\bwhich no file in this tree provides\b/gi,
 ];
 
 /** A block that marks its own claim as history rather than stating it. */
-const REFUTED = /It read:|WAS FALSE|IS FALSE|REFUTED|\bSTALE\b|~~|no longer true|was true when/;
+const REFUTED =
+  /it read\b|was false|is false|refuted|\bstale\b|~~|no longer true|was true when|correction rather than/i;
 
 /** Where an export would live if the claim were wrong. */
 const EXPORT_ROOTS = ['apps', 'packages'];

@@ -68,9 +68,10 @@ function cleanTree(): string {
 
   write(root, 'pnpm-workspace.yaml', "packages:\n  - 'apps/*'\n  - 'packages/*'\n");
   write(root, '.nvmrc', '22\n');
-  // RI-14 reads this file by name, so the clean tree carries it with a reason
-  // that is TRUE. A fixture missing it would make the rename guard below fire on
-  // every case, which is the guard working and the fixture wrong.
+  // RI-14 reads these files BY NAME, so the clean tree carries all of them with
+  // reasons that are TRUE. A fixture missing one makes the rename guard fire on
+  // every case, which is the guard working and the fixture wrong. That happened
+  // twice while this check was written, both times caught by running it.
   write(
     root,
     'apps/api/test/wiring.test.ts',
@@ -79,6 +80,8 @@ function cleanTree(): string {
       "    'a vendor adapter this workspace does not ship, named in no package.json.',\n" +
       '};\n',
   );
+  write(root, 'apps/api/src/idempotency.ts', '// The protocol over the store port.\n');
+  write(root, 'apps/api/src/routes/wallet-withdrawals.ts', '// The external leg.\n');
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(
     root,
@@ -801,6 +804,28 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
         '};\n',
     );
     expect(findings('RI-14', root)).toEqual([]);
+  });
+
+  test('RI-14 reads a SHOUTED claim, which the first draft of it did not', () => {
+    // THE GAP THAT WAS REAL. The first version of this check was case-sensitive
+    // and a claim reading "No implementation of `IdempotencyStore` exists in this
+    // tree" walked straight past it. This codebase shouts in its comments as a
+    // house style, and the emphatic half is exactly where somebody states a claim
+    // they are sure of, so a case-sensitive matcher reads the quiet half and skips
+    // the half that matters.
+    const root = cleanTree();
+    write(root, 'apps/api/src/idempotency-store.ts', STORE_EXPORT);
+    write(
+      root,
+      'apps/api/test/wiring.test.ts',
+      'const BLOCKED = {\n' +
+        '  useWithdrawalBackend:\n' +
+        "    'NO IMPLEMENTATION OF `IdempotencyStore` EXISTS IN THIS TREE.',\n" +
+        '};\n',
+    );
+    expect(findings('RI-14', root).join('\n')).toContain(
+      'the reason claims `IdempotencyStore` does not exist',
+    );
   });
 
   test('RI-14 fails loudly when the file it reads is renamed away', () => {
