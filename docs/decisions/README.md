@@ -192,6 +192,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-171](ADR-171.md) | the third door is REFUSED, and the reason is a measurement rather than the argument it was allocated against: it unblocks none of the five ports (2026-08-28, status: proposed) |
 | [ADR-172](ADR-172.md) | the ledger handle a request handler cannot hold, and the store that was already built (2026-08-28, status: proposed) |
 | [ADR-173](ADR-173.md) | the correction's reference is the adjustment, the corrected entry is in `admin_actions`, and no column is missing  (2026-08-28, status: proposed) |
+| [ADR-176](ADR-176.md) | the request path records the approval and does not post it, and the key it must store to make that safe (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
