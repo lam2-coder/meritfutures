@@ -143,7 +143,31 @@
  */
 export type LiabilityResponse = {
   readonly as_of: string;
+
+  /**
+   * ONE COMPONENT OF THE PANEL THAT SHARES ITS NAME, AND THE FIELD BELOW IS THE
+   * OTHER.
+   *
+   * ADR-188 clause 2 keeps the column's name on the wire and clause 3 sends NO
+   * TOTAL: `P-M6-01` requires the components "shown separately as well as
+   * summed" and the sum is the reader's, because a total the server computed is
+   * a third number that can disagree with the two beside it AND the one figure
+   * a client can render alone under the panel's name. `../liability.ts` is where
+   * this console does the addition, and it renames on arrival for that reason.
+   */
   readonly open_liability_cents: number;
+  readonly wallet_balances_cents: number;
+  readonly bounded_near_term_cents: number;
+  readonly remaining_ladder_exposure_cents: number;
+
+  /**
+   * `P-M6-10`, and IT IS SIGNED.
+   *
+   * The only field on this response that may be negative. A renderer that clamps
+   * it at zero reports an absorbed correction as none, which is the one way this
+   * field can be rendered wrongly without looking wrong.
+   */
+  readonly absorbed_corrections_cents: number;
   readonly funded_accounts: number;
   readonly eligible_next_7d: {
     readonly total_cents: number;
@@ -169,15 +193,45 @@ export type LiabilityResponse = {
    * That is the contract agreeing with `../liability.ts`, which computes the
    * ratio from reserve alone and renders float beside it. `AS-M20-08` names the
    * misreading this shape forecloses: a coverage ratio that counts wallet float
-   * as reserve "flatters itself with the same money on both sides". There is no
-   * float field on this response to add into `reserve_cents` by accident, and
-   * `GET /admin/wallet/reconciliation` is where the float position lives.
+   * as reserve "flatters itself with the same money on both sides".
+   *
+   * THE SENTENCE THAT USED TO STAND HERE IS NARROWED RATHER THAN DELETED, AND
+   * ADR-188 registered the narrowing before the field arrived. It read "there is
+   * no float field on this response to add into `reserve_cents` by accident".
+   * After clause 1 there IS one, `wallet_balances_cents`, and it is on this
+   * response deliberately as a LIABILITY component of `P-M6-01`. What stays true
+   * is the half that was ever load bearing: it is not inside `reserve`, nothing
+   * in this group is a float figure, and `GET /admin/wallet/reconciliation` is
+   * where the float position lives. The accident the sentence guarded against is
+   * now refused by the grouping rather than by an absence.
    */
   readonly reserve: {
+    /**
+     * ITS OWN `as_of`, BECAUSE IT IS A DIFFERENT TABLE ON A DIFFERENT CLOCK.
+     *
+     * `INV-M6-04` makes a number without its as-of a number this console may not
+     * render, and dating this group with the top-level `as_of` would put the
+     * book's clock on the rail's figure: "one row forces one `as_of` on two
+     * sources that do not move together" is why the two are two tables, and a
+     * response carrying one instant for both would re-collapse it in the payload.
+     */
+    readonly as_of: string;
     readonly reserve_cents: number;
     readonly cvar99_cents: number;
     readonly rcr_bp: number;
     readonly breaker_armed: boolean;
+
+    /**
+     * The anchor the numerator is asserted against, and its own instant.
+     *
+     * `treasury_as_of` IS NOT `as_of` ABOVE and staleness is measured from it.
+     * `P-M6-07` requires "attestation staleness shown when the balance is a
+     * manual attestation", and `treasury_source` is the only field on this
+     * response that answers which of the two kinds it is.
+     */
+    readonly treasury_account_code: string;
+    readonly treasury_as_of: string;
+    readonly treasury_source: 'provider_api' | 'manual_attestation';
   };
   readonly per_plan: readonly {
     readonly plan_id: string;

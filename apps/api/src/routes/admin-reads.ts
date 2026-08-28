@@ -528,7 +528,27 @@ export interface EligibleNext7d {
 /** Section 8, `LiabilityResponse`. */
 export interface LiabilityResponse {
   readonly as_of: string;
+
+  // ONE COMPONENT OF THE PANEL THAT SHARES ITS NAME, AND THE NAME IS KEPT.
+  // ADR-188 clause 2: the wire speaks the schema's vocabulary in both
+  // directions, so a reader tracing this field back to `0009_ledger.sql` finds
+  // the column it was read from. The panel is this plus the next field summed,
+  // and NO TOTAL IS SENT (clause 3): the sum is a pure function of two fields of
+  // one row at one `as_of`, and a third number the handler computed could
+  // disagree with the two beside it.
   readonly open_liability_cents: number;
+  readonly wallet_balances_cents: number;
+  readonly bounded_near_term_cents: number;
+  readonly remaining_ladder_exposure_cents: number;
+
+  /**
+   * `P-M6-10`, and IT IS SIGNED.
+   *
+   * The only field on this response that may be negative (`0009_ledger.sql`
+   * declares the column signed), which the contract now states because a
+   * renderer that clamps it at zero reports an absorbed correction as none.
+   */
+  readonly absorbed_corrections_cents: number;
   readonly funded_accounts: number;
   readonly eligible_next_7d: EligibleNext7d;
   readonly payout_velocity: {
@@ -538,10 +558,34 @@ export interface LiabilityResponse {
     readonly alarm: boolean;
   };
   readonly reserve: {
+    /**
+     * ITS OWN `as_of`, BECAUSE IT IS A DIFFERENT TABLE ON A DIFFERENT CLOCK.
+     *
+     * `reserve_coverage_snapshots` is the rail's balance against ours and
+     * `liability_snapshots` is the book; dating both with the top-level `as_of`
+     * would re-collapse in the payload exactly what the schema separated, which
+     * is `data-model/liability_snapshots.md`'s second reason for two tables:
+     * "one row forces one `as_of` on two sources that do not move together".
+     */
+    readonly as_of: string;
     readonly reserve_cents: number;
     readonly cvar99_cents: number;
     readonly rcr_bp: number;
+
+    /** The one member that is not a column, and it stays. ADR-188 clause 4. */
     readonly breaker_armed: boolean;
+    readonly treasury_account_code: string;
+    readonly treasury_as_of: string;
+
+    /**
+     * CLOSED ON THE WIRE AND NARROWED AT THE READER, and both are correct.
+     *
+     * `treasury_balances.source` is closed at these two names, so the contract
+     * publishes what the column may hold. `P-M6-07` requires "attestation
+     * staleness shown when the balance is a manual attestation" and nothing else
+     * on this response answers which of the two it is.
+     */
+    readonly treasury_source: 'provider_api' | 'manual_attestation';
   };
   readonly per_plan: readonly {
     readonly plan_id: string;
@@ -1159,6 +1203,10 @@ function projectLiability(value: LiabilityResponse): LiabilityResponse {
   return {
     as_of: value.as_of,
     open_liability_cents: value.open_liability_cents,
+    wallet_balances_cents: value.wallet_balances_cents,
+    bounded_near_term_cents: value.bounded_near_term_cents,
+    remaining_ladder_exposure_cents: value.remaining_ladder_exposure_cents,
+    absorbed_corrections_cents: value.absorbed_corrections_cents,
     funded_accounts: value.funded_accounts,
     eligible_next_7d: projectEligibleNext7d(value.eligible_next_7d),
     payout_velocity: {
@@ -1168,10 +1216,14 @@ function projectLiability(value: LiabilityResponse): LiabilityResponse {
       alarm: value.payout_velocity.alarm,
     },
     reserve: {
+      as_of: value.reserve.as_of,
       reserve_cents: value.reserve.reserve_cents,
       cvar99_cents: value.reserve.cvar99_cents,
       rcr_bp: value.reserve.rcr_bp,
       breaker_armed: value.reserve.breaker_armed,
+      treasury_account_code: value.reserve.treasury_account_code,
+      treasury_as_of: value.reserve.treasury_as_of,
+      treasury_source: value.reserve.treasury_source,
     },
     per_plan: value.per_plan.map((plan) => ({
       plan_id: plan.plan_id,
