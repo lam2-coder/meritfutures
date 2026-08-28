@@ -5793,3 +5793,16 @@ passed / 6 skipped.** The baseline was reproduced on the dispatch tree before a 
 from 13 to 14 because `RI-14` landed on `main` mid-session and was merged in, not because this slice
 touched [`repo-invariants.mjs`](../packages/tooling/checks/repo-invariants.mjs). **This session contributes
 one module, one composition file and 155 cases.**
+
+**AND WRITING THAT LOG FOUND A LATENT DEFECT IN [`scripts/corpus/gates.mjs`](../scripts/corpus/gates.mjs),
+REPORTED AND NOT REPAIRED.** Its span writer interpolates the generated text into the **replacement**
+argument of `String.prototype.replace`, and a replacement string is not literal text: JavaScript gives it
+a substitution vocabulary whose members can insert the parts of the subject the match did not cover. A
+session-log index line carrying a dollar sign immediately before a backtick therefore wrote **the entire
+text preceding the span back into the span**, taking [`docs/sessions/README.md`](sessions/README.md) from
+549 lines to 743 with its own frontmatter inside the generated table. **`generate` exited 0 and reported
+one span rewritten; `CI-06g` failed on the next run**, which is the gate working. **Re-running `generate`
+does not heal it**, because each run rewrites the corruption. The exposure belongs to any span whose query
+returns prose rather than an integer. The repair is one line in that runner, passing a FUNCTION as the
+replacement so the substitution vocabulary is suppressed, and it is **outside this slice's fence**: the
+prose was changed instead, which fixes the occurrence and not the class.
