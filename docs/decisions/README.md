@@ -211,6 +211,7 @@ grouped these rulings live in [gates/](gates/).
 | [ADR-190](ADR-190.md) | an operator route answers eight things and none of them is 503, the uncomposed source keeps its 500, and a console renders no status it did not receive (2026-08-28, status: proposed) |
 | [ADR-191](ADR-191.md) | a row that reaches an identity two DIFFERENT ways is scoped by both, and the sixth class is `either`  (2026-08-28, status: proposed) |
 | [ADR-192](ADR-192.md) | the thirteen keep their 503 and stop disclosing it before authenticating, because ADR-190's ground is two grounds and only one of them reaches here (2026-08-28, status: proposed) |
+| [ADR-193](ADR-193.md) | a reversal may not chain onto another reversal, the rule refuses the LINK and not the operation, and it lives in a trigger because the builder is not weak here but incapable  (2026-08-28, status: proposed) |
 <!--/gen-->
 
 ## Gate closures
