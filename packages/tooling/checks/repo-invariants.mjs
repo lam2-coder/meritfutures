@@ -2803,7 +2803,7 @@ const ri15 = {
     'checked for resolution and range only; of the four false citations of ' +
     '2026-08-28 this catches THREE and misses `wallet-withdrawals.ts:1506`, ' +
     'which sits behind the words "the identity arm this route presents" and ' +
-    'names nothing a runner can look up. 32 of the 94 citations this check ' +
+    'names nothing a runner can look up. 47 of the 207 citations this check ' +
     'reads today carry a bindable name, 27 of them in `wiring.test.ts`. (1a) ' +
     'THE IN-TOKEN NAME IS RI-16s HALF IN PRACTICE, because it is read only ' +
     'where a markdown LINK states the path and no source file here writes one. ' +
