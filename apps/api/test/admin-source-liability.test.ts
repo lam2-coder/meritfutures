@@ -1,8 +1,17 @@
 // =============================================================================
 // apps/api/test/admin-source-liability.test.ts
 // =============================================================================
-// `AdminReadSource.readLiability`, WHICH IS STILL NOT WRITABLE, AND THIS SUITE
+// `AdminReadSource.readLiability`, WHICH IS STILL NOT WRITTEN, AND THIS SUITE
 // IS THE MEASUREMENT RATHER THAN THE CLAIM.
+//
+// TWO OF THE FOUR BLOCKERS HAVE CLEARED SINCE THIS FILE WAS WRITTEN AND THE
+// CASES ARE WHAT SAID SO (ADR-199). Blocker 1 went RED, which is the news a
+// clearing condition exists to deliver: `packages/db` registered
+// `reserve_coverage_snapshots` and `reserve` is a keyed read now. Blockers 2 to
+// 4 are still GREEN and their MEANING changed underneath them, which is the
+// harder half: the columns are still absent and the absences are now RULED
+// CORRECT rather than owed, so the cases are kept as live readings and their
+// comments are repointed at the rulings. See each one below.
 //
 // There is no `src/admin-source/liability.ts` and this file is not the suite of
 // a module. It is the suite of an ABSENCE, on the precedent session 349 set for
@@ -33,16 +42,26 @@
 //   clause 1 rules are a keyed read plus ordinary code, exactly like the three
 //   adapters this directory already holds.
 //
-//   `reserve` needs `reserve_coverage_snapshots`, which `0049` creates and no
-//   file of `packages/db/src/` registers. A `Tx` naming it does not COMPILE,
-//   which is session 349's `TS2322` on a different table.
+//   `reserve` needed `reserve_coverage_snapshots`, which `0049` creates and no
+//   file of `packages/db/src/` registered. A `Tx` naming it did not COMPILE,
+//   which was session 349's `TS2322` on a different table. **CLEARED by
+//   ADR-199**, which registered it `firm`.
 //
-//   `per_plan[].cusum`, `integrations.batch` and `eligible_next_7d` need columns
-//   that no migration declares at all. That is a schema gap and not a type
-//   error: the code would compile and there would be nothing to read.
+//   `per_plan[].cusum`, `integrations.batch` and `eligible_next_7d` name no
+//   column any migration declares. THAT WAS READ AS A SCHEMA GAP AND ADR-199
+//   RULES IT IS NOT ONE: all three are DERIVABLE from columns that already
+//   exist, so the census below measures a correct absence rather than an owed
+//   migration. `per_plan[].cusum` is ADR-167 clause 1, recomputed at read time
+//   and stored nowhere by ruling; `integrations.batch` is the `batch.completed`
+//   event, whose payload carries `duration_ms` and whose table has been a
+//   `TableKey` since ADR-191; `eligible_next_7d` is a fold over `rule_states`,
+//   `plan_versions.rules` and `trading_calendar`.
 //
-// So the method's remaining work is a migration and a registration, both of them
-// in `packages/db`, and neither is reachable from a fence over `apps/api`.
+// So the method's remaining work is NEITHER a migration nor a registration. It
+// is the adapter itself plus two things outside `packages/db`: `DEP-M6-05`'s
+// calibration, which ADR-167 clause 5 says is rendered ABSENT rather than
+// manufactured, and `trading_calendar`, which is the one input of the three
+// derivations that is still not a `TableKey` (its `_loads` and `_revisions` are).
 //
 // -----------------------------------------------------------------------------
 // THE COLUMN CENSUS IS DERIVED AND ITS NON-VACUITY IS ASSERTED FIRST
@@ -151,21 +170,24 @@ describe('readLiability is declared by the port and implemented by no module', (
   });
 });
 
-describe('blocker 1: reserve, and it is a compile error rather than a gap', () => {
+describe('blocker 1: reserve, and it CLEARED -- ADR-199 registered the table', () => {
   it('has a table that a migration creates', () => {
     const ddl = readFileSync(join(MIGRATIONS, '0049_reserve_coverage_snapshots.sql'), 'utf8');
     expect(ddl).toMatch(/^CREATE TABLE reserve_coverage_snapshots \($/m);
   });
 
-  it('has no registration, so no Tx in this directory may name it', () => {
-    // THE CLEARING CONDITION. When `packages/db` registers this table the name
-    // is a `TableKey`, this case goes red, and `reserve` becomes a keyed read
-    // like every other group. That registration is ADR-191's shape and it needs
-    // an entry, which is why it is not done here.
-    expect(TABLE_KEYS).not.toContain('reserveCoverageSnapshots');
-    // Non-vacuity, and the contrast that makes the finding precise: the table
-    // holding the SEVEN TOP-LEVEL FIELDS is registered, so what blocks this
-    // method is the second table and never the first.
+  it('is now a TableKey, so a Tx in this directory may name it', () => {
+    // THE CLEARING CONDITION FIRED, WHICH IS THE NEWS THIS CASE EXISTS TO
+    // DELIVER. It read `expect(TABLE_KEYS).not.toContain(...)` and went red the
+    // moment `packages/db` registered the table, exactly as session 363 wrote
+    // it to. ADR-199 is that registration: `firm`, on the DDL rather than on
+    // the name, because the row declares no column against `identities(id)` and
+    // its one foreign key is a COMPOSITE edge to `treasury_balances`, which is
+    // itself firm. `reserve` is a keyed read now, like every other group.
+    expect(TABLE_KEYS).toContain('reserveCoverageSnapshots');
+    // Non-vacuity, and the contrast that made the finding precise: the table
+    // holding the SEVEN TOP-LEVEL FIELDS was registered all along, so what
+    // blocked this method was the second table and never the first.
     expect(TABLE_KEYS).toContain('liabilitySnapshots');
     expect(TABLE_KEYS).toContain('treasuryBalances');
   });
@@ -183,8 +205,17 @@ describe('blocker 1: reserve, and it is a compile error rather than a gap', () =
   });
 });
 
-describe('blockers 2 to 4: three groups whose columns no migration declares', () => {
-  it('has no CUSUM column anywhere, so per_plan[].cusum has nothing behind it', () => {
+// ADR-199 RULES ALL THREE OF THESE DERIVABLE, so what these cases now measure is
+// that the schema still declares no column for a figure the corpus says must not
+// have one. They are kept, and re-titled, because a case deleted the day its
+// reading changes is a measurement nobody can re-run.
+describe('blockers 2 to 4: three groups ADR-199 rules DERIVABLE rather than owed a column', () => {
+  it('has no CUSUM column anywhere, which ADR-167 clause 1 RULES rather than laments', () => {
+    // ADR-167 takes reading 3: `S_t` is folded at read time from the pass-rate
+    // series and "no column, table or row anywhere holds it", and `0051` was
+    // returned to the pool for it. So this absence is the ruling holding, and
+    // the day a CUSUM column lands it is that ruling being overturned rather
+    // than this blocker clearing.
     const columns = [...migrationColumnNames()];
     expect(columns.filter((name) => name.includes('cusum'))).toStrictEqual([]);
     // `plan_breaker_state` is the table that would carry it and it carries the
@@ -196,19 +227,41 @@ describe('blockers 2 to 4: three groups whose columns no migration declares', ()
     expect(columns2).toContain('sample_size');
   });
 
-  it('has no batch-run column, so integrations.batch has nothing behind it', () => {
+  it('has no batch-run column, because the batch reports through EVENTS instead', () => {
+    // ADR-199. The two names are absent and the FIGURES are not: EVENTS.md
+    // section 5 declares `batch.started` / `batch.completed` with a payload of
+    // `{ run_id, trading_day, accounts_total, accounts_done, duration_ms }`, and
+    // `events` has been a `TableKey` since ADR-191. `last_success_at` is the
+    // `occurred_at` of the latest `batch.completed` row and `last_duration_ms`
+    // is that row's `payload->>'duration_ms'`. A batch-run column would be a
+    // SECOND record of a fact this schema already holds, which is `0049` header
+    // item 1's own objection to storing a value beside its inputs.
     const columns = migrationColumnNames();
     expect(columns).not.toContain('last_success_at');
     expect(columns).not.toContain('last_duration_ms');
+    // The derivation's own columns, read back so the absence above is not the
+    // only thing this case asserts.
+    expect(columns).toContain('event_name');
+    expect(columns).toContain('occurred_at');
+    expect(columns).toContain('payload');
   });
 
-  it('has neither of SD-M6-01 eligible-forecast columns, which ADR-188 finding 9 measured', () => {
-    // ADR-188 clause 5 refuses a FIELD for a figure no column produces, and
-    // this is the read side of the same fact: the field `eligible_next_7d` is on
-    // the wire already and the forecast behind it is stored nowhere.
+  it('has neither of SD-M6-01 eligible-forecast columns, which are a DIFFERENT figure', () => {
+    // ADR-188 clause 5 refuses a FIELD for a figure no column produces, and the
+    // two columns below are that figure: `P-M6-03`'s largest-single-identity
+    // share, which is on NO field of `LiabilityResponse`. ADR-199 separates
+    // them: the response's `eligible_next_7d` is `{ total_cents, account_count,
+    // by_day[] }`, and every input it folds is landed -- `rule_states`,
+    // `plan_versions.rules` and `trading_calendar` -- which is why `0062` was
+    // not taken for it. This case therefore measures the identity maximum and
+    // says nothing about the group, which is the distinction it used to blur.
     const columns = migrationColumnNames();
     expect(columns).not.toContain('eligible_next_7d_identity_max_cents');
     expect(columns).not.toContain('eligible_next_7d_identity_max_id');
+    // The fold's inputs, read back so the ruling above is checkable here.
+    expect(columns).toContain('withdrawable_cents');
+    expect(columns).toContain('payout_anchor_day');
+    expect(columns).toContain('trading_day');
   });
 });
 
