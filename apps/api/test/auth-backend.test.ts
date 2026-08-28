@@ -2,11 +2,18 @@ import { createHash } from 'node:crypto';
 
 import { expect, test } from 'vitest';
 
+import { normalizedEmail } from '@merit/db';
 import {
   AuthRowError,
+  OTP_MAC_KEY_RETIRING_VAR,
+  OTP_MAC_KEY_VAR,
+  OtpKeyError,
   SESSION_TOKEN_SEPARATOR,
   databaseAuthBackend,
+  otpCodeDigest,
+  otpCodeMatches,
   parseSessionToken,
+  resolveOtpMacKeys,
   sessionTokenHash,
   userAgentFamily,
 } from '../src/auth-backend.ts';
@@ -375,7 +382,7 @@ test('the twelve refuse as AuthBackendUnwired, each with its own reason, opening
   expect(calls).toEqual([]);
 });
 
-test('the refusals name the two constructions rather than saying "not implemented"', async () => {
+test('the refusals name what is actually missing rather than saying "not implemented"', async () => {
   const backend = databaseAuthBackend(recordingDb().db, clock);
   const reasonOf = async (call: Promise<unknown>): Promise<string> =>
     call.then(
@@ -383,16 +390,43 @@ test('the refusals name the two constructions rather than saying "not implemente
       (e: unknown) => (e as AuthBackendUnwired).reason,
     );
 
-  // B1 and B2, both on the one method the whole surface waits behind.
+  // THIS CASE PINNED B1 AND B2 AND BOTH WERE DISCHARGED BEFORE IT WAS EDITED.
+  // It asserted the words "pre-identity read" and "OwnedTableKey", which is a
+  // suite holding a refusal in place after ADR-126 built the two constructions
+  // it named -- so the suite was GREEN over a live 503 whose log line was
+  // false. ADR-197 repairs the strings and this case with them, and it now
+  // pins the property that made the drift possible rather than the sentence:
+  // a refusal must not cite a construction that exists.
   const verify = await reasonOf(
     backend.verifyOtp({ channel: 'email', email: 'a@b.test', code: '000000' }),
   );
-  expect(verify).toContain('pre-identity read');
-  expect(verify).toContain('OwnedTableKey');
-  // The schema gap this session found rather than went looking for.
+  expect(verify).toContain('the handler that composes them does not');
+  for (const discharged of ['a pre-identity read has no door', 'takes `OwnedTableKey`'])
+    expect(verify, `verifyOtp still cites ${discharged}`).not.toContain(discharged);
+  // The schema gap session 218 found rather than went looking for.
   expect(await reasonOf(backend.readPhoneChange(session()))).toContain('no preview column');
   // The contract field with no configured source.
   expect(await reasonOf(backend.readMe(session()))).toContain('max_accounts');
+});
+
+test('no refusal in this file cites the OTP digest as unspecified', async () => {
+  // ADR-197 RULED IT, so a method still claiming `otp_challenges.code_hash` has
+  // no digest is the same class of stale sentence the case above repairs. Every
+  // one of the twelve is read, not just the ones that used to cite it.
+  const backend = databaseAuthBackend(recordingDb().db, clock);
+  const methods: Array<[string, () => Promise<unknown>]> = [
+    ['verifyOtp', () => backend.verifyOtp({ channel: 'email', email: 'a@b.test', code: '0' })],
+    ['requestOtp', () => backend.requestOtp({ channel: 'email', turnstile_token: 't' }, null)],
+    ['elevate', () => backend.elevate(session(), { factor: 'passkey', credential: {} })],
+    ['verifyPhone', () => backend.verifyPhone(session(), { challenge_id: 'c', code: '0' })],
+  ];
+  for (const [name, call] of methods) {
+    const reason = await call().then(
+      () => '',
+      (e: unknown) => (e as AuthBackendUnwired).reason,
+    );
+    expect(reason, name).not.toContain('has no specified digest');
+  }
 });
 
 test('the default backend still fails closed, and says a different thing', async () => {
@@ -433,4 +467,138 @@ test('the backend the deployment installs is the database one', () => {
   const backend: AuthBackend = databaseAuthBackend(recordingDb().db, clock);
   expect(backend).not.toBe(UNWIRED_AUTH_BACKEND);
   expect(backend.sessionByToken).not.toBe(UNWIRED_AUTH_BACKEND.sessionByToken);
+});
+
+// =============================================================================
+// THE OTP DIGEST (ADR-197)
+// =============================================================================
+// `otp_challenges.code_hash` over a six-digit code a human types. Every case
+// here is about a SEPARATION the digest makes that the row cannot, and the
+// sharpest of them is `crossPerson`: `otp_challenges` keys off
+// `email_normalized`, `users.email_normalized` is deliberately NOT unique, and
+// so the challenge row cannot tell two people apart whom the normalizer merged.
+
+const KEY_A = Buffer.alloc(32, 0xa1);
+const KEY_B = Buffer.alloc(32, 0xb2);
+const SUBJECT = { channel: 'email', code: '482913', destination: 'Bob.Smith@Gmail.com' } as const;
+
+test('the digest is 32 bytes and it is the KEY that makes it one, not the algorithm', () => {
+  const under = otpCodeDigest(KEY_A, SUBJECT);
+  expect(under).toHaveLength(32);
+  // THE WHOLE RULING IN ONE ASSERTION. An unkeyed digest of a six-digit code is
+  // a one-million-candidate offline break for anybody holding the table; this
+  // says the same input under a different key is a different digest, which is
+  // what "the attacker does not have the key" is worth.
+  expect(Buffer.from(under).equals(Buffer.from(otpCodeDigest(KEY_B, SUBJECT)))).toBe(false);
+});
+
+test('a code that differs by one digit does not match', () => {
+  const stored = otpCodeDigest(KEY_A, SUBJECT);
+  expect(otpCodeMatches([KEY_A], { ...SUBJECT, code: '482914' }, stored)).toBe(false);
+  expect(otpCodeMatches([KEY_A], SUBJECT, stored)).toBe(true);
+});
+
+test('casing does not create a second human, because `users.email` is citext', () => {
+  const stored = otpCodeDigest(KEY_A, SUBJECT);
+  expect(otpCodeMatches([KEY_A], { ...SUBJECT, destination: 'bob.smith@gmail.com' }, stored)).toBe(
+    true,
+  );
+});
+
+test('two addresses sharing a NORMALIZED form do not share a digest', () => {
+  // THE SEPARATION THE CHALLENGE ROW CANNOT MAKE, and the reason this digest
+  // binds the address AS TYPED. `normalizedEmail` is `packages/db`'s, over the
+  // column whose own comment says the key is "deliberately NOT unique... a
+  // SIGNAL, not a constraint". Without this binding a code mailed to
+  // `bob.smith@gmail.com` answers a challenge presented as `bobsmith@gmail.com`,
+  // which is one person authenticating as another.
+  expect(normalizedEmail(SUBJECT.destination)).toBe(normalizedEmail('bobsmith@gmail.com'));
+  const stored = otpCodeDigest(KEY_A, SUBJECT);
+  expect(otpCodeMatches([KEY_A], { ...SUBJECT, destination: 'bobsmith@gmail.com' }, stored)).toBe(
+    false,
+  );
+});
+
+test('the channel is bound, so an email challenge is not an SMS one', () => {
+  const stored = otpCodeDigest(KEY_A, SUBJECT);
+  expect(otpCodeMatches([KEY_A], { ...SUBJECT, channel: 'sms' }, stored)).toBe(false);
+});
+
+test('the fields are length-prefixed, so a destination cannot be extended into a code', () => {
+  const a = otpCodeDigest(KEY_A, { channel: 'email', destination: 'ab', code: 'c' });
+  const b = otpCodeDigest(KEY_A, { channel: 'email', destination: 'a', code: 'bc' });
+  expect(Buffer.from(a).equals(Buffer.from(b))).toBe(false);
+});
+
+test('a stored value of the wrong length answers `false` rather than throwing', () => {
+  // `timingSafeEqual` RAISES on a length mismatch, and a raise here would turn a
+  // corrupt row into a 500 on the auth path. A digest length is not a secret.
+  expect(otpCodeMatches([KEY_A], SUBJECT, new Uint8Array(16))).toBe(false);
+});
+
+test('a rotation window verifies under EITHER key and issuing uses the first', () => {
+  const underRetiring = otpCodeDigest(KEY_B, SUBJECT);
+  expect(otpCodeMatches([KEY_A, KEY_B], SUBJECT, underRetiring)).toBe(true);
+  // AND THE WINDOW IS WHAT CLOSES IT. Once the retiring key is dropped from the
+  // list the same challenge stops verifying, which is why the window is one TTL
+  // and why `otp_challenges` needs no `key_id` column to have one.
+  expect(otpCodeMatches([KEY_A], SUBJECT, underRetiring)).toBe(false);
+});
+
+test('a verification with no admitted key is refused, not answered `false`', () => {
+  // A DENIAL IS THE WRONG ANSWER TO A MISCONFIGURATION: it would be a total
+  // outage wearing the costume of a wrong code, on the endpoint that is the only
+  // way into the product.
+  expect(() => otpCodeMatches([], SUBJECT, otpCodeDigest(KEY_A, SUBJECT))).toThrow(OtpKeyError);
+});
+
+test('a key shorter than the digest it keys is refused', () => {
+  expect(() => otpCodeDigest(Buffer.alloc(31, 1), SUBJECT)).toThrow(/floor is 32/);
+});
+
+test('an empty destination or an empty code is refused rather than digested', () => {
+  expect(() => otpCodeDigest(KEY_A, { ...SUBJECT, destination: '' })).toThrow(
+    /binds the code to nobody/,
+  );
+  expect(() => otpCodeDigest(KEY_A, { ...SUBJECT, code: '' })).toThrow(/destination alone/);
+});
+
+test('the key comes off the environment and there is NO default', () => {
+  // INFRA section 7: secrets live in the platform vault and are injected as
+  // environment variables. A baked-in fallback is a published key, so an unset
+  // variable is a throw and never a constant.
+  expect(() => resolveOtpMacKeys({})).toThrow(new RegExp(`${OTP_MAC_KEY_VAR} is unset`));
+  const one = resolveOtpMacKeys({ [OTP_MAC_KEY_VAR]: KEY_A.toString('base64') });
+  expect(one).toHaveLength(1);
+  expect(Buffer.from(one[0] as Uint8Array).equals(KEY_A)).toBe(true);
+});
+
+test('a retiring key is admitted second, and only for verifying', () => {
+  const keys = resolveOtpMacKeys({
+    [OTP_MAC_KEY_VAR]: KEY_A.toString('base64'),
+    [OTP_MAC_KEY_RETIRING_VAR]: KEY_B.toString('base64'),
+  });
+  expect(keys).toHaveLength(2);
+  expect(Buffer.from(keys[0] as Uint8Array).equals(KEY_A)).toBe(true);
+});
+
+test('a rotation to the value it was rotating away from is refused', () => {
+  expect(() =>
+    resolveOtpMacKeys({
+      [OTP_MAC_KEY_VAR]: KEY_A.toString('base64'),
+      [OTP_MAC_KEY_RETIRING_VAR]: KEY_A.toString('base64'),
+    }),
+  ).toThrow(/rotation nobody performed/);
+});
+
+test('the base64 decode is STRICT, because a lenient one shortens a key silently', () => {
+  // `Buffer.from(_, 'base64')` ignores every character it does not recognise, so
+  // a truncated or corrupted secret decodes to a SHORTER WORKING KEY and the
+  // deployment runs on it. The round trip is what refuses that.
+  expect(() => resolveOtpMacKeys({ [OTP_MAC_KEY_VAR]: '!!!!not base64!!!!' })).toThrow(
+    /standard padded base64/,
+  );
+  expect(() =>
+    resolveOtpMacKeys({ [OTP_MAC_KEY_VAR]: Buffer.alloc(31, 1).toString('base64') }),
+  ).toThrow(/floor is 32/);
 });
