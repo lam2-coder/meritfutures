@@ -88,12 +88,37 @@ function cleanTree(): string {
   // wrong. Each one carries a citation that is TRUE against this fixture, so the
   // clean direction is a real pass rather than an empty one.
   write(root, 'apps/api/src/idempotency-store.ts', 'export const databaseIdempotencyStore = 1;\n');
+  write(root, 'apps/worker/src/detectors/fills.ts', '// No citation here, and that is allowed.\n');
+  // RI-16 READS docs/ AND ITS REGISTER NAMES TWO DOCUMENTS AND TWO SOURCE
+  // FILES, so the fixture carries all four and reproduces all four registered
+  // findings. THE REGISTER SHRINKS ONLY: an entry matching no finding is itself
+  // a finding, so a fixture that omitted these would make RI-16 report four on
+  // every case in this file -- the register working and the fixture wrong. That
+  // is the same trap RI-14's three files and RI-15's six set twice while they
+  // were being written.
   write(
     root,
     'apps/api/src/routes/payouts.ts',
-    '// The store is `databaseIdempotencyStore` (`src/idempotency-store.ts:1`).\n',
+    '// The store is `databaseIdempotencyStore` (`src/idempotency-store.ts:1`).\n' +
+      '//\n'.repeat(399),
   );
-  write(root, 'apps/worker/src/detectors/fills.ts', '// No citation here, and that is allowed.\n');
+  write(root, 'apps/worker/src/sweeps/ports.ts', '//\n'.repeat(250));
+  write(
+    root,
+    'docs/plans/FOLD-01-phone-identity.md',
+    '# FOLD-01\n\n## Evidence\n\n' +
+      '| 3 | the vendor already buys phone footprint | `DECISIONS.md:483` |\n' +
+      '| 4 | the store that exists | `databaseIdempotencyStore` ' +
+      '(`apps/api/src/idempotency-store.ts:1`) |\n',
+  );
+  write(
+    root,
+    'docs/decisions/ALLOCATION.md',
+    '# Number allocation\n\n## Reservations\n\n' +
+      '| 164 | `PayoutTx.ledger` (`routes/payouts.ts:395`) is required, and the worker at ' +
+      "`systemDb('nightly-batch')` (`sweeps/ports.ts:219`) already posts |\n" +
+      '| 168 | `PayoutTx.ledger` is a required `LedgerTx` at `routes/payouts.ts:395` |\n',
+  );
   write(root, 'package.json', JSON.stringify({ name: 'merit', private: true }));
   write(
     root,
@@ -1117,6 +1142,189 @@ describe('seeded tree: each invariant fails on the violation it names', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // RI-16, and every seed runs in BOTH directions
+  // ---------------------------------------------------------------------------
+  // The check reads 603 citations on the real tree and returns four findings, so
+  // a case that only ever plants a violation cannot tell it from a check that
+  // fails every pointer it sees. Each transition below is therefore asserted
+  // twice: the defect fires, and the repaired or excluded form is silent.
+  //
+  // The seeds are the shapes the corpus actually writes. `M05:214` is a real
+  // bare pointer out of `ALLOCATION.md` naming a PLAN and a section line, and
+  // ``[`:1`](../../path.ts)`` is the real markdown-link shape whose path the
+  // document states rather than the runner guessing it.
+
+  /** A live document: a heading that names no date, so its body is in scope. */
+  const liveDoc = (body: string): string => `# Notes\n\n## The seam\n\n${body}\n`;
+  const LIVE_DOC = 'docs/architecture/NOTES.md';
+
+  test('RI-16 catches a pointer past the end of the file it names', () => {
+    const root = cleanTree();
+    write(
+      root,
+      LIVE_DOC,
+      liveDoc('The store is `databaseIdempotencyStore` (`apps/api/src/idempotency-store.ts:900`).'),
+    );
+    expect(findings('RI-16', root).join('\n')).toContain(
+      'docs/architecture/NOTES.md:5: cites `apps/api/src/idempotency-store.ts:900` and ' +
+        'apps/api/src/idempotency-store.ts has 2 lines',
+    );
+  });
+
+  test('RI-16 goes quiet on the SAME sentence once the pointer is corrected', () => {
+    const root = cleanTree();
+    write(
+      root,
+      LIVE_DOC,
+      liveDoc('The store is `databaseIdempotencyStore` (`apps/api/src/idempotency-store.ts:1`).'),
+    );
+    expect(findings('RI-16', root)).toEqual([]);
+  });
+
+  test('RI-16 catches a path no file in this tree has', () => {
+    // THE FINDING IT ARRIVED WITH, IN THE SHAPE IT ARRIVED IN.
+    // `docs/plans/FOLD-01-phone-identity.md` cites `DECISIONS.md:483`, and
+    // `DECISIONS.md` is this corpus's NICKNAME for the ADR registry rather than
+    // a file it has ever had. That one is registered; this is the same shape on
+    // a document the register does not name.
+    const root = cleanTree();
+    write(root, LIVE_DOC, liveDoc('The adapter (`routes/rail-vendor.ts:12`) is not shipped.'));
+    expect(findings('RI-16', root).join('\n')).toContain(
+      'cites `routes/rail-vendor.ts:12` and NO FILE IN THIS TREE has that path',
+    );
+  });
+
+  test('RI-16 admits a name two lines off and catches one three lines off', () => {
+    // THE WINDOW, AT ITS TWO BOUNDARIES, because a case that only asserted the
+    // catch could not tell this window from one of zero.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    const cite = (line: number): string =>
+      liveDoc(`The canary reads \`fills\` (\`packages/db/src/schema.ts:${line}\`).`);
+
+    write(root, LIVE_DOC, cite(22));
+    expect(findings('RI-16', root)).toEqual([]);
+
+    write(root, LIVE_DOC, cite(23));
+    expect(findings('RI-16', root).join('\n')).toContain(
+      'cites `packages/db/src/schema.ts:23` for `fills` and `fills` is at ' +
+        'packages/db/src/schema.ts:20, 3 lines away',
+    );
+  });
+
+  test('RI-16 reads a SHOUTED name, for the reason RI-14 reads a shouted claim', () => {
+    // RI-14's first draft was case-sensitive and a shouted claim walked past it.
+    // This corpus shouts in its documents as a house style, and a matcher that
+    // reads the quiet half and skips the emphatic half skips the half where
+    // somebody states a claim they are sure of.
+    const root = cleanTree();
+    write(root, 'packages/db/src/schema.ts', fileWithNameAt(40, 20, 'fills'));
+    write(root, LIVE_DOC, liveDoc('**`FILLS`** (`packages/db/src/schema.ts:23`) IS THE EDGE.'));
+    expect(findings('RI-16', root).join('\n')).toContain('for `FILLS`');
+  });
+
+  test('RI-16 says nothing under a DATED heading and says it under a plain one', () => {
+    // THE EXCLUSION THAT MAKES THE CHECK POSSIBLE, ASSERTED IN BOTH DIRECTIONS,
+    // and it is CI-06/derivable-counts' rule rather than this check's: an entry
+    // headed with a date or a session number is a RECORD OF A MEASUREMENT MADE
+    // THAT DAY, and repairing it would rewrite the record to say something it
+    // did not say. A case that only planted the defect could not tell this rule
+    // from a check that reads nothing at all.
+    const root = cleanTree();
+    const body =
+      'The store is `databaseIdempotencyStore` (`apps/api/src/idempotency-store.ts:900`).';
+
+    write(root, LIVE_DOC, `# Notes\n\n## The seam (2026-08-24)\n\n${body}\n`);
+    expect(findings('RI-16', root)).toEqual([]);
+
+    write(root, LIVE_DOC, `# Notes\n\n## Session 207: the seam\n\n${body}\n`);
+    expect(findings('RI-16', root)).toEqual([]);
+
+    write(root, LIVE_DOC, `# Notes\n\n## The seam\n\n${body}\n`);
+    expect(findings('RI-16', root).join('\n')).toContain('has 2 lines');
+  });
+
+  test('RI-16 says nothing inside a fenced block', () => {
+    // A worked example of this check's own finding is exactly what the document
+    // explaining it would quote. CI-06t masks fences for the same reason.
+    const root = cleanTree();
+    const body =
+      'The store is `databaseIdempotencyStore` (`apps/api/src/idempotency-store.ts:900`).';
+    write(root, LIVE_DOC, liveDoc(`\`\`\`\n${body}\n\`\`\``));
+    expect(findings('RI-16', root)).toEqual([]);
+
+    // AND THE SAME SENTENCE OUTSIDE THE FENCE FIRES, for the reason every case
+    // in this block is written twice: a silence asserted alone is
+    // indistinguishable from a check that never looked.
+    write(root, LIVE_DOC, liveDoc(body));
+    expect(findings('RI-16', root).join('\n')).toContain('has 2 lines');
+  });
+
+  test('RI-16 does NOT inherit a path into a bare pointer, and reads the same line spelled out', () => {
+    // THE ONE THING IT DISAGREES WITH RI-15 ABOUT, in both directions. `M05:214`
+    // is a real bare pointer out of `ALLOCATION.md` and it names a PLAN and a
+    // section line. Inheriting the path cited beside it turns it into a
+    // citation of a file nobody wrote, which is the check guessing; all fifteen
+    // findings inheritance adds inside this scope are that.
+    const root = cleanTree();
+    write(
+      root,
+      LIVE_DOC,
+      liveDoc(
+        'The store is `databaseIdempotencyStore` (`apps/api/src/idempotency-store.ts:1`), ' +
+          'and the ladder is `M05:900`.',
+      ),
+    );
+    expect(findings('RI-16', root)).toEqual([]);
+
+    // AND THE SAME POINTER WITH THE PATH WRITTEN OUT FIRES, which is what keeps
+    // this case from passing for some other reason.
+    write(
+      root,
+      LIVE_DOC,
+      liveDoc(
+        'The store is `databaseIdempotencyStore` (`apps/api/src/idempotency-store.ts:1`), ' +
+          'and the ladder is `apps/api/src/idempotency-store.ts:900`.',
+      ),
+    );
+    expect(findings('RI-16', root).join('\n')).toContain('has 2 lines');
+  });
+
+  test('RI-16 takes the path a markdown LINK states, in both directions', () => {
+    // THE HALF OF THE BARE-POINTER HOLE THAT CLOSES WITHOUT GUESSING. The
+    // document states the path in the link; the runner does not infer it. This
+    // is 130 of the 603 citations in scope, so a check that dropped them would
+    // be reading three quarters of what it claims.
+    const root = cleanTree();
+    write(root, LIVE_DOC, liveDoc('The store is [`:1`](../../apps/api/src/idempotency-store.ts).'));
+    expect(findings('RI-16', root)).toEqual([]);
+
+    write(
+      root,
+      LIVE_DOC,
+      liveDoc('The store is [`:900`](../../apps/api/src/idempotency-store.ts).'),
+    );
+    expect(findings('RI-16', root).join('\n')).toContain('has 2 lines');
+  });
+
+  test('RI-16 catches a register entry that no longer names a finding', () => {
+    // THE REGISTER SHRINKS ONLY, which is CI-06u's rule about its own and the
+    // difference between a register and an exemption list. The entry names the
+    // repair the gate is waiting for; the day the repair lands, the entry has to
+    // go with it, and this is what makes that happen rather than hoping for it.
+    const root = cleanTree();
+    write(
+      root,
+      'docs/plans/FOLD-01-phone-identity.md',
+      liveDoc('The vendor buys phone footprint.'),
+    );
+    expect(findings('RI-16', root).join('\n')).toContain(
+      'docs/plans/FOLD-01-phone-identity.md: the register claims `DECISIONS.md:483` is a known ' +
+        'finding and it is not one on this ref',
+    );
+  });
+
+  // ---------------------------------------------------------------------------
   // RI-13, and the seeds run in BOTH directions on the same entry
   // ---------------------------------------------------------------------------
   // The block is what an unsigned entry owes its reader, so the cases that matter
@@ -1322,6 +1530,31 @@ describe('a check that cannot reach its inputs throws rather than passing', () =
     withDbAdmitted(everybody, () => {
       expect(() => findings('RI-08', root)).toThrow(/asserting nothing/);
     });
+  });
+
+  test('RI-16 throws when no tracked `.md` under docs/ is left to read', () => {
+    // A check that names a TREE rather than a file is emptied by a move, and it
+    // then reports PASS forever about a corpus it never opened.
+    const root = cleanTree();
+    rmSync(join(root, 'docs'), { recursive: true, force: true });
+    expect(() => findings('RI-16', root)).toThrow(/cannot run/);
+  });
+
+  test('RI-16 throws when every citation falls out of scope', () => {
+    // THE DIRECTION THAT FAILS SILENTLY, and it is the same shape as RI-09
+    // reporting PASS with no operator prefixes. The record-heading rule holds
+    // 1,737 of 2,340 path-bearing citations out of scope on the real tree, so a
+    // rule that widened by accident would empty this check while it kept saying
+    // PASS. Zero in scope is an ERROR, not a clean result.
+    const root = cleanTree();
+    for (const doc of ['docs/plans/FOLD-01-phone-identity.md', 'docs/decisions/ALLOCATION.md']) {
+      write(
+        root,
+        doc,
+        `# D\n\n## The rows (2026-08-24)\n\nThe store (\`src/idempotency-store.ts:900\`).\n`,
+      );
+    }
+    expect(() => findings('RI-16', root)).toThrow(/NO citation in scope/);
   });
 
   test('RI-07 throws when the graph walk reaches only the entry point', () => {

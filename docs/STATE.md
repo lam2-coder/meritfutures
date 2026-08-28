@@ -6451,3 +6451,32 @@ invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 214 test fi
 **One prediction was wrong in the cheap direction.** [WAVE-06](plans/WAVE-06-admin-console-transport.md) rowed [`INDEX`](INDEX.md) as a `W6-a` and `W6-e` collision at one row each; `W6-a` needed none, because `CI-06c` reads the `decisions/` directory row and the per-entry registry is a generated span.
 
 **No migration number, no `SD-M6-nn`, no `GS-nnn`, no `M6-N-nn`, no `SystemReason` member, no `pg` import, and no file outside the fence.** Measured with `pnpm install` first and each command run separately, reproduced on `main` before a line changed and unmoved after: **33 of 33 gates, 15 of 15 invariants, `typecheck` exit 0, `lint` exit 0, `format:check` clean, 213 test files / 5,028 passed / 6 skipped.** `falsify.mjs` ran LAST and ALONE on a committed tree: 33 gates clean and dirty, 80 scope cases, 10 loader cases, **no seed uncaught**.
+
+---
+
+## `RI-16` reads the corpus's own citations, and the scope argument is the slice (2026-08-28, session 333)
+
+**`RI-15` reads six source files and its own `covers` line records that it reads `docs/decisions` NOT AT ALL.** Both were checked at the source before anything was built and both hold. That left **879 markdown documents carrying 3,463 `file:line` pointers** with nothing mechanical following one of them, which is the half where a wrong pointer is read by the founder at an `E2` review and by every later session that treats the entry as settled.
+
+**THE SCOPE IS THE WHOLE OF `docs/` AND THE THREE EXCLUSIONS ARE BY SHAPE, EACH ONE MEASURED.**
+
+| Population | Count |
+| --- | --- |
+| Citations carrying a path of their own or a markdown link | 2,340 |
+| Excluded: under a dated or session heading | **1,737** |
+| **In scope** | **603** |
+| Excluded: a bare `:12` with no path and no link | **1,123** |
+| In scope carrying a bindable NAME | 5 |
+| **Findings** | **4** |
+
+**The first exclusion is `CI-06/derivable-counts`' rule rather than this check's**, applied through its own recogniser: an entry headed with a date or a session number is a record of a measurement made that day, and repairing it would rewrite the record to say something it did not say. **It reaches INSIDE `docs/STATE.md`, which is a live document that accumulates dated sections and that no directory rule could split**, and it puts a new session log out of scope and a new plan in scope on the day each is written with nobody maintaining a list.
+
+**The third exclusion diverges from `RI-15` and the measurement is the argument.** `RI-15` lets a bare pointer inherit the nearest path within six lines and names that as its miss (6). Here inheritance adds fifteen findings inside the scope and **all fifteen are the check guessing a path**: `M05:214` is a plan and a section line, `0011:49` is a migration, `open_ct 17:00` is a clock. **The half of that hole that closes without guessing is closed**: a citation inside a markdown link takes the path the link states, which is 130 more citations, a 27 percent gain, resolved to one file rather than to every file whose name ends the same way.
+
+**FOUR FINDINGS, ZERO REPAIRED, AND THE REASON IS A RULE.** Three are `ALLOCATION` rows `164` and `168` restating [ADR-172](decisions/ADR-172.md)'s finding 1, whose member [ADR-176](decisions/ADR-176.md) DELETED, so there is no line to repoint them at; the fourth is `FOLD-01`'s `DECISIONS.md:483`, a pointer with a line number on a document this tree has never had. All four sit in documents whose frontmatter reads `status: approved`, a change to a frozen document is an ADR rather than a commit, and **this session held no ADR number**. Each is registered in `DOC_CITATIONS_OWNED_ELSEWHERE` with the repair it waits for named, and the register **shrinks only** per `CI-06u`: an entry matching no finding on a later ref is itself a finding.
+
+**POINTING THE SHARED READER AT 19 MB OF MARKDOWN BROKE IT THREE TIMES, ALL THREE INVISIBLE ON SIX SOURCE FILES.** The citation pattern was quadratic on a document with long backtick-free stretches; the line joiner had every leading group optional, so it was tried at every index, and two greedy runs over one character class, which backtracks over every way to split a run of spaces (**a padded markdown table is one 13,000-character line of them**); and the path class dropped a Next.js route group. **`docs/decisions/ALLOCATION.md` did not finish in five minutes and the whole of `docs/` now reads in 0.38 seconds.** The citation grammar is now one reader shared by both checks, and `RI-15`'s ten unchanged cases assert its finding text character for character, which makes them the equivalence oracle for all three repairs.
+
+**Twelve seeded cases, every one in both directions, and four seeds run against the REAL tree** with the finding text recorded and the tree restored byte for byte, proved by checksum: a true citation shifted 39 lines FIRED, a pointer past the end of the file its link names FIRED, a link naming a file this tree does not have FIRED, and the control seeding the same drift under a dated session heading stayed SILENT exactly as `covers` says. **No seed went uncaught.** All four design decisions are additionally watched failing under mutation.
+
+**Measured on this branch with `pnpm install` first and each command run separately: 33 of 33 gates, 16 of 16 invariants, 213 test files / 5,041 passed / 6 skipped.** The `main` baseline of 33 / 15 / 213 / 5,028 / 6 was reproduced before a line changed. Thirteen new cases are the whole of the test delta. **No ADR number, no migration number, no document repaired and no frozen document edited.**

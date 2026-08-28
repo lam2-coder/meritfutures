@@ -2243,15 +2243,25 @@ const CITATION_INHERIT_LINES = 6;
 const CITED_EXTENSIONS = 'ts|tsx|mts|mjs|js|sql|md|json|ya?ml';
 
 /**
- * A citation inside backticks: `` `path/to/file.ts:12` ``, `` `file.ts:12-34` ``
- * or the bare `` `:12` `` that continues the path cited before it.
+ * A citation is a BACKTICKED TOKEN THAT ENDS IN A POINTER: `` `path/to/x.ts:12` ``,
+ * `` `x.ts:12-34` ``, or the bare `` `:12` `` that continues the path cited before
+ * it. It is read as two anchored pieces over one token rather than as a single
+ * pattern over the whole text, AND THAT IS NOT A STYLE CHOICE.
+ *
+ * The single pattern was `` `([^`\n]*?)(path)?:(\d+)(-(\d+))?` `` and it is
+ * QUADRATIC on a document with long backtick-free stretches: the lazy prefix
+ * cannot cross a backtick, so every backtick in the file is tried as an opener
+ * and each one rescans the region after it. On six source files nobody noticed.
+ * On `docs/decisions/ALLOCATION.md`, 1.29 MB flattened to one line, it does not
+ * finish in five minutes, and A CHECK THAT CANNOT FINISH IS A CHECK THAT DOES
+ * NOT RUN. The tokenizer in `citationsIn` walks the backticks once and tests
+ * each candidate token against these two, both anchored, which is linear in the
+ * file and reads the same citations.
  */
-const CITATION = new RegExp(
-  '`([^`\\n]*?)((?:[A-Za-z0-9_./-]*[A-Za-z0-9_-]\\.(?:' +
-    CITED_EXTENSIONS +
-    '))?):(\\d+)(?:-(\\d+))?`',
-  'g',
-);
+const CITATION_TAIL = /:(\d+)(?:-(\d+))?$/;
+
+/** The path half, anchored at the end of whatever sits before the pointer. */
+const CITATION_PATH = new RegExp('[A-Za-z0-9_./()-]*[A-Za-z0-9_-]\\.(?:' + CITED_EXTENSIONS + ')$');
 
 /** A backticked token that is itself a citation, which names nothing. */
 const CITATION_TOKEN = new RegExp('\\.(?:' + CITED_EXTENSIONS + '):\\d');
@@ -2278,32 +2288,86 @@ const NEGATED_CLAIM =
  * check passing the defect it was written for.
  *
  * @param {string} text
- * @returns {{flat: string, lineAt: number[]}}
+ * @returns {{flat: string, lineOf: (index: number) => number}}
  */
 function flattenReasons(text) {
-  const JOINER = /['"]?[ \t]*\+?[ \t]*\r?\n[ \t]*(?:\/\/+|\*|>)?[ \t]*['"]?/g;
-  let flat = '';
+  // SCANNED CHARACTER BY CHARACTER FROM EACH END OF A LINE, AND NOT BY REGEX,
+  // and the line of a character is found by BINARY SEARCH over the pieces
+  // rather than stored per character. The two shapes below are the same two the
+  // first draft wrote as one global regex, and the regex was wrong twice: every
+  // leading group was optional so it had no literal to prefilter on and was
+  // tried at EVERY index of the text, and `[ \t]*` twice around an optional
+  // token is two greedy runs over one character class, which backtracks over
+  // every way to split a run of spaces. Source files have neither problem. A
+  // PADDED MARKDOWN TABLE IS ONE 13,000-CHARACTER LINE OF THEM, and the regex
+  // did not finish on `docs/decisions/ALLOCATION.md` in five minutes. A hand
+  // scan is linear, states the shape it strips in the order it strips it, and
+  // reads the 19 MB under `docs/` in a fifth of a second.
+  const ws = (/** @type {string} */ c) => c === ' ' || c === '\t';
+  const quote = (/** @type {string} */ c) => c === "'" || c === '"';
+  const raw = text.split('\n');
+  /** @type {string[]} */
+  const pieces = [];
   /** @type {number[]} */
-  const lineAt = [];
-  let line = 1;
-  let i = 0;
-  for (const m of text.matchAll(JOINER)) {
-    const start = m.index ?? 0;
-    for (; i < start; i += 1) {
-      flat += text.charAt(i);
-      lineAt.push(line);
+  const at = [];
+  /** @type {number[]} */
+  const of = [];
+  let width = 0;
+  /** @type {(piece: string, line: number) => void} */
+  const push = (piece, line) => {
+    if (piece === '') return;
+    pieces.push(piece);
+    at.push(width);
+    of.push(line);
+    width += piece.length;
+  };
+  for (let i = 0; i < raw.length; i += 1) {
+    const line = raw[i] ?? '';
+    let from = 0;
+    let to = line.length;
+    if (i < raw.length - 1) {
+      // Backwards from the newline: `\r?`, spaces, an optional `+` joining two
+      // string literals, spaces, and the quote that closed the first of them.
+      if (line.charAt(to - 1) === '\r') to -= 1;
+      while (to > from && ws(line.charAt(to - 1))) to -= 1;
+      if (line.charAt(to - 1) === '+') {
+        to -= 1;
+        while (to > from && ws(line.charAt(to - 1))) to -= 1;
+      }
+      if (quote(line.charAt(to - 1))) to -= 1;
     }
-    for (const ch of m[0]) if (ch === '\n') line += 1;
-    flat += ' ';
-    lineAt.push(line);
-    i = start + m[0].length;
+    if (i > 0) {
+      // Forwards from the newline: indent, a comment leader, indent, and the
+      // quote that opens the continuation.
+      while (from < to && ws(line.charAt(from))) from += 1;
+      if (line.startsWith('//', from)) {
+        from += 2;
+        while (line.charAt(from) === '/') from += 1;
+      } else if (line.charAt(from) === '*' || line.charAt(from) === '>') from += 1;
+      while (from < to && ws(line.charAt(from))) from += 1;
+      if (quote(line.charAt(from))) from += 1;
+    }
+    push(line.slice(from, Math.max(from, to)), i + 1);
+    // The joiner stands for the newline and belongs to the line AFTER it, which
+    // is where a citation that opens the next line is read from.
+    if (i < raw.length - 1) push(' ', i + 2);
   }
-  for (; i < text.length; i += 1) {
-    if (text.charAt(i) === '\n') line += 1;
-    flat += text.charAt(i);
-    lineAt.push(line);
-  }
-  return { flat, lineAt };
+  return {
+    flat: pieces.join(''),
+    lineOf: (index) => {
+      let lo = 0;
+      let hi = at.length - 1;
+      let best = -1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if ((at[mid] ?? 0) <= index) {
+          best = mid;
+          lo = mid + 1;
+        } else hi = mid - 1;
+      }
+      return best < 0 ? 0 : (of[best] ?? 0);
+    },
+  };
 }
 
 /**
@@ -2338,6 +2402,158 @@ function citedIdentifier(flat, upto) {
     .filter((s) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(s));
   const name = segments[segments.length - 1];
   return name !== undefined && name.length >= 3 ? name : null;
+}
+
+/**
+ * Every citation in one text, with the bare `:12` resolved against the path
+ * cited above it and the name it is about bound to it.
+ *
+ * ONE GRAMMAR, READ BY TWO CHECKS. RI-15 reads live source files and RI-16
+ * reads live documents, and the thing they read is the same thing: a pointer
+ * somebody wrote so a later reader could follow it. A second copy of this
+ * grammar would drift the first time one of them learned a shape the other did
+ * not, which is the failure RI-13's header names about phrase lists. The two
+ * checks differ in WHAT THEY READ and in what they say about a finding, and
+ * they share how a citation is spelled.
+ *
+ * INHERITANCE IS THE ONE THING THE TWO CHECKS DISAGREE ABOUT and it is a
+ * parameter rather than a fork of the reader. RI-15 inherits the nearest path
+ * within `CITATION_INHERIT_LINES` lines, which is how a reader reads a source
+ * comment. RI-16 does not, and its header measures why: in a padded markdown
+ * table a bare pointer is usually a registry shorthand, and every one of the
+ * fifteen findings inheritance adds there is the reader guessing.
+ *
+ * @param {string} text
+ * @param {boolean} [inherit]
+ * @returns {{at: number, target: string, href: string | null, start: number, end: number, cited: string, name: string | null}[]}
+ */
+function citationsIn(text, inherit = true) {
+  const { flat, lineOf } = flattenReasons(text);
+  /** @type {{at: number, target: string, href: string | null, start: number, end: number, cited: string, name: string | null}[]} */
+  const out = [];
+  /** @type {number[]} */
+  const ticks = [];
+  for (let i = flat.indexOf('`'); i >= 0; i = flat.indexOf('`', i + 1)) ticks.push(i);
+  /** @type {string | null} */
+  let inherited = null;
+  let inheritedAt = -CITATION_INHERIT_LINES - 1;
+  // THE PAIRING IS THE ONE A SCANNER MAKES AND NOT THE ONE A PARSER WOULD. A
+  // token that is not a citation gives its CLOSING backtick up to be the next
+  // token's opener, which is what a left-to-right search does and what keeps a
+  // backtick used as an apostrophe from inverting every pairing after it.
+  for (let k = 0; k + 1 < ticks.length;) {
+    const open = ticks[k] ?? 0;
+    const close = ticks[k + 1] ?? 0;
+    const token = flat.slice(open + 1, close);
+    const tail = CITATION_TAIL.exec(token);
+    if (tail === null || tail[1] === undefined) {
+      k += 1;
+      continue;
+    }
+    k += 2;
+    const at = lineOf(open);
+    // THE MARKDOWN LINK A CITATION SITS INSIDE NAMES ITS FILE OUTRIGHT, and
+    // `[`0004:40`](../../packages/db/migrations/0004_catalog.sql)` is how this
+    // corpus writes a citation whose pointer alone would resolve to nothing.
+    // Read here rather than in one caller so that BOTH checks read one grammar;
+    // no source file in `CITED_REASON_FILES` carries the shape.
+    /** @type {string | null} */
+    let href = null;
+    if (flat.slice(close + 1, close + 3) === '](') {
+      const shut = flat.indexOf(')', close + 3);
+      const spec = shut < 0 ? '' : flat.slice(close + 3, shut);
+      if (/^[^\s#?:]+\.[A-Za-z0-9]+$/.test(spec)) href = spec;
+    }
+    const found = CITATION_PATH.exec(token.slice(0, tail.index));
+    const path = found === null ? '' : found[0];
+    /** @type {string | null} */
+    let target = null;
+    if (path !== '') {
+      target = path;
+      inherited = path;
+      inheritedAt = at;
+    } else if (href !== null) {
+      target = href;
+    } else if (inherit && inherited !== null && at - inheritedAt <= CITATION_INHERIT_LINES) {
+      target = inherited;
+    }
+    if (target === null) continue;
+    const first = tail[1];
+    const last = tail[2];
+    const start = Number(first);
+    const end = last === undefined ? start : Number(last);
+    out.push({
+      href,
+      at,
+      target,
+      start,
+      end,
+      cited: `${target}:${first}${last === undefined ? '' : `-${last}`}`,
+      name: citedIdentifier(flat, open),
+    });
+  }
+  return out;
+}
+
+/**
+ * The nearest line in `files` holding `needle`, and how far it sits from the
+ * cited range. Null when no line in any of them holds it at all.
+ *
+ * @param {readonly string[]} files
+ * @param {(rel: string) => string[]} linesOf
+ * @param {number} start
+ * @param {number} end
+ * @param {string} needle  already lower-cased
+ * @returns {{file: string, line: number, away: number} | null}
+ */
+function nearestName(files, linesOf, start, end, needle) {
+  /** @type {{file: string, line: number, away: number} | null} */
+  let best = null;
+  for (const f of files) {
+    const lines = linesOf(f);
+    for (let j = 0; j < lines.length; j += 1) {
+      if (!(lines[j] ?? '').toLowerCase().includes(needle)) continue;
+      const line = j + 1;
+      const away = line < start ? start - line : line > end ? line - end : 0;
+      if (best === null || away < best.away) best = { file: f, line, away };
+      if (away === 0) return best;
+    }
+  }
+  return best;
+}
+
+/**
+ * A reader over one tree, resolving a cited path to the files that could answer
+ * it and caching every file it reads.
+ *
+ * @param {string} root
+ * @returns {{tree: string[], linesOf: (rel: string) => string[], candidates: (target: string) => string[]}}
+ */
+function citationReader(root) {
+  const tree = walk(root);
+  /** @type {Map<string, string[]>} */
+  const cache = new Map();
+  /** @type {(rel: string) => string[]} */
+  const linesOf = (rel) => {
+    const hit = cache.get(rel);
+    if (hit !== undefined) return hit;
+    const lines = read(root, rel).split('\n');
+    cache.set(rel, lines);
+    return lines;
+  };
+  /** @type {Map<string, string[]>} */
+  const found = new Map();
+  return {
+    tree,
+    linesOf,
+    candidates: (target) => {
+      const hit = found.get(target);
+      if (hit !== undefined) return hit;
+      const files = tree.filter((f) => f === target || f.endsWith(`/${target}`));
+      found.set(target, files);
+      return files;
+    },
+  };
 }
 
 /** @type {Invariant} */
@@ -2383,17 +2599,7 @@ const ri15 = {
   run(root) {
     /** @type {string[]} */
     const findings = [];
-    const tree = walk(root);
-    /** @type {Map<string, string[]>} */
-    const cache = new Map();
-    /** @type {(rel: string) => string[]} */
-    const linesOf = (rel) => {
-      const hit = cache.get(rel);
-      if (hit !== undefined) return hit;
-      const lines = read(root, rel).split('\n');
-      cache.set(rel, lines);
-      return lines;
-    };
+    const { linesOf, candidates } = citationReader(root);
 
     for (const rel of CITED_REASON_FILES) {
       if (!existsSync(join(root, rel))) {
@@ -2403,92 +2609,359 @@ const ri15 = {
         );
         continue;
       }
-      const { flat, lineAt } = flattenReasons(read(root, rel));
-      /** @type {string | null} */
-      let inherited = null;
-      let inheritedAt = -CITATION_INHERIT_LINES - 1;
-      for (const m of flat.matchAll(CITATION)) {
-        const at = lineAt[m.index ?? 0] ?? 0;
-        const path = m[2];
-        const first = m[3];
-        const last = m[4];
-        if (first === undefined) continue;
-        /** @type {string | null} */
-        let target = null;
-        if (path !== undefined && path !== '') {
-          target = path;
-          inherited = path;
-          inheritedAt = at;
-        } else if (inherited !== null && at - inheritedAt <= CITATION_INHERIT_LINES) {
-          target = inherited;
-        }
-        if (target === null) continue;
-
-        const cited = `${target}:${first}${last === undefined ? '' : `-${last}`}`;
-        const candidates = tree.filter((f) => f === target || f.endsWith(`/${target}`));
-        if (candidates.length === 0) {
+      for (const c of citationsIn(read(root, rel))) {
+        const found = candidates(c.target);
+        if (found.length === 0) {
           findings.push(
-            `${rel}:${at}: cites \`${cited}\` and NO FILE IN THIS TREE has that path. ` +
+            `${rel}:${c.at}: cites \`${c.cited}\` and NO FILE IN THIS TREE has that path. ` +
               `A pointer nobody can follow reads as verified and is not`,
           );
           continue;
         }
-        const start = Number(first);
-        const end = last === undefined ? start : Number(last);
-        const reachable = candidates.filter((f) => linesOf(f).length >= end);
+        const reachable = found.filter((f) => linesOf(f).length >= c.end);
         if (reachable.length === 0) {
-          const shown = candidates[0] ?? target;
+          const shown = found[0] ?? c.target;
           findings.push(
-            `${rel}:${at}: cites \`${cited}\` and ${shown} has ${linesOf(shown).length} lines. ` +
+            `${rel}:${c.at}: cites \`${c.cited}\` and ${shown} has ${linesOf(shown).length} lines. ` +
               `The pointer is past the end of the file it names`,
           );
           continue;
         }
-
-        const name = citedIdentifier(flat, m.index ?? 0);
-        if (name === null) continue;
-        const needle = name.toLowerCase();
-        const near = reachable.some((f) => {
-          const lines = linesOf(f);
-          const from = Math.max(0, start - 1 - CITATION_WINDOW);
-          const to = Math.min(lines.length, end + CITATION_WINDOW);
-          for (let j = from; j < to; j += 1)
-            if ((lines[j] ?? '').toLowerCase().includes(needle)) return true;
-          return false;
-        });
-        if (near) continue;
+        if (c.name === null) continue;
+        const hit = nearestName(reachable, linesOf, c.start, c.end, c.name.toLowerCase());
+        if (hit !== null && hit.away <= CITATION_WINDOW) continue;
         if (
           CITATIONS_OWNED_ELSEWHERE.some(
-            (k) => k.file === rel && k.cites === cited && k.name === name,
+            (k) => k.file === rel && k.cites === c.cited && k.name === c.name,
           )
         )
           continue;
-
-        let where = 'NOWHERE IN THAT FILE';
-        for (const f of reachable) {
-          const lines = linesOf(f);
-          let best = Number.POSITIVE_INFINITY;
-          let bestLine = 0;
-          for (let j = 0; j < lines.length; j += 1) {
-            if (!(lines[j] ?? '').toLowerCase().includes(needle)) continue;
-            const d = j + 1 < start ? start - (j + 1) : j + 1 - end;
-            if (d < best) {
-              best = d;
-              bestLine = j + 1;
-            }
-          }
-          if (best < Number.POSITIVE_INFINITY) {
-            where = `at ${f}:${bestLine}, ${best} lines away`;
-            break;
-          }
-        }
+        const where =
+          hit === null
+            ? 'NOWHERE IN THAT FILE'
+            : `at ${hit.file}:${hit.line}, ${hit.away} lines away`;
         findings.push(
-          `${rel}:${at}: cites \`${cited}\` for \`${name}\` and \`${name}\` is ${where}. ` +
+          `${rel}:${c.at}: cites \`${c.cited}\` for \`${c.name}\` and \`${c.name}\` is ${where}. ` +
             `A citation that drifts is worse than none: it reads as verified and sends the ` +
             `next reader to the wrong line, which is how one stale claim survived four ` +
             `restatements. Open the file and repoint it, or say what the line does hold`,
         );
       }
+    }
+    return findings;
+  },
+};
+
+// -----------------------------------------------------------------------------
+// RI-16  A citation in a LIVE DOCUMENT resolves, and the line says the name beside it
+// -----------------------------------------------------------------------------
+//
+// RI-15 READS SIX SOURCE FILES AND ITS OWN `covers` LINE SAYS IT READS
+// `docs/decisions` "NOT AT ALL". That was the right call for the input it had and
+// it left the larger half of this corpus unread: 879 markdown documents under
+// `docs/` carrying 3,463 pointers of the form `file.ts:12`, and until this check
+// nothing mechanical followed one of them.
+//
+// WHY THIS MATTERS MORE HERE THAN IN SOURCE. A wrong citation in a test file is
+// read by whoever next edits that test. A wrong citation in a corpus document is
+// read by the founder during an E2 review and by every later session that treats
+// the entry as settled, and neither of them opens the file to check. RI-15's own
+// first run settled that these are AUTHORED WRONG rather than drifting: two of
+// the citations it found in `routes/payouts.ts` were false at the commit that
+// wrote them, checked by hand.
+//
+// THE SCOPE IS THE WHOLE OF docs/ AND THE EXCLUSIONS ARE BY SHAPE, EACH ONE
+// MEASURED. This is the hard half of the slice and the numbers are the argument.
+// Measured on this branch, 2026-08-28:
+//
+//   * 2,340 citations carry a path of their own or a markdown link beside them.
+//     1,737 of those sit UNDER A DATED OR SESSION HEADING and 603 do not.
+//   * 1,123 citations are a bare `:12` with no path anywhere near them.
+//   * In scope: 603 citations across 879 documents, 5 of them carrying a name
+//     this check can bind. FOUR FINDINGS, all four registered below.
+//
+// EXCLUSION 1: A DATED OR SESSION HEADING, AND IT IS NOT THIS CHECK'S IDEA.
+// `CI-06/derivable-counts` argued and ruled exactly this axis over exactly this
+// corpus: "an entry headed `## ... (2026-08-24)` or `## Session 207: ...` IS A
+// RECORD OF A MEASUREMENT MADE THAT DAY", and rewriting it "would REWRITE THE
+// RECORD TO SAY SOMETHING IT DID NOT SAY, which is a worse defect than the one
+// being repaired". That is RI-15's reason for skipping ADRs, stated one level
+// finer, and it is better than a directory list in three ways. It reaches
+// INSIDE `docs/STATE.md`, which is a LIVE document that ACCUMULATES dated
+// sections and which no directory rule can split. It puts a new session log out
+// of scope the day it is written and a new plan IN scope the day it is written,
+// with nobody maintaining a list. And it is one rule this corpus already keeps
+// rather than a second one that drifts from it. The recogniser is
+// `RECORD_HEADING` and it is read at heading levels 1 and 2 only, so an ADR's
+// `### 3.` inherits the dated `##` its file opens with, for CI-06's reason.
+//
+// EXCLUSION 2: A FENCED BLOCK OR A GENERATED SPAN, masked with CI-06's own two
+// expressions. A worked example of this check's own finding is exactly what the
+// document explaining it would quote, and a generated span is the remedy rather
+// than the defect.
+//
+// EXCLUSION 3: A BARE `:12` WITH NO PATH, AND THIS IS THE ONE THAT DIVERGES FROM
+// RI-15. RI-15 lets a bare pointer inherit the nearest full path within six
+// lines, and names as its miss (6) that this "is wrong wherever a nearer path
+// was cited for something else -- across the rows of a markdown table". IN THIS
+// CORPUS THAT IS NOT AN EDGE, IT IS THE COMMON CASE, and the measurement is
+// decisive. Inheritance adds FIFTEEN findings inside this scope and ALL FIFTEEN
+// ARE THE CHECK GUESSING A PATH:
+//
+//     `M05:214`, `M05:271`     a PLAN and a section line, not a file
+//     `M03:311`                the same shape, in `FOLD-01`
+//     `0011:49`, `0026:157`    a MIGRATION NUMBER, which has no extension
+//     `open_ct 17:00`          a CLOCK TIME inside a transcribed calendar row
+//     [`:874`](../a/path.ts)   the path is in the LINK, not above the line
+//
+// A bare pointer here is a shorthand for a REGISTRY ID far more often than it is
+// a continuation of a path, so this check declines to invent a target. 1,123
+// citations are out of scope for it and the number is stated rather than buried.
+//
+// AND THE HALF OF THAT HOLE THAT COULD BE CLOSED IS CLOSED, WHICH IS WHY THE
+// DIVERGENCE IS NOT A NARROWING. A markdown citation routinely carries its own
+// path in the link beside it, as `[`0004:40`](../../packages/db/migrations/0004_catalog.sql)`
+// does, and that path is STATED BY THE DOCUMENT rather than guessed by the
+// runner. Reading it brings 130 more citations into scope, a 27 percent gain
+// over the path-carrying set alone, and resolves each one to ONE file rather
+// than to every file in the tree whose name ends the same way.
+//
+// WHAT IT DOES NOT CATCH, stated rather than left to be discovered.
+// (1) THE NAME HALF IS THIN HERE AND THE NUMBER SAYS SO: 5 of the 603 citations
+//     in scope carry a name this check can bind, against 57 in `wiring.test.ts`
+//     alone. Markdown writes a citation inside a link or alone in a table cell,
+//     and neither has a backticked name in front of it. The other 598 are
+//     checked for RESOLUTION AND RANGE only, which is the half that found
+//     `DECISIONS.md:483`.
+// (2) A NAME AFTER THE POINTER is not read. This corpus writes
+//     "`routes/account-reads.ts:851` `ELIGIBILITY_BLOCKER`" as readily as the
+//     other order, and binding backwards is a second inference this check does
+//     not make. It is the next thing worth adding.
+// (3) A BARE POINTER'S REGISTRY SHORTHAND is out of scope rather than resolved.
+//     `M05:214` and `0011:49` name a plan and a migration, and both COULD be
+//     resolved by a table this check does not have. That is the growth path.
+// (4) Everything RI-15's covers line lists about the window, the possessive, the
+//     negated claim and the range, because this reads the same grammar through
+//     the same reader. The window is TWO and the reason is RI-15's.
+// (5) It reads the tree it is given and never git history, so it cannot say
+//     whether a citation drifted or was false the day it was written.
+//
+// THE FOUR FINDINGS ARE REGISTERED AND NONE IS REPAIRED HERE, and the reason is
+// a rule rather than a shortage of time. All four sit in documents whose
+// frontmatter reads `status: approved` in a FROZEN corpus, where "changing a
+// frozen document requires an ADR, not a commit"; the tree agrees, and every
+// post-FREEZE amendment to a plan carries an ADR number in its commit subject.
+// This session holds no ADR number. So each entry names the repair it is waiting
+// for, and the register SHRINKS ONLY: an entry that matches no finding on this
+// ref is itself a finding, which is CI-06u's rule about its own register and the
+// difference between a register and an exemption list.
+
+/** A record of a measurement rather than a claim about the tree, per CI-06. */
+const RECORD_HEADING = /\b20\d{2}-[01]\d-[0-3]\d\b|\bsessions?\s+\d{1,4}\b/i;
+
+/**
+ * THE FINDINGS THIS CHECK ARRIVED WITH, EACH ONE A REPAIR IT IS WAITING FOR.
+ *
+ * `ALLOCATION.md` rows 164 and 168 restate ADR-172's finding 1, and RI-15's own
+ * header has already ruled on the citation: `PayoutTx.ledger` at
+ * `routes/payouts.ts:395` "is 324 lines out today because ADR-176 DELETED that
+ * member, which is the entry being right rather than wrong". THERE IS NO LINE TO
+ * REPOINT IT AT. The repair is a sentence saying the member is gone, written in
+ * the ADR that says so. Row 164's `sweeps/ports.ts:219` is the neighbouring
+ * case: the pointer is right for the ADAPTER it was cited for, and the name
+ * written beside it, `systemDb('nightly-batch')`, is at `:283`. A reader who
+ * follows it lands on the right evidence for a different word.
+ *
+ * `FOLD-01`'s `DECISIONS.md:483` names NO FILE THIS TREE HAS EVER HAD.
+ * `DECISIONS.md` is this corpus's nickname for the ADR registry and every other
+ * appearance of it is a markdown link to `decisions/README.md`; this one is a
+ * pointer with a line number on a document that does not exist, which is
+ * RI-15's "false the day it was written" in its purest form. The repair is to
+ * cite `ADR-023` itself, which the same table cell already links.
+ *
+ * @type {readonly {file: string, cites: string, name: string | null}[]}
+ */
+const DOC_CITATIONS_OWNED_ELSEWHERE = [
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'routes/payouts.ts:395', name: 'ledger' },
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'routes/payouts.ts:395', name: 'LedgerTx' },
+  { file: 'docs/decisions/ALLOCATION.md', cites: 'sweeps/ports.ts:219', name: 'systemDb' },
+  { file: 'docs/plans/FOLD-01-phone-identity.md', cites: 'DECISIONS.md:483', name: null },
+];
+
+/**
+ * One document with its generated spans and fenced blocks blanked, and the
+ * record flag of every line. BLANKED RATHER THAN REMOVED so that a line number
+ * still means what it means in the file somebody opens.
+ *
+ * @param {string} text
+ * @returns {{body: string, inRecord: boolean[]}}
+ */
+function documentScope(text) {
+  /** @type {(m: string) => string} */
+  const blank = (m) => m.replace(/[^\n]/g, ' ');
+  const body = text
+    .replace(new RegExp(`<!--${'gen'}:[a-z0-9_]+-->.*?<!--/${'gen'}-->`, 'gs'), blank)
+    .replace(/^(```+|~~~+)[\s\S]*?^\1.*$/gm, blank);
+  /** @type {boolean[]} */
+  const inRecord = [];
+  let flag = false;
+  for (const line of body.split('\n')) {
+    const heading = /^(#{1,6})\s/.exec(line);
+    if (heading !== null && (heading[1] ?? '').length <= 2) flag = RECORD_HEADING.test(line);
+    inRecord.push(flag);
+  }
+  return { body, inRecord };
+}
+
+/**
+ * Whether a finding is one the register already names.
+ *
+ * @param {string} file
+ * @param {string} cites
+ * @param {string | null} name
+ * @returns {boolean}
+ */
+function registeredDocCitation(file, cites, name) {
+  return DOC_CITATIONS_OWNED_ELSEWHERE.some(
+    (k) => k.file === file && k.cites === cites && k.name === name,
+  );
+}
+
+/** @type {Invariant} */
+const ri16 = {
+  id: 'RI-16',
+  title: 'No live document cites a line that does not hold the name beside it',
+  covers:
+    'every `file.ts:12` and `file.ts:12-34` citation in every tracked `.md` ' +
+    'under docs/, plus the bare `:12` whose own markdown link names the file. ' +
+    'THE SAME THREE THINGS RI-15 ASSERTS, through the same reader: the path ' +
+    'resolves to a file in this tree, the file reaches the line, and a ' +
+    `BACKTICKED NAME in front of the citation appears within ${CITATION_WINDOW} ` +
+    'lines of it, matched case-insensitively as a substring. THREE EXCLUSIONS, ' +
+    'ALL BY SHAPE, ALL MEASURED on this branch on 2026-08-28. (1) A citation ' +
+    'under a level-1 or level-2 heading naming a DATE or a SESSION is out of ' +
+    'scope: 1,737 of the 2,340 path-bearing citations, and the rule is ' +
+    "CI-06/derivable-counts' rather than this check's -- such an entry is a " +
+    'record of a measurement made that day, and repairing it would rewrite the ' +
+    'record to say something it did not say. It reaches INSIDE `docs/STATE.md`, ' +
+    'a LIVE document that accumulates dated sections and that no directory rule ' +
+    'could split. (2) A fenced block or a generated span, masked with CI-06s ' +
+    'own two expressions. (3) A bare `:12` with NO path of its own and no link ' +
+    'beside it: 1,123 citations. RI-15 lets such a pointer inherit the nearest ' +
+    'path within 6 lines and names that as its miss (6); in THIS corpus ' +
+    'inheritance adds 15 findings inside this scope and ALL FIFTEEN are the ' +
+    'check guessing, because a bare pointer here is usually a REGISTRY ID: ' +
+    '`M05:214` is a plan and a section line, `0011:49` is a migration, and ' +
+    '`open_ct 17:00` is a clock. WHAT IT DOES NOT CATCH. (1) The name half is ' +
+    'THIN and the number says so: only 5 of the 603 citations in scope carry a ' +
+    'bindable name, against 57 in `wiring.test.ts` alone, because markdown ' +
+    'writes a citation inside a link or alone in a table cell. The other 598 ' +
+    'are checked for RESOLUTION AND RANGE only, which is the half that found ' +
+    '`DECISIONS.md:483`. (2) A name written AFTER the pointer is not read, and ' +
+    'this corpus writes that order as readily as the other. (3) A registry ' +
+    'shorthand in a bare pointer is skipped rather than resolved; a table ' +
+    'mapping `M05` and `0011` to files is the growth path. (4) Everything ' +
+    'RI-15 lists about the window, the possessive, the negated claim and the ' +
+    'range, since this reads the same grammar. (5) It never reads git history, ' +
+    'so it cannot say whether a citation drifted or was false the day it was ' +
+    `written. ${DOC_CITATIONS_OWNED_ELSEWHERE.length} citation(s) are ` +
+    'REGISTERED in DOC_CITATIONS_OWNED_ELSEWHERE, each one a repair this gate ' +
+    'is waiting for and none of them repairable here: all four sit in documents ' +
+    'whose frontmatter reads `status: approved` in a frozen corpus, where a ' +
+    'change is an ADR rather than a commit, and this session holds no ADR ' +
+    'number. The register SHRINKS ONLY: an entry matching no finding on this ' +
+    'ref is itself a finding, which is what separates a register from an ' +
+    'exemption list.',
+  run(root) {
+    /** @type {string[]} */
+    const findings = [];
+    const { tree, linesOf, candidates } = citationReader(root);
+    const docs = tree.filter((f) => f.startsWith('docs/') && f.endsWith('.md'));
+    if (docs.length === 0) {
+      throw new Error(
+        'RI-16 cannot run: no tracked `.md` under docs/. This check reads the corpus, so an ' +
+          'empty scope is a walk that has stopped reaching it and not a clean tree',
+      );
+    }
+    /** @type {Set<string>} */
+    const raised = new Set();
+    let scoped = 0;
+
+    for (const rel of docs) {
+      const { body, inRecord } = documentScope(read(root, rel));
+      for (const c of citationsIn(body, false)) {
+        if (inRecord[c.at - 1] === true) continue;
+        scoped += 1;
+        // A LINK NAMES ITS FILE OUTRIGHT, so it is resolved as a path from the
+        // citing document: one file, rather than every file in the tree whose
+        // name happens to end the same way.
+        const found =
+          c.href === null
+            ? candidates(c.target)
+            : [relative(root, resolve(dirname(join(root, rel)), c.href))].filter((f) =>
+                existsSync(join(root, f)),
+              );
+        const key = `${rel} ${c.cited} ${c.name ?? ''}`;
+        if (found.length === 0) {
+          raised.add(key);
+          if (registeredDocCitation(rel, c.cited, null)) continue;
+          findings.push(
+            `${rel}:${c.at}: cites \`${c.cited}\` and NO FILE IN THIS TREE has that path. ` +
+              'A pointer nobody can follow reads as verified and is not',
+          );
+          continue;
+        }
+        const reachable = found.filter((f) => linesOf(f).length >= c.end);
+        if (reachable.length === 0) {
+          raised.add(key);
+          if (registeredDocCitation(rel, c.cited, null)) continue;
+          const shown = found[0] ?? c.target;
+          findings.push(
+            `${rel}:${c.at}: cites \`${c.cited}\` and ${shown} has ${linesOf(shown).length} lines. ` +
+              'The pointer is past the end of the file it names',
+          );
+          continue;
+        }
+        if (c.name === null) continue;
+        const hit = nearestName(reachable, linesOf, c.start, c.end, c.name.toLowerCase());
+        if (hit !== null && hit.away <= CITATION_WINDOW) continue;
+        raised.add(key);
+        if (registeredDocCitation(rel, c.cited, c.name)) continue;
+        const where =
+          hit === null
+            ? 'NOWHERE IN THAT FILE'
+            : `at ${hit.file}:${hit.line}, ${hit.away} lines away`;
+        findings.push(
+          `${rel}:${c.at}: cites \`${c.cited}\` for \`${c.name}\` and \`${c.name}\` is ${where}. ` +
+            'A citation in a corpus document is read by a founder at an E2 review and by every ' +
+            'later session that treats the entry as settled, and neither of them opens the ' +
+            'file. Repoint it, or say what the line does hold',
+        );
+      }
+    }
+
+    if (scoped === 0) {
+      throw new Error(
+        `RI-16 read ${docs.length} document(s) under docs/ and found NO citation in scope. ` +
+          'This corpus argues in `file:line` pointers, so zero means the reader or the ' +
+          'record-heading rule has stopped matching, and every drifted pointer in the tree ' +
+          'would then pass for the wrong reason',
+      );
+    }
+
+    // THE REGISTER SHRINKS ONLY, which is CI-06u's rule about its own. An entry
+    // naming a citation that is no longer a finding is a repair that landed
+    // without the register following it, and a register nobody has to maintain
+    // is an exemption list that outlives its reason.
+    for (const k of DOC_CITATIONS_OWNED_ELSEWHERE) {
+      if (raised.has(`${k.file} ${k.cites} ${k.name ?? ''}`)) continue;
+      findings.push(
+        `${k.file}: the register claims \`${k.cites}\`${
+          k.name === null ? '' : ` for \`${k.name}\``
+        } is a known finding and it is not one on this ref. Either the repair landed and this ` +
+          'entry goes, or the document moved and the entry moves with it. A register entry ' +
+          'that names nothing exempts nothing and hides the next one',
+      );
     }
     return findings;
   },
@@ -2510,6 +2983,7 @@ export const CHECKS = [
   ri13,
   ri14,
   ri15,
+  ri16,
 ];
 
 function main() {
