@@ -207,7 +207,37 @@ const PENDING: readonly PendingPanel[] = [
   },
 ];
 
-const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/i;
+// THE PATTERN CARRIES NO BOUNDARY ASSERTION, AND THE OMISSION IS THE REPAIR.
+//
+// It was `\b[0-9a-f]{8}-...-[0-9a-f]{12}\b` until session 348. A `\b` is a WORD
+// boundary, so a word character on either side of the token removes it and the
+// match is lost: `linked to <uuid>`, `manual-review-<uuid>` and `ref:<uuid>` all
+// threw, while `linked_to_<uuid>`, `x<uuid>` and `<uuid>y` all passed. An
+// underscore is a word character, which is why the first of those three is the
+// spelling a real payload carries. Session 344 found it by a SEED FAILING TO
+// FIRE rather than by reading this line, which is the only way a hole in a
+// refusal gets found: a guard that refuses too little is green all the way down.
+//
+// DROPPING BOTH BOUNDARIES RATHER THAN REPLACING THEM WITH A LOOKAROUND BUYS A
+// PROPERTY. Removing an assertion from a regex can only ADD matches, so this
+// pattern refuses a strict SUPERSET of what the old one refused: no line that
+// used to throw now passes, and `M6-A-55` asserts that over a generated corpus
+// rather than trusting the argument. A hex-digit lookbehind, `(?<![0-9a-f])`,
+// was the alternative and leaves a residue this cannot afford: `d` is a hex
+// digit, so `id<uuid>` would still pass, and `id` is exactly the prefix an
+// operator screen glues on.
+//
+// WHAT THE WIDENING COSTS, STATED RATHER THAN LEFT TO BE FOUND: a uuid shape
+// sitting inside a longer hex-and-dash run is now refused too, so a 16-hex first
+// group or a 13-hex last group throws where it did not. That is a token this
+// page has no business printing either, and refusing it is the safe direction
+// for a control whose false negative is bulk PII on an aggregate screen
+// (FM-M6-10) and whose false positive is a page that says so loudly.
+//
+// The widening is in the NEIGHBOURS and never in the SHAPE: the five groups
+// still have to be 8-4-4-4-12 hex with four dashes, so a token one digit or one
+// dash short is not a match here any more than it was before.
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 /**
  * INV-M6-10 on the page's own output.

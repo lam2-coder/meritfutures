@@ -69,4 +69,15 @@ export {
 
 export { postTransaction, type PostOptions, type PostedTransaction } from './post.ts';
 
+export {
+  WALLET_WITHDRAWAL_APPROVAL_KIND,
+  WALLET_WITHDRAWAL_FAILURE_KIND,
+  WALLET_WITHDRAWAL_REFERENCE_KIND,
+  reversalPosting,
+  walletWithdrawalFailureKey,
+  walletWithdrawalFailurePosting,
+  type ReversalHeader,
+  type WalletWithdrawalFacts,
+} from './reversal.ts';
+
 export type { LedgerReadKey, LedgerTx, LedgerWriteKey, WriteValues } from './tx.ts';

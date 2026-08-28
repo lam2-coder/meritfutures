@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import LiabilityHomeRoute from '../src/app/page.tsx';
 import {
   LiabilityHomeDocument,
   assertServedLiabilityHomeStrings,
@@ -383,5 +384,138 @@ describe('M6-A-42: the shipped walk and the served bytes are the same surface', 
     expect(() => collectServedStrings({ type: 'section', props: { children: 'x' } }, [])).toThrow(
       PageError,
     );
+  });
+});
+
+// =============================================================================
+// ADR-190: A STATUS THIS CONSOLE DID NOT RECEIVE IS A STATUS IT MAY NOT NAME
+// =============================================================================
+// `W6-d` shipped `const NOT_YET: AdminErrorKind = toAdminErrorKind(503)` in
+// `src/app/page.tsx`, on WAVE-06 section 4.1's sentence *"every one of the 26
+// operator routes above answers 503 today"*. Session 336 reported that sentence
+// false, session 344 measured the two answers this page's own endpoint really
+// gives, and neither could repair the file. ADR-190 rules it and these two
+// suites are what stop the number coming back.
+//
+// THE RULE IS NARROWER THAN "503 WAS WRONG". An `AdminErrorKind` is derived
+// from a response this console RECEIVED (`../src/http/client.ts` computes it
+// from `response.status` and pairs it with that status in `AdminApiFailure`).
+// A route that performs no read has received nothing, so it names nothing.
+// Three screens already shipped that way; `M6-A-60` is what makes the fourth
+// screen inherit it.
+
+describe('M6-A-60: no route under src/app names an error kind it did not receive', () => {
+  const APP = join(import.meta.dirname, '..', 'src', 'app');
+
+  const appFiles = (): string[] => {
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) walk(path);
+        else files.push(path);
+      }
+    };
+    walk(APP);
+    return files;
+  };
+
+  test('no file under src/app imports or derives an AdminErrorKind', () => {
+    // COMMENTS ARE STRIPPED FIRST, AND THAT IS THE POINT RATHER THAN A
+    // CONVENIENCE. Every one of these screens EXPLAINS in prose which statuses
+    // its endpoint really answers, naming `toAdminErrorKind` and the kinds
+    // while doing so. The rule is about the CODE: a kind that reaches a render
+    // without a response behind it.
+    const offences: string[] = [];
+    for (const file of appFiles()) {
+      const body = code(file);
+      for (const needle of ['toAdminErrorKind', 'AdminErrorKind'])
+        if (body.includes(needle)) offences.push(`${file}: ${needle}`);
+    }
+    expect(offences).toEqual([]);
+  });
+
+  test('no file under src/app serves an error kind as an attribute', () => {
+    // `data-error` was `src/app/page.tsx`'s, and `test/flags-render.test.ts`
+    // and `test/identity-render.test.ts` each already refuse it for their own
+    // screen. This is the same refusal held over the DIRECTORY, so the screen
+    // that has no suite yet is covered on the day its file lands.
+    const offences = appFiles().filter((file) => code(file).includes('data-error'));
+    expect(offences).toEqual([]);
+  });
+
+  test('the sweep walks the routes rather than an empty set', () => {
+    // A FLOOR, DERIVED FROM THE DIRECTORY. `M6-A-41` states the same reason:
+    // a green sweep over nothing is the failure mode of a source sweep.
+    expect(appFiles().filter((file) => file.endsWith('.tsx')).length).toBeGreaterThanOrEqual(3);
+  });
+
+  test('the needle is real, and the kinds are still declared where they belong', () => {
+    // THE COUNTERFACTUAL. A sweep for a name that no longer exists anywhere is
+    // a sweep that can never fail, so this reads the file that DOES declare the
+    // vocabulary and asserts it is intact. ADR-190 ruling 2 keeps `unavailable`
+    // for the 13 registered `/admin/*` routes that really do answer 503.
+    const client = readFileSync(
+      join(import.meta.dirname, '..', 'src', 'http', 'client.ts'),
+      'utf8',
+    );
+    expect(client).toContain('export function toAdminErrorKind');
+    expect(client).toContain("if (status === 503) return 'unavailable';");
+  });
+});
+
+describe('M6-A-61: the liability home serves the answers that were measured', () => {
+  // THE BYTES, not the constant. WAVE-06 section 5.2's rule applied to the
+  // arm this route actually returns today.
+  const markup = renderToStaticMarkup(LiabilityHomeRoute());
+  const served = text(markup);
+
+  test('the page carries no error attribute at all', () => {
+    expect(markup).not.toContain('data-error');
+  });
+
+  test("no AdminErrorKind member is served as this page's own read state", () => {
+    // SCOPED TO THE READ-STATE PARAGRAPH RATHER THAN THE WHOLE PAGE, and the
+    // scoping is the ruling rather than a way to keep the case green. The
+    // blocker prose below it QUOTES `401 unauthenticated` and `500
+    // internal_error` because those were measured against a real `compose()`;
+    // what ADR-190 refuses is this page stating a kind AS ITS OWN read state,
+    // which is the sentence `data-error` and `{read.error}` used to make.
+    const paragraph = /<p data-testid="read-state">([\s\S]*?)<\/p>/.exec(markup);
+    expect(paragraph).not.toBeNull();
+    const state = text(paragraph?.[1] ?? '');
+    for (const kind of [
+      'unauthenticated',
+      'forbidden',
+      'not_found',
+      'rate_limited',
+      'unavailable',
+      'server_error',
+    ])
+      expect(state, kind).not.toContain(kind);
+  });
+
+  test('the ADR-171 blocker names BOTH measured statuses with the condition of each', () => {
+    // THE NUMBERS THAT WERE MEASURED, PINNED HERE SO PROSE CANNOT DRIFT AGAIN.
+    // `apps/api/test/admin-reads.test.ts` asserts the same two against a real
+    // `compose()`; this asserts the console says what that measures.
+    expect(served).toContain('401 `unauthenticated`');
+    expect(served).toContain('500 `internal_error`');
+    expect(served).not.toContain('503');
+  });
+
+  test('every blocker is served with its origin and what blocks it', () => {
+    expect(markup).toContain('data-origin="ADR-171"');
+    expect(markup).toContain('data-origin="P5-l"');
+    expect(markup).toContain('data-origin="API_CONTRACT section 8"');
+    expect(served.match(/NOT BUILT, blocked by/g)).toHaveLength(3);
+  });
+
+  test('it invents no number while a supplier is missing', () => {
+    // The page renders no figure at all in this arm, so no digit group that
+    // could be read as money reaches the bytes. The statuses are three digits
+    // and are what the exception is for.
+    const money = served.match(/\d[\d,]*\.\d\d/g) ?? [];
+    expect(money).toEqual([]);
   });
 });
