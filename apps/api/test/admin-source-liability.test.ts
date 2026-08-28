@@ -763,14 +763,53 @@ describe('blocker B4: integrations.recon.last_run_at, a run nothing records', ()
     expect(events).toContain('`batch.started` / `batch.completed`');
   });
 
-  it('has no run table and no run column, so mismatches_open is the only half produced', () => {
+  // INVERTED BY THE SESSION THAT SPENT THE CLEARING CONDITION. Session 374 wrote
+  // this case as "has no run table and no run column", and `0064` gives the
+  // schema half of B4's stated clearing condition ("a `recon.completed` event or
+  // a run record"). The case now asserts what LANDED and what still STANDS,
+  // because a case whose title has gone false while its assertions still pass is
+  // the worst of the three states: session 374's own landmine 1 is that a
+  // clearing condition fires once and the session that lifts the blocker is the
+  // session that spends it.
+  //
+  // THE COLUMN ASSERTION IS KEPT AND IT SAYS MORE THAN IT DID. `last_run_at` is
+  // still not a column anywhere, and now it is not a column on a table that
+  // exists: the field is a fold over `reconciliation_runs.started_at` rather
+  // than a figure anybody stores, which is ADR-199 ruling 6's distinction
+  // holding on the one field that had failed it.
+  it('has a run table now, and no run column, so the record half of B4 has fired', () => {
     const columns = migrationColumnNames();
     expect(columns).not.toContain('last_run_at');
     expect(TABLE_KEYS).toContain('reconciliations');
+    expect(TABLE_KEYS).toContain('reconciliationRuns');
+    // The control that makes the clock trustworthy, which is the whole reason a
+    // run record clears what `max(reconciliations.created_at)` could not: a
+    // sweep that stopped at the account boundary may not claim it completed.
+    expect(readFileSync(join(MIGRATIONS, '0064_reconciliation_runs.sql'), 'utf8')).toContain(
+      'reconciliation_runs_completed_is_whole',
+    );
     // `status` is what makes the COUNT producible: `0014` closes it at three
     // names and `mismatch` is the open one.
     expect(readFileSync(join(MIGRATIONS, '0014_marks.sql'), 'utf8')).toContain(
       "status IN ('match', 'mismatch', 'resolved')",
     );
+  });
+
+  // WHAT B4 STILL HOLDS, AND IT IS NOT THE SCHEMA. Two things stand between this
+  // record and a produced `last_run_at`, and neither is a migration: a producer
+  // that writes the row (`apps/worker`, which reaches neither this package's
+  // producer nor this adapter today), and the reader here. The event named in
+  // the case above is a THIRD thing and is owed to a frozen document rather than
+  // to this field: the data-model README section 1 says a mutable table emits an
+  // event on every meaningful transition, and EVENTS section 5.3 has no
+  // `recon.completed` to emit.
+  //
+  // THIS CASE IS THE NEXT CLEARING CONDITION and it goes red the day the adapter
+  // produces the field, which is the day this whole describe block should be
+  // re-derived rather than edited.
+  it('is still blocked on a reader, which is what the record does not supply', () => {
+    const book = readFileSync(join(ROOT, 'apps/api/src/admin-source/liability.ts'), 'utf8');
+    expect(book).toContain("'last_run_at'");
+    expect(book).not.toContain('reconciliationRuns');
   });
 });
