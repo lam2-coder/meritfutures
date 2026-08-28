@@ -902,8 +902,11 @@ function clearHold(status: 'approved' | 'failed', at: Date): Record<string, unkn
  * `ledger_transactions.idempotency_key` is `text NOT NULL UNIQUE`, and
  * `INV-M5-06` is "the same `idempotency_key` on every attempt, generated BEFORE
  * the first send and persisted in the same transaction". The request's own
- * stored key is that value, and `payouts.ts` builds the same string for the
- * posting it makes when NO hold stands: `${PAYOUT_ENDPOINT} ${key}`.
+ * stored key is that value, and `payouts.ts` is where `PAYOUT_ENDPOINT` is
+ * declared: `${PAYOUT_ENDPOINT} ${key}`. THAT FILE NO LONGER POSTS. ADR-176
+ * applied ADR-172 clause 2, so the request path records the approval and writes
+ * the client's token to `payout_requests.idempotency_key`, which is the column
+ * `held.idempotencyKey` below is read from.
  *
  * **USING THE IDENTICAL STRING IS THE FAIL-CLOSED DIRECTION AND IS THE REASON
  * `PAYOUT_ENDPOINT` IS IMPORTED RATHER THAN RETYPED.** `LT-01` for one payout

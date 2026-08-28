@@ -60,10 +60,13 @@
 //
 // THE KEY THIS FILE WOULD HAVE USED IS RECORDED, BECAUSE THE ANALYSIS WAS DONE
 // AND A LATER SESSION SHOULD NOT REDO IT. `ledger_transactions.idempotency_key`
-// is `text NOT NULL UNIQUE`, and `payouts.ts`, `admin-payouts.ts` and
-// `apps/worker/src/sweeps/expiry.ts` all build the IDENTICAL string
-// `` `${PAYOUT_ENDPOINT} ${idempotencyKey}` `` for `LT-01`, so one approval is
-// one posting whichever of the three doors reaches it. `LT-06`'s equivalent is
+// is `text NOT NULL UNIQUE`, and every door that posts `LT-01` builds the
+// IDENTICAL string `` `${PAYOUT_ENDPOINT} ${idempotencyKey}` `` from the
+// request's own stored key, so one approval is one posting whichever door
+// reaches it: `admin-payouts.ts` and `apps/worker/src/sweeps/expiry.ts` today,
+// and `payouts.ts` until ADR-176 applied ADR-172 clause 2 and moved the request
+// path's posting to a system authority -- WHICH IS THIS FILE'S OWN CHOICE,
+// ARRIVING ON THE PAYOUT SIDE. `LT-06`'s equivalent is
 // the string derived from `wallet_withdrawals.idempotency_key`, which is the
 // key the trader supplied and which the schema already makes unique per
 // identity -- NOT one naming this endpoint, because the approval edge is

@@ -11,10 +11,27 @@
 // fixture, and the PAIR is what is asserted:
 //
 //   a `restricted` identity is refused ... and an `active` one is APPROVED and
-//   POSTS `LT-01`, out of the same store, in the same shape.
+//   the `payout_requests` row COMMITS, out of the same store, in the same shape.
 //
 // The negative control on the whole file is `the honest path`: if the route
 // refused everything, or approved nothing, that block goes red first.
+//
+// -----------------------------------------------------------------------------
+// THIS ROUTE NO LONGER POSTS, AND THE `LT-01` ASSERTIONS WERE RETARGETED RATHER
+// THAN DELETED. ADR-176
+// -----------------------------------------------------------------------------
+// ADR-172 clause 2 moved the posting off the request path and ADR-176 applied
+// it here, so `PayoutTx` carries no `LedgerTx` and the fixture has nothing to
+// record. EVERY ASSERTION THAT WAS MADE ABOUT THE POSTING STILL RUNS: the
+// header, the four entries, the two debits summing to `approved_cents`, the
+// signs, the zero sum and the `bigint` check all moved into `LT-01 is built and
+// never computed`, where they are made over `postTransaction(recorder,
+// chart, lt01(...))` directly. Deleting them would have been the weakening;
+// they are facts about `lt01` and about `packages/ledger`, and neither moved.
+//
+// WHAT REPLACES THEM ON THE ROUTE IS THE PROPERTY THAT NOW MATTERS: the
+// approval commits the CALLER'S OWN IDEMPOTENCY KEY to the row, because that
+// column is the only thing a later door can rebuild the ledger key from.
 //
 // -----------------------------------------------------------------------------
 // `ADR-140`'s WITNESS IS `closed` AND IT HAS ITS OWN CASE
@@ -35,6 +52,9 @@
 // returned is a suite asserting the engine agrees with itself.
 // =============================================================================
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { InjectOptions, LightMyRequestResponse } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -48,6 +68,7 @@ import type {
   RuleState,
   TradingDay,
 } from '@merit/rules-engine';
+import { postTransaction, readChart } from '@merit/ledger';
 import type { LedgerTx, WriteValues } from '@merit/ledger';
 
 import { BASE_PATH, buildServer, discoverRouteModules } from '../src/index.ts';
@@ -274,7 +295,6 @@ interface Fixture {
   state: RuleState;
   /** COMMITTED rows only. A rolled-back transaction leaves nothing here. */
   requests: PayoutRequestInsert[];
-  ledgerWrites: Array<{ key: string; values: WriteValues }>;
   list: PayoutListItem[];
   keys: Map<string, IdempotencyRecord & { readonly owner: string }>;
 }
@@ -291,7 +311,6 @@ function freshFixture(): Fixture {
     gates,
     state,
     requests: [],
-    ledgerWrites: [],
     list: [],
     keys: new Map(),
   };
@@ -334,7 +353,10 @@ function ledgerOver(writes: Array<{ key: string; values: WriteValues }>): Ledger
 const backend: PayoutBackend = {
   transact: async <T>(_session: AuthSession, fn: (tx: PayoutTx) => Promise<T>): Promise<T> => {
     const stagedRequests = [...fixture.requests];
-    const stagedLedger = [...fixture.ledgerWrites];
+    // THE HANDLE HAS FOUR MEMBERS AND NOT FIVE, AND THAT IS ADR-176 ASSERTED BY
+    // THE TYPE. A fixture that still supplied a `ledger` would not compile, so
+    // "this route posts nothing" is a compile-time property here rather than a
+    // count this file has to remember to check.
     const tx: PayoutTx = {
       identityStatus: () => Promise.resolve(fixture.identityStatus),
       subject: (accountId) => Promise.resolve(fixture.subjects.get(accountId) ?? null),
@@ -343,11 +365,9 @@ const backend: PayoutBackend = {
         stagedRequests.push(row);
         return Promise.resolve({ eligibilitySnapshotId: `snap-${row.id}` });
       },
-      ledger: ledgerOver(stagedLedger),
     };
     const value = await fn(tx);
     fixture.requests = stagedRequests;
-    fixture.ledgerWrites = stagedLedger;
     return value;
   },
   listPayouts: () => Promise.resolve(fixture.list),
@@ -410,6 +430,13 @@ async function call(options: {
   return res;
 }
 
+/**
+ * The client's token on the honest path, named so the ROW can be asserted
+ * against it. `nextKey()` is fine everywhere the key is only a token; it is not
+ * fine where the assertion is that this exact value survived into the column.
+ */
+const DEFAULT_KEY = 'idem-honest-path';
+
 function requestPayout(
   over: {
     account?: string;
@@ -441,9 +468,9 @@ afterEach(() => {
 // THE ADMISSION. Everything below it is a refusal measured against this.
 // -----------------------------------------------------------------------------
 
-describe('the honest path: an eligible trader is approved and LT-01 posts', () => {
-  it('approves at the cap, splits 9000bp, and posts three accounts in two transfers', async () => {
-    const res = await requestPayout();
+describe('the honest path: an eligible trader is approved and the request commits', () => {
+  it('approves at the cap, splits 9000bp, and stores the key a later door must post under', async () => {
+    const res = await requestPayout({ idempotencyKey: DEFAULT_KEY });
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -474,36 +501,15 @@ describe('the honest path: an eligible trader is approved and LT-01 posts', () =
     expect(fixture.requests[0]?.approvedCents).toBe(DEFAULT_APPROVED);
     expect(fixture.requests[0]?.hold).toBeNull();
 
-    // LT-01: one `ledger_transactions` row and FOUR `ledger_entries`, because
-    // every `Transfer` yields exactly two entries (ADR-104 ruling 1) and a
-    // one-debit two-credit posting is unrepresentable in that library.
-    const header = fixture.ledgerWrites.filter((w) => w.key === 'ledgerTransactions');
-    const entries = fixture.ledgerWrites.filter((w) => w.key === 'ledgerEntries');
-    expect(header).toHaveLength(1);
-    expect(header[0]?.values['kind']).toBe('payout_approval');
-    expect(header[0]?.values['referenceKind']).toBe('payout_request');
-    expect(header[0]?.values['referenceId']).toBe(body.payout_request_id);
-    expect(entries).toHaveLength(4);
-
-    // The DEBIT total against the withdrawable position is `approved_cents`,
-    // and it is `trader_withdrawable` rather than `firm_treasury`: M05 rules
-    // that booking cash at approval contradicts the recognition timing.
-    const debited = entries.filter((e) => e.values['ledgerAccountId'] === 'acct-withdrawable');
-    expect(debited).toHaveLength(2);
-    expect(debited.reduce((sum, e) => sum + (e.values['amountCents'] as bigint), 0n)).toBe(
-      DEFAULT_APPROVED,
-    );
-
-    const wallet = entries.find((e) => e.values['ledgerAccountId'] === 'acct-wallet');
-    const fees = entries.find((e) => e.values['ledgerAccountId'] === 'acct-fees');
-    expect(wallet?.values['amountCents']).toBe(-DEFAULT_TRADER);
-    expect(fees?.values['amountCents']).toBe(-DEFAULT_FIRM);
-
-    // The whole posting sums to zero, which is what makes it a posting.
-    expect(entries.reduce((sum, e) => sum + (e.values['amountCents'] as bigint), 0n)).toBe(0n);
-
-    // NO FLOAT REACHED THE LEDGER. Every amount is a `bigint`.
-    for (const entry of entries) expect(typeof entry.values['amountCents']).toBe('bigint');
+    // `INV-M5-06` SURVIVES THE MOVE ONLY IF THE KEY IS ON THE ROW, and this is
+    // where that is checked. ADR-176 moved the `LT-01` posting to a system
+    // authority, and the driver has nowhere but `payout_requests.idempotency_key`
+    // to rebuild the ledger key from. It is stored UNPREFIXED, because the
+    // column is the client's token and `payout_requests_account_idempotency_uq`
+    // is `(account_id, idempotency_key)`; the `PAYOUT_ENDPOINT` prefix belongs
+    // to the ledger key the doors compose.
+    expect(fixture.requests[0]?.idempotencyKey).toBe(DEFAULT_KEY);
+    expect(fixture.requests[0]?.idempotencyKey).not.toContain(PAYOUT_ENDPOINT);
   });
 
   it('honours a supplied amount as a CEILING and clamps for the reason `requested`', async () => {
@@ -547,7 +553,6 @@ describe('ADR-140: the identity-status term of G-ELIGIBLE is a named refusal', (
       // IT IS NEVER EXPRESSED AS A GATE RESULT. No breakdown, no snapshot, no row.
       expect(res.json().gates).toBeUndefined();
       expect(fixture.requests).toHaveLength(0);
-      expect(fixture.ledgerWrites).toHaveLength(0);
     });
   }
 
@@ -655,7 +660,6 @@ describe('payout_not_eligible carries the FULL breakdown', () => {
     expect(res.json().gates.kyc_verified).toEqual({ pass: true, state: 'verified' });
     expect(res.json().gates.minimum_amount.pass).toBe(true);
     expect(fixture.requests).toHaveLength(0);
-    expect(fixture.ledgerWrites).toHaveLength(0);
   });
 
   it('reports a CONTEXT gate failure through the same breakdown', async () => {
@@ -719,6 +723,9 @@ describe('one payout in flight per account', () => {
 // -----------------------------------------------------------------------------
 
 describe('the hold path (ADR-040, INV-M5-21)', () => {
+  /** The client's token on the hold path, named for the same reason `DEFAULT_KEY` is. */
+  const HELD_KEY = 'idem-hold-path';
+
   const FLAG: HoldFlag = {
     flagId: '0199c7a1-5555-7000-8000-000000000001',
     tosClause: 'ToS 7.3',
@@ -727,7 +734,7 @@ describe('the hold path (ADR-040, INV-M5-21)', () => {
 
   it('holds with a 200, populates every money field, and POSTS NOTHING', async () => {
     fixture.holdFlag = FLAG;
-    const res = await requestPayout();
+    const res = await requestPayout({ idempotencyKey: HELD_KEY });
 
     // "A hold is a 200 carrying `held_pending_review`, not an error." Returning
     // a 422 would put a state with a clock into the vocabulary of a refusal.
@@ -748,9 +755,16 @@ describe('the hold path (ADR-040, INV-M5-21)', () => {
     // 48 WALL-CLOCK hours. Merit computes nothing in business days (ADR-042).
     expect(resolves - held).toBe(HOLD_WINDOW_MS);
 
-    // INV-M5-21: no ledger transaction, no wallet credit. The ledger is the
-    // discriminator between `held_pending_review` and `frozen`.
-    expect(fixture.ledgerWrites).toHaveLength(0);
+    // `INV-M5-21` AT REQUEST TIME IS NOW A PROPERTY OF THE STATUS COLUMN,
+    // BECAUSE NOTHING POSTS HERE AT ALL (ADR-176). The ledger stays the
+    // discriminator between `held_pending_review` and `frozen`, and the
+    // discrimination is made by the system-authority driver ADR-172 section 5
+    // names, which must select on `status = 'approved'`. THIS SUITE CANNOT
+    // ASSERT THAT DRIVER, because it does not exist yet, and saying so here is
+    // the honest version of the assertion that used to stand on this line.
+    // What IS asserted is the input that driver reads.
+    expect(fixture.requests[0]?.status).toBe('held_pending_review');
+    expect(fixture.requests[0]?.idempotencyKey).toBe(HELD_KEY);
 
     // SD-M5-08: all five hold columns together or none.
     const row = fixture.requests[0];
@@ -760,12 +774,17 @@ describe('the hold path (ADR-040, INV-M5-21)', () => {
     expect(row?.hold?.holdReason).toBe(FLAG.reason);
   });
 
-  it('and without the flag the identical request approves AND posts', async () => {
+  it('and without the flag the identical request approves, with no hold columns', async () => {
+    // THE PAIR IS STILL A PAIR. What discriminates the two rows is `status` and
+    // the five hold columns, which is what a request-time transaction decides
+    // now that no posting happens on either branch.
     fixture.holdFlag = null;
     const res = await requestPayout();
     expect(res.json().status).toBe('approved');
     expect(res.json().hold).toBeNull();
-    expect(fixture.ledgerWrites.filter((w) => w.key === 'ledgerTransactions')).toHaveLength(1);
+    expect(fixture.requests).toHaveLength(1);
+    expect(fixture.requests[0]?.status).toBe('approved');
+    expect(fixture.requests[0]?.hold).toBeNull();
   });
 });
 
@@ -796,9 +815,11 @@ describe('Idempotency-Key', () => {
     const replay = await requestPayout({ idempotencyKey: key });
     expect(replay.statusCode).toBe(200);
     expect(replay.json()).toEqual(first.json());
-    // AND IT RAN ONCE. One row, one posting.
+    // AND IT RAN ONCE. One row, carrying the key ONCE, which is what makes the
+    // later posting unrepeatable: `ledger_transactions.idempotency_key` is
+    // `text NOT NULL UNIQUE` and every door composes it from this column.
     expect(fixture.requests).toHaveLength(1);
-    expect(fixture.ledgerWrites.filter((w) => w.key === 'ledgerTransactions')).toHaveLength(1);
+    expect(fixture.requests[0]?.idempotencyKey).toBe(key);
   });
 
   it('answers 409 idempotency_key_reuse when the same key carries a different body', async () => {
@@ -872,7 +893,6 @@ describe('the body, which has one optional member', () => {
     expect(res.json().code).toBe('validation_failed');
     expect(res.json().errors[0].path).toBe('amount_cents');
     expect(fixture.requests).toHaveLength(0);
-    expect(fixture.ledgerWrites).toHaveLength(0);
   });
 
   it('refuses zero and a negative amount', async () => {
@@ -933,6 +953,59 @@ describe('LT-01 is built and never computed', () => {
 
   it('REFUSES a zero or negative leg before the database is asked', () => {
     expect(() => lt01({ ...ARGS, traderCents: 0n, firmCents: DEFAULT_APPROVED })).toThrow();
+  });
+
+  // ---------------------------------------------------------------------------
+  // THE POSTING'S SHAPE, ASSERTED WHERE THE POSTING NOW HAPPENS: OVER A HANDLE,
+  // AND NOT OVER THIS ROUTE
+  // ---------------------------------------------------------------------------
+  // These six assertions ran against `POST /accounts/:accountId/payout` until
+  // ADR-176 moved the posting to a system authority. THEY ARE THE SAME
+  // ASSERTIONS: nothing about `lt01` or about `postTransaction` changed, and
+  // deleting them because the route stopped calling them would have thrown away
+  // the only place in this deployable that reads the four entries back.
+  //
+  // WHAT THIS PROVES AND WHAT IT DOES NOT, kept from the fixture it came from:
+  // a recorder proves which accounts a posting named, in which direction, for
+  // how much. It proves NOTHING about the zero-sum trigger or `LEDGER-C1` at
+  // COMMIT, which are the database's and are asserted in `packages/ledger`'s
+  // own suite.
+  it('composes into ONE header and FOUR entries, whichever door holds the handle', async () => {
+    const writes: Array<{ key: string; values: WriteValues }> = [];
+    const handle = ledgerOver(writes);
+    await postTransaction(handle, await readChart(handle), lt01(ARGS));
+
+    // Every `Transfer` yields exactly two entries (ADR-104 ruling 1), so a
+    // one-debit two-credit posting is unrepresentable in that library.
+    const header = writes.filter((w) => w.key === 'ledgerTransactions');
+    const entries = writes.filter((w) => w.key === 'ledgerEntries');
+    expect(header).toHaveLength(1);
+    expect(header[0]?.values['kind']).toBe('payout_approval');
+    expect(header[0]?.values['referenceKind']).toBe('payout_request');
+    expect(header[0]?.values['referenceId']).toBe('pr-x');
+    expect(entries).toHaveLength(4);
+
+    // The DEBIT total against the withdrawable position is `approved_cents`,
+    // and it is `trader_withdrawable` rather than `firm_treasury`: M05 rules
+    // that booking cash at approval contradicts the recognition timing.
+    const debited = entries.filter((e) => e.values['ledgerAccountId'] === 'acct-withdrawable');
+    expect(debited).toHaveLength(2);
+    expect(debited.reduce((sum, e) => sum + (e.values['amountCents'] as bigint), 0n)).toBe(
+      DEFAULT_APPROVED,
+    );
+
+    // The sign is read off `packages/ledger/src/posting.ts`: `+` on the debit
+    // and `-` on the credit. Session 288 wrote it inverted once on a draft.
+    const wallet = entries.find((e) => e.values['ledgerAccountId'] === 'acct-wallet');
+    const fees = entries.find((e) => e.values['ledgerAccountId'] === 'acct-fees');
+    expect(wallet?.values['amountCents']).toBe(-DEFAULT_TRADER);
+    expect(fees?.values['amountCents']).toBe(-DEFAULT_FIRM);
+
+    // The whole posting sums to zero, which is what makes it a posting.
+    expect(entries.reduce((sum, e) => sum + (e.values['amountCents'] as bigint), 0n)).toBe(0n);
+
+    // NO FLOAT REACHED THE LEDGER. Every amount is a `bigint`.
+    for (const entry of entries) expect(typeof entry.values['amountCents']).toBe('bigint');
   });
 });
 
@@ -996,5 +1069,71 @@ describe('an unwired deployment answers 503 and never approves', () => {
     expect(posted.statusCode).toBe(503);
     expect(posted.json().code).toBe('service_unavailable');
     expect(fixture.requests).toHaveLength(0);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// THE RULING, PINNED AGAINST THE SOURCE RATHER THAN AGAINST A COMMENT
+// -----------------------------------------------------------------------------
+// ADR-176 is a REMOVAL, and a removal is the one kind of change a behavioural
+// suite cannot hold: every case above passes just as well against a file that
+// posts again tomorrow, because the fixture would simply record a write nobody
+// reads. `db.test.ts` met the same problem in this deployable and answered it
+// the same way -- read the source as text -- and its reason applies here word
+// for word: there is no way to ask the module graph "which handle did this
+// module NOT take".
+//
+// THE PAIRED HALF IS ASSERTED TOO, AND IT IS WHAT KEEPS THIS FROM BEING A
+// ONE-WAY RATCHET. `lt01` must STAY exported here and `admin-payouts.ts` must
+// keep importing it, because the alternative to one statement of
+// `debit trader_withdrawable / credit trader_wallet / credit fees_revenue` is
+// two of them, which is ADR-092 section 5's hazard on the money path. A session
+// that "finished" ADR-176 by moving `lt01` out and letting each door write its
+// own goes red on the second case.
+
+describe('ADR-176: the request path holds no ledger handle', () => {
+  const SOURCE = readFileSync(
+    join(import.meta.dirname, '..', 'src', 'routes', 'payouts.ts'),
+    'utf8',
+  );
+  const ADMIN = readFileSync(
+    join(import.meta.dirname, '..', 'src', 'routes', 'admin-payouts.ts'),
+    'utf8',
+  );
+
+  /** The file with every line and block comment removed. Prose may name what code may not. */
+  const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  it('imports no WRITE-side symbol from @merit/ledger, so nothing here can post', () => {
+    // `posting`, `transfer`, `identityAccount`, `firmAccount` and `Posting` BUILD
+    // a value and reach no database. `postTransaction`, `readChart` and
+    // `LedgerTx` are the three that need a handle, and a handle is what ADR-172
+    // clause 2 refuses this surface.
+    expect(CODE).not.toMatch(/\bpostTransaction\b/);
+    expect(CODE).not.toMatch(/\breadChart\b/);
+    expect(CODE).not.toMatch(/\bLedgerTx\b/);
+  });
+
+  it('declares no `ledger` member on `PayoutTx`, which is the field ADR-172 called the defect', () => {
+    const port = /export interface PayoutTx \{([\s\S]*?)\n\}/.exec(CODE)?.[1] ?? '';
+    expect(port.length).toBeGreaterThan(0);
+    expect(port).not.toMatch(/\bledger\b/);
+    // And the members that DO remain are the four a scoped handle could serve.
+    expect(port).toMatch(/identityStatus\(/);
+    expect(port).toMatch(/subject\(/);
+    expect(port).toMatch(/holdFlag\(/);
+    expect(port).toMatch(/insertPayoutRequest\(/);
+  });
+
+  it('still states `LT-01` exactly once, and `admin-payouts.ts` still reads it from here', () => {
+    expect(CODE).toMatch(/export function lt01\(/);
+    expect(ADMIN).toContain("import { PAYOUT_ENDPOINT, lt01 } from './payouts.ts';");
+  });
+
+  it('carries the caller key into the row, because no later door can post without it', () => {
+    // The type would already refuse an insert shape without it; this asserts the
+    // HANDLER writes it, which the type cannot.
+    expect(CODE).toMatch(/readonly idempotencyKey: string;/);
+    expect(CODE).toMatch(/^\s*idempotencyKey,$/m);
   });
 });
