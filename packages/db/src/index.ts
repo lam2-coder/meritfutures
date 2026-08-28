@@ -101,6 +101,42 @@ export {
 // reaches through `transaction(handle, fn)`; ADR-112 section 10 records the same
 // fact about `updateAt` and the same consequence, that a caller wanting to
 // DECLARE a variable of one of these types adds the line.
+// THE TWO DOORS THAT CREATE A SCOPE RATHER THAN EXERCISE ONE (ADR-126, ADR-197).
+//
+// `resolutionDb` LANDED WITH ADR-126 AND WAS NEVER EXPORTED, WHICH IS WHY
+// ADR-196 MEASURED THAT IT "HAS NO CALLER ANYWHERE IN `apps/`". Its docblock
+// says it exists "because `POST /auth/verify` must turn the address a person
+// typed into the identity that owns it", and that endpoint could not import it:
+// `apps/api/src/db.ts` is the one file in that deployable that takes a handle off
+// this package, it takes them from here, and this list did not carry the door.
+// The refusal string in `auth-backend.ts` that cites a missing pre-identity read
+// was therefore true of the PACKAGE SURFACE for as long as it was false of the
+// package. ADR-197 finding 1.
+//
+// `establishmentDb` IS THE WRITE SIBLING AND IT IS NARROWER THAN A TABLE LIST.
+// `EstablishmentTx` carries one verb, so what is exported here is an ACT and not
+// an authority: nothing reachable through it can write an `identities` row
+// without the `users` row ADR-196 clause 2 binds to it.
+//
+// `normalizedEmail` IS EXPORTED BECAUSE `otp_challenges.email_normalized` NEEDS
+// THE SAME FUNCTION. The challenge is keyed on the normalized address before any
+// user exists, and two spellings of one entity-resolution key is the drift the
+// column's own comment is written against.
+export {
+  establishmentDb,
+  normalizedEmail,
+  resolutionDb,
+  IdentityAlreadyEstablished,
+  RESOLUTION_ADDRESS,
+  type EstablishedIdentity,
+  type EstablishmentAddress,
+  type EstablishmentDb,
+  type EstablishmentTx,
+  type ResolutionAddress,
+  type ResolutionDb,
+  type ResolvableTableKey,
+} from './scoped-db.ts';
+
 export { atLeast, atMost, isFilterTerm, isNull, type FilterTerm } from './scoped-db.ts';
 
 export {
