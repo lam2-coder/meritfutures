@@ -433,14 +433,7 @@ describe('the registry is total', () => {
   // sixth member had to move first.
   test('every class in the vocabulary has at least one member, so none is vacuous', () => {
     const classes = new Set(TABLE_KEYS.map((k) => SCOPE_RULES[k].class));
-    expect([...classes].sort()).toEqual([
-      'derived',
-      'either',
-      'firm',
-      'owned',
-      'pair',
-      'root',
-    ]);
+    expect([...classes].sort()).toEqual(['derived', 'either', 'firm', 'owned', 'pair', 'root']);
   });
 
   test('every rule carries a reason and none is a placeholder', () => {
