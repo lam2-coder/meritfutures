@@ -60,6 +60,38 @@ import { PayoutCenter, PayoutCenterUnavailable } from './sections.ts';
 import { load } from './source.ts';
 
 /**
+ * Never prerendered, never cached.
+ *
+ * THIS WAS ABSENT AND THE ROUTE WAS PRERENDERING STATIC, ON THE ONE SCREEN M04
+ * SAYS IS "authoritative, always" (section 3.6's table, INV-M4-13). Measured
+ * rather than suspected: `pnpm --filter @merit/portal build` printed `/payouts`
+ * with the STATIC marker and the other nine data-reading routes with the
+ * dynamic one, and those nine each declare this line.
+ *
+ * THE MECHANISM IS AN ORDERING IN THE TRANSPORT AND IT IS WORTH STATING. What
+ * marks an App Router route dynamic is a request-scoped API, and this segment's
+ * only one is `cookies()`. `serverApiClient` (`../../http/client.ts:412`) is
+ * where it is reached, and it is reached in the LAST of that function's four
+ * lines: `resolveApiOrigin` (`../../http/client.ts:121`) runs first and throws
+ * `ApiConfigError` when `MERIT_API_ORIGIN` is unset. A build environment
+ * without that variable therefore never reaches the cookie, ./source.ts
+ * correctly returns `unavailable`, and Next successfully bakes THAT screen into
+ * a static artifact and serves it to every trader afterwards.
+ *
+ * SO THE RENDER MODE OF THE PAYOUT CENTRE WAS DECIDED BY WHETHER AN ENVIRONMENT
+ * VARIABLE HAPPENED TO BE SET IN THE BUILD ENVIRONMENT, which is not a property
+ * any screen should have and least of all this one. ../accounts/page.ts wrote
+ * the argument this line is missing from: M04 section 1.2's "no client-side
+ * cache of a money number survives a navigation", and a statically rendered
+ * money screen is "FM-M4-03's shape arriving through a build step rather than
+ * through a query".
+ *
+ * `test/route-rendering.test.ts` now asserts it for every route that reaches
+ * the client, so the next segment cannot be built without it either.
+ */
+export const dynamic = 'force-dynamic';
+
+/**
  * The payout center.
  *
  * THE READY BRANCH IS THE REAL ONE AND IT IS EXERCISED TODAY. `load` returns
